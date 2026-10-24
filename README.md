@@ -101,3 +101,7 @@ tags: [예시]
 ## 검증 요청
 
 검증을 맡은 분은 [`docs/handoff-round2.md`](docs/handoff-round2.md)를 먼저 보세요. 빌드부터 묶음 실행까지 순서가 있습니다.
+
+## 라이선스
+
+[MIT](LICENSE)
