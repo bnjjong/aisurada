@@ -97,3 +97,7 @@ tags: [예시]
 | `vault` | 아젠다, 노트, 템플릿, 회고, 휴지통을 읽는 부품 |
 | `text` | 다듬기, UTF-16 자르기, URI 등 글 도구 |
 | `out` | 정해진 바이트 모양의 JSON 쓰기 |
+
+## 검증 요청
+
+검증을 맡은 분은 [`docs/handoff-round2.md`](docs/handoff-round2.md)를 먼저 보세요. 빌드부터 묶음 실행까지 순서가 있습니다.
