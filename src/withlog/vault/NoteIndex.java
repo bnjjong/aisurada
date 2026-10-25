@@ -46,25 +46,27 @@ public final class NoteIndex {
     }
 
     /**
-     * 지정한 vaultRoot에 대해 NoteIndex를 반환합니다. (프로세스 내 캐시 적용)
+     * 지정한 vaultRoot에 대해 새로 디스크를 훑어 NoteIndex를 생성합니다.
+     * 설명서 8.3 및 8.6에 따라 요청마다 항상 최신 디스크 상태를 새로 스캔합니다.
      */
-    public static synchronized NoteIndex get(Path vaultRoot) {
-        if (cachedInstance != null && vaultRoot.equals(cachedVaultRoot)) {
-            return cachedInstance;
-        }
+    public static NoteIndex fresh(Path vaultRoot) {
         AgendaReader.ScanResult aScan = AgendaReader.scanAgendas(vaultRoot, false);
         NoteScanner.ScanResult nScan = NoteScanner.scan(vaultRoot, aScan.table(), false);
-        cachedVaultRoot = vaultRoot;
-        cachedInstance = new NoteIndex(vaultRoot, aScan, nScan);
-        return cachedInstance;
+        return new NoteIndex(vaultRoot, aScan, nScan);
+    }
+
+    /**
+     * 호환성을 위해 유지되는 메서드로, 항상 fresh(vaultRoot)를 호출합니다.
+     */
+    public static NoteIndex get(Path vaultRoot) {
+        return fresh(vaultRoot);
     }
 
     /**
      * 캐시를 무효화하고 새로 스캔합니다.
      */
-    public static synchronized NoteIndex refresh(Path vaultRoot) {
-        cachedInstance = null;
-        return get(vaultRoot);
+    public static NoteIndex refresh(Path vaultRoot) {
+        return fresh(vaultRoot);
     }
 
     public Path vaultRoot() {

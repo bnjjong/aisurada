@@ -49,11 +49,15 @@ mkdir -p "$CLASSES_DIR" "$DIST_DIR"
 (cd "$CLASSES_DIR" && "$JAR" -xf "$SNAKEYAML_JAR")
 rm -rf "$CLASSES_DIR/META-INF/MANIFEST.MF"
 
-# Find and compile Java source files
+# Find and compile Java source files (src/ only)
 find "$SCRIPT_DIR/src" -name "*.java" > "$BUILD_DIR/sources.txt"
 "$JAVAC" -encoding UTF-8 -d "$CLASSES_DIR" -cp "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
 
-# Build fat jar
+# Build fat jars
 "$JAR" --create --file "$DIST_DIR/wl-engine.jar" --main-class withlog.cli.Main -C "$CLASSES_DIR" .
+"$JAR" --create --file "$DIST_DIR/wl-cli.jar" --main-class withlog.cli.WlCliMain -C "$CLASSES_DIR" .
+cp "$DIST_DIR/wl-engine.jar" "$DIST_DIR/wl-sidecar.jar"
 
 echo "Build successful: $DIST_DIR/wl-engine.jar"
+echo "Build successful: $DIST_DIR/wl-cli.jar"
+echo "Build successful: $DIST_DIR/wl-sidecar.jar"
