@@ -5,11 +5,14 @@ import withlog.args.ParsedArgs;
 import withlog.cli.WlException;
 import withlog.cmd.*;
 import withlog.out.JsonWriter;
+import withlog.vault.AgendaReader;
 import withlog.vault.NoteIndex;
+import withlog.vault.NoteScanner;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -18,6 +21,9 @@ import java.util.*;
  * 단발 모드와 serve 모드 양쪽에서 공통으로 명령을 실행하고 규격화된 EngineResult를 생성합니다.
  */
 public final class EngineExecutor {
+
+    public static final String NO_PART4_MESSAGE =
+            "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
 
     private EngineExecutor() {}
 
@@ -66,8 +72,8 @@ public final class EngineExecutor {
             return EngineResult.unknownCommand(err);
         }
 
-        // 지원 대상 외 명령 거절 (3.3 & 32.2: WL-409 종료 코드 3, errorCode 409)
-        if (!CommandRegistry.isSupported(firstArg)) {
+        boolean isPart4 = CommandRegistry.isPart4Command(firstArg);
+        if (!isPart4 && !CommandRegistry.isSupported(firstArg)) {
             byte[] err = ("WL-409 이 판에는 " + firstArg + "이 없다\n").getBytes(StandardCharsets.UTF_8);
             return EngineResult.wlError(3, 409, err);
         }
@@ -76,6 +82,29 @@ public final class EngineExecutor {
 
         try {
             ParsedArgs parsed = ArgsParser.parse(firstArg, commandArgs);
+
+            if (isPart4) {
+                // 설명서 32.2 4부 명령 실행 차례:
+                // 1(명령 이름 5.1), 2(이름 인자 허용 목록, 자리 인자 상한 5.2)는 이미 통과함.
+                if ("append-ask-turn".equals(firstArg) || "append-chat-turn".equals(firstArg)) {
+                    // 3. 워크스페이스 표식 확인 (1.1, 7.1, 7.6의 3번)
+                    Path workspaceJson = vaultRoot.resolve(".withlog/workspace.json");
+                    if (!Files.exists(workspaceJson)) {
+                        throw new WlException(400, "이 폴더는 아직 워크스페이스가 아니다: " +
+                                vaultRoot.toAbsolutePath().normalize() +
+                                ". .withlog/workspace.json 이 없다. 경로가 맞는지 보고, 새로 만들 자리면 init-workspace 를 먼저 부른다.");
+                    }
+
+                    // 4. 색인 맞추기에 해당하는 실패 (8.3, 8.4, 20.9의 13번)
+                    AgendaReader.ScanResult agendaScan = AgendaReader.scanAgendas(vaultRoot, true);
+                    NoteScanner.scan(vaultRoot, agendaScan.table(), true);
+                }
+
+                // 5. 4부가 없음 (32.2)
+                byte[] err = NO_PART4_MESSAGE.getBytes(StandardCharsets.UTF_8);
+                return EngineResult.wlError(3, 409, err);
+            }
+
             Object response;
 
             if ("reindex".equals(parsed.commandName())) {

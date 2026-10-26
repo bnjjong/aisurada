@@ -401,6 +401,46 @@ public final class ArgsParser {
                 maxPositional = 0;
                 usage = "reindex";
             }
+            case "get-ask" -> {
+                maxPositional = 2;
+                usage = "get-ask <노트 id> [하위 노트 id]";
+            }
+            case "append-ask-turn" -> {
+                allowedOptions = List.of(
+                        "answer", "asked-at", "effort", "elapsed-ms", "error",
+                        "images", "mark-id", "model", "question", "quote",
+                        "session-id", "session-lines", "turn-id"
+                );
+                maxPositional = 2;
+                usage = "append-ask-turn <노트 id> [하위 노트 id] session-id=<대화 id> turn-id=<회차 id> mark-id=<밑줄 id> asked-at=<시각> [quote=<물은 대목>] question=<질문> answer=<답> [error=<실패 까닭>] model=<모델> effort=<노력> elapsed-ms=<밀리초> [session-lines=<줄 수>] [images=<attach/이름,…>]";
+            }
+            case "list-chats" -> {
+                maxPositional = 2;
+                usage = "list-chats <노트 id> [하위 노트 id]";
+            }
+            case "append-chat-turn" -> {
+                allowedOptions = List.of(
+                        "answer", "asked-at", "chat-id", "effort", "elapsed-ms",
+                        "error", "images", "model", "question", "source-session",
+                        "turn-id"
+                );
+                maxPositional = 2;
+                usage = "append-chat-turn <노트 id> [하위 노트 id] chat-id=<대화 id> source-session=<세션 id> turn-id=<회차 id> asked-at=<시각> question=<질문> answer=<답> [error=<실패 까닭>] model=<모델> effort=<노력> elapsed-ms=<밀리초> [images=<attach/이름,…>]";
+            }
+            case "read-session" -> {
+                allowedOptions = List.of("author", "before", "limit", "note", "urls");
+                maxPositional = 1;
+                usage = "read-session <세션 id> [limit=<개수>] [before=<순번>] [urls=true] [note=<노트 id>] [author=<노트 id>,...]";
+            }
+            case "session-titles" -> {
+                maxPositional = Integer.MAX_VALUE;
+                usage = "session-titles <세션 id> [세션 id...]";
+            }
+            case "recent-sessions" -> {
+                allowedOptions = List.of("days");
+                maxPositional = 0;
+                usage = "recent-sessions [days=<일 수>]";
+            }
             default -> {
                 maxPositional = 1;
                 usage = cmdName;
@@ -431,7 +471,7 @@ public final class ArgsParser {
             }
         }
 
-        if (positional.size() > maxPositional) {
+        if (maxPositional != Integer.MAX_VALUE && positional.size() > maxPositional) {
             throw new WlException(400, cmdName + " 이 받는 자리 인자는 " + maxPositional +
                     " 개인데 " + positional.size() + " 개를 받았다: " + usage);
         }

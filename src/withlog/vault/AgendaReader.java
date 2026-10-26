@@ -169,6 +169,16 @@ public final class AgendaReader {
                 }
             }
 
+            // 20.9 13번: 아젠다 제목이 공백뿐인 경우 색인 맞추기 전체를 세움
+            if (Trim.isBlank(title)) {
+                if (haltOnFatal) {
+                    throw new WlException(400, "아젠다 제목이 비었다: " + slug);
+                } else {
+                    addSkipped(skipped, relPath, "아젠다 제목이 비었다");
+                    continue;
+                }
+            }
+
             // 색상 결정 (2.1 4번)
             String rawHue = kv.get("hue");
             String hue = "blue";

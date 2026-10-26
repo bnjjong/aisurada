@@ -35,6 +35,11 @@ public final class CommandRegistry {
             "recent-sessions"
     )));
 
+    public static final Set<String> PART4_COMMANDS = Collections.unmodifiableSet(new LinkedHashSet<>(List.of(
+            "get-ask", "append-ask-turn", "list-chats", "append-chat-turn",
+            "read-session", "session-titles", "recent-sessions"
+    )));
+
     public static final List<String> USAGE_LINES = List.of(
             "reindex",
             "reindex-paths <vault 상대 경로> [경로...]",
@@ -116,6 +121,16 @@ public final class CommandRegistry {
                 "list_reports".equals(name) || "list-reports".equals(name) ||
                 "get_report".equals(name) || "get-report".equals(name) ||
                 "list_trash".equals(name) || "list-trash".equals(name);
+    }
+
+    /**
+     * 설명서 32.1에 정의된 4부(Claude 연동) 명령 7개 여부를 확인합니다.
+     *
+     * @param name 명령 이름
+     * @return 4부 명령이면 true
+     */
+    public static boolean isPart4Command(String name) {
+        return PART4_COMMANDS.contains(name);
     }
 
     /**
