@@ -118,6 +118,41 @@ public final class ArgsParser {
                 throw new WlException(400, "인자 검증 실패(list_attachments): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
             }
             return new ParsedArgs(true, "list-attachments", segments, Collections.emptyMap(), rawParent);
+        } else if ("write_attachment".equals(toolName)) {
+            // 18.8의 1번: 칸을 parent, name, content 차례로 1개씩 끝까지 본다. parent는 그 자리에서 자른다
+            validateKeys(toolName, props.keySet(), List.of("parent", "name", "content"));
+            if (!props.containsKey("parent")) {
+                throw new WlException(400, "인자 검증 실패(write_attachment): parent 가 필요하다.");
+            }
+            JsonValue parentVal = props.get("parent");
+            if (!(parentVal instanceof JsonValue.JsonString strParent)) {
+                throw new WlException(400, "인자 검증 실패(write_attachment): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
+            }
+            String rawParent = strParent.value();
+            List<String> segments = new ArrayList<>();
+            for (String s : rawParent.split("/")) {
+                if (!Trim.isBlank(s)) {
+                    segments.add(s);
+                }
+            }
+            if (segments.isEmpty() || segments.size() >= 3) {
+                throw new WlException(400, "인자 검증 실패(write_attachment): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
+            }
+            Map<String, Object> toolOpts = new LinkedHashMap<>();
+            for (String key : List.of("name", "content")) {
+                if (!props.containsKey(key)) {
+                    throw new WlException(400, "인자 검증 실패(write_attachment): " + key + " 가 필요하다.");
+                }
+                JsonValue v = props.get(key);
+                if (!(v instanceof JsonValue.JsonString sv)) {
+                    throw new WlException(400, "인자 검증 실패(write_attachment): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
+                }
+                if ("content".equals(key) && sv.value().length() > 200000) {
+                    throw new WlException(400, "인자 검증 실패(write_attachment): content 가 너무 길다(최대 200000자): " + sv.value().length() + "자");
+                }
+                toolOpts.put(key, sv.value());
+            }
+            return new ParsedArgs(true, "write-attachment", segments, Collections.emptyMap(), rawParent, toolOpts);
         } else if ("list_sub_notes".equals(toolName)) {
             validateKeys(toolName, props.keySet(), List.of("parent"));
             if (!props.containsKey("parent")) {
@@ -759,6 +794,11 @@ public final class ArgsParser {
                 );
                 maxPositional = 0;
                 usage = withlog.cmd.CreateDoc.USAGE;
+            }
+            case "write-attachment" -> {
+                allowedOptions = List.of("content", "name");
+                maxPositional = 2;
+                usage = withlog.cmd.WriteAttachment.USAGE;
             }
             case "update-doc" -> {
                 allowedOptions = List.of("body", "date", "f1", "mins", "tags", "template", "time", "title");

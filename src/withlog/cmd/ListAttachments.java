@@ -161,7 +161,8 @@ public final class ListAttachments {
         return true;
     }
 
-    private static String makeRef(String name) {
+    /** 18.6의 ref. write_attachment도 같은 규칙으로 지어 응답 2가지가 같은 조각을 낸다. */
+    static String makeRef(String name) {
         // 1. 그림 여부 판별
         int lastDot = name.lastIndexOf('.');
         String ext = (lastDot != -1) ? name.substring(lastDot + 1).toLowerCase(Locale.ROOT) : "";
