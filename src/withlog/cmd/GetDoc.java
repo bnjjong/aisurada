@@ -52,6 +52,10 @@ public final class GetDoc {
             throw new WlException(404, "Note not found: " + rawId);
         }
 
+        // 11.5 & 11.9의 6·13번: 메인 노트의 HTML 첨부를 읽음 (입출력 오류면 예상 밖 실패)
+        // 도구 표면에서 기록 층 노트를 WL-409로 거절하기 전에 이 읽기가 먼저임 (11.9 13번)
+        AttachText.extract(vaultRoot, note);
+
         // 도구 표면이고 층이 record인 경우 WL-409 거절
         if (parsed.isToolSurface() && "record".equals(note.meta().tier())) {
             throw new WlException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rawId +

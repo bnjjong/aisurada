@@ -114,7 +114,29 @@ public final class ListDocs {
             }
         }
 
-        // 5. bodies 파싱 (명령 표면만, 9.3 8번: 목록을 다 읽은 뒤에 검사)
+        // 5. 쪽 규칙(9.5)에 따라 읽을 줄 수(rowsToRead) 계산
+        int total = candidates.size();
+        int rowsToRead;
+        if (isTool || limit <= 0) {
+            rowsToRead = total;
+        } else if (limit < 100) {
+            // 1~99: 쪽 크기가 limit, 1쪽만 읽으면 limit에 닿음
+            rowsToRead = Math.min(total, limit);
+        } else {
+            // limit >= 100: 쪽 크기가 100, limit에 닿거나 전체 건수에 닿을 때까지 쪽을 통째로 읽음
+            int pages = (limit + 99) / 100;
+            rowsToRead = Math.min(total, pages * 100);
+        }
+
+        // 6. 읽는 범위 내의 모든 메인 노트에 대해 HTML 첨부를 읽음 (9.5, 9.9 11번)
+        // 입출력 오류 발생 시 AttachText.extract에서 예상 밖 예외(RuntimeException) 발생
+        String[] attachTexts = new String[rowsToRead];
+        for (int i = 0; i < rowsToRead; i++) {
+            NoteScanner.NoteRecord note = candidates.get(i);
+            attachTexts[i] = AttachText.extract(vaultRoot, note);
+        }
+
+        // 7. bodies 파싱 (명령 표면만, 9.3 8번: 목록을 다 읽은 뒤에 검사)
         boolean includeBodies = false;
         if (!isTool && parsed.namedOptions().containsKey("bodies")) {
             String rawBodies = parsed.namedOptions().get("bodies");
@@ -128,19 +150,14 @@ public final class ListDocs {
             }
         }
 
-        // 6. limit 건수 자르기
-        int total = candidates.size();
+        // 8. 응답에 나갈 줄 수(countToTake) 자르기
         int countToTake = (limit > 0) ? Math.min(total, limit) : total;
 
         List<Map<String, Object>> resultRows = new ArrayList<>(countToTake);
         for (int i = 0; i < countToTake; i++) {
             NoteScanner.NoteRecord note = candidates.get(i);
             String agendaTitle = noteIndex.agendaTable().slugToTitle().getOrDefault(note.meta().agendaSlug(), "");
-
-            String attachText = null;
-            if (includeBodies) {
-                attachText = AttachText.extract(vaultRoot, note);
-            }
+            String attachText = attachTexts[i];
 
             resultRows.add(NoteRow.forListDocs(note, agendaTitle, isTool, includeBodies, attachText));
         }

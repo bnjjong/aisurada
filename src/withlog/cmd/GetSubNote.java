@@ -3,6 +3,7 @@ package withlog.cmd;
 import withlog.args.ParsedArgs;
 import withlog.cli.WlException;
 import withlog.text.Trim;
+import withlog.vault.AttachText;
 import withlog.vault.CommentsReader;
 import withlog.vault.NoteScanner;
 import withlog.vault.PathJoin;
@@ -103,11 +104,14 @@ public final class GetSubNote {
             throw new WlException(404, "SubNote not found: " + rawTargetId);
         }
 
-        // 6. 도구 표면이면 루트 노트 존재 및 층 검사
+        // 6. 도구 표면이면 루트 노트 존재 및 층 검사 (11.8, 11.9의 17번)
         if (parsed.isToolSurface()) {
             if (rootNote == null) {
                 throw new WlException(404, "Note not found: " + rootId);
             }
+            // 11.8 & 11.9 17번: 도구 표면에서 루트 층을 볼 때 루트의 HTML 첨부까지 읽음 (입출력 오류 시 예상 밖 실패)
+            AttachText.extract(vaultRoot, rootNote);
+
             if ("record".equals(rootNote.meta().tier())) {
                 throw new WlException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rootId +
                         ". 기계가 남긴 기록 노트는 앱에서만 열립니다.");

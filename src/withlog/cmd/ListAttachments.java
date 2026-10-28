@@ -5,6 +5,7 @@ import withlog.cli.WlException;
 import withlog.text.Trim;
 import withlog.text.Uri;
 import withlog.text.Utf16;
+import withlog.vault.AttachText;
 import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 
@@ -75,6 +76,12 @@ public final class ListAttachments {
 
         NoteScanner.NoteRecord owner = targetSub != null ? targetSub : rootNote;
         String reconstructedParent = targetSub != null ? (rawRootId + "/" + rawSubId) : rawRootId;
+
+        // 18.5 & 18.9 5번: 메인 노트를 물을 때(targetSub == null), 주인 확인 읽기가 get_doc과 같은 길로 HTML 첨부를 읽음
+        // 하위 노트를 물을 때는 이 읽기가 없음
+        if (targetSub == null) {
+            AttachText.extract(vaultRoot, rootNote);
+        }
 
         // 4. 첨부 파일 탐색
         List<Map<String, String>> attachmentsList = new ArrayList<>();

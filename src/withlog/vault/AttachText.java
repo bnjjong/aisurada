@@ -39,7 +39,7 @@ public final class AttachText {
      * @return 결합된 첨부 텍스트 (없으면 null)
      */
     public static String extract(Path vaultRoot, NoteScanner.NoteRecord note) {
-        if (note.isSingleFile()) {
+        if (note == null || note.isSingleFile()) {
             return null;
         }
 
@@ -48,30 +48,41 @@ public final class AttachText {
             return null;
         }
 
-        List<Path> htmlFiles = new ArrayList<>();
+        List<String> htmlNames = new ArrayList<>();
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(attachDir)) {
             for (Path p : ds) {
                 String name = p.getFileName().toString();
-                if (isHtmlAttachment(name, p)) {
-                    htmlFiles.add(p);
+                if (isHtmlAttachmentName(name)) {
+                    htmlNames.add(name);
                 }
             }
         } catch (IOException e) {
-            // 입출력 오류 발생 시 10.5 4654행: 예상 밖 실패(종료 코드 1)로 전파
-            throw new RuntimeException("HTML attachment read error: " + e.getMessage(), e);
-        }
-
-        if (htmlFiles.isEmpty()) {
+            // 18.5 7518행: attach/ 폴더 목록을 못 읽어도 0개이고 실패하지 않는다
             return null;
         }
 
-        // 이름의 UTF-16 순서로 정렬
-        htmlFiles.sort((a, b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
+        if (htmlNames.isEmpty()) {
+            return null;
+        }
+
+        // 이름의 UTF-16 순서로 정렬 (10.5 2번)
+        htmlNames.sort(Utf16::compare);
 
         List<String> plainTexts = new ArrayList<>();
-        for (Path file : htmlFiles) {
+        for (String name : htmlNames) {
+            Path file = attachDir.resolve(name);
+            if (!Files.isRegularFile(file)) {
+                // 심볼릭 링크는 따라간다. 따라간 끝이 일반 파일이 아니거나(색인 뒤 지워진 것 포함) 건너뛴다
+                continue;
+            }
             try {
-                long size = Files.size(file);
+                long size;
+                try {
+                    size = Files.size(file);
+                } catch (IOException e) {
+                    // 10.5 2번: 크기를 못 읽으면 0바이트로 보고 읽기를 시도한다
+                    size = 0L;
+                }
                 if (size > MAX_FILE_SIZE) {
                     continue;
                 }
@@ -82,6 +93,7 @@ public final class AttachText {
                     plainTexts.add(plain);
                 }
             } catch (IOException e) {
+                // 읽다 입출력 오류가 나면 건너뛰지 않고 명령 전체가 예상 밖 실패로 끝난다 (10.5, 10.9, 9.9, 11.9, 18.9)
                 throw new RuntimeException("HTML attachment read error: " + e.getMessage(), e);
             }
         }
@@ -97,21 +109,20 @@ public final class AttachText {
         return joined;
     }
 
-    private static boolean isHtmlAttachment(String name, Path path) {
-        if (!Files.isRegularFile(path)) {
-            return false;
-        }
+    private static boolean isHtmlAttachmentName(String name) {
         String lower = name.toLowerCase(Locale.ROOT);
         if (!lower.endsWith(".html") && !lower.endsWith(".htm")) {
             return false;
         }
-        // 점 앞에 U+0085, U+2028, U+2029 가 든 이름은 제외 (10.5 1번)
+        // 이름은 1자 이상 뒤에 .htm 이나 .html 로 끝나야 함 (10.5 1번)
         int dot = name.lastIndexOf('.');
-        if (dot > 0) {
-            char beforeDot = name.charAt(dot - 1);
-            if (beforeDot == '\u0085' || beforeDot == '\u2028' || beforeDot == '\u2029') {
-                return false;
-            }
+        if (dot <= 0) {
+            return false;
+        }
+        // 점 앞에 U+0085, U+2028, U+2029 가 든 이름은 제외 (10.5 1번)
+        char beforeDot = name.charAt(dot - 1);
+        if (beforeDot == '\u0085' || beforeDot == '\u2028' || beforeDot == '\u2029') {
+            return false;
         }
         return true;
     }
