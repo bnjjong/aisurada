@@ -4,6 +4,7 @@ import withlog.args.ParsedArgs;
 import withlog.cli.WlException;
 import withlog.out.NoteRow;
 import withlog.text.Trim;
+import withlog.vault.AttachText;
 import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 
@@ -19,6 +20,7 @@ public final class ListSubNotes {
 
     private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
     private static final Pattern SUB_NOTE_ID_PATTERN = Pattern.compile("^sn[0-9a-z]+-[0-9a-f]{8}$");
+    private static final String USAGE = "list-sub-notes <부모 노트 id> [bodies=true. 본문까지 싣는다. 기본은 메타만]";
 
     private ListSubNotes() {}
 
@@ -29,10 +31,9 @@ public final class ListSubNotes {
     ) {
         List<String> pos = parsed.positionalArgs();
 
-        // 1. 첫 자리 인자 공백 검사 (16.3 1번)
+        // 1. 첫 자리 인자 공백 검사 (16.3 1번). 「부모 노트 참조가 비었다」는 조각이 0개일 때(2번)만이다
         if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
-            String origin = parsed.rawParentSubNote() != null ? parsed.rawParentSubNote() : (pos.isEmpty() ? "" : pos.get(0));
-            throw new WlException(400, "부모 노트 참조가 비었다: " + origin);
+            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
         }
 
         String rawParent = pos.get(0);
@@ -82,6 +83,8 @@ public final class ListSubNotes {
             if (rootNote == null) {
                 throw new WlException(404, "Note not found: " + rootId);
             }
+            // 16.5, 16.9의 7번: 메인 노트를 찾을 때 HTML 첨부까지 읽는다(입출력 오류면 예상 밖 실패)
+            AttachText.extract(vaultRoot, rootNote);
             if ("record".equals(rootNote.meta().tier())) {
                 throw new WlException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rootId +
                         ". 기계가 남긴 기록 노트는 앱에서만 열립니다.");
@@ -92,6 +95,8 @@ public final class ListSubNotes {
                 if (rootNote == null) {
                     throw new WlException(404, "Note not found: " + rootId);
                 }
+                // 16.9의 7번: 명령 표면은 컨테이너가 메인 노트일 때만 메인 노트를 찾는다
+                AttachText.extract(vaultRoot, rootNote);
             }
         }
 
