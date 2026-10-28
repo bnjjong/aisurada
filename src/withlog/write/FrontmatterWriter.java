@@ -241,7 +241,7 @@ public final class FrontmatterWriter {
             Object val = entry.getValue();
             checkValidValue(val);
 
-            sb.append(dumpKey(key)).append(": ");
+            sb.append(dumpKey(key)).append(":");
             appendGeneralValue(sb, val, 1);
         }
         return sb.toString();
@@ -274,8 +274,13 @@ public final class FrontmatterWriter {
         throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
     }
 
+    /** 키의 `:` 뒤에 값을 잇습니다. 비지 않은 맵과 목록은 다음 줄부터 적고, 나머지는 공백 1개 뒤에 적습니다(1.9). */
     private static void appendGeneralValue(StringBuilder sb, Object val, int depth) {
         checkValidValue(val);
+        boolean block = (val instanceof Map<?, ?> bm && !bm.isEmpty()) || (val instanceof List<?> bl && !bl.isEmpty());
+        if (!block) {
+            sb.append(' ');
+        }
         if (val == null) {
             sb.append("null\n");
         } else if (val instanceof Boolean b) {
@@ -295,7 +300,7 @@ public final class FrontmatterWriter {
                     if (!(entry.getKey() instanceof String k)) {
                         throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                     }
-                    sb.append(indent).append(dumpKey(k)).append(": ");
+                    sb.append(indent).append(dumpKey(k)).append(":");
                     appendGeneralValue(sb, entry.getValue(), depth + 1);
                 }
             }
@@ -317,11 +322,11 @@ public final class FrontmatterWriter {
                                     throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                                 }
                                 if (first) {
-                                    sb.append(indent).append("- ").append(dumpKey(k)).append(": ");
+                                    sb.append(indent).append("- ").append(dumpKey(k)).append(":");
                                     appendGeneralValue(sb, entry.getValue(), depth + 2);
                                     first = false;
                                 } else {
-                                    sb.append(indent).append("  ").append(dumpKey(k)).append(": ");
+                                    sb.append(indent).append("  ").append(dumpKey(k)).append(":");
                                     appendGeneralValue(sb, entry.getValue(), depth + 2);
                                 }
                             }
@@ -364,7 +369,7 @@ public final class FrontmatterWriter {
                 if (!(entry.getKey() instanceof String k)) {
                     throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                 }
-                sb.append(indent).append(dumpKey(k)).append(": ");
+                sb.append(indent).append(dumpKey(k)).append(":");
                 appendGeneralValue(sb, entry.getValue(), depth + 2);
             }
         } else {
@@ -388,7 +393,7 @@ public final class FrontmatterWriter {
                     if (!(entry.getKey() instanceof String k)) {
                         throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                     }
-                    sb.append(mapIndent).append(dumpKey(k)).append(": ");
+                    sb.append(mapIndent).append(dumpKey(k)).append(":");
                     appendGeneralValue(sb, entry.getValue(), depth + 2);
                 }
             } else {

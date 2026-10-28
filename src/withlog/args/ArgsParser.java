@@ -679,6 +679,37 @@ public final class ArgsParser {
             }
 
             return new ParsedArgs(true, "link-docs", List.of(sFrom.value(), sTo.value()), Collections.emptyMap(), null, toolOpts);
+        } else if ("create_sub_note".equals(toolName)) {
+            // 17.3: 칸은 parent, title, body, type 차례로 본다. parent는 사슬째 자리 0으로 간다(B.6)
+            validateKeys(toolName, props.keySet(), List.of("parent", "title", "body", "type"));
+            String parent = requiredString(toolName, props, "parent");
+            Map<String, String> named = new LinkedHashMap<>();
+            named.put("title", requiredString(toolName, props, "title"));
+            named.put("body", withinBodyLimit(toolName, requiredString(toolName, props, "body")));
+            if (props.containsKey("type")) {
+                named.put("type", optionalString(toolName, props, "type"));
+            }
+            return new ParsedArgs(true, "create-sub-note", List.of(parent), named, parent);
+        } else if ("update_sub_note".equals(toolName)) {
+            // 17.3: 칸은 parent, id, body, title, f1 차례로 본다. tags 칸은 없다(17.9의 11번)
+            validateKeys(toolName, props.keySet(), List.of("parent", "id", "body", "title", "f1"));
+            String parent = requiredString(toolName, props, "parent");
+            String id = requiredString(toolName, props, "id");
+            Map<String, String> named = new LinkedHashMap<>();
+            if (props.containsKey("body")) {
+                named.put("body", withinBodyLimit(toolName, optionalString(toolName, props, "body")));
+            }
+            for (String key : List.of("title", "f1")) {
+                if (props.containsKey(key)) {
+                    named.put(key, optionalString(toolName, props, key));
+                }
+            }
+            return new ParsedArgs(true, "update-sub-note", List.of(parent, id), named, parent);
+        } else if ("delete_sub_note".equals(toolName)) {
+            validateKeys(toolName, props.keySet(), List.of("parent", "id"));
+            String parent = requiredString(toolName, props, "parent");
+            String id = requiredString(toolName, props, "id");
+            return new ParsedArgs(true, "delete-sub-note", List.of(parent, id), Collections.emptyMap(), parent);
         } else {
             throw new WlException(400, "미지원 도구: " + toolName);
         }
@@ -698,6 +729,31 @@ public final class ArgsParser {
             throw new WlException(400, "인자 검증 실패(" + toolName + "): 모르는 키다: [" + unknownJoined +
                     "]. 쓸 수 있는 것은 [" + allowedJoined + "] 뿐이다.");
         }
+    }
+
+    /** 필수 문자열 칸입니다. 없으면 `<키> 가 필요하다.`, 문자열이 아니면(JSON null 포함) 갈래 실패입니다(5.4의 6번). */
+    private static String requiredString(String toolName, Map<String, JsonValue> props, String key) {
+        if (!props.containsKey(key)) {
+            throw new WlException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 필요하다.");
+        }
+        return optionalString(toolName, props, key);
+    }
+
+    /** 있는 문자열 칸의 값입니다. 탈출을 푼 글자 그대로이고 안 다듬습니다. */
+    private static String optionalString(String toolName, Map<String, JsonValue> props, String key) {
+        JsonValue v = props.get(key);
+        if (!(v instanceof JsonValue.JsonString s)) {
+            throw new WlException(400, "인자 검증 실패(" + toolName + "): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
+        }
+        return s.value();
+    }
+
+    /** 본문 칸의 글자 수 상한 200,000(B.8)을 UTF-16 코드 단위로 봅니다. */
+    private static String withinBodyLimit(String toolName, String body) {
+        if (body.length() > 200_000) {
+            throw new WlException(400, "인자 검증 실패(" + toolName + "): body 가 너무 길다(최대 200000자): " + body.length() + "자");
+        }
+        return body;
     }
 
     public static long parseToolLimit(JsonValue value, String toolName) {
@@ -819,6 +875,20 @@ public final class ArgsParser {
                 allowedOptions = List.of("f1", "kind", "remove");
                 maxPositional = 2;
                 usage = withlog.cmd.LinkDocs.USAGE;
+            }
+            case "create-sub-note" -> {
+                allowedOptions = List.of("body", "title", "type");
+                maxPositional = 1;
+                usage = withlog.cmd.CreateSubNote.USAGE;
+            }
+            case "update-sub-note" -> {
+                allowedOptions = List.of("body", "f1", "tags", "title");
+                maxPositional = 2;
+                usage = withlog.cmd.UpdateSubNote.USAGE;
+            }
+            case "delete-sub-note" -> {
+                maxPositional = 2;
+                usage = withlog.cmd.DeleteSubNote.USAGE;
             }
             case "reindex" -> {
                 maxPositional = 0;
