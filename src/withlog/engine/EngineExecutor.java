@@ -148,6 +148,12 @@ public final class EngineExecutor {
                 response = ListTrash.execute(vaultRoot, parsed);
             } else if ("create-doc".equals(parsed.commandName())) {
                 response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
+            } else if ("set-favorite".equals(parsed.commandName())) {
+                response = withlog.cmd.SetFavorite.execute(vaultRoot, parsed, sessionId);
+            } else if ("evaluate-doc".equals(parsed.commandName())) {
+                response = withlog.cmd.EvaluateDoc.execute(vaultRoot, parsed, sessionId);
+            } else if ("link-docs".equals(parsed.commandName())) {
+                response = withlog.cmd.LinkDocs.execute(vaultRoot, parsed, sessionId);
             } else {
                 throw new IllegalStateException("Unhandled command: " + parsed.commandName());
             }

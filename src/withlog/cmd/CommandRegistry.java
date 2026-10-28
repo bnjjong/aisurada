@@ -110,6 +110,9 @@ public final class CommandRegistry {
     public static boolean isSupported(String name) {
         return "reindex".equals(name) ||
                 "create_doc".equals(name) || "create-doc".equals(name) ||
+                "set_favorite".equals(name) || "set-favorite".equals(name) ||
+                "evaluate_doc".equals(name) || "evaluate-doc".equals(name) ||
+                "link_docs".equals(name) || "link-docs".equals(name) ||
                 "get_doc".equals(name) || "get-doc".equals(name) ||
                 "get_sub_note".equals(name) || "get-sub-note".equals(name) ||
                 "list_attachments".equals(name) || "list-attachments".equals(name) ||

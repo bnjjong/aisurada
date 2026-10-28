@@ -1,14 +1,13 @@
 package withlog.write;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import withlog.cli.WlException;
+
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
  * 설명서 1.9 프론트매터 쓰기 규격 직렬화기.
- * 키 차례(1.7), 따옴표 규칙, 큰따옴표 탈출, 접는 블록/그대로 블록을 구현합니다.
+ * 키 차례(1.7), 따옴표 규칙, 큰따옴표 탈출, 접는 블록/그대로 블록 및 1.10 B 재직렬화를 구현합니다.
  */
 public final class FrontmatterWriter {
 
@@ -31,23 +30,28 @@ public final class FrontmatterWriter {
     private FrontmatterWriter() {}
 
     /**
-     * 노트 생성에 사용되는 프론트매터 YAML을 생성합니다.
-     * 키 차례(1.7): id, agenda, type, title, created, sessionId, mins, tier, tags, template, links
+     * 설명서 1.7 키 차례(17개 키) 전체를 지원하는 프론트매터 YAML 문자열을 생성합니다.
      *
-     * @param id 노트 id
-     * @param agenda 아젠다 slug
-     * @param type 정식 소문자 노트 유형
-     * @param title 노트 제목 (원본 그대로)
-     * @param created 시각 문자열 (yyyy-MM-ddTHH:mm:00+09:00)
-     * @param sessionId 세션 표식 (있을 때만)
-     * @param mins 소요 시간
-     * @param tier 층 (record일 때만 기록)
-     * @param tags 태그 목록 (비어있지 않을 때만)
-     * @param template 템플릿 id (있을 때만)
-     * @param links 연결 목록 (비어있지 않을 때만)
-     * @return YAML 내용 (양쪽 --- 울타리 제외)
+     * @param id 노트 id (1)
+     * @param agenda 아젠다 slug (2)
+     * @param type 정식 소문자 노트 유형 (3)
+     * @param title 노트 제목 (4)
+     * @param created 시각 문자열 (5)
+     * @param sessionId 세션 식별자 (6, 있을 때만)
+     * @param mins 소요 시간 (7)
+     * @param tier 층 (8, record일 때만)
+     * @param editedBy 마지막 편집자 (9, 도장 있을 때만)
+     * @param editedAt 마지막 편집 시각 (10, 도장 있을 때만)
+     * @param editedSessionId 마지막 편집 세션 (11, 도장 및 세션 있을 때만)
+     * @param tags 태그 목록 (12, 비어있지 않을 때만)
+     * @param favorite 즐겨찾기 여부 (13, 참일 때만)
+     * @param favoriteCategory 즐겨찾기 라벨 (14, 있을 때만)
+     * @param template 템플릿 id (15, 있을 때만)
+     * @param evaluation 평가 정보 (16, 있을 때만: score, note, at)
+     * @param links 연결 목록 (17, 비어있지 않을 때만)
+     * @return YAML 내용 (양쪽 울타리 제외)
      */
-    public static String buildNoteFrontmatter(
+    public static String buildFullNoteFrontmatter(
             String id,
             String agenda,
             String type,
@@ -56,8 +60,14 @@ public final class FrontmatterWriter {
             String sessionId,
             int mins,
             String tier,
+            String editedBy,
+            String editedAt,
+            String editedSessionId,
             List<String> tags,
+            boolean favorite,
+            String favoriteCategory,
             String template,
+            Map<String, Object> evaluation,
             List<Map<String, String>> links
     ) {
         StringBuilder sb = new StringBuilder();
@@ -77,7 +87,7 @@ public final class FrontmatterWriter {
         // 5. created
         appendKeyVal(sb, "created", created, 1);
 
-        // 6. sessionId
+        // 6. sessionId. 13.9의 6번: 새 노트는 빈 표식도 '' 로 적는다. 메타 쓰기는 다듬어 빈 값을 이미 null로 넘긴다
         if (sessionId != null) {
             appendKeyVal(sb, "sessionId", sessionId, 1);
         }
@@ -90,6 +100,16 @@ public final class FrontmatterWriter {
             sb.append("tier: record\n");
         }
 
+        // 9. editedBy, 10. editedAt, 11. editedSessionId
+        if (editedBy != null && editedAt != null) {
+            appendKeyVal(sb, "editedBy", editedBy, 1);
+            appendKeyVal(sb, "editedAt", editedAt, 1);
+            // 14.9의 17번: 새 도장은 빈 표식도 '' 로 적는다. 읽은 옛 값은 1.8에서 이미 빈 글이 없음이 됐다
+            if (editedSessionId != null) {
+                appendKeyVal(sb, "editedSessionId", editedSessionId, 1);
+            }
+        }
+
         // 12. tags
         if (tags != null && !tags.isEmpty()) {
             sb.append("tags:\n");
@@ -99,9 +119,47 @@ public final class FrontmatterWriter {
             }
         }
 
+        // 13. favorite
+        if (favorite) {
+            sb.append("favorite: true\n");
+        }
+
+        // 14. favoriteCategory
+        if (favoriteCategory != null && !favoriteCategory.isEmpty()) {
+            appendKeyVal(sb, "favoriteCategory", favoriteCategory, 1);
+        }
+
         // 15. template
         if (template != null && !template.isEmpty()) {
             appendKeyVal(sb, "template", template, 1);
+        }
+
+        // 16. evaluation
+        if (evaluation != null) {
+            sb.append("evaluation:\n");
+            Object scoreObj = evaluation.get("score");
+            int score = scoreObj instanceof Number n ? n.intValue() : 0;
+            sb.append("  score: ").append(score).append("\n");
+
+            Object noteObj = evaluation.get("note");
+            String note = noteObj instanceof String s ? s : "";
+            sb.append("  note: ");
+            String dumpedNote = dumpString(note, 2);
+            if (dumpedNote.startsWith("|") || dumpedNote.startsWith(">")) {
+                sb.append(dumpedNote).append("\n");
+            } else {
+                sb.append(dumpedNote).append("\n");
+            }
+
+            Object atObj = evaluation.get("at");
+            String at = atObj instanceof String s ? s : "";
+            sb.append("  at: ");
+            String dumpedAt = dumpString(at, 2);
+            if (dumpedAt.startsWith("|") || dumpedAt.startsWith(">")) {
+                sb.append(dumpedAt).append("\n");
+            } else {
+                sb.append(dumpedAt).append("\n");
+            }
         }
 
         // 17. links
@@ -119,13 +177,29 @@ public final class FrontmatterWriter {
     }
 
     /**
+     * 하위 호환성을 위한 기본 노트 생성 프론트매터 YAML 빌더.
+     */
+    public static String buildNoteFrontmatter(
+            String id,
+            String agenda,
+            String type,
+            String title,
+            String created,
+            String sessionId,
+            int mins,
+            String tier,
+            List<String> tags,
+            String template,
+            List<Map<String, String>> links
+    ) {
+        return buildFullNoteFrontmatter(
+                id, agenda, type, title, created, sessionId, mins, tier,
+                null, null, null, tags, false, null, template, null, links
+        );
+    }
+
+    /**
      * 아젠다 파일 생성을 위한 프론트매터 YAML을 생성합니다.
-     *
-     * @param id 아젠다 id
-     * @param slug 아젠다 slug
-     * @param title 아젠다 제목
-     * @param hue 색상
-     * @return YAML 내용 (양쪽 --- 울타리 제외)
      */
     public static String buildAgendaFrontmatter(String id, String slug, String title, String hue) {
         StringBuilder sb = new StringBuilder();
@@ -144,6 +218,238 @@ public final class FrontmatterWriter {
         } else {
             sb.append(dumped).append("\n");
         }
+    }
+
+    /**
+     * 설명서 1.10 Form B를 위해 임의의 YAML 맵을 1.9의 규격에 맞춰 직렬화합니다.
+     * 잘못된 타입(Double, BigInteger, Date 등)이나 비문자열 내부 맵 키가 있으면 WlException을 발생시킵니다.
+     *
+     * @param rawMap 파싱된 원본 YAML 맵
+     * @return 직렬화된 YAML 문자열
+     */
+    public static String dumpGeneralMap(Map<?, ?> rawMap) {
+        if (rawMap == null || rawMap.isEmpty()) {
+            return "{}\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            Object keyObj = entry.getKey();
+            // 최상위 키가 문자열이 아니면 1.8에서 이미 빠져 B에도 없음 (1.10 1074행)
+            if (!(keyObj instanceof String key)) {
+                continue;
+            }
+            Object val = entry.getValue();
+            checkValidValue(val);
+
+            sb.append(dumpKey(key)).append(": ");
+            appendGeneralValue(sb, val, 1);
+        }
+        return sb.toString();
+    }
+
+    private static void checkValidValue(Object val) {
+        if (val == null || val instanceof String || val instanceof Boolean ||
+                val instanceof Long || val instanceof Integer || val instanceof Short || val instanceof Byte ||
+                val instanceof Map || val instanceof List) {
+            return;
+        }
+        if (val instanceof Double || val instanceof Float) {
+            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: Double (" + val + ")");
+        }
+        if (val instanceof java.math.BigInteger || val instanceof java.math.BigDecimal) {
+            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: BigInteger (" + val + ")");
+        }
+        if (val instanceof java.util.Date) {
+            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: Date (" + val + ")");
+        }
+        if (val instanceof byte[]) {
+            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: ByteArray (" + Arrays.toString((byte[]) val) + ")");
+        }
+        if (val instanceof Set) {
+            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
+        }
+        if (val.getClass().isArray()) {
+            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: Array (" + val + ")");
+        }
+        throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
+    }
+
+    private static void appendGeneralValue(StringBuilder sb, Object val, int depth) {
+        checkValidValue(val);
+        if (val == null) {
+            sb.append("null\n");
+        } else if (val instanceof Boolean b) {
+            sb.append(b ? "true\n" : "false\n");
+        } else if (val instanceof Number) {
+            sb.append(val.toString()).append("\n");
+        } else if (val instanceof String s) {
+            String dumped = dumpString(s, depth);
+            sb.append(dumped).append("\n");
+        } else if (val instanceof Map<?, ?> m) {
+            if (m.isEmpty()) {
+                sb.append("{}\n");
+            } else {
+                sb.append("\n");
+                String indent = "  ".repeat(depth);
+                for (Map.Entry<?, ?> entry : m.entrySet()) {
+                    if (!(entry.getKey() instanceof String k)) {
+                        throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                    }
+                    sb.append(indent).append(dumpKey(k)).append(": ");
+                    appendGeneralValue(sb, entry.getValue(), depth + 1);
+                }
+            }
+        } else if (val instanceof List<?> list) {
+            if (list.isEmpty()) {
+                sb.append("[]\n");
+            } else {
+                sb.append("\n");
+                String indent = "  ".repeat(depth);
+                for (Object item : list) {
+                    checkValidValue(item);
+                    if (item instanceof Map<?, ?> mapItem) {
+                        if (mapItem.isEmpty()) {
+                            sb.append(indent).append("- {}\n");
+                        } else {
+                            boolean first = true;
+                            for (Map.Entry<?, ?> entry : mapItem.entrySet()) {
+                                if (!(entry.getKey() instanceof String k)) {
+                                    throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                                }
+                                if (first) {
+                                    sb.append(indent).append("- ").append(dumpKey(k)).append(": ");
+                                    appendGeneralValue(sb, entry.getValue(), depth + 2);
+                                    first = false;
+                                } else {
+                                    sb.append(indent).append("  ").append(dumpKey(k)).append(": ");
+                                    appendGeneralValue(sb, entry.getValue(), depth + 2);
+                                }
+                            }
+                        }
+                    } else if (item instanceof List<?> listItem) {
+                        sb.append(indent).append("- ");
+                        appendNestedList(sb, listItem, depth + 1);
+                    } else {
+                        sb.append(indent).append("- ");
+                        if (item == null) {
+                            sb.append("null\n");
+                        } else if (item instanceof Boolean b) {
+                            sb.append(b ? "true\n" : "false\n");
+                        } else if (item instanceof Number) {
+                            sb.append(item.toString()).append("\n");
+                        } else if (item instanceof String s) {
+                            String dumped = dumpString(s, depth + 1);
+                            sb.append(dumped).append("\n");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void appendNestedList(StringBuilder sb, List<?> list, int depth) {
+        if (list.isEmpty()) {
+            sb.append("[]\n");
+            return;
+        }
+        sb.append("- ");
+        Object first = list.get(0);
+        checkValidValue(first);
+        if (first instanceof List<?> subList) {
+            appendNestedList(sb, subList, depth + 1);
+        } else if (first instanceof Map<?, ?> map) {
+            sb.append("\n");
+            String indent = "  ".repeat(depth + 1);
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String k)) {
+                    throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                }
+                sb.append(indent).append(dumpKey(k)).append(": ");
+                appendGeneralValue(sb, entry.getValue(), depth + 2);
+            }
+        } else {
+            if (first == null) sb.append("null\n");
+            else if (first instanceof Boolean b) sb.append(b ? "true\n" : "false\n");
+            else if (first instanceof Number) sb.append(first.toString()).append("\n");
+            else if (first instanceof String s) sb.append(dumpString(s, depth + 1)).append("\n");
+        }
+
+        String indent = "  ".repeat(depth);
+        for (int i = 1; i < list.size(); i++) {
+            Object item = list.get(i);
+            checkValidValue(item);
+            sb.append(indent).append("- ");
+            if (item instanceof List<?> subList) {
+                appendNestedList(sb, subList, depth + 1);
+            } else if (item instanceof Map<?, ?> map) {
+                sb.append("\n");
+                String mapIndent = "  ".repeat(depth + 1);
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (!(entry.getKey() instanceof String k)) {
+                        throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                    }
+                    sb.append(mapIndent).append(dumpKey(k)).append(": ");
+                    appendGeneralValue(sb, entry.getValue(), depth + 2);
+                }
+            } else {
+                if (item == null) sb.append("null\n");
+                else if (item instanceof Boolean b) sb.append(b ? "true\n" : "false\n");
+                else if (item instanceof Number) sb.append(item.toString()).append("\n");
+                else if (item instanceof String s) sb.append(dumpString(s, depth + 1)).append("\n");
+            }
+        }
+    }
+
+    /**
+     * 설명서 1.9에 따라 YAML 맵 키 문자열을 직렬화합니다.
+     */
+    public static String dumpKey(String key) {
+        if (key == null || key.isEmpty()) {
+            return "''";
+        }
+        if (BOOLEAN_KEYWORDS.contains(key) || BASE60_PATTERN.matcher(key).matches()) {
+            return "'" + key + "'";
+        }
+        if (hasNonPrintableCharactersForKey(key)) {
+            return dumpDoubleQuoted(key);
+        }
+        if (isPlainSafe(key) && !isOtherType(key)) {
+            return key;
+        }
+        return "'" + key.replace("'", "''") + "'";
+    }
+
+    private static boolean hasNonPrintableCharactersForKey(String s) {
+        int len = s.length();
+        for (int i = 0; i < len; ) {
+            int cp = s.codePointAt(i);
+            int charCount = Character.charCount(cp);
+
+            if (cp == '\n' || cp == '\t' || cp == '\r') {
+                return true; // 키에서는 LF, 탭, CR도 큰따옴표로 이스케이프 (1.9 995행)
+            }
+            if (cp == 0x2028 || cp == 0x2029 || cp == 0xFEFF) {
+                return true;
+            }
+            if (charCount == 1) {
+                char c = s.charAt(i);
+                if (Character.isSurrogate(c)) {
+                    return true;
+                }
+                boolean printable = (c >= 0x20 && c <= 0x7E) ||
+                        (c >= 0xA1 && c <= 0xD7FF) ||
+                        (c >= 0xE000 && c <= 0xFFFD);
+                if (!printable) {
+                    return true;
+                }
+            } else {
+                if (cp > 0x10FFFF) {
+                    return true;
+                }
+            }
+            i += charCount;
+        }
+        return false;
     }
 
     /**
@@ -224,7 +530,6 @@ public final class FrontmatterWriter {
                     return true;
                 }
             } else {
-                // cp >= 0x10000
                 if (cp > 0x10FFFF) {
                     return true;
                 }
@@ -292,7 +597,6 @@ public final class FrontmatterWriter {
     }
 
     private static String dumpLiteralBlock(String s, String[] lines, int depth) {
-        // 1.9: 들여쓰기 표시 뒤에 끝 표시를 붙인다(|2-)
         StringBuilder header = new StringBuilder("|");
         if (startsWithSpaceAfterNewlines(s)) header.append('2');
         char chomping = getChompingIndicator(s);
@@ -304,7 +608,6 @@ public final class FrontmatterWriter {
         int indent = 2 * depth;
         String indentStr = " ".repeat(indent);
 
-        // 마지막 줄바꿈 1개는 뗀 내용
         int count = lines.length;
         if (s.endsWith("\n") && count > 0 && lines[count - 1].isEmpty()) {
             count--;
@@ -323,7 +626,6 @@ public final class FrontmatterWriter {
     }
 
     private static String dumpFoldedBlock(String s, String[] lines, int depth, int w) {
-        // 1.9: 들여쓰기 표시 뒤에 끝 표시를 붙인다(|2-)
         StringBuilder header = new StringBuilder(">");
         if (startsWithSpaceAfterNewlines(s)) header.append('2');
         char chomping = getChompingIndicator(s);
@@ -349,7 +651,6 @@ public final class FrontmatterWriter {
             if (line.startsWith(" ")) {
                 sb.append(indentStr).append(line);
             } else {
-                // 접기 적용
                 String folded = foldLine(line, w, indentStr);
                 sb.append(folded);
             }
@@ -375,7 +676,6 @@ public final class FrontmatterWriter {
                 res.append(indentStr).append(line, start, len);
                 break;
             }
-            // start부터 start + w 범위 내 마지막 공백(' ') 위치 탐색
             int breakPos = -1;
             for (int i = start; i <= start + w && i < len; i++) {
                 if (line.charAt(i) == ' ' && i + 1 < len && line.charAt(i + 1) != ' ') {
@@ -383,7 +683,6 @@ public final class FrontmatterWriter {
                 }
             }
             if (breakPos == -1) {
-                // 범위 내 적절한 공백이 없으면 다음 공백까지 확장
                 for (int i = start + w + 1; i < len; i++) {
                     if (line.charAt(i) == ' ' && i + 1 < len && line.charAt(i + 1) != ' ') {
                         breakPos = i;
@@ -392,7 +691,6 @@ public final class FrontmatterWriter {
                 }
             }
             if (breakPos == -1 || breakPos <= start) {
-                // 더 이상 나눌 공백이 없으면 나머지 전체
                 if (!firstSubLine) res.append("\n");
                 res.append(indentStr).append(line, start, len);
                 break;
@@ -401,7 +699,7 @@ public final class FrontmatterWriter {
             if (!firstSubLine) res.append("\n");
             res.append(indentStr).append(line, start, breakPos);
             firstSubLine = false;
-            start = breakPos + 1; // 공백 건너뜀
+            start = breakPos + 1;
         }
         return res.toString();
     }
@@ -413,7 +711,7 @@ public final class FrontmatterWriter {
         if (s.equals("\n") || s.endsWith("\n\n")) {
             return '+';
         }
-        return ' '; // 1개의 줄바꿈으로 끝남
+        return ' ';
     }
 
     private static boolean startsWithSpaceAfterNewlines(String s) {

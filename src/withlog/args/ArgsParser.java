@@ -428,6 +428,153 @@ public final class ArgsParser {
             }
 
             return new ParsedArgs(true, "create-doc", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
+        } else if ("set_favorite".equals(toolName)) {
+            List<String> allowed = List.of("id", "favorite", "category", "f1");
+            validateKeys(toolName, props.keySet(), allowed);
+
+            if (!props.containsKey("id")) {
+                throw new WlException(400, "인자 검증 실패(set_favorite): id 가 필요하다.");
+            }
+            JsonValue idVal = props.get("id");
+            if (!(idVal instanceof JsonValue.JsonString sId)) {
+                throw new WlException(400, "인자 검증 실패(set_favorite): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+            }
+
+            Map<String, Object> toolOpts = new LinkedHashMap<>();
+            toolOpts.put("id", sId.value());
+
+            if (props.containsKey("favorite")) {
+                JsonValue favVal = props.get("favorite");
+                if (favVal instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
+                    toolOpts.put("favorite", Boolean.valueOf(lit.raw()));
+                } else {
+                    throw new WlException(400, "인자 검증 실패(set_favorite): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(favVal));
+                }
+            }
+
+            if (props.containsKey("category")) {
+                JsonValue catVal = props.get("category");
+                if (!(catVal instanceof JsonValue.JsonString sCat)) {
+                    throw new WlException(400, "인자 검증 실패(set_favorite): category 는 문자열 여야 한다: " + JsonCompact.compact(catVal));
+                }
+                toolOpts.put("category", sCat.value());
+            }
+
+            if (props.containsKey("f1")) {
+                JsonValue f1Val = props.get("f1");
+                if (!(f1Val instanceof JsonValue.JsonString sF1)) {
+                    throw new WlException(400, "인자 검증 실패(set_favorite): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                }
+                toolOpts.put("f1", sF1.value());
+            }
+
+            return new ParsedArgs(true, "set-favorite", List.of(sId.value()), Collections.emptyMap(), null, toolOpts);
+        } else if ("evaluate_doc".equals(toolName)) {
+            List<String> allowed = List.of("id", "score", "note", "clear", "f1");
+            validateKeys(toolName, props.keySet(), allowed);
+
+            if (!props.containsKey("id")) {
+                throw new WlException(400, "인자 검증 실패(evaluate_doc): id 가 필요하다.");
+            }
+            JsonValue idVal = props.get("id");
+            if (!(idVal instanceof JsonValue.JsonString sId)) {
+                throw new WlException(400, "인자 검증 실패(evaluate_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+            }
+
+            Map<String, Object> toolOpts = new LinkedHashMap<>();
+            toolOpts.put("id", sId.value());
+
+            if (props.containsKey("score")) {
+                JsonValue scoreVal = props.get("score");
+                if (scoreVal instanceof JsonValue.JsonLiteral lit &&
+                        !"true".equals(lit.raw()) && !"false".equals(lit.raw()) && !"null".equals(lit.raw())) {
+                    try {
+                        double d = Double.parseDouble(lit.raw());
+                        toolOpts.put("score", d);
+                    } catch (NumberFormatException e) {
+                        throw new WlException(400, "인자 검증 실패(evaluate_doc): score 는 숫자 여야 한다: " + JsonCompact.compact(scoreVal));
+                    }
+                } else {
+                    throw new WlException(400, "인자 검증 실패(evaluate_doc): score 는 숫자 여야 한다: " + JsonCompact.compact(scoreVal));
+                }
+            }
+
+            if (props.containsKey("note")) {
+                JsonValue noteVal = props.get("note");
+                if (!(noteVal instanceof JsonValue.JsonString sNote)) {
+                    throw new WlException(400, "인자 검증 실패(evaluate_doc): note 는 문자열 여야 한다: " + JsonCompact.compact(noteVal));
+                }
+                toolOpts.put("note", sNote.value());
+            }
+
+            if (props.containsKey("clear")) {
+                JsonValue clearVal = props.get("clear");
+                if (clearVal instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
+                    toolOpts.put("clear", Boolean.valueOf(lit.raw()));
+                } else {
+                    throw new WlException(400, "인자 검증 실패(evaluate_doc): clear 는 true 나 false 여야 한다: " + JsonCompact.compact(clearVal));
+                }
+            }
+
+            if (props.containsKey("f1")) {
+                JsonValue f1Val = props.get("f1");
+                if (!(f1Val instanceof JsonValue.JsonString sF1)) {
+                    throw new WlException(400, "인자 검증 실패(evaluate_doc): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                }
+                toolOpts.put("f1", sF1.value());
+            }
+
+            return new ParsedArgs(true, "evaluate-doc", List.of(sId.value()), Collections.emptyMap(), null, toolOpts);
+        } else if ("link_docs".equals(toolName)) {
+            List<String> allowed = List.of("from", "to", "kind", "remove", "f1");
+            validateKeys(toolName, props.keySet(), allowed);
+
+            if (!props.containsKey("from")) {
+                throw new WlException(400, "인자 검증 실패(link_docs): from 가 필요하다.");
+            }
+            JsonValue fromVal = props.get("from");
+            if (!(fromVal instanceof JsonValue.JsonString sFrom)) {
+                throw new WlException(400, "인자 검증 실패(link_docs): from 는 문자열 여야 한다: " + JsonCompact.compact(fromVal));
+            }
+
+            if (!props.containsKey("to")) {
+                throw new WlException(400, "인자 검증 실패(link_docs): to 가 필요하다.");
+            }
+            JsonValue toVal = props.get("to");
+            if (!(toVal instanceof JsonValue.JsonString sTo)) {
+                throw new WlException(400, "인자 검증 실패(link_docs): to 는 문자열 여야 한다: " + JsonCompact.compact(toVal));
+            }
+
+            Map<String, Object> toolOpts = new LinkedHashMap<>();
+            toolOpts.put("from", sFrom.value());
+            toolOpts.put("to", sTo.value());
+
+            if (props.containsKey("kind")) {
+                JsonValue kindVal = props.get("kind");
+                if (!(kindVal instanceof JsonValue.JsonString sKind)) {
+                    throw new WlException(400, "인자 검증 실패(link_docs): kind 는 문자열 여야 한다: " + JsonCompact.compact(kindVal));
+                }
+                toolOpts.put("kind", sKind.value());
+            }
+
+            if (props.containsKey("remove")) {
+                JsonValue removeVal = props.get("remove");
+                if (removeVal instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
+                    toolOpts.put("remove", Boolean.valueOf(lit.raw()));
+                } else {
+                    throw new WlException(400, "인자 검증 실패(link_docs): remove 는 true 나 false 여야 한다: " + JsonCompact.compact(removeVal));
+                }
+            }
+
+            if (props.containsKey("f1")) {
+                JsonValue f1Val = props.get("f1");
+                if (!(f1Val instanceof JsonValue.JsonString sF1)) {
+                    throw new WlException(400, "인자 검증 실패(link_docs): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                }
+                toolOpts.put("f1", sF1.value());
+            }
+
+            return new ParsedArgs(true, "link-docs", List.of(sFrom.value(), sTo.value()), Collections.emptyMap(), null, toolOpts);
         } else {
             throw new WlException(400, "미지원 도구: " + toolName);
         }
@@ -543,6 +690,21 @@ public final class ArgsParser {
                 );
                 maxPositional = 0;
                 usage = withlog.cmd.CreateDoc.USAGE;
+            }
+            case "set-favorite" -> {
+                allowedOptions = List.of("category", "f1", "favorite");
+                maxPositional = 1;
+                usage = withlog.cmd.SetFavorite.USAGE;
+            }
+            case "evaluate-doc" -> {
+                allowedOptions = List.of("clear", "f1", "note", "score");
+                maxPositional = 1;
+                usage = withlog.cmd.EvaluateDoc.USAGE;
+            }
+            case "link-docs" -> {
+                allowedOptions = List.of("f1", "kind", "remove");
+                maxPositional = 2;
+                usage = withlog.cmd.LinkDocs.USAGE;
             }
             case "reindex" -> {
                 maxPositional = 0;
