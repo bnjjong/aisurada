@@ -118,13 +118,20 @@ public final class GetSubNote {
             }
         }
 
-        // 7. 코멘트 읽기: 직계 컨테이너 폴더의 sub-comments/<하위 id>.json
-        Path containerDir;
+        // 7. 코멘트 읽기: 직계 컨테이너 폴더의 sub-comments/<하위 id>.json (11.4 16번, 11.8)
+        NoteScanner.NoteRecord directContainer;
         if (rootId.equals(targetSub.directParentId())) {
-            containerDir = vaultRoot.resolve(rootNote.vaultRelPath());
+            directContainer = rootNote;
         } else {
-            NoteScanner.NoteRecord directParent = rootNote.subNotes().get(targetSub.directParentId());
-            containerDir = vaultRoot.resolve(directParent.vaultRelPath());
+            directContainer = rootNote.subNotes().get(targetSub.directParentId());
+        }
+
+        Path containerDir = vaultRoot;
+        if (directContainer != null && directContainer.vaultRelPath() != null) {
+            String[] pathSegments = directContainer.vaultRelPath().split("/");
+            for (String seg : pathSegments) {
+                containerDir = PathJoin.join(containerDir, seg);
+            }
         }
 
         Path commentFile = PathJoin.join(containerDir, "sub-comments", targetSub.id() + ".json");
