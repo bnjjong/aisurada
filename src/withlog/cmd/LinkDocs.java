@@ -22,7 +22,7 @@ public final class LinkDocs {
     public static final String USAGE =
             "link-docs <출발 노트 id> <대상 노트 id> [kind=direct|indirect|attach] [remove=true] [f1=<직전에 읽은 토큰>]";
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
     private static final Set<String> ALLOWED_KINDS = Set.of("direct", "indirect", "attach");
 
     private LinkDocs() {}
@@ -214,8 +214,8 @@ public final class LinkDocs {
                 note,
                 f1Token,
                 note.meta().favorite(),
-                note.meta().favoriteCategory(),
-                note.meta().evaluation(),
+                MetaWriter.asIndexed(note.meta().favoriteCategory()),
+                MetaWriter.asIndexed(note.meta().evaluation()),
                 updatedLinks,
                 isTool,
                 sessionId

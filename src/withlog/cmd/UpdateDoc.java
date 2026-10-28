@@ -45,7 +45,7 @@ public final class UpdateDoc {
     public static final String USAGE = "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] " +
             "[template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [mins=<분>] [f1=<직전에 읽은 토큰>]";
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
 
     /**
      * update_doc / update-doc 명령을 실행합니다. 검사 차례는 14.3, 쓰는 차례는 14.5입니다.
@@ -187,11 +187,7 @@ public final class UpdateDoc {
 
         // 10번: 파일 글자와 도장(1.10). 비교에는 본문도 든다
         String indexedCategory = MetaWriter.asIndexed(note.meta().favoriteCategory());
-        Map<String, Object> evaluation = note.meta().evaluation();
-        if (evaluation != null && evaluation.get("note") instanceof String en) {
-            evaluation = new LinkedHashMap<>(evaluation);
-            evaluation.put("note", MetaWriter.asIndexed(en));
-        }
+        Map<String, Object> evaluation = MetaWriter.asIndexed(note.meta().evaluation());
         StampJudgment.JudgmentResult judgment = StampJudgment.judge(
                 format, body, oldBody, rawYamlMap,
                 noteId, agendaSlug, note.meta().type(), title, created, fileSessionId, mins, note.meta().tier(),

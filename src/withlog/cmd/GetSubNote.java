@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
  * 설명서 11.8에 따라 부모 참조 사슬 검증 및 하위 노트 조회 응답을 생성합니다.
  */
 public final class GetSubNote {
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Pattern SUB_NOTE_ID_PATTERN = Pattern.compile("^sn[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
+    private static final Pattern SUB_NOTE_ID_PATTERN = withlog.text.IdShape.SUB_NOTE;
 
     private GetSubNote() {}
 

@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * 설명서 11장에 따라 단일 노트 조회 및 규격 JSON 응답을 생성합니다.
  */
 public final class GetDoc {
-    private static final Pattern ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern ID_PATTERN = withlog.text.IdShape.NOTE;
 
     private GetDoc() {}
 

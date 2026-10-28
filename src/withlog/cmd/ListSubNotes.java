@@ -18,8 +18,8 @@ import java.util.regex.Pattern;
  */
 public final class ListSubNotes {
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Pattern SUB_NOTE_ID_PATTERN = Pattern.compile("^sn[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
+    private static final Pattern SUB_NOTE_ID_PATTERN = withlog.text.IdShape.SUB_NOTE;
     private static final String USAGE = "list-sub-notes <부모 노트 id> [bodies=true. 본문까지 싣는다. 기본은 메타만]";
 
     private ListSubNotes() {}

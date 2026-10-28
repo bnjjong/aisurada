@@ -30,8 +30,8 @@ public final class WriteAttachment {
 
     public static final String USAGE = "write-attachment <노트 id> [하위 노트 id] name=<파일명.확장자> content=<내용>";
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Pattern SUB_NOTE_ID_PATTERN = Pattern.compile("^sn[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
+    private static final Pattern SUB_NOTE_ID_PATTERN = withlog.text.IdShape.SUB_NOTE;
     // 18.5: Java의 $라서 글 끝에 U+0085, U+2028, U+2029 1개가 붙어도 그 앞에서 맞는다
     private static final Pattern EXT_PATTERN = Pattern.compile("\\.[A-Za-z0-9]+$");
     private static final Set<String> TEXT_EXTENSIONS = Set.of(

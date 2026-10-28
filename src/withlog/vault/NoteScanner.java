@@ -104,7 +104,8 @@ public final class NoteScanner {
             // 읽기 명령에서는 비정상 노트 발생 시 훑기를 중단하고 이전까지 읽은 노트를 보존함 (설명서 8.6, 8.7 14번)
         }
 
-        // 1.12, 1.15의 21번과 23번: 코멘트 색인 사본 읽기가 세우는 자리. 읽기는 그 노트까지만 노트로 본다
+        // 1.12, 1.15의 21번과 23번: 코멘트 색인 사본 읽기가 세우는 자리.
+        // 읽기는 8.4대로 그 노트 앞까지만 노트로 본다. 깨진 노트와 그 뒤 노트는 WL-404다
         Set<String> commentIds = new HashSet<>();
         List<String> ids = new ArrayList<>(notesById.keySet());
         for (int i = 0; i < ids.size(); i++) {
@@ -114,7 +115,7 @@ public final class NoteScanner {
                 if (haltOnFatal) {
                     throw e;
                 }
-                for (int j = i + 1; j < ids.size(); j++) {
+                for (int j = i; j < ids.size(); j++) {
                     notesById.remove(ids.get(j));
                 }
                 break;
@@ -333,7 +334,13 @@ public final class NoteScanner {
         if (!isSingleFile) {
             Path subDir = candidatePath.resolve("sub");
             if (Files.isDirectory(subDir)) {
-                scanSubNotes(vaultRoot, candidatePath, meta.id(), meta.id(), folderAgendaSlug, 1, subNotes, skipped, haltOnFatal);
+                try {
+                    scanSubNotes(vaultRoot, candidatePath, meta.id(), meta.id(), folderAgendaSlug, 1, subNotes, skipped, haltOnFatal);
+                } catch (ScanHaltedException e) {
+                    // 8.4: 하위 노트에서 서면 그 메인 노트부터 노트가 아니다(1.15의 6번, mins: .nan 같은 것)
+                    notesById.remove(meta.id());
+                    throw e;
+                }
             }
         }
     }

@@ -19,8 +19,8 @@ import java.util.regex.Pattern;
  * 설명서 1.7 및 1.8의 규칙에 따라 각 키의 유효성을 검사하고 값을 정제합니다.
  */
 public final class NoteMeta {
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Pattern SUB_NOTE_ID_PATTERN = Pattern.compile("^sn[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
+    private static final Pattern SUB_NOTE_ID_PATTERN = withlog.text.IdShape.SUB_NOTE;
     private static final Pattern TEMPLATE_ID_PATTERN = Pattern.compile("^[A-Za-z0-9._-]{1,128}$");
     private static final Set<String> ALLOWED_TYPES = Set.of("plan", "build", "report", "research", "meeting", "free");
     private static final Set<String> ALLOWED_KINDS = Set.of("direct", "indirect", "attach");

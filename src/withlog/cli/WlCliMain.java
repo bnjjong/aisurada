@@ -37,6 +37,39 @@ public final class WlCliMain {
             "write_attachment", "list_attachments", "list_comments", "export_markdown"
     );
 
+    /** --list의 도구 설명. 장마다 첫머리 요약에서 지은 1줄이고 계약이 아니다(3.3). */
+    private static final Map<String, String> TOOL_DESCRIPTIONS = Map.ofEntries(
+            Map.entry("create_doc", "새 노트 1건을 만든다"),
+            Map.entry("update_doc", "노트의 제목, 본문, 태그, 날짜, 시각을 고치고 자리를 다시 정한다"),
+            Map.entry("set_favorite", "즐겨찾기 별과 라벨을 고친다"),
+            Map.entry("evaluate_doc", "평가 점수와 메모를 새기거나 지운다"),
+            Map.entry("link_docs", "다른 노트로의 연결 1건을 잇거나 끊는다"),
+            Map.entry("list_docs", "조건에 맞는 노트 목록을 만든 시각 차례로 낸다"),
+            Map.entry("search_docs", "제목, 메타, 본문, 첨부 글에서 찾아 대목과 함께 낸다"),
+            Map.entry("list_tags", "태그와 쓰인 횟수를 낸다"),
+            Map.entry("get_doc", "노트 1건을 본문, 도장, 코멘트와 함께 낸다"),
+            Map.entry("delete_doc", "노트를 휴지통으로 보낸다"),
+            Map.entry("list_trash", "휴지통 목록을 낸다"),
+            Map.entry("restore_doc", "휴지통의 노트를 되살린다"),
+            Map.entry("purge_doc", "휴지통의 노트를 영구히 지운다"),
+            Map.entry("plan_day", "하루 계획 초안을 짓고, 원하면 노트로 저장한다"),
+            Map.entry("list_reports", "회고 목록을 낸다"),
+            Map.entry("get_report", "회고 1건을 낸다"),
+            Map.entry("list_templates", "문서와 리추얼 템플릿 목록을 낸다"),
+            Map.entry("get_template", "템플릿 1건을 낸다"),
+            Map.entry("save_report", "회고를 저장한다"),
+            Map.entry("save_template", "문서 템플릿을 저장한다"),
+            Map.entry("create_sub_note", "하위 노트 1건을 만든다"),
+            Map.entry("list_sub_notes", "바로 아래 하위 노트 목록을 낸다"),
+            Map.entry("get_sub_note", "하위 노트 1건을 낸다"),
+            Map.entry("update_sub_note", "하위 노트의 제목과 본문을 고친다"),
+            Map.entry("delete_sub_note", "하위 노트를 지운다"),
+            Map.entry("write_attachment", "노트나 하위 노트에 글 첨부 1개를 쓴다"),
+            Map.entry("list_attachments", "첨부 목록과 본문에 붙일 참조 조각을 낸다"),
+            Map.entry("list_comments", "코멘트 목록을 낸다"),
+            Map.entry("export_markdown", "노트를 마크다운 사본으로 내보낸다")
+    );
+
     public static final List<String> DIRECT_COMMANDS = List.of(
             "doctor", "sweep", "report", "schedule", "install"
     );
@@ -113,7 +146,7 @@ public final class WlCliMain {
 
     private static void printListOnly() {
         for (String tool : CLI_TOOL_NAMES) {
-            System.out.println(tool + " — " + tool + " 도구");
+            System.out.println(tool + " — " + TOOL_DESCRIPTIONS.get(tool));
         }
         System.out.println();
         System.out.println("doctor — 사이드카와 관련 파일의 상태를 진단합니다");
@@ -124,6 +157,27 @@ public final class WlCliMain {
         System.out.println();
         System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61));
         System.out.println("  앱이 쓰는 배선입니다. 이름이 하이픈인 것이 표시이고, 도구 이름(밑줄)과 다른 표면입니다.");
+    }
+
+    /** 3.3: uid는 launchctl을 부를 때마다 다시 읽는다. 못 읽으면 그 글 1줄과 종료 코드 4다. */
+    private static String uidOrExit() {
+        try {
+            return Launchctl.getUid();
+        } catch (Launchctl.LaunchctlException e) {
+            System.err.println(e.getMessage());
+            System.exit(4);
+            return null;
+        }
+    }
+
+    /** 3.3: launchctl을 못 돌렸거나 10초를 넘기면 그 글 1줄과 종료 코드 4다. 돌았으면 종료 코드는 부르는 쪽이 본다. */
+    private static Launchctl.Result launchctlOrExit(List<String> args) {
+        Launchctl.Result r = Launchctl.runLaunchctl(args);
+        if (r.error() != null) {
+            System.err.println(r.error());
+            System.exit(4);
+        }
+        return r;
     }
 
     private static void printUnknownName(String name) {
@@ -180,28 +234,13 @@ public final class WlCliMain {
             } catch (IOException ignored) {}
         }
 
-        String uid = null;
-
+        // 3.3: uid는 launchctl을 부를 때마다 다시 읽고, launchctl을 안 부르는 호출은 uid를 안 읽는다
         if (connected) {
             // 4. 다시 띄우기 판정
-            try {
-                uid = Launchctl.getUid();
-            } catch (Launchctl.LaunchctlException e) {
-                System.err.println(e.getMessage());
-                System.exit(4);
-                return;
-            }
-            checkRestart(userHome, uid, vaultKey, label, socketPath);
+            checkRestart(userHome, vaultKey, label, socketPath);
         } else {
             // 5. 엔진 띄우기
-            try {
-                uid = Launchctl.getUid();
-            } catch (Launchctl.LaunchctlException e) {
-                System.err.println(e.getMessage());
-                System.exit(4);
-                return;
-            }
-            launchEngine(userHome, uid, vaultKey, label, normalizedVault, socketPath);
+            launchEngine(userHome, vaultKey, label, normalizedVault, socketPath);
         }
 
         // 6. 소켓 연결 및 요청 전송
@@ -270,7 +309,7 @@ public final class WlCliMain {
         System.exit(header.status() % 256);
     }
 
-    private static void checkRestart(String userHome, String uid, String vaultKey, String label, Path socketPath) {
+    private static void checkRestart(String userHome, String vaultKey, String label, Path socketPath) {
         Path stateFilePath = Paths.get(userHome, "Library", "Application Support", "withlog", "run", vaultKey + ".json");
         Path plistPath = Paths.get(userHome, "Library", "LaunchAgents", label + ".plist");
 
@@ -307,12 +346,7 @@ public final class WlCliMain {
         System.err.println("사이드카를 다시 띄운다 — jar 가 뜬 뒤에 바뀌었다: " + jarPath);
         Long oldPid = state.getPid();
 
-        Launchctl.Result r = Launchctl.runLaunchctl(List.of("kickstart", "-k", "gui/" + uid + "/" + label));
-        if (r.error() != null) {
-            System.err.println(r.error());
-            System.exit(4);
-            return;
-        }
+        Launchctl.Result r = launchctlOrExit(List.of("kickstart", "-k", "gui/" + uidOrExit() + "/" + label));
 
         if (r.exitCode() == 0 || r.exitCode() == 37) {
             // pid 변경 대기 (100ms 간격, 30초 대기)
@@ -327,12 +361,12 @@ public final class WlCliMain {
                     try { Thread.sleep(100); } catch (InterruptedException ignored) { break; }
                 }
             }
-            waitForSocketReady(socketPath, uid, label, timeoutSec);
+            waitForSocketReady(socketPath, label, timeoutSec);
         } else if (r.exitCode() == 113) {
             System.err.println("사이드카 재시작 대상이 없다 — 그 라벨이 launchd 에 없다(113): " + label);
             System.err.println("낡은 jar 로 계속 돈다. wl-cli install 로 그 라벨을 다시 등록해야 한다.");
             long timeoutSec = getReadyTimeoutSeconds();
-            waitForSocketReady(socketPath, uid, label, timeoutSec);
+            waitForSocketReady(socketPath, label, timeoutSec);
         } else {
             System.err.println("사이드카 재시작이 실패했다. launchctl kickstart -k 가 " + r.exitCode() + " 를 줬다: " + label);
             if (!r.output().trim().isEmpty()) {
@@ -342,7 +376,7 @@ public final class WlCliMain {
         }
     }
 
-    private static void launchEngine(String userHome, String uid, String vaultKey, String label, String normalizedVault, Path socketPath) {
+    private static void launchEngine(String userHome, String vaultKey, String label, String normalizedVault, Path socketPath) {
         // 3.4: WITHLOG_SIDECAR_JAR는 상대 경로든 없는 파일이든 확인 없이 싣는다. 못 정했을 때만 선다
         String sidecarJar = PlistGenerator.resolveSidecarJar(userHome);
         if (sidecarJar == null) {
@@ -359,12 +393,17 @@ public final class WlCliMain {
         Path plistFile = Paths.get(userHome, "Library", "LaunchAgents", label + ".plist");
         boolean plistDiff = true;
         if (Files.exists(plistFile)) {
+            // 3.3 띄우기 2번: 파일은 있는데 못 읽으면(UTF-8이 아님 포함) 덮지 않고 예외로 죽어 종료 코드 1이다
             try {
                 String existing = Files.readString(plistFile, StandardCharsets.UTF_8);
                 if (plistContent.equals(existing)) {
                     plistDiff = false;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                e.printStackTrace(System.err);
+                System.exit(1);
+                return;
+            }
         }
 
         if (plistDiff) {
@@ -373,37 +412,28 @@ public final class WlCliMain {
                     Files.createDirectories(plistFile.getParent());
                 }
                 Files.writeString(plistFile, plistContent, StandardCharsets.UTF_8);
-                Launchctl.runLaunchctl(List.of("bootout", "gui/" + uid + "/" + label));
             } catch (Exception e) {
                 e.printStackTrace(System.err);
                 System.exit(1);
                 return;
             }
+            // bootout의 종료 코드는 안 본다. 못 돌렸거나 10초를 넘기면 종료 코드 4다
+            launchctlOrExit(List.of("bootout", "gui/" + uidOrExit() + "/" + label));
         }
 
         // 동시 상한 3 지키기
-        enforceConcurrencyLimit(userHome, uid, vaultKey);
+        enforceConcurrencyLimit(userHome, vaultKey);
 
         // kickstart
-        Launchctl.Result kr = Launchctl.runLaunchctl(List.of("kickstart", "gui/" + uid + "/" + label));
-        if (kr.error() != null) {
-            System.err.println(kr.error());
-            System.exit(4);
-            return;
+        Launchctl.Result kr = launchctlOrExit(List.of("kickstart", "gui/" + uidOrExit() + "/" + label));
+
+        if (kr.exitCode() == 113) {
+            launchctlOrExit(List.of("bootstrap", "gui/" + uidOrExit(), plistFile.toString()));
+            kr = launchctlOrExit(List.of("kickstart", "gui/" + uidOrExit() + "/" + label));
         }
 
         if (kr.exitCode() == 113) {
-            Launchctl.runLaunchctl(List.of("bootstrap", "gui/" + uid, plistFile.toString()));
-            kr = Launchctl.runLaunchctl(List.of("kickstart", "gui/" + uid + "/" + label));
-            if (kr.error() != null) {
-                System.err.println(kr.error());
-                System.exit(4);
-                return;
-            }
-        }
-
-        if (kr.exitCode() == 113) {
-            Launchctl.Result printDis = Launchctl.runLaunchctl(List.of("print-disabled", "gui/" + uid));
+            Launchctl.Result printDis = launchctlOrExit(List.of("print-disabled", "gui/" + uidOrExit()));
             boolean isDisabled = false;
             for (String l : printDis.output().split("\n")) {
                 if (l.contains(label)) {
@@ -415,14 +445,9 @@ public final class WlCliMain {
                 }
             }
             if (isDisabled) {
-                Launchctl.runLaunchctl(List.of("enable", "gui/" + uid + "/" + label));
-                Launchctl.runLaunchctl(List.of("bootstrap", "gui/" + uid, plistFile.toString()));
-                kr = Launchctl.runLaunchctl(List.of("kickstart", "gui/" + uid + "/" + label));
-                if (kr.error() != null) {
-                    System.err.println(kr.error());
-                    System.exit(4);
-                    return;
-                }
+                launchctlOrExit(List.of("enable", "gui/" + uidOrExit() + "/" + label));
+                launchctlOrExit(List.of("bootstrap", "gui/" + uidOrExit(), plistFile.toString()));
+                kr = launchctlOrExit(List.of("kickstart", "gui/" + uidOrExit() + "/" + label));
             }
         }
 
@@ -436,7 +461,7 @@ public final class WlCliMain {
         }
 
         long timeoutSec = getReadyTimeoutSeconds();
-        waitForSocketReady(socketPath, uid, label, timeoutSec);
+        waitForSocketReady(socketPath, label, timeoutSec);
     }
 
     /**
@@ -494,7 +519,7 @@ public final class WlCliMain {
         return new ArrayList<>(quietTargets.subList(0, stopCount));
     }
 
-    private static void enforceConcurrencyLimit(String userHome, String uid, String currentVaultKey) {
+    private static void enforceConcurrencyLimit(String userHome, String currentVaultKey) {
         Path runDir = Paths.get(userHome, "Library", "Application Support", "withlog", "run");
         int limit = getConcurrencyLimit();
         List<SweepCommand.Target> quietTargets;
@@ -506,7 +531,12 @@ public final class WlCliMain {
             return;
         }
         for (SweepCommand.Target t : quietTargets) {
-            Launchctl.Result br = Launchctl.runLaunchctl(List.of("bootout", "gui/" + uid + "/" + t.label));
+            Launchctl.Result br;
+            try {
+                br = Launchctl.runLaunchctl(List.of("bootout", "gui/" + Launchctl.getUid() + "/" + t.label));
+            } catch (Launchctl.LaunchctlException e) {
+                br = new Launchctl.Result(-1, "", false, e.getMessage());
+            }
             String ago = TimeFormat.formatAgo(t.state.getLastActiveAt());
             if (br.error() != null) {
                 System.err.println("사이드카 동시 상한 " + limit + "개를 지키려고 가장 오래 조용했던 것을 내린다: " + t.label + " (마지막 활동 " + ago + ", bootout 실패: " + br.error() + ")");
@@ -516,7 +546,7 @@ public final class WlCliMain {
         }
     }
 
-    private static void waitForSocketReady(Path socketPath, String uid, String label, long timeoutSec) {
+    private static void waitForSocketReady(Path socketPath, String label, long timeoutSec) {
         long startWait = System.currentTimeMillis();
         boolean warned10s = false;
 
@@ -540,12 +570,7 @@ public final class WlCliMain {
         }
 
         // 상한 초과 시 print 호출 후 종료 코드 4
-        Launchctl.Result pr = Launchctl.runLaunchctl(List.of("print", "gui/" + uid + "/" + label));
-        if (pr.error() != null) {
-            System.err.println(pr.error());
-            System.exit(4);
-            return;
-        }
+        Launchctl.Result pr = launchctlOrExit(List.of("print", "gui/" + uidOrExit() + "/" + label));
 
         System.err.println("사이드카가 " + timeoutSec + " 초 안에 준비되지 않았다: " + socketPath);
         System.err.println("WITHLOG_READY_TIMEOUT_SECONDS 로 더 기다리게 할 수 있다.");

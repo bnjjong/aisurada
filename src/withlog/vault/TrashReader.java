@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 public final class TrashReader {
 
     private static final Pattern TRASH_ID_PATTERN = Pattern.compile("^tr[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Pattern DOC_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern DOC_ID_PATTERN = withlog.text.IdShape.NOTE;
     private static final Pattern AGENDA_ID_PATTERN = Pattern.compile("^ag[0-9a-z]+-[0-9a-f]{8}$");
     private static final Set<String> ALLOWED_TYPES = Set.of("plan", "build", "report", "research", "meeting", "free");
 

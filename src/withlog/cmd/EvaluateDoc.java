@@ -27,7 +27,7 @@ public final class EvaluateDoc {
     public static final String USAGE =
             "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]";
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
 
     private EvaluateDoc() {}
 
@@ -167,8 +167,7 @@ public final class EvaluateDoc {
             int intScore = (int) Math.max(0, Math.min(100, rounded));
             String cleanNote = (noteStr != null) ? Utf16.cut(Trim.trim(noteStr), 1000) : "";
             Instant now = TestApparatus.nowInstant();
-            String at = NoteMeta.CreatedResult.class.getName(); // use NoteMeta format
-            at = java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'")
+            String at = java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'")
                     .withZone(java.time.ZoneOffset.UTC).format(now);
 
             newEvaluation = new LinkedHashMap<>();
@@ -183,7 +182,7 @@ public final class EvaluateDoc {
                 note,
                 f1Token,
                 note.meta().favorite(),
-                note.meta().favoriteCategory(),
+                MetaWriter.asIndexed(note.meta().favoriteCategory()),
                 newEvaluation,
                 note.meta().links(),
                 isTool,

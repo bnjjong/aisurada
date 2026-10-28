@@ -93,6 +93,12 @@ public final class ServeMode {
             System.exit(1);
         }
 
+        // 셧다운 훅: 잠금을 잡은 직후에 건다. 그래야 뜨는 도중(실행 상태 파일을 쓴 뒤, bind 전)에 신호를 받아도
+        // 3.2의 「내려가는 차례」가 돌아 실행 상태 파일을 지우고 잠금을 놓는다. 신호로 끝나면 128 + 신호 번호다
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            doTeardown();
+        }, "wl-shutdown-hook"));
+
         // 4. 활동 시각 초기화
         Instant initialLastActiveAt = Instant.now();
         AtomicReference<Instant> lastActiveAtRef = new AtomicReference<>(initialLastActiveAt);
@@ -149,11 +155,6 @@ public final class ServeMode {
             doTeardown();
             System.exit(1);
         }
-
-        // 8. 셧다운 훅 등록 (신호 수신 시 128 + signum 등으로 종료)
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            doTeardown();
-        }, "wl-shutdown-hook"));
 
         // 9. 정비 스레드 시작 (5초 간격)
         Thread maintThread = new Thread(() -> {
@@ -304,7 +305,8 @@ public final class ServeMode {
 
         // 소켓 파일 삭제 및 로그
         try {
-            if (socketPath != null && Files.deleteIfExists(socketPath)) {
+            // 이 프로세스가 연 소켓만 지운다. bind 전에 내려가면 소켓 자리는 다음 엔진의 8번이 치운다
+            if (serverChannel != null && socketPath != null && Files.deleteIfExists(socketPath)) {
                 System.err.println("소켓을 닫았다: " + socketPath);
             }
         } catch (Exception ignored) {}

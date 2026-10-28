@@ -24,7 +24,7 @@ public final class SetFavorite {
     public static final String USAGE =
             "set-favorite <노트 id> [favorite=true|false. 안 주면 지금 값을 뒤집는다] [category=<라벨. 빈 값이면 지운다>] [f1=<직전에 읽은 토큰>]";
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
 
     private SetFavorite() {}
 
@@ -166,8 +166,8 @@ public final class SetFavorite {
                 note,
                 f1Token,
                 newFavorite,
-                newCategory,
-                note.meta().evaluation(),
+                categoryGiven ? newCategory : MetaWriter.asIndexed(newCategory),
+                MetaWriter.asIndexed(note.meta().evaluation()),
                 note.meta().links(),
                 isTool,
                 sessionId

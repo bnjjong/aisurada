@@ -102,15 +102,10 @@ public final class MetaWriter {
             }
         }
 
-        // 11.6: 색인을 거친 제목, 태그, 즐겨찾기 분류, 평가 메모는 짝 없는 서로게이트가 ?로 저장돼 있다.
-        // 이번 호출이 새로 준 값(인자에서 온 라벨과 평가)은 색인을 안 거쳐 그대로 둔다(15.9의 4번)
-        String indexedCategory = favoriteCategory == note.meta().favoriteCategory()
-                ? asIndexed(favoriteCategory) : favoriteCategory;
+        // 11.6: 색인을 거친 제목과 태그는 짝 없는 서로게이트가 ?로 저장돼 있다.
+        // 즐겨찾기 분류와 평가는 부르는 쪽이 색인에서 온 값에만 asIndexed를 걸어 넘긴다(15.9의 4번)
+        String indexedCategory = favoriteCategory;
         Map<String, Object> indexedEvaluation = evaluation;
-        if (evaluation != null && evaluation == note.meta().evaluation() && evaluation.get("note") instanceof String n) {
-            indexedEvaluation = new LinkedHashMap<>(evaluation);
-            indexedEvaluation.put("note", asIndexed(n));
-        }
         List<String> indexedTags = note.meta().tags() == null ? null
                 : note.meta().tags().stream().map(MetaWriter::asIndexed).toList();
 
@@ -205,6 +200,16 @@ public final class MetaWriter {
     }
 
     /** 색인(SQLite)에 UTF-8로 넣었다 꺼낸 글자처럼, 짝 없는 서로게이트를 ?로 바꿉니다(11.6). */
+    /** 색인에서 온 평가의 메모에 asIndexed를 건 사본입니다. 평가가 없으면 null입니다. */
+    public static Map<String, Object> asIndexed(Map<String, Object> evaluation) {
+        if (evaluation == null || !(evaluation.get("note") instanceof String n)) {
+            return evaluation;
+        }
+        Map<String, Object> copy = new LinkedHashMap<>(evaluation);
+        copy.put("note", asIndexed(n));
+        return copy;
+    }
+
     public static String asIndexed(String s) {
         return s == null ? null : new String(Utf16.toUtf8BytesWithQuestionForUnpaired(s), StandardCharsets.UTF_8);
     }

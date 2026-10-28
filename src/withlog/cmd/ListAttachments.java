@@ -22,8 +22,8 @@ import java.util.regex.Pattern;
  */
 public final class ListAttachments {
 
-    private static final Pattern NOTE_ID_PATTERN = Pattern.compile("^nd[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Pattern SUB_NOTE_ID_PATTERN = Pattern.compile("^sn[0-9a-z]+-[0-9a-f]{8}$");
+    private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
+    private static final Pattern SUB_NOTE_ID_PATTERN = withlog.text.IdShape.SUB_NOTE;
     private static final Pattern ATTACH_EXT_PATTERN = Pattern.compile("\\.[A-Za-z0-9]+$");
 
     private static final Set<String> IMAGE_EXTENSIONS = Set.of(
