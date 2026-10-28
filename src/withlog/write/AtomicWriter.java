@@ -31,7 +31,8 @@ public final class AtomicWriter {
         Path normTarget = target.toAbsolutePath().normalize();
         Path parent = normTarget.getParent();
 
-        if (parent != null && !Files.exists(parent)) {
+        // 부모 자리에 폴더가 아닌 것(일반 파일)이 있어도 만들기를 시도해 1번 문구로 선다
+        if (parent != null && !Files.isDirectory(parent)) {
             try {
                 Files.createDirectories(parent);
             } catch (IOException e) {
@@ -72,18 +73,15 @@ public final class AtomicWriter {
             throw new WlException(500, "파일을 쓰지 못했다: " + normTarget);
         }
 
-        // 원자적 이름 바꾸기
+        // 원자적 이름 바꾸기. 원자적이 아닌 옮기기로 다시 하지 않는다.
+        // 그 길은 대상 자리의 빈 폴더를 지우고 파일을 둬서, 실패해야 할 쓰기가 성공한다
         try {
             Files.move(tempPath, normTarget, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (Exception e1) {
+        } catch (Exception e) {
             try {
-                Files.move(tempPath, normTarget, StandardCopyOption.REPLACE_EXISTING);
-            } catch (Exception e2) {
-                try {
-                    Files.deleteIfExists(tempPath);
-                } catch (Exception ignored) {}
-                throw new WlException(500, "파일을 쓰지 못했다: " + normTarget);
-            }
+                Files.deleteIfExists(tempPath);
+            } catch (Exception ignored) {}
+            throw new WlException(500, "파일을 쓰지 못했다: " + normTarget);
         }
     }
 }
