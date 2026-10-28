@@ -1,0 +1,55 @@
+{
+  "before": true,
+  "afterMode": true,
+  "otherVault": false,
+  "backToA": true,
+  "reindexStarts": 1,
+  "reindexEvents": [
+    {
+      "event": "start",
+      "command": "reindex",
+      "vault": "a",
+      "pid": 86441,
+      "at": 1793192570373,
+      "args": [
+        "-jar",
+        "unused.jar",
+        "reindex",
+        "--withlog.vault=/var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/withlog-fixes-20261028-5T39U9/a",
+        "--withlog.db.home=/var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/withlog-fixes-20261028-5T39U9/state"
+      ]
+    },
+    {
+      "event": "end",
+      "command": "reindex",
+      "vault": "a",
+      "pid": 86441,
+      "at": 1793192582375,
+      "args": [
+        "-jar",
+        "unused.jar",
+        "reindex",
+        "--withlog.vault=/var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/withlog-fixes-20261028-5T39U9/a",
+        "--withlog.db.home=/var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/withlog-fixes-20261028-5T39U9/state"
+      ]
+    }
+  ],
+  "lastList": {
+    "event": "end",
+    "command": "list-sub-notes",
+    "vault": "a",
+    "pid": 86723,
+    "at": 1793192582424,
+    "args": [
+      "-jar",
+      "unused.jar",
+      "list-sub-notes",
+      "ndfixture-00000001",
+      "bodies=true",
+      "--withlog.vault=/var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/withlog-fixes-20261028-5T39U9/a",
+      "--withlog.db.home=/var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/withlog-fixes-20261028-5T39U9/state"
+    ]
+  },
+  "afterRemountDisabled": true,
+  "totalReindexStartsAfterTwoIntentionalRuns": 2
+}

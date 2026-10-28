@@ -1,0 +1,33 @@
+{
+  "method": "delayed synthetic executable + actual UI and HTTP host",
+  "delayMs": 8000,
+  "firstRequestButtonDisabled": true,
+  "afterBodyModeSwitchButtonDisabled": false,
+  "maxConcurrentReindex": 2,
+  "events": [
+    {
+      "event": "start",
+      "command": "reindex",
+      "pid": 49534,
+      "at": 1793191345988
+    },
+    {
+      "event": "start",
+      "command": "reindex",
+      "pid": 49561,
+      "at": 1793191347969
+    },
+    {
+      "event": "end",
+      "command": "reindex",
+      "pid": 49534,
+      "at": 1793191353990
+    },
+    {
+      "event": "end",
+      "command": "reindex",
+      "pid": 49561,
+      "at": 1793191355972
+    }
+  ]
+}
