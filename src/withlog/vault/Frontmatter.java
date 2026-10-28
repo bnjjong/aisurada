@@ -33,7 +33,8 @@ public final class Frontmatter {
     static {
         LOADER_OPTIONS = new LoaderOptions();
         LOADER_OPTIONS.setMaxAliasesForCollections(50);
-        LOADER_OPTIONS.setNestingDepthLimit(51);
+        // 1.8: 스칼라까지 노드마다 깊이를 세어 깊이 52의 노드에서 선다. SnakeYAML은 상한+1까지 받아서 50이다
+        LOADER_OPTIONS.setNestingDepthLimit(50);
     }
 
     private Frontmatter() {}

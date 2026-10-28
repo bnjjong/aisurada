@@ -148,6 +148,8 @@ public final class EngineExecutor {
                 response = ListTrash.execute(vaultRoot, parsed);
             } else if ("create-doc".equals(parsed.commandName())) {
                 response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
+            } else if ("update-doc".equals(parsed.commandName())) {
+                response = withlog.cmd.UpdateDoc.execute(vaultRoot, parsed, sessionId);
             } else if ("set-favorite".equals(parsed.commandName())) {
                 response = withlog.cmd.SetFavorite.execute(vaultRoot, parsed, sessionId);
             } else if ("evaluate-doc".equals(parsed.commandName())) {

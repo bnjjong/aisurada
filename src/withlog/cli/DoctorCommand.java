@@ -67,8 +67,8 @@ public final class DoctorCommand {
         }
         Path socketPath = Paths.get(VaultPath.normalize(rawSocket));
         byte[] socketBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
-        if (socketBytes.length > 103) {
-            System.err.println("WL-400 소켓 경로가 103 바이트를 넘는다(" + socketBytes.length + " 바이트): " + socketPath + ". WITHLOG_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+        if (socketBytes.length > 102) {
+            System.err.println("WL-400 소켓 경로가 102 바이트를 넘는다(" + socketBytes.length + " 바이트): " + socketPath + ". WITHLOG_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(2);
             return;
         }
@@ -197,7 +197,7 @@ public final class DoctorCommand {
 
         // --plist 옵션 처리
         if (showPlist) {
-            if (sidecarJar == null || !Files.exists(Paths.get(sidecarJar))) {
+            if (sidecarJar == null) {
                 System.err.println("WL-400 WITHLOG_SIDECAR_JAR 가 없고 설치된 wl-sidecar.jar 도 없다(" +
                         Paths.get(userHome, "Library", "Application Support", "withlog", "bin", "wl-sidecar.jar") +
                         "). `install` 을 돌리거나 jar 의 절대 경로를 WITHLOG_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
@@ -268,7 +268,8 @@ public final class DoctorCommand {
             String[] lines = statusRes.output.split("\n");
             int count = 0;
             for (String l : lines) {
-                if (!l.isBlank() && !l.endsWith(".tmp")) {
+                // 3.6: *.tmp는 뺀다. git은 한글 같은 글자가 든 경로를 따옴표로 감싸서 줄 끝이 .tmp" 이다
+                if (!l.isBlank() && !l.endsWith(".tmp") && !l.endsWith(".tmp\"")) {
                     count++;
                 }
             }
@@ -512,12 +513,22 @@ public final class DoctorCommand {
         pb.redirectErrorStream(true);
         try {
             Process p = pb.start();
+            // 3.8의 30번: 출력은 따로 도는 읽기로 받는다. 끝나기를 먼저 기다리면 파이프가 차서 git이 막힌다
+            java.util.concurrent.CompletableFuture<byte[]> output = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try (java.io.InputStream in = p.getInputStream()) {
+                    return in.readAllBytes();
+                } catch (java.io.IOException e) {
+                    return new byte[0];
+                }
+            });
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
             boolean finished = p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
             if (!finished) {
                 p.destroyForcibly();
                 return new ProcessResult(-1, "");
             }
-            String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            long left = Math.max(0, deadline - System.nanoTime());
+            String out = new String(output.get(left, java.util.concurrent.TimeUnit.NANOSECONDS), StandardCharsets.UTF_8);
             return new ProcessResult(p.exitValue(), out);
         } catch (Exception e) {
             return new ProcessResult(-1, "");

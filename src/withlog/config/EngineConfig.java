@@ -32,6 +32,8 @@ public final class EngineConfig {
     private static final Set<String> TRUTHY_BOOLEANS = Set.of("true", "on", "yes", "1");
     private static final Set<String> FALSY_BOOLEANS = Set.of("false", "off", "no", "0");
 
+    private static volatile EngineConfig active;
+
     private final String rawVault;
     private final String normalizedVault;
     private final String dbHome;
@@ -69,6 +71,12 @@ public final class EngineConfig {
     public boolean autocommitEnabled() { return autocommitEnabled; }
     public long autocommitIdleSeconds() { return autocommitIdleSeconds; }
     public boolean snapshotEnabled() { return snapshotEnabled; }
+
+    /** 엔진이 뜰 때 검증한 설정을 프로세스에 둡니다. 명령이 설정을 다시 읽으면 명령줄 칸을 놓치기 때문입니다(1.3, 33.1). */
+    public static void activate(EngineConfig config) { active = config; }
+
+    /** 뜰 때 검증한 설정입니다. 엔진 진입점을 안 거친 호출이면 null입니다. */
+    public static EngineConfig active() { return active; }
 
     /**
      * CLI argv에서 설정 칸을 읽어옵니다.

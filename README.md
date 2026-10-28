@@ -6,7 +6,7 @@ withlog vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 4개입니다. 새 노트를 만드는 `create_doc`, 그리고 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`입니다.
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 5개입니다. 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 그리고 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`입니다.
 
 엔진은 두 가지 모양으로 돕니다.
 
@@ -28,11 +28,12 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 | `list_trash` | 휴지통 |
 | `reindex` | vault를 한 번 훑어 읽지 못한 파일이 있는지 알려 준다 |
 | `create_doc` | 새 노트 1건을 쓴다. 없는 아젠다면 아젠다 파일도 만들고, 같은 제목이나 들여쓴 블록 같은 경고 5가지를 함께 답한다 |
+| `update_doc` | 제목, 본문, 태그, 템플릿, 날짜, 시각, 소요 시간을 고치고 그 값으로 다시 계산한 자리로 옮긴다. 폴더 노트는 폴더째 옮기고, 옛 단일 파일은 폴더로 올리거나 이름만 바꾼다 |
 | `set_favorite` | 즐겨찾기 별과 라벨을 고친다. 값이 그대로면 파일을 안 연다 |
 | `evaluate_doc` | 평가(점수, 메모, 시각)를 새기거나 지운다 |
 | `link_docs` | 다른 노트로의 연결 1건을 잇거나 끊는다. 없는 노트로 이으면 경고를 싣는다 |
 
-도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 메타를 고치는 3개는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `update_doc` 같은 다른 쓰기 명령처럼 이 판에 없는 명령은 `WL-409`로 답합니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. vault의 git 자동 커밋은 짓지 않았습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다.
+도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. `update_doc`과 메타를 고치는 3개는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `update_sub_note` 같은 다른 쓰기 명령처럼 이 판에 없는 명령은 `WL-409`로 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. vault의 git 자동 커밋은 짓지 않았습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다.
 
 ## 빌드
 
@@ -140,7 +141,7 @@ java -jar dist/wl-cli.jar list_tags '{}'
 | 이름 | 쓰임 | 기본값 |
 |---|---|---|
 | `WITHLOG_VAULT` | vault 폴더 | 없음 |
-| `WITHLOG_SIDECAR_SOCKET` | 소켓 자리. 103바이트 이하 | `~/Library/Caches/withlog/wl-<해시>.sock` |
+| `WITHLOG_SIDECAR_SOCKET` | 소켓 자리. 102바이트 이하 | `~/Library/Caches/withlog/wl-<해시>.sock` |
 | `WITHLOG_SIDECAR_JAR` | plist에 실을 엔진 jar | `install`로 깐 jar |
 | `WITHLOG_SIDECAR_JAVA` | plist에 실을 `java` | `wl-cli`를 돌리는 JVM의 `java` |
 | `WITHLOG_CLI_JAR` | `install`이 깔 `wl-cli.jar` 원본 | 없음 |
@@ -173,8 +174,8 @@ serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으�
 | `serve` | 소켓, 잠금, 실행 상태 파일, 유휴 종료 |
 | `frame` | 소켓 위의 요청 프레임(`WLQ1`)과 응답 프레임(`WLG1`) |
 | `args` | 도구 표면의 JSON 인자와 명령 표면의 `key=value` 인자 읽기 |
-| `cmd` | 명령 17개와 이름 목록 |
-| `write` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, id와 폴더 이름, 프론트매터 YAML, 경고, 선결 조건 토큰, 편집 도장, 메타 쓰기 |
+| `cmd` | 명령 18개와 이름 목록 |
+| `write` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 프론트매터 YAML, 경고, 선결 조건 토큰, 편집 도장, 메타 쓰기 |
 | `vault` | 아젠다, 노트, 템플릿, 회고, 휴지통을 읽는 부품 |
 | `text` | 다듬기, UTF-16 자르기, URI 등 글 도구 |
 | `out` | 정해진 바이트 모양의 JSON 쓰기 |

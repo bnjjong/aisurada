@@ -68,8 +68,8 @@ public final class ServeMode {
         socketPath = Paths.get(VaultPath.normalize(rawSocket));
 
         byte[] socketPathBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
-        if (socketPathBytes.length > 103) {
-            System.err.println("소켓 경로가 103 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". WITHLOG_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+        if (socketPathBytes.length > 102) {
+            System.err.println("소켓 경로가 102 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". WITHLOG_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(1);
         }
 

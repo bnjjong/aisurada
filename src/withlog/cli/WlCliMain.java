@@ -166,8 +166,8 @@ public final class WlCliMain {
         }
         Path socketPath = Paths.get(VaultPath.normalize(rawSocket));
         byte[] socketPathBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
-        if (socketPathBytes.length > 103) {
-            System.err.println("WL-400 소켓 경로가 103 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". WITHLOG_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+        if (socketPathBytes.length > 102) {
+            System.err.println("WL-400 소켓 경로가 102 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". WITHLOG_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(2);
             return;
         }
@@ -343,8 +343,9 @@ public final class WlCliMain {
     }
 
     private static void launchEngine(String userHome, String uid, String vaultKey, String label, String normalizedVault, Path socketPath) {
+        // 3.4: WITHLOG_SIDECAR_JAR는 상대 경로든 없는 파일이든 확인 없이 싣는다. 못 정했을 때만 선다
         String sidecarJar = PlistGenerator.resolveSidecarJar(userHome);
-        if (sidecarJar == null || !Files.exists(Paths.get(sidecarJar))) {
+        if (sidecarJar == null) {
             Path installed = Paths.get(userHome, "Library", "Application Support", "withlog", "bin", "wl-sidecar.jar");
             System.err.println("WL-400 WITHLOG_SIDECAR_JAR 가 없고 설치된 wl-sidecar.jar 도 없다(" + installed + "). `install` 을 돌리거나 jar 의 절대 경로를 WITHLOG_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
             System.exit(2);

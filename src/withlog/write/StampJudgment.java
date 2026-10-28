@@ -51,6 +51,40 @@ public final class StampJudgment {
             boolean isToolSurface,
             String currentSessionId
     ) {
+        return judge(format, body, body, rawYamlMapFromFile, id, agenda, type, title, created, sessionId, mins, tier,
+                oldEditedBy, oldEditedAt, oldEditedSessionId, tags, favorite, favoriteCategory, template,
+                evaluation, links, isToolSurface, currentSessionId);
+    }
+
+    /**
+     * 본문까지 바꾸는 쓰기의 도장 판정입니다. A와 새 글은 [body]로, B는 옛 파일의 [oldBody]로 짓습니다.
+     * 그래서 본문만 바꿔도 A와 B가 달라 새 도장이 찍힙니다(1.10, 14.5의 10번).
+     */
+    public static JudgmentResult judge(
+            String format,
+            String body,
+            String oldBody,
+            Map<?, ?> rawYamlMapFromFile,
+            String id,
+            String agenda,
+            String type,
+            String title,
+            String created,
+            String sessionId,
+            int mins,
+            String tier,
+            String oldEditedBy,
+            String oldEditedAt,
+            String oldEditedSessionId,
+            List<String> tags,
+            boolean favorite,
+            String favoriteCategory,
+            String template,
+            Map<String, Object> evaluation,
+            List<Map<String, String>> links,
+            boolean isToolSurface,
+            String currentSessionId
+    ) {
         String openFence;
         String closeFence;
         if ("html".equalsIgnoreCase(format)) {
@@ -71,7 +105,7 @@ public final class StampJudgment {
 
         // 2. Form B: 옛 파일의 YAML 맵 전체를 1.9로 다시 찍고, 울타리로 감싸고, 옛 본문을 붙임
         String frontmatterB = FrontmatterWriter.dumpGeneralMap(rawYamlMapFromFile);
-        String formB = openFence + frontmatterB + closeFence + body;
+        String formB = openFence + frontmatterB + closeFence + oldBody;
 
         // 3. A와 B 맞대기
         if (formA.equals(formB)) {

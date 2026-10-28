@@ -9,7 +9,6 @@ import withlog.text.Trim;
 import withlog.text.Uri;
 import withlog.text.Utf16;
 import withlog.config.EngineConfig;
-import withlog.vault.AgendaReader;
 import withlog.vault.AgendaTable;
 import withlog.vault.NoteFile;
 import withlog.vault.NoteIndex;
@@ -20,6 +19,7 @@ import withlog.write.DocToken;
 import withlog.write.FrontmatterWriter;
 import withlog.write.IdGenerator;
 import withlog.write.PathConfinement;
+import withlog.write.ShardLayout;
 import withlog.write.SlugBuilder;
 import withlog.write.TestApparatus;
 import withlog.write.TimeScheduler;
@@ -27,7 +27,6 @@ import withlog.write.WarningsDetector;
 import withlog.write.WorkspaceMarker;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -43,8 +42,8 @@ import java.util.regex.Pattern;
  * 아젠다 조회/생성(13.5), 시각 배정, 중복 경고 및 원자적 쓰기를 수행합니다.
  */
 public final class CreateDoc {
-    private static final DateTimeFormatter CREATED_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final DateTimeFormatter CREATED_MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
+    static final DateTimeFormatter CREATED_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    static final DateTimeFormatter CREATED_MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
 
 
     public static final String USAGE = "create-doc agenda=<slug 또는 이름> type=<유형> title=<제목> body=<본문> " +
@@ -61,7 +60,7 @@ public final class CreateDoc {
 
     private static final Pattern DATE_SYNTAX_PATTERN = Pattern.compile("^(?:[0-9]{4}|\\+[0-9]{5,10}|-[0-9]{4,10})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$");
     private static final Pattern TIME_SYNTAX_PATTERN = Pattern.compile("^([01][0-9]|2[0-3]):[0-5][0-9]$");
-    private static final Pattern TEMPLATE_ID_PATTERN = Pattern.compile("^[A-Za-z0-9._-]{1,128}$");
+    static final Pattern TEMPLATE_ID_PATTERN = Pattern.compile("^[A-Za-z0-9._-]{1,128}$");
 
     private CreateDoc() {}
 
@@ -80,9 +79,7 @@ public final class CreateDoc {
         WorkspaceMarker.check(vaultRoot);
 
         // 5. 색인 맞추기 (7.1 step 3, 13.4 row 9) - 아젠다 치명 오류 시 즉시 중단
-        AgendaReader.ScanResult agendaScan = AgendaReader.scanAgendas(vaultRoot, true);
-        NoteScanner.ScanResult noteScan = NoteScanner.scan(vaultRoot, agendaScan.table(), true);
-        NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
 
         // 7. 값 읽기 및 의미론 검증 (13.3, 13.4 rows 10-23)
         Map<String, String> opts = parsed.namedOptions();
@@ -233,7 +230,7 @@ public final class CreateDoc {
         String warning = WarningsDetector.detectWarnings(isTool, rawBody, rawTitle, sameAgendaNotes);
 
         // 노트 폴더 및 파일 경로 계산
-        boolean isSharded = isShardedVault(vaultRoot);
+        boolean isSharded = ShardLayout.isSharded(vaultRoot);
         String relParent;
         if (isSharded) {
             // 1.3: 샤드 연월은 created의 연월이다
@@ -307,7 +304,7 @@ public final class CreateDoc {
         return resp;
     }
 
-    private static LocalDate validateAndParseDate(String dateStr) {
+    static LocalDate validateAndParseDate(String dateStr) {
         if (!DATE_SYNTAX_PATTERN.matcher(dateStr).matches() || dateStr.startsWith("-0000-")) {
             throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
         }
@@ -350,7 +347,7 @@ public final class CreateDoc {
         return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
     }
 
-    private static LocalTime validateAndParseTime(String timeStr) {
+    static LocalTime validateAndParseTime(String timeStr) {
         if (!TIME_SYNTAX_PATTERN.matcher(timeStr).matches()) {
             throw new WlException(400, "time 은 HH:MM 모양이어야 한다: " + timeStr);
         }
@@ -360,7 +357,7 @@ public final class CreateDoc {
         return LocalTime.of(hour, minute);
     }
 
-    private static int parseMins(String trimmed) {
+    static int parseMins(String trimmed) {
         // 부호 0~1개 뒤 Unicode Nd 숫자 1개 이상
         int start = 0;
         boolean negative = false;
@@ -561,7 +558,7 @@ public final class CreateDoc {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<String> parseAndValidateTags(
+    static List<String> parseAndValidateTags(
             boolean isTool,
             Map<String, Object> toolOpts,
             Map<String, String> opts
@@ -707,69 +704,7 @@ public final class CreateDoc {
         return chosen;
     }
 
-    private static boolean isShardedVault(Path vaultRoot) {
-        String prop = System.getProperty(EngineConfig.WITHLOG_NOTES_SHARD_BY_MONTH);
-        if (prop == null || prop.trim().isEmpty()) {
-            prop = System.getenv("WITHLOG_NOTES_SHARD_BY_MONTH");
-        }
-        if (prop != null) {
-            String trimmed = prop.trim();
-            if ("true".equalsIgnoreCase(trimmed) || "on".equalsIgnoreCase(trimmed) || "yes".equalsIgnoreCase(trimmed) || "1".equals(trimmed)) {
-                return true;
-            }
-            if ("false".equalsIgnoreCase(trimmed) || "off".equalsIgnoreCase(trimmed) || "no".equalsIgnoreCase(trimmed) || "0".equals(trimmed)) {
-                return false;
-            }
-        }
-
-        // 디스크 판정 (1.3)
-        Path notesDir = vaultRoot.resolve("notes");
-        if (!Files.isDirectory(notesDir)) {
-            return false;
-        }
-
-        Pattern ymPattern = Pattern.compile("^[0-9]{4}-(0[1-9]|1[0-2])$");
-        try (DirectoryStream<Path> agendaDirs = Files.newDirectoryStream(notesDir)) {
-            for (Path aDir : agendaDirs) {
-                if (!Files.isDirectory(aDir)) continue;
-                try (DirectoryStream<Path> ymDirs = Files.newDirectoryStream(aDir)) {
-                    for (Path ymDir : ymDirs) {
-                        if (!Files.isDirectory(ymDir)) continue;
-                        if (ymPattern.matcher(ymDir.getFileName().toString()).matches()) {
-                            if (containsDirectNote(ymDir)) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (IOException ignored) {}
-        return false;
-    }
-
-    private static boolean containsDirectNote(Path dir) {
-        try (DirectoryStream<Path> entries = Files.newDirectoryStream(dir)) {
-            for (Path entry : entries) {
-                String name = entry.getFileName().toString();
-                if (Files.isDirectory(entry)) {
-                    if (Files.isRegularFile(entry.resolve("note.md")) ||
-                            Files.isRegularFile(entry.resolve("note.json")) ||
-                            Files.isRegularFile(entry.resolve("note.html"))) {
-                        return true;
-                    }
-                } else {
-                    if (name.endsWith(".md") || name.endsWith(".html") || name.endsWith(".json")) {
-                        if (!"comments.json".equals(name) && !"ask.json".equals(name)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        } catch (IOException ignored) {}
-        return false;
-    }
-
-    private static String extractIdTail(String id) {
+    static String extractIdTail(String id) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < id.length(); i++) {
             char c = id.charAt(i);

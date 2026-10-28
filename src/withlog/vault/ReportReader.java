@@ -62,7 +62,7 @@ public final class ReportReader {
         LOADER_OPTIONS = new LoaderOptions();
         LOADER_OPTIONS.setCodePointLimit(1_000_000);
         LOADER_OPTIONS.setMaxAliasesForCollections(50);
-        LOADER_OPTIONS.setNestingDepthLimit(51);
+        LOADER_OPTIONS.setNestingDepthLimit(50); // 1.8과 같다(Frontmatter 참고)
     }
 
     private ReportReader() {}

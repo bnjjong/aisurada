@@ -420,6 +420,21 @@ public final class NoteMeta {
         return new CreatedResult(formattedCreated, outDate, time, utcInstant);
     }
 
+    /** 1.8의 at 규칙 1번(순간)이나 2번(created 꼴)으로 읽히는 글인지 봅니다. 코멘트 색인 사본(1.12)이 씁니다. */
+    static boolean readsAsAt(String s) {
+        if (s == null || Trim.isBlank(s)) return false;
+        try {
+            Instant.parse(s.replace('t', 'T').replace('z', 'Z'));
+            return true;
+        } catch (DateTimeParseException e) {
+            try {
+                return parseCreated(s) != null;
+            } catch (RuntimeException e2) {
+                return false;
+            }
+        }
+    }
+
     private static String parseEvaluationAt(String s, String fallbackUtcInstant) {
         if (s == null || s.isEmpty()) return fallbackUtcInstant;
         if (Trim.isBlank(s)) return fallbackUtcInstant;

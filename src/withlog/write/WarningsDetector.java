@@ -300,13 +300,23 @@ public final class WarningsDetector {
         if (body == null || body.indexOf('\uFFFD') < 0) {
             return null;
         }
+        return brokenCharWarning(body, countBrokenChars(body));
+    }
 
+    /** 글에 든 U+FFFD 개수입니다. */
+    public static int countBrokenChars(String s) {
         int count = 0;
-        for (int i = 0; i < body.length(); i++) {
-            if (body.charAt(i) == '\uFFFD') {
+        if (s == null) return 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\uFFFD') {
                 count++;
             }
         }
+        return count;
+    }
+
+    /** U+FFFD 경고 문구입니다. [count]는 늘어난 개수이고, 자리는 [body]에서 셉니다. */
+    public static String brokenCharWarning(String body, int count) {
 
         String normalized = body.replace("\r\n", "\n").replace("\r", "\n");
         String[] lines = normalized.split("\n", -1);

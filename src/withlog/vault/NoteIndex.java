@@ -56,6 +56,18 @@ public final class NoteIndex {
     }
 
     /**
+     * 쓰기 깃발 명령의 색인 맞추기(7.1의 3번, 8.3)로 vault를 훑어 NoteIndex를 생성합니다.
+     * 읽기용 fresh와 달리 맞추기를 세우는 파일(8.7의 4번, 20.9의 13번, 1.15의 6번)을 만나면
+     * 그 자리에서 던져서, 쓰기는 일을 안 하고 실패로 끝납니다. 8.6 「남는 차이」의 마지막 줄은
+     * 읽기의 규칙이라 쓰기에는 안 걸립니다.
+     */
+    public static NoteIndex reconciled(Path vaultRoot) {
+        AgendaReader.ScanResult aScan = AgendaReader.scanAgendas(vaultRoot, true);
+        NoteScanner.ScanResult nScan = NoteScanner.scan(vaultRoot, aScan.table(), true);
+        return new NoteIndex(vaultRoot, aScan, nScan);
+    }
+
+    /**
      * 호환성을 위해 유지되는 메서드로, 항상 fresh(vaultRoot)를 호출합니다.
      */
     public static NoteIndex get(Path vaultRoot) {

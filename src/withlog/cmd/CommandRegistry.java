@@ -105,11 +105,12 @@ public final class CommandRegistry {
     );
 
     /**
-     * 현재 1부 엔진 구현에서 지원하는 12개 읽기 명령(두 표면 24개) 및 reindex 여부를 확인합니다.
+     * 이 판이 지은 명령인지 확인합니다. 읽기 명령 13개와 reindex, 쓰기 명령 5개(create_doc, update_doc, set_favorite, evaluate_doc, link_docs)다.
      */
     public static boolean isSupported(String name) {
         return "reindex".equals(name) ||
                 "create_doc".equals(name) || "create-doc".equals(name) ||
+                "update_doc".equals(name) || "update-doc".equals(name) ||
                 "set_favorite".equals(name) || "set-favorite".equals(name) ||
                 "evaluate_doc".equals(name) || "evaluate-doc".equals(name) ||
                 "link_docs".equals(name) || "link-docs".equals(name) ||

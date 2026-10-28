@@ -51,6 +51,7 @@ public class Main {
         EngineConfig config;
         try {
             config = EngineConfig.loadAndValidate(cliOpts);
+            EngineConfig.activate(config);
         } catch (Exception e) {
             // 설정 값 타입 불일치 또는 vault 폴더 유효성 검증 실패 -> stdout 0바이트, 종료 코드 1
             System.err.println("엔진 조립 실패: " + e.getMessage());

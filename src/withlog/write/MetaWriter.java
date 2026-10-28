@@ -4,7 +4,6 @@ import withlog.cli.WlException;
 import withlog.text.Trim;
 import withlog.text.Utf16;
 import withlog.vault.Frontmatter;
-import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 import withlog.vault.StrictUtf8;
 
@@ -67,41 +66,10 @@ public final class MetaWriter {
         } catch (Exception e) {
             throw new WlException(500, "노트 본문 파일을 못 읽어 메타를 저장하지 않았다: " + targetRelPath);
         }
-        if (content.startsWith("\uFEFF")) {
-            content = content.substring(1);
-        }
-
-        String yamlPart = null;
-        String rawBody = "";
-        boolean fenceFound = false;
-
-        if (content.startsWith("<!--withlog")) {
-            int closeIdx = content.indexOf("\n-->", 11);
-            if (closeIdx != -1) {
-                yamlPart = content.substring(11, closeIdx);
-                rawBody = content.substring(closeIdx + 4);
-                fenceFound = true;
-            }
-        } else if (content.startsWith("---")) {
-            int firstLf = content.indexOf('\n', 3);
-            if (firstLf != -1) {
-                int closeIdx = content.indexOf("\n---", firstLf);
-                if (closeIdx != -1) {
-                    yamlPart = content.substring(firstLf + 1, closeIdx + 1);
-                    rawBody = content.substring(closeIdx + 4);
-                    fenceFound = true;
-                }
-            }
-        }
-
-        // 본문 앞 줄바꿈 정리 (1.6 6번): \r\n 1개 떼고, 이어서 \n 1개 뗌
-        String body = rawBody;
-        if (body.startsWith("\r\n")) {
-            body = body.substring(2);
-        }
-        if (body.startsWith("\n")) {
-            body = body.substring(1);
-        }
+        FileParts fileParts = split(content);
+        String yamlPart = fileParts.yamlPart();
+        String body = fileParts.body();
+        boolean fenceFound = fileParts.fenceFound();
 
         // 4. 프론트매터 확인 (7.2 step 6)
         if (!fenceFound || yamlPart == null || yamlPart.length() > 16_000) {
@@ -183,8 +151,7 @@ public final class MetaWriter {
         byte[] writeBytes = newFileText.getBytes(StandardCharsets.UTF_8);
         AtomicWriter.writeAtomic(contentPath, writeBytes);
 
-        // 8. vault 색인 갱신 (15.5 8번)
-        NoteIndex.fresh(vaultRoot);
+        // 8. 쓴 뒤의 색인 맞추기(15.5 8번)는 할 일이 없다. 이 엔진은 부를 때마다 디스크를 훑는다(8.6의 4번)
 
         // 새 선결 조건 토큰 계산
         String newToken = DocToken.compute(writeBytes);
@@ -192,8 +159,53 @@ public final class MetaWriter {
         return new WriteResult(note.vaultRelPath(), newToken, judgment);
     }
 
+    /** 본문 파일 글을 울타리 안의 YAML 조각과 본문으로 가른 결과입니다. */
+    public record FileParts(String yamlPart, String body, boolean fenceFound) {}
+
+    /**
+     * 본문 파일 글에서 BOM을 떼고 울타리(1.6)로 프론트매터 조각과 본문을 가릅니다.
+     * 본문은 닫는 울타리 뒤의 \r\n 1개와 이어서 \n 1개를 뗀 글입니다(1.6의 6번).
+     */
+    public static FileParts split(String content) {
+        if (content.startsWith("\uFEFF")) {
+            content = content.substring(1);
+        }
+
+        String yamlPart = null;
+        String rawBody = "";
+        boolean fenceFound = false;
+
+        if (content.startsWith("<!--withlog")) {
+            int closeIdx = content.indexOf("\n-->", 11);
+            if (closeIdx != -1) {
+                yamlPart = content.substring(11, closeIdx);
+                rawBody = content.substring(closeIdx + 4);
+                fenceFound = true;
+            }
+        } else if (content.startsWith("---")) {
+            int firstLf = content.indexOf('\n', 3);
+            if (firstLf != -1) {
+                int closeIdx = content.indexOf("\n---", firstLf);
+                if (closeIdx != -1) {
+                    yamlPart = content.substring(firstLf + 1, closeIdx + 1);
+                    rawBody = content.substring(closeIdx + 4);
+                    fenceFound = true;
+                }
+            }
+        }
+
+        String body = rawBody;
+        if (body.startsWith("\r\n")) {
+            body = body.substring(2);
+        }
+        if (body.startsWith("\n")) {
+            body = body.substring(1);
+        }
+        return new FileParts(yamlPart, body, fenceFound);
+    }
+
     /** 색인(SQLite)에 UTF-8로 넣었다 꺼낸 글자처럼, 짝 없는 서로게이트를 ?로 바꿉니다(11.6). */
-    private static String asIndexed(String s) {
+    public static String asIndexed(String s) {
         return s == null ? null : new String(Utf16.toUtf8BytesWithQuestionForUnpaired(s), StandardCharsets.UTF_8);
     }
 }

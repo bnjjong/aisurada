@@ -428,6 +428,75 @@ public final class ArgsParser {
             }
 
             return new ParsedArgs(true, "create-doc", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
+        } else if ("update_doc".equals(toolName)) {
+            // 14.3의 2번: 칸은 id, body, title, tags, template, f1 차례로 본다
+            List<String> allowed = List.of("id", "body", "title", "tags", "template", "f1");
+            validateKeys(toolName, props.keySet(), allowed);
+
+            if (!props.containsKey("id")) {
+                throw new WlException(400, "인자 검증 실패(update_doc): id 가 필요하다.");
+            }
+            JsonValue idVal = props.get("id");
+            if (!(idVal instanceof JsonValue.JsonString sId)) {
+                throw new WlException(400, "인자 검증 실패(update_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+            }
+            Map<String, Object> toolOpts = new LinkedHashMap<>();
+            toolOpts.put("id", sId.value());
+
+            if (props.containsKey("body")) {
+                JsonValue bodyVal = props.get("body");
+                if (!(bodyVal instanceof JsonValue.JsonString sBody)) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): body 는 문자열 여야 한다: " + JsonCompact.compact(bodyVal));
+                }
+                if (sBody.value().length() > 200000) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): body 가 너무 길다(최대 200000자): " + sBody.value().length() + "자");
+                }
+                toolOpts.put("body", sBody.value());
+            }
+            if (props.containsKey("title")) {
+                JsonValue titleVal = props.get("title");
+                if (!(titleVal instanceof JsonValue.JsonString sTitle)) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): title 는 문자열 여야 한다: " + JsonCompact.compact(titleVal));
+                }
+                toolOpts.put("title", sTitle.value());
+            }
+            if (props.containsKey("tags")) {
+                JsonValue tagsVal = props.get("tags");
+                if (!(tagsVal instanceof JsonValue.JsonArray arr)) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                }
+                for (JsonValue el : arr.elements()) {
+                    if (!(el instanceof JsonValue.JsonString)) {
+                        throw new WlException(400, "인자 검증 실패(update_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                    }
+                }
+                if (arr.elements().size() > 50) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): tags 항목이 너무 많다(최대 50개): " + arr.elements().size() + "개");
+                }
+                List<String> rawTags = new ArrayList<>();
+                for (JsonValue el : arr.elements()) {
+                    rawTags.add(((JsonValue.JsonString) el).value());
+                }
+                toolOpts.put("tags", rawTags);
+            }
+            if (props.containsKey("template")) {
+                JsonValue templateVal = props.get("template");
+                if (!(templateVal instanceof JsonValue.JsonString sTemplate)) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): template 는 문자열 여야 한다: " + JsonCompact.compact(templateVal));
+                }
+                if (sTemplate.value().length() > 200) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): template 가 너무 길다(최대 200자): " + sTemplate.value().length() + "자");
+                }
+                toolOpts.put("template", sTemplate.value());
+            }
+            if (props.containsKey("f1")) {
+                JsonValue f1Val = props.get("f1");
+                if (!(f1Val instanceof JsonValue.JsonString sF1)) {
+                    throw new WlException(400, "인자 검증 실패(update_doc): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                }
+                toolOpts.put("f1", sF1.value());
+            }
+            return new ParsedArgs(true, "update-doc", List.of(sId.value()), Collections.emptyMap(), null, toolOpts);
         } else if ("set_favorite".equals(toolName)) {
             List<String> allowed = List.of("id", "favorite", "category", "f1");
             validateKeys(toolName, props.keySet(), allowed);
@@ -690,6 +759,11 @@ public final class ArgsParser {
                 );
                 maxPositional = 0;
                 usage = withlog.cmd.CreateDoc.USAGE;
+            }
+            case "update-doc" -> {
+                allowedOptions = List.of("body", "date", "f1", "mins", "tags", "template", "time", "title");
+                maxPositional = 1;
+                usage = withlog.cmd.UpdateDoc.USAGE;
             }
             case "set-favorite" -> {
                 allowedOptions = List.of("category", "f1", "favorite");
