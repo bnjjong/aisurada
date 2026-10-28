@@ -288,6 +288,146 @@ public final class ArgsParser {
             List<String> allowed = Collections.emptyList();
             validateKeys(toolName, props.keySet(), allowed);
             return new ParsedArgs(true, "list-trash", Collections.emptyList(), Collections.emptyMap(), null, Collections.emptyMap());
+        } else if ("create_doc".equals(toolName)) {
+            List<String> allowed = List.of("agenda", "type", "title", "body", "date", "time", "format", "links", "tags", "template");
+            validateKeys(toolName, props.keySet(), allowed);
+
+            Map<String, Object> toolOpts = new LinkedHashMap<>();
+
+            // 1. agenda
+            if (!props.containsKey("agenda")) {
+                throw new WlException(400, "인자 검증 실패(create_doc): agenda 가 필요하다.");
+            }
+            JsonValue agendaVal = props.get("agenda");
+            if (!(agendaVal instanceof JsonValue.JsonString sAgenda)) {
+                throw new WlException(400, "인자 검증 실패(create_doc): agenda 는 문자열 여야 한다: " + JsonCompact.compact(agendaVal));
+            }
+            toolOpts.put("agenda", sAgenda.value());
+
+            // 2. type
+            if (!props.containsKey("type")) {
+                throw new WlException(400, "인자 검증 실패(create_doc): type 가 필요하다.");
+            }
+            JsonValue typeVal = props.get("type");
+            if (!(typeVal instanceof JsonValue.JsonString sType)) {
+                throw new WlException(400, "인자 검증 실패(create_doc): type 는 문자열 여야 한다: " + JsonCompact.compact(typeVal));
+            }
+            toolOpts.put("type", sType.value());
+
+            // 3. title
+            if (!props.containsKey("title")) {
+                throw new WlException(400, "인자 검증 실패(create_doc): title 가 필요하다.");
+            }
+            JsonValue titleVal = props.get("title");
+            if (!(titleVal instanceof JsonValue.JsonString sTitle)) {
+                throw new WlException(400, "인자 검증 실패(create_doc): title 는 문자열 여야 한다: " + JsonCompact.compact(titleVal));
+            }
+            toolOpts.put("title", sTitle.value());
+
+            // 4. body
+            if (!props.containsKey("body")) {
+                throw new WlException(400, "인자 검증 실패(create_doc): body 가 필요하다.");
+            }
+            JsonValue bodyVal = props.get("body");
+            if (!(bodyVal instanceof JsonValue.JsonString sBody)) {
+                throw new WlException(400, "인자 검증 실패(create_doc): body 는 문자열 여야 한다: " + JsonCompact.compact(bodyVal));
+            }
+            if (sBody.value().length() > 200_000) {
+                throw new WlException(400, "인자 검증 실패(create_doc): body 가 너무 길다(최대 200000자): " + sBody.value().length() + "자");
+            }
+            toolOpts.put("body", sBody.value());
+
+            // 5. date
+            if (props.containsKey("date")) {
+                JsonValue dateVal = props.get("date");
+                if (!(dateVal instanceof JsonValue.JsonString sDate)) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): date 는 문자열 여야 한다: " + JsonCompact.compact(dateVal));
+                }
+                toolOpts.put("date", sDate.value());
+            }
+
+            // 6. time
+            if (props.containsKey("time")) {
+                JsonValue timeVal = props.get("time");
+                if (!(timeVal instanceof JsonValue.JsonString sTime)) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): time 는 문자열 여야 한다: " + JsonCompact.compact(timeVal));
+                }
+                toolOpts.put("time", sTime.value());
+            }
+
+            // 7. format
+            if (props.containsKey("format")) {
+                JsonValue formatVal = props.get("format");
+                if (!(formatVal instanceof JsonValue.JsonString sFormat)) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): format 는 문자열 여야 한다: " + JsonCompact.compact(formatVal));
+                }
+                toolOpts.put("format", sFormat.value());
+            }
+
+            // 8. links
+            if (props.containsKey("links")) {
+                JsonValue linksVal = props.get("links");
+                if (!(linksVal instanceof JsonValue.JsonArray arr)) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + JsonCompact.compact(linksVal));
+                }
+                for (JsonValue el : arr.elements()) {
+                    if (!(el instanceof JsonValue.JsonObject)) {
+                        throw new WlException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + JsonCompact.compact(linksVal));
+                    }
+                }
+                if (arr.elements().size() > 200) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): links 항목이 너무 많다(최대 200개): " + arr.elements().size() + "개");
+                }
+                List<Object> rawLinks = new ArrayList<>();
+                for (JsonValue el : arr.elements()) {
+                    JsonValue.JsonObject obj = (JsonValue.JsonObject) el;
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    for (Map.Entry<String, JsonValue> entry : obj.properties().entrySet()) {
+                        if (entry.getValue() instanceof JsonValue.JsonString str) {
+                            map.put(entry.getKey(), str.value());
+                        } else {
+                            map.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    rawLinks.add(map);
+                }
+                toolOpts.put("links", rawLinks);
+            }
+
+            // 9. tags
+            if (props.containsKey("tags")) {
+                JsonValue tagsVal = props.get("tags");
+                if (!(tagsVal instanceof JsonValue.JsonArray arr)) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                }
+                for (JsonValue el : arr.elements()) {
+                    if (!(el instanceof JsonValue.JsonString)) {
+                        throw new WlException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                    }
+                }
+                if (arr.elements().size() > 50) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): tags 항목이 너무 많다(최대 50개): " + arr.elements().size() + "개");
+                }
+                List<String> rawTags = new ArrayList<>();
+                for (JsonValue el : arr.elements()) {
+                    rawTags.add(((JsonValue.JsonString) el).value());
+                }
+                toolOpts.put("tags", rawTags);
+            }
+
+            // 10. template
+            if (props.containsKey("template")) {
+                JsonValue templateVal = props.get("template");
+                if (!(templateVal instanceof JsonValue.JsonString sTemplate)) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): template 는 문자열 여야 한다: " + JsonCompact.compact(templateVal));
+                }
+                if (sTemplate.value().length() > 200) {
+                    throw new WlException(400, "인자 검증 실패(create_doc): template 가 너무 길다(최대 200자): " + sTemplate.value().length() + "자");
+                }
+                toolOpts.put("template", sTemplate.value());
+            }
+
+            return new ParsedArgs(true, "create-doc", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
         } else {
             throw new WlException(400, "미지원 도구: " + toolName);
         }
@@ -396,6 +536,13 @@ public final class ArgsParser {
             case "list-trash" -> {
                 maxPositional = 0;
                 usage = "list-trash";
+            }
+            case "create-doc" -> {
+                allowedOptions = List.of(
+                        "agenda", "body", "date", "format", "links", "mins", "tags", "template", "tier", "time", "title", "type"
+                );
+                maxPositional = 0;
+                usage = withlog.cmd.CreateDoc.USAGE;
             }
             case "reindex" -> {
                 maxPositional = 0;

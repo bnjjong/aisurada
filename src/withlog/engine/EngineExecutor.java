@@ -49,6 +49,12 @@ public final class EngineExecutor {
                 argv.remove(secondFromLast);
             }
         }
+        if (sessionId == null) {
+            String testSessionId = System.getProperty("withlog.test.session.id");
+            if (testSessionId != null && !testSessionId.isEmpty()) {
+                sessionId = testSessionId;
+            }
+        }
 
         // 2. 명령 존재 확인
         if (argv.isEmpty()) {
@@ -140,6 +146,8 @@ public final class EngineExecutor {
                 response = GetReport.execute(vaultRoot, parsed);
             } else if ("list-trash".equals(parsed.commandName())) {
                 response = ListTrash.execute(vaultRoot, parsed);
+            } else if ("create-doc".equals(parsed.commandName())) {
+                response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
             } else {
                 throw new IllegalStateException("Unhandled command: " + parsed.commandName());
             }
