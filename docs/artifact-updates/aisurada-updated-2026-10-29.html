@@ -368,6 +368,7 @@ pre.json .dim { color: var(--muted); }
         <li><a href="#c18"><span class="n">18</span>소켓 프레임</a></li>
         <li><a href="#c19"><span class="n">19</span>wl-cli</a></li>
         <li><a href="#c20"><span class="n">20</span>launchd · 청소</a></li>
+        <li><a href="#engine-chapter20"><span class="n">追</span>Java 엔진 20장 · 완료</a></li>
         <li><a href="#engine-chapter19"><span class="n">追</span>Java 엔진 19장 · 완료</a></li>
         <li><a href="#app-progress"><span class="n">追</span>개발 현황 · withlog 앱 연동</a></li>
         <li><a href="#app-chapter19"><span class="n">追</span>19장 코멘트 · 작업 완료</a></li>
@@ -2237,6 +2238,7 @@ pre.xml .dim { color: var(--muted); }
 
 <section class="ch" id="c17">
   <div class="ch-head"><span class="ch-no">17</span><h2>serve 모드</h2><span class="src">설명서 3.2 · 33.3 · <code>serve/ServeMode</code> · <code>serve/StateFile</code></span></div>
+  <div class="app-progress-link" id="engine-chapter20-summary"><strong>aisurada Java 엔진 20장 반영 완료 · 2026-10-29</strong><p>아젠다 명령 4개(<code>list-agendas</code>·<code>create-agenda</code>·<code>update-agenda</code>·<code>delete-agenda</code>)를 aisurada에 구현하고 커밋 a2c0952를 푸시했습니다. 20장 자가 시험 97개와 19장 시험 308개가 통과했고, 19장 커밋의 코멘트 문구 1건이 확인 필요로 남았습니다.</p><p><a href="#engine-chapter20">20장 완료 노트</a> · <a href="#engine-chapter19">19장 완료 노트</a></p></div>
   <div class="app-progress-link" id="engine-chapter19-summary"><strong>aisurada Java 엔진 19장 반영 완료 · 2026-10-29</strong><p>실제 코멘트 파일 읽기·쓰기·본문 마커 제거를 aisurada에 구현하고 커밋 b22a443을 푸시했습니다. Java 308개·HTTP 6개·17장 190개·18장 110개 검사가 통과했습니다.</p><p><a href="#engine-chapter19">Java 엔진 완료 노트</a> · <a href="#app-chapter19">이전 TypeScript 클라이언트 기록</a></p></div>
   <div class="app-progress-link" id="app-chapter19-summary"><strong>withlog 앱 19장 · 코멘트 클라이언트/호스트 구현 완료 · 2026-10-29</strong><p>세 상태 봉투, 명령 전용 쓰기 3개, 삭제 본문 토큰 검증과 vault별 쓰기 직렬화를 추가했습니다. 681개 테스트와 빌드가 통과했고 JAR 미설정으로 실제 엔진 통합 12개는 건너뛰었습니다. 커밋 <code>38796f6</code>을 origin/main에 푸시했습니다.</p><p><a href="#app-chapter19">19장 작업 완료 노트와 검증 범위</a> · <a href="#app-daily-fixes-20261028">10월 28일 보완 이력</a></p><p>파일 재작성·마커 제거는 외부 Java 엔진이 수행합니다. 아래 17장은 기존 Java 엔진 설명입니다.</p></div>
   <div class="app-progress-link"><strong>withlog 앱 전반 검토 · 네 문제 보완 완료 · 2026-10-28</strong><p>중복 색인 실행, 토큰 문맥 참조 공유, dispose 후 실행/통지, 잘못된 UTF-8 성공 처리를 수정했습니다. 회귀 29개를 추가해 재구현 엔진 시험 포함 24개 파일·587개 테스트와 빌드가 통과했습니다.</p><p><a href="#app-daily-fixes-20261028">수정 내용과 회귀 검증</a> · <a href="#app-daily-audit-20261028">수정 전 재현 이력</a> · <a href="#app-chapter16">16장 구현 범위</a></p><p>실제 브라우저에서 본문 모드·vault 전환·두 화면·화면 재생성 중 실행 상태 유지와 단일 호스트 실행을 확인했습니다. 아래 17장은 별도 Java 엔진의 설명입니다.</p></div>
@@ -2728,6 +2730,33 @@ pre.xml .dim { color: var(--muted); }
   </div>
 </section>
 
+
+<section class="ch" id="engine-chapter20">
+  <div class="ch-head"><span class="ch-no">追</span><h2>aisurada Java 엔진 · 20장 아젠다 명령 4개 구현 완료</h2><span class="src">2026-10-29 · /Users/df/github/aisurada</span></div>
+  <p class="key">설명서 20장의 <code>list-agendas</code>·<code>create-agenda</code>·<code>update-agenda</code>·<code>delete-agenda</code>를 aisurada Java 엔진에 지었습니다. 명령 표면(하이픈 이름)에만 있고, <code>list_agendas</code> 같은 밑줄 이름은 모르는 명령입니다.</p>
+  <p><strong>코드 커밋 <a href="https://github.com/bnjjong/aisurada/commit/a2c0952">a2c0952</a> · origin/main 푸시 완료.</strong> 19장 커밋 b22a443 위에 20장 변경만 얹었습니다.</p>
+  <h3>실제 엔진에 추가한 동작</h3>
+  <ul>
+    <li><code>list-agendas</code>: 워크스페이스 표식 없이 아젠다 파일을 읽어 slug 차례로 냅니다. 값이 없는 <code>repo</code>·<code>project</code>는 키째 빼고, deepLink는 <code>withlog://agenda/&lt;slug&gt;?ws=&lt;vault&gt;</code>입니다.</li>
+    <li><code>create-agenda</code>: 같은 이름이어도 늘 새로 만들고 slug만 <code>-2</code>부터 <code>-100</code>까지 비켜섭니다. 색을 안 주면 12색 가운데 가장 덜 쓰인 색을 고르고, 파일은 끝 줄바꿈 없이 씁니다. 50단위 자르기가 서로게이트 쌍을 가르는 이름은 WL-400으로 서고 아무것도 안 씁니다.</li>
+    <li><code>update-agenda</code>: 준 칸만 얹어 파일을 통째로 다시 씁니다. <code>repo=</code>는 저장소를 지우고 <code>project=</code>는 미분류로 옮기며, 빈 <code>title</code>은 이름을 안 바꿉니다. slug와 파일 이름은 그대로이고, 모르는 키는 다시 쓸 때 사라집니다.</li>
+    <li><code>delete-agenda</code>: 그 아젠다의 노트가 층과 무관하게 0건일 때만 파일을 <code>.withlog/trash/agendas/&lt;slug&gt;-&lt;id&gt;.md</code>로 이름 바꾸기 1번에 옮깁니다. 노트 폴더는 남깁니다. 원래 파일이 없으면 성공하고, 옮길 자리가 차 있으면 WL-500입니다.</li>
+    <li><code>create_doc</code>의 아젠다 만들기가 같은 색 규칙과 파일 바이트를 쓰도록 공용 부품 <code>write/AgendaFile</code>로 묶었습니다.</li>
+  </ul>
+  <h3>기준 자료</h3>
+  <p>붙여 준 20장 글은 설명서 20장을 다시 쓴 판으로, WL 실패 종료 코드(1과 3), 아젠다 id 모양, 빈 값의 <code>null</code>과 키 빼기, <code>?vault=</code>와 <code>?ws=</code>, 실패 문구 등 12곳이 설명서와 달랐습니다. 엔진 전체가 따르는 설명서 20장을 따랐고, 붙여 준 글이 든 미추적 파일 3개는 커밋하지 않았습니다.</p>
+  <h3>실행한 검증</h3>
+  <ul>
+    <li>새 20장 자가 시험 <strong>97/97</strong>: 20.6 예시 id·응답·파일 바이트, 칸 검사 차례와 문구, 경계 값, 3갈래 칸, 심볼릭 링크·<code>ag-recovered</code>·기록 층 노트 등.</li>
+    <li>20장만 얹은 판: 자가 시험 <strong>922/922</strong>, 검증 스크립트 <strong>1,994/1,995</strong>. 어긋난 1건은 지은 명령 목록이라 스크립트를 넓혀 해소했습니다.</li>
+    <li>커밋한 판(19장과 20장): 19장 <code>bash test.sh</code> <strong>308/308</strong>, 자가 시험 921/922, 검증 1,994/1,995. 남은 1건은 아래 19장 문구입니다.</li>
+    <li>모든 쓰기는 임시 vault·HOME에서 했고 실제 vault·launchd는 쓰지 않았습니다.</li>
+  </ul>
+  <h3>유지한 차이와 확인 필요</h3>
+  <p>색인을 두지 않는 판이라 8.6대로 부를 때마다 아젠다 파일을 읽습니다. 손으로 지운 아젠다가 목록에 남는 원본의 유령 행(20.9의 1번)은 재현하지 않고, 옮기기에 실패한 지우기 뒤에도 아젠다가 목록에 남습니다. 20.9의 나머지 특이점은 부록 D 결정 전이라 원본처럼 냈습니다.</p>
+  <p>19장 커밋 b22a443이 코멘트 파일 실패 이유를 <code>내용이 JSON이 아니다</code>로 붙여 썼는데, 설명서와 그 커밋의 19장 원문은 <code>내용이 JSON 이 아니다</code>입니다. 20장과 무관해 고치지 않았습니다.</p>
+  <p>완료 노트: <a href="https://github.com/bnjjong/aisurada/blob/a2c0952/docs/rebuild-p1-chapter20-complete.md">docs/rebuild-p1-chapter20-complete.md</a> · 자가 시험: <code>withlog-p1-rebuild/selftest/test_chapter20_agendas.mjs</code></p>
+</section>
 
 <section class="ch" id="engine-chapter19">
   <div class="ch-head"><span class="ch-no">追</span><h2>aisurada Java 엔진 · 19장 코멘트 구현 완료</h2><span class="src">2026-10-29 · /Users/df/github/aisurada</span></div>
