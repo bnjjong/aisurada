@@ -97,7 +97,9 @@ public final class CreateSubNote {
         }
         PathConfinement.checkConfinement(vaultRoot, vaultRoot.resolve(folderRel));
         byte[] written = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);
-        AtomicWriter.writeAtomic(vaultRoot.resolve(folderRel).resolve("note.md"), written);
+        Path target = vaultRoot.resolve(folderRel).resolve("note.md");
+        withlog.git.VaultSnapshot.beforeWrite(vaultRoot, subId, target);
+        AtomicWriter.writeAtomic(target, written);
 
         // 7번: 쓴 뒤 루트를 다시 읽는 일은 없다. 이 엔진은 부를 때마다 디스크를 훑는다(8.6의 4번)
 

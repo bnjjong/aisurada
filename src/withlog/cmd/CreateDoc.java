@@ -274,6 +274,7 @@ public final class CreateDoc {
         Path noteFile = noteDir.resolve("note.md");
 
         // Row 30: 원자적 쓰기
+        withlog.git.VaultSnapshot.beforeWrite(vaultRoot, noteId, noteFile);
         AtomicWriter.writeAtomic(noteFile, noteBytes);
 
         String precondition = DocToken.compute(noteBytes);

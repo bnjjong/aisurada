@@ -10,7 +10,9 @@ mkdir -p build/test-classes
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.ReindexPathsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.AgendaFactsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.git.VaultGitTest
-for chapter in 24 25 26 27 28 29 30; do
+"$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.git.VaultHistoryTest
+for chapter in 24 25 26 27 28 29 30 31; do
     "$JAVA" -cp dist/wl-engine.jar:build/test-classes "withlog.Chapter${chapter}Test"
 done
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Chapter25To30IntegrationTest
+"$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Chapter31IntegrationTest

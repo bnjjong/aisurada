@@ -144,6 +144,7 @@ public final class MetaWriter {
 
         // 원자적 파일 쓰기 (7.4)
         byte[] writeBytes = newFileText.getBytes(StandardCharsets.UTF_8);
+        withlog.git.VaultSnapshot.beforeWrite(vaultRoot, note.id(), contentPath);
         AtomicWriter.writeAtomic(contentPath, writeBytes);
 
         // 8. 쓴 뒤의 색인 맞추기(15.5 8번)는 할 일이 없다. 이 엔진은 부를 때마다 디스크를 훑는다(8.6의 4번)

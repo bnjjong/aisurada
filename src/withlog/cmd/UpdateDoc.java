@@ -214,14 +214,14 @@ public final class UpdateDoc {
             finalRel = NoteMover.placeFolder(vaultRoot, oldRel, canonicalRel);
             checkSize(fileText, finalRel);
             writeTarget = vaultRoot.resolve(finalRel).resolve(contentName);
-            write(writeTarget, fileText);
+            write(vaultRoot, noteId, writeTarget, fileText);
         } else if ("html".equals(format)) {
             // 옛 .html 단일 파일: 이름만 바꾼다. 상한, 경로, 쓰기 차례이고 같은 이름 파일은 덮는다
             finalRel = parent + "/" + folderName + ".html";
             checkSize(fileText, finalRel);
             checkPath(vaultRoot, finalRel);
             writeTarget = vaultRoot.resolve(finalRel);
-            write(writeTarget, fileText);
+            write(vaultRoot, noteId, writeTarget, fileText);
             if (!finalRel.equals(oldRel)) {
                 removeOld(vaultRoot, oldRel, warnings);
             }
@@ -231,7 +231,7 @@ public final class UpdateDoc {
             checkSize(fileText, finalRel);
             checkPath(vaultRoot, finalRel);
             writeTarget = vaultRoot.resolve(finalRel).resolve("json".equals(format) ? "note.json" : "note.md");
-            write(writeTarget, fileText);
+            write(vaultRoot, noteId, writeTarget, fileText);
             removeOld(vaultRoot, oldRel, warnings);
         }
         byte[] written = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);
@@ -282,7 +282,8 @@ public final class UpdateDoc {
         }
     }
 
-    private static void write(Path target, String fileText) {
+    private static void write(Path vaultRoot, String noteId, Path target, String fileText) {
+        withlog.git.VaultSnapshot.beforeWrite(vaultRoot, noteId, target);
         AtomicWriter.writeAtomic(target, Utf16.toUtf8BytesWithQuestionForUnpaired(fileText));
     }
 

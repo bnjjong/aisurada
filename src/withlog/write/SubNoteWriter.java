@@ -116,7 +116,9 @@ public final class SubNoteWriter {
             throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + finalRel);
         }
         byte[] bytes = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);
-        AtomicWriter.writeAtomic(vaultRoot.resolve(finalRel).resolve(sub.contentFilePath().getFileName().toString()), bytes);
+        Path target = vaultRoot.resolve(finalRel).resolve(sub.contentFilePath().getFileName().toString());
+        withlog.git.VaultSnapshot.beforeWrite(vaultRoot, sub.id(), target);
+        AtomicWriter.writeAtomic(target, bytes);
         return new Placed(finalRel, bytes);
     }
 

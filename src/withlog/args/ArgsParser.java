@@ -1038,6 +1038,10 @@ public final class ArgsParser {
                 usage = "plan-day [date=<YYYY-MM-DD>] [agenda=<slug 또는 이름. 주면 저장한다>] [dryRun=true]";
             }
             case "check-notes" -> { allowedOptions = List.of("date"); maxPositional = 0; usage = "check-notes [date=<YYYY-MM-DD>]"; }
+            case "history" -> {
+                allowedOptions = List.of("commit", "query"); maxPositional = 2; usage = withlog.cmd.History.USAGE;
+            }
+            case "commit-vault" -> { maxPositional = 0; usage = "commit-vault"; }
             case "reindex-paths" -> {
                 maxPositional = Integer.MAX_VALUE;
                 usage = "reindex-paths <vault 상대 경로> [경로...]";

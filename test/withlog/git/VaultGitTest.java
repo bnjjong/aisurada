@@ -22,7 +22,7 @@ public final class VaultGitTest {
         if (args.length > 0 && args[0].equals("process-probe")) { processProbe(Path.of(args[1])); return; }
         temp=Files.createTempDirectory("aisurada-git-test-");
         try {
-            commits(); blocking(); retries(); ids(); pipeline(); factsPipeline(); templatesPipeline(); process();
+            commits(); blocking(); retries(); pendingValues(); ids(); pipeline(); factsPipeline(); templatesPipeline(); process();
             System.out.println("vault git: "+checks+" checks passed");
         } finally {
             EngineConfig.activate(null);
@@ -152,6 +152,23 @@ public final class VaultGitTest {
         outcome(g.commit("startup"),"committed",null);String msg=message(v);
         check(msg.startsWith("wl(outside): 노트 201개, 파일 201개\n"),"full note count");
         eq(msg.substring(msg.indexOf("Withlog-Notes: ")+15).trim().split(" ").length,200,"notes trailer capped");
+    }
+    private static void pendingValues() throws Exception {
+        Path v=repo(); TestClock clock=new TestClock(); List<String> messages=new ArrayList<>();
+        VaultGit.Runner runner=(args,input)->{
+            if(args.getFirst().equals("symbolic-ref"))return result(0,"refs/heads/main\n");
+            if(args.getFirst().equals("diff"))return result(0,"M\u0000external\u0000");
+            if(args.getFirst().equals("commit"))messages.add(new String(input,StandardCharsets.UTF_8));
+            return result(0,"");
+        };
+        VaultGit pending=new VaultGit(v,true,-1,clock,runner);
+        pending.afterWrite(true,"");pending.afterWrite(true,"raw\nOther: injected  ");pending.afterWrite(true,"");pending.afterWrite(false,"ignored");
+        pending.tick();
+        eq(messages.getFirst(),"wl(tool,app): 노트 0개, 파일 1개\n\nWithlog-Writer: tool app\nWithlog-Reason: idle\nWithlog-Session:  raw\nOther: injected  \n","pending keeps insertion order, deduplicates and preserves raw empty/newline sessions");
+        outcome(pending.commit("restore"),"committed",null);
+        check(messages.getLast().startsWith("wl(outside)"),"successful attempt cleared pending writers");
+        VaultGit warning=new VaultGit(v,true,0,clock,(args,input)->result(0,"warning\nrefs/heads/main\n"));
+        outcome(warning.commit("restore"),"skipped","not-main");
     }
     private static void pipeline() throws Exception {
         Path v=repo();EngineConfig.activate(new EngineConfig(v.toString(),v.toString(),null,false,10,true,300,true));

@@ -119,6 +119,7 @@ public final class CommandRegistry {
      * delete-project), 사실층 명령 3개는 명령 표면에만 있어서 밑줄 이름이 없다(20.2, 21.2, 22.2).
      */
     public static boolean isSupported(String name) {
+        if (Set.of("history", "commit-vault").contains(name)) return true;
         if (Set.of("save_template", "save-template", "delete-doc-template", "save-ritual-template").contains(name)) return true;
         if (Set.of("shard-notes", "verify-shard").contains(name)) return true;
         if (Set.of("delete_doc", "delete-doc", "restore_doc", "restore-doc", "purge_doc", "purge-doc", "empty-trash").contains(name)) return true;

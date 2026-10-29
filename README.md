@@ -38,7 +38,7 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 | `update_sub_note` | 하위 노트의 제목, 본문, 태그(명령 표면만)를 고치고 다시 계산한 폴더 이름으로 같은 `sub/` 안에서 폴더째 옮긴다. 본문만 주면 첫 헤딩이 제목이 된다 |
 | `delete_sub_note` | 직계 컨테이너 본문에서 그 하위 노트의 카드 줄을 걷고 하위 노트 폴더를 휴지통 없이 통째로 지운다. 카드를 걷었으면 컨테이너의 앞뒤 토큰을 함께 답한다 |
 
-도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `WL-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`, `commit-vault`처럼 이 판에 아직 없는 명령은 `WL-409`로 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
+도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `WL-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`는 노트의 git 판과 옛 스냅숏을 합쳐 조회하고, `commit-vault`는 현재 변경의 커밋 결과를 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
 
 ## 19장 코멘트
 
@@ -184,7 +184,7 @@ java -jar dist/wl-engine.jar reindex-paths notes/demo/hello/note.md --withlog.va
 
 노트 내부 경로는 루트 노트로 접고 중복은 한 번만 엽니다. 200개를 넘겨 `mode: full`이 되어도 템플릿·회고·휴지통은 검사하지 않습니다. 색인이 없는 구현이므로 `indexed`는 이번에 읽은 노트 수, `unchanged`와 `removed`는 0입니다(8.6).
 
-자동 커밋은 `.git` 폴더가 있는 `main` 브랜치에서 동작합니다. `WITHLOG_VAULT_AUTOCOMMIT_ENABLED=false`로 끄고, `WITHLOG_VAULT_AUTOCOMMIT_IDLE_SECONDS`로 유휴 시간을 정합니다(기본 300초). git 잠금·병합 중 상태는 건너뛰고, 실패는 재시도하되 노트 쓰기의 성공 여부를 바꾸지 않습니다. 훅·서명은 끄고 `*.tmp`를 제외한 vault 변경을 담습니다. 이 범위는 31.1~31.3의 자동 커밋이며 `history`, `commit-vault`, 스냅숏 명령은 별도 범위입니다.
+자동 커밋은 `.git` 폴더가 있는 `main` 브랜치에서 동작합니다. `WITHLOG_VAULT_AUTOCOMMIT_ENABLED=false`로 끄고, `WITHLOG_VAULT_AUTOCOMMIT_IDLE_SECONDS`로 유휴 시간을 정합니다(기본 300초). git 잠금·병합 중 상태는 건너뛰고, 실패는 재시도하되 노트 쓰기의 성공 여부를 바꾸지 않습니다. 훅·서명은 끄고 `*.tmp`를 제외한 vault 변경을 담습니다. `history <노트 id> [번호] [commit=<40자 커밋>] [query=<글자>]`는 수동·자동 커밋과 옛 스냅숏을 합쳐 보여 줍니다. `commit-vault`는 즉시 시도한 결과를 `outcome`과 선택적인 `blocked`로 돌려주며, git 실패도 종료 코드 0입니다. 두 명령은 명령 표면에만 있고 워크스페이스 표식이나 색인을 요구하지 않습니다. 선택 기능 `WITHLOG_VAULT_SNAPSHOT_ENABLED=true`는 본문을 덮기 직전에 노트별 참조에 옛 바이트를 남깁니다(기본 false). 자세한 계약과 유지한 경계는 [31장 완료 문서](docs/rebuild-p1-chapter31-complete.md)에 있습니다.
 
 `bash test.sh`는 코멘트·경로 재색인·자동 커밋을 실제 임시 파일과 git 저장소로 검증합니다. [누락 기능 완료 노트](docs/rebuild-p1-chapters01-20-gaps-complete.md)에 구현과 시험 근거를 기록했습니다.
 
@@ -302,6 +302,9 @@ java -jar dist/wl-cli.jar list_tags '{}'
 | `WITHLOG_SIDECAR_LIMIT` | 동시에 떠 있을 엔진 수 | 3 |
 | `WITHLOG_SWEEP_QUIET_HOURS` | 청소가 내릴 만큼 조용한 시간 | 24 |
 | `WITHLOG_IDLE_TIMEOUT_MINUTES` | serve 모드가 스스로 내려가기까지 조용한 분 | 10 |
+| `WITHLOG_VAULT_AUTOCOMMIT_ENABLED` | vault 자동 커밋과 commit-vault 사용 | true |
+| `WITHLOG_VAULT_AUTOCOMMIT_IDLE_SECONDS` | 마지막 쓰기부터 커밋까지의 유휴 초 | 300 |
+| `WITHLOG_VAULT_SNAPSHOT_ENABLED` | 본문 덮기 전 옛 스냅숏 저장 | false |
 
 ## 종료 코드
 

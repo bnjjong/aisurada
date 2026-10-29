@@ -92,6 +92,10 @@ public final class EngineExecutor {
 
                 if ("reindex".equals(parsed.commandName())) {
                     response = Reindex.execute(vaultRoot, startTime);
+                } else if ("history".equals(parsed.commandName())) {
+                    response = History.execute(vaultRoot, parsed);
+                } else if ("commit-vault".equals(parsed.commandName())) {
+                    response = CommitVault.execute(vaultRoot, isServeMode);
                 } else if ("reindex-paths".equals(parsed.commandName())) {
                     response = Reindex.paths(vaultRoot, parsed.positionalArgs(), startTime);
                 } else if ("get-doc".equals(parsed.commandName())) {

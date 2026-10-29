@@ -11,7 +11,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -120,14 +119,14 @@ public final class VaultGit {
         Path git = vault.resolve(".git");
         if (!Files.isDirectory(git)) return new Result("disabled", "not-repo");
         Path indexLock = git.resolve("index.lock");
-        if (Files.exists(indexLock)) {
-            try {
-                if (Duration.between(Files.getLastModifiedTime(indexLock).toInstant(), clock.instant()).compareTo(Duration.ofMinutes(10)) <= 0)
-                    return new Result("skipped", "index-lock");
-                Files.delete(indexLock);
-                System.err.println("경고: 10분 넘은 vault git 잠금을 지웠다: " + indexLock);
-            } catch (IOException e) { return new Result("skipped", "index-lock"); }
-        }
+        try {
+            if (Duration.between(Files.getLastModifiedTime(indexLock).toInstant(), clock.instant()).compareTo(Duration.ofMinutes(10)) <= 0)
+                return new Result("skipped", "index-lock");
+            Files.delete(indexLock);
+            System.err.println("경고: 10분 넘은 vault git 잠금을 지웠다: " + indexLock);
+        } catch (java.nio.file.NoSuchFileException ignored) {
+            // 깨진 링크도 따라가면 없으므로 잠금이 아니다.
+        } catch (IOException e) { return new Result("skipped", "index-lock"); }
         for (String marker : List.of("rebase-merge", "rebase-apply", "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD")) {
             if (Files.exists(git.resolve(marker))) return new Result("skipped", "in-progress");
         }
@@ -162,7 +161,10 @@ public final class VaultGit {
         if (!deleted.isEmpty()) {
             byte[] input = (String.join("\n", deleted.stream().map(p -> "HEAD:" + p).toList()) + "\n").getBytes(StandardCharsets.UTF_8);
             var batch = run(List.of("cat-file", "--batch"), input);
-            if (batch.code() == 0) previous = readBatch(deleted, batch.output());
+            if (batch.code() == 0) {
+                List<byte[]> contents = GitBatch.read(deleted.size(), batch.output());
+                for (int i = 0; i < deleted.size(); i++) previous.put(deleted.get(i), contents.get(i));
+            }
         }
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         for (Change change : changes) {
@@ -198,24 +200,4 @@ public final class VaultGit {
         return null;
     }
 
-    private static Map<String, byte[]> readBatch(List<String> paths, byte[] output) {
-        Map<String, byte[]> contents = new LinkedHashMap<>();
-        int offset = 0;
-        for (String path : paths) {
-            int end = offset;
-            while (end < output.length && output[end] != '\n') end++;
-            if (end == output.length) break;
-            String header = new String(output, offset, end - offset, StandardCharsets.UTF_8);
-            offset = end + 1;
-            String[] fields = header.split(" ");
-            if (fields.length != 3 || !fields[1].equals("blob")) continue;
-            try {
-                int length = Integer.parseInt(fields[2]);
-                if (length < 0 || length > output.length - offset) break;
-                contents.put(path, Arrays.copyOfRange(output, offset, offset + length));
-                offset += length + 1;
-            } catch (NumberFormatException e) { break; }
-        }
-        return contents;
-    }
 }

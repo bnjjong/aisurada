@@ -95,6 +95,7 @@ public final class DerivedBodyWriter {
                     + vaultRoot.relativize(root.contentFilePath()).toString().replace('\\', '/'));
         }
         byte[] bytes = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);
+        withlog.git.VaultSnapshot.beforeWrite(vaultRoot, root.id(), root.contentFilePath());
         AtomicWriter.writeAtomic(root.contentFilePath(), bytes);
         return bytes;
     }
