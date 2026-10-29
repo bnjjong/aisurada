@@ -8,6 +8,10 @@
 
 ## 현재 반영 상태
 
+19장 Java 완료 절의 브라우저 표시와 가로 넘침 없음을 확인했다. 화면 기록은 `chapter19-engine-document-2026-10-29.png`다.
+
+2026-10-29 aisurada Java 엔진 19장 완료: 실제 코멘트 파일 목록·명령 전용 쓰기 3개·본문 마커 제거와 토큰을 `/Users/df/github/aisurada`에 구현했다. Java 회귀 308개(실제 serve/wl-cli 포함), withlog HTTP 통합 6개, 기존 17장 190개·18장 110개가 통과했다. 코드·완료 노트 커밋 `b22a443`을 origin/main에 푸시했고, 로컬 해부도의 `#engine-chapter19`·목차·`#c17`에 반영했다. 이전 TypeScript 완료 노트는 당시 기록으로 남기고 Java 완료 절로 연결했다. Java 엔진의 영속 색인·git·쓴 쪽 기록 미구현과 19.9 호환 동작은 구분해 기록했다. 기존 모든 앵커·Java 1~20장 본문·스크립트를 보존하고 Downloads 원본을 같은 폴더의 `aisurada 엔진 해부도.before-engine19-20261029-093849.html`로 백업했다. 상세는 `docs/review-chapter-19-engine-complete.md`, 최신 사본은 `aisurada-updated-2026-10-29.html`이다.
+
 2026-10-28 전반 검토 네 건 보완 완료: 앱 수명의 vault별 재조정 코디네이터와 호스트 병합/직렬화, 토큰 문맥 독립·동결, dispose 재검사, 성공 stdout의 엄격한 UTF-8 검증을 구현했다. 회귀 29개를 추가해 실제 재구현 JAR 시험 포함 24개 파일·587개 테스트와 빌드가 통과했다. 두 브라우저 화면·본문 모드·vault 왕복·화면 재생성도 확인했다. 로컬 HTML의 `#app-daily-fixes-20261028`과 `#c17`에 수정 완료로 반영했다. 상세는 `docs/review-workspace-fixes-2026-10-28.md`다.
 
 2026-10-28 전반 재검토: 기존 558개 테스트·빌드는 통과하지만 P2 네 건을 별도 재현했다. 화면 모드 전환 중 중복 reindex, 토큰 target 참조 공유, running 통지의 dispose 후 호출, 잘못된 UTF-8 성공 처리가 보완 대상이다. 코드 수정은 하지 않았고 로컬 HTML의 `#app-daily-audit-20261028`과 `#c17`에 보완 필요로 반영했다. 상세는 `docs/review-workspace-2026-10-28.md`다.
