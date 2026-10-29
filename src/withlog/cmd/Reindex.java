@@ -37,8 +37,6 @@ public final class Reindex {
         // 5. 휴지통 훑기 (2.6, 26장)
         TrashReader.ScanResult trashScan = TrashReader.scan(vaultRoot);
 
-        long elapsedMs = Math.max(0, System.currentTimeMillis() - startTimeMillis);
-
         // 6. skipped 합치기 차례 (8.4):
         // 아젠다, 노트 훑기 단계의 건너뜀 및 노트를 열다 생긴 건너뜀, 템플릿, 회고, 휴지통
         List<Map<String, String>> allSkipped = new ArrayList<>();
@@ -81,13 +79,28 @@ public final class Reindex {
         List<Map<String, String>> allConflicts = new ArrayList<>(noteScan.conflicts());
         allConflicts.addAll(reviewConflicts);
 
+        return response("full", startTimeMillis, agendaScan, noteScan, allSkipped, allConflicts);
+    }
+
+    /** 8.5: 200칸 초과만 전체 노트로 물러서고, 두 갈래 모두 템플릿/회고/휴지통은 열지 않는다. */
+    public static Map<String, Object> paths(Path vaultRoot, List<String> paths, long startTimeMillis) {
+        var agendas = AgendaReader.scanAgendas(vaultRoot, true);
+        boolean full = paths.size() > 200;
+        var notes = full ? NoteScanner.scan(vaultRoot, agendas.table(), true)
+                : NoteScanner.scanPaths(vaultRoot, agendas.table(), paths);
+        List<Map<String, String>> skipped = new ArrayList<>(agendas.skipped()); skipped.addAll(notes.skipped());
+        return response(full ? "full" : "paths", startTimeMillis, agendas, notes, skipped, notes.conflicts());
+    }
+
+    private static Map<String, Object> response(String mode, long startTimeMillis, AgendaReader.ScanResult agendaScan,
+            NoteScanner.ScanResult noteScan, List<Map<String, String>> allSkipped, List<Map<String, String>> allConflicts) {
         int indexed = noteScan.notesById().size();
         int unchanged = 0;
         int scanned = indexed + unchanged;
 
         Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("mode", "full");
-        resp.put("elapsedMs", (int) elapsedMs);
+        resp.put("mode", mode);
+        resp.put("elapsedMs", Math.min(Integer.MAX_VALUE, Math.max(0, System.currentTimeMillis() - startTimeMillis)));
         resp.put("agendas", agendaScan.table().slugToId().size());
         resp.put("scanned", scanned);
         resp.put("indexed", indexed);

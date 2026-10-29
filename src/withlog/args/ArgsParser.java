@@ -932,6 +932,10 @@ public final class ArgsParser {
                 maxPositional = 0;
                 usage = "reindex";
             }
+            case "reindex-paths" -> {
+                maxPositional = Integer.MAX_VALUE;
+                usage = "reindex-paths <vault 상대 경로> [경로...]";
+            }
             case "get-ask" -> {
                 maxPositional = 2;
                 usage = "get-ask <노트 id> [하위 노트 id]";

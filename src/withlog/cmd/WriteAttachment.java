@@ -9,7 +9,7 @@ import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 import withlog.write.AtomicWriter;
 import withlog.write.PathConfinement;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -45,8 +45,8 @@ public final class WriteAttachment {
         boolean isTool = parsed.isToolSurface();
 
         // 2. 워크스페이스 표식, 3. 색인 맞추기 (7.1)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 5. 18.3의 8번부터 11번: 자리 인자
         List<String> pos = parsed.positionalArgs();

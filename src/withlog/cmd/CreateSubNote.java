@@ -15,7 +15,7 @@ import withlog.write.SlugBuilder;
 import withlog.write.SubNoteWriter;
 import withlog.write.TestApparatus;
 import withlog.write.WarningsDetector;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -45,8 +45,8 @@ public final class CreateSubNote {
         Map<String, String> opts = parsed.namedOptions();
 
         // 3. 워크스페이스 표식, 색인 맞추기 (17.4의 2번)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 4. 첫 자리 인자, 부모 참조, title, body, type, 제목 공백, 그다음 루트 노트 차례
         List<String> pos = parsed.positionalArgs();

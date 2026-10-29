@@ -11,7 +11,7 @@ import withlog.write.DerivedBodyWriter;
 import withlog.write.DocToken;
 import withlog.write.IdGenerator;
 import withlog.write.TestApparatus;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.time.ZoneId;
@@ -33,8 +33,8 @@ public final class CommentCommands {
 
     @SuppressWarnings("unchecked")
     public static Map<String, Object> execute(Path vault, ParsedArgs parsed) {
-        WorkspaceMarker.check(vault);
-        NoteIndex index = NoteIndex.reconciled(vault);
+
+        NoteIndex index = WritePipeline.index(vault);
         String command = parsed.commandName();
         boolean create = command.equals("create-comment");
         boolean delete = command.equals("delete-comment");

@@ -1,0 +1,100 @@
+================================================================================
+            WITHLOG PART 1 REBUILD - COMPREHENSIVE SELF-TEST                    
+================================================================================
+
+[1/4] Verifying 5 Fixture Tokens (SHA-256 byte-exact)...
+  ✓ 0001 note.md: SHA-256 matches (b3fb9b301e442551...)
+  ✓ 0003 note.md: SHA-256 matches (20bcdc8fcf54d915...)
+  ✓ 0004 .html: SHA-256 matches (7d9adf33b23c69c8...)
+  ✓ snfixture-00000001: SHA-256 matches (595c8397b26b6e27...)
+  ✓ snfixture-00000006: SHA-256 matches (093f0094cbb7bc34...)
+
+[2/4] Preparation Step: reindex...
+  ✓ reindex: exit 0, indexed 110 notes (156ms)
+
+[3/5] Acceptance Bundle Cases (115 cases)...
+  Executing 115 cases concurrently (jobs = 4)...
+  ✓ Finished 115 acceptance bundle cases.
+
+[4/5] Additional Command Surface & Basic Failure Tests...
+  ✓ command surface get-doc
+  ✓ command surface get-sub-note
+  ✓ get_doc missing id arg
+  ✓ get_doc invalid id shape
+  ✓ get_sub_note invalid parent shape
+  ✓ conflict copy skipped in index
+  ✓ list_attachments: 0001 attachment diagram.svg
+  ✓ command surface list-attachments
+  ✓ list_sub_notes: 0001 sub-notes
+  ✓ command surface list-sub-notes
+  ✓ list_docs: type=research
+  ✓ command surface list-docs: agenda=bulk limit=5
+  ✓ list_tags: query=랭킹
+  ✓ command surface list-tags
+  ✓ search_docs: query=10
+  ✓ search_docs: query=10 limit=2
+  ✓ command surface search-docs: query=픽스처
+  ✓ list_templates: all 6 templates
+  ✓ command surface list-templates: category=ritual
+  ✓ get_template: t-legacy
+  ✓ list-docs type=report bodies=true (exact)
+  ✓ get_template: t-morning (exact)
+  ✓ command surface get-template
+  ✓ list_reports: all reports
+  ✓ command surface list-reports: kind=evening
+  ✓ get_report: rv-evening-2026-06-04
+  ✓ command surface get-report
+  ✓ list_trash: all 6 items sorted by trashedAt descending
+  ✓ command surface list-trash
+
+[5/5] Boundary & Edge Case Suite (146 cases from edge.mjs)...
+  ✓ All 147 edge & boundary checks passed!
+
+[6/6] Chapter 3 & 4 Suite (serve mode, wl-cli, frame protocol, launchctl seam)...
+  ✓ All 116 Chapter 3 & 4 checks passed!
+
+[7/8] Chapter 5 Suite (Part 4 commands seam 32.2)...
+  ✓ All 59 Chapter 5 checks passed!
+
+[8/9] Chapter 9 & Related Attachments Suite (9.5, 9.9, 11.5, 11.8, 18.5)...
+  ✓ All 42 Chapter 9 attachment checks passed!
+
+[9/9] Chapter 11: get_sub_note Blank Path Segment Suite (11.4 16번, 11.8)...
+  ✓ All 22 Chapter 11 blank path checks passed!
+
+[10/11] Chapter 13: create_doc & Write Pipeline Suite (13.1~13.7, 7.1, 7.4)...
+  ✓ All 92 Chapter 13 checks passed!
+
+[11/11] Chapter 15: set_favorite, evaluate_doc, link_docs & Meta Write Suite...
+  ✓ All 113 Chapter 15 checks passed!
+
+[12/16] Chapter 16: list_sub_notes Suite (16.3~16.9)...
+  ✓ All 22 Chapter 16 checks passed!
+
+[13/16] Chapter 14: update_doc Suite (14.3~14.7)...
+  ✓ All 19 Chapter 14 checks passed!
+
+[14/16] Chapter 18: write_attachment Suite (18.8)...
+  ✓ All 21 Chapter 18 checks passed!
+
+[15/16] Chapter 17: sub note write Suite (17.3~17.9)...
+  ✓ All 21 Chapter 17 checks passed!
+
+[16/16] Chapter 20: agenda commands Suite (20.2~20.8)...
+  ✓ All 97 Chapter 20 checks passed!
+
+[Verification] Checking Vault and HOME Immutability...
+  ✓ Vault and HOME directories remained completely pristine (0 byte modification).
+
+================================================================================
+                           SELF-TEST REPORT SUMMARY                             
+================================================================================
+Total Test Checks  : 922
+Passed             : 922
+Failed             : 0
+Token Verification : 5 / 5 matched byte-exact
+Average Exec Time  : 229.2 ms (min: 43ms, max: 437ms)
+================================================================================
+
+🎉 ALL TESTS PASSED SUCCESSFULLY! Verified 115 acceptance bundle cases (spec-derived) and 146 boundary cases. 🎉
+

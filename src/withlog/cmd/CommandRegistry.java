@@ -10,6 +10,16 @@ public final class CommandRegistry {
 
     private CommandRegistry() {}
 
+    /** 설명서 7.1의 쓰기 깃발. 도구 표면도 짝 명령의 깃발을 따른다. */
+    public static final Set<String> WRITE_COMMANDS = Set.of(
+            "create-project", "update-project", "delete-project", "save-report", "save-template",
+            "set-favorite", "evaluate-doc", "link-docs", "write-attachment", "delete-doc", "restore-doc",
+            "purge-doc", "create-sub-note", "update-sub-note", "delete-sub-note", "export-markdown",
+            "create-doc", "update-doc", "empty-trash", "create-agenda", "update-agenda", "delete-agenda",
+            "save-ritual-template", "delete-doc-template", "init-workspace", "create-comment", "update-comment",
+            "delete-comment", "shard-notes", "plan-day", "check-notes", "append-ask-turn", "append-chat-turn",
+            "update-agenda-facts", "facts-brief");
+
     public static final Set<String> TOOL_NAMES = Collections.unmodifiableSet(new LinkedHashSet<>(List.of(
             "create_doc", "update_doc", "set_favorite", "evaluate_doc", "link_docs",
             "list_docs", "search_docs", "list_tags", "get_doc", "delete_doc",
@@ -110,7 +120,7 @@ public final class CommandRegistry {
      * delete-agenda)다. 아젠다 명령 4개는 명령 표면에만 있어서 밑줄 이름이 없다(20.2).
      */
     public static boolean isSupported(String name) {
-        return "reindex".equals(name) ||
+        return "reindex".equals(name) || "reindex-paths".equals(name) ||
                 "list-agendas".equals(name) || "create-agenda".equals(name) ||
                 "update-agenda".equals(name) || "delete-agenda".equals(name) ||
                 "create_doc".equals(name) || "create-doc".equals(name) ||

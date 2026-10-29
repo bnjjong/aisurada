@@ -25,7 +25,7 @@ import withlog.write.SlugBuilder;
 import withlog.write.TestApparatus;
 import withlog.write.TimeScheduler;
 import withlog.write.WarningsDetector;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,7 +45,6 @@ import java.util.regex.Pattern;
 public final class CreateDoc {
     static final DateTimeFormatter CREATED_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     static final DateTimeFormatter CREATED_MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
-
 
     public static final String USAGE = "create-doc agenda=<slug 또는 이름> type=<유형> title=<제목> body=<본문> " +
             "[date=<YYYY-MM-DD>] [time=<HH:MM>] [mins=<분>] [format=markdown] [links=<JSON 배열>] " +
@@ -72,11 +71,8 @@ public final class CreateDoc {
     public static Map<String, Object> execute(Path vaultRoot, ParsedArgs parsed, String sessionId) {
         boolean isTool = parsed.isToolSurface();
 
-        // 4. 워크스페이스 표식 확인 (7.1 step 2, 13.4 row 8)
-        WorkspaceMarker.check(vaultRoot);
-
         // 5. 색인 맞추기 (7.1 step 3, 13.4 row 9) - 아젠다 치명 오류 시 즉시 중단
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 7. 값 읽기 및 의미론 검증 (13.3, 13.4 rows 10-23)
         Map<String, String> opts = parsed.namedOptions();

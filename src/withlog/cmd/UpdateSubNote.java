@@ -14,7 +14,7 @@ import withlog.write.PreconditionChecker;
 import withlog.write.StampJudgment;
 import withlog.write.SubNoteWriter;
 import withlog.write.WarningsDetector;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -40,8 +40,8 @@ public final class UpdateSubNote {
         Map<String, String> opts = parsed.namedOptions();
 
         // 3. 워크스페이스 표식, 색인 맞추기 (17.4의 2번)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 5. 자리 인자 2칸, 부모 참조, 하위 id의 3가지 검사, tags, 제목 공백 차례
         List<String> pos = parsed.positionalArgs();

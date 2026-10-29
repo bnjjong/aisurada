@@ -18,7 +18,7 @@ import withlog.write.ShardLayout;
 import withlog.write.SlugBuilder;
 import withlog.write.StampJudgment;
 import withlog.write.WarningsDetector;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -56,8 +56,8 @@ public final class UpdateDoc {
         Map<String, String> opts = parsed.namedOptions();
 
         // 4. 워크스페이스 표식, 5. 색인 맞추기 (14.4의 2번, 3번)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 7. 값 읽기: id, id 모양, tags, date, time, mins, 그다음 제목 공백과 음수 소요 시간
         String rawId = isTool ? (String) toolOpts.get("id")

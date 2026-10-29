@@ -1,0 +1,47 @@
+Build successful: /Users/df/github/aisurada/dist/wl-engine.jar
+Build successful: /Users/df/github/aisurada/dist/wl-cli.jar
+Build successful: /Users/df/github/aisurada/dist/wl-sidecar.jar
+chapter19: 308 checks passed (isolated Java engine/files)
+reindex-paths: 133 checks passed
+경고: 10분 넘은 vault git 잠금을 지웠다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-14207107084930093218/.git/index.lock
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+경고: vault git 커밋을 못 했다. 다음 정비에서 다시 시도한다: /var/folders/wk/f8brmjrs6892v_cfbn9vv_280000gn/T/aisurada-git-test-3152991936711492321/vault-5859179349879761820
+java.lang.NumberFormatException: For input string: "abc"
+	at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)
+	at java.base/java.lang.Integer.parseInt(Integer.java:662)
+	at java.base/java.math.BigInteger.<init>(BigInteger.java:547)
+	at org.yaml.snakeyaml.constructor.SafeConstructor.createLongOrBigInteger(SafeConstructor.java:336)
+	at org.yaml.snakeyaml.constructor.SafeConstructor.createNumber(SafeConstructor.java:327)
+	at org.yaml.snakeyaml.constructor.SafeConstructor.access$100(SafeConstructor.java:34)
+	at org.yaml.snakeyaml.constructor.SafeConstructor$ConstructYamlInt.construct(SafeConstructor.java:284)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructObjectNoCheck(BaseConstructor.java:265)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructObject(BaseConstructor.java:248)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructMapping2ndStep(BaseConstructor.java:577)
+	at org.yaml.snakeyaml.constructor.SafeConstructor.constructMapping2ndStep(SafeConstructor.java:205)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructMapping(BaseConstructor.java:553)
+	at org.yaml.snakeyaml.constructor.SafeConstructor$ConstructYamlMap.construct(SafeConstructor.java:592)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructObjectNoCheck(BaseConstructor.java:265)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructObject(BaseConstructor.java:248)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.constructDocument(BaseConstructor.java:202)
+	at org.yaml.snakeyaml.constructor.BaseConstructor.getSingleData(BaseConstructor.java:186)
+	at org.yaml.snakeyaml.Yaml.loadFromReader(Yaml.java:508)
+	at org.yaml.snakeyaml.Yaml.load(Yaml.java:437)
+	at withlog.vault.Frontmatter.parse(Frontmatter.java:59)
+	at withlog.vault.NoteFile.parse(NoteFile.java:113)
+	at withlog.vault.NoteScanner.processRootCandidate(NoteScanner.java:259)
+	at withlog.vault.NoteScanner$Collector.open(NoteScanner.java:176)
+	at withlog.vault.NoteScanner.scan(NoteScanner.java:76)
+	at withlog.vault.NoteIndex.reconciled(NoteIndex.java:66)
+	at withlog.engine.WritePipeline.begin(WritePipeline.java:25)
+	at withlog.engine.EngineExecutor.execute(EngineExecutor.java:83)
+	at withlog.git.VaultGitTest.pipeline(VaultGitTest.java:163)
+	at withlog.git.VaultGitTest.main(VaultGitTest.java:25)
+vault git: 88 checks passed

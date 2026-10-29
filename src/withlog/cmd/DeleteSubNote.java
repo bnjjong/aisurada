@@ -10,7 +10,7 @@ import withlog.write.DocToken;
 import withlog.write.DerivedBodyWriter;
 import withlog.write.SubNoteWriter;
 import withlog.write.TreeRemover;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -33,8 +33,8 @@ public final class DeleteSubNote {
      */
     public static Map<String, Object> execute(Path vaultRoot, ParsedArgs parsed) {
         // 3. 워크스페이스 표식, 색인 맞추기 (17.4의 2번)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 6. 자리 인자 2칸, 부모 참조, 하위 id의 3가지 검사. 17.5 지우기 1번이라 카드를 걷기 전에 다 본다
         List<String> pos = parsed.positionalArgs();

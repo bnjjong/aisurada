@@ -6,7 +6,7 @@ import withlog.vault.AgendaTable;
 import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 import withlog.write.AgendaFile;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,8 +35,8 @@ public final class DeleteAgenda {
      */
     public static Map<String, Object> execute(Path vaultRoot, ParsedArgs parsed) {
         // 3. 워크스페이스 표식, 4. 색인 맞추기 (20.3)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 5. 칸 검사: id 있음, id 모양
         String id = AgendaArgs.requireId(parsed, USAGE);

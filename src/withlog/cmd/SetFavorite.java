@@ -6,7 +6,7 @@ import withlog.text.Trim;
 import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 import withlog.write.MetaWriter;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -34,11 +34,8 @@ public final class SetFavorite {
     public static Map<String, Object> execute(Path vaultRoot, ParsedArgs parsed, String sessionId) {
         boolean isTool = parsed.isToolSurface();
 
-        // 2. 워크스페이스 표식 확인 (15.4 row 2)
-        WorkspaceMarker.check(vaultRoot);
-
         // 3. 색인 맞추기 (15.4 row 3). 맞추기를 세우는 파일이 있으면 쓰기도 선다(8.7의 4번)
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 4. id 검증 (15.4 row 4, 6)
         String rawId;

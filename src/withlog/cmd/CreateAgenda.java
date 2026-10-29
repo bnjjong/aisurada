@@ -12,7 +12,7 @@ import withlog.write.AtomicWriter;
 import withlog.write.IdGenerator;
 import withlog.write.PathConfinement;
 import withlog.write.SlugBuilder;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -41,8 +41,8 @@ public final class CreateAgenda {
      */
     public static Map<String, Object> execute(Path vaultRoot, ParsedArgs parsed) {
         // 3. 워크스페이스 표식, 4. 색인 맞추기 (20.3)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 5. 칸 검사: title, hue, project 차례. 칸마다 앞에서 걸리면 뒤는 안 본다
         Map<String, String> opts = parsed.namedOptions();

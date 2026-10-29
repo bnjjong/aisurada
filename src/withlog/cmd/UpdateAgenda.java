@@ -9,7 +9,7 @@ import withlog.vault.AgendaTable;
 import withlog.vault.NoteIndex;
 import withlog.write.AgendaFile;
 import withlog.write.AtomicWriter;
-import withlog.write.WorkspaceMarker;
+import withlog.engine.WritePipeline;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -35,8 +35,8 @@ public final class UpdateAgenda {
      */
     public static Map<String, Object> execute(Path vaultRoot, ParsedArgs parsed) {
         // 3. 워크스페이스 표식, 4. 색인 맞추기 (20.3)
-        WorkspaceMarker.check(vaultRoot);
-        NoteIndex noteIndex = NoteIndex.reconciled(vaultRoot);
+
+        NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
         // 5. 칸 검사: id 있음, id 모양, hue, project 차례
         Map<String, String> opts = parsed.namedOptions();

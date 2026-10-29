@@ -1,0 +1,13 @@
+
+> withlog@0.1.0 test
+> vitest run host/chapter19.integration.test.ts
+
+
+ RUN  v5.0.5 /Users/df/github/withlog
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  10:57:19
+   Duration  3.85s (tests 99%, import 1%)
+

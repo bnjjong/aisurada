@@ -1,0 +1,577 @@
+{
+  "source": {
+    "files": 107,
+    "sha256": "aad776562670ba36d5cdff5a7d15d34c6439a9f42fb46189d8b4a96f9146f0c2"
+  },
+  "smoke": [
+    {
+      "command": "reindex",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 177,
+      "stderr": "",
+      "data": {
+        "mode": "full",
+        "elapsedMs": 63,
+        "agendas": 2,
+        "scanned": 1,
+        "indexed": 1,
+        "unchanged": 0,
+        "removed": 0,
+        "skipped": [],
+        "conflicts": [],
+        "unsharded": []
+      }
+    },
+    {
+      "command": "reindex-paths",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 178,
+      "stderr": "",
+      "data": {
+        "mode": "paths",
+        "elapsedMs": 60,
+        "agendas": 2,
+        "scanned": 1,
+        "indexed": 1,
+        "unchanged": 0,
+        "removed": 0,
+        "skipped": [],
+        "conflicts": [],
+        "unsharded": []
+      }
+    },
+    {
+      "command": "list-docs",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 452,
+      "stderr": "",
+      "data": [
+        {
+          "id": "ndfixture-00000001",
+          "agenda": "demo",
+          "agendaTitle": "데모",
+          "type": "free",
+          "title": "검사 노트",
+          "created": "2026-06-16T10:00:00+09:00",
+          "date": "2026-06-16",
+          "time": "10:00",
+          "mins": 30,
+          "format": "markdown",
+          "precondition": "f1:bdd6a16f6665ec8eed8814cf6f6a07a7ca04a8106be2b661e2cb39ae20f53168",
+          "links": [],
+          "tags": [
+            "검사"
+          ],
+          "path": "notes/demo/root"
+        }
+      ]
+    },
+    {
+      "command": "search-docs",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 641,
+      "stderr": "",
+      "data": {
+        "query": "본문",
+        "total": 1,
+        "returned": 1,
+        "docs": [
+          {
+            "id": "ndfixture-00000001",
+            "agenda": "demo",
+            "agendaTitle": "데모",
+            "type": "free",
+            "title": "검사 노트",
+            "created": "2026-06-16T10:00:00+09:00",
+            "date": "2026-06-16",
+            "time": "10:00",
+            "mins": 30,
+            "format": "markdown",
+            "precondition": "f1:bdd6a16f6665ec8eed8814cf6f6a07a7ca04a8106be2b661e2cb39ae20f53168",
+            "links": [],
+            "tags": [
+              "검사"
+            ],
+            "path": "notes/demo/root",
+            "matchedIn": "body",
+            "snippet": "검사 노트 본문입니다. 자식"
+          }
+        ]
+      }
+    },
+    {
+      "command": "get-doc",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 857,
+      "stderr": "",
+      "data": {
+        "id": "ndfixture-00000001",
+        "agenda": "demo",
+        "agendaTitle": "데모",
+        "type": "free",
+        "title": "검사 노트",
+        "created": "2026-06-16T10:00:00+09:00",
+        "date": "2026-06-16",
+        "time": "10:00",
+        "mins": 30,
+        "format": "markdown",
+        "precondition": "f1:bdd6a16f6665ec8eed8814cf6f6a07a7ca04a8106be2b661e2cb39ae20f53168",
+        "comments": {
+          "state": "loaded",
+          "comments": [
+            {
+              "id": "cmfixture-0000000a",
+              "createdAt": "2026-06-16T10:30:00.000Z",
+              "body": "기존 코멘트"
+            }
+          ]
+        },
+        "body": "# 검사 노트\n\n본문입니다.\n[자식](#sub:snfixture-00000001)\n",
+        "links": [],
+        "tags": [
+          "검사"
+        ],
+        "path": "notes/demo/root",
+        "deepLink": "withlog://doc/ndfixture-00000001?ws=%2Fvar%2Ffolders%2Fwk%2Ff8brmjrs6892v_cfbn9vv_280000gn%2FT%2Faisurada-audit-probes-uxns78_7%2Fcase-04"
+      }
+    },
+    {
+      "command": "get-sub-note",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 503,
+      "stderr": "",
+      "data": {
+        "id": "snfixture-00000001",
+        "parent": "ndfixture-00000001",
+        "type": "free",
+        "title": "검사 하위",
+        "created": "2026-06-16T10:00:00+09:00",
+        "date": "2026-06-16",
+        "time": "10:00",
+        "mins": 30,
+        "format": "markdown",
+        "precondition": "f1:4b30527a83daf2b668ff6c0275ee8d4999903c3edc76b465eee618719d1b3d97",
+        "comments": {
+          "state": "absent"
+        },
+        "body": "# 검사 하위\n\n본문입니다.\n",
+        "links": [],
+        "tags": [
+          "검사"
+        ],
+        "path": "notes/demo/root/sub/child"
+      }
+    },
+    {
+      "command": "list-tags",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 48,
+      "stderr": "",
+      "data": [
+        {
+          "tag": "검사",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "command": "create-doc",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 405,
+      "stderr": "",
+      "data": {
+        "id": "ndmvsw81kr-8266f710",
+        "agenda": "demo",
+        "agendaCreated": false,
+        "date": "2026-10-29",
+        "path": "notes/demo/2026-10-29-1057-새-노트-f710",
+        "precondition": "f1:f0ce99bf943d6c35688444adff5d00cf18f4a401a351d227f269755e7248eee1",
+        "deepLink": "withlog://doc/ndmvsw81kr-8266f710?ws=%2Fvar%2Ffolders%2Fwk%2Ff8brmjrs6892v_cfbn9vv_280000gn%2FT%2Faisurada-audit-probes-uxns78_7%2Fcase-07"
+      }
+    },
+    {
+      "command": "update-doc",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 200,
+      "stderr": "",
+      "data": {
+        "id": "ndfixture-00000001",
+        "path": "notes/demo/2026-06-16-1000-검사-노트-0001",
+        "precondition": "f1:07cb3fef7772a0df7718c4ebf632b482226ee8a735571793e78e65ccec98bd46",
+        "renamed": true
+      }
+    },
+    {
+      "command": "set-favorite",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 190,
+      "stderr": "",
+      "data": {
+        "id": "ndfixture-00000001",
+        "favorite": true,
+        "changed": true,
+        "path": "notes/demo/root",
+        "precondition": "f1:544211dc62ea74b6a50df17da3f75d54bf3d5725b14861afe586e6bbf924d898"
+      }
+    },
+    {
+      "command": "evaluate-doc",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 244,
+      "stderr": "",
+      "data": {
+        "id": "ndfixture-00000001",
+        "path": "notes/demo/root",
+        "precondition": "f1:6329aa568ce65b21c50b6b6aa20853b99ae3c8f43641b99a18a4a87250571138",
+        "evaluation": {
+          "score": 80,
+          "note": "",
+          "at": "2026-10-29T01:57:18.952Z"
+        }
+      }
+    },
+    {
+      "command": "link-docs",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 424,
+      "stderr": "",
+      "data": {
+        "id": "ndfixture-00000001",
+        "to": "ndfixture-00000002",
+        "kind": "direct",
+        "removed": false,
+        "changed": true,
+        "path": "notes/demo/root",
+        "precondition": "f1:df7abda4b79f5b6b88734cea208a0a13b094a4e4b8821c83f2683fa36e221179",
+        "warning": "대상 문서 id를 vault에서 찾지 못했어요(ndfixture-00000002) — 연결은 저장되지만 대상이 생길 때까지 그래프엔 안 보일 수 있어요."
+      }
+    },
+    {
+      "command": "list-sub-notes",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 551,
+      "stderr": "",
+      "data": {
+        "parent": "ndfixture-00000001",
+        "subNotes": [
+          {
+            "id": "snfixture-00000001",
+            "ref": "ndfixture-00000001/snfixture-00000001",
+            "type": "free",
+            "title": "검사 하위",
+            "created": "2026-06-16T10:00:00+09:00",
+            "date": "2026-06-16",
+            "time": "10:00",
+            "mins": 30,
+            "format": "markdown",
+            "precondition": "f1:4b30527a83daf2b668ff6c0275ee8d4999903c3edc76b465eee618719d1b3d97",
+            "links": [],
+            "tags": [
+              "검사"
+            ],
+            "path": "notes/demo/root/sub/child"
+          }
+        ]
+      }
+    },
+    {
+      "command": "create-sub-note",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 298,
+      "stderr": "",
+      "data": {
+        "id": "snmvsw82aj-66693d3e",
+        "parent": "ndfixture-00000001",
+        "ref": "ndfixture-00000001/snmvsw82aj-66693d3e",
+        "title": "새 하위",
+        "path": "notes/demo/root/sub/2026-10-29-1057-새-하위-3d3e",
+        "precondition": "f1:a1c58bcdbd214c7b47b3155823c8005f3f72248fd4c95adfacd244d63adb98d0"
+      }
+    },
+    {
+      "command": "update-sub-note",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 252,
+      "stderr": "",
+      "data": {
+        "id": "snfixture-00000001",
+        "parent": "ndfixture-00000001",
+        "title": "고친 하위",
+        "path": "notes/demo/root/sub/2026-06-16-1000-고친-하위-0001",
+        "precondition": "f1:cce4bd54c8836ccc6ec3d81b7b50a0429f0fcb0558f631666e2f6888ed2bceef"
+      }
+    },
+    {
+      "command": "delete-sub-note",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 331,
+      "stderr": "",
+      "data": {
+        "id": "snfixture-00000001",
+        "parent": "ndfixture-00000001",
+        "deleted": true,
+        "path": "notes/demo/root/sub/child",
+        "cardRemoved": true,
+        "containerBefore": "f1:bdd6a16f6665ec8eed8814cf6f6a07a7ca04a8106be2b661e2cb39ae20f53168",
+        "containerAfter": "f1:4ac479fd7994e5f1c5a184c2476632c326ecb0c39be0f16aced79e1a0f242acb"
+      }
+    },
+    {
+      "command": "list-attachments",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 58,
+      "stderr": "",
+      "data": {
+        "parent": "ndfixture-00000001",
+        "attachments": []
+      }
+    },
+    {
+      "command": "write-attachment",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 164,
+      "stderr": "",
+      "data": {
+        "parent": "ndfixture-00000001",
+        "name": "검사.txt",
+        "path": "notes/demo/root/attach/검사.txt",
+        "ref": "[검사.txt](attach/%EA%B2%80%EC%82%AC.txt)"
+      }
+    },
+    {
+      "command": "list-comments",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 171,
+      "stderr": "",
+      "data": {
+        "state": "loaded",
+        "comments": [
+          {
+            "id": "cmfixture-0000000a",
+            "createdAt": "2026-06-16T10:30:00.000Z",
+            "body": "기존 코멘트"
+          }
+        ]
+      }
+    },
+    {
+      "command": "create-comment",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 91,
+      "stderr": "",
+      "data": {
+        "id": "cmmvsw82wp-97e845db",
+        "path": "notes/demo/root/comments.json",
+        "total": 2
+      }
+    },
+    {
+      "command": "update-comment",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 90,
+      "stderr": "",
+      "data": {
+        "id": "cmfixture-0000000a",
+        "path": "notes/demo/root/comments.json",
+        "total": 1
+      }
+    },
+    {
+      "command": "delete-comment",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 121,
+      "stderr": "",
+      "data": {
+        "id": "cmfixture-0000000a",
+        "path": "notes/demo/root/comments.json",
+        "remaining": 0,
+        "markerStripped": false
+      }
+    },
+    {
+      "command": "list-agendas",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 543,
+      "stderr": "",
+      "data": [
+        {
+          "id": "agfixture-00000001",
+          "slug": "demo",
+          "title": "데모",
+          "hue": "blue",
+          "summary": "",
+          "deepLink": "withlog://agenda/demo?ws=%2Fvar%2Ffolders%2Fwk%2Ff8brmjrs6892v_cfbn9vv_280000gn%2FT%2Faisurada-audit-probes-uxns78_7%2Fcase-22"
+        },
+        {
+          "id": "agfixture-00000002",
+          "slug": "empty",
+          "title": "비었음",
+          "hue": "green",
+          "summary": "",
+          "deepLink": "withlog://agenda/empty?ws=%2Fvar%2Ffolders%2Fwk%2Ff8brmjrs6892v_cfbn9vv_280000gn%2FT%2Faisurada-audit-probes-uxns78_7%2Fcase-22"
+        }
+      ]
+    },
+    {
+      "command": "create-agenda",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 302,
+      "stderr": "",
+      "data": {
+        "id": "agmvsw838l-3128f4f2",
+        "slug": "새-아젠다",
+        "title": "새 아젠다",
+        "hue": "violet",
+        "summary": "",
+        "deepLink": "withlog://agenda/%EC%83%88-%EC%95%84%EC%A0%A0%EB%8B%A4?ws=%2Fvar%2Ffolders%2Fwk%2Ff8brmjrs6892v_cfbn9vv_280000gn%2FT%2Faisurada-audit-probes-uxns78_7%2Fcase-23"
+      }
+    },
+    {
+      "command": "update-agenda",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 260,
+      "stderr": "",
+      "data": {
+        "id": "agfixture-00000001",
+        "slug": "demo",
+        "title": "고친 아젠다",
+        "hue": "blue",
+        "summary": "",
+        "deepLink": "withlog://agenda/demo?ws=%2Fvar%2Ffolders%2Fwk%2Ff8brmjrs6892v_cfbn9vv_280000gn%2FT%2Faisurada-audit-probes-uxns78_7%2Fcase-24"
+      }
+    },
+    {
+      "command": "delete-agenda",
+      "expectedExitCode": 0,
+      "exitCode": 0,
+      "wlCode": null,
+      "stdoutBytes": 153,
+      "stderr": "",
+      "data": {
+        "id": "agfixture-00000002",
+        "slug": "empty",
+        "archivedPath": ".withlog/trash/agendas/empty-agfixture-00000002.md",
+        "notesDir": "notes/empty"
+      }
+    }
+  ],
+  "smokeSummary": {
+    "total": 26,
+    "success": 26,
+    "unsupported": []
+  },
+  "automaticCommit": {
+    "enabled": true,
+    "idleSeconds": 0,
+    "branch": "main",
+    "counts": {
+      "beforeStartup": 1,
+      "afterStartup": 2,
+      "afterToolWrite": 2,
+      "afterWriterChange": 3,
+      "afterMaintenance": 4,
+      "beforeShutdown": 4,
+      "afterShutdown": 5
+    },
+    "writes": [
+      {
+        "command": "set_favorite",
+        "exitCode": 0,
+        "wlCode": null,
+        "stdoutBytes": 190,
+        "stderr": "",
+        "data": {
+          "id": "ndfixture-00000001",
+          "favorite": true,
+          "changed": true,
+          "path": "notes/demo/root",
+          "precondition": "f1:8ba301f9903549ca464623cd282133f341be0f1dacae6fd25b53586208d5c950"
+        }
+      },
+      {
+        "command": "set-favorite",
+        "exitCode": 0,
+        "wlCode": null,
+        "stdoutBytes": 191,
+        "stderr": "",
+        "data": {
+          "id": "ndfixture-00000001",
+          "favorite": false,
+          "changed": true,
+          "path": "notes/demo/root",
+          "precondition": "f1:b1cddb5aac54d27287776fecc5c570595e55f171f43843b2a2b064a22477175e"
+        }
+      },
+      {
+        "command": "set-favorite",
+        "exitCode": 0,
+        "wlCode": null,
+        "stdoutBytes": 190,
+        "stderr": "",
+        "data": {
+          "id": "ndfixture-00000001",
+          "favorite": true,
+          "changed": true,
+          "path": "notes/demo/root",
+          "precondition": "f1:d9e65c32fc2a63954f3a2627b1ba40f390a88fc7eccf26188def18b29f9b713e"
+        }
+      }
+    ],
+    "finalStatus": ""
+  },
+  "optionalBuildDiagnostics": {
+    "hasCommitStamp": false,
+    "hasWatchedPathsStamp": false,
+    "note": "3.6은 재구현 doctor의 이런 진단을 바꾸거나 생략해도 된다고 명시한다."
+  }
+}

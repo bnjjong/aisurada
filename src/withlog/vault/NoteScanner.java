@@ -3,6 +3,8 @@ package withlog.vault;
 import withlog.cli.WlException;
 import withlog.text.Trim;
 import withlog.text.Utf16;
+import withlog.write.PathConfinement;
+import withlog.write.ShardLayout;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -69,129 +71,132 @@ public final class NoteScanner {
      * @return 훑기 결과 ScanResult
      */
     public static ScanResult scan(Path vaultRoot, AgendaTable agendaTable, boolean haltOnFatal) {
-        Path notesDir = vaultRoot.resolve("notes");
-        List<Map<String, String>> skipped = new ArrayList<>();
-        List<Map<String, String>> conflicts = new ArrayList<>();
-        List<String> unsharded = new ArrayList<>();
-        Map<String, NoteRecord> notesById = new LinkedHashMap<>();
-
-        if (!Files.exists(notesDir)) {
-            return new ScanResult(notesById, skipped, conflicts, unsharded);
-        }
-        if (!Files.isDirectory(notesDir)) {
-            return new ScanResult(notesById, skipped, conflicts, unsharded);
-        }
-
-        List<Path> agendaDirs = new ArrayList<>();
-        try (DirectoryStream<Path> ds = Files.newDirectoryStream(notesDir)) {
-            for (Path p : ds) {
-                if (Files.isDirectory(p)) {
-                    agendaDirs.add(p);
-                }
-            }
-        } catch (IOException e) {
-            throw new WlException(500, "노트 폴더를 읽지 못했다: " + notesDir.toAbsolutePath().normalize());
-        }
-
-        agendaDirs.sort((a, b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
-
-        try {
-            for (Path agendaDir : agendaDirs) {
-                String folderAgendaSlug = agendaDir.getFileName().toString();
-                scanAgendaFolder(vaultRoot, agendaDir, folderAgendaSlug, 0, agendaTable, notesById, skipped, conflicts, haltOnFatal);
-            }
-        } catch (ScanHaltedException e) {
-            // 읽기 명령에서는 비정상 노트 발생 시 훑기를 중단하고 이전까지 읽은 노트를 보존함 (설명서 8.6, 8.7 14번)
-        }
-
-        // 1.12, 1.15의 21번과 23번: 코멘트 색인 사본 읽기가 세우는 자리.
-        // 읽기는 8.4대로 그 노트 앞까지만 노트로 본다. 깨진 노트와 그 뒤 노트는 WL-404다
-        Set<String> commentIds = new HashSet<>();
-        List<String> ids = new ArrayList<>(notesById.keySet());
-        for (int i = 0; i < ids.size(); i++) {
-            try {
-                CommentCopy.check(vaultRoot, notesById.get(ids.get(i)), commentIds);
-            } catch (RuntimeException e) {
-                if (haltOnFatal) {
-                    throw e;
-                }
-                for (int j = i; j < ids.size(); j++) {
-                    notesById.remove(ids.get(j));
-                }
-                break;
-            }
-        }
-
-        return new ScanResult(notesById, skipped, conflicts, unsharded);
+        Collector collector = new Collector(vaultRoot);
+        collector.collectAll();
+        return collector.open(agendaTable, haltOnFatal);
     }
 
-    private static void scanAgendaFolder(
-            Path vaultRoot,
-            Path dir,
-            String folderAgendaSlug,
-            int depth,
-            AgendaTable agendaTable,
-            Map<String, NoteRecord> notesById,
-            List<Map<String, String>> skipped,
-            List<Map<String, String>> conflicts,
-            boolean haltOnFatal
-    ) {
-        List<Path> entries = new ArrayList<>();
-        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir)) {
-            for (Path p : ds) {
-                entries.add(p);
+    /** 8.5: 받은 자리만 먼저 모은 뒤 연다. 경로 검사 실패 전에는 노트 파일을 열지 않는다. */
+    public static ScanResult scanPaths(Path vaultRoot, AgendaTable agendas, List<String> paths) {
+        Collector collector = new Collector(vaultRoot);
+        Set<String> seen = new LinkedHashSet<>();
+        for (String raw : paths) {
+            String path = Trim.trim(raw);
+            int first = 0, last = path.length();
+            while (first < last && path.charAt(first) == '/') first++;
+            while (last > first && path.charAt(last - 1) == '/') last--;
+            path = path.substring(first, last);
+            if (path.startsWith("notes/") && seen.add(path)) collector.collectPath(path);
+        }
+        return collector.open(agendas, true);
+    }
+
+    private record Candidate(Path path, Path body, String agenda, boolean single) {}
+
+    /** 전체 훑기와 지정 경로 훑기가 같은 1.2 후보 판정·깊이·순서를 쓴다. */
+    private static final class Collector {
+        final Path vault;
+        final List<Map<String, String>> skipped = new ArrayList<>();
+        final List<Map<String, String>> conflicts = new ArrayList<>();
+        final Map<Path, Candidate> candidates = new LinkedHashMap<>();
+
+        Collector(Path vault) { this.vault = vault.toAbsolutePath().normalize(); }
+
+        void collectAll() {
+            Path notes = vault.resolve("notes");
+            if (!Files.isDirectory(notes)) return;
+            List<Path> dirs = new ArrayList<>();
+            try (var entries = Files.newDirectoryStream(notes)) {
+                for (Path entry : entries) if (Files.isDirectory(entry)) dirs.add(entry);
+            } catch (IOException e) {
+                throw new WlException(500, "노트 폴더를 읽지 못했다: " + notes);
             }
-        } catch (IOException e) {
-            // 1.2 550행: 목록을 못 읽은 하위 폴더는 빈 폴더로 본다
-            return;
+            dirs.sort((a,b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
+            for (Path dir : dirs) collectFolder(dir, dir.getFileName().toString(), 0);
         }
 
-        entries.sort((a, b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
+        void collectPath(String raw) {
+            List<String> pieces = Arrays.stream(raw.split("/")).filter(s -> !Trim.isBlank(s)).toList();
+            if (pieces.size() < 2) return;
+            String agenda = pieces.get(1);
+            PathConfinement.checkSegment(vault, agenda);
+            Path current = vault.resolve("notes").resolve(agenda).normalize();
+            // 두 번째 조각의 기준만 vault다. notes/..은 vault 자신이라 통과한다(8.5/8.7).
+            PathConfinement.checkConfinement(vault, current);
+            if (!Files.isDirectory(current)) return;
+            int depth = 0;
+            for (int i = 2; i < pieces.size(); i++) {
+                String piece = pieces.get(i);
+                PathConfinement.checkSegment(current, piece);
+                Path next = current.resolve(piece).normalize();
+                PathConfinement.checkConfinement(current, next);
+                if (!Files.exists(next)) return;
+                String name = next.getFileName().toString();
+                boolean ordinary = Files.isDirectory(next) && !Files.isSymbolicLink(next)
+                        && !RESERVED_NAMES.contains(name) && !CONFLICT_PATTERN.matcher(name).find()
+                        && findFolderContentFile(next) == null && depth < 8;
+                if (!ordinary) { collectEntry(next, agenda, depth); return; }
+                current = next;
+                depth++;
+            }
+            collectFolder(current, agenda, depth);
+        }
 
-        for (Path entry : entries) {
+        void collectFolder(Path dir, String agenda, int depth) {
+            List<Path> entries = new ArrayList<>();
+            try (var stream = Files.newDirectoryStream(dir)) { for (Path entry : stream) entries.add(entry); }
+            catch (IOException e) { return; }
+            entries.sort((a,b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
+            for (Path entry : entries) collectEntry(entry, agenda, depth);
+        }
+
+        void collectEntry(Path entry, String agenda, int depth) {
             String name = entry.getFileName().toString();
-            String relPath = vaultRoot.relativize(entry).toString().replace('\\', '/');
-
-            // 2. 예약 이름 건너뜀
-            if (RESERVED_NAMES.contains(name)) {
-                continue;
-            }
-
-            // 3. 심볼릭 링크 -> skipped
-            if (Files.isSymbolicLink(entry)) {
-                addSkipped(skipped, relPath, "심링크라 따라가지 않았다");
-                continue;
-            }
-
-            // 4. 충돌 사본 모양 -> conflicts
+            String relative = vault.relativize(entry).toString().replace('\\', '/');
+            if (RESERVED_NAMES.contains(name)) return;
+            if (Files.isSymbolicLink(entry)) { addSkipped(skipped, relative, "심링크라 따라가지 않았다"); return; }
             if (CONFLICT_PATTERN.matcher(name).find()) {
-                Map<String, String> c = new LinkedHashMap<>();
-                c.put("kind", "note");
-                c.put("path", relPath);
-                conflicts.add(c);
-                continue;
+                Map<String, String> row = new LinkedHashMap<>(); row.put("kind", "note"); row.put("path", relative);
+                conflicts.add(row); return;
             }
-
             if (Files.isDirectory(entry)) {
-                // 본문 파일이 있는지 확인
-                Path contentFile = findFolderContentFile(entry);
-                if (contentFile != null) {
-                    // 깊이 0~8 어디서든 노트로 적고 안으로 안 내려감 (1.2 5번)
-                    processRootCandidate(vaultRoot, entry, contentFile, folderAgendaSlug, false, agendaTable, notesById, skipped, haltOnFatal);
-                } else {
-                    // 본문 파일이 없는 폴더
-                    if (depth < 8) {
-                        scanAgendaFolder(vaultRoot, entry, folderAgendaSlug, depth + 1, agendaTable, notesById, skipped, conflicts, haltOnFatal);
-                    } else {
-                        addSkipped(skipped, relPath, "스캔 깊이 상한을 넘었다");
-                    }
-                }
-            } else if (Files.isRegularFile(entry)) {
-                // 7. 일반 파일: 단일 파일 노트 이름일 때만 노트로 적고 깊이 검사 안 받음
-                if (isSingleFileNoteName(name)) {
-                    processRootCandidate(vaultRoot, entry, entry, folderAgendaSlug, true, agendaTable, notesById, skipped, haltOnFatal);
+                Path body = findFolderContentFile(entry);
+                if (body != null) candidates.putIfAbsent(entry, new Candidate(entry, body, agenda, false));
+                else if (depth < 8) collectFolder(entry, agenda, depth + 1);
+                else addSkipped(skipped, relative, "스캔 깊이 상한을 넘었다");
+            } else if (Files.isRegularFile(entry) && isSingleFileNoteName(name)) {
+                candidates.putIfAbsent(entry, new Candidate(entry, entry, agenda, true));
+            }
+        }
+
+        ScanResult open(AgendaTable agendas, boolean haltOnFatal) {
+            Map<String, NoteRecord> notes = new LinkedHashMap<>();
+            List<Map<String, String>> openingSkipped = new ArrayList<>();
+            try {
+                for (Candidate c : candidates.values()) processRootCandidate(vault, c.path(), c.body(), c.agenda(), c.single(),
+                        agendas, notes, openingSkipped, haltOnFatal);
+            } catch (ScanHaltedException ignored) { /* 새 색인의 첫 실패 앞까지만 남긴다(8.6). */ }
+            Set<String> commentIds = new HashSet<>();
+            List<String> ids = new ArrayList<>(notes.keySet());
+            for (int i = 0; i < ids.size(); i++) {
+                try { CommentCopy.check(vault, notes.get(ids.get(i)), commentIds); }
+                catch (RuntimeException e) {
+                    if (haltOnFatal) throw e;
+                    for (int j = i; j < ids.size(); j++) notes.remove(ids.get(j));
+                    break;
                 }
             }
+            List<Map<String, String>> allSkipped = new ArrayList<>(skipped); allSkipped.addAll(openingSkipped);
+            List<String> unsharded = new ArrayList<>();
+            if (!candidates.isEmpty() && ShardLayout.isSharded(vault)) {
+                for (Path path : candidates.keySet()) {
+                    Path rel = vault.relativize(path);
+                    if (rel.getNameCount() != 4 || !rel.getName(2).toString().matches("[0-9]{4}-(0[1-9]|1[0-2])"))
+                        unsharded.add(rel.toString().replace('\\', '/'));
+                }
+                unsharded.sort(Utf16::compare);
+            }
+            return new ScanResult(notes, allSkipped, conflicts, unsharded);
         }
     }
 

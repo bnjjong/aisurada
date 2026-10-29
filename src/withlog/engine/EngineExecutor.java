@@ -5,14 +5,11 @@ import withlog.args.ParsedArgs;
 import withlog.cli.WlException;
 import withlog.cmd.*;
 import withlog.out.JsonWriter;
-import withlog.vault.AgendaReader;
 import withlog.vault.NoteIndex;
-import withlog.vault.NoteScanner;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -83,99 +80,87 @@ public final class EngineExecutor {
         try {
             ParsedArgs parsed = ArgsParser.parse(firstArg, commandArgs);
 
-            if (isPart4) {
-                // 설명서 32.2 4부 명령 실행 차례:
-                // 1(명령 이름 5.1), 2(이름 인자 허용 목록, 자리 인자 상한 5.2)는 이미 통과함.
-                if ("append-ask-turn".equals(firstArg) || "append-chat-turn".equals(firstArg)) {
-                    // 3. 워크스페이스 표식 확인 (1.1, 7.1, 7.6의 3번)
-                    Path workspaceJson = vaultRoot.resolve(".withlog/workspace.json");
-                    if (!Files.exists(workspaceJson)) {
-                        throw new WlException(400, "이 폴더는 아직 워크스페이스가 아니다: " +
-                                vaultRoot.toAbsolutePath().normalize() +
-                                ". .withlog/workspace.json 이 없다. 경로가 맞는지 보고, 새로 만들 자리면 init-workspace 를 먼저 부른다.");
-                    }
-
-                    // 4. 색인 맞추기에 해당하는 실패 (8.3, 8.4, 20.9의 13번)
-                    AgendaReader.ScanResult agendaScan = AgendaReader.scanAgendas(vaultRoot, true);
-                    NoteScanner.scan(vaultRoot, agendaScan.table(), true);
+            try (WritePipeline scope = WritePipeline.begin(vaultRoot, parsed.commandName(), isTool, isServeMode, sessionId)) {
+                if (isPart4) {
+                    // 5. 4부가 없음 (32.2)
+                    byte[] err = NO_PART4_MESSAGE.getBytes(StandardCharsets.UTF_8);
+                    return EngineResult.wlError(3, 409, err);
                 }
 
-                // 5. 4부가 없음 (32.2)
-                byte[] err = NO_PART4_MESSAGE.getBytes(StandardCharsets.UTF_8);
-                return EngineResult.wlError(3, 409, err);
+                Object response;
+
+                if ("reindex".equals(parsed.commandName())) {
+                    response = Reindex.execute(vaultRoot, startTime);
+                } else if ("reindex-paths".equals(parsed.commandName())) {
+                    response = Reindex.paths(vaultRoot, parsed.positionalArgs(), startTime);
+                } else if ("get-doc".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = GetDoc.execute(vaultRoot, parsed, noteIndex.agendaTable(), noteIndex.noteScan());
+                } else if ("get-sub-note".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = GetSubNote.execute(vaultRoot, parsed, noteIndex.noteScan());
+                } else if ("list-attachments".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = ListAttachments.execute(vaultRoot, parsed, noteIndex);
+                } else if ("list-comments".equals(parsed.commandName())) {
+                    response = ListComments.execute(vaultRoot, parsed, NoteIndex.fresh(vaultRoot));
+                } else if (Set.of("create-comment", "update-comment", "delete-comment").contains(parsed.commandName())) {
+                    response = CommentCommands.execute(vaultRoot, parsed);
+                } else if ("list-sub-notes".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = ListSubNotes.execute(vaultRoot, parsed, noteIndex);
+                } else if ("list-docs".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = ListDocs.execute(vaultRoot, parsed, noteIndex);
+                } else if ("list-tags".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = ListTags.execute(parsed, noteIndex);
+                } else if ("search-docs".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = SearchDocs.execute(vaultRoot, parsed, noteIndex);
+                } else if ("list-templates".equals(parsed.commandName())) {
+                    response = ListTemplates.execute(vaultRoot, parsed);
+                } else if ("get-template".equals(parsed.commandName())) {
+                    response = GetTemplate.execute(vaultRoot, parsed);
+                } else if ("list-reports".equals(parsed.commandName())) {
+                    response = ListReports.execute(vaultRoot, parsed);
+                } else if ("get-report".equals(parsed.commandName())) {
+                    response = GetReport.execute(vaultRoot, parsed);
+                } else if ("list-trash".equals(parsed.commandName())) {
+                    response = ListTrash.execute(vaultRoot, parsed);
+                } else if ("list-agendas".equals(parsed.commandName())) {
+                    response = ListAgendas.execute(vaultRoot);
+                } else if ("create-agenda".equals(parsed.commandName())) {
+                    response = CreateAgenda.execute(vaultRoot, parsed);
+                } else if ("update-agenda".equals(parsed.commandName())) {
+                    response = UpdateAgenda.execute(vaultRoot, parsed);
+                } else if ("delete-agenda".equals(parsed.commandName())) {
+                    response = DeleteAgenda.execute(vaultRoot, parsed);
+                } else if ("create-doc".equals(parsed.commandName())) {
+                    response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
+                } else if ("write-attachment".equals(parsed.commandName())) {
+                    response = withlog.cmd.WriteAttachment.execute(vaultRoot, parsed);
+                } else if ("create-sub-note".equals(parsed.commandName())) {
+                    response = CreateSubNote.execute(vaultRoot, parsed);
+                } else if ("update-sub-note".equals(parsed.commandName())) {
+                    response = UpdateSubNote.execute(vaultRoot, parsed, sessionId);
+                } else if ("delete-sub-note".equals(parsed.commandName())) {
+                    response = DeleteSubNote.execute(vaultRoot, parsed);
+                } else if ("update-doc".equals(parsed.commandName())) {
+                    response = withlog.cmd.UpdateDoc.execute(vaultRoot, parsed, sessionId);
+                } else if ("set-favorite".equals(parsed.commandName())) {
+                    response = withlog.cmd.SetFavorite.execute(vaultRoot, parsed, sessionId);
+                } else if ("evaluate-doc".equals(parsed.commandName())) {
+                    response = withlog.cmd.EvaluateDoc.execute(vaultRoot, parsed, sessionId);
+                } else if ("link-docs".equals(parsed.commandName())) {
+                    response = withlog.cmd.LinkDocs.execute(vaultRoot, parsed, sessionId);
+                } else {
+                    throw new IllegalStateException("Unhandled command: " + parsed.commandName());
+                }
+
+                byte[] stdoutBytes = JsonWriter.toBytes(response);
+                return EngineResult.success(stdoutBytes);
             }
-
-            Object response;
-
-            if ("reindex".equals(parsed.commandName())) {
-                response = Reindex.execute(vaultRoot, startTime);
-            } else if ("get-doc".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = GetDoc.execute(vaultRoot, parsed, noteIndex.agendaTable(), noteIndex.noteScan());
-            } else if ("get-sub-note".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = GetSubNote.execute(vaultRoot, parsed, noteIndex.noteScan());
-            } else if ("list-attachments".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = ListAttachments.execute(vaultRoot, parsed, noteIndex);
-            } else if ("list-comments".equals(parsed.commandName())) {
-                response = ListComments.execute(vaultRoot, parsed, NoteIndex.fresh(vaultRoot));
-            } else if (Set.of("create-comment", "update-comment", "delete-comment").contains(parsed.commandName())) {
-                response = CommentCommands.execute(vaultRoot, parsed);
-            } else if ("list-sub-notes".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = ListSubNotes.execute(vaultRoot, parsed, noteIndex);
-            } else if ("list-docs".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = ListDocs.execute(vaultRoot, parsed, noteIndex);
-            } else if ("list-tags".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = ListTags.execute(parsed, noteIndex);
-            } else if ("search-docs".equals(parsed.commandName())) {
-                NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                response = SearchDocs.execute(vaultRoot, parsed, noteIndex);
-            } else if ("list-templates".equals(parsed.commandName())) {
-                response = ListTemplates.execute(vaultRoot, parsed);
-            } else if ("get-template".equals(parsed.commandName())) {
-                response = GetTemplate.execute(vaultRoot, parsed);
-            } else if ("list-reports".equals(parsed.commandName())) {
-                response = ListReports.execute(vaultRoot, parsed);
-            } else if ("get-report".equals(parsed.commandName())) {
-                response = GetReport.execute(vaultRoot, parsed);
-            } else if ("list-trash".equals(parsed.commandName())) {
-                response = ListTrash.execute(vaultRoot, parsed);
-            } else if ("list-agendas".equals(parsed.commandName())) {
-                response = ListAgendas.execute(vaultRoot);
-            } else if ("create-agenda".equals(parsed.commandName())) {
-                response = CreateAgenda.execute(vaultRoot, parsed);
-            } else if ("update-agenda".equals(parsed.commandName())) {
-                response = UpdateAgenda.execute(vaultRoot, parsed);
-            } else if ("delete-agenda".equals(parsed.commandName())) {
-                response = DeleteAgenda.execute(vaultRoot, parsed);
-            } else if ("create-doc".equals(parsed.commandName())) {
-                response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
-            } else if ("write-attachment".equals(parsed.commandName())) {
-                response = withlog.cmd.WriteAttachment.execute(vaultRoot, parsed);
-            } else if ("create-sub-note".equals(parsed.commandName())) {
-                response = CreateSubNote.execute(vaultRoot, parsed);
-            } else if ("update-sub-note".equals(parsed.commandName())) {
-                response = UpdateSubNote.execute(vaultRoot, parsed, sessionId);
-            } else if ("delete-sub-note".equals(parsed.commandName())) {
-                response = DeleteSubNote.execute(vaultRoot, parsed);
-            } else if ("update-doc".equals(parsed.commandName())) {
-                response = withlog.cmd.UpdateDoc.execute(vaultRoot, parsed, sessionId);
-            } else if ("set-favorite".equals(parsed.commandName())) {
-                response = withlog.cmd.SetFavorite.execute(vaultRoot, parsed, sessionId);
-            } else if ("evaluate-doc".equals(parsed.commandName())) {
-                response = withlog.cmd.EvaluateDoc.execute(vaultRoot, parsed, sessionId);
-            } else if ("link-docs".equals(parsed.commandName())) {
-                response = withlog.cmd.LinkDocs.execute(vaultRoot, parsed, sessionId);
-            } else {
-                throw new IllegalStateException("Unhandled command: " + parsed.commandName());
-            }
-
-            byte[] stdoutBytes = JsonWriter.toBytes(response);
-            return EngineResult.success(stdoutBytes);
 
         } catch (WlException e) {
             byte[] err = (e.toWlLine() + "\n").getBytes(StandardCharsets.UTF_8);

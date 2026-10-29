@@ -6,6 +6,7 @@ import withlog.engine.EngineResult;
 import withlog.frame.FrameException;
 import withlog.frame.RequestFrame;
 import withlog.frame.ResponseFrame;
+import withlog.git.VaultGit;
 import withlog.text.Trim;
 import withlog.vault.VaultKey;
 import withlog.vault.VaultPath;
@@ -48,6 +49,7 @@ public final class ServeMode {
     private static String vaultKey;
     private static FileLock lock;
     private static FileChannel lockChannel;
+    private static VaultGit vaultGit;
     private static final AtomicInteger openConnections = new AtomicInteger(0);
 
     /**
@@ -93,11 +95,16 @@ public final class ServeMode {
             System.exit(1);
         }
 
+        vaultGit = VaultGit.serving(Paths.get(vaultRoot));
+
         // 셧다운 훅: 잠금을 잡은 직후에 건다. 그래야 뜨는 도중(실행 상태 파일을 쓴 뒤, bind 전)에 신호를 받아도
         // 3.2의 「내려가는 차례」가 돌아 실행 상태 파일을 지우고 잠금을 놓는다. 신호로 끝나면 128 + 신호 번호다
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             doTeardown();
         }, "wl-shutdown-hook"));
+
+        // 잠금을 쥔 뒤, 상태 파일과 소켓을 만들기 전에 외부 변경을 담는다(31.1).
+        vaultGit.commit("startup");
 
         // 4. 활동 시각 초기화
         Instant initialLastActiveAt = Instant.now();
@@ -179,6 +186,8 @@ public final class ServeMode {
                     if (updated != null) {
                         lastWrittenJsonRef.set(updated);
                     }
+                    // 상태 파일 갱신에 실패한 정비 걸음에서는 git도 건너뛴다(3.2).
+                    vaultGit.tick();
                 } catch (Exception e) {
                     System.err.println("경고: 정비 중 상태 파일 작성 실패: " + e.getMessage());
                 }
@@ -321,7 +330,8 @@ public final class ServeMode {
             }
         }
 
-        // 3. shutdown git 커밋: 결정 2에 따라 생략
+        // 3. 처리 중이던 쓰기를 기다린 뒤, 실행 잠금을 놓기 전에 마지막 판을 남긴다.
+        if (vaultGit != null) vaultGit.commit("shutdown");
 
         // 4. 실행 상태 파일 삭제
         try {
