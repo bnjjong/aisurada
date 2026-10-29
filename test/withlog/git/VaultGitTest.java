@@ -22,7 +22,7 @@ public final class VaultGitTest {
         if (args.length > 0 && args[0].equals("process-probe")) { processProbe(Path.of(args[1])); return; }
         temp=Files.createTempDirectory("aisurada-git-test-");
         try {
-            commits(); blocking(); retries(); ids(); pipeline(); process();
+            commits(); blocking(); retries(); ids(); pipeline(); factsPipeline(); process();
             System.out.println("vault git: "+checks+" checks passed");
         } finally {
             EngineConfig.activate(null);
@@ -193,6 +193,28 @@ public final class VaultGitTest {
         if(!done)probe.destroyForcibly();check(done,"timeout probe terminates");
         String output=new String(probe.getInputStream().readAllBytes(),StandardCharsets.UTF_8);
         eq(probe.exitValue(),0,"isolated git process checks: "+output);
+    }
+    private static void factsPipeline() throws Exception {
+        Path v=repo();EngineConfig.activate(new EngineConfig(v.toString(),v.toString(),null,false,10,true,300,true));
+        int before=count(v);
+        run(v,0,"facts-brief","from=2026-06-16","to=2026-06-25");
+        eq(git(v,"status","--porcelain"),"","brief writes no vault files");eq(count(v),before,"brief creates no immediate commit");
+        outcome(VaultGit.serving(v).commit("shutdown"),"nothing",null);
+        run(v,0,"facts-brief","from=2026-06-16","to=2026-06-25");
+        write(v,"outside","external change after brief");
+        run(v,400,"create_doc","{\"agenda\":\"demo\",\"type\":\"bad\",\"title\":\"x\",\"body\":\"x\"}","\u0000wl-session-id","facts-session");
+        eq(count(v),before+1,"brief pending writer triggers next tool transition");
+        check(message(v).contains("Withlog-Writer: app\n"),"brief records app writer");
+        VaultGit.serving(v).commit("shutdown"); // 도구의 의미 검사 실패 기록을 비운다.
+        write(v,"outside","external change before get");run(v,0,"get-agenda-facts","agfixture-00000001");
+        VaultGit.serving(v).commit("shutdown");check(message(v).contains("Withlog-Writer: outside\n"),"get facts is not a write");
+        run(v,0,"update-agenda-facts","agfixture-00000001","facts=approved facts");
+        outcome(VaultGit.serving(v).commit("shutdown"),"committed",null);
+        check(message(v).contains("Withlog-Writer: app\n"),"update facts records app writer");
+        eq(git(v,"show","HEAD:.withlog/facts/demo.md"),"approved facts\n","facts committed as file bytes");
+        run(v,400,"facts-brief","min-new-file=0");write(v,"outside","semantic brief failure");
+        VaultGit.serving(v).commit("shutdown");check(message(v).contains("Withlog-Writer: app\n"),"semantic brief failure still records app writer");
+        EngineConfig.activate(null);
     }
     private static void processProbe(Path v) {
         GitProcess process=new GitProcess(v);

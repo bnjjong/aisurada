@@ -928,6 +928,20 @@ public final class ArgsParser {
                 maxPositional = 1;
                 usage = withlog.cmd.DeleteAgenda.USAGE;
             }
+            case "get-agenda-facts" -> {
+                maxPositional = 1;
+                usage = withlog.cmd.AgendaFacts.GET_USAGE;
+            }
+            case "update-agenda-facts" -> {
+                allowedOptions = List.of("facts");
+                maxPositional = 1;
+                usage = withlog.cmd.AgendaFacts.UPDATE_USAGE;
+            }
+            case "facts-brief" -> {
+                allowedOptions = List.of("from", "min-new-file", "to");
+                maxPositional = 0;
+                usage = withlog.cmd.FactsBrief.USAGE;
+            }
             case "reindex" -> {
                 maxPositional = 0;
                 usage = "reindex";

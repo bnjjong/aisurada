@@ -102,27 +102,27 @@ public final class CommandRegistry {
             "check-notes [date=<YYYY-MM-DD>]",
             "history <노트 id> [번호] [commit=<커밋>] [query=<글자>]",
             "commit-vault",
-            "get-agenda-facts <아젠다 id>",
+            AgendaFacts.GET_USAGE,
             "get-ask <노트 id> [하위 노트 id]",
             "append-ask-turn <노트 id> [하위 노트 id] session-id=<대화 id> turn-id=<회차 id> mark-id=<밑줄 id> asked-at=<시각> [quote=<물은 대목>] question=<질문> answer=<답> [error=<실패 까닭>] model=<모델> effort=<노력> elapsed-ms=<밀리초> [session-lines=<줄 수>] [images=<attach/이름,…>]",
             "list-chats <노트 id> [하위 노트 id]",
             "append-chat-turn <노트 id> [하위 노트 id] chat-id=<대화 id> source-session=<세션 id> turn-id=<회차 id> asked-at=<시각> question=<질문> answer=<답> [error=<실패 까닭>] model=<모델> effort=<노력> elapsed-ms=<밀리초> [images=<attach/이름,…>]",
-            "update-agenda-facts <아젠다 id> facts=<지금도 참인 것. 빈 값이면 지운다>",
-            "facts-brief [from=<YYYY-MM-DD>] [to=<YYYY-MM-DD>] [min-new-file=<노트 수>]",
+            AgendaFacts.UPDATE_USAGE,
+            FactsBrief.USAGE,
             "read-session <세션 id> [limit=<개수>] [before=<순번>] [urls=true] [note=<노트 id>] [author=<노트 id>,...]",
             "session-titles <세션 id> [세션 id...]",
             "recent-sessions [days=<일 수>]"
     );
 
     /**
-     * 이 판이 지은 명령인지 확인합니다. 읽기 명령 14개(list-agendas 포함)와 reindex, 쓰기 명령 12개(create_doc, update_doc, set_favorite,
-     * evaluate_doc, link_docs, write_attachment, create_sub_note, update_sub_note, delete_sub_note, create-agenda, update-agenda,
-     * delete-agenda)다. 아젠다 명령 4개는 명령 표면에만 있어서 밑줄 이름이 없다(20.2).
+     * 이 판이 지은 명령인지 확인합니다. 아젠다 명령 4개와 사실층 명령 3개는
+     * 명령 표면에만 있어서 밑줄 이름이 없다(20.2, 22.2).
      */
     public static boolean isSupported(String name) {
         return "reindex".equals(name) || "reindex-paths".equals(name) ||
                 "list-agendas".equals(name) || "create-agenda".equals(name) ||
                 "update-agenda".equals(name) || "delete-agenda".equals(name) ||
+                "get-agenda-facts".equals(name) || "update-agenda-facts".equals(name) || "facts-brief".equals(name) ||
                 "create_doc".equals(name) || "create-doc".equals(name) ||
                 "update_doc".equals(name) || "update-doc".equals(name) ||
                 "write_attachment".equals(name) || "write-attachment".equals(name) ||

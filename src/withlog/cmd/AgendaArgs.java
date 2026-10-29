@@ -62,7 +62,11 @@ final class AgendaArgs {
      * 방금 맞춘 색인(이번 호출이 훑은 아젠다 파일)에서 id로 아젠다를 찾습니다. 없으면 WL-404입니다.
      */
     static AgendaTable.AgendaInfo find(NoteIndex noteIndex, String id) {
-        AgendaTable.AgendaInfo info = noteIndex.agendaTable().idToAgenda().get(id);
+        return find(noteIndex.agendaTable(), id);
+    }
+
+    static AgendaTable.AgendaInfo find(AgendaTable table, String id) {
+        AgendaTable.AgendaInfo info = table.idToAgenda().get(id);
         if (info == null) {
             throw new WlException(404, "Agenda not found: " + id);
         }

@@ -6,7 +6,7 @@ withlog vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 15개입니다. 19장의 코멘트 쓰기 3개와 20장의 아젠다 쓰기 3개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 16개입니다. 19장의 코멘트 쓰기 3개와 20장의 아젠다 쓰기 3개, 22장의 사실층 쓰기 1개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
 
 엔진은 두 가지 모양으로 돕니다.
 
@@ -78,6 +78,23 @@ java -jar dist/wl-engine.jar delete-agenda <아젠다 id> --withlog.vault=/path/
 - 색인이 없는 판이라 부를 때마다 아젠다 파일을 읽습니다(8.6). 그래서 손으로 지운 아젠다는 목록에서 바로 빠지고, 지금 엔진이 색인에 남기는 행(20.9의 1번)은 재현하지 않습니다.
 
 자세한 것은 [20장 완료 노트](docs/rebuild-p1-chapter20-complete.md)에 있습니다.
+
+## 22장 사실층
+
+명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.withlog/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
+
+```bash
+java -jar dist/wl-engine.jar get-agenda-facts <아젠다 id> --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar update-agenda-facts <아젠다 id> 'facts=지금도 참인 것' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar facts-brief from=2026-06-16 to=2026-06-25 --withlog.vault=/path/to/vault
+```
+
+- 저장은 다듬은 글 2,000 UTF-16 단위까지 받고, LF 1개를 붙여 원자적으로 씁니다. `facts=`는 파일을 지웁니다.
+- 편집용 읽기는 10,000단위까지 원문을 줍니다. 넘으면 `tooLargeToEdit: true`를 주고, AI용 읽기는 2,000단위를 넘으면 고정 안내 문장을 줍니다.
+- 브리핑은 창 안 읽기 층 루트 노트를 셉니다. 사실층이 있으면 1건부터, 없으면 기본 5건부터 실으며, 노트 수 내림차순과 slug UTF-16 순으로 냅니다.
+- `facts-brief`는 파일을 바꾸지 않아도 쓰기 깃발을 따라 워크스페이스 표식과 쓰기 전 훑기를 요구하고, serve의 자동 커밋 대기 기록에 `app`으로 남습니다.
+
+22.9의 읽기 버퍼·다듬기 경계 동작을 유지했습니다. 색인을 저장하지 않는 이 구현에서는 새 아젠다가 즉시 보이고, 지운 아젠다의 옛 행은 남지 않습니다. `bash test.sh`가 사실층 파일·UTF-8 경계·serve와 `wl-cli` 왕복을 검증합니다. 자세한 내용은 [22장 완료 노트](docs/rebuild-p1-chapter22-complete.md)에 있습니다.
 
 ## 1~20장 점검에서 찾은 누락 보완
 

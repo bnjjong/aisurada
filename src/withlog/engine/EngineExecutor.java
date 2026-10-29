@@ -136,6 +136,12 @@ public final class EngineExecutor {
                     response = UpdateAgenda.execute(vaultRoot, parsed);
                 } else if ("delete-agenda".equals(parsed.commandName())) {
                     response = DeleteAgenda.execute(vaultRoot, parsed);
+                } else if ("get-agenda-facts".equals(parsed.commandName())) {
+                    response = AgendaFacts.get(vaultRoot, parsed);
+                } else if ("update-agenda-facts".equals(parsed.commandName())) {
+                    response = AgendaFacts.update(vaultRoot, parsed);
+                } else if ("facts-brief".equals(parsed.commandName())) {
+                    response = FactsBrief.execute(vaultRoot, parsed);
                 } else if ("create-doc".equals(parsed.commandName())) {
                     response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
                 } else if ("write-attachment".equals(parsed.commandName())) {
