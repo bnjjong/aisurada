@@ -1,4 +1,8 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}#engine-gaps0120 .app-table-scroll { overflow-x: auto; }
+#engine-gaps0120 table { width: 100%; border-collapse: collapse; font-size: 14px; }
+#engine-gaps0120 th, #engine-gaps0120 td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+#engine-gaps0120 th { background: var(--soft); }
+</style></head><body>
 <title>aisurada 엔진 해부도</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -368,6 +372,7 @@ pre.json .dim { color: var(--muted); }
         <li><a href="#c18"><span class="n">18</span>소켓 프레임</a></li>
         <li><a href="#c19"><span class="n">19</span>wl-cli</a></li>
         <li><a href="#c20"><span class="n">20</span>launchd · 청소</a></li>
+        <li><a href="#engine-gaps0120"><span class="n">追</span>Java 엔진 1~20장 · 누락 보완</a></li>
         <li><a href="#engine-chapter20"><span class="n">追</span>Java 엔진 20장 · 완료</a></li>
         <li><a href="#engine-chapter19"><span class="n">追</span>Java 엔진 19장 · 완료</a></li>
         <li><a href="#app-progress"><span class="n">追</span>개발 현황 · withlog 앱 연동</a></li>
@@ -2238,6 +2243,7 @@ pre.xml .dim { color: var(--muted); }
 
 <section class="ch" id="c17">
   <div class="ch-head"><span class="ch-no">17</span><h2>serve 모드</h2><span class="src">설명서 3.2 · 33.3 · <code>serve/ServeMode</code> · <code>serve/StateFile</code></span></div>
+  <div class="app-progress-link" id="engine-gaps0120-summary"><strong>공통 쓰기·자동 커밋 보완 완료 · 2026-10-29</strong><p>이 장 아래의 생략 표기는 당시 상태입니다. 작성자 검사·기록과 startup/idle/overdue/shutdown 자동 커밋을 구현했고 Java 529개, 외부 자가 시험 922개가 통과했습니다. 경로별 재색인도 지원합니다.</p><p><a href="#engine-gaps0120">1~20장 누락 기능 완료 노트</a></p></div>
   <div class="app-progress-link" id="engine-chapter20-summary"><strong>aisurada Java 엔진 20장 반영 완료 · 2026-10-29</strong><p>아젠다 명령 4개(<code>list-agendas</code>·<code>create-agenda</code>·<code>update-agenda</code>·<code>delete-agenda</code>)를 aisurada에 구현하고 커밋 a2c0952를 푸시했습니다. 20장 자가 시험 97개와 19장 시험 308개가 통과했습니다. 19장 커밋의 코멘트 문구 1건은 후속 커밋에서 설명서대로 고쳐 자가 시험 922개와 검증 1,995개가 모두 통과합니다.</p><p><a href="#engine-chapter20">20장 완료 노트</a> · <a href="#engine-chapter19">19장 완료 노트</a></p></div>
   <div class="app-progress-link" id="engine-chapter19-summary"><strong>aisurada Java 엔진 19장 반영 완료 · 2026-10-29</strong><p>실제 코멘트 파일 읽기·쓰기·본문 마커 제거를 aisurada에 구현하고 커밋 b22a443을 푸시했습니다. Java 308개·HTTP 6개·17장 190개·18장 110개 검사가 통과했습니다.</p><p><a href="#engine-chapter19">Java 엔진 완료 노트</a> · <a href="#app-chapter19">이전 TypeScript 클라이언트 기록</a></p></div>
   <div class="app-progress-link" id="app-chapter19-summary"><strong>withlog 앱 19장 · 코멘트 클라이언트/호스트 구현 완료 · 2026-10-29</strong><p>세 상태 봉투, 명령 전용 쓰기 3개, 삭제 본문 토큰 검증과 vault별 쓰기 직렬화를 추가했습니다. 681개 테스트와 빌드가 통과했고 JAR 미설정으로 실제 엔진 통합 12개는 건너뛰었습니다. 커밋 <code>38796f6</code>을 origin/main에 푸시했습니다.</p><p><a href="#app-chapter19">19장 작업 완료 노트와 검증 범위</a> · <a href="#app-daily-fixes-20261028">10월 28일 보완 이력</a></p><p>파일 재작성·마커 제거는 외부 Java 엔진이 수행합니다. 아래 17장은 기존 Java 엔진 설명입니다.</p></div>
@@ -2730,6 +2736,27 @@ pre.xml .dim { color: var(--muted); }
   </div>
 </section>
 
+
+<section class="ch" id="engine-gaps0120">
+  <div class="ch-head"><span class="ch-no">追</span><h2>aisurada Java 엔진 · 1~20장 누락 기능 보완 완료</h2><span class="src">2026-10-29 · /Users/df/github/aisurada</span></div>
+  <p class="key">1~20장 점검에서 찾은 <code>reindex-paths</code>와 vault git 자동 커밋·작성자 기록을 aisurada Java 엔진에 구현했습니다.</p>
+  <p><strong>구현 커밋 <a href="https://github.com/bnjjong/aisurada/commit/5d1ae0e">5d1ae0e</a></strong>. 아래 기존 1~20장 해설은 당시 구현의 기록이며, 이 절이 해당 누락 기능의 현재 상태입니다.</p>
+  <h3>경로별 재색인 · 설명서 8.5/8.6</h3>
+  <p><code>reindex-paths</code>는 지정한 노트와 폴더만 수집합니다. 노트 안쪽 첨부·하위 경로는 루트 노트로 접고 중복은 한 번만 엽니다. 경로 이탈을 검사하고, 훑기 진단 뒤에 열기 진단을 싣습니다. 받은 자리 인자가 200개를 넘으면 <code>mode: full</code>로 노트 전체에 전환하지만 템플릿·회고·휴지통은 검사하지 않습니다.</p>
+  <h3>공통 쓰기와 자동 커밋 · 설명서 3.2/7.1/31.1~31.3</h3>
+  <p>표식 확인과 전체 맞추기 뒤, 작성자 또는 도구 세션이 바뀌기 전에 이전 변경을 커밋합니다. 명령의 일에 도달하면 성공·실패 모두 작성자를 남깁니다. serve 시작·유휴·15분 경과·종료에도 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다.</p>
+  <p>git 저장소의 main 브랜치에서 동작하며 잠금·병합 상태를 확인하고 실패는 재시도합니다. 훅과 서명은 끄고 임시 파일은 제외합니다. git 실패가 노트 쓰기를 실패로 바꾸지 않습니다. 기본 유휴 시간은 300초이며 <code>WITHLOG_VAULT_AUTOCOMMIT_ENABLED=false</code>로 끌 수 있습니다.</p>
+  <h3>실제 실행한 검증</h3>
+  <div class="app-table-scroll"><table><thead><tr><th>검증</th><th>결과</th></tr></thead><tbody>
+    <tr><td>저장소 Java 시험 · 코멘트 / 경로 재색인 / git</td><td>308 + 133 + 88 = 529개 통과</td></tr>
+    <tr><td>기존 외부 전체 자가 시험</td><td>922/922 · vault와 HOME 바이트 불변</td></tr>
+    <tr><td>17장 / 18장 / 실제 JAR HTTP 통합</td><td>190/190 · 110/110 · 6/6</td></tr>
+    <tr><td>1~20장 명령 이름별 정상 호출</td><td>26/26</td></tr>
+    <tr><td>실제 serve·wl-cli의 git 커밋 수</td><td>시작 전 1 → startup 2 → 작성자 전환 3 → idle 4 → shutdown 5</td></tr>
+  </tbody></table></div>
+  <p>실제 사용자 vault와 launchd 등록은 변경하지 않았습니다. 영속 색인 부재는 설명서 8.6이 허용한 방식입니다. 이번 범위는 자동 커밋이며 <code>history</code>·<code>commit-vault</code>·스냅숏과 21장 이후 변형 명령은 별도 범위입니다.</p>
+  <p>상세 완료 노트: <a href="https://github.com/bnjjong/aisurada/blob/5d1ae0e/docs/rebuild-p1-chapters01-20-gaps-complete.md">docs/rebuild-p1-chapters01-20-gaps-complete.md</a>. 기존 코멘트 오류 문구는 후속 커밋 <code>50b450d</code>에서 로컬 전체 설명서에 맞췄고 외부 시험 원본은 수정하지 않았습니다.</p>
+</section>
 
 <section class="ch" id="engine-chapter20">
   <div class="ch-head"><span class="ch-no">追</span><h2>aisurada Java 엔진 · 20장 아젠다 명령 4개 구현 완료</h2><span class="src">2026-10-29 · /Users/df/github/aisurada</span></div>

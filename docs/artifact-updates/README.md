@@ -62,3 +62,5 @@
 - 실제 엔진 연결·파일 쓰기·색인 DB·git·공식 수용 묶음 검증과 구분한다.
 
 후속 로컬 업데이트 시 최신 코드를 다시 확인한 뒤 상태를 갱신하고 수정 전 HTML을 백업한다. 구현·검토·계획 상태를 구분하며 기존 Java 엔진 본문과 앵커·스크립트를 보존한다. 별도 요청으로 원격 업데이트를 할 경우 기존 문서 URL에서 확인하고, 로컬 파일 수정을 원격 갱신으로 보고하지 않는다.
+
+2026-10-29 aisurada 1~20장 누락 보완: `reindex-paths`와 자동 커밋·작성자 기록을 Java 엔진에 구현했다. 구현 커밋 `5d1ae0e`를 origin/main에 푸시했다. Java 529개·전체 외부 자가 시험 922개·17장 190개·18장 110개·HTTP 6개·정상 명령 26개가 통과했다. 실제 serve에서 startup/writer/idle/shutdown 커밋과 종료 후 변경 없음도 확인했다. Downloads 원본을 `aisurada 엔진 해부도.before-gaps0120-20261029-110001.html`로 백업하고 목차·`#c17` 안내·새 `#engine-gaps0120` 절을 추가했다. 기존 앵커 70개와 본문·스크립트를 보존했다. 상세는 `../rebuild-p1-chapters01-20-gaps-complete.md`, 화면은 `chapter01-20-completion-document-2026-10-29.png`, 구조 검사는 `chapter01-20-completion-document-check.json`이다.

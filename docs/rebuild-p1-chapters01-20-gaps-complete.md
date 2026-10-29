@@ -74,3 +74,7 @@ python3 docs/review-repros/chapter01-20-audit.py --root "$PWD" --output /tmp/ais
 이번 점검에서 발견한 1~20장 필수 미구현 두 가지는 해소했다. 모든 파일 시스템 경계와 동시 실행 조합이 완전히 증명됐다는 뜻은 아니다. 8.6이 허용한 영속 색인 부재·옛 행과 코멘트 표의 낡음 차이, 부록 D 미결정 특이점은 그대로다. `history`, `commit-vault`, 스냅숏과 21장 이후 변형 명령은 이번 누락 보완 범위에 포함하지 않았다.
 
 이제 기본 설정에서 serve를 시작하면 기존 main 브랜치 git vault의 외부 변경도 자동 커밋된다. 이 동작을 원하지 않는 vault는 `WITHLOG_VAULT_AUTOCOMMIT_ENABLED=false`로 끈다.
+
+## 커밋·문서 반영
+
+구현·시험·점검 기록은 `5d1ae0e`로 커밋해 `origin/main`에 푸시했다. 로컬 `/Users/df/Downloads/aisurada 엔진 해부도.html`의 목차·공통 쓰기 안내·`#engine-gaps0120` 완료 절에도 반영했다. 원본은 같은 폴더의 `aisurada 엔진 해부도.before-gaps0120-20261029-110001.html`로 백업했다. 기존 앵커 70개·1~20장 본문·스크립트를 보존하고 공통 쓰기 장에는 현재 상태 안내만 추가했다. 저장소의 [최신 HTML 사본](artifact-updates/aisurada-updated-2026-10-29.html)과 [화면 기록](artifact-updates/chapter01-20-completion-document-2026-10-29.png)도 갱신했다.
