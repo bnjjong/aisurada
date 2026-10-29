@@ -1,5 +1,7 @@
 # 19장 list_comments와 코멘트 쓰기 3개 — 구현 계약
 
+> 이 문서는 별도 withlog TypeScript 앱의 작업 당시 요약이다. aisurada Java 엔진 구현은 [19장 원문](./engine-manual/19-comments.md)과 [Java 완료 노트](./review-chapter-19-engine-complete.md)를 따른다.
+
 사용자가 제공한 19장 설명서의 구현용 요약이다. 이 저장소는 TypeScript 앱/엔진 응답 소비 계층이며, vault 파일을 다루는 Java 엔진 소스와 `fixtures/golden/comment-parse.json`, `comment-anchors.json`은 포함하지 않는다. 아래에서 파일 처리 규칙은 연결된 엔진의 계약이고, 여기서 구현한 범위는 호출·응답 검증·호스트 전송이다.
 
 ## 표면과 인자 (19.1–19.4)

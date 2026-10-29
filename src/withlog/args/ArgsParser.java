@@ -97,14 +97,14 @@ public final class ArgsParser {
             String rawParent = strParent.value();
             String rawId = strId.value();
             return new ParsedArgs(true, "get-sub-note", List.of(rawParent, rawId), Collections.emptyMap(), rawParent);
-        } else if ("list_attachments".equals(toolName)) {
+        } else if ("list_attachments".equals(toolName) || "list_comments".equals(toolName)) {
             validateKeys(toolName, props.keySet(), List.of("parent"));
             if (!props.containsKey("parent")) {
-                throw new WlException(400, "인자 검증 실패(list_attachments): parent 가 필요하다.");
+                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 가 필요하다.");
             }
             JsonValue parentVal = props.get("parent");
             if (!(parentVal instanceof JsonValue.JsonString strParent)) {
-                throw new WlException(400, "인자 검증 실패(list_attachments): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
+                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
             }
             String rawParent = strParent.value();
             String[] split = rawParent.split("/");
@@ -115,9 +115,10 @@ public final class ArgsParser {
                 }
             }
             if (segments.isEmpty() || segments.size() >= 3) {
-                throw new WlException(400, "인자 검증 실패(list_attachments): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
+                String shape = "list_comments".equals(toolName) ? "'노트id' 이거나 '노트id/하위노트id'" : "`노트id` 이거나 `노트id/하위노트id`";
+                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 는 " + shape + " 여야 한다: " + rawParent);
             }
-            return new ParsedArgs(true, "list-attachments", segments, Collections.emptyMap(), rawParent);
+            return new ParsedArgs(true, toolName.replace('_', '-'), segments, Collections.emptyMap(), rawParent);
         } else if ("write_attachment".equals(toolName)) {
             // 18.8의 1번: 칸을 parent, name, content 차례로 1개씩 끝까지 본다. parent는 그 자리에서 자른다
             validateKeys(toolName, props.keySet(), List.of("parent", "name", "content"));
@@ -801,6 +802,25 @@ public final class ArgsParser {
             case "list-attachments" -> {
                 maxPositional = 2;
                 usage = "list-attachments <노트 id> [하위 노트 id]";
+            }
+            case "list-comments" -> {
+                maxPositional = 2;
+                usage = withlog.cmd.ListComments.USAGE;
+            }
+            case "create-comment" -> {
+                allowedOptions = List.of("anchor_quote", "body", "comment_id");
+                maxPositional = 2;
+                usage = withlog.cmd.CommentCommands.CREATE_USAGE;
+            }
+            case "update-comment" -> {
+                allowedOptions = List.of("body", "comment_id");
+                maxPositional = 2;
+                usage = withlog.cmd.CommentCommands.UPDATE_USAGE;
+            }
+            case "delete-comment" -> {
+                allowedOptions = List.of("comment_id");
+                maxPositional = 2;
+                usage = withlog.cmd.CommentCommands.DELETE_USAGE;
             }
             case "list-sub-notes" -> {
                 allowedOptions = List.of("bodies");

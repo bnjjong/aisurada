@@ -7,7 +7,6 @@ import withlog.text.Utf16;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -56,9 +55,6 @@ public final class CommentsReader {
         byte[] rawBytes;
         try {
             rawBytes = Files.readAllBytes(commentFile);
-        } catch (NoSuchFileException e) {
-            envelope.put("state", "absent");
-            return envelope;
         } catch (IOException e) {
             envelope.put("state", "unreadable");
             envelope.put("reason", "파일을 못 읽었다: " + relPath);
@@ -70,10 +66,10 @@ public final class CommentsReader {
 
         JsonValue jsonVal;
         try {
-            jsonVal = JsonReader.parse(jsonText);
+            jsonVal = JsonReader.parseFile(jsonText);
         } catch (Exception e) {
             envelope.put("state", "unreadable");
-            envelope.put("reason", "내용이 JSON 이 아니다: " + relPath);
+            envelope.put("reason", "내용이 JSON이 아니다: " + relPath);
             return envelope;
         }
 
@@ -155,15 +151,20 @@ public final class CommentsReader {
             liveComments.add(item);
         }
 
-        // 정렬: createdAt 글자, 다음 id 글자의 UTF-16 차례 (1.12 10번)
-        liveComments.sort((a, b) -> {
+        sort(liveComments);
+
+        envelope.put("state", "loaded");
+        envelope.put("comments", liveComments);
+        return envelope;
+    }
+
+    /** 읽기와 파일 전체 재쓰기가 같은 UTF-16 차례를 사용한다(19.5, 19.8). */
+    public static void sort(List<Map<String, Object>> comments) {
+        comments.sort((a, b) -> {
             int cmp = Utf16.compare((String) a.get("createdAt"), (String) b.get("createdAt"));
             if (cmp != 0) return cmp;
             return Utf16.compare((String) a.get("id"), (String) b.get("id"));
         });
 
-        envelope.put("state", "loaded");
-        envelope.put("comments", liveComments);
-        return envelope;
     }
 }

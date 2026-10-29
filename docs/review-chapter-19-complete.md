@@ -1,5 +1,7 @@
 # 19장 작업 완료 — 코멘트 클라이언트와 로컬 호스트 연결
 
+> 이 문서는 withlog TypeScript 클라이언트의 완료 기록이다. `/Users/df/github/aisurada`의 실제 Java 엔진 반영 결과는 [별도 완료 노트](./review-chapter-19-engine-complete.md)에 기록한다.
+
 작성일: 2026-10-29
 
 19장 설명서에 따라 TypeScript 엔진 응답 소비 계층에 코멘트 목록 읽기와 명령 전용 쓰기 3개를 구현했다. 파일 파싱·전체 재작성·본문 마커 제거는 연결된 외부 Java 엔진이 수행한다. 이 저장소에는 Java 엔진 소스와 원본 golden 규칙 파일이 포함되어 있지 않다.

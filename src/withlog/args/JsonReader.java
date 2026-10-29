@@ -32,7 +32,12 @@ public final class JsonReader {
         if (trimmed.isEmpty()) {
             trimmed = "{}";
         }
-        JsonReader reader = new JsonReader(trimmed);
+        return parseFile(trimmed);
+    }
+
+    /** 19.5: 파일 글은 다듬거나 빈 객체로 보충하지 않고 그대로 읽는다. */
+    public static JsonValue parseFile(String raw) {
+        JsonReader reader = new JsonReader(raw);
         reader.skipSpaces();
         JsonValue val = reader.readValue();
         reader.skipSpaces();

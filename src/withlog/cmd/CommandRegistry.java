@@ -122,6 +122,8 @@ public final class CommandRegistry {
                 "get_doc".equals(name) || "get-doc".equals(name) ||
                 "get_sub_note".equals(name) || "get-sub-note".equals(name) ||
                 "list_attachments".equals(name) || "list-attachments".equals(name) ||
+                "list_comments".equals(name) || "list-comments".equals(name) ||
+                "create-comment".equals(name) || "update-comment".equals(name) || "delete-comment".equals(name) ||
                 "list_sub_notes".equals(name) || "list-sub-notes".equals(name) ||
                 "list_docs".equals(name) || "list-docs".equals(name) ||
                 "list_tags".equals(name) || "list-tags".equals(name) ||

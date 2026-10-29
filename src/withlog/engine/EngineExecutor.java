@@ -118,6 +118,10 @@ public final class EngineExecutor {
             } else if ("list-attachments".equals(parsed.commandName())) {
                 NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
                 response = ListAttachments.execute(vaultRoot, parsed, noteIndex);
+            } else if ("list-comments".equals(parsed.commandName())) {
+                response = ListComments.execute(vaultRoot, parsed, NoteIndex.fresh(vaultRoot));
+            } else if (Set.of("create-comment", "update-comment", "delete-comment").contains(parsed.commandName())) {
+                response = CommentCommands.execute(vaultRoot, parsed);
             } else if ("list-sub-notes".equals(parsed.commandName())) {
                 NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
                 response = ListSubNotes.execute(vaultRoot, parsed, noteIndex);

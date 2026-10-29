@@ -39,6 +39,26 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 
 도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `WL-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `delete_doc` 같은 다른 쓰기 명령처럼 이 판에 없는 명령은 `WL-409`로 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. vault의 git 자동 커밋은 짓지 않았습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
 
+## 19장 코멘트
+
+코멘트 읽기 `list_comments`(도구) / `list-comments`(명령)와 명령 전용 쓰기 `create-comment`, `update-comment`, `delete-comment`를 지원합니다. 위 18장까지의 기본 명령 목록에 추가된 범위입니다.
+
+```bash
+java -jar dist/wl-engine.jar list_comments '{"parent":"nddemo-00000001"}' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar list-comments nddemo-00000001 sndemo-00000001 --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar create-comment nddemo-00000001 'body=확인했습니다' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar update-comment nddemo-00000001 'comment_id=<코멘트id>' 'body=고친 글' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘트id>' --withlog.vault=/path/to/vault
+```
+
+목록은 `absent`, `loaded`, `unreadable` 봉투를 구별합니다. 하위 노트 코멘트는 직계 컨테이너의 `sub-comments/<하위 id>.json`에서 읽고 씁니다. 쓰기 3개는 못 읽은 파일을 덮지 않고 WL-409로 서며, f1을 받지 않습니다. 삭제는 코멘트가 달린 본문 마커를 먼저 걷고 코멘트 항목을 지웁니다. 본문이 바뀌었으면 앞뒤 토큰을 답하고, JSON/HTML 본문은 마커가 없어도 거절합니다.
+
+코멘트 파일은 전체를 다시 쓰고 링크는 따라 씁니다. 짝 없는 서로게이트는 파일에서 소문자 탈출로 보존하고 stdout에서는 `?`로 냅니다. 쓰기 크기 상한 부재와 읽기에서 탈락한 항목의 다음 쓰기 소실 등 19.9의 미결정 호환 동작은 유지합니다.
+
+이 구현은 호출마다 새로 훑으므로 옛 색인 행·코멘트 표의 낡음·본문 쓰기 뒤 색인 재삽입을 재현하지 않습니다(8.6). 코멘트 사본 읽기가 세우는 오류가 있으면 쓰기 전에 실패할 수 있습니다. git 자동 커밋과 쓴 쪽 기록은 기존 구현처럼 제공하지 않습니다.
+
+격리된 실제 Java 엔진/파일 및 serve·wl-cli 검증은 `bash test.sh`로 실행합니다. 외부 시험 프레임워크 없이 JDK 21만 사용하며 임시 vault·HOME·소켓만 만들고 지웁니다. [19장 원문](docs/engine-manual/19-comments.md), [Java 엔진 완료 노트](docs/review-chapter-19-engine-complete.md)를 참고하세요. 이전 [19장 앱 완료 노트](docs/review-chapter-19-complete.md)는 별도 withlog TypeScript 작업 기록입니다.
+
 ## 빌드
 
 JDK 21 이상이 필요합니다. `JAVA_HOME`이 있으면 그것을, 없으면 `PATH`의 `javac`와 `jar`를 씁니다.

@@ -37,6 +37,24 @@ public final class JsonWriter {
         return Utf16.toUtf8BytesWithQuestionForUnpaired(json);
     }
 
+    /** 19.8: 파일은 JSON.stringify처럼 짝 없는 서로게이트를 소문자 탈출로 보존한다. stdout과 구별한다. */
+    public static byte[] toFileBytes(Object root) {
+        String json = stringify(root);
+        StringBuilder escaped = new StringBuilder(json.length());
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (Character.isHighSurrogate(c) && i + 1 < json.length()
+                    && Character.isLowSurrogate(json.charAt(i + 1))) {
+                escaped.append(c).append(json.charAt(++i));
+            } else if (Character.isSurrogate(c)) {
+                escaped.append(String.format(java.util.Locale.ROOT, "\\u%04x", (int) c));
+            } else {
+                escaped.append(c);
+            }
+        }
+        return escaped.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     @SuppressWarnings("unchecked")
     private static void appendValue(StringBuilder sb, Object val, int depth) {
         if (val == null) {
