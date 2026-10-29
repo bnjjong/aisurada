@@ -910,6 +910,24 @@ public final class ArgsParser {
                 maxPositional = 2;
                 usage = withlog.cmd.DeleteSubNote.USAGE;
             }
+            case "list-agendas" -> {
+                maxPositional = 0;
+                usage = withlog.cmd.ListAgendas.USAGE;
+            }
+            case "create-agenda" -> {
+                allowedOptions = List.of("hue", "project", "repo", "summary", "title");
+                maxPositional = 0;
+                usage = withlog.cmd.CreateAgenda.USAGE;
+            }
+            case "update-agenda" -> {
+                allowedOptions = List.of("hue", "project", "repo", "summary", "title");
+                maxPositional = 1;
+                usage = withlog.cmd.UpdateAgenda.USAGE;
+            }
+            case "delete-agenda" -> {
+                maxPositional = 1;
+                usage = withlog.cmd.DeleteAgenda.USAGE;
+            }
             case "reindex" -> {
                 maxPositional = 0;
                 usage = "reindex";

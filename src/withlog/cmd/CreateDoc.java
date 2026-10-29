@@ -14,6 +14,7 @@ import withlog.vault.NoteFile;
 import withlog.vault.NoteIndex;
 import withlog.vault.NoteMeta;
 import withlog.vault.NoteScanner;
+import withlog.write.AgendaFile;
 import withlog.write.AtomicWriter;
 import withlog.write.DocToken;
 import withlog.write.FrontmatterWriter;
@@ -49,10 +50,6 @@ public final class CreateDoc {
     public static final String USAGE = "create-doc agenda=<slug 또는 이름> type=<유형> title=<제목> body=<본문> " +
             "[date=<YYYY-MM-DD>] [time=<HH:MM>] [mins=<분>] [format=markdown] [links=<JSON 배열>] " +
             "[tags=<JSON 배열>] [template=<템플릿 id>] [tier=reading|record]";
-
-    private static final List<String> ALLOWED_HUES = List.of(
-            "blue", "violet", "teal", "orange", "pink", "green", "red", "amber", "lime", "cyan", "fuchsia", "brown"
-    );
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
             "plan", "build", "report", "research", "meeting", "free"
@@ -650,17 +647,13 @@ public final class CreateDoc {
             return new AgendaLookupResult(match.slug(), false);
         }
 
-        // 5. 새 아젠다 생성
+        // 5. 새 아젠다 생성. create-agenda와 같은 색 규칙과 바이트다(20.8). 저장소와 프로젝트는 없고 본문은 빈 글이다
         String newId = IdGenerator.nextAgendaId();
-        String chosenHue = chooseLeastUsedHue(table);
+        String chosenHue = AgendaFile.leastUsedHue(table.idToAgenda().values());
 
-        String frontmatter = FrontmatterWriter.buildAgendaFrontmatter(newId, slugKey, key, chosenHue);
-        String fileContent = "---\n" + frontmatter + "---\n";
-        byte[] bytes = fileContent.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-
-        Path agendaFile = vaultRoot.resolve(".withlog/agendas/" + slugKey + ".md");
+        Path agendaFile = vaultRoot.resolve(AgendaFile.relPath(slugKey));
         // Row 27: 새 아젠다 쓰기
-        AtomicWriter.writeAtomic(agendaFile, bytes);
+        AtomicWriter.writeAtomic(agendaFile, AgendaFile.render(newId, slugKey, key, chosenHue, null, null, ""));
 
         // 색인에 추가
         AgendaTable.AgendaInfo createdInfo = new AgendaTable.AgendaInfo(newId, slugKey, key, chosenHue, null, null, null);
@@ -670,38 +663,6 @@ public final class CreateDoc {
         table.slugToAgenda().put(slugKey, createdInfo);
 
         return new AgendaLookupResult(slugKey, true);
-    }
-
-    private static String chooseLeastUsedHue(AgendaTable table) {
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (String h : ALLOWED_HUES) {
-            counts.put(h, 0);
-        }
-
-        for (AgendaTable.AgendaInfo info : table.slugToAgenda().values()) {
-            String hue = info.hue();
-            if (hue != null) {
-                String th = Trim.trim(hue);
-                if (counts.containsKey(th)) {
-                    counts.put(th, counts.get(th) + 1);
-                } else {
-                    counts.put("blue", counts.get("blue") + 1);
-                }
-            } else {
-                counts.put("blue", counts.get("blue") + 1);
-            }
-        }
-
-        int minCount = Integer.MAX_VALUE;
-        String chosen = "blue";
-        for (String h : ALLOWED_HUES) {
-            int cnt = counts.get(h);
-            if (cnt < minCount) {
-                minCount = cnt;
-                chosen = h;
-            }
-        }
-        return chosen;
     }
 
     static String extractIdTail(String id) {

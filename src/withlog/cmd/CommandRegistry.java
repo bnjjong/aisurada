@@ -105,11 +105,14 @@ public final class CommandRegistry {
     );
 
     /**
-     * 이 판이 지은 명령인지 확인합니다. 읽기 명령 13개와 reindex, 쓰기 명령 9개(create_doc, update_doc, set_favorite, evaluate_doc, link_docs, write_attachment,
-     * create_sub_note, update_sub_note, delete_sub_note)다.
+     * 이 판이 지은 명령인지 확인합니다. 읽기 명령 14개(list-agendas 포함)와 reindex, 쓰기 명령 12개(create_doc, update_doc, set_favorite,
+     * evaluate_doc, link_docs, write_attachment, create_sub_note, update_sub_note, delete_sub_note, create-agenda, update-agenda,
+     * delete-agenda)다. 아젠다 명령 4개는 명령 표면에만 있어서 밑줄 이름이 없다(20.2).
      */
     public static boolean isSupported(String name) {
         return "reindex".equals(name) ||
+                "list-agendas".equals(name) || "create-agenda".equals(name) ||
+                "update-agenda".equals(name) || "delete-agenda".equals(name) ||
                 "create_doc".equals(name) || "create-doc".equals(name) ||
                 "update_doc".equals(name) || "update-doc".equals(name) ||
                 "write_attachment".equals(name) || "write-attachment".equals(name) ||

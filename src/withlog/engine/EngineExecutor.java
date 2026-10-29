@@ -144,6 +144,14 @@ public final class EngineExecutor {
                 response = GetReport.execute(vaultRoot, parsed);
             } else if ("list-trash".equals(parsed.commandName())) {
                 response = ListTrash.execute(vaultRoot, parsed);
+            } else if ("list-agendas".equals(parsed.commandName())) {
+                response = ListAgendas.execute(vaultRoot);
+            } else if ("create-agenda".equals(parsed.commandName())) {
+                response = CreateAgenda.execute(vaultRoot, parsed);
+            } else if ("update-agenda".equals(parsed.commandName())) {
+                response = UpdateAgenda.execute(vaultRoot, parsed);
+            } else if ("delete-agenda".equals(parsed.commandName())) {
+                response = DeleteAgenda.execute(vaultRoot, parsed);
             } else if ("create-doc".equals(parsed.commandName())) {
                 response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
             } else if ("write-attachment".equals(parsed.commandName())) {

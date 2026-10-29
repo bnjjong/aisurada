@@ -202,11 +202,26 @@ public final class FrontmatterWriter {
      * 아젠다 파일 생성을 위한 프론트매터 YAML을 생성합니다.
      */
     public static String buildAgendaFrontmatter(String id, String slug, String title, String hue) {
+        return buildAgendaFrontmatter(id, slug, title, hue, null, null);
+    }
+
+    /**
+     * 설명서 20.5의 아젠다 프론트매터 줄. 키 차례는 id, slug, title, hue, repo, project이고,
+     * repo와 project는 값이 있을 때(null이 아닐 때)만 적는다. project를 맨 뒤에 두어서
+     * 프로젝트에 안 속한 아젠다의 파일은 이 칸이 생기기 전과 바이트가 같다.
+     */
+    public static String buildAgendaFrontmatter(String id, String slug, String title, String hue, String repo, String project) {
         StringBuilder sb = new StringBuilder();
         appendKeyVal(sb, "id", id, 1);
         appendKeyVal(sb, "slug", slug, 1);
         appendKeyVal(sb, "title", title, 1);
         appendKeyVal(sb, "hue", hue, 1);
+        if (repo != null) {
+            appendKeyVal(sb, "repo", repo, 1);
+        }
+        if (project != null) {
+            appendKeyVal(sb, "project", project, 1);
+        }
         return sb.toString();
     }
 

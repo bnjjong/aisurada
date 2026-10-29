@@ -59,6 +59,25 @@ java -jar dist/wl-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘�
 
 격리된 실제 Java 엔진/파일 및 serve·wl-cli 검증은 `bash test.sh`로 실행합니다. 외부 시험 프레임워크 없이 JDK 21만 사용하며 임시 vault·HOME·소켓만 만들고 지웁니다. [19장 원문](docs/engine-manual/19-comments.md), [Java 엔진 완료 노트](docs/review-chapter-19-engine-complete.md)를 참고하세요. 이전 [19장 앱 완료 노트](docs/review-chapter-19-complete.md)는 별도 withlog TypeScript 작업 기록입니다.
 
+## 20장 아젠다
+
+아젠다를 읽고 만들고 고치고 지우는 명령 4개 `list-agendas`, `create-agenda`, `update-agenda`, `delete-agenda`를 지원합니다. 명령 표면(하이픈 이름)에만 있고, `list_agendas` 같은 밑줄 이름은 모르는 명령(종료 코드 2)입니다.
+
+```bash
+java -jar dist/wl-engine.jar list-agendas --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar create-agenda 'title=광고 플랫폼' 'summary=광고 지표와 입찰을 다룬다.' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar update-agenda <아젠다 id> 'title=새 이름' 'repo=' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar delete-agenda <아젠다 id> --withlog.vault=/path/to/vault
+```
+
+- `list-agendas`는 읽기라 워크스페이스 표식이 없어도 답하고, slug 차례로 냅니다. `repo`와 `project`는 값이 없으면 키째 뺍니다.
+- `create-agenda`는 같은 이름이 있어도 늘 새로 만들고 slug만 `-2`부터 `-100`까지 비켜섭니다. 색을 안 주면 12색 가운데 가장 덜 쓰인 색을 고릅니다. `create_doc`이 아젠다를 만들 때도 같은 색 규칙과 바이트를 씁니다.
+- `update-agenda`는 준 칸만 바꾸고 파일을 통째로 다시 씁니다. `repo=`는 저장소를 지우고 `project=`는 미분류로 옮깁니다. slug와 파일 이름은 안 바뀝니다.
+- `delete-agenda`는 그 아젠다의 노트가 0건일 때만 파일을 `.withlog/trash/agendas/<slug>-<아젠다 id>.md`로 옮깁니다. `notes/<slug>/` 폴더는 비어 있어도 안 지웁니다.
+- 색인이 없는 판이라 부를 때마다 아젠다 파일을 읽습니다(8.6). 그래서 손으로 지운 아젠다는 목록에서 바로 빠지고, 지금 엔진이 색인에 남기는 행(20.9의 1번)은 재현하지 않습니다.
+
+자세한 것은 [20장 완료 노트](docs/rebuild-p1-chapter20-complete.md)에 있습니다.
+
 ## 빌드
 
 JDK 21 이상이 필요합니다. `JAVA_HOME`이 있으면 그것을, 없으면 `PATH`의 `javac`와 `jar`를 씁니다.

@@ -18,7 +18,12 @@ import java.util.regex.Pattern;
  */
 public final class AgendaReader {
     private static final Pattern ID_PATTERN = Pattern.compile("^ag[0-9a-z]+-[0-9a-f]{8}$");
-    private static final Set<String> ALLOWED_HUES = Set.of(
+
+    /**
+     * 설명서 20.3의 색 12개. 표의 차례가 자동 배정의 차례라 목록으로 둔다.
+     * 파일에서 읽은 모르는 색은 blue로 물러서고(2.1), 명령이 받은 모르는 색은 거절한다(20.3).
+     */
+    public static final List<String> HUES = List.of(
             "blue", "violet", "teal", "orange", "pink", "green",
             "red", "amber", "lime", "cyan", "fuchsia", "brown"
     );
@@ -184,7 +189,7 @@ public final class AgendaReader {
             String hue = "blue";
             if (rawHue != null) {
                 String th = Trim.trim(rawHue);
-                if (ALLOWED_HUES.contains(th)) {
+                if (HUES.contains(th)) {
                     hue = th;
                 }
             }
@@ -236,7 +241,15 @@ public final class AgendaReader {
         skipped.add(map);
     }
 
-    private static boolean isValidSlugSegment(String s) {
+    /**
+     * 설명서 20.3의 slug 모양 검사. 아젠다 slug와 프로젝트 slug에 같다.
+     * 1자 이상 100자 이하이고, /와 \와 ..이 없고, .으로 시작하지 않고, U+0020 미만 글자가 없어야 한다.
+     * 이 값이 경로 1조각이 되어 vault 밖이나 .withlog 아래의 다른 파일을 가리키면 안 되기 때문이다.
+     *
+     * @param s 다듬은 slug
+     * @return 경로 1조각으로 안전하면 true
+     */
+    public static boolean isValidSlugSegment(String s) {
         if (s == null || s.isEmpty() || s.length() > 100) return false;
         if (s.startsWith(".")) return false;
         if (s.contains("/") || s.contains("\\") || s.contains("..")) return false;
