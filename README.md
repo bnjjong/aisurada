@@ -6,7 +6,7 @@ withlog vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 19개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 20개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
 
 엔진은 두 가지 모양으로 돕니다.
 
@@ -114,6 +114,21 @@ java -jar dist/wl-engine.jar facts-brief from=2026-06-16 to=2026-06-25 --withlog
 - `facts-brief`는 파일을 바꾸지 않아도 쓰기 깃발을 따라 워크스페이스 표식과 쓰기 전 훑기를 요구하고, serve의 자동 커밋 대기 기록에 `app`으로 남습니다.
 
 22.9의 읽기 버퍼·다듬기 경계 동작을 유지했습니다. 색인을 저장하지 않는 이 구현에서는 새 아젠다가 즉시 보이고, 지운 아젠다의 옛 행은 남지 않습니다. `bash test.sh`가 사실층 파일·UTF-8 경계·serve와 `wl-cli` 왕복을 검증합니다. 자세한 내용은 [22장 완료 노트](docs/rebuild-p1-chapter22-complete.md)에 있습니다.
+
+## 23장 init-workspace
+
+vault 폴더 1개를 워크스페이스로 갖추는 `init-workspace`를 지원합니다. 명령 표면에만 있고 `init_workspace`는 모르는 명령(종료 코드 2)입니다.
+
+```bash
+java -jar dist/wl-engine.jar init-workspace name=새-vault 'templates=[]' --withlog.vault=/path/to/new-vault
+```
+
+- 골격 폴더 `.withlog/agendas`, `.withlog/templates/doc`, `.withlog/templates/ritual`, `notes`를 만들고, `templates=`로 받은 템플릿 가운데 그 파일 자리가 빈 것만 심고, 맨 마지막에 `.withlog/workspace.json`을 없을 때만 씁니다. 아무것도 덮지 않아서 몇 번을 불러도 안전합니다.
+- 응답은 `created`(표식을 이번에 썼는가), `seeded`(이번에 쓴 템플릿), `skipped`(자리가 차 있어 건너뛴 템플릿)입니다.
+- `templates`는 JSON 배열(64개까지)이고, 항목마다 `category`가 `doc`이면 `id`, `name`, `format`, `desc`, `body`, `type`, `builtin`을, `ritual`이면 `id`, `name`, `format`, `desc`, `body`, `rev`, `icon`을 모두 받습니다. 모르는 키는 거절합니다.
+- 쓰기 명령 가운데 이 명령만 워크스페이스 표식을 안 봅니다. 색인 맞추기와 vault git 처리는 다른 쓰기처럼 받고, 그 2가지가 `templates`와 `name` 검사보다 먼저 돕니다.
+
+자세한 것은 [23장 완료 노트](docs/rebuild-p1-chapter23-complete.md)에 있습니다.
 
 ## 1~20장 점검에서 찾은 누락 보완
 

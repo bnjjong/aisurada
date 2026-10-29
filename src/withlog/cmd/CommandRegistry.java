@@ -147,7 +147,8 @@ public final class CommandRegistry {
                 "get_report".equals(name) || "get-report".equals(name) ||
                 "list_trash".equals(name) || "list-trash".equals(name) ||
                 "list-projects".equals(name) || "create-project".equals(name) ||
-                "update-project".equals(name) || "delete-project".equals(name);
+                "update-project".equals(name) || "delete-project".equals(name) ||
+                "init-workspace".equals(name);
     }
 
     /**

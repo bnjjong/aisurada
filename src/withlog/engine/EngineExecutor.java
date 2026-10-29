@@ -150,6 +150,8 @@ public final class EngineExecutor {
                     response = AgendaFacts.update(vaultRoot, parsed);
                 } else if ("facts-brief".equals(parsed.commandName())) {
                     response = FactsBrief.execute(vaultRoot, parsed);
+                } else if ("init-workspace".equals(parsed.commandName())) {
+                    response = InitWorkspace.execute(vaultRoot, parsed);
                 } else if ("create-doc".equals(parsed.commandName())) {
                     response = withlog.cmd.CreateDoc.execute(vaultRoot, parsed, sessionId);
                 } else if ("write-attachment".equals(parsed.commandName())) {

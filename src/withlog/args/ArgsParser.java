@@ -910,6 +910,11 @@ public final class ArgsParser {
                 maxPositional = 2;
                 usage = withlog.cmd.DeleteSubNote.USAGE;
             }
+            case "init-workspace" -> {
+                allowedOptions = List.of("name", "templates");
+                maxPositional = 0;
+                usage = withlog.cmd.InitWorkspace.USAGE;
+            }
             case "list-projects" -> {
                 maxPositional = 0;
                 usage = withlog.cmd.ListProjects.USAGE;
