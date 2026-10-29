@@ -73,6 +73,7 @@ public final class ListTemplates {
 
         // 3. 폴더 훑기 (24.3 3번)
         TemplateReader.ScanResult scan = TemplateReader.scan(vaultRoot);
+        if (!isTool) printDiagnosticsIfAny(scan.skipped(), targetCategory, targetType);
 
         // 4. bodies 검증 (명령 표면만, 24.3 4번: 폴더 훑은 뒤 검사)
         boolean includeBodies = false;
@@ -84,7 +85,6 @@ public final class ListTemplates {
                 } else if ("false".equals(trimmedBodies)) {
                     includeBodies = false;
                 } else {
-                    printDiagnosticsIfAny(scan.skipped(), targetCategory, targetType);
                     throw new WlException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
                 }
             }
@@ -132,9 +132,6 @@ public final class ListTemplates {
         }
 
         if (!filteredSkipped.isEmpty()) {
-            if (!isTool) {
-                printDiagnostics(filteredSkipped);
-            }
             Map<String, Object> incompleteObj = new LinkedHashMap<>();
             incompleteObj.put("skipped", filteredSkipped.size());
             incompleteObj.put("conflicts", 0);
@@ -166,9 +163,9 @@ public final class ListTemplates {
     }
 
     private static void printDiagnostics(List<TemplateReader.SkippedTemplate> skippedList) {
-        System.err.println("템플릿 " + skippedList.size() + "건을 못 읽어 목록에서 뺐다.");
+        withlog.engine.Diagnostics.line("템플릿 " + skippedList.size() + "건을 못 읽어 목록에서 뺐다.");
         for (TemplateReader.SkippedTemplate s : skippedList) {
-            System.err.println("  " + s.relPath() + " — " + s.reason());
+            withlog.engine.Diagnostics.line("  " + s.relPath() + " — " + s.reason());
         }
     }
 

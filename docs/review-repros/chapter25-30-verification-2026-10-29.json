@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-29",
+  "source": {
+    "name": "withlog 1부 vault 엔진 설명서 25~30장.pdf",
+    "pages": 86,
+    "sha256": "3eedc2c6d463e64784013f0fed02abbb766ea8a5df0e9318495b0906d462a845"
+  },
+  "baseCommit": "62c0d41b2f400e092206ba7c7451ef9cbf0a33a6",
+  "runtime": "openjdk version \"21.0.11\" 2026-04-21 LTS",
+  "command": "bash test.sh",
+  "checks": {
+    "chapter19": 362,
+    "reindex-paths": 133,
+    "chapter22": 554,
+    "vault git": 104,
+    "chapter25": 102,
+    "chapter26": 130,
+    "chapter27": 24,
+    "chapter28": 88,
+    "chapter29": 58,
+    "chapter30": 65,
+    "chapters25-30-socket": 40
+  },
+  "totalChecks": 1660,
+  "status": "passed",
+  "fixtureCopy": {
+    "reindex": 110,
+    "planDay": {
+      "saved": false,
+      "date": "2026-06-19",
+      "body": "# 2026-06-19 데일리 플랜\n\n## 어제 한 일 (2026-06-18)\n- 메타가 다 찬 노트 · 서빙 (research)\n\n## 오늘\n- 옛 HTML 노트 · 서빙 (report)\n"
+    },
+    "checkNotes": 1,
+    "export": {
+      "exported": 107,
+      "totalNotes": 110,
+      "skippedHtml": 1,
+      "skippedJson": 2,
+      "normalizedDest": ".withlog/md-export"
+    },
+    "shardPlan": {
+      "total": 116,
+      "planned": 112,
+      "moved": 0,
+      "alreadyInPlace": 0
+    },
+    "reports": {
+      "id": "rv-evening-2026-06-04",
+      "kind": "evening",
+      "date": "2026-06-04",
+      "body": "픽스처에 미리 있는 저녁 회고.",
+      "memo": null
+    },
+    "trashRoundtrip": true,
+    "shardApplication": {
+      "applied": 112,
+      "rows": 116,
+      "checked": 112,
+      "ok": true,
+      "root0001": {
+        "fileCountBefore": 9,
+        "byteSumBefore": 1928,
+        "pdfByteSumExample": 2101,
+        "difference": "Local fixture contains 11-byte SVG placeholders and shorter sub-comment JSON files; the measured local sum was independently confirmed."
+      },
+      "reversed": 112,
+      "reverseOk": true
+    }
+  },
+  "scope": "PDF chapters 25 through 30. Java implementation checked against the specification; no differential run of the original Kotlin engine."
+}

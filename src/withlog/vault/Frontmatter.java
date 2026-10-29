@@ -39,6 +39,11 @@ public final class Frontmatter {
 
     private Frontmatter() {}
 
+    /** 휴지통 등 파일 전체를 읽을 때도 암시적 시각 해석을 끈 같은 읽개를 쓴다. */
+    public static Yaml yamlWithoutTimestamps(LoaderOptions options) {
+        return new Yaml(new SafeConstructor(options), new org.yaml.snakeyaml.representer.Representer(new org.yaml.snakeyaml.DumperOptions()), new org.yaml.snakeyaml.DumperOptions(), options, new NoTimestampResolver());
+    }
+
     /**
      * YAML 조각을 파싱하여 Map으로 반환합니다.
      * 설명서 1.8 및 1.15의 6번에 따라 YAMLException만 잡아서 null(프론트매터 없음)을 반환하고,
@@ -52,7 +57,7 @@ public final class Frontmatter {
             return null;
         }
 
-        Yaml yaml = new Yaml(new SafeConstructor(LOADER_OPTIONS), new org.yaml.snakeyaml.representer.Representer(new org.yaml.snakeyaml.DumperOptions()), new org.yaml.snakeyaml.DumperOptions(), LOADER_OPTIONS, new NoTimestampResolver());
+        Yaml yaml = yamlWithoutTimestamps(LOADER_OPTIONS);
 
         Object loaded;
         try {

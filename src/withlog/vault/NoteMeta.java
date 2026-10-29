@@ -345,7 +345,7 @@ public final class NoteMeta {
         return UTC_MILLIS_FORMATTER.format(inst);
     }
 
-    private static CreatedResult parseCreated(String s) {
+    public static CreatedResult parseCreated(String s) {
         if (s == null || s.isEmpty()) return null;
         if (s.startsWith(" ") || s.endsWith(" ")) return null;
         if (s.length() < 10) return null;

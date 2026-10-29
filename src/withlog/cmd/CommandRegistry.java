@@ -72,7 +72,7 @@ public final class CommandRegistry {
             "update-project <프로젝트 id> [title=<이름>] [hue=<색>] [summary=<한 문단 설명>]",
             "delete-project <프로젝트 id>",
             "save-report kind=<morning|evening|weekly> date=<YYYY-MM-DD> [body=<다듬은 본문>] [memo=<개인 메모>]",
-            "save-template [id=<고칠 템플릿 id. 없으면 새로 만든다>] [name=<이름. 새로 만들 때 필수>] [type=<plan|build|report|research|meeting|free. 새로 만들 때 기본 plan>] [desc=<언제 쓰는 템플릿인지>] [body=<본문. 새로 만들 때 필수>]",
+            TemplateCommands.SAVE_USAGE,
             "set-favorite <노트 id> [favorite=true|false. 안 주면 지금 값을 뒤집는다] [category=<라벨. 빈 값이면 지운다>] [f1=<직전에 읽은 토큰>]",
             "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]",
             "link-docs <출발 노트 id> <대상 노트 id> [kind=direct|indirect|attach] [remove=true] [f1=<직전에 읽은 토큰>]",
@@ -90,8 +90,8 @@ public final class CommandRegistry {
             "create-agenda title=<이름> [hue=<색>] [repo=<저장소>] [summary=<한 문단 설명>] [project=<프로젝트 slug>]",
             "update-agenda <아젠다 id> [title=<이름>] [hue=<색>] [repo=<저장소. 빈 값이면 지운다>] [summary=<한 문단 설명>] [project=<프로젝트 slug. 빈 값이면 미분류로>]",
             "delete-agenda <아젠다 id>",
-            "save-ritual-template <리추얼 템플릿 id> [name=<이름>] [desc=<언제 쓰는 양식인지>] [body=<본문>]",
-            "delete-doc-template <문서 템플릿 id>",
+            TemplateCommands.RITUAL_USAGE,
+            TemplateCommands.DELETE_USAGE,
             "init-workspace [name=<워크스페이스 이름>] [templates=<빌트인 템플릿 JSON 배열>]",
             "create-comment <노트 id> [하위 노트 id] body=<본문> [anchor_quote=<가리킨 글>] [comment_id=<식별자. 안 주면 발급한다>]",
             "update-comment <노트 id> [하위 노트 id] comment_id=<코멘트 id> body=<본문>",
@@ -119,6 +119,10 @@ public final class CommandRegistry {
      * delete-project), 사실층 명령 3개는 명령 표면에만 있어서 밑줄 이름이 없다(20.2, 21.2, 22.2).
      */
     public static boolean isSupported(String name) {
+        if (Set.of("save_template", "save-template", "delete-doc-template", "save-ritual-template").contains(name)) return true;
+        if (Set.of("shard-notes", "verify-shard").contains(name)) return true;
+        if (Set.of("delete_doc", "delete-doc", "restore_doc", "restore-doc", "purge_doc", "purge-doc", "empty-trash").contains(name)) return true;
+        if (Set.of("save_report", "save-report", "export_markdown", "export-markdown", "plan_day", "plan-day", "check-notes").contains(name)) return true;
         return "reindex".equals(name) || "reindex-paths".equals(name) ||
                 "list-agendas".equals(name) || "create-agenda".equals(name) ||
                 "update-agenda".equals(name) || "delete-agenda".equals(name) ||

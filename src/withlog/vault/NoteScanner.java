@@ -200,7 +200,7 @@ public final class NoteScanner {
         }
     }
 
-    private static Path findFolderContentFile(Path folder) {
+    public static Path findFolderContentFile(Path folder) {
         Path md = null;
         Path json = null;
         Path html = null;

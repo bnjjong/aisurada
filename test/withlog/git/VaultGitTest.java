@@ -22,7 +22,7 @@ public final class VaultGitTest {
         if (args.length > 0 && args[0].equals("process-probe")) { processProbe(Path.of(args[1])); return; }
         temp=Files.createTempDirectory("aisurada-git-test-");
         try {
-            commits(); blocking(); retries(); ids(); pipeline(); factsPipeline(); process();
+            commits(); blocking(); retries(); ids(); pipeline(); factsPipeline(); templatesPipeline(); process();
             System.out.println("vault git: "+checks+" checks passed");
         } finally {
             EngineConfig.activate(null);
@@ -224,6 +224,29 @@ public final class VaultGitTest {
         long before=System.nanoTime();
         eq(new GitProcess(v,Duration.ofMillis(150),Duration.ofMillis(50)).run(List.of("wait"),EMPTY).code(),-1,"timeout is failure");
         check(Duration.ofNanos(System.nanoTime()-before).compareTo(Duration.ofSeconds(5))<0,"TERM then KILL bounds ignored TERM");
+    }
+    private static void templatesPipeline() throws Exception {
+        Path v=repo();EngineConfig.activate(new EngineConfig(v.toString(),v.toString(),null,false,10,true,300,true));
+        run(v,0,"save_template","{\"name\":\"template\",\"body\":\"body\"}","\u0000wl-session-id","template-session");
+        outcome(VaultGit.serving(v).commit("shutdown"),"committed",null);
+        check(message(v).contains("Withlog-Writer: tool\n") && message(v).contains("Withlog-Session: template-session\n"),"template tool records writer and session");
+        String id;
+        try(var entries=Files.list(v.resolve(".withlog/templates/doc"))) {String name=entries.findFirst().orElseThrow().getFileName().toString();id=name.substring(0,name.length()-3);}
+        run(v,0,"save-template","id="+id,"desc=app update");
+        outcome(VaultGit.serving(v).commit("shutdown"),"committed",null);
+        check(message(v).contains("Withlog-Writer: app\n") && !message(v).contains("Withlog-Session:"),"template command records app without session");
+        write(v,".withlog/templates/ritual/morning.md","---\nid: ritual\nrev: morning\nformat: markdown\n---\nbody");
+        run(v,0,"save-ritual-template","ritual","name=app ritual");
+        outcome(VaultGit.serving(v).commit("shutdown"),"committed",null);check(message(v).contains("Withlog-Writer: app\n"),"ritual command records app");
+        run(v,0,"delete-doc-template",id);outcome(VaultGit.serving(v).commit("shutdown"),"committed",null);
+        check(message(v).contains("Withlog-Writer: app\n"),"template deletion records app");
+        run(v,400,"save_template","{\"unknown\":1}");write(v,"outside","syntax failure");VaultGit.serving(v).commit("shutdown");
+        check(message(v).contains("Withlog-Writer: outside\n"),"template schema failure does not record writer");
+        run(v,400,"save_template","{}");write(v,"outside","semantic failure");VaultGit.serving(v).commit("shutdown");
+        check(message(v).contains("Withlog-Writer: tool\n"),"template semantic failure still records writer");
+        run(v,404,"get-template","absent");write(v,"outside","read request");VaultGit.serving(v).commit("shutdown");
+        check(message(v).contains("Withlog-Writer: outside\n"),"template get does not record writer");
+        EngineConfig.activate(null);
     }
     private static EngineResult run(Path v,int code,String... argv){EngineResult r=EngineExecutor.execute(v,argv,true,System.currentTimeMillis());eq(r.errorCode(),code,"pipeline result "+Arrays.toString(argv)+": "+new String(r.stderrBytes(),StandardCharsets.UTF_8));return r;}
     private static VaultGit.CommandResult result(int code,String text){return new VaultGit.CommandResult(code,text.getBytes(StandardCharsets.UTF_8));}

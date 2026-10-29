@@ -6,7 +6,7 @@ withlog vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 20개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 31개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`, 24장의 템플릿 쓰기 3개, 25~30장의 회고·휴지통·내보내기·샤드·플랜 쓰기 8개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
 
 엔진은 두 가지 모양으로 돕니다.
 
@@ -38,7 +38,7 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 | `update_sub_note` | 하위 노트의 제목, 본문, 태그(명령 표면만)를 고치고 다시 계산한 폴더 이름으로 같은 `sub/` 안에서 폴더째 옮긴다. 본문만 주면 첫 헤딩이 제목이 된다 |
 | `delete_sub_note` | 직계 컨테이너 본문에서 그 하위 노트의 카드 줄을 걷고 하위 노트 폴더를 휴지통 없이 통째로 지운다. 카드를 걷었으면 컨테이너의 앞뒤 토큰을 함께 답한다 |
 
-도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `WL-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `delete_doc` 같은 다른 쓰기 명령처럼 이 판에 없는 명령은 `WL-409`로 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
+도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.withlog/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `WL-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`, `commit-vault`처럼 이 판에 아직 없는 명령은 `WL-409`로 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 이름 인자와 자리 인자 검사를 먼저 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `withlog.test.now`(시계. 도장과 평가 시각도 따른다)와 `withlog.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
 
 ## 19장 코멘트
 
@@ -129,6 +129,50 @@ java -jar dist/wl-engine.jar init-workspace name=새-vault 'templates=[]' --with
 - 쓰기 명령 가운데 이 명령만 워크스페이스 표식을 안 봅니다. 색인 맞추기와 vault git 처리는 다른 쓰기처럼 받고, 그 2가지가 `templates`와 `name` 검사보다 먼저 돕니다.
 
 자세한 것은 [23장 완료 노트](docs/rebuild-p1-chapter23-complete.md)에 있습니다.
+
+## 24장 템플릿
+
+읽기 `list_templates` / `list-templates`, `get_template` / `get-template`에 쓰기 `save_template` / `save-template`, 명령 전용 `delete-doc-template`, `save-ritual-template`를 지원합니다.
+
+```bash
+java -jar dist/wl-engine.jar save_template '{"name":"조사 노트","type":"research","body":"# 조사\n"}' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar save-template id=<템플릿 id> 'desc=고친 설명' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar save-ritual-template t-morning 'name=내 모닝' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar delete-doc-template <템플릿 id> --withlog.vault=/path/to/vault
+```
+
+새 문서 템플릿은 본문과 이름이 필요하고, 기존 템플릿은 준 칸만 바꿉니다. HTML·JSON에서 마크다운으로 고칠 때는 새 파일을 쓴 뒤 옛 확장자 파일을 지웁니다. 빌트인·리추얼 삭제는 거절하고, 리추얼 고치기는 같은 rev가 여러 파일에 있으면 거절합니다. 목록의 `bodies=true`와 못 읽은 파일의 진단도 지원합니다.
+
+[24장 완료 문서](docs/rebuild-p1-chapter24-complete.md)에 파일 바이트, 호환 동작, 검증 결과와 붙인 글에서 해석이 필요한 두 경계를 기록했습니다.
+
+## 25~30장
+
+회고 저장, 휴지통의 보내기·복원·영구 삭제·비우기, 마크다운 내보내기, 샤드 이동과 검증, 하루 플랜, 답 없는 코멘트 점검을 지원합니다. 기준은 제공된 25~30장 PDF이며, 각 장의 미결정 호환 동작을 유지합니다.
+
+| 장 | 명령과 완료 문서 |
+|---|---|
+| 25 | `list_reports`, `get_report`, `save_report`와 짝 명령 — [회고](docs/rebuild-p1-chapter25-complete.md) |
+| 26 | `list_trash`, `delete_doc`, `restore_doc`, `purge_doc`와 짝 명령, `empty-trash` — [휴지통](docs/rebuild-p1-chapter26-complete.md) |
+| 27 | `export_markdown` / `export-markdown` — [내보내기](docs/rebuild-p1-chapter27-complete.md) |
+| 28 | `shard-notes`, `verify-shard` — [샤드](docs/rebuild-p1-chapter28-complete.md) |
+| 29 | `plan_day` / `plan-day` — [일일 계획](docs/rebuild-p1-chapter29-complete.md) |
+| 30 | `check-notes` — [노트 점검](docs/rebuild-p1-chapter30-complete.md) |
+
+```bash
+java -jar dist/wl-engine.jar save-report kind=evening date=2026-06-16 'body=오늘의 회고' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar plan-day date=2026-06-22 dryRun=true --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar check-notes date=2026-06-22 --withlog.vault=/path/to/vault
+```
+
+샤드는 방향을 못박아 계획을 확인한 뒤 적용하고 기준값과 대조합니다. `wl-cli` 뒤의 설정 옵션은 이미 뜬 엔진의 방향을 바꾸지 않으므로, 방향을 정하는 이관은 단발 모드로 실행합니다.
+
+```bash
+java -jar dist/wl-engine.jar shard-notes --withlog.notes.shard.by.month=true --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar shard-notes apply=true --withlog.notes.shard.by.month=true --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar verify-shard --withlog.vault=/path/to/vault
+```
+
+회고·휴지통의 목록 진단, 플랜의 같은 제목 경고, 샤드의 불일치 진단은 소켓 응답의 stderr에도 전달합니다. `bash test.sh`는 장별 시험과 실제 serve·wl-cli 왕복을 함께 실행합니다.
 
 ## 1~20장 점검에서 찾은 누락 보완
 
@@ -283,7 +327,7 @@ serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으�
 | `serve` | 소켓, 잠금, 실행 상태 파일, 유휴 종료 |
 | `frame` | 소켓 위의 요청 프레임(`WLQ1`)과 응답 프레임(`WLG1`) |
 | `args` | 도구 표면의 JSON 인자와 명령 표면의 `key=value` 인자 읽기 |
-| `cmd` | 명령 22개와 이름 목록, 하위 노트 부모 사슬 풀기 |
+| `cmd` | 명령 실행기와 이름 목록, 하위 노트 부모 사슬 풀기 |
 | `write` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 프론트매터 YAML, 경고, 선결 조건 토큰, 편집 도장, 메타 쓰기, 하위 노트 쓰기, 카드 걷기, 폴더 지우기 |
 | `vault` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통을 읽는 부품 |
 | `text` | 다듬기, UTF-16 자르기, URI 등 글 도구 |

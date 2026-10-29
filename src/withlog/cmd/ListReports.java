@@ -148,9 +148,9 @@ public final class ListReports {
         // 8. incomplete 봉투 (25.6: 못 읽은 파일은 필터로 거르지 않고 모두 센다)
         if (!scan.skipped().isEmpty()) {
             if (!isTool) {
-                System.err.println("회고 " + scan.skipped().size() + "건을 못 읽어 목록에서 뺐다.");
+                withlog.engine.Diagnostics.line("회고 " + scan.skipped().size() + "건을 못 읽어 목록에서 뺐다.");
                 for (ReportReader.SkippedReport s : scan.skipped()) {
-                    System.err.println("  " + s.relPath() + " — " + s.reason());
+                    withlog.engine.Diagnostics.line("  " + s.relPath() + " — " + s.reason());
                 }
             }
             Map<String, Object> incomplete = new LinkedHashMap<>();

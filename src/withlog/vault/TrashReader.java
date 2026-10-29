@@ -101,7 +101,7 @@ public final class TrashReader {
         }
 
         // 2. YAML 1.1 파싱 (시각 해석 끔)
-        Yaml yaml = new Yaml(new SafeConstructor(LOADER_OPTIONS));
+        Yaml yaml = Frontmatter.yamlWithoutTimestamps(LOADER_OPTIONS);
         Object loaded;
         try {
             loaded = yaml.load(content);
@@ -285,7 +285,7 @@ public final class TrashReader {
         if (hours == 0 && mins == 0) {
             return dtPart + "Z";
         }
-        return String.format("%s%s%02d:%02d", dtPart, hours >= 0 ? "+" : "-", Math.abs(hours), mins);
+        return String.format("%s%s%02d:%02d", dtPart, totalSec >= 0 ? "+" : "-", Math.abs(hours), mins);
     }
 
     public record ParsedInstant(Instant instant, String formatted) {}

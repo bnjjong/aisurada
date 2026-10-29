@@ -706,6 +706,48 @@ public final class ArgsParser {
                 }
             }
             return new ParsedArgs(true, "update-sub-note", List.of(parent, id), named, parent);
+        } else if ("save_template".equals(toolName)) {
+            List<String> keys = List.of("id", "name", "type", "desc", "body");
+            validateKeys(toolName, props.keySet(), keys);
+            Map<String, String> named = new LinkedHashMap<>();
+            for (String key : keys) {
+                if (!props.containsKey(key)) continue;
+                String value = optionalString(toolName, props, key);
+                named.put(key, key.equals("body") ? withinBodyLimit(toolName, value) : value);
+            }
+            return new ParsedArgs(true, "save-template", List.of(), named, null);
+        } else if ("save_report".equals(toolName)) {
+            validateKeys(toolName, props.keySet(), List.of("kind", "date", "body", "memo"));
+            Map<String, String> named = new LinkedHashMap<>();
+            for (String key : List.of("kind", "date", "body", "memo")) {
+                if (key.equals("kind") || key.equals("date")) named.put(key, requiredString(toolName, props, key));
+                else if (props.containsKey(key)) {
+                    String value = optionalString(toolName, props, key);
+                    if (value.length() > 200_000) throw new WlException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 너무 길다(최대 200000자): " + value.length() + "자");
+                    named.put(key, value);
+                }
+            }
+            return new ParsedArgs(true, "save-report", List.of(), named, null);
+        } else if (Set.of("delete_doc", "restore_doc", "purge_doc").contains(toolName)) {
+            String key = toolName.equals("delete_doc") ? "id" : "trashId";
+            validateKeys(toolName, props.keySet(), List.of(key));
+            return new ParsedArgs(true, toolName.replace('_', '-'), List.of(requiredString(toolName, props, key)), Map.of(), null);
+        } else if ("export_markdown".equals(toolName)) {
+            validateKeys(toolName, props.keySet(), List.of());
+            return new ParsedArgs(true, "export-markdown", List.of(), Map.of(), null);
+        } else if ("plan_day".equals(toolName)) {
+            validateKeys(toolName, props.keySet(), List.of("date", "agenda", "dryRun"));
+            Map<String, String> named = new LinkedHashMap<>();
+            for (String key : List.of("date", "agenda", "dryRun")) {
+                if (!props.containsKey(key)) continue;
+                if (key.equals("dryRun")) {
+                    JsonValue v = props.get(key);
+                    if (!(v instanceof JsonValue.JsonLiteral l) || !(l.raw().equals("true") || l.raw().equals("false")))
+                        throw new WlException(400, "인자 검증 실패(plan_day): dryRun 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
+                    named.put(key, ((JsonValue.JsonLiteral) v).raw());
+                } else named.put(key, optionalString(toolName, props, key));
+            }
+            return new ParsedArgs(true, "plan-day", List.of(), named, null);
         } else if ("delete_sub_note".equals(toolName)) {
             validateKeys(toolName, props.keySet(), List.of("parent", "id"));
             String parent = requiredString(toolName, props, "parent");
@@ -851,6 +893,17 @@ public final class ArgsParser {
                 maxPositional = 1;
                 usage = "get-template <템플릿 id>";
             }
+            case "save-template" -> {
+                allowedOptions = List.of("id", "name", "type", "desc", "body"); maxPositional = 0;
+                usage = withlog.cmd.TemplateCommands.SAVE_USAGE;
+            }
+            case "delete-doc-template" -> {
+                maxPositional = 1; usage = withlog.cmd.TemplateCommands.DELETE_USAGE;
+            }
+            case "save-ritual-template" -> {
+                allowedOptions = List.of("name", "desc", "body"); maxPositional = 1;
+                usage = withlog.cmd.TemplateCommands.RITUAL_USAGE;
+            }
             case "list-reports" -> {
                 allowedOptions = List.of("bodies", "from", "kind", "to");
                 maxPositional = 0;
@@ -969,6 +1022,22 @@ public final class ArgsParser {
                 maxPositional = 0;
                 usage = "reindex";
             }
+            case "save-report" -> {
+                allowedOptions = List.of("kind", "date", "body", "memo"); maxPositional = 0;
+                usage = withlog.cmd.SaveReport.USAGE;
+            }
+            case "delete-doc", "restore-doc", "purge-doc" -> {
+                maxPositional = 1;
+                usage = cmdName.equals("delete-doc") ? "delete-doc <노트 id>" : cmdName + " <휴지통 항목 id. list-trash 로 조회한다>";
+            }
+            case "empty-trash", "export-markdown" -> { maxPositional = 0; usage = cmdName; }
+            case "shard-notes" -> { allowedOptions = List.of("apply"); maxPositional = 0; usage = "shard-notes [apply=true]"; }
+            case "verify-shard" -> { allowedOptions = List.of("file"); maxPositional = 0; usage = "verify-shard [file=<매핑 파일 이름>]"; }
+            case "plan-day" -> {
+                allowedOptions = List.of("date", "agenda", "dryRun"); maxPositional = 0;
+                usage = "plan-day [date=<YYYY-MM-DD>] [agenda=<slug 또는 이름. 주면 저장한다>] [dryRun=true]";
+            }
+            case "check-notes" -> { allowedOptions = List.of("date"); maxPositional = 0; usage = "check-notes [date=<YYYY-MM-DD>]"; }
             case "reindex-paths" -> {
                 maxPositional = Integer.MAX_VALUE;
                 usage = "reindex-paths <vault 상대 경로> [경로...]";

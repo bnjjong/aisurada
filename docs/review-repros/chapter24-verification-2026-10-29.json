@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-29",
+  "source": "User-supplied chapter 24 in this conversation",
+  "baseCommit": "e91e8257b74e6a18d4ac9f4208fa4e9f6baa8a59",
+  "runtime": "openjdk version \"21.0.11\" 2026-04-21 LTS",
+  "command": "bash test.sh",
+  "checks": {
+    "chapter19": 362,
+    "reindex-paths": 133,
+    "chapter22": 554,
+    "vault git": 122,
+    "chapter24": 445,
+    "chapter25": 102,
+    "chapter26": 130,
+    "chapter27": 24,
+    "chapter28": 88,
+    "chapter29": 58,
+    "chapter30": 65,
+    "chapters25-30-socket": 40
+  },
+  "totalChecks": 2123,
+  "status": "passed",
+  "fixtureCopy": {
+    "readCalls": 15,
+    "rows": [
+      "m-plan",
+      "t-legacy",
+      "tpl-halfmoved",
+      "tpl-halfmoved",
+      "tpl-seeded",
+      "t-morning"
+    ],
+    "filterCounts": {
+      "doc": 5,
+      "ritual": 1,
+      "plan": 1,
+      "build": 2,
+      "report": 1,
+      "research": 1,
+      "meeting": 0,
+      "free": 0
+    },
+    "halfmovedExactBytes": true,
+    "ritualUpdate": true,
+    "userTemplateDelete": true
+  },
+  "notes": [
+    "Chapter 24 uses the supplied double-quoted empty/edge-space scalar examples; chapter 23 seed serialization is preserved.",
+    "CRLF followed by LF is removed in that explicit sequence, consistent with the existing section 1.6 reader.",
+    "Original Kotlin engine was not run for differential verification."
+  ]
+}

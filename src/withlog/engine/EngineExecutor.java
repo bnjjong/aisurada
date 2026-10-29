@@ -77,7 +77,8 @@ public final class EngineExecutor {
 
         List<String> commandArgs = argv.subList(1, argv.size());
 
-        try {
+        Diagnostics diagnostics = new Diagnostics();
+        try (diagnostics) {
             ParsedArgs parsed = ArgsParser.parse(firstArg, commandArgs);
 
             try (WritePipeline scope = WritePipeline.begin(vaultRoot, parsed.commandName(), isTool, isServeMode, sessionId)) {
@@ -122,12 +123,28 @@ public final class EngineExecutor {
                     response = ListTemplates.execute(vaultRoot, parsed);
                 } else if ("get-template".equals(parsed.commandName())) {
                     response = GetTemplate.execute(vaultRoot, parsed);
+                } else if (Set.of("save-template", "delete-doc-template", "save-ritual-template").contains(parsed.commandName())) {
+                    response = TemplateCommands.execute(vaultRoot, parsed);
                 } else if ("list-reports".equals(parsed.commandName())) {
                     response = ListReports.execute(vaultRoot, parsed);
                 } else if ("get-report".equals(parsed.commandName())) {
                     response = GetReport.execute(vaultRoot, parsed);
+                } else if ("save-report".equals(parsed.commandName())) {
+                    response = SaveReport.execute(vaultRoot, parsed);
+                } else if ("export-markdown".equals(parsed.commandName())) {
+                    response = ExportMarkdown.execute(vaultRoot);
+                } else if ("plan-day".equals(parsed.commandName())) {
+                    response = PlanDay.execute(vaultRoot, parsed);
+                } else if ("check-notes".equals(parsed.commandName())) {
+                    response = CheckNotes.execute(vaultRoot, parsed);
+                } else if ("shard-notes".equals(parsed.commandName())) {
+                    response = ShardNotes.execute(vaultRoot, parsed);
+                } else if ("verify-shard".equals(parsed.commandName())) {
+                    response = VerifyShard.execute(vaultRoot, parsed);
                 } else if ("list-trash".equals(parsed.commandName())) {
                     response = ListTrash.execute(vaultRoot, parsed);
+                } else if (Set.of("delete-doc", "restore-doc", "purge-doc", "empty-trash").contains(parsed.commandName())) {
+                    response = TrashCommands.execute(vaultRoot, parsed);
                 } else if ("list-projects".equals(parsed.commandName())) {
                     response = ListProjects.execute(vaultRoot);
                 } else if ("create-project".equals(parsed.commandName())) {
@@ -175,11 +192,11 @@ public final class EngineExecutor {
                 }
 
                 byte[] stdoutBytes = JsonWriter.toBytes(response);
-                return EngineResult.success(stdoutBytes);
+                return new EngineResult(0, 0, stdoutBytes, diagnostics.text().getBytes(StandardCharsets.UTF_8));
             }
 
         } catch (WlException e) {
-            byte[] err = (e.toWlLine() + "\n").getBytes(StandardCharsets.UTF_8);
+            byte[] err = (diagnostics.text() + e.toWlLine() + "\n").getBytes(StandardCharsets.UTF_8);
             return EngineResult.wlError(e.getExitCode(), e.getWlCode(), err);
         } catch (Throwable t) {
             if (isServeMode) {
