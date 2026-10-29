@@ -96,7 +96,7 @@ public final class CommentCommandsTest {
         Path v = vault(), f = comments(v);
         for (String text : List.of("", " \t\r\n", "\ufeff{}", "\u00a0{}", "{id:\"x\"}", "'a b'", "[{},]", "{\"a\":1,}", "{} x", "{}0", "{\"a\":\"\\x41\"}")) {
             Files.writeString(f, text);
-            eq(CommentsReader.readComments(v,f), Map.of("state","unreadable","reason","내용이 JSON이 아니다: notes/demo/root/comments.json"), "invalid raw file " + text);
+            eq(CommentsReader.readComments(v,f), Map.of("state","unreadable","reason","내용이 JSON 이 아니다: notes/demo/root/comments.json"), "invalid raw file " + text);
         }
         for (String text : List.of("hello", "NaN", "01", "true", "'x'", "42", "null", "\"글\"", "{\"comments\":false}", "[1,null,\"글\"]")) {
             Files.writeString(f,text); eq(CommentsReader.readComments(v,f), Map.of("state","loaded","comments",List.of()), "loaded scalar/empty " + text);

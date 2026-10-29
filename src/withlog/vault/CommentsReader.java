@@ -69,7 +69,7 @@ public final class CommentsReader {
             jsonVal = JsonReader.parseFile(jsonText);
         } catch (Exception e) {
             envelope.put("state", "unreadable");
-            envelope.put("reason", "내용이 JSON이 아니다: " + relPath);
+            envelope.put("reason", "내용이 JSON 이 아니다: " + relPath);
             return envelope;
         }
 
