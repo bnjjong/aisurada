@@ -4,8 +4,10 @@ import withlog.text.Utf16;
 import withlog.vault.AgendaReader;
 import withlog.vault.AgendaTable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -51,13 +53,25 @@ public final class AgendaFile {
      * 원색 6개가 먼저 다 쓰여서 아젠다가 적을 때 또렷한 색을 받는다.
      */
     public static String leastUsedHue(Collection<AgendaTable.AgendaInfo> rows) {
+        List<String> used = new ArrayList<>(rows.size());
+        for (AgendaTable.AgendaInfo row : rows) {
+            used.add(row.hue());
+        }
+        return leastUsedHueOf(used);
+    }
+
+    /**
+     * 색 목록 {@code usedHues}에서 가장 적게 쓰인 색을 고릅니다. 규칙은 {@link #leastUsedHue}와 같다.
+     * 프로젝트(21.5)도 이 규칙으로 고르되 프로젝트 색만 센다. 프로젝트 색과 아젠다 색은 쓰는 자리가 달라 서로 독립이다.
+     */
+    public static String leastUsedHueOf(Collection<String> usedHues) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (String hue : AgendaReader.HUES) {
             counts.put(hue, 0);
         }
-        for (AgendaTable.AgendaInfo row : rows) {
+        for (String used : usedHues) {
             // 파일에서 읽은 모르는 색은 이미 blue로 물러서 있다(2.1)
-            String hue = counts.containsKey(row.hue()) ? row.hue() : "blue";
+            String hue = counts.containsKey(used) ? used : "blue";
             counts.merge(hue, 1, Integer::sum);
         }
         String chosen = AgendaReader.HUES.get(0);

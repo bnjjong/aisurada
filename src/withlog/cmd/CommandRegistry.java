@@ -115,8 +115,8 @@ public final class CommandRegistry {
     );
 
     /**
-     * 이 판이 지은 명령인지 확인합니다. 아젠다 명령 4개와 사실층 명령 3개는
-     * 명령 표면에만 있어서 밑줄 이름이 없다(20.2, 22.2).
+     * 이 판이 지은 명령인지 확인합니다. 아젠다 명령 4개, 프로젝트 명령 4개(list-projects, create-project, update-project,
+     * delete-project), 사실층 명령 3개는 명령 표면에만 있어서 밑줄 이름이 없다(20.2, 21.2, 22.2).
      */
     public static boolean isSupported(String name) {
         return "reindex".equals(name) || "reindex-paths".equals(name) ||
@@ -145,7 +145,9 @@ public final class CommandRegistry {
                 "get_template".equals(name) || "get-template".equals(name) ||
                 "list_reports".equals(name) || "list-reports".equals(name) ||
                 "get_report".equals(name) || "get-report".equals(name) ||
-                "list_trash".equals(name) || "list-trash".equals(name);
+                "list_trash".equals(name) || "list-trash".equals(name) ||
+                "list-projects".equals(name) || "create-project".equals(name) ||
+                "update-project".equals(name) || "delete-project".equals(name);
     }
 
     /**

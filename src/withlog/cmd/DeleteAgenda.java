@@ -6,12 +6,10 @@ import withlog.vault.AgendaTable;
 import withlog.vault.NoteIndex;
 import withlog.vault.NoteScanner;
 import withlog.write.AgendaFile;
+import withlog.write.TrashArchive;
 import withlog.engine.WritePipeline;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -55,7 +53,7 @@ public final class DeleteAgenda {
         // 5. 파일 옮기기
         String slug = agenda.slug();
         String archivedRel = ".withlog/trash/agendas/" + slug + "-" + id + ".md";
-        moveToTrash(vaultRoot.resolve(AgendaFile.relPath(slug)), vaultRoot.resolve(archivedRel));
+        TrashArchive.move(vaultRoot.resolve(AgendaFile.relPath(slug)), vaultRoot.resolve(archivedRel), "아젠다");
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
@@ -80,34 +78,5 @@ public final class DeleteAgenda {
             }
         }
         return count;
-    }
-
-    /**
-     * 20.5 지우기 5번의 걸음 5-1부터 5-5입니다. 원래 자리가 비었으면 경고 로그만 남기고 성공한다.
-     * 사람이 파일을 손으로 지웠어도 그 아젠다를 지울 길이 있어야 하기 때문이다.
-     */
-    private static void moveToTrash(Path source, Path target) {
-        // 5-1, 5-2: 링크는 따라가서 본다. 끊어진 링크는 「없음」이라 그 자리에 남는다
-        if (!Files.exists(source)) {
-            System.err.println("Warning: 옮길 아젠다 파일이 없어 옮기지 않았다: " + source);
-            return;
-        }
-        // 5-3: 옮길 자리가 차 있으면 덮지 않는다
-        if (Files.exists(target)) {
-            throw new WlException(500, "옮길 자리에 이미 무엇이 있어 옮기지 않았다: " + target);
-        }
-        // 5-4: 휴지통 폴더를 위쪽까지 만든다. 실패한 조각이 위여도 만들려던 폴더 전체를 찍는다
-        Path trashDir = target.getParent();
-        try {
-            Files.createDirectories(trashDir);
-        } catch (IOException e) {
-            throw new WlException(500, "폴더를 만들지 못했다: " + trashDir);
-        }
-        // 5-5: 이름 바꾸기 1번. 폴더는 폴더째, 심볼릭 링크는 링크 자신을 옮긴다
-        try {
-            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException e) {
-            throw new WlException(500, "옮기지 못했다: " + source + " -> " + target);
-        }
     }
 }

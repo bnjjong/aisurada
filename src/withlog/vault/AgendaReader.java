@@ -110,32 +110,14 @@ public final class AgendaReader {
                 content = content.substring(1);
             }
 
-            if (!content.startsWith("---")) {
+            Fenced fenced = splitFence(content);
+            if (fenced == null) {
                 addSkipped(skipped, relPath, "프론트매터가 없다");
                 continue;
             }
+            String bodyPart = fenced.body();
 
-            int firstLf = content.indexOf('\n', 3);
-            if (firstLf == -1) {
-                addSkipped(skipped, relPath, "프론트매터가 없다");
-                continue;
-            }
-
-            int closeIndex = content.indexOf("\n---", firstLf);
-            if (closeIndex == -1) {
-                addSkipped(skipped, relPath, "프론트매터가 없다");
-                continue;
-            }
-
-            String frontmatterPart = content.substring(firstLf + 1, closeIndex + 1);
-            String bodyPart = content.substring(closeIndex + 4);
-
-            if (frontmatterPart.length() > 16_000) {
-                addSkipped(skipped, relPath, "프론트매터가 없다");
-                continue;
-            }
-
-            Map<String, String> kv = parseLineReader(frontmatterPart);
+            Map<String, String> kv = parseLineReader(fenced.frontmatter());
 
             String fileName = file.getFileName().toString();
             String fileBase = fileName.substring(0, fileName.length() - 3);
@@ -233,6 +215,38 @@ public final class AgendaReader {
         return new ScanResult(new AgendaTable(slugToId, slugToTitle, idToAgenda, slugToAgenda), skipped);
     }
 
+    /**
+     * 2.1의 4번과 5번으로 가른 프론트매터와 본문.
+     *
+     * @param frontmatter 여는 줄 LF 다음 글자부터 닫는 {@code \n---}의 LF까지. 그 LF를 품는다
+     * @param body        닫는 {@code ---} 3글자 바로 뒤부터 끝까지
+     */
+    record Fenced(String frontmatter, String body) {}
+
+    /**
+     * 2.1의 4번과 5번 울타리 찾기. 맨 앞 U+FEFF를 뗀 글을 받는다. 프로젝트 파일(2.2)도 같은 규칙으로 가른다.
+     * {@code ---}로 시작하지 않거나, 여는 줄 뒤 LF가 없거나, 닫는 {@code \n---}가 없거나,
+     * 프론트매터가 16,000자를 넘으면 null이다. 이유 문구는 4가지 모두 「프론트매터가 없다」다.
+     */
+    static Fenced splitFence(String content) {
+        if (!content.startsWith("---")) {
+            return null;
+        }
+        int firstLf = content.indexOf('\n', 3);
+        if (firstLf == -1) {
+            return null;
+        }
+        int closeIndex = content.indexOf("\n---", firstLf);
+        if (closeIndex == -1) {
+            return null;
+        }
+        String frontmatter = content.substring(firstLf + 1, closeIndex + 1);
+        if (frontmatter.length() > 16_000) {
+            return null;
+        }
+        return new Fenced(frontmatter, content.substring(closeIndex + 4));
+    }
+
     private static void addSkipped(List<Map<String, String>> skipped, String path, String reason) {
         Map<String, String> map = new LinkedHashMap<>();
         map.put("kind", "agenda");
@@ -304,9 +318,9 @@ public final class AgendaReader {
     }
 
     /**
-     * 설명서 2.1 줄 읽개(Line Reader) 구현.
+     * 설명서 2.1 줄 읽개(Line Reader) 구현. 프로젝트 파일(2.2)도 이 읽개를 그대로 쓴다.
      */
-    private static Map<String, String> parseLineReader(String text) {
+    static Map<String, String> parseLineReader(String text) {
         Map<String, String> result = new LinkedHashMap<>();
         // LF, CRLF, CR 단위 줄 분리
         String[] lines = text.split("\r\n|\n|\r");

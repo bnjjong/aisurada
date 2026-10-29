@@ -12,6 +12,7 @@ public final class IdGenerator {
     private static final Pattern NOTE_ID_PATTERN = withlog.text.IdShape.NOTE;
     private static final Pattern SUB_NOTE_ID_PATTERN = withlog.text.IdShape.SUB_NOTE;
     private static final Pattern AGENDA_ID_PATTERN = Pattern.compile("^(ag[0-9a-z]+-[0-9a-f]{8}|ag-recovered)$");
+    private static final Pattern PROJECT_ID_PATTERN = Pattern.compile("^pj[0-9a-z]+-[0-9a-f]{8}$");
 
     private IdGenerator() {}
 
@@ -44,6 +45,15 @@ public final class IdGenerator {
      */
     public static String nextAgendaId() {
         return nextId("ag");
+    }
+
+    /**
+     * 새 프로젝트 id를 발급합니다 (pj 접두어).
+     *
+     * @return pj... 식별자
+     */
+    public static String nextProjectId() {
+        return nextId("pj");
     }
 
     /**
@@ -86,5 +96,16 @@ public final class IdGenerator {
     public static boolean isValidAgendaId(String id) {
         if (id == null) return false;
         return AGENDA_ID_PATTERN.matcher(id).matches();
+    }
+
+    /**
+     * 문자열이 올바른 프로젝트 식별자 모양인지 검사합니다. 아젠다의 ag-recovered 같은 고정 id는 없다(21.3).
+     *
+     * @param id 검사할 식별자
+     * @return 올바른 모양이면 true
+     */
+    public static boolean isValidProjectId(String id) {
+        if (id == null) return false;
+        return PROJECT_ID_PATTERN.matcher(id).matches();
     }
 }

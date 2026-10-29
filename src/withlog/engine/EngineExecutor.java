@@ -128,6 +128,14 @@ public final class EngineExecutor {
                     response = GetReport.execute(vaultRoot, parsed);
                 } else if ("list-trash".equals(parsed.commandName())) {
                     response = ListTrash.execute(vaultRoot, parsed);
+                } else if ("list-projects".equals(parsed.commandName())) {
+                    response = ListProjects.execute(vaultRoot);
+                } else if ("create-project".equals(parsed.commandName())) {
+                    response = CreateProject.execute(vaultRoot, parsed);
+                } else if ("update-project".equals(parsed.commandName())) {
+                    response = UpdateProject.execute(vaultRoot, parsed);
+                } else if ("delete-project".equals(parsed.commandName())) {
+                    response = DeleteProject.execute(vaultRoot, parsed);
                 } else if ("list-agendas".equals(parsed.commandName())) {
                     response = ListAgendas.execute(vaultRoot);
                 } else if ("create-agenda".equals(parsed.commandName())) {

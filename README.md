@@ -6,7 +6,7 @@ withlog vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 16개입니다. 19장의 코멘트 쓰기 3개와 20장의 아젠다 쓰기 3개, 22장의 사실층 쓰기 1개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 19개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
 
 엔진은 두 가지 모양으로 돕니다.
 
@@ -78,6 +78,25 @@ java -jar dist/wl-engine.jar delete-agenda <아젠다 id> --withlog.vault=/path/
 - 색인이 없는 판이라 부를 때마다 아젠다 파일을 읽습니다(8.6). 그래서 손으로 지운 아젠다는 목록에서 바로 빠지고, 지금 엔진이 색인에 남기는 행(20.9의 1번)은 재현하지 않습니다.
 
 자세한 것은 [20장 완료 노트](docs/rebuild-p1-chapter20-complete.md)에 있습니다.
+
+## 21장 프로젝트
+
+아젠다를 묶는 프로젝트를 읽고 만들고 고치고 지우는 명령 4개 `list-projects`, `create-project`, `update-project`, `delete-project`를 지원합니다. 아젠다 명령처럼 명령 표면에만 있고, `list_projects` 같은 밑줄 이름은 모르는 명령(종료 코드 2)입니다.
+
+```bash
+java -jar dist/wl-engine.jar list-projects --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar create-project 'title=광고 플랫폼' 'summary=광고 쪽 아젠다를 묶는다.' --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar update-project <프로젝트 id> 'title=새 이름' hue=teal --withlog.vault=/path/to/vault
+java -jar dist/wl-engine.jar delete-project <프로젝트 id> --withlog.vault=/path/to/vault
+```
+
+- 프로젝트는 `.withlog/projects/<slug>.md` 파일 1개가 1개입니다. 키는 `id`, `slug`, `title`, `hue` 4개이고 본문이 `summary`입니다. 응답은 `id`, `slug`, `title`, `hue`, `summary` 차례이고 `deepLink`가 없습니다.
+- `create-project`는 이름을 `title=`로 받습니다(자리 인자 없음). 같은 이름이 있으면 slug만 `-2`부터 `-100`까지 비켜서고, 색을 안 주면 프로젝트 색만 세어 가장 덜 쓰인 색을 고릅니다.
+- `update-project`는 준 칸만 바꾸고 파일을 통째로 다시 씁니다. slug와 파일 이름은 안 바뀝니다.
+- `delete-project`는 그 slug를 `project`로 가리키는 아젠다가 0개일 때만 파일을 `.withlog/trash/projects/<slug>-<프로젝트 id>.md`로 옮깁니다. 아젠다를 떼려면 `update-agenda <아젠다 id> project=`를 부릅니다.
+- 지금 엔진은 프로젝트를 색인에만 두고 파일을 안 읽지만, 이 판은 색인이 없어 부를 때마다 프로젝트 파일을 설명서 2.2의 규칙으로 읽습니다(8.6). 그래서 손으로 둔 파일도 목록에 나오고, 목록은 id 차례(엔진이 발급한 id끼리는 만든 차례)입니다.
+
+자세한 것은 [21장 완료 노트](docs/rebuild-p1-chapter21-complete.md)에 있습니다.
 
 ## 22장 사실층
 
@@ -251,7 +270,7 @@ serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으�
 | `args` | 도구 표면의 JSON 인자와 명령 표면의 `key=value` 인자 읽기 |
 | `cmd` | 명령 22개와 이름 목록, 하위 노트 부모 사슬 풀기 |
 | `write` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 프론트매터 YAML, 경고, 선결 조건 토큰, 편집 도장, 메타 쓰기, 하위 노트 쓰기, 카드 걷기, 폴더 지우기 |
-| `vault` | 아젠다, 노트, 템플릿, 회고, 휴지통을 읽는 부품 |
+| `vault` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통을 읽는 부품 |
 | `text` | 다듬기, UTF-16 자르기, URI 등 글 도구 |
 | `out` | 정해진 바이트 모양의 JSON 쓰기 |
 
