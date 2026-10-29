@@ -74,7 +74,7 @@
 종료 칸의 「6.6」은 18.4의 표기와 같다.
 
 ```text
-WL-400 인자 검증 실패(list_comments): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: <원문>
+WL-400 인자 검증 실패(list_comments): parent 는 '노트id' 이거나 '노트id/하위노트id' 여야 한다: <원문>
 WL-400 list-comments 이 받는 자리 인자는 2 개인데 <n> 개를 받았다: list-comments <노트 id> [하위 노트 id]
 WL-400 인자가 하나 필요하다: list-comments <노트 id> [하위 노트 id]
 WL-400 노트 id 모양이 아니다: <값>

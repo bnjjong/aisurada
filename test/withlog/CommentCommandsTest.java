@@ -148,6 +148,10 @@ public final class CommentCommandsTest {
         eq(rows(ok(v,"list-comments",ROOT," \t")).size(),1,"blank second positional omitted");
         error(v,3,400,"인자 검증 실패(list_comments): parent 는 '노트id' 이거나 '노트id/하위노트id' 여야 한다: "+ROOT+"/"+SUB+"/"+GRAND,
                 "list_comments","{\"parent\":\""+ROOT+"/"+SUB+"/"+GRAND+"\"}");
+        for (String parent : List.of("", "/ /")) {
+            error(v,3,400,"인자 검증 실패(list_comments): parent 는 '노트id' 이거나 '노트id/하위노트id' 여야 한다: "+parent,
+                    "list_comments","{\"parent\":\""+parent+"\"}");
+        }
         error(v,3,400,null,"list_comments","{\"parent\":null}");
         error(v,3,400,null,"list_comments","{\"parent\":\""+ROOT+"\",\"body\":\"x\"}");
         error(v,3,400,null,"list-comments",ROOT,SUB,GRAND);
@@ -248,7 +252,13 @@ public final class CommentCommandsTest {
             }
         }
         // 옵션 검사는 코멘트 파일 읽기보다 앞이다.
-        error(v,3,400,"코멘트 본문이 비었다","create-comment",ROOT,"body= \t");
+        byte[] unreadableBefore=Files.readAllBytes(f);
+        for (String blank : List.of("", " ", " \t", "\r\n", "\u00a0\u2003")) {
+            error(v,3,400,"코멘트 본문이 비었다.","create-comment",ROOT,"body="+blank);
+            error(v,3,400,"코멘트 본문이 비었다.","update-comment",ROOT,"comment_id="+ID,"body="+blank);
+            eq(Arrays.equals(unreadableBefore,Files.readAllBytes(f)),true,"blank body preserves comments");
+            eq(Arrays.equals(body,Files.readAllBytes(v.resolve("notes/demo/root/note.md"))),true,"blank body preserves note");
+        }
         error(v,3,400,"코멘트 본문이 너무 길다(20001자). 상한은 20000자다.","create-comment",ROOT,"body="+"x".repeat(20001));
         error(v,3,400,"앵커 인용문이 너무 길다. 상한은 2000자다.","create-comment",ROOT,"body=x","anchor_quote="+" ".repeat(2001));
         error(v,3,400,null,"update-comment",ROOT,"body=x"); error(v,3,400,null,"create-comment",ROOT);

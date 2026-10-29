@@ -35,3 +35,10 @@
 - 원본 Kotlin 엔진이나 제공되지 않은 공식 수용 묶음/golden 파일과 비교 실행한 결과는 아니다. 검증 대상은 이번 aisurada Java 구현과 설명서의 규칙이다.
 
 원문은 [engine-manual/19-comments.md](./engine-manual/19-comments.md), 재실행 가능한 회귀는 `test/withlog/CommentCommandsTest.java`다.
+
+## 후속: 19장 오류 문구 보완 — 2026-10-29
+
+- list_comments의 잘못된 parent 오류는 이미 홑따옴표를 쓰고 있었다. 19.4 문서 예시의 백틱을 실제 응답과 같은 '노트id' / '노트id/하위노트id'로 맞췄다.
+- create-comment와 update-comment의 body가 비었거나 공백뿐이면 오류를 `WL-400 코멘트 본문이 비었다.`로 낸다. 누락된 끝마침표를 추가했다.
+- 빈 문자열·스페이스·탭·줄바꿈·유니코드 공백의 정확한 stderr 바이트와 코멘트/본문 파일 보존을 검증했다. 빈 parent와 공백 조각뿐인 parent의 홑따옴표도 검사했다.
+- `bash test.sh` 통과: 코멘트 362개 + 경로 재색인 133개 + git 88개 = 583개. 오류 문구와 검증을 바꿨으며 파일 저장 규칙은 그대로다.

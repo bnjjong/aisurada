@@ -114,7 +114,7 @@ public final class CommentCommands {
 
     private static void checkBody(String body, String usage) {
         if (body == null) throw new WlException(400, "body 이 필요하다: " + usage);
-        if (Trim.isBlank(body)) throw new WlException(400, "코멘트 본문이 비었다");
+        if (Trim.isBlank(body)) throw new WlException(400, "코멘트 본문이 비었다.");
         if (body.length() > 20_000) throw new WlException(400, "코멘트 본문이 너무 길다(" + body.length() + "자). 상한은 20000자다.");
     }
 
