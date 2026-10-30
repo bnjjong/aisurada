@@ -6,7 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/check-web.mjs",
     "backend:jars": "bash ../build.sh",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:acceptance": "node scripts/acceptance.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.2"

@@ -380,3 +380,5 @@ Tauri 2 호스트의 1~2장 기반은 [native-host](native-host/README.md)에 �
 5~6장의 `sidecar_call`과 자식 프로세스 실행·환경 정리도 연결했습니다. [5장 완료 기록](docs/rebuild-p2-chapter05-complete.md)과 [6장 완료 기록](docs/rebuild-p2-chapter06-complete.md)에 실제 Java 엔진 왕복, jar 탐색과 시간 초과 검증을 기록했습니다.
 
 7~8장의 그림 첨부 쓰기·기본 앱 열기·자기 쓰기 알림도 지원합니다. [7장 완료 기록](docs/rebuild-p2-chapter07-complete.md)과 [8장 완료 기록](docs/rebuild-p2-chapter08-complete.md)에 파일 경계와 실제 Tauri IPC 이벤트 검증을 기록했습니다.
+
+9~18장의 외부 Markdown, HTML 첨부 프로토콜, 노트 창 복원·모니터별 배치, 실제 PTY와 비밀 가림까지 구현했습니다. [9장](docs/rebuild-p2-chapter09-complete.md) · [10장](docs/rebuild-p2-chapter10-complete.md) · [11장](docs/rebuild-p2-chapter11-complete.md) · [12장](docs/rebuild-p2-chapter12-complete.md) · [13장](docs/rebuild-p2-chapter13-complete.md) · [14장](docs/rebuild-p2-chapter14-complete.md) · [15장](docs/rebuild-p2-chapter15-complete.md) · [16장](docs/rebuild-p2-chapter16-complete.md) · [17장](docs/rebuild-p2-chapter17-complete.md) · [18장](docs/rebuild-p2-chapter18-complete.md)에 장별 구현과 검증 범위를 적었습니다. 실제 macOS webview의 26개 자동 점검은 `cd native-host && pnpm test:acceptance`로 실행합니다. 4부 Rust 모듈과 실제 편집 화면은 아직 포함하지 않습니다.
