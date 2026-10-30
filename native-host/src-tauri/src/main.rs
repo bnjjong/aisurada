@@ -3,6 +3,8 @@ mod environment;
 mod ipc;
 mod lifecycle;
 mod menu;
+mod process;
+mod sidecar;
 mod workspace;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -31,7 +33,8 @@ fn main() {
             workspace::allow_workspace,
             workspace::vault_root,
             workspace::is_workspace,
-            workspace::create_workspace_dir
+            workspace::create_workspace_dir,
+            sidecar::sidecar_call
         ])
         .setup(|app| {
             lifecycle::create_main(app.handle())?;
@@ -51,3 +54,6 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("withlog native host failed to start");
 }
+
+#[cfg(test)]
+mod sidecar_integration_tests;

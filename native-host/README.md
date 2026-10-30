@@ -1,6 +1,6 @@
 # withlog 네이티브 호스트
 
-2부 1~4장의 Tauri 2 호스트 기반이다. Java 엔진과 별도 빌드하며, 화면은 3부를 연결하기 전의 최소 HTML이다.
+2부 1~6장의 Tauri 2 호스트 기반이다. Java 엔진과 별도 빌드하며, 화면은 3부를 연결하기 전의 최소 HTML이다.
 
 ```bash
 bash build.sh
@@ -18,5 +18,9 @@ macOS 앱 번들을 만들려면 `pnpm tauri build --debug --bundles app`을 사
 현재 식별자·스킴·파일 연결·자원·CSP·플러그인·권한과 창 기동/이벤트, 공통 IPC 규약 및 vault 커맨드 네 개를 구현했다. `allow_workspace`, `vault_root`, `is_workspace`, `create_workspace_dir`를 invoke로 부를 수 있다. main만 vault를 바꾸며 노트 창이 있는 동안 다른 vault로 전환하지 못한다. vault는 받은 글자 그대로 보관하고 범위는 누적된다. 기본 상태는 비어 있다.
 
 바이트 본문과 퍼센트 인코딩 헤더, base64 채널, 이벤트 대상과 페이로드의 공통 코드는 후속 커맨드가 사용한다. 나머지 커맨드, PTY, 파일 프로토콜 응답, 모니터별 레이아웃과 노트 창 복원 파일은 후속 장에서 연결한다. `wlframe`은 등록돼 있으나 10장 구현 전까지 파일을 내주지 않고 404를 반환한다.
+
+`sidecar_call({argv})`은 열린 vault로 실제 `wl-cli.jar`를 호출한다. argv와 종료 코드·출력을 보존하며 작업은 main 스레드 밖에서 돈다. `WITHLOG_CLI_JAR`, `WITHLOG_SIDECAR_JAVA`, `WITHLOG_SIDECAR_JAR`로 경로를 지정할 수 있다. 환경변수가 없으면 문서의 탐색 순서를 쓰며, 원본 Gradle 자리 외에 이 소스 트리의 `dist/`도 개발 후보로 확인한다. 개발 판은 자원 폴더의 jar 사본을 쓰지 않는다. sidecar jar는 개발 판과 빌드 폴더 아래 번들에서 자동으로 넘기지 않으므로, 설치된 엔진이 없으면 `WITHLOG_SIDECAR_JAR`로 명시한다.
+
+자식은 출력 두 개를 동시에 읽으며 120초 안에 끝나지 않으면 TERM→최대 3초→KILL로 직접 자식만 회수한다. `bash test-native.sh`는 격리된 HOME·소켓·vault에서 실제 Java 엔진과 IPC 왕복도 실행한다. 테스트의 ignored IPC probe는 이 격리 실행이 사용하는 내부 진입점이다.
 
 원본 저장소의 자원 경로를 이 저장소의 `dist/`에 맞춰 변경했다. jar 두 개의 번들 내 이름은 그대로다. 제공되지 않은 `wl-agent/*.mjs`는 번들에 추가하지 않았다. 원본 아이콘 대신 코드로 만든 임시 SVG 아이콘과 그 변환본을 사용한다. 실 비밀 이름 표는 추적하지 않으며, 없으면 항목 없는 견본을 포함한다.
