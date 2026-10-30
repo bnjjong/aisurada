@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod environment;
+mod files;
 mod ipc;
 mod lifecycle;
 mod menu;
 mod process;
+mod self_write;
 mod sidecar;
 mod workspace;
 use tauri::Manager;
@@ -34,7 +36,10 @@ fn main() {
             workspace::vault_root,
             workspace::is_workspace,
             workspace::create_workspace_dir,
-            sidecar::sidecar_call
+            sidecar::sidecar_call,
+            files::write_attachment_bytes,
+            files::open_in_default_app,
+            self_write::announce_self_write
         ])
         .setup(|app| {
             lifecycle::create_main(app.handle())?;
@@ -57,3 +62,6 @@ fn main() {
 
 #[cfg(test)]
 mod sidecar_integration_tests;
+
+#[cfg(test)]
+mod file_ipc_tests;

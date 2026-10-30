@@ -1,4 +1,4 @@
-//! Shared chapter 3 transport. Concrete attachment/PTY commands are added in chapters 7/14.
+//! Shared chapter 3 transport. Used by attachment writes; PTY commands are added in chapter 14.
 #![allow(dead_code)]
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
@@ -12,14 +12,14 @@ pub const NAVIGATE: &str = "wl://navigate";
 pub const NOTE_WINDOWS: &str = "wl://note-windows";
 pub const SELF_WRITE: &str = "wl://self-write";
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Navigate {
     pub path: String,
     pub rail: Option<String>,
     pub sub: Option<String>,
 }
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SelfWrite {
     pub root: String,

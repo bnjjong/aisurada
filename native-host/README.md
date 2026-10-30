@@ -1,6 +1,6 @@
 # withlog 네이티브 호스트
 
-2부 1~6장의 Tauri 2 호스트 기반이다. Java 엔진과 별도 빌드하며, 화면은 3부를 연결하기 전의 최소 HTML이다.
+2부 1~8장의 Tauri 2 호스트 기반이다. Java 엔진과 별도 빌드하며, 화면은 3부를 연결하기 전의 최소 HTML이다.
 
 ```bash
 bash build.sh
@@ -22,5 +22,9 @@ macOS 앱 번들을 만들려면 `pnpm tauri build --debug --bundles app`을 사
 `sidecar_call({argv})`은 열린 vault로 실제 `wl-cli.jar`를 호출한다. argv와 종료 코드·출력을 보존하며 작업은 main 스레드 밖에서 돈다. `WITHLOG_CLI_JAR`, `WITHLOG_SIDECAR_JAVA`, `WITHLOG_SIDECAR_JAR`로 경로를 지정할 수 있다. 환경변수가 없으면 문서의 탐색 순서를 쓰며, 원본 Gradle 자리 외에 이 소스 트리의 `dist/`도 개발 후보로 확인한다. 개발 판은 자원 폴더의 jar 사본을 쓰지 않는다. sidecar jar는 개발 판과 빌드 폴더 아래 번들에서 자동으로 넘기지 않으므로, 설치된 엔진이 없으면 `WITHLOG_SIDECAR_JAR`로 명시한다.
 
 자식은 출력 두 개를 동시에 읽으며 120초 안에 끝나지 않으면 TERM→최대 3초→KILL로 직접 자식만 회수한다. `bash test-native.sh`는 격리된 HOME·소켓·vault에서 실제 Java 엔진과 IPC 왕복도 실행한다. 테스트의 ignored IPC probe는 이 격리 실행이 사용하는 내부 진입점이다.
+
+`write_attachment_bytes`는 raw 본문 또는 숫자 배열과 `x-wl-note-dir`, `x-wl-name` 헤더로 그림을 받아 attach/에 쓴다. 8개 그림 확장자와 5,000,000바이트 상한을 적용한다. `open_in_default_app({path})`는 현재 vault의 실재 경로만 열고 실행 가능한 파일은 거절한다. 직접 덮어쓰기와 심볼릭 링크 관련 경계는 [7장 기록](../docs/rebuild-p2-chapter07-complete.md)에 적었다.
+
+`announce_self_write({root, relPath})`는 현재 vault 글자가 일치할 때만 실제 호출 창 이름표를 붙여 모든 창에 `wl://self-write`를 보낸다. 상대 경로 문법과 UTF-8 2,048바이트 상한을 검사하며 파일이 있는지는 보지 않는다. 화면의 2초 기록은 3부 연결 범위다.
 
 원본 저장소의 자원 경로를 이 저장소의 `dist/`에 맞춰 변경했다. jar 두 개의 번들 내 이름은 그대로다. 제공되지 않은 `wl-agent/*.mjs`는 번들에 추가하지 않았다. 원본 아이콘 대신 코드로 만든 임시 SVG 아이콘과 그 변환본을 사용한다. 실 비밀 이름 표는 추적하지 않으며, 없으면 항목 없는 견본을 포함한다.
