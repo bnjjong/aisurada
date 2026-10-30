@@ -2,6 +2,8 @@ package withlog.config;
 
 import withlog.text.Trim;
 import withlog.vault.VaultPath;
+import withlog.args.JsonReader;
+import withlog.args.JsonValue;
 
 import java.util.*;
 
@@ -97,15 +99,12 @@ public final class EngineConfig {
                 int eqIdx = arg.indexOf('=');
                 String name;
                 String val;
-                boolean hasEquals;
                 if (eqIdx != -1) {
                     name = arg.substring(2, eqIdx);
                     val = arg.substring(eqIdx + 1);
-                    hasEquals = true;
                 } else {
                     name = arg.substring(2);
                     val = "";
-                    hasEquals = false;
                 }
 
                 if (name.isEmpty()) {
@@ -113,7 +112,7 @@ public final class EngineConfig {
                 }
 
                 // 33.1: 다시 짓는 구현은 정확한 이름만 받는다. 모르는 이름은 조용히 버린다.
-                if (!VALID_CONFIG_KEYS.contains(name)) {
+                if (!VALID_CONFIG_KEYS.contains(name) && !name.equals("spring.profiles.active") && !name.equals("spring.application.json")) {
                     continue;
                 }
 
@@ -122,7 +121,7 @@ public final class EngineConfig {
                     entry = new CliOptionEntry();
                     map.put(name, entry);
                 }
-                entry.add(hasEquals, val);
+                entry.add(val);
             }
         }
 
@@ -134,22 +133,12 @@ public final class EngineConfig {
     }
 
     private static class CliOptionEntry {
-        boolean hasExplicitValue = false;
+        boolean seen = false;
         String currentValue = "";
 
-        void add(boolean hasEquals, String val) {
-            if (!hasEquals) {
-                if (!hasExplicitValue) {
-                    currentValue = "";
-                }
-            } else {
-                if (!hasExplicitValue) {
-                    currentValue = val;
-                    hasExplicitValue = true;
-                } else {
-                    currentValue = currentValue + "," + val;
-                }
-            }
+        void add(String val) {
+            currentValue = seen ? currentValue + "," + val : val;
+            seen = true;
         }
 
         String getValue() {
@@ -175,7 +164,7 @@ public final class EngineConfig {
         // 2. withlog.db.home
         String rawDbHome = resolveRawValue(WITHLOG_DB_HOME, "WITHLOG_DB_HOME", cliOpts, "");
         String dbHome;
-        if (rawDbHome == null || rawDbHome.trim().isEmpty()) {
+        if (Trim.isBlank(rawDbHome)) {
             String userHome = System.getProperty("user.home", "");
             dbHome = userHome + "/Library/Application Support/withlog/db";
         } else {
@@ -187,7 +176,9 @@ public final class EngineConfig {
         Boolean shardByMonth = parseShardByMonth(rawShard);
 
         // 4. withlog.idle.timeout.minutes
-        String rawIdle = resolveRawValue(WITHLOG_IDLE_TIMEOUT_MINUTES, "WITHLOG_IDLE_TIMEOUT_MINUTES", cliOpts, "10");
+        String profile = cliOpts.getOrDefault("spring.profiles.active", System.getProperty("spring.profiles.active", System.getenv().getOrDefault("SPRING_PROFILES_ACTIVE", "")));
+        boolean dev = Arrays.stream(profile.split(",")).anyMatch(p -> Trim.trim(p).equals("dev"));
+        String rawIdle = resolveRawValue(WITHLOG_IDLE_TIMEOUT_MINUTES, "WITHLOG_IDLE_TIMEOUT_MINUTES", cliOpts, dev ? "0" : "10");
         long idleTimeoutMinutes = parseIntegerConfig(WITHLOG_IDLE_TIMEOUT_MINUTES, rawIdle);
 
         // 5. withlog.vault.autocommit.enabled
@@ -217,6 +208,21 @@ public final class EngineConfig {
     private static String resolveRawValue(String key, String envKey, Map<String, String> cliOpts, String defaultVal) {
         if (cliOpts.containsKey(key)) {
             return cliOpts.get(key);
+        }
+        String json = cliOpts.getOrDefault("spring.application.json", System.getenv("SPRING_APPLICATION_JSON"));
+        if (json != null && !json.isEmpty()) {
+            JsonValue root = JsonReader.parse(json);
+            if (!(root instanceof JsonValue.JsonObject object)) throw new IllegalArgumentException("spring.application.json must be an object");
+            JsonValue value = object.properties().get(key);
+            if (value == null) {
+                value = object;
+                for (String part : key.split("\\.")) {
+                    if (!(value instanceof JsonValue.JsonObject nested)) { value = null; break; }
+                    value = nested.properties().get(part);
+                }
+            }
+            if (value instanceof JsonValue.JsonString s) return s.value();
+            if (value instanceof JsonValue.JsonLiteral literal && !literal.isNull()) return literal.raw();
         }
         String sysProp = System.getProperty(key);
         if (sysProp != null) {
@@ -301,8 +307,7 @@ public final class EngineConfig {
             if (d < 0) throw new NumberFormatException("invalid digit: " + ch);
             normalized.append(Integer.toString(d, radix));
         }
-        long val = Long.parseLong(normalized.toString(), radix);
-        return negative ? -val : val;
+        return Long.parseLong((negative ? "-" : "") + normalized, radix);
     }
 
     private static long parseIntegerConfig(String key, String rawVal) {

@@ -178,6 +178,10 @@ java -jar dist/wl-engine.jar verify-shard --withlog.vault=/path/to/vault
 
 4부 명령 7개는 인자 문법과 쓰기 준비를 먼저 검사한 뒤 4부가 없으면 `WL-409`로 답합니다. 노트 안의 `ask.json`과 `chats/`는 노트 폴더와 함께 이동·보관하고 색인과 마크다운 내보내기에서는 제외합니다. [32장 완료 문서](docs/rebuild-p1-chapter32-complete.md)에 검사 순서와 검증 결과를 기록했습니다.
 
+## 33장 설정과 기기 위 파일
+
+엔진 설정의 우선순위와 값 규칙, vault 키와 기기 위 파일 자리를 지원합니다. 이 엔진은 영속 SQLite 색인 대신 vault를 다시 훑습니다. [33장 완료 문서](docs/rebuild-p1-chapter33-complete.md)에 구현과 검증 범위를 기록했습니다.
+
 ## 1~20장 점검에서 찾은 누락 보완
 
 `reindex-paths`와 공통 쓰기의 자동 커밋·작성자 기록을 구현했습니다. 경로별 재색인은 명령 표면에서만 받고, 옵션 없이 경로 argv를 그대로 보냅니다.
