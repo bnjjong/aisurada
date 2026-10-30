@@ -26,7 +26,11 @@ const OPTIONS = {
 // 1. 옵션
 // ---------------------------------------------------------------------------
 
-/** 이름 뒤 칸에 값을 둔 꼴만 받는다. 모르는 옵션, 값이 빠진 옵션, 다시 준 옵션, 빈 목록 항목, 정수가 아닌 값은 선다. */
+/**
+ * 이름 뒤 칸에 값을 둔 꼴만 받는다. 모르는 옵션, 값이 빠진 옵션, 다시 준 옵션은 여기(1번)서 선다.
+ * 값은 글자 그대로 두고 회차 차례대로 잰다. 정수와 빈 목록 항목은 --jobs면 4번, 나머지는 5번이고 --engine이 빠진 것도 5번이다.
+ * 그래서 그런 오류로 설 때는 3번이 만든 빈 --out 폴더가 남는다. 지금 실행기와 같다.
+ */
 function parseOptions(argv) {
   const opts = {};
   for (let i = 0; i < argv.length; i++) {
@@ -41,24 +45,26 @@ function parseOptions(argv) {
     const raw = argv[i + 1];
     if (raw === undefined || raw.startsWith('--')) throw new RunnerError(`옵션 값이 빠졌다: ${name}`);
     i++;
-    if (kind === 'value') opts[name] = raw;
-    else if (kind === 'int') opts[name] = toInt(raw, name);
-    else {
-      const items = raw.split(',');
-      if (items.some(x => x === '')) throw new RunnerError(`빈 목록 항목이 있다: ${name} ${raw}`);
-      opts[name] = kind === 'ints' ? items.map(x => toInt(x, name)) : items;
-    }
+    opts[name] = raw;
   }
   if (!('--out' in opts)) throw new RunnerError('--out 이 필요하다');
   if (opts['--self-check']) {
     for (const n of ['--engine', '--lanes', '--parts', '--only']) {
       if (n in opts) throw new RunnerError(`--self-check 는 ${n} 와 함께 못 쓴다`);
     }
-  } else {
-    if (opts['--mutants']) throw new RunnerError('--mutants 는 --self-check 와 함께만 쓴다');
-    if (!('--engine' in opts)) throw new RunnerError('--engine 이 필요하다');
+  } else if (opts['--mutants']) {
+    throw new RunnerError('--mutants 는 --self-check 와 함께만 쓴다');
   }
   return opts;
+}
+
+/** 목록은 쉼표로 가르고 빈 항목을 받지 않는다. 겹친 항목은 1번만 센다(--lanes read,read는 read). */
+function listOption(opts, name) {
+  const raw = opts[name];
+  if (raw === undefined) return undefined;
+  const items = raw.split(',');
+  if (items.some(x => x === '')) throw new RunnerError(`빈 목록 항목이 있다: ${name} ${raw}`);
+  return [...new Set(items)];
 }
 
 /** 정수는 JavaScript Number로 읽는다. 앞뒤 공백, 4.0, 0x10, 1e1도 정수다. */
@@ -106,22 +112,37 @@ function nearestExisting(p) {
   return cur;
 }
 
+/** 지킬 폴더. 묶음 폴더와 부모 셸의 WITHLOG_VAULT다. 아직 없는 WITHLOG_VAULT는 가장 가까운 있는 위 폴더로 잰다. */
+function outGuards() {
+  const guards = [{ label: '묶음 폴더', dir: BUNDLE, exists: true }];
+  const vault = process.env.WITHLOG_VAULT;
+  if (vault) {
+    const abs = path.resolve(vault);
+    const exists = fs.existsSync(abs);
+    guards.push({ label: 'WITHLOG_VAULT', dir: exists ? abs : nearestExisting(abs), exists });
+  }
+  return guards;
+}
+
+/** 있는 폴더는 한쪽이 다른 쪽 안이면 겹친다. 아직 없는 vault는 그 위 폴더가 --out과 같거나 안일 때, 곧 vault가 --out 안에 생길 자리일 때 겹친다. */
+function hitsGuard(out, guard) {
+  return guard.exists ? overlaps(out, guard.dir) : insideOrSame(guard.dir, out);
+}
+
 /**
  * 있는데 폴더가 아니거나 비어 있지 않으면 선다. 묶음 폴더나 부모 셸의 WITHLOG_VAULT와 겹치면 선다.
  * 없으면 만들고 realpath를 지난 실제 자리로 1번 더 잰다. 그때 겹치면 방금 만든 폴더를 지우고 선다.
  */
 function prepareOut(raw) {
   const out = path.resolve(raw);
-  const guards = [['묶음 폴더', BUNDLE]];
-  if (process.env.WITHLOG_VAULT && fs.existsSync(process.env.WITHLOG_VAULT)) guards.push(['WITHLOG_VAULT', process.env.WITHLOG_VAULT]);
   const created = [];
   if (fs.existsSync(out)) {
     if (!fs.statSync(out).isDirectory()) throw new RunnerError(`--out 이 폴더가 아니다: ${out}`);
     if (fs.readdirSync(out).length > 0) throw new RunnerError(`--out 폴더가 비어 있지 않다: ${out}`);
-    for (const [label, g] of guards) if (overlaps(out, g)) throw new RunnerError(`--out 이 ${label}와 겹친다: ${out}`);
+    for (const g of outGuards()) if (hitsGuard(out, g)) throw new RunnerError(`--out 이 ${g.label}와 겹친다: ${out}`);
   } else {
     const anchor = nearestExisting(path.dirname(out));
-    for (const [label, g] of guards) if (insideOrSame(anchor, g)) throw new RunnerError(`--out 이 ${label}와 겹친다: ${out}`);
+    for (const g of outGuards()) if (g.exists && insideOrSame(anchor, g.dir)) throw new RunnerError(`--out 이 ${g.label}와 겹친다: ${out}`);
     let cur = out;
     while (!fs.existsSync(cur)) {
       created.unshift(cur);
@@ -129,11 +150,12 @@ function prepareOut(raw) {
     }
     for (const dir of created) fs.mkdirSync(dir);
   }
+  // 방금 만든 폴더가 아직 없던 vault 자리이거나 그 위 폴더일 수 있어서 지킬 폴더도 다시 잰다
   const real = fs.realpathSync(out);
-  for (const [label, g] of guards) {
-    if (overlaps(real, g)) {
+  for (const g of outGuards()) {
+    if (hitsGuard(real, g)) {
       for (const dir of [...created].reverse()) fs.rmdirSync(dir);
-      throw new RunnerError(`--out 이 ${label}와 겹친다: ${real}`);
+      throw new RunnerError(`--out 이 ${g.label}와 겹친다: ${real}`);
     }
   }
   return real;
@@ -251,11 +273,19 @@ async function pool(items, jobs, worker) {
 // 판정(34.1의 표)
 // ---------------------------------------------------------------------------
 
+/** `WL-` 3자리 번호. 뒤에 숫자가 이어지면(WL-4044) 3자리 번호가 아니다. */
+const WL_CODE = /WL-\d{3}(?!\d)/;
+
 /** stderr에서 고른 1줄. WL- 번호가 든 첫 줄, 없으면 마지막 줄, 200자까지. */
 function stderrLine(buf) {
   const lines = buf.toString('utf8').split('\n').filter(l => l !== '');
-  const line = lines.find(l => /WL-\d{3}/.test(l)) ?? lines[lines.length - 1] ?? '';
+  const line = lines.find(l => WL_CODE.test(l)) ?? lines[lines.length - 1] ?? '';
   return line.slice(0, 200);
+}
+
+/** detail은 사람이 읽는 글 1줄이다. node의 JSON 읽기 오류처럼 줄바꿈이 든 글은 \n 꼴로 적는다. */
+function oneLine(text) {
+  return String(text).replace(/\r\n|[\r\n\u2028\u2029]/g, c => JSON.stringify(c).slice(1, -1));
 }
 
 /** 처음 걸린 검사 이름과 까닭. 다 맞으면 {pass:true, tokens}. */
@@ -267,7 +297,7 @@ function judge(expect, r, vars) {
     return { check: 'code', detail: `종료 코드 기대 ${expect.code}, 실제 ${got}. stderr: ${stderrLine(r.stderr)}` };
   }
   if ('wl' in expect) {
-    const m = /WL-\d{3}/.exec(r.stderr.toString('utf8'));
+    const m = WL_CODE.exec(r.stderr.toString('utf8'));
     if (!m || m[0] !== expect.wl) return { check: 'wl', detail: `기대 ${expect.wl}, 실제 ${m ? m[0] : '(없음)'}` };
   }
   let text;
@@ -390,7 +420,7 @@ async function runAll(files, selected, outDir, impl, jobs, quiet = false) {
       if (v.pass) totals.passed++;
       else {
         totals.failed++;
-        failures.push({ id: c.id, check: v.check, detail: v.detail });
+        failures.push({ id: c.id, check: v.check, detail: oneLine(v.detail) });
       }
     }
   }
@@ -412,19 +442,19 @@ function printSummary(report, reportPath) {
 }
 
 /** 7번: 항목마다 고른 레인의 케이스 가운데 1건이라도 걸리는지 따로 잰다. 함께 적용한 결과가 0건이어도 선다. */
-function selectCases(files, opts) {
+function selectCases(files, filters) {
   const all = files.flatMap(f => f.cases);
-  for (const lane of opts['--lanes'] ?? []) {
+  for (const lane of filters['--lanes'] ?? []) {
     if (!files.some(f => f.lane === lane && f.cases.length > 0)) throw new RunnerError(`--lanes 의 항목에 걸리는 케이스가 없다: ${lane}`);
   }
-  for (const part of opts['--parts'] ?? []) {
+  for (const part of filters['--parts'] ?? []) {
     if (!all.some(c => c.part === part)) throw new RunnerError(`--parts 의 항목에 걸리는 케이스가 없다: ${part}`);
   }
-  for (const head of opts['--only'] ?? []) {
+  for (const head of filters['--only'] ?? []) {
     if (!all.some(c => c.id.startsWith(head))) throw new RunnerError(`--only 의 항목에 걸리는 케이스가 없다: ${head}`);
   }
-  const parts = opts['--parts'];
-  const only = opts['--only'];
+  const parts = filters['--parts'];
+  const only = filters['--only'];
   const selected = new Set(all.filter(c => (!parts || parts.includes(c.part)) && (!only || only.some(h => c.id.startsWith(h)))).map(c => c.id));
   if (selected.size === 0) throw new RunnerError('고른 케이스가 없다');
   return selected;
@@ -445,21 +475,18 @@ const MUTANTS = [
   { name: 'token', checks: ['token'], targets: ['tokenJson', 'tokenShare'], atLeastOne: true }
 ];
 
-/** 변형 대상: 레인에서 처음 맞는 것. 토큰 없는 JSON 객체(키 2개 이상), 토큰 1개인 JSON 객체, 그 토큰을 같이 쓰는 다른 케이스, 글, 빈 출력. */
+/**
+ * 변형 대상: 레인에서 처음 맞는 것. 토큰 없는 JSON 객체(키 2개 이상), 토큰 1개인 JSON 객체, 그 토큰을 같이 쓰는 다른 케이스, 글, 빈 출력.
+ * 처음 맞는 토큰 1개짜리에 짝이 없으면 다음 후보로 넘어가지 않고 선다. 지금 실행기와 같다.
+ */
 function pickTargets(cases) {
   const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
   const pick = {};
   pick.json = cases.find(c => 'stdoutJson' in c.expect && isObj(c.expect.stdoutJson) && Object.keys(c.expect.stdoutJson).length >= 2 && tokenPaths(c.expect).length === 0);
-  // 토큰 1개인 JSON 객체는 그 토큰을 같이 쓰는 다른 케이스가 있는 것 가운데 처음 것이다
-  for (const c of cases) {
-    if (!('stdoutJson' in c.expect) || !isObj(c.expect.stdoutJson) || tokenPaths(c.expect).length !== 1) continue;
-    const p = tokenPaths(c.expect)[0];
-    const share = cases.find(o => o !== c && tokenPaths(o.expect).includes(p));
-    if (share) {
-      pick.tokenJson = c;
-      pick.tokenShare = share;
-      break;
-    }
+  pick.tokenJson = cases.find(c => 'stdoutJson' in c.expect && isObj(c.expect.stdoutJson) && tokenPaths(c.expect).length === 1);
+  if (pick.tokenJson) {
+    const p = tokenPaths(pick.tokenJson.expect)[0];
+    pick.tokenShare = cases.find(o => o !== pick.tokenJson && tokenPaths(o.expect).includes(p));
   }
   pick.text = cases.find(c => 'stdoutText' in c.expect);
   pick.empty = cases.find(c => 'stdout' in c.expect && c.expect.stdout === '');
@@ -474,8 +501,9 @@ async function selfCheck(opts, outDir, jobs) {
   const started = Date.now();
   const files = readLaneFiles(BUNDLE, lanes);
   const all = files.flatMap(f => f.cases);
+  // engine 칸은 변형 회차에서도 늘 replay다. 설명서가 안 정한 칸이라 지금 실행기를 따른다
   const replay = {
-    name: 'self-check/replay',
+    name: 'replay',
     prefix: [process.execPath, path.join(BUNDLE, 'selftest', 'replay-impl.mjs')],
     suffix: [],
     extraEnv: () => ({})
@@ -494,7 +522,6 @@ async function selfCheck(opts, outDir, jobs) {
     fs.mkdirSync(mutantOut);
     const impl = {
       ...replay,
-      name: `self-check/mutant-${m.name}`,
       extraEnv: c => (c ? { WLX_SELFTEST_MUTANT: m.name, WLX_SELFTEST_TARGETS: ids.join('\n') } : {})
     };
     const { report } = await runAll(files, new Set(ids), mutantOut, impl, jobs, true);
@@ -513,17 +540,22 @@ async function main() {
   const opts = parseOptions(process.argv.slice(2));
   checkIntegrity(BUNDLE);
   const outDir = prepareOut(opts['--out']);
-  const jobs = opts['--jobs'] ?? defaultJobs();
+  const jobs = '--jobs' in opts ? toInt(opts['--jobs'], '--jobs') : defaultJobs();
   if (jobs < 1) throw new RunnerError(`--jobs 는 1 이상이어야 한다: ${jobs}`);
   if (opts['--self-check']) return selfCheck(opts, outDir, jobs);
 
+  const parts = listOption(opts, '--parts');
+  const filters = { '--parts': parts && [...new Set(parts.map(x => toInt(x, '--parts')))] };
+  if (!('--engine' in opts)) throw new RunnerError('--engine 이 필요하다');
   const impl = readAdapter(opts['--engine']);
+  filters['--lanes'] = listOption(opts, '--lanes');
+  filters['--only'] = listOption(opts, '--only');
   const known = laneNames(BUNDLE);
-  for (const lane of opts['--lanes'] ?? []) {
+  for (const lane of filters['--lanes'] ?? []) {
     if (!known.includes(lane)) throw new RunnerError(`--lanes 의 항목에 걸리는 케이스가 없다: ${lane}`);
   }
-  const files = readLaneFiles(BUNDLE, opts['--lanes'] ?? known);
-  const selected = selectCases(files, opts);
+  const files = readLaneFiles(BUNDLE, filters['--lanes'] ?? known);
+  const selected = selectCases(files, filters);
   const { code } = await runAll(files, selected, outDir, impl, jobs);
   return code;
 }

@@ -53,13 +53,17 @@
     {
       "date": "2026-10-30",
       "change": "24장 회차: 진짜 묶음과 같은 자리의 list_templates 8건(갈래 2가지, 유형 6가지)과 get_template/tpl-halfmoved 1건을 더함. 기대값은 24.6의 목록 예시를 24.3의 거르기 규칙으로 거른 값과 2.4의 1건 읽기 본문"
+    },
+    {
+      "date": "2026-10-31",
+      "change": "34장 판 확인 후속: get_doc.json의 케이스 차례를 바꿔 ndfixture-00000003을 앞에 둠. 토큰 1개인 첫 JSON 객체에 짝(list_docs/type-research)이 있어야 지금 실행기의 --mutants도 대상을 고른다. 실행기는 옵션 값 재는 자리, 겹친 목록 항목, WL 번호 끝 경계, detail 1줄, 아직 없는 WITHLOG_VAULT, stdout 자리표, 나무 dirs, 자가 점검 engine 칸, 변형 대상 고르기를 지금 실행기에 맞춤"
     }
   ],
   "files": {
     ".gitattributes": "4a669ece67c496f5d07207f2daaf830c1e5b962e389baebd0ac068fd88be22ff",
-    "README.md": "35d991a9805cb30eae92c920f273e982d7ebc95ad9356e0209f1bda13438c7c9",
+    "README.md": "8f7318dcc7a666bcb42219575c32e0fe1ebdb7317b08e3e2d0e943a098f796f6",
     "adapters/withlog-jar.json": "ff94ae4d1ec2e3dd894dac516a3f2c5ec8817f8486bcd519d89ed60205793f07",
-    "lanes/read/get_doc.json": "4395652bb37c28c4b88d1fa662026a9e7ca2f0b8d6acec75001fa2b19697c7ab",
+    "lanes/read/get_doc.json": "916704dd51af6c02983624119a222b243e61b0e457bb8357f241711c418097a1",
     "lanes/read/get_report.json": "7b7db5a77739f67796f73d623e3ad4875d5b11a90c85caa3d89932d8b66273a5",
     "lanes/read/get_sub_note.json": "f281ce64f74b14c205ac280e2357914c785dc8a2510db6def151dc2702009b8c",
     "lanes/read/get_template.json": "eb26411118ae389c106a8f6b78ea05c0c42cf6b06fb1c72fd2217510f1b7b763",
@@ -69,9 +73,9 @@
     "lanes/read/list_sub_notes.json": "21e91d043410befc290d6569e23d449d8e207c09892ede2d6ab5e31f0b73f213",
     "lanes/read/list_templates.json": "73b059aa49aadaf0cbe1ad8d39da95d782b70276aeee7761b26098cbcf9815f7",
     "lib/bundle.mjs": "649ad5934660557a7ac425bc754b5e15c990fea329e6bfbdd8757bfebfe42901",
-    "lib/template.mjs": "af85432faecdd47a740a32f308002c7a5259b783434be3b88b2d16f034040056",
-    "lib/tree.mjs": "5b581a8afad8311ef7fc3c6cf060fe82e98bb2d8db5f0a763c61d0963ca9d6cf",
-    "run.mjs": "9fc7f87c755fb236aa47470ee2240817cce1c04d0837ec11d82128694274e5df",
+    "lib/template.mjs": "48229fe00409c143461e7663613c448e8b46fc09c88c1281d01d98adec8ad4c6",
+    "lib/tree.mjs": "38cfe237e1dead5f2b27d431734c0ed35ce6e07c4a20191c98163795673c2f67",
+    "run.mjs": "3fd94ab2c5645ba06a2ba5e4e817e62d7444ab9bdb2b260fa70ee51f3ec6233b",
     "selftest/replay-impl.mjs": "a92289ac3477df6ba9c6a7ef61679f9af206f440726048b67e2267aff8991ca6",
     "trees/rebuild-fixture.v1.json": "57ff79ddef06f451ce26732b8de16a9490cefd430f5e10cb8d0d0a2ec0e2a2f7"
   }

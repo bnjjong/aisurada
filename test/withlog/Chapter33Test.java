@@ -82,7 +82,13 @@ public final class Chapter33Test {
         eq(config(v, home, Map.of(), List.of(), "--WITHLOG.IDLE.TIMEOUT.MINUTES=99")[3], "10", "only exact config names accepted");
         eq(child(home, Map.of("WITHLOG_VAULT", v.toString()), List.of(), "--withlog.vault.autocommit.enabled=true", "--withlog.vault.autocommit.enabled=false").status(), 1, "repeated values join then fail boolean");
         eq(EngineConfig.parseCliOptions(new String[]{"--withlog.db.home=one", "--withlog.db.home=two"}).get("withlog.db.home"), "one,two", "repeated explicit values join");
-        eq(EngineConfig.parseCliOptions(new String[]{"--withlog.db.home", "--withlog.db.home=two", "--withlog.db.home"}).get("withlog.db.home"), ",two,", "repeated empty flags retain position");
+        eq(EngineConfig.parseCliOptions(new String[]{"--withlog.db.home", "--withlog.db.home=two", "--withlog.db.home"}).get("withlog.db.home"), "two", "flags without = add no value");
+        eq(EngineConfig.parseCliOptions(new String[]{"--withlog.db.home", "--withlog.db.home"}).get("withlog.db.home"), "", "flags without = alone are empty");
+        eq(EngineConfig.parseCliOptions(new String[]{"--withlog.db.home=", "--withlog.db.home=two"}).get("withlog.db.home"), ",two", "explicit empty value joins");
+        eq(EngineConfig.parseCliOptions(new String[]{"--withlog.db.home=x", "--withlog.db.home="}).get("withlog.db.home"), "x,", "explicit empty value joins at the end");
+        eq(config(v, home, Map.of(), List.of(), "--withlog.notes.shard.by.month", "--withlog.notes.shard.by.month=true")[2], "true", "flag then value keeps value");
+        eq(config(v, home, env, List.of(), "--withlog.notes.shard.by.month=true", "--withlog.notes.shard.by.month")[2], "true", "value then flag keeps value");
+        eq(config(v, home, Map.of(), List.of(), "--withlog.notes.shard.by.month", "--withlog.notes.shard.by.month")[2], "null", "flags without = alone leave shard unset");
     }
     private static void gate(Path v, Path home) throws Exception {
         List<String> cmd = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Dwithlog.vault=" + v, "-jar", Path.of("dist/wl-engine.jar").toAbsolutePath().toString(), "history", "missing");

@@ -11,38 +11,6 @@
   ],
   "cases": [
     {
-      "id": "get_doc/ndfixture-00000004",
-      "part": 1,
-      "argv": [
-        "get_doc",
-        "{\"id\":\"ndfixture-00000004\"}"
-      ],
-      "expect": {
-        "code": 0,
-        "stdoutJson": {
-          "id": "ndfixture-00000004",
-          "agenda": "serving",
-          "agendaTitle": "서빙",
-          "type": "report",
-          "title": "옛 HTML 노트",
-          "created": "2026-06-19T09:05:00+09:00",
-          "date": "2026-06-19",
-          "time": "09:05",
-          "mins": 15,
-          "format": "html",
-          "precondition": "⟦token:notes/serving/2026-06-19-0905-옛-html-노트-0004.html⟧",
-          "comments": {
-            "state": "absent"
-          },
-          "body": "<h1>옛 HTML 노트</h1>\n",
-          "links": [],
-          "tags": [],
-          "path": "notes/serving/2026-06-19-0905-옛-html-노트-0004.html",
-          "deepLink": "withlog://doc/ndfixture-00000004?ws=⟦vault-uri⟧"
-        }
-      }
-    },
-    {
       "id": "get_doc/ndfixture-00000003",
       "part": 1,
       "argv": [
@@ -87,6 +55,38 @@
           },
           "path": "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003",
           "deepLink": "withlog://doc/ndfixture-00000003?ws=⟦vault-uri⟧"
+        }
+      }
+    },
+    {
+      "id": "get_doc/ndfixture-00000004",
+      "part": 1,
+      "argv": [
+        "get_doc",
+        "{\"id\":\"ndfixture-00000004\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "id": "ndfixture-00000004",
+          "agenda": "serving",
+          "agendaTitle": "서빙",
+          "type": "report",
+          "title": "옛 HTML 노트",
+          "created": "2026-06-19T09:05:00+09:00",
+          "date": "2026-06-19",
+          "time": "09:05",
+          "mins": 15,
+          "format": "html",
+          "precondition": "⟦token:notes/serving/2026-06-19-0905-옛-html-노트-0004.html⟧",
+          "comments": {
+            "state": "absent"
+          },
+          "body": "<h1>옛 HTML 노트</h1>\n",
+          "links": [],
+          "tags": [],
+          "path": "notes/serving/2026-06-19-0905-옛-html-노트-0004.html",
+          "deepLink": "withlog://doc/ndfixture-00000004?ws=⟦vault-uri⟧"
         }
       }
     },

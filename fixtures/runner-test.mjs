@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // fixtures/expect 실행기를 재는 시험. 설명서 34.1의 옵션 문법, 무결성, --out, 거르개, 어댑터, 준비 걸음,
 // 판정 9가지, 경고, 구현 환경, 신호를 시험용 작은 묶음과 대본대로 답하는 가짜 엔진으로 잰다.
-// 마지막에 진짜 묶음의 자가 점검(--mutants)과, dist/wl-engine.jar가 있으면 이 엔진 회차를 돈다.
+// 그다음 진짜 묶음의 자가 점검(--mutants)과, dist/wl-engine.jar가 있으면 이 엔진 회차를 돈다.
+// 마지막 [11]은 34장 판 확인이 짚은 갈래를 지금 실행기에 맞춘 것을 잰다.
 //
 //   node fixtures/runner-test.mjs
 import fs from 'node:fs';
@@ -281,6 +282,7 @@ console.log('\n[6] 판정 9가지와 보고서');
     'bad/format': 'format', 'bad/bom': 'stdout', 'bad/token-inner': 'token', 'bad/token-space': 'stdout', 'bad/token-cross': 'token'
   });
   check('code 의 detail 은 stderr 에서 WL 번호가 든 첫 줄을 고른다', byId['bad/code'].detail, '종료 코드 기대 0, 실제 3. stderr: WL-404 Not found: x');
+  check('detail 은 1줄이다. BOM 붙은 JSON 의 읽기 오류 글도 줄바꿈을 \\n 으로 적는다', [rep.failures.every(f => !/[\r\n]/.test(f.detail)), byId['bad/bom'].detail.startsWith('JSON 이 아니다: ')], [true, true]);
   check('failures 는 케이스 차례', rep.failures.map(f => f.id)[0], 'bad/code');
   check('totals', [rep.totals.cases, rep.totals.passed, rep.totals.failed, rep.totals.launches], [14, 3, 11, 15]);
   check('report.json 키 차례', [Object.keys(rep), Object.keys(rep.totals)], [['engine', 'totals', 'failures', 'warnings'], ['cases', 'passed', 'failed', 'launches', 'wallMs']]);
@@ -340,6 +342,78 @@ if (fs.existsSync(jar)) {
   const r = runner(BUNDLE, ['--engine', path.join(HERE, 'aisurada.adapter.json'), '--out', o], { WLX_IMPL_JAVA: javaBin, WLX_IMPL_JAR: jar });
   const rep = report(o);
   check('묶음의 케이스가 모두 맞고 vault 와 HOME 을 안 바꾼다', [r.code, rep.totals.passed === rep.totals.cases, rep.failures.map(f => `${f.id} [${f.check}] ${f.detail}`), rep.warnings], [0, true, [], []]);
+}
+
+console.log('\n[11] 지금 실행기와 맞춘 갈래(34장 판 확인 후속)');
+{
+  const base = makeBundle('align', { 'read/t.json': lane([kase('t/a', ['a'], { code: 0, stdout: '' })]) }, { 'tiny.v1': TINY });
+  const answer = o => script([[withSuffix(['a'], path.join(o, 'read-0', 'vault')), { code: 0 }]]);
+  const emptyDir = o => fs.existsSync(o) && fs.readdirSync(o).length === 0;
+
+  // 34.1의 13걸음: 정수와 빈 목록 항목은 4번(--jobs)과 5번(--parts, --lanes, --only), --engine 은 5번에서 잰다
+  for (const [args, msg] of [
+    [['--engine', ADAPTER, '--jobs', '4.5'], '정수가 아니다: --jobs 4.5'],
+    [['--engine', ADAPTER, '--parts', 'x'], '정수가 아니다: --parts x'],
+    [['--engine', ADAPTER, '--lanes', 'read,'], '빈 목록 항목이 있다: --lanes read,'],
+    [[], '--engine 이 필요하다']
+  ]) {
+    const o = freshOut();
+    const r = runner(base, [...args, '--out', o]);
+    const shown = [...args, '--out', '<폴더>'].map(a => (a === ADAPTER ? 'fake.adapter.json' : a)).join(' ');
+    check(`${shown} → 2, 3번이 만든 빈 --out 이 남는다`, [r.code, why(r), emptyDir(o)], [2, msg, true]);
+  }
+  const syntax = freshOut();
+  check('문법 오류(1번)면 --out 을 안 만든다', [runner(base, ['--engine', ADAPTER, '--out', syntax, '--jobs=4']).code, fs.existsSync(syntax)], [2, false]);
+
+  const o1 = freshOut();
+  const dup = runner(base, ['--engine', ADAPTER, '--out', o1, '--lanes', 'read,read', '--parts', '1,1.0', '--only', 't/,t/'], { WLX_IMPL_SCRIPT: answer(o1) });
+  check('겹친 목록 항목은 1번만 센다(--lanes read,read)', [dup.code, report(o1).totals.cases], [0, 1]);
+
+  const wl = makeBundle('wl4044', { 'read/t.json': lane([
+    kase('w/long', ['long'], { code: 3, stdout: '', wl: 'WL-404' }),
+    kase('w/later', ['later'], { code: 3, stdout: '', wl: 'WL-404' })
+  ]) }, { 'tiny.v1': TINY });
+  const o2 = freshOut();
+  const v2 = path.join(o2, 'read-0', 'vault');
+  runner(wl, ['--engine', ADAPTER, '--out', o2], { WLX_IMPL_SCRIPT: script([
+    [withSuffix(['long'], v2), { code: 3, stderr: 'WL-4044 Not found' }],
+    [withSuffix(['later'], v2), { code: 3, stderr: 'WL-4044 앞줄\nWL-404 Not found' }]
+  ]) });
+  check('WL- 뒤에 숫자가 4개면 3자리 번호가 아니다(WL-4044)', report(o2).failures, [{ id: 'w/long', check: 'wl', detail: '기대 WL-404, 실제 (없음)' }]);
+
+  const o3 = freshOut();
+  fs.mkdirSync(o3, { recursive: true });
+  check('아직 없는 WITHLOG_VAULT 가 있는 --out 안이면 2', why(runner(BUNDLE, ['--self-check', '--out', o3], { WITHLOG_VAULT: path.join(o3, 'vault') })), `--out 이 WITHLOG_VAULT와 겹친다: ${o3}`);
+  const o4 = freshOut();
+  const r4 = runner(BUNDLE, ['--self-check', '--out', o4], { WITHLOG_VAULT: path.join(o4, 'deep', 'vault') });
+  check('아직 없는 --out 안이면 만든 뒤 다시 재서 2, 만든 폴더는 지운다', [r4.code, fs.existsSync(o4)], [2, false]);
+  const nv = path.join(TMP, 'not-yet-vault');
+  const r5 = runner(BUNDLE, ['--self-check', '--out', path.join(nv, 'o')], { WITHLOG_VAULT: nv });
+  check('--out 이 아직 없는 WITHLOG_VAULT 안이면 2, vault 자리를 안 남긴다', [r5.code, fs.existsSync(nv)], [2, false]);
+  check('아직 없는 WITHLOG_VAULT 의 위 폴더 안에 --out 이 있는 것만으로는 안 겹친다', runner(BUNDLE, ['--self-check', '--out', freshOut()], { WITHLOG_VAULT: path.join(TMP, 'elsewhere', 'vault') }).code, 0);
+
+  const phOut = makeBundle('stdoutph', { 'read/t.json': lane([kase('x', ['x'], { code: 0, stdout: 'ws=⟦vault-uri⟧' })]) }, { 'tiny.v1': TINY });
+  check('stdout 에 자리표 모양 글자가 들면 구현을 부르기 전에 2', why(runner(phOut, ['--engine', ADAPTER, '--out', freshOut()])), 'lanes/read/t.json 의 1번째 케이스 (x): stdout 은 자리표 없는 글이다. 자리표를 쓰려면 stdoutText 로 적는다');
+
+  const strDirs = makeBundle('strdirs', { 'read/t.json': lane([kase('t/a', ['a'], { code: 0, stdout: '' })]) }, { 'tiny.v1': { ...TINY, dirs: 'notes' } });
+  const o6 = freshOut();
+  const r6 = runner(strDirs, ['--engine', ADAPTER, '--out', o6], { WLX_IMPL_SCRIPT: answer(o6) });
+  check('나무는 format 과 version 만 맞대서 dirs 가 글이어도 돈다', [r6.code, report(o6).warnings], [0, []]);
+
+  const o7 = freshOut();
+  runner(BUNDLE, ['--self-check', '--mutants', '--out', o7]);
+  check('자가 점검 보고서의 engine 칸은 변형 회차에서도 replay', ['replay', 'mutant-byte', 'mutant-token'].map(d => report(path.join(o7, d)).engine), ['replay', 'replay', 'replay']);
+
+  const lonely = makeBundle('lonely', { 'read/t.json': lane([
+    kase('a/json', ['a'], { code: 0, stdoutJson: { x: 1, y: 2 } }),
+    kase('b/lonely', ['b'], { code: 0, stdoutJson: { p: '⟦token:notes/a.md⟧' } }),
+    kase('c/token', ['c'], { code: 0, stdoutJson: { p: '⟦token:bin.dat⟧' } }),
+    kase('d/share', ['d'], { code: 0, stdoutJson: { q: '⟦token:bin.dat⟧' } }),
+    kase('e/text', ['e'], { code: 0, stdoutText: 't\n' }),
+    kase('f/empty', ['f'], { code: 3, stdout: '' })
+  ]) }, { 'tiny.v1': TINY });
+  const r8 = runner(lonely, ['--self-check', '--mutants', '--out', freshOut()]);
+  check('처음 맞는 토큰 1개짜리 JSON 에 짝이 없으면 다음 후보로 안 넘어가고 2', [r8.code, why(r8)], [2, '변형 대상을 못 골랐다: tokenShare']);
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });

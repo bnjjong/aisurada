@@ -25,11 +25,13 @@ export function fileBytes(entry) {
   return Buffer.from(text, 'utf8');
 }
 
-/** 나무 파일의 꼴을 잰다. 실행기는 format과 version만 맞대고 source와 note는 사람이 읽는 칸이다. */
+/**
+ * 나무 파일의 꼴을 잰다. 실행기는 format과 version만 맞대고 source와 note는 사람이 읽는 칸이다.
+ * dirs와 files가 배열인지는 안 잰다. 지금 실행기처럼 받은 값을 차례로 펼치고, 펼칠 자리 밖을 가리키는 경로에서만 선다.
+ */
 export function checkTree(tree, where) {
   if (!tree || typeof tree !== 'object' || Array.isArray(tree)) throw new RunnerError(`${where}: JSON 객체가 아니다`);
   if (tree.format !== 'wlx-tree' || tree.version !== 1) throw new RunnerError(`${where}: format 이 wlx-tree 이고 version 이 1 이어야 한다`);
-  if (!Array.isArray(tree.dirs) || !Array.isArray(tree.files)) throw new RunnerError(`${where}: dirs 와 files 는 배열이어야 한다`);
   for (const d of tree.dirs) checkRelPath(d, where);
   for (const f of tree.files) {
     checkRelPath(f && f.path, where);

@@ -39,13 +39,13 @@ public final class Chapter32Test {
         for (String name : List.of("get-ask", "list-chats", "append-ask-turn", "append-chat-turn")) {
             var r = error(v, 400, name, "one", "two", "three");
             check(stderr(r).contains("자리 인자는 2 개인데 3 개"), "positional maximum " + name);
-            if (name.startsWith("append-")) check(stderr(r).contains("[images=<attach/이름,...>]"), "exact usage ASCII dots " + name);
+            if (name.startsWith("append-")) check(stderr(r).contains("[images=<attach/이름,…>]"), "exact usage ellipsis like manual 32 and A.3 " + name);
             error(v, 400, name, "one", "two", "three", "unknown=x");
         }
         error(v, 400, "read-session", "one", "two"); error(v, 400, "recent-sessions", "one");
         String[] many = new String[150]; Arrays.fill(many, "session"); String[] argv = new String[151]; argv[0] = "session-titles"; System.arraycopy(many, 0, argv, 1, many.length);
         error(v, 409, argv);
-        check(CommandRegistry.USAGE_LINES.stream().filter(s -> s.startsWith("append-ask-turn ") || s.startsWith("append-chat-turn ")).allMatch(s -> s.contains("[images=<attach/이름,...>]")), "registry usage matches chapter 32");
+        check(CommandRegistry.USAGE_LINES.stream().filter(s -> s.startsWith("append-ask-turn ") || s.startsWith("append-chat-turn ")).allMatch(s -> s.contains("[images=<attach/이름,…>]")), "registry usage matches chapter 32");
         Files.delete(v.resolve(".withlog/workspace.json"));
         for (String name : List.of("append-ask-turn", "append-chat-turn")) {
             check(stderr(error(v, 400, name)).contains("워크스페이스"), "workspace before no part4");

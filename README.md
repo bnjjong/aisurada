@@ -182,7 +182,7 @@ java -jar dist/wl-engine.jar verify-shard --withlog.vault=/path/to/vault
 
 ## 33장 설정과 기기 위 파일
 
-엔진 설정의 우선순위와 값 규칙, vault 키와 기기 위 파일 자리를 지원합니다. 이 엔진은 영속 SQLite 색인 대신 vault를 다시 훑습니다. [33장 완료 문서](docs/rebuild-p1-chapter33-complete.md)에 구현과 검증 범위를 기록했습니다.
+엔진 설정의 우선순위와 값 규칙, vault 키와 기기 위 파일 자리를 지원합니다. 이 엔진은 영속 SQLite 색인 대신 vault를 다시 훑습니다. [33장 완료 문서](docs/rebuild-p1-chapter33-complete.md)에 구현과 검증 범위를 기록했습니다. 같은 키를 명령줄에 여러 번 주면 `=`가 있는 칸의 값만 쉼표로 잇습니다(3.1).
 
 ## 34장 받아들임 검사
 
@@ -200,6 +200,8 @@ node fixtures/runner-test.mjs
 - 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 29건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
 
 자세한 것은 [34장 완료 노트](docs/rebuild-p1-chapter34-complete.md)에 있습니다.
+
+34장 판 확인이 짚은 것은 [34장 판 확인 후속](docs/rebuild-p1-chapter34-review-fixes.md)에서 고쳤습니다. 33장 설정의 값 없는 칸을 설명서 3.1대로 되돌렸습니다. `append-ask-turn`, `append-chat-turn` 사용법의 줄임표는 부록 A.3대로 `…`로 바꿨습니다. 실행기는 두 실행기의 계약이 갈린 25가지 가운데 24가지를 지금 실행기와 같게 했습니다.
 
 ## 1~20장 점검에서 찾은 누락 보완
 

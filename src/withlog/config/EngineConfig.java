@@ -84,6 +84,7 @@ public final class EngineConfig {
      * CLI argv에서 설정 칸을 읽어옵니다.
      * 설명서 3.1: 이름이 빈 칸(--=x)이 있으면 엔진 시작 실패 (exit 1).
      * 같은 이름을 여러 번: 모든 값을 argv 차례대로 ,로 이은 글자 1개가 값.
+     * = 없는 칸은 값을 보태지 않고 --이름= 은 빈 값 1개를 보탠다. = 없는 칸뿐이면 빈 글이다.
      */
     public static Map<String, String> parseCliOptions(String[] args) {
         Map<String, CliOptionEntry> map = new LinkedHashMap<>();
@@ -99,12 +100,15 @@ public final class EngineConfig {
                 int eqIdx = arg.indexOf('=');
                 String name;
                 String val;
+                boolean hasEquals;
                 if (eqIdx != -1) {
                     name = arg.substring(2, eqIdx);
                     val = arg.substring(eqIdx + 1);
+                    hasEquals = true;
                 } else {
                     name = arg.substring(2);
                     val = "";
+                    hasEquals = false;
                 }
 
                 if (name.isEmpty()) {
@@ -121,7 +125,7 @@ public final class EngineConfig {
                     entry = new CliOptionEntry();
                     map.put(name, entry);
                 }
-                entry.add(val);
+                entry.add(hasEquals, val);
             }
         }
 
@@ -132,13 +136,15 @@ public final class EngineConfig {
         return result;
     }
 
+    /** 3.1: 그래서 --a --a=x 는 x 이고 --a=x --a= 는 x, 이다. */
     private static class CliOptionEntry {
-        boolean seen = false;
+        boolean hasExplicitValue = false;
         String currentValue = "";
 
-        void add(String val) {
-            currentValue = seen ? currentValue + "," + val : val;
-            seen = true;
+        void add(boolean hasEquals, String val) {
+            if (!hasEquals) return;
+            currentValue = hasExplicitValue ? currentValue + "," + val : val;
+            hasExplicitValue = true;
         }
 
         String getValue() {

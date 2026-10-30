@@ -26,10 +26,16 @@ export function parseTemplate(text, where) {
   return parts;
 }
 
-/** 기대값 전체를 훑어 자리표를 잰다. JSON 값은 문자열 값만 자리표를 품는다. */
+/**
+ * 기대값 전체를 훑어 자리표를 잰다. JSON 값은 문자열 값만 자리표를 품는다.
+ * stdout은 자리표 없이 글자 그대로 맞대는 꼴이라, 자리표 모양 글자가 들면 기대값을 잘못 적은 것으로 보고 선다.
+ */
 export function checkExpectation(expect, where) {
   if ('stdoutJson' in expect) walkStrings(expect.stdoutJson, s => parseTemplate(s, where));
   if ('stdoutText' in expect) parseTemplate(expect.stdoutText, where);
+  if ('stdout' in expect && new RegExp(PLACEHOLDER.source).test(expect.stdout)) {
+    throw new RunnerError(`${where}: stdout 은 자리표 없는 글이다. 자리표를 쓰려면 stdoutText 로 적는다`);
+  }
 }
 
 function walkStrings(value, fn) {
