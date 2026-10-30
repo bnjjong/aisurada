@@ -1,0 +1,100 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 list_docs 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "list_docs/type-research",
+      "part": 1,
+      "argv": [
+        "list_docs",
+        "{\"type\":\"research\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "ndfixture-00000003",
+            "agenda": "serving",
+            "agendaTitle": "서빙",
+            "type": "research",
+            "title": "메타가 다 찬 노트",
+            "created": "2026-06-18T12:30:00+09:00",
+            "date": "2026-06-18",
+            "time": "12:30",
+            "mins": 90,
+            "format": "markdown",
+            "precondition": "⟦token:notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/note.md⟧",
+            "links": [
+              {
+                "to": "ndfixture-00000002",
+                "kind": "direct"
+              }
+            ],
+            "tags": [
+              "랭킹",
+              "실험"
+            ],
+            "favorite": true,
+            "favoriteCategory": "매뉴얼",
+            "template": "m-plan",
+            "evaluation": {
+              "score": 72,
+              "note": "구조는 맞았다.\n다음엔 표를 하나 줄인다.",
+              "at": "2026-06-18T04:00:00.000Z"
+            },
+            "path": "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003"
+          },
+          {
+            "id": "ndfixture-00000007",
+            "agenda": "serving",
+            "agendaTitle": "서빙",
+            "type": "research",
+            "title": "옛 마크다운 노트",
+            "created": "2026-06-22T09:30:00+09:00",
+            "date": "2026-06-22",
+            "time": "09:30",
+            "mins": 5,
+            "format": "markdown",
+            "precondition": "⟦token:notes/serving/2026-06-22-0930-옛-마크다운-노트-0007.md⟧",
+            "links": [],
+            "path": "notes/serving/2026-06-22-0930-옛-마크다운-노트-0007.md"
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_docs/empty-range",
+      "part": 1,
+      "argv": [
+        "list_docs",
+        "{\"dateFrom\":\"2026-07-01\",\"dateTo\":\"2026-06-16\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    },
+    {
+      "id": "list_docs/unknown-agenda",
+      "part": 1,
+      "argv": [
+        "list_docs",
+        "{\"agenda\":\"zzzz-없는-아젠다\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-404"
+      }
+    }
+  ]
+}

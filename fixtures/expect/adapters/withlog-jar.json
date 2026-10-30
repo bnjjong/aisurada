@@ -1,0 +1,21 @@
+{
+  "format": "wlx-adapter",
+  "version": 1,
+  "surface": "engine",
+  "name": "withlog-jar",
+  "note": "지금 엔진(Kotlin 사이드카) jar를 부르는 보기 어댑터(설명서 34.5). WLX_IMPL_JAVA와 WLX_IMPL_JAR로 자리를 준다.",
+  "prefix": [
+    "${WLX_IMPL_JAVA}",
+    "-XX:TieredStopAtLevel=1",
+    "-Xmx512m",
+    "-XX:-UsePerfData",
+    "-Duser.home=${HOME}",
+    "-Djava.io.tmpdir=${TMPDIR}",
+    "-jar",
+    "${WLX_IMPL_JAR}"
+  ],
+  "suffix": [
+    "--withlog.vault=${WITHLOG_VAULT}",
+    "--withlog.db.home=${WLX_STATE_DIR}/db"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 list_attachments 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "list_attachments/ndfixture-00000001",
+      "part": 1,
+      "argv": [
+        "list_attachments",
+        "{\"parent\":\"ndfixture-00000001\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "parent": "ndfixture-00000001",
+          "attachments": [
+            {
+              "name": "diagram.svg",
+              "ref": "![diagram.svg](attach/diagram.svg)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "list_attachments/ndfixture-00000001/snfixture-00000001/snfixture-00000006",
+      "part": 1,
+      "argv": [
+        "list_attachments",
+        "{\"parent\":\"ndfixture-00000001/snfixture-00000001/snfixture-00000006\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    },
+    {
+      "id": "list_attachments/missing",
+      "part": 1,
+      "argv": [
+        "list_attachments",
+        "{\"parent\":\"nd없는노트\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    }
+  ]
+}

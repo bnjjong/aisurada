@@ -1,0 +1,20 @@
+{
+  "format": "wlx-adapter",
+  "version": 1,
+  "surface": "engine",
+  "name": "aisurada",
+  "note": "이 저장소의 Java 엔진(dist/wl-engine.jar)을 부르는 어댑터. 34.5의 9번대로 묶음 폴더 밖에 둔다. 색인이 없는 구현이라 --withlog.db.home 을 안 준다.",
+  "prefix": [
+    "${WLX_IMPL_JAVA}",
+    "-XX:TieredStopAtLevel=1",
+    "-Xmx512m",
+    "-XX:-UsePerfData",
+    "-Duser.home=${HOME}",
+    "-Djava.io.tmpdir=${TMPDIR}",
+    "-jar",
+    "${WLX_IMPL_JAR}"
+  ],
+  "suffix": [
+    "--withlog.vault=${WITHLOG_VAULT}"
+  ]
+}

@@ -182,6 +182,23 @@ java -jar dist/wl-engine.jar verify-shard --withlog.vault=/path/to/vault
 
 엔진 설정의 우선순위와 값 규칙, vault 키와 기기 위 파일 자리를 지원합니다. 이 엔진은 영속 SQLite 색인 대신 vault를 다시 훑습니다. [33장 완료 문서](docs/rebuild-p1-chapter33-complete.md)에 구현과 검증 범위를 기록했습니다.
 
+## 34장 받아들임 검사
+
+설명서 34장의 받아들임 묶음 `fixtures/expect`를 설명서만 보고 다시 지었습니다. 실행기가 케이스마다 엔진을 셸 없이 불러 종료 코드와 stdout 바이트를 맞댑니다. node 20 이상의 내장 모듈만 씁니다.
+
+```bash
+./build.sh
+WLX_IMPL_JAVA="$(command -v java)" WLX_IMPL_JAR="$PWD/dist/wl-engine.jar" \
+  node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out /tmp/wlx-run-1
+node fixtures/expect/run.mjs --self-check --mutants --out /tmp/wlx-self-1
+node fixtures/runner-test.mjs
+```
+
+- 실행기는 34.1의 옵션 문법, 묶음 무결성(sha256), `--out` 겹침(장치와 inode), 거르개, 판정 9가지, `report.json`, 자가 점검과 변형 8가지를 따릅니다. 어댑터 계약은 34.5이고, 이 엔진의 어댑터 `fixtures/aisurada.adapter.json`은 묶음 밖에 둡니다.
+- 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 20건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
+
+자세한 것은 [34장 완료 노트](docs/rebuild-p1-chapter34-complete.md)에 있습니다.
+
 ## 1~20장 점검에서 찾은 누락 보완
 
 `reindex-paths`와 공통 쓰기의 자동 커밋·작성자 기록을 구현했습니다. 경로별 재색인은 명령 표면에서만 받고, 옵션 없이 경로 argv를 그대로 보냅니다.

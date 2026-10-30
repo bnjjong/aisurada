@@ -1,0 +1,81 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 list_sub_notes 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "list_sub_notes/ndfixture-00000001",
+      "part": 1,
+      "argv": [
+        "list_sub_notes",
+        "{\"parent\":\"ndfixture-00000001\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "parent": "ndfixture-00000001",
+          "subNotes": [
+            {
+              "id": "snfixture-00000001",
+              "ref": "ndfixture-00000001/snfixture-00000001",
+              "type": "free",
+              "title": "후속 메모",
+              "created": "2026-06-16T11:00:00+09:00",
+              "date": "2026-06-16",
+              "time": "11:00",
+              "mins": 0,
+              "format": "markdown",
+              "precondition": "⟦token:notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/note.md⟧",
+              "links": [
+                {
+                  "to": "ndfixture-00000002",
+                  "kind": "attach"
+                }
+              ],
+              "tags": [
+                "후속",
+                "랭킹"
+              ],
+              "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "list_sub_notes/ndfixture-00000002",
+      "part": 1,
+      "argv": [
+        "list_sub_notes",
+        "{\"parent\":\"ndfixture-00000002\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "parent": "ndfixture-00000002",
+          "subNotes": []
+        }
+      }
+    },
+    {
+      "id": "list_sub_notes/missing",
+      "part": 1,
+      "argv": [
+        "list_sub_notes",
+        "{\"parent\":\"nd없는노트\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    }
+  ]
+}

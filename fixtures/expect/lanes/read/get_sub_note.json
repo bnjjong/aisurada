@@ -1,0 +1,64 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 get_sub_note 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "get_sub_note/ndfixture-00000001/snfixture-00000001/snfixture-00000006",
+      "part": 1,
+      "argv": [
+        "get_sub_note",
+        "{\"parent\":\"ndfixture-00000001/snfixture-00000001\",\"id\":\"snfixture-00000006\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "id": "snfixture-00000006",
+          "parent": "ndfixture-00000001/snfixture-00000001",
+          "type": "free",
+          "title": "손자 메모",
+          "created": "2026-06-16T12:00:00+09:00",
+          "date": "2026-06-16",
+          "time": "12:00",
+          "mins": 0,
+          "format": "markdown",
+          "precondition": "⟦token:notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub/2026-06-16-1200-손자-메모-0006/note.md⟧",
+          "comments": {
+            "state": "loaded",
+            "comments": [
+              {
+                "id": "cmfixture-0000000e",
+                "createdAt": "2026-06-16T12:30:00.000Z",
+                "body": "손자 메모에 단 코멘트"
+              }
+            ]
+          },
+          "body": "손자 노트 본문이다.\n",
+          "links": [],
+          "tags": [],
+          "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub/2026-06-16-1200-손자-메모-0006"
+        }
+      }
+    },
+    {
+      "id": "get_sub_note/missing-child",
+      "part": 1,
+      "argv": [
+        "get_sub_note",
+        "{\"parent\":\"ndfixture-00000001\",\"id\":\"nd없는하위\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    }
+  ]
+}

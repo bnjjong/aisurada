@@ -1,0 +1,81 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 list_templates 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "list_templates/all",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "m-plan",
+            "category": "doc",
+            "name": "기본 플래닝 템플릿 (markdown)",
+            "type": "plan",
+            "format": "markdown",
+            "desc": "설계 전에 씁니다",
+            "builtin": true
+          },
+          {
+            "id": "t-legacy",
+            "category": "doc",
+            "name": "옛 HTML 템플릿",
+            "type": "report",
+            "format": "html",
+            "desc": "아직 HTML 인 템플릿입니다",
+            "builtin": true
+          },
+          {
+            "id": "tpl-halfmoved",
+            "category": "doc",
+            "name": "옮기다 만 템플릿",
+            "type": "build",
+            "format": "html",
+            "desc": "옛 본문입니다",
+            "builtin": false
+          },
+          {
+            "id": "tpl-halfmoved",
+            "category": "doc",
+            "name": "옮기다 만 템플릿",
+            "type": "build",
+            "format": "markdown",
+            "desc": "새 본문입니다",
+            "builtin": false
+          },
+          {
+            "id": "tpl-seeded",
+            "category": "doc",
+            "name": "내가 만든 템플릿",
+            "type": "research",
+            "format": "markdown",
+            "desc": "조사할 때 씁니다",
+            "builtin": false
+          },
+          {
+            "id": "t-morning",
+            "category": "ritual",
+            "name": "기본 모닝 데일리 템플릿",
+            "rev": "morning",
+            "icon": "sunrise",
+            "format": "markdown",
+            "desc": "아침에 씁니다"
+          }
+        ]
+      }
+    }
+  ]
+}

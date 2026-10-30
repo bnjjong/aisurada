@@ -1,0 +1,27 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 get_report 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "get_report/missing",
+      "part": 1,
+      "argv": [
+        "get_report",
+        "{\"id\":\"rv-evening-1999-01-01\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-404"
+      }
+    }
+  ]
+}

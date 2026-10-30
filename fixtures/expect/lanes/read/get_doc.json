@@ -1,0 +1,107 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 get_doc 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "get_doc/ndfixture-00000004",
+      "part": 1,
+      "argv": [
+        "get_doc",
+        "{\"id\":\"ndfixture-00000004\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "id": "ndfixture-00000004",
+          "agenda": "serving",
+          "agendaTitle": "서빙",
+          "type": "report",
+          "title": "옛 HTML 노트",
+          "created": "2026-06-19T09:05:00+09:00",
+          "date": "2026-06-19",
+          "time": "09:05",
+          "mins": 15,
+          "format": "html",
+          "precondition": "⟦token:notes/serving/2026-06-19-0905-옛-html-노트-0004.html⟧",
+          "comments": {
+            "state": "absent"
+          },
+          "body": "<h1>옛 HTML 노트</h1>\n",
+          "links": [],
+          "tags": [],
+          "path": "notes/serving/2026-06-19-0905-옛-html-노트-0004.html",
+          "deepLink": "withlog://doc/ndfixture-00000004?ws=⟦vault-uri⟧"
+        }
+      }
+    },
+    {
+      "id": "get_doc/ndfixture-00000003",
+      "part": 1,
+      "argv": [
+        "get_doc",
+        "{\"id\":\"ndfixture-00000003\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "id": "ndfixture-00000003",
+          "agenda": "serving",
+          "agendaTitle": "서빙",
+          "type": "research",
+          "title": "메타가 다 찬 노트",
+          "created": "2026-06-18T12:30:00+09:00",
+          "date": "2026-06-18",
+          "time": "12:30",
+          "mins": 90,
+          "format": "markdown",
+          "precondition": "⟦token:notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/note.md⟧",
+          "comments": {
+            "state": "absent"
+          },
+          "body": "# 메타가 다 찬 노트\n\n선택 키가 전부 들어 있다.\n",
+          "links": [
+            {
+              "to": "ndfixture-00000002",
+              "kind": "direct"
+            }
+          ],
+          "tags": [
+            "랭킹",
+            "실험"
+          ],
+          "favorite": true,
+          "favoriteCategory": "매뉴얼",
+          "template": "m-plan",
+          "evaluation": {
+            "score": 72,
+            "note": "구조는 맞았다.\n다음엔 표를 하나 줄인다.",
+            "at": "2026-06-18T04:00:00.000Z"
+          },
+          "path": "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003",
+          "deepLink": "withlog://doc/ndfixture-00000003?ws=⟦vault-uri⟧"
+        }
+      }
+    },
+    {
+      "id": "get_doc/missing",
+      "part": 1,
+      "argv": [
+        "get_doc",
+        "{\"id\":\"nd없는노트\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    }
+  ]
+}

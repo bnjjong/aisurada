@@ -1,0 +1,2333 @@
+{
+  "format": "wlx-tree",
+  "version": 1,
+  "source": "withlog-p1-rebuild/selftest/vault",
+  "note": "다시 짜기 개발 폴더의 픽스처 vault. 설명서 34.1의 fixture.v1(파일 149개, 폴더 149개)이 이 기기에 없어서 대신 담았다.",
+  "dirs": [
+    ".withlog",
+    ".withlog/agendas",
+    ".withlog/reports",
+    ".withlog/templates",
+    ".withlog/templates/doc",
+    ".withlog/templates/ritual",
+    ".withlog/trash",
+    ".withlog/trash/files",
+    ".withlog/trash/files/trfixture-00000001",
+    ".withlog/trash/files/trfixture-00000002",
+    ".withlog/trash/files/trfixture-00000003",
+    "notes",
+    "notes/bulk",
+    "notes/bulk/2026-07-01-0900-대량-노트-1-0101",
+    "notes/bulk/2026-07-01-0901-대량-노트-2-0102",
+    "notes/bulk/2026-07-01-0902-대량-노트-3-0103",
+    "notes/bulk/2026-07-01-0903-대량-노트-4-0104",
+    "notes/bulk/2026-07-01-0904-대량-노트-5-0105",
+    "notes/bulk/2026-07-01-0905-대량-노트-6-0106",
+    "notes/bulk/2026-07-01-0906-대량-노트-7-0107",
+    "notes/bulk/2026-07-01-0907-대량-노트-8-0108",
+    "notes/bulk/2026-07-01-0908-대량-노트-9-0109",
+    "notes/bulk/2026-07-01-0909-대량-노트-10-0110",
+    "notes/bulk/2026-07-01-0910-대량-노트-11-0111",
+    "notes/bulk/2026-07-01-0911-대량-노트-12-0112",
+    "notes/bulk/2026-07-01-0912-대량-노트-13-0113",
+    "notes/bulk/2026-07-01-0913-대량-노트-14-0114",
+    "notes/bulk/2026-07-01-0914-대량-노트-15-0115",
+    "notes/bulk/2026-07-01-0915-대량-노트-16-0116",
+    "notes/bulk/2026-07-01-0916-대량-노트-17-0117",
+    "notes/bulk/2026-07-01-0917-대량-노트-18-0118",
+    "notes/bulk/2026-07-01-0918-대량-노트-19-0119",
+    "notes/bulk/2026-07-01-0919-대량-노트-20-0120",
+    "notes/bulk/2026-07-01-0920-대량-노트-21-0121",
+    "notes/bulk/2026-07-01-0921-대량-노트-22-0122",
+    "notes/bulk/2026-07-01-0922-대량-노트-23-0123",
+    "notes/bulk/2026-07-01-0923-대량-노트-24-0124",
+    "notes/bulk/2026-07-01-0924-대량-노트-25-0125",
+    "notes/bulk/2026-07-01-0925-대량-노트-26-0126",
+    "notes/bulk/2026-07-01-0926-대량-노트-27-0127",
+    "notes/bulk/2026-07-01-0927-대량-노트-28-0128",
+    "notes/bulk/2026-07-01-0928-대량-노트-29-0129",
+    "notes/bulk/2026-07-01-0929-대량-노트-30-0130",
+    "notes/bulk/2026-07-01-0930-대량-노트-31-0131",
+    "notes/bulk/2026-07-01-0931-대량-노트-32-0132",
+    "notes/bulk/2026-07-01-0932-대량-노트-33-0133",
+    "notes/bulk/2026-07-01-0933-대량-노트-34-0134",
+    "notes/bulk/2026-07-01-0934-대량-노트-35-0135",
+    "notes/bulk/2026-07-01-0935-대량-노트-36-0136",
+    "notes/bulk/2026-07-01-0936-대량-노트-37-0137",
+    "notes/bulk/2026-07-01-0937-대량-노트-38-0138",
+    "notes/bulk/2026-07-01-0938-대량-노트-39-0139",
+    "notes/bulk/2026-07-01-0939-대량-노트-40-0140",
+    "notes/bulk/2026-07-01-0940-대량-노트-41-0141",
+    "notes/bulk/2026-07-01-0941-대량-노트-42-0142",
+    "notes/bulk/2026-07-01-0942-대량-노트-43-0143",
+    "notes/bulk/2026-07-01-0943-대량-노트-44-0144",
+    "notes/bulk/2026-07-01-0944-대량-노트-45-0145",
+    "notes/bulk/2026-07-01-0945-대량-노트-46-0146",
+    "notes/bulk/2026-07-01-0946-대량-노트-47-0147",
+    "notes/bulk/2026-07-01-0947-대량-노트-48-0148",
+    "notes/bulk/2026-07-01-0948-대량-노트-49-0149",
+    "notes/bulk/2026-07-01-0949-대량-노트-50-0150",
+    "notes/bulk/2026-07-01-0950-대량-노트-51-0151",
+    "notes/bulk/2026-07-01-0951-대량-노트-52-0152",
+    "notes/bulk/2026-07-01-0952-대량-노트-53-0153",
+    "notes/bulk/2026-07-01-0953-대량-노트-54-0154",
+    "notes/bulk/2026-07-01-0954-대량-노트-55-0155",
+    "notes/bulk/2026-07-01-0955-대량-노트-56-0156",
+    "notes/bulk/2026-07-01-0956-대량-노트-57-0157",
+    "notes/bulk/2026-07-01-0957-대량-노트-58-0158",
+    "notes/bulk/2026-07-01-0958-대량-노트-59-0159",
+    "notes/bulk/2026-07-01-0959-대량-노트-60-0160",
+    "notes/bulk/2026-07-01-1000-대량-노트-61-0161",
+    "notes/bulk/2026-07-01-1001-대량-노트-62-0162",
+    "notes/bulk/2026-07-01-1002-대량-노트-63-0163",
+    "notes/bulk/2026-07-01-1003-대량-노트-64-0164",
+    "notes/bulk/2026-07-01-1004-대량-노트-65-0165",
+    "notes/bulk/2026-07-01-1005-대량-노트-66-0166",
+    "notes/bulk/2026-07-01-1006-대량-노트-67-0167",
+    "notes/bulk/2026-07-01-1007-대량-노트-68-0168",
+    "notes/bulk/2026-07-01-1008-대량-노트-69-0169",
+    "notes/bulk/2026-07-01-1009-대량-노트-70-0170",
+    "notes/bulk/2026-07-01-1010-대량-노트-71-0171",
+    "notes/bulk/2026-07-01-1011-대량-노트-72-0172",
+    "notes/bulk/2026-07-01-1012-대량-노트-73-0173",
+    "notes/bulk/2026-07-01-1013-대량-노트-74-0174",
+    "notes/bulk/2026-07-01-1014-대량-노트-75-0175",
+    "notes/bulk/2026-07-01-1015-대량-노트-76-0176",
+    "notes/bulk/2026-07-01-1016-대량-노트-77-0177",
+    "notes/bulk/2026-07-01-1017-대량-노트-78-0178",
+    "notes/bulk/2026-07-01-1018-대량-노트-79-0179",
+    "notes/bulk/2026-07-01-1019-대량-노트-80-0180",
+    "notes/bulk/2026-07-01-1020-대량-노트-81-0181",
+    "notes/bulk/2026-07-01-1021-대량-노트-82-0182",
+    "notes/bulk/2026-07-01-1022-대량-노트-83-0183",
+    "notes/bulk/2026-07-01-1023-대량-노트-84-0184",
+    "notes/bulk/2026-07-01-1024-대량-노트-85-0185",
+    "notes/bulk/2026-07-01-1025-대량-노트-86-0186",
+    "notes/bulk/2026-07-01-1026-대량-노트-87-0187",
+    "notes/bulk/2026-07-01-1027-대량-노트-88-0188",
+    "notes/bulk/2026-07-01-1028-대량-노트-89-0189",
+    "notes/bulk/2026-07-01-1029-대량-노트-90-0190",
+    "notes/bulk/2026-07-01-1030-대량-노트-91-0191",
+    "notes/bulk/2026-07-01-1031-대량-노트-92-0192",
+    "notes/bulk/2026-07-01-1032-대량-노트-93-0193",
+    "notes/bulk/2026-07-01-1033-대량-노트-94-0194",
+    "notes/bulk/2026-07-01-1034-대량-노트-95-0195",
+    "notes/bulk/2026-07-01-1035-대량-노트-96-0196",
+    "notes/bulk/2026-07-01-1036-대량-노트-97-0197",
+    "notes/bulk/2026-07-01-1037-대량-노트-98-0198",
+    "notes/bulk/2026-07-01-1038-대량-노트-99-0199",
+    "notes/bulk/2026-07-01-1039-대량-노트-100-0200",
+    "notes/bulk/2026-07-01-1040-대량-노트-101-0201",
+    "notes/serving",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/attach",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/attach",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub/2026-06-16-1200-손자-메모-0006",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub/2026-06-16-1200-손자-메모-0006/attach",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub-comments",
+    "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub-comments",
+    "notes/serving/2026-06-17-1100-연결-대상-노트-0002",
+    "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003",
+    "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/sub",
+    "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/sub/2026-06-18-1530-json하위-0002",
+    "notes/serving/2026-06-20-1000-폴더-노트-0005",
+    "notes/serving/2026-06-21-0800-hand-renamed",
+    "notes/serving/2026-06-21-0800-hand-renamed/sub",
+    "notes/serving/2026-06-21-0800-hand-renamed/sub/2026-06-21-0900-하위-메모-0003",
+    "notes/serving/2026-06-23-1000-폴더-노트-0008",
+    "notes/serving/2026-06-24-0900-프론트매터-없는-노트-0021",
+    "notes/serving/2026-06-24-0910-id-없는-노트-0022",
+    "notes/serving/2026-06-24-0920-created-깨진-노트-0023",
+    "notes/serving/2026-06-24-0930-중복-id-노트-가-0024",
+    "notes/serving/2026-06-24-0940-중복-id-노트-나-0024",
+    "notes/serving/2026-06-25-0910-충돌된 사본 폴더-0026"
+  ],
+  "files": [
+    {
+      "path": ".withlog/agendas/bulk.md",
+      "lines": [
+        "---",
+        "id: agfixture-0000000b",
+        "slug: bulk",
+        "title: 대량",
+        "hue: amber",
+        "---",
+        "대량 테스트용 아젠다다."
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/agendas/kotlin-ref.md",
+      "lines": [
+        "---",
+        "id: agfixture-0000000c",
+        "slug: kotlin-ref",
+        "title: 코틀린 참조",
+        "hue: green",
+        "---",
+        "코틀린 참조 노트들."
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/agendas/serving.md",
+      "lines": [
+        "---",
+        "id: agfixture-0000000a",
+        "slug: serving",
+        "title: 서빙",
+        "hue: blue",
+        "status: active",
+        "---",
+        "서빙 관련 노트를 모은다."
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/reports/rv-evening-2026-06-04.json",
+      "lines": [
+        "{",
+        "  \"body\": \"픽스처에 미리 있는 저녁 회고.\"",
+        "}"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/templates/doc/m-plan.md",
+      "lines": [
+        "---",
+        "id: m-plan",
+        "name: 기본 플래닝 템플릿 (markdown)",
+        "type: plan",
+        "desc: 설계 전에 씁니다",
+        "builtin: true",
+        "---",
+        "# 계획"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/templates/doc/t-legacy.html",
+      "lines": [
+        "---",
+        "id: t-legacy",
+        "name: 옛 HTML 템플릿",
+        "type: report",
+        "desc: 아직 HTML 인 템플릿입니다",
+        "builtin: true",
+        "---",
+        "<h1>[제목] 완료 보고</h1>"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/templates/doc/tpl-halfmoved.html",
+      "lines": [
+        "---",
+        "id: tpl-halfmoved",
+        "name: 옮기다 만 템플릿",
+        "type: build",
+        "desc: 옛 본문입니다",
+        "builtin: false",
+        "---",
+        "<h1>옛 본문</h1>"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/templates/doc/tpl-halfmoved.md",
+      "lines": [
+        "---",
+        "id: tpl-halfmoved",
+        "name: 옮기다 만 템플릿",
+        "type: build",
+        "desc: 새 본문입니다",
+        "builtin: false",
+        "---",
+        "새 본문"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/templates/doc/tpl-seeded.md",
+      "lines": [
+        "---",
+        "id: tpl-seeded",
+        "name: 내가 만든 템플릿",
+        "type: research",
+        "desc: 조사할 때 씁니다",
+        "builtin: false",
+        "---",
+        "조사 템플릿"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/templates/ritual/morning.md",
+      "lines": [
+        "---",
+        "id: t-morning",
+        "rev: morning",
+        "name: 기본 모닝 데일리 템플릿",
+        "icon: sunrise",
+        "format: markdown",
+        "desc: 아침에 씁니다",
+        "---",
+        "# 모닝 리포트 — [날짜]"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/trash/files/trfixture-00000001/note.md",
+      "lines": [
+        "# 버린 노트 1"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/trash/files/trfixture-00000002/note.md",
+      "lines": [
+        "# 버린 노트 2"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/trash/files/trfixture-00000003/note.md",
+      "lines": [
+        "# 버린 노트 3"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/trash/files/trfixture-00000005.md",
+      "lines": [
+        "# 버린 단일 파일 5"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/trash/files/trfixture-00000006.html",
+      "lines": [
+        "<h1>버린 HTML 6</h1>"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/trash/trash.json",
+      "lines": [
+        "[",
+        "  {",
+        "    \"trashId\": \"trfixture-00000001\",",
+        "    \"file\": \"trfixture-00000001\",",
+        "    \"originalPath\": \"notes/serving/2026-06-23-1000-버린-폴더-노트-0011\",",
+        "    \"docId\": \"ndfixture-00000011\",",
+        "    \"agendaId\": \"agfixture-0000000a\",",
+        "    \"agendaSlug\": \"serving\",",
+        "    \"title\": \"버린 폴더 노트\",",
+        "    \"type\": \"build\",",
+        "    \"format\": \"markdown\",",
+        "    \"created\": \"2026-06-23T10:00:00+09:00\",",
+        "    \"trashedAt\": \"2026-06-23T02:00:00.000Z\"",
+        "  },",
+        "  {",
+        "    \"trashId\": \"trfixture-00000002\",",
+        "    \"file\": \"trfixture-00000002\",",
+        "    \"originalPath\": \"notes/serving/2026-06-24-1000-버린-폴더-노트-0012\",",
+        "    \"docId\": \"ndfixture-00000012\",",
+        "    \"agendaId\": \"agfixture-0000000a\",",
+        "    \"agendaSlug\": \"serving\",",
+        "    \"title\": \"버린 폴더 노트 2\",",
+        "    \"type\": \"build\",",
+        "    \"format\": \"markdown\",",
+        "    \"created\": \"2026-06-24T10:00:00+09:00\",",
+        "    \"trashedAt\": \"2026-06-24T02:00:00.000Z\"",
+        "  },",
+        "  {",
+        "    \"trashId\": \"trfixture-00000003\",",
+        "    \"file\": \"trfixture-00000003\",",
+        "    \"originalPath\": \"notes/serving/2026-06-16-1000-픽스처-노트-0001\",",
+        "    \"docId\": \"ndfixture-00000013\",",
+        "    \"agendaId\": \"agfixture-0000000a\",",
+        "    \"agendaSlug\": \"serving\",",
+        "    \"title\": \"겹치는 자리의 노트\",",
+        "    \"type\": \"build\",",
+        "    \"format\": \"markdown\",",
+        "    \"created\": \"2026-06-25T10:00:00+09:00\",",
+        "    \"trashedAt\": \"2026-06-25T02:00:00.000Z\"",
+        "  },",
+        "  {",
+        "    \"trashId\": \"trfixture-00000004\",",
+        "    \"file\": \"trfixture-00000004\",",
+        "    \"originalPath\": \"notes/serving/2026-06-26-1000-보관물없는노트-0014\",",
+        "    \"docId\": \"ndfixture-00000014\",",
+        "    \"agendaId\": \"agfixture-0000000a\",",
+        "    \"agendaSlug\": \"serving\",",
+        "    \"title\": \"보관물 없는 노트\",",
+        "    \"type\": \"build\",",
+        "    \"format\": \"markdown\",",
+        "    \"created\": \"2026-06-26T10:00:00+09:00\",",
+        "    \"trashedAt\": \"2026-06-26T02:00:00.000Z\"",
+        "  },",
+        "  {",
+        "    \"trashId\": \"trfixture-00000005\",",
+        "    \"file\": \"trfixture-00000005.md\",",
+        "    \"originalPath\": \"notes/gone-agenda/2026-06-27-0930-옛-단일-파일-0015.md\",",
+        "    \"docId\": \"ndfixture-00000015\",",
+        "    \"agendaId\": \"agfixture-0000000b\",",
+        "    \"agendaSlug\": \"gone-agenda\",",
+        "    \"title\": \"옛 단일 파일\",",
+        "    \"type\": \"research\",",
+        "    \"format\": \"markdown\",",
+        "    \"created\": \"2026-06-27T09:30:00+09:00\",",
+        "    \"trashedAt\": \"2026-06-27T02:00:00.000Z\"",
+        "  },",
+        "  {",
+        "    \"trashId\": \"trfixture-00000006\",",
+        "    \"file\": \"trfixture-00000006.html\",",
+        "    \"originalPath\": \"notes/serving/2026-06-28-1400-옛-html-보관물-0016.html\",",
+        "    \"docId\": \"ndfixture-00000016\",",
+        "    \"agendaId\": \"agfixture-0000000a\",",
+        "    \"agendaSlug\": \"serving\",",
+        "    \"title\": \"옛 html 보관물\",",
+        "    \"type\": \"report\",",
+        "    \"format\": \"html\",",
+        "    \"created\": \"2026-06-28T14:00:00+09:00\",",
+        "    \"trashedAt\": \"2026-06-28T02:00:00.000Z\"",
+        "  }",
+        "]"
+      ],
+      "eol": true
+    },
+    {
+      "path": ".withlog/workspace.json",
+      "lines": [
+        "{",
+        "  \"schemaVersion\": 1,",
+        "  \"name\": \"write-fixture\",",
+        "  \"createdAt\": \"2026-06-16T04:07:50.704Z\"",
+        "}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0900-대량-노트-1-0101/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000101",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 1",
+        "created: '2026-07-01T09:00:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 1"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0901-대량-노트-2-0102/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000102",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 2",
+        "created: '2026-07-01T09:01:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 2"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0902-대량-노트-3-0103/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000103",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 3",
+        "created: '2026-07-01T09:02:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 3"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0903-대량-노트-4-0104/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000104",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 4",
+        "created: '2026-07-01T09:03:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 4"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0904-대량-노트-5-0105/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000105",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 5",
+        "created: '2026-07-01T09:04:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 5"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0905-대량-노트-6-0106/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000106",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 6",
+        "created: '2026-07-01T09:05:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 6"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0906-대량-노트-7-0107/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000107",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 7",
+        "created: '2026-07-01T09:06:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 7"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0907-대량-노트-8-0108/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000108",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 8",
+        "created: '2026-07-01T09:07:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 8"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0908-대량-노트-9-0109/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000109",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 9",
+        "created: '2026-07-01T09:08:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 9"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0909-대량-노트-10-0110/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000110",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 10",
+        "created: '2026-07-01T09:09:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 10"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0910-대량-노트-11-0111/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000111",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 11",
+        "created: '2026-07-01T09:10:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 11"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0911-대량-노트-12-0112/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000112",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 12",
+        "created: '2026-07-01T09:11:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 12"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0912-대량-노트-13-0113/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000113",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 13",
+        "created: '2026-07-01T09:12:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 13"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0913-대량-노트-14-0114/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000114",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 14",
+        "created: '2026-07-01T09:13:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 14"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0914-대량-노트-15-0115/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000115",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 15",
+        "created: '2026-07-01T09:14:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 15"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0915-대량-노트-16-0116/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000116",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 16",
+        "created: '2026-07-01T09:15:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 16"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0916-대량-노트-17-0117/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000117",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 17",
+        "created: '2026-07-01T09:16:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 17"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0917-대량-노트-18-0118/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000118",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 18",
+        "created: '2026-07-01T09:17:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 18"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0918-대량-노트-19-0119/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000119",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 19",
+        "created: '2026-07-01T09:18:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 19"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0919-대량-노트-20-0120/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000120",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 20",
+        "created: '2026-07-01T09:19:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 20"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0920-대량-노트-21-0121/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000121",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 21",
+        "created: '2026-07-01T09:20:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 21"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0921-대량-노트-22-0122/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000122",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 22",
+        "created: '2026-07-01T09:21:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 22"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0922-대량-노트-23-0123/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000123",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 23",
+        "created: '2026-07-01T09:22:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 23"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0923-대량-노트-24-0124/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000124",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 24",
+        "created: '2026-07-01T09:23:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 24"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0924-대량-노트-25-0125/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000125",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 25",
+        "created: '2026-07-01T09:24:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 25"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0925-대량-노트-26-0126/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000126",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 26",
+        "created: '2026-07-01T09:25:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 26"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0926-대량-노트-27-0127/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000127",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 27",
+        "created: '2026-07-01T09:26:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 27"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0927-대량-노트-28-0128/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000128",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 28",
+        "created: '2026-07-01T09:27:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 28"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0928-대량-노트-29-0129/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000129",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 29",
+        "created: '2026-07-01T09:28:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 29"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0929-대량-노트-30-0130/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000130",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 30",
+        "created: '2026-07-01T09:29:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 30"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0930-대량-노트-31-0131/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000131",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 31",
+        "created: '2026-07-01T09:30:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 31"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0931-대량-노트-32-0132/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000132",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 32",
+        "created: '2026-07-01T09:31:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 32"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0932-대량-노트-33-0133/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000133",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 33",
+        "created: '2026-07-01T09:32:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 33"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0933-대량-노트-34-0134/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000134",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 34",
+        "created: '2026-07-01T09:33:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 34"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0934-대량-노트-35-0135/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000135",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 35",
+        "created: '2026-07-01T09:34:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 35"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0935-대량-노트-36-0136/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000136",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 36",
+        "created: '2026-07-01T09:35:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 36"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0936-대량-노트-37-0137/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000137",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 37",
+        "created: '2026-07-01T09:36:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 37"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0937-대량-노트-38-0138/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000138",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 38",
+        "created: '2026-07-01T09:37:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 38"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0938-대량-노트-39-0139/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000139",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 39",
+        "created: '2026-07-01T09:38:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 39"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0939-대량-노트-40-0140/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000140",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 40",
+        "created: '2026-07-01T09:39:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 40"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0940-대량-노트-41-0141/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000141",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 41",
+        "created: '2026-07-01T09:40:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 41"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0941-대량-노트-42-0142/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000142",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 42",
+        "created: '2026-07-01T09:41:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 42"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0942-대량-노트-43-0143/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000143",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 43",
+        "created: '2026-07-01T09:42:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 43"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0943-대량-노트-44-0144/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000144",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 44",
+        "created: '2026-07-01T09:43:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 44"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0944-대량-노트-45-0145/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000145",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 45",
+        "created: '2026-07-01T09:44:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 45"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0945-대량-노트-46-0146/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000146",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 46",
+        "created: '2026-07-01T09:45:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 46"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0946-대량-노트-47-0147/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000147",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 47",
+        "created: '2026-07-01T09:46:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 47"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0947-대량-노트-48-0148/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000148",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 48",
+        "created: '2026-07-01T09:47:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 48"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0948-대량-노트-49-0149/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000149",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 49",
+        "created: '2026-07-01T09:48:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 49"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0949-대량-노트-50-0150/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000150",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 50",
+        "created: '2026-07-01T09:49:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 50"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0950-대량-노트-51-0151/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000151",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 51",
+        "created: '2026-07-01T09:50:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 51"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0951-대량-노트-52-0152/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000152",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 52",
+        "created: '2026-07-01T09:51:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 52"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0952-대량-노트-53-0153/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000153",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 53",
+        "created: '2026-07-01T09:52:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 53"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0953-대량-노트-54-0154/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000154",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 54",
+        "created: '2026-07-01T09:53:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 54"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0954-대량-노트-55-0155/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000155",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 55",
+        "created: '2026-07-01T09:54:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 55"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0955-대량-노트-56-0156/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000156",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 56",
+        "created: '2026-07-01T09:55:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 56"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0956-대량-노트-57-0157/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000157",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 57",
+        "created: '2026-07-01T09:56:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 57"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0957-대량-노트-58-0158/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000158",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 58",
+        "created: '2026-07-01T09:57:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 58"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0958-대량-노트-59-0159/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000159",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 59",
+        "created: '2026-07-01T09:58:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 59"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-0959-대량-노트-60-0160/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000160",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 60",
+        "created: '2026-07-01T09:59:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 60"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1000-대량-노트-61-0161/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000161",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 61",
+        "created: '2026-07-01T10:00:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 61"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1001-대량-노트-62-0162/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000162",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 62",
+        "created: '2026-07-01T10:01:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 62"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1002-대량-노트-63-0163/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000163",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 63",
+        "created: '2026-07-01T10:02:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 63"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1003-대량-노트-64-0164/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000164",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 64",
+        "created: '2026-07-01T10:03:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 64"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1004-대량-노트-65-0165/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000165",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 65",
+        "created: '2026-07-01T10:04:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 65"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1005-대량-노트-66-0166/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000166",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 66",
+        "created: '2026-07-01T10:05:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 66"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1006-대량-노트-67-0167/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000167",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 67",
+        "created: '2026-07-01T10:06:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 67"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1007-대량-노트-68-0168/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000168",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 68",
+        "created: '2026-07-01T10:07:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 68"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1008-대량-노트-69-0169/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000169",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 69",
+        "created: '2026-07-01T10:08:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 69"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1009-대량-노트-70-0170/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000170",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 70",
+        "created: '2026-07-01T10:09:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 70"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1010-대량-노트-71-0171/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000171",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 71",
+        "created: '2026-07-01T10:10:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 71"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1011-대량-노트-72-0172/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000172",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 72",
+        "created: '2026-07-01T10:11:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 72"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1012-대량-노트-73-0173/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000173",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 73",
+        "created: '2026-07-01T10:12:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 73"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1013-대량-노트-74-0174/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000174",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 74",
+        "created: '2026-07-01T10:13:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 74"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1014-대량-노트-75-0175/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000175",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 75",
+        "created: '2026-07-01T10:14:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 75"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1015-대량-노트-76-0176/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000176",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 76",
+        "created: '2026-07-01T10:15:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 76"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1016-대량-노트-77-0177/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000177",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 77",
+        "created: '2026-07-01T10:16:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 77"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1017-대량-노트-78-0178/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000178",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 78",
+        "created: '2026-07-01T10:17:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 78"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1018-대량-노트-79-0179/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000179",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 79",
+        "created: '2026-07-01T10:18:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 79"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1019-대량-노트-80-0180/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000180",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 80",
+        "created: '2026-07-01T10:19:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 80"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1020-대량-노트-81-0181/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000181",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 81",
+        "created: '2026-07-01T10:20:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 81"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1021-대량-노트-82-0182/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000182",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 82",
+        "created: '2026-07-01T10:21:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 82"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1022-대량-노트-83-0183/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000183",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 83",
+        "created: '2026-07-01T10:22:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 83"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1023-대량-노트-84-0184/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000184",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 84",
+        "created: '2026-07-01T10:23:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 84"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1024-대량-노트-85-0185/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000185",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 85",
+        "created: '2026-07-01T10:24:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 85"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1025-대량-노트-86-0186/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000186",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 86",
+        "created: '2026-07-01T10:25:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 86"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1026-대량-노트-87-0187/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000187",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 87",
+        "created: '2026-07-01T10:26:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 87"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1027-대량-노트-88-0188/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000188",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 88",
+        "created: '2026-07-01T10:27:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 88"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1028-대량-노트-89-0189/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000189",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 89",
+        "created: '2026-07-01T10:28:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 89"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1029-대량-노트-90-0190/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000190",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 90",
+        "created: '2026-07-01T10:29:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 90"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1030-대량-노트-91-0191/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000191",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 91",
+        "created: '2026-07-01T10:30:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 91"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1031-대량-노트-92-0192/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000192",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 92",
+        "created: '2026-07-01T10:31:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 92"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1032-대량-노트-93-0193/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000193",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 93",
+        "created: '2026-07-01T10:32:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 93"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1033-대량-노트-94-0194/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000194",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 94",
+        "created: '2026-07-01T10:33:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 94"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1034-대량-노트-95-0195/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000195",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 95",
+        "created: '2026-07-01T10:34:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 95"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1035-대량-노트-96-0196/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000196",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 96",
+        "created: '2026-07-01T10:35:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 96"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1036-대량-노트-97-0197/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000197",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 97",
+        "created: '2026-07-01T10:36:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 97"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1037-대량-노트-98-0198/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000198",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 98",
+        "created: '2026-07-01T10:37:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 98"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1038-대량-노트-99-0199/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000199",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 99",
+        "created: '2026-07-01T10:38:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 99"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1039-대량-노트-100-0200/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000200",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 100",
+        "created: '2026-07-01T10:39:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 100"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/bulk/2026-07-01-1040-대량-노트-101-0201/note.md",
+      "lines": [
+        "---",
+        "id: ndbulk-00000201",
+        "agenda: bulk",
+        "type: build",
+        "title: 대량 노트 101",
+        "created: '2026-07-01T10:40:00+09:00'",
+        "mins: 0",
+        "---",
+        "# 대량 노트 101"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/attach/diagram.svg",
+      "lines": [
+        "<svg></svg>"
+      ],
+      "eol": false
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/comments.json",
+      "lines": [
+        "{",
+        "  \"v\": 1,",
+        "  \"comments\": [",
+        "    {",
+        "      \"id\": \"cmfixture-0000000a\",",
+        "      \"createdAt\": \"2026-06-16T10:30:00.000Z\",",
+        "      \"body\": \"코멘트 한 줄\"",
+        "    },",
+        "    {",
+        "      \"id\": \"cmfixture-0000000b\",",
+        "      \"createdAt\": \"2026-06-16T10:31:00.000Z\",",
+        "      \"editedAt\": \"2026-06-16T10:35:00.000Z\",",
+        "      \"body\": \"고친 적 있는 코멘트\"",
+        "    },",
+        "    {",
+        "      \"id\": \"cmfixture-0000000c\",",
+        "      \"createdAt\": \"2026-06-16T10:32:00.000Z\",",
+        "      \"anchor\": {",
+        "        \"quote\": \"본문 한 줄\"",
+        "      },",
+        "      \"body\": \"본문에 매달린 코멘트\"",
+        "    },",
+        "    {",
+        "      \"id\": \"not-a-comment-id\",",
+        "      \"createdAt\": \"2026-06-16T10:33:00.000Z\",",
+        "      \"body\": \"읽는 쪽이 버려야 한다\"",
+        "    }",
+        "  ]",
+        "}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000001",
+        "agenda: serving",
+        "type: build",
+        "title: 픽스처 노트",
+        "created: '2026-06-16T10:00:00+09:00'",
+        "mins: 30",
+        "status: done",
+        "---",
+        "# 픽스처 노트",
+        "",
+        "메타가 아직 아무것도 없는 노트다.",
+        "",
+        "<!--wlc:cmfixture-0000000c-->본문 한 줄<!--/wlc:cmfixture-0000000c-->",
+        "",
+        "[후속 메모](#sub:snfixture-00000001)",
+        "",
+        "  [들여쓴 카드](#sub:snfixture-00000001)",
+        "",
+        "문장 안의 [링크](#sub:snfixture-00000001)다.",
+        "",
+        "[다른 하위](#sub:snfixture-0000dead)"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/attach/후속-그림.svg",
+      "lines": [
+        "<svg></svg>"
+      ],
+      "eol": false
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/note.md",
+      "lines": [
+        "---",
+        "id: snfixture-00000001",
+        "agenda: serving",
+        "type: free",
+        "title: 후속 메모",
+        "created: '2026-06-16T11:00:00+09:00'",
+        "mins: 0",
+        "status: active",
+        "tags:",
+        "  - 후속",
+        "  - 랭킹",
+        "links:",
+        "  - to: ndfixture-00000002",
+        "    kind: attach",
+        "---",
+        "후속 노트 본문이다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub/2026-06-16-1200-손자-메모-0006/attach/손자-그림.svg",
+      "lines": [
+        "<svg></svg>"
+      ],
+      "eol": false
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub/2026-06-16-1200-손자-메모-0006/note.md",
+      "lines": [
+        "---",
+        "id: snfixture-00000006",
+        "agenda: serving",
+        "type: free",
+        "title: 손자 메모",
+        "created: '2026-06-16T12:00:00+09:00'",
+        "mins: 0",
+        "status: active",
+        "---",
+        "손자 노트 본문이다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub/2026-06-16-1100-후속-메모-0001/sub-comments/snfixture-00000006.json",
+      "lines": [
+        "{",
+        "  \"comments\": [",
+        "    {",
+        "      \"id\": \"cmfixture-0000000e\",",
+        "      \"createdAt\": \"2026-06-16T12:30:00.000Z\",",
+        "      \"body\": \"손자 메모에 단 코멘트\"",
+        "    }",
+        "  ]",
+        "}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-16-1000-픽스처-노트-0001/sub-comments/snfixture-00000001.json",
+      "lines": [
+        "{",
+        "  \"comments\": [",
+        "    {",
+        "      \"id\": \"cmfixture-0000000d\",",
+        "      \"createdAt\": \"2026-06-16T11:30:00.000Z\",",
+        "      \"body\": \"후속 메모에 단 코멘트\"",
+        "    }",
+        "  ]",
+        "}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-17-1100-연결-대상-노트-0002/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000002",
+        "agenda: serving",
+        "type: plan",
+        "title: 연결 대상 노트",
+        "created: '2026-06-17T11:00:00+09:00'",
+        "mins: 0",
+        "status: active",
+        "---",
+        "# 연결 대상 노트"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000003",
+        "agenda: serving",
+        "type: research",
+        "title: 메타가 다 찬 노트",
+        "created: '2026-06-18T12:30:00+09:00'",
+        "mins: 90",
+        "status: review",
+        "tags:",
+        "  - 랭킹",
+        "  - 실험",
+        "favorite: true",
+        "favoriteCategory: 매뉴얼",
+        "template: m-plan",
+        "evaluation:",
+        "  score: 72",
+        "  note: |-",
+        "    구조는 맞았다.",
+        "    다음엔 표를 하나 줄인다.",
+        "  at: '2026-06-18T04:00:00.000Z'",
+        "links:",
+        "  - to: ndfixture-00000002",
+        "    kind: direct",
+        "---",
+        "# 메타가 다 찬 노트",
+        "",
+        "선택 키가 전부 들어 있다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/sub/2026-06-18-1530-json하위-0002/note.json",
+      "lines": [
+        "---",
+        "id: snfixture-00000002",
+        "agenda: serving",
+        "type: free",
+        "title: json 하위",
+        "created: '2026-06-18T15:30:00+09:00'",
+        "mins: 0",
+        "---",
+        "{}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-19-0905-옛-html-노트-0004.html",
+      "lines": [
+        "<!--withlog",
+        "id: ndfixture-00000004",
+        "agenda: serving",
+        "type: report",
+        "title: 옛 HTML 노트",
+        "created: '2026-06-19T09:05:00+09:00'",
+        "mins: 15",
+        "status: done",
+        "-->",
+        "<h1>옛 HTML 노트</h1>"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-20-1000-폴더-노트-0005/note.json",
+      "lines": [
+        "---",
+        "id: ndfixture-00000005",
+        "agenda: serving",
+        "type: build",
+        "title: 폴더 JSON 노트 0005",
+        "created: '2026-06-20T10:00:00+09:00'",
+        "mins: 15",
+        "---",
+        "{\"root\": {}}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-21-0800-hand-renamed/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000006",
+        "agenda: serving",
+        "type: build",
+        "title: 손으로 바꾼 폴더",
+        "created: '2026-06-21T08:00:00+09:00'",
+        "mins: 20",
+        "---",
+        "손으로 이름을 바꾼 폴더 노트다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-21-0800-hand-renamed/sub/2026-06-21-0900-하위-메모-0003/note.md",
+      "lines": [
+        "---",
+        "id: snfixture-00000003",
+        "agenda: serving",
+        "type: free",
+        "title: 하위 메모",
+        "created: '2026-06-21T09:00:00+09:00'",
+        "mins: 0",
+        "---",
+        "첨부 없는 하위 메모다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-22-0930-옛-마크다운-노트-0007.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000007",
+        "agenda: serving",
+        "type: research",
+        "title: 옛 마크다운 노트",
+        "created: '2026-06-22T09:30:00+09:00'",
+        "mins: 5",
+        "status: done",
+        "---",
+        "단일 파일 마크다운 노트다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-23-1000-폴더-노트-0008/note.json",
+      "lines": [
+        "---",
+        "id: ndfixture-00000008",
+        "agenda: serving",
+        "type: build",
+        "title: 폴더 JSON 노트 0008",
+        "created: '2026-06-23T10:00:00+09:00'",
+        "mins: 25",
+        "---",
+        "{\"root\": {}}"
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-24-0900-프론트매터-없는-노트-0021/note.md",
+      "lines": [
+        "울타리가 아예 없는 노트 본문이다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-24-0910-id-없는-노트-0022/note.md",
+      "lines": [
+        "---",
+        "agenda: serving",
+        "title: id 없는 노트",
+        "created: '2026-06-24T09:10:00+09:00'",
+        "mins: 10",
+        "---",
+        "id가 없는 노트다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-24-0920-created-깨진-노트-0023/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000023",
+        "agenda: serving",
+        "title: 달력에 없는 날짜",
+        "created: '2026-02-31T09:20:00+09:00'",
+        "mins: 10",
+        "---",
+        "날짜가 깨진 노트다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-24-0930-중복-id-노트-가-0024/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000024",
+        "agenda: serving",
+        "type: free",
+        "title: 중복 id 노트",
+        "created: '2026-06-24T09:30:00+09:00'",
+        "mins: 10",
+        "---",
+        "중복 id 노트 가 본문이다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-24-0940-중복-id-노트-나-0024/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000024",
+        "agenda: serving",
+        "type: free",
+        "title: 중복 id 노트 나",
+        "created: '2026-06-24T09:40:00+09:00'",
+        "mins: 10",
+        "---",
+        "중복 id 노트 나 본문이다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-25-0900-충돌-사본-노트-0025 (conflicted copy 2026-06-25).md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000025",
+        "agenda: serving",
+        "type: free",
+        "title: 충돌 사본",
+        "created: '2026-06-25T09:00:00+09:00'",
+        "mins: 5",
+        "---",
+        "충돌 사본 파일이다."
+      ],
+      "eol": true
+    },
+    {
+      "path": "notes/serving/2026-06-25-0910-충돌된 사본 폴더-0026/note.md",
+      "lines": [
+        "---",
+        "id: ndfixture-00000026",
+        "agenda: serving",
+        "type: free",
+        "title: 충돌된 사본 폴더",
+        "created: '2026-06-25T09:10:00+09:00'",
+        "mins: 5",
+        "---",
+        "충돌된 사본 폴더다."
+      ],
+      "eol": true
+    }
+  ]
+}

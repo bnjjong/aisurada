@@ -1,0 +1,60 @@
+{
+  "format": "wlx-cases",
+  "version": 1,
+  "lane": "read",
+  "note": "설명서 원문에 기대값이 글자 그대로 적힌 get_template 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",
+  "tree": "rebuild-fixture.v1",
+  "prepare": [
+    [
+      "reindex"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "get_template/t-legacy",
+      "part": 1,
+      "argv": [
+        "get_template",
+        "{\"id\":\"t-legacy\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "id": "t-legacy",
+          "category": "doc",
+          "name": "옛 HTML 템플릿",
+          "type": "report",
+          "format": "html",
+          "desc": "아직 HTML 인 템플릿입니다",
+          "body": "<h1>[제목] 완료 보고</h1>\n",
+          "builtin": true
+        }
+      }
+    },
+    {
+      "id": "get_template/t-morning",
+      "part": 1,
+      "argv": [
+        "get_template",
+        "{\"id\":\"t-morning\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutText": "{\n  \"id\": \"t-morning\",\n  \"category\": \"ritual\",\n  \"name\": \"기본 모닝 데일리 템플릿\",\n  \"rev\": \"morning\",\n  \"icon\": \"sunrise\",\n  \"format\": \"markdown\",\n  \"desc\": \"아침에 씁니다\",\n  \"body\": \"# 모닝 리포트 — [날짜]\\n\"\n}\n"
+      }
+    },
+    {
+      "id": "get_template/missing",
+      "part": 1,
+      "argv": [
+        "get_template",
+        "{\"id\":\"t-없는템플릿\"}"
+      ],
+      "expect": {
+        "code": 3,
+        "stdout": "",
+        "wl": "WL-400"
+      }
+    }
+  ]
+}
