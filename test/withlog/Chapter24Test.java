@@ -62,6 +62,7 @@ public final class Chapter24Test {
         message(v, 400, "save-template 이 모르는 옵션이다: f1. 쓸 수 있는 것은 [body, desc, id, name, type] 뿐이다.", "save-template", "f1=");
         message(v, 400, "save-template 이 받는 자리 인자는 0 개인데 1 개를 받았다: " + withlog.cmd.TemplateCommands.SAVE_USAGE, "save-template", "=x");
         message(v, 400, "delete-doc-template 이 받는 자리 인자는 1 개인데 2 개를 받았다: delete-doc-template <문서 템플릿 id>", "delete-doc-template", "a", "b");
+        message(v, 400, "list-templates 이 받는 자리 인자는 0 개인데 1 개를 받았다: list-templates [category=doc|ritual] [type=<유형. 주면 리추얼이 빠진다>] [bodies=true. 본문까지 싣는다. 기본은 메타만]", "list-templates", "x");
         for (String id : List.of("m-plan\n", "한글", "a b")) message(v, 400, "템플릿 id 모양이 아니다: " + id, "delete-doc-template", id);
         eq(ok(v, "delete-doc-template", "missing").get("removed"), List.of(), "absent deletion succeeds");
         Files.delete(v.resolve(".withlog/workspace.json"));
@@ -84,7 +85,7 @@ public final class Chapter24Test {
         random("00000001"); result = ok(v, "save-template", "id=", " name =\u3000 x \u00a0", "body=without final LF", "type=PLAN");
         id = result.get("id").toString(); relative = result.get("path").toString();
         String file = Files.readString(v.resolve(relative));
-        check(file.contains("name: x\n") && file.contains("type: plan\n") && file.contains("desc: \"\"\n"), "create trims name, accepts uppercase type, emits empty desc");
+        check(file.contains("name: x\n") && file.contains("type: plan\n") && file.contains("desc: ''\n"), "create trims name, accepts uppercase type, emits empty desc");
         check(file.endsWith("without final LF"), "writer adds no body LF");
         var read = ok(v, "get_template", json(Map.of("id", id)));
         eq(read.keySet().stream().toList(), List.of("id", "category", "name", "type", "format", "desc", "body", "builtin"), "doc detail order");
@@ -125,7 +126,7 @@ public final class Chapter24Test {
         error(v, 400, "delete-doc-template", "defaults");
         ok(v, "save-template", "id=defaults", "name= a ", "desc=  description  ");
         String file = Files.readString(v.resolve(".withlog/templates/doc/defaults.md"));
-        check(file.contains("name: \" a \"\n") && file.contains("type: build\n") && file.contains("builtin: true\n"), "update raw name and reader fallback values persisted");
+        check(file.contains("name: ' a '\n") && file.contains("type: build\n") && file.contains("builtin: true\n"), "update raw name and reader fallback values persisted");
         var read = ok(v, "get-template", "defaults"); eq(read.get("name"), "a", "reader trims updated name"); eq(read.get("desc"), "  description  ", "description untrimmed");
         ok(v, "save-template", "id=defaults"); check(Files.readString(v.resolve(".withlog/templates/doc/defaults.md")).contains("name: a\n"), "omitted name rewrites trimmed read value");
         String multiline = "line one\n  indented\n\n" + "long word ".repeat(12) + "\n";
@@ -189,7 +190,7 @@ public final class Chapter24Test {
         String failure = stderr(error(v, 400, "list-templates", "bodies=bad", "category=doc"));
         check(failure.startsWith("템플릿 1건을 못 읽어 목록에서 뺐다.\n  .withlog/templates/doc/README.md — 프론트매터가 없거나 문법이 어긋난다\nWL-400"), "diagnostic before bodies error");
         check(!stderr(error(v, 400, "list-templates", "category=bogus", "bodies=bad")).contains("README.md"), "category error before scan diagnostics");
-        eq(run(v, "list_templates", "{}").stderrBytes().length, 0, "tool list has no human diagnostics");
+        eq(stderr(run(v, "list_templates", "{}")), "템플릿 2건을 못 읽어 목록에서 뺐다.\n  .withlog/templates/doc/README.md — 프론트매터가 없거나 문법이 어긋난다\n  .withlog/templates/ritual/bad.md — 프론트매터가 없거나 문법이 어긋난다\n", "tool list writes the same diagnostics as the command list");
         eq(run(v, "get-template", "user").stderrBytes().length, 0, "get suppresses unrelated skipped-file diagnostics");
         put(v, ".withlog/templates/doc/README.md", "---\n{}\n---\n"); Files.delete(v.resolve(".withlog/templates/ritual/bad.md"));
         var fallback = ok(v, "get-template", "README"); eq(fallback.get("name"), "README", "empty YAML map is a template"); eq(fallback.get("builtin"), true, "empty map builtin default true");

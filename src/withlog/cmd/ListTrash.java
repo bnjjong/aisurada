@@ -41,11 +41,9 @@ public final class ListTrash {
         }
 
         if (!scan.skipped().isEmpty()) {
-            if (!parsed.isToolSurface()) {
-                withlog.engine.Diagnostics.line("휴지통 항목 " + scan.skipped().size() + "건을 못 읽어 목록에서 뺐다.");
-                for (TrashReader.SkippedTrash s : scan.skipped()) {
-                    withlog.engine.Diagnostics.line("  " + s.location() + " — " + s.reason());
-                }
+            withlog.engine.Diagnostics.line("휴지통 항목 " + scan.skipped().size() + "건을 못 읽어 목록에서 뺐다.");
+            for (TrashReader.SkippedTrash s : scan.skipped()) {
+                withlog.engine.Diagnostics.line("  " + s.location() + " — " + s.reason());
             }
             Map<String, Object> incomplete = new LinkedHashMap<>();
             incomplete.put("skipped", scan.skipped().size());

@@ -209,7 +209,7 @@ public final class InitWorkspace {
                 // 따옴표 없는 true와 false 글자만 불리언이다. True와 "true"는 거절한다
                 if (!(v instanceof JsonValue.JsonLiteral literal)
                         || !("true".equals(literal.raw()) || "false".equals(literal.raw()))) {
-                    throw new WlException(400, "templates 항목의 builtin 이 boolean 이 아니다: " + compactOrNull(v));
+                    throw new WlException(400, "templates 항목의 builtin 가 boolean 이 아니다: " + compactOrNull(v));
                 }
                 builtin = "true".equals(literal.raw());
             } else {

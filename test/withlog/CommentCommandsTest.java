@@ -146,10 +146,10 @@ public final class CommentCommandsTest {
         ok(v,"update-comment",ROOT,GRAND,"comment_id=cmfixture-0000000f","body=손자 고침");
         eq(ok(v,"delete-comment",ROOT,GRAND,"comment_id=cmfixture-0000000f").get("markerStripped"),false,"grandchild delete without marker");
         eq(rows(ok(v,"list-comments",ROOT," \t")).size(),1,"blank second positional omitted");
-        error(v,3,400,"인자 검증 실패(list_comments): parent 는 '노트id' 이거나 '노트id/하위노트id' 여야 한다: "+ROOT+"/"+SUB+"/"+GRAND,
+        error(v,3,400,"인자 검증 실패(list_comments): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: "+ROOT+"/"+SUB+"/"+GRAND,
                 "list_comments","{\"parent\":\""+ROOT+"/"+SUB+"/"+GRAND+"\"}");
         for (String parent : List.of("", "/ /")) {
-            error(v,3,400,"인자 검증 실패(list_comments): parent 는 '노트id' 이거나 '노트id/하위노트id' 여야 한다: "+parent,
+            error(v,3,400,"인자 검증 실패(list_comments): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: "+parent,
                     "list_comments","{\"parent\":\""+parent+"\"}");
         }
         error(v,3,400,null,"list_comments","{\"parent\":null}");

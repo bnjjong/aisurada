@@ -559,7 +559,7 @@ public final class FrontmatterWriter {
         return false;
     }
 
-    public static String dumpDoubleQuoted(String s) {
+    private static String dumpDoubleQuoted(String s) {
         StringBuilder sb = new StringBuilder(s.length() + 16);
         sb.append('"');
         int len = s.length();

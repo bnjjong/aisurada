@@ -8,6 +8,8 @@ import java.util.Map;
 /**
  * 설명서 2.4 템플릿 파일의 쓰기 바이트. {@code ---\n}, YAML, {@code ---\n}, 본문 차례로 잇는다.
  * 울타리는 포맷과 상관없이 늘 {@code ---}이고, 본문 뒤에는 아무것도 안 붙인다.
+ * init-workspace(23장)와 템플릿 쓰기 3개(24장)가 함께 쓴다. 쓰개가 2벌이면 같은 값이 길에 따라
+ * 다른 따옴표로 적혀서, 빈 설명은 늘 {@code desc: ''}, 앞뒤 공백 값은 {@code ' a '}로 1.9의 규칙 1벌만 따른다.
  */
 public final class TemplateFileBytes {
 

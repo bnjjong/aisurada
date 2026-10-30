@@ -7,7 +7,7 @@ import withlog.text.Trim;
 import withlog.vault.TemplateReader;
 import withlog.write.AtomicWriter;
 import withlog.write.IdGenerator;
-import withlog.write.TemplateFile;
+import withlog.write.TemplateFileBytes;
 import withlog.write.WarningsDetector;
 
 import java.io.IOException;
@@ -54,13 +54,13 @@ public final class TemplateCommands {
             name = options.getOrDefault("name", existing.name());
             if (type == null) type = existing.type();
             desc = options.getOrDefault("desc", existing.desc()); body = options.getOrDefault("body", existing.body()); builtin = existing.builtin();
-            String path = TemplateFile.docPath(id);
-            AtomicWriter.writeAtomic(vault.resolve(path), TemplateFile.document(id, name, type, desc, builtin, body));
+            String path = TemplateFileBytes.docRelPath(id, "markdown");
+            AtomicWriter.writeAtomic(vault.resolve(path), TemplateFileBytes.renderDoc(id, name, type, "markdown", desc, builtin, body));
             if (!existing.format().equals("markdown")) remove(vault, ".withlog/templates/doc/" + id + "." + existing.format());
             return saved(id, "updated", builtin, path, options.get("body"));
         }
-        String path = TemplateFile.docPath(id);
-        AtomicWriter.writeAtomic(vault.resolve(path), TemplateFile.document(id, name, type, desc, builtin, body));
+        String path = TemplateFileBytes.docRelPath(id, "markdown");
+        AtomicWriter.writeAtomic(vault.resolve(path), TemplateFileBytes.renderDoc(id, name, type, "markdown", desc, builtin, body));
         return saved(id, "created", builtin, path, options.get("body"));
     }
 
@@ -70,8 +70,8 @@ public final class TemplateCommands {
         if (existing == null || !existing.category().equals("ritual")) throw notFound(id);
         long sameRev = TemplateReader.scan(vault).templates().stream().filter(t -> t.category().equals("ritual") && t.rev().equals(existing.rev())).count();
         if (sameRev != 1) throw new WlException(400, "같은 rev 를 든 리추얼 템플릿이 " + sameRev + "건이라 저장하지 않는다. 파일 이름이 rev 라서 서로를 덮는다: rev=" + existing.rev());
-        String path = TemplateFile.ritualPath(existing.rev());
-        AtomicWriter.writeAtomic(vault.resolve(path), TemplateFile.ritual(id, existing.rev(), options.getOrDefault("name", existing.name()), existing.icon(), existing.format(), options.getOrDefault("desc", existing.desc()), options.getOrDefault("body", existing.body())));
+        String path = TemplateFileBytes.ritualRelPath(existing.rev());
+        AtomicWriter.writeAtomic(vault.resolve(path), TemplateFileBytes.renderRitual(id, existing.rev(), options.getOrDefault("name", existing.name()), existing.icon(), existing.format(), options.getOrDefault("desc", existing.desc()), options.getOrDefault("body", existing.body())));
         return saved(id, "updated", false, path, options.get("body"));
     }
 

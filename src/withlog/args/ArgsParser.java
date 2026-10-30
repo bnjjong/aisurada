@@ -115,8 +115,7 @@ public final class ArgsParser {
                 }
             }
             if (segments.isEmpty() || segments.size() >= 3) {
-                String shape = "list_comments".equals(toolName) ? "'노트id' 이거나 '노트id/하위노트id'" : "`노트id` 이거나 `노트id/하위노트id`";
-                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 는 " + shape + " 여야 한다: " + rawParent);
+                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
             }
             return new ParsedArgs(true, toolName.replace('_', '-'), segments, Collections.emptyMap(), rawParent);
         } else if ("write_attachment".equals(toolName)) {
@@ -887,7 +886,7 @@ public final class ArgsParser {
             case "list-templates" -> {
                 allowedOptions = List.of("bodies", "category", "type");
                 maxPositional = 0;
-                usage = "list-templates [category=<갈래>] [type=<유형>] [bodies=true]";
+                usage = "list-templates [category=doc|ritual] [type=<유형. 주면 리추얼이 빠진다>] [bodies=true. 본문까지 싣는다. 기본은 메타만]";
             }
             case "get-template" -> {
                 maxPositional = 1;
@@ -907,7 +906,7 @@ public final class ArgsParser {
             case "list-reports" -> {
                 allowedOptions = List.of("bodies", "from", "kind", "to");
                 maxPositional = 0;
-                usage = "list-reports [kind=<종류>] [from=<YYYY-MM-DD>] [to=<YYYY-MM-DD>] [bodies=true]";
+                usage = "list-reports [kind=morning|evening|weekly] [from=<YYYY-MM-DD>] [to=<YYYY-MM-DD>] [bodies=true. 본문과 메모까지 싣는다. 기본은 유무만]";
             }
             case "get-report" -> {
                 maxPositional = 1;

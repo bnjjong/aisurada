@@ -98,7 +98,11 @@ public final class Chapter26Test {
                 check(text.contains("agenda: recovered\n") && text.contains("status: keep\n"), "recovery rewrites only agenda in " + format);
                 check(text.endsWith(body), "recovery preserves raw " + format + " body");
             }
-            error(v, 400, "restore-doc", " ndfixture-00000001 "); error(v, 400, "empty-trash", "x"); t.done();
+            error(v, 400, "restore-doc", " ndfixture-00000001 "); error(v, 400, "empty-trash", "x");
+            Path broken = t.vault(); put(broken, TRASH, "{}");
+            eq(stderr(run(broken, "list_trash", "{}")), "휴지통 항목 1건을 못 읽어 목록에서 뺐다.\n  .withlog/trash/trash.json — 매니페스트가 배열이 아니다\n", "tool list writes trash diagnostics");
+            eq(stderr(run(broken, "list-trash")), stderr(run(broken, "list_trash", "{}")), "both surfaces write the same trash diagnostics");
+            t.done();
         }
     }
 }

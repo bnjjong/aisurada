@@ -30,6 +30,8 @@ public final class Chapter25Test {
             put(v, ".withlog/reports/rv-morning-2026-01-01.json", "{\"memo\":\"fine\"}");
             var incomplete = ok(v, "list-reports", "kind=morning"); check(incomplete.containsKey("incomplete"), "bad other kind still wraps list");
             check(stderr(run(v, "list-reports")).contains("회고 1건을 못 읽어 목록에서 뺐다."), "diagnostics in result stderr");
+            eq(stderr(run(v, "list_reports", "{}")), stderr(run(v, "list-reports")), "tool list writes the same diagnostics as the command list");
+            check(stderr(error(v, 400, "list-reports", "x")).endsWith("list-reports 이 받는 자리 인자는 0 개인데 1 개를 받았다: list-reports [kind=morning|evening|weekly] [from=<YYYY-MM-DD>] [to=<YYYY-MM-DD>] [bodies=true. 본문과 메모까지 싣는다. 기본은 유무만]\n"), "positional usage is the appendix A line");
             put(v, path, "body: !!int abc"); eq(run(v, "get-report", id).status(), 1, "explicit bad YAML tag is unexpected failure");
             ok(v, "save-report", "kind=evening", "date=2026-02-30", "body=repaired");
             eq(ok(v, "get-report", id).get("body"), "repaired", "save does not read existing broken content");
