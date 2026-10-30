@@ -374,3 +374,5 @@ serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으�
 ## 2부 네이티브 호스트
 
 Tauri 2 호스트의 1~2장 기반은 [native-host](native-host/README.md)에 있습니다. 번들 설정과 권한, main 창·메뉴·딥링크 및 종료 이벤트를 연결했습니다. [1장 구현 기록](docs/rebuild-p2-chapter01-complete.md)과 [2장 구현 기록](docs/rebuild-p2-chapter02-complete.md)에 검증과 후속 범위를 적었습니다.
+
+3~4장의 공통 IPC 규약과 vault 커맨드 네 개도 연결했습니다. [3장 완료 기록](docs/rebuild-p2-chapter03-complete.md)과 [4장 완료 기록](docs/rebuild-p2-chapter04-complete.md)에 실제 Tauri IPC 검증과 경계 동작을 정리했습니다.

@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod environment;
+mod ipc;
 mod lifecycle;
 mod menu;
+mod workspace;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 
@@ -25,6 +27,12 @@ fn main() {
         })
         .manage(lifecycle::HostState::default())
         .manage(lifecycle::SecretTable::default())
+        .invoke_handler(tauri::generate_handler![
+            workspace::allow_workspace,
+            workspace::vault_root,
+            workspace::is_workspace,
+            workspace::create_workspace_dir
+        ])
         .setup(|app| {
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;

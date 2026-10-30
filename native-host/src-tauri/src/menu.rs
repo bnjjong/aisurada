@@ -1,6 +1,6 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem as P, Submenu},
-    Emitter, Manager,
+    Manager,
 };
 
 pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
@@ -95,7 +95,7 @@ pub fn clicked(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
         .find(|w| w.is_focused().unwrap_or(false));
     if id == "wl_close_tab" {
         if let Some(window) = focused {
-            let _ = window.emit("wl://menu", id);
+            let _ = crate::ipc::emit_window(app, window.label(), crate::ipc::MENU, id);
         }
     } else {
         if focused
@@ -105,7 +105,7 @@ pub fn clicked(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
             crate::lifecycle::bring_main_forward(app);
         }
         if let Some(main) = app.get_webview_window("main") {
-            let _ = main.emit("wl://menu", id);
+            let _ = crate::ipc::emit_window(app, main.label(), crate::ipc::MENU, id);
         }
     }
 }

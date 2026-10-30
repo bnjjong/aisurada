@@ -11,7 +11,7 @@ use tauri::{Emitter, Manager};
 
 #[derive(Default)]
 pub struct HostState {
-    pub vault: Mutex<Option<PathBuf>>,
+    pub vault: Mutex<Option<String>>,
     pub terminals: Mutex<HashMap<String, Child>>,
     pub quitting: AtomicBool,
     pub note_windows: Mutex<Vec<String>>,
@@ -83,7 +83,7 @@ pub fn window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
                 .filter_map(|s| s.strip_prefix("note-").map(str::to_owned))
                 .collect::<Vec<_>>();
             windows.sort();
-            let _ = app.emit("wl://note-windows", windows);
+            let _ = app.emit(crate::ipc::NOTE_WINDOWS, windows);
         }
         tauri::WindowEvent::Moved(_)
         | tauri::WindowEvent::Resized(_)
