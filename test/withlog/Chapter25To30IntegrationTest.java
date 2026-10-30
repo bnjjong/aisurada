@@ -31,6 +31,10 @@ public final class Chapter25To30IntegrationTest {
                 long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
                 while (!Files.exists(socket) && server.isAlive() && System.nanoTime() < until) Thread.sleep(25);
                 check(Files.exists(socket), "server ready: " + Files.readString(home.resolve("server.err")));
+                Reply absent = request(3, "get-ask");
+                eq(absent.err, "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n", "part4 absence over socket");
+                check(request(3, "read-session", "id", "unknown=x").err.startsWith("WL-400"), "part4 syntax failure over socket");
+                check(request(3, "append-chat-turn").err.startsWith("WL-409"), "part4 write preparation over socket");
                 request(0, "save_report", "{\"kind\":\"evening\",\"date\":\"2026-06-16\",\"body\":\"회고\\n원문\"}");
                 eq(request(0, "get-report", "rv-evening-2026-06-16").object().get("body"), "회고\n원문", "socket report UTF8");
                 put(v, ".withlog/reports/rv-morning-2026-06-17.json", "broken");

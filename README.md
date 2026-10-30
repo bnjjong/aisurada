@@ -174,6 +174,10 @@ java -jar dist/wl-engine.jar verify-shard --withlog.vault=/path/to/vault
 
 회고·휴지통의 목록 진단, 플랜의 같은 제목 경고, 샤드의 불일치 진단은 소켓 응답의 stderr에도 전달합니다. `bash test.sh`는 장별 시험과 실제 serve·wl-cli 왕복을 함께 실행합니다.
 
+## 32장 4부 이음매
+
+4부 명령 7개는 인자 문법과 쓰기 준비를 먼저 검사한 뒤 4부가 없으면 `WL-409`로 답합니다. 노트 안의 `ask.json`과 `chats/`는 노트 폴더와 함께 이동·보관하고 색인과 마크다운 내보내기에서는 제외합니다. [32장 완료 문서](docs/rebuild-p1-chapter32-complete.md)에 검사 순서와 검증 결과를 기록했습니다.
+
 ## 1~20장 점검에서 찾은 누락 보완
 
 `reindex-paths`와 공통 쓰기의 자동 커밋·작성자 기록을 구현했습니다. 경로별 재색인은 명령 표면에서만 받고, 옵션 없이 경로 argv를 그대로 보냅니다.
