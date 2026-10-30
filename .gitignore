@@ -5,3 +5,7 @@ lib/
 !/fixtures/expect/lib/
 .DS_Store
 /.idea/
+/native-host/node_modules/
+/native-host/src-tauri/target/
+/native-host/src-tauri/gen/
+/native-host/src-tauri/secret-names.txt

@@ -1,0 +1,14 @@
+{
+  "name": "withlog-native-host",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/check-web.mjs",
+    "backend:jars": "bash ../build.sh",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.2"
+  }
+}
