@@ -11,6 +11,27 @@
   ],
   "cases": [
     {
+      "id": "get_template/tpl-halfmoved",
+      "part": 1,
+      "argv": [
+        "get_template",
+        "{\"id\":\"tpl-halfmoved\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": {
+          "id": "tpl-halfmoved",
+          "category": "doc",
+          "name": "옮기다 만 템플릿",
+          "type": "build",
+          "format": "html",
+          "desc": "옛 본문입니다",
+          "body": "<h1>옛 본문</h1>\n",
+          "builtin": false
+        }
+      }
+    },
+    {
       "id": "get_template/t-legacy",
       "part": 1,
       "argv": [

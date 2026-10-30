@@ -76,6 +76,207 @@
           }
         ]
       }
+    },
+    {
+      "id": "list_templates/category-doc",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"category\":\"doc\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "m-plan",
+            "category": "doc",
+            "name": "기본 플래닝 템플릿 (markdown)",
+            "type": "plan",
+            "format": "markdown",
+            "desc": "설계 전에 씁니다",
+            "builtin": true
+          },
+          {
+            "id": "t-legacy",
+            "category": "doc",
+            "name": "옛 HTML 템플릿",
+            "type": "report",
+            "format": "html",
+            "desc": "아직 HTML 인 템플릿입니다",
+            "builtin": true
+          },
+          {
+            "id": "tpl-halfmoved",
+            "category": "doc",
+            "name": "옮기다 만 템플릿",
+            "type": "build",
+            "format": "html",
+            "desc": "옛 본문입니다",
+            "builtin": false
+          },
+          {
+            "id": "tpl-halfmoved",
+            "category": "doc",
+            "name": "옮기다 만 템플릿",
+            "type": "build",
+            "format": "markdown",
+            "desc": "새 본문입니다",
+            "builtin": false
+          },
+          {
+            "id": "tpl-seeded",
+            "category": "doc",
+            "name": "내가 만든 템플릿",
+            "type": "research",
+            "format": "markdown",
+            "desc": "조사할 때 씁니다",
+            "builtin": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_templates/category-ritual",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"category\":\"ritual\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "t-morning",
+            "category": "ritual",
+            "name": "기본 모닝 데일리 템플릿",
+            "rev": "morning",
+            "icon": "sunrise",
+            "format": "markdown",
+            "desc": "아침에 씁니다"
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_templates/type-plan",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"type\":\"plan\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "m-plan",
+            "category": "doc",
+            "name": "기본 플래닝 템플릿 (markdown)",
+            "type": "plan",
+            "format": "markdown",
+            "desc": "설계 전에 씁니다",
+            "builtin": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_templates/type-build",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"type\":\"build\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "tpl-halfmoved",
+            "category": "doc",
+            "name": "옮기다 만 템플릿",
+            "type": "build",
+            "format": "html",
+            "desc": "옛 본문입니다",
+            "builtin": false
+          },
+          {
+            "id": "tpl-halfmoved",
+            "category": "doc",
+            "name": "옮기다 만 템플릿",
+            "type": "build",
+            "format": "markdown",
+            "desc": "새 본문입니다",
+            "builtin": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_templates/type-report",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"type\":\"report\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "t-legacy",
+            "category": "doc",
+            "name": "옛 HTML 템플릿",
+            "type": "report",
+            "format": "html",
+            "desc": "아직 HTML 인 템플릿입니다",
+            "builtin": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_templates/type-research",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"type\":\"research\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": [
+          {
+            "id": "tpl-seeded",
+            "category": "doc",
+            "name": "내가 만든 템플릿",
+            "type": "research",
+            "format": "markdown",
+            "desc": "조사할 때 씁니다",
+            "builtin": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "list_templates/type-meeting",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"type\":\"meeting\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": []
+      }
+    },
+    {
+      "id": "list_templates/type-free",
+      "part": 1,
+      "argv": [
+        "list_templates",
+        "{\"type\":\"free\"}"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutJson": []
+      }
     }
   ]
 }

@@ -7,12 +7,12 @@
     "lanes/read/get_doc.json": 3,
     "lanes/read/get_report.json": 1,
     "lanes/read/get_sub_note.json": 2,
-    "lanes/read/get_template.json": 3,
+    "lanes/read/get_template.json": 4,
     "lanes/read/list_attachments.json": 3,
     "lanes/read/list_docs.json": 3,
     "lanes/read/list_reports.json": 1,
     "lanes/read/list_sub_notes.json": 3,
-    "lanes/read/list_templates.json": 1
+    "lanes/read/list_templates.json": 9
   },
   "provenance": {
     "get_doc/ndfixture-00000004": "설명서 13145줄(34.1이 묶음에서 그대로 옮긴 케이스)",
@@ -21,6 +21,7 @@
     "get_report/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
     "get_sub_note/ndfixture-00000001/snfixture-00000001/snfixture-00000006": "설명서 5353줄의 예시",
     "get_sub_note/missing-child": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "get_template/tpl-halfmoved": "설명서 1542줄(2.4: 같은 id 2벌의 1건 읽기는 html 쪽)과 10049줄의 목록 값",
     "get_template/t-legacy": "설명서 10110줄의 예시",
     "get_template/t-morning": "설명서 10110줄의 예시. stdoutText로 담음",
     "get_template/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
@@ -34,27 +35,39 @@
     "list_sub_notes/ndfixture-00000001": "설명서 6873줄의 예시",
     "list_sub_notes/ndfixture-00000002": "설명서 6931줄의 예시",
     "list_sub_notes/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
-    "list_templates/all": "설명서 10049줄의 예시"
+    "list_templates/all": "설명서 10049줄의 예시",
+    "list_templates/category-doc": "설명서 10049줄의 목록 예시를 24.3의 갈래 조건으로 거름",
+    "list_templates/category-ritual": "설명서 10049줄의 목록 예시를 24.3의 갈래 조건으로 거름",
+    "list_templates/type-plan": "설명서 10049줄의 목록 예시를 24.3의 유형 조건으로 거름(리추얼은 빠진다)",
+    "list_templates/type-build": "설명서 10049줄의 목록 예시를 24.3의 유형 조건으로 거름(리추얼은 빠진다)",
+    "list_templates/type-report": "설명서 10049줄의 목록 예시를 24.3의 유형 조건으로 거름(리추얼은 빠진다)",
+    "list_templates/type-research": "설명서 10049줄의 목록 예시를 24.3의 유형 조건으로 거름(리추얼은 빠진다)",
+    "list_templates/type-meeting": "설명서 10049줄의 목록 예시를 24.3의 유형 조건으로 거름(리추얼은 빠진다)",
+    "list_templates/type-free": "설명서 10049줄의 목록 예시를 24.3의 유형 조건으로 거름(리추얼은 빠진다)"
   },
   "history": [
     {
       "date": "2026-10-30",
       "change": "처음 지음. 설명서 원문의 예시 20건(성공 11건, 실패 9건)을 레인 9파일로 옮김. get_template/t-morning 1건은 실행기의 stdoutText 갈래를 재려고 글로 담음 실패 9건에는 6.5의 표가 적은 WL 번호를 wl 칸으로 담음(진짜 묶음은 증분 2에서 채울 칸)"
+    },
+    {
+      "date": "2026-10-30",
+      "change": "24장 회차: 진짜 묶음과 같은 자리의 list_templates 8건(갈래 2가지, 유형 6가지)과 get_template/tpl-halfmoved 1건을 더함. 기대값은 24.6의 목록 예시를 24.3의 거르기 규칙으로 거른 값과 2.4의 1건 읽기 본문"
     }
   ],
   "files": {
     ".gitattributes": "4a669ece67c496f5d07207f2daaf830c1e5b962e389baebd0ac068fd88be22ff",
-    "README.md": "c82480790d8f53cbf56690d951e9d37fcc1f315d7917f4784cf67bb718c87193",
+    "README.md": "35d991a9805cb30eae92c920f273e982d7ebc95ad9356e0209f1bda13438c7c9",
     "adapters/withlog-jar.json": "ff94ae4d1ec2e3dd894dac516a3f2c5ec8817f8486bcd519d89ed60205793f07",
     "lanes/read/get_doc.json": "4395652bb37c28c4b88d1fa662026a9e7ca2f0b8d6acec75001fa2b19697c7ab",
     "lanes/read/get_report.json": "7b7db5a77739f67796f73d623e3ad4875d5b11a90c85caa3d89932d8b66273a5",
     "lanes/read/get_sub_note.json": "f281ce64f74b14c205ac280e2357914c785dc8a2510db6def151dc2702009b8c",
-    "lanes/read/get_template.json": "160586a3e3d84efe4013af9c1049790f697fa08d17c0e032ef9cbd33514fa525",
+    "lanes/read/get_template.json": "eb26411118ae389c106a8f6b78ea05c0c42cf6b06fb1c72fd2217510f1b7b763",
     "lanes/read/list_attachments.json": "dc907f5da53d21f37f890319a9f29e9722c9daf88463deb285af0abb95a45408",
     "lanes/read/list_docs.json": "9d470aa4a78b799dba63a03a8951e44edf2cef4e42bae756e46054e700f927dd",
     "lanes/read/list_reports.json": "91a902c3d509752da71e646778cad967e0fd2e94f25fe60bce05742137ee77cb",
     "lanes/read/list_sub_notes.json": "21e91d043410befc290d6569e23d449d8e207c09892ede2d6ab5e31f0b73f213",
-    "lanes/read/list_templates.json": "418c59e66f7952534afe9ec1ae9a21c0570b4fde1fc9d0b9442a3e41e126698f",
+    "lanes/read/list_templates.json": "73b059aa49aadaf0cbe1ad8d39da95d782b70276aeee7761b26098cbcf9815f7",
     "lib/bundle.mjs": "649ad5934660557a7ac425bc754b5e15c990fea329e6bfbdd8757bfebfe42901",
     "lib/template.mjs": "af85432faecdd47a740a32f308002c7a5259b783434be3b88b2d16f034040056",
     "lib/tree.mjs": "5b581a8afad8311ef7fc3c6cf060fe82e98bb2d8db5f0a763c61d0963ca9d6cf",

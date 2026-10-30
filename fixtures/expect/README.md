@@ -2,7 +2,7 @@
 
 다시 지은 withlog 1부 엔진이 지금 엔진과 같은 답을 내는지 가르는 묶음이다. 실행기가 케이스마다 엔진을 셸 없이 불러 종료 코드와 stdout 바이트를 맞댄다. 규칙의 정본은 「withlog 1부 vault 엔진 설명서」 34장이고, 이 글은 그 계약을 줄여 적는다.
 
-> 이 판은 설명서만 보고 다시 지은 묶음이다. 실행기(`run.mjs`, `lib/`, `selftest/`)는 34.1의 규칙을 따른다. 진짜 묶음의 읽기 레인 460건과 나무 `fixture.v1`, `claude-home.v1`이 이 저장소에 없어서, 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 20건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault(`trees/rebuild-fixture.v1.json`)를 담았다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 `bundle.json`을 다시 적는다.
+> 이 판은 설명서만 보고 다시 지은 묶음이다. 실행기(`run.mjs`, `lib/`, `selftest/`)는 34.1의 규칙을 따른다. 진짜 묶음의 읽기 레인 460건과 나무 `fixture.v1`, `claude-home.v1`이 이 저장소에 없어서, 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 29건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault(`trees/rebuild-fixture.v1.json`)를 담았다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 `bundle.json`을 다시 적는다.
 
 ## 부르는 법
 

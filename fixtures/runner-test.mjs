@@ -339,7 +339,7 @@ if (fs.existsSync(jar)) {
   const o = freshOut();
   const r = runner(BUNDLE, ['--engine', path.join(HERE, 'aisurada.adapter.json'), '--out', o], { WLX_IMPL_JAVA: javaBin, WLX_IMPL_JAR: jar });
   const rep = report(o);
-  check('20건이 모두 맞고 vault 와 HOME 을 안 바꾼다', [r.code, rep.totals.passed, rep.failures.map(f => `${f.id} [${f.check}] ${f.detail}`), rep.warnings], [0, 20, [], []]);
+  check('묶음의 케이스가 모두 맞고 vault 와 HOME 을 안 바꾼다', [r.code, rep.totals.passed === rep.totals.cases, rep.failures.map(f => `${f.id} [${f.check}] ${f.detail}`), rep.warnings], [0, true, [], []]);
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });

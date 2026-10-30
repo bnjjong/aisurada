@@ -145,6 +145,8 @@ java -jar dist/wl-engine.jar delete-doc-template <템플릿 id> --withlog.vault=
 
 [24장 완료 문서](docs/rebuild-p1-chapter24-complete.md)에 파일 바이트, 호환 동작, 검증 결과와 붙인 글에서 해석이 필요한 두 경계를 기록했습니다.
 
+설명서 원문 24장과 다시 맞댄 결과는 [24장 원문 맞대기](docs/rebuild-p1-chapter24-recheck.md)에 있습니다. 원문의 문구와 바이트로 짠 독립 시험 88건이 맞았고, 받아들임 묶음(`fixtures/expect`)에 진짜 묶음과 같은 자리의 템플릿 케이스 9건을 더했습니다.
+
 ## 25~30장
 
 회고 저장, 휴지통의 보내기·복원·영구 삭제·비우기, 마크다운 내보내기, 샤드 이동과 검증, 하루 플랜, 답 없는 코멘트 점검을 지원합니다. 기준은 제공된 25~30장 PDF이며, 각 장의 미결정 호환 동작을 유지합니다.
@@ -195,7 +197,7 @@ node fixtures/runner-test.mjs
 ```
 
 - 실행기는 34.1의 옵션 문법, 묶음 무결성(sha256), `--out` 겹침(장치와 inode), 거르개, 판정 9가지, `report.json`, 자가 점검과 변형 8가지를 따릅니다. 어댑터 계약은 34.5이고, 이 엔진의 어댑터 `fixtures/aisurada.adapter.json`은 묶음 밖에 둡니다.
-- 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 20건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
+- 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 29건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
 
 자세한 것은 [34장 완료 노트](docs/rebuild-p1-chapter34-complete.md)에 있습니다.
 
