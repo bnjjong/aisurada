@@ -39,3 +39,5 @@ PTY 커맨드는 `pty_start`, `pty_write`, `pty_resize`, `pty_detach`, `pty_aliv
 비밀 가림은 `secret_table_probe`, `secret_table_status`, `mask_scrollback`, `scan_text_shapes`로 제공한다. probe를 실제로 부를 때만 HOME의 `.zshrc` 관리 블록과 로그인 셸 환경을 읽는다. 값은 직렬화·Debug를 구현하지 않은 타입에만 보관한다. 실 이름 분류표 `src-tauri/secret-names.txt`는 Git에서 제외하며, 없으면 항목 없는 견본을 포함한다. 견본 빌드는 표를 뜨기 전 가리기를 거절한다. 테스트는 지어낸 이름과 값만 사용한다.
 
 원본 `wl-agent/*.mjs`와 4부 소스는 제공되지 않아 포함하지 않았다. 4부 커맨드 9개는 Tauri의 `Command … not found`로 거절된다. 번들 자원은 이 저장소의 `dist/`에 맞췄으며 원본 아이콘 대신 임시 SVG 아이콘을 사용한다. 장별 구현·검증·손 확인 범위는 [9장](../docs/rebuild-p2-chapter09-complete.md)부터 [18장](../docs/rebuild-p2-chapter18-complete.md)까지의 완료 문서와 [부록 기록](../docs/rebuild-p2-appendices-complete.md)에 적었다.
+
+외부 검증 사진에서 확인한 원본 받아들임·합치기 결과, 동작 차이 네 건과 실제 앱 조작으로 확인할 일곱 항목은 [2부 피드백 확인 기록](../docs/rebuild-p2-review-2026-10-31.md)에 정리했다.
