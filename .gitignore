@@ -1,11 +1,13 @@
 build/
 dist/
 lib/
+*.iml
 # 받아들임 묶음의 실행기 라이브러리는 빌드 산출물이 아니다
 !/fixtures/expect/lib/
 .DS_Store
 /.idea/
 /native-host/node_modules/
+/native-host/dist/
 /native-host/src-tauri/target/
 /native-host/src-tauri/gen/
 /native-host/src-tauri/secret-names.txt

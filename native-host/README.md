@@ -1,6 +1,6 @@
 # withlog 네이티브 호스트
 
-2부 1~18장의 Tauri 2 호스트다. 2부 커맨드 29개, 이벤트 4개, `wlframe` 프로토콜을 구현했다. Java 엔진은 별도로 빌드하고, 화면은 3부 연결 전의 최소 HTML이다. 4부 Rust 모듈은 포함하지 않으며 `--no-default-features`로 빌드할 수 있다.
+2부 1~18장의 Tauri 2 호스트와 3부 React 화면이다. 2부 커맨드 29개, 이벤트 4개, `wlframe` 프로토콜을 구현했다. 화면은 제공된 13장까지 연결하여 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·댓글·연결, 캘린더와 목록, 검색·이력 복원·외부 Markdown·설정을 지원한다. [3부 구현 순서](../docs/rebuild-p3-plan.md)와 [11~13장 기록](../docs/rebuild-p3-chapters11-13-complete.md)을 참고한다. 14~18장과 부록 본문, 원본 가이드 스킬·검색 골든 파일이 없어 그 범위는 별도 판정한다. 4부 Rust 모듈은 포함하지 않으며 `--no-default-features`로 빌드할 수 있다.
 
 ```bash
 bash build.sh
@@ -9,14 +9,38 @@ pnpm install --frozen-lockfile
 pnpm tauri dev
 ```
 
-macOS 앱은 `pnpm tauri build --debug --bundles app`으로 만든다. 산출물은 `src-tauri/target/debug/bundle/macos/withlog.app`이다. 최적화 빌드는 `--debug`를 뺀다. 번들 빌드는 저장소의 Java jar도 새로 짓는다. 앱 설치나 launchd 등록은 하지 않는다.
+Node.js 22.12 이상과 pnpm 10.33.4를 사용한다. `pnpm dev`는 Vite 서버만, `pnpm tauri dev`는 실제 앱까지 띄운다. `pnpm build`는 타입 검사 후 4부 없는 화면을 `dist/`에 만들고 빌드 계약을 검사한다. `pnpm preview`는 호스트 없이 화면을 보며 번들 CSP를 적용한다. 개발 서버 포트는 1420이며 충돌 시 실패한다.
+
+macOS 앱은 `pnpm tauri build --debug --bundles app`으로 만든다. 산출물은 `src-tauri/target/debug/bundle/macos/withlog.app`이다. 최적화 빌드는 `--debug`를 뺀다. 번들 빌드는 화면과 저장소의 Java jar도 새로 짓는다. 앱 설치나 launchd 등록은 하지 않는다.
 
 검증은 저장소 루트에서 `bash test-native.sh`로 실행한다. Rust/Cargo, Node, pnpm, JDK 21, Xcode 도구가 필요하다. `Cargo.lock`과 `pnpm-lock.yaml`의 Tauri 2.11.2 호환 조합을 사용한다. 실제 macOS webview 점검은 다음과 같다.
 
 ```bash
 cd native-host
-pnpm test:acceptance
+pnpm test:acceptance              # 2부 호스트의 실제 WKWebView 점검
+pnpm test:workspace               # 3부 부팅·전환·이관 검사 29개
+pnpm test:workspace:acceptance    # 새 React 화면 + Java 엔진 + WKWebView 점검 9개
+pnpm test:navigation              # 3부 주소·탭·스크롤 검사 25개
+pnpm test:navigation:acceptance   # 실제 WKWebView의 주소·탭·새로고침 점검 11개
+pnpm test:interaction             # 3부 메뉴·단축키·딥링크·개발 다리 검사 30개
+pnpm test:interaction:acceptance  # WKWebView의 창별 이벤트·Markdown 진입 점검 11개
+pnpm test:data                    # 엔진 argv·토큰·재조정·읽기 경합 검사 48개
+pnpm test:data:acceptance         # Java 엔진·WKWebView·FSEvents·창 사이 쓰기 점검 12개
+pnpm test:editor                  # 독립 왕복 71사례와 경계·저장 연결 검사
+pnpm test:editor:acceptance       # 실제 WKWebView 왕복 바이트와 편집 기능 검사
+pnpm test:views                   # 11~13장 검색·최근·날짜·배치·실패 복구 검사 22개
+pnpm test:views:acceptance        # 실제 제품 화면·엔진·Git·WKWebView 통합 점검
+pnpm test:autosave                # 자동저장·제목·충돌·복원·diff 독립 검사 44개
+pnpm test:autosave:acceptance     # 실제 엔진·WKWebView·Git·미러/undo 검사 16개
 ```
+
+3부 하네스도 별도 앱 식별자와 임시 HOME·vault·소켓을 사용하며 전역 Tauri 객체 없이 실행한다. `WITHLOG_WORKSPACE_REPORT=/절대/경로.json`으로 결과를 남긴다. 편집기 검사는 DOM 선택·insertText·클립보드 이벤트와 실제 호스트 IPC를 사용한다. 실제 선택 대화 상자와 물리 IME 입력은 자동 조작하지 않는다.
+
+`test:data:acceptance`는 제품의 controller·데이터 계층·플랫폼 어댑터와 알림 부품을 별도 시험 진입부로 컴파일한다. 실제 파일 쓰기와 엔진 응답을 확인하며 제품 권한 파일을 그대로 쓴다. 전체 편집 화면을 조작하는 시험과는 구분한다. 본문·메타 큐·토큰과 버퍼 분리·600ms 저장·4초 재시도·제목 커밋·충돌 선택·미러·이력 교체 포트를 연결했다. `test:views:acceptance`는 실제 제품 화면의 메타·댓글·하위 페이지·이력 복원·시각 변경·폼·사실층 충돌·템플릿·리포트·휴지통·외부 파일·노트 창 이동을 검증한다. 이력 목록과 폼은 11~13장 화면에 연결했다.
+
+`test:interaction:acceptance`는 이벤트를 주입하려고 격리된 테스트 설정에서만 이벤트 송신 거절 두 개를 제외한다. 제품 권한 파일은 바꾸지 않는다. 실제 메뉴 클릭과 macOS의 URL·파일 연결 전달은 손 확인 범위이며 자동 점검과 구분한다.
+
+개발 서버에 페이지가 붙어 있으면 `curl -X POST localhost:1420/__deeplink --data-raw 'withlog://doc/<id>'`로 열린 main 창을 이동한다. `?deeplink=<인코딩한 주소>`도 개발 판에서 처음 한 번 받는다. 두 입구는 번들에서 제외하며 개발 다리는 `file://`를 받지 않는다.
 
 이 하네스는 매 실행 별도 앱 식별자, 임시 HOME·vault·소켓·빈 ZDOTDIR를 만든다. 실제 Java 엔진, WKWebView, PTY를 통해 24개 페이지 점검과 창 자리 파일 2개 점검을 수행한다. 가짜 `claude`가 불리지 않는지도 확인한다. 성공하면 임시 자료를 지우고, 실패하면 진단 경로를 출력한다. `WITHLOG_CHECK_REPORT=/절대/경로.json`으로 JSON 보고서를 남길 수 있다. 원본 저장소의 `scripts/parts/host.mjs`는 제공되지 않아 PDF 18장의 재료와 조건을 이 저장소에 구현했다.
 
@@ -28,7 +52,7 @@ pnpm test:acceptance
 
 `resolve_md_target({path,knownRoots})`는 vault 노트와 외부 Markdown을 구분한다. `read_external_md({path})`는 엄격한 UTF-8의 2 MiB 이하 파일을 읽는다. `allow_external_images({mdPath,srcs})`는 문서 폴더 안의 상대 그림을 파일별로 그림 범위에 연다.
 
-`wlframe://localhost/절대/첨부/경로`는 `notes/**/attach/` 안의 허용 형식만 제공한다. HTML에는 높이·외부 링크 알림 스크립트를 붙이고 모든 응답에 고정 CSP·nosniff·no-store를 단다. 부모 화면의 sandbox와 링크 처리·높이 제한은 3부에서 연결한다.
+`wlframe://localhost/절대/첨부/경로`는 `notes/**/attach/` 안의 허용 형식만 제공한다. HTML에는 높이·외부 링크 알림 스크립트를 붙이고 모든 응답에 고정 CSP·nosniff·no-store를 단다. 부모 화면의 sandbox와 링크 처리·높이 제한은 3부 편집기에 연결했다.
 
 노트 창은 `open_note_window({docId,title,geometry})`로 열고 `note_windows`, `close_note_windows`, `destroy_current_window`, `show_in_main`으로 다룬다. `saved_note_windows`, `restore_note_windows({docs})`, `remember_note_window({geometry})`가 vault별 복원 목록을 관리한다. 창의 JS 닫기 요청 처리와 편집 글 저장은 3부의 몫이다.
 

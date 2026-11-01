@@ -32,5 +32,6 @@ test('production and development CSP retain their separate boundaries', () => {
   assert.ok(config.app.security.devCsp.includes('ws://localhost:1420'));
   assert.ok(!config.app.security.devCsp.includes('media-src'));
   assert.ok(config.app.security.csp.endsWith('frame-src wlframe: http://wlframe.localhost'));
-  assert.ok(!/<style\b|\sstyle\s*=/i.test(readFileSync(new URL('../web/index.html',import.meta.url),'utf8')));
+  assert.ok(!/<style\b|\sstyle\s*=/i.test(readFileSync(new URL('../index.html',import.meta.url),'utf8')));
+  assert.equal(config.build.frontendDist, '../dist');
 });

@@ -1,0 +1,363 @@
+[
+  {
+    "id": "A1",
+    "input": "가\n나",
+    "expected": "가 나"
+  },
+  {
+    "id": "A2",
+    "input": "가  \n나",
+    "expected": "가  \n나"
+  },
+  {
+    "id": "A3",
+    "input": "가    \n나",
+    "expected": "가  \n나"
+  },
+  {
+    "id": "A4",
+    "input": "가\\\n나",
+    "expected": "가  \n나"
+  },
+  {
+    "id": "A5",
+    "input": "가\r\n\r\n\r\n나\r\n",
+    "expected": "가\n\n나"
+  },
+  {
+    "id": "B1",
+    "input": "a * b snake_case C:\\temp",
+    "expected": "a \\* b snake\\_case C:\\\\temp"
+  },
+  {
+    "id": "B2",
+    "input": "\\# 글\n\n\\- 글\n\n\\+ 글\n\n\\> 글\n\n1\\. 글",
+    "expected": "# 글\n\n- 글\n\n+ 글\n\n> 글\n\n1. 글",
+    "second": "# 글\n\n- 글\n- 글\n\n> 글\n\n1. 글"
+  },
+  {
+    "id": "B3",
+    "input": "값 &#35; &#65; &amp;",
+    "expected": "값 # A &amp;"
+  },
+  {
+    "id": "B4",
+    "input": "1~2kg",
+    "expected": "1\\~2kg"
+  },
+  {
+    "id": "B5",
+    "input": "__init__ 함수 _기울임_ **굵게**",
+    "expected": "**init** 함수 *기울임* **굵게**"
+  },
+  {
+    "id": "B6",
+    "input": "`a\\.b` 뒤",
+    "expected": "`a.b` 뒤"
+  },
+  {
+    "id": "C1",
+    "input": "***둘 다*** ~~취소~~ ==강조==",
+    "expected": "***둘 다*** ~~취소~~ ==강조=="
+  },
+  {
+    "id": "C2",
+    "input": "앞 `a\\.b` 뒤",
+    "expected": "앞 `a\\.b` 뒤"
+  },
+  {
+    "id": "D1",
+    "input": "# 헤딩\n다음",
+    "expected": "# 헤딩\n\n다음"
+  },
+  {
+    "id": "D2",
+    "input": "글\n---",
+    "expected": "글  \n---"
+  },
+  {
+    "id": "D3",
+    "input": "***\n\n___\n\n####### 아니다\n\n===\n\n>200ms",
+    "expected": "\\*\\*\\*\n\n\\_\\_\\_\n\n####### 아니다\n\n===\n\n>200ms"
+  },
+  {
+    "id": "E1",
+    "input": "* 하나\n+ 둘\n- 셋",
+    "expected": "- 하나\n- 둘\n- 셋"
+  },
+  {
+    "id": "E2",
+    "input": "5. 가\n5. 나\n1. 다",
+    "expected": "5. 가\n6. 나\n7. 다"
+  },
+  {
+    "id": "E3",
+    "input": "- 항목\n계속\n두 번째\n세 번째",
+    "expected": "- 항목\n계속 두 번째 세 번째"
+  },
+  {
+    "id": "E4",
+    "input": "- 하나\n  - 둘\n    - 셋",
+    "expected": "- 하나\n  - 둘\n    - 셋"
+  },
+  {
+    "id": "E5",
+    "input": "- 하나\n   - 둘\n\t- 셋",
+    "expected": "- 하나\n  - 둘\n  - 셋"
+  },
+  {
+    "id": "E6",
+    "input": "1. 부모\n  - 자식",
+    "expected": "1. 부모\n\n  - 자식"
+  },
+  {
+    "id": "E7",
+    "input": "- 하나\n\n- 둘",
+    "expected": "- 하나\n- 둘"
+  },
+  {
+    "id": "F1",
+    "input": "- [ ] 할 일\n- [x] 끝낸 일",
+    "expected": "- [ ] 할 일\n- [x] 끝낸 일"
+  },
+  {
+    "id": "F2",
+    "input": "- [/] 보류\n- [-] 중단",
+    "expected": "- [/] 보류\n- [-] 중단"
+  },
+  {
+    "id": "F3",
+    "input": "[x] 완료\n[ ] 미완",
+    "expected": "- [x] 완료 [ ] 미완"
+  },
+  {
+    "id": "F4",
+    "input": "- [ ] 할일\n- 보통",
+    "expected": "- [ ] 할일\n\n- 보통"
+  },
+  {
+    "id": "G1",
+    "input": "> a\n>\n> b",
+    "expected": "> a\n> \n> b"
+  },
+  {
+    "id": "G2",
+    "input": "> a\n>= 3\n>> b\n계속",
+    "expected": "> a\n> = 3\n> > b\n> 계속"
+  },
+  {
+    "id": "G3",
+    "input": "글\n>\n> 인용",
+    "expected": "글  \n\n\n> 인용",
+    "second": "글  \n\n> 인용"
+  },
+  {
+    "id": "H1",
+    "input": "> [!success] 결정\n> 첫 줄\n> 둘째 줄",
+    "expected": "> [!success] 결정\n> 첫 줄\n> 둘째 줄"
+  },
+  {
+    "id": "H2",
+    "input": "> [!success] 결정\n>\n> 첫 줄",
+    "expected": "> [!success] 결정\n> 첫 줄"
+  },
+  {
+    "id": "H3",
+    "input": "> [!note]\n> 본문 첫 줄\n> 본문 둘째 줄",
+    "expected": "> [!note] 본문 첫 줄\n> 본문 둘째 줄"
+  },
+  {
+    "id": "H4",
+    "input": "> [!warn]\n> - 하나\n> - 둘",
+    "expected": "> [!warn]\n> - 하나\n> - 둘"
+  },
+  {
+    "id": "H5",
+    "input": "> [!tip]- 접는 제목\n> 본문\n바깥",
+    "expected": "> [!tip]\n> - 접는 제목\n>\n> 본문\n\n바깥"
+  },
+  {
+    "id": "I1",
+    "input": "```java\nint x = 1;\n```",
+    "expected": "```java\nint x = 1;\n```"
+  },
+  {
+    "id": "I2",
+    "input": "````\n내용\n````",
+    "expected": "````\n내용\n````"
+  },
+  {
+    "id": "I3",
+    "input": "```\n\n가\n\n\n```",
+    "expected": "```\n가\n```"
+  },
+  {
+    "id": "I4",
+    "input": "```\n  하나\n둘\n```",
+    "expected": "```\n 하나\n둘\n```",
+    "second": "```\n하나\n둘\n```"
+  },
+  {
+    "id": "I5",
+    "input": "```c++\nint x;\n```",
+    "expected": "```c\n++\nint x;\n```"
+  },
+  {
+    "id": "I6",
+    "input": "~~~\n내용\n~~~",
+    "expected": "\\~\\~\\~ 내용 \\~\\~\\~"
+  },
+  {
+    "id": "I7",
+    "input": "````markdown\n```\n가\n나\n```\n````",
+    "expected": "````markdown\n```\n가 나\n```\n````"
+  },
+  {
+    "id": "J1",
+    "input": "|a|b|\n|---|---|\n|1|",
+    "expected": "| a | b |\n| --- | --- |\n| 1 | |",
+    "headless": "| a | b |\n| --- | --- |\n| 1 |"
+  },
+  {
+    "id": "J2",
+    "input": "|a|b|\n|:-|-:|\n|1|2|",
+    "expected": "| a | b |\n| --- | --- |\n| 1 | 2 |"
+  },
+  {
+    "id": "J3",
+    "input": "|a|b|\n|---|---|\n|---|---|",
+    "expected": "| a | b |\n| --- | --- |\n| --- | --- |"
+  },
+  {
+    "id": "J4",
+    "input": "|a|b|c|\n|---|------------|\n|1|2|3|",
+    "expected": "| a | b | c |\n| ----- | --------------------- | --------------------- |\n| 1 | 2 | 3 |",
+    "headless": "| a | b | c |\n| --- | --- | --- |\n| 1 | 2 | 3 |"
+  },
+  {
+    "id": "J5",
+    "input": "|a|b|  \n|---|---|\n|1|2|",
+    "expected": "|a|b|  \n\n\n| 1 | 2 |\n| --- | --- |"
+  },
+  {
+    "id": "K1",
+    "input": "|줄1\\n줄2|x|\n|---|---|",
+    "expected": "| 줄1\\n줄2 | x |\n| --- | --- |"
+  },
+  {
+    "id": "K2",
+    "input": "|`a\\.b`|앞 `a\\.b`|\n|---|---|",
+    "expected": "| `a.b` | 앞 `a\\.b` |\n| --- | --- |"
+  },
+  {
+    "id": "K3",
+    "input": "|`split('\\n')`|x|\n|---|---|",
+    "expected": "| \\`split('\\n')\\` | x |\n| --- | --- |"
+  },
+  {
+    "id": "K4",
+    "input": "|![a_b](attach/a.png)|[a_b](#doc:nd1-a)|\n|---|---|",
+    "expected": "| ![a_b](attach/a.png) | [a_b](#doc:nd1-a) |\n| --- | --- |"
+  },
+  {
+    "id": "K5",
+    "input": "|+ 하나\\n  + 둘|x|\n|---|---|",
+    "expected": "| + 하나\\n+ 둘 | x |\n| --- | --- |"
+  },
+  {
+    "id": "K6",
+    "input": "|> [!warn] 주의\\n> 내용|x|\n|---|---|",
+    "expected": "| > [!warn] 주의\\n> 내용 | x |\n| --- | --- |"
+  },
+  {
+    "id": "K7",
+    "input": "|>= 3|>|\n|---|---|",
+    "expected": "| >= 3 | > |\n| --- | --- |"
+  },
+  {
+    "id": "K8",
+    "input": "|`a|b`|c|\n|---|---|---|",
+    "expected": "| \\`a | b\\` | c |\n| --- | --- | --- |"
+  },
+  {
+    "id": "K9",
+    "input": "|[x] 완료|- [/] 대기|\n|---|---|",
+    "expected": "| [x] 완료 | - [/] 대기 |\n| --- | --- |"
+  },
+  {
+    "id": "L1",
+    "input": "![a_b](attach/a.png)",
+    "expected": "![a_b](attach/a.png)"
+  },
+  {
+    "id": "L2",
+    "input": "[a_b](#doc:nd1-a)",
+    "expected": "[a_b](#doc:nd1-a)"
+  },
+  {
+    "id": "L3",
+    "input": "[a_b](https://example.com \"제목\")",
+    "expected": "[a\\_b](https://example.com \"제목\")"
+  },
+  {
+    "id": "L4",
+    "input": "[가](u)[나](u)",
+    "expected": "[가나](u)",
+    "headless": "[가](u)[나](u)"
+  },
+  {
+    "id": "L5",
+    "input": "<details>\n<span class=\"a_b\">글</span>\n</details>\n\n<!-- 메모 -->",
+    "expected": "<details> <span class=\"a\\_b\">글</span> </details>\n\n<!-- 메모 -->"
+  },
+  {
+    "id": "M1",
+    "input": "[하위](#sub:sn1-a)",
+    "expected": "[하위](#sub:sn1-a)"
+  },
+  {
+    "id": "M2",
+    "input": "앞 [하_위](#sub:sn1-a) 뒤",
+    "expected": "앞 [하\\_위](#sub:sn1-a) 뒤"
+  },
+  {
+    "id": "N1",
+    "input": "앞 <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> 뒤",
+    "expected": "앞 <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> 뒤"
+  },
+  {
+    "id": "N2",
+    "input": "<!--wlc:cm1-a-->하나\n\n둘<!--/wlc:cm1-a-->",
+    "expected": "<!--wlc:cm1-a-->하나<!--/wlc:cm1-a-->\n\n<!--wlc:cm1-a-->둘<!--/wlc:cm1-a-->"
+  },
+  {
+    "id": "N3",
+    "input": "<!--wlc:cm1-a-->- 글<!--/wlc:cm1-a-->",
+    "expected": "<!--wlc:cm1-a-->- 글<!--/wlc:cm1-a-->"
+  },
+  {
+    "id": "N4",
+    "input": "<!--wlc:cm1-a-->![그림](attach/a.png) [노트](#doc:nd1-a)<!--/wlc:cm1-a-->",
+    "expected": "<!--wlc:cm1-a-->![그림](attach/a.png) [노트](#doc:nd1-a)<!--/wlc:cm1-a-->"
+  },
+  {
+    "id": "N5",
+    "input": "<!--wlc:cm1-a-->가<!--wla:ak1-a-->나<!--/wla:ak1-a-->다<!--/wlc:cm1-a-->\n\n**굵<!--wlc:cm3-c-->게<!--/wlc:cm3-c-->**",
+    "expected": "<!--wlc:cm1-a-->가<!--wla:ak1-a-->나<!--/wla:ak1-a-->다<!--/wlc:cm1-a-->\n\n**굵**<!--wlc:cm3-c-->**게**<!--/wlc:cm3-c-->"
+  },
+  {
+    "id": "N6",
+    "input": "<!--wlc:cm1-a-->가<!--wlc:cm2-b-->나<!--/wlc:cm1-a-->다<!--/wlc:cm2-b-->",
+    "expected": "<!--wlc:cm1-a-->가<!--wlc:cm2-b-->나<!--/wlc:cm2-b--><!--/wlc:cm1-a--><!--wlc:cm2-b-->다<!--/wlc:cm2-b-->"
+  },
+  {
+    "id": "N7",
+    "input": "<!--wlc:ak1-a-->남김<!--/wlc:ak1-a--> <!--wlc:cm1-a-->홀로 유삭제지",
+    "expected": "남김 홀로 유지"
+  },
+  {
+    "id": "N8",
+    "input": "|<!--wlc:cm1-a-->글<!--/wlc:cm1-a-->|x|\n|---|---|",
+    "expected": "| <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> | x |\n| --- | --- |"
+  }
+]

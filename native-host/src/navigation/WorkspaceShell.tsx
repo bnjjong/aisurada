@@ -1,0 +1,161 @@
+import { Component } from "react";
+import type { ReactNode } from "react";
+import type { WorkspaceController } from "../workspace/controller.ts";
+import type { WorkspaceState } from "../workspace/types.ts";
+import { parseRoute, routeTab } from "./routes.ts";
+import type { ScreenRoute } from "./routes.ts";
+import { NoteScreen } from "./NoteReading.tsx";
+import { TabBar } from "./TabBar.tsx";
+import { InteractionOverlays } from "../interaction/Overlays.tsx";
+import { VaultBanner } from "../data/VaultBanner.tsx";
+import { Rail } from "../ui/Rail.tsx";
+import { Preview } from "../ui/Preview.tsx";
+import { Calendar, AgendaPage } from "../ui/CalendarAgenda.tsx";
+import {
+  Page,
+  Favorites,
+  Connections,
+  Templates,
+  Review,
+  Trash,
+  Guide,
+} from "../ui/OtherPages.tsx";
+import { ExternalFile } from "../ui/ExternalFile.tsx";
+type Props = { controller: WorkspaceController; state: WorkspaceState };
+class RouteBoundary extends Component<
+  { children: ReactNode; controller: WorkspaceController },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error) {
+    console.error("이 화면을 열지 못했어요", error);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <section className="empty-state">
+        <h1>이 화면을 여는 중 문제가 생겼어요</h1>
+        <div className="page-actions">
+          <button onClick={() => location.reload()}>새로고침</button>
+          <button onClick={() => this.props.controller.navigate("/calendar")}>
+            캘린더
+          </button>
+          <button onClick={() => this.props.controller.navigate("/launcher")}>
+            시작 화면
+          </button>
+        </div>
+      </section>
+    );
+  }
+}
+export function WorkspaceShell({ controller, state }: Props) {
+  const route = parseRoute(state.route),
+    ws = state.workspace!,
+    rail = route.kind !== "doc" && route.kind !== "file";
+  return (
+    <div className="workspace-shell workspace-frame" aria-busy={state.busy}>
+      <TabBar controller={controller} state={state} />
+      {ws.noteReadFailed && (
+        <div className="read-failure" role="alert">
+          노트를 못 읽었어요 — 파일은 그대로 있어요. 엔진과 워크스페이스 경로를
+          확인해 주세요.
+        </div>
+      )}
+      <VaultBanner
+        state={state}
+        dismiss={() => controller.data.dismissFailures()}
+      />
+      <div className={`workspace-screen ${rail ? "" : "without-rail"}`}>
+        {rail && <Rail controller={controller} state={state} />}
+        <main className="screen-content" id="screen-content" role="tabpanel">
+          <RouteBoundary
+            controller={controller}
+            key={route.kind === "templates" ? "templates" : state.route}
+          >
+            {route.kind !== "terminal" && (
+              <RouteContent
+                route={route}
+                controller={controller}
+                state={state}
+              />
+            )}
+          </RouteBoundary>
+          {state.tabs.openIds
+            .filter((id) => id.startsWith("term:"))
+            .map((id) => (
+              <section
+                className="terminal-pane"
+                data-terminal-key={id}
+                hidden={route.kind !== "terminal" || routeTab(route) !== id}
+                key={id}
+                aria-label="터미널"
+              >
+                <h1>터미널</h1>
+              </section>
+            ))}
+        </main>
+      </div>
+      {state.preview && (
+        <Preview key={state.preview} controller={controller} state={state} />
+      )}
+      <InteractionOverlays controller={controller} state={state} />
+    </div>
+  );
+}
+function RouteContent({
+  route,
+  controller,
+  state,
+}: Props & { route: ScreenRoute }) {
+  const ws = state.workspace!;
+  switch (route.kind) {
+    case "doc": {
+      const note = ws.notes.find((n) => n.id === route.id);
+      return note ? (
+        <NoteScreen note={note} controller={controller} />
+      ) : (
+        <Page title="이 노트를 찾을 수 없어요" />
+      );
+    }
+    case "file":
+      return <ExternalFile path={route.path} controller={controller} />;
+    case "calendar":
+      return (
+        <Calendar state={state} controller={controller} query={route.query} />
+      );
+    case "agenda":
+      return (
+        <AgendaPage
+          state={state}
+          controller={controller}
+          id={route.id}
+          open={route.open}
+        />
+      );
+    case "favorites":
+      return <Favorites state={state} controller={controller} />;
+    case "connections":
+      return <Connections state={state} controller={controller} />;
+    case "templates":
+      return (
+        <Templates
+          initialOpen={route.open}
+          state={state}
+          controller={controller}
+        />
+      );
+    case "review":
+      return <Review state={state} controller={controller} />;
+    case "trash":
+      return <Trash state={state} controller={controller} />;
+    case "guide":
+      return <Guide />;
+    case "session":
+      return <Page title="이 판에는 Claude 연동이 없어요" />;
+    default:
+      return null;
+  }
+}

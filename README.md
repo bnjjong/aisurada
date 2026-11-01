@@ -2,6 +2,8 @@
 
 withlog vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그 엔진을 띄워 두고 부르는 클라이언트 `wl-cli`입니다. Java 21 하나와 SnakeYAML만으로 짓습니다.
 
+데스크톱 앱은 [native-host](native-host/README.md)에 있습니다. 2부 Tauri 호스트 위에 3부 React 화면을 단계별로 연결하고 있습니다. 제공된 13장까지 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·목록·검색·이력 복원·외부 Markdown·설정 화면을 연결했습니다. [3부 구현 순서](docs/rebuild-p3-plan.md)와 [11~13장 기록](docs/rebuild-p3-chapters11-13-complete.md)에 구현·검증 및 미제공 자료 때문에 재구성한 범위를 구분했습니다. 14~18장과 부록의 본문은 제공되지 않았습니다.
+
 이름은 〈신세기 GPX 사이버 포뮬러〉의 아스라다에서 따온 말장난(AI + 아스라다)입니다. 사람 옆에서 달리는 AI라는 자리가 마음에 들었습니다.
 
 ## 하는 일
@@ -383,4 +385,4 @@ Tauri 2 호스트의 1~2장 기반은 [native-host](native-host/README.md)에 �
 
 7~8장의 그림 첨부 쓰기·기본 앱 열기·자기 쓰기 알림도 지원합니다. [7장 완료 기록](docs/rebuild-p2-chapter07-complete.md)과 [8장 완료 기록](docs/rebuild-p2-chapter08-complete.md)에 파일 경계와 실제 Tauri IPC 이벤트 검증을 기록했습니다.
 
-9~18장의 외부 Markdown, HTML 첨부 프로토콜, 노트 창 복원·모니터별 배치, 실제 PTY와 비밀 가림까지 구현했습니다. [9장](docs/rebuild-p2-chapter09-complete.md) · [10장](docs/rebuild-p2-chapter10-complete.md) · [11장](docs/rebuild-p2-chapter11-complete.md) · [12장](docs/rebuild-p2-chapter12-complete.md) · [13장](docs/rebuild-p2-chapter13-complete.md) · [14장](docs/rebuild-p2-chapter14-complete.md) · [15장](docs/rebuild-p2-chapter15-complete.md) · [16장](docs/rebuild-p2-chapter16-complete.md) · [17장](docs/rebuild-p2-chapter17-complete.md) · [18장](docs/rebuild-p2-chapter18-complete.md)에 장별 구현과 검증 범위를 적었습니다. 실제 macOS webview의 26개 자동 점검은 `cd native-host && pnpm test:acceptance`로 실행합니다. 4부 Rust 모듈과 실제 편집 화면은 아직 포함하지 않습니다.
+9~18장의 외부 Markdown, HTML 첨부 프로토콜, 노트 창 복원·모니터별 배치, 실제 PTY와 비밀 가림까지 구현했습니다. [9장](docs/rebuild-p2-chapter09-complete.md) · [10장](docs/rebuild-p2-chapter10-complete.md) · [11장](docs/rebuild-p2-chapter11-complete.md) · [12장](docs/rebuild-p2-chapter12-complete.md) · [13장](docs/rebuild-p2-chapter13-complete.md) · [14장](docs/rebuild-p2-chapter14-complete.md) · [15장](docs/rebuild-p2-chapter15-complete.md) · [16장](docs/rebuild-p2-chapter16-complete.md) · [17장](docs/rebuild-p2-chapter17-complete.md) · [18장](docs/rebuild-p2-chapter18-complete.md)에 장별 구현과 검증 범위를 적었습니다. 실제 macOS webview의 26개 자동 점검은 `cd native-host && pnpm test:acceptance`로 실행합니다. 4부 Rust 모듈은 포함하지 않습니다. 3부 편집 화면 검사는 native-host의 별도 하네스로 실행합니다.

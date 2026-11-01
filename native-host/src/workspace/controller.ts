@@ -1,0 +1,671 @@
+import { engineCall, readWorkspace } from './engine.ts';
+import { migrateLegacy } from './migrateLegacy.ts';
+import { sampleWorkspace } from './sample.ts';
+import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readTheme, recentWorkspaces,
+  removeRecent, savedOpenIds, writeJSON } from './storage.ts';
+import { asRow, asText, workspaceName } from './types.ts';
+import { TabModel } from '../navigation/tabs.ts';
+import { NoteScrollMemory } from '../navigation/scroll.ts';
+import { activeTab, agendaAddress, docAddress, fileAddress, parseRoute, tabAddress } from '../navigation/routes.ts';
+import { connectLinkSource, latestInput } from '../interaction/links.ts';
+import type { AppLink } from '../interaction/links.ts';
+import { shortcutFor } from '../interaction/shortcuts.ts';
+import type { KeyInput } from '../interaction/shortcuts.ts';
+import type { RecentWorkspace, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import { VaultData } from '../data/vault.ts';
+import { write } from '../data/commands.ts';
+import { preferences } from '../ui/model.ts';
+import type { Preferences } from '../ui/model.ts';
+import { RecentNotes } from '../ui/recent.ts';
+import { blocksEscape } from '../ui/layers.ts';
+import type { RestoreResult } from '../editor/session.ts';
+
+export class WorkspaceController {
+  readonly context: WindowContext;
+  private services: WorkspaceServices;
+  private state: WorkspaceState;
+  private listeners = new Set<() => void>();
+  private queue: Promise<unknown> = Promise.resolve();
+  private bootPromise?: Promise<void>;
+  private watchGeneration = 0;
+  private unwatch?: () => void;
+  private restored = false;
+  private disposed = false;
+  private noticeTimer?: ReturnType<typeof setTimeout>;
+  private tabs: TabModel;
+  private unlistenWindows?: () => void;
+  private inputsStarted = false;
+  private inputDisposers = new Set<() => void>();
+  private linkRevision = 0;
+  private pendingLink: { link: AppLink; revision: number } | null = null;
+  private drainingLinks = false;
+  private closingNote = false;
+  private unlistenSelf?: () => void;
+  private selfListenerStarted = false;
+  private editorFlushers = new Map<symbol, { root: string; flush: () => Promise<void> }>();
+  private restorers = new Map<symbol, { key: string; restore: (body: string) => Promise<RestoreResult> }>();
+  readonly data: VaultData;
+  readonly scrollMemory = new NoteScrollMemory();
+  readonly recentNotes: RecentNotes;
+  private childRemovers = new Map<symbol, { id: string; remove: (child: string) => void }>();
+  private buffers = new Map<symbol, { key: string; read: () => string }>();
+  private moving = new Set<string>();
+  lastRestoreCommit: import('./types.ts').Row | null = null;
+
+  constructor(services: WorkspaceServices, context: WindowContext, route: string) {
+    this.services = services;
+    this.recentNotes = new RecentNotes(services.storage);
+    this.context = context;
+    this.tabs = new TabModel(services.storage, context.kind === 'main');
+    this.data = new VaultData(services, () => this.state.workspace, (vault, workspace) => this.patch({ vault, ...(workspace ? { workspace } : {}) }));
+    this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
+      prefs: preferences(services.storage), settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
+      recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
+      theme: readTheme(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
+  }
+
+  getSnapshot = () => this.state;
+  subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
+
+  private patch(update: Partial<WorkspaceState>, location?: 'push' | 'replace' | 'external') {
+    if (this.disposed) return;
+    const next = { ...this.state, ...update };
+    if (update.workspace && update.workspace.path !== this.state.workspace?.path) {
+      next.form = null; next.preview = null; next.previewOpened = null; next.hiddenAgendas = [];
+    }
+    if (update.noteWindows?.includes(next.preview || '')) { next.preview = null; next.previewOpened = null; }
+    if (next.subNotes && update.noteWindows?.includes(next.subNotes.root)) next.subNotes = null;
+    if (this.context.kind === 'main') {
+      const requested = next.route;
+      if (update.workspace) this.tabs.attach(update.workspace);
+      if (update.workspace || update.noteWindows) {
+        for (const id of next.noteWindows) next.route = this.tabs.close(id, next.route);
+      }
+      if (!next.booting) {
+        const register = location !== undefined || this.state.booting || (!!update.workspace && !this.state.workspace);
+        for (let n = 0; n < 3; n++) {
+          const resolved = this.tabs.visit(next.route, next.workspace, register);
+          if (resolved === next.route) break;
+          next.route = resolved;
+        }
+      }
+      if (location === 'push' || location === 'replace') this.services.navigate(next.route, location === 'replace' || next.route !== requested);
+      else if (next.route !== requested) this.services.navigate(next.route, true);
+    }
+    if (next.route !== this.state.route && next.subNotes) next.subNotes = next.subNotes.arrival === next.route ? { ...next.subNotes, arrival: null } : null;
+    if (next.route !== this.state.route) next.preview = null;
+    if (!next.workspace || parseRoute(next.route).kind === 'launcher') next.searchOpen = false;
+    this.state = { ...next, tabs: this.tabs.snapshot() };
+    for (const listener of this.listeners) listener();
+  }
+
+  navigate = (path: string, replace = false) => {
+    this.changeLocation(path, replace ? 'replace' : 'push');
+  };
+  locationChanged = (path: string) => { if (this.context.kind === 'main') this.changeLocation(path, 'external'); };
+  private changeLocation(path: string, location: 'push' | 'replace' | 'external') {
+    const route = parseRoute(path);
+    if (this.context.kind === 'main' && this.state.workspace && route.kind === 'doc' && this.state.noteWindows.includes(route.id)) {
+      const previous = this.tabs.close(route.id, this.state.route);
+      this.focusNoteWindow(route.id);
+      this.patch({ route: previous }, location === 'external' ? 'replace' : undefined);
+      return;
+    }
+    this.patch({ route: path }, location);
+  }
+  setNoteWindows = (ids: string[]) => { if (this.context.kind === 'main') this.patch({ noteWindows: ids.filter(id => typeof id === 'string') }); };
+  focusNoteWindow = (id: string) => {
+    const title = this.state.workspace?.notes.find(note => note.id === id)?.title;
+    void this.services.host.invoke('open_note_window', { docId: id, title }).catch(error => this.services.warn('노트 창을 열지 못했어요', error));
+  };
+  selectTab = (id: string | null) => this.navigate(id === null ? this.state.tabs.lastMain : tabAddress(id));
+  closeTab = (id: string) => {
+    if (this.context.kind !== 'main') return;
+    const present = this.state.tabs.openIds.includes(id);
+    const next = this.tabs.close(id, this.state.route);
+    if (present && id.startsWith('term:')) void this.services.host.invoke('pty_detach', { key: id }).catch(() => {});
+    this.patch({ route: next }, next !== this.state.route ? 'push' : undefined);
+  };
+  closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
+  reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), ...(this.context.kind === 'main' ? { prefs: preferences(this.services.storage) } : {}) });
+  preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark' }) => {
+    if (this.context.kind !== 'main') return;
+    const old = asRow(readJSON(this.services.storage, KEYS.prefs)) || {}, stored = asRow(old.state) || {};
+    writeJSON(this.services.storage, KEYS.prefs, { ...old, version: 1, state: { ...stored, ...this.state.prefs, ...update } }); this.refreshTheme();
+  };
+  settings = (open: boolean) => { if (this.context.kind === 'main') this.patch({ settingsOpen: open }); };
+  form = (form: WorkspaceState['form']) => { if (this.context.kind === 'main') this.patch({ form }); };
+  filterAgendas = (hidden: string[]) => this.patch({ hiddenAgendas: [...new Set(hidden)] });
+  isNative = () => !!this.services.native;
+  confirm = (text: string) => this.services.host.confirmLeave(text);
+
+  notify = (notice: string) => {
+    clearTimeout(this.noticeTimer);
+    this.patch({ notice });
+    this.noticeTimer = setTimeout(() => this.patch({ notice: null }), 2600);
+  };
+
+  private enqueue<T>(action: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(action, action);
+    this.queue = result.catch(() => undefined);
+    return result;
+  }
+
+  private action(work: () => Promise<boolean>, failure: string, onFailure?: () => void): Promise<boolean> {
+    if (this.context.kind === 'note' || this.disposed) return Promise.resolve(false);
+    return this.enqueue(async () => {
+      this.patch({ busy: true });
+      try { return await work(); }
+      catch (error) { this.notify(`${failure}: ${String(error)}`); onFailure?.(); return false; }
+      finally { this.patch({ busy: false }); }
+    });
+  }
+
+  boot(seedSample = false, developmentLink?: string): Promise<void> {
+    if (this.bootPromise) return this.bootPromise;
+    this.connectInputs(developmentLink);
+    this.bootPromise = this.enqueue(async () => {
+      try {
+        if (this.context.kind === 'note') {
+          const root = await this.services.host.invoke<string | null>('vault_root');
+          if (!root) { this.patch({ fatal: 'main 창에 열린 vault가 없어요. main 창에서 vault를 연 뒤 다시 열어 주세요.' }); return; }
+          const data = await readWorkspace(this.services.host, false, undefined, this.services.sanitizeHTML);
+          const workspace: Workspace = { ...data, path: root, name: workspaceName(root), sample: false, today: this.today() };
+          this.patch({ workspace, vault: this.data.reset(workspace) });
+          this.installWatch(root);
+        } else {
+          this.listenNoteWindows();
+          void this.discoverHome();
+          if (seedSample) { this.openSample(); }
+          else {
+            const last = lastWorkspace(this.services.storage);
+            if (last) {
+              try { await this.openWorkspace(last.path, last.name); }
+              catch {
+                writeJSON(this.services.storage, KEYS.last, null);
+                this.notify(`이전 워크스페이스를 열 수 없어 시작 화면으로 돌아왔어요: ${last.path}`);
+              }
+            }
+          }
+          if (this.state.route === '/') this.navigate(this.state.workspace ? '/calendar' : '/launcher', true);
+          else if (!this.state.workspace && this.state.route.split('?')[0] !== '/launcher') this.navigate('/launcher', true);
+        }
+      } catch (error) {
+        this.patch({ fatal: `vault를 읽지 못했어요: ${String(error)}` });
+      } finally { this.patch({ booting: false }); this.scheduleLinks(); }
+    });
+    return this.bootPromise;
+  }
+
+  private connectInputs(developmentLink?: string) {
+    if (this.inputsStarted) return;
+    this.inputsStarted = true;
+    const keep = (dispose: () => void) => { if (this.disposed) dispose(); else this.inputDisposers.add(dispose); };
+    if (this.services.menu) void this.services.menu(id => { void this.handleMenu(id); }).then(keep)
+      .catch(error => this.services.warn('메뉴를 듣지 못했어요', error));
+    if (this.context.kind !== 'main') return;
+    if (this.services.deepLinks) void connectLinkSource(this.services.deepLinks, urls => { void this.receiveURLs(urls); },
+      () => this.linkRevision, error => this.services.warn('앱을 연 주소를 읽지 못했어요', error)).then(keep)
+      .catch(error => this.services.warn('딥링크를 듣지 못했어요', error));
+    if (this.services.developmentLinks) keep(this.services.developmentLinks(urls => { void this.receiveURLs(urls); }));
+    if (developmentLink) void this.receiveURLs([developmentLink]);
+  }
+
+  private showingTabs() {
+    return this.context.kind === 'main' && !this.state.booting && this.state.workspace !== null && parseRoute(this.state.route).kind !== 'launcher';
+  }
+
+  handleMenu = async (id: string): Promise<boolean> => {
+    if (this.disposed) return false;
+    if (this.context.kind === 'note') return id === 'wl_close_tab' ? this.closeNoteWindow() : false;
+    if (id === 'wl_new_workspace') { this.navigate('/launcher?mode=create'); return true; }
+    if (id === 'wl_welcome') return this.launcher();
+    if (id === 'wl_open_workspace') {
+      try {
+        const path = await this.services.host.chooseDirectory();
+        return path ? this.open(path, true) : false;
+      } catch (error) { this.notify(`폴더를 열 수 없어요: ${String(error)}`); this.navigate('/launcher'); return false; }
+    }
+    if (!this.showingTabs()) return false;
+    if (id === 'wl_open_terminal') { this.navigate('/terminal'); return true; }
+    if (id === 'wl_close_tab') {
+      const active = activeTab(this.state.route);
+      if (active !== null) this.closeTab(active);
+      else if (this.services.native) { try { await this.services.closeWindow?.(); } catch { /* The host intentionally denies main close. */ } }
+      return true;
+    }
+    return false;
+  };
+
+  handleKey = (event: KeyInput): boolean => {
+    if (event.defaultPrevented) return false;
+    if (event.key === 'Escape') {
+      if (this.state.searchOpen) this.patch({ searchOpen: false });
+      else if (blocksEscape(event)) return false;
+      else if (this.state.settingsOpen) this.settings(false);
+      else if (this.state.form) this.form(null);
+      else if (this.state.preview) this.showPreview(null);
+      else if (this.state.subNotes) this.popSubNote();
+      else return false;
+      event.preventDefault(); return true;
+    }
+    if (!this.showingTabs()) return false;
+    const shortcut = shortcutFor(event, this.services.mac ?? true, this.services.native ?? false);
+    if (!shortcut) return false;
+    if (shortcut.kind === 'search') { event.preventDefault(); this.patch({ searchOpen: !this.state.searchOpen }); return true; }
+    if (shortcut.kind === 'close') { event.preventDefault(); void this.handleMenu('wl_close_tab'); return true; }
+    const tabs: (string | null)[] = [null, ...this.state.tabs.openIds];
+    let target: string | null | undefined;
+    if (shortcut.kind === 'cycle') {
+      if (!this.state.tabs.openIds.length) return false;
+      target = tabs[(tabs.indexOf(activeTab(this.state.route)) + shortcut.direction + tabs.length) % tabs.length];
+    } else target = shortcut.index === -1 ? tabs.at(-1) : tabs[shortcut.index];
+    if (target === undefined) return false;
+    event.preventDefault();
+    if (target !== activeTab(this.state.route)) this.selectTab(target);
+    return true;
+  };
+
+  closeSearch = () => this.patch({ searchOpen: false });
+  showPreview = (id: string | null) => {
+    if (id && this.state.noteWindows.includes(id)) { this.focusNoteWindow(id); return; }
+    this.patch({ preview: id, previewOpened: this.state.workspace?.notes.find(n => n.id === id) || null });
+  };
+  registerChildRemover = (id: string, remove: (child: string) => void) => { const token = Symbol(); this.childRemovers.set(token, { id, remove }); return () => { this.childRemovers.delete(token); }; };
+  removeChildCards = (parent: string, child: string) => { for (const port of this.childRemovers.values()) if (port.id === parent) port.remove(child); };
+  registerBuffer = (key: string, read: () => string) => { const token = Symbol(); this.buffers.set(token, { key, read }); return () => { this.buffers.delete(token); }; };
+  readBuffer = (key: string, fallback = '') => [...this.buffers.values()].reverse().find(entry => entry.key === key)?.read() ?? fallback;
+  moveNoteWindow = async (id: string): Promise<'opened' | 'unsaved' | 'failed'> => {
+    if (this.moving.has(id)) return 'opened'; this.moving.add(id);
+    try {
+      await this.flushEditors(); await this.data.settled();
+      if (this.data.unsavedForRoot(id).length) return 'unsaved';
+      const note = this.state.workspace?.notes.find(n => n.id === id);
+      await this.services.host.invoke('open_note_window', { docId: id, title: note?.title || null, geometry: this.noteGeometry() });
+      if (this.state.preview === id) this.showPreview(null); return 'opened';
+    } catch { return 'failed'; } finally { this.moving.delete(id); }
+  };
+  registerEditor = (root: string, flush: () => Promise<void>): (() => void) => {
+    const key = Symbol(); this.editorFlushers.set(key, { root, flush }); return () => { this.editorFlushers.delete(key); };
+  };
+  registerRestore = (key: string, restore: (body: string) => Promise<RestoreResult>) => {
+    const token = Symbol(); this.restorers.set(token, { key, restore }); return () => { this.restorers.delete(token); };
+  };
+  restoreNote = (key: string, body: string): Promise<RestoreResult> => {
+    const target = [...this.restorers.values()].reverse().find(entry => entry.key === key);
+    return target ? target.restore(body) : Promise.resolve('unavailable');
+  };
+  flushNoteEditors = (root?: string) => this.flushEditors(root);
+  private flushEditors = async (root?: string) => {
+    await Promise.allSettled([...this.editorFlushers.values()].filter(editor => !root || editor.root === root).map(editor => editor.flush()));
+  };
+  openSubNotes = (root: string, ids: string[]) => { if (!ids.length) { this.patch({ subNotes: null }); return; } if (this.state.noteWindows.includes(root)) { this.focusNoteWindow(root); return; } this.patch({ subNotes: {
+    root, ids, arrival: this.state.route === docAddress(root) ? null : docAddress(root),
+  } }); };
+  popSubNote = () => {
+    const current = this.state.subNotes;
+    this.patch({ subNotes: current && current.ids.length > 1 ? { ...current, ids: current.ids.slice(0, -1) } : null });
+  };
+
+  closeNoteWindow = async (): Promise<boolean> => {
+    if (this.context.kind !== 'note' || this.closingNote || this.disposed) return false;
+    this.closingNote = true;
+    try {
+      if (!await this.canLeave()) return false;
+      this.stopWatch();
+      await this.services.host.invoke('destroy_current_window');
+      this.dispose(); return true;
+    } catch (error) {
+      this.services.warn('노트 창을 닫지 못했어요', error);
+      if (this.state.workspace) this.installWatch(this.state.workspace.path);
+      return false;
+    } finally { this.closingNote = false; }
+  };
+
+  receiveURLs = async (urls: string[]): Promise<void> => {
+    if (this.context.kind !== 'main' || this.disposed) return;
+    const input = latestInput(urls);
+    if (!input) return;
+    // Claim file URLs before the asynchronous host lookup so stale cold-start
+    // reads and older lookups cannot overtake a more recent user request.
+    const revision = ++this.linkRevision;
+    this.pendingLink = null;
+    let link: AppLink;
+    if ('link' in input) link = input.link;
+    else {
+      const root = this.state.workspace?.path;
+      const knownRoots = [...(root ? [root] : []), ...recentWorkspaces(this.services.storage).map(item => item.path)];
+      try {
+        const target = asRow(await this.services.host.invoke('resolve_md_target', { path: input.file, knownRoots }));
+        if (revision !== this.linkRevision || this.disposed) return;
+        if (target?.kind === 'note' && Array.isArray(target.chain) && target.chain.length > 0 && target.chain.every(id => typeof id === 'string' && id.length > 0) && asText(target.ws)) {
+          link = { kind: 'doc', id: target.chain[0], chain: target.chain.slice(1), ws: asText(target.ws), window: false };
+        } else if (target?.kind === 'external' && asText(target.path)) link = { kind: 'external', path: asText(target.path), ws: null };
+        else return;
+      } catch { return; }
+    }
+    if (revision !== this.linkRevision || this.disposed) return;
+    this.pendingLink = { link, revision };
+    this.scheduleLinks();
+    await this.waitForIdle();
+  };
+
+  waitForIdle = (): Promise<void> => this.queue.then(() => this.data.idle());
+
+  private scheduleLinks() {
+    if (this.drainingLinks || this.state.booting || this.disposed || !this.pendingLink) return;
+    this.drainingLinks = true;
+    void this.enqueue(async () => {
+      try {
+        while (!this.disposed && this.pendingLink) {
+          const pending = this.pendingLink;
+          this.pendingLink = null;
+          await this.openLink(pending.link, pending.revision);
+        }
+      } finally { this.drainingLinks = false; this.scheduleLinks(); }
+    });
+  }
+
+  private async openLink(link: AppLink, revision: number) {
+    if (link.ws && this.state.workspace?.path !== link.ws) {
+      this.patch({ busy: true });
+      try {
+        if (!await this.services.host.invoke<boolean>('is_workspace', { root: link.ws })) {
+          if (revision === this.linkRevision) { this.notify(`딥링크가 가리키는 폴더가 워크스페이스가 아니에요: ${link.ws}`); this.navigate('/launcher'); }
+          return;
+        }
+        if (!await this.canLeave()) return;
+        await this.data.flushReports();
+        this.data.invalidate();
+        await this.data.idle();
+        await this.authorize(link.ws);
+        await this.openWorkspace(link.ws);
+        this.patch({ recent: addRecent(this.services.storage, { path: link.ws, name: workspaceName(link.ws) }) });
+      } catch (error) {
+        if (revision === this.linkRevision) { this.notify(`딥링크 워크스페이스를 열 수 없어요: ${String(error)}`); this.navigate('/launcher'); }
+        return;
+      } finally { this.patch({ busy: false }); }
+    }
+    if (this.disposed || revision !== this.linkRevision) return;
+    if (!this.state.workspace) {
+      this.notify('딥링크를 열려면 워크스페이스가 필요해요. 먼저 워크스페이스를 열어 주세요.');
+      this.navigate('/launcher'); return;
+    }
+    if (link.kind === 'agenda') { this.navigate(agendaAddress(link.slug)); return; }
+    if (link.kind === 'external') { this.navigate(fileAddress(link.path)); return; }
+    if (link.window) {
+      const opened = await this.openLinkWindow(link.id, revision);
+      if (opened || revision !== this.linkRevision) return;
+    }
+    if (link.chain.length && !this.state.noteWindows.includes(link.id)) this.openSubNotes(link.id, link.chain);
+    this.navigate(docAddress(link.id));
+  }
+
+  private noteGeometry() {
+    const value = asRow(readJSON(this.services.storage, 'withlog.noteWindow.v1'));
+    if (!value || typeof value.width !== 'number' || !Number.isFinite(value.width) || value.width <= 0 || typeof value.height !== 'number' || !Number.isFinite(value.height) || value.height <= 0) return null;
+    return { width: value.width, height: value.height,
+      x: typeof value.x === 'number' && Number.isFinite(value.x) ? value.x : null,
+      y: typeof value.y === 'number' && Number.isFinite(value.y) ? value.y : null };
+  }
+
+  private async openLinkWindow(id: string, revision: number): Promise<boolean> {
+    const geometry = this.noteGeometry();
+    try {
+      if (this.state.noteWindows.includes(id)) {
+        await this.services.host.invoke('open_note_window', { docId: id, title: null, geometry }); return true;
+      }
+      const note = this.state.workspace?.notes.find(item => item.id === id);
+      if (!note) return false;
+      if (this.services.pending.flushNote) await this.services.pending.flushNote(id); else await this.services.pending.flushEditors();
+      await this.flushEditors(id);
+      if (!await this.services.pending.waitForWrites(10_000) || !await this.data.settled() || this.data.unsavedForRoot(id).length || (this.services.pending.unsavedForNote?.(id) ?? this.services.pending.unsavedNotes()) > 0) {
+        this.services.warn('못 쓴 글이 남아서 노트를 새 창으로 옮기지 않았어요'); return false;
+      }
+      if (revision !== this.linkRevision || this.disposed) return false;
+      await this.services.host.invoke('open_note_window', { docId: id, title: note.title, geometry });
+      return true;
+    } catch (error) { this.services.warn('노트를 새 창으로 옮기지 못했어요', error); return false; }
+  }
+
+  private today() {
+    const date = this.services.now();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  private listenNoteWindows() {
+    if (!this.services.noteWindowsChanged) return;
+    void this.services.noteWindowsChanged(this.setNoteWindows).then(unlisten => {
+      if (this.disposed) unlisten(); else this.unlistenWindows = unlisten;
+    }).catch(error => this.services.warn('노트 창 목록을 듣지 못했어요', error));
+    void this.services.host.invoke<string[]>('note_windows').then(this.setNoteWindows).catch(() => {});
+  }
+
+  callHost = <T,>(command: string, args?: Record<string, unknown>): Promise<T> => this.services.host.invoke<T>(command, args);
+  callEngine = (argv: string[]): Promise<unknown> => engineCall(this.services.host, argv);
+
+  private async discoverHome() {
+    try {
+      const home = homePath(await this.services.host.documentDir());
+      if (home && this.state.home === '~/Documents') this.patch({ home });
+    } catch { /* Browser previews retain the documented fallback. */ }
+  }
+
+  setHome = (home: string) => this.patch({ home });
+  chooseDirectory = async (forCreation: boolean): Promise<string | null> => {
+    if (this.context.kind === 'note') return null;
+    try {
+      const path = await this.services.host.chooseDirectory();
+      if (!path) throw new Error('취소');
+      if (forCreation) {
+        this.patch({ home: path });
+        writeJSON(this.services.storage, KEYS.home, homePath(path));
+      }
+      return path;
+    } catch { this.notify('폴더 선택 창을 열 수 없어요'); return null; }
+  };
+
+  private async canLeave(): Promise<boolean> {
+    if (!this.state.workspace || this.state.workspace.sample) return true;
+    const pending = this.services.pending;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      settled = await Promise.race([
+        (async () => { await pending.flushEditors(); await this.flushEditors();
+          return (await Promise.all([pending.waitForWrites(10_000), this.data.settled()])).every(Boolean); })(),
+        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 10_000); }),
+      ]);
+    } catch { /* A failed flush must still ask before discarding data. */ }
+    finally { clearTimeout(timer); }
+    const count = pending.unsavedNotes() + this.data.unsavedKeys().length;
+    // Part 4's outstanding questions and unpersisted answers are both zero.
+    return settled && count === 0 || await this.services.host.confirmLeave(
+      `아직 저장하지 못한 노트가 ${count}개 있어요.${settled ? '' : ' 저장을 마치지 못했어요.'} 워크스페이스를 바꿀까요?`);
+  }
+
+  private async authorize(path: string) {
+    try {
+      const notes = await this.services.host.invoke<string[]>('note_windows');
+      if (notes.length) {
+        const current = await this.services.host.invoke<string | null>('vault_root');
+        if (current && current !== path) {
+          await this.services.host.invoke('close_note_windows');
+          for (let n = 0; n < 40; n++) {
+            await this.services.sleep(100);
+            if (!(await this.services.host.invoke<string[]>('note_windows')).length) break;
+          }
+        }
+      }
+    } catch { /* Only allow_workspace's string rejection is fatal. */ }
+    try { await this.services.host.invoke('allow_workspace', { path }); }
+    catch (error) { if (typeof error === 'string') throw new Error(error); }
+  }
+
+  private async openWorkspace(path: string, requestedName = '') {
+    const name = requestedName || workspaceName(path);
+    await this.services.pending.flushReports();
+    await this.data.flushReports();
+    this.data.invalidate();
+    await this.data.idle();
+    await this.authorize(path);
+    this.stopWatch();
+    try { await engineCall(this.services.host, write.init(name)); }
+    catch { /* Engine startup errors do not prevent opening existing workspaces. */ }
+    try { await migrateLegacy(path, this.services.files, this.services.now(), this.services.uuid, this.services.warn); }
+    catch (error) { this.services.warn('옛 노트 이관을 마치지 못했어요', error); }
+    const data = await readWorkspace(this.services.host, true, undefined, this.services.sanitizeHTML);
+    const workspace: Workspace = { ...data, path, name, sample: false, today: this.today() };
+    this.patch({ workspace, fatal: null, vault: this.data.reset(workspace), subNotes: null, searchOpen: false });
+    writeJSON(this.services.storage, KEYS.last, { path, name });
+    this.installWatch(path);
+    await this.restoreWindows(workspace);
+  }
+
+  open = (rawPath: string, menu = false): Promise<boolean> => this.action(async () => {
+    const path = rawPath.trim();
+    if (!path || !await this.canLeave()) return false;
+    await this.openWorkspace(path);
+    this.patch({ recent: addRecent(this.services.storage, { path, name: workspaceName(path) }) });
+    this.navigate('/calendar');
+    return true;
+  }, '폴더를 열 수 없어요', menu ? () => this.navigate('/launcher') : undefined);
+
+  create = (rawName: string): Promise<boolean> => this.action(async () => {
+    const name = rawName.trim(), parent = this.state.home;
+    if (!name || !await this.canLeave()) return false;
+    await this.services.pending.flushReports();
+    await this.data.flushReports();
+    const path = await this.services.host.invoke<string>('create_workspace_dir', { parent, name });
+    this.data.invalidate();
+    await this.data.idle();
+    await this.authorize(path);
+    this.stopWatch();
+    // Creation reports initialization failure instead of claiming success.
+    try { await engineCall(this.services.host, write.init(name)); }
+    catch (error) {
+      // The host has already switched. Never leave an old workspace displayed
+      // against that new host root after initialization fails.
+      this.patch({ workspace: null, vault: this.data.reset() });
+      this.navigate('/launcher');
+      throw error;
+    }
+    await this.openWorkspace(path, name);
+    writeJSON(this.services.storage, KEYS.home, homePath(parent));
+    this.patch({ recent: addRecent(this.services.storage, { path, name, created: true }) });
+    this.navigate('/calendar');
+    return true;
+  }, '워크스페이스 생성 실패');
+
+  private openSample() {
+    this.stopWatch();
+    const workspace = sampleWorkspace();
+    const templates = readJSON(this.services.storage, 'withlog.templates.v1');
+    if (Array.isArray(templates)) workspace.templates = templates.filter(item => asRow(item) && asText(item.id));
+    const edits = asRow(readJSON(this.services.storage, 'withlog.reportEdits.v1')) || {};
+    const memos = asRow(readJSON(this.services.storage, 'withlog.reportMemos.v1')) || {};
+    const ids = new Set([...workspace.reports.map(row => asText(row.id)), ...Object.keys(edits), ...Object.keys(memos)]);
+    workspace.reports = [...ids].map(id => ({ id, body: asText(edits[id]), memo: asText(memos[id]) }))
+      .filter(row => row.body.trim() || row.memo.trim());
+    this.patch({ workspace, fatal: null, vault: this.data.reset(workspace), subNotes: null, searchOpen: false });
+  }
+
+  sample = (): Promise<boolean> => this.action(async () => {
+    let documents = '~/Documents';
+    try { documents = (await this.services.host.documentDir()).replace(/\/+$/, '') || documents; } catch { /* fallback */ }
+    this.patch({ recent: addRecent(this.services.storage,
+      { path: `${documents}/withlog-sample`, name: '샘플 워크스페이스', sample: true }) });
+    if (!await this.canLeave()) return false;
+    this.stopWatch(); this.data.invalidate(); await this.data.idle();
+    this.openSample();
+    this.navigate('/calendar');
+    return true;
+  }, '워크스페이스를 열 수 없어요');
+
+  openRecent = (item: RecentWorkspace): Promise<boolean> => this.action(async () => {
+    if (!await this.canLeave()) return false;
+    if (item.sample) { this.stopWatch(); this.data.invalidate(); await this.data.idle(); this.openSample(); }
+    else await this.openWorkspace(item.path, item.name);
+    this.navigate('/calendar');
+    return true;
+  }, '워크스페이스를 열 수 없어요');
+
+  forgetRecent = (path: string) => {
+    if (this.context.kind === 'main') this.patch({ recent: removeRecent(this.services.storage, path) });
+  };
+
+  launcher = (): Promise<boolean> => this.action(async () => {
+    if (!await this.canLeave()) return false;
+    await this.services.pending.flushReports();
+    await this.data.flushReports();
+    this.stopWatch();
+    this.data.invalidate(); await this.data.idle();
+    void this.services.host.invoke('close_note_windows').catch(() => {});
+    this.patch({ workspace: null, vault: this.data.reset() });
+    writeJSON(this.services.storage, KEYS.last, null);
+    this.navigate('/launcher');
+    return true;
+  }, '시작 화면으로 돌아갈 수 없어요');
+
+  private async restoreWindows(workspace: Workspace) {
+    if (this.restored || this.context.kind !== 'main') return;
+    this.restored = true;
+    try {
+      const saved = await this.services.host.invoke<string[]>('saved_note_windows');
+      const mainTabs = savedOpenIds(this.services.storage, workspace.path);
+      const docs = workspace.notes.filter(note => saved.includes(note.id) && !mainTabs.has(note.id))
+        .map(note => ({ docId: note.id, title: note.title }));
+      if (docs.length) await this.services.host.invoke('restore_note_windows', { docs });
+    } catch (error) { this.services.warn('노트 창을 되살리지 못했어요', error); }
+  }
+
+  private stopWatch() {
+    this.watchGeneration++;
+    this.unwatch?.();
+    this.unwatch = undefined;
+    this.data.selfWrites.clear();
+  }
+
+  private installWatch(root: string) {
+    this.stopWatch();
+    if (!this.selfListenerStarted && this.services.selfWritesChanged) {
+      this.selfListenerStarted = true;
+      void this.services.selfWritesChanged(this.data.receiveOwn).then(unlisten => {
+        if (this.disposed) unlisten(); else this.unlistenSelf = unlisten;
+      }).catch(error => this.services.warn('다른 창의 쓰기를 듣지 못했어요', error));
+    }
+    const generation = this.watchGeneration;
+    void this.services.watch(root, paths => {
+      if (generation === this.watchGeneration && this.data.selfWrites.external(paths).length) void this.refresh();
+    }).then(unwatch => {
+      if (this.disposed || generation !== this.watchGeneration) unwatch();
+      else this.unwatch = unwatch;
+    }).catch(error => this.services.warn('vault 감시를 걸지 못했어요', error));
+  }
+
+  refresh = (): Promise<void> => {
+    if (this.disposed) return Promise.resolve();
+    if (this.state.busy) return this.queue.then(() => this.refresh());
+    let workspace = this.state.workspace;
+    if (!workspace || workspace.sample || this.disposed) return Promise.resolve();
+    const today = this.today();
+    if (workspace.today !== today) { workspace = { ...workspace, today }; this.patch({ workspace }); }
+    return this.data.reconcile();
+  };
+
+  dispose() {
+    this.disposed = true;
+    this.stopWatch();
+    this.unlistenWindows?.();
+    this.unlistenSelf?.();
+    this.data.dispose();
+    this.editorFlushers.clear();
+    this.restorers.clear();
+    this.buffers.clear(); this.childRemovers.clear();
+    for (const dispose of this.inputDisposers) dispose();
+    this.inputDisposers.clear();
+    clearTimeout(this.noticeTimer);
+    this.listeners.clear();
+  }
+}
