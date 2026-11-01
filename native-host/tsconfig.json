@@ -14,7 +14,10 @@
     "verbatimModuleSyntax": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@claude-plug/*": ["./src/plugs/empty/*"]
+    }
   },
   "include": ["src", "vite.config.ts", "scripts/screen-contracts.mjs"]
 }

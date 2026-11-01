@@ -35,6 +35,26 @@ function WorkspaceApp() {
     const visible = () => { if (document.visibilityState === 'visible') focus(); };
     const storage = (event: StorageEvent) => { if (event.key === 'withlog.prefs.v1') controller.refreshTheme(); };
     const keydown = (event: KeyboardEvent) => { controller.handleKey(event); };
+    let unlistenClose: (() => void) | undefined;
+    if (context.kind === 'note') {
+      void controller.listenCloseRequested(() => { void controller.closeNoteWindow(); })?.then(fn => { unlistenClose = fn; });
+    }
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    const handleResize = () => {
+      if (context.kind !== 'note') return;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        controller.saveNoteGeometry({
+          width: window.innerWidth,
+          height: window.innerHeight,
+          x: window.screenX,
+          y: window.screenY,
+        });
+      }, 400);
+    };
+    if (context.kind === 'note') {
+      window.addEventListener('resize', handleResize);
+    }
     addEventListener('popstate', changed);
     addEventListener('focus', focus);
     addEventListener('storage', storage);
@@ -43,6 +63,9 @@ function WorkspaceApp() {
     void controller.boot(context.kind === 'main' && import.meta.env.DEV && new URLSearchParams(location.search).get('seed') === 'sample',
       context.kind === 'main' && import.meta.env.DEV ? new URLSearchParams(location.search).get('deeplink') || undefined : undefined);
     return () => {
+      unlistenClose?.();
+      clearTimeout(resizeTimer);
+      if (context.kind === 'note') window.removeEventListener('resize', handleResize);
       removeEventListener('popstate', changed); removeEventListener('focus', focus); removeEventListener('storage', storage);
       removeEventListener('keydown', keydown); removeEventListener('keydown', captureEscape, true);
       document.removeEventListener('visibilitychange', visible); controller.dispose();
@@ -50,14 +73,47 @@ function WorkspaceApp() {
   }, [controller]);
   useEffect(() => { document.documentElement.dataset.theme = state.theme; }, [state.theme]);
   if (state.booting) return <main className="status-screen" role="status"><Brand />
-    <p>{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
-  if (state.fatal) return <main className="status-screen"><Brand /><p role="alert">{state.fatal}</p></main>;
+    <p className="wl-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
+  if (state.fatal) {
+    if (context.kind === 'note') {
+      return (
+        <main className="status-screen note-window tabwin">
+          <div className="doc-route-empty-card">
+            <h2>노트를 열지 못했어요</h2>
+            <p role="alert">{state.fatal}</p>
+          </div>
+        </main>
+      );
+    }
+    return <main className="status-screen"><Brand /><p role="alert">{state.fatal}</p></main>;
+  }
   if (context.kind === 'note') {
     const note = state.workspace?.notes.find(n => n.id === context.docId);
     const preview = state.workspace?.notes.find(n => n.id === state.preview);
-    return <main className="note-window"><VaultBanner state={state} dismiss={() => controller.data.dismissFailures()} />{note ? <NoteScreen note={note} controller={controller} /> : <p className="empty-state">이 노트를 찾을 수 없어요.</p>}
+    return <main className="note-window tabwin">
+      <VaultBanner state={state} dismiss={() => controller.data.dismissFailures()} />
+      {note ? <NoteScreen note={note} controller={controller} /> : (
+        <div className="doc-route-empty-card">
+          <h2>이 노트를 찾을 수 없어요</h2>
+          <p>삭제됐거나 옮겨졌을 수 있어요. 이 창을 닫고 main 창에서 다시 찾아보세요.</p>
+        </div>
+      )}
       {preview && <Preview key={preview.id} controller={controller} state={state} />}
       <InteractionOverlays controller={controller} state={state} />
+      {state.noteCloseDialog && (
+        <div className="note-window-dialog-backdrop modal-overlay" onClick={() => controller.dismissNoteCloseDialog()}>
+          <div className="note-window-dialog modal-card" onClick={e => e.stopPropagation()}>
+            <h2>창을 닫으면 사라지는 것이 있어요</h2>
+            <ul className="note-window-dialog-list">
+              {state.noteCloseDialog.reasons.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+            <div className="note-window-dialog-actions modal-actions">
+              <button type="button" onClick={() => controller.dismissNoteCloseDialog()}>남겨 두기</button>
+              <button type="button" className="btn-danger" onClick={() => void controller.forceCloseNoteWindow()}>그래도 닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>;
   }
   return <>

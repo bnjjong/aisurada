@@ -1,3 +1,4 @@
+import { CLAUDE_ENABLED } from "@claude-plug/state";
 import { useEffect, useRef, useState } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
@@ -141,7 +142,7 @@ export function Editor(props: EditorProps) {
   }).current;
   return (
     <EditorContext.Provider value={props.features || {}}>
-      <div className="lex-editor lex-no-ask">
+      <div className={`lex-editor ${CLAUDE_ENABLED ? "" : "lex-no-ask"}`}>
         {error && (
           <p className="lex-error" role="alert">
             {error}

@@ -21,6 +21,8 @@ import {
   Guide,
 } from "../ui/OtherPages.tsx";
 import { ExternalFile } from "../ui/ExternalFile.tsx";
+import { TerminalHost } from "../ui/terminal/TerminalHost.tsx";
+import { SessionRoute } from "@claude-plug/session";
 type Props = { controller: WorkspaceController; state: WorkspaceState };
 class RouteBoundary extends Component<
   { children: ReactNode; controller: WorkspaceController },
@@ -86,15 +88,35 @@ export function WorkspaceShell({ controller, state }: Props) {
           {state.tabs.openIds
             .filter((id) => id.startsWith("term:"))
             .map((id) => (
-              <section
-                className="terminal-pane"
-                data-terminal-key={id}
-                hidden={route.kind !== "terminal" || routeTab(route) !== id}
+              <TerminalHost
                 key={id}
-                aria-label="터미널"
-              >
-                <h1>터미널</h1>
-              </section>
+                tabKey={id}
+                isVisible={route.kind === "terminal" && routeTab(route) === id}
+                agendas={ws.agendas}
+                onCreateDoc={async (agendaSlug, title, body) => {
+                  try {
+                    const agendaObj = ws.agendas.find((a) => a.slug === agendaSlug);
+                    const res = await controller.data.createDoc({
+                      agendaId: agendaObj?.id || agendaSlug,
+                      type: "free",
+                      title,
+                      body,
+                      date: ws.today,
+                      time: new Date().toTimeString().slice(0, 5),
+                      mins: 0,
+                      tags: ["터미널기록"],
+                      tier: "record",
+                    });
+                    if (res.ok && res.value?.id) {
+                      return { ok: true, id: res.value.id as string };
+                    }
+                    return { ok: false, error: "노트 생성에 실패했어요." };
+                  } catch (err: any) {
+                    return { ok: false, error: err?.message || String(err) };
+                  }
+                }}
+                onNavigate={(path) => controller.navigate(path)}
+              />
             ))}
         </main>
       </div>
@@ -154,7 +176,7 @@ function RouteContent({
     case "guide":
       return <Guide />;
     case "session":
-      return <Page title="이 판에는 Claude 연동이 없어요" />;
+      return <SessionRoute />;
     default:
       return null;
   }

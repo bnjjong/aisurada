@@ -11,5 +11,6 @@ pnpm --dir native-host test:data
 pnpm --dir native-host test:editor
 pnpm --dir native-host test:views
 pnpm --dir native-host test:autosave
+pnpm --dir native-host test:chapters
 node --test native-host/scripts/contracts.test.mjs
 cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked

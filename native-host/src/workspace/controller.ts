@@ -2,7 +2,8 @@ import { engineCall, readWorkspace } from './engine.ts';
 import { migrateLegacy } from './migrateLegacy.ts';
 import { sampleWorkspace } from './sample.ts';
 import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readTheme, recentWorkspaces,
-  removeRecent, savedOpenIds, writeJSON } from './storage.ts';
+  removeRecent, savedOpenIds, writeJSON, writeNoteGeometry } from './storage.ts';
+import { waitingAnswers, unsavedAnswers } from '@claude-plug/state';
 import { asRow, asText, workspaceName } from './types.ts';
 import { TabModel } from '../navigation/tabs.ts';
 import { NoteScrollMemory } from '../navigation/scroll.ts';
@@ -104,6 +105,16 @@ export class WorkspaceController {
   };
   locationChanged = (path: string) => { if (this.context.kind === 'main') this.changeLocation(path, 'external'); };
   private changeLocation(path: string, location: 'push' | 'replace' | 'external') {
+    if (this.context.kind === 'note') {
+      const noteRoute = `/note-window/${encodeURIComponent(this.context.docId)}`;
+      const docPath = docAddress(this.context.docId);
+      if (path !== noteRoute && path !== docPath) {
+        void this.services.host.invoke('show_in_main', { path, rail: null, sub: null }).catch(err => {
+          this.services.warn('show_in_main failed', err);
+        });
+        return;
+      }
+    }
     const route = parseRoute(path);
     if (this.context.kind === 'main' && this.state.workspace && route.kind === 'doc' && this.state.noteWindows.includes(route.id)) {
       const previous = this.tabs.close(route.id, this.state.route);
@@ -115,8 +126,7 @@ export class WorkspaceController {
   }
   setNoteWindows = (ids: string[]) => { if (this.context.kind === 'main') this.patch({ noteWindows: ids.filter(id => typeof id === 'string') }); };
   focusNoteWindow = (id: string) => {
-    const title = this.state.workspace?.notes.find(note => note.id === id)?.title;
-    void this.services.host.invoke('open_note_window', { docId: id, title }).catch(error => this.services.warn('노트 창을 열지 못했어요', error));
+    void this.services.host.invoke('open_note_window', { docId: id, title: null, geometry: this.noteGeometry() }).catch(error => this.services.warn('노트 창을 열지 못했어요', error));
   };
   selectTab = (id: string | null) => this.navigate(id === null ? this.state.tabs.lastMain : tabAddress(id));
   closeTab = (id: string) => {
@@ -241,6 +251,7 @@ export class WorkspaceController {
   handleKey = (event: KeyInput): boolean => {
     if (event.defaultPrevented) return false;
     if (event.key === 'Escape') {
+      if (this.state.noteCloseDialog) { this.dismissNoteCloseDialog(); event.preventDefault(); return true; }
       if (this.state.searchOpen) this.patch({ searchOpen: false });
       else if (blocksEscape(event)) return false;
       else if (this.state.settingsOpen) this.settings(false);
@@ -254,6 +265,7 @@ export class WorkspaceController {
     const shortcut = shortcutFor(event, this.services.mac ?? true, this.services.native ?? false);
     if (!shortcut) return false;
     if (shortcut.kind === 'search') { event.preventDefault(); this.patch({ searchOpen: !this.state.searchOpen }); return true; }
+    if (shortcut.kind === 'terminal') { event.preventDefault(); void this.handleMenu('wl_open_terminal'); return true; }
     if (shortcut.kind === 'close') { event.preventDefault(); void this.handleMenu('wl_close_tab'); return true; }
     const tabs: (string | null)[] = [null, ...this.state.tabs.openIds];
     let target: string | null | undefined;
@@ -308,19 +320,91 @@ export class WorkspaceController {
     this.patch({ subNotes: current && current.ids.length > 1 ? { ...current, ids: current.ids.slice(0, -1) } : null });
   };
 
+  listenCloseRequested = (handler: () => void) => this.services.closeRequested?.(handler);
+  saveNoteGeometry = (geo: { width: number; height: number; x: number; y: number }) => {
+    writeNoteGeometry(this.services.storage, geo);
+    void this.services.host.invoke('remember_note_window', { geometry: geo }).catch(err => {
+      console.error('remember_note_window failed', err);
+    });
+  };
+
   closeNoteWindow = async (): Promise<boolean> => {
     if (this.context.kind !== 'note' || this.closingNote || this.disposed) return false;
+    const docId = this.context.docId;
     this.closingNote = true;
     try {
-      if (!await this.canLeave()) return false;
-      this.stopWatch();
-      await this.services.host.invoke('destroy_current_window');
-      this.dispose(); return true;
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        settled = await Promise.race([
+          (async () => {
+            if (this.services.pending.flushNote) await this.services.pending.flushNote(docId);
+            else await this.services.pending.flushEditors();
+            await this.flushEditors();
+            return (await Promise.all([
+              this.services.pending.waitForWrites(10_000),
+              this.data.settled(),
+            ])).every(Boolean);
+          })(),
+          new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 10_000); }),
+        ]);
+      } catch {
+        settled = false;
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const count = (this.services.pending.unsavedForNote?.(docId) ?? this.services.pending.unsavedNotes()) + this.data.unsavedForRoot(docId).length;
+      const waiting = waitingAnswers();
+      const unsavedA = unsavedAnswers();
+
+      if (settled && count === 0 && waiting === 0 && unsavedA === 0) {
+        this.stopWatch();
+        await this.services.host.invoke('destroy_current_window');
+        this.dispose();
+        return true;
+      }
+
+      const reasons: string[] = [];
+      if (!settled) {
+        reasons.push('저장이 끝났는지 확인하지 못했어요. 사이드카가 답하지 않아요.');
+      }
+      if (count > 0) {
+        reasons.push(`디스크에 아직 못 쓴 노트가 ${count}개 있어요. 충돌 배너가 떠 있거나 저장이 실패한 노트예요.`);
+      }
+      if (waiting > 0) {
+        reasons.push(`답을 기다리는 물음이 ${waiting}개 있어요. 답은 이 창이 노트에 붙여서, 창을 닫으면 답이 노트에 안 남아요.`);
+      }
+      if (unsavedA > 0) {
+        reasons.push(`답은 왔는데 노트에 못 적은 회차가 ${unsavedA}개 있어요.`);
+      }
+
+      this.patch({ noteCloseDialog: { reasons } });
+      return false;
     } catch (error) {
       this.services.warn('노트 창을 닫지 못했어요', error);
       if (this.state.workspace) this.installWatch(this.state.workspace.path);
       return false;
-    } finally { this.closingNote = false; }
+    } finally {
+      this.closingNote = false;
+    }
+  };
+
+  dismissNoteCloseDialog = () => {
+    this.patch({ noteCloseDialog: null });
+  };
+
+  forceCloseNoteWindow = async (): Promise<boolean> => {
+    this.patch({ noteCloseDialog: null });
+    this.stopWatch();
+    try {
+      await this.services.host.invoke('destroy_current_window');
+      this.dispose();
+      return true;
+    } catch (error) {
+      this.services.warn('노트 창을 닫지 못했어요', error);
+      return false;
+    }
   };
 
   receiveURLs = async (urls: string[]): Promise<void> => {

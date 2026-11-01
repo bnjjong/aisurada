@@ -27,6 +27,11 @@ export default defineConfig(() => {
         },
       },
     ],
+    resolve: {
+      alias: {
+        '@claude-plug': resolve(__dirname, 'src/plugs/empty'),
+      },
+    },
     server: {
       host: host || 'localhost',
       port: 1420,

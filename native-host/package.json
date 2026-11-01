@@ -9,6 +9,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "vite --mode noclaude",
+    "postinstall": "node scripts/setup-plugs.mjs",
     "build": "pnpm typecheck && vite build --mode noclaude",
     "build:noclaude": "pnpm build",
     "typecheck": "tsc --noEmit",
@@ -31,6 +32,7 @@
     "test:autosave": "node --import tsx --test scripts/autosave.test.mjs",
     "test:autosave:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --autosave",
     "test:views": "node --import tsx --test scripts/views.test.mjs",
+    "test:chapters": "node --import tsx --test scripts/chapters14-17.test.mjs",
     "test:views:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --views"
   },
   "devDependencies": {

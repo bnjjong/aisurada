@@ -7,7 +7,150 @@ export const KEYS = {
   home: 'withlog.workspaceHome.v1',
   prefs: 'withlog.prefs.v1',
   tabs: 'withlog.tabs.v1',
+  noteWindow: 'withlog.noteWindow.v1',
+  sampleReport: 'withlog.sampleReport.v1',
+  connMode: 'withlog.connMode.v3',
+  connFilter: 'withlog.connFilter.v2',
+  sampleReportEdits: 'withlog.reportEdits.v1',
+  sampleReportMemos: 'withlog.reportMemos.v1',
+  sampleTemplates: 'withlog.templates.v1',
+  recentNotesPrefix: 'withlog.recentNotes.v1:',
 } as const;
+
+export interface AppPreferences {
+  theme: 'light' | 'dark';
+  weekLayout: 'swimlane' | 'stack';
+  railWidth: number;
+  detailListWidth: number;
+  docWidth: number;
+  noteRailWidth: number;
+  previewWidth: number;
+  previewHeight: number | null;
+  askCardWidth: number;
+  askCardHeight: number | null;
+  composeWidth: number;
+  composeInputHeight: number | null;
+  docSortMode: 'structure' | 'time';
+  docSortDir: 'desc' | 'asc';
+  titleDatePrefix: boolean;
+  showRecordTier: boolean;
+  mermaidShowSource: boolean;
+  askTimeoutSeconds: number;
+  sessionPreviewOpen: boolean;
+  collapsedProjects: string[];
+  expandedSessionProjects: string[];
+  [key: string]: unknown;
+}
+
+export const DEFAULT_PREFERENCES: AppPreferences = {
+  theme: 'light',
+  weekLayout: 'swimlane',
+  railWidth: 264,
+  detailListWidth: 340,
+  docWidth: 820,
+  noteRailWidth: 392,
+  previewWidth: 720,
+  previewHeight: null,
+  askCardWidth: 360,
+  askCardHeight: null,
+  composeWidth: 280,
+  composeInputHeight: null,
+  docSortMode: 'structure',
+  docSortDir: 'desc',
+  titleDatePrefix: true,
+  showRecordTier: false,
+  mermaidShowSource: false,
+  askTimeoutSeconds: 3600,
+  sessionPreviewOpen: true,
+  collapsedProjects: [],
+  expandedSessionProjects: [],
+};
+
+function clampInt(val: unknown, min: number, max: number, def: number): number {
+  if (typeof val !== 'number' || !Number.isFinite(val)) return def;
+  return Math.max(min, Math.min(max, Math.round(val)));
+}
+
+function clampNullableInt(val: unknown, min: number, max: number): number | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val !== 'number' || !Number.isFinite(val)) return null;
+  return Math.max(min, Math.min(max, Math.round(val)));
+}
+
+export function normalizePreferences(raw: unknown): { state: AppPreferences; version: number } {
+  const row = asRow(raw);
+  const stateRow = asRow(row?.state) || {};
+  const merged: AppPreferences = { ...DEFAULT_PREFERENCES, ...stateRow };
+
+  merged.theme = stateRow.theme === 'dark' ? 'dark' : 'light';
+  merged.weekLayout = stateRow.weekLayout === 'stack' ? 'stack' : 'swimlane';
+  merged.railWidth = clampInt(stateRow.railWidth, 200, 420, 264);
+  merged.detailListWidth = clampInt(stateRow.detailListWidth, 260, 560, 340);
+  merged.docWidth = clampInt(stateRow.docWidth, 640, 1600, 820);
+  merged.noteRailWidth = clampInt(stateRow.noteRailWidth, 392, 960, 392);
+  merged.previewWidth = clampInt(stateRow.previewWidth, 480, 1600, 720);
+  merged.previewHeight = clampNullableInt(stateRow.previewHeight, 320, 2400);
+  merged.askCardWidth = clampInt(stateRow.askCardWidth, 280, 720, 360);
+  merged.askCardHeight = clampNullableInt(stateRow.askCardHeight, 160, 1600);
+  merged.composeWidth = clampInt(stateRow.composeWidth, 240, 720, 280);
+  merged.composeInputHeight = clampNullableInt(stateRow.composeInputHeight, 80, 1200);
+  merged.docSortMode = stateRow.docSortMode === 'time' ? 'time' : 'structure';
+  merged.docSortDir = stateRow.docSortDir === 'asc' ? 'asc' : 'desc';
+  merged.titleDatePrefix = typeof stateRow.titleDatePrefix === 'boolean' ? stateRow.titleDatePrefix : true;
+  merged.showRecordTier = typeof stateRow.showRecordTier === 'boolean' ? stateRow.showRecordTier : false;
+  merged.mermaidShowSource = typeof stateRow.mermaidShowSource === 'boolean' ? stateRow.mermaidShowSource : false;
+
+  const validTimeouts = [600, 1200, 1800, 3600, 7200];
+  merged.askTimeoutSeconds = typeof stateRow.askTimeoutSeconds === 'number' && validTimeouts.includes(stateRow.askTimeoutSeconds)
+    ? stateRow.askTimeoutSeconds
+    : 3600;
+
+  merged.sessionPreviewOpen = typeof stateRow.sessionPreviewOpen === 'boolean' ? stateRow.sessionPreviewOpen : true;
+  merged.collapsedProjects = Array.isArray(stateRow.collapsedProjects)
+    ? stateRow.collapsedProjects.filter((s): s is string => typeof s === 'string')
+    : [];
+  merged.expandedSessionProjects = Array.isArray(stateRow.expandedSessionProjects)
+    ? stateRow.expandedSessionProjects.filter((s): s is string => typeof s === 'string')
+    : [];
+
+  return { state: merged, version: 1 };
+}
+
+export function readNoteWindowGeometry(storage: StoragePort): { width: number; height: number; x?: number; y?: number } | null {
+  const row = asRow(readJSON(storage, KEYS.noteWindow));
+  const width = typeof row?.width === 'number' && row.width > 0 ? row.width : null;
+  const height = typeof row?.height === 'number' && row.height > 0 ? row.height : null;
+  if (!width || !height) return null;
+  const x = typeof row?.x === 'number' && Number.isFinite(row.x) ? row.x : undefined;
+  const y = typeof row?.y === 'number' && Number.isFinite(row.y) ? row.y : undefined;
+  return { width, height, ...(x !== undefined ? { x } : {}), ...(y !== undefined ? { y } : {}) };
+}
+
+export function writeNoteWindowGeometry(
+  storage: StoragePort,
+  geom: { width: number; height: number; x?: number; y?: number }
+) {
+  if (geom.width <= 0 || geom.height <= 0) return;
+  const val: Record<string, number> = { width: geom.width, height: geom.height };
+  if (typeof geom.x === 'number' && Number.isFinite(geom.x)) val.x = geom.x;
+  if (typeof geom.y === 'number' && Number.isFinite(geom.y)) val.y = geom.y;
+  writeJSON(storage, KEYS.noteWindow, val);
+}
+
+export const writeNoteGeometry = writeNoteWindowGeometry;
+export const readNoteGeometry = readNoteWindowGeometry;
+
+export function readPreferences(storage: StoragePort): AppPreferences {
+  const json = readJSON(storage, KEYS.prefs);
+  return normalizePreferences(json).state;
+}
+
+export function writePreferences(storage: StoragePort, prefs: Partial<AppPreferences>, isMain = true) {
+  if (!isMain) return; // 노트 창은 설정을 쓰지 않는다 (15.7, 16.3)
+  const current = readPreferences(storage);
+  const next = { ...current, ...prefs };
+  writeJSON(storage, KEYS.prefs, { state: next, version: 1 });
+}
 
 export function readJSON(storage: StoragePort, key: string): unknown {
   try { return JSON.parse(storage.getItem(key) || 'null'); }
@@ -55,8 +198,9 @@ export function removeRecent(storage: StoragePort, path: string): RecentWorkspac
 
 export function homePath(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const path = value.replace(/\/+$/, '');
-  return path.startsWith('/') ? path : null;
+  const path = value.trim().replace(/\/+$/, '');
+  if (!path.startsWith('/') || path === '~/Documents') return null;
+  return path;
 }
 
 export function readTheme(storage: StoragePort): WorkspaceState['theme'] {

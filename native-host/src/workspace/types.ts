@@ -61,6 +61,7 @@ export interface WorkspaceServices {
   deepLinks?: import('../interaction/links.ts').DeepLinkSource;
   developmentLinks?(received: (urls: string[]) => void): () => void;
   closeWindow?(): Promise<void>;
+  closeRequested?(handler: () => void): Promise<() => void>;
   native?: boolean;
   mac?: boolean;
   navigate(path: string, replace: boolean): void;
@@ -122,6 +123,7 @@ export interface WorkspaceState {
   preview: string | null;
   subNotes: { root: string; ids: string[]; arrival: string | null } | null;
   vault: import('../data/vault.ts').VaultMemory;
+  noteCloseDialog?: { reasons: string[] } | null;
 }
 
 export const asRow = (value: unknown): Row | null =>
