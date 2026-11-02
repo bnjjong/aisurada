@@ -3,10 +3,11 @@ import {
   CODE, CHECK_LIST, HEADING, QUOTE, UNORDERED_LIST, ORDERED_LIST, LINK,
   HIGHLIGHT, TEXT_FORMAT_TRANSFORMERS,
 } from '@lexical/markdown';
-import type { ElementTransformer, TextMatchTransformer, Transformer } from '@lexical/markdown';
+import type { ElementTransformer, MultilineElementTransformer, TextMatchTransformer, Transformer } from '@lexical/markdown';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { ListNode, ListItemNode, $isListNode, $isListItemNode } from '@lexical/list';
-import { CodeNode, CodeHighlightNode } from '@lexical/code';
+import { ListNode, ListItemNode, $isListNode, $isListItemNode, $createListNode, $createListItemNode } from '@lexical/list';
+import type { ListType } from '@lexical/list';
+import { CodeNode, CodeHighlightNode, $createCodeNode, $isCodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
 import { MarkNode, $wrapSelectionInMarkNode } from '@lexical/mark';
 import {
@@ -15,20 +16,95 @@ import {
 } from '@lexical/table';
 import {
   $getRoot, $setSelection, $createRangeSelection, $createParagraphNode, $createLineBreakNode, $isParagraphNode,
-  $isElementNode, $isTextNode, $getState, $setState, createState, $addUpdateTag,
+  $isElementNode, $isTextNode, $getState, $setState, createState, $addUpdateTag, $createTextNode,
 } from 'lexical';
 import type { ElementNode, LexicalNode, BaseSelection } from 'lexical';
 import {
   AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
   $createAnnotation, $isAnnotation, $createCallout, $isCallout, $createReference, $isReference, $createImage, $isImage,
 } from './nodes.tsx';
-import { foldParagraphs, doubleListIndent, halveListIndent, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
+import { foldParagraphs, doubleListIndent, fenceTracker, mapOutsideCode, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
 
 export const EDITOR_NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, CodeHighlightNode,
   TableNode, TableRowNode, TableCellNode, MarkNode, AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
   { replace: LinkNode, with: (node: LinkNode) => new RelativeLinkNode(node.getURL(), { rel: node.getRel(), target: node.getTarget(), title: node.getTitle() }), withKlass: RelativeLinkNode }];
 export const pendingState = createState('wlPending', { parse: value => value === '/' || value === '-' ? value : '' });
 const dividerState = createState('wlDivider', { parse: value => value === true });
+
+const fenceState = createState('wlFence', { parse: value => typeof value === 'string' && /^`{3,}$/.test(value) ? value : '```' });
+const tailState = createState('wlFenceTail', { parse: value => typeof value === 'string' ? value : '' });
+// C74: the language is the info string's first word when it has the reading view's
+// language shape (1-30 of [A-Za-z0-9+#._-]), otherwise the [\w-] run as before. The
+// rest stays on the fence line; spaces between the backticks and the language do not.
+export function codeInfo(info: string): { language: string; tail: string } {
+  const text = info.replace(/^[ \t]+/, '').replace(/[ \t]+$/, ''), word = /^\S*/.exec(text)![0];
+  const language = /^[a-zA-Z0-9+#._-]{1,30}$/.test(word) ? word : /^[\w-]*/.exec(text)![0];
+  return { language, tail: text.slice(language.length) };
+}
+function $appendCode(root: ElementNode, fence: string, info: { language: string; tail: string }, code: string) {
+  const node = $createCodeNode(info.language || undefined);
+  $setState(node, fenceState, fence); $setState(node, tailState, info.tail);
+  root.append(node.append($createTextNode(code)));
+}
+// C73: the first code line keeps its spaces; the library dropped one on every open,
+// so indented code shrank on each save. The fence judge is the one line joining uses (9.9).
+const CODE_BLOCK: MultilineElementTransformer = {
+  ...CODE,
+  handleImportAfterStartMatch: ({ lines, rootNode, startLineIndex }) => {
+    const start = /^[ \t]*(`{3,})(.*)$/.exec(lines[startLineIndex]);
+    if (!start) return null;
+    const fence = start[1], single = new RegExp(`\`{${fence.length},}$`).exec(start[2]);
+    if (single && single.index > 0) { $appendCode(rootNode, fence, { language: '', tail: '' }, start[2].slice(0, single.index)); return [true, startLineIndex]; }
+    const close = new RegExp(`^[ \\t]*\`{${fence.length},}[ \\t]*$`);
+    let end = startLineIndex + 1;
+    while (end < lines.length && !close.test(lines[end])) end++;
+    const body = lines.slice(startLineIndex + 1, end);
+    // 9.9 keeps dropping a blank first line and empty last lines of a multi-line block.
+    if (body.length > 1) { if (!body[0].trim()) body.shift(); while (body.length && !body.at(-1)) body.pop(); }
+    $appendCode(rootNode, fence, codeInfo(start[2]), body.join('\n'));
+    return [true, Math.min(end, lines.length - 1)];
+  },
+  export: node => {
+    if (!$isCodeNode(node)) return null;
+    const raw = (item: LexicalNode): string => $isAnnotation(item) ? `<!--wl${item.getKind()}:${item.getIDs()[0]}-->${item.getChildren().map(raw).join('')}<!--/wl${item.getKind()}:${item.getIDs()[0]}-->`
+      : $isElementNode(item) ? item.getChildren().map(raw).join('') : item.getTextContent();
+    const body = node.getChildren().map(raw).join(''), runs = body.match(/`{3,}/g);
+    let fence = $getState(node, fenceState);
+    if (body.includes(fence) && runs) fence = '`'.repeat(Math.max(...runs.map(run => run.length)) + 1);
+    return fence + (node.getLanguage() || '') + $getState(node, tailState) + (body ? '\n' + body : '') + '\n' + fence;
+  },
+};
+
+const holder = (node: LexicalNode | null): node is ListItemNode => $isListItemNode(node) && node.getChildrenSize() === 1 && $isListNode(node.getFirstChild());
+const listIndent = (space: string) => (space.match(/\t/g)?.length || 0) + Math.floor((space.match(/ /g)?.length || 0) / 4);
+// C72, C196: an indented list line goes under the item above whatever its kind, and a
+// nested numbered list keeps the number of its own first line. An outer list that
+// begins with an indented line takes its start from the first outer line.
+function $placeListLine(parent: ElementNode, children: LexicalNode[], kind: ListType, space: string, number: number, checked?: boolean): ListItemNode {
+  const level = listIndent(space), previous = parent.getPreviousSibling(), item = $createListItemNode(kind === 'check' ? checked : undefined);
+  const real = (list: ListNode) => list.getChildren().some(child => !holder(child));
+  let list: ListNode;
+  if ($isListNode(previous) && (level > 0 || previous.getListType() === kind || !real(previous))) {
+    list = previous; parent.remove();
+    if (!level && list.getListType() !== kind) list.setListType(kind);
+  } else { list = $createListNode(kind); parent.replace(list); }
+  for (let depth = 0; depth < level; depth++) {
+    const last = list.getLastChild(), own = depth === level - 1;
+    let nested = holder(last) ? last.getFirstChild() as ListNode : null;
+    if (!nested || own && nested.getListType() !== kind) { nested = $createListNode(own ? kind : nested?.getListType() || kind); list.append($createListItemNode().append(nested)); }
+    list = nested;
+  }
+  if (kind === 'number' && !real(list)) list.setStart(number);
+  list.append(item.append(...children));
+  return item;
+}
+const listRule = (base: ElementTransformer, kind: ListType): ElementTransformer => ({
+  ...base,
+  replace: (parent, children, match, importing) => {
+    if (!importing) return base.replace(parent, children, match, importing);
+    $placeListLine(parent, children, kind, match[1], kind === 'number' ? Number(match[2]) : 1);
+  },
+});
 
 const PARAGRAPH: ElementTransformer = {
   type: 'element', dependencies: [], regExp: /$^/,
@@ -59,7 +135,13 @@ function checklist(cell: boolean): ElementTransformer {
     ...CHECK_LIST, regExp: cell ? /^(\s*)[-*+]\s\[([ xX/\-])\]\s/ : /^(\s*)(?:[-*+]\s)?\[([ xX/\-])\]\s/,
     replace: (parent, children, match, importing) => {
       if (isInCell(parent) && !/^\s*[-*+]\s/.test(match[0])) return false;
-      CHECK_LIST.replace(parent, children, [match[0], match[1], `[${match[2]}]`, match[2].toLowerCase() === 'x' ? 'x' : ''], importing);
+      const checked = match[2].toLowerCase() === 'x';
+      if (!cell && importing) {
+        const item = $placeListLine(parent, children, 'check', match[1], 1, checked);
+        if (/[/\-]/.test(match[2])) $setState(item, pendingState, match[2] as '/' | '-');
+        return;
+      }
+      CHECK_LIST.replace(parent, children, [match[0], match[1], `[${match[2]}]`, checked ? 'x' : ''], importing);
       const list = children[0]?.getParent();
       if ($isListItemNode(list) && /[/\-]/.test(match[2])) $setState(list, pendingState, match[2] as '/' | '-');
     },
@@ -135,7 +217,7 @@ const TABLE: ElementTransformer = {
     const table = $isTableNode(previous) ? previous : $createTableNode(), row = $createTableRowNode();
     for (const text of tableCells(match[0])) {
       const cell = $createTableCellNode(TableCellHeaderStates.NO_STATUS);
-      table.append(row); row.append(cell); importInto(text.replace(/\\n/g, '\n'), cell, true, false);
+      table.append(row); row.append(cell); importInto(mapOutsideCode(text, part => part.replace(/\\n/g, '\n')), cell, true, false);
     }
     if ($isTableNode(previous)) parent.remove(); else parent.replace(table);
     if (!importing) table.getLastDescendant()?.selectEnd();
@@ -158,26 +240,16 @@ const GUARDED_QUOTE: ElementTransformer = {
   },
 };
 export function transformers(cell = false, copy = false): Transformer[] {
-  const code = { ...CODE, export: (node: LexicalNode) => {
-    let text = CODE.export?.(node, () => '') ?? null;
-    if (text !== null && $isElementNode(node)) {
-      const raw = (item: LexicalNode): string => $isAnnotation(item) ? `<!--wl${item.getKind()}:${item.getIDs()[0]}-->${item.getChildren().map(raw).join('')}<!--/wl${item.getKind()}:${item.getIDs()[0]}-->`
-        : $isElementNode(item) ? item.getChildren().map(raw).join('') : item.getTextContent();
-      const body = node.getChildren().map(raw).join('');
-      if (body !== node.getTextContent()) text = text.slice(0, text.indexOf('\n') + 1) + body + text.slice(text.lastIndexOf('\n'));
-    }
-    return text === null || cell ? text : text.split('\n').map((line, index, lines) => index > 0 && index < lines.length - 1 ? halveListIndent(line) : line).join('\n');
-  } };
-  return [code, ...(cell ? [] : [PARAGRAPH, { ...TABLE, export: (node: LexicalNode, _children: (node: ElementNode) => string, selected?: BaseSelection | null) => $isTableNode(node) ? $tableMarkdown(node, copy, selected) : null }]), CALLOUT, checklist(cell), ...(cell ? [] : [CARD]), HEADING,
-    cell ? QUOTE : GUARDED_QUOTE, UNORDERED_LIST, ORDERED_LIST,
+  return [CODE_BLOCK, ...(cell ? [] : [PARAGRAPH, { ...TABLE, export: (node: LexicalNode, _children: (node: ElementNode) => string, selected?: BaseSelection | null) => $isTableNode(node) ? $tableMarkdown(node, copy, selected) : null }]), CALLOUT, checklist(cell), ...(cell ? [] : [CARD]), HEADING,
+    cell ? QUOTE : GUARDED_QUOTE, cell ? UNORDERED_LIST : listRule(UNORDERED_LIST, 'bullet'), cell ? ORDERED_LIST : listRule(ORDERED_LIST, 'number'),
     HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, IMAGE, CHIP, LINK, ANNOTATION];
 }
 function extractCallouts(text: string) {
-  const blocks: { kind: string; text: string }[] = [], lines = text.split('\n'), output: string[] = [];
-  let fenced = false;
+  const blocks: { kind: string; text: string }[] = [], lines = text.split('\n'), output: string[] = [], fenced = fenceTracker();
   for (let i = 0; i < lines.length; i++) {
-    if (/^\s*`{3}/.test(lines[i])) { fenced = !fenced; output.push(lines[i]); continue; }
-    const match = !fenced && /^> ?\[!([a-z\d_]+)\]\s*(.*)$/i.exec(lines[i]);
+    // C181: a callout written inside a code fence is code.
+    if (fenced(lines[i])) { output.push(lines[i]); continue; }
+    const match = /^> ?\[!([a-z\d_]+)\]\s*(.*)$/i.exec(lines[i]);
     if (!match) { output.push(lines[i]); continue; }
     const body: string[] = [];
     while (i + 1 < lines.length && lines[i + 1].startsWith('>')) body.push(lines[++i].replace(/^> ?/, ''));

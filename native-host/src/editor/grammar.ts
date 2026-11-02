@@ -1,20 +1,42 @@
+// 9.9: a fence opens on a line whose text after leading spaces and tabs is three
+// or more backticks, and closes only on a line of backticks at least as long. A
+// one-line fence closes on its own line. Line joining, callout lifting, list
+// indents and marker placeholders all ask this one judge (C88, C179, C181, C186, C187).
+export function fenceTracker() {
+  let open = 0;
+  return (raw: string): boolean => {
+    const line = raw.replace(/\r$/, '');
+    if (open) {
+      if (new RegExp(`^[ \\t]*\`{${open},}[ \\t]*$`).test(line)) open = 0;
+      return true;
+    }
+    const start = /^[ \t]*(`{3,})(.*)$/.exec(line);
+    if (!start) return false;
+    const rest = start[2].trimEnd(), close = new RegExp(`\`{${start[1].length},}$`).exec(rest);
+    if (!(close && close.index > 0)) open = start[1].length;
+    return true;
+  };
+}
+export const fenceLine = (line: string) => /^[ \t]*`{3,}/.test(line);
+
 export function foldParagraphs(input: string): string {
-  const lines = input.replace(/\r\n?/g, '\n').split('\n'), output: string[] = [];
-  let fenced = false;
-  const block = (line: string) => /^(?:#{1,6}\s|>|`{3}|\s*(?:[-*+]|\d+\.)\s|\s*\|.*\|\s*$)/.test(line)
+  const lines = input.replace(/\r\n?/g, '\n').split('\n'), output: string[] = [], fenced = fenceTracker();
+  const block = (line: string) => /^(?:#{1,6}\s|>|\s*(?:[-*+]|\d+\.)\s|\s*\|.*\|\s*$)/.test(line) || fenceLine(line)
     || /^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
   for (const line of lines) {
-    if (/^\s*`{3}/.test(line)) { fenced = !fenced; output.push(line); continue; }
+    if (fenced(line)) { output.push(line); continue; }
     const previous = output.at(-1);
-    if (!fenced && previous !== undefined && previous.trim() && line.trim() && !block(previous) && !block(line)
+    if (previous !== undefined && previous.trim() && line.trim() && !block(previous) && !block(line)
       && !/(?: {2,}|\\)$/.test(previous)) output[output.length - 1] += ' ' + line;
     else output.push(line);
   }
   return output.join('\n');
 }
 
+// C186: code lines that look like list items keep their spaces.
 export function doubleListIndent(text: string): string {
-  return text.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/gm, indent => indent + indent);
+  const fenced = fenceTracker();
+  return text.split('\n').map(line => fenced(line) ? line : line.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/, indent => indent + indent)).join('\n');
 }
 export function halveListIndent(text: string): string {
   return text.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/gm, indent => ' '.repeat(Math.round(indent.length / 2)));
@@ -43,12 +65,30 @@ export function widthDashes(widths: readonly number[] | undefined, count: number
   return widthHint(dashes) || Array(count).fill(3);
 }
 export const markerPattern = /<!--(\/?)(wl[ca]):((?:cm|ak)[a-z0-9]+-[a-z0-9]{1,8})-->/gi;
-export const stripMarkers = (text: string) => text.replace(markerPattern, '');
+// C182: marker syntax written in a code fence or an inline code span is code text.
+// `map` sees only the text outside code, in document order.
+export function mapOutsideCode(text: string, map: (part: string) => string): string {
+  const fenced = fenceTracker();
+  return text.split('\n').map(line => {
+    if (fenced(line)) return line;
+    let out = '', plain = '', i = 0;
+    while (i < line.length) {
+      if (line[i] !== '`') { plain += line[i++]; continue; }
+      const run = /^`+/.exec(line.slice(i))![0];
+      let end = line.indexOf(run, i + run.length);
+      while (end !== -1 && (line[end - 1] === '`' || line[end + run.length] === '`')) end = line.indexOf(run, end + 1);
+      if (end === -1) { plain += run; i += run.length; continue; }
+      out += map(plain) + line.slice(i, end + run.length); plain = ''; i = end + run.length;
+    }
+    return out + map(plain);
+  }).join('\n');
+}
+export const stripMarkers = (text: string) => mapOutsideCode(text, part => part.replace(markerPattern, ''));
 export interface MarkerPair { open: number; close: number; id: string; kind: 'c' | 'a'; }
 export function markerPlaceholders(input: string): { text: string; pairs: MarkerPair[]; marked: boolean } {
   let count = 0;
   const opens = new Map<string, { index: number; kind: 'c' | 'a' }>(), pairs: MarkerPair[] = [];
-  const text = input.replace(markerPattern, (_all, closing: string, type: string, id: string) => {
+  const text = mapOutsideCode(input, part => part.replace(markerPattern, (_all, closing: string, type: string, id: string) => {
     const index = count++, kind = type.toLowerCase().at(-1) as 'c' | 'a';
     const valid = kind === 'c' ? /^cm/i.test(id) : /^ak/i.test(id);
     if (valid && !closing) opens.set(id, { index, kind });
@@ -57,7 +97,7 @@ export function markerPlaceholders(input: string): { text: string; pairs: Marker
       if (open && open.kind === kind) { pairs.push({ open: open.index, close: index, id, kind }); opens.delete(id); }
     }
     return `\ue000${closing ? 'c' : 'o'}:${index}:${id}\ue000`;
-  });
+  }));
   return { text, pairs: pairs.sort((a, b) => a.open - b.open), marked: count > 0 };
 }
 export function relativePath(raw: string): string | null {

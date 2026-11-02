@@ -5,8 +5,10 @@ import { createHeadlessEditor } from '@lexical/headless';
 import { $getSelection, $getRoot } from 'lexical';
 import { extractTitle } from '../src/data/title.ts';
 import { $insertBlock } from '../src/editor/wrapBlock.ts';
-import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument } from '../src/editor/markdown.ts';
-import { relativePath, widthDashes, markerPlaceholders, calloutStyle } from '../src/editor/grammar.ts';
+import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument, codeInfo } from '../src/editor/markdown.ts';
+import { $createCodeNode } from '@lexical/code';
+import { $createTextNode } from 'lexical';
+import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs } from '../src/editor/grammar.ts';
 import { frameHeight, openEditorLink } from '../src/editor/media.tsx';
 import { tablesOnlyJSON } from '../src/editor/tableTools.tsx';
 const cases=JSON.parse(readFileSync(new URL('../fixtures/editor-roundtrip/cases.json',import.meta.url),'utf8'));
@@ -34,6 +36,30 @@ test('C190: code block and callout inside a list wrap only the cursor item and s
  assert.equal(wrap('- a\n- b\n  - b1\n- c','b','code'),'- a\n\n```plaintext\nb\n```\n\n  - b1\n- c');
  assert.equal(wrap('- a\n  - x\n  - y\n    - z\n  - w\n- c','y','callout'),'- a\n  - x\n\n> [!info] y\n\n    - z\n  - w\n- c');
  assert.equal(wrap('문단 하나','문단 하나','callout'),'> [!info] 문단 하나');
+});
+test('C186: list-like lines typed in a code block are saved with their own spaces',()=>{
+ const editor=createHeadlessEditor({namespace:'code',nodes:EDITOR_NODES,onError:e=>{throw e}});
+ editor.update(()=>{$importDocument('글');$getRoot().append($createCodeNode('yaml').append($createTextNode('key:\n  - a\n    - b')));},{discrete:true});
+ assert.equal(editor.getEditorState().read($exportDocument),'글\n\n```yaml\nkey:\n  - a\n    - b\n```');
+ const opened=createHeadlessEditor({namespace:'code-open',nodes:EDITOR_NODES,onError:e=>{throw e}});
+ opened.update(()=>$importDocument('```yaml\nkey:\n  - a\n```'),{discrete:true});
+ assert.equal(opened.getEditorState().read(()=>$getRoot().getFirstChild().getTextContent()),'key:\n  - a','the editor shows code lines with their file spaces');
+});
+test('9.9 fence judge: one-line fences close themselves, closers must be at least as long, indents allowed',()=>{
+ const judge=lines=>{const fenced=fenceTracker();return lines.map(line=>fenced(line));};
+ assert.deepEqual(judge(['```한 줄```','x','```js','x','```']),[true,false,true,true,true]);
+ assert.deepEqual(judge(['````md','```','a','```','````','b']),[true,true,true,true,true,false]);
+ assert.deepEqual(judge(['글','  ```js','  a','  ```','뒤']),[false,true,true,true,false]);
+ assert.equal(foldParagraphs('설명\n  ```js\n  a\n  b\n  ```\n뒤\n줄'),'설명\n  ```js\n  a\n  b\n  ```\n뒤 줄');
+});
+test('C182: marker syntax inside code survives placeholders and stripping; markers outside still pair',()=>{
+ const text='`<!--wlc:cmab-12345678-->` 앞 <!--wlc:cmcd-12345678-->글<!--/wlc:cmcd-12345678-->\n```\n<!--wla:akab-12345678-->x<!--/wla:akab-12345678-->\n```';
+ const placed=markerPlaceholders(text);assert.deepEqual(placed.pairs.map(pair=>pair.id),['cmcd-12345678']);assert.ok(placed.text.startsWith('`<!--wlc:cmab-12345678-->`'));assert.ok(placed.text.includes('<!--wla:akab-12345678-->x'));
+ assert.equal(stripMarkers(text),'`<!--wlc:cmab-12345678-->` 앞 글\n```\n<!--wla:akab-12345678-->x<!--/wla:akab-12345678-->\n```');
+});
+test('C74: the language is the first word in the reading-view shape, else the old [\\w-] run, and the rest stays on the fence',()=>{
+ assert.deepEqual(codeInfo('c++'),{language:'c++',tail:''});assert.deepEqual(codeInfo('ts title="x"'),{language:'ts',tail:' title="x"'});
+ assert.deepEqual(codeInfo('   js'),{language:'js',tail:''});assert.deepEqual(codeInfo('{.python}'),{language:'',tail:'{.python}'});assert.deepEqual(codeInfo(''),{language:'',tail:''});
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});

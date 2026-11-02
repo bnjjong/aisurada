@@ -133,8 +133,8 @@ markdown 줄은 설명서 부록 C.3의 「예」를 이 저장소의 헤드리�
 |---|---|---|
 | 1. 스토어와 vault | 완료. 8줄 고침, 역확인 8가지 | [rebuild-p3-fix-01-complete.md](rebuild-p3-fix-01-complete.md) |
 | 2. 화면 동작 | 완료. 8줄 고침(다른 세션 `9cf4dde`가 먼저 손댄 C112, C110, C188 포함), 2줄 시험만 | [rebuild-p3-fix-02-complete.md](rebuild-p3-fix-02-complete.md) |
-| 3. markdown 왕복 | 다음 | |
-| 4. 굵은 글의 한글 예외와 중첩 번호 | | |
+| 3. markdown 왕복 | 완료. 10줄과 C196 고침, C183 사례만. 묶음 87개 | [rebuild-p3-fix-03-complete.md](rebuild-p3-fix-03-complete.md) |
+| 4. 굵은 글의 한글 예외 | 다음. C196은 증분 3에서 고쳐서 C178만 남음 | |
 | 5. 강조 짝짓기 | | |
 | 6. 서식 안의 노트 칩 | | |
 | 7. vault 바꾸기 | | |

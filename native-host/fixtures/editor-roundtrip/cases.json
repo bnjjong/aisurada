@@ -108,7 +108,7 @@
   {
     "id": "E6",
     "input": "1. 부모\n  - 자식",
-    "expected": "1. 부모\n\n  - 자식"
+    "expected": "1. 부모\n  - 자식"
   },
   {
     "id": "E7",
@@ -194,13 +194,13 @@
   {
     "id": "I4",
     "input": "```\n  하나\n둘\n```",
-    "expected": "```\n 하나\n둘\n```",
-    "second": "```\n하나\n둘\n```"
+    "expected": "```\n  하나\n둘\n```",
+    "second": "```\n  하나\n둘\n```"
   },
   {
     "id": "I5",
     "input": "```c++\nint x;\n```",
-    "expected": "```c\n++\nint x;\n```"
+    "expected": "```c++\nint x;\n```"
   },
   {
     "id": "I6",
@@ -210,7 +210,7 @@
   {
     "id": "I7",
     "input": "````markdown\n```\n가\n나\n```\n````",
-    "expected": "````markdown\n```\n가 나\n```\n````"
+    "expected": "````markdown\n```\n가\n나\n```\n````"
   },
   {
     "id": "J1",
@@ -252,7 +252,7 @@
   {
     "id": "K3",
     "input": "|`split('\\n')`|x|\n|---|---|",
-    "expected": "| \\`split('\\n')\\` | x |\n| --- | --- |"
+    "expected": "| `split('\\n')` | x |\n| --- | --- |"
   },
   {
     "id": "K4",
@@ -359,5 +359,87 @@
     "id": "N8",
     "input": "|<!--wlc:cm1-a-->글<!--/wlc:cm1-a-->|x|\n|---|---|",
     "expected": "| <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> | x |\n| --- | --- |"
+  },
+  {
+    "id": "C69a",
+    "input": "| 코드 | 뜻 |\n|---|---|\n| `a\\nb` | 줄 |",
+    "expected": "| 코드 | 뜻 |\n| --- | --- |\n| `a\\nb` | 줄 |"
+  },
+  {
+    "id": "C72a",
+    "input": "1. 단계\n   - 세부 사항",
+    "expected": "1. 단계\n  - 세부 사항"
+  },
+  {
+    "id": "C72b",
+    "input": "- 글머리\n  - [ ] 할 일\n  - [x] 끝낸 일",
+    "expected": "- 글머리\n  - [ ] 할 일\n  - [x] 끝낸 일"
+  },
+  {
+    "id": "C72c",
+    "input": "1. a\n   - b\n   1. c",
+    "expected": "1. a\n  - b\n  1. c"
+  },
+  {
+    "id": "C72d",
+    "input": "  1. 앞 중첩\n3. 바깥\n4. 다음",
+    "expected": "  1. 앞 중첩\n3. 바깥\n4. 다음"
+  },
+  {
+    "id": "C73a",
+    "input": "```yaml\n  key: a\n  b: c\n```",
+    "expected": "```yaml\n  key: a\n  b: c\n```",
+    "second": "```yaml\n  key: a\n  b: c\n```"
+  },
+  {
+    "id": "C74a",
+    "input": "```ts title=\"x\"\nconst a = 1\n```",
+    "expected": "```ts title=\"x\"\nconst a = 1\n```"
+  },
+  {
+    "id": "C88a",
+    "input": "````md\n```\n첫 줄\n둘째 줄\n```\n````",
+    "expected": "````md\n```\n첫 줄\n둘째 줄\n```\n````"
+  },
+  {
+    "id": "C179a",
+    "input": "설명 줄\n  ```js\n  const a = 1\n  const b = 2\n  ```",
+    "expected": "설명 줄\n\n```js\n  const a = 1\n  const b = 2\n```"
+  },
+  {
+    "id": "C181a",
+    "input": "```md\n> [!note] 예시\n> 본문\n```\n\n````md\n```\n````\n\n````md\n> [!tip] 둘\n> 몸\n````",
+    "expected": "```md\n> [!note] 예시\n> 본문\n```\n\n````md\n```\n````\n\n````md\n> [!tip] 둘\n> 몸\n````"
+  },
+  {
+    "id": "C182a",
+    "input": "표식 설명: `<!--wlc:cmab-12345678-->` 를 여는 표식이라 한다",
+    "expected": "표식 설명: `<!--wlc:cmab-12345678-->` 를 여는 표식이라 한다"
+  },
+  {
+    "id": "C182b",
+    "input": "```html\n<!--wlc:cmab-12345678-->글<!--/wlc:cmab-12345678-->\n```",
+    "expected": "```html\n<!--wlc:cmab-12345678-->글<!--/wlc:cmab-12345678-->\n```"
+  },
+  {
+    "id": "C183a",
+    "input": "> [!note] 제목\n> - a\n>   - b",
+    "expected": "> [!note] 제목\n> - a\n>   - b",
+    "second": "> [!note] 제목\n> - a\n>   - b"
+  },
+  {
+    "id": "C187a",
+    "input": "```한 줄```\n```js\nx\ny\n```",
+    "expected": "```\n한 줄\n```\n\n```js\nx\ny\n```"
+  },
+  {
+    "id": "C196a",
+    "input": "1. a\n   3. x",
+    "expected": "1. a\n  3. x"
+  },
+  {
+    "id": "C196b",
+    "input": "5. a\n   1. x",
+    "expected": "5. a\n  1. x"
   }
 ]
