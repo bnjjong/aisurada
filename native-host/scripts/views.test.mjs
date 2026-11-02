@@ -17,6 +17,7 @@ import {
   relativeFile,
   preferences,
   scheduleNotice,
+  agendaRepoField,
 } from "../src/ui/model.ts";
 import { RecentNotes, recentNotes, recentKey } from "../src/ui/recent.ts";
 import {
@@ -24,6 +25,7 @@ import {
   timeAt,
   addDays,
   canPlaceAt,
+  movedTime,
 } from "../src/ui/CalendarAgenda.tsx";
 import { reportIds } from "../src/ui/OtherPages.tsx";
 import {
@@ -276,6 +278,23 @@ test("외부 md 상대 링크 한 번 디코드·점 경로, URL과 다른 파�
   );
   for (const s of ["https://a/x.md", "/x.md", "#x", "x.png", "%ZZ.md"])
     assert.equal(relativeFile("/a/start.md", s), null);
+});
+test("C193: 일 보기 화살표는 15분 그대로, 끌기는 격자로 옮기고 누른 쪽의 반대로 가둔 값은 안 쓴다", () => {
+  assert.equal(movedTime("14:37", 15, false), "14:52");
+  assert.equal(movedTime("14:37", -15, false), "14:22");
+  assert.equal(movedTime("23:30", 15, false), "23:45");
+  assert.equal(movedTime("23:50", 15, false), null);
+  assert.equal(movedTime("23:50", 40 / 0.8, true), null);
+  assert.equal(movedTime("00:05", -15, false), "00:00");
+  assert.equal(movedTime("09:30", 20, true), "09:45");
+  assert.equal(movedTime("09:44", 6, true), "09:45");
+});
+test("C28: 아젠다 폼은 연 때 저장소가 있던 아젠다에서 비운 칸만 repo= 로 싣는다", () => {
+  assert.deepEqual(agendaRepoField("git@x:a.git", ""), { repo: "" });
+  assert.deepEqual(agendaRepoField("", ""), {});
+  assert.deepEqual(agendaRepoField("", "  "), {});
+  assert.deepEqual(agendaRepoField("", "git@x:b.git"), { repo: "git@x:b.git" });
+  assert.deepEqual(agendaRepoField("git@x:a.git", "git@x:b.git"), { repo: "git@x:b.git" });
 });
 test("캘린더 15분 스냅·경계·한 시간 겹침 레인", () => {
   assert.equal(timeAt(67), "01:00");

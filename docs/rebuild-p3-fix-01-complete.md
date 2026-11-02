@@ -58,7 +58,7 @@
 
 | 검사 | 결과 |
 |---|---|
-| `bash test-native.sh` (jar 빌드, 화면 빌드, 시험 10묶음, `contracts`, `cargo test`) | 통과(16초, 다른 세션의 `9cf4dde` 위로 옮긴 뒤). data 50, navigation 26, workspace 31, editor 79, views 44, interaction 22, autosave 9, chapters 3, screen 6, contracts 30, cargo 65 |
+| `bash test-native.sh` (jar 빌드, 화면 빌드, 시험 10묶음, `contracts`, `cargo test`) | 통과(16초, 다른 세션의 `9cf4dde` 위로 옮긴 뒤). screen 6, workspace 31, navigation 26, interaction 30, data 50, editor 79, views 22, autosave 44, chapters 9, contracts 3, cargo 65 |
 | `test:workspace:acceptance`(실제 WKWebView, 격리된 vault와 홈) | 8개 모두 통과 |
 | `test:data:acceptance` | 11개 모두 통과 |
 | `test:navigation:acceptance` | 5개 통과, 1개 실패(`terminal-panels-survive-navigation`). 고치기 전 판 `17f7457`에서도 같은 자리에서 실패했다 |

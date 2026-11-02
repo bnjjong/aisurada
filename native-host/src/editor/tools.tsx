@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $wrapSelectionInMarkNode } from '@lexical/mark';
-import { $createCodeNode, $isCodeNode } from '@lexical/code';
-import { $createTableNodeWithDimensions, $isTableSelection, $isTableCellNode, $isTableNode } from '@lexical/table';
-import { $setBlocksType } from '@lexical/selection';
+import { $isCodeNode } from '@lexical/code';
+import { $isTableSelection, $isTableCellNode, $isTableNode } from '@lexical/table';
 import {
   $getRoot, $getSelection, $setSelection, $isRangeSelection, $isTextNode, $getNodeByKey, $createRangeSelection,
-  $createParagraphNode, $isParagraphNode, $insertNodes,
+  $createParagraphNode, $isParagraphNode,
   FORMAT_TEXT_COMMAND, PASTE_COMMAND, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH, createCommand,
 } from 'lexical';
 import type { BaseSelection, ElementNode, TextNode } from 'lexical';
 import type { EditorProps } from './Editor.tsx';
-import { $createAnnotation, $createCallout, $isCallout, $createReference, $createImage } from './nodes.tsx';
+import { $createAnnotation, $isCallout, $createReference, $createImage } from './nodes.tsx';
 import { calloutStyle } from './grammar.ts';
+import { $insertBlock } from './wrapBlock.ts';
 
 type Trigger = { key: string; start: number; size: number };
 type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; x: number; y: number };
@@ -51,15 +51,7 @@ export function EditorTools(props: EditorProps) {
     .sort((a, b) => b.created.localeCompare(a.created)).slice(0, 20);
   function restore() { if (selection.current) $setSelection(selection.current.clone()); }
   function format(value: typeof formats[number]) { editor.update(() => { restore(); editor.dispatchCommand(FORMAT_TEXT_COMMAND, value); }); }
-  function block(kind: string) {
-    const selected = $getSelection(); if (!$isRangeSelection(selected)) return;
-    if (kind === 'table') { $insertNodes([$createTableNodeWithDimensions(3, 3, { rows: true, columns: false })]); return; }
-    if (kind === 'code') { $setBlocksType(selected, () => $createCodeNode('plaintext')); return; }
-    const node = selected.anchor.getNode();
-    if (node.getParents().some($isCallout) || $isCallout(node)) return;
-    const top = node.getTopLevelElement(); if (!top) return;
-    const wrapper = $createCallout(); top.insertBefore(wrapper); wrapper.append(top); top.selectStart();
-  }
+  const block = $insertBlock;
   function removeTrigger(trigger: Trigger) {
     const node = $getNodeByKey<TextNode>(trigger.key); if (!$isTextNode(node)) return null;
     const range = $createRangeSelection(); range.anchor.set(trigger.key, trigger.start, 'text'); range.focus.set(trigger.key, trigger.start + trigger.size, 'text');

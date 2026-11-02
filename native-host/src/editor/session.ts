@@ -17,7 +17,6 @@ export class EditorSession {
   private readonly controller: WorkspaceController;
   private readonly ref: NoteRef;
   private readonly epoch: number;
-  private readonly initialTitle: string;
   private readonly format: string;
   private gate: string;
   private buffer: string;
@@ -42,7 +41,7 @@ export class EditorSession {
     const memory = controller.data.getSnapshot(), clash = memory.conflicted.includes(this.key());
     this.buffer = clash ? memory.buffers[this.key()] ?? body : body;
     this.ownEditing = clash;
-    this.initialTitle = extractTitle(body, this.format); this.gate = extractTitle(this.buffer, this.format);
+    this.gate = extractTitle(this.buffer, this.format);
     this.state = { status: clash ? '외부 변경됨' : '저장됨', state: clash ? 'conflict' : 'saved', discarding: false,
       mirror: { revision: 0, body: this.buffer, external: false } };
     const root = ref.parent ? controller.data.chain(ref.parent)?.split('/')[0] || ref.id : ref.id;
@@ -117,8 +116,10 @@ export class EditorSession {
   private async title(mode: SaveMode): Promise<boolean> {
     if (mode === 'auto' || mode === 'keep') { if (this.cursor === 1) return true; }
     const note = this.controller.data.note(this.ref); if (!note) return true;
-    const title = extractTitle(note.body, this.format), compare = mode === 'dispose' ? this.initialTitle : this.gate;
-    if (!title || title === compare) return true;
+    // C90: leaving compares with the gate like window blur. The mirror moves the gate,
+    // so a heading changed elsewhere is never committed as this editor's title.
+    const title = extractTitle(note.body, this.format);
+    if (!title || title === this.gate) return true;
     const previous = this.gate; this.gate = title;
     if (note.title === title) return true;
     const result = await this.controller.data.updateNote(this.ref, { title });

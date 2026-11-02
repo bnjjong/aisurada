@@ -1,5 +1,9 @@
 import { asRow, asText } from "../workspace/types.ts";
 import type { Note, Agenda, Row, StoragePort } from "../workspace/types.ts";
+// C28: an emptied repository clears the agenda's old one only when the form
+// opened with a repository; otherwise an empty field is not sent at all.
+export const agendaRepoField = (opened: string, repo: string) =>
+  repo.trim() || opened.trim() ? { repo } : {};
 export const HUE_COLORS: Record<string, string> = {
   blue: "#5f8fbd",
   violet: "#9380bf",

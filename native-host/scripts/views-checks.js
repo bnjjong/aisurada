@@ -186,6 +186,49 @@ if (location.pathname.startsWith("/note-window/")) {
         "minutes",
       );
     });
+    await test("C112-untouched-minutes-follow-memory-and-blur-writes-nothing", async () => {
+      const current = await engine(["get-doc", cfg.id]);
+      await engine(["update-doc", cfg.id, "mins=60", "f1=" + current.precondition]);
+      dispatchEvent(new Event("focus"));
+      await until(() => $(".doc-meta-mins-input")?.value === "60", "minutes follow outside change");
+      const before = (await fetch("/calls").then((r) => r.json())).length;
+      $(".doc-meta-mins-input").focus();
+      $(".doc-meta-mins-input").blur();
+      await pause(600);
+      const calls = (await fetch("/calls").then((r) => r.json())).slice(before);
+      assert(!calls.some((c) => c.args.argv[0] === "update-doc"), "blur without typing wrote");
+      assert((await engine(["get-doc", cfg.id])).mins === 60, "outside minutes overwritten");
+      const input = $(".doc-meta-mins-input");
+      input.focus();
+      fill(input, "45");
+      input.blur();
+      await until(async () => (await engine(["get-doc", cfg.id])).mins === 45, "typed minutes");
+      const after = await engine(["get-doc", cfg.id]);
+      await engine(["update-doc", cfg.id, "mins=70", "f1=" + after.precondition]);
+      dispatchEvent(new Event("focus"));
+      await until(() => $(".doc-meta-mins-input")?.value === "70", "follows memory again after typing");
+      // Later checks expect the minutes the previous check set.
+      $(".doc-meta-mins-input").focus();
+      fill($(".doc-meta-mins-input"), "35");
+      $(".doc-meta-mins-input").blur();
+      await until(async () => (await engine(["get-doc", cfg.id])).mins === 35, "minutes restored");
+    });
+    await test("C110-evaluation-escape-keeps-the-preview-open", async () => {
+      go("/calendar?mode=day&date=" + cfg.today);
+      await until(() => $('.tl-block[data-calendar-note="' + cfg.id + '"]'), "day");
+      key($('.tl-block[data-calendar-note="' + cfg.id + '"]'), "Enter");
+      await until(() => $(".note-preview .doc-eval-badge"), "preview");
+      $(".note-preview .doc-eval-badge").click();
+      await until(() => $(".note-preview .doc-eval-pop"), "evaluation popover in preview");
+      fill($(".doc-eval-note"), "쓰던 메모");
+      key($(".doc-eval-note"), "Escape");
+      await until(() => !$(".doc-eval-pop"), "popover closed");
+      await pause(100);
+      assert($(".note-preview"), "Esc closed the preview with the popover");
+      esc();
+      await until(() => !$(".note-preview"), "preview closes on its own Esc");
+      await open();
+    });
     await test("tag-enter-deduplicate-blur-and-backspace", async () => {
       const input = $('[aria-label="태그 추가"]');
       fill(input, " 공유태그 ");
@@ -818,7 +861,29 @@ if (location.pathname.startsWith("/note-window/")) {
       go("/guide");
       await until(() => $$(".guide-step").length === 3, "guide");
       assert($$(".guide-step button").length === 3, "guide copy");
+      const step2 = $$(".guide-step")[1].textContent;
+      assert(!step2.includes("withlog-mcp.js") && !step2.includes("mcpServers"), "C119 guide still registers the removed MCP server");
+      assert(step2.includes('install --cli "$APP/wl-cli.jar" --sidecar "$APP/wl-sidecar.jar"') && step2.includes("export WITHLOG_VAULT="), "C119 guide lacks the CLI mode setup");
       assert(!$(".set-ask-timeout"), "AI control visible");
+    });
+    // Last on purpose: a selection left in the template editor disturbs later navigation.
+    await test("C57-template-editor-selection-offers-no-comment", async () => {
+      const made = await engine(["save-template", "name=C57 템플릿", "type=free", "desc=", "body=고를 글이 있는 본문"]);
+      dispatchEvent(new Event("focus"));
+      go("/templates?open=" + encodeURIComponent(made.id));
+      await until(() => $(".template-editor .lex-content")?.textContent.includes("고를 글"), "template body");
+      const root = $(".template-editor .lex-content"),
+        walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT),
+        node = walker.nextNode();
+      root.focus();
+      const range = document.createRange();
+      range.setStart(node, 0);
+      range.setEnd(node, 2);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+      await until(() => $(".sel-bar"), "selection bar");
+      assert(!$(".comment-add-btn"), "comment button in an editor that takes no comments");
     });
   } catch (error) {
     if (!results.some((r) => !r.ok))

@@ -22,13 +22,20 @@ export const addDays = (date: string, n: number) => {
 };
 export const minute = (time: string) =>
   Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-export const timeAt = (n: number) => {
-  const m = Math.max(0, Math.min(1425, Math.round(n / 15) * 15));
+const clockAt = (n: number) => {
+  const m = Math.max(0, Math.min(1425, Math.round(n)));
   return (
     String(Math.floor(m / 60)).padStart(2, "0") +
     ":" +
     String(m % 60).padStart(2, "0")
   );
+};
+export const timeAt = (n: number) => clockAt(Math.round(n / 15) * 15);
+// 12.4: arrows move exactly 15 minutes, drags snap to the 15-minute grid.
+// C193: a clamped time on the other side of the pressed direction is not written.
+export const movedTime = (time: string, delta: number, snap: boolean): string | null => {
+  const from = minute(time), next = snap ? timeAt(from + delta) : clockAt(from + delta), to = minute(next);
+  return (delta > 0 && to < from) || (delta < 0 && to > from) ? null : next;
 };
 export function lanes(notes: Note[]) {
   const ends: number[] = [],
@@ -228,12 +235,12 @@ export function Calendar({
                         controller.showPreview(n.id);
                       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                         e.preventDefault();
-                        saveTime(
-                          n,
-                          timeAt(
-                            minute(n.time) + (e.key === "ArrowUp" ? -15 : 15),
-                          ),
+                        const next = movedTime(
+                          n.time,
+                          e.key === "ArrowUp" ? -15 : 15,
+                          false,
                         );
+                        if (next) saveTime(n, next);
                       }
                     }}
                     onPointerDown={(e) => {
@@ -278,10 +285,12 @@ export function Calendar({
                         saveTime(n, other.time);
                         saveTime(other, n.time);
                       } else {
-                        const next = timeAt(
-                          minute(n.time) + (e.clientY - d.y) / 0.8,
+                        const next = movedTime(
+                          n.time,
+                          (e.clientY - d.y) / 0.8,
+                          true,
                         );
-                        if (canPlaceAt(n, dayNotes, layout, next))
+                        if (next && canPlaceAt(n, dayNotes, layout, next))
                           saveTime(n, next);
                       }
                     }}

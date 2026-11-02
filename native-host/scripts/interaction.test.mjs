@@ -69,6 +69,11 @@ test('file parsing accepts local Markdown only and latest input ignores unsuppor
   assert.equal(latestInput([url('a'), 'invalid', url('b'), 'https://ignored']).link.id, 'b');
 });
 
+test('C194: the palette shortcut ignores a key whose default the editor already handled', () => {
+  assert.equal(shortcutFor(key({ key:'k', defaultPrevented:true }), true, true), null);
+  assert.equal(shortcutFor(key({ key:'k', metaKey:false, ctrlKey:true, defaultPrevented:true }), false, true), null);
+  assert.deepEqual(shortcutFor(key({ key:'k' }), true, true), { kind:'search' });
+});
 test('shortcuts use physical codes for digits and brackets and ignore Alt, Shift-digits and wrong modifiers', () => {
   assert.deepEqual(shortcutFor(key({ code:'Digit2', key:'é' }), true, true), {kind:'index',index:1});
   assert.deepEqual(shortcutFor(key({ code:'Numpad9' }), true, true), {kind:'index',index:-1});

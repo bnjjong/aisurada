@@ -6,6 +6,8 @@ import { SelfWrites } from '../src/data/selfWrites.ts';
 import { WriteQueues } from '../src/data/writeQueues.ts';
 import { engineCall, engineRefusal, SidecarCommandError, readWorkspace } from '../src/workspace/engine.ts';
 import { sampleWorkspace } from '../src/workspace/sample.ts';
+import { TITLE_MISMATCH_HEAD } from '../src/data/titleWarning.ts';
+import { readFileSync } from 'node:fs';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -252,9 +254,11 @@ test('trash writes restore optimistic removals on failure and restoration waits 
   await h.data.deleteDoc('a');assert.equal(h.workspace.notes[0].id,'a');await h.data.trashAction('tr1','purge');assert.equal(h.workspace.trash[0].trashId,'tr1');
   await h.data.trashAction('tr1','restore');assert.ok(h.argv().some(a=>a[0]==='reindex'));
 });
-test('entity updates retain optimistic values on failure and empty repo is omitted while project= is sent',async t=>{
+test('C28: entity updates retain optimistic values on failure and send a given empty repo= to clear it, while creation omits it',async t=>{
   const h=fixture(t,{handler:async argv=>argv[0]==='update-agenda'?fail(4):undefined});await h.data.saveEntity('agenda',{title:' New ',repo:'',project:'',summary:''},'ag');
-  assert.equal(h.workspace.agendas[0].title,'New');assert.deepEqual(h.argv().at(-1),['update-agenda','ag','title=New','project=','summary=']);await h.data.reconcile();assert.equal(h.workspace.agendas[0].title,'Demo');
+  assert.equal(h.workspace.agendas[0].title,'New');assert.deepEqual(h.argv().at(-1),['update-agenda','ag','title=New','repo=','project=','summary=']);await h.data.reconcile();assert.equal(h.workspace.agendas[0].title,'Demo');
+  await h.data.saveEntity('agenda',{title:'Plain',summary:''},'ag');assert.deepEqual(h.argv().at(-1),['update-agenda','ag','title=Plain','summary=']);
+  await h.data.saveEntity('agenda',{title:'Fresh',repo:'',hue:'',project:'',summary:''});assert.ok(!h.argv().at(-1).some(cell=>cell.startsWith('repo=')));
 });
 test('entity deletion refusal exposes full stderr and keeps preceding note deletions',async t=>{
   const h=fixture(t,{handler:async argv=>argv[0]==='delete-doc'?ok({trashId:'tr2',file:'a'}):argv[0]==='delete-agenda'?fail(-1):undefined});
@@ -292,6 +296,15 @@ test('a read started before creation cannot remove the real id after the create 
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='list-docs'?(await gate.promise,ok([note(),note('b')])):argv[0]==='create-doc'?ok({id:'real',path:'notes/demo/real',precondition:'CREATED'}):undefined});
   const reading=h.data.reconcile();await tick();await h.data.createDoc({agendaId:'ag',type:'free',title:'New',body:'new',date:'2026-11-01',time:'12:30',mins:0,tags:[]});
   gate.resolve();await reading;assert.ok(h.workspace.notes.some(note=>note.id==='real'&&note.precondition==='CREATED'));
+});
+test('C188: a renaming title write drops only the engine title-mismatch notice, whose head matches the engine source',async t=>{
+  const mismatch='본문 첫 헤딩("snake\\_case")이 제목("snake_case")과 달라요 — 앱에서 고치면 제목이 바뀝니다.';
+  let warning=mismatch+'\n옛 노트 삭제 실패 — 같은 id가 둘 남았을 수 있어요(정리 필요): notes/demo/a';
+  const h=fixture(t,{handler:async argv=>argv[0]==='update-doc'?ok({path:'notes/demo/moved',precondition:'T1',renamed:true,warning}):undefined});
+  await h.data.updateNote({id:'a'},{title:'snake_case'});assert.deepEqual(h.data.getSnapshot().failures.map(line=>line.text),['옛 노트 삭제 실패 — 같은 id가 둘 남았을 수 있어요(정리 필요): notes/demo/a']);
+  h.data.dismissFailures();warning=mismatch;await h.data.updateNote({id:'a'},{title:'snake_case 2'});assert.deepEqual(h.data.getSnapshot().failures,[]);
+  const engine=readFileSync(new URL('../../src/withlog/write/WarningsDetector.java',import.meta.url),'utf8');
+  assert.ok(engine.includes('return "'+TITLE_MISMATCH_HEAD.replace('"','\\"')+'"'),'engine title-mismatch sentence head changed');
 });
 test('failure banner deduplicates to ten lines and success retains only active conflict failures',async t=>{
   const h=fixture(t,{handler:async argv=>argv[0]==='update-doc'?fail(4):undefined});

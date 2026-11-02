@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHeadlessEditor } from '@lexical/headless';
-import { $getSelection } from 'lexical';
+import { $getSelection, $getRoot } from 'lexical';
+import { extractTitle } from '../src/data/title.ts';
+import { $insertBlock } from '../src/editor/wrapBlock.ts';
 import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument } from '../src/editor/markdown.ts';
 import { relativePath, widthDashes, markerPlaceholders, calloutStyle } from '../src/editor/grammar.ts';
 import { frameHeight, openEditorLink } from '../src/editor/media.tsx';
@@ -12,6 +14,26 @@ for(const c of cases) test(`PDF에서 독립 재구성한 왕복 ${c.id}: headle
  const editor=createHeadlessEditor({namespace:c.id,nodes:EDITOR_NODES,onError:e=>{throw e}});
  editor.update(()=>{$importDocument(`# 왕복 ${c.id}\n\n${c.input}\n\n왕복 사례 끝`); assert.equal($getSelection(),null)},{discrete:true});
  assert.equal(editor.getEditorState().read($exportDocument),`# 왕복 ${c.id}\n\n${c.headless??c.expected}\n\n왕복 사례 끝`);
+});
+test('C188: the screen title equals the heading text the editor shows, before and after a save',()=>{
+ const headings=['snake\\_case 정리','snake_case 정리','a_b_c','**굵은** 제목','*기울임*과 _기울임_','__init__ 함수','~~취소~~ 됨','==강조== 됨','`코드` 제목','1\\~2kg','a * b * c','값 &#35; 끝','\\*literal\\*','[링크](https://x.y) 글','[노트](#doc:nd1) 칩','**(주의)**를 확인','\\# 아님','***둘 다***','C:\\\\temp','앞 `a\\.b` 뒤','2 * 3 = 6','**a*b**','_a_b_','~a~','=a='];
+ for(const heading of headings){
+  const editor=createHeadlessEditor({namespace:'title',nodes:EDITOR_NODES,onError:e=>{throw e}});editor.update(()=>$importDocument('# '+heading),{discrete:true});
+  const shown=editor.getEditorState().read(()=>$getRoot().getFirstChild().getTextContent()),saved=editor.getEditorState().read($exportDocument);
+  assert.equal(extractTitle('# '+heading),shown,heading);assert.equal(extractTitle(saved),shown,'saved '+heading);
+ }
+});
+test('C190: code block and callout inside a list wrap only the cursor item and split up to the outermost list',()=>{
+ const wrap=(markdown,target,kind)=>{const editor=createHeadlessEditor({namespace:'wrap',nodes:EDITOR_NODES,onError:e=>{throw e}});
+  editor.update(()=>$importDocument(markdown),{discrete:true});
+  editor.update(()=>{$getRoot().getAllTextNodes().find(node=>node.getTextContent()===target).select(1,1);$insertBlock(kind);},{discrete:true});
+  return editor.getEditorState().read($exportDocument);};
+ assert.equal(wrap('- [ ] 할 일\n- [x] 끝난 일','할 일','code'),'```plaintext\n할 일\n```\n\n- [x] 끝난 일');
+ assert.equal(wrap('- [ ] 할 일\n- [x] 끝난 일','할 일','callout'),'> [!info] 할 일\n\n- [x] 끝난 일');
+ assert.equal(wrap('1. a\n2. b\n3. c','b','code'),'1. a\n\n```plaintext\nb\n```\n\n3. c');
+ assert.equal(wrap('- a\n- b\n  - b1\n- c','b','code'),'- a\n\n```plaintext\nb\n```\n\n  - b1\n- c');
+ assert.equal(wrap('- a\n  - x\n  - y\n    - z\n  - w\n- c','y','callout'),'- a\n  - x\n\n> [!info] y\n\n    - z\n  - w\n- c');
+ assert.equal(wrap('문단 하나','문단 하나','callout'),'> [!info] 문단 하나');
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});

@@ -8,6 +8,7 @@ import { WriteQueues } from './writeQueues.ts';
 import type { WriteStamp } from './writeQueues.ts';
 import { readJSON, writeJSON } from '../workspace/storage.ts';
 import { extractTitle } from './title.ts';
+import { withoutTitleMismatch } from './titleWarning.ts';
 
 export interface NoteRef { id: string; parent?: string; }
 export interface FailureLine { text: string; key?: string; kind: 'failed' | 'conflict' | 'reloaded'; }
@@ -334,7 +335,8 @@ export class VaultData {
         this.replaceNote(ref, update);
         if (bodyWrite) this.setFlag('unsaved', key, false);
         this.success();
-        if (response.renamed === true && asText(response.warning)) this.failure(asText(response.warning));
+        const warning = argv.some(cell => cell.startsWith('title=')) ? withoutTitleMismatch(asText(response.warning)) : asText(response.warning);
+        if (response.renamed === true && warning) this.failure(warning);
         return { ok: true, value: response };
       } catch (error) {
         if (!this.valid(generation)) return { ok: false };
@@ -579,7 +581,6 @@ export class VaultData {
     const workspace = this.workspace(); if (!workspace) return { ok: false };
     const fields = { ...input };
     for (const field of ['title', 'summary', 'repo']) if (typeof fields[field] === 'string') fields[field] = fields[field].trim();
-    if (!fields.repo) delete fields.repo;
     if (!id) for (const field of ['hue', 'project', 'repo']) if (!fields[field]) delete fields[field];
     const key = kind === 'agenda' ? 'agendas' : 'projects', nid = id || `${kind === 'agenda' ? 'ag' : 'pr'}${this.services.now().getTime().toString(36)}-${this.services.uuid().slice(0, 8)}`;
     const local = { ...fields, id: nid, slug: asText(fields.title).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-') || nid };

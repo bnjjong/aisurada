@@ -4,7 +4,7 @@ import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { Modal, Confirm } from "./Modal.tsx";
 import { Editor } from "../editor/Editor.tsx";
-import { TYPES, TYPE_NAMES } from "./model.ts";
+import { TYPES, TYPE_NAMES, agendaRepoField } from "./model.ts";
 export const EMPTY_TEMPLATE =
   "# [제목]\n\n한 줄 요약을 적어요.\n\n## 핵심 내용\n- 첫 번째 항목\n";
 const HUES = [
@@ -298,7 +298,7 @@ function EntityForm({
               summary,
               ...(kind === "agenda"
                 ? {
-                    repo,
+                    ...agendaRepoField(asText(old?.repo), repo),
                     ...(!id || project !== asText(old?.project)
                       ? { project }
                       : {}),

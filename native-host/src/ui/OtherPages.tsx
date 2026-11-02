@@ -969,20 +969,19 @@ export function Guide() {
       "1. CLI 스킬",
       `withlog의 노트는 wl-cli로 읽고 씁니다.\n목록: wl-cli list-docs limit=20\n읽기: wl-cli get-doc <노트 id>\n쓰기 전 토큰을 받고 f1=<precondition>을 함께 보냅니다.`,
     ],
+    // C119: step 2 sets up the CLI mode the step-1 skill assumes. `install`
+    // copies only the two jars, so the wrapper script is written here.
     [
-      "2. MCP 서버 설정 예시",
-      JSON.stringify(
-        {
-          mcpServers: {
-            withlog: {
-              command: "node",
-              args: ["~/withlog/dist-mcp/withlog-mcp.js"],
-            },
-          },
-        },
-        null,
-        2,
-      ),
+      "2. wl-cli를 셸에 두기",
+      [
+        'APP="/Applications/withlog.app/Contents/Resources"',
+        'java -jar "$APP/wl-cli.jar" install --cli "$APP/wl-cli.jar" --sidecar "$APP/wl-sidecar.jar"',
+        "mkdir -p ~/.local/bin",
+        `printf '#!/bin/sh\\nexec java -jar "$HOME/Library/Application Support/withlog/bin/wl-cli.jar" "$@"\\n' > ~/.local/bin/wl-cli`,
+        "chmod +x ~/.local/bin/wl-cli",
+        `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`,
+        `echo 'export WITHLOG_VAULT="<vault 경로>"' >> ~/.zshrc`,
+      ].join("\n"),
     ],
     ["3. Claude에게 말하기", "withlog에서 오늘 작업한 노트를 찾아 요약해 줘."],
   ];

@@ -110,11 +110,14 @@ export function NoteMeta({
                     );
                   }}
                   onBlur={() => {
+                    // C112: only typed minutes are written, and after leaving
+                    // the field it follows memory again.
                     if (minsDirty && mins !== Number(live.mins || 0))
                       void controller.data.updateNote(
                         { id: note.id },
                         { mins },
                       );
+                    setMinsDirty(false);
                   }}
                 />
                 분
