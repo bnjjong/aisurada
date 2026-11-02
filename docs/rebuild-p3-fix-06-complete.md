@@ -58,7 +58,7 @@
 
 | 검사 | 결과 |
 |---|---|
-| `bash test-native.sh` | 통과(18초). screen 6, workspace 31, navigation 26, interaction 31, data 51, editor 119, views 25, autosave 45, chapters 9, contracts 3, cargo 65 |
+| `bash test-native.sh` | 통과(18초). screen 6, workspace 31, navigation 26, interaction 31, data 51, editor 119, views 26, autosave 45, chapters 9, contracts 3, cargo 65 |
 | `test:editor:acceptance`(실제 WKWebView) | 113개 모두 통과. 왕복 102사례와 기능 점검 11개다 |
 | `test:views:acceptance` | 27개 모두 통과 |
 | `test:autosave:acceptance` | 15개 모두 통과 |

@@ -129,6 +129,8 @@ markdown 줄은 설명서 부록 C.3의 「예」를 이 저장소의 헤드리�
 
 ## 6. 진행
 
+증분 1~7을 모두 끝냈다. 남은 것은 3부 10단계(18장 받아들임)이고, 18장 본문과 원본 실행기는 아직 받지 못했다.
+
 | 증분 | 상태 | 기록 |
 |---|---|---|
 | 1. 스토어와 vault | 완료. 8줄 고침, 역확인 8가지 | [rebuild-p3-fix-01-complete.md](rebuild-p3-fix-01-complete.md) |
@@ -137,7 +139,7 @@ markdown 줄은 설명서 부록 C.3의 「예」를 이 저장소의 헤드리�
 | 4. 굵은 글의 한글 예외 | 완료. C178과 증분 5의 C197, C199, C200을 짝짓기 함수 하나로 함께 고침 | [rebuild-p3-fix-04-complete.md](rebuild-p3-fix-04-complete.md) |
 | 5. 강조 짝짓기 | 완료. C198(줄을 넘는 서식) | [rebuild-p3-fix-05-complete.md](rebuild-p3-fix-05-complete.md) |
 | 6. 서식 안의 노트 칩 | 완료. C201 | [rebuild-p3-fix-06-complete.md](rebuild-p3-fix-06-complete.md) |
-| 7. vault 바꾸기 | 다음 | |
+| 7. vault 바꾸기 | 완료. C202 고침, C174는 시험만 | [rebuild-p3-fix-07-complete.md](rebuild-p3-fix-07-complete.md) |
 
 ## 7. 참조
 

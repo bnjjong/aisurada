@@ -647,6 +647,7 @@ export class WorkspaceController {
     await this.services.pending.flushReports();
     await this.data.flushReports();
     const path = await this.services.host.invoke<string>('create_workspace_dir', { parent, name });
+    const before = await this.services.host.invoke<string | null>('vault_root').catch(() => null);
     this.data.invalidate();
     await this.data.idle();
     await this.authorize(path);
@@ -654,10 +655,12 @@ export class WorkspaceController {
     // Creation reports initialization failure instead of claiming success.
     try { await engineCall(this.services.host, write.init(name)); }
     catch (error) {
-      // The host has already switched. Never leave an old workspace displayed
-      // against that new host root after initialization fails.
-      this.patch({ workspace: null, vault: this.data.reset() });
-      this.navigate('/launcher');
+      // C202: the host goes back to the vault it had when creation started, so the
+      // vault still on screen and the host's vault never part. The first error is
+      // the one reported.
+      if (before) { try { await this.services.host.invoke('allow_workspace', { path: before }); } catch { /* reported below */ } }
+      const shown = this.state.workspace;
+      if (shown && !shown.sample) this.installWatch(shown.path);
       throw error;
     }
     await this.openWorkspace(path, name);

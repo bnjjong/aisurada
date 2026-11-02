@@ -141,17 +141,33 @@ test('sample stops watching, preserves last real workspace and makes no invoke c
   assert.equal(h.controller.getSnapshot().recent[0].path, '/documents/withlog-sample');
 });
 
-test('creation failure after host authorization detaches the old displayed workspace', async t => {
+test('C202: a failed initialization of a new vault puts the host back on the old vault and keeps the old vault on screen', async t => {
   let fail = false;
   const h = harness(t, { invoke: async (cmd, args) => {
     if (fail && cmd === 'sidecar_call' && args.argv[0] === 'init-workspace') return { status: 3, stdout: '', stderr: 'init failed' };
   } }); setLast(h); await h.controller.boot(); await tick();
-  const oldLast = h.values.get(KEYS.last); fail = true;
+  const oldLast = h.values.get(KEYS.last), shown = h.controller.getSnapshot().workspace, route = h.controller.getSnapshot().route; fail = true;
+  h.controller.setHome('/parent');
   assert.equal(await h.controller.create('new'), false);
-  assert.equal(h.controller.getSnapshot().workspace, null);
-  assert.equal(h.controller.getSnapshot().route, '/launcher');
+  const allows = h.calls.filter(c => c.command === 'allow_workspace').map(c => c.args.path);
+  assert.deepEqual(allows.slice(-2), ['/parent/new', shown.path]);
+  assert.equal(await h.services.host.invoke('vault_root'), shown.path);
+  assert.equal(h.controller.getSnapshot().workspace.path, shown.path);
+  assert.equal(h.controller.getSnapshot().route, route);
+  assert.match(h.controller.getSnapshot().notice, /생성 실패/);
   assert.equal(h.values.get(KEYS.last), oldLast);
-  assert.equal(h.watches[0].stopped, true);
+  assert.equal(h.watches[0].stopped, true); assert.equal(h.watches.at(-1).root, shown.path); assert.equal(h.watches.at(-1).stopped, false);
+});
+
+test('C174: retrospective edits waiting to be written go to the old vault before opening or creating another vault', async t => {
+  for (const change of [h => h.controller.create('new'), h => h.controller.open('/other')]) {
+    const h = harness(t); setLast(h); await h.controller.boot(); await tick(); h.controller.setHome('/parent');
+    h.controller.data.saveReport('rv-morning-2026-06-04', '아침 회고', '');
+    await change(h);
+    const save = h.calls.findIndex(c => c.command === 'sidecar_call' && c.args.argv[0] === 'save-report');
+    const leave = h.calls.findIndex(c => c.command === 'allow_workspace' && c.args.path !== h.calls.find(d => d.command === 'allow_workspace').args.path);
+    assert.ok(save >= 0 && leave >= 0 && save < leave, 'report written after the host left the vault');
+  }
 });
 
 test('recent opening does not reorder entries and removal re-reads shared storage', async t => {
