@@ -3,9 +3,10 @@ import type { ListItemNode, ListNode } from '@lexical/list';
 import { $createCodeNode } from '@lexical/code';
 import { $createTableNodeWithDimensions } from '@lexical/table';
 import { $setBlocksType } from '@lexical/selection';
-import { $createParagraphNode, $createTextNode, $getSelection, $insertNodes, $isElementNode, $isRangeSelection } from 'lexical';
-import type { ElementNode, LexicalNode } from 'lexical';
-import { $createCallout, $isCallout } from './nodes.tsx';
+import { $createParagraphNode, $createTextNode, $getSelection, $insertNodes, $isElementNode, $isRangeSelection, $isTextNode, TEXT_TYPE_TO_FORMAT } from 'lexical';
+import type { ElementNode, LexicalNode, RangeSelection, TextFormatType } from 'lexical';
+import { $createCallout, $isCallout, $isReference, CHIP_FORMATS } from './nodes.tsx';
+import type { ReferenceNode } from './nodes.tsx';
 
 // A list item whose only child is a list is the holder of a nested list, not an item of its own.
 const isHolder = (item: ListItemNode) => item.getChildrenSize() === 1 && $isListNode(item.getFirstChild());
@@ -65,4 +66,26 @@ export function $insertBlock(kind: string) {
   if (item) { $wrapListItem(item, 'callout'); return; }
   const top = node.getTopLevelElement(); if (!top) return;
   const wrapper = $createCallout(); top.insertBefore(wrapper); wrapper.append(top); top.selectStart();
+}
+
+// C201 (decided 2026-11-02): B and I, Cmd+B and Cmd+I also format the note chips in the
+// selection, and a button shows pressed only when every selected text and chip has the
+// format. Inline code and underline never go on a chip; those stay with the library.
+const selectedChips = (selection: RangeSelection) => selection.getNodes().filter((node): node is ReferenceNode => $isReference(node) && !node.isCard());
+export function $selectionHasFormat(format: TextFormatType): boolean {
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection)) return false;
+  const chips = selectedChips(selection);
+  if (!chips.length || !(CHIP_FORMATS as readonly string[]).includes(format)) return selection.hasFormat(format);
+  return chips.every(chip => chip.hasFormat(format)) && selection.getNodes().filter($isTextNode).every(text => text.hasFormat(format));
+}
+export function $formatSelection(format: TextFormatType): boolean {
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection) || !(CHIP_FORMATS as readonly string[]).includes(format)) return false;
+  const chips = selectedChips(selection);
+  if (!chips.length) return false;
+  const on = !$selectionHasFormat(format);
+  for (const chip of chips) chip.setFormats(on ? [...chip.getFormats(), format] : chip.getFormats().filter(item => item !== format));
+  selection.formatText(format, on ? TEXT_TYPE_TO_FORMAT[format] : 0);
+  return true;
 }

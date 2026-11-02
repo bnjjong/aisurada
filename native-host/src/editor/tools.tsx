@@ -6,13 +6,13 @@ import { $isTableSelection, $isTableCellNode, $isTableNode } from '@lexical/tabl
 import {
   $getRoot, $getSelection, $setSelection, $isRangeSelection, $isTextNode, $getNodeByKey, $createRangeSelection,
   $createParagraphNode, $isParagraphNode,
-  FORMAT_TEXT_COMMAND, PASTE_COMMAND, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH, createCommand,
+  FORMAT_TEXT_COMMAND, PASTE_COMMAND, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_LOW, createCommand,
 } from 'lexical';
 import type { BaseSelection, ElementNode, TextNode } from 'lexical';
 import type { EditorProps } from './Editor.tsx';
 import { $createAnnotation, $isCallout, $createReference, $createImage } from './nodes.tsx';
 import { calloutStyle } from './grammar.ts';
-import { $insertBlock } from './wrapBlock.ts';
+import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock.ts';
 
 type Trigger = { key: string; start: number; size: number };
 type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; x: number; y: number };
@@ -113,7 +113,7 @@ export function EditorTools(props: EditorProps) {
           const dom = window.getSelection(), rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : root.getBoundingClientRect();
           const quote = $isTableSelection(selected) ? tableRowCells(selected).reduce((lines, cell, index, cells) => lines + cell.getTextContent()
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '') : text;
-          setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && selected.hasFormat(format)) });
+          setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)) });
         } else if (!composeRef.current) setBar(null);
         if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('wl:import') || tags.has('wl:repair') || tags.has('wl:mirror') || tags.has('withlog-mirror') || menuRef.current) return;
         if ($isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
@@ -158,6 +158,7 @@ export function EditorTools(props: EditorProps) {
       if (!parents.some($isCodeNode) || parents.some($isTableCellNode)) return false;
       event.preventDefault(); selected.insertText('\t'); return true;
     }, COMMAND_PRIORITY_HIGH);
+    const formatCommand = editor.registerCommand(FORMAT_TEXT_COMMAND, $formatSelection, COMMAND_PRIORITY_LOW);
     const commentCommand = editor.registerCommand(OPEN_COMMENT_COMMAND, () => {
       const selected = $getSelection(); if (!selected) return false;
       selection.current = selected.clone();
@@ -184,7 +185,7 @@ export function EditorTools(props: EditorProps) {
     const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { closeCompose(); setMenu(null); setCard(null); } };
     root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop);
     document.addEventListener('pointerdown', outside);
-    return () => { update(); paste(); tab(); commentCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); document.removeEventListener('pointerdown', outside); };
+    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); document.removeEventListener('pointerdown', outside); };
   }, [editor]);
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>

@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHeadlessEditor } from '@lexical/headless';
-import { $getSelection, $getRoot } from 'lexical';
+import { $getSelection, $getRoot, $createRangeSelection, $setSelection } from 'lexical';
 import { extractTitle } from '../src/data/title.ts';
-import { $insertBlock } from '../src/editor/wrapBlock.ts';
+import { $insertBlock, $formatSelection, $selectionHasFormat } from '../src/editor/wrapBlock.ts';
 import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument, codeInfo, transformers } from '../src/editor/markdown.ts';
 import { $convertFromMarkdownString } from '@lexical/markdown';
 import { $createCodeNode } from '@lexical/code';
@@ -80,6 +80,23 @@ test('C198: a format crossing a line break inside one block is closed and reopen
  assert.equal(closeBlockEmphasis('**굵게\\\n이어짐**'),'**굵게**\\\n**이어짐**');
  assert.equal(closeBlockEmphasis('긴 **문단\n이어짐**',true),'긴 **문단**\n**이어짐**');
  const long='> **'+'가'.repeat(10001)+'\n> 끝**';assert.equal(closeBlockEmphasis(long),long);
+});
+test('C201: B and I format the chips in the selection with the text, and pressed means every text and chip has the format',()=>{
+ const editor=createHeadlessEditor({namespace:'chip-format',nodes:EDITOR_NODES,onError:e=>{throw e}});
+ editor.update(()=>$importDocument('앞 [노트](#doc:nd1) 뒤'),{discrete:true});
+ const selectAll=()=>{const texts=$getRoot().getAllTextNodes(),range=$createRangeSelection();range.anchor.set(texts[0].getKey(),0,'text');range.focus.set(texts.at(-1).getKey(),texts.at(-1).getTextContentSize(),'text');$setSelection(range);};
+ const save=()=>editor.getEditorState().read($exportDocument);
+ editor.update(()=>{selectAll();assert.equal($selectionHasFormat('bold'),false);assert.equal($formatSelection('bold'),true);},{discrete:true});
+ assert.equal(save(),'**앞 [노트](#doc:nd1) 뒤**');
+ editor.update(()=>{selectAll();assert.equal($selectionHasFormat('bold'),true);$formatSelection('italic');},{discrete:true});
+ assert.equal(save(),'***앞 [노트](#doc:nd1) 뒤***');
+ editor.update(()=>{selectAll();$formatSelection('bold');$formatSelection('italic');},{discrete:true});
+ assert.equal(save(),'앞 [노트](#doc:nd1) 뒤');
+ editor.update(()=>{selectAll();assert.equal($formatSelection('code'),false,'code stays with the library');},{discrete:true});
+ const half=createHeadlessEditor({namespace:'chip-half',nodes:EDITOR_NODES,onError:e=>{throw e}});
+ half.update(()=>$importDocument('**앞**[노트](#doc:nd1)**뒤**'),{discrete:true});
+ half.update(()=>{const texts=$getRoot().getAllTextNodes(),range=$createRangeSelection();range.anchor.set(texts[0].getKey(),0,'text');range.focus.set(texts.at(-1).getKey(),texts.at(-1).getTextContentSize(),'text');$setSelection(range);
+  assert.equal($selectionHasFormat('bold'),false,'an unformatted chip keeps the button off');},{discrete:true});
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});

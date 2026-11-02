@@ -16,12 +16,13 @@ import {
 } from '@lexical/table';
 import {
   $getRoot, $setSelection, $createRangeSelection, $createParagraphNode, $createLineBreakNode, $isParagraphNode,
-  $isElementNode, $isTextNode, $getState, $setState, createState, $addUpdateTag, $createTextNode,
+  $isElementNode, $isTextNode, $getState, $setState, createState, $addUpdateTag, $createTextNode, TextNode,
 } from 'lexical';
+import type { TextFormatType } from 'lexical';
 import type { ElementNode, LexicalNode, BaseSelection } from 'lexical';
 import {
   AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
-  $createAnnotation, $isAnnotation, $createCallout, $isCallout, $createReference, $isReference, $createImage, $isImage,
+  $createAnnotation, $isAnnotation, $createCallout, $isCallout, $createReference, $isReference, $createImage, $isImage, CHIP_FORMATS,
 } from './nodes.tsx';
 import { outermostInline, TAG_FORMATS, IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN } from '../data/mdInline.ts';
 import type { FormatMatch, LinkMatch } from '../data/mdInline.ts';
@@ -161,7 +162,7 @@ const CHIP: TextMatchTransformer = {
   type: 'text-match', dependencies: [ReferenceNode], trigger: ')',
   importRegExp: CHIP_PATTERN,
   regExp: /\[([^\]\ue000]+)\]\(#doc:([^\s)]+)\)$/,
-  replace: (node, match) => { node.replace($createReference(match[2], match[1])); },
+  replace: (node, match) => { node.replace($createReference(match[2], match[1], false, CHIP_FORMATS.filter(format => node.hasFormat(format)))); },
   export: node => $isReference(node) ? `[${node.getLabel()}](#${node.isCard() ? 'sub' : 'doc'}:${node.getTarget()})` : null,
 };
 // C178, C197, C199, C200: one inline rule replaces the library's format and text-match
@@ -183,6 +184,43 @@ const INLINE: TextMatchTransformer = {
     node.setTextContent(mark.content);
     for (const format of TAG_FORMATS[mark.tag]) if (!node.hasFormat(format)) node.toggleFormat(format);
     return node;
+  },
+};
+// C201: the library closes every format before a decorator, so `**앞 [칩](#doc:x) 뒤**`
+// came back as `**앞** [칩](#doc:x) **뒤**`. Touching text and chips form one run when
+// a chip in it carries a format. The run's first node writes the whole run through the
+// library's format writer, using stand-ins (objects with the TextNode prototype) in which
+// each chip is a placeholder letter with the chip's formats; the placeholders then become
+// chip links. The other nodes of the run write nothing.
+const inRun = (node: LexicalNode | null): node is TextNode | ReferenceNode => $isTextNode(node) || $isReference(node) && !node.isCard();
+function chipRun(node: LexicalNode): (TextNode | ReferenceNode)[] | null {
+  if (!inRun(node)) return null;
+  let first: TextNode | ReferenceNode = node;
+  for (let previous = first.getPreviousSibling(); inRun(previous); previous = previous.getPreviousSibling()) first = previous;
+  const run = [first];
+  for (let next = first.getNextSibling(); inRun(next); next = next.getNextSibling()) run.push(next);
+  return run.some(member => $isReference(member) && member.getFormats().length) ? run : null;
+}
+const CHIP_RUN: TextMatchTransformer = {
+  type: 'text-match', dependencies: [ReferenceNode], regExp: /$^/,
+  export: (node, _children, exportFormat) => {
+    const run = chipRun(node);
+    if (!run) return null;
+    if (!run[0].is(node)) return '';
+    // Members with the same formats merge into one stand-in, so a space between two
+    // chips does not close and reopen the format; inline code stays on its own.
+    const links: string[] = [], groups: { text: string; member: TextNode | ReferenceNode; key: string | null }[] = [];
+    for (const member of run) {
+      const text = $isReference(member) ? String.fromCharCode(0xe100 + links.push(`[${member.getLabel()}](#doc:${member.getTarget()})`) - 1) : member.getTextContent();
+      const key = member.hasFormat('code') ? null : CHIP_FORMATS.filter(format => member.hasFormat(format)).join();
+      const last = groups.at(-1);
+      if (key !== null && last && last.key === key) last.text += text; else groups.push({ text, member, key });
+    }
+    const standIns: TextNode[] = groups.map(({ member, text }, n) => Object.assign(Object.create(TextNode.prototype) as TextNode, {
+      hasFormat: (format: TextFormatType) => member.hasFormat(format), getTextContent: () => text,
+      getPreviousSibling: () => standIns[n - 1] ?? null, getNextSibling: () => standIns[n + 1] ?? null,
+    }));
+    return standIns.map((standIn, n) => exportFormat(standIn, groups[n].text)).join('').replace(/[\ue100-\ue8ff]/g, letter => links[letter.charCodeAt(0) - 0xe100]);
   },
 };
 const ANNOTATION: TextMatchTransformer = {
@@ -265,7 +303,7 @@ const GUARDED_QUOTE: ElementTransformer = {
 export function transformers(cell = false, copy = false): Transformer[] {
   return [CODE_BLOCK, ...(cell ? [] : [PARAGRAPH, { ...TABLE, export: (node: LexicalNode, _children: (node: ElementNode) => string, selected?: BaseSelection | null) => $isTableNode(node) ? $tableMarkdown(node, copy, selected) : null }]), CALLOUT, checklist(cell), ...(cell ? [] : [CARD]), HEADING,
     cell ? QUOTE : GUARDED_QUOTE, cell ? UNORDERED_LIST : listRule(UNORDERED_LIST, 'bullet'), cell ? ORDERED_LIST : listRule(ORDERED_LIST, 'number'),
-    HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, IMAGE, CHIP, LINK, ANNOTATION];
+    HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, ...(copy ? [] : [CHIP_RUN]), IMAGE, CHIP, LINK, ANNOTATION];
 }
 const INLINE_RULES: Transformer[] = [HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, IMAGE, CHIP, LINK];
 // Opening a note uses INLINE in place of the library's inline rules; saving keeps them.
