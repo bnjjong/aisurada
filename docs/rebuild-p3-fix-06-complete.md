@@ -56,4 +56,11 @@
 
 ### 게이트
 
-(받아들임 결과를 적는다.)
+| 검사 | 결과 |
+|---|---|
+| `bash test-native.sh` | 통과(18초). screen 6, workspace 31, navigation 26, interaction 31, data 51, editor 119, views 25, autosave 45, chapters 9, contracts 3, cargo 65 |
+| `test:editor:acceptance`(실제 WKWebView) | 113개 모두 통과. 왕복 102사례와 기능 점검 11개다 |
+| `test:views:acceptance` | 27개 모두 통과 |
+| `test:autosave:acceptance` | 15개 모두 통과 |
+
+views와 autosave 받아들임은 첫 회차에 각각 1건이 시간 초과로 실패했다. 그 회차가 도는 동안 앞서 멈춘 회차의 앱 프로세스가 1시간 넘게 남아 있었고 기계 부하가 높았다. 남은 프로세스를 내리고 다시 돌리니 둘 다 통과했다. 같은 코드에서 앞의 증분 4·5 회차는 처음부터 통과했다.
