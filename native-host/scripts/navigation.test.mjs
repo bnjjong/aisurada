@@ -110,11 +110,18 @@ test('workspace changes clear all tabs while pruning preserves transient tabs', 
   tabs.attach({ ...workspace(), path: '/different' }); assert.deepEqual(tabs.snapshot().openIds, []); assert.equal(tabs.snapshot().workspaceRoot, '/different');
 });
 
-test('frozen failed-read and sample behavior prunes saved notes while retaining the real root', () => {
+test('C15: browsing the sample keeps the real vault saved tabs and the real root', () => {
   const { tabs, disk } = model(['a','b']); tabs.attach(sampleWorkspace());
-  assert.deepEqual(JSON.parse(disk.values.get(KEYS.tabs)), { state: { workspaceRoot: '/fixture', openIds: [] }, version: 1 });
-  tabs.attach(workspace()); assert.deepEqual(tabs.snapshot().openIds, []);
-  tabs.visit('/doc/a', workspace()); tabs.attach({ ...workspace([]), noteReadFailed: true }); assert.deepEqual(tabs.snapshot().openIds, []);
+  assert.deepEqual(JSON.parse(disk.values.get(KEYS.tabs)), { state: { workspaceRoot: '/fixture', openIds: ['a','b'] }, version: 1 });
+  assert.deepEqual(tabs.visible(), []);
+  tabs.attach(workspace()); assert.deepEqual(tabs.snapshot().openIds, ['a','b']); assert.deepEqual(tabs.visible(), ['a','b']);
+});
+
+test('C14: a round whose note list failed to read keeps saved tabs until the engine recovers', () => {
+  const { tabs, disk } = model(['a','b']); tabs.attach({ ...workspace([]), noteReadFailed: true });
+  assert.deepEqual(JSON.parse(disk.values.get(KEYS.tabs)).state.openIds, ['a','b']); assert.deepEqual(tabs.visible(), []);
+  tabs.attach(workspace()); assert.deepEqual(tabs.visible(), ['a','b']);
+  tabs.attach(workspace(['b'])); assert.deepEqual(tabs.snapshot().openIds, ['b']);
 });
 
 test('a read-only note-window model never writes main tabs', () => {

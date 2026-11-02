@@ -45,6 +45,7 @@ export class VaultData {
   private reports = new Map<string, ReturnType<typeof setTimeout>>();
   private retries = new Map<string, ReturnType<typeof setTimeout>>();
   private savedTitles = new Map<string, string>();
+  private unsavedTemplates = new Map<string, Row>();
   readonly selfWrites: SelfWrites;
   private services: WorkspaceServices;
   private workspace: () => Workspace | null;
@@ -65,7 +66,7 @@ export class VaultData {
     for (const timer of this.retries.values()) clearTimeout(timer);
     this.retries.clear();
     this.savedTitles = new Map((workspace?.notes || []).map(note => [note.id, note.title]));
-    this.reports.clear(); this.queues = new WriteQueues(); this.reads.clear(); this.visibleParents.clear(); this.selfWrites.clear();
+    this.reports.clear(); this.queues = new WriteQueues(); this.reads.clear(); this.visibleParents.clear(); this.selfWrites.clear(); this.unsavedTemplates.clear();
     this.memory = { ...empty(), relations: relations(workspace?.notes || []) };
     return this.memory;
   }
@@ -245,16 +246,19 @@ export class VaultData {
       created, date: created.slice(0, 10), time: /T((?:[01]\d|2[0-3]):[0-5]\d)/.exec(created)?.[1] || '00:00', format: asText(row.format) || 'markdown' };
   }
   private mergeNotes(disk: Note[], memory: Note[], snapshot: WriteStamp, parent?: string): Note[] {
-    const merged = disk.map(note => {
+    const merged = disk.flatMap(note => {
       const ref = { id: note.id, parent }, key = keyOf(ref), old = memory.find(item => item.id === note.id);
-      if (!old) { this.setFlag('unsaved', key, false); if (parent) this.setFlag('editing', key, false); else this.savedTitles.set(note.id, note.title); return note; }
-      if (this.queues.overlapped(key, snapshot)) return old;
+      // C175: a note trashed while this read was in flight is not revived.
+      if (!old && this.queues.overlapped(key, snapshot)) return [];
+      if (!old) { this.setFlag('unsaved', key, false); if (parent) this.setFlag('editing', key, false); else this.savedTitles.set(note.id, note.title); return [note]; }
+      if (this.queues.overlapped(key, snapshot)) return [old];
       if (this.memory.editing.includes(key) || this.memory.unsaved.includes(key)) {
         if (old.body !== note.body && (!asText(old.precondition) || !asText(note.precondition) || old.precondition !== note.precondition)) this.conflict(ref);
-        return parent ? old : { ...old, path: note.path };
+        // C45: protected text stays in memory, but the folder always follows the disk.
+        return [{ ...old, path: note.path }];
       }
       if (!parent) this.savedTitles.set(note.id, note.title);
-      return note;
+      return [note];
     });
     for (const old of memory) if (!disk.some(note => note.id === old.id)) {
       if (!parent && (this.memory.editing.includes(old.id) || this.queues.overlapped(old.id, snapshot))) merged.push(old);
@@ -287,7 +291,9 @@ export class VaultData {
         if (!this.valid(generation) || this.workspace()?.path !== workspace.path || data.noteReadFailed) continue;
         const current = this.workspace()!;
         const notes = this.mergeNotes(data.notes, current.notes, snapshot);
-        this.prune(notes); this.emit({ ...current, ...data, notes });
+        // C95: a template whose save failed keeps its typed values over the disk copy.
+        const templates = data.templates.map(row => ({ ...row, ...this.unsavedTemplates.get(asText(row.id)) }));
+        this.prune(notes); this.emit({ ...current, ...data, notes, templates });
         const parents = Object.keys(this.memory.subNotes).filter(parent => this.visibleParents.has(parent) || (this.memory.subNotes[parent] || [])
           .some(note => ['editing', 'unsaved', 'conflicted'].some(flag => this.memory[flag as 'editing'].includes(keyOf({ id: note.id, parent })))));
         await Promise.allSettled(parents.map(parent => this.loadSubNotes(parent)));
@@ -405,21 +411,18 @@ export class VaultData {
     const id = `nd${this.services.now().getTime().toString(36)}-${this.services.uuid().slice(0, 8)}`;
     const doc = { ...input, agenda, mins: Math.max(0, Math.round(input.mins)), tags: cleanTags(input.tags) };
     const note = this.toNote({ ...doc, id, created: `${doc.date}T${doc.time}:00`, format: 'markdown' }, input.agendaId);
-    this.emit({ ...workspace, notes: [...workspace.notes, note] });
+    // C32: the note enters memory only after the engine accepted it, so a
+    // refusal leaves no local-only note behind and the caller sees the failure.
     const result = await this.perform(write.createDoc(doc), `문서 저장: ${doc.title || '제목 없음'}`, response => {
       const current = this.workspace()!, actualId = asText(response.id) || id;
       this.queues.advance(actualId);
-      const existing = current.notes.find(item => item.id === id || item.id === actualId);
-      const created = { ...(existing || note), id: actualId,
+      const created = { ...note, id: actualId,
         ...(has(response, 'path') ? { path: response.path } : {}), ...(has(response, 'precondition') ? { precondition: response.precondition } : {}) };
-      // A stale read may have pruned the provisional id while creation was in
-      // flight. The successful response must still register the real document.
-      const notes = current.notes.filter(item => item.id !== id && item.id !== actualId);
-      notes.splice(existing ? Math.min(current.notes.indexOf(existing), notes.length) : notes.length, 0, created);
-      this.emit({ ...current, notes });
+      this.emit({ ...current, notes: [...current.notes.filter(item => item.id !== actualId), created] });
       this.markOwn(asText(response.path));
     });
-    if (result.ok && (result.value?.agendaCreated === true || asText(result.value?.agenda) && result.value?.agenda !== agenda)) this.failure(`아젠다가 달라졌어요: ${doc.title || '제목 없음'}`);
+    if (!result.ok) return result;
+    if (result.value?.agendaCreated === true || asText(result.value?.agenda) && result.value?.agenda !== agenda) this.failure(`아젠다가 달라졌어요: ${doc.title || '제목 없음'}`);
     return { ...result, value: { ...result.value, id: asText(result.value?.id) || id } };
   }
   async createSubNote(parent: string): Promise<WriteResult> {
@@ -606,7 +609,7 @@ export class VaultData {
     } catch (error) { this.services.warn('지우지 못했어요', error); this.failure(`${kind === 'agenda' ? '아젠다' : '프로젝트'} 삭제: ${asText(item.title)}`); return { ok: false, reason: `${kind === 'agenda' ? '아젠다' : '프로젝트'}를 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.` }; }
   }
   async saveTemplate(input: Fields, ritualId?: string): Promise<WriteResult> {
-    const workspace = this.workspace(); if (!workspace) return { ok: false };
+    const workspace = this.workspace(), generation = this.generation; if (!workspace) return { ok: false };
     const id = ritualId || asText(input.id) || `tpl-${this.services.now().getTime().toString(36)}-${this.services.uuid().slice(0,8)}`, old = workspace.templates.find(item => item.id === id);
     if (old) this.emit({ ...workspace, templates: workspace.templates.map(row => row.id === id ? { ...row, ...input } : row) });
     const result = await this.perform(ritualId ? write.saveRitual(ritualId, input) : write.saveTemplate(input), `${ritualId ? '리추얼 ' : ''}템플릿 저장: ${asText(input.name) || '제목 없음'}`, response => {
@@ -615,6 +618,8 @@ export class VaultData {
       this.markOwn(asText(response.path));
       if (current.sample) writeJSON(this.services.storage, 'withlog.templates.v1', this.workspace()!.templates);
     });
+    if (result.ok) this.unsavedTemplates.delete(id);
+    else if (old && this.valid(generation)) this.unsavedTemplates.set(id, { ...this.unsavedTemplates.get(id), ...input });
     return { ...result, value: { ...result.value, id: asText(result.value?.id) || id } };
   }
   deleteTemplate(id: string): Promise<WriteResult> {

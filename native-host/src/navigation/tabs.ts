@@ -48,7 +48,8 @@ export class TabModel {
     this.live = new Set(workspace.notes.map(note => note.id));
     const root = workspace.sample ? this.state.workspaceRoot : workspace.path;
     const ids = !workspace.sample && root !== this.state.workspaceRoot ? [] : this.state.openIds;
-    // Frozen 3.8.1–2: failed reads and the sample prune persisted real-note tabs.
+    // C14, C15: an unread note list and the sample leave the real vault's saved tabs alone.
+    if (workspace.sample || workspace.noteReadFailed) { this.change(ids, root); return; }
     this.change(ids.filter(id => !isNoteTab(id) || this.live.has(id)), root);
   }
 

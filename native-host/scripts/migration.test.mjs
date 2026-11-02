@@ -58,11 +58,35 @@ test('skips existing note containers, reserved trees, conflict copies, symlinks 
   assert.equal(await exists(join(h.root, 'notes/demo/container/other.md')), true);
 });
 
-test('backs up invalid front matter but leaves the original untouched', async t => {
-  const h = await fixture(t); await h.write('notes/demo/README.md', '# Not a note\n');
-  const result = await h.run(); assert.equal(result.moved, 0); assert.equal(result.failures.length, 1);
-  assert.equal(await fs.readFile(join(result.backup, 'demo/README.md'), 'utf8'), '# Not a note\n');
+test('C10: a file without front matter or id is neither backed up nor moved, on any opening', async t => {
+  const h = await fixture(t); await h.write('notes/demo/README.md', '# Not a note\n'); await h.write('notes/demo/noid.md', '---\ntitle: x\n---\n');
+  for (let round = 0; round < 2; round++) {
+    const result = await h.run(); assert.equal(result.moved, 0); assert.equal(result.failures.length, 2); assert.equal(result.backup, null);
+  }
+  assert.equal(await exists(join(h.root, '.withlog/backup')), false);
   assert.equal(await fs.readFile(join(h.root, 'notes/demo/README.md'), 'utf8'), '# Not a note\n');
+});
+
+test('C10 with the <!--withlog head: an HTML note with an id moves once, one without an id is never backed up', async t => {
+  const h = await fixture(t);
+  await h.write('notes/demo/old.html', '<!--withlog\nid: ndtest-0001\ntitle: HTML\ncreated: \'2026-06-04T09:30:00+09:00\'\n-->\n<h1>기록</h1>\n');
+  await h.write('notes/demo/noid.html', '<!--withlog\ntitle: x\n-->\n<p>x</p>\n');
+  const first = await h.run(); assert.equal(first.moved, 1); assert.equal(first.failures.length, 1);
+  assert.equal(await fs.readFile(join(h.root, 'notes/demo/2026-06-04-0930-html-0001/attach/index.html'), 'utf8'), '<h1>기록</h1>\n');
+  assert.deepEqual(await fs.readdir(join(first.backup, 'demo')), ['old.html']);
+  const second = await h.run(); assert.equal(second.moved, 0); assert.equal(second.backup, null);
+});
+
+test('C176: an existing folder differing only in case or Unicode normalization is treated as taken', async t => {
+  const h = await fixture(t), nfd = '2026-06-04-0930-한글-test-0002'.normalize('NFD');
+  await h.write('notes/demo/2026-06-04-0930-한글-TEST-0001/note.md', head('ndexisting-0001') + 'upper');
+  await h.write(`notes/demo/${nfd}/note.md`, head('ndexisting-0002') + 'decomposed');
+  await h.write('notes/demo/one.md', head('ndtest-0001') + 'one'); await h.write('notes/demo/two.md', head('ndtest-0002') + 'two');
+  assert.equal((await h.run()).moved, 2);
+  assert.equal(await fs.readFile(join(h.root, 'notes/demo/2026-06-04-0930-한글-TEST-0001/note.md'), 'utf8'), head('ndexisting-0001') + 'upper');
+  assert.equal(await fs.readFile(join(h.root, `notes/demo/${nfd}/note.md`), 'utf8'), head('ndexisting-0002') + 'decomposed');
+  assert.equal(await fs.readFile(join(h.root, 'notes/demo/2026-06-04-0930-한글-test-0001-2/note.md'), 'utf8'), head('ndtest-0001') + 'one');
+  assert.equal(await fs.readFile(join(h.root, 'notes/demo/2026-06-04-0930-한글-test-0002-2/note.md'), 'utf8'), head('ndtest-0002') + 'two');
 });
 
 test('backup and new body follow plugin UTF-8 decoding, including BOM and invalid bytes', async t => {

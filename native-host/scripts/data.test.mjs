@@ -186,10 +186,10 @@ test('a retention disposer from an old workspace does not clear a new workspace 
   await h.data.loadSubNotes('a');const release=h.data.retainSubNotes('a');old();await h.data.reconcile();release();
   assert.equal(h.argv().filter(a=>a[0]==='list-sub-notes').length,3);
 });
-test('protected sub-notes retain their old path but disk deletion removes even editing sub-notes',async t=>{
+test('C45: protected sub-notes keep their text but follow the disk path; disk deletion removes even editing sub-notes',async t=>{
   const h=fixture(t);await h.data.loadSubNotes('a');h.data.edit({parent:'a',id:'child'},{body:'local'});
   h.sub.a[0]={...h.sub.a[0],path:'moved',body:'external',precondition:'EXT'};await h.data.loadSubNotes('a');
-  assert.equal(h.data.getSnapshot().subNotes.a[0].path,'notes/demo/a/sub/child');assert.deepEqual(h.data.getSnapshot().conflicted,['a:child']);
+  assert.equal(h.data.getSnapshot().subNotes.a[0].path,'moved');assert.equal(h.data.getSnapshot().subNotes.a[0].body,'local');assert.deepEqual(h.data.getSnapshot().conflicted,['a:child']);
   h.sub.a=[];await h.data.loadSubNotes('a');assert.deepEqual(h.data.getSnapshot().subNotes.a,[]);assert.ok(!h.data.getSnapshot().editing.includes('a:child'));
 });
 test('sub-note body writes include the current title and token; subtitle failure is unsaved',async t=>{
@@ -260,10 +260,26 @@ test('entity deletion refusal exposes full stderr and keeps preceding note delet
   const h=fixture(t,{handler:async argv=>argv[0]==='delete-doc'?ok({trashId:'tr2',file:'a'}):argv[0]==='delete-agenda'?fail(-1):undefined});
   const result=await h.data.deleteEntity('agenda','ag');assert.equal(result.reason,'WL-412: changed');assert.equal(h.workspace.agendas.length,1);assert.equal(h.workspace.notes.length,0);
 });
-test('failed creation leaves a local document while template creation failure leaves templates unchanged',async t=>{
-  const h=fixture(t,{handler:async argv=>['create-doc','save-template'].includes(argv[0])?fail(4):undefined});
-  const result=await h.data.createDoc({agendaId:'ag',type:'free',title:'Local',body:'body',date:'2026-11-01',time:'12:30',mins:0,tags:[]});assert.equal(result.ok,false);assert.ok(h.workspace.notes.some(n=>n.id===result.value.id));
+test('C32: a refused creation never enters memory and returns the failure; template creation failure leaves templates unchanged',async t=>{
+  const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='create-doc'?(await gate.promise,fail(4)):argv[0]==='save-template'?fail(4):undefined});
+  const creating=h.data.createDoc({agendaId:'ag',type:'free',title:'Local',body:'body',date:'2026-11-01',time:'12:30',mins:0,tags:[]});
+  await tick();assert.deepEqual(h.workspace.notes.map(n=>n.id),['a','b']);gate.resolve();
+  const result=await creating;assert.equal(result.ok,false);assert.equal(result.value,undefined);assert.deepEqual(h.workspace.notes.map(n=>n.id),['a','b']);
+  assert.deepEqual(h.data.getSnapshot().failures.map(line=>line.text),['문서 저장: Local']);
   await h.data.saveTemplate({name:'New',type:'free',desc:'',body:''});assert.equal(h.workspace.templates.length,1);
+});
+test('C175: a note trashed while a reconciliation read is in flight is not revived by that read',async t=>{
+  const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='list-docs'?(await gate.promise,ok([note(),note('b')])):argv[0]==='delete-doc'?ok({trashId:'tr2',file:'a'}):undefined});
+  const reading=h.data.reconcile();await tick();await h.data.deleteDoc('a');assert.deepEqual(h.workspace.notes.map(n=>n.id),['b']);
+  gate.resolve();await reading;assert.deepEqual(h.workspace.notes.map(n=>n.id),['b']);
+  h.setHandler(undefined);h.disk.notes=[note('b')];await h.data.reconcile();assert.deepEqual(h.workspace.notes.map(n=>n.id),['b']);
+});
+test('C95: a template whose save failed keeps the typed text across reconciliation until a later save succeeds',async t=>{
+  const h=fixture(t,{workspace:{templates:[{id:'tp',category:'doc',name:'T',type:'free',desc:'',body:'disk'}]},handler:async argv=>argv[0]==='save-template'?fail(-1):undefined});
+  await h.data.saveTemplate({id:'tp',name:'T',type:'free',desc:'',body:'typed'});assert.equal(h.workspace.templates[0].body,'typed');
+  await h.data.reconcile();assert.equal(h.workspace.templates[0].body,'typed');
+  h.setHandler(undefined);await h.data.saveTemplate({id:'tp',name:'T',type:'free',desc:'',body:'typed again'});
+  h.disk.templates=[{id:'tp',category:'doc',name:'T',type:'free',desc:'',body:'external'}];await h.data.reconcile();assert.equal(h.workspace.templates[0].body,'external');
 });
 test('a successful create registers its real id even if an older reconciliation pruned the provisional note',async t=>{
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='create-doc'?gate.promise:undefined});

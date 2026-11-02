@@ -7,6 +7,8 @@ const reserved = new Set(['attach', 'sub', 'sub-comments', 'chats']);
 const bodies = new Set(['note.md', 'note.json', 'note.html']);
 const conflicted = /conflicted copy|\(conflicted\b|충돌(된)?\s*사본|conflicted version/i;
 const sortNames = (a: FileEntry, b: FileEntry) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+// C176: APFS treats names differing only in case or NFC/NFD as the same folder.
+const folderKey = (name: string) => name.normalize('NFC').toLowerCase();
 
 export function legacyFolderName(meta: Record<string, unknown>): string {
   const id = asText(meta.id), created = asText(meta.created);
@@ -37,14 +39,12 @@ export async function migrateLegacy(root: string, files: FilePort, now: Date, uu
   }
   const occupied = new Map<string, Set<string>>();
   const failures: string[] = [];
-  let moved = 0;
+  let moved = 0, backedUp = false;
   for (const candidate of candidates) {
     const original = `${root}/notes/${candidate.agenda}/${candidate.relative}`;
     try {
       const text = await files.readTextFile(original);
-      const saved = `${backup}/${candidate.agenda}/${candidate.relative}`;
-      await files.mkdir(saved.slice(0, saved.lastIndexOf('/')), { recursive: true });
-      await atomicWrite(files, saved, text, uuid);
+      // C10: only a file that can move is backed up, so an unmovable one is not copied again on every opening.
       let frontYaml: string | null = null;
       let frontLen = 0;
       const front = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
@@ -60,15 +60,19 @@ export async function migrateLegacy(root: string, files: FilePort, now: Date, uu
       }
       const meta = frontYaml ? asRow(load(frontYaml)) : null;
       if (!meta || !asText(meta.id).trim()) throw new Error('front matter와 id가 필요해요.');
+      const saved = `${backup}/${candidate.agenda}/${candidate.relative}`;
+      await files.mkdir(saved.slice(0, saved.lastIndexOf('/')), { recursive: true });
+      await atomicWrite(files, saved, text, uuid);
+      backedUp = true;
       const immediate = candidate.relative.split('/').slice(0, -1).pop() || '';
       const month = /^\d{4}-(?:0[1-9]|1[0-2])$/.test(immediate) ? `/${immediate}` : '';
       const parent = `${root}/notes/${candidate.agenda}${month}`;
-      if (!occupied.has(parent)) occupied.set(parent, new Set((await readDirectory(files, parent, warn)).filter(e => e.isDirectory).map(e => e.name)));
+      if (!occupied.has(parent)) occupied.set(parent, new Set((await readDirectory(files, parent, warn)).filter(e => e.isDirectory).map(e => folderKey(e.name))));
       const names = occupied.get(parent)!;
       const base = legacyFolderName(meta);
       let name = base, suffix = 2;
-      while (names.has(name)) name = `${base}-${suffix++}`;
-      names.add(name);
+      while (names.has(folderKey(name))) name = `${base}-${suffix++}`;
+      names.add(folderKey(name));
       const target = `${parent}/${name}`;
       await files.mkdir(target, { recursive: true });
       if (candidate.relative.endsWith('.html')) {
@@ -84,5 +88,5 @@ export async function migrateLegacy(root: string, files: FilePort, now: Date, uu
       moved++;
     } catch (error) { failures.push(original); warn(`옛 노트를 옮기지 못했어요: ${original}`, error); }
   }
-  return { moved, failures, backup: candidates.length ? backup : null };
+  return { moved, failures, backup: backedUp ? backup : null };
 }
