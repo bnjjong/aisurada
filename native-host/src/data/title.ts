@@ -11,7 +11,16 @@ export function extractTitle(body: string, format = 'markdown'): string {
   } else {
     for (const line of body.split('\n')) {
       const match = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
-      if (match) { text = match[1].trim(); break; }
+      if (match) {
+        text = match[1]
+          .replace(/\\([\\`*_{}[\]()#+\-.!])/g, '$1')
+          .replace(/(\*\*|__)(.*?)\1/g, '$2')
+          .replace(/(\*|_)(.*?)\1/g, '$2')
+          .replace(/~~(.*?)~~/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .trim();
+        break;
+      }
     }
     if (!text) {
       const html = /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(body)?.[1];

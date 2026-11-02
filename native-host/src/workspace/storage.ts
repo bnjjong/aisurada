@@ -80,6 +80,10 @@ function clampNullableInt(val: unknown, min: number, max: number): number | null
 export function normalizePreferences(raw: unknown): { state: AppPreferences; version: number } {
   const row = asRow(raw);
   const stateRow = asRow(row?.state) || {};
+  const rawVersion = typeof row?.version === 'number' ? row.version : 0;
+  if (rawVersion < 1 && stateRow.askTimeoutSeconds === 1200) {
+    delete stateRow.askTimeoutSeconds;
+  }
   const merged: AppPreferences = { ...DEFAULT_PREFERENCES, ...stateRow };
 
   merged.theme = stateRow.theme === 'dark' ? 'dark' : 'light';
@@ -150,7 +154,12 @@ export const readNoteGeometry = readNoteWindowGeometry;
 
 export function readPreferences(storage: StoragePort): AppPreferences {
   const json = readJSON(storage, KEYS.prefs);
-  return normalizePreferences(json).state;
+  const normalized = normalizePreferences(json);
+  const row = asRow(json);
+  if (row && row.version !== 1) {
+    writeJSON(storage, KEYS.prefs, { state: normalized.state, version: 1 });
+  }
+  return normalized.state;
 }
 
 export function writePreferences(

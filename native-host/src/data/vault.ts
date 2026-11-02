@@ -607,7 +607,7 @@ export class VaultData {
   }
   async saveTemplate(input: Fields, ritualId?: string): Promise<WriteResult> {
     const workspace = this.workspace(); if (!workspace) return { ok: false };
-    const id = ritualId || asText(input.id) || `tpl${this.services.now().getTime().toString(36)}-${this.services.uuid().slice(0,8)}`, old = workspace.templates.find(item => item.id === id);
+    const id = ritualId || asText(input.id) || `tpl-${this.services.now().getTime().toString(36)}-${this.services.uuid().slice(0,8)}`, old = workspace.templates.find(item => item.id === id);
     if (old) this.emit({ ...workspace, templates: workspace.templates.map(row => row.id === id ? { ...row, ...input } : row) });
     const result = await this.perform(ritualId ? write.saveRitual(ritualId, input) : write.saveTemplate(input), `${ritualId ? '리추얼 ' : ''}템플릿 저장: ${asText(input.name) || '제목 없음'}`, response => {
       const current = this.workspace()!, value = { ...old, ...input, ...response, id: asText(response.id) || id, category: ritualId ? 'ritual' : 'doc' };

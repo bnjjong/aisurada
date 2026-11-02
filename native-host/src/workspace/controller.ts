@@ -124,7 +124,7 @@ export class WorkspaceController {
     }
     this.patch({ route: path }, location);
   }
-  setNoteWindows = (ids: string[]) => { if (this.context.kind === 'main') this.patch({ noteWindows: ids.filter(id => typeof id === 'string') }); };
+  setNoteWindows = (ids: string[]) => { this.patch({ noteWindows: ids.filter(id => typeof id === 'string') }); };
   focusNoteWindow = (id: string) => {
     void this.services.host.invoke('open_note_window', { docId: id, title: null, geometry: this.noteGeometry() }).catch(error => this.services.warn('노트 창을 열지 못했어요', error));
   };
@@ -183,6 +183,7 @@ export class WorkspaceController {
           const data = await readWorkspace(this.services.host, false, undefined, this.services.sanitizeHTML);
           const workspace: Workspace = { ...data, path: root, name: workspaceName(root), sample: false, today: this.today() };
           this.patch({ workspace, vault: this.data.reset(workspace) });
+          this.listenNoteWindows();
           this.installWatch(root);
         } else {
           this.listenNoteWindows();
@@ -330,7 +331,12 @@ export class WorkspaceController {
     this.patch({ subNotes: current && current.ids.length > 1 ? { ...current, ids: current.ids.slice(0, -1) } : null });
   };
 
-  listenCloseRequested = (handler: () => void) => this.services.closeRequested?.(handler);
+  private unlistenCloseRequested?: () => void;
+  listenCloseRequested = (handler: () => void) => {
+    const promise = this.services.closeRequested?.(handler);
+    void promise?.then(fn => { this.unlistenCloseRequested = fn; });
+    return promise;
+  };
   saveNoteGeometry = (geo: { width: number; height: number; x: number; y: number }) => {
     writeNoteWindowGeometry(this.services.storage, geo);
     void this.services.host.invoke('remember_note_window', { geometry: geo }).catch(err => {
@@ -367,6 +373,7 @@ export class WorkspaceController {
       const unsavedA = unsavedAnswers();
 
       if (settled && count === 0 && waiting === 0 && unsavedA === 0) {
+        this.unlistenCloseRequested?.();
         this.stopWatch();
         await this.services.host.invoke('destroy_current_window');
         this.dispose();
@@ -404,6 +411,7 @@ export class WorkspaceController {
 
   forceCloseNoteWindow = async (): Promise<boolean> => {
     this.patch({ noteCloseDialog: null });
+    this.unlistenCloseRequested?.();
     this.stopWatch();
     try {
       await this.services.host.invoke('destroy_current_window');
@@ -531,10 +539,16 @@ export class WorkspaceController {
 
   private listenNoteWindows() {
     if (!this.services.noteWindowsChanged) return;
-    void this.services.noteWindowsChanged(this.setNoteWindows).then(unlisten => {
+    let heard = false;
+    void this.services.noteWindowsChanged(ids => {
+      heard = true;
+      this.setNoteWindows(ids);
+    }).then(unlisten => {
       if (this.disposed) unlisten(); else this.unlistenWindows = unlisten;
     }).catch(error => this.services.warn('노트 창 목록을 듣지 못했어요', error));
-    void this.services.host.invoke<string[]>('note_windows').then(this.setNoteWindows).catch(() => {});
+    void this.services.host.invoke<string[]>('note_windows').then(ids => {
+      if (!heard && Array.isArray(ids)) this.setNoteWindows(ids);
+    }).catch(() => {});
   }
 
   callHost = <T,>(command: string, args?: Record<string, unknown>): Promise<T> => this.services.host.invoke<T>(command, args);
@@ -707,10 +721,19 @@ export class WorkspaceController {
     if (this.restored || this.context.kind !== 'main') return;
     this.restored = true;
     try {
-      const saved = await this.services.host.invoke<string[]>('saved_note_windows');
+      const saved = await this.services.host.invoke<string[]>('saved_note_windows') || [];
       const mainTabs = savedOpenIds(this.services.storage, workspace.path);
-      const docs = workspace.notes.filter(note => saved.includes(note.id) && !mainTabs.has(note.id))
-        .map(note => ({ docId: note.id, title: note.title }));
+      const notesMap = new Map(workspace.notes.map(note => [note.id, note]));
+      const seen = new Set<string>();
+      const docs: { docId: string; title: string }[] = [];
+      for (const id of saved) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const note = notesMap.get(id);
+        if (note && !mainTabs.has(id)) {
+          docs.push({ docId: note.id, title: note.title });
+        }
+      }
       if (docs.length) await this.services.host.invoke('restore_note_windows', { docs });
     } catch (error) { this.services.warn('노트 창을 되살리지 못했어요', error); }
   }

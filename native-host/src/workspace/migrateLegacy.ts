@@ -45,8 +45,20 @@ export async function migrateLegacy(root: string, files: FilePort, now: Date, uu
       const saved = `${backup}/${candidate.agenda}/${candidate.relative}`;
       await files.mkdir(saved.slice(0, saved.lastIndexOf('/')), { recursive: true });
       await atomicWrite(files, saved, text, uuid);
+      let frontYaml: string | null = null;
+      let frontLen = 0;
       const front = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-      const meta = front ? asRow(load(front[1])) : null;
+      if (front && front[1].length <= 16000) {
+        frontYaml = front[1];
+        frontLen = front[0].length;
+      } else if (text.startsWith('<!--withlog')) {
+        const htmlFront = /^<!--withlog\r?\n([\s\S]*?)\r?\n-->(?:\r?\n|$)/.exec(text);
+        if (htmlFront && htmlFront[1].length <= 16000) {
+          frontYaml = htmlFront[1];
+          frontLen = htmlFront[0].length;
+        }
+      }
+      const meta = frontYaml ? asRow(load(frontYaml)) : null;
       if (!meta || !asText(meta.id).trim()) throw new Error('front matter와 id가 필요해요.');
       const immediate = candidate.relative.split('/').slice(0, -1).pop() || '';
       const month = /^\d{4}-(?:0[1-9]|1[0-2])$/.test(immediate) ? `/${immediate}` : '';
@@ -61,7 +73,7 @@ export async function migrateLegacy(root: string, files: FilePort, now: Date, uu
       await files.mkdir(target, { recursive: true });
       if (candidate.relative.endsWith('.html')) {
         await files.mkdir(`${target}/attach`, { recursive: true });
-        await atomicWrite(files, `${target}/attach/index.html`, text.slice(front![0].length), uuid);
+        await atomicWrite(files, `${target}/attach/index.html`, text.slice(frontLen), uuid);
         const title = asText(meta.title) || asText(meta.id);
         const note = `---\n${dump(meta, { lineWidth: -1 })}---\n# ${title}\n\n이 노트는 원래 HTML로 작성됐어요. 아래 첨부를 브라우저로 여세요.\n\n[브라우저로 열기](attach/index.html)\n`;
         await atomicWrite(files, `${target}/note.md`, note, uuid);

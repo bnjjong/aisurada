@@ -1,5 +1,5 @@
 // Pinned note modal according to Chapter 14 (14.9, 14.10, 14.12, C32).
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { MaskedResult, SecretTableStatus } from './ptyBridge.ts';
 import { secretTableProbe, secretTableStatus, maskScrollback } from './ptyBridge.ts';
 import { sliceLogicalLines, formatPinnedNoteBody } from './logicalLines.ts';
@@ -24,11 +24,12 @@ export function PinScrollbackModal({
   onCreateDoc,
   onNavigate,
 }: PinScrollbackModalProps): React.JSX.Element {
+  const linesSnapshot = useRef(logicalLines).current;
   const [range, setRange] = useState<'100' | '500' | '2000' | '10000' | 'selection'>('500');
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
-  const defaultTitle = `터미널기록 ${hh}:${mm}`;
+  const defaultTitle = `터미널 기록 ${hh}:${mm}`;
 
   const [title, setTitle] = useState(defaultTitle);
   const [agendaSlug, setAgendaSlug] = useState<string>(agendas[0]?.slug || '');
@@ -38,7 +39,15 @@ export function PinScrollbackModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Initial probe and mask
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Initial probe and mask using snapshot lines
   useEffect(() => {
     let active = true;
     async function init() {
@@ -47,7 +56,7 @@ export function PinScrollbackModal({
       if (!active) return;
       setTableStatus(status);
 
-      const sliced = sliceLogicalLines(logicalLines, '500', selectionIndices);
+      const sliced = sliceLogicalLines(linesSnapshot, '500', selectionIndices);
       try {
         const res = await maskScrollback(sliced);
         if (active) {
@@ -65,12 +74,12 @@ export function PinScrollbackModal({
     }
     init();
     return () => { active = false; };
-  }, [logicalLines, selectionIndices]);
+  }, [linesSnapshot, selectionIndices]);
 
   async function handleRangeChange(newRange: '100' | '500' | '2000' | '10000' | 'selection') {
     setRange(newRange);
     setLoading(true);
-    const sliced = sliceLogicalLines(logicalLines, newRange, selectionIndices);
+    const sliced = sliceLogicalLines(linesSnapshot, newRange, selectionIndices);
     try {
       const res = await maskScrollback(sliced);
       setMasked(res);
@@ -87,7 +96,7 @@ export function PinScrollbackModal({
     setLoading(true);
     const status = await secretTableProbe();
     setTableStatus(status);
-    const sliced = sliceLogicalLines(logicalLines, range, selectionIndices);
+    const sliced = sliceLogicalLines(linesSnapshot, range, selectionIndices);
     try {
       const res = await maskScrollback(sliced);
       setMasked(res);
@@ -100,7 +109,7 @@ export function PinScrollbackModal({
     }
   }
 
-  const currentLines = sliceLogicalLines(logicalLines, range, selectionIndices);
+  const currentLines = sliceLogicalLines(linesSnapshot, range, selectionIndices);
   const shapesSum = masked ? masked.shapes.reduce((sum, s) => sum + s.count, 0) : 0;
 
   const currentBody = masked ? formatPinnedNoteBody({
@@ -111,7 +120,7 @@ export function PinScrollbackModal({
   }) : '';
 
   const bodyBytes = new TextEncoder().encode(currentBody).length;
-  const canSubmit = !!masked && bodyBytes <= 300000 && !!agendaSlug && !loading && !submitting;
+  const canSubmit = !!masked && bodyBytes <= 300000 && !!agendaSlug && !loading && !submitting && title.trim().length > 0;
 
   async function handleSubmit() {
     if (!canSubmit || !masked) return;

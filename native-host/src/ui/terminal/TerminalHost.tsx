@@ -1,6 +1,6 @@
 // Terminal Host component adhering to Chapter 14 of withlog Part 3 screen specifications.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ptyStart, ptyWrite, ptyResize, ptyDetach } from './ptyBridge.ts';
+import { ptyStart, ptyWrite, ptyResize, ptyDetach, secretTableProbe } from './ptyBridge.ts';
 import { extractLogicalLines } from './logicalLines.ts';
 import { PinScrollbackModal } from './PinScrollbackModal.tsx';
 import type { Agenda } from '../../workspace/types.ts';
@@ -146,6 +146,7 @@ export function TerminalHost({
         }
       }
       if (!active) return;
+      void secretTableProbe().catch(() => {});
 
       try {
         const sessionId = tabKey.startsWith('term:') ? tabKey.slice(5) : undefined;

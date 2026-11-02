@@ -37,6 +37,7 @@ export function NoteMeta({
 }) {
   const state = controller.getSnapshot(),
     [mins, setMins] = useState(Math.max(0, Number(note.mins) || 0)),
+    [minsDirty, setMinsDirty] = useState(false),
     [identity, setIdentity] = useState(false),
     [evaluating, setEvaluating] = useState(false),
     [history, setHistory] = useState(false),
@@ -101,14 +102,15 @@ export function NoteMeta({
                   className="doc-meta-mins-input"
                   type="number"
                   min={0}
-                  value={mins}
-                  onChange={(e) =>
+                  value={minsDirty ? mins : Math.max(0, Number(live.mins) || 0)}
+                  onChange={(e) => {
+                    setMinsDirty(true);
                     setMins(
                       Math.max(0, Math.round(Number(e.target.value) || 0)),
-                    )
-                  }
+                    );
+                  }}
                   onBlur={() => {
-                    if (mins !== Number(live.mins || 0))
+                    if (minsDirty && mins !== Number(live.mins || 0))
                       void controller.data.updateNote(
                         { id: note.id },
                         { mins },
@@ -310,7 +312,10 @@ function Evaluation({
       className="doc-eval-pop"
       ref={box}
       onKeyDown={(e) => {
-        if (e.key === "Escape") close();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          close();
+        }
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
           e.preventDefault();
           save();

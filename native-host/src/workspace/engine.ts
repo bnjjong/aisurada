@@ -50,7 +50,7 @@ export async function readWorkspace(host: HostPort, reindex: boolean, previous?:
   const index = asRow(value(first[0]));
   return {
     agendas, projects: rows(fallback(second[1], previous?.projects)), notes,
-    reports: rows(fallback(first[1], previous?.reports), 'reports').map(row => ({ ...row, body: asText(row.body).trim() ? /<[a-z][\s\S]*>/i.test(asText(row.body)) ? sanitizeHTML(asText(row.body)) : asText(row.body) : '', memo: asText(row.memo).trim() ? asText(row.memo) : '' })),
+    reports: rows(fallback(first[1], previous?.reports), 'reports').map(row => ({ ...row, body: asText(row.body).trim() ? /^\s*<(!DOCTYPE|[a-z])/i.test(asText(row.body)) ? sanitizeHTML(asText(row.body)) : asText(row.body) : '', memo: asText(row.memo).trim() ? asText(row.memo) : '' })),
     templates: rows(fallback(first[2], previous?.templates), 'templates').filter(r => r.category === 'doc' || r.category === 'ritual'),
     trash: rows(fallback(first[3], previous?.trash), 'trash'), skipped: rows(index?.skipped), conflicts: rows(index?.conflicts),
     noteReadFailed: second[2].status === 'rejected',
