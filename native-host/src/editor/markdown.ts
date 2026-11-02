@@ -25,7 +25,7 @@ import {
 } from './nodes.tsx';
 import { outermostInline, TAG_FORMATS, IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN } from '../data/mdInline.ts';
 import type { FormatMatch, LinkMatch } from '../data/mdInline.ts';
-import { foldParagraphs, doubleListIndent, fenceTracker, mapOutsideCode, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
+import { foldParagraphs, closeBlockEmphasis, doubleListIndent, fenceTracker, mapOutsideCode, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
 
 export const EDITOR_NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, CodeHighlightNode,
   TableNode, TableRowNode, TableCellNode, MarkNode, AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
@@ -289,7 +289,7 @@ function extractCallouts(text: string) {
 }
 function importInto(text: string, root: ElementNode, cell: boolean, fold: boolean, depth = 0) {
   if (depth > 20) { root.append($createParagraphNode()); return; }
-  const extracted = extractCallouts(fold ? foldParagraphs(text) : text);
+  const extracted = extractCallouts(fold ? closeBlockEmphasis(foldParagraphs(text)) : text);
   $convertFromMarkdownString(cell ? extracted.text : doubleListIndent(extracted.text), importTransformers(cell), root);
   for (const child of root.getChildren()) {
     if (!$isParagraphNode(child)) continue;

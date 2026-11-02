@@ -309,6 +309,14 @@ test("C178, C197, C199, C200: 읽기 화면은 편집기와 같은 짝을 그리
   assert.equal(html("긴 문단의 **굵게\n이어짐** 끝"), "<p>긴 문단의 <strong>굵게 이어짐</strong> 끝</p>");
   assert.equal(html("setext\n===", true), "<h1>setext</h1>");
 });
+test("C198: 읽기 화면도 블록 안에서 줄을 넘는 서식을 편집기처럼 줄마다 그린다", () => {
+  const html = (md, external = false) => readingHTML(md, external).trim().replace(/\n/g, "⏎");
+  assert.equal(html("> **굵게\n> 이어짐** 끝"), "<blockquote>⏎<p><strong>굵게</strong>⏎<strong>이어짐</strong> 끝</p>⏎</blockquote>");
+  assert.equal(html("- **항목\n  이어짐** 끝"), "<ul>⏎<li><strong>항목</strong>⏎<strong>이어짐</strong> 끝</li>⏎</ul>");
+  assert.equal(html("**굵게  \n이어짐** 끝"), "<p><strong>굵게</strong><br><strong>이어짐</strong> 끝</p>");
+  assert.equal(html("긴 **문단\n이어짐** 끝", true), "<p>긴 <strong>문단</strong>⏎<strong>이어짐</strong> 끝</p>");
+  assert.equal(html("> **a\n>\n> b**"), "<blockquote>⏎<p>**a</p>⏎<p>b**</p>⏎</blockquote>");
+});
 test("캘린더 15분 스냅·경계·한 시간 겹침 레인", () => {
   assert.equal(timeAt(67), "01:00");
   assert.equal(timeAt(68), "01:15");

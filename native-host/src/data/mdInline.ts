@@ -38,6 +38,7 @@ function canEmphasis(char: string, text: string, index: number, length: number, 
   return adjacent !== undefined && PUNCTUATION.test(adjacent);
 }
 
+// The editor imports one line at a time, so a code span never crosses a line break.
 export function codeSpans(text: string): { start: number; end: number; content: string }[] {
   const runs: { index: number; length: number }[] = [];
   for (let i = 0; i < text.length;) {
@@ -49,7 +50,7 @@ export function codeSpans(text: string): { start: number; end: number; content: 
   for (let open = 0; open < runs.length;) {
     const opener = runs[open];
     if (escaped(text, opener.index)) { open++; continue; }
-    const close = runs.findIndex((run, n) => n > open && run.length === opener.length);
+    const close = runs.findIndex((run, n) => n > open && run.length === opener.length && !text.slice(opener.index, run.index).includes('\n'));
     if (close === -1) { open++; continue; }
     let content = text.slice(opener.index + opener.length, runs[close].index);
     if (content.length >= 2 && content.startsWith(' ') && content.endsWith(' ') && /[^ ]/.test(content)) content = content.slice(1, -1);
@@ -124,6 +125,31 @@ export function outermostInline(text: string): FormatMatch | LinkMatch | null {
   if (!format || !link) return format || link;
   if (format.kind === 'code') return link.start <= format.start && link.end >= format.end ? link : format;
   return format.start <= link.start && format.end >= link.end || link.start > format.end ? format : link;
+}
+
+/** Every emphasis pair in `source`, outermost first, with absolute delimiter offsets. */
+export function markPairs(source: string, offset = 0): { tag: string; open: number; close: number }[] {
+  const found = outermostInline(source);
+  if (!found) return [];
+  const pairs = found.start ? markPairs(source.slice(0, found.start), offset) : [];
+  if (found.kind === 'mark') {
+    pairs.push({ tag: found.tag, open: offset + found.start, close: offset + found.end - found.tag.length });
+    pairs.push(...markPairs(found.content, offset + found.start + found.tag.length));
+  } else if (found.kind !== 'code' && (found as LinkMatch).label) {
+    const label = (found as LinkMatch).label;
+    pairs.push(...markPairs(label, offset + found.start + source.slice(found.start, found.end).indexOf(label)));
+  }
+  return [...pairs, ...markPairs(source.slice(found.end), offset + found.end)];
+}
+/** Each character the editor shows for `source` with the formats on it. */
+export function charFormats(source: string, formats: string[] = []): { ch: string; formats: string }[] {
+  const plain = (text: string, on: string[]) => [...text].map(ch => ({ ch, formats: [...on].sort().join() }));
+  const found = outermostInline(source);
+  if (!found) return plain(source, formats);
+  const middle = found.kind === 'code' ? plain(found.content, [...formats, 'code'])
+    : found.kind === 'mark' ? charFormats(found.content, [...formats, ...TAG_FORMATS[found.tag]])
+    : charFormats((found as LinkMatch).label, [...formats, found.kind]);
+  return [...(found.start ? charFormats(source.slice(0, found.start), formats) : []), ...middle, ...charFormats(source.slice(found.end), formats)];
 }
 
 const unescape = (text: string) => text.replace(/\\([!-/:-@[-`{-~])/g, '$1').replace(/&#(\d+);/g, (all, code) => {

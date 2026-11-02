@@ -135,8 +135,8 @@ markdown 줄은 설명서 부록 C.3의 「예」를 이 저장소의 헤드리�
 | 2. 화면 동작 | 완료. 8줄 고침(다른 세션 `9cf4dde`가 먼저 손댄 C112, C110, C188 포함), 2줄 시험만 | [rebuild-p3-fix-02-complete.md](rebuild-p3-fix-02-complete.md) |
 | 3. markdown 왕복 | 완료. 10줄과 C196 고침, C183 사례만. 묶음 87개 | [rebuild-p3-fix-03-complete.md](rebuild-p3-fix-03-complete.md) |
 | 4. 굵은 글의 한글 예외 | 완료. C178과 증분 5의 C197, C199, C200을 짝짓기 함수 하나로 함께 고침 | [rebuild-p3-fix-04-complete.md](rebuild-p3-fix-04-complete.md) |
-| 5. 강조 짝짓기 | 다음. C198(줄을 넘는 서식)만 남음 | |
-| 6. 서식 안의 노트 칩 | | |
+| 5. 강조 짝짓기 | 완료. C198(줄을 넘는 서식) | [rebuild-p3-fix-05-complete.md](rebuild-p3-fix-05-complete.md) |
+| 6. 서식 안의 노트 칩 | 다음 | |
 | 7. vault 바꾸기 | | |
 
 ## 7. 참조

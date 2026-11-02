@@ -1,3 +1,5 @@
+import { markPairs, charFormats, IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN } from '../data/mdInline.ts';
+
 // 9.9: a fence opens on a line whose text after leading spaces and tabs is three
 // or more backticks, and closes only on a line of backticks at least as long. A
 // one-line fence closes on its own line. Line joining, callout lifting, list
@@ -19,18 +21,86 @@ export function fenceTracker() {
 }
 export const fenceLine = (line: string) => /^[ \t]*`{3,}/.test(line);
 
+// 9.4: the lines that open a block and so never join the line before them.
+const blockLine = (line: string) => /^(?:#{1,6}\s|>|\s*(?:[-*+]|\d+\.)\s|\s*\|.*\|\s*$)/.test(line) || fenceLine(line)
+  || /^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
+const hardBreak = (line: string) => /(?: {2,}|\\)$/.test(line);
+
 export function foldParagraphs(input: string): string {
   const lines = input.replace(/\r\n?/g, '\n').split('\n'), output: string[] = [], fenced = fenceTracker();
-  const block = (line: string) => /^(?:#{1,6}\s|>|\s*(?:[-*+]|\d+\.)\s|\s*\|.*\|\s*$)/.test(line) || fenceLine(line)
-    || /^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
+  const block = blockLine;
   for (const line of lines) {
     if (fenced(line)) { output.push(line); continue; }
     const previous = output.at(-1);
     if (previous !== undefined && previous.trim() && line.trim() && !block(previous) && !block(line)
-      && !/(?: {2,}|\\)$/.test(previous)) output[output.length - 1] += ' ' + line;
+      && !hardBreak(previous)) output[output.length - 1] += ' ' + line;
     else output.push(line);
   }
   return output.join('\n');
+}
+
+// C198: within one block (following quote lines including a callout body, a list item
+// with its indented continuation lines, a paragraph joined by hard breaks) a format
+// that crosses a line break is closed at the line end and reopened on the next line,
+// because the editor imports line by line. The editor import and the reading view
+// both pass here. A blank > line, and a heading or list shaped line in a quote, end
+// the block; an unindented continuation line does not join it. A block stays as it
+// came if pairing the rewritten lines one by one shows different formats, if a
+// crossing mark sits inside link syntax, or if the block is over 10,000 characters.
+// `paragraphs` also treats soft-wrapped paragraph lines as one block (reading an
+// external file, which is not folded first).
+export function closeBlockEmphasis(markdown: string, paragraphs = false): string {
+  const lines = markdown.split('\n'), fenced = fenceTracker();
+  type Part = { line: number; prefix: number; end: number };
+  const blocks: Part[][] = [];
+  let kind = '', current: Part[] = [];
+  const close = () => { if (current.length > 1) blocks.push(current); current = []; kind = ''; };
+  const part = (line: number, prefix: number) => {
+    const text = lines[line], suffix = /(?: {2,}|\\)$/.exec(text.slice(prefix));
+    return { line, prefix, end: suffix ? text.length - suffix[0].length : text.length };
+  };
+  lines.forEach((line, n) => {
+    if (fenced(line)) return close();
+    const quote = /^> ?/.exec(line);
+    if (quote) {
+      const content = line.slice(quote[0].length);
+      if (!content.trim() || /^(?:#{1,6}\s|\s*(?:[-*+]|\d+\.)\s|\[!|>)/.test(content)) return close();
+      if (kind !== 'quote') { close(); kind = 'quote'; }
+      return void current.push(part(n, quote[0].length));
+    }
+    const item = /^\s*(?:[-*+]|\d+\.)\s+(?:\[[ xX/-]\]\s+)?/.exec(line);
+    if (item) { close(); kind = 'list'; return void current.push(part(n, item[0].length)); }
+    if (kind === 'list' && /^\s+\S/.test(line) && !blockLine(line)) return void current.push(part(n, /^\s*/.exec(line)![0].length));
+    if (line.trim() && !blockLine(line)) {
+      const previous = current.at(-1);
+      if (kind === 'para' && previous && (paragraphs || hardBreak(lines[previous.line]))) return void current.push(part(n, 0));
+      close(); kind = 'para'; return void current.push(part(n, 0));
+    }
+    close();
+  });
+  close();
+  for (const block of blocks) {
+    const contents = block.map(({ line, prefix, end }) => lines[line].slice(prefix, end)), joined = contents.join('\n');
+    if (joined.length > 10000) continue;
+    const starts: number[] = [];
+    contents.reduce((at, text) => { starts.push(at); return at + text.length + 1; }, 0);
+    const lineOf = (offset: number) => starts.filter(start => start <= offset).length - 1;
+    const crossing = markPairs(joined).filter(pair => lineOf(pair.open) !== lineOf(pair.close));
+    if (!crossing.length) continue;
+    const links = [IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN].flatMap(pattern => [...joined.matchAll(new RegExp(pattern.source, 'g'))])
+      .map(match => [match.index!, match.index! + match[0].length]);
+    if (crossing.some(pair => links.some(([from, to]) => [pair.open, pair.close].some(at => at >= from && at < to)))) continue;
+    const opens = contents.map(() => [] as string[]), ends = contents.map(() => [] as string[]);
+    for (const pair of crossing) {
+      for (let n = lineOf(pair.open); n < lineOf(pair.close); n++) ends[n].unshift(pair.tag);
+      for (let n = lineOf(pair.open) + 1; n <= lineOf(pair.close); n++) opens[n].push(pair.tag);
+    }
+    const rewritten = contents.map((text, n) => opens[n].join('') + text + ends[n].join(''));
+    const want = charFormats(joined).filter(item => item.ch !== '\n'), got = rewritten.flatMap(text => charFormats(text));
+    if (want.length !== got.length || want.some((item, n) => item.ch !== got[n].ch || item.formats !== got[n].formats)) continue;
+    block.forEach(({ line, prefix, end }, n) => { lines[line] = lines[line].slice(0, prefix) + rewritten[n] + lines[line].slice(end); });
+  }
+  return lines.join('\n');
 }
 
 // C186: code lines that look like list items keep their spaces.

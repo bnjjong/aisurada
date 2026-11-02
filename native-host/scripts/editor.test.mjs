@@ -9,7 +9,7 @@ import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument, codeIn
 import { $convertFromMarkdownString } from '@lexical/markdown';
 import { $createCodeNode } from '@lexical/code';
 import { $createTextNode } from 'lexical';
-import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs } from '../src/editor/grammar.ts';
+import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs, closeBlockEmphasis } from '../src/editor/grammar.ts';
 import { frameHeight, openEditorLink } from '../src/editor/media.tsx';
 import { tablesOnlyJSON } from '../src/editor/tableTools.tsx';
 const cases=JSON.parse(readFileSync(new URL('../fixtures/editor-roundtrip/cases.json',import.meta.url),'utf8'));
@@ -71,6 +71,15 @@ test('C178/C197: on text with no CJK the inline rule saves exactly what the libr
  const pieces=['a','b',' ','*','**','_','__','~~','==','`','[',']','(u)','!','\\','.','(',')','x y','#doc:'];
  const random=Array.from({length:3000},()=>Array.from({length:2+next(9)},()=>pieces[next(pieces.length)]).join('')).filter(line=>line.trim()&&!/^[#>\-+*\d\s|`]/.test(line));
  for(const line of [...chosen,...random])assert.equal(ours(line),library(line),line);
+});
+test('C198: a format crossing a line break inside one block is closed and reopened per line; block edges and unsafe rewrites stay',()=>{
+ const same=['> **a\n>\n> b**','> **a\n> # b**','> **a\n> - b**','- **a\n이어짐**','> **a \n> b**','```\n> **a\n> b**\n```','긴 **문단\n이어짐**'];
+ for(const text of same)assert.equal(closeBlockEmphasis(text),text,text);
+ assert.equal(closeBlockEmphasis('> ~~a\n> b~~ ==c\n> d=='),'> ~~a~~\n> ~~b~~ ==c==\n> ==d==');
+ assert.equal(closeBlockEmphasis('> ***x\n> y***'),'> ***x***\n> ***y***');
+ assert.equal(closeBlockEmphasis('**굵게\\\n이어짐**'),'**굵게**\\\n**이어짐**');
+ assert.equal(closeBlockEmphasis('긴 **문단\n이어짐**',true),'긴 **문단**\n**이어짐**');
+ const long='> **'+'가'.repeat(10001)+'\n> 끝**';assert.equal(closeBlockEmphasis(long),long);
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});

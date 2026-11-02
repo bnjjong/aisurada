@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Marked, Renderer } from "marked";
 import type { Tokens } from "marked";
 import { SENTINEL, sentinelInline } from "../data/mdInline.ts";
-import { fenceTracker, foldParagraphs } from "../editor/grammar.ts";
+import { closeBlockEmphasis, fenceTracker, foldParagraphs } from "../editor/grammar.ts";
 import DOMPurify from "dompurify";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { renderDiagram } from "../editor/mermaid.tsx";
@@ -49,7 +49,8 @@ const reader = new Marked({
 });
 function readingSource(body: string, external: boolean) {
   const fenced = fenceTracker();
-  return (external ? body : foldParagraphs(body)).split("\n").map((line) => {
+  // C198: lines of one block close and reopen a crossing format, as in the editor.
+  return (external ? closeBlockEmphasis(body, true) : closeBlockEmphasis(foldParagraphs(body))).split("\n").map((line) => {
     if (fenced(line) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return line;
     if (/^\s*\|/.test(line)) return line.split(/(?<!\\)\|/).map((cell, n, cells) => n && n < cells.length - 1 ? sentinelInline(cell) : cell).join("|");
     const prefix = /^\s*(?:>\s?)*\s*(?:(?:[-*+]|\d+\.)\s+(?:\[[ xX/-]\]\s+)?)?(?:#{1,6}\s+)?/.exec(line)![0];
