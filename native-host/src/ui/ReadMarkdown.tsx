@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { marked, Renderer } from "marked";
+import { Marked, Renderer } from "marked";
+import type { Tokens } from "marked";
+import { SENTINEL, sentinelInline } from "../data/mdInline.ts";
+import { fenceTracker, foldParagraphs } from "../editor/grammar.ts";
 import DOMPurify from "dompurify";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { renderDiagram } from "../editor/mermaid.tsx";
@@ -15,6 +18,47 @@ const allowed = new Set(
   ),
 );
 export type SanitizedHTML = string & { readonly __sanitizedHTML: unique symbol };
+// C178, C197, C199, C200: the reading view draws the editor's pairs. Paired marks
+// become sentinels before parsing and the parser's own emphasis is off, so a pair the
+// editor does not see is never drawn here either. Notes fold lines like the editor.
+const TAGS: [string, string, string][] = [
+  [...SENTINEL.bold, "strong"], [...SENTINEL.italic, "em"], [...SENTINEL.strikethrough, "del"], [...SENTINEL.highlight, "mark"],
+];
+const OPENERS = new RegExp(`[${TAGS.map(([open]) => open).join("")}]`);
+const reader = new Marked({
+  tokenizer: { emStrong: () => undefined, del: () => undefined } as never,
+  extensions: [{
+    name: "wlFormat",
+    level: "inline",
+    start: (src: string) => { const at = src.search(OPENERS); return at < 0 ? undefined : at; },
+    tokenizer(src: string) {
+      const kind = TAGS.find(([open]) => src[0] === open);
+      if (!kind) return undefined;
+      let depth = 0;
+      for (let i = 0; i < src.length; i++) {
+        if (src[i] === kind[0]) depth++;
+        else if (src[i] === kind[1] && --depth === 0)
+          return { type: "wlFormat", raw: src.slice(0, i + 1), tag: kind[2], tokens: this.lexer.inlineTokens(src.slice(1, i)) };
+      }
+      return undefined;
+    },
+    renderer(token: Tokens.Generic) {
+      return `<${token.tag}>${this.parser.parseInline(token.tokens || [])}</${token.tag}>`;
+    },
+  }],
+});
+function readingSource(body: string, external: boolean) {
+  const fenced = fenceTracker();
+  return (external ? body : foldParagraphs(body)).split("\n").map((line) => {
+    if (fenced(line) || /^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return line;
+    if (/^\s*\|/.test(line)) return line.split(/(?<!\\)\|/).map((cell, n, cells) => n && n < cells.length - 1 ? sentinelInline(cell) : cell).join("|");
+    const prefix = /^\s*(?:>\s?)*\s*(?:(?:[-*+]|\d+\.)\s+(?:\[[ xX/-]\]\s+)?)?(?:#{1,6}\s+)?/.exec(line)![0];
+    return prefix + sentinelInline(line.slice(prefix.length));
+  }).join("\n");
+}
+export function readingHTML(body: string, external = false, renderer?: Renderer) {
+  return (reader.parse(readingSource(body, external), { renderer, gfm: true, async: false }) as string).replace(/[\ue020-\ue027]/g, "");
+}
 export function markdownHTML(body: string, external = false) {
   const renderer = new Renderer();
   renderer.html = ({ text, block }) =>
@@ -28,11 +72,7 @@ export function markdownHTML(body: string, external = false) {
             allowed.has(name.toLowerCase()) ? tag : escape(tag),
           )
       : escape(text);
-  const html = marked.parse(body, {
-    renderer,
-    gfm: true,
-    async: false,
-  }) as string;
+  const html = readingHTML(body, external, renderer);
   const template = document.createElement("template");
   template.innerHTML = html;
   if (external) {

@@ -28,6 +28,7 @@ import {
   movedTime,
 } from "../src/ui/CalendarAgenda.tsx";
 import { reportIds } from "../src/ui/OtherPages.tsx";
+import { readingHTML } from "../src/ui/ReadMarkdown.tsx";
 import {
   addLayer,
   topLayer,
@@ -295,6 +296,18 @@ test("C28: 아젠다 폼은 연 때 저장소가 있던 아젠다에서 비운 �
   assert.deepEqual(agendaRepoField("", "  "), {});
   assert.deepEqual(agendaRepoField("", "git@x:b.git"), { repo: "git@x:b.git" });
   assert.deepEqual(agendaRepoField("git@x:a.git", "git@x:b.git"), { repo: "git@x:b.git" });
+});
+test("C178, C197, C199, C200: 읽기 화면은 편집기와 같은 짝을 그리고 스스로는 짝을 짓지 않는다", () => {
+  const html = (md, external = false) => readingHTML(md, external).trim();
+  assert.equal(html("**(주의)**를 확인"), "<p><strong>(주의)</strong>를 확인</p>");
+  assert.equal(html("**주의.** 값은 **`timeout` 을 넘지 않는다.**"), "<p><strong>주의.</strong> 값은 <strong><code>timeout</code> 을 넘지 않는다.</strong></p>");
+  assert.equal(html("「**(주의)**」"), "<p>「<strong>(주의)</strong>」</p>");
+  assert.equal(html("x**(a)**y"), "<p>x**(a)**y</p>");
+  assert.equal(html("*기울임* _밑줄_ ~~취소~~ ==강조=="), "<p><em>기울임</em> <em>밑줄</em> <del>취소</del> <mark>강조</mark></p>");
+  assert.equal(html("가_나_다 2 * 3 * 4 `**코드**`"), "<p>가_나_다 2 * 3 * 4 <code>**코드**</code></p>");
+  assert.match(html("| **a** | b **c** \\| d |\n|---|---|\n| 1 | 2 |"), /<th><strong>a<\/strong><\/th>\n<th>b <strong>c<\/strong> \| d<\/th>/);
+  assert.equal(html("긴 문단의 **굵게\n이어짐** 끝"), "<p>긴 문단의 <strong>굵게 이어짐</strong> 끝</p>");
+  assert.equal(html("setext\n===", true), "<h1>setext</h1>");
 });
 test("캘린더 15분 스냅·경계·한 시간 겹침 레인", () => {
   assert.equal(timeAt(67), "01:00");

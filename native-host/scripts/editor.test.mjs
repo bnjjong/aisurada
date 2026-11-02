@@ -5,7 +5,8 @@ import { createHeadlessEditor } from '@lexical/headless';
 import { $getSelection, $getRoot } from 'lexical';
 import { extractTitle } from '../src/data/title.ts';
 import { $insertBlock } from '../src/editor/wrapBlock.ts';
-import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument, codeInfo } from '../src/editor/markdown.ts';
+import { EDITOR_NODES, $importDocument, $exportDocument, $repairDocument, codeInfo, transformers } from '../src/editor/markdown.ts';
+import { $convertFromMarkdownString } from '@lexical/markdown';
 import { $createCodeNode } from '@lexical/code';
 import { $createTextNode } from 'lexical';
 import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs } from '../src/editor/grammar.ts';
@@ -60,6 +61,16 @@ test('C182: marker syntax inside code survives placeholders and stripping; marke
 test('C74: the language is the first word in the reading-view shape, else the old [\\w-] run, and the rest stays on the fence',()=>{
  assert.deepEqual(codeInfo('c++'),{language:'c++',tail:''});assert.deepEqual(codeInfo('ts title="x"'),{language:'ts',tail:' title="x"'});
  assert.deepEqual(codeInfo('   js'),{language:'js',tail:''});assert.deepEqual(codeInfo('{.python}'),{language:'',tail:'{.python}'});assert.deepEqual(codeInfo(''),{language:'',tail:''});
+});
+test('C178/C197: on text with no CJK the inline rule saves exactly what the library import saves (18 chosen, 3,000 random lines)',()=>{
+ const make=()=>createHeadlessEditor({namespace:'diff',nodes:EDITOR_NODES,onError:e=>{throw e}});
+ const ours=line=>{const e=make();e.update(()=>$importDocument(line),{discrete:true});return e.getEditorState().read($exportDocument);};
+ const library=line=>{const e=make();e.update(()=>{$convertFromMarkdownString(line,transformers(),$getRoot());},{discrete:true});return e.getEditorState().read($exportDocument);};
+ const chosen=['a **b** c','*a* _b_ ~~c~~ ==d==','**a `b` c**','x `*` y','[**a**](u) b','**[a](u)**','***x***','**a*b**','_a_b_','snake_case_x','\\*not\\*','`a\\.b` x','![i](a.png) **b**','[n](#doc:nd1) *c*','__init__ f','1~2kg','x**(a)**y','2 * 3 * 4'];
+ let seed=7;const next=n=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed%n;};
+ const pieces=['a','b',' ','*','**','_','__','~~','==','`','[',']','(u)','!','\\','.','(',')','x y','#doc:'];
+ const random=Array.from({length:3000},()=>Array.from({length:2+next(9)},()=>pieces[next(pieces.length)]).join('')).filter(line=>line.trim()&&!/^[#>\-+*\d\s|`]/.test(line));
+ for(const line of [...chosen,...random])assert.equal(ours(line),library(line),line);
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});

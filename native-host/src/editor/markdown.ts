@@ -23,6 +23,8 @@ import {
   AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
   $createAnnotation, $isAnnotation, $createCallout, $isCallout, $createReference, $isReference, $createImage, $isImage,
 } from './nodes.tsx';
+import { outermostInline, TAG_FORMATS, IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN } from '../data/mdInline.ts';
+import type { FormatMatch, LinkMatch } from '../data/mdInline.ts';
 import { foldParagraphs, doubleListIndent, fenceTracker, mapOutsideCode, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
 
 export const EDITOR_NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, CodeHighlightNode,
@@ -150,17 +152,38 @@ function checklist(cell: boolean): ElementTransformer {
 }
 const IMAGE: TextMatchTransformer = {
   type: 'text-match', dependencies: [ImageNode], trigger: ')',
-  importRegExp: /!\[([^\]\ue000]*)\]\(([^\s)]+)\)/,
+  importRegExp: IMAGE_PATTERN,
   regExp: /!\[([^\]\ue000]*)\]\(([^\s)]+)\)$/,
   replace: (node, match) => { node.replace($createImage(match[2], match[1])); },
   export: node => $isImage(node) ? `![${node.getAlt()}](${node.getSource()})` : null,
 };
 const CHIP: TextMatchTransformer = {
   type: 'text-match', dependencies: [ReferenceNode], trigger: ')',
-  importRegExp: /\[([^\]\ue000]+)\]\(#doc:([^\s)]+)\)/,
+  importRegExp: CHIP_PATTERN,
   regExp: /\[([^\]\ue000]+)\]\(#doc:([^\s)]+)\)$/,
   replace: (node, match) => { node.replace($createReference(match[2], match[1])); },
   export: node => $isReference(node) ? `[${node.getLabel()}](#${node.isCard() ? 'sub' : 'doc'}:${node.getTarget()})` : null,
+};
+// C178, C197, C199, C200: one inline rule replaces the library's format and text-match
+// import, so the editor pairs exactly like the title and the reading view do. The
+// library still splits the node and recurses; this rule only picks what comes first.
+const INLINE: TextMatchTransformer = {
+  type: 'text-match', dependencies: [ImageNode, ReferenceNode, LinkNode], regExp: /$^/,
+  importRegExp: { [Symbol.match]: (text: string) => {
+    const found = outermostInline(text);
+    if (!found) return null;
+    return Object.assign([text.slice(found.start, found.end)], { index: found.start, input: text, found });
+  } } as unknown as RegExp,
+  replace: (node, match) => {
+    const found = (match as unknown as { found: FormatMatch | LinkMatch }).found, text = node.getTextContent();
+    if (found.kind === 'image') return IMAGE.replace!(node, text.match(IMAGE_PATTERN)!);
+    if (found.kind === 'chip') return CHIP.replace!(node, text.match(CHIP_PATTERN)!);
+    if (found.kind === 'link') return LINK.replace!(node, text.match(LINK_PATTERN)!);
+    const mark = found as FormatMatch;
+    node.setTextContent(mark.content);
+    for (const format of TAG_FORMATS[mark.tag]) if (!node.hasFormat(format)) node.toggleFormat(format);
+    return node;
+  },
 };
 const ANNOTATION: TextMatchTransformer = {
   type: 'text-match', dependencies: [AnnotationNode], regExp: /$^/,
@@ -244,6 +267,11 @@ export function transformers(cell = false, copy = false): Transformer[] {
     cell ? QUOTE : GUARDED_QUOTE, cell ? UNORDERED_LIST : listRule(UNORDERED_LIST, 'bullet'), cell ? ORDERED_LIST : listRule(ORDERED_LIST, 'number'),
     HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, IMAGE, CHIP, LINK, ANNOTATION];
 }
+const INLINE_RULES: Transformer[] = [HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, IMAGE, CHIP, LINK];
+// Opening a note uses INLINE in place of the library's inline rules; saving keeps them.
+function importTransformers(cell: boolean): Transformer[] {
+  return [...transformers(cell).filter(rule => !INLINE_RULES.includes(rule)), INLINE];
+}
 function extractCallouts(text: string) {
   const blocks: { kind: string; text: string }[] = [], lines = text.split('\n'), output: string[] = [], fenced = fenceTracker();
   for (let i = 0; i < lines.length; i++) {
@@ -262,7 +290,7 @@ function extractCallouts(text: string) {
 function importInto(text: string, root: ElementNode, cell: boolean, fold: boolean, depth = 0) {
   if (depth > 20) { root.append($createParagraphNode()); return; }
   const extracted = extractCallouts(fold ? foldParagraphs(text) : text);
-  $convertFromMarkdownString(cell ? extracted.text : doubleListIndent(extracted.text), transformers(cell), root);
+  $convertFromMarkdownString(cell ? extracted.text : doubleListIndent(extracted.text), importTransformers(cell), root);
   for (const child of root.getChildren()) {
     if (!$isParagraphNode(child)) continue;
     const match = /^\ue001(\d+)\ue001$/.exec(child.getTextContent());
