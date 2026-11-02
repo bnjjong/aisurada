@@ -14,7 +14,7 @@ export function useNoteAsk(_props?: any): any {
   };
 }
 
-export function NoteAskFrame({ children }: { baseDir?: string; children?: ReactNode }): ReactNode {
+export function NoteAskFrame({ children }: { baseDir?: string; noteId?: string; children?: ReactNode }): ReactNode {
   return children ?? null;
 }
 

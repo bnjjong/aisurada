@@ -39,6 +39,9 @@ export function workspaceServices(): WorkspaceServices {
     menu: received => isTauri()
       ? getCurrentWebviewWindow().listen<string>('wl://menu', event => received(event.payload))
       : Promise.resolve(() => {}),
+    navigateRequested: received => isTauri()
+      ? getCurrentWebviewWindow().listen<{ path: string; rail?: string | null; sub?: string | null }>('wl://navigate', event => received(event.payload))
+      : Promise.resolve(() => {}),
     ...(isTauri() ? { deepLinks: { listen: onOpenUrl, current: getCurrent } } : {}),
     ...(import.meta.hot ? { developmentLinks: (received: (urls: string[]) => void) => {
       const hot = import.meta.hot!;

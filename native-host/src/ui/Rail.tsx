@@ -2,6 +2,8 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { agendaOrder, HUE_COLORS } from "./model.ts";
+import { RailProjects, useProjectsList } from "@claude-plug/projects";
+import { useSessionBadge } from "@claude-plug/session";
 export function Rail({
   controller,
   state,
@@ -9,6 +11,8 @@ export function Rail({
   controller: WorkspaceController;
   state: WorkspaceState;
 }) {
+  useProjectsList();
+  useSessionBadge();
   const ws = state.workspace!,
     sorted = agendaOrder(ws.agendas, ws.notes);
   const group = (
@@ -155,6 +159,7 @@ export function Rail({
           "__none__",
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
+        <RailProjects />
       </section>
       <footer className="rail-footer">
         <button

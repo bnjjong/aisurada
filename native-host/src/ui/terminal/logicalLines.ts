@@ -8,11 +8,15 @@ export interface PinnedNoteOptions {
   hadTui: boolean;
 }
 
+export function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '').replace(/\r/g, '');
+}
+
 export function extractLogicalLines(rawLines: string[]): string[] {
   const result: string[] = [];
   for (const line of rawLines) {
-    // Strip trailing empty space that was never written to
-    const trimmedRight = line.replace(/ +$/, '');
+    // Strip ANSI escape codes and trailing empty space that was never written to
+    const trimmedRight = stripAnsi(line).replace(/ +$/, '');
     result.push(trimmedRight);
   }
   // Remove trailing empty lines

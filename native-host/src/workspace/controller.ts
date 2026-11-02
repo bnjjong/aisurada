@@ -2,7 +2,7 @@ import { engineCall, readWorkspace } from './engine.ts';
 import { migrateLegacy } from './migrateLegacy.ts';
 import { sampleWorkspace } from './sample.ts';
 import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readTheme, recentWorkspaces,
-  removeRecent, savedOpenIds, writeJSON, writeNoteGeometry } from './storage.ts';
+  removeRecent, savedOpenIds, writeJSON } from './storage.ts';
 import { waitingAnswers, unsavedAnswers } from '@claude-plug/state';
 import { asRow, asText, workspaceName } from './types.ts';
 import { TabModel } from '../navigation/tabs.ts';
@@ -15,7 +15,7 @@ import type { KeyInput } from '../interaction/shortcuts.ts';
 import type { RecentWorkspace, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
-import { preferences } from '../ui/model.ts';
+import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry } from './storage.ts';
 import type { Preferences } from '../ui/model.ts';
 import { RecentNotes } from '../ui/recent.ts';
 import { blocksEscape } from '../ui/layers.ts';
@@ -60,7 +60,7 @@ export class WorkspaceController {
     this.tabs = new TabModel(services.storage, context.kind === 'main');
     this.data = new VaultData(services, () => this.state.workspace, (vault, workspace) => this.patch({ vault, ...(workspace ? { workspace } : {}) }));
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
-      prefs: preferences(services.storage), settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
+      prefs: readPreferences(services.storage) as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
       theme: readTheme(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
@@ -138,11 +138,11 @@ export class WorkspaceController {
   };
   closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
   reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
-  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), ...(this.context.kind === 'main' ? { prefs: preferences(this.services.storage) } : {}) });
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage) as unknown as Preferences } : {}) });
   preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark' }) => {
     if (this.context.kind !== 'main') return;
-    const old = asRow(readJSON(this.services.storage, KEYS.prefs)) || {}, stored = asRow(old.state) || {};
-    writeJSON(this.services.storage, KEYS.prefs, { ...old, version: 1, state: { ...stored, ...this.state.prefs, ...update } }); this.refreshTheme();
+    writePreferences(this.services.storage, update as any);
+    this.refreshTheme();
   };
   settings = (open: boolean) => { if (this.context.kind === 'main') this.patch({ settingsOpen: open }); };
   form = (form: WorkspaceState['form']) => { if (this.context.kind === 'main') this.patch({ form }); };
@@ -215,6 +215,16 @@ export class WorkspaceController {
     if (this.services.menu) void this.services.menu(id => { void this.handleMenu(id); }).then(keep)
       .catch(error => this.services.warn('메뉴를 듣지 못했어요', error));
     if (this.context.kind !== 'main') return;
+    if (this.services.navigateRequested) void this.services.navigateRequested(nav => {
+      if (this.disposed || !nav?.path) return;
+      this.navigate(nav.path);
+      if (nav.sub) {
+        const parts = nav.sub.split('/');
+        const root = parts[0];
+        const chain = parts.slice(1);
+        if (root && chain.length) this.openSubNotes(root, chain);
+      }
+    }).then(keep).catch(error => this.services.warn('이동 요청을 듣지 못했어요', error));
     if (this.services.deepLinks) void connectLinkSource(this.services.deepLinks, urls => { void this.receiveURLs(urls); },
       () => this.linkRevision, error => this.services.warn('앱을 연 주소를 읽지 못했어요', error)).then(keep)
       .catch(error => this.services.warn('딥링크를 듣지 못했어요', error));
@@ -322,7 +332,7 @@ export class WorkspaceController {
 
   listenCloseRequested = (handler: () => void) => this.services.closeRequested?.(handler);
   saveNoteGeometry = (geo: { width: number; height: number; x: number; y: number }) => {
-    writeNoteGeometry(this.services.storage, geo);
+    writeNoteWindowGeometry(this.services.storage, geo);
     void this.services.host.invoke('remember_note_window', { geometry: geo }).catch(err => {
       console.error('remember_note_window failed', err);
     });
@@ -330,7 +340,6 @@ export class WorkspaceController {
 
   closeNoteWindow = async (): Promise<boolean> => {
     if (this.context.kind !== 'note' || this.closingNote || this.disposed) return false;
-    const docId = this.context.docId;
     this.closingNote = true;
     try {
       let settled = false;
@@ -338,8 +347,7 @@ export class WorkspaceController {
       try {
         settled = await Promise.race([
           (async () => {
-            if (this.services.pending.flushNote) await this.services.pending.flushNote(docId);
-            else await this.services.pending.flushEditors();
+            await this.services.pending.flushEditors();
             await this.flushEditors();
             return (await Promise.all([
               this.services.pending.waitForWrites(10_000),
@@ -354,7 +362,7 @@ export class WorkspaceController {
         clearTimeout(timer);
       }
 
-      const count = (this.services.pending.unsavedForNote?.(docId) ?? this.services.pending.unsavedNotes()) + this.data.unsavedForRoot(docId).length;
+      const count = this.services.pending.unsavedNotes() + this.data.unsavedKeys().length;
       const waiting = waitingAnswers();
       const unsavedA = unsavedAnswers();
 
@@ -487,11 +495,14 @@ export class WorkspaceController {
   }
 
   private noteGeometry() {
-    const value = asRow(readJSON(this.services.storage, 'withlog.noteWindow.v1'));
-    if (!value || typeof value.width !== 'number' || !Number.isFinite(value.width) || value.width <= 0 || typeof value.height !== 'number' || !Number.isFinite(value.height) || value.height <= 0) return null;
-    return { width: value.width, height: value.height,
-      x: typeof value.x === 'number' && Number.isFinite(value.x) ? value.x : null,
-      y: typeof value.y === 'number' && Number.isFinite(value.y) ? value.y : null };
+    const geo = readNoteWindowGeometry(this.services.storage);
+    if (!geo) return null;
+    return {
+      width: geo.width,
+      height: geo.height,
+      x: geo.x ?? null,
+      y: geo.y ?? null,
+    };
   }
 
   private async openLinkWindow(id: string, revision: number): Promise<boolean> {

@@ -5,6 +5,9 @@ import { rememberNoteScroll } from "./scroll.ts";
 import { NoteEditor } from "../editor/NoteEditor.tsx";
 import { NoteMeta } from "../ui/NoteParts.tsx";
 import type { NoteMode } from "../ui/NoteParts.tsx";
+import { useNoteAsk, NoteAskFrame, AskComposePopover } from "@claude-plug/ask";
+import { useNoteRail, noteRailNow } from "@claude-plug/state";
+import { NoteSessionRail } from "@claude-plug/session";
 
 export function NoteReading({
   note,
@@ -52,6 +55,9 @@ export function NoteReading({
             controller={controller}
             mode={context}
           />
+          <NoteAskFrame noteId={note.id} />
+          <AskComposePopover noteId={note.id} />
+          <NoteSessionRail noteId={note.id} />
         </div>
       ) : (
         <>
@@ -70,6 +76,9 @@ export function NoteScreen({
   note: Note;
   controller: WorkspaceController;
 }) {
+  useNoteAsk(note.id);
+  useNoteRail();
+  noteRailNow();
   const surface = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (!surface.current) return;

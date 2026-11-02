@@ -297,19 +297,19 @@ export function Calendar({
           <>
             <div className="week-layout-controls">
               <button
-                aria-pressed={state.prefs.weekLayout === "agendas"}
-                onClick={() => controller.preference({ weekLayout: "agendas" })}
+                aria-pressed={state.prefs.weekLayout === "agendas" || state.prefs.weekLayout === "swimlane"}
+                onClick={() => controller.preference({ weekLayout: "swimlane" })}
               >
                 아젠다 레인
               </button>
               <button
-                aria-pressed={state.prefs.weekLayout === "dates"}
-                onClick={() => controller.preference({ weekLayout: "dates" })}
+                aria-pressed={state.prefs.weekLayout === "dates" || state.prefs.weekLayout === "stack"}
+                onClick={() => controller.preference({ weekLayout: "stack" })}
               >
                 날짜 열
               </button>
             </div>
-            {state.prefs.weekLayout === "dates" ? (
+            {state.prefs.weekLayout === "dates" || state.prefs.weekLayout === "stack" ? (
               <div className="week-columns">
                 {Array.from({ length: 7 }, (_, i) => addDays(view.week, i)).map(
                   (date) => (

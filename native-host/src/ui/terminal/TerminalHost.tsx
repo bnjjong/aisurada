@@ -14,6 +14,79 @@ interface TerminalHostProps {
   onNavigate: (path: string) => void;
 }
 
+const ANSI_COLORS: Record<number, string> = {
+  30: '#1e1e1e', 31: '#ef4444', 32: '#22c55e', 33: '#eab308',
+  34: '#3b82f6', 35: '#a855f7', 36: '#06b6d4', 37: '#f8fafc',
+  90: '#71717a', 91: '#f87171', 92: '#4ade80', 93: '#fde047',
+  94: '#60a5fa', 95: '#c084fc', 96: '#22d3ee', 97: '#ffffff',
+};
+
+function renderAnsiLine(raw: string): React.ReactNode {
+  if (!raw.includes('\x1b')) return raw || '\u00A0';
+  const parts: React.ReactNode[] = [];
+  const regex = /\x1b\[([0-9;]*)m/g;
+  let lastIndex = 0;
+  let currentColor: string | undefined;
+  let isBold = false;
+  let isDim = false;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(raw)) !== null) {
+    if (match.index > lastIndex) {
+      const text = raw.substring(lastIndex, match.index).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      if (text) {
+        parts.push(
+          <span
+            key={lastIndex}
+            style={{
+              color: currentColor,
+              fontWeight: isBold ? 'bold' : undefined,
+              opacity: isDim ? 0.6 : undefined,
+            }}
+          >
+            {text}
+          </span>
+        );
+      }
+    }
+    const codes = match[1] ? match[1].split(';').map(Number) : [0];
+    for (const code of codes) {
+      if (code === 0) {
+        currentColor = undefined;
+        isBold = false;
+        isDim = false;
+      } else if (code === 1) {
+        isBold = true;
+      } else if (code === 2) {
+        isDim = true;
+      } else if (ANSI_COLORS[code]) {
+        currentColor = ANSI_COLORS[code];
+      }
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < raw.length) {
+    const text = raw.substring(lastIndex).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    if (text) {
+      parts.push(
+        <span
+          key={lastIndex}
+          style={{
+            color: currentColor,
+            fontWeight: isBold ? 'bold' : undefined,
+            opacity: isDim ? 0.6 : undefined,
+          }}
+        >
+          {text}
+        </span>
+      );
+    }
+  }
+
+  return parts.length ? parts : '\u00A0';
+}
+
 export function TerminalHost({
   tabKey,
   isVisible,
@@ -30,6 +103,7 @@ export function TerminalHost({
   const screenRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const decoderRef = useRef<TextDecoder | null>(null);
 
   // Buffer lines: cap to 10,000 lines (14.3)
   const appendOutput = useCallback((text: string) => {
@@ -50,13 +124,29 @@ export function TerminalHost({
     });
   }, []);
 
-  // Launch or reattach PTY on first view
+  // Launch PTY on mount, keep alive while tab exists in openIds
   useEffect(() => {
-    if (!isVisible || startedRef.current) return;
+    if (startedRef.current) return;
     startedRef.current = true;
+    if (!decoderRef.current) {
+      decoderRef.current = new TextDecoder('utf-8');
+    }
 
     let active = true;
     async function start() {
+      // 14.2: Wait up to 2000ms for monospace fonts to load before starting PTY
+      if (typeof document !== 'undefined' && 'fonts' in document) {
+        try {
+          await Promise.race([
+            document.fonts.ready,
+            new Promise(resolve => setTimeout(resolve, 2000)),
+          ]);
+        } catch {
+          // ignore font loading race failure
+        }
+      }
+      if (!active) return;
+
       try {
         const sessionId = tabKey.startsWith('term:') ? tabKey.slice(5) : undefined;
         const plan = await planSessionShell(tabKey, sessionId === 'main' ? undefined : sessionId);
@@ -75,8 +165,8 @@ export function TerminalHost({
             const decoded = atob(b64);
             const bytes = new Uint8Array(decoded.length);
             for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
-            const str = new TextDecoder().decode(bytes);
-            appendOutput(str);
+            const str = decoderRef.current?.decode(bytes, { stream: true }) || '';
+            if (str) appendOutput(str);
           } catch {
             // decode failure
           }
@@ -91,24 +181,43 @@ export function TerminalHost({
       }
     }
 
-    start();
+    void start();
 
     return () => {
       active = false;
-      // pty_detach on unmount (14.6)
-      ptyDetach(tabKey);
+      // pty_detach on unmount (when tab is closed) (14.6)
+      void ptyDetach(tabKey).catch(() => {});
     };
-  }, [isVisible, tabKey, appendOutput]);
+  }, [tabKey, appendOutput]);
 
   // Focus and keyboard input listener
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!started) return;
+
+    // Handle Cmd+V / Ctrl+V paste
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+        navigator.clipboard.readText().then(text => {
+          if (text) void ptyWrite(tabKey, text).catch(() => {});
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // Ignore other meta key combinations (Cmd+C, Cmd+W, etc.) so raw characters are not sent to shell
+    if (e.metaKey) return;
+
     e.stopPropagation();
 
     let data = e.key;
     if (e.key === 'Enter') data = '\r';
     else if (e.key === 'Backspace') data = '\x7f';
-    else if (e.key === 'Tab') data = '\t';
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      data = '\t';
+    }
     else if (e.key === 'ArrowUp') data = '\x1b[A';
     else if (e.key === 'ArrowDown') data = '\x1b[B';
     else if (e.key === 'ArrowRight') data = '\x1b[C';
@@ -123,7 +232,18 @@ export function TerminalHost({
       return; // Ignore other non-printable keys
     }
 
-    ptyWrite(tabKey, data).catch(() => {});
+    void ptyWrite(tabKey, data).catch(() => {});
+  }, [started, tabKey]);
+
+  // Handle native paste event
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!started) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const text = e.clipboardData.getData('text');
+    if (text) {
+      void ptyWrite(tabKey, text).catch(() => {});
+    }
   }, [started, tabKey]);
 
   // Resize observer
@@ -134,16 +254,17 @@ export function TerminalHost({
         const { width, height } = entry.contentRect;
         const cols = Math.max(20, Math.floor(width / 7.2));
         const rows = Math.max(5, Math.floor(height / 15));
-        ptyResize(tabKey, cols, rows).catch(() => {});
+        void ptyResize(tabKey, cols, rows).catch(() => {});
       }
     });
     observer.observe(screenRef.current);
     return () => observer.disconnect();
   }, [started, tabKey]);
 
-  // Auto scroll to bottom
+  // Auto focus and scroll to bottom on visibility change
   useEffect(() => {
     if (screenRef.current && isVisible) {
+      screenRef.current.focus();
       screenRef.current.scrollTop = screenRef.current.scrollHeight;
     }
   }, [rawLines, isVisible]);
@@ -174,6 +295,7 @@ export function TerminalHost({
         className="term-screen"
         tabIndex={0}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         onClick={() => screenRef.current?.focus()}
         style={{
           flex: 1,
@@ -195,7 +317,7 @@ export function TerminalHost({
           </div>
         ) : (
           rawLines.map((line, idx) => (
-            <div key={idx}>{line || '\u00A0'}</div>
+            <div key={idx}>{renderAnsiLine(line)}</div>
           ))
         )}
       </div>

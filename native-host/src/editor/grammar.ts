@@ -7,7 +7,7 @@ export function foldParagraphs(input: string): string {
     if (/^\s*`{3}/.test(line)) { fenced = !fenced; output.push(line); continue; }
     const previous = output.at(-1);
     if (!fenced && previous !== undefined && previous.trim() && line.trim() && !block(previous) && !block(line)
-      && !/(?: {2,}|\\)$/.test(previous)) output[output.length - 1] += ' ' + line.trimStart();
+      && !/(?: {2,}|\\)$/.test(previous)) output[output.length - 1] += ' ' + line;
     else output.push(line);
   }
   return output.join('\n');

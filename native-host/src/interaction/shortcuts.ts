@@ -18,7 +18,7 @@ export type Shortcut =
 export function shortcutFor(event: KeyInput, mac: boolean, native: boolean): Shortcut | null {
   if (event.defaultPrevented || event.altKey || !(mac ? event.metaKey : event.ctrlKey)) return null;
   if (event.key === 'k' || event.key === 'K') return { kind: 'search' };
-  if (event.shiftKey && (event.key === 't' || event.key === 'T' || event.code === 'KeyT')) return { kind: 'terminal' };
+  if (!native && event.shiftKey && (event.key === 't' || event.key === 'T' || event.code === 'KeyT')) return { kind: 'terminal' };
   if (!native && !event.shiftKey && event.key.toLowerCase() === 'w') return { kind: 'close' };
   if (event.shiftKey && event.code === 'BracketLeft') return { kind: 'cycle', direction: -1 };
   if (event.shiftKey && event.code === 'BracketRight') return { kind: 'cycle', direction: 1 };

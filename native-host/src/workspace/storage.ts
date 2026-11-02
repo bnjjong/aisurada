@@ -83,7 +83,7 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
   const merged: AppPreferences = { ...DEFAULT_PREFERENCES, ...stateRow };
 
   merged.theme = stateRow.theme === 'dark' ? 'dark' : 'light';
-  merged.weekLayout = stateRow.weekLayout === 'stack' ? 'stack' : 'swimlane';
+  merged.weekLayout = stateRow.weekLayout === 'stack' || stateRow.weekLayout === 'dates' ? 'stack' : 'swimlane';
   merged.railWidth = clampInt(stateRow.railWidth, 200, 420, 264);
   merged.detailListWidth = clampInt(stateRow.detailListWidth, 260, 560, 340);
   merged.docWidth = clampInt(stateRow.docWidth, 640, 1600, 820);
@@ -96,9 +96,17 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
   merged.composeInputHeight = clampNullableInt(stateRow.composeInputHeight, 80, 1200);
   merged.docSortMode = stateRow.docSortMode === 'time' ? 'time' : 'structure';
   merged.docSortDir = stateRow.docSortDir === 'asc' ? 'asc' : 'desc';
-  merged.titleDatePrefix = typeof stateRow.titleDatePrefix === 'boolean' ? stateRow.titleDatePrefix : true;
-  merged.showRecordTier = typeof stateRow.showRecordTier === 'boolean' ? stateRow.showRecordTier : false;
-  merged.mermaidShowSource = typeof stateRow.mermaidShowSource === 'boolean' ? stateRow.mermaidShowSource : false;
+  merged.titleDatePrefix = typeof stateRow.titleDatePrefix === 'boolean' ? stateRow.titleDatePrefix : (typeof stateRow.titleDate === 'boolean' ? stateRow.titleDate : true);
+  merged.showRecordTier = typeof stateRow.showRecordTier === 'boolean' ? stateRow.showRecordTier : (typeof stateRow.showRecords === 'boolean' ? stateRow.showRecords : false);
+  merged.mermaidShowSource = typeof stateRow.mermaidShowSource === 'boolean' ? stateRow.mermaidShowSource : (typeof stateRow.diagrams === 'boolean' ? stateRow.diagrams : false);
+
+  // Backward compatibility aliases for existing UI bindings
+  (merged as any).titleDate = merged.titleDatePrefix;
+  (merged as any).showRecords = merged.showRecordTier;
+  (merged as any).diagrams = merged.mermaidShowSource;
+  (merged as any).agendaSort = merged.docSortMode;
+  (merged as any).agendaDesc = merged.docSortDir === 'desc';
+  (merged as any).previewSize = merged.previewWidth ? { width: merged.previewWidth, height: merged.previewHeight || 480 } : null;
 
   const validTimeouts = [600, 1200, 1800, 3600, 7200];
   merged.askTimeoutSeconds = typeof stateRow.askTimeoutSeconds === 'number' && validTimeouts.includes(stateRow.askTimeoutSeconds)
@@ -145,10 +153,44 @@ export function readPreferences(storage: StoragePort): AppPreferences {
   return normalizePreferences(json).state;
 }
 
-export function writePreferences(storage: StoragePort, prefs: Partial<AppPreferences>, isMain = true) {
+export function writePreferences(
+  storage: StoragePort,
+  prefs: Partial<Omit<AppPreferences, 'weekLayout'> & { weekLayout?: 'swimlane' | 'stack' | 'agendas' | 'dates' | string; titleDate?: boolean; showRecords?: boolean; diagrams?: boolean; agendaSort?: 'structure' | 'time'; agendaDesc?: boolean; previewSize?: { width: number; height: number } | null }>,
+  isMain = true
+) {
   if (!isMain) return; // 노트 창은 설정을 쓰지 않는다 (15.7, 16.3)
   const current = readPreferences(storage);
-  const next = { ...current, ...prefs };
+  const normalizedUpdate: Record<string, unknown> = { ...prefs };
+  if (typeof prefs.titleDate === 'boolean' && prefs.titleDatePrefix === undefined) {
+    normalizedUpdate.titleDatePrefix = prefs.titleDate;
+  }
+  if (typeof prefs.titleDatePrefix === 'boolean') {
+    normalizedUpdate.titleDate = prefs.titleDatePrefix;
+  }
+  if (typeof prefs.showRecords === 'boolean' && prefs.showRecordTier === undefined) {
+    normalizedUpdate.showRecordTier = prefs.showRecords;
+  }
+  if (typeof prefs.showRecordTier === 'boolean') {
+    normalizedUpdate.showRecords = prefs.showRecordTier;
+  }
+  if (typeof prefs.diagrams === 'boolean' && prefs.mermaidShowSource === undefined) {
+    normalizedUpdate.mermaidShowSource = prefs.diagrams;
+  }
+  if (typeof prefs.mermaidShowSource === 'boolean') {
+    normalizedUpdate.diagrams = prefs.mermaidShowSource;
+  }
+  if (prefs.agendaSort !== undefined && prefs.docSortMode === undefined) {
+    normalizedUpdate.docSortMode = prefs.agendaSort;
+  }
+  if (typeof prefs.agendaDesc === 'boolean' && prefs.docSortDir === undefined) {
+    normalizedUpdate.docSortDir = prefs.agendaDesc ? 'desc' : 'asc';
+  }
+  if (prefs.weekLayout === 'dates') {
+    normalizedUpdate.weekLayout = 'stack';
+  } else if (prefs.weekLayout === 'agendas') {
+    normalizedUpdate.weekLayout = 'swimlane';
+  }
+  const next = { ...current, ...normalizedUpdate };
   writeJSON(storage, KEYS.prefs, { state: next, version: 1 });
 }
 

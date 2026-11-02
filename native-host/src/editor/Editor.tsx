@@ -1,4 +1,5 @@
 import { CLAUDE_ENABLED } from "@claude-plug/state";
+import { EditorAskPlugins, AskHoverCard } from "@claude-plug/ask";
 import { useEffect, useRef, useState } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
@@ -175,6 +176,8 @@ export function Editor(props: EditorProps) {
           <EditorTools {...props} />
           <TableTools {...props} />
           <MermaidLayer open={props.diagramsOpen || false} />
+          <EditorAskPlugins />
+          <AskHoverCard />
         </LexicalComposer>
       </div>
     </EditorContext.Provider>
@@ -359,14 +362,14 @@ function EditorBridge(props: EditorProps) {
           }
           if (body === last.current) return;
           last.current = body;
-          const selection = $getSelection(),
-            first = $getRoot().getFirstChild();
+          const selection = $getSelection();
+          const firstHeading = $getRoot().getChildren().find($isHeadingNode);
           const top = $isRangeSelection(selection)
             ? selection.anchor.getNode().getTopLevelElement()
             : null;
           callbacks.current.onChange?.(
             body,
-            first && $isHeadingNode(first) && top?.is(first) ? 1 : 2,
+            firstHeading && top?.is(firstHeading) ? 1 : 2,
           );
         });
       },

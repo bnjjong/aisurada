@@ -51,7 +51,7 @@ rm -rf "$CLASSES_DIR/META-INF/MANIFEST.MF"
 
 # Find and compile Java source files (src/ only)
 find "$SCRIPT_DIR/src" -name "*.java" > "$BUILD_DIR/sources.txt"
-"$JAVAC" -encoding UTF-8 -d "$CLASSES_DIR" -cp "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
+"$JAVAC" -encoding UTF-8 --release 21 -d "$CLASSES_DIR" -cp "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
 
 # Build fat jars
 "$JAR" --create --file "$DIST_DIR/wl-engine.jar" --main-class withlog.cli.Main -C "$CLASSES_DIR" .

@@ -31,22 +31,33 @@ export const TYPE_NAMES: Record<string, string> = {
   free: "자유",
 };
 export interface Preferences {
+  titleDatePrefix?: boolean;
+  showRecordTier?: boolean;
+  mermaidShowSource?: boolean;
   titleDate: boolean;
   showRecords: boolean;
   diagrams: boolean;
-  weekLayout: "agendas" | "dates";
+  weekLayout: "agendas" | "dates" | "swimlane" | "stack";
   agendaSort: "structure" | "time";
   agendaDesc: boolean;
+  docSortMode?: "structure" | "time";
+  docSortDir?: "desc" | "asc";
   collapsedProjects: string[];
   previewSize: { width: number; height: number } | null;
+  [key: string]: unknown;
 }
 export const defaultPrefs: Preferences = {
+  titleDatePrefix: true,
+  showRecordTier: false,
+  mermaidShowSource: false,
   titleDate: true,
   showRecords: false,
   diagrams: false,
   weekLayout: "agendas",
   agendaSort: "structure",
   agendaDesc: true,
+  docSortMode: "structure",
+  docSortDir: "desc",
   collapsedProjects: [],
   previewSize: null,
 };

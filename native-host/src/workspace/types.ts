@@ -58,6 +58,7 @@ export interface WorkspaceServices {
   windowLabel?: string;
   sanitizeHTML?(html: string): string;
   menu?(received: (id: string) => void): Promise<() => void>;
+  navigateRequested?(received: (nav: { path: string; rail?: string | null; sub?: string | null }) => void): Promise<() => void>;
   deepLinks?: import('../interaction/links.ts').DeepLinkSource;
   developmentLinks?(received: (urls: string[]) => void): () => void;
   closeWindow?(): Promise<void>;

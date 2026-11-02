@@ -23,6 +23,7 @@ import {
 import { ExternalFile } from "../ui/ExternalFile.tsx";
 import { TerminalHost } from "../ui/terminal/TerminalHost.tsx";
 import { SessionRoute } from "@claude-plug/session";
+import { useAskState } from "@claude-plug/state";
 type Props = { controller: WorkspaceController; state: WorkspaceState };
 class RouteBoundary extends Component<
   { children: ReactNode; controller: WorkspaceController },
@@ -54,6 +55,7 @@ class RouteBoundary extends Component<
   }
 }
 export function WorkspaceShell({ controller, state }: Props) {
+  useAskState();
   const route = parseRoute(state.route),
     ws = state.workspace!,
     rail = route.kind !== "doc" && route.kind !== "file";
