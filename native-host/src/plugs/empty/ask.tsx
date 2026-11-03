@@ -1,17 +1,36 @@
 // Empty implementation of @claude-plug/ask for Part 4-free builds.
 // Adheres to Chapter 17 (17.4) of withlog Part 3 screen specifications.
 import type { ReactNode } from 'react';
+import type { Note } from '../../workspace/types.ts';
+
+/**
+ * Note body port providing writing capabilities for main and sub notes (Chapter 10, 17.4).
+ */
+export interface NoteBodyPort {
+  kind?: 'main' | 'sub';
+  id?: string;
+  parent?: string;
+  write(body: string): Promise<void> | void;
+  saveDraft?(body: string): void;
+  read?(): string;
+}
+
+export interface AskEditorProps {
+  onAskAi?: (quote: string, question: string, turnId: string, images?: File[]) => void;
+  askDocId?: string;
+  onAskFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
+}
 
 export interface NoteAskInput {
-  doc?: any;
-  port?: any;
+  doc: Note;
+  port: NoteBodyPort;
   baseDir?: string;
-  currentDraft?: () => string;
-  onFollowUp?: (question: string, underlineId: string, images?: any[]) => void;
+  currentDraft: () => string;
+  onFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
 }
 
 export interface NoteAskOutput {
-  editor: any;
+  editor: AskEditorProps;
   panel: ReactNode;
 }
 
@@ -26,19 +45,41 @@ export function NoteAskFrame({ children }: { baseDir?: string; noteId?: string; 
   return children ?? null;
 }
 
-export function EditorAskPlugins(_props?: any): null {
-  return null;
-}
-
-export function AskComposePopover(_props?: {
-  state?: any;
-  onSubmit?: (text: string) => void;
-  onCancel?: () => void;
+export function EditorAskPlugins(_props?: {
+  docId?: string;
+  onAsk?: (quote: string, question: string, turnId: string, images?: File[]) => void;
+  onFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
 }): null {
   return null;
 }
 
-export function AskHoverCard(_props?: any): null {
+export interface AskComposeState {
+  left: number;
+  top: number;
+  quote: string;
+}
+
+export interface AskComposePopoverProps {
+  state: AskComposeState;
+  onSubmit: (question: string, images?: File[]) => void;
+  onCancel: () => void;
+}
+
+export function AskComposePopover(_props: AskComposePopoverProps): null {
+  return null;
+}
+
+export interface AskHoverCardProps {
+  docId: string;
+  turnId: string;
+  onFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
+  onFocusInput?: () => void;
+  onClose?: () => void;
+  pinned?: boolean;
+  boundaryRef?: React.RefObject<HTMLElement | null>;
+}
+
+export function AskHoverCard(_props: AskHoverCardProps): null {
   return null;
 }
 

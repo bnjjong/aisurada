@@ -88,7 +88,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
       const title = id === null ? '내 기록' : tabTitle(id, state);
       const note = state.workspace?.notes.find(n => n.id === id);
       return <div className={`tab-item tabx-item ${id === null ? 'tab-main tabx-main' : ''} ${active === id ? 'tab-selected tabx-selected' : ''} ${dragging === id && id !== null ? 'tab-dragging' : ''}`}
-        key={id ?? '__main__'} data-tab-id={id ?? undefined} aria-selected={active === id}
+        key={id ?? '__main__'} aria-selected={active === id}
         onClick={event => {
           if ((event.target as Element).closest('.tab-close, .tabx-close')) return;
           if (id !== null && suppressClick.current === id) { suppressClick.current = null; return; }

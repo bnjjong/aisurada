@@ -75,6 +75,9 @@ export interface EditorProps {
   onSection?(key: string): void;
   onReady?(handle: EditorHandle | null): void;
   diagramsOpen?: boolean;
+  askDocId?: string;
+  onAskAi?(quote: string, question: string, turnId: string, images?: File[]): void;
+  onAskFollowUp?(question: string, underlineId: string, images?: File[]): void;
 }
 const theme = {
   paragraph: "lex-paragraph",
@@ -176,8 +179,8 @@ export function Editor(props: EditorProps) {
           <EditorTools {...props} />
           <TableTools {...props} />
           <MermaidLayer open={props.diagramsOpen || false} />
-          <EditorAskPlugins />
-          <AskHoverCard />
+          <EditorAskPlugins docId={props.askDocId} onAsk={props.onAskAi} onFollowUp={props.onAskFollowUp} />
+          <AskHoverCard docId={props.askDocId || ""} turnId="" />
         </LexicalComposer>
       </div>
     </EditorContext.Provider>

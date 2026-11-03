@@ -6,14 +6,14 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { confirm, open } from '@tauri-apps/plugin-dialog';
 import * as fs from '@tauri-apps/plugin-fs';
-import DOMPurify from 'dompurify';
+import { sanitizeHtml } from '../lib/sanitize.ts';
 import type { WorkspaceServices } from './types.ts';
 
 export function workspaceServices(): WorkspaceServices {
   return {
     native: isTauri(), mac: /Mac|iPhone|iPad/.test(navigator.platform),
     windowLabel: isTauri() ? getCurrentWebviewWindow().label : 'main',
-    sanitizeHTML: html => DOMPurify.sanitize(html),
+    sanitizeHTML: html => sanitizeHtml(html),
     host: {
       invoke: (command, args) => {
         if (!isTauri()) return Promise.reject(new Error('앱에서 워크스페이스를 열어 주세요.'));

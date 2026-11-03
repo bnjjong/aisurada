@@ -192,9 +192,16 @@ export function TerminalHost({
     };
   }, [tabKey, appendOutput]);
 
+  const isComposingRef = useRef(false);
+
   // Focus and keyboard input listener
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
     if (!started) return;
+
+    // Do not intercept if an external modal or dialog is open
+    if (typeof document !== 'undefined' && document.querySelector('.ps-modal, .pin-scrollback-modal, .modal-backdrop, [role="dialog"], .popover')) {
+      return;
+    }
 
     // Handle Cmd+V paste (macOS metaKey)
     if (e.metaKey && (e.key === 'v' || e.key === 'V')) {
@@ -211,26 +218,57 @@ export function TerminalHost({
     // Ignore other meta key combinations (Cmd+C, Cmd+W, etc.) so raw characters are not sent to shell
     if (e.metaKey) return;
 
-    e.stopPropagation();
+    // If IME is composing, do not handle keydown - let IME compose into textarea
+    if ((e.nativeEvent as KeyboardEvent).isComposing || e.key === 'Process') {
+      return;
+    }
 
     let data = e.key;
-    if (e.key === 'Enter') data = '\r';
-    else if (e.key === 'Backspace') data = '\x7f';
-    else if (e.key === 'Tab') {
+    if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
+      data = '\r';
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      e.stopPropagation();
+      data = '\x7f';
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
       data = '\t';
-    }
-    else if (e.key === 'ArrowUp') data = '\x1b[A';
-    else if (e.key === 'ArrowDown') data = '\x1b[B';
-    else if (e.key === 'ArrowRight') data = '\x1b[C';
-    else if (e.key === 'ArrowLeft') data = '\x1b[D';
-    else if (e.key === 'Escape') data = '\x1b';
-    else if (e.ctrlKey && e.key.length === 1) {
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      data = '\x1b[A';
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+      data = '\x1b[B';
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      e.stopPropagation();
+      data = '\x1b[C';
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();
+      data = '\x1b[D';
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      data = '\x1b';
+    } else if (e.ctrlKey && e.key.length === 1) {
+      e.preventDefault();
+      e.stopPropagation();
       const code = e.key.charCodeAt(0);
       if (code >= 97 && code <= 122) {
         data = String.fromCharCode(code - 96);
       }
-    } else if (e.key.length > 1) {
+    } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+      // Intercept single printable character with preventDefault so textarea doesn't duplicate it in onInput
+      e.preventDefault();
+      e.stopPropagation();
+      data = e.key;
+    } else {
       return; // Ignore other non-printable keys
     }
 
@@ -277,7 +315,11 @@ export function TerminalHost({
       const active = document.activeElement;
       const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.closest?.('.cmdk-panel, .modal-card, .ps-modal'));
       if (!isInput) {
-        inputRef.current?.focus() || screenRef.current?.focus();
+        if (inputRef.current) {
+          inputRef.current.focus();
+        } else {
+          screenRef.current?.focus();
+        }
       }
     }
     prevVisible.current = isVisible;
@@ -314,11 +356,25 @@ export function TerminalHost({
         spellCheck={false}
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        onInput={(e) => {
-          const val = (e.target as HTMLTextAreaElement).value;
+        onCompositionStart={() => {
+          isComposingRef.current = true;
+        }}
+        onCompositionEnd={(e) => {
+          isComposingRef.current = false;
+          const target = e.currentTarget;
+          const val = target.value;
           if (val) {
             void ptyWrite(tabKey, val).catch(() => {});
-            (e.target as HTMLTextAreaElement).value = '';
+            target.value = '';
+          }
+        }}
+        onInput={(e) => {
+          if (isComposingRef.current || (e.nativeEvent as InputEvent).isComposing) return;
+          const target = e.currentTarget;
+          const val = target.value;
+          if (val) {
+            void ptyWrite(tabKey, val).catch(() => {});
+            target.value = '';
           }
         }}
         onPaste={handlePaste}
@@ -339,7 +395,13 @@ export function TerminalHost({
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        onClick={() => inputRef.current?.focus() || screenRef.current?.focus()}
+        onClick={() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+          } else {
+            screenRef.current?.focus();
+          }
+        }}
         style={{
           flex: 1,
           overflowY: 'auto',

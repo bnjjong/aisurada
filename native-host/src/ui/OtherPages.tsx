@@ -353,6 +353,7 @@ export function Connections({
               return (
                 <line
                   key={r.from + r.to + r.kind}
+                  className="cg-edge"
                   x1={p(a).x}
                   y1={p(a).y}
                   x2={p(b).x}

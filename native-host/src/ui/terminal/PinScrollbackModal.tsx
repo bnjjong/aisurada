@@ -38,13 +38,22 @@ export function PinScrollbackModal({
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    titleInputRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onClose]);
 
   // Initial probe and mask using snapshot lines
@@ -252,6 +261,7 @@ export function PinScrollbackModal({
         <div className="form-group" style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>제목</label>
           <input
+            ref={titleInputRef}
             type="text"
             className="ndf-input input"
             value={title}

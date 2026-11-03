@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Note } from "../workspace/types.ts";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { rememberNoteScroll } from "./scroll.ts";
@@ -6,6 +6,7 @@ import { NoteEditor } from "../editor/NoteEditor.tsx";
 import { NoteMeta } from "../ui/NoteParts.tsx";
 import type { NoteMode } from "../ui/NoteParts.tsx";
 import { useNoteAsk, NoteAskFrame, AskComposePopover } from "@claude-plug/ask";
+import type { NoteBodyPort, AskComposeState } from "@claude-plug/ask";
 import { useNoteRail, noteRailNow } from "@claude-plug/state";
 import { NoteSessionRail } from "@claude-plug/session";
 
@@ -24,11 +25,27 @@ export function NoteReading({
   const noteDir = controller?.getSnapshot().workspace?.path && note.path
     ? `${controller.getSnapshot().workspace!.path}/${note.path}`
     : undefined;
+  const draftGetter = useRef<() => string>(() => live.body);
+  const [composeState, setComposeState] = useState<AskComposeState | null>(null);
+
+  const port = useMemo<NoteBodyPort>(() => ({
+    kind: parent ? "sub" : "main",
+    id: note.id,
+    parent,
+    write: async (body: string) => {
+      await controller?.data.saveBody({ id: note.id, parent }, body);
+    },
+    saveDraft: (body: string) => {
+      controller?.data.edit({ id: note.id, parent }, { body });
+    },
+    read: () => draftGetter.current(),
+  }), [controller, note.id, parent]);
+
   const askWire = useNoteAsk({
     doc: live,
-    port: parent ? { kind: "sub", parent, id: note.id } : { kind: "main", id: note.id },
+    port,
     baseDir: noteDir || "",
-    currentDraft: () => live.body,
+    currentDraft: () => draftGetter.current(),
   });
   useEffect(() => {
     if (parent || !controller) return;
@@ -59,21 +76,31 @@ export function NoteReading({
       )}
       {controller ? (
         <div className="note-body">
-          <NoteAskFrame noteId={note.id}>
+          <NoteAskFrame baseDir={noteDir} noteId={note.id}>
             <NoteEditor
               key={`${parent || ""}:${note.id}`}
               note={live}
               parent={parent}
               controller={controller}
               mode={context}
+              askEditor={askWire?.editor}
+              onDraftBuffer={(fn) => {
+                draftGetter.current = fn;
+              }}
             />
           </NoteAskFrame>
           {askWire?.panel}
-          <AskComposePopover
-            state={askWire?.editor}
-            onSubmit={() => {}}
-            onCancel={() => {}}
-          />
+          {composeState && (
+            <AskComposePopover
+              state={composeState}
+              onSubmit={(question, images) => {
+                const turnId = `ak${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+                askWire?.editor?.onAskAi?.(composeState.quote, question, turnId, images);
+                setComposeState(null);
+              }}
+              onCancel={() => setComposeState(null)}
+            />
+          )}
         </div>
       ) : (
         <>

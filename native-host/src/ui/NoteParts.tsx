@@ -296,6 +296,12 @@ function Evaluation({
     ),
     [memo, setMemo] = useState(asText(asRow(note.evaluation)?.note));
   const box = useRef<HTMLDivElement>(null);
+  const rangeRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    rangeRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     const outside = (e: PointerEvent) => {
       if (
@@ -307,6 +313,20 @@ function Evaluation({
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
   }, [close]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+        close();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [close]);
+
   const save = () => {
     void controller.data.evaluate(note.id, score, memo);
     close();
@@ -318,6 +338,7 @@ function Evaluation({
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
+          e.stopPropagation();
           close();
         }
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -329,6 +350,7 @@ function Evaluation({
       <label>
         평가 {score}
         <input
+          ref={rangeRef}
           className="doc-eval-range"
           type="range"
           min={0}
@@ -824,7 +846,7 @@ function Comments({
               onChange={(e) => setBody(e.target.value)}
               onKeyDown={(e) => keyboard(e, send)}
             />
-            <button disabled={!body.trim()} onClick={send}>
+            <button className="btn-primary" disabled={!body.trim()} onClick={send}>
               추가
             </button>
           </div>

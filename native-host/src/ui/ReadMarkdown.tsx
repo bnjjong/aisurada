@@ -3,7 +3,7 @@ import { Marked, Renderer } from "marked";
 import type { Tokens } from "marked";
 import { SENTINEL, sentinelInline } from "../data/mdInline.ts";
 import { closeBlockEmphasis, fenceTracker, foldParagraphs } from "../editor/grammar.ts";
-import DOMPurify from "dompurify";
+import { sanitizeHtml } from "../lib/sanitize.ts";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { renderDiagram } from "../editor/mermaid.tsx";
 const escape = (s: string) =>
@@ -90,7 +90,7 @@ export function markdownHTML(body: string, external = false) {
         source.remove();
     });
   }
-  return DOMPurify.sanitize(template.innerHTML) as SanitizedHTML;
+  return sanitizeHtml(template.innerHTML) as SanitizedHTML;
 }
 export function imageSources(html: string) {
   const t = document.createElement("template");
@@ -133,7 +133,7 @@ export function ReadMarkdown({
     const safe = preparedHTML ?? (
       html === undefined
         ? markdownHTML(body || "", external)
-        : DOMPurify.sanitize(html));
+        : sanitizeHtml(html));
     if (!directory || !native) return safe;
     // Sanitize before resolving trusted native assets. A later sanitizer
     // would discard the asset: URI; resolving in an effect would issue a

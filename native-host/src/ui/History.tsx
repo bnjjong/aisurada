@@ -330,11 +330,13 @@ export function History({
               .map((v) => (
                 <div
                   className={`nhist-item ${v.commit === selected ? "active selected" : ""}`}
+                  aria-selected={v.commit === selected}
                   aria-current={v.commit === selected ? "true" : undefined}
                   key={asText(v.commit)}
+                  onClick={() => setSelected(asText(v.commit))}
                 >
                   <button
-                    className="nhist-item-btn nhist-item"
+                    className="nhist-item-btn"
                     aria-selected={v.commit === selected}
                     aria-current={v.commit === selected ? "true" : undefined}
                     onClick={() => setSelected(asText(v.commit))}

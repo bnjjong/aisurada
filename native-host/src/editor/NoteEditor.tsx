@@ -18,21 +18,29 @@ import type { NoteMode } from "../ui/NoteParts.tsx";
 import { ReadMarkdown } from "../ui/ReadMarkdown.tsx";
 import { openEditorLink } from "./media.tsx";
 import type { EditorHeading } from "./Editor.tsx";
+import type { AskEditorProps } from "../plugs/empty/ask.tsx";
 
 export function NoteEditor({
   note,
   parent,
   controller,
   mode = "tab",
+  askEditor,
+  onDraftBuffer,
 }: {
   note: Note;
   parent?: string;
   controller: WorkspaceController;
   mode?: NoteMode;
+  askEditor?: AskEditorProps;
+  onDraftBuffer?: (fn: () => string) => void;
 }) {
   const [session] = useState(
     () => new EditorSession(controller, { id: note.id, parent }, note.body),
   );
+  useEffect(() => {
+    onDraftBuffer?.(() => session.body());
+  }, [session, onDraftBuffer]);
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const state = controller.getSnapshot(),
     data = controller.data,
@@ -167,7 +175,7 @@ export function NoteEditor({
               </button>
             )}
             <button
-              data-conflict-action="discard"
+              data-conflict-action="load"
               onClick={() => void session.discard()}
               disabled={snapshot.discarding}
             >
@@ -213,6 +221,9 @@ export function NoteEditor({
           onHeadings={setHeadings}
           onSection={setSection}
           diagramsOpen={state.prefs.diagrams}
+          askDocId={askEditor?.askDocId || note.id}
+          onAskAi={askEditor?.onAskAi}
+          onAskFollowUp={askEditor?.onAskFollowUp}
         />
       )}
       {headings.length >= 3 && (
