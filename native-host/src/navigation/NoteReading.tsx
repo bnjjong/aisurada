@@ -39,6 +39,40 @@ export function NoteReading({
       controller?.data.edit({ id: note.id, parent }, { body });
     },
     read: () => draftGetter.current(),
+    autosaveBody: async (body?: string) => {
+      const text = body ?? draftGetter.current();
+      await controller?.data.saveBody({ id: note.id, parent }, text);
+    },
+    currentBody: () => draftGetter.current(),
+    commitTitle: async (title?: string) => {
+      if (title !== undefined) {
+        await controller?.data.updateNote({ id: note.id, parent }, { title });
+      }
+    },
+    protect: (enabled = true) => {
+      controller?.data.protect({ id: note.id, parent }, enabled);
+    },
+    flush: async () => {
+      await controller?.data.saveBody({ id: note.id, parent }, draftGetter.current());
+    },
+    discard: async () => {
+      if (parent) await controller?.data.loadSubNotes(parent);
+      else await controller?.data.reconcile();
+    },
+    keep: async () => {
+      await controller?.data.saveBody({ id: note.id, parent }, draftGetter.current(), true);
+    },
+    restore: async (body: string) => {
+      await controller?.data.saveBody({ id: note.id, parent }, body, true);
+    },
+    conflicted: () => {
+      const key = parent ? `${parent}:${note.id}` : note.id;
+      return controller?.data.getSnapshot().conflicted.includes(key) ?? false;
+    },
+    editing: () => {
+      const key = parent ? `${parent}:${note.id}` : note.id;
+      return controller?.data.getSnapshot().editing.includes(key) ?? false;
+    },
   }), [controller, note.id, parent]);
 
   const askWire = useNoteAsk({
@@ -86,6 +120,9 @@ export function NoteReading({
               askEditor={askWire?.editor}
               onDraftBuffer={(fn) => {
                 draftGetter.current = fn;
+              }}
+              onOpenAskCompose={(quote, rect) => {
+                setComposeState({ quote, left: rect.left, top: rect.top });
               }}
             />
           </NoteAskFrame>

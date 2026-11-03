@@ -27,6 +27,7 @@ export function NoteEditor({
   mode = "tab",
   askEditor,
   onDraftBuffer,
+  onOpenAskCompose,
 }: {
   note: Note;
   parent?: string;
@@ -34,6 +35,7 @@ export function NoteEditor({
   mode?: NoteMode;
   askEditor?: AskEditorProps;
   onDraftBuffer?: (fn: () => string) => void;
+  onOpenAskCompose?: (quote: string, rect: { left: number; top: number }) => void;
 }) {
   const [session] = useState(
     () => new EditorSession(controller, { id: note.id, parent }, note.body),
@@ -224,6 +226,7 @@ export function NoteEditor({
           askDocId={askEditor?.askDocId || note.id}
           onAskAi={askEditor?.onAskAi}
           onAskFollowUp={askEditor?.onAskFollowUp}
+          onOpenAskCompose={onOpenAskCompose}
         />
       )}
       {headings.length >= 3 && (

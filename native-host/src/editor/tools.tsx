@@ -88,6 +88,10 @@ export function EditorTools(props: EditorProps) {
     if (!selectionBar) return;
     setCompose({ quote: selectionBar.quote, x: selectionBar.x, y: selectionBar.y + 42 }); setComment('');
   }
+  function beginAsk() {
+    if (!selectionBar) return;
+    props.onOpenAskCompose?.(selectionBar.quote, { left: selectionBar.x, top: selectionBar.y + 42 });
+  }
   function submitComment() {
     if (!comment.trim() || !composeRef.current || !selection.current) return;
     const body = comment.trim(), quote = composeRef.current.quote, id = `cm${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
@@ -211,6 +215,7 @@ export function EditorTools(props: EditorProps) {
     {selectionBar && !compose && !menu && <div className="sel-bar" style={{ left: selectionBar.x, top: selectionBar.y }} onMouseDown={event => event.preventDefault()}>
       {!selectionBar.special && formats.map((value, index) => <button className={`sel-format-btn sel-format-${value}`} aria-pressed={selectionBar.formats[index]} key={value} onClick={() => format(value)}>{['B', 'I', 'S', '</>'][index]}</button>)}
       {props.features?.comment && <button className="comment-add-btn" onClick={beginComment}>코멘트</button>}
+      {props.onAskAi && <button className="ask-add-btn comment-add-btn" onClick={beginAsk}>AI에게 묻기</button>}
     </div>}
     {compose && <div className="comment-compose-popover comment-compose" style={{ left: compose.x, top: compose.y }} onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeCompose(); }

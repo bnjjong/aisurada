@@ -5,6 +5,7 @@ import type { Note } from '../../workspace/types.ts';
 
 /**
  * Note body port providing writing capabilities for main and sub notes (Chapter 10, 17.4).
+ * Adheres to noteBodyPort contract with 13 fields.
  */
 export interface NoteBodyPort {
   kind?: 'main' | 'sub';
@@ -13,6 +14,16 @@ export interface NoteBodyPort {
   write(body: string): Promise<void> | void;
   saveDraft?(body: string): void;
   read?(): string;
+  autosaveBody?(body?: string): Promise<void> | void;
+  currentBody?(): string;
+  commitTitle?(title?: string): Promise<boolean | void> | void;
+  protect?(enabled?: boolean): void;
+  flush?(mode?: string): Promise<any> | void;
+  discard?(): Promise<void> | void;
+  keep?(): Promise<any> | void;
+  restore?(body: string): Promise<any> | void;
+  conflicted?(): boolean;
+  editing?(): boolean;
 }
 
 export interface AskEditorProps {

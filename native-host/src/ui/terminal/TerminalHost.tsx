@@ -198,11 +198,6 @@ export function TerminalHost({
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
     if (!started) return;
 
-    // Do not intercept if an external modal or dialog is open
-    if (typeof document !== 'undefined' && document.querySelector('.ps-modal, .pin-scrollback-modal, .modal-backdrop, [role="dialog"], .popover')) {
-      return;
-    }
-
     // Handle Cmd+V paste (macOS metaKey)
     if (e.metaKey && (e.key === 'v' || e.key === 'V')) {
       e.stopPropagation();
@@ -218,8 +213,16 @@ export function TerminalHost({
     // Ignore other meta key combinations (Cmd+C, Cmd+W, etc.) so raw characters are not sent to shell
     if (e.metaKey) return;
 
-    // If IME is composing, do not handle keydown - let IME compose into textarea
-    if ((e.nativeEvent as KeyboardEvent).isComposing || e.key === 'Process') {
+    // If IME is composing, do not handle keydown - let IME compose into textarea.
+    // In WebKit (macOS), the first IME keystroke may carry keyCode 229 or 'Process' before compositionstart.
+    const isIme =
+      (e.nativeEvent as KeyboardEvent).isComposing ||
+      e.key === 'Process' ||
+      e.keyCode === 229 ||
+      e.which === 229 ||
+      isComposingRef.current ||
+      /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/.test(e.key);
+    if (isIme) {
       return;
     }
 
@@ -253,6 +256,10 @@ export function TerminalHost({
       e.stopPropagation();
       data = '\x1b[D';
     } else if (e.key === 'Escape') {
+      // Yield Escape to open dialogs/modals if one is present
+      if (typeof document !== 'undefined' && document.querySelector('.ps-modal, .pin-scrollback-modal, .modal-card, [role="dialog"], .doc-eval-pop')) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       data = '\x1b';
