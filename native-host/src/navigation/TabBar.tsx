@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import type { WorkspaceController } from '../workspace/controller.ts';
 import type { WorkspaceState } from '../workspace/types.ts';
-import { activeTab } from './routes.ts';
+import { activeTab, isNoteTab } from './routes.ts';
 import { displayTitle } from '../ui/model.ts';
 
 interface Drag {
@@ -26,10 +26,20 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
   const drag = useRef<Drag | null>(null);
   const suppressClick = useRef<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
-  const ids: (string | null)[] = [null, ...new Set(state.tabs.openIds)];
+  const ids: (string | null)[] = [
+    null,
+    ...new Set(
+      state.tabs.openIds.filter(
+        (id) =>
+          !isNoteTab(id) ||
+          id === active ||
+          (state.workspace?.notes.some((n) => n.id === id) ?? true),
+      ),
+    ),
+  ];
 
   useLayoutEffect(() => {
-    const item = buttons.current.get(active)?.closest('.tab-item');
+    const item = buttons.current.get(active)?.closest('.tab-item, .tabx-item');
     if (!item || !list.current) return;
     const rect = item.getBoundingClientRect(), view = list.current.getBoundingClientRect();
     if (rect.left < view.left) list.current.scrollLeft += rect.left - view.left;
@@ -51,7 +61,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
     }
   };
   const pointerDown = (event: PointerEvent<HTMLDivElement>, id: string) => {
-    if (event.button !== 0 || (event.target as Element).closest('.tab-close')) return;
+    if (event.button !== 0 || (event.target as Element).closest('.tab-close, .tabx-close')) return;
     const centers = [...list.current!.querySelectorAll<HTMLElement>('.tab-item[data-tab-id]')]
       .filter(element => element.dataset.tabId !== id)
       .map(element => { const box = element.getBoundingClientRect(); return box.left + box.width / 2; });
@@ -77,10 +87,10 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
     {ids.map(id => {
       const title = id === null ? '내 기록' : tabTitle(id, state);
       const note = state.workspace?.notes.find(n => n.id === id);
-      return <div className={`tab-item ${id === null ? 'tab-main' : ''} ${active === id ? 'tab-selected' : ''} ${dragging === id && id !== null ? 'tab-dragging' : ''}`}
+      return <div className={`tab-item tabx-item ${id === null ? 'tab-main tabx-main' : ''} ${active === id ? 'tab-selected tabx-selected' : ''} ${dragging === id && id !== null ? 'tab-dragging' : ''}`}
         key={id ?? '__main__'} data-tab-id={id ?? undefined} aria-selected={active === id}
         onClick={event => {
-          if ((event.target as Element).closest('.tab-close')) return;
+          if ((event.target as Element).closest('.tab-close, .tabx-close')) return;
           if (id !== null && suppressClick.current === id) { suppressClick.current = null; return; }
           controller.selectTab(id);
         }}
@@ -89,7 +99,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
         <button role="tab" aria-selected={active === id} aria-controls="screen-content" tabIndex={active === id ? 0 : -1}
           className="tab-button" title={title} ref={element => { if (element) buttons.current.set(id, element); else buttons.current.delete(id); }}
           onKeyDown={event => keydown(event, id)}>{id === null && <span aria-hidden="true">w.</span>}<span className="tab-label">{note && state.prefs.titleDate ? <><small>{note.date}</small>{displayTitle(note,true).replace(/^\d{8}-?/,'')}</> : title}</span></button>
-        {id !== null && <button className="tab-close" tabIndex={-1} aria-label={`${title} 탭 닫기`} onClick={() => controller.closeTab(id)}>×</button>}
+        {id !== null && <button className="tab-close tabx-close" tabIndex={-1} aria-label={`${title} 탭 닫기`} onClick={() => controller.closeTab(id)}>×</button>}
       </div>;
     })}
   </div>;

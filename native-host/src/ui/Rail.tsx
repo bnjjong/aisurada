@@ -13,6 +13,7 @@ export function Rail({
 }) {
   useProjectsList();
   useSessionBadge();
+  const LOOSE_GROUP_KEY = "(미분류)";
   const ws = state.workspace!,
     sorted = agendaOrder(ws.agendas, ws.notes);
   const group = (
@@ -21,20 +22,32 @@ export function Rail({
     agendas: Agenda[],
     id?: string,
   ) => {
-    const isNone = slug === "" || slug === "__none__";
+    const isNone = slug === LOOSE_GROUP_KEY || slug === "" || slug === "__none__";
     const collapsed = isNone
-      ? state.prefs.collapsedProjects.includes("") || state.prefs.collapsedProjects.includes("__none__")
+      ? state.prefs.collapsedProjects.includes(LOOSE_GROUP_KEY) ||
+        state.prefs.collapsedProjects.includes("") ||
+        state.prefs.collapsedProjects.includes("__none__")
       : state.prefs.collapsedProjects.includes(slug);
     return (
-      <section key={slug || "__none__"} className="rail-group">
+      <section key={slug || LOOSE_GROUP_KEY} className="rail-group">
         {ws.projects.length > 0 && (
           <header>
             <button
               onClick={() =>
                 controller.preference({
                   collapsedProjects: collapsed
-                    ? state.prefs.collapsedProjects.filter((p) => p !== slug && (!isNone || (p !== "" && p !== "__none__")))
-                    : [...state.prefs.collapsedProjects, slug],
+                    ? state.prefs.collapsedProjects.filter(
+                        (p) =>
+                          p !== slug &&
+                          (!isNone ||
+                            (p !== LOOSE_GROUP_KEY &&
+                              p !== "" &&
+                              p !== "__none__")),
+                      )
+                    : [
+                        ...state.prefs.collapsedProjects,
+                        isNone ? LOOSE_GROUP_KEY : slug,
+                      ],
                 })
               }
             >
@@ -159,14 +172,14 @@ export function Rail({
         )}
         {group(
           "미분류",
-          "",
+          LOOSE_GROUP_KEY,
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
         <RailProjects />
       </section>
       <footer className="rail-footer">
         <button
-          className="iconbtn"
+          className="iconbtn icon-btn"
           title="테마 전환"
           onClick={() =>
             controller.preference({
@@ -177,7 +190,7 @@ export function Rail({
           ◐
         </button>
         <button
-          className="iconbtn"
+          className="iconbtn icon-btn"
           title="설정"
           onClick={() => controller.settings(true)}
         >

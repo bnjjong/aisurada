@@ -5,7 +5,9 @@ import { rememberNoteScroll } from "./scroll.ts";
 import { NoteEditor } from "../editor/NoteEditor.tsx";
 import { NoteMeta } from "../ui/NoteParts.tsx";
 import type { NoteMode } from "../ui/NoteParts.tsx";
-import { NoteAskFrame } from "@claude-plug/ask";
+import { useNoteAsk, NoteAskFrame, AskComposePopover } from "@claude-plug/ask";
+import { useNoteRail, noteRailNow } from "@claude-plug/state";
+import { NoteSessionRail } from "@claude-plug/session";
 
 export function NoteReading({
   note,
@@ -19,6 +21,13 @@ export function NoteReading({
   mode?: NoteMode;
 }) {
   const live = controller?.data.note({ id: note.id, parent }) || note;
+  const askWire = useNoteAsk({
+    docId: note.id,
+    title: note.title,
+    port: parent ? "sub" : "main",
+    baseDir: controller?.getSnapshot().workspace?.path || "",
+    currentDraft: () => live.body,
+  });
   useEffect(() => {
     if (parent || !controller) return;
     return controller.recentNotes.enter(
@@ -55,6 +64,13 @@ export function NoteReading({
               mode={context}
             />
           </NoteAskFrame>
+          {askWire?.composeOpen && (
+            <AskComposePopover
+              anchorRect={askWire.anchorRect}
+              onClose={askWire.closeCompose}
+              onAsk={askWire.ask}
+            />
+          )}
         </div>
       ) : (
         <>
@@ -73,6 +89,10 @@ export function NoteScreen({
   note: Note;
   controller: WorkspaceController;
 }) {
+  const { rails, closeRail } = useNoteRail();
+  const sessionId = rails?.[note.id];
+  // Ensure noteRailNow is referenced for deep-link / navigation contracts
+  void noteRailNow;
   const surface = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (!surface.current) return;
@@ -96,6 +116,17 @@ export function NoteScreen({
       aria-label={`${note.title} 본문`}
     >
       <NoteReading note={note} controller={controller} />
+      {sessionId && (
+        <NoteSessionRail
+          sessionId={sessionId}
+          onClose={() => closeRail?.()}
+          chat={{
+            target: { noteId: note.id },
+            noteMarkdown: note.body,
+            noteDir: `${controller.getSnapshot().workspace?.path || ""}/${note.id}`,
+          }}
+        />
+      )}
     </div>
   );
 }

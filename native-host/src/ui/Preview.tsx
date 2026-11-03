@@ -44,8 +44,8 @@ export function Preview({
           resizing.current = false;
           const r = box.current?.getBoundingClientRect();
           if (r) {
-            const width = Math.max(400, Math.min(1200, Math.round(r.width)));
-            const height = Math.max(300, Math.min(1000, Math.round(r.height)));
+            const width = Math.max(480, Math.min(1600, Math.round(r.width)));
+            const height = Math.max(320, Math.min(2400, Math.round(r.height)));
             if (width !== pw || height !== (ph || 480)) {
               controller.preference({
                 previewWidth: width,
