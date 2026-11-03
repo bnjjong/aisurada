@@ -17,7 +17,7 @@ export function useAskState<T = typeof EMPTY_ASK_STATE>(
 const EMPTY_RAIL_STATE = {
   rails: {} as Record<string, string>,
   openRail: null as ((noteKey: string, sessionId: string) => void) | null,
-  closeRail: () => {},
+  closeRail: (_noteKey?: string) => {},
 };
 
 export function useNoteRail<T = typeof EMPTY_RAIL_STATE>(

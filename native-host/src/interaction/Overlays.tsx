@@ -112,7 +112,7 @@ function QuickSearch({
             matches.map((hit, index) => (
               <button
                 id={`cmdk-result-${index}`}
-                className="cmdk-item"
+                className={`cmdk-item ${selected === index ? "active" : ""}`}
                 role="option"
                 aria-selected={selected === index}
                 key={hit.note.id}
@@ -213,7 +213,7 @@ function SubNotePages({
       onClick={() => controller.openSubNotes(trail.root, [])}
     >
       <section
-        className="subnote-page"
+        className="subnote-page docmodal"
         role="dialog"
         aria-modal="true"
         aria-label="하위 노트"

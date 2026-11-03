@@ -189,7 +189,7 @@ export function PinScrollbackModal({
           {tableStatus?.ready ? (
             <div>가릴 수 있는 값 {tableStatus.maskable}종. 물어본 이름 {tableStatus.asked}중 {tableStatus.read}개를 읽었어요.</div>
           ) : (
-            <div>
+            <div className="pin-warn">
               표가 없어 굳힐 수 없어요. {tableStatus?.reason ? tableStatus.reason : '표를 아직 안 떴어요.'}
               <button type="button" onClick={handleReprobe} disabled={loading} style={{ marginLeft: 8 }} className="btn btn-xs">
                 표 다시 뜨기

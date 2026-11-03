@@ -22,6 +22,6 @@ export function ConflictDiff({ left, readRight, close, discard, keep }: {
             <td>{row.pieces ? row.pieces.map((piece, i) => <span key={i} className={piece.changed ? 'cdiff-word-change' : undefined}>{piece.text}</span>) : row.text || ' '}</td></tr>)}
         </tbody></table></div>
       </>}
-    <footer><button onClick={close}>닫기</button><button onClick={() => { close(); discard(); }}>디스크 버전 불러오기</button><button onClick={() => { close(); keep(); }}>내 편집 유지</button></footer>
+    <footer><button onClick={close}>닫기</button><button data-conflict-action="discard" onClick={() => { close(); discard(); }}>디스크 버전 불러오기</button><button data-conflict-action="keep" onClick={() => { close(); keep(); }}>내 편집 유지</button></footer>
   </div>;
 }

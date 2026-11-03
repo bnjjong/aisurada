@@ -152,6 +152,7 @@ export function NoteMeta({
           controller.isNative() &&
           controller.context.kind === "main" && (
             <button
+              className="pane-pop"
               onClick={() =>
                 void controller
                   .moveNoteWindow(note.id)
@@ -382,7 +383,7 @@ export function Tags({
     setValue("");
   };
   return (
-    <section className="note-tags">
+    <section className="note-tags doc-tags">
       <h3>태그</h3>
       <div>
         {own.map((t) => (
@@ -403,6 +404,7 @@ export function Tags({
         ))}
       </div>
       <input
+        className="tag-input"
         aria-label="태그 추가"
         placeholder="태그 추가"
         value={value}
@@ -479,7 +481,11 @@ export function Links({
   return (
     <section className="note-links">
       <header>
-        <button onClick={() => setOpen(!open)} aria-expanded={open}>
+        <button
+          className="dlp-toggle"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+        >
           연결 {out.length + incoming.length}
         </button>
         <button
@@ -495,13 +501,14 @@ export function Links({
         <>
           <h4>추천 연결</h4>
           {recommendations(note, all, state.vault.relations).map((r) => (
-            <div key={r.note.id}>
+            <div className="dlp-sugrow" key={r.note.id}>
               <span>{names[r.kind]}</span>{" "}
               <button onClick={() => openNote(r.note)}>
                 {displayTitle(r.note, state.prefs.titleDate)}
               </button>
               <small>{r.reason}</small>
               <button
+                className="dlp-connectbtn"
                 onClick={() =>
                   void controller.data.link(note.id, r.note.id, r.kind)
                 }
@@ -808,16 +815,19 @@ function Comments({
               <p>아직 코멘트가 없어요.</p>
             )}
           </div>
-          <textarea
-            aria-label="새 코멘트"
-            placeholder="코멘트를 남겨요"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onKeyDown={(e) => keyboard(e, send)}
-          />
-          <button disabled={!body.trim()} onClick={send}>
-            추가
-          </button>
+          <div className="comment-compose">
+            <textarea
+              className="comment-input"
+              aria-label="새 코멘트"
+              placeholder="코멘트를 남겨요"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => keyboard(e, send)}
+            />
+            <button disabled={!body.trim()} onClick={send}>
+              추가
+            </button>
+          </div>
         </>
       )}
       {deleting && (

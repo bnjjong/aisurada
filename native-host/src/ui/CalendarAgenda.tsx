@@ -823,19 +823,22 @@ function Facts({
           <p>
             {draft.trim().length} / {String(facts.limit)}자
           </p>
-          <button onClick={() => setEditing(false)}>취소</button>
-          <button
-            disabled={busy || draft.trim().length > Number(facts.limit)}
-            onClick={() => void save()}
-          >
-            {clash
-              ? draft.trim()
-                ? "그래도 저장"
-                : "그래도 지우기"
-              : draft.trim()
-                ? "저장"
-                : "사실층 지우기"}
-          </button>
+          <div className="ag-facts-foot">
+            <button onClick={() => setEditing(false)}>취소</button>
+            <button
+              className="btn-primary"
+              disabled={busy || draft.trim().length > Number(facts.limit)}
+              onClick={() => void save()}
+            >
+              {clash
+                ? draft.trim()
+                  ? "그래도 저장"
+                  : "그래도 지우기"
+                : draft.trim()
+                  ? "저장"
+                  : "사실층 지우기"}
+            </button>
+          </div>
         </>
       ) : facts.facts ? (
         <p className="facts-text">{asText(facts.facts)}</p>

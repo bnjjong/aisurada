@@ -21,11 +21,13 @@ export function NoteReading({
   mode?: NoteMode;
 }) {
   const live = controller?.data.note({ id: note.id, parent }) || note;
+  const noteDir = controller?.getSnapshot().workspace?.path && note.path
+    ? `${controller.getSnapshot().workspace!.path}/${note.path}`
+    : undefined;
   const askWire = useNoteAsk({
-    docId: note.id,
-    title: note.title,
-    port: parent ? "sub" : "main",
-    baseDir: controller?.getSnapshot().workspace?.path || "",
+    doc: live,
+    port: parent ? { kind: "sub", parent, id: note.id } : { kind: "main", id: note.id },
+    baseDir: noteDir || "",
     currentDraft: () => live.body,
   });
   useEffect(() => {
@@ -39,7 +41,9 @@ export function NoteReading({
     mode ||
     (parent ? "sub" : controller?.context.kind === "note" ? "window" : "tab");
   return (
-    <article className="doc-pane note-reading">
+    <article
+      className={`doc-pane note-reading ${live.format === "html" ? "doc-prose" : ""}`}
+    >
       {controller ? (
         <NoteMeta
           key={note.id}
@@ -64,13 +68,12 @@ export function NoteReading({
               mode={context}
             />
           </NoteAskFrame>
-          {askWire?.composeOpen && (
-            <AskComposePopover
-              anchorRect={askWire.anchorRect}
-              onClose={askWire.closeCompose}
-              onAsk={askWire.ask}
-            />
-          )}
+          {askWire?.panel}
+          <AskComposePopover
+            state={askWire?.editor}
+            onSubmit={() => {}}
+            onCancel={() => {}}
+          />
         </div>
       ) : (
         <>
@@ -91,6 +94,9 @@ export function NoteScreen({
 }) {
   const { rails, closeRail } = useNoteRail();
   const sessionId = rails?.[note.id];
+  const noteDir = controller?.getSnapshot().workspace?.path && note.path
+    ? `${controller.getSnapshot().workspace!.path}/${note.path}`
+    : undefined;
   // Ensure noteRailNow is referenced for deep-link / navigation contracts
   void noteRailNow;
   const surface = useRef<HTMLDivElement>(null);
@@ -119,11 +125,11 @@ export function NoteScreen({
       {sessionId && (
         <NoteSessionRail
           sessionId={sessionId}
-          onClose={() => closeRail?.()}
+          onClose={() => closeRail?.(note.id)}
           chat={{
             target: { noteId: note.id },
             noteMarkdown: note.body,
-            noteDir: `${controller.getSnapshot().workspace?.path || ""}/${note.id}`,
+            noteDir,
           }}
         />
       )}

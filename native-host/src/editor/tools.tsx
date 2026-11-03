@@ -212,10 +212,10 @@ export function EditorTools(props: EditorProps) {
       {!selectionBar.special && formats.map((value, index) => <button className={`sel-format-btn sel-format-${value}`} aria-pressed={selectionBar.formats[index]} key={value} onClick={() => format(value)}>{['B', 'I', 'S', '</>'][index]}</button>)}
       {props.features?.comment && <button className="comment-add-btn" onClick={beginComment}>코멘트</button>}
     </div>}
-    {compose && <div className="comment-compose-popover" style={{ left: compose.x, top: compose.y }} onKeyDown={event => {
+    {compose && <div className="comment-compose-popover comment-compose" style={{ left: compose.x, top: compose.y }} onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeCompose(); }
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.stopPropagation(); submitComment(); }
-    }}><blockquote>{compose.quote}</blockquote><textarea aria-label="코멘트 내용" autoFocus value={comment} onChange={event => setComment(event.target.value)} />
+    }}><blockquote>{compose.quote}</blockquote><textarea className="comment-input" aria-label="코멘트 내용" autoFocus value={comment} onChange={event => setComment(event.target.value)} />
       <div><button className="link-popover-btn" onClick={closeCompose}>취소</button><button className="link-popover-btn primary" disabled={!comment.trim()} onClick={submitComment}>추가</button></div></div>}
     {menu && <div className={menu.kind === 'note' ? 'note-picker' : 'slash-menu'} style={{ left: menu.x, top: menu.y }}>
       <input aria-label={menu.kind === 'note' ? '노트 링크 검색' : '블록 검색'} ref={input => input?.focus({ preventScroll: true })} value={menu.query} onChange={event => setMenu({ ...menu, query: event.target.value, selected: 0 })}
@@ -224,7 +224,7 @@ export function EditorTools(props: EditorProps) {
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); event.stopPropagation(); setMenu({ ...menu, selected: Math.max(0, Math.min(candidates.length - 1, menu.selected + (event.key === 'ArrowDown' ? 1 : -1))) }); }
           if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (candidates[menu.selected]) void choose(candidates[menu.selected].id); }
         }} />
-      {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id}
+      {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id} data-slash-id={item.id}
         aria-selected={menu.selected === index} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setMenu({ ...menu, selected: index })} onClick={() => void choose(item.id)}>
         <span className="slash-item-label">{item.label}</span>{'hint' in item && <small>{item.hint}</small>}</button>) : <p>일치하는 {menu.kind === 'note' ? '노트가' : '블록이'} 없어요.</p>}
     </div>}

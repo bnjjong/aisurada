@@ -328,27 +328,33 @@ export function History({
             versions
               .filter((v) => !matches || matches.includes(asText(v.commit)))
               .map((v) => (
-                <button
-                  className="nhist-item"
-                  aria-selected={v.commit === selected}
+                <div
+                  className={`nhist-item ${v.commit === selected ? "active selected" : ""}`}
+                  aria-current={v.commit === selected ? "true" : undefined}
                   key={asText(v.commit)}
-                  onClick={() => setSelected(asText(v.commit))}
                 >
-                  <strong>{versionTime(v.takenAt)}</strong>
-                  <small>
-                    {v.editedBy === "app"
-                      ? "앱"
-                      : v.editedBy === "tool"
-                        ? `Claude 세션${titles[asText(v.editedSessionId)] ? " 「" + titles[asText(v.editedSessionId)] + "」" : ""}`
-                        : "쓴 쪽 모름"}{" "}
-                    ·{" "}
-                    {v.source === "auto"
-                      ? "자동 커밋"
-                      : v.source === "manual"
-                        ? "손 커밋"
-                        : "덮기 직전"}
-                  </small>
-                </button>
+                  <button
+                    className="nhist-item-btn nhist-item"
+                    aria-selected={v.commit === selected}
+                    aria-current={v.commit === selected ? "true" : undefined}
+                    onClick={() => setSelected(asText(v.commit))}
+                  >
+                    <strong>{versionTime(v.takenAt)}</strong>
+                    <small>
+                      {v.editedBy === "app"
+                        ? "앱"
+                        : v.editedBy === "tool"
+                          ? `Claude 세션${titles[asText(v.editedSessionId)] ? " 「" + titles[asText(v.editedSessionId)] + "」" : ""}`
+                          : "쓴 쪽 모름"}{" "}
+                      ·{" "}
+                      {v.source === "auto"
+                        ? "자동 커밋"
+                        : v.source === "manual"
+                          ? "손 커밋"
+                          : "덮기 직전"}
+                    </small>
+                  </button>
+                </div>
               ))
           )}
         </aside>

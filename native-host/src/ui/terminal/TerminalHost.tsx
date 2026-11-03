@@ -101,6 +101,7 @@ export function TerminalHost({
   const [pinModalOpen, setPinModalOpen] = useState(false);
 
   const screenRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const decoderRef = useRef<TextDecoder | null>(null);
@@ -192,7 +193,7 @@ export function TerminalHost({
   }, [tabKey, appendOutput]);
 
   // Focus and keyboard input listener
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
     if (!started) return;
 
     // Handle Cmd+V paste (macOS metaKey)
@@ -237,7 +238,7 @@ export function TerminalHost({
   }, [started, tabKey]);
 
   // Handle native paste event
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLElement>) => {
     if (!started) return;
     e.stopPropagation();
     e.preventDefault();
@@ -272,11 +273,11 @@ export function TerminalHost({
   // Focus only when tab becomes newly visible and user is not focused on an input/modal
   const prevVisible = useRef(isVisible);
   useEffect(() => {
-    if (!prevVisible.current && isVisible && screenRef.current) {
+    if (!prevVisible.current && isVisible) {
       const active = document.activeElement;
       const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.closest?.('.cmdk-panel, .modal-card, .ps-modal'));
       if (!isInput) {
-        screenRef.current.focus();
+        inputRef.current?.focus() || screenRef.current?.focus();
       }
     }
     prevVisible.current = isVisible;
@@ -304,14 +305,41 @@ export function TerminalHost({
         outline: 'none',
       }}
     >
+      <textarea
+        ref={inputRef}
+        className="term-input xterm-helper-textarea"
+        aria-label="터미널 입력"
+        autoCapitalize="off"
+        autoComplete="off"
+        spellCheck={false}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        onInput={(e) => {
+          const val = (e.target as HTMLTextAreaElement).value;
+          if (val) {
+            void ptyWrite(tabKey, val).catch(() => {});
+            (e.target as HTMLTextAreaElement).value = '';
+          }
+        }}
+        onPaste={handlePaste}
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          left: -9999,
+          top: 0,
+          width: 1,
+          height: 1,
+          zIndex: -1,
+        }}
+      />
       {/* Terminal Screen Area */}
       <div
         ref={screenRef}
         className="term-screen"
-        tabIndex={0}
+        tabIndex={-1}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        onClick={() => screenRef.current?.focus()}
+        onClick={() => inputRef.current?.focus() || screenRef.current?.focus()}
         style={{
           flex: 1,
           overflowY: 'auto',

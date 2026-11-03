@@ -159,17 +159,22 @@ export function NoteEditor({
           </p>
           <div>
             {note.format !== "json" && (
-              <button onClick={() => setDifference(session.body())}>
+              <button
+                data-conflict-action="diff"
+                onClick={() => setDifference(session.body())}
+              >
                 차이 보기
               </button>
             )}
             <button
+              data-conflict-action="discard"
               onClick={() => void session.discard()}
               disabled={snapshot.discarding}
             >
               디스크 버전 불러오기
             </button>
             <button
+              data-conflict-action="keep"
               onClick={() => void session.keep()}
               disabled={snapshot.discarding}
             >
@@ -180,16 +185,18 @@ export function NoteEditor({
       )}
       {snapshot.discarding && <p role="status">디스크 버전을 불러오는 중…</p>}
       {note.format === "html" ? (
-        <ReadMarkdown
-          html={note.body}
-          directory={directory}
-          native={host.native}
-          onLink={(url) => {
-            if (url.startsWith("#") && !/^#(?:doc|sub):/.test(url))
-              return false;
-            void openEditorLink(url, features);
-          }}
-        />
+        <div className="doc-prose">
+          <ReadMarkdown
+            html={note.body}
+            directory={directory}
+            native={host.native}
+            onLink={(url) => {
+              if (url.startsWith("#") && !/^#(?:doc|sub):/.test(url))
+                return false;
+              void openEditorLink(url, features);
+            }}
+          />
+        </div>
       ) : (
         <Editor
           body={snapshot.mirror.body}

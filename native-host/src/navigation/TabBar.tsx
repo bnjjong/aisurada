@@ -97,7 +97,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
         onPointerDown={id === null ? undefined : event => pointerDown(event, id)} onPointerMove={pointerMove} onPointerUp={pointerUp}
         onPointerCancel={() => { drag.current = null; setDragging(null); }}>
         <button role="tab" aria-selected={active === id} aria-controls="screen-content" tabIndex={active === id ? 0 : -1}
-          className="tab-button" title={title} ref={element => { if (element) buttons.current.set(id, element); else buttons.current.delete(id); }}
+          className="tab-button" title={title} data-tab-id={id ?? undefined} ref={element => { if (element) buttons.current.set(id, element); else buttons.current.delete(id); }}
           onKeyDown={event => keydown(event, id)}>{id === null && <span aria-hidden="true">w.</span>}<span className="tab-label">{note && state.prefs.titleDate ? <><small>{note.date}</small>{displayTitle(note,true).replace(/^\d{8}-?/,'')}</> : title}</span></button>
         {id !== null && <button className="tab-close tabx-close" tabIndex={-1} aria-label={`${title} 탭 닫기`} onClick={() => controller.closeTab(id)}>×</button>}
       </div>;

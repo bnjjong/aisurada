@@ -25,7 +25,7 @@ export function Preview({
     <Modal
       title={displayTitle(note, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true)}
       close={() => controller.showPreview(null)}
-      className={`note-preview ${full ? "preview-full" : ""}`}
+      className={`note-preview docmodal ${full ? "preview-full" : ""}`}
       wide={full}
     >
       <div

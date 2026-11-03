@@ -17,13 +17,15 @@ import { weekMonday } from "../navigation/routes.ts";
 export function Page({
   title,
   children,
+  className,
 }: {
   title: string;
   children?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="page-scroll">
-      <div className="route-page">
+    <section className={`page-scroll ${className || ""}`}>
+      <div className={`route-page ${className || ""}`}>
         <h1>{title}</h1>
         {children}
       </div>
@@ -74,7 +76,7 @@ export function Favorites({
         : a.localeCompare(b, "ko"),
   );
   return (
-    <Page title="즐겨찾기">
+    <Page title="즐겨찾기" className="fav-page">
       {!all.length ? (
         <p>아직 즐겨찾기한 노트가 없어요.</p>
       ) : (
@@ -934,11 +936,15 @@ export function Trash({
                 {asText(r.deletedAt || r.trashedAt)}
               </small>
               <button
+                className="btn-neutral"
                 onClick={() => void controller.data.trashAction(id, "restore")}
               >
                 복구
               </button>
-              <button className="trash-purge" onClick={() => setConfirm(id)}>
+              <button
+                className="trash-purge btn-neutral"
+                onClick={() => setConfirm(id)}
+              >
                 완전 삭제
               </button>
             </div>

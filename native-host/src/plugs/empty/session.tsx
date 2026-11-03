@@ -15,7 +15,16 @@ export function SessionRoute(_props?: any): React.JSX.Element {
   );
 }
 
-export function NoteSessionRail(_props?: any): null {
+export function NoteSessionRail(_props?: {
+  sessionId?: string;
+  onClose?: () => void;
+  onLeave?: () => void;
+  chat?: {
+    target: { noteId: string; subId?: string };
+    noteMarkdown?: string;
+    noteDir?: string;
+  };
+}): null {
   return null;
 }
 

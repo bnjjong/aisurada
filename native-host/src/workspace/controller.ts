@@ -3,7 +3,7 @@ import { migrateLegacy } from './migrateLegacy.ts';
 import { sampleWorkspace } from './sample.ts';
 import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readTheme, recentWorkspaces,
   removeRecent, savedOpenIds, writeJSON } from './storage.ts';
-import { waitingAnswers, unsavedAnswers } from '@claude-plug/state';
+import { waitingAnswers, unsavedAnswers, noteRailNow } from '@claude-plug/state';
 import { asRow, asText, workspaceName } from './types.ts';
 import { TabModel } from '../navigation/tabs.ts';
 import { NoteScrollMemory } from '../navigation/scroll.ts';
@@ -219,13 +219,20 @@ export class WorkspaceController {
     if (this.services.navigateRequested) void this.services.navigateRequested(nav => {
       if (this.disposed || !nav?.path) return;
       this.navigate(nav.path);
+      const route = parseRoute(nav.path);
       if (nav.sub) {
-        const route = parseRoute(nav.path);
         const parts = nav.sub.split('/').filter(Boolean);
         if (parts.length > 0) {
           const root = route.kind === 'doc' ? route.id : parts[0];
           const chain = route.kind === 'doc' ? parts : parts.slice(1);
           if (root && chain.length) this.openSubNotes(root, chain);
+        }
+      }
+      if (nav.rail) {
+        const docId = route.kind === 'doc' ? route.id : '';
+        if (docId) {
+          const railState = noteRailNow();
+          railState.openRail?.(docId, nav.rail);
         }
       }
     }).then(keep).catch(error => this.services.warn('이동 요청을 듣지 못했어요', error));

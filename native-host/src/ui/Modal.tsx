@@ -55,7 +55,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`ui-modal ${className}`}
+        className={`ui-modal docmodal ${className}`}
       >
         <header>
           <h2>{title}</h2>
