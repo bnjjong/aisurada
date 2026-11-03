@@ -7,6 +7,9 @@ import { planSessionShell } from '@claude-plug/terminal';
 import { NoteAskFrame, EditorAskPlugins, AskComposePopover, AskHoverCard } from '@claude-plug/ask';
 import { NoteSessionRail, SessionRoute } from '@claude-plug/session';
 import { RailProjects } from '@claude-plug/projects';
+import { createHeadlessEditor } from '@lexical/headless';
+import { EDITOR_NODES, $importDocument, $exportDocument } from '../src/editor/markdown.ts';
+import { OPEN_ASK_COMMAND } from '../src/editor/tools.tsx';
 
 // Mock in-memory storage port
 function createStorage(initial = {}) {
@@ -217,4 +220,16 @@ test('Chapter 17: Plugs stub exports in Part 4-free build', async () => {
 
   // 5. projects
   assert.equal(RailProjects(), null);
+});
+
+test('Chapter 17: Q&A marker wrap with turnId and OPEN_ASK_COMMAND', () => {
+  assert.ok(OPEN_ASK_COMMAND);
+  const editor = createHeadlessEditor({ namespace: 'ask-test', nodes: EDITOR_NODES, onError: e => { throw e; } });
+  const turnId = `ak${Date.now().toString(36)}-abcdef12`;
+  const markdown = `# 질문 테스트\n\n<!--wla:${turnId}-->선택한 본문 질문 문장<!--/wla:${turnId}-->\n`;
+  editor.update(() => {
+    $importDocument(markdown);
+  }, { discrete: true });
+  const exported = editor.getEditorState().read($exportDocument);
+  assert.equal(exported.trim(), markdown.trim());
 });

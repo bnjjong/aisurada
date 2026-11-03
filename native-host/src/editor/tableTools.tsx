@@ -9,7 +9,7 @@ import { $getRoot, $getSelection, $setSelection, $getNodeByKey, $getNearestNodeF
 import type { LexicalNode } from 'lexical';
 import type { EditorProps } from './Editor.tsx';
 import { $exportSelection, $tableMarkdown, $tableTSV } from './markdown.ts';
-import { OPEN_COMMENT_COMMAND } from './tools.tsx';
+import { OPEN_COMMENT_COMMAND, OPEN_ASK_COMMAND } from './tools.tsx';
 
 type Cell = { key: string; x: number; y: number; right: number; tableRight: number; tableTop: number; tableBottom: number };
 export function tablesOnlyJSON(raw?: string): string | undefined {
@@ -181,9 +181,13 @@ export function TableTools(props: EditorProps) {
       <button aria-label="이 줄의 코멘트" onClick={() => props.features?.openComment?.(dot.ids[0])}>●</button>
       {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}</div>}
     </div>)}
-    {cell && props.features?.comment && <button className="lex-row-comment" style={{ left: cell.x - 35, top: cell.y }} title="이 줄에 코멘트 달기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
+    {cell && props.features?.comment && <button className="lex-row-comment" style={{ left: cell.x - 35, top: cell.y }} title="이 줄에 코멘트 달기" aria-label="이 줄에 코멘트 달기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
       const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();
       if (table && row) { $setSelection($createTableSelectionFrom(table, row.getFirstChild<TableCellNode>()!, row.getLastChild<TableCellNode>()!)); editor.dispatchCommand(OPEN_COMMENT_COMMAND, undefined); }
     })}>＋</button>}
+    {cell && props.onAskAi && <button className="lex-row-ask lex-row-comment ask-add-btn" style={{ left: cell.x - (props.features?.comment ? 65 : 35), top: cell.y }} title="이 줄을 AI에게 묻기" aria-label="이 줄을 AI에게 묻기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
+      const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();
+      if (table && row) { $setSelection($createTableSelectionFrom(table, row.getFirstChild<TableCellNode>()!, row.getLastChild<TableCellNode>()!)); editor.dispatchCommand(OPEN_ASK_COMMAND, undefined); }
+    })}>AI</button>}
   </>;
 }

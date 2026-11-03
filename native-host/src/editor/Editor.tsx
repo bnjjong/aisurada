@@ -78,7 +78,7 @@ export interface EditorProps {
   askDocId?: string;
   onAskAi?(quote: string, question: string, turnId: string, images?: File[]): void;
   onAskFollowUp?(question: string, underlineId: string, images?: File[]): void;
-  onOpenAskCompose?(quote: string, rect: { left: number; top: number }): void;
+  onOpenAskCompose?(quote: string, rect: { left: number; top: number }, wrapMark?: (turnId: string) => void): void;
 }
 const theme = {
   paragraph: "lex-paragraph",

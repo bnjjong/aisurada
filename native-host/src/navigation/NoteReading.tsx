@@ -26,7 +26,7 @@ export function NoteReading({
     ? `${controller.getSnapshot().workspace!.path}/${note.path}`
     : undefined;
   const draftGetter = useRef<() => string>(() => live.body);
-  const [composeState, setComposeState] = useState<AskComposeState | null>(null);
+  const [composeState, setComposeState] = useState<(AskComposeState & { wrapMark?: (turnId: string) => void }) | null>(null);
 
   const port = useMemo<NoteBodyPort>(() => ({
     kind: parent ? "sub" : "main",
@@ -121,8 +121,8 @@ export function NoteReading({
               onDraftBuffer={(fn) => {
                 draftGetter.current = fn;
               }}
-              onOpenAskCompose={(quote, rect) => {
-                setComposeState({ quote, left: rect.left, top: rect.top });
+              onOpenAskCompose={(quote, rect, wrapMark) => {
+                setComposeState({ quote, left: rect.left, top: rect.top, wrapMark });
               }}
             />
           </NoteAskFrame>
@@ -132,6 +132,7 @@ export function NoteReading({
               state={composeState}
               onSubmit={(question, images) => {
                 const turnId = `ak${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+                composeState.wrapMark?.(turnId);
                 askWire?.editor?.onAskAi?.(composeState.quote, question, turnId, images);
                 setComposeState(null);
               }}

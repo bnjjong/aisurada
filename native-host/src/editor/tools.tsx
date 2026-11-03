@@ -17,6 +17,7 @@ import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock
 type Trigger = { key: string; start: number; size: number };
 type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; x: number; y: number };
 export const OPEN_COMMENT_COMMAND = createCommand<void>('withlog:comment-compose');
+export const OPEN_ASK_COMMAND = createCommand<void>('withlog:ask-compose');
 const formats = ['bold', 'italic', 'strikethrough', 'code'] as const;
 const imageTypes: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
 const languages = ['plaintext', 'kotlin', 'java', 'typescript', 'javascript', 'python', 'sql', 'bash', 'yaml', 'json', 'xml', 'groovy', 'dockerfile', 'properties', 'diff', 'mermaid'];
@@ -88,9 +89,23 @@ export function EditorTools(props: EditorProps) {
     if (!selectionBar) return;
     setCompose({ quote: selectionBar.quote, x: selectionBar.x, y: selectionBar.y + 42 }); setComment('');
   }
+  function wrapAskSelection(turnId: string, targetSelection: BaseSelection) {
+    editor.update(() => {
+      $setSelection(targetSelection.clone());
+      const selected = $getSelection();
+      if ($isTableSelection(selected)) {
+        for (const cell of tableRowCells(selected)) {
+          const range = $createRangeSelection(); range.anchor.set(cell.getKey(), 0, 'element'); range.focus.set(cell.getKey(), cell.getChildrenSize(), 'element');
+          $wrapSelectionInMarkNode(range, false, turnId, ids => $createAnnotation(ids, 'a'));
+        }
+      } else if ($isRangeSelection(selected)) $wrapSelectionInMarkNode(selected, selected.isBackward(), turnId, ids => $createAnnotation(ids, 'a'));
+    });
+    editor.focus();
+  }
   function beginAsk() {
-    if (!selectionBar) return;
-    props.onOpenAskCompose?.(selectionBar.quote, { left: selectionBar.x, top: selectionBar.y + 42 });
+    if (!selectionBar || !selection.current) return;
+    const target = selection.current.clone();
+    props.onOpenAskCompose?.(selectionBar.quote, { left: selectionBar.x, top: selectionBar.y + 42 }, (turnId: string) => wrapAskSelection(turnId, target));
   }
   function submitComment() {
     if (!comment.trim() || !composeRef.current || !selection.current) return;
@@ -177,6 +192,23 @@ export function EditorTools(props: EditorProps) {
       const quote = $isTableSelection(selected) ? tableRowCells(selected).map(cell => cell.getTextContent()).join('\t') + '\n' : selected.getTextContent();
       const rect = currentRoot.getBoundingClientRect(); setCompose({ quote, ...coords(rect), y: 70 }); return true;
     }, COMMAND_PRIORITY_HIGH);
+    const askCommand = editor.registerCommand(OPEN_ASK_COMMAND, () => {
+      const currentRoot = editor.getRootElement();
+      if (!currentRoot) return false;
+      const selected = $getSelection(); if (!selected) return false;
+      selection.current = selected.clone();
+      const target = selected.clone();
+      const quote = $isTableSelection(selected)
+        ? tableRowCells(selected).reduce((lines, cell, index, cells) => lines + cell.getTextContent()
+            + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '')
+        : selected.getTextContent();
+      const dom = window.getSelection();
+      const rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : currentRoot.getBoundingClientRect();
+      const position = coords(rect);
+      const top = rect.height > 0 ? position.y + 42 : 70;
+      latest.current.onOpenAskCompose?.(quote, { left: position.x, top }, (turnId: string) => wrapAskSelection(turnId, target));
+      return true;
+    }, COMMAND_PRIORITY_HIGH);
     const over = (event: MouseEvent) => {
       const currentRoot = editor.getRootElement();
       const container = outer();
@@ -200,7 +232,7 @@ export function EditorTools(props: EditorProps) {
     const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { closeCompose(); setMenu(null); setCard(null); } };
     root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop);
     document.addEventListener('pointerdown', outside);
-    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); document.removeEventListener('pointerdown', outside); };
+    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); askCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); document.removeEventListener('pointerdown', outside); };
   }, [editor]);
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>
