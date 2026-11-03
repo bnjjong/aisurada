@@ -38,8 +38,12 @@ export function EditorTools(props: EditorProps) {
   const [code, setCode] = useState<{ key: string; language: string } | null>(null), [callout, setCallout] = useState<{ key: string; kind: string } | null>(null);
   const [card, setCard] = useState<{ ids: string[]; x: number; y: number; pinned: boolean } | null>(null);
   const closeCard = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), closeCompose = () => { setCompose(null); setComment(''); };
-  const outer = () => editor.getRootElement()!.closest<HTMLElement>('.lex-editor')!;
-  const coords = (rect: DOMRect) => { const box = outer().getBoundingClientRect(); return { x: Math.max(8, Math.min(rect.left - box.left, box.width - 260)), y: Math.max(0, rect.top - box.top - 42) }; };
+  const outer = () => editor.getRootElement()?.closest<HTMLElement>('.lex-editor') ?? null;
+  const coords = (rect: DOMRect) => {
+    const box = outer()?.getBoundingClientRect();
+    if (!box) return { x: 0, y: 0 };
+    return { x: Math.max(8, Math.min(rect.left - box.left, box.width - 260)), y: Math.max(0, rect.top - box.top - 42) };
+  };
   const slashItems = [
     ...(props.features?.createChild ? [{ id: 'page', label: '페이지', aliases: 'page 후속 하위 노트 새 페이지' }] : []),
     ...(props.features?.notes ? [{ id: 'note', label: '노트 링크', aliases: 'note link 링크 기록' }] : []),
@@ -99,8 +103,10 @@ export function EditorTools(props: EditorProps) {
     void latest.current.features?.comment?.(id, body, quote); closeCompose(); editor.focus();
   }
   useEffect(() => {
-    const root = editor.getRootElement()!;
+    const root = editor.getRootElement();
+    if (!root) return;
     const update = editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
+      if (!editor.getRootElement()) return;
       editorState.read(() => {
         const selected = $getSelection(), node = $isRangeSelection(selected) ? selected.anchor.getNode() : null;
         const inCode = node && [node, ...node.getParents()].find($isCodeNode);
@@ -160,18 +166,23 @@ export function EditorTools(props: EditorProps) {
     }, COMMAND_PRIORITY_HIGH);
     const formatCommand = editor.registerCommand(FORMAT_TEXT_COMMAND, $formatSelection, COMMAND_PRIORITY_LOW);
     const commentCommand = editor.registerCommand(OPEN_COMMENT_COMMAND, () => {
+      const currentRoot = editor.getRootElement();
+      if (!currentRoot) return false;
       const selected = $getSelection(); if (!selected) return false;
       selection.current = selected.clone();
       const quote = $isTableSelection(selected) ? tableRowCells(selected).map(cell => cell.getTextContent()).join('\t') + '\n' : selected.getTextContent();
-      const rect = root.getBoundingClientRect(); setCompose({ quote, ...coords(rect), y: 70 }); return true;
+      const rect = currentRoot.getBoundingClientRect(); setCompose({ quote, ...coords(rect), y: 70 }); return true;
     }, COMMAND_PRIORITY_HIGH);
     const over = (event: MouseEvent) => {
+      const currentRoot = editor.getRootElement();
+      const container = outer();
+      if (!currentRoot || !container) return;
       const mark = (event.target as Element).closest<HTMLElement>('[data-comment-id]');
-      if (!mark || !root.contains(mark) || mark.closest('td,th')) return;
+      if (!mark || !currentRoot.contains(mark) || mark.closest('td,th')) return;
       clearTimeout(closeCard.current);
       const ids: string[] = []; let node: HTMLElement | null = mark;
-      while (node && node !== root) { if (node.dataset.commentId) ids.unshift(node.dataset.commentId); node = node.parentElement; }
-      const rect = mark.getBoundingClientRect(), base = outer().getBoundingClientRect();
+      while (node && node !== currentRoot) { if (node.dataset.commentId) ids.unshift(node.dataset.commentId); node = node.parentElement; }
+      const rect = mark.getBoundingClientRect(), base = container.getBoundingClientRect();
       setCard(previous => previous?.pinned ? previous : { ids, x: Math.max(0, rect.left - base.left), y: rect.bottom - base.top + 8, pinned: false });
     };
     const leave = () => { closeCard.current = setTimeout(() => setCard(previous => previous?.pinned ? previous : null), 180); };

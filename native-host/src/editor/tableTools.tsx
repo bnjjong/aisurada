@@ -27,7 +27,7 @@ export function TableTools(props: EditorProps) {
   const fixedWidths = useRef(new Map<string, number>());
   const scaled = useRef(new Set<string>());
   const stopResize = useRef<(() => void) | null>(null);
-  const outer = () => editor.getRootElement()!.closest<HTMLElement>('.lex-editor')!;
+  const outer = () => editor.getRootElement()?.closest<HTMLElement>('.lex-editor') ?? null;
   function tablesFromSelection() {
     const selection = $getSelection(), found = new Map<string, TableNode>();
     for (const node of selection?.getNodes() || []) {
@@ -56,7 +56,9 @@ export function TableTools(props: EditorProps) {
       }
       if (name === 'remove-col') $deleteTableColumnAtSelection();
       if (name === 'fit') {
-        const width = editor.getRootElement()!.clientWidth, widths = table.getColWidths() || Array(table.getFirstChild<TableRowNode>()!.getChildrenSize()).fill(1);
+        const root = editor.getRootElement();
+        if (!root) return;
+        const width = root.clientWidth, widths = table.getColWidths() || Array(table.getFirstChild<TableRowNode>()!.getChildrenSize()).fill(1);
         const total = widths.reduce((a, b) => a + b, 0); table.setColWidths(widths.map(n => n / total * width)); fixedWidths.current.delete(table.getKey());
         const element = editor.getElementByKey(table.getKey()); if (element) element.style.width = '100%';
       }
@@ -87,10 +89,14 @@ export function TableTools(props: EditorProps) {
     document.addEventListener('pointermove', move); document.addEventListener('pointerup', stop, { once: true });
   }
   useEffect(() => {
-    const root = editor.getRootElement()!;
     let active = true;
+    let rafId = 0;
+    const root = editor.getRootElement();
+    if (!root) return;
     const collect = () => {
-      const base = outer().getBoundingClientRect(), next: typeof dots = [];
+      const container = outer();
+      if (!container || !root) return;
+      const base = container.getBoundingClientRect(), next: typeof dots = [];
       root.querySelectorAll<HTMLTableRowElement>('tr').forEach(row => {
         const ids = [...new Set([...row.querySelectorAll<HTMLElement>('[data-comment-id]')].map(mark => mark.dataset.commentId!))];
         if (!ids.length) return;
@@ -101,6 +107,7 @@ export function TableTools(props: EditorProps) {
       setDots(next);
     };
     const scale = () => {
+      if (!root) return;
       const keys: string[] = [];
       editor.read(() => { const find = (node: LexicalNode) => { if ($isTableNode(node) && !scaled.current.has(node.getKey())) keys.push(node.getKey()); if ($isElementNode(node)) node.getChildren().forEach(find); }; find($getRoot()); });
       if (!keys.length) return;
@@ -114,10 +121,19 @@ export function TableTools(props: EditorProps) {
       }; walk($getRoot()); });
     };
     scale();
-    const update = editor.registerUpdateListener(() => { requestAnimationFrame(() => { if (active) { collect(); scale(); } }); });
+    const update = editor.registerUpdateListener(() => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (active && editor.getRootElement()) { collect(); scale(); }
+      });
+    });
     const over = (event: MouseEvent) => {
+      const container = outer();
+      if (!root || !container) return;
       const element = (event.target as Element).closest<HTMLTableCellElement>('td,th'); if (!element || !root.contains(element)) return;
-      const base = outer().getBoundingClientRect(), rect = element.getBoundingClientRect(), table = element.closest('table')!.getBoundingClientRect();
+      const tableElem = element.closest('table');
+      if (!tableElem) return;
+      const base = container.getBoundingClientRect(), rect = element.getBoundingClientRect(), table = tableElem.getBoundingClientRect();
       editor.read(() => {
         const node = $getNearestNodeFromDOMNode(element);
         if ($isTableCellNode(node)) setCell({ key: node.getKey(), x: rect.right - base.left - 28, y: rect.top - base.top + 2, right: rect.right - base.left,
@@ -153,7 +169,7 @@ export function TableTools(props: EditorProps) {
       if (!event || event.altKey || !event.shiftKey || !(/Mac/.test(navigator.platform) ? event.metaKey : event.ctrlKey) || event.code !== 'KeyC' || !tablesFromSelection().length) return false;
       event.preventDefault(); copyMode.current = true; document.execCommand('copy'); return true;
     }, COMMAND_PRIORITY_HIGH);
-    return () => { active = false; stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
+    return () => { active = false; cancelAnimationFrame(rafId); stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
   }, [editor, open]);
   const operations = [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제'], ['before-col', '왼쪽에 열 추가'], ['after-col', '오른쪽에 열 추가'], ['remove-col', '열 삭제'], ['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']];
   return <>

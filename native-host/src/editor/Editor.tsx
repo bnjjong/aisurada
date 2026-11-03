@@ -302,7 +302,8 @@ function EditorBridge(props: EditorProps) {
       if (node.getChecked() && $getState(node, pendingState))
         $setState(node, pendingState, "");
     });
-    const root = editor.getRootElement()!;
+    const root = editor.getRootElement();
+    if (!root) return;
     const start = () => {
       composing.current = true;
     };
@@ -411,8 +412,10 @@ function EditorBridge(props: EditorProps) {
       COMMAND_PRIORITY_HIGH,
     );
     const section = () => {
+      const currentRoot = editor.getRootElement();
+      if (!currentRoot) return;
       const scroller =
-        root.closest(".doc-scroll, .page-scroll, .subnote-page") ||
+        currentRoot.closest(".doc-scroll, .page-scroll, .subnote-page") ||
         document.scrollingElement;
       const top = scroller?.getBoundingClientRect().top || 0;
       let key = "";
@@ -432,7 +435,9 @@ function EditorBridge(props: EditorProps) {
       markdown: () => editor.getEditorState().read(exportBody),
       heading: goHeading,
       comment: (id) => {
-        const target = root.querySelector(
+        const currentRoot = editor.getRootElement();
+        if (!currentRoot) return;
+        const target = currentRoot.querySelector(
           `[data-comment-id="${CSS.escape(id)}"]`,
         );
         target?.scrollIntoView({ block: "center", behavior: "smooth" });
