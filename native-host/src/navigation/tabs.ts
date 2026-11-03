@@ -73,11 +73,11 @@ export class TabModel {
   }
 
   close(id: string, address: string): string {
+    if (!this.writable || !this.state.openIds.includes(id)) return address;
     const visible = this.visible(), index = visible.indexOf(id);
-    if (index < 0 || !this.writable) return address;
     this.change(this.state.openIds.filter(item => item !== id));
     if (activeTab(address) !== id) return address;
-    const neighbor = visible[index + 1] || visible[index - 1];
+    const neighbor = index >= 0 ? (visible[index + 1] || visible[index - 1]) : visible[0];
     return neighbor ? tabAddress(neighbor) : this.state.lastMain;
   }
 

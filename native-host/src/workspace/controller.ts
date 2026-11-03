@@ -60,7 +60,7 @@ export class WorkspaceController {
     this.tabs = new TabModel(services.storage, context.kind === 'main');
     this.data = new VaultData(services, () => this.state.workspace, (vault, workspace) => this.patch({ vault, ...(workspace ? { workspace } : {}) }));
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
-      prefs: readPreferences(services.storage) as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
+      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
       theme: readTheme(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
@@ -138,10 +138,10 @@ export class WorkspaceController {
   };
   closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
   reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
-  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage) as unknown as Preferences } : {}) });
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
   preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark' }) => {
     if (this.context.kind !== 'main') return;
-    writePreferences(this.services.storage, update as any);
+    writePreferences(this.services.storage, update as any, true);
     this.refreshTheme();
   };
   settings = (open: boolean) => { if (this.context.kind === 'main') this.patch({ settingsOpen: open }); };
@@ -220,10 +220,13 @@ export class WorkspaceController {
       if (this.disposed || !nav?.path) return;
       this.navigate(nav.path);
       if (nav.sub) {
-        const parts = nav.sub.split('/');
-        const root = parts[0];
-        const chain = parts.slice(1);
-        if (root && chain.length) this.openSubNotes(root, chain);
+        const route = parseRoute(nav.path);
+        const parts = nav.sub.split('/').filter(Boolean);
+        if (parts.length > 0) {
+          const root = route.kind === 'doc' ? route.id : parts[0];
+          const chain = route.kind === 'doc' ? parts : parts.slice(1);
+          if (root && chain.length) this.openSubNotes(root, chain);
+        }
       }
     }).then(keep).catch(error => this.services.warn('이동 요청을 듣지 못했어요', error));
     if (this.services.deepLinks) void connectLinkSource(this.services.deepLinks, urls => { void this.receiveURLs(urls); },
@@ -290,9 +293,14 @@ export class WorkspaceController {
     return true;
   };
 
+  isPoppedOut = (id: string): boolean => {
+    if (!id || !this.state.noteWindows.includes(id)) return false;
+    if (this.context.kind === 'note' && this.context.docId === id) return false;
+    return true;
+  };
   closeSearch = () => this.patch({ searchOpen: false });
   showPreview = (id: string | null) => {
-    if (id && this.state.noteWindows.includes(id)) { this.focusNoteWindow(id); return; }
+    if (id && this.isPoppedOut(id)) { this.focusNoteWindow(id); return; }
     this.patch({ preview: id, previewOpened: this.state.workspace?.notes.find(n => n.id === id) || null });
   };
   registerChildRemover = (id: string, remove: (child: string) => void) => { const token = Symbol(); this.childRemovers.set(token, { id, remove }); return () => { this.childRemovers.delete(token); }; };
@@ -323,7 +331,7 @@ export class WorkspaceController {
   private flushEditors = async (root?: string) => {
     await Promise.allSettled([...this.editorFlushers.values()].filter(editor => !root || editor.root === root).map(editor => editor.flush()));
   };
-  openSubNotes = (root: string, ids: string[]) => { if (!ids.length) { this.patch({ subNotes: null }); return; } if (this.state.noteWindows.includes(root)) { this.focusNoteWindow(root); return; } this.patch({ subNotes: {
+  openSubNotes = (root: string, ids: string[]) => { if (!ids.length) { this.patch({ subNotes: null }); return; } if (this.isPoppedOut(root)) { this.focusNoteWindow(root); return; } this.patch({ subNotes: {
     root, ids, arrival: this.state.route === docAddress(root) ? null : docAddress(root),
   } }); };
   popSubNote = () => {

@@ -137,9 +137,9 @@ if (location.pathname.startsWith("/note-window/")) {
         "toggle count",
       );
       $(".set-switch input").click();
+      const s = JSON.parse(localStorage.getItem("withlog.prefs.v1")).state;
       assert(
-        JSON.parse(localStorage.getItem("withlog.prefs.v1")).state.titleDate ===
-          false,
+        (s.titleDatePrefix ?? s.titleDate) === false,
         "immediate preference",
       );
       esc();

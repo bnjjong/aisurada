@@ -19,10 +19,11 @@ export function Preview({
   const captured =
       state.previewOpened?.id === note.id ? state.previewOpened : note,
     agenda = state.workspace?.agendas.find((a) => a.id === captured.agendaId),
-    size = state.prefs.previewSize;
+    pw = Number(state.prefs.previewWidth) || 720,
+    ph = typeof state.prefs.previewHeight === "number" ? state.prefs.previewHeight : null;
   return (
     <Modal
-      title={displayTitle(note, state.prefs.titleDate)}
+      title={displayTitle(note, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true)}
       close={() => controller.showPreview(null)}
       className={`note-preview ${full ? "preview-full" : ""}`}
       wide={full}
@@ -31,7 +32,7 @@ export function Preview({
         ref={box}
         className="preview-resize"
         style={
-          !full && size ? { width: size.width, height: size.height } : undefined
+          !full ? ({ width: pw, ...(ph ? { height: ph } : {}) } as React.CSSProperties) : undefined
         }
         onPointerDown={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
@@ -42,17 +43,16 @@ export function Preview({
           if (!resizing.current) return;
           resizing.current = false;
           const r = box.current?.getBoundingClientRect();
-          if (
-            r &&
-            (Math.round(r.width) !== size?.width ||
-              Math.round(r.height) !== size?.height)
-          )
-            controller.preference({
-              previewSize: {
-                width: Math.round(r.width),
-                height: Math.round(r.height),
-              },
-            });
+          if (r) {
+            const width = Math.max(400, Math.min(1200, Math.round(r.width)));
+            const height = Math.max(300, Math.min(1000, Math.round(r.height)));
+            if (width !== pw || height !== (ph || 480)) {
+              controller.preference({
+                previewWidth: width,
+                previewHeight: height,
+              });
+            }
+          }
         }}
       >
         <div className="preview-tools">

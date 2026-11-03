@@ -21,16 +21,19 @@ export function Rail({
     agendas: Agenda[],
     id?: string,
   ) => {
-    const collapsed = state.prefs.collapsedProjects.includes(slug);
+    const isNone = slug === "" || slug === "__none__";
+    const collapsed = isNone
+      ? state.prefs.collapsedProjects.includes("") || state.prefs.collapsedProjects.includes("__none__")
+      : state.prefs.collapsedProjects.includes(slug);
     return (
-      <section key={slug} className="rail-group">
+      <section key={slug || "__none__"} className="rail-group">
         {ws.projects.length > 0 && (
           <header>
             <button
               onClick={() =>
                 controller.preference({
                   collapsedProjects: collapsed
-                    ? state.prefs.collapsedProjects.filter((p) => p !== slug)
+                    ? state.prefs.collapsedProjects.filter((p) => p !== slug && (!isNone || (p !== "" && p !== "__none__")))
                     : [...state.prefs.collapsedProjects, slug],
                 })
               }
@@ -156,13 +159,14 @@ export function Rail({
         )}
         {group(
           "미분류",
-          "__none__",
+          "",
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
         <RailProjects />
       </section>
       <footer className="rail-footer">
         <button
+          className="iconbtn"
           title="테마 전환"
           onClick={() =>
             controller.preference({

@@ -101,7 +101,7 @@ test('C201: B and I format the chips in the selection with the text, and pressed
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});
  editor.update(()=>{$importDocument('| a | b |\n| - | ----------- |\n| 1 |\n| x | y | z |');$repairDocument();},{discrete:true});
- const text=editor.getEditorState().read($exportDocument);assert.match(text,/\| 1 \| \| \|/);assert.match(text,/\| --- \| -{20,} \| -{20,} \|/);
+ const text=editor.getEditorState().read($exportDocument);assert.match(text,/\| 1 \|  \|/);assert.match(text,/\| --- \| -{20,} \| -{20,} \|/);
 });
 test('상대 첨부 경로는 한 번만 디코드하고 위험 세그먼트를 거절한다',()=>{
  for(const path of ['https://a/x','/x','#x','a\\b','a//b','a/../b','%2e%2e/a','a/%00','a/%2f/b'])assert.equal(relativePath(path),null,path);

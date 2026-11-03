@@ -254,6 +254,17 @@ function EditorBridge(props: EditorProps) {
     );
     editor.getEditorState().read(() => {
       last.current = exportBody();
+      const headings = $getRoot()
+        .getChildren()
+        .filter($isHeadingNode)
+        .map((node) => ({
+          key: node.getKey(),
+          level: Number(node.getTag().slice(1)),
+          text: node.getTextContent(),
+          slug: headingSlug(node.getTextContent()),
+        }));
+      heads.current = JSON.stringify(headings);
+      callbacks.current.onHeadings?.(headings);
     });
     let secondFrame = 0;
     const initialFrame = requestAnimationFrame(() => {

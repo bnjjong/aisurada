@@ -26,7 +26,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
   const drag = useRef<Drag | null>(null);
   const suppressClick = useRef<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
-  const ids: (string | null)[] = [null, ...state.tabs.openIds];
+  const ids: (string | null)[] = [null, ...new Set(state.tabs.openIds)];
 
   useLayoutEffect(() => {
     const item = buttons.current.get(active)?.closest('.tab-item');
@@ -78,7 +78,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
       const title = id === null ? '내 기록' : tabTitle(id, state);
       const note = state.workspace?.notes.find(n => n.id === id);
       return <div className={`tab-item ${id === null ? 'tab-main' : ''} ${active === id ? 'tab-selected' : ''} ${dragging === id && id !== null ? 'tab-dragging' : ''}`}
-        key={id ?? '__main__'} data-tab-id={id ?? undefined}
+        key={id ?? '__main__'} data-tab-id={id ?? undefined} aria-selected={active === id}
         onClick={event => {
           if ((event.target as Element).closest('.tab-close')) return;
           if (id !== null && suppressClick.current === id) { suppressClick.current = null; return; }

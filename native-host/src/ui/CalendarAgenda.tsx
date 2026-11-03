@@ -519,10 +519,10 @@ export function AgendaPage({
     [error, setError] = useState(""),
     [widths, setWidths] = useState<Record<string, number>>({});
   const selected = ws.notes.filter(
-    (n) => open.includes(n.id) && !state.noteWindows.includes(n.id),
+    (n) => open.includes(n.id) && !controller.isPoppedOut(n.id),
   );
   useEffect(() => {
-    const floating = open.filter((id) => state.noteWindows.includes(id));
+    const floating = open.filter((id) => controller.isPoppedOut(id));
     if (!floating.length) return;
     floating.forEach(controller.focusNoteWindow);
     setOpen(open.filter((id) => !floating.includes(id)));
@@ -542,11 +542,12 @@ export function AgendaPage({
     );
   const notes = visibleNotes(
       ws.notes.filter((n) => n.agendaId === agenda.id),
-      state.prefs.showRecords,
+      state.prefs.showRecordTier ?? (state.prefs as any).showRecords ?? false,
     ),
     sorted = [...notes].sort(
       (a, b) =>
-        (state.prefs.agendaDesc ? -1 : 1) * a.created.localeCompare(b.created),
+        ((state.prefs.docSortDir === "desc" || (state.prefs as any).agendaDesc) ? -1 : 1) *
+        (a.created || "").localeCompare(b.created || ""),
     );
   const toggle = (nid: string) =>
     setOpen(
@@ -556,11 +557,11 @@ export function AgendaPage({
     <div className="doc-listitem" key={n.id}>
       <button onClick={() => toggle(n.id)}>
         <strong className="dli-title">
-          {displayTitle(n, state.prefs.titleDate)}
+          {displayTitle(n, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true)}
         </strong>
         <small>
           {n.date} · {n.time}{" "}
-          {n.format !== "markdown" && n.format.toUpperCase()}
+          {Boolean(n.format && n.format !== "markdown") && String(n.format).toUpperCase()}
         </small>
       </button>
       <button
@@ -595,10 +596,10 @@ export function AgendaPage({
         <div className="agenda-sort">
           <select
             aria-label="아젠다 정렬"
-            value={state.prefs.agendaSort}
+            value={state.prefs.docSortMode || (state.prefs as any).agendaSort || "structure"}
             onChange={(e) =>
               controller.preference({
-                agendaSort: e.target.value as "structure" | "time",
+                docSortMode: e.target.value as "structure" | "time",
               })
             }
           >
@@ -607,17 +608,19 @@ export function AgendaPage({
           </select>
           <button
             onClick={() =>
-              controller.preference({ agendaDesc: !state.prefs.agendaDesc })
+              controller.preference({
+                docSortDir: ((state.prefs.docSortDir === "desc" || (state.prefs as any).agendaDesc)) ? "asc" : "desc",
+              })
             }
           >
-            {state.prefs.agendaDesc ? "최신이 위" : "오래된 것이 위"}
+            {((state.prefs.docSortDir === "desc" || (state.prefs as any).agendaDesc)) ? "최신이 위" : "오래된 것이 위"}
           </button>
         </div>
         <button className="ag-ov-nav" onClick={() => setOpen([])}>
           개요
         </button>
         <div className="doclist">
-          {state.prefs.agendaSort === "structure"
+          {(state.prefs.docSortMode || (state.prefs as any).agendaSort || "structure") === "structure"
             ? TYPES.map((type) => {
                 const group = sorted.filter((n) => (n.type || "free") === type);
                 return group.length ? (
@@ -706,14 +709,14 @@ export function AgendaPage({
           )}
           <h3>히스토리</h3>
           {[...notes]
-            .sort((a, b) => a.created.localeCompare(b.created))
+            .sort((a, b) => (a.created || "").localeCompare(b.created || ""))
             .map((n) => (
               <button
                 className="agenda-history-note"
                 key={n.id}
                 onClick={() => toggle(n.id)}
               >
-                {n.time} {displayTitle(n, state.prefs.titleDate)}
+                {n.time} {displayTitle(n, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true)}
               </button>
             ))}
         </section>

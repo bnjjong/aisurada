@@ -195,8 +195,8 @@ export function TerminalHost({
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!started) return;
 
-    // Handle Cmd+V / Ctrl+V paste
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
+    // Handle Cmd+V paste (macOS metaKey)
+    if (e.metaKey && (e.key === 'v' || e.key === 'V')) {
       e.stopPropagation();
       e.preventDefault();
       if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
@@ -262,13 +262,25 @@ export function TerminalHost({
     return () => observer.disconnect();
   }, [started, tabKey]);
 
-  // Auto focus and scroll to bottom on visibility change
+  // Scroll to bottom on new output
   useEffect(() => {
     if (screenRef.current && isVisible) {
-      screenRef.current.focus();
       screenRef.current.scrollTop = screenRef.current.scrollHeight;
     }
   }, [rawLines, isVisible]);
+
+  // Focus only when tab becomes newly visible and user is not focused on an input/modal
+  const prevVisible = useRef(isVisible);
+  useEffect(() => {
+    if (!prevVisible.current && isVisible && screenRef.current) {
+      const active = document.activeElement;
+      const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.closest?.('.cmdk-panel, .modal-card, .ps-modal'));
+      if (!isInput) {
+        screenRef.current.focus();
+      }
+    }
+    prevVisible.current = isVisible;
+  }, [isVisible]);
 
   const logicalLines = extractLogicalLines(rawLines);
 
@@ -276,8 +288,10 @@ export function TerminalHost({
     <div
       ref={containerRef}
       className={`term-host ${!isVisible ? 'is-hidden' : ''}`}
+      data-terminal-key={tabKey}
       data-tab-key={tabKey}
       data-testid="terminal-host"
+      hidden={!isVisible}
       style={{
         display: isVisible ? 'flex' : 'none',
         flexDirection: 'column',

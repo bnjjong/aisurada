@@ -69,8 +69,8 @@ export function NoteMeta({
           {TYPE_NAMES[asText(note.type) || "free"] || asText(note.type)} ·{" "}
           {note.date} {note.time}
         </span>
-        {note.format !== "markdown" && (
-          <span className="format-badge">{note.format.toUpperCase()}</span>
+        {Boolean(note.format && note.format !== "markdown") && (
+          <span className="format-badge">{String(note.format).toUpperCase()}</span>
         )}
         {live.tier === "record" && <span className="record-badge">기록</span>}
         {!parent && (

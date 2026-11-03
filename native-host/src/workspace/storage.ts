@@ -77,6 +77,25 @@ function clampNullableInt(val: unknown, min: number, max: number): number | null
   return Math.max(min, Math.min(max, Math.round(val)));
 }
 
+const LEGACY_ALIAS_KEYS = new Set([
+  'titleDate',
+  'showRecords',
+  'diagrams',
+  'agendaSort',
+  'agendaDesc',
+  'previewSize',
+]);
+
+export function sanitizePreferences(obj: Record<string, unknown>): AppPreferences {
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (!LEGACY_ALIAS_KEYS.has(k) && v !== undefined) {
+      result[k] = v;
+    }
+  }
+  return result as unknown as AppPreferences;
+}
+
 export function normalizePreferences(raw: unknown): { state: AppPreferences; version: number } {
   const row = asRow(raw);
   const stateRow = asRow(row?.state) || {};
@@ -85,6 +104,14 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
     delete stateRow.askTimeoutSeconds;
   }
   const merged: AppPreferences = { ...DEFAULT_PREFERENCES, ...stateRow };
+
+  // Remove legacy aliases from merged's own keys
+  delete (merged as any).titleDate;
+  delete (merged as any).showRecords;
+  delete (merged as any).diagrams;
+  delete (merged as any).agendaSort;
+  delete (merged as any).agendaDesc;
+  delete (merged as any).previewSize;
 
   merged.theme = stateRow.theme === 'dark' ? 'dark' : 'light';
   merged.weekLayout = stateRow.weekLayout === 'stack' || stateRow.weekLayout === 'dates' ? 'stack' : 'swimlane';
@@ -98,19 +125,11 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
   merged.askCardHeight = clampNullableInt(stateRow.askCardHeight, 160, 1600);
   merged.composeWidth = clampInt(stateRow.composeWidth, 240, 720, 280);
   merged.composeInputHeight = clampNullableInt(stateRow.composeInputHeight, 80, 1200);
-  merged.docSortMode = stateRow.docSortMode === 'time' ? 'time' : 'structure';
-  merged.docSortDir = stateRow.docSortDir === 'asc' ? 'asc' : 'desc';
+  merged.docSortMode = stateRow.docSortMode === 'time' || stateRow.agendaSort === 'time' ? 'time' : 'structure';
+  merged.docSortDir = stateRow.docSortDir === 'asc' || stateRow.agendaDesc === false ? 'asc' : 'desc';
   merged.titleDatePrefix = typeof stateRow.titleDatePrefix === 'boolean' ? stateRow.titleDatePrefix : (typeof stateRow.titleDate === 'boolean' ? stateRow.titleDate : true);
   merged.showRecordTier = typeof stateRow.showRecordTier === 'boolean' ? stateRow.showRecordTier : (typeof stateRow.showRecords === 'boolean' ? stateRow.showRecords : false);
   merged.mermaidShowSource = typeof stateRow.mermaidShowSource === 'boolean' ? stateRow.mermaidShowSource : (typeof stateRow.diagrams === 'boolean' ? stateRow.diagrams : false);
-
-  // Backward compatibility aliases for existing UI bindings
-  (merged as any).titleDate = merged.titleDatePrefix;
-  (merged as any).showRecords = merged.showRecordTier;
-  (merged as any).diagrams = merged.mermaidShowSource;
-  (merged as any).agendaSort = merged.docSortMode;
-  (merged as any).agendaDesc = merged.docSortDir === 'desc';
-  (merged as any).previewSize = merged.previewWidth ? { width: merged.previewWidth, height: merged.previewHeight || 480 } : null;
 
   const validTimeouts = [600, 1200, 1800, 3600, 7200];
   merged.askTimeoutSeconds = typeof stateRow.askTimeoutSeconds === 'number' && validTimeouts.includes(stateRow.askTimeoutSeconds)
@@ -124,6 +143,16 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
   merged.expandedSessionProjects = Array.isArray(stateRow.expandedSessionProjects)
     ? stateRow.expandedSessionProjects.filter((s): s is string => typeof s === 'string')
     : [];
+
+  // Non-enumerable aliases for backward compatibility with UI bindings
+  Object.defineProperties(merged, {
+    titleDate: { get() { return this.titleDatePrefix; }, enumerable: false, configurable: true },
+    showRecords: { get() { return this.showRecordTier; }, enumerable: false, configurable: true },
+    diagrams: { get() { return this.mermaidShowSource; }, enumerable: false, configurable: true },
+    agendaSort: { get() { return this.docSortMode; }, enumerable: false, configurable: true },
+    agendaDesc: { get() { return this.docSortDir === 'desc'; }, enumerable: false, configurable: true },
+    previewSize: { get() { return this.previewWidth ? { width: this.previewWidth, height: this.previewHeight ?? 480 } : null; }, enumerable: false, configurable: true },
+  });
 
   return { state: merged, version: 1 };
 }
@@ -152,12 +181,13 @@ export function writeNoteWindowGeometry(
 export const writeNoteGeometry = writeNoteWindowGeometry;
 export const readNoteGeometry = readNoteWindowGeometry;
 
-export function readPreferences(storage: StoragePort): AppPreferences {
+export function readPreferences(storage: StoragePort, isMain = true): AppPreferences {
   const json = readJSON(storage, KEYS.prefs);
   const normalized = normalizePreferences(json);
   const row = asRow(json);
-  if (row && row.version !== 1) {
-    writeJSON(storage, KEYS.prefs, { state: normalized.state, version: 1 });
+  if (isMain && row && row.version !== 1) {
+    const sanitized = sanitizePreferences(normalized.state as any);
+    writeJSON(storage, KEYS.prefs, { state: sanitized, version: 1 });
   }
   return normalized.state;
 }
@@ -168,25 +198,16 @@ export function writePreferences(
   isMain = true
 ) {
   if (!isMain) return; // 노트 창은 설정을 쓰지 않는다 (15.7, 16.3)
-  const current = readPreferences(storage);
+  const current = readPreferences(storage, true);
   const normalizedUpdate: Record<string, unknown> = { ...prefs };
   if (typeof prefs.titleDate === 'boolean' && prefs.titleDatePrefix === undefined) {
     normalizedUpdate.titleDatePrefix = prefs.titleDate;
   }
-  if (typeof prefs.titleDatePrefix === 'boolean') {
-    normalizedUpdate.titleDate = prefs.titleDatePrefix;
-  }
   if (typeof prefs.showRecords === 'boolean' && prefs.showRecordTier === undefined) {
     normalizedUpdate.showRecordTier = prefs.showRecords;
   }
-  if (typeof prefs.showRecordTier === 'boolean') {
-    normalizedUpdate.showRecords = prefs.showRecordTier;
-  }
   if (typeof prefs.diagrams === 'boolean' && prefs.mermaidShowSource === undefined) {
     normalizedUpdate.mermaidShowSource = prefs.diagrams;
-  }
-  if (typeof prefs.mermaidShowSource === 'boolean') {
-    normalizedUpdate.diagrams = prefs.mermaidShowSource;
   }
   if (prefs.agendaSort !== undefined && prefs.docSortMode === undefined) {
     normalizedUpdate.docSortMode = prefs.agendaSort;
@@ -199,8 +220,21 @@ export function writePreferences(
   } else if (prefs.weekLayout === 'agendas') {
     normalizedUpdate.weekLayout = 'swimlane';
   }
-  const next = { ...current, ...normalizedUpdate };
-  writeJSON(storage, KEYS.prefs, { state: next, version: 1 });
+  if (prefs.previewSize) {
+    if (typeof prefs.previewSize.width === 'number') normalizedUpdate.previewWidth = prefs.previewSize.width;
+    if (typeof prefs.previewSize.height === 'number') normalizedUpdate.previewHeight = prefs.previewSize.height;
+  }
+
+  delete normalizedUpdate.titleDate;
+  delete normalizedUpdate.showRecords;
+  delete normalizedUpdate.diagrams;
+  delete normalizedUpdate.agendaSort;
+  delete normalizedUpdate.agendaDesc;
+  delete normalizedUpdate.previewSize;
+
+  const nextRaw = { ...current, ...normalizedUpdate };
+  const sanitized = sanitizePreferences(nextRaw);
+  writeJSON(storage, KEYS.prefs, { state: sanitized, version: 1 });
 }
 
 export function readJSON(storage: StoragePort, key: string): unknown {

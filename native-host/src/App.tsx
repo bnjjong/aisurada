@@ -31,7 +31,7 @@ function WorkspaceApp() {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   useEffect(() => {
     const changed = () => controller.locationChanged(location.pathname + location.search);
-    const focus = () => { controller.refreshTheme(); if (document.visibilityState !== 'hidden') void controller.refresh(); };
+    const focus = () => { controller.refreshTheme(); void controller.refresh(); };
     const visible = () => { if (document.visibilityState === 'visible') focus(); };
     const storage = (event: StorageEvent) => { if (event.key === 'withlog.prefs.v1') controller.refreshTheme(); };
     const keydown = (event: KeyboardEvent) => { controller.handleKey(event); };

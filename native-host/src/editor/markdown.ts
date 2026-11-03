@@ -256,7 +256,7 @@ export function $tableMarkdown(table: TableNode, copy = false, selection?: BaseS
     })).filter(row => row.length);
   if (!rows.length) return '';
   const count = Math.max(...rows.map(row => row.length)), dashes = copy ? Array(count).fill(3) : widthDashes(table.getColWidths(), count);
-  const line = (cells: string[]) => '|' + cells.map(cell => cell ? ` ${cell} ` : ' ').join('|') + '|';
+  const line = (cells: string[]) => '|' + cells.map(cell => cell ? ` ${cell} ` : '  ').join('|') + '|';
   return [line(rows[0]), line(dashes.map(n => '-'.repeat(n))), ...rows.slice(1).map(line)].join('\n');
 }
 export function $tableTSV(table: TableNode, selected?: Set<string>): string {
