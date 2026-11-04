@@ -945,14 +945,700 @@ export function NoteSessionRail({
 }
 
 // --------------------------------------------------------------------------
-// Chapter 9 Stubs
+// Chapter 9: Session Route Component (/session/:id)
 // --------------------------------------------------------------------------
 
-export function SessionRoute(_props?: any): React.JSX.Element {
+export interface SessionRouteProps {
+  sessionId?: string;
+  controller?: any;
+  state?: any;
+}
+
+export function formatDuration(sec: number): string {
+  if (sec < 60) {
+    return `${sec.toFixed(1)}초`;
+  }
+  if (sec < 3600) {
+    return `${Math.round(sec / 60)}분`;
+  }
+  return `${(sec / 3600).toFixed(1)}시간`;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1048576) {
+    return `${(bytes / 1048576).toFixed(1)}MB`;
+  }
+  if (bytes >= 1024) {
+    return `${Math.round(bytes / 1024)}KB`;
+  }
+  return `${bytes}B`;
+}
+
+export function buildPinTranscriptMarkdown(opts: {
+  title: string;
+  turns: any[];
+  findingsCount: number;
+}): string {
+  const lines: string[] = [];
+  lines.push(`# ${opts.title}`);
+  lines.push('');
+
+  // 콜아웃
+  if (opts.findingsCount > 0) {
+    lines.push(`> [!danger] 표에 없는데 비밀처럼 생긴 것 ${opts.findingsCount}건`);
+    lines.push('> 이 검사는 도구 결과 본문은 보지 못해요.');
+  } else {
+    lines.push('> [!success] 모양 검사에 걸린 것이 0건입니다.');
+    lines.push('> 이 검사는 도구 결과 본문은 보지 못해요.');
+  }
+  lines.push('');
+
+  for (const t of opts.turns) {
+    if (t.who === 'user' || t.user) {
+      const text = t.text || t.user || '';
+      lines.push('**나**');
+      lines.push('');
+      lines.push('```');
+      lines.push(text);
+      lines.push('```');
+      lines.push('');
+    } else if (t.who === 'assistant' || t.assistant) {
+      const text = t.text || t.assistant || '';
+      lines.push('**클로드**');
+      lines.push('');
+      lines.push('```');
+      lines.push(text);
+      lines.push('```');
+      lines.push('');
+    } else if (t.who === 'tool' || t.tools) {
+      const tools = t.tools || (t.tool ? [t.tool] : []);
+      for (const tool of tools) {
+        const name = tool.name || String(tool);
+        const arg = tool.arg ? ` — \`${tool.arg.replace(/\r?\n/g, ' ')}\`` : '';
+        lines.push(`- \`${name}\`${arg}`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+export function SessionRoute({
+  sessionId: rawSessionId,
+  controller,
+  state,
+}: SessionRouteProps): React.JSX.Element {
+  // 세션 id 추출 (props 우선, 없으면 URL hash/path 파싱)
+  const sessionId = useMemo(() => {
+    if (rawSessionId) return rawSessionId;
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname || window.location.hash;
+      const m = path.match(/\/session\/([^/?#]+)/);
+      if (m) return decodeURIComponent(m[1]);
+    }
+    return '';
+  }, [rawSessionId]);
+
+  // 세션 목록
+  const projectSessions = useProjectsList();
+  const sessionItem = useMemo(
+    () => projectSessions.find((s) => s.sessionId === sessionId || s.id === sessionId),
+    [projectSessions, sessionId]
+  );
+
+  // 전사 데이터 상태
+  const [sessionData, setSessionData] = useState<any | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  // 오른쪽 레일 상태: 'notes' | 'links' | 'cli'
+  const [tab, setTab] = useState<'notes' | 'links' | 'cli'>('notes');
+  const [previewOpen, setPreviewOpen] = useState(true);
+
+  // 세션 id 변경 시 오른쪽 탭을 'notes'로 리셋 (9.7)
+  useEffect(() => {
+    setTab('notes');
+  }, [sessionId]);
+
+  // 굳히기 모달 상태
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinCount, setPinCount] = useState<100 | 200 | 500>(100);
+  const [pinTitle, setPinTitle] = useState('');
+  const [pinAgenda, setPinAgenda] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinLoading, setPinLoading] = useState(false);
+
+  // 대화 읽기 (read-session)
+  const loadTranscript = (limit = 100) => {
+    if (!sessionId) return;
+    setSessionLoading(true);
+    setSessionError(null);
+
+    callEngine(['read-session', sessionId, `limit=${limit}`, 'urls=true'])
+      .then((data) => {
+        setSessionData(data);
+        setSessionLoading(false);
+      })
+      .catch((err) => {
+        setSessionError(err?.message || '대화 기록을 못 읽었어요.');
+        setSessionLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadTranscript(100);
+  }, [sessionId]);
+
+  // 창 너비 감시 (1100px 이하 시 오른쪽 레일 자동 접힘, 9.7)
+  const [windowNarrow, setWindowNarrow] = useState(false);
+  useEffect(() => {
+    const checkWidth = () => {
+      setWindowNarrow(window.innerWidth <= 1100);
+    };
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
+
+  const isRailVisible = previewOpen && !windowNarrow;
+
+  // 관련 노트 목록 (9.7)
+  const relatedNotes = useMemo(() => {
+    const notes: any[] = state?.workspace?.notes || [];
+    return notes
+      .filter((n) => n.sessionId === sessionId || n.editedSessionId === sessionId)
+      .map((n) => {
+        const isCreated = n.sessionId === sessionId;
+        const why = isCreated ? '이 세션이 만들었어요.' : '이 세션이 고쳤어요.';
+        return { ...n, why };
+      })
+      .sort((a, b) => {
+        const d1 = String(a.created || '');
+        const d2 = String(b.created || '');
+        const c = d2.localeCompare(d1);
+        if (c !== 0) return c;
+        return String(a.id || '').localeCompare(String(b.id || ''));
+      });
+  }, [state?.workspace?.notes, sessionId]);
+
+  // 링크 목록 (9.7)
+  const urlsList = useMemo(() => {
+    const urls: any[] = sessionData?.urls || [];
+    return urls.map((u) => {
+      if (typeof u === 'string') {
+        try {
+          const parsed = new URL(u);
+          return { url: u, host: parsed.host, path: parsed.pathname + parsed.search, count: 1 };
+        } catch {
+          return { url: u, host: u, path: '', count: 1 };
+        }
+      }
+      try {
+        const parsed = new URL(u.url);
+        return { url: u.url, host: parsed.host, path: parsed.pathname + parsed.search, count: u.count || 1 };
+      } catch {
+        return { url: u.url, host: u.url, path: '', count: u.count || 1 };
+      }
+    });
+  }, [sessionData?.urls]);
+
+  // 전사 굳히기 열기
+  const handleOpenPinModal = () => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    setPinTitle(`세션대화 ${hh}:${mm}`);
+    const agendas: any[] = state?.workspace?.agendas || [];
+    if (agendas.length > 0) {
+      setPinAgenda(agendas[0].slug || agendas[0].id);
+    }
+    setPinError(null);
+    setPinModalOpen(true);
+  };
+
+  // 전사 굳히기 저장 (create-doc, D29)
+  const handleSavePin = async () => {
+    if (!pinTitle.trim() || !sessionData) return;
+    setPinLoading(true);
+    setPinError(null);
+
+    const body = buildPinTranscriptMarkdown({
+      title: pinTitle,
+      turns: sessionData.turns || [],
+      findingsCount: 0,
+    });
+
+    const utf8Bytes = new TextEncoder().encode(body).length;
+    // D29 결함 고침: 1,000,000 바이트 초과 사전 검사
+    if (utf8Bytes > 1000000) {
+      setPinError(`본문이 1000000바이트를 넘어 저장할 수 없어요: ${utf8Bytes}바이트`);
+      setPinLoading(false);
+      return;
+    }
+
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = now.toISOString().slice(11, 16);
+
+    try {
+      const argv = [
+        'create-doc',
+        `agenda=${pinAgenda}`,
+        `title=${pinTitle}`,
+        `body=${body}`,
+        `date=${date}`,
+        `time=${time}`,
+        'format=markdown',
+        'tier=record',
+      ];
+      const res = await callEngine<{ id?: string }>(argv);
+      setPinLoading(false);
+      setPinModalOpen(false);
+
+      if (res?.id && controller?.navigate) {
+        controller.navigate(`/doc/${res.id}`);
+      }
+    } catch (err: any) {
+      setPinError(err?.message || '노트를 만들지 못했어요.');
+      setPinLoading(false);
+    }
+  };
+
+  const isAlive = sessionItem?.status === 'running';
+
   return (
-    <section className="session-route">
-      <h1>세션 대화</h1>
-    </section>
+    <div className={`sess-screen ${!isRailVisible ? 'no-preview' : ''}`}>
+      {/* 메인 영역 */}
+      <div className="sess-main-area">
+        {/* 머리 (9.3) */}
+        <header className="sess-page-header">
+          <div className="sess-page-head-row">
+            <h1 className="sess-page-title">
+              {sessionItem ? sessionItem.title || '(이름 없는 세션)' : '지금 안 돌고 있는 세션'}
+              {sessionItem?.status === 'running' && <span className="sess-run" />}
+            </h1>
+
+            <div className="sess-page-actions">
+              {!windowNarrow && (
+                <button
+                  type="button"
+                  className="open-cli"
+                  onClick={() => {
+                    setPreviewOpen(true);
+                    setTab('cli');
+                  }}
+                >
+                  터미널 열기
+                </button>
+              )}
+              <button
+                type="button"
+                className="sess-page-resume"
+                onClick={handleOpenPinModal}
+              >
+                노트로 굳히기
+              </button>
+              {!windowNarrow && (
+                <button
+                  type="button"
+                  className="prev-toggle"
+                  onClick={() => setPreviewOpen(!previewOpen)}
+                >
+                  {previewOpen ? '레일 접기' : '레일 펴기'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="sess-page-meta">
+            {sessionItem ? (
+              <>
+                <span className="sess-page-kind">
+                  {sessionItem.kind === 'interactive'
+                    ? '터미널'
+                    : sessionItem.kind === 'background'
+                      ? '백그라운드'
+                      : '알 수 없음'}
+                </span>
+                <span className={`sess-page-status ${sessionItem.status === 'running' ? '' : 'sess-ended'}`}>
+                  {sessionItem.status === 'running' ? '도는 중' : '끝남'}
+                </span>
+                {sessionItem.startedAt && (
+                  <span className="sess-page-started">
+                    {formatTurnTime(new Date(sessionItem.startedAt).toISOString())}에 시작
+                  </span>
+                )}
+                {sessionItem.pid && <span className="sess-page-pid">pid {sessionItem.pid}</span>}
+                {sessionItem.branch && <span className="sess-page-branch">{sessionItem.branch}</span>}
+              </>
+            ) : (
+              <span>
+                {sessionLoading
+                  ? '세션 목록을 읽는 중이에요.'
+                  : '끝났거나 다른 기기의 세션이에요. 대화는 디스크에 남아 있어서 아래 명령으로 이어 갈 수 있어요.'}
+              </span>
+            )}
+          </div>
+
+          {sessionItem?.cwd && <div className="sess-page-cwd">{sessionItem.cwd}</div>}
+
+          {/* 마지막 회차 줄 (runState) */}
+          {sessionData?.runState && (
+            <div className="sess-page-runstate">
+              <span>마지막 회차</span>
+              {sessionData.runState.model && <span>{sessionData.runState.model}</span>}
+              {sessionData.runState.effort && <span>{sessionData.runState.effort}</span>}
+              {sessionData.runState.contextTokens && (
+                <span>컨텍스트 {sessionData.runState.contextTokens.toLocaleString()}토큰</span>
+              )}
+              {sessionData.runState.quotaBlocked && (
+                <span
+                  className="sess-page-runstate-quota"
+                  title={
+                    sessionData.runState.quotaResetsAt
+                      ? `재설정 예정: ${formatTurnTime(sessionData.runState.quotaResetsAt)}`
+                      : undefined
+                  }
+                >
+                  사용량 한도에 걸린 적 있음
+                </span>
+              )}
+            </div>
+          )}
+        </header>
+
+        {/* 대화 칸 (.sess-page-talk, 9.4) */}
+        <section className="sess-page-talk">
+          <div className="sess-page-talk-head">
+            <h2>대화</h2>
+            {sessionData?.linesTotal != null && (
+              <span className="sess-count">{sessionData.linesTotal}</span>
+            )}
+          </div>
+
+          {sessionLoading && (
+            <div className="sess-page-empty">대화 기록을 읽는 중이에요.</div>
+          )}
+          {sessionError && !sessionLoading && (
+            <div className="sess-page-empty" title={sessionError}>
+              대화 기록을 못 읽었어요. 사이드카가 안 떠 있을 수 있어요.
+            </div>
+          )}
+          {!sessionLoading && !sessionError && sessionData && (
+            <>
+              {sessionData.file === null ? (
+                <div className="sess-page-empty">
+                  이 기계에 그 세션의 기록이 없어요. 다른 기기에서 돌던 세션일 수 있어요.
+                </div>
+              ) : sessionData.turns?.length === 0 ? (
+                // D20 결함 고침: 말이 없을 때 정직한 명시
+                <div className="sess-page-empty">기록은 있는데 주고받은 말이 없어요.</div>
+              ) : (
+                <>
+                  <div className="sess-page-source">
+                    {formatBytes(sessionData.sizeBytes || 0)} 중에서 골랐어요 ·{' '}
+                    {sessionData.linesTotal || 0}줄에서 {sessionData.turns?.length || 0}건
+                    {Number(sessionData.linesDropped || 0) > 0 && (
+                      <strong> · 못 읽은 줄 {sessionData.linesDropped}개</strong>
+                    )}
+                  </div>
+
+                  {sessionData.hasMore && (
+                    <div className="sess-page-hasmore">
+                      앞의 대화가 더 있어요. 지금은 최근 건만 보여요.
+                    </div>
+                  )}
+
+                  {/* 회차 목록 (.sess-page-turns) */}
+                  <div className="sess-page-turns">
+                    {sessionData.turns.map((t: any, idx: number) => {
+                      const atStr = formatTurnTime(t.askedAt || t.at || '');
+                      if (t.who === 'user' || t.user) {
+                        return (
+                          <div key={idx} className="sess-turn sess-turn-user">
+                            <div className="sess-turn-head">
+                              <span className="sess-turn-author">나</span>
+                              <span className="sess-turn-at">{atStr}</span>
+                            </div>
+                            <div className="sess-turn-text">{t.user || t.text}</div>
+                          </div>
+                        );
+                      }
+                      if (t.who === 'assistant' || t.assistant) {
+                        return (
+                          <div key={idx} className="sess-turn sess-turn-assistant">
+                            <div className="sess-turn-head">
+                              <span className="sess-turn-author">클로드</span>
+                              <span className="sess-turn-at">{atStr}</span>
+                              {t.truncated && <span className="sess-turn-cut">2,000자 중 앞부분</span>}
+                            </div>
+                            <div className="sess-turn-text">
+                              <ModelProse content={t.assistant || t.text || ''} />
+                            </div>
+                          </div>
+                        );
+                      }
+                      if (t.who === 'tool' || t.tools) {
+                        const tools = t.tools || (t.tool ? [t.tool] : []);
+                        return tools.map((tl: any, ti: number) => {
+                          const failed = tl.failed || t.failed;
+                          const sec = tl.seconds != null ? tl.seconds : t.seconds;
+                          return (
+                            <div key={`${idx}-${ti}`} className={`toolrow ${failed ? 'is-failed' : ''}`}>
+                              <span
+                                className="tr-ic"
+                                data-state={failed ? 'failed' : sec != null ? 'done' : 'running'}
+                              >
+                                {failed ? '✕' : sec != null ? '✓' : '●'}
+                              </span>
+                              <span className="tr-name">{tl.name}</span>
+                              {tl.arg && <span className="tr-arg" title={tl.arg}>{tl.arg}</span>}
+                              {sec != null && <span className="tr-ms">{formatDuration(sec)}</span>}
+                            </div>
+                          );
+                        });
+                      }
+                      return null;
+                    })}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* 하단 독 (.sess-dock, 9.5) */}
+          <footer className="sess-dock">
+            {/* 서브에이전트 바 (D26 결함 고침) */}
+            {sessionData?.runningAgents && sessionData.runningAgents.length > 0 && (
+              <div className="subagent-bar sess-dock-row">
+                <div className="sess-dock-head">
+                  {isAlive && <span className="sess-run" />}
+                  <span>
+                    {isAlive
+                      ? `서브에이전트 ${sessionData.runningAgents.length}개가 도는 중`
+                      : `결과가 안 온 서브에이전트 ${sessionData.runningAgents.length}개, 지금 도는지는 몰라요`}
+                  </span>
+                </div>
+                <div className="sess-dock-list">
+                  {sessionData.runningAgents.map((ag: any, ai: number) => (
+                    <div key={ai} className="sess-dock-item">
+                      <span className="sess-dock-what">{ag.name || ag.task || '에이전트'}</span>
+                      {ag.startedAt && (
+                        <span className="sess-dock-at">{formatTurnTime(ag.startedAt)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 할 일 바 (9.5) */}
+            {sessionData?.todos && sessionData.todos.length > 0 && (
+              <div className="todo-bar sess-dock-row">
+                <div className="sess-dock-head">
+                  <span>할 일 ({sessionData.todos.length})</span>
+                </div>
+                <div className="sess-dock-list">
+                  {sessionData.todos.map((td: any, ti: number) => (
+                    <div key={ti} className="sess-dock-item">
+                      <span className="todo-status" data-status={td.status}>
+                        {td.status === 'completed' ? '완료' : '진행 중'}
+                      </span>
+                      <span className="sess-dock-what">{td.content}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </footer>
+        </section>
+      </div>
+
+      {/* 오른쪽 레일 (.prevcol, 9.7) */}
+      {isRailVisible && (
+        <aside className="prevcol">
+          {/* 탭 헤더 */}
+          <div className="prev-tabs">
+            <button
+              type="button"
+              className={`prev-tab ${tab === 'notes' ? 'on' : ''}`}
+              onClick={() => setTab('notes')}
+            >
+              관련 노트 <span className="prev-tab-n">{relatedNotes.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`prev-tab ${tab === 'links' ? 'on' : ''}`}
+              onClick={() => setTab('links')}
+            >
+              링크 <span className="prev-tab-n">{urlsList.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`prev-tab ${tab === 'cli' ? 'on' : ''}`}
+              onClick={() => setTab('cli')}
+            >
+              CLI
+            </button>
+          </div>
+
+          {/* 관련 노트 패널 */}
+          <div className="prev-pane" style={{ display: tab === 'notes' ? 'block' : 'none' }}>
+            {relatedNotes.length === 0 ? (
+              <div className="prev-empty">
+                이 세션이 만들거나 고친 노트가 없어요. 노트에 세션 도장이 찍히기 시작한 것이 2026-09-12 이라, 그보다 이른 세션은 만들었어도 안 적혀 있어요.
+              </div>
+            ) : (
+              <div className="relnotes-list">
+                {relatedNotes.map((n) => (
+                  <div
+                    key={n.id}
+                    className="relnote"
+                    onClick={() => controller?.navigate?.(`/doc/${n.id}`)}
+                  >
+                    <div className="relnote-title">{n.title || '(제목 없는 노트)'}</div>
+                    <div className="relnote-why">{n.why}</div>
+                    <div className="relnote-date">{n.date || String(n.created || '').slice(0, 10)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 링크 패널 */}
+          <div className="prev-pane" style={{ display: tab === 'links' ? 'block' : 'none' }}>
+            {urlsList.length === 0 ? (
+              <div className="prev-empty">그 세션에서 오간 링크가 없어요.</div>
+            ) : (
+              <div className="sess-links-list">
+                {urlsList.map((u, ui) => (
+                  <div
+                    key={ui}
+                    className="sess-page-link"
+                    title={u.url}
+                    onClick={() => {
+                      safeInvoke('open_external', { url: u.url }).catch(() => {
+                        window.open(u.url, '_blank');
+                      });
+                    }}
+                  >
+                    <strong>{u.host}</strong>
+                    <span>{u.path}</span>
+                    {u.count > 1 && (
+                      <span className="sess-page-link-count">({u.count})</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CLI 패널 */}
+          <div className="prev-pane is-cli" style={{ display: tab === 'cli' ? 'block' : 'none' }}>
+            <div className="cli-placeholder">
+              터미널 뷰어 (`claude --resume {sessionId}`)
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* 9.8 전사 굳히기 모달 (.ndf) */}
+      {pinModalOpen && (
+        <div className="modal-backdrop">
+          <div className="ndf modal-content">
+            <header className="modal-header">
+              <h3>노트로 굳히기</h3>
+              <button type="button" onClick={() => setPinModalOpen(false)}>✕</button>
+            </header>
+
+            <div className="ndf-body">
+              {/* 회차 수 선택 */}
+              <div className="pin-ranges">
+                <button
+                  type="button"
+                  className={`btn-range ${pinCount === 100 ? 'active' : ''}`}
+                  onClick={() => {
+                    setPinCount(100);
+                    loadTranscript(100);
+                  }}
+                >
+                  최근 100건
+                </button>
+                <button
+                  type="button"
+                  className={`btn-range ${pinCount === 200 ? 'active' : ''}`}
+                  onClick={() => {
+                    setPinCount(200);
+                    loadTranscript(200);
+                  }}
+                >
+                  최근 200건
+                </button>
+                <button
+                  type="button"
+                  className={`btn-range ${pinCount === 500 ? 'active' : ''}`}
+                  onClick={() => {
+                    setPinCount(500);
+                    loadTranscript(500);
+                  }}
+                >
+                  최근 500건
+                </button>
+              </div>
+
+              <div className="pin-hint">
+                실제로 담을 회차는 {sessionData?.turns?.length || 0}건이에요.
+              </div>
+
+              {/* 제목 입력 */}
+              <div className="form-group">
+                <label>노트 제목</label>
+                <input
+                  type="text"
+                  value={pinTitle}
+                  onChange={(e) => setPinTitle(e.target.value)}
+                />
+              </div>
+
+              {/* 아젠다 선택 */}
+              <div className="form-group">
+                <label>아젠다</label>
+                <select
+                  value={pinAgenda}
+                  onChange={(e) => setPinAgenda(e.target.value)}
+                >
+                  {(state?.workspace?.agendas || []).map((ag: any) => (
+                    <option key={ag.id} value={ag.slug || ag.id}>
+                      {ag.title || ag.slug}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {pinError && <div className="pin-warn">{pinError}</div>}
+            </div>
+
+            <footer className="ndf-foot modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setPinModalOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={pinLoading || !pinTitle.trim()}
+                onClick={() => void handleSavePin()}
+              >
+                {pinLoading ? '저장 중…' : '기록 노트로 만들기'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -967,3 +1653,4 @@ export function SessionRail(_props?: any): null {
 export function useSessionBadge(_docId?: string): null {
   return null;
 }
+

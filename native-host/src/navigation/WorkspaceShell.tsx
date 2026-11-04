@@ -180,7 +180,13 @@ function RouteContent({
     case "guide":
       return <Guide />;
     case "session":
-      return <SessionRoute />;
+      return (
+        <SessionRoute
+          sessionId={route.id}
+          controller={controller}
+          state={state}
+        />
+      );
     default:
       return null;
   }
