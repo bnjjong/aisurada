@@ -52,11 +52,12 @@ java -jar dist/ais-engine.jar create-agenda 'title=demo' --aisurada.vault="$VAUL
 java -jar dist/ais-engine.jar create-doc agenda=demo type=free title=제목 body=본문 --aisurada.vault="$VAULT_DIR"
 java -jar dist/ais-engine.jar list-docs --aisurada.vault="$VAULT_DIR"
 
-# 4. 엔진을 띄워 두고 클라이언트로 부른다 (터미널 둘, 둘 다 같은 환경 변수)
-export AISURADA_VAULT="$VAULT_DIR" AISURADA_SIDECAR_SOCKET="$HOME/aisurada-dev.sock"
-java -jar dist/ais-engine.jar serve            # 터미널 1
-java -jar dist/ais-cli.jar list-docs limit=5  # 터미널 2
+# 4. 엔진을 띄워 두고 클라이언트로 부른다 (터미널 둘). 변수는 export하지 말고 명령 앞에 붙인다
+AISURADA_VAULT="$VAULT_DIR" AISURADA_SIDECAR_SOCKET="$HOME/aisurada-dev.sock" java -jar dist/ais-engine.jar serve            # 터미널 1
+AISURADA_VAULT="$VAULT_DIR" AISURADA_SIDECAR_SOCKET="$HOME/aisurada-dev.sock" java -jar dist/ais-cli.jar list-docs limit=5  # 터미널 2 (VAULT_DIR을 같은 값으로 다시 준다)
 ```
+
+4번의 `AISURADA_*` 값을 `export`하면 같은 터미널에서 띄우는 앱도 그 값을 물려받는다. 소켓 경로가 vault 하나에 고정돼서 앱이 여는 다른 vault와 어긋나고, 그 소켓에 엔진이 없으면 §7의 `AIS-400` 오류가 난다.
 
 `create-doc`은 `agenda=`, `type=`, `title=`, `body=`가 필요하다(`type=`을 빼면 `AIS-400`). 응답에는 `id`, `path`, 쓰기 전 토큰 `precondition`(`f1:…`)이 들어 있다.
 
@@ -235,6 +236,17 @@ pnpm preview                        # 호스트 없이 번들 CSP로 화면만 �
 
 `pnpm tauri dev`는 README에 적힌 대로 쓰는 길이고 이 문서를 쓰면서 새로 돌려 보지는 않았다. 개발 서버에 페이지가 붙어 있으면 `curl -X POST localhost:1420/__deeplink --data-raw 'aisurada://doc/<id>'`로 열린 main 창을 이동할 수 있다(개발 판 전용, 번들에서는 빠진다).
 
+**개발 실행은 엔진 jar를 자동으로 넘기지 않는다.** 번들 판은 자원 폴더의 `ais-sidecar.jar`를 `ais-cli`에 넘기지만, `tauri dev`와 `target/…/bundle` 아래 번들은 낡은 사본을 쓰지 않으려고 넘기지 않는다(`sidecar.rs`의 `execute`). 앱이 vault를 열 때 엔진이 없으면 `ais-cli`가 launchd로 엔진을 띄우려 하고, 이때 jar를 못 찾으면 `AIS-400 AISURADA_SIDECAR_JAR 가 없고 …`로 선다. 앱으로 워크스페이스를 만들거나 열어 보려면 앱을 띄우는 터미널에서 먼저 이렇게 한다.
+
+```bash
+unset AISURADA_VAULT AISURADA_SIDECAR_SOCKET              # §3 예시의 값이 남아 있으면 지운다
+export AISURADA_SIDECAR_JAR="$PWD/dist/ais-sidecar.jar"   # 반드시 절대 경로다(plist에 그대로 실린다)
+```
+
+대신 한 번 `java -jar dist/ais-cli.jar install --cli dist/ais-cli.jar --sidecar dist/ais-sidecar.jar`로 `~/Library/Application Support/aisurada/bin/`에 깔아도 된다. 깐 사본은 빌드할 때마다 다시 깔아야 한다.
+
+**이 길은 진짜 launchd를 쓴다.** vault마다 `~/Library/LaunchAgents/co.kcd.aisurada.sidecar.<키>.plist`가 생기고 `launchctl`에 올라간다. 이 저장소의 시험은 모두 가짜 `launchctl`이라 이 길을 자동으로 잰 적이 없다. 끝나면 `java -jar dist/ais-cli.jar doctor`로 레이블과 plist를 보고, `launchctl bootout gui/$(id -u)/<레이블>` 뒤에 그 plist를 지운다. launchd를 건드리지 않고 앱을 보려면 [`beta-hand-check.md`](beta-hand-check.md)의 격리 실행법을 쓴다. 이때는 엔진 하나가 vault 하나만 맡으므로 그 vault만 열 수 있다.
+
 ### 번들 만들기
 
 ```bash
@@ -385,6 +397,7 @@ node fixtures/runner-test.mjs
 | 증상 | 원인과 처방 |
 |---|---|
 | `소켓 경로가 102 바이트를 넘는다` | `AISURADA_SIDECAR_SOCKET`을 `$HOME` 바로 아래 같은 짧은 경로로 준다 |
+| 앱에서 `워크스페이스 생성 실패 … AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다` | 개발 실행의 앱이 엔진을 띄우려는데 jar를 못 찾는다(§7). 앱을 띄우는 터미널에서 `AISURADA_SIDECAR_JAR`를 절대 경로로 주고, §3 예시의 `AISURADA_VAULT`와 `AISURADA_SIDECAR_SOCKET`은 `unset`한 뒤 앱을 다시 띄운다 |
 | `ais-cli.jar를 못 찾았어요 … 찾아본 자리: …/dist/ais-cli.jar` | `./build.sh`를 안 돌렸거나, 다른 곳에서 `build.sh`가 `dist/`를 지우는 중이다(§8) |
 | 문서를 `open`했더니 앱이 떴다 | 번들이 `.md` 기본 편집기로 등록돼 있다. 에디터나 브라우저로 연다 |
 | 앱을 켰더니 진짜 launchd에 plist가 생길 것 같다 | §6처럼 엔진을 먼저 띄우고 격리 HOME으로 앱을 띄운다 |
