@@ -42,15 +42,15 @@ public final class Part4ReviewTest {
         System.out.println("Part4ReviewTest: all checks passed!");
     }
 
-    /** H1. 4부를 켠 jar는 스위치를 안 줘도 4부 명령 7개가 돈다. 속성이나 환경 변수로만 끈다. */
+    /** H1. 4부를 켠 jar는 스위치를 안 줘도 4부 명령 7개가 돈다. 속성이나 환경 변수는 빌드 스위치를 바꾸지 못한다. */
     private static void engineSwitch(ChapterTestSupport t) throws Exception {
         Path v = t.vault();
         System.clearProperty("aisurada.enable.part4");
         check(EngineExecutor.isPart4Enabled(), "H1: part4 jar is on without any switch");
         eq(error(v, 400, "get-ask").errorCode(), 400, "H1: get-ask runs instead of WL-409");
         System.setProperty("aisurada.enable.part4", "false");
-        check(!EngineExecutor.isPart4Enabled(), "H1: property false turns it off");
-        error(v, 409, "get-ask");
+        check(EngineExecutor.isPart4Enabled(), "N1: property false cannot disable the enabled build");
+        error(v, 400, "get-ask");
         System.clearProperty("aisurada.enable.part4");
     }
 
@@ -92,10 +92,17 @@ public final class Part4ReviewTest {
         eq(turn(got, 0).get("elapsedMs"), 0L, "L4: 7600.5 is not an integer");
         check(!turn(got, 0).containsKey("sessionLines"), "L4: 21.0 is no integer line count");
         eq(turn(got, 1).get("elapsedMs"), 0L, "L4: 1e3 is not an integer");
-        check(!turn(got, 1).containsKey("sessionLines"), "L4: quoted line count is absent");
+        eq(turn(got, 1).get("sessionLines"), 21L, "L4: quoted line count reads as Int");
         eq(turn(got, 2).get("elapsedMs"), 5L, "L4: quoted integer elapsedMs still reads");
         eq(turn(got, 2).get("sessionLines"), 21L, "L4: integer sessionLines reads");
         eq(turn(got, 2).get("images"), List.of("attach/a\u007F.png"), "L6: U+007F is accepted in attachment names");
+
+        // Second review L4: Int overflow, non-positive values and floating point never become line counts.
+        for (String count : List.of("3000000000", "\"3000000000\"", "0", "-1", "21.0")) {
+            String row = "{\"id\":\"range\",\"question\":\"q\",\"answer\":\"a\",\"sessionLines\":" + count + "}";
+            Files.writeString(askFile, "{\"v\":1,\"noteId\":\"" + NOTE + "\",\"sessionId\":\"s\",\"turns\":[" + row + "]}");
+            check(!turn(ok(v, "get-ask", NOTE), 0).containsKey("sessionLines"), "second review: invalid line count " + count);
+        }
 
         // L5. 깨진 UTF-8 바이트는 U+FFFD 로 읽는다
         ByteArrayOutputStream broken = new ByteArrayOutputStream();
@@ -182,6 +189,9 @@ public final class Part4ReviewTest {
         lines.add(toolResult("c4", "5"));
         lines.add(toolUse("c5", "TaskCreate", "{\"description\":\"c\"}"));
         lines.add(toolResult("c5", "\"Task #99999999999 created successfully: x\""));
+        // Second review N3: DOTALL would incorrectly accept a Unicode line separator inside the task result.
+        lines.add(toolUse("unicode-task", "TaskCreate", "{}"));
+        lines.add(toolResult("unicode-task", "\"Task #2 created successfully: a\\u2028b\""));
         // L13. 링크 호스트
         lines.add(user("2026-09-20T01:00:09Z", "http://LOCALHOST/x http://user@localhost/x http://localhost?x=1 http://localhost:1420/x http://127.0.0.1/abc"));
         // L17. U+3000 한 글자뿐인 사람 말은 버린다
@@ -205,7 +215,7 @@ public final class Part4ReviewTest {
         eq(todos.get(0).get("title"), "x", "L11: first line splits at CR");
         eq(todos.get(0).get("status"), "in_progress", "L14: status after revival");
         @SuppressWarnings("unchecked") Map<String, Object> source = (Map<String, Object>) res.get("source");
-        eq(source.get("skipped"), 2, "L14, L15: number content and 32-bit overflow each skip once");
+        eq(source.get("skipped"), 3, "L14, L15, N3: invalid task results each skip once");
 
         @SuppressWarnings("unchecked") List<Map<String, Object>> urls = (List<Map<String, Object>>) res.get("urls");
         List<Object> found = urls.stream().map(u -> u.get("url")).toList();
@@ -236,6 +246,15 @@ public final class Part4ReviewTest {
         Files.writeString(projects.resolve(emptyId + ".jsonl"), "{\"type\":\"user\",\"gitBranch\":\"\",\"cwd\":\"\"}\n");
         Map<String, Object> empty = titleOf(v, emptyId);
         check(empty.get("branch") == null && empty.get("cwd") == null, "L16: empty branch and cwd are null");
+        String spaceId = "f1a50000-0000-4000-8000-0000000000b4";
+        Files.writeString(projects.resolve(spaceId + ".jsonl"), "{\"type\":\"user\",\"gitBranch\":\" \",\"cwd\":\" \"}\n");
+        Map<String, Object> spaces = titleOf(v, spaceId);
+        eq(spaces.get("branch"), " ", "N2: whitespace is a non-empty branch");
+        eq(spaces.get("cwd"), " ", "N2: whitespace is a non-empty cwd");
+        String literalId = "f1a50000-0000-4000-8000-0000000000b5";
+        Files.writeString(projects.resolve(literalId + ".jsonl"), "{\"type\":\"user\",\"gitBranch\":true,\"cwd\":5}\n");
+        Map<String, Object> literals = titleOf(v, literalId);
+        check(literals.get("branch") == null && literals.get("cwd") == null, "N2: branch and cwd require JSON strings");
     }
 
     @SuppressWarnings("unchecked")

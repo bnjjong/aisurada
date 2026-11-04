@@ -4,6 +4,8 @@ import { createContext } from 'react';
 export interface AskContextValue {
   /** The absolute path of the note's folder. Unknown for an old single-file note. */
   baseDir?: string;
+  cardSize?: { width: number; height: number | null };
+  saveCardSize?: (width: number, height: number) => void;
   /** The note id (the sub note id for a sub note). It is the store key. */
   noteId?: string;
 }

@@ -95,6 +95,6 @@
 
 ## 4. 커밋 및 형상 관리
 - `src/withlog/ask/AskCommands.java`: 2장 명령 및 파서 구현.
-- `src/withlog/engine/EngineExecutor.java`: 4부 명령 7개의 라우팅과 4부 스위치(`isPart4Enabled`)를 더했다. 스위치는 jar가 싣는 `withlog/engine-build.properties`의 `part4`가 기본이고, 시스템 속성 `withlog.enable.part4`와 환경 변수 `WITHLOG_ENABLE_PART4`가 있으면 그 값이 이긴다. 켠 판 `wl-sidecar.jar`는 늘 켜짐이고, 뺀 판 `wl-sidecar-noclaude.jar`는 4부 클래스를 안 싣는다(리뷰 2026-11-04 H1, 기록 1번 정정).
+- `src/withlog/engine/EngineExecutor.java`: 4부 명령 7개의 라우팅과 4부 스위치(`isPart4Enabled`)를 더했다. 스위치는 jar가 싣는 `aisurada/engine-build.properties`의 `part4`만 따른다. 런타임 속성과 환경 변수는 빌드를 바꾸지 못한다(2차 리뷰 N1). 켠 판 `wl-sidecar.jar`는 늘 켜짐이고, 뺀 판 `wl-sidecar-noclaude.jar`는 4부 클래스를 안 싣는다(리뷰 2026-11-04 H1, 기록 1번 정정).
 - `test/withlog/AskCommandsTest.java`: 2장 통합 검증 테스트.
 - `test.sh`: 4부 문답 검증 단계 추가.

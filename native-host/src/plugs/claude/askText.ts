@@ -81,11 +81,11 @@ export function rowQuote(cells: string[]): string {
 }
 
 /**
- * 3.6: the folded quote of a follow-up. Tabs become `|`, every other run of blanks becomes one space,
+ * 3.6: the folded quote of a follow-up. Tabs become ` | `, every other run of blanks becomes one space,
  * the ends are trimmed, and more than 200 code points keep 200 and an ellipsis.
  */
 export function foldQuote(quote: string): string {
-  const folded = quote.replace(/\t/g, '|').replace(/\s+/g, ' ').trim();
+  const folded = quote.replace(/\t/g, ' | ').replace(/\s+/g, ' ').trim();
   const points = [...folded];
   return points.length > 200 ? `${points.slice(0, 200).join('')}…` : folded;
 }
@@ -156,10 +156,10 @@ export function targetPlace(target: AskTarget): string {
 export function noteHeading(markdown: string | undefined, format: string | undefined): string | null {
   if (!markdown || (format && format !== 'markdown')) return null;
   for (const line of markdown.split('\n')) {
-    const match = /^# +(.*)$/.exec(line.replace(/\r$/, ''));
+    const match = /^#[ \t]+(.*)$/.exec(line.replace(/\r$/, ''));
     if (!match) continue;
     const text = match[1].replace(/<!--[\s\S]*?-->/g, '').trim();
-    if (text) return text;
+    return text || null;
   }
   return null;
 }

@@ -19,3 +19,6 @@ export class SelfWrites {
   external(paths: string[]) { return paths.filter(path => !ignoredWatchPath.test(path) && !this.has(path)); }
   clear() { this.entries.clear(); }
 }
+
+/** Claude writes bypass VaultData; record them synchronously before broadcasting to other windows. */
+export const claudeSelfWrites = new SelfWrites(() => Date.now());

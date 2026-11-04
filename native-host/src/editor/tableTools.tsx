@@ -25,6 +25,11 @@ export function TableTools(props: EditorProps) {
   const [editor] = useLexicalComposerContext();
   const [cell, setCell] = useState<Cell | null>(null), [open, setOpen] = useState(false), copyMode = useRef(false);
   const [dots, setDots] = useState<{ key: string; x: number; y: number; ids: string[]; asks: string[] }[]>([]), [rowCard, setRowCard] = useState<string | null>(null);
+  const rowPinned = useRef(false);
+  const rowCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelRowClose = () => { if (rowCloseTimer.current) clearTimeout(rowCloseTimer.current); rowCloseTimer.current = null; };
+  const closeRowSoon = () => { cancelRowClose(); if (!rowPinned.current) rowCloseTimer.current = setTimeout(() => { setRowCard(null); rowCloseTimer.current = null; }, 180); };
+  useEffect(() => () => cancelRowClose(), []);
   const fixedWidths = useRef(new Map<string, number>());
   const scaled = useRef(new Set<string>());
   const stopResize = useRef<(() => void) | null>(null);
@@ -130,6 +135,8 @@ export function TableTools(props: EditorProps) {
         if (active && editor.getRootElement()) { collect(); scale(); }
       });
     });
+    // The document can already be in the DOM before this listener is installed.
+    rafId = requestAnimationFrame(() => { if (active && editor.getRootElement()) collect(); });
     const over = (event: MouseEvent) => {
       const container = outer();
       if (!root || !container) return;
@@ -173,17 +180,17 @@ export function TableTools(props: EditorProps) {
       event.preventDefault(); copyMode.current = true; document.execCommand('copy'); return true;
     }, COMMAND_PRIORITY_HIGH);
     return () => { active = false; cancelAnimationFrame(rafId); stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
-  }, [editor, open]);
+  }, [editor, open, props.askDocId]);
   const operations = [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제'], ['before-col', '왼쪽에 열 추가'], ['after-col', '오른쪽에 열 추가'], ['remove-col', '열 삭제'], ['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']];
   return <>
     {cell && <><button className="lex-cell-menu-btn" title="표 편집" aria-label="표 편집" style={{ left: cell.x, top: cell.y }} onMouseDown={event => event.preventDefault()} onClick={() => setOpen(!open)}>⋯</button>
       <div className="lex-col-grip" style={{ left: cell.right - 3, top: cell.y - 2, height: 28 }} onPointerDown={event => resize(event, false)} />
       <div className="lex-table-grip" style={{ left: cell.tableRight - 3, top: cell.tableTop, height: cell.tableBottom - cell.tableTop }} onPointerDown={event => resize(event, true)} onDoubleClick={() => operation('fit')} /></>}
     {open && cell && <div className="lex-table-menu" style={{ left: cell.x, top: cell.y + 26 }}>{operations.map(([id, title]) => <button key={id} onClick={() => operation(id)}>{title}</button>)}</div>}
-    {dots.map(dot => <div className={`lex-row-dot lex-rownote-dot${dot.asks.length ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}`} key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => setRowCard(dot.key)} onMouseLeave={() => setRowCard(null)}>
+    {dots.map(dot => <div className={`lex-row-dot lex-rownote-dot${dot.asks.length ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}`} key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => { cancelRowClose(); if (!rowPinned.current) setRowCard(dot.key); }} onMouseLeave={closeRowSoon}>
       <button aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'} onClick={() => { if (dot.ids.length) props.features?.openComment?.(dot.ids[0]); }}>●</button>
       {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}
-        {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => setRowCard(null)} pinned={false} />)}</div>}
+        {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => { cancelRowClose(); rowPinned.current = false; setRowCard(null); }} onPin={() => { cancelRowClose(); rowPinned.current = true; }} pinned={false} />)}</div>}
     </div>)}
     {cell && props.features?.comment && <button className="lex-row-comment" style={{ left: cell.x - 35, top: cell.y }} title="이 줄에 코멘트 달기" aria-label="이 줄에 코멘트 달기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
       const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();

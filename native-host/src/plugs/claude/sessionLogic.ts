@@ -2,7 +2,7 @@
 // `read-session` answer is read (7.7), the session header (9.3), whether the composer is open (10.1), the rail chat's
 // question and turn (8.6 to 8.10) and the note a transcript is pinned into (9.8).
 // Adheres to Chapters 7 to 10 of aisurada Part 4 Claude integration specifications.
-import { cutText, TEXT_LIMIT } from './askText.ts';
+import { cutText, noteHeading, TEXT_LIMIT } from './askText.ts';
 import type { EngineTurn } from './transcriptLines.ts';
 import type { ClaudeSession } from './sessionTypes.ts';
 
@@ -225,11 +225,11 @@ export function railTurnId(now: number, uuid: string): string {
 
 /**
  * 8.5: the session id a chat goes to claude with. A new chat's id is a UUID and goes as it is, in lower case. An old
- * HTTP-time chat id (`rc<time>-<hex>`) becomes a UUID from the first 16 bytes of its SHA-256, with the version nibble set to 4
+ * chat id (including HTTP-time `rc<time>-<hex>`) becomes a UUID from the first 16 bytes of its SHA-256, with the version nibble set to 4
  * and the top two bits of byte 9 to 10, in lower case 8-4-4-4-12.
  */
 export async function railChatSessionId(chatId: string): Promise<string> {
-  if (!/^rc[0-9a-z]+-[0-9a-f]{8}$/.test(chatId)) return chatId.toLowerCase();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatId)) return chatId.toLowerCase();
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(chatId))).slice(0, 16);
   digest[6] = (digest[6] & 0x0f) | 0x40;
   digest[8] = (digest[8] & 0x3f) | 0x80;
@@ -277,14 +277,7 @@ export function railTurnFrom(input: { id: string; askedAt: string; question: str
 
 /** 8.4 the note's name for the persona: the first `#` heading without HTML comments, or none (a json note has none). */
 export function railHeading(markdown: string | undefined, format?: string): string | null {
-  if (!markdown || (format && format !== 'markdown')) return null;
-  for (const line of markdown.split('\n')) {
-    const match = /^# +(.*)$/.exec(line.replace(/\r$/, ''));
-    if (!match) continue;
-    const text = match[1].replace(/<!--[\s\S]*?-->/g, '').trim();
-    if (text) return text;
-  }
-  return null;
+  return noteHeading(markdown, format);
 }
 
 /** 8.7: the rail chat's persona. The second line's end depends on whether the bundle has anything in it. */
@@ -358,7 +351,7 @@ export interface PinInput {
   title: string;
   sessionId: string;
   turns: EngineTurn[];
-  source: { bytes: number; lines: number };
+  source: { bytes: number; lines: number; messages: number };
   /** How many things the shape check found (`scan_text_shapes`). */
   shapeFindings: number;
   /** The shape check's names with counts, for the callout. */
@@ -382,20 +375,24 @@ function pinTurn(turn: EngineTurn, fence: string): string[] {
 export function pinBody(input: PinInput): string {
   const fence = pinFence(input.turns);
   const callout = input.shapeFindings > 0
-    ? [`> [!danger] 표에 없는데 비밀처럼 생긴 것 ${input.shapeFindings} 건`, ...(input.shapeLines ?? []).map((line) => `> ${line}`), '> 이 검사는 도구 결과 본문은 보지 못해요.']
+    ? [`> [!danger] 표에 없는데 비밀처럼 생긴 것 ${input.shapeFindings} 건`, `> ${(input.shapeLines ?? []).join(', ')}`, '> 이 검사는 도구 결과 본문은 보지 못해요.']
     : ['> [!success] 모양 검사에 걸린 것이 0 건입니다', '> 도구 결과 본문은 애초에 안 담아서, 이 굳히기는 값 표를 안 써요.', '> 이 검사는 채택한 모양 밖과 도구 결과 본문은 보지 못해요.'];
   const lines = [
     `# ${input.title}`,
+    '',
     'Claude Code 세션 대화를 굳힌 노트입니다. 도구 결과 본문은 안 담아서 자격증명이 안 실립니다.',
+    '',
     '| 무엇 | 값 |',
     '| --- | --- |',
     `| 세션 id | \`${input.sessionId}\` |`,
     `| 담은 회차 | ${input.turns.length} |`,
-    `| 원본 | ${formatBytes(input.source.bytes)}, ${input.source.lines}줄에서 ${input.turns.length}건 |`,
+    `| 원본 | ${formatBytes(input.source.bytes)}, ${input.source.lines.toLocaleString('en-US')}줄에서 ${input.source.messages.toLocaleString('en-US')}건 |`,
     `| 모양으로 걸린 것 | ${input.shapeFindings} 건 |`,
+    '',
     ...callout,
     '',
     '## 대화',
+    '',
   ];
   for (const turn of input.turns) lines.push(...pinTurn(turn, fence));
   return lines.join('\n');
@@ -403,11 +400,11 @@ export function pinBody(input: PinInput): string {
 
 /** 9.8: the lines a shape check reads: one per turn, speech as its text, a tool as its name and argument. */
 export function pinScanText(turns: EngineTurn[]): string {
-  return turns.map((turn) => (turn.who === 'tool' ? `${turn.tool?.name ?? ''} ${turn.tool?.arg ?? ''}`.trim() : turn.text ?? '')).join('\n');
+  return turns.map((turn) => (turn.who === 'tool' ? `${turn.tool?.name ?? ''}\n${turn.tool?.arg ?? ''}` : turn.text ?? '')).join('\n');
 }
 
-/** 9.8: the default title is `세션대화 <HH:MM>` with the machine's clock. */
+/** 9.8: the default title is `세션 대화 <HH:MM>` with the machine's clock. */
 export function pinDefaultTitle(now: Date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0');
-  return `세션대화 ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return `세션 대화 ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }

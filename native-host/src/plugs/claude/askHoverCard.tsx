@@ -1,10 +1,11 @@
 // Hover card appearing above/below ask mark in note editor.
 // Adheres to Chapter 4 (4.5, 4.7) of aisurada Part 4 Claude integration specifications.
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { AskTurnView, FollowUpRow, PendingLine } from './askParts.tsx';
 import { turnsForUnderline } from './askText.ts';
 import type { AskThread } from './askText.ts';
+import { AskContext } from './askContext.ts';
 import { useAskState } from './state.ts';
 
 export interface AskHoverCardProps {
@@ -16,13 +17,18 @@ export interface AskHoverCardProps {
   onFocusInput?: () => void;
   onClose?: () => void;
   pinned?: boolean;
+  onPin?: () => void;
   boundaryRef?: RefObject<HTMLElement | null>;
 }
 
 /** 4.5: the delay before a card that is not pinned closes once the pointer has left. */
 export const CARD_CLOSE_DELAY_MS = 180;
 
-export function AskHoverCard({ docId, turnId, onFollowUp, onClose, pinned = false }: AskHoverCardProps) {
+export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned = false }: AskHoverCardProps) {
+  const context = useContext(AskContext);
+  const [size, setSize] = useState(() => context.cardSize ?? { width: 360, height: null });
+  const stopResize = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopResize.current?.(), []);
   const thread = useAskState((state) => state.threads[docId] ?? null) as AskThread | null;
   const pendingByMark = useAskState((state) => state.pending[docId]);
   const [isPinned, setIsPinned] = useState(pinned);
@@ -55,10 +61,32 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, pinned = fals
       timer.current = null;
     }
   };
-  const scheduleClose = () => {
-    if (isPinned) return;
-    cancelClose();
-    timer.current = setTimeout(() => onClose?.(), CARD_CLOSE_DELAY_MS);
+
+
+  const pin = () => { cancelClose(); setIsPinned(true); onPin?.(); };
+  const resize = (event: React.PointerEvent) => {
+    event.preventDefault();
+    pin();
+    stopResize.current?.();
+    const rect = card.current!.getBoundingClientRect();
+    const x = event.clientX, y = event.clientY;
+    let width = rect.width, height = rect.height;
+    const move = (next: PointerEvent) => {
+      width = Math.max(280, Math.min(720, rect.width + next.clientX - x));
+      height = Math.max(160, Math.min(1600, rect.height + next.clientY - y));
+      setSize({ width, height });
+    };
+    const stop = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', stop);
+      document.removeEventListener('pointercancel', stop);
+      stopResize.current = null;
+      context.saveCardSize?.(width, height);
+    };
+    stopResize.current = stop;
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', stop, { once: true });
+    document.addEventListener('pointercancel', stop, { once: true });
   };
 
   return (
@@ -66,11 +94,11 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, pinned = fals
       ref={card}
       className={`ask-hovercard${isPinned ? ' is-pinned' : ''}`}
       data-ask-card={underline}
+      style={{ position: 'relative', width: size.width, height: size.height ?? undefined, maxHeight: 1600, boxSizing: 'border-box', overflow: 'auto' }}
       onMouseEnter={cancelClose}
-      onMouseLeave={scheduleClose}
       // Any press inside the card pins it; a focus that lands in its box does the same.
-      onPointerDown={() => setIsPinned(true)}
-      onFocus={() => setIsPinned(true)}
+      onPointerDown={pin}
+      onFocus={pin}
       onKeyDown={(event) => {
         // 4.5: Esc inside the card closes it and stops the native propagation, so a preview modal around it stays.
         if (event.key === 'Escape') {
@@ -95,6 +123,8 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, pinned = fals
       {turns.length > 0 && isPinned && !record && onFollowUp && (
         <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} />
       )}
+      <div className="ask-card-resizer" role="separator" aria-label="문답 카드 크기 조절" onPointerDown={resize}
+        style={{ position: 'sticky', display: 'block', marginLeft: 'auto', bottom: 0, width: 16, height: 16, cursor: 'nwse-resize', borderRight: '2px solid var(--muted)', borderBottom: '2px solid var(--muted)' }} />
     </div>
   );
 }

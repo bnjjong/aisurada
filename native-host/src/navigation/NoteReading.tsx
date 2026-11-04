@@ -134,7 +134,9 @@ export function NoteReading({
       )}
       {controller ? (
         <div className="note-body">
-          <NoteAskFrame baseDir={noteDir} noteId={note.id}>
+          <NoteAskFrame baseDir={noteDir} noteId={note.id}
+            cardSize={{ width: Number(controller.getSnapshot().prefs.askCardWidth) || 360, height: typeof controller.getSnapshot().prefs.askCardHeight === "number" ? Number(controller.getSnapshot().prefs.askCardHeight) : null }}
+            saveCardSize={(width, height) => controller.preference({ askCardWidth: width, askCardHeight: height })}>
             <NoteEditor
               key={`${parent || ""}:${note.id}`}
               note={live}
@@ -152,7 +154,9 @@ export function NoteReading({
           </NoteAskFrame>
           {askWire?.panel}
           {composeState && (
-            <NoteAskFrame baseDir={noteDir} noteId={note.id}>
+            <NoteAskFrame baseDir={noteDir} noteId={note.id}
+            cardSize={{ width: Number(controller.getSnapshot().prefs.askCardWidth) || 360, height: typeof controller.getSnapshot().prefs.askCardHeight === "number" ? Number(controller.getSnapshot().prefs.askCardHeight) : null }}
+            saveCardSize={(width, height) => controller.preference({ askCardWidth: width, askCardHeight: height })}>
               <AskComposePopover
                 state={composeState}
                 onSubmit={(question, images) => {

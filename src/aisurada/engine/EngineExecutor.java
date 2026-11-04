@@ -27,17 +27,9 @@ public final class EngineExecutor {
 
     /**
      * 이 엔진이 4부 명령 7개를 도는지 판정합니다.
-     * 시스템 속성 aisurada.enable.part4, 환경 변수 AISURADA_ENABLE_PART4 순으로 값이 있으면 그 값이 이기고,
-     * 둘 다 없으면 jar에 실린 빌드 스위치를 따릅니다(4부를 켠 wl-sidecar.jar는 늘 켜짐).
+     * jar에 실린 빌드 스위치만 따릅니다. 런타임 속성이나 환경 변수는 빌드에 없는 클래스를 켜지 못합니다.
      */
     public static boolean isPart4Enabled() {
-        String sys = System.getProperty("aisurada.enable.part4");
-        if (sys != null) return "true".equalsIgnoreCase(sys.trim());
-        String env = System.getenv("AISURADA_ENABLE_PART4");
-        if (env != null && !env.isBlank()) {
-            String value = env.trim();
-            return "true".equalsIgnoreCase(value) || "1".equals(value);
-        }
         return builtWithPart4();
     }
 

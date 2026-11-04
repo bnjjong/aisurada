@@ -28,7 +28,7 @@ export function AskComposePopover({ state, onSubmit, onCancel }: AskComposePopov
   const context = useContext(AskContext);
   const runtime = useAskState((store) => store.runtime);
   const [question, setQuestion] = useState('');
-  const pictures = useAskImages({ hasNoteFolder: Boolean(context.baseDir), http: runtime === 'http' });
+  const pictures = useAskImages({ hasNoteFolder: Boolean(context.baseDir) && !/\.(?:md|markdown|html|json)$/i.test(context.baseDir ?? ''), http: runtime === 'http' });
   const box = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
 
@@ -55,7 +55,7 @@ export function AskComposePopover({ state, onSubmit, onCancel }: AskComposePopov
     <div
       ref={box}
       className={MOUSE}
-      style={{ left: Math.max(10, state.left), top: Math.max(10, state.top) }}
+      style={{ position: 'fixed', left: Math.max(10, state.left), top: Math.max(10, state.top), zIndex: 60 }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();

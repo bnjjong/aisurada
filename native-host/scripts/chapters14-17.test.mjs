@@ -307,6 +307,7 @@ test('목록 12번(14.8): D2Coding 보통과 굵은 글꼴을 번들하고 --fon
 test('목록 24번(17.4): 문답 카드는 표 줄 카드가 그 줄의 문답 id마다 그리고, 편집기 맨 위에 props 없이 늘 그리지 않는다',()=>{
   const editor=readFileSync(new URL('../src/editor/Editor.tsx',import.meta.url),'utf8'),table=readFileSync(new URL('../src/editor/tableTools.tsx',import.meta.url),'utf8');
   assert.ok(!/<AskHoverCard/.test(editor),'a bare AskHoverCard is drawn in every editor');
-  assert.match(table,/<AskHoverCard key=\{id\} docId=\{props\.askDocId \|\| ''\} turnId=\{id\} onFollowUp=\{props\.onAskFollowUp\} onClose=\{[^}]+\} pinned=\{false\} \/>/);
+  assert.match(table,/<AskHoverCard key=\{id\} docId=\{props\.askDocId \|\| ''\} turnId=\{id\} onFollowUp=\{props\.onAskFollowUp\}/);
+  assert.match(table,/onPin=\{\(\) => \{ cancelRowClose\(\); rowPinned\.current = true;/);
   assert.match(table,/props\.askDocId \? \[\.\.\.new Set/);
 });

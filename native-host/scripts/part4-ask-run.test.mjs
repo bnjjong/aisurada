@@ -68,31 +68,39 @@ test('3.7 bundle text: header, parts and the 물음 header', () => {
   assert.equal(lines, 2);
   assert.equal(text, [
     '## 이 노트를 쓴 세션의 대화',
+    '',
     '이 노트를 만든 Claude Code 세션 `11111111-2222-4333-8444-555555555555` 의 대화에서 노트를 쓰던 무렵만 잘라 실었다. 도구 호출은 이름만 남기고 도구 결과는 뺐다.',
     '아래 대화만으로 답이 모자라면 짐작하지 말고 모자라다고 말하라.',
+    '',
     '<session-transcript part="노트를 만들기까지">',
     '사용자: 캐시 정리 규칙을 노트로 남겨 줘',
     '(도구: Read)',
     '</session-transcript>',
+    '',
     '## 물음',
+    '',
     '',
   ].join('\n'));
   assert.equal(authorBundleText('s', null).text, '');
 });
 
-test('8.7 rail bundle: header lines, a single newline around the transcript, and the cut note', () => {
+test('8.7 rail bundle: header lines, blank lines around the transcript, and the cut note', () => {
   const text = railBundleText('f1a50000-0000-4000-8000-000000000001', [turn(0, 'user', '노트 옆에 레일을 붙여줘.'), tool(1, 'Read'), tool(2, 'Bash'), tool(3, 'Agent'), tool(4, 'Agent'), turn(5, 'assistant', '레일을 붙였어요.')]);
   assert.equal(text, [
     '## 이 세션의 최근 대화',
+    '',
     '사용자가 노트 옆에서 연 Claude Code 세션 `f1a50000-0000-4000-8000-000000000001` 의 대화다. 최신 쪽부터 24,000자까지 실었다. 도구 호출은 이름만 남겼다.',
     '이것은 읽은 순간의 스냅샷이라 가장 최근 활동이 빠졌을 수 있다.',
     '아래 대화만으로 답이 모자라면 짐작하지 말고 모자라다고 말하라.',
+    '',
     '<session-transcript>',
     '사용자: 노트 옆에 레일을 붙여줘.',
     '(도구: Read, Bash, Agent ×2)',
     '클로드: 레일을 붙였어요.',
     '</session-transcript>',
+    '',
     '## 물음',
+    '',
     '',
   ].join('\n'));
   assert.equal(railBundleText('s', []), '');
@@ -155,7 +163,7 @@ test('3.8 first question: nine keys, the text, the persona, the author bundle, a
   assert.equal(args.timeoutSeconds, 7200, 'the limit of the press, not 3600');
   assert.match(args.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.ok(args.prompt.startsWith('## 이 노트를 쓴 세션의 대화\n'));
-  assert.ok(args.prompt.includes('## 물음\n이 노트가 속한 아젠다의 소스 저장소: example/cache-service\n이 대목을 고른 노트의 id: ndq-00000001.'));
+  assert.ok(args.prompt.includes('## 물음\n\n이 노트가 속한 아젠다의 소스 저장소: example/cache-service\n이 대목을 고른 노트의 id: ndq-00000001.'));
   assert.ok(args.prompt.endsWith('[대목] 「노트를 다시 열 때 비운다」\n\n이 대목에 대한 질문이다. 짧게 답해라.\n\n언제 비우나?'));
   assert.equal(args.persona.split('\n').length, 3);
   assert.deepEqual(host.calls.engine[0], ['read-session', 'f1a50000-0000-4000-8000-000000000001', 'limit=200', 'before=0', 'author=ndq-00000001']);
@@ -275,4 +283,31 @@ test('2.10: an old thread moves turn by turn and leaves the key; a failure keeps
   map.set('legacy', JSON.stringify({ ndq: { sessionId: 'S', turns: [{ id: 'a', question: 'q', answer: 'x' }] } }));
   assert.equal(await migrateLegacyThread(failing, storage, 'legacy', '/v', { id: 'ndq' }), null);
   assert.ok(map.has('legacy'), 'the original stays');
+});
+
+test('second review: creation falls back to latest, and nameless tools contribute no line', () => {
+  const latest = [turn(0, 'user', '노트를 만들었다'), ...Array.from({ length: 20 }, (_, i) => turn(i + 1, 'assistant', 'x'.repeat(2000)))];
+  const parts = authorParts({ note: 'n', mentions: [0, 20], latest });
+  assert.deepEqual(parts.map((part) => part.label), ['노트를 만들기까지', '마지막으로 고치기까지']);
+  assert.deepEqual(parts[0].lines, ['사용자: 노트를 만들었다']);
+  assert.deepEqual(turnsToLines([tool(0, null), tool(1, 'Read'), tool(2, null)]).map((line) => line.text), ['(도구: Read)']);
+  assert.deepEqual(turnsToLines([tool(0, null)]), []);
+});
+
+test('second review: stored table quote keeps its final newline', async () => {
+  const host = fakeHost();
+  await startAsk(host, baseRequest({ target: { id: 'ndquote' }, quote: 'a\tb\n', authorSession: undefined }));
+  assert.ok(host.calls.engine.find((argv) => argv[0] === 'append-ask-turn').includes('quote=a\tb\n'));
+});
+
+test('second review: legacy migration preserves session id, overlong text and optional fields', async () => {
+  const old = { sessionId: '', turns: [{ id: 'a', question: 'q'.repeat(20001), answer: 'a', quote: 'x'.repeat(2001), sessionLines: 21, images: ['attach/a.png'] }] };
+  const map = new Map([['legacy', JSON.stringify({ ndlegacy: old })]]);
+  const storage = { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v), removeItem: (k) => map.delete(k) };
+  const host = fakeHost({ saveFails: true });
+  await migrateLegacyThread(host, storage, 'legacy', '/v', { id: 'ndlegacy' });
+  const argv = host.calls.engine[0];
+  assert.ok(argv.includes('session-id=') && argv.includes(`question=${old.turns[0].question}`));
+  assert.ok(argv.includes(`quote=${old.turns[0].quote}`) && argv.includes('session-lines=21') && argv.includes('images=attach/a.png'));
+  assert.deepEqual(JSON.parse(map.get('legacy')).ndlegacy, old);
 });

@@ -49,7 +49,7 @@ export function imageRefusal(rules: ImageRules, native: boolean): string | null 
 /** 3.2: why one picture is not taken, or null. Type and size are seen when pasted, not when sent. */
 export function pictureRefusal(file: { name: string; type: string; size: number }, taken: number): string | null {
   if (taken >= MAX_IMAGES) return '한 물음에 그림은 8장까지예요.';
-  if (!(file.type in IMAGE_MIME_EXTENSIONS)) return `${file.name || '이 파일'} 은 못 붙여요.`;
+  if (!(file.type in IMAGE_MIME_EXTENSIONS)) return `${file.type || '이 파일'} 은 못 붙여요.`;
   if (file.size > MAX_IMAGE_BYTES) return `그림 한 장은 5.0MB까지예요(이 그림은 ${(file.size / 1_000_000).toFixed(1)}MB).`;
   return null;
 }
@@ -64,9 +64,15 @@ function readDataUrl(file: File): Promise<string> {
 }
 
 /** The pictures of one box, the reason one was refused, and the paste handler. Empties when the box closes. */
-export function useAskImages(rules: ImageRules) {
-  const [images, setImages] = useState<PickedImage[]>([]);
-  const [refusal, setRefusal] = useState<string | null>(null);
+export function useAskImages(rules: ImageRules, held?: {
+  images: PickedImage[];
+  setImages: React.Dispatch<React.SetStateAction<PickedImage[]>>;
+  refusal: string | null;
+  setRefusal: React.Dispatch<React.SetStateAction<string | null>>;
+}) {
+  const [localImages, setLocalImages] = useState<PickedImage[]>([]);
+  const [localRefusal, setLocalRefusal] = useState<string | null>(null);
+  const { images, setImages, refusal, setRefusal } = held ?? { images: localImages, setImages: setLocalImages, refusal: localRefusal, setRefusal: setLocalRefusal };
 
   const paste = useCallback(
     (event: React.ClipboardEvent) => {

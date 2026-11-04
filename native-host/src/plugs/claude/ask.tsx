@@ -200,8 +200,8 @@ export function useNoteAsk(props?: NoteAskInput): NoteAskOutput {
 // UI Helper Frame & Editor Plugin
 // --------------------------------------------------------------------------
 
-export function NoteAskFrame({ children, baseDir, noteId }: { baseDir?: string; noteId?: string; children?: ReactNode }): ReactNode {
-  return createElement(AskContext.Provider, { value: { baseDir, noteId } }, children);
+export function NoteAskFrame({ children, ...value }: AskContextValue & { children?: ReactNode }): ReactNode {
+  return createElement(AskContext.Provider, { value }, children);
 }
 
 interface CardAt {
@@ -282,6 +282,12 @@ export function EditorAskPlugins(props?: {
       const next = (event as MouseEvent).relatedTarget as Element | null;
       // Moving from a mark to the card does not schedule a close; the card is not part of the root.
       if (next?.closest('.ask-card-anchor')) return;
+      const id = mark.dataset.askId;
+      const pieces = [...root.querySelectorAll<HTMLElement>('[data-ask-id]')].filter((el) => el.dataset.askId === id);
+      const openCard = root.querySelector('.ask-card-anchor');
+      const area = unionRect([...pieces, ...(openCard ? [openCard] : [])]);
+      const pointer = event as MouseEvent;
+      if (area && pointer.clientX >= area.left && pointer.clientX <= area.right && pointer.clientY >= area.top && pointer.clientY <= area.bottom) return;
       closeSoon();
     };
     const click = (event: MouseEvent) => {
@@ -292,10 +298,21 @@ export function EditorAskPlugins(props?: {
       const at = place(mark.dataset.askId!);
       if (at) setCard({ id: mark.dataset.askId!, ...at, pinned: true });
     };
+    const move = (event: MouseEvent) => {
+      const shown = root.querySelector<HTMLElement>('.ask-card-anchor');
+      if (!shown || shown.querySelector('.is-pinned')) return;
+      const id = shown.querySelector<HTMLElement>('[data-ask-card]')?.dataset.askCard;
+      const pieces = [...root.querySelectorAll<HTMLElement>('[data-ask-id]')].filter((el) => el.dataset.askId === id && !el.closest('td,th'));
+      const area = unionRect([...pieces, shown]);
+      if (area && event.clientX >= area.left && event.clientX <= area.right && event.clientY >= area.top && event.clientY <= area.bottom) cancel();
+      else if (!timer.current) closeSoon();
+    };
+    document.addEventListener('mousemove', move);
     root.addEventListener('mouseover', over);
     root.addEventListener('mouseout', out);
     root.addEventListener('click', click as EventListener);
     return () => {
+      document.removeEventListener('mousemove', move);
       root.removeEventListener('mouseover', over);
       root.removeEventListener('mouseout', out);
       root.removeEventListener('click', click as EventListener);
@@ -312,23 +329,24 @@ export function EditorAskPlugins(props?: {
     const paint = () => {
       frame = 0;
       const { thread: current, pending: records, props: latest } = live.current;
-      // Clear every ring first: Enter inside a mark rewrites the earlier piece's DOM and would leave a stale ring.
-      root.querySelectorAll('.lex-ask-busy').forEach((el) => el.classList.remove('lex-ask-busy', 'is-queued'));
+      const busy = new Map<Element, boolean>();
       for (const [markId, record] of Object.entries(records ?? {})) {
         const pieces = [...root.querySelectorAll<HTMLElement>('.lex-ask[data-ask-id]')].filter((el) => el.dataset.askId === markId && !el.closest('td,th'));
         const lastPiece = pieces[pieces.length - 1];
-        if (lastPiece) {
-          lastPiece.classList.add('lex-ask-busy');
-          if (record.queued) lastPiece.classList.add('is-queued');
-        }
+        if (lastPiece) busy.set(lastPiece, Boolean(record.queued));
       }
+      root.querySelectorAll('.lex-ask').forEach((el) => {
+        if (el.classList.contains('lex-ask-busy') !== busy.has(el)) el.classList.toggle('lex-ask-busy', busy.has(el));
+        const queued = busy.get(el) === true;
+        if (el.classList.contains('is-queued') !== queued) el.classList.toggle('is-queued', queued);
+      });
       root.querySelectorAll<HTMLButtonElement>('.wl-html-frame-ask').forEach((button) => {
         const id = htmlAskId(button.dataset.rel ?? '');
         const text = htmlButtonText({ pending: records?.[id], turns: turnsForUnderline(current?.turns ?? [], id).length });
         button.hidden = !latest?.onAsk; // only an editor that takes questions shows the button
         if (button.textContent !== text) button.textContent = text; // written only when it changes
-        button.classList.toggle('is-busy', Boolean(records?.[id]));
-        button.classList.toggle('is-queued', Boolean(records?.[id]?.queued));
+        if (button.classList.contains('is-busy') !== Boolean(records?.[id])) button.classList.toggle('is-busy', Boolean(records?.[id]));
+        if (button.classList.contains('is-queued') !== Boolean(records?.[id]?.queued)) button.classList.toggle('is-queued', Boolean(records?.[id]?.queued));
       });
     };
     const schedule = () => {
@@ -379,7 +397,7 @@ export function EditorAskPlugins(props?: {
       <span ref={anchor} hidden />
       {card && docId && (
         <div className="ask-card-anchor" style={{ position: 'fixed', left: card.left, top: card.top, zIndex: 50 }} onMouseEnter={cancel} onMouseLeave={() => !card.pinned && closeSoon()}>
-          <AskHoverCard key={card.id} docId={docId} turnId={card.id} pinned={card.pinned} onFollowUp={props?.onFollowUp} onClose={() => setCard(null)} />
+          <AskHoverCard key={card.id} docId={docId} turnId={card.id} pinned={card.pinned} onPin={() => { cancel(); setCard((current) => current ? { ...current, pinned: true } : null); }} onFollowUp={props?.onFollowUp} onClose={() => setCard(null)} />
         </div>
       )}
     </>

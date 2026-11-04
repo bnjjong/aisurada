@@ -21,8 +21,8 @@ public final class VaultGitTest {
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && args[0].equals("process-probe")) { processProbe(Path.of(args[1])); return; }
         temp=Files.createTempDirectory("aisurada-git-test-");
-        // 4부를 켠 jar가 기본이라, 4부 뺀 판의 쓰기 준비(409)를 재려면 스위치를 끈다
-        System.setProperty("aisurada.enable.part4","false");
+        // test.sh가 실제 4부 없는 jar를 classpath에 둔다.
+        System.setProperty("aisurada.enable.part4","true");
         try {
             commits(); blocking(); retries(); pendingValues(); ids(); pipeline(); factsPipeline(); templatesPipeline(); process();
             System.out.println("vault git: "+checks+" checks passed");

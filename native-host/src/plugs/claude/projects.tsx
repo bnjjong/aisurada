@@ -59,10 +59,15 @@ function subscribe(listener: () => void) {
 /**
  * 6.1 한 번 읽는 차례를 수행합니다.
  */
-export async function refreshSessions(vaultPath?: string) {
-  if (storeState.status === "loading") {
-    return;
-  }
+let refreshInFlight: Promise<void> | null = null;
+export function refreshSessions(vaultPath?: string): Promise<void> {
+  if (refreshInFlight) return refreshInFlight;
+  const task = refreshSessionList(vaultPath);
+  refreshInFlight = task;
+  void task.finally(() => { if (refreshInFlight === task) refreshInFlight = null; });
+  return task;
+}
+async function refreshSessionList(vaultPath?: string) {
 
   if (!isTauri()) {
     storeState = {

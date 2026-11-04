@@ -11,13 +11,6 @@ const CAUSE_CHARS: usize = 400;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SeedMessage {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct AskClaudeArgs {
     pub vault: String,
     pub session_id: String,
@@ -27,7 +20,7 @@ pub struct AskClaudeArgs {
     pub resume: bool,
     pub timeout_seconds: u64,
     pub keep_alive: Option<bool>,
-    pub seed: Option<Vec<SeedMessage>>,
+    pub seed: Option<Vec<serde_json::Value>>,
     pub system: Option<String>,
     pub route: Option<String>,
     pub cwd: Option<String>,
@@ -239,15 +232,15 @@ fn flip_target(stderr: &str) -> Option<bool> {
 
 /// 새 세션을 여는 부름의 물음 글. 앞 문답이 실릴 것이 있으면 물음 앞에 싣고, 없으면 물음 글 그대로다(5.3, 8.8).
 /// 앞뒤 공백을 걷어 빈 content 와 user, assistant 가 아닌 role 은 건너뛴다.
-fn seed_prompt(seed: &[SeedMessage], prompt: &str) -> String {
+fn seed_prompt(seed: &[serde_json::Value], prompt: &str) -> String {
     let mut body = String::new();
     for message in seed {
-        let head = match message.role.as_str() {
-            "user" => "### 사용자",
-            "assistant" => "### Claude",
+        let head = match message.get("role").and_then(|value| value.as_str()) {
+            Some("user") => "### 사용자",
+            Some("assistant") => "### Claude",
             _ => continue,
         };
-        let content = message.content.trim();
+        let content = message.get("content").and_then(|value| value.as_str()).unwrap_or("").trim();
         if content.is_empty() {
             continue;
         }
@@ -456,7 +449,7 @@ pub async fn ask_claude(
     resume: bool,
     timeout_seconds: u64,
     keep_alive: Option<bool>,
-    seed: Option<Vec<SeedMessage>>,
+    seed: Option<Vec<serde_json::Value>>,
     system: Option<String>,
     route: Option<String>,
     cwd: Option<String>,
@@ -485,12 +478,13 @@ pub async fn ask_claude(
 
     // async 일꾼 밖의 blocking 일꾼에서 실행하고 await 로 기다린다. recv() 로 막으면 상한(1~2시간) 동안
     // async 일꾼 하나를 붙잡는다(5.1 4번). 일꾼이 끊겨도 실패는 ok: false 답 객체로 준다(5.8, elapsed_ms 0)
+    let (_, missing_cwd) = determine_work_dir(&args.vault, args.cwd.as_deref());
     match tauri::async_runtime::spawn_blocking(move || execute_ask(args)).await {
         Ok(response) => Ok(response),
         Err(e) => Ok(failure(
             format!("claude 를 기다리던 일꾼이 끊겼다: {}", e),
             0,
-            None,
+            missing_cwd,
         )),
     }
 }
@@ -541,16 +535,21 @@ mod tests {
     #[test]
     fn seed_trims_skips_unknown_roles_and_empty_content() {
         let seed = vec![
-            SeedMessage { role: "user".into(), content: "  레일 폭을 왜?  \n".into() },
-            SeedMessage { role: "system".into(), content: "건너뜀".into() },
-            SeedMessage { role: "assistant".into(), content: " \n ".into() },
-            SeedMessage { role: "assistant".into(), content: "목업의 폭이에요.".into() },
+            serde_json::json!({"role": 4, "content": "skip"}),
+            serde_json::json!({"role": "user", "content": false}),
+            serde_json::json!(null),
+            serde_json::json!(7),
+            serde_json::json!({}),
+            serde_json::json!({"role": "user", "content": "  레일 폭을 왜?  \n"}),
+            serde_json::json!({"role": "system", "content": "건너뜀"}),
+            serde_json::json!({"role": "assistant", "content": " \n "}),
+            serde_json::json!({"role": "assistant", "content": "목업의 폭이에요."}),
         ];
         assert_eq!(
             seed_prompt(&seed, "그럼 960px?"),
             "## 앞 대화\n\n이 대화는 다른 길에서 시작해 여기로 옮겨 왔다. 아래가 앞서 오간 문답이다. 이 문답을 이어서 답하라.\n\n### 사용자\n\n레일 폭을 왜?\n\n### Claude\n\n목업의 폭이에요.\n\n## 이번 물음\n\n그럼 960px?"
         );
-        let nothing = vec![SeedMessage { role: "user".into(), content: "  ".into() }];
+        let nothing = vec![serde_json::json!({"role": "user", "content": "  "})];
         assert_eq!(seed_prompt(&nothing, "물음 그대로"), "물음 그대로");
         assert_eq!(seed_prompt(&[], "물음 그대로"), "물음 그대로");
     }

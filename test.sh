@@ -9,11 +9,12 @@ mkdir -p build/test-classes
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.CommentCommandsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.ReindexPathsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.AgendaFactsTest
-"$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.git.VaultGitTest
+"$JAVA" -cp dist/wl-sidecar-noclaude.jar:build/test-classes aisurada.git.VaultGitTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.git.VaultHistoryTest
-for chapter in 24 25 26 27 28 29 30 31 32 33; do
+for chapter in 24 25 26 27 28 29 30 31 33; do
     "$JAVA" -cp dist/wl-engine.jar:build/test-classes "aisurada.Chapter${chapter}Test"
 done
+"$JAVA" -Daisurada.enable.part4=true -cp dist/wl-sidecar-noclaude.jar:build/test-classes aisurada.Chapter32Test
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.AskCommandsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.SessionCommandsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes aisurada.ChatCommandsTest

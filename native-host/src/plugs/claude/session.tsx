@@ -2,10 +2,10 @@
 // Adheres to Chapters 8, 9, 10 and 17 of aisurada Part 4 Claude integration specifications.
 // The decisions live in sessionLogic.ts and transcriptLines.ts; this file draws them and calls the host.
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { agendaOrder } from '../../ui/model.ts';
+import { agendaOrder, HUE_COLORS } from '../../ui/model.ts';
 import { AskContext } from './askContext.ts';
 import { askClaudeBridge, tauriAskHost } from './askHost.ts';
 import { AskImageStrip, useAskImages } from './askPickers.tsx';
@@ -158,10 +158,10 @@ export function TranscriptBody({ read }: { read: { view: ReadSessionView | null;
   return (
     <>
       <div className="sess-page-source">
-        {formatBytes(view.source.bytes)} 중에서 골랐어요 · {view.source.lines}줄에서 {view.turns.length}건
+        {formatBytes(view.source.bytes)} 중에서 골랐어요 · {view.source.lines.toLocaleString('en-US')}줄에서 {view.source.messages.toLocaleString('en-US')}건
         {view.source.skipped > 0 && <strong> · 못 읽은 줄 {view.source.skipped}</strong>}
       </div>
-      {view.hasMore && <div className="sess-page-hasmore">앞의 대화가 더 있어요. 지금은 최근 건만 보여요.</div>}
+      {view.hasMore && <div className="sess-page-hasmore">앞의 대화가 더 있어요. 지금은 최근 {view.turns.length.toLocaleString('en-US')}건만 보여요.</div>}
       <div className="sess-page-turns">
         {view.turns.map((turn) => (
           <TranscriptTurn key={turn.index} turn={turn} />
@@ -505,6 +505,7 @@ interface Running {
   chatId: string;
   startedAt: number;
   images: number;
+  previews: string[];
   question: string;
   timeoutSeconds: number;
 }
@@ -518,9 +519,54 @@ export function mergeChats(file: RailChat[], memory: RailChat[], hadBeforeRead: 
   });
   for (const mem of memory) {
     if (byId.has(mem.chatId)) continue;
-    if (!hadBeforeRead.has(mem.chatId)) merged.push(mem); // created while the read ran
+    if (!hadBeforeRead.has(mem.chatId) || mem.turns.some((turn) => turn.unsaved)) merged.push(mem); // created while the read ran
   }
   return merged;
+}
+
+export interface RailMemory {
+  chats: RailChat[];
+  unreadable: string[];
+  chatsError: string | null;
+  lastSent: string | null;
+  newChat: boolean;
+  running: Running | null;
+  notice: string | null;
+  text: string;
+  images: PickedImage[];
+  refusal: string | null;
+  picked: { model?: string; effort?: string };
+}
+const railMemory = new Map<string, RailMemory>();
+const railMemoryListeners = new Set<() => void>();
+export function railMemoryKey(vault: string, noteId: string, subId: string | undefined, sessionId: string): string {
+  return JSON.stringify([vault, noteId, subId ?? '', sessionId]);
+}
+export function getRailMemory(key: string): RailMemory {
+  let value = railMemory.get(key);
+  if (!value) {
+    value = { chats: [], unreadable: [], chatsError: null, lastSent: null, newChat: false, running: null, notice: null, text: '', images: [], refusal: null, picked: {} };
+    railMemory.set(key, value);
+  }
+  return value;
+}
+export function patchRailMemory(key: string, patch: Partial<RailMemory>): void {
+  railMemory.set(key, { ...getRailMemory(key), ...patch });
+  railMemoryListeners.forEach((listener) => listener());
+}
+function subscribeRailMemory(listener: () => void): () => void {
+  railMemoryListeners.add(listener);
+  return () => { railMemoryListeners.delete(listener); };
+}
+function useRailMemory(key: string): RailMemory {
+  return useSyncExternalStore(subscribeRailMemory, () => getRailMemory(key), () => getRailMemory(key));
+}
+function railSetter<K extends keyof RailMemory>(key: string, field: K): React.Dispatch<React.SetStateAction<RailMemory[K]>> {
+  return (change) => {
+    const current = getRailMemory(key)[field];
+    const value = typeof change === 'function' ? (change as (current: RailMemory[K]) => RailMemory[K])(current) : change;
+    patchRailMemory(key, { [field]: value });
+  };
 }
 
 export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailProps): React.JSX.Element {
@@ -541,33 +587,36 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
   const noteId = chat?.target.noteId ?? '';
   const subId = chat?.target.subId;
 
-  const [chats, setChats] = useState<RailChat[]>([]);
-  const chatsRef = useRef<RailChat[]>([]);
-  chatsRef.current = chats;
-  const [unreadable, setUnreadable] = useState<string[]>([]);
-  const [chatsError, setChatsError] = useState<string | null>(null);
-  const [lastSent, setLastSent] = useState<string | null>(null);
-  const [newChat, setNewChat] = useState(false);
-  const [running, setRunning] = useState<Running | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [text, setText] = useState('');
-  const pictures = useAskImages({ hasNoteFolder: Boolean(chat?.noteDir), http: false });
-  const [picked, setPicked] = useState<{ model?: string; effort?: string }>({});
+  const memoryKey = railMemoryKey(vault, noteId, subId, sessionId);
+  const memory = useRailMemory(memoryKey);
+  const { chats, unreadable, chatsError, lastSent, newChat, running, notice, text, picked } = memory;
+  const setChats = railSetter(memoryKey, 'chats');
+  const setUnreadable = railSetter(memoryKey, 'unreadable');
+  const setChatsError = railSetter(memoryKey, 'chatsError');
+  const setLastSent = railSetter(memoryKey, 'lastSent');
+  const setNewChat = railSetter(memoryKey, 'newChat');
+  const setRunning = railSetter(memoryKey, 'running');
+  const setNotice = railSetter(memoryKey, 'notice');
+  const setText = railSetter(memoryKey, 'text');
+  const setPicked = railSetter(memoryKey, 'picked');
+  const pictures = useAskImages({ hasNoteFolder: Boolean(chat?.noteDir) && !/\.(?:md|markdown|html|json)$/i.test(chat?.noteDir ?? ''), http: false }, {
+    images: memory.images, setImages: railSetter(memoryKey, 'images'), refusal: memory.refusal, setRefusal: railSetter(memoryKey, 'refusal'),
+  });
   const body = useRef<HTMLDivElement>(null);
 
   const reloadChats = useCallback(async () => {
     if (!noteId) return;
-    const before = new Set(chatsRef.current.map((item) => item.chatId));
+    const before = new Set(getRailMemory(memoryKey).chats.map((item) => item.chatId));
     try {
       const reply = await callEngine<{ chats: RailChat[]; unreadable: string[] }>(['list-chats', noteId, ...(subId ? [subId] : [])]);
-      setChats(mergeChats(reply.chats ?? [], chatsRef.current, before));
+      setChats(mergeChats(reply.chats ?? [], getRailMemory(memoryKey).chats, before));
       setUnreadable(reply.unreadable ?? []);
       setChatsError(null);
     } catch (error: any) {
       // 8.12: a failed read keeps the chats that are already drawn and writes the reason.
       setChatsError(`대화 기록을 못 읽었어요: ${error?.message ?? error}`);
     }
-  }, [noteId, subId]);
+  }, [memoryKey, noteId, subId]);
   useEffect(() => {
     void reloadChats();
   }, [reloadChats]);
@@ -612,7 +661,8 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
   const startResize = (event: React.MouseEvent) => {
     dragging.current = true;
     const startX = event.clientX;
-    const startW = widthRef.current;
+    const startW = (event.currentTarget as HTMLElement).closest('.nsrail')!.getBoundingClientRect().width;
+    widthRef.current = startW;
     const move = (e: MouseEvent) => {
       if (!dragging.current) return;
       const next = Math.max(392, Math.min(960, startW + (startX - e.clientX)));
@@ -632,7 +682,8 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
   const send = async () => {
     const question = text.trim();
     // 8.6 step 1
-    if (!question || !vault || running || (first && read.loading)) return;
+    if (!question || !vault || getRailMemory(memoryKey).running || (first && read.loading)) return;
+    const previews = pictures.images.map((image) => image.preview);
     const files = pictures.images.map((image) => image.file);
     setText('');
     pictures.clear();
@@ -641,7 +692,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
     const timeoutSeconds = chat?.timeoutSeconds?.() ?? 3600; // 6
     const askedAt = new Date().toISOString(); // the time of 8.6 step 9
     const turnId = railTurnId(Date.now(), randomUuid());
-    setRunning({ chatId, startedAt: Date.now(), images: files.length, question, timeoutSeconds }); // 7
+    setRunning({ chatId, startedAt: Date.now(), images: files.length, previews, question, timeoutSeconds }); // 7
     setLastSent(chatId);
     setNewChat(false);
     setNotice(null);
@@ -681,6 +732,9 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
         if (result.ok && result.missing_cwd) setNotice(`이 세션이 처음 돌던 폴더(${result.missing_cwd})가 없어서 vault 에서 답했어요.`);
       }
       const turn = railTurnFrom({ id: turnId, askedAt, question, model, effort, images: written.written, answer: result });
+      await appendTurns(vault, { noteId, subId, chatId, sessionId }, active, [turn], setChats);
+    } catch (error) {
+      const turn = railTurnFrom({ id: turnId, askedAt, question, model, effort, images: [], answer: { ok: false, error: error instanceof Error ? error.message : String(error), elapsed_ms: 0 } });
       await appendTurns(vault, { noteId, subId, chatId, sessionId }, active, [turn], setChats);
     } finally {
       setRunning(null); // 14
@@ -735,14 +789,14 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
             )}
             <div className="rchat-turns">
               {turns.map((turn) => (
-                <RailTurnPair key={turn.id} turn={turn} />
+                <RailTurnPair key={turn.id} turn={turn} baseDir={baseDir} />
               ))}
               {running && (
                 <div className="rchat-turn-pair rchat-pending">
                   <div className="sess-turn sess-turn-user">
                     <div className="sess-turn-head"><span className="sess-turn-author">나</span></div>
                     <div className="sess-turn-body">{running.question}</div>
-                    {running.images > 0 && <div className="sess-turn-images">그림 {running.images}장 붙임</div>}
+                    {running.images > 0 && <div className="sess-turn-images">{running.previews.map((src, index) => <img key={index} src={src} alt="붙인 그림" style={{ maxWidth: 120, maxHeight: 90 }} />)}</div>}
                   </div>
                   <div className="sess-turn sess-turn-assistant">
                     <div className="sess-turn-body"><PendingLine record={{ at: running.startedAt, sessionId: '', timeoutSeconds: running.timeoutSeconds }} /></div>
@@ -792,7 +846,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
   );
 }
 
-function RailTurnPair({ turn }: { turn: RailTurn }): React.JSX.Element {
+function RailTurnPair({ turn, baseDir }: { turn: RailTurn; baseDir?: string }): React.JSX.Element {
   return (
     <div className="rchat-turn-pair">
       <div className="sess-turn sess-turn-user">
@@ -801,7 +855,7 @@ function RailTurnPair({ turn }: { turn: RailTurn }): React.JSX.Element {
           <span className="sess-turn-time">{formatTurnTime(turn.askedAt)}</span>
         </div>
         <div className="sess-turn-body">{turn.question}</div>
-        {turn.images && turn.images.length > 0 && <div className="sess-turn-images">그림 {turn.images.length}장 붙임</div>}
+        {turn.images && turn.images.length > 0 && <div className="sess-turn-images">{turn.images.map((relative) => <img key={relative} src={baseDir ? convertFileSrc(`${baseDir}/${relative}`) : undefined} alt="붙인 그림" style={{ maxWidth: 120, maxHeight: 90 }} />)}</div>}
       </div>
       <div className={`sess-turn sess-turn-assistant${turn.error ? ' rchat-failed' : ''}`}>
         <div className="sess-turn-head">
@@ -889,8 +943,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
 
   // 9.2: the conversation is read again only when the answer signal of this session changes.
   const signal = useReplySignal(sessionId);
-  const [limit, setLimit] = useState(100);
-  const read = useReadSession(sessionId, limit, signal);
+  const read = useReadSession(sessionId, 100, signal);
   const view = read.view;
 
   // 9.7: the chosen tab is not saved and goes back to "관련 노트" when the session changes, in this very render.
@@ -1075,8 +1128,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
         </section>
       </div>
 
-      {railVisible && (
-        <aside className="prevcol">
+      <aside className="prevcol" hidden={!railVisible} style={{ display: railVisible ? undefined : 'none' }}>
           <div className="prev-tabs">
             <button type="button" className={`prev-tab${tab === 'notes' ? ' on' : ''}`} onClick={() => chooseTab('notes')}>관련 노트 <span className="prev-tab-n">{related.length}</span></button>
             <button type="button" className={`prev-tab${tab === 'links' ? ' on' : ''}`} onClick={() => chooseTab('links')}>링크 <span className="prev-tab-n">{view?.urls.length ?? 0}</span></button>
@@ -1090,7 +1142,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
               <div className="relnotes-list">
                 {related.map(({ note, made }) => (
                   <div key={note.id} className="relnote" onClick={() => controller?.navigate?.(`/doc/${note.id}`)}>
-                    <div className="relnote-title">{note.title || '(제목 없는 노트)'}</div>
+                    <div className="relnote-title"><span className="relnote-agenda-dot" aria-hidden="true" style={{ display: 'inline-block', width: 7, height: 7, marginRight: 6, borderRadius: '50%', background: HUE_COLORS[state?.workspace?.agendas.find((agenda: any) => agenda.id === note.agendaId)?.hue as keyof typeof HUE_COLORS] ?? 'var(--muted)' }} />{note.title || '(제목 없는 노트)'}</div>
                     <div className="relnote-why">{made ? '이 세션이 만들었어요.' : '이 세션이 고쳤어요.'}</div>
                     <div className="relnote-date">{String(note.created ?? '').slice(0, 10)}</div>
                   </div>
@@ -1122,9 +1174,8 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
             )}
           </div>
 
-          <SessionCliPane key={sessionId} sessionId={sessionId} visible={tab === 'cli'} controller={controller} state={state} />
+          <SessionCliPane key={sessionId} sessionId={sessionId} visible={railVisible && tab === 'cli'} controller={controller} state={state} />
         </aside>
-      )}
 
       {pinOpen && view && (
         <PinSessionModal
@@ -1132,7 +1183,6 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
           controller={controller}
           state={state}
           onClose={() => setPinOpen(false)}
-          onLimit={(next) => setLimit(next)}
         />
       )}
     </div>
@@ -1237,16 +1287,15 @@ export function PinSessionModal({
   controller,
   state,
   onClose,
-  onLimit,
 }: {
   sessionId: string;
   controller: any;
   state: any;
   onClose: () => void;
-  onLimit: (limit: number) => void;
 }): React.JSX.Element {
   const agendas = useMemo(() => agendaOrder(state?.workspace?.agendas ?? [], state?.workspace?.notes ?? []), [state?.workspace?.agendas, state?.workspace?.notes]);
   const [count, setCount] = useState<100 | 200 | 500>(100);
+  const [retry, setRetry] = useState(0);
   const [title, setTitle] = useState(() => pinDefaultTitle());
   const [agenda, setAgenda] = useState(() => agendas[0]?.slug ?? ''); // decided once, when the window opens
   const [view, setView] = useState<ReadSessionView | null>(null);
@@ -1276,7 +1325,7 @@ export function PinSessionModal({
     return () => {
       generation.current += 1;
     };
-  }, [sessionId, count]);
+  }, [sessionId, count, retry]);
 
   const findings = shapes ? shapes.reduce((sum, shape) => sum + shape.count, 0) : 0;
   const body = useMemo(
@@ -1310,10 +1359,10 @@ export function PinSessionModal({
         <div className="ndf-body">
           <div className="pin-ranges">
             {([100, 200, 500] as const).map((n) => (
-              <button key={n} type="button" className={`btn-range${count === n ? ' active' : ''}`} onClick={() => { setCount(n); onLimit(n); }}>최근 {n}건</button>
+              <button key={n} type="button" className={`btn-range${count === n ? ' active' : ''}`} onClick={() => { setCount(n); setRetry((value) => value + 1); }}>최근 {n}건</button>
             ))}
           </div>
-          <div className="pin-hint">실제로 담을 회차는 {view?.turns.length ?? 0}건이에요.</div>
+          {view && shapes && <div className="pin-hint">실제로 담을 회차는 {view.turns.length}건이에요.</div>}
           {shapes && (
             <div className="pin-shapes">
               {findings > 0
@@ -1333,9 +1382,9 @@ export function PinSessionModal({
               ))}
             </select>
           </div>
-          <div className="pin-size">
+          {view && shapes && <div className="pin-size">
             본문 {bytes} 바이트 / 상한 300,000 바이트{bytes > 300_000 ? ' — 회차 수를 줄여 주세요.' : ''}
-          </div>
+          </div>}
           {error && <div className="pin-warn">{error}</div>}
         </div>
         <footer className="ndf-foot modal-footer">

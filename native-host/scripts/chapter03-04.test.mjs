@@ -94,7 +94,7 @@ test('Chapter 3.6: the question text of a new underline, a follow-up, an HTML bo
     imagePaths: ['/Users/me/vault/notes/a/attach/ask-1-5e6f7a8b.png'],
   });
   assert.equal(followUp, [
-    '[대목] 「노트를 다시|열 때 비운다」',
+    '[대목] 「노트를 다시 | 열 때 비운다」',
     '',
     '그림의 빨간 칸은 무엇인가?',
     '',
@@ -229,4 +229,32 @@ test('Chapter 4: note session rail opening and closing tracking', () => {
   closeNoteRail('note-a');
   assert.equal(noteRailNow().rails['note-a'], undefined);
   assert.ok(serializeAskState);
+});
+
+test('second review: tab separators and first heading retain the documented meaning', () => {
+  assert.equal(foldQuote('a\t\tb\n'), 'a | | b');
+  assert.equal(noteHeading('#\t탭 제목\n# 뒤 제목', 'markdown'), '탭 제목');
+  assert.equal(noteHeading('# <!-- x -->\n# 뒤 제목', 'markdown'), null);
+});
+
+test('second review: closing a nested preview restores its parent link opener', async () => {
+  const { registerDocOpener, openDocLink } = await import('../src/plugs/claude/docLinks.ts');
+  const calls = [];
+  const removeParent = registerDocOpener((id) => { calls.push(`parent:${id}`); return true; });
+  const removeChild = registerDocOpener((id) => { calls.push(`child:${id}`); return true; });
+  assert.equal(openDocLink('a'), true);
+  removeChild();
+  assert.equal(openDocLink('b'), true);
+  removeParent();
+  assert.equal(openDocLink('c'), false);
+  assert.deepEqual(calls, ['child:a', 'parent:b']);
+});
+
+test('second review: the sending window suppresses its own Claude file events', async () => {
+  const { tauriAskHost } = await import('../src/plugs/claude/askHost.ts');
+  const { claudeSelfWrites } = await import('../src/data/selfWrites.ts');
+  claudeSelfWrites.clear();
+  tauriAskHost.announceSelfWrite('/fixture', 'notes/a/ask.json');
+  assert.deepEqual(claudeSelfWrites.external(['/fixture/notes/a/ask.json', '/fixture/notes/b/note.md']), ['/fixture/notes/b/note.md']);
+  claudeSelfWrites.clear();
 });

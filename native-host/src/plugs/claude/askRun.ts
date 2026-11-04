@@ -335,7 +335,7 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
       id: request.turnId,
       markId: request.markId,
       askedAt: new Date().toISOString(),
-      ...(request.quote.trim() ? { quote: cutText(request.quote.trim(), QUOTE_LIMIT) } : {}),
+      ...(request.quote.trim() ? { quote: cutText(request.quote, QUOTE_LIMIT) } : {}),
       question: cutText(request.question, TEXT_LIMIT),
       answer: failed ? '' : cutText(result.answer ?? '', TEXT_LIMIT),
       ...(failed ? { error: result.error || '까닭을 못 받았다' } : {}),
@@ -385,7 +385,7 @@ export async function migrateLegacyThread(host: AskHost, storage: LegacyStorage,
   if (!all || typeof all !== 'object') return null;
   const old = all[target.id];
   if (!old || typeof old !== 'object' || !Array.isArray(old.turns)) return null;
-  const sessionId = typeof old.sessionId === 'string' && old.sessionId ? old.sessionId : randomUuid();
+  const sessionId = typeof old.sessionId === 'string' ? old.sessionId : '';
   let latest: AskThread | null = null;
   for (const item of old.turns as any[]) {
     if (!item || typeof item !== 'object') continue;
@@ -393,13 +393,15 @@ export async function migrateLegacyThread(host: AskHost, storage: LegacyStorage,
       id: String(item.id ?? newUnderlineId()),
       markId: typeof item.markId === 'string' ? item.markId : undefined,
       askedAt: String(item.askedAt ?? new Date().toISOString()),
-      quote: typeof item.quote === 'string' && item.quote ? cutText(item.quote, QUOTE_LIMIT) : undefined,
-      question: cutText(String(item.question ?? ''), TEXT_LIMIT),
-      answer: cutText(String(item.answer ?? ''), TEXT_LIMIT),
+      quote: typeof item.quote === 'string' && item.quote ? item.quote : undefined,
+      question: String(item.question ?? ''),
+      answer: String(item.answer ?? ''),
       error: typeof item.error === 'string' && item.error ? item.error : undefined,
       model: normalizeModel(item.model),
       effort: normalizeEffort(item.effort),
       elapsedMs: Number(item.elapsedMs) || 0,
+      ...(typeof item.sessionLines === 'number' ? { sessionLines: item.sessionLines } : {}),
+      ...(Array.isArray(item.images) ? { images: item.images.filter((value: unknown) => typeof value === 'string') } : {}),
     };
     const saved = await saveTurn(host, vault, target, sessionId, turn);
     if ('failed' in saved) return latest; // the original stays; what arrived is shown

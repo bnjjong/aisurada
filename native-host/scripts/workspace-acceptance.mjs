@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { assertScreenBundle } from './screen-contracts.mjs';
 
 const host = fileURLToPath(new URL('..', import.meta.url)), repo = resolve(host, '..');
+const part4Check = process.argv.includes('--part4');
+const askMarksCheck = part4Check || process.argv.includes('--ask-marks');
 const navigationCheck = process.argv.includes('--navigation');
 const interactionCheck = process.argv.includes('--interaction');
 const dataCheck = process.argv.includes('--data');
@@ -28,7 +30,7 @@ if (dataCheck || autosaveCheck) {
   dataDriver = output.find(output => output.type === 'chunk' && output.isEntry).code;
   for (const asset of output) probeAssets.set('/' + asset.fileName, asset.type === 'chunk' ? asset.code : asset.source);
 }
-assertScreenBundle(join(host, 'dist'));
+assertScreenBundle(join(host, 'dist'), { part4: part4Check });
 const root = realpathSync(mkdtempSync(join(tmpdir(), 'wl-p3-'))), home = join(root, 'home'), vault = join(root, 'vault');
 const mkdir = path => mkdirSync(path, { recursive: true });
 const write = (path, text) => { mkdir(resolve(path, '..')); writeFileSync(path, text); };
@@ -45,7 +47,7 @@ const external = join(root, 'external/외부 기록.md');
 const rootNote = join(vault, 'notes/demo/root/note.md');
 const childId = 'snfixture-00000001', childNote = join(vault, 'notes/demo/root/sub/child/note.md');
 const grandchildNote = join(vault, 'notes/demo/root/sub/child/sub/grandchild/note.md');
-if (interactionCheck || dataCheck || editorCheck || autosaveCheck || viewsCheck) {
+if (askMarksCheck || interactionCheck || dataCheck || editorCheck || autosaveCheck || viewsCheck) {
   write(childNote, noteHead(childId, '하위 파일 노트') + '# 하위 파일 노트\n\n하위 Markdown 파일의 본문이에요.\n');
   write(grandchildNote, noteHead('snfixture-00000002', '두 단계 하위 노트') + '# 두 단계 하위 노트\n\n두 단계 사슬의 본문이에요.\n');
 }
@@ -65,7 +67,13 @@ if (viewsCheck) {
   write(join(root, 'external/next.MARKDOWN'), '# 다음 파일\n\n상대 경로로 연 읽기 전용 파일');
   write(join(root, 'external/pic one.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6n8AAAAASUVORK5CYII=', 'base64'));
 }
-const cfg = { parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, today };
+if (askMarksCheck) {
+  write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n격리된 vault의 본문이에요.\n\n| 열 | 값 |\n| --- | --- |\n| <!--wla:akfixture-12345678-->표 문답<!--/wla:akfixture-12345678--> | 값 |\n\n[하위](#sub:' + childId + ')\n');
+  const fakeClaude = join(root, 'fake-claude');
+  write(fakeClaude, `#!/bin/sh\nif [ "$1" = agents ]; then printf '[]\\n'; else cat >/dev/null; printf 'fixture answer\\n'; fi\n`);
+  chmodSync(fakeClaude, 0o700);
+}
+const cfg = { part4Check, askMarksCheck, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, today };
 const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin/java') : '/usr/bin/java';
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 const wrapper = join(root, 'java');
@@ -77,6 +85,7 @@ const env = { ...process.env, HOME: home, ZDOTDIR: join(root, 'zdot'), HISTFILE:
   CARGO_HOME: process.env.CARGO_HOME || join(homedir(), '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), '.rustup'),
   AISURADA_VAULT: vault, AISURADA_CLI_JAR: join(repo, 'dist/ais-cli.jar'), AISURADA_SIDECAR_JAVA: wrapper,
   AISURADA_SIDECAR_SOCKET: join(root, 'engine.sock'), AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
+if (askMarksCheck) env.AISURADA_CLAUDE_BIN = join(root, 'fake-claude');
 for (const key of ['AISURADA_SIDECAR_JAR', 'CLAUDE_CODE_SESSION_ID', 'AISURADA_ASK_RUNTIME', 'AISURADA_ASK_USE_AGENT']) delete env[key];
 if (!existsSync(join(repo, 'dist/wl-sidecar.jar'))) throw Error('Run bash build.sh first');
 let finish, noteResult;
@@ -105,7 +114,7 @@ const server = createServer(async (req, res) => {
   }
   if (path === '/bootstrap.js' || path === '/workspace-checks.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });
-    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
+    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
   }
   if (probeAssets.has(path)) { res.writeHead(200, { 'Content-Type': path.endsWith('.css') ? 'text/css' : 'text/javascript' }); res.end(probeAssets.get(path)); return; }
   if (path.startsWith('/assets/')) {
@@ -174,7 +183,12 @@ try {
     }
     console.log(`Seeded ${editorCases.length} independent editor cases`);
   }
-  const app = start(join(host, 'node_modules/.bin/tauri'), ['dev', '--config', override, '--no-watch', '--', '--no-default-features']);
+  // Tauri CLI re-adds the crate's default feature list. The explicit off regression runs cargo directly
+  // with the same isolated config, so it really contains no Claude host commands.
+  if (askMarksCheck && !part4Check) env.TAURI_CONFIG = readFileSync(override, 'utf8');
+  const app = askMarksCheck && !part4Check
+    ? start('cargo', ['run', '--manifest-path', join(host, 'src-tauri/Cargo.toml'), '--no-default-features', '--'])
+    : start(join(host, 'node_modules/.bin/tauri'), ['dev', '--config', override, '--no-watch', '--', ...(part4Check ? [] : ['--no-default-features'])]);
   app.on('exit', code => { if (code) finish([{ id: 'native-process', ok: false, error: `exited ${code}` }]); });
   timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), editorCheck || autosaveCheck || viewsCheck ? 420_000 : 180_000);
   results = await completed;

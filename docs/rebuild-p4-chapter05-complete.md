@@ -1,5 +1,8 @@
 # 5장 claude -p 기본 길 재구현 및 검증 보고서
 
+2026-11-04 2차 리뷰에 따라 동작 설명을 정정했다. 아래 과거 테스트 수와 출력은 당시 실행 기록이며, 최신 코드의 검증 결과는 [2차 리뷰 반영 기록](rebuild-p4-second-review-complete.md)을 따른다.
+
+
 ## 1. 개요 및 목적
 - **대상**: withlog 4부 Claude 연동 설명서 5장 「claude -p 기본 길」
 - **핵심 목표**:
@@ -15,7 +18,7 @@
 ## 2. 주요 계약 및 구현 내용
 
 ### 2.1 호스트 커맨드 인터페이스
-- `ask_runtime`: 현재 가동 중인 묻기 런타임 경로 반환 (기본값 `"cli"`, 환경변수에 따라 `"http"` 또는 `"agent-sdk"`).
+- `ask_runtime`: 현재 구현은 환경변수와 무관하게 항상 `"cli"`를 반환한다.
 - `ask_claude`:
   - 파라미터: `vault`, `session_id`, `model`, `effort`, `prompt`, `resume`, `timeout_seconds`, `keep_alive`, `seed`, `system`, `route`, `cwd`, `resume_only`, `persona`
   - 반환값: `{ ok: bool, answer: string, error?: string, elapsed_ms: number, missing_cwd?: string }`
@@ -41,9 +44,9 @@
 
 ### 2.4 타임아웃 및 프로세스 강제 종료 (5.6)
 - 지정된 `timeout_seconds` 경과 시:
-  1. `libc::kill(child_pid, SIGTERM)` 전송.
+  1. 공통 `process::run_typed`가 `/bin/kill -TERM`을 보낸다.
   2. 3초간 정상 종료 대기 (`TERM_GRACE`).
-  3. 여전히 미종료 시 `libc::kill(child_pid, SIGKILL)` 강제 회수.
+  3. 여전히 미종료 시 `Child::kill`로 강제 종료하고 자식을 거둔다.
 - 에러 메시지: `N초 안에 답이 안 왔다. 터미널에서 claude --resume <대화id> 로 이어 볼 수 있다.`
 
 ### 2.5 D12 결함 고침: 에러 문구 추출 (5.8)

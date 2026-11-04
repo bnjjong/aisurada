@@ -13,6 +13,7 @@ import type { AppLink } from '../interaction/links.ts';
 import { shortcutFor } from '../interaction/shortcuts.ts';
 import type { KeyInput } from '../interaction/shortcuts.ts';
 import type { RecentWorkspace, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
 import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry } from './storage.ts';
@@ -809,7 +810,7 @@ export class WorkspaceController {
     }
     const generation = this.watchGeneration;
     void this.services.watch(root, paths => {
-      if (generation === this.watchGeneration && this.data.selfWrites.external(paths).length) void this.refresh();
+      if (generation === this.watchGeneration && this.data.selfWrites.external(claudeSelfWrites.external(paths)).length) void this.refresh();
     }).then(unwatch => {
       if (this.disposed || generation !== this.watchGeneration) unwatch();
       else this.unwatch = unwatch;

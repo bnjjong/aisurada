@@ -33,7 +33,9 @@
     "test:autosave:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --autosave",
     "test:views": "node --import tsx --test scripts/views.test.mjs",
     "test:chapters": "node --import tsx --test scripts/chapters14-17.test.mjs",
-    "test:views:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --views"
+    "test:views:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --views",
+    "test:part4:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --part4",
+    "test:ask-marks:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --ask-marks"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.2",

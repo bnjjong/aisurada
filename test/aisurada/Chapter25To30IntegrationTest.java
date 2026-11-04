@@ -24,7 +24,7 @@ public final class Chapter25To30IntegrationTest {
             cli = Path.of("dist/ais-cli.jar").toAbsolutePath();
             prefix = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Daisurada.test.now=" + System.getProperty("aisurada.test.now"), "-Duser.timezone=Asia/Seoul", "-Daisurada.enable.part4=false", "-jar");
             environment = Map.of("HOME", home.toString(), "AISURADA_VAULT", v.toString(), "AISURADA_SIDECAR_SOCKET", socket.toString(), "AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
-            List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/wl-engine.jar").toAbsolutePath().toString()); command.addAll(List.of("serve", "--aisurada.notes.shard.by.month=true"));
+            List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/wl-sidecar-noclaude.jar").toAbsolutePath().toString()); command.addAll(List.of("serve", "--aisurada.notes.shard.by.month=true"));
             ProcessBuilder builder = new ProcessBuilder(command); builder.environment().clear(); builder.environment().putAll(environment);
             builder.redirectOutput(home.resolve("server.out").toFile()); builder.redirectError(home.resolve("server.err").toFile()); Process server = builder.start();
             try {

@@ -62,6 +62,9 @@ PTY 커맨드는 `pty_start`, `pty_write`, `pty_resize`, `pty_detach`, `pty_aliv
 
 비밀 가림은 `secret_table_probe`, `secret_table_status`, `mask_scrollback`, `scan_text_shapes`로 제공한다. probe를 실제로 부를 때만 HOME의 `.zshrc` 관리 블록과 로그인 셸 환경을 읽는다. 값은 직렬화·Debug를 구현하지 않은 타입에만 보관한다. 실 이름 분류표 `src-tauri/secret-names.txt`는 Git에서 제외하며, 없으면 항목 없는 견본을 포함한다. 견본 빌드는 표를 뜨기 전 가리기를 거절한다. 테스트는 지어낸 이름과 값만 사용한다.
 
-원본 `wl-agent/*.mjs`와 4부 소스는 제공되지 않아 포함하지 않았다. 4부 커맨드 9개는 Tauri의 `Command … not found`로 거절된다. 번들 자원은 이 저장소의 `dist/`에 맞췄으며 원본 아이콘 대신 임시 SVG 아이콘을 사용한다. 장별 구현·검증·손 확인 범위는 [9장](../docs/rebuild-p2-chapter09-complete.md)부터 [18장](../docs/rebuild-p2-chapter18-complete.md)까지의 완료 문서와 [부록 기록](../docs/rebuild-p2-appendices-complete.md)에 적었다.
+원본 `wl-agent/*.mjs` 데몬은 제공되지 않아 포함하지 않았다. 기본 빌드는 다시 구현한 4부 커맨드 9개를 제공하며, 4부를 뺀 Rust 빌드에서는 `Command … not found`로 거절된다. 번들 자원은 이 저장소의 `dist/`에 맞췄으며 원본 아이콘 대신 임시 SVG 아이콘을 사용한다. 장별 구현·검증·손 확인 범위는 [9장](../docs/rebuild-p2-chapter09-complete.md)부터 [18장](../docs/rebuild-p2-chapter18-complete.md)까지의 완료 문서와 [부록 기록](../docs/rebuild-p2-appendices-complete.md)에 적었다.
 
 외부 검증 사진에서 확인한 원본 받아들임·합치기 결과, 동작 차이 네 건과 실제 앱 조작으로 확인할 일곱 항목은 [2부 피드백 확인 기록](../docs/rebuild-p2-review-2026-10-31.md)에 정리했다.
+
+
+4부 2차 리뷰 회귀 검사는 `pnpm test:part4:acceptance`(켜진 화면과 호스트), `pnpm test:ask-marks:acceptance`(꺼진 화면과 호스트)로 실행한다. 두 검사는 임시 vault, HOME, 로컬 가짜 Claude를 쓰는 실제 WKWebView 검사다. React 효과와 요청 중 화면 이동을 따로 보려면 Vite 개발 서버의 `/scripts/part4-review.html`을 연다. 검증 범위와 결과는 [2차 리뷰 반영 기록](../docs/rebuild-p4-second-review-complete.md)에 있다.

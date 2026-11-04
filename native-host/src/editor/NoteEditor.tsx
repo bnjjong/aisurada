@@ -223,7 +223,7 @@ export function NoteEditor({
           onHeadings={setHeadings}
           onSection={setSection}
           diagramsOpen={state.prefs.diagrams}
-          askDocId={askEditor?.askDocId || note.id}
+          askDocId={askEditor?.askDocId}
           onAskAi={askEditor?.onAskAi}
           onAskFollowUp={askEditor?.onAskFollowUp}
           onOpenAskCompose={onOpenAskCompose}

@@ -55,15 +55,17 @@ export function turnsToLines(turns: EngineTurn[]): BundleLine[] {
       let last = turn.index;
       while (at < turns.length && turns[at].who === 'tool') {
         const name = turns[at].tool?.name ?? '';
-        const tail = groups[groups.length - 1];
-        if (tail && tail.name === name) tail.count += 1;
-        else groups.push({ name, count: 1 });
+        if (name) {
+          const tail = groups[groups.length - 1];
+          if (tail && tail.name === name) tail.count += 1;
+          else groups.push({ name, count: 1 });
+        }
         last = turns[at].index;
         at += 1;
       }
       at -= 1;
       const names = groups.map((group) => (group.count > 1 ? `${group.name} ×${group.count}` : group.name)).join(', ');
-      lines.push({ text: `(도구: ${names})`, first, last });
+      if (groups.length) lines.push({ text: `(도구: ${names})`, first, last });
       continue;
     }
     const text = spoken(turn);
@@ -116,7 +118,7 @@ export function authorParts(author: EngineAuthor): BundlePart[] {
   if (whole.picked.length && whole.picked[0].first <= firstMention) {
     return [{ label: '노트를 만들고 고치기까지', lines: whole.picked.map((line) => line.text) }];
   }
-  const creationLines = turnsToLines(author.creation ?? []);
+  const creationLines = turnsToLines(author.creation ?? author.latest.filter((turn) => turn.index <= firstMention));
   const creation = fillFromEnd(creationLines, CREATION_BUDGET);
   const after = latestLines.filter((line) => line.first > firstMention);
   const latest = fillFromEnd(after, BUNDLE_BUDGET - (CREATION_BUDGET - creation.left));
@@ -135,10 +137,14 @@ export function authorBundleText(sessionId: string, author: EngineAuthor | null 
   const lines = parts.reduce((sum, part) => sum + part.lines.length, 0);
   const text = [
     '## 이 노트를 쓴 세션의 대화',
+    '',
     `이 노트를 만든 Claude Code 세션 \`${sessionId}\` 의 대화에서 노트를 쓰던 무렵만 잘라 실었다. 도구 호출은 이름만 남기고 도구 결과는 뺐다.`,
     '아래 대화만으로 답이 모자라면 짐작하지 말고 모자라다고 말하라.',
+    '',
     body,
+    '',
     '## 물음',
+    '',
     '',
   ].join('\n');
   return { text, lines };
@@ -154,13 +160,17 @@ export function railBundleText(sessionId: string, turns: EngineTurn[]): string {
   const loaded = cut ? '실었다 (앞쪽은 뺐다).' : '실었다.';
   return [
     '## 이 세션의 최근 대화',
+    '',
     `사용자가 노트 옆에서 연 Claude Code 세션 \`${sessionId}\` 의 대화다. 최신 쪽부터 24,000자까지 ${loaded} 도구 호출은 이름만 남겼다.`,
     '이것은 읽은 순간의 스냅샷이라 가장 최근 활동이 빠졌을 수 있다.',
     '아래 대화만으로 답이 모자라면 짐작하지 말고 모자라다고 말하라.',
+    '',
     '<session-transcript>',
     ...picked.map((line) => line.text),
     '</session-transcript>',
+    '',
     '## 물음',
+    '',
     '',
   ].join('\n');
 }

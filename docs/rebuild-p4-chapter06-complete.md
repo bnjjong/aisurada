@@ -1,5 +1,8 @@
 # 4부 6장(PROJECTS 레일) 구현 및 검증 완료 보고서
 
+2026-11-04 2차 리뷰에 따라 동작 설명을 정정했다. 아래 과거 테스트 수와 출력은 당시 실행 기록이며, 최신 코드의 검증 결과는 [2차 리뷰 반영 기록](rebuild-p4-second-review-complete.md)을 따른다.
+
+
 ## 1. 개요 및 구현 범위
 - **설명서**: withlog 4부 Claude 연동 설명서 6장 (PROJECTS 레일) 및 부록 C 결함 고침 (D14, D15).
 - **목표**:
@@ -26,10 +29,10 @@
 - `list_claude_agents`:
   - `resolve_claude()`로 claude 실행 바이너리 탐색.
   - `cmd.arg("agents").arg("--json")` (`--all` 제외, 호스트 PATH 그대로 사용).
-  - 10초 상한 초과 시 `terminate_pid()`로 자식 프로세스 강제 정리 및 `"10초 안에 세션 목록이 안 왔다."` 반환.
+  - 10초 상한 초과 시 `process::run_typed`가 SIGTERM, 3초 유예, SIGKILL과 자식 회수를 수행 및 `"10초 안에 세션 목록이 안 왔다."` 반환.
   - 오류 발생 시 표준오류 마지막 400자 꼬리 반영.
 - `alive_pids`:
-  - **D14 결함 고침**: 5초 상한 초과 시 `terminate_pid()`로 ps 강제 정리 및 `Err("ps가 5초 안에 안 끝났다.")` 반환.
+  - **D14 결함 고침**: 5초 상한 초과 시 `process::run_typed`가 같은 3초 유예 규칙으로 ps를 거둠 및 `Err("ps가 5초 안에 안 끝났다.")` 반환.
   - 표준출력 줄 파싱으로 유효 pid 목록 반환.
 - `held_agent_sessions` & `release_agent_session`:
   - 계약에 따라 각각 `Ok(vec![])`와 `Ok("not_live")` 반환.
@@ -58,7 +61,7 @@
    - `cargo test --features claude`: 78개 테스트 통과 (agents 빈 pid, 자기 자신 pid 검사 등 포함).
 2. **TypeScript / 화면 테스트**:
    - `pnpm -C native-host typecheck`: 컴파일 성공 (0 errors).
-   - `pnpm -C native-host exec node --import tsx --test scripts/chapter06.test.mjs`: 4개 테스트 통과.
+   - `pnpm -C native-host exec node --import tsx --test scripts/chapter06.test.mjs`: 5개 테스트 통과(1차 반영본 기준). 실제 재실행 결과는 2차 리뷰 반영 기록을 따른다.
    - `bash test-native.sh`: screen-contracts, workspace, navigation, data, editor, views, autosave, chapters 전체 회귀 없이 통과.
 3. **Java 백엔드 통합 테스트**:
    - `./test.sh`: 전체 1~3부 테스트 및 4부 `AskCommandsTest`, `SessionCommandsTest` 전체 통과.

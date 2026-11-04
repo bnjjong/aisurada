@@ -313,7 +313,8 @@ export function askNow(): AskStoreState {
 }
 
 export function useAskState<T = AskStoreState>(selector: (state: AskStoreState) => T = (s) => s as unknown as T): T {
-  return useSyncExternalStore(store.subscribe, () => selector(store.get()), () => selector(store.get()));
+  const snapshot = useSyncExternalStore(store.subscribe, store.get, store.get);
+  return selector(snapshot);
 }
 
 /** The number of questions in flight, for the vault leaving check (3부 설명서 17.5). */
@@ -369,34 +370,21 @@ export function closeNoteRail(noteKey?: string) {
   notifyRail();
 }
 
-export function useNoteRail<T = NoteRailState>(
-  selector: (state: NoteRailState) => T = (s) => s as unknown as T
-): T {
-  const snapshot = useSyncExternalStore(
-    (onStoreChange) => {
-      railListeners.add(onStoreChange);
-      return () => railListeners.delete(onStoreChange);
-    },
-    () =>
-      selector({
-        rails: railState,
-        openRail: openNoteRail,
-        closeRail: closeNoteRail,
-      }),
-    () =>
-      selector({
-        rails: railState,
-        openRail: openNoteRail,
-        closeRail: closeNoteRail,
-      })
-  );
-  return snapshot;
+let railSnapshot: NoteRailState = { rails: railState, openRail: openNoteRail, closeRail: closeNoteRail };
+function getRailSnapshot(): NoteRailState {
+  if (railSnapshot.rails !== railState) railSnapshot = { ...railSnapshot, rails: railState };
+  return railSnapshot;
+}
+function subscribeRail(listener: () => void): () => void {
+  railListeners.add(listener);
+  return () => { railListeners.delete(listener); };
+}
+
+export function useNoteRail<T = NoteRailState>(selector: (state: NoteRailState) => T = (s) => s as unknown as T): T {
+  const snapshot = useSyncExternalStore(subscribeRail, getRailSnapshot, getRailSnapshot);
+  return selector(snapshot);
 }
 
 export function noteRailNow(): NoteRailState {
-  return {
-    rails: railState,
-    openRail: openNoteRail,
-    closeRail: closeNoteRail,
-  };
+  return getRailSnapshot();
 }

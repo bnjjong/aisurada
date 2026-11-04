@@ -240,10 +240,13 @@ public final class AskCommands {
         }
         t.put("elapsedMs", elapsed);
 
-        // sessionLines: 정수 글자만 받는다. "21" 과 21.0 은 없는 칸이다
+        // 2.3: 정수와 정수 글을 Int 범위로 읽고, 양수만 남긴다.
         Object slVal = turnMap.get("sessionLines");
-        if (slVal instanceof Long n && n > 0) {
-            t.put("sessionLines", n);
+        if (slVal instanceof Long || slVal instanceof String) {
+            try {
+                int lines = Integer.parseInt(slVal.toString());
+                if (lines > 0) t.put("sessionLines", lines);
+            } catch (NumberFormatException ignored) {}
         }
 
         // images

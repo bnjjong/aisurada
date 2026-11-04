@@ -1,12 +1,15 @@
 # 4부 10장 세션 입력창과 CLI 탭 재구현 완료 보고서
 
+2026-11-04 2차 리뷰에 따라 동작 설명을 정정했다. 아래 과거 테스트 수와 출력은 당시 실행 기록이며, 최신 코드의 검증 결과는 [2차 리뷰 반영 기록](rebuild-p4-second-review-complete.md)을 따른다.
+
+
 ## 1. 개요
 - **대상**: 『withlog 4부 Claude 연동 설명서』 10장 (152~170쪽)
 - **주요 내용**:
   - 세션 화면 하단 독의 세션 입력창(`SessionComposer`)
   - 오른쪽 레일의 CLI 터미널 패널(`SessionCliPane`)
   - 호스트 커맨드 3개: `write_session_image`, `start_dictation`, `pty_start_session`
-  - 10장 관련 계약 및 부록 C 결정 완벽 준수
+  - 10장 관련 계약과 부록 C에서 채택한 결정 구현. 검증 범위는 아래와 2차 리뷰 반영 기록에 구분한다
 
 ---
 
@@ -19,13 +22,13 @@
    - 크기 상한 검사: 5,000,000 바이트 (`그림이 너무 커요: <바이트> 바이트. 상한은 5000000 바이트예요`).
    - 저장 경로: `<app_data>/session-images/<sessionId>/<name>`. 경로 탈출(`starts_with`) 차단.
 2. **`start_dictation` (`native-host/src-tauri/src/dictation.rs`)**:
-   - macOS 환경에서 시스템 받아쓰기 시그널 트리거 (osascript fn 2회).
+   - macOS 환경에서 AppKit `startDictation:`을 응답 사슬로 보내고 처리 여부를 반환한다.
 3. **`pty_start_session` (`native-host/src-tauri/src/session_shell.rs`)**:
    - 이미 살아있는 터미널인 경우 버퍼 재생 및 재접속(세션 id 검사 스킵).
    - 새로 띄울 때 세션 id 검사(영문자, 숫자, `-` 외 거절).
    - `sessionAction` 분기:
      - `resume`: 작업 폴더 유효성 검사. 유효 폴더가 아니면 `HOME`으로 물러서고 `fellBack: true` 및 첫 명령에 알림 출력 포함.
-     - `attach`: 살아있는 배경 세션에 `claude attach <shortId>;exec zsh -l -i`로 진입.
+     - `attach`: 살아있는 배경 세션에 `claude attach <shortId> ; exec zsh -l -i`로 진입.
    - `/bin/zsh -l -i -c '<첫명령>'` 및 `TERM=xterm-256color`로 PTY 생성.
 
 ### 2.2 프론트엔드 세션 입력창 (`SessionComposer`)
@@ -37,11 +40,11 @@
 2. **10.2 세션별 상태 격리**:
    - `sessionComposerMap`을 통해 세션 전환 후 복귀 시에도 작성 중인 텍스트, 첨부 이미지, 알림, 실패 메시지 보존.
 3. **10.3 ~ 10.5 전송 차례 및 성공/실패 처리**:
-   - 전송 직전 `recent-sessions` 재조회하여 프로세스가 살아있으면 거절.
+   - 전송 직전 6.1의 목록 전체와 `session-titles`를 함께 읽는다. 목록 읽기가 이미 돌고 있으면 그 완료를 기다려 재판정하고, 프로세스가 살아있으면 거절한다.
    - 첨부 이미지는 `write_session_image`로 순차 저장 후 실패 시 전송 중단 및 메시지 표시.
    - 전송 텍스트 끝에 `[첨부 그림]` 안내 블록 및 경로 리스트 첨부.
-   - `ask_claude` 호출: `sessionId`, `prompt`, `resume: true`, `resumeOnly: true`, `keepAlive: true`, `cwd: sessionData.cwd`, `model`, `effort` 전달 (페르소나는 미포함).
-   - 성공 시 입력 내용 비우고 세션 대화 다시 읽기(`loadTranscript`) 트리거.
+   - `ask_claude` 호출: `sessionId`, `prompt`, `resume: true`, `resumeOnly: true`, `keepAlive: true`, `session-titles`에서 읽은 첫 작업 폴더 `cwd`, `vault`, `timeoutSeconds`, `model`, `effort` 전달 (페르소나는 미포함).
+   - 성공 시 입력 내용 비우고 세션별 답 신호를 올려 대화를 다시 읽는다. 굳히기 창의 회차 수와는 독립이다.
    - 실패 시 입력 내용 보존 및 에러 메시지 표시.
 4. **10.6 그림 붙이기 (⌘V)**:
    - 클립보드 이미지 감지, 5MB 상한 및 한 물음 8장 상한 검사.

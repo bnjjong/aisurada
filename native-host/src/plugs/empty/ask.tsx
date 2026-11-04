@@ -58,7 +58,7 @@ export function useNoteAsk(_props?: NoteAskInput): NoteAskOutput {
   };
 }
 
-export function NoteAskFrame({ children }: { baseDir?: string; noteId?: string; children?: ReactNode }): ReactNode {
+export function NoteAskFrame({ children }: { baseDir?: string; noteId?: string; cardSize?: { width: number; height: number | null }; saveCardSize?: (width: number, height: number) => void; children?: ReactNode }): ReactNode {
   return children ?? null;
 }
 
@@ -95,6 +95,7 @@ export interface AskHoverCardProps {
   onFocusInput?: () => void;
   onClose?: () => void;
   pinned?: boolean;
+  onPin?: () => void;
   boundaryRef?: React.RefObject<HTMLElement | null>;
 }
 

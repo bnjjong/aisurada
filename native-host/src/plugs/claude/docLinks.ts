@@ -2,17 +2,19 @@
 // The part 3 note screen registers the opener; the answer renderer calls it.
 export type DocOpener = (id: string) => boolean | void;
 
-let opener: DocOpener | null = null;
+const openers: Array<{ open: DocOpener }> = [];
 
 /** Registers the opener of this window. Returns the function that removes it. */
 export function registerDocOpener(next: DocOpener): () => void {
-  opener = next;
+  const entry = { open: next };
+  openers.push(entry);
   return () => {
-    if (opener === next) opener = null;
+    const index = openers.indexOf(entry);
+    if (index >= 0) openers.splice(index, 1);
   };
 }
 
 /** True when a note was found and its preview was asked to open. */
 export function openDocLink(id: string): boolean {
-  return opener ? opener(id) !== false : false;
+  return openers.length ? openers[openers.length - 1].open(id) !== false : false;
 }

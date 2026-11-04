@@ -97,7 +97,7 @@ export function FollowUpRow({
 }) {
   const context = useContext(AskContext);
   const runtime = useAskState((state) => state.runtime);
-  const pictures = useAskImages({ hasNoteFolder: Boolean(context.baseDir), http: runtime === 'http' });
+  const pictures = useAskImages({ hasNoteFolder: Boolean(context.baseDir) && !/\.(?:md|markdown|html|json)$/i.test(context.baseDir ?? ''), http: runtime === 'http' });
   const [text, setText] = useState('');
   const box = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {

@@ -88,3 +88,9 @@ test('8.4: the rail draws its header, the four-way conversation state and the ch
   assert.match(html, /aria-label="새 대화로 묻기"/);
   assert.match(html, /이 세션에는 보내지 않아요/);
 });
+
+test('second review: every non-UUID conversation id hashes deterministically', async () => {
+  const value = await railChatSessionId('older-custom-id');
+  assert.match(value, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(await railChatSessionId('older-custom-id'), value);
+});

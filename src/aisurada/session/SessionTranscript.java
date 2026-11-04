@@ -34,8 +34,8 @@ public final class SessionTranscript {
     private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("\"timestamp\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern GIT_BRANCH_PATTERN = Pattern.compile("\"gitBranch\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern CWD_PATTERN = Pattern.compile("\"cwd\"\\s*:\\s*\"([^\"]*)\"");
-    private static final Pattern TASK_CREATE_PATTERN = Pattern.compile("^Task #(\\d+) created successfully:\\s*(.*)$", Pattern.DOTALL);
-    private static final Pattern TASK_UPDATE_PATTERN = Pattern.compile("^Updated task #(\\d+).*$", Pattern.DOTALL);
+    private static final Pattern TASK_CREATE_PATTERN = Pattern.compile("^Task #(\\d+) created successfully:\\s*(.*)$");
+    private static final Pattern TASK_UPDATE_PATTERN = Pattern.compile("^Updated task #(\\d+).*$");
 
     private static final Set<String> LOCAL_HOSTS = Set.of(
             "localhost", "ipc.localhost", "asset.localhost", "127.0.0.1"
@@ -853,7 +853,7 @@ public final class SessionTranscript {
             JsonValue jv = JsonReader.parseFile(line);
             if (jv instanceof JsonValue.JsonObject obj) {
                 String val = getStringProp(obj.properties(), key);
-                if (val != null && !Trim.isBlank(val)) {
+                if (val != null && !val.isEmpty()) {
                     return val;
                 }
             }
@@ -1103,14 +1103,13 @@ public final class SessionTranscript {
     }
 
     private static String nonBlank(String value) {
-        return (value == null || Trim.isBlank(value)) ? null : value;
+        return (value == null || value.isEmpty()) ? null : value;
     }
 
     private static String getStringProp(Map<String, JsonValue> props, String key) {
         if (props == null) return null;
         JsonValue val = props.get(key);
         if (val instanceof JsonValue.JsonString s) return s.value();
-        if (val instanceof JsonValue.JsonLiteral lit && !lit.isNull()) return lit.raw();
         return null;
     }
 

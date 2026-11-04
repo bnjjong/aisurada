@@ -92,20 +92,21 @@ test('9.8 H5 M12: the pinned note body', () => {
   ];
   assert.equal(pinFence(turns), '````', 'one longer than the longest run of any spoken turn, never under 3');
   assert.equal(pinFence([{ who: 'user', text: 'a' }]), '```');
-  const body = pinBody({ title: '세션대화 12:30', sessionId: 'f1a5', turns, source: { bytes: 2048, lines: 10 }, shapeFindings: 0 });
+  const body = pinBody({ title: '세션 대화 12:30', sessionId: 'f1a5', turns, source: { bytes: 2048, lines: 12748, messages: 1312 }, shapeFindings: 0 });
   const lines = body.split('\n');
-  assert.equal(lines[0], '# 세션대화 12:30');
-  assert.equal(lines[1], 'Claude Code 세션 대화를 굳힌 노트입니다. 도구 결과 본문은 안 담아서 자격증명이 안 실립니다.');
-  assert.deepEqual(lines.slice(2, 8), ['| 무엇 | 값 |', '| --- | --- |', '| 세션 id | `f1a5` |', '| 담은 회차 | 4 |', '| 원본 | 2KB, 10줄에서 4건 |', '| 모양으로 걸린 것 | 0 건 |']);
-  assert.equal(lines[8], '> [!success] 모양 검사에 걸린 것이 0 건입니다', 'the callout is there at zero, with a space before 건');
+  assert.equal(lines[0], '# 세션 대화 12:30');
+  assert.equal(lines[1], '');
+  assert.equal(lines[2], 'Claude Code 세션 대화를 굳힌 노트입니다. 도구 결과 본문은 안 담아서 자격증명이 안 실립니다.');
+  assert.deepEqual(lines.slice(4, 10), ['| 무엇 | 값 |', '| --- | --- |', '| 세션 id | `f1a5` |', '| 담은 회차 | 4 |', '| 원본 | 2KB, 12,748줄에서 1,312건 |', '| 모양으로 걸린 것 | 0 건 |']);
+  assert.equal(lines[11], '> [!success] 모양 검사에 걸린 것이 0 건입니다', 'the callout is there at zero, with a space before 건');
   assert.equal(lines.indexOf('## 대화') > 8, true);
   assert.ok(body.includes('**나**\n\n````\n프로젝트 상태 확인해줘\n````\n'));
   assert.ok(body.includes('- `Bash` — `` echo `date` ``'));
   assert.equal(body.includes('- ``\n'), false, 'a tool turn without tool adds no line');
-  const danger = pinBody({ title: 't', sessionId: 's', turns: [], source: { bytes: 0, lines: 0 }, shapeFindings: 2, shapeLines: ['토큰 2 건'] });
+  const danger = pinBody({ title: 't', sessionId: 's', turns: [], source: { bytes: 0, lines: 0, messages: 0 }, shapeFindings: 2, shapeLines: ['토큰 2 건'] });
   assert.ok(danger.includes('> [!danger] 표에 없는데 비밀처럼 생긴 것 2 건\n> 토큰 2 건\n> 이 검사는 도구 결과 본문은 보지 못해요.'));
-  assert.equal(pinScanText(turns), '프로젝트 상태 확인해줘\n```\n코드\n```\n끝\nBash echo `date`\n');
-  assert.match(pinDefaultTitle(new Date(2026, 10, 3, 9, 5)), /^세션대화 09:05$/);
+  assert.equal(pinScanText(turns), '프로젝트 상태 확인해줘\n```\n코드\n```\n끝\nBash\necho `date`\n\n');
+  assert.match(pinDefaultTitle(new Date(2026, 10, 3, 9, 5)), /^세션 대화 09:05$/);
 });
 
 test('9.4: the four states of the conversation column', () => {
@@ -116,9 +117,9 @@ test('9.4: the four states of the conversation column', () => {
   assert.match(html({ view: normalizeReadSession({ file: null }), loading: false, error: null }), /이 기계에 그 세션의 기록이 없어요/);
   assert.match(html({ view: normalizeReadSession({ file: '/x', turns: [] }), loading: false, error: null }), /기록은 있는데 주고받은 말이 없어요/);
   const full = html({ view: normalizeReadSession(engineAnswer), loading: false, error: null });
-  assert.match(full, /45KB 중에서 골랐어요 · 1200줄에서 3건/);
+  assert.match(full, /45KB 중에서 골랐어요 · 1,200줄에서 380건/);
   assert.match(full, /<strong> · 못 읽은 줄 2<\/strong>/);
-  assert.match(full, /앞의 대화가 더 있어요. 지금은 최근 건만 보여요./);
+  assert.match(full, /앞의 대화가 더 있어요. 지금은 최근 3건만 보여요./);
   assert.match(full, /class="toolrow"/);
   assert.match(full, /1\.5초/);
 });

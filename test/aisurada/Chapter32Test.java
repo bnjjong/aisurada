@@ -22,8 +22,8 @@ public final class Chapter32Test {
             "read-session", List.of("limit", "before", "urls", "note", "author"),
             "session-titles", List.of(), "recent-sessions", List.of("days"));
     public static void main(String[] args) throws Exception {
-        // 이 시험은 4부를 뺀 판의 답(WL-409)을 잰다. 4부를 켠 jar가 기본이라 스위치를 끈다
-        System.setProperty("aisurada.enable.part4", "false");
+        // test.sh가 실제 4부 없는 jar를 classpath에 둔다. 런타임 켬은 이 빌드를 바꾸지 못한다.
+        System.setProperty("aisurada.enable.part4", "true");
         try (var t = new ChapterTestSupport("chapter32")) {
             commands(t); files(t); shards(t); pending(t); doctor(t); t.done();
         } finally {

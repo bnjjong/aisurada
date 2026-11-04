@@ -1,4 +1,5 @@
 // The real host behind `AskHost`: the Tauri commands the drag question uses.
+import { claudeSelfWrites } from '../../data/selfWrites.ts';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { AskClaudeArgs, AskAnswer, AskHost, EngineReply } from './askRun.ts';
 
@@ -29,6 +30,7 @@ export const tauriAskHost: AskHost = {
     });
   },
   announceSelfWrite: (vault, relPath) => {
+    claudeSelfWrites.record(vault, relPath);
     void invoke('announce_self_write', { root: vault, relPath }).catch(() => {});
   },
 };
