@@ -73,7 +73,17 @@ if (askMarksCheck) {
   write(fakeClaude, `#!/bin/sh\nif [ "$1" = agents ]; then printf '[]\\n'; else cat >/dev/null; printf 'fixture answer\\n'; fi\n`);
   chmodSync(fakeClaude, 0o700);
 }
-const cfg = { part4Check, askMarksCheck, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, today };
+// 4부를 켠 판만 전사를 쓴다. 엔진은 격리 HOME의 ~/.claude/projects를 읽는다(래퍼가 -Duser.home을 준다).
+const sessionId = 'f1a50000-0000-4000-8000-000000000001';
+if (part4Check) {
+  const stamp = new Date().toISOString();
+  write(join(home, '.claude/projects/-Users-test-vault', `${sessionId}.jsonl`), [
+    { type: 'user', entrypoint: 'cli', cwd: '/Users/test/vault', timestamp: stamp, message: { content: '세션 점검용 첫 물음' } },
+    { type: 'assistant', timestamp: stamp, message: { model: 'claude-opus-4', content: [{ type: 'text', text: '세션 점검용 첫 답' }] } },
+    { type: 'custom-title', customTitle: '점검 세션' },
+  ].map(line => JSON.stringify(line)).join('\n') + '\n');
+}
+const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, today };
 const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin/java') : '/usr/bin/java';
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 const wrapper = join(root, 'java');
