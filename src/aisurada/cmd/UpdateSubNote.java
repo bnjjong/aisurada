@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.Frontmatter;
 import aisurada.vault.NoteIndex;
@@ -46,17 +46,17 @@ public final class UpdateSubNote {
         // 5. 자리 인자 2칸, 부모 참조, 하위 id의 3가지 검사, tags, 제목 공백 차례
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
         if (pos.size() < 2 || Trim.isBlank(pos.get(1))) {
-            throw new WlException(400, "인자가 둘 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 둘 필요하다: " + USAGE);
         }
         SubNoteChain.Parent parent = SubNoteChain.resolveParent(noteIndex, pos.get(0));
         NoteScanner.NoteRecord sub = SubNoteChain.resolveTarget(parent, pos.get(1));
         List<String> newTags = opts.containsKey("tags") ? CreateDoc.parseAndValidateTags(false, Map.of(), opts) : null;
         String givenTitle = opts.get("title");
         if (givenTitle != null && Trim.isBlank(givenTitle)) {
-            throw new WlException(400, "하위 노트 제목이 비었다: " + sub.id());
+            throw new AisException(400, "하위 노트 제목이 비었다: " + sub.id());
         }
         String givenBody = opts.get("body");
         String f1Token = opts.get("f1") == null || Trim.trim(opts.get("f1")).isEmpty() ? null : Trim.trim(opts.get("f1"));
@@ -82,17 +82,17 @@ public final class UpdateSubNote {
         try {
             parts = MetaWriter.split(StrictUtf8.decodeStrict(fileBytes));
         } catch (Exception e) {
-            throw new WlException(500, "노트 본문 파일을 못 읽어 " + snippet + " 않았다: " + contentRel);
+            throw new AisException(500, "노트 본문 파일을 못 읽어 " + snippet + " 않았다: " + contentRel);
         }
         Map<String, Object> rawYamlMap = parts.fenceFound() && parts.yamlPart() != null && parts.yamlPart().length() <= 16_000
                 ? Frontmatter.parse(parts.yamlPart()) : null;
         if (rawYamlMap == null) {
-            throw new WlException(500, "프론트매터가 없어 " + snippet + " 않았다: " + contentRel);
+            throw new AisException(500, "프론트매터가 없어 " + snippet + " 않았다: " + contentRel);
         }
         String oldBody = parts.body();
         String body = givenBody != null ? givenBody : oldBody;
 
-        // 5번: 하위 노트 키 11개로 짓고 도장은 1.10으로 정한다. B를 못 찍으면 여기서 WL-400이다
+        // 5번: 하위 노트 키 11개로 짓고 도장은 1.10으로 정한다. B를 못 찍으면 여기서 AIS-400이다
         StampJudgment.JudgmentResult judgment = StampJudgment.judge(
                 sub.format(), body, oldBody, rawYamlMap,
                 sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, sub.meta().mins(), null,

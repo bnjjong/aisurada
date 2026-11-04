@@ -37,10 +37,10 @@ public final class Chapter31IntegrationTest {
         try (var t = new ChapterTestSupport("chapter31-socket")) {
             vault = t.vault(); Path home = Files.createDirectory(t.temp.resolve("home"));
             root(vault, "root", 1, "2026-06-16T10:00:00+09:00", "", "body\n"); git("init", "-b", "main");
-            Path socket = Path.of("/tmp", "wl-ch31-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
+            Path socket = Path.of("/tmp", "ais-ch31-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
             prefix = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-jar");
             env = Map.of("HOME", home.toString(), "PATH", "/usr/bin:/bin", "AISURADA_VAULT", vault.toString(), "AISURADA_SIDECAR_SOCKET", socket.toString(), "AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS", "0");
-            List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/wl-engine.jar").toAbsolutePath().toString()); command.add("serve");
+            List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/ais-engine.jar").toAbsolutePath().toString()); command.add("serve");
             ProcessBuilder builder = new ProcessBuilder(command); builder.environment().clear(); builder.environment().putAll(env);
             builder.redirectOutput(home.resolve("server.out").toFile()); builder.redirectError(home.resolve("server.err").toFile()); Process server = builder.start();
             try {
@@ -48,11 +48,11 @@ public final class Chapter31IntegrationTest {
                 while (!Files.exists(socket) && server.isAlive() && System.nanoTime() < deadline) Thread.sleep(20);
                 check(Files.exists(socket), "server ready: " + Files.readString(home.resolve("server.err")));
                 check(message().contains("Aisurada-Reason: startup"), "startup committed before socket opened");
-                check(message().startsWith("wl(outside)"), "startup outside writer");
+                check(message().startsWith("ais(outside)"), "startup outside writer");
                 eq(request(null, "history", "ndfixture-00000001").get("count"), 1L, "history socket response");
                 request(null, "update-agenda-facts", "agfixture-00000001", "facts=approved");
                 request("session-A", "save_report", "{\"kind\":\"evening\",\"date\":\"2026-10-21\",\"body\":\"first tool\"}");
-                String message = message(); check(message.startsWith("wl(app)"), "tool request commits previous app"); check(message.contains("Aisurada-Reason: writer"), "writer reason through real request");
+                String message = message(); check(message.startsWith("ais(app)"), "tool request commits previous app"); check(message.contains("Aisurada-Reason: writer"), "writer reason through real request");
                 request("session-B", "save_report", "{\"kind\":\"evening\",\"date\":\"2026-10-21\",\"body\":\"second tool\"}");
                 message = message(); check(message.contains("Aisurada-Session: session-A"), "new tool session commits previous session");
                 deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12);
@@ -66,7 +66,7 @@ public final class Chapter31IntegrationTest {
                 check(!Files.exists(socket), "socket removed after teardown");
                 // startup와 단발 호출 모두 설정 오류는 명령 처리 전에 종료 코드 1이다.
                 for (String option : List.of("--aisurada.vault.autocommit.enabled=", "--aisurada.vault.autocommit.enabled=maybe", "--aisurada.vault.snapshot.enabled=maybe", "--aisurada.vault.autocommit.idle.seconds=", "--aisurada.vault.autocommit.idle.seconds=9223372036854775808")) {
-                    List<String> invalid = new ArrayList<>(prefix); invalid.add(Path.of("dist/wl-engine.jar").toAbsolutePath().toString()); invalid.addAll(List.of("history", "missing", option));
+                    List<String> invalid = new ArrayList<>(prefix); invalid.add(Path.of("dist/ais-engine.jar").toAbsolutePath().toString()); invalid.addAll(List.of("history", "missing", option));
                     ProcessBuilder bad = new ProcessBuilder(invalid); bad.environment().clear(); bad.environment().putAll(env);
                     Process child = bad.start(); check(child.waitFor(10, TimeUnit.SECONDS), "invalid config exits"); eq(child.exitValue(), 1, "strict config " + option);
                 }

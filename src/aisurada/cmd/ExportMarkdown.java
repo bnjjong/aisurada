@@ -1,6 +1,6 @@
 package aisurada.cmd;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
@@ -29,7 +29,7 @@ public final class ExportMarkdown {
             if ("html".equals(note.format())) { html++; continue; }
             if ("json".equals(note.format())) { json++; continue; }
             String path = note.vaultRelPath();
-            if (Trim.isBlank(path)) throw new WlException(409, "저장 자리를 모르는 노트가 있어 내보내지 않았다. 색인을 다시 만들어야 한다: " + note.id());
+            if (Trim.isBlank(path)) throw new AisException(409, "저장 자리를 모르는 노트가 있어 내보내지 않았다. 색인을 다시 만들어야 한다: " + note.id());
             // 확장자로 단일 파일을 판정하는 기존 읽기 경계도 유지한다(27.9의 9번).
             boolean single = path.matches("(?is).*\\.(md|html|json)$");
             Path body = single ? vault.resolve(path) : note.contentFilePath();
@@ -38,7 +38,7 @@ public final class ExportMarkdown {
         Path dest = vault.resolve(".aisurada/md-export").toAbsolutePath().normalize();
         TreeRemover.remove(dest);
         try { Files.createDirectories(dest); }
-        catch (IOException e) { throw new WlException(500, "폴더를 만들지 못했다: " + dest); }
+        catch (IOException e) { throw new AisException(500, "폴더를 만들지 못했다: " + dest); }
         for (Export item : exports) {
             String relative = item.path().startsWith("notes/") ? item.path().substring(6) : item.path();
             relative = relative.replaceFirst("(?i)\\.(md|html|json)$", "") + ".md";

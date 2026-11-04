@@ -1,5 +1,5 @@
 {
-  "format": "wlx-bundle",
+  "format": "aisx-bundle",
   "version": 1,
   "node": ">=20",
   "note": "설명서 34장의 받아들임 묶음을 설명서만 보고 다시 지은 판. 실행기와 라이브러리는 34.1의 규칙을 따른다. 진짜 묶음(읽기 레인 460건, 나무 fixture.v1과 claude-home.v1)이 이 저장소에 없어서, 레인은 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았다. 진짜 묶음을 받으면 lanes와 trees를 그것으로 바꾸고 build-bundle.mjs로 목록을 다시 적는다.",
@@ -17,24 +17,24 @@
   "provenance": {
     "get_doc/ndfixture-00000004": "설명서 13145줄(34.1이 묶음에서 그대로 옮긴 케이스)",
     "get_doc/ndfixture-00000003": "설명서 5249줄의 예시",
-    "get_doc/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
-    "get_report/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "get_doc/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
+    "get_report/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "get_sub_note/ndfixture-00000001/snfixture-00000001/snfixture-00000006": "설명서 5353줄의 예시",
-    "get_sub_note/missing-child": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "get_sub_note/missing-child": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "get_template/tpl-halfmoved": "설명서 1542줄(2.4: 같은 id 2벌의 1건 읽기는 html 쪽)과 10049줄의 목록 값",
     "get_template/t-legacy": "설명서 10110줄의 예시",
     "get_template/t-morning": "설명서 10110줄의 예시. stdoutText로 담음",
-    "get_template/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "get_template/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "list_attachments/ndfixture-00000001": "설명서 7563줄의 예시",
-    "list_attachments/ndfixture-00000001/snfixture-00000001/snfixture-00000006": "설명서 3474줄의 실패 9건 표(wl 포함)",
-    "list_attachments/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "list_attachments/ndfixture-00000001/snfixture-00000001/snfixture-00000006": "설명서 3474줄의 실패 9건 표(ais 포함)",
+    "list_attachments/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "list_docs/type-research": "설명서 4381줄의 예시",
-    "list_docs/empty-range": "설명서 3474줄의 실패 9건 표(wl 포함)",
-    "list_docs/unknown-agenda": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "list_docs/empty-range": "설명서 3474줄의 실패 9건 표(ais 포함)",
+    "list_docs/unknown-agenda": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "list_reports/all": "설명서 10550줄의 예시",
     "list_sub_notes/ndfixture-00000001": "설명서 6873줄의 예시",
     "list_sub_notes/ndfixture-00000002": "설명서 6931줄의 예시",
-    "list_sub_notes/missing": "설명서 3474줄의 실패 9건 표(wl 포함)",
+    "list_sub_notes/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "list_templates/all": "설명서 10049줄의 예시",
     "list_templates/category-doc": "설명서 10049줄의 목록 예시를 24.3의 갈래 조건으로 거름",
     "list_templates/category-ritual": "설명서 10049줄의 목록 예시를 24.3의 갈래 조건으로 거름",
@@ -48,7 +48,7 @@
   "history": [
     {
       "date": "2026-10-30",
-      "change": "처음 지음. 설명서 원문의 예시 20건(성공 11건, 실패 9건)을 레인 9파일로 옮김. get_template/t-morning 1건은 실행기의 stdoutText 갈래를 재려고 글로 담음 실패 9건에는 6.5의 표가 적은 WL 번호를 wl 칸으로 담음(진짜 묶음은 증분 2에서 채울 칸)"
+      "change": "처음 지음. 설명서 원문의 예시 20건(성공 11건, 실패 9건)을 레인 9파일로 옮김. get_template/t-morning 1건은 실행기의 stdoutText 갈래를 재려고 글로 담음 실패 9건에는 6.5의 표가 적은 AIS 번호를 ais 칸으로 담음(진짜 묶음은 증분 2에서 채울 칸)"
     },
     {
       "date": "2026-10-30",
@@ -56,27 +56,27 @@
     },
     {
       "date": "2026-10-31",
-      "change": "34장 판 확인 후속: get_doc.json의 케이스 차례를 바꿔 ndfixture-00000003을 앞에 둠. 토큰 1개인 첫 JSON 객체에 짝(list_docs/type-research)이 있어야 지금 실행기의 --mutants도 대상을 고른다. 실행기는 옵션 값 재는 자리, 겹친 목록 항목, WL 번호 끝 경계, detail 1줄, 아직 없는 AISURADA_VAULT, stdout 자리표, 나무 dirs, 자가 점검 engine 칸, 변형 대상 고르기를 지금 실행기에 맞춤"
+      "change": "34장 판 확인 후속: get_doc.json의 케이스 차례를 바꿔 ndfixture-00000003을 앞에 둠. 토큰 1개인 첫 JSON 객체에 짝(list_docs/type-research)이 있어야 지금 실행기의 --mutants도 대상을 고른다. 실행기는 옵션 값 재는 자리, 겹친 목록 항목, AIS 번호 끝 경계, detail 1줄, 아직 없는 AISURADA_VAULT, stdout 자리표, 나무 dirs, 자가 점검 engine 칸, 변형 대상 고르기를 지금 실행기에 맞춤"
     }
   ],
   "files": {
     ".gitattributes": "4a669ece67c496f5d07207f2daaf830c1e5b962e389baebd0ac068fd88be22ff",
-    "README.md": "bca76c463696cd36c55dfc7f9018ceca924576e1aaed196bd8dec87985ebc18a",
-    "adapters/aisurada-jar.json": "fc25fca6b33fe8d5e461ee8932770dd6ced8addd3e449bd2a72f6139e1f2ed93",
-    "lanes/read/get_doc.json": "0e4778d50f1d34d380fe43911a705a809750a154d81488fb263d0b2083f14681",
-    "lanes/read/get_report.json": "7b7db5a77739f67796f73d623e3ad4875d5b11a90c85caa3d89932d8b66273a5",
-    "lanes/read/get_sub_note.json": "f281ce64f74b14c205ac280e2357914c785dc8a2510db6def151dc2702009b8c",
-    "lanes/read/get_template.json": "eb26411118ae389c106a8f6b78ea05c0c42cf6b06fb1c72fd2217510f1b7b763",
-    "lanes/read/list_attachments.json": "dc907f5da53d21f37f890319a9f29e9722c9daf88463deb285af0abb95a45408",
-    "lanes/read/list_docs.json": "9d470aa4a78b799dba63a03a8951e44edf2cef4e42bae756e46054e700f927dd",
-    "lanes/read/list_reports.json": "91a902c3d509752da71e646778cad967e0fd2e94f25fe60bce05742137ee77cb",
-    "lanes/read/list_sub_notes.json": "21e91d043410befc290d6569e23d449d8e207c09892ede2d6ab5e31f0b73f213",
-    "lanes/read/list_templates.json": "73b059aa49aadaf0cbe1ad8d39da95d782b70276aeee7761b26098cbcf9815f7",
-    "lib/bundle.mjs": "649ad5934660557a7ac425bc754b5e15c990fea329e6bfbdd8757bfebfe42901",
+    "README.md": "031951e38bed86a62445fa274776cb087165a451e341fead459825366a4aee74",
+    "adapters/aisurada-jar.json": "f0819304fc1c948f0d2fc611aca17f35ac63abed6a2e1a3e8a7f1c70e4a60504",
+    "lanes/read/get_doc.json": "a75cf136f8722d63ee93a9102dd1692ca1c2b3eec688487631e619996a46645a",
+    "lanes/read/get_report.json": "6377793174d1e9e9befacb495e5193ef87ae4fb54a1ccf2a377bf790c467abd7",
+    "lanes/read/get_sub_note.json": "88de70af0f437b8dcc055e616e81c9461ee3e80e3eb0c74eba80a15bc307d942",
+    "lanes/read/get_template.json": "922fd8cf32b7536cf36871a39d8177079f455725df60942ac8f3449c10a364b8",
+    "lanes/read/list_attachments.json": "eff4cec0a90a7087aae012aa619c052ba4cc0d5f2a40d851b7f54219d1a64d50",
+    "lanes/read/list_docs.json": "626efe55a718647bc927703c61689c398fb6197203d1a918a7a7de5584b5a7f8",
+    "lanes/read/list_reports.json": "0581cca4369a5ae7884eb711b1e3791e63c704440866718039fb5fdf5a018ee6",
+    "lanes/read/list_sub_notes.json": "a066cb6d5d89aff4b29a799951fced44049b9a3a432ddd4f1a1eb5e0e89547d3",
+    "lanes/read/list_templates.json": "8460f10bc6c8124152c2f6499508dfda75aab5a3f38ef799b6683046485f76cd",
+    "lib/bundle.mjs": "9ee66830c1bfbf0e1c43b9b29a0598c82cf4c8c057e3dc8f5b8aeee62922565e",
     "lib/template.mjs": "48229fe00409c143461e7663613c448e8b46fc09c88c1281d01d98adec8ad4c6",
-    "lib/tree.mjs": "38cfe237e1dead5f2b27d431734c0ed35ce6e07c4a20191c98163795673c2f67",
-    "run.mjs": "a30d815a8ff16f61b034e2d648431548e8a55bb05e784d185ee49e324d54b99c",
-    "selftest/replay-impl.mjs": "b8f09c575449e1890c9c04d2ac60c38f1fe5aa04d83d82420fe52ce09a471a29",
-    "trees/rebuild-fixture.v1.json": "56b3cd822fe165ed6603ba2eb8e5d47d21295b87dcbbe93468e00dd1c7cce1ed"
+    "lib/tree.mjs": "7813bc8ac30e8f74c78f68e773dcfc7a45c433f3741cfc273e6eb1422c40bb76",
+    "run.mjs": "a0809e7fdb0fd2c42beb1550865f73a152c63974c5c2ab79fca6e973b4c400f9",
+    "selftest/replay-impl.mjs": "451a760b7fcc70d45893b8a3c874d251ee36a93a2e548d387825f1e06bdde0ee",
+    "trees/rebuild-fixture.v1.json": "84a63a0136d60481d7b03329ab1a0dcf08da27daead2dfbec26c11d7d8d626cb"
   }
 }

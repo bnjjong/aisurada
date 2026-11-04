@@ -4,7 +4,7 @@ import aisurada.args.JsonCompact;
 import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Uri;
 import aisurada.text.Utf16;
@@ -81,18 +81,18 @@ public final class CreateDoc {
         // Row 10: format 검증
         String rawFormat = isTool ? (String) toolOpts.get("format") : opts.get("format");
         if (rawFormat != null && !"markdown".equals(rawFormat)) {
-            throw new WlException(400, "모르는 본문 포맷 이다: " + rawFormat + ". 쓸 수 있는 것은 [markdown] 뿐이다.");
+            throw new AisException(400, "모르는 본문 포맷 이다: " + rawFormat + ". 쓸 수 있는 것은 [markdown] 뿐이다.");
         }
 
         // Row 11: agenda 존재 검증 (명령 표면만)
         if (!isTool && !opts.containsKey("agenda")) {
-            throw new WlException(400, "agenda 이 필요하다: " + USAGE);
+            throw new AisException(400, "agenda 이 필요하다: " + USAGE);
         }
         String rawAgenda = isTool ? (String) toolOpts.get("agenda") : opts.get("agenda");
 
         // Row 12: type 존재 검증 (명령 표면만)
         if (!isTool && !opts.containsKey("type")) {
-            throw new WlException(400, "type 이 필요하다: " + USAGE);
+            throw new AisException(400, "type 이 필요하다: " + USAGE);
         }
         String rawType = isTool ? (String) toolOpts.get("type") : opts.get("type");
 
@@ -107,19 +107,19 @@ public final class CreateDoc {
             }
         }
         if (canonicalType == null) {
-            throw new WlException(400, "모르는 유형 이다: " + (rawType != null ? rawType : "") +
+            throw new AisException(400, "모르는 유형 이다: " + (rawType != null ? rawType : "") +
                     ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
         }
 
         // Row 14: title 존재 검증 (명령 표면만)
         if (!isTool && !opts.containsKey("title")) {
-            throw new WlException(400, "title 이 필요하다: " + USAGE);
+            throw new AisException(400, "title 이 필요하다: " + USAGE);
         }
         String rawTitle = isTool ? (String) toolOpts.get("title") : opts.get("title");
 
         // Row 15: body 존재 검증 (명령 표면만)
         if (!isTool && !opts.containsKey("body")) {
-            throw new WlException(400, "body 이 필요하다: " + USAGE);
+            throw new AisException(400, "body 이 필요하다: " + USAGE);
         }
         String rawBody = isTool ? (String) toolOpts.get("body") : opts.get("body");
 
@@ -162,19 +162,19 @@ public final class CreateDoc {
             } else if ("record".equalsIgnoreCase(rawTier)) {
                 tier = "record";
             } else {
-                throw new WlException(400, "모르는 노트 층 이다: " + (rawTier != null ? rawTier : "") +
+                throw new AisException(400, "모르는 노트 층 이다: " + (rawTier != null ? rawTier : "") +
                         ". 쓸 수 있는 것은 [reading, record] 뿐이다.");
             }
         }
 
         // Row 22: title 공백 여부 검증
         if (Trim.isBlank(rawTitle)) {
-            throw new WlException(400, "노트 제목이 비었다");
+            throw new AisException(400, "노트 제목이 비었다");
         }
 
         // Row 23: mins 음수 검증
         if (mins < 0) {
-            throw new WlException(400, "노트 소요 시간이 음수다: " + mins);
+            throw new AisException(400, "노트 소요 시간이 음수다: " + mins);
         }
 
         // template 처리: 다듬어서 regex 일치 시 사용, 불일치 시 버림 (13.3)
@@ -190,7 +190,7 @@ public final class CreateDoc {
         // 8. 아젠다 찾기 또는 생성 (13.5, Row 24)
         String agendaKey = Trim.trim(rawAgenda);
         if (agendaKey.isEmpty()) {
-            throw new WlException(400, "아젠다 이름이 비었다");
+            throw new AisException(400, "아젠다 이름이 비었다");
         }
 
         AgendaLookupResult agendaResult = lookupOrCreateAgenda(vaultRoot, noteIndex.agendaTable(), agendaKey);
@@ -242,7 +242,7 @@ public final class CreateDoc {
 
         // Row 29: 폴더 자리를 경로로 못 지음 (서로게이트 쌍 분리 등)
         if (PathConfinement.hasUnusablePathCharacters(noteRelPath)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + noteRelPath);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + noteRelPath);
         }
 
         Path noteDir = vaultRoot.resolve(noteRelPath);
@@ -267,7 +267,7 @@ public final class CreateDoc {
 
         // Row 28: 노트 파일이 저장 상한을 넘음 (UTF-16 코드 단위 1,000,000 초과)
         if (fullFileContent.length() > 1_000_000) {
-            throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + noteRelPath);
+            throw new AisException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + noteRelPath);
         }
 
         byte[] noteBytes = Utf16.toUtf8BytesWithQuestionForUnpaired(fullFileContent);
@@ -300,7 +300,7 @@ public final class CreateDoc {
 
     static LocalDate validateAndParseDate(String dateStr) {
         if (!DATE_SYNTAX_PATTERN.matcher(dateStr).matches() || dateStr.startsWith("-0000-")) {
-            throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
+            throw new AisException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
         }
 
         // 그레고리력 달력 유효성 검사
@@ -316,15 +316,15 @@ public final class CreateDoc {
             int day = Integer.parseInt(dateStr.substring(secondDash + 1));
 
             if (month < 1 || month > 12) {
-                throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
+                throw new AisException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
             }
             int maxDays = getDaysInMonth(year, month);
             if (day < 1 || day > maxDays) {
-                throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
+                throw new AisException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
             }
             return LocalDate.of(year, month, day);
         } catch (Exception e) {
-            throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
+            throw new AisException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + dateStr);
         }
     }
 
@@ -343,7 +343,7 @@ public final class CreateDoc {
 
     static LocalTime validateAndParseTime(String timeStr) {
         if (!TIME_SYNTAX_PATTERN.matcher(timeStr).matches()) {
-            throw new WlException(400, "time 은 HH:MM 모양이어야 한다: " + timeStr);
+            throw new AisException(400, "time 은 HH:MM 모양이어야 한다: " + timeStr);
         }
         int colon = timeStr.indexOf(':');
         int hour = Integer.parseInt(timeStr.substring(0, colon));
@@ -363,7 +363,7 @@ public final class CreateDoc {
         }
 
         if (start >= trimmed.length()) {
-            throw new WlException(400, "mins 은 숫자여야 한다: " + trimmed);
+            throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
         }
 
         long val = 0;
@@ -371,17 +371,17 @@ public final class CreateDoc {
             char c = trimmed.charAt(i);
             int digit = Character.digit(c, 10);
             if (digit < 0) {
-                throw new WlException(400, "mins 은 숫자여야 한다: " + trimmed);
+                throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
             }
             val = val * 10 + digit;
             if (val > (long) Integer.MAX_VALUE + 1L) {
-                throw new WlException(400, "mins 은 숫자여야 한다: " + trimmed);
+                throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
             }
         }
 
         long signed = negative ? -val : val;
         if (signed < Integer.MIN_VALUE || signed > Integer.MAX_VALUE) {
-            throw new WlException(400, "mins 은 숫자여야 한다: " + trimmed);
+            throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
         }
         return (int) signed;
     }
@@ -407,10 +407,10 @@ public final class CreateDoc {
             try {
                 val = JsonReader.parse(rawJson);
             } catch (Exception e) {
-                throw new WlException(400, "links 은 JSON 배열이어야 한다: " + rawJson);
+                throw new AisException(400, "links 은 JSON 배열이어야 한다: " + rawJson);
             }
             if (!(val instanceof JsonValue.JsonArray arr)) {
-                throw new WlException(400, "links 은 JSON 배열이어야 한다: " + rawJson);
+                throw new AisException(400, "links 은 JSON 배열이어야 한다: " + rawJson);
             }
             return validateJsonArrayLinks(arr);
         }
@@ -422,7 +422,7 @@ public final class CreateDoc {
 
         for (Object item : rawList) {
             if (!(item instanceof Map<?, ?> map)) {
-                throw new WlException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + item);
+                throw new AisException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + item);
             }
             Map<String, String> validLink = validateLinkEntry(map);
             String key = validLink.get("to") + "\u0000" + validLink.get("kind");
@@ -440,7 +440,7 @@ public final class CreateDoc {
 
         for (JsonValue el : arr.elements()) {
             if (!(el instanceof JsonValue.JsonObject obj)) {
-                throw new WlException(400, "links 항목이 객체가 아니다: " + JsonCompact.compact(el));
+                throw new AisException(400, "links 항목이 객체가 아니다: " + JsonCompact.compact(el));
             }
             Map<String, String> validLink = validateLinkJsonObject(obj);
             String key = validLink.get("to") + "\u0000" + validLink.get("kind");
@@ -462,27 +462,27 @@ public final class CreateDoc {
         }
         if (!unknownKeys.isEmpty()) {
             unknownKeys.sort(String::compareTo);
-            throw new WlException(400, "links 항목에 모르는 키가 있다: " + unknownKeys + ". 쓸 수 있는 것은 [to, kind] 뿐이다.");
+            throw new AisException(400, "links 항목에 모르는 키가 있다: " + unknownKeys + ". 쓸 수 있는 것은 [to, kind] 뿐이다.");
         }
 
         // 2. to 문자열 및 200자 검증
         JsonValue toVal = obj.properties().get("to");
         if (!(toVal instanceof JsonValue.JsonString toStr)) {
-            throw new WlException(400, "links 항목의 to 가 문자열이 아니다: " + (toVal != null ? JsonCompact.compact(toVal) : "null"));
+            throw new AisException(400, "links 항목의 to 가 문자열이 아니다: " + (toVal != null ? JsonCompact.compact(toVal) : "null"));
         }
         String to = toStr.value();
         if (to.length() > 200) {
-            throw new WlException(400, "links 항목의 to 가 너무 길다(최대 200자): " + to.length() + "자");
+            throw new AisException(400, "links 항목의 to 가 너무 길다(최대 200자): " + to.length() + "자");
         }
 
         // 3. kind 문자열 및 200자 검증
         JsonValue kindVal = obj.properties().get("kind");
         if (!(kindVal instanceof JsonValue.JsonString kindStr)) {
-            throw new WlException(400, "links 항목의 kind 가 문자열이 아니다: " + (kindVal != null ? JsonCompact.compact(kindVal) : "null"));
+            throw new AisException(400, "links 항목의 kind 가 문자열이 아니다: " + (kindVal != null ? JsonCompact.compact(kindVal) : "null"));
         }
         String kind = kindStr.value();
         if (kind.length() > 200) {
-            throw new WlException(400, "links 항목의 kind 가 너무 길다(최대 200자): " + kind.length() + "자");
+            throw new AisException(400, "links 항목의 kind 가 너무 길다(최대 200자): " + kind.length() + "자");
         }
 
         // 4. kind 값 검증 (direct, indirect, attach)
@@ -490,7 +490,7 @@ public final class CreateDoc {
 
         // 5. to id 모양 검증
         if (!IdGenerator.isValidNoteId(to)) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + to);
+            throw new AisException(400, "노트 id 모양이 아니다: " + to);
         }
 
         Map<String, String> link = new LinkedHashMap<>();
@@ -509,28 +509,28 @@ public final class CreateDoc {
         }
         if (!unknownKeys.isEmpty()) {
             unknownKeys.sort(String::compareTo);
-            throw new WlException(400, "links 항목에 모르는 키가 있다: " + unknownKeys + ". 쓸 수 있는 것은 [to, kind] 뿐이다.");
+            throw new AisException(400, "links 항목에 모르는 키가 있다: " + unknownKeys + ". 쓸 수 있는 것은 [to, kind] 뿐이다.");
         }
 
         Object toObj = map.get("to");
         if (!(toObj instanceof String to)) {
-            throw new WlException(400, "links 항목의 to 가 문자열이 아니다: " + (toObj != null ? "\"" + toObj + "\"" : "null"));
+            throw new AisException(400, "links 항목의 to 가 문자열이 아니다: " + (toObj != null ? "\"" + toObj + "\"" : "null"));
         }
         if (to.length() > 200) {
-            throw new WlException(400, "links 항목의 to 가 너무 길다(최대 200자): " + to.length() + "자");
+            throw new AisException(400, "links 항목의 to 가 너무 길다(최대 200자): " + to.length() + "자");
         }
 
         Object kindObj = map.get("kind");
         if (!(kindObj instanceof String kind)) {
-            throw new WlException(400, "links 항목의 kind 가 문자열이 아니다: " + (kindObj != null ? "\"" + kindObj + "\"" : "null"));
+            throw new AisException(400, "links 항목의 kind 가 문자열이 아니다: " + (kindObj != null ? "\"" + kindObj + "\"" : "null"));
         }
         if (kind.length() > 200) {
-            throw new WlException(400, "links 항목의 kind 가 너무 길다(최대 200자): " + kind.length() + "자");
+            throw new AisException(400, "links 항목의 kind 가 너무 길다(최대 200자): " + kind.length() + "자");
         }
 
         String canonicalKind = validateKind(kind);
         if (!IdGenerator.isValidNoteId(to)) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + to);
+            throw new AisException(400, "노트 id 모양이 아니다: " + to);
         }
 
         Map<String, String> link = new LinkedHashMap<>();
@@ -547,7 +547,7 @@ public final class CreateDoc {
         } else if ("attach".equalsIgnoreCase(kind)) {
             return "attach";
         } else {
-            throw new WlException(400, "모르는 관계 종류 이다: " + kind + ". 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.");
+            throw new AisException(400, "모르는 관계 종류 이다: " + kind + ". 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.");
         }
     }
 
@@ -565,7 +565,7 @@ public final class CreateDoc {
             List<Object> list = (List<Object>) toolOpts.get("tags");
             for (Object o : list) {
                 if (!(o instanceof String s)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + o);
+                    throw new AisException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + o);
                 }
                 rawItems.add(s);
             }
@@ -578,14 +578,14 @@ public final class CreateDoc {
             try {
                 val = JsonReader.parse(rawJson);
             } catch (Exception e) {
-                throw new WlException(400, "tags 은 JSON 배열이어야 한다: " + rawJson);
+                throw new AisException(400, "tags 은 JSON 배열이어야 한다: " + rawJson);
             }
             if (!(val instanceof JsonValue.JsonArray arr)) {
-                throw new WlException(400, "tags 은 JSON 배열이어야 한다: " + rawJson);
+                throw new AisException(400, "tags 은 JSON 배열이어야 한다: " + rawJson);
             }
             for (JsonValue el : arr.elements()) {
                 if (!(el instanceof JsonValue.JsonString str)) {
-                    throw new WlException(400, "tags 항목이 문자열이 아니다: " + JsonCompact.compact(el));
+                    throw new AisException(400, "tags 항목이 문자열이 아니다: " + JsonCompact.compact(el));
                 }
                 rawItems.add(str.value());
             }
@@ -604,7 +604,7 @@ public final class CreateDoc {
             }
             String trimmed = Trim.trim(raw);
             if (trimmed.indexOf('\n') >= 0 || trimmed.indexOf('\r') >= 0) {
-                throw new WlException(400, "태그에 줄바꿈이 있다: '" + trimmed + "'");
+                throw new AisException(400, "태그에 줄바꿈이 있다: '" + trimmed + "'");
             }
             if (!seen.contains(trimmed)) {
                 seen.add(trimmed);
@@ -636,7 +636,7 @@ public final class CreateDoc {
         String slugKey = SlugBuilder.build(key, 50);
         // Row 26: 경로로 쓸 수 없는 slug 검사
         if (PathConfinement.hasUnusablePathCharacters(slugKey + ".md")) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + slugKey + ".md");
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + slugKey + ".md");
         }
 
         match = table.slugToAgenda().get(slugKey);

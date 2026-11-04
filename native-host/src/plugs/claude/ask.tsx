@@ -340,7 +340,7 @@ export function EditorAskPlugins(props?: {
         const queued = busy.get(el) === true;
         if (el.classList.contains('is-queued') !== queued) el.classList.toggle('is-queued', queued);
       });
-      root.querySelectorAll<HTMLButtonElement>('.wl-html-frame-ask').forEach((button) => {
+      root.querySelectorAll<HTMLButtonElement>('.ais-html-frame-ask').forEach((button) => {
         const id = htmlAskId(button.dataset.rel ?? '');
         const text = htmlButtonText({ pending: records?.[id], turns: turnsForUnderline(current?.turns ?? [], id).length });
         button.hidden = !latest?.onAsk; // only an editor that takes questions shows the button
@@ -356,13 +356,13 @@ export function EditorAskPlugins(props?: {
     const observer = new MutationObserver(schedule);
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-ask-id', 'class'] });
     const clickButton = (event: Event) => {
-      const button = (event.target as Element | null)?.closest<HTMLButtonElement>('.wl-html-frame-ask');
+      const button = (event.target as Element | null)?.closest<HTMLButtonElement>('.ais-html-frame-ask');
       if (!button || !root.contains(button)) return;
       event.preventDefault();
       event.stopPropagation();
       const rel = button.dataset.rel ?? '';
       const id = htmlAskId(rel);
-      const header = button.closest('.wl-html-frame-header') ?? button;
+      const header = button.closest('.ais-html-frame-header') ?? button;
       const rect = header.getBoundingClientRect();
       const { thread: current, pending: records, props: latest } = live.current;
       if (turnsForUnderline(current?.turns ?? [], id).length === 0 && !records?.[id]) {
@@ -386,8 +386,8 @@ export function EditorAskPlugins(props?: {
       if (!pending?.[id]) continue;
       askedHtml.current.delete(id);
       const root = anchor.current?.closest('.lex-editor');
-      const button = [...(root?.querySelectorAll<HTMLButtonElement>('.wl-html-frame-ask') ?? [])].find((el) => htmlAskId(el.dataset.rel ?? '') === id);
-      const rect = (button?.closest('.wl-html-frame-header') ?? button)?.getBoundingClientRect();
+      const button = [...(root?.querySelectorAll<HTMLButtonElement>('.ais-html-frame-ask') ?? [])].find((el) => htmlAskId(el.dataset.rel ?? '') === id);
+      const rect = (button?.closest('.ais-html-frame-header') ?? button)?.getBoundingClientRect();
       if (rect) setCard({ id, left: rect.left, top: rect.bottom + 6, pinned: true });
     }
   }, [pending]);

@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.AgendaRow;
 import aisurada.text.Trim;
 import aisurada.vault.AgendaReader;
@@ -50,7 +50,7 @@ public final class UpdateAgenda {
             if (project.isEmpty()) {
                 project = null;
             } else if (!AgendaReader.isValidSlugSegment(project)) {
-                throw new WlException(400, "프로젝트 slug 가 안전한 경로 세그먼트가 아니다: " + project);
+                throw new AisException(400, "프로젝트 slug 가 안전한 경로 세그먼트가 아니다: " + project);
             }
         }
 

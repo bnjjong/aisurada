@@ -120,13 +120,13 @@ function fakeHost(options = {}) {
       calls.engine.push(argv);
       if (argv[0] === 'read-session') return { status: 0, stdout: JSON.stringify({ author: options.author ?? null }), stderr: '' };
       if (argv[0] === 'append-ask-turn') {
-        if (options.saveFails) return { status: 3, stdout: '', stderr: 'WL-500 디스크가 가득 찼다' };
+        if (options.saveFails) return { status: 3, stdout: '', stderr: 'AIS-500 디스크가 가득 찼다' };
         const get = (name) => argv.find((a) => a.startsWith(`${name}=`))?.slice(name.length + 1);
         const prior = options.saved ?? (options.saved = { noteId: argv[1], sessionId: get('session-id'), turns: [] });
         prior.turns.push({ id: get('turn-id'), markId: get('mark-id'), askedAt: get('asked-at'), ...(get('quote') ? { quote: get('quote') } : {}), question: get('question'), answer: get('answer'), ...(get('error') ? { error: get('error') } : {}), model: get('model'), effort: get('effort'), elapsedMs: Number(get('elapsed-ms')), ...(get('session-lines') ? { sessionLines: Number(get('session-lines')) } : {}), ...(get('images') ? { images: get('images').split(',') } : {}) });
         return { status: 0, stdout: JSON.stringify({ ...prior, path: `notes/a/${argv[1]}/ask.json` }), stderr: '' };
       }
-      return { status: 3, stdout: '', stderr: 'WL-400' };
+      return { status: 3, stdout: '', stderr: 'AIS-400' };
     },
     async askClaude(args) {
       calls.ask.push(args);
@@ -266,7 +266,7 @@ test('3.7: when the first note has nothing to carry, the next id is asked for', 
   const found = await authorBundleFor(host, 'f1a50000-0000-4000-8000-000000000001', ['snq', 'ndq']);
   assert.deepEqual(asked, ['author=snq,ndq', 'author=ndq']);
   assert.match(found.text, /사용자: 뿌리 노트의 대화/);
-  const failing = { engine: async () => ({ status: 3, stdout: '', stderr: 'WL-400' }) };
+  const failing = { engine: async () => ({ status: 3, stdout: '', stderr: 'AIS-400' }) };
   assert.deepEqual(await authorBundleFor(failing, 's', ['x']), { text: '', lines: 0 }, 'an old engine means no bundle, never a blocked question');
 });
 

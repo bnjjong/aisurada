@@ -1,6 +1,6 @@
 # aisurada 네이티브 호스트
 
-2부 1~18장의 Tauri 2 호스트와 3부 React 화면이다. 2부 커맨드 29개, 이벤트 4개, `wlframe` 프로토콜을 구현했다. 화면은 제공된 13장까지 연결하여 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·댓글·연결, 캘린더와 목록, 검색·이력 복원·외부 Markdown·설정을 지원한다. [3부 구현 순서](../docs/rebuild-p3-plan.md)와 [11~13장 기록](../docs/rebuild-p3-chapters11-13-complete.md)을 참고한다. 14~18장과 부록 본문, 원본 가이드 스킬·검색 골든 파일이 없어 그 범위는 별도 판정한다. 4부 Rust 모듈 6개(cargo 기능 `claude`)는 기본으로 켜져 있고, `--no-default-features`로 끄면 4부 커맨드 9개가 빠진다.
+2부 1~18장의 Tauri 2 호스트와 3부 React 화면이다. 2부 커맨드 29개, 이벤트 4개, `aisframe` 프로토콜을 구현했다. 화면은 제공된 13장까지 연결하여 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·댓글·연결, 캘린더와 목록, 검색·이력 복원·외부 Markdown·설정을 지원한다. [3부 구현 순서](../docs/rebuild-p3-plan.md)와 [11~13장 기록](../docs/rebuild-p3-chapters11-13-complete.md)을 참고한다. 14~18장과 부록 본문, 원본 가이드 스킬·검색 골든 파일이 없어 그 범위는 별도 판정한다. 4부 Rust 모듈 6개(cargo 기능 `claude`)는 기본으로 켜져 있고, `--no-default-features`로 끄면 4부 커맨드 9개가 빠진다.
 
 ```bash
 bash build.sh
@@ -48,11 +48,11 @@ pnpm test:autosave:acceptance     # 실제 엔진·WKWebView·Git·미러/undo �
 
 `sidecar_call({argv})`는 열린 vault로 `ais-cli.jar`를 호출한다. main 스레드 밖에서 두 출력을 동시에 읽고 120초를 넘으면 TERM→최대 3초→KILL로 직접 자식을 회수한다. `AISURADA_CLI_JAR`, `AISURADA_SIDECAR_JAVA`, `AISURADA_SIDECAR_JAR`로 경로를 지정한다. 원본 Gradle 경로와 이 저장소의 `dist/`를 개발 후보로 확인한다. 개발 판은 자원 폴더의 jar 사본을 쓰지 않는다. 개발 판과 빌드 폴더 아래 번들은 sidecar jar를 자동으로 넘기지 않는다.
 
-`write_attachment_bytes`는 raw 바이트와 퍼센트 인코딩한 `x-wl-note-dir`, `x-wl-name` 헤더를 받는다. 그림 확장자 8개와 5,000,000바이트 상한을 적용하고 vault 상대 경로를 반환한다. `open_in_default_app({path})`는 현재 vault의 실재 경로만 열고 실행 파일을 거절한다. `announce_self_write({root,relPath})`는 유효한 상대 경로와 현재 vault 글자가 일치할 때 실제 호출 창 이름을 붙여 모든 창에 알린다.
+`write_attachment_bytes`는 raw 바이트와 퍼센트 인코딩한 `x-ais-note-dir`, `x-ais-name` 헤더를 받는다. 그림 확장자 8개와 5,000,000바이트 상한을 적용하고 vault 상대 경로를 반환한다. `open_in_default_app({path})`는 현재 vault의 실재 경로만 열고 실행 파일을 거절한다. `announce_self_write({root,relPath})`는 유효한 상대 경로와 현재 vault 글자가 일치할 때 실제 호출 창 이름을 붙여 모든 창에 알린다.
 
 `resolve_md_target({path,knownRoots})`는 vault 노트와 외부 Markdown을 구분한다. `read_external_md({path})`는 엄격한 UTF-8의 2 MiB 이하 파일을 읽는다. `allow_external_images({mdPath,srcs})`는 문서 폴더 안의 상대 그림을 파일별로 그림 범위에 연다.
 
-`wlframe://localhost/절대/첨부/경로`는 `notes/**/attach/` 안의 허용 형식만 제공한다. HTML에는 높이·외부 링크 알림 스크립트를 붙이고 모든 응답에 고정 CSP·nosniff·no-store를 단다. 부모 화면의 sandbox와 링크 처리·높이 제한은 3부 편집기에 연결했다.
+`aisframe://localhost/절대/첨부/경로`는 `notes/**/attach/` 안의 허용 형식만 제공한다. HTML에는 높이·외부 링크 알림 스크립트를 붙이고 모든 응답에 고정 CSP·nosniff·no-store를 단다. 부모 화면의 sandbox와 링크 처리·높이 제한은 3부 편집기에 연결했다.
 
 노트 창은 `open_note_window({docId,title,geometry})`로 열고 `note_windows`, `close_note_windows`, `destroy_current_window`, `show_in_main`으로 다룬다. `saved_note_windows`, `restore_note_windows({docs})`, `remember_note_window({geometry})`가 vault별 복원 목록을 관리한다. 창의 JS 닫기 요청 처리와 편집 글 저장은 3부의 몫이다.
 
@@ -62,7 +62,7 @@ PTY 커맨드는 `pty_start`, `pty_write`, `pty_resize`, `pty_detach`, `pty_aliv
 
 비밀 가림은 `secret_table_probe`, `secret_table_status`, `mask_scrollback`, `scan_text_shapes`로 제공한다. probe를 실제로 부를 때만 HOME의 `.zshrc` 관리 블록과 로그인 셸 환경을 읽는다. 값은 직렬화·Debug를 구현하지 않은 타입에만 보관한다. 실 이름 분류표 `src-tauri/secret-names.txt`는 Git에서 제외하며, 없으면 항목 없는 견본을 포함한다. 견본 빌드는 표를 뜨기 전 가리기를 거절한다. 테스트는 지어낸 이름과 값만 사용한다.
 
-원본 `wl-agent/*.mjs` 데몬은 제공되지 않아 포함하지 않았다. 기본 빌드는 다시 구현한 4부 커맨드 9개를 제공하며, 4부를 뺀 Rust 빌드에서는 `Command … not found`로 거절된다. 번들 자원은 이 저장소의 `dist/`에 맞췄으며 원본 아이콘 대신 임시 SVG 아이콘을 사용한다. 장별 구현·검증·손 확인 범위는 [9장](../docs/rebuild-p2-chapter09-complete.md)부터 [18장](../docs/rebuild-p2-chapter18-complete.md)까지의 완료 문서와 [부록 기록](../docs/rebuild-p2-appendices-complete.md)에 적었다.
+원본 `ais-agent/*.mjs` 데몬은 제공되지 않아 포함하지 않았다. 기본 빌드는 다시 구현한 4부 커맨드 9개를 제공하며, 4부를 뺀 Rust 빌드에서는 `Command … not found`로 거절된다. 번들 자원은 이 저장소의 `dist/`에 맞췄으며 원본 아이콘 대신 임시 SVG 아이콘을 사용한다. 장별 구현·검증·손 확인 범위는 [9장](../docs/rebuild-p2-chapter09-complete.md)부터 [18장](../docs/rebuild-p2-chapter18-complete.md)까지의 완료 문서와 [부록 기록](../docs/rebuild-p2-appendices-complete.md)에 적었다.
 
 외부 검증 사진에서 확인한 원본 받아들임·합치기 결과, 동작 차이 네 건과 실제 앱 조작으로 확인할 일곱 항목은 [2부 피드백 확인 기록](../docs/rebuild-p2-review-2026-10-31.md)에 정리했다.
 

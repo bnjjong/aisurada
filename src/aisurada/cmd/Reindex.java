@@ -31,7 +31,7 @@ public final class Reindex {
         // 3. 템플릿 훑기 (2.4, 24장)
         TemplateReader.ScanResult templateScan = TemplateReader.scan(vaultRoot);
 
-        // 4. 회고 훑기 (2.5, 25장) - .aisurada/reports/ 폴더 목록 못 읽으면 WL-500 던짐
+        // 4. 회고 훑기 (2.5, 25장) - .aisurada/reports/ 폴더 목록 못 읽으면 AIS-500 던짐
         ReportReader.ScanResult reportScan = ReportReader.scan(vaultRoot);
 
         // 5. 휴지통 훑기 (2.6, 26장)

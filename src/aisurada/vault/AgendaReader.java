@@ -1,6 +1,6 @@
 package aisurada.vault;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 
@@ -78,7 +78,7 @@ public final class AgendaReader {
                 }
             }
         } catch (IOException e) {
-            throw new WlException(500, "아젠다 폴더를 읽지 못했다: " + agendasDir.toAbsolutePath().normalize());
+            throw new AisException(500, "아젠다 폴더를 읽지 못했다: " + agendasDir.toAbsolutePath().normalize());
         }
 
         files.sort((a, b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
@@ -159,7 +159,7 @@ public final class AgendaReader {
             // 20.9 13번: 아젠다 제목이 공백뿐인 경우 색인 맞추기 전체를 세움
             if (Trim.isBlank(title)) {
                 if (haltOnFatal) {
-                    throw new WlException(400, "아젠다 제목이 비었다: " + slug);
+                    throw new AisException(400, "아젠다 제목이 비었다: " + slug);
                 } else {
                     addSkipped(skipped, relPath, "아젠다 제목이 비었다");
                     continue;

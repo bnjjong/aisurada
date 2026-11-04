@@ -3,7 +3,7 @@ package aisurada.ask;
 import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.JsonWriter;
 import aisurada.text.IdShape;
 import aisurada.text.Trim;
@@ -51,16 +51,16 @@ public final class AskCommands {
     public static String[] checkPositionalIds(ParsedArgs parsed, String commandName) {
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + commandName + " <노트 id> [하위 노트 id]");
+            throw new AisException(400, "인자가 하나 필요하다: " + commandName + " <노트 id> [하위 노트 id]");
         }
 
         String rawRootId = pos.get(0);
         if (pos.size() > 1 && (pos.get(1) == null || Trim.isBlank(pos.get(1)))) {
-            throw new WlException(400, "하위 노트 id 칸이 비어 있다. 노트에 붙이려면 그 칸을 빼라");
+            throw new AisException(400, "하위 노트 id 칸이 비어 있다. 노트에 붙이려면 그 칸을 빼라");
         }
 
         if (!IdShape.NOTE.matcher(rawRootId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawRootId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawRootId);
         }
 
         if (pos.size() == 1) {
@@ -69,7 +69,7 @@ public final class AskCommands {
 
         String rawSubId = pos.get(1);
         if (!IdShape.SUB_NOTE.matcher(rawSubId).matches()) {
-            throw new WlException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
+            throw new AisException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
         }
         return new String[]{rawRootId, rawSubId};
     }
@@ -84,10 +84,10 @@ public final class AskCommands {
         if (rawSubId == null) {
             NoteScanner.NoteRecord note = scanResult.notesById().get(rawRootId);
             if (note == null) {
-                throw new WlException(404, "Note not found: " + rawRootId);
+                throw new AisException(404, "Note not found: " + rawRootId);
             }
             if (note.isSingleFile()) {
-                throw new WlException(500, "폴더로 안 올라간 단일 파일 노트에는 문답을 둘 수 없다: " + note.contentFilePath());
+                throw new AisException(500, "폴더로 안 올라간 단일 파일 노트에는 문답을 둘 수 없다: " + note.contentFilePath());
             }
             Path noteDir = note.contentFilePath().getParent();
             Path askFile = noteDir.resolve("ask.json");
@@ -97,16 +97,16 @@ public final class AskCommands {
 
         NoteScanner.NoteRecord rootNote = scanResult.notesById().get(rawRootId);
         if (rootNote == null) {
-            throw new WlException(404, "Note not found: " + rawRootId);
+            throw new AisException(404, "Note not found: " + rawRootId);
         }
 
         NoteScanner.NoteRecord subNote = rootNote.subNotes().get(rawSubId);
         if (subNote == null) {
-            throw new WlException(404, "SubNote not found: " + rawSubId);
+            throw new AisException(404, "SubNote not found: " + rawSubId);
         }
 
         if (subNote.isSingleFile()) {
-            throw new WlException(500, "폴더로 안 올라간 단일 파일 하위 노트에는 문답을 둘 수 없다: " + subNote.contentFilePath());
+            throw new AisException(500, "폴더로 안 올라간 단일 파일 하위 노트에는 문답을 둘 수 없다: " + subNote.contentFilePath());
         }
 
         Path noteDir = subNote.contentFilePath().getParent();
@@ -135,10 +135,10 @@ public final class AskCommands {
         try {
             long size = Files.size(askFile);
             if (size > MAX_ASK_FILE_BYTES) {
-                throw new WlException(500, "문답 파일을 못 읽었다: 파일이 너무 크다(" + size + "바이트). 상한은 1000000바이트다.");
+                throw new AisException(500, "문답 파일을 못 읽었다: 파일이 너무 크다(" + size + "바이트). 상한은 1000000바이트다.");
             }
         } catch (IOException e) {
-            throw new WlException(500, "문답 파일을 못 읽었다: " + e.getMessage());
+            throw new AisException(500, "문답 파일을 못 읽었다: " + e.getMessage());
         }
 
         String content;
@@ -146,18 +146,18 @@ public final class AskCommands {
             // 깨진 UTF-8 바이트는 U+FFFD로 바꿔 읽는다. 바이트 하나로 문답 전체를 잃지 않게 한다(2.5)
             content = new String(Files.readAllBytes(askFile), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new WlException(500, "문답 파일을 못 읽었다: " + e.getMessage());
+            throw new AisException(500, "문답 파일을 못 읽었다: " + e.getMessage());
         }
 
         JsonValue parsedVal;
         try {
             parsedVal = JsonReader.parseFile(content);
         } catch (Exception e) {
-            throw new WlException(500, "문답 파일을 못 읽었다: " + e.getMessage());
+            throw new AisException(500, "문답 파일을 못 읽었다: " + e.getMessage());
         }
 
         if (!(parsedVal instanceof JsonValue.JsonObject)) {
-            throw new WlException(500, "문답 파일을 못 읽었다: 최상위가 객체가 아니다");
+            throw new AisException(500, "문답 파일을 못 읽었다: 최상위가 객체가 아니다");
         }
 
         Map<String, Object> rawMap = (Map<String, Object>) toJavaValue(parsedVal);
@@ -340,19 +340,19 @@ public final class AskCommands {
             elapsedMs = Integer.parseInt(rawElapsed);
             if (elapsedMs < 0) throw new NumberFormatException();
         } catch (Exception e) {
-            throw new WlException(400, "elapsed-ms 은 숫자여야 한다: " + rawElapsed);
+            throw new AisException(400, "elapsed-ms 은 숫자여야 한다: " + rawElapsed);
         }
 
         if (question.length() > MAX_TEXT_CHARS) {
-            throw new WlException(400, "질문이 상한을 넘었다: " + question.length() + "자. 상한은 20000자다.");
+            throw new AisException(400, "질문이 상한을 넘었다: " + question.length() + "자. 상한은 20000자다.");
         }
         if (answer.length() > MAX_TEXT_CHARS) {
-            throw new WlException(400, "답변이 상한을 넘었다: " + answer.length() + "자. 상한은 20000자다.");
+            throw new AisException(400, "답변이 상한을 넘었다: " + answer.length() + "자. 상한은 20000자다.");
         }
 
         String quote = opts.get("quote");
         if (quote != null && quote.length() > MAX_QUOTE_CHARS) {
-            throw new WlException(400, "인용이 상한을 넘었다: " + quote.length() + "자. 상한은 2000자다.");
+            throw new AisException(400, "인용이 상한을 넘었다: " + quote.length() + "자. 상한은 2000자다.");
         }
 
         String error = opts.get("error");
@@ -365,7 +365,7 @@ public final class AskCommands {
                 if (lines < 1) throw new NumberFormatException();
                 sessionLines = lines;
             } catch (Exception e) {
-                throw new WlException(400, "session-lines 은 1 이상이어야 한다: " + rawSessionLines);
+                throw new AisException(400, "session-lines 은 1 이상이어야 한다: " + rawSessionLines);
             }
         }
 
@@ -381,15 +381,15 @@ public final class AskCommands {
                 }
             }
             if (valid.size() > MAX_IMAGES) {
-                throw new WlException(400, "그림은 한 물음에 8장까지다: " + valid.size() + "장");
+                throw new AisException(400, "그림은 한 물음에 8장까지다: " + valid.size() + "장");
             }
             for (String img : valid) {
                 if (!img.startsWith("attach/")) {
-                    throw new WlException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
+                    throw new AisException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
                 }
                 String name = img.substring("attach/".length());
                 if (!isValidAttachmentName(name)) {
-                    throw new WlException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
+                    throw new AisException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
                 }
             }
             if (!valid.isEmpty()) {
@@ -397,7 +397,7 @@ public final class AskCommands {
             }
         }
 
-        // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 WL-404, 단일 파일 노트면 WL-500
+        // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 AIS-404, 단일 파일 노트면 AIS-500
         NoteTarget target = locateTarget(vaultRoot, ids, noteIndex.noteScan());
 
         // 기존 ask.json 읽기 또는 새 구조체 생성
@@ -450,7 +450,7 @@ public final class AskCommands {
 
         // D1 고침 (cc12691b): 1,000,000 바이트 초과 사전 검사
         if (fileBytes.length > MAX_ASK_FILE_BYTES) {
-            throw new WlException(500, "문답 파일이 상한을 넘어 붙일 수 없다: 붙이면 " + fileBytes.length + "바이트다. 상한은 1000000바이트다.");
+            throw new AisException(500, "문답 파일이 상한을 넘어 붙일 수 없다: 붙이면 " + fileBytes.length + "바이트다. 상한은 1000000바이트다.");
         }
 
         // 원자적 파일 쓰기
@@ -468,7 +468,7 @@ public final class AskCommands {
     private static String requireOption(Map<String, String> opts, String key) {
         String val = opts.get(key);
         if (val == null || Trim.isBlank(val)) {
-            throw new WlException(400, key + " 이 필요하다");
+            throw new AisException(400, key + " 이 필요하다");
         }
         return Trim.trim(val);
     }
@@ -476,7 +476,7 @@ public final class AskCommands {
     private static String requireOptionRaw(Map<String, String> opts, String key) {
         String val = opts.get(key);
         if (val == null) {
-            throw new WlException(400, key + " 이 필요하다");
+            throw new AisException(400, key + " 이 필요하다");
         }
         return val;
     }
@@ -487,7 +487,7 @@ public final class AskCommands {
             try {
                 Files.createDirectories(parent);
             } catch (IOException e) {
-                throw new WlException(500, "폴더를 만들지 못했다: " + parent);
+                throw new AisException(500, "폴더를 만들지 못했다: " + parent);
             }
         }
         Path tmp = parent.resolve(targetFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
@@ -500,7 +500,7 @@ public final class AskCommands {
             }
         } catch (IOException e) {
             try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
-            throw new WlException(500, "문답 파일 쓰기 실패: " + e.getMessage());
+            throw new AisException(500, "문답 파일 쓰기 실패: " + e.getMessage());
         }
     }
 }

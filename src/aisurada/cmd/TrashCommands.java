@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.Diagnostics;
 import aisurada.engine.WritePipeline;
 import aisurada.out.JsonWriter;
@@ -26,14 +26,14 @@ public final class TrashCommands {
         var index = WritePipeline.index(vault);
         if (args.commandName().equals("empty-trash")) return empty(vault);
         String usage = args.commandName().equals("delete-doc") ? "delete-doc <노트 id>" : args.commandName() + " <휴지통 항목 id. list-trash 로 조회한다>";
-        if (args.positionalArgs().isEmpty() || Trim.isBlank(args.positionalArgs().getFirst())) throw new WlException(400, "인자가 하나 필요하다: " + usage);
+        if (args.positionalArgs().isEmpty() || Trim.isBlank(args.positionalArgs().getFirst())) throw new AisException(400, "인자가 하나 필요하다: " + usage);
         String id = args.positionalArgs().getFirst();
         if (args.commandName().equals("delete-doc")) {
-            if (!IdGenerator.isValidNoteId(id)) throw new WlException(400, "노트 id 모양이 아니다: " + id);
+            if (!IdGenerator.isValidNoteId(id)) throw new AisException(400, "노트 id 모양이 아니다: " + id);
             return delete(vault, index, id);
         }
-        if (!id.matches("tr[0-9a-z]+-[0-9a-f]{8}")) throw new WlException(400, "휴지통 항목 id 모양이 아니다: " + id);
-        var first = entries(vault).stream().filter(r -> r.trashId().equals(id)).findFirst().orElseThrow(() -> new WlException(404, "TrashEntry not found: " + id));
+        if (!id.matches("tr[0-9a-z]+-[0-9a-f]{8}")) throw new AisException(400, "휴지통 항목 id 모양이 아니다: " + id);
+        var first = entries(vault).stream().filter(r -> r.trashId().equals(id)).findFirst().orElseThrow(() -> new AisException(404, "TrashEntry not found: " + id));
         if (args.commandName().equals("restore-doc")) return restore(vault, index, first);
         var entries = entries(vault);
         TreeRemover.remove(archive(vault, first.file()));
@@ -43,7 +43,7 @@ public final class TrashCommands {
 
     private static Map<String, Object> delete(Path vault, NoteIndex index, String id) {
         var note = index.notesById().get(id);
-        if (note == null) throw new WlException(404, "Note not found: " + id);
+        if (note == null) throw new AisException(404, "Note not found: " + id);
         AttachText.extract(vault, note); // 기록 층도 보낸다. 도구의 읽기 게이트는 적용하지 않는다.
         String trashId = IdGenerator.nextId("tr"), path = note.vaultRelPath();
         String extension = note.format().equals("markdown") ? "md" : note.format();
@@ -61,7 +61,7 @@ public final class TrashCommands {
                 note.meta().created(), UTC.format(now), now, -1);
         var entries = entries(vault);
         Path source = vault.resolve(path);
-        if (!Files.exists(source)) throw new WlException(400, "옮길 노트 파일이 없다: " + path);
+        if (!Files.exists(source)) throw new AisException(400, "옮길 노트 파일이 없다: " + path);
         NoteMover.move(source, archive(vault, file));
         List<TrashReader.TrashRecord> updated = new ArrayList<>(); updated.add(entry);
         entries.stream().filter(r -> !r.trashId().equals(trashId)).forEach(updated::add); save(vault, updated);
@@ -85,7 +85,7 @@ public final class TrashCommands {
         Path source = archive(vault, entry.file());
         if (!Files.exists(source)) {
             save(vault, entries.stream().filter(r -> !r.trashId().equals(entry.trashId())).toList());
-            throw new WlException(400, "보관 파일이 사라져 복구할 수 없어요(휴지통 목록 정리됨).");
+            throw new AisException(400, "보관 파일이 사라져 복구할 수 없어요(휴지통 목록 정리됨).");
         }
         String[] pieces = entry.originalPath().split("[/\\\\]", -1);
         String name = pieces[pieces.length - 1];

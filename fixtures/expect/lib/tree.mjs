@@ -31,7 +31,7 @@ export function fileBytes(entry) {
  */
 export function checkTree(tree, where) {
   if (!tree || typeof tree !== 'object' || Array.isArray(tree)) throw new RunnerError(`${where}: JSON 객체가 아니다`);
-  if (tree.format !== 'wlx-tree' || tree.version !== 1) throw new RunnerError(`${where}: format 이 wlx-tree 이고 version 이 1 이어야 한다`);
+  if (tree.format !== 'aisx-tree' || tree.version !== 1) throw new RunnerError(`${where}: format 이 aisx-tree 이고 version 이 1 이어야 한다`);
   for (const d of tree.dirs) checkRelPath(d, where);
   for (const f of tree.files) {
     checkRelPath(f && f.path, where);
@@ -156,7 +156,7 @@ export function treeFromDisk(root, source, note) {
     }
   };
   walk('');
-  return { format: 'wlx-tree', version: 1, source, note, dirs, files };
+  return { format: 'aisx-tree', version: 1, source, note, dirs, files };
 }
 
 export function compareUtf16(a, b) {

@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.vault.Frontmatter;
@@ -39,7 +39,7 @@ public final class DerivedBodyWriter {
 
     /**
      * 걷은 본문을 쓰기 직전에 파일을 다시 열어 7.2의 2번과 6번만 봅니다. 토큰과 도장은 안 봅니다(7.3의 5번).
-     * 못 읽거나 프론트매터가 없으면 `WL-500`이고, 그 파일의 YAML 맵을 돌려줍니다.
+     * 못 읽거나 프론트매터가 없으면 `AIS-500`이고, 그 파일의 YAML 맵을 돌려줍니다.
      */
     private static Map<String, Object> reopen(Path vaultRoot, Path file, String snippet) {
         String rel = vaultRoot.relativize(file).toString().replace('\\', '/');
@@ -50,13 +50,13 @@ public final class DerivedBodyWriter {
             }
             content = StrictUtf8.decodeStrict(Files.readAllBytes(file));
         } catch (IOException e) {
-            throw new WlException(500, "노트 본문 파일을 못 읽어 " + snippet + " 않았다: " + rel);
+            throw new AisException(500, "노트 본문 파일을 못 읽어 " + snippet + " 않았다: " + rel);
         }
         MetaWriter.FileParts parts = MetaWriter.split(content);
         Map<String, Object> map = parts.fenceFound() && parts.yamlPart() != null && parts.yamlPart().length() <= 16_000
                 ? Frontmatter.parse(parts.yamlPart()) : null;
         if (map == null) {
-            throw new WlException(500, "프론트매터가 없어 " + snippet + " 않았다: " + rel);
+            throw new AisException(500, "프론트매터가 없어 " + snippet + " 않았다: " + rel);
         }
         return map;
     }
@@ -91,7 +91,7 @@ public final class DerivedBodyWriter {
                 root.meta().template(), evaluation, root.meta().links());
         String fileText = "---\n" + frontmatter + "---\n" + body;
         if (fileText.length() > 1_000_000) {
-            throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: "
+            throw new AisException(500, "노트가 저장 상한을 넘어 저장하지 않았다: "
                     + vaultRoot.relativize(root.contentFilePath()).toString().replace('\\', '/'));
         }
         byte[] bytes = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);

@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.ProjectReader;
 import aisurada.write.IdGenerator;
@@ -28,22 +28,22 @@ final class ProjectArgs {
     static String requireId(ParsedArgs parsed, String usage) {
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + usage);
+            throw new AisException(400, "인자가 하나 필요하다: " + usage);
         }
         String id = pos.get(0);
         if (!IdGenerator.isValidProjectId(id)) {
-            throw new WlException(400, "프로젝트 id 모양이 아니다: " + id);
+            throw new AisException(400, "프로젝트 id 모양이 아니다: " + id);
         }
         return id;
     }
 
     /**
-     * 프로젝트 행에서 id로 찾습니다. 없으면 WL-404입니다.
+     * 프로젝트 행에서 id로 찾습니다. 없으면 AIS-404입니다.
      */
     static ProjectReader.ProjectInfo find(Map<String, ProjectReader.ProjectInfo> projects, String id) {
         ProjectReader.ProjectInfo info = projects.get(id);
         if (info == null) {
-            throw new WlException(404, "Project not found: " + id);
+            throw new AisException(404, "Project not found: " + id);
         }
         return info;
     }

@@ -10,7 +10,7 @@
     }
     const style = getComputedStyle(document.body);
     const height = Math.ceil(bottom + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.marginBottom) || 0));
-    if (height !== last) { last = height; parent.postMessage({wlframeHeight: height}, '*'); }
+    if (height !== last) { last = height; parent.postMessage({aisframeHeight: height}, '*'); }
   }
   function schedule() { if (!timer) timer = setTimeout(send, 30); }
   if (document.body) {

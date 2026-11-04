@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.vault.NoteIndex;
@@ -51,23 +51,23 @@ public final class CreateSubNote {
         // 4. 첫 자리 인자, 부모 참조, title, body, type, 제목 공백, 그다음 루트 노트 차례
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
         SubNoteChain.Parent parent = SubNoteChain.resolveParent(noteIndex, pos.get(0));
         String title = opts.get("title");
         if (title == null) {
-            throw new WlException(400, "title 이 필요하다: " + USAGE);
+            throw new AisException(400, "title 이 필요하다: " + USAGE);
         }
         String body = opts.get("body");
         if (body == null) {
-            throw new WlException(400, "body 이 필요하다: " + USAGE);
+            throw new AisException(400, "body 이 필요하다: " + USAGE);
         }
         String type = canonicalType(opts.getOrDefault("type", "free"));
         if (Trim.isBlank(title)) {
-            throw new WlException(400, "하위 노트 제목이 비었다");
+            throw new AisException(400, "하위 노트 제목이 비었다");
         }
         if (parent.root() == null) {
-            throw new WlException(404, "Note not found: " + parent.rootId());
+            throw new AisException(404, "Note not found: " + parent.rootId());
         }
 
         // 17.5 만들기 2번~5번: 새 id, 분 아래를 버린 created, 루트에서 물려받는 아젠다, 컨테이너 자리
@@ -78,7 +78,7 @@ public final class CreateSubNote {
         String agenda = SubNoteWriter.rootAgenda(parent.root());
         NoteScanner.NoteRecord container = parent.container();
         if (container.isSingleFile() || container.isExtensionFolder()) {
-            throw new WlException(500, SubNoteWriter.SINGLE_FILE_MESSAGE + container.vaultRelPath());
+            throw new AisException(500, SubNoteWriter.SINGLE_FILE_MESSAGE + container.vaultRelPath());
         }
 
         // 6번: <컨테이너 자리>/sub/<폴더 이름>/note.md. 상한을 본 뒤 경로를 보고, 빈자리를 안 보고 쓴다(1.5)
@@ -90,10 +90,10 @@ public final class CreateSubNote {
                 null, false, null, null, null, null);
         String fileText = "---\n" + frontmatter + "---\n" + body;
         if (fileText.length() > 1_000_000) {
-            throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + folderRel);
+            throw new AisException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + folderRel);
         }
         if (PathConfinement.hasUnusablePathCharacters(folderRel)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + folderRel);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + folderRel);
         }
         PathConfinement.checkConfinement(vaultRoot, vaultRoot.resolve(folderRel));
         byte[] written = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);
@@ -132,6 +132,6 @@ public final class CreateSubNote {
                 return t;
             }
         }
-        throw new WlException(400, "모르는 유형 이다: " + raw + ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
+        throw new AisException(400, "모르는 유형 이다: " + raw + ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
     }
 }

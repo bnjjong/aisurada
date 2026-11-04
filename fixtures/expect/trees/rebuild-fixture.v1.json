@@ -1,5 +1,5 @@
 {
-  "format": "wlx-tree",
+  "format": "aisx-tree",
   "version": 1,
   "source": "aisurada-p1-rebuild/selftest/vault",
   "note": "다시 짜기 개발 폴더의 픽스처 vault. 설명서 34.1의 fixture.v1(파일 149개, 폴더 149개)이 이 기기에 없어서 대신 담았다.",
@@ -1985,7 +1985,7 @@
         "",
         "메타가 아직 아무것도 없는 노트다.",
         "",
-        "<!--wlc:cmfixture-0000000c-->본문 한 줄<!--/wlc:cmfixture-0000000c-->",
+        "<!--aisc:cmfixture-0000000c-->본문 한 줄<!--/aisc:cmfixture-0000000c-->",
         "",
         "[후속 메모](#sub:snfixture-00000001)",
         "",

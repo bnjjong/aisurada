@@ -1,5 +1,5 @@
 /* Chapter 3 acceptance driver; uses DOM and public host commands only. */
-const cfg = window.__WL_FIXTURE__;
+const cfg = window.__AIS_FIXTURE__;
 const invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);
 const assert = (value, message) => { if (!value) throw Error(message || 'assertion failed'); };
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -24,7 +24,7 @@ if (location.pathname.startsWith('/note-window/')) {
   try {
     await until(() => document.querySelector('.note-body'));
     assert(!document.querySelector('.tab-bar'), 'note window has tabs');
-    assert(!window.__WL_WRITES__.length, 'note window wrote main storage');
+    assert(!window.__AIS_WRITES__.length, 'note window wrote main storage');
     await post('/note-result', { ok: true });
   } catch (error) { await post('/note-result', { ok: false, error: String(error) }); }
 } else {
@@ -107,7 +107,7 @@ if (location.pathname.startsWith('/note-window/')) {
         go('/terminal'); await until(() => document.querySelector('[data-terminal-key="term:main"] .xterm .xterm-screen'), 40000, 'xterm mounted');
         const bar = () => document.querySelector('[data-terminal-key="term:main"] .term-bar-btn');
         await until(() => bar() && !bar().disabled, 40000, 'shell started');
-        for (const n of [1, 2, 3, 4, 5]) await invoke('pty_write', { key: 'term:main', data: `echo wl-xterm-marker-${n}\r` });
+        for (const n of [1, 2, 3, 4, 5]) await invoke('pty_write', { key: 'term:main', data: `echo ais-xterm-marker-${n}\r` });
         const hinted = () => Number(/(\d+)줄이에요/.exec(document.querySelector('.pin-hint')?.textContent || '')?.[1] || 0);
         let lines = 0;
         await until(async () => {

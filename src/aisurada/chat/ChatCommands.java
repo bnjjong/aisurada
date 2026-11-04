@@ -3,7 +3,7 @@ package aisurada.chat;
 import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.JsonWriter;
 import aisurada.text.IdShape;
 import aisurada.text.Trim;
@@ -66,10 +66,10 @@ public final class ChatCommands {
         if (rawSubId == null) {
             NoteScanner.NoteRecord note = scanResult.notesById().get(rawRootId);
             if (note == null) {
-                throw new WlException(404, "Note not found: " + rawRootId);
+                throw new AisException(404, "Note not found: " + rawRootId);
             }
             if (note.isSingleFile()) {
-                throw new WlException(500, "폴더로 안 올라간 단일 파일 노트에는 레일 대화를 둘 수 없다: " + note.contentFilePath());
+                throw new AisException(500, "폴더로 안 올라간 단일 파일 노트에는 레일 대화를 둘 수 없다: " + note.contentFilePath());
             }
             Path noteDir = note.contentFilePath().getParent();
             Path chatsDir = noteDir.resolve("chats");
@@ -78,16 +78,16 @@ public final class ChatCommands {
 
         NoteScanner.NoteRecord rootNote = scanResult.notesById().get(rawRootId);
         if (rootNote == null) {
-            throw new WlException(404, "Note not found: " + rawRootId);
+            throw new AisException(404, "Note not found: " + rawRootId);
         }
 
         NoteScanner.NoteRecord subNote = rootNote.subNotes().get(rawSubId);
         if (subNote == null) {
-            throw new WlException(404, "SubNote not found: " + rawSubId);
+            throw new AisException(404, "SubNote not found: " + rawSubId);
         }
 
         if (subNote.isSingleFile()) {
-            throw new WlException(500, "폴더로 안 올라간 단일 파일 하위 노트에는 레일 대화를 둘 수 없다: " + subNote.contentFilePath());
+            throw new AisException(500, "폴더로 안 올라간 단일 파일 하위 노트에는 레일 대화를 둘 수 없다: " + subNote.contentFilePath());
         }
 
         Path noteDir = subNote.contentFilePath().getParent();
@@ -117,7 +117,7 @@ public final class ChatCommands {
         }
 
         if (!Files.isDirectory(target.chatsDir)) {
-            throw new WlException(500, "chats 경로가 디렉토리가 아니다: " + target.chatsDir);
+            throw new AisException(500, "chats 경로가 디렉토리가 아니다: " + target.chatsDir);
         }
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(target.chatsDir)) {
@@ -153,7 +153,7 @@ public final class ChatCommands {
                 }
             }
         } catch (IOException e) {
-            throw new WlException(500, "chats 폴더를 읽지 못했다: " + e.getMessage());
+            throw new AisException(500, "chats 폴더를 읽지 못했다: " + e.getMessage());
         }
 
         // 정렬: createdAt 시각 오름차순, 같으면 chatId 오름차순
@@ -193,12 +193,12 @@ public final class ChatCommands {
 
         String chatId = requireTrimmed(opts, "chat-id", "chat-id 이 필요하다");
         if (!CHAT_ID_PATTERN.matcher(chatId).matches()) {
-            throw new WlException(400, "대화 id 모양이 아니다: " + chatId);
+            throw new AisException(400, "대화 id 모양이 아니다: " + chatId);
         }
 
         String sourceSession = requireTrimmed(opts, "source-session", "source-session 이 필요하다");
         if (sourceSession.length() > 128) {
-            throw new WlException(400, "source-session 은 128자 이하여야 한다");
+            throw new AisException(400, "source-session 은 128자 이하여야 한다");
         }
 
         String turnId = requireTrimmed(opts, "turn-id", "turn-id 이 필요하다");
@@ -206,12 +206,12 @@ public final class ChatCommands {
 
         String question = requireRaw(opts, "question", "question 이 필요하다");
         if (question.length() > MAX_TEXT_CHARS) {
-            throw new WlException(400, "질문은 " + MAX_TEXT_CHARS + "자 이하여야 한다");
+            throw new AisException(400, "질문은 " + MAX_TEXT_CHARS + "자 이하여야 한다");
         }
 
         String answer = requireRaw(opts, "answer", "answer 가 필요하다");
         if (answer.length() > MAX_TEXT_CHARS) {
-            throw new WlException(400, "답은 " + MAX_TEXT_CHARS + "자 이하여야 한다");
+            throw new AisException(400, "답은 " + MAX_TEXT_CHARS + "자 이하여야 한다");
         }
 
         String error = opts.get("error"); // raw 유지
@@ -225,10 +225,10 @@ public final class ChatCommands {
             // 정수는 32비트다. 문답 파일의 elapsed-ms 와 같은 범위다(2.7)
             elapsedMs = Integer.parseInt(elapsedMsStr);
             if (elapsedMs < 0) {
-                throw new WlException(400, "elapsed-ms 는 0 이상의 정수여야 한다");
+                throw new AisException(400, "elapsed-ms 는 0 이상의 정수여야 한다");
             }
         } catch (NumberFormatException e) {
-            throw new WlException(400, "elapsed-ms 는 0 이상의 정수여야 한다");
+            throw new AisException(400, "elapsed-ms 는 0 이상의 정수여야 한다");
         }
 
         List<String> imageList = null;
@@ -241,15 +241,15 @@ public final class ChatCommands {
                 if (!img.isEmpty()) valid.add(img);
             }
             if (valid.size() > MAX_IMAGES) {
-                throw new WlException(400, "그림 첨부는 " + MAX_IMAGES + "개까지만 가능하다");
+                throw new AisException(400, "그림 첨부는 " + MAX_IMAGES + "개까지만 가능하다");
             }
             for (String img : valid) {
                 if (!img.startsWith("attach/")) {
-                    throw new WlException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
+                    throw new AisException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
                 }
                 String name = img.substring("attach/".length());
                 if (!isValidAttachmentName(name)) {
-                    throw new WlException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
+                    throw new AisException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
                 }
             }
             if (!valid.isEmpty()) {
@@ -257,7 +257,7 @@ public final class ChatCommands {
             }
         }
 
-        // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 WL-404, 단일 파일 노트면 WL-500
+        // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 AIS-404, 단일 파일 노트면 AIS-500
         ChatTarget target = locateTarget(vaultRoot, ids, noteIndex.noteScan());
 
         Path chatFile = target.chatsDir.resolve(chatId + ".json");
@@ -269,16 +269,16 @@ public final class ChatCommands {
             try {
                 size = Files.size(chatFile);
             } catch (IOException e) {
-                throw new WlException(500, "레일 대화 파일을 못 읽어 붙일 수 없다: " + e.getMessage());
+                throw new AisException(500, "레일 대화 파일을 못 읽어 붙일 수 없다: " + e.getMessage());
             }
             if (size > MAX_CHAT_FILE_BYTES) {
-                throw new WlException(500, "레일 대화 파일을 못 읽어 붙일 수 없다: 파일이 상한을 넘었다: " + size + "바이트");
+                throw new AisException(500, "레일 대화 파일을 못 읽어 붙일 수 없다: 파일이 상한을 넘었다: " + size + "바이트");
             }
 
             try {
                 currentChat = readChatFile(chatFile, target.noteId, chatId);
             } catch (Exception e) {
-                throw new WlException(500, "레일 대화 파일을 못 읽어 붙일 수 없다: " + e.getMessage());
+                throw new AisException(500, "레일 대화 파일을 못 읽어 붙일 수 없다: " + e.getMessage());
             }
         } else {
             currentChat = new LinkedHashMap<>();
@@ -322,7 +322,7 @@ public final class ChatCommands {
 
         // D19 결함 고침 (cc12691b): 1,000,000 바이트 초과 사전 검사
         if (fileBytes.length > MAX_CHAT_FILE_BYTES) {
-            throw new WlException(500, "레일 대화 파일이 상한을 넘어 붙일 수 없다: 붙이면 " + fileBytes.length + "바이트다. 상한은 1000000바이트다: " + vaultRelPath);
+            throw new AisException(500, "레일 대화 파일이 상한을 넘어 붙일 수 없다: 붙이면 " + fileBytes.length + "바이트다. 상한은 1000000바이트다: " + vaultRelPath);
         }
 
         // 원자적 파일 쓰기
@@ -352,12 +352,12 @@ public final class ChatCommands {
         String content = new String(Files.readAllBytes(chatFile), StandardCharsets.UTF_8);
         JsonValue parsed = JsonReader.parseFile(content);
         if (!(parsed instanceof JsonValue.JsonObject)) {
-            throw new WlException(500, "최상위 객체가 아니다");
+            throw new AisException(500, "최상위 객체가 아니다");
         }
 
         Map<String, Object> root = (Map<String, Object>) toJavaValue(parsed);
         if (root == null) {
-            throw new WlException(500, "최상위 객체가 아니다");
+            throw new AisException(500, "최상위 객체가 아니다");
         }
 
         String noteId = fallbackNoteId;
@@ -505,7 +505,7 @@ public final class ChatCommands {
     private static String requireTrimmed(Map<String, String> opts, String key, String errorMsg) {
         String val = opts.get(key);
         if (val == null || Trim.isBlank(val)) {
-            throw new WlException(400, errorMsg);
+            throw new AisException(400, errorMsg);
         }
         return Trim.trim(val);
     }
@@ -513,7 +513,7 @@ public final class ChatCommands {
     private static String requireRaw(Map<String, String> opts, String key, String errorMsg) {
         String val = opts.get(key);
         if (val == null) {
-            throw new WlException(400, errorMsg);
+            throw new AisException(400, errorMsg);
         }
         return val;
     }
@@ -528,7 +528,7 @@ public final class ChatCommands {
             try {
                 Files.createDirectories(parent);
             } catch (IOException e) {
-                throw new WlException(500, "폴더를 만들지 못했다: " + parent);
+                throw new AisException(500, "폴더를 만들지 못했다: " + parent);
             }
         }
         Path tmp = parent.resolve(targetFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
@@ -541,7 +541,7 @@ public final class ChatCommands {
             }
         } catch (IOException e) {
             try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
-            throw new WlException(500, "레일 대화 파일 쓰기 실패: " + e.getMessage());
+            throw new AisException(500, "레일 대화 파일 쓰기 실패: " + e.getMessage());
         }
     }
 }

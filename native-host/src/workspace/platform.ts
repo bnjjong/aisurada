@@ -31,16 +31,16 @@ export function workspaceServices(): WorkspaceServices {
     },
     watch: (root, changed) => fs.watch(root, event => changed(event.paths), { recursive: true, delayMs: 400 }),
     noteWindowsChanged: changed => isTauri()
-      ? listen<string[]>('wl://note-windows', event => changed(event.payload))
+      ? listen<string[]>('ais://note-windows', event => changed(event.payload))
       : Promise.resolve(() => {}),
     selfWritesChanged: changed => isTauri()
-      ? listen<{ root: string; relPath: string; from: string }>('wl://self-write', event => changed(event.payload))
+      ? listen<{ root: string; relPath: string; from: string }>('ais://self-write', event => changed(event.payload))
       : Promise.resolve(() => {}),
     menu: received => isTauri()
-      ? getCurrentWebviewWindow().listen<string>('wl://menu', event => received(event.payload))
+      ? getCurrentWebviewWindow().listen<string>('ais://menu', event => received(event.payload))
       : Promise.resolve(() => {}),
     navigateRequested: received => isTauri()
-      ? getCurrentWebviewWindow().listen<{ path: string; rail?: string | null; sub?: string | null }>('wl://navigate', event => received(event.payload))
+      ? getCurrentWebviewWindow().listen<{ path: string; rail?: string | null; sub?: string | null }>('ais://navigate', event => received(event.payload))
       : Promise.resolve(() => {}),
     ...(isTauri() ? { deepLinks: { listen: onOpenUrl, current: getCurrent } } : {}),
     ...(import.meta.hot ? { developmentLinks: (received: (urls: string[]) => void) => {

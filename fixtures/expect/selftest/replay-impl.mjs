@@ -2,7 +2,7 @@
 // 설명서 34.1의 자가 점검용 가짜 구현. 받은 argv와 글자가 같은 케이스를 찾아 기대값을 그대로 찍는다.
 // ["reindex"]에는 아무것도 안 하고 0으로 끝난다. 토큰은 엔진과 다른 규칙(rp- 머리)으로 지어서,
 // 이 가짜가 통과하면 실행기가 토큰 값을 계산하지 않는다는 것도 함께 선다.
-// 변형 점검이면 실행기가 WLX_SELFTEST_MUTANT와 WLX_SELFTEST_TARGETS로 바꿀 케이스를 알려 준다.
+// 변형 점검이면 실행기가 AISX_SELFTEST_MUTANT와 AISX_SELFTEST_TARGETS로 바꿀 케이스를 알려 준다.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -20,8 +20,8 @@ if (!found) {
   process.exit(1);
 }
 
-const mutant = process.env.WLX_SELFTEST_MUTANT ?? '';
-const targeted = (process.env.WLX_SELFTEST_TARGETS ?? '').split('\n').includes(found.id);
+const mutant = process.env.AISX_SELFTEST_MUTANT ?? '';
+const targeted = (process.env.AISX_SELFTEST_TARGETS ?? '').split('\n').includes(found.id);
 const vars = { vault: process.env.AISURADA_VAULT, home: process.env.HOME };
 const tokenFor = p => 'rp-' + crypto.createHash('sha256').update(targeted && mutant === 'token' ? `${p}\n${found.id}` : p).digest('hex').slice(0, 24);
 
@@ -51,8 +51,8 @@ if (targeted) {
   }
 }
 
-// 기대값에 wl 칸이 있으면 그 번호를 stderr 1줄로 남긴다(34.1의 4번 검사)
-if ('wl' in e) process.stderr.write(`${e.wl} replay\n`);
+// 기대값에 ais 칸이 있으면 그 번호를 stderr 1줄로 남긴다(34.1의 4번 검사)
+if ('ais' in e) process.stderr.write(`${e.ais} replay\n`);
 process.stdout.write(Buffer.from(out, 'utf8'), () => process.exit(code));
 
 function findCase(args) {

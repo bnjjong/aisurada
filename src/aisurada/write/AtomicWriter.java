@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,7 +25,7 @@ public final class AtomicWriter {
      *
      * @param target 대상 파일 경로
      * @param bytes  기록할 바이트 배열
-     * @throws WlException 파일 기록 또는 폴더 생성 실패 시 WL-500
+     * @throws AisException 파일 기록 또는 폴더 생성 실패 시 AIS-500
      */
     public static void writeAtomic(Path target, byte[] bytes) {
         Path normTarget = target.toAbsolutePath().normalize();
@@ -36,7 +36,7 @@ public final class AtomicWriter {
             try {
                 Files.createDirectories(parent);
             } catch (IOException e) {
-                throw new WlException(500, "폴더를 만들지 못했다: " + parent);
+                throw new AisException(500, "폴더를 만들지 못했다: " + parent);
             }
         }
 
@@ -56,7 +56,7 @@ public final class AtomicWriter {
         }
 
         if (tempPath == null) {
-            throw new WlException(500, "임시 파일 이름을 3 번 골랐는데 다 이미 있었다: " + (parent != null ? parent : ""));
+            throw new AisException(500, "임시 파일 이름을 3 번 골랐는데 다 이미 있었다: " + (parent != null ? parent : ""));
         }
 
         // 임시 파일 열기, 쓰기 및 fsync
@@ -70,7 +70,7 @@ public final class AtomicWriter {
             try {
                 Files.deleteIfExists(tempPath);
             } catch (Exception ignored) {}
-            throw new WlException(500, "파일을 쓰지 못했다: " + normTarget);
+            throw new AisException(500, "파일을 쓰지 못했다: " + normTarget);
         }
 
         // 원자적 이름 바꾸기. 원자적이 아닌 옮기기로 다시 하지 않는다.
@@ -81,7 +81,7 @@ public final class AtomicWriter {
             try {
                 Files.deleteIfExists(tempPath);
             } catch (Exception ignored) {}
-            throw new WlException(500, "파일을 쓰지 못했다: " + normTarget);
+            throw new AisException(500, "파일을 쓰지 못했다: " + normTarget);
         }
     }
 }

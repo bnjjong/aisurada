@@ -34,14 +34,14 @@ fn call(
 fn headers(dir: &str, name: &str) -> tauri::http::HeaderMap {
     let mut headers = tauri::http::HeaderMap::new();
     headers.insert(
-        "x-wl-note-dir",
+        "x-ais-note-dir",
         percent_encoding::utf8_percent_encode(dir, percent_encoding::NON_ALPHANUMERIC)
             .to_string()
             .parse()
             .unwrap(),
     );
     headers.insert(
-        "x-wl-name",
+        "x-ais-name",
         percent_encoding::utf8_percent_encode(name, percent_encoding::NON_ALPHANUMERIC)
             .to_string()
             .parse()
@@ -72,7 +72,7 @@ fn attachments_decode_before_vault_check_and_support_both_windows_and_body_forms
         Default::default(),
     )
     .unwrap_err();
-    assert!(error.as_str().unwrap().contains("x-wl-note-dir"));
+    assert!(error.as_str().unwrap().contains("x-ais-note-dir"));
     let h = headers("/none", "a.png");
     let error = call(
         &main,

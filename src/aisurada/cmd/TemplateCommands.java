@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.text.Trim;
 import aisurada.vault.TemplateReader;
@@ -42,9 +42,9 @@ public final class TemplateCommands {
         boolean builtin;
         if (create) {
             // 만들기는 훑지 않는다. 템플릿 파일 1개의 치명적 YAML 오류도 새 만들기를 막지 않는다.
-            if (Trim.isBlank(body)) throw new WlException(400, "새 템플릿은 body 이 필요하다: " + SAVE_USAGE);
+            if (Trim.isBlank(body)) throw new AisException(400, "새 템플릿은 body 이 필요하다: " + SAVE_USAGE);
             name = Trim.trim(options.get("name"));
-            if (name.isEmpty()) throw new WlException(400, "새 템플릿은 name 이 필요하다: " + SAVE_USAGE);
+            if (name.isEmpty()) throw new AisException(400, "새 템플릿은 name 이 필요하다: " + SAVE_USAGE);
             type = type(options.get("type")); if (type == null) type = "plan";
             id = IdGenerator.nextId("tpl-"); builtin = false;
         } else {
@@ -69,7 +69,7 @@ public final class TemplateCommands {
         var existing = find(vault, id);
         if (existing == null || !existing.category().equals("ritual")) throw notFound(id);
         long sameRev = TemplateReader.scan(vault).templates().stream().filter(t -> t.category().equals("ritual") && t.rev().equals(existing.rev())).count();
-        if (sameRev != 1) throw new WlException(400, "같은 rev 를 든 리추얼 템플릿이 " + sameRev + "건이라 저장하지 않는다. 파일 이름이 rev 라서 서로를 덮는다: rev=" + existing.rev());
+        if (sameRev != 1) throw new AisException(400, "같은 rev 를 든 리추얼 템플릿이 " + sameRev + "건이라 저장하지 않는다. 파일 이름이 rev 라서 서로를 덮는다: rev=" + existing.rev());
         String path = TemplateFileBytes.ritualRelPath(existing.rev());
         AtomicWriter.writeAtomic(vault.resolve(path), TemplateFileBytes.renderRitual(id, existing.rev(), options.getOrDefault("name", existing.name()), existing.icon(), existing.format(), options.getOrDefault("desc", existing.desc()), options.getOrDefault("body", existing.body())));
         return saved(id, "updated", false, path, options.get("body"));
@@ -79,8 +79,8 @@ public final class TemplateCommands {
         var existing = find(vault, id);
         List<String> removed = new ArrayList<>();
         if (existing != null) {
-            if (existing.category().equals("ritual")) throw new WlException(400, "리추얼 템플릿은 지울 수 없다. 지우는 길이 앱에도 없다: " + id);
-            if (existing.builtin()) throw new WlException(400, "빌트인 템플릿은 지울 수 없다. 고친 것을 되돌리려면 기본값으로 복원한다: " + id);
+            if (existing.category().equals("ritual")) throw new AisException(400, "리추얼 템플릿은 지울 수 없다. 지우는 길이 앱에도 없다: " + id);
+            if (existing.builtin()) throw new AisException(400, "빌트인 템플릿은 지울 수 없다. 고친 것을 되돌리려면 기본값으로 복원한다: " + id);
             for (String extension : List.of("md", "html", "json")) {
                 String path = ".aisurada/templates/doc/" + id + "." + extension;
                 if (remove(vault, path)) removed.add(path);
@@ -92,28 +92,28 @@ public final class TemplateCommands {
     private static boolean remove(Path vault, String relative) {
         Path file = vault.resolve(relative);
         try { return Files.deleteIfExists(file); }
-        catch (IOException e) { throw new WlException(500, "파일을 지우지 못했다: " + file.toAbsolutePath().normalize()); }
+        catch (IOException e) { throw new AisException(500, "파일을 지우지 못했다: " + file.toAbsolutePath().normalize()); }
     }
     private static String positionalId(ParsedArgs args, String usage) {
-        if (args.positionalArgs().isEmpty() || Trim.isBlank(args.positionalArgs().getFirst())) throw new WlException(400, "인자가 하나 필요하다: " + usage);
+        if (args.positionalArgs().isEmpty() || Trim.isBlank(args.positionalArgs().getFirst())) throw new AisException(400, "인자가 하나 필요하다: " + usage);
         String id = args.positionalArgs().getFirst(); validateId(id); return id;
     }
     private static void validateId(String id) {
-        if (Trim.isBlank(id) || !ID.matcher(id).matches()) throw new WlException(400, "템플릿 id 모양이 아니다: " + id);
+        if (Trim.isBlank(id) || !ID.matcher(id).matches()) throw new AisException(400, "템플릿 id 모양이 아니다: " + id);
     }
     private static void validateName(Map<String, String> options) {
-        if (options.containsKey("name") && Trim.isBlank(options.get("name"))) throw new WlException(400, "템플릿 이름이 비었다");
+        if (options.containsKey("name") && Trim.isBlank(options.get("name"))) throw new AisException(400, "템플릿 이름이 비었다");
     }
     private static String type(String raw) {
         if (raw == null) return null;
         String type = raw.toLowerCase(Locale.ROOT);
-        if (!TYPES.contains(type)) throw new WlException(400, "모르는 템플릿 유형 이다: " + raw + ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
+        if (!TYPES.contains(type)) throw new AisException(400, "모르는 템플릿 유형 이다: " + raw + ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
         return type;
     }
     private static TemplateReader.TemplateRecord find(Path vault, String id) {
         return TemplateReader.scan(vault).templates().stream().filter(t -> t.id().equals(id)).findFirst().orElse(null);
     }
-    private static WlException notFound(String id) { return new WlException(404, "Template not found: " + id); }
+    private static AisException notFound(String id) { return new AisException(404, "Template not found: " + id); }
     private static Map<String, Object> saved(String id, String action, boolean builtin, String path, String receivedBody) {
         Map<String, Object> result = new LinkedHashMap<>(); result.put("id", id); result.put("action", action); result.put("builtin", builtin); result.put("path", path);
         String warning = WarningsDetector.detectIndentedBlocksWarning(receivedBody);

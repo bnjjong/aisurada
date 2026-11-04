@@ -1,7 +1,7 @@
 package aisurada.session;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 
 import java.nio.file.Path;
@@ -27,10 +27,10 @@ public final class SessionCommands {
     public static Map<String, Object> executeReadSession(ParsedArgs parsed) {
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty()) {
-            throw new WlException(400, "인자가 하나 필요하다: " + READ_SESSION_USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + READ_SESSION_USAGE);
         }
 
-        // 자리 인자는 안 걷는다. 앞뒤에 공백이 붙은 세션 id는 꼴이 아니라서 WL-400이다(7.2)
+        // 자리 인자는 안 걷는다. 앞뒤에 공백이 붙은 세션 id는 꼴이 아니라서 AIS-400이다(7.2)
         String sessionId = pos.get(0);
         validateSessionId(sessionId);
 
@@ -45,7 +45,7 @@ public final class SessionCommands {
                 try {
                     limit = Integer.parseInt(trimmed);
                 } catch (NumberFormatException e) {
-                    throw new WlException(400, "limit 은 숫자여야 한다: " + rawLimit);
+                    throw new AisException(400, "limit 은 숫자여야 한다: " + rawLimit);
                 }
             }
         }
@@ -59,7 +59,7 @@ public final class SessionCommands {
                 try {
                     before = Integer.parseInt(trimmed);
                 } catch (NumberFormatException e) {
-                    throw new WlException(400, "before 은 숫자여야 한다: " + rawBefore);
+                    throw new AisException(400, "before 은 숫자여야 한다: " + rawBefore);
                 }
             }
         }
@@ -75,7 +75,7 @@ public final class SessionCommands {
                 } else if ("false".equals(trimmed)) {
                     includeUrls = false;
                 } else {
-                    throw new WlException(400, "urls 은 true 나 false 여야 한다: " + rawUrls);
+                    throw new AisException(400, "urls 은 true 나 false 여야 한다: " + rawUrls);
                 }
             }
         }
@@ -99,7 +99,7 @@ public final class SessionCommands {
             if (!trimmed.isEmpty()) {
                 String[] parts = trimmed.split(",", -1);
                 if (parts.length < 1 || parts.length > 8) {
-                    throw new WlException(400, "author 의 노트 id 는 1개에서 8개까지예요: " + parts.length);
+                    throw new AisException(400, "author 의 노트 id 는 1개에서 8개까지예요: " + parts.length);
                 }
                 authorNotes = new ArrayList<>();
                 for (String part : parts) {
@@ -151,7 +151,7 @@ public final class SessionCommands {
     public static Map<String, Object> executeSessionTitles(ParsedArgs parsed) {
         List<String> pos = parsed.positionalArgs();
         if (pos.size() > 200) {
-            throw new WlException(400, "세션을 한 번에 200개까지 물을 수 있어요: " + pos.size());
+            throw new AisException(400, "세션을 한 번에 200개까지 물을 수 있어요: " + pos.size());
         }
 
         // 읽기 전에 모두 검증 (7.10)
@@ -198,10 +198,10 @@ public final class SessionCommands {
                 try {
                     days = Integer.parseInt(trimmed);
                 } catch (NumberFormatException e) {
-                    throw new WlException(400, "days 은 숫자여야 한다: " + rawDays);
+                    throw new AisException(400, "days 은 숫자여야 한다: " + rawDays);
                 }
                 if (days < 1 || days > 30) {
-                    throw new WlException(400, "days 는 1 부터 30 사이여야 해요: " + rawDays);
+                    throw new AisException(400, "days 는 1 부터 30 사이여야 해요: " + rawDays);
                 }
             }
         }
@@ -230,13 +230,13 @@ public final class SessionCommands {
 
     private static void validateSessionId(String id) {
         if (id == null || !SessionTranscript.SESSION_ID_PATTERN.matcher(id).matches()) {
-            throw new WlException(400, "세션 식별자 모양이 아니에요: " + id);
+            throw new AisException(400, "세션 식별자 모양이 아니에요: " + id);
         }
     }
 
     private static void validateNoteId(String id) {
         if (id == null || !SessionTranscript.NOTE_ID_PATTERN.matcher(id).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니에요: " + id);
+            throw new AisException(400, "노트 id 모양이 아니에요: " + id);
         }
     }
 }

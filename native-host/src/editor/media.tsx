@@ -38,16 +38,16 @@ export function ImageView({ source, alt }: { source: string; alt: string }) {
 export const FRAME_LINK = /^(?:https?|mailto|tel):/i;
 function HTMLFrame({ path, label }: { path: string; label: string }) {
   const features = useContext(EditorContext), frame = useRef<HTMLIFrameElement>(null);
-  const url = 'wlframe://localhost' + `${features.noteDirectory}/${path}`.split('/').map(encodeURIComponent).join('/');
+  const url = 'aisframe://localhost' + `${features.noteDirectory}/${path}`.split('/').map(encodeURIComponent).join('/');
   const [height, setHeight] = useState(() => frameHeight(url));
   const lastInput = useRef(0), lastOpen = useRef(0);
   useEffect(() => {
     const input = (event: Event) => { if (event.isTrusted) lastInput.current = Date.now(); };
     const message = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || !event.data || typeof event.data !== 'object') return;
-      if (typeof event.data.wlframeHeight === 'number' && Number.isFinite(event.data.wlframeHeight)) setHeight(frameHeight(url, event.data.wlframeHeight));
+      if (typeof event.data.aisframeHeight === 'number' && Number.isFinite(event.data.aisframeHeight)) setHeight(frameHeight(url, event.data.aisframeHeight));
       // 8.7: only http:, https:, mailto: and tel: open, after trimming; anything else is dropped.
-      const link = typeof event.data.wlframeOpen === 'string' ? event.data.wlframeOpen.trim() : null, now = Date.now();
+      const link = typeof event.data.aisframeOpen === 'string' ? event.data.aisframeOpen.trim() : null, now = Date.now();
       if (typeof link === 'string' && link.length <= 8192 && FRAME_LINK.test(link) && document.activeElement === frame.current
         && (navigator.userActivation?.isActive || now - lastInput.current < 1500) && now - lastOpen.current >= 1000) {
         lastOpen.current = now; void openEditorLink(link, features).catch(() => {});
@@ -56,8 +56,8 @@ function HTMLFrame({ path, label }: { path: string; label: string }) {
     addEventListener('pointerdown', input, true); addEventListener('keydown', input, true); addEventListener('message', message);
     return () => { removeEventListener('pointerdown', input, true); removeEventListener('keydown', input, true); removeEventListener('message', message); };
   }, [url, features]);
-  return <span className="wl-html-frame"><span className="wl-html-frame-header"><strong>{label || path}</strong>
-    <button className="wl-html-frame-ask" data-rel={path} data-label={label} hidden>AI에게 묻기</button>
-    <button className="wl-html-frame-open" onClick={() => void openEditorLink(path, features)}>브라우저로 열기</button></span>
-    <iframe ref={frame} src={url} title={label || path} sandbox="allow-scripts" referrerPolicy="no-referrer" loading="lazy" className="wl-html-frame-view" style={{ height }} /></span>;
+  return <span className="ais-html-frame"><span className="ais-html-frame-header"><strong>{label || path}</strong>
+    <button className="ais-html-frame-ask" data-rel={path} data-label={label} hidden>AI에게 묻기</button>
+    <button className="ais-html-frame-open" onClick={() => void openEditorLink(path, features)}>브라우저로 열기</button></span>
+    <iframe ref={frame} src={url} title={label || path} sandbox="allow-scripts" referrerPolicy="no-referrer" loading="lazy" className="ais-html-frame-view" style={{ height }} /></span>;
 }

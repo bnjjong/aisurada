@@ -134,7 +134,7 @@ export function widthDashes(widths: readonly number[] | undefined, count: number
   const dashes = widths.map(width => Math.max(3, Math.round(width / total * budget)));
   return widthHint(dashes) || Array(count).fill(3);
 }
-export const markerPattern = /<!--(\/?)(wl[ca]):((?:cm|ak)[a-z0-9]+-[a-z0-9]{1,8})-->/gi;
+export const markerPattern = /<!--(\/?)(ais[ca]):((?:cm|ak)[a-z0-9]+-[a-z0-9]{1,8})-->/gi;
 // C182: marker syntax written in a code fence or an inline code span is code text.
 // `map` sees only the text outside code, in document order.
 export function mapOutsideCode(text: string, map: (part: string) => string): string {

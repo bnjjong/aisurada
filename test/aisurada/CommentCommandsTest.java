@@ -73,8 +73,8 @@ public final class CommentCommandsTest {
     }
     private static void error(Path v, int status, int code, String message, String... args) {
         EngineResult r = run(v, args); eq(r.status(), status, "error status " + Arrays.toString(args));
-        eq(r.errorCode(), code, "WL code"); eq(r.stdoutBytes().length, 0, "failure stdout empty");
-        if (message != null) eq(new String(r.stderrBytes(), StandardCharsets.UTF_8), "WL-" + code + " " + message + "\n", "error text");
+        eq(r.errorCode(), code, "AIS code"); eq(r.stdoutBytes().length, 0, "failure stdout empty");
+        if (message != null) eq(new String(r.stderrBytes(), StandardCharsets.UTF_8), "AIS-" + code + " " + message + "\n", "error text");
     }
     @SuppressWarnings("unchecked")
     private static Map<String, Object> object(byte[] raw) { return (Map<String, Object>) value(JsonReader.parseFile(new String(raw, StandardCharsets.UTF_8))); }
@@ -208,8 +208,8 @@ public final class CommentCommandsTest {
 
     private static void deletion() throws Exception {
         Path v=vault(), f=comments(v), body=v.resolve("notes/demo/root/note.md");
-        String marked="<!--WLC:"+ID+"-->앞<!--/WLC:"+ID+"-->뒤\n```md\n<!--wlc:"+ID+"-->펜스\n```\n"
-                +"<!--wlc:"+ID.toUpperCase(Locale.ROOT)+"-->다른 id<!--/wlc:"+ID.toUpperCase(Locale.ROOT)+"-->\n";
+        String marked="<!--AISC:"+ID+"-->앞<!--/AISC:"+ID+"-->뒤\n```md\n<!--aisc:"+ID+"-->펜스\n```\n"
+                +"<!--aisc:"+ID.toUpperCase(Locale.ROOT)+"-->다른 id<!--/aisc:"+ID.toUpperCase(Locale.ROOT)+"-->\n";
         Files.writeString(body,note(ROOT,"루트",marked)); save(f,List.of(item(ID,AT,"삭제")));
         byte[] before=Files.readAllBytes(body);
         var deleted=ok(v,"delete-comment",ROOT,"comment_id="+ID);
@@ -217,24 +217,24 @@ public final class CommentCommandsTest {
         eq(deleted.get("bodyBefore"),sha(before),"before hash"); eq(deleted.get("bodyAfter"),sha(Files.readAllBytes(body)),"after hash");
         String after=Files.readString(body); eq(after.contains("앞뒤"),true,"marker removal inserts no spaces");
         eq(after.contains("```md\n펜스\n```"),true,"half marker in fence removed");
-        eq(after.contains("<!--wlc:"+ID.toUpperCase(Locale.ROOT)+"-->"),true,"literal id comparison");
+        eq(after.contains("<!--aisc:"+ID.toUpperCase(Locale.ROOT)+"-->"),true,"literal id comparison");
         eq(after.contains("status:"),false,"unknown frontmatter removed"); eq(after.contains("sessionId: old-session"),true,"old session retained");
         eq(after.contains("editedAt: '2026-06-16T11:00:00+09:00'"),true,"old stamp retained"); eq(Files.exists(f),false,"last comment file deleted");
-        eq(CommentAnchors.strip("<!-- wlc:"+ID+" -->"+"<!--wlc:"+ID+"0-->",ID),"<!-- wlc:"+ID+" -->"+"<!--wlc:"+ID+"0-->","strict marker spelling and id length");
+        eq(CommentAnchors.strip("<!-- aisc:"+ID+" -->"+"<!--aisc:"+ID+"0-->",ID),"<!-- aisc:"+ID+" -->"+"<!--aisc:"+ID+"0-->","strict marker spelling and id length");
         save(f,List.of(item(ID,AT,"앵커 없음"))); before=Files.readAllBytes(body);
         eq(ok(v,"delete-comment",ROOT,"comment_id="+ID),Map.of("id",ID,"path","notes/demo/root/comments.json","remaining",0,"markerStripped",false),"no marker response");
         eq(Arrays.equals(before,Files.readAllBytes(body)),true,"no marker no body write");
-        Files.writeString(body,note(ROOT,"루트","<!--wlc:"+ID+"-->없는 코멘트")); before=Files.readAllBytes(body);
+        Files.writeString(body,note(ROOT,"루트","<!--aisc:"+ID+"-->없는 코멘트")); before=Files.readAllBytes(body);
         error(v,3,409,"그 코멘트가 없다: "+ID,"delete-comment",ROOT,"comment_id="+ID);
         eq(Arrays.equals(before,Files.readAllBytes(body)),true,"missing comment leaves marker");
         Path childFile=v.resolve("notes/demo/root/sub-comments/"+SUB+".json");
         save(childFile,List.of(item(ID2,AT,"하위")));
-        Path childBody=v.resolve("notes/demo/root/sub/child/note.md"); Files.writeString(childBody,note(SUB,"자식","<!--wlc:"+ID2+"-->자식<!--/wlc:"+ID2+"-->"));
+        Path childBody=v.resolve("notes/demo/root/sub/child/note.md"); Files.writeString(childBody,note(SUB,"자식","<!--aisc:"+ID2+"-->자식<!--/aisc:"+ID2+"-->"));
         var subDeleted=ok(v,"delete-comment",ROOT,SUB,"comment_id="+ID2);
         eq(subDeleted.get("path"),"notes/demo/root/sub-comments/"+SUB+".json","sub comment stays in direct container");
         eq(Files.exists(v.resolve("notes/demo/root/sub/2026-06-16-1000-자식-0001/note.md")),true,"derived sub body write renames folder");
         eq(Files.isDirectory(childFile.getParent()),true,"empty sub-comments directory retained");
-        write(v,"notes/demo/root/sub/legacy.md",note("snfixture-00000009","옛 하위","<!--wlc:"+ID2+"-->원문"));
+        write(v,"notes/demo/root/sub/legacy.md",note("snfixture-00000009","옛 하위","<!--aisc:"+ID2+"-->원문"));
         Path legacyComments=v.resolve("notes/demo/root/sub-comments/snfixture-00000009.json");
         save(legacyComments,List.of(item(ID2,AT,"옛 하위 코멘트")));
         byte[] legacyBefore=Files.readAllBytes(legacyComments);
@@ -296,7 +296,7 @@ public final class CommentCommandsTest {
         Path home=Files.createTempDirectory(temp,"home-");
         // macOS 유닉스 소켓 경로 길이 상한을 피한다.
         Path socket=Path.of("/tmp/asc-"+UUID.randomUUID().toString().substring(0,8)+".sock");
-        Path engine=Path.of("dist/wl-engine.jar").toAbsolutePath(), cli=Path.of("dist/ais-cli.jar").toAbsolutePath();
+        Path engine=Path.of("dist/ais-engine.jar").toAbsolutePath(), cli=Path.of("dist/ais-cli.jar").toAbsolutePath();
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin/java").toString();
         List<String> prefix=List.of(javaExecutable,"-Duser.home="+home,"-Daisurada.test.now="+TestApparatus.nowMillis(),"-jar");
         var args=new ArrayList<>(prefix); args.add(engine.toString()); args.add("serve");

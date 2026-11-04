@@ -26,7 +26,7 @@ export const tauriAskHost: AskHost = {
   // 2.8: the same door as a body picture: the bytes are the IPC body, the folder and name ride in headers.
   writeImage: async (noteDir, name, bytes) => {
     await invoke('write_attachment_bytes', bytes, {
-      headers: { 'x-wl-note-dir': encodeURIComponent(noteDir), 'x-wl-name': encodeURIComponent(name) },
+      headers: { 'x-ais-note-dir': encodeURIComponent(noteDir), 'x-ais-name': encodeURIComponent(name) },
     });
   },
   announceSelfWrite: (vault, relPath) => {

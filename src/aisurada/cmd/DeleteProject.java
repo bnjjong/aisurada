@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.vault.AgendaTable;
 import aisurada.vault.NoteIndex;
@@ -45,7 +45,7 @@ public final class DeleteProject {
         // 2, 3. 그 slug를 가리키는 아젠다를 센다
         int agendas = countAgendas(noteIndex, slug);
         if (agendas > 0) {
-            throw new WlException(400, "아젠다가 " + agendas + "건 있는 프로젝트는 지울 수 없다. 먼저 그 아젠다를 옮긴다: " + slug);
+            throw new AisException(400, "아젠다가 " + agendas + "건 있는 프로젝트는 지울 수 없다. 먼저 그 아젠다를 옮긴다: " + slug);
         }
 
         // 4. 색인 행 지우기는 색인이 없는 판이라 할 일이 없다

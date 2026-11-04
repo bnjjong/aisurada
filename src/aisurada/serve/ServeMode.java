@@ -63,7 +63,7 @@ public final class ServeMode {
         // 1. 소켓 경로 결정
         String rawSocket = System.getenv("AISURADA_SIDECAR_SOCKET");
         if (rawSocket == null || Trim.isBlank(rawSocket)) {
-            rawSocket = userHome + "/Library/Caches/aisurada/wl-" + hash16 + ".sock";
+            rawSocket = userHome + "/Library/Caches/aisurada/ais-" + hash16 + ".sock";
         } else {
             rawSocket = Trim.trim(rawSocket);
         }
@@ -101,7 +101,7 @@ public final class ServeMode {
         // 3.2의 「내려가는 차례」가 돌아 실행 상태 파일을 지우고 잠금을 놓는다. 신호로 끝나면 128 + 신호 번호다
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             doTeardown();
-        }, "wl-shutdown-hook"));
+        }, "ais-shutdown-hook"));
 
         // 잠금을 쥔 뒤, 상태 파일과 소켓을 만들기 전에 외부 변경을 담는다(31.1).
         vaultGit.commit("startup");
@@ -204,7 +204,7 @@ public final class ServeMode {
                     }
                 }
             }
-        }, "wl-maintenance");
+        }, "ais-maintenance");
         maintThread.setDaemon(true);
         maintThread.start();
 
@@ -354,7 +354,7 @@ public final class ServeMode {
     }
 
     private static String readBuiltCommit() {
-        try (InputStream in = ServeMode.class.getResourceAsStream("/META-INF/wl-build-commit.txt")) {
+        try (InputStream in = ServeMode.class.getResourceAsStream("/META-INF/ais-build-commit.txt")) {
             if (in != null) {
                 String c = new String(in.readAllBytes(), StandardCharsets.UTF_8).strip();
                 if (!c.isBlank()) {

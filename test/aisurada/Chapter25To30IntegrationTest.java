@@ -20,11 +20,11 @@ public final class Chapter25To30IntegrationTest {
             Path v = t.vault(), home = Files.createDirectory(t.temp.resolve("home"));
             root(v, "root", 1, "2026-06-16T10:00:00+09:00", "", "body"); put(v, "notes/demo/root/attach/file.bin", "1234");
             put(v, "notes/demo/root/comments.json", "[{\"id\":\"cmfixture-00000001\",\"createdAt\":\"2026-06-18T10:00Z\",\"body\":\"reply\"}]");
-            Path socket = Path.of("/tmp", "wl-ch25-30-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
+            Path socket = Path.of("/tmp", "ais-ch25-30-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
             cli = Path.of("dist/ais-cli.jar").toAbsolutePath();
             prefix = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Daisurada.test.now=" + System.getProperty("aisurada.test.now"), "-Duser.timezone=Asia/Seoul", "-Daisurada.enable.part4=false", "-jar");
             environment = Map.of("HOME", home.toString(), "AISURADA_VAULT", v.toString(), "AISURADA_SIDECAR_SOCKET", socket.toString(), "AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
-            List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/wl-sidecar-noclaude.jar").toAbsolutePath().toString()); command.addAll(List.of("serve", "--aisurada.notes.shard.by.month=true"));
+            List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/ais-sidecar-noclaude.jar").toAbsolutePath().toString()); command.addAll(List.of("serve", "--aisurada.notes.shard.by.month=true"));
             ProcessBuilder builder = new ProcessBuilder(command); builder.environment().clear(); builder.environment().putAll(environment);
             builder.redirectOutput(home.resolve("server.out").toFile()); builder.redirectError(home.resolve("server.err").toFile()); Process server = builder.start();
             try {
@@ -32,9 +32,9 @@ public final class Chapter25To30IntegrationTest {
                 while (!Files.exists(socket) && server.isAlive() && System.nanoTime() < until) Thread.sleep(25);
                 check(Files.exists(socket), "server ready: " + Files.readString(home.resolve("server.err")));
                 Reply absent = request(3, "get-ask");
-                eq(absent.err, "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n", "part4 absence over socket");
-                check(request(3, "read-session", "id", "unknown=x").err.startsWith("WL-400"), "part4 syntax failure over socket");
-                check(request(3, "append-chat-turn").err.startsWith("WL-409"), "part4 write preparation over socket");
+                eq(absent.err, "AIS-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 ais-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n", "part4 absence over socket");
+                check(request(3, "read-session", "id", "unknown=x").err.startsWith("AIS-400"), "part4 syntax failure over socket");
+                check(request(3, "append-chat-turn").err.startsWith("AIS-409"), "part4 write preparation over socket");
                 request(0, "save_report", "{\"kind\":\"evening\",\"date\":\"2026-06-16\",\"body\":\"회고\\n원문\"}");
                 eq(request(0, "get-report", "rv-evening-2026-06-16").object().get("body"), "회고\n원문", "socket report UTF8");
                 put(v, ".aisurada/reports/rv-morning-2026-06-17.json", "broken");
@@ -49,7 +49,7 @@ public final class Chapter25To30IntegrationTest {
                 Files.delete(v.resolve("notes/demo/2026-06/root/attach/file.bin"));
                 Reply mismatch = request(0, "verify-shard"); eq(mismatch.object().get("ok"), false, "socket mismatch flag");
                 check(mismatch.err.contains("크기가 갈린 것 1 건"), "verify diagnostics returned over frame");
-                check(request(3, "plan-day", "dryRun=yes").err.startsWith("WL-400"), "socket semantic error code/text");
+                check(request(3, "plan-day", "dryRun=yes").err.startsWith("AIS-400"), "socket semantic error code/text");
                 request(0, "empty-trash"); t.done();
             } finally {
                 server.destroy(); if (!server.waitFor(5, TimeUnit.SECONDS)) server.destroyForcibly().waitFor(); Files.deleteIfExists(socket);

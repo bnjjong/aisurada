@@ -1,5 +1,5 @@
 /* Acceptance-only driver; never included in the application bundle. */
-const cfg = window.__WL_FIXTURE__;
+const cfg = window.__AIS_FIXTURE__;
 const invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);
 const assert = (condition, message) => { if (!condition) throw Error(message || 'assertion failed'); };
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -23,7 +23,7 @@ if (location.pathname.startsWith('/note-window/')) {
   try {
     await until(() => document.querySelector('.note-body'));
     assert(text().includes('격리된 vault의 본문이에요.'), 'note body');
-    assert(!window.__WL_WRITES__.length, 'note window wrote browser storage');
+    assert(!window.__AIS_WRITES__.length, 'note window wrote browser storage');
     assert(document.documentElement.dataset.theme === 'dark', 'note theme');
     await post('/note-result', { ok: true });
   } catch (error) { await post('/note-result', { ok: false, error: String(error) }); }

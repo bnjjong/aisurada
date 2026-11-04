@@ -1,5 +1,5 @@
 {
-  "format": "wlx-cases",
+  "format": "aisx-cases",
   "version": 1,
   "lane": "read",
   "note": "설명서 원문에 기대값이 글자 그대로 적힌 list_reports 케이스. 토큰과 vault 경로는 자리표로 바꿨다.",

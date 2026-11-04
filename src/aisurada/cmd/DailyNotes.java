@@ -1,6 +1,6 @@
 package aisurada.cmd;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.*;
 import aisurada.write.TestApparatus;
@@ -17,13 +17,13 @@ final class DailyNotes {
         String value = Trim.trim(raw);
         if (value.isEmpty()) return TestApparatus.today(ZoneId.systemDefault());
         try { return LocalDate.parse(value); }
-        catch (DateTimeParseException e) { throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + value); }
+        catch (DateTimeParseException e) { throw new AisException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + value); }
     }
     static boolean bool(String raw, String key) {
         String value = Trim.trim(raw);
         if (value.isEmpty() || value.equals("false")) return false;
         if (value.equals("true")) return true;
-        throw new WlException(400, key + " 은 true 나 false 여야 한다: " + value);
+        throw new AisException(400, key + " 은 true 나 false 여야 한다: " + value);
     }
     static List<NoteScanner.NoteRecord> read(Path vault, NoteIndex index) {
         List<NoteScanner.NoteRecord> notes = new ArrayList<>();

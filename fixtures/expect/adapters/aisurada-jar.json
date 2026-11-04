@@ -1,21 +1,21 @@
 {
-  "format": "wlx-adapter",
+  "format": "aisx-adapter",
   "version": 1,
   "surface": "engine",
   "name": "aisurada-jar",
-  "note": "지금 엔진(Kotlin 사이드카) jar를 부르는 보기 어댑터(설명서 34.5). WLX_IMPL_JAVA와 WLX_IMPL_JAR로 자리를 준다.",
+  "note": "지금 엔진(Kotlin 사이드카) jar를 부르는 보기 어댑터(설명서 34.5). AISX_IMPL_JAVA와 AISX_IMPL_JAR로 자리를 준다.",
   "prefix": [
-    "${WLX_IMPL_JAVA}",
+    "${AISX_IMPL_JAVA}",
     "-XX:TieredStopAtLevel=1",
     "-Xmx512m",
     "-XX:-UsePerfData",
     "-Duser.home=${HOME}",
     "-Djava.io.tmpdir=${TMPDIR}",
     "-jar",
-    "${WLX_IMPL_JAR}"
+    "${AISX_IMPL_JAR}"
   ],
   "suffix": [
     "--aisurada.vault=${AISURADA_VAULT}",
-    "--aisurada.db.home=${WLX_STATE_DIR}/db"
+    "--aisurada.db.home=${AISX_STATE_DIR}/db"
   ]
 }

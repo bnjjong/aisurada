@@ -1,5 +1,5 @@
 /* Actual WKWebView, real Java sidecar and isolated vault. Claude listing uses a local fake executable. */
-const cfg = window.__WL_FIXTURE__;
+const cfg = window.__AIS_FIXTURE__;
 const results = [];
 const invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);
 const assert = (condition, why) => { if (!condition) throw Error(why); };

@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.NoteIndex;
 import aisurada.vault.NoteScanner;
@@ -32,7 +32,7 @@ public final class ListTags {
                 Long toolLimitLong = (Long) opts.get("limit");
                 if (toolLimitLong != null) {
                     if (toolLimitLong > Integer.MAX_VALUE) {
-                        throw new WlException(400, "limit 은 숫자여야 한다: " + toolLimitLong);
+                        throw new AisException(400, "limit 은 숫자여야 한다: " + toolLimitLong);
                     }
                     limit = toolLimitLong.intValue();
                 }
@@ -49,15 +49,15 @@ public final class ListTags {
                     try {
                         long parsedLimit = Long.parseLong(trimmedLimit);
                         if (parsedLimit > Integer.MAX_VALUE || parsedLimit < Integer.MIN_VALUE) {
-                            throw new WlException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
+                            throw new AisException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
                         }
                         int lim = (int) parsedLimit;
                         if (lim < 1) {
-                            throw new WlException(400, "태그 개수 상한은 1 이상이다: " + lim);
+                            throw new AisException(400, "태그 개수 상한은 1 이상이다: " + lim);
                         }
                         limit = lim;
                     } catch (NumberFormatException e) {
-                        throw new WlException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
+                        throw new AisException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
                     }
                 }
             }

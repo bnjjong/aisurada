@@ -7,7 +7,7 @@ export function editorHost(): EditorHost {
   return {
     native: isTauri(),
     writeImage: (directory, name, bytes) => invoke('write_attachment_bytes', bytes, {
-      headers: { 'x-wl-note-dir': encodeURIComponent(directory), 'x-wl-name': encodeURIComponent(name) },
+      headers: { 'x-ais-note-dir': encodeURIComponent(directory), 'x-ais-name': encodeURIComponent(name) },
     }),
     openFile: path => invoke('open_in_default_app', { path }),
     openURL: url => openUrl(url),

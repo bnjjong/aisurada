@@ -4,7 +4,7 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 
@@ -85,8 +85,8 @@ public final class ReportReader {
                 }
             }
         } catch (IOException e) {
-            // 폴더 목록을 못 읽으면 25.4 차례 8번: WL-500
-            throw new WlException(500, "회고 폴더를 읽지 못했다: " + dir.toAbsolutePath());
+            // 폴더 목록을 못 읽으면 25.4 차례 8번: AIS-500
+            throw new AisException(500, "회고 폴더를 읽지 못했다: " + dir.toAbsolutePath());
         }
 
         // 파일 이름의 UTF-16 순서로 정렬

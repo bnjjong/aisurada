@@ -1,7 +1,7 @@
 //! Chapter 10. No broad asset scope, CORS, network, or parent capabilities.
 use std::{fs, path::Path};
 use tauri::http::{Response, StatusCode};
-pub const CSP:&str="default-src 'none'; script-src 'unsafe-inline' wlframe: http://wlframe.localhost; style-src 'unsafe-inline' wlframe: http://wlframe.localhost; img-src data: blob: wlframe: http://wlframe.localhost; font-src data: wlframe: http://wlframe.localhost; media-src data: blob: wlframe: http://wlframe.localhost; sandbox allow-scripts";
+pub const CSP:&str="default-src 'none'; script-src 'unsafe-inline' aisframe: http://aisframe.localhost; style-src 'unsafe-inline' aisframe: http://aisframe.localhost; img-src data: blob: aisframe: http://aisframe.localhost; font-src data: aisframe: http://aisframe.localhost; media-src data: blob: aisframe: http://aisframe.localhost; sandbox allow-scripts";
 fn response(status: u16, mime: Option<&str>, body: Vec<u8>) -> Response<Vec<u8>> {
     let mut b = Response::builder()
         .status(StatusCode::from_u16(status).unwrap())
@@ -121,7 +121,7 @@ mod tests {
         assert_eq!(r.status(), 200);
         assert_eq!(r.headers()["Content-Security-Policy"], CSP);
         assert!(r.body().contains(&255));
-        assert!(String::from_utf8_lossy(r.body()).contains("wlframeHeight"));
+        assert!(String::from_utf8_lossy(r.body()).contains("aisframeHeight"));
         assert!(r.body().ends_with(b"</BoDy>"));
         for (vault, path, status) in [
             (None, f.to_str().unwrap(), 503),

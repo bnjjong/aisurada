@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.vault.AgendaTable;
 import aisurada.vault.NoteIndex;
 import aisurada.vault.NoteScanner;
@@ -45,7 +45,7 @@ public final class DeleteAgenda {
         // 2, 3. 그 아젠다를 가리키는 노트를 센다. 층을 안 가리고, 하위 노트는 루트에 딸려서 따로 안 센다
         int notes = countNotes(noteIndex, id);
         if (notes > 0) {
-            throw new WlException(400, "노트가 " + notes + "건 있는 아젠다는 지울 수 없다. 먼저 그 노트를 옮기거나 버린다: "
+            throw new AisException(400, "노트가 " + notes + "건 있는 아젠다는 지울 수 없다. 먼저 그 노트를 옮기거나 버린다: "
                     + agenda.slug());
         }
 

@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.AgendaReader;
 import aisurada.vault.AgendaTable;
@@ -30,11 +30,11 @@ final class AgendaArgs {
     static String requireId(ParsedArgs parsed, String usage) {
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + usage);
+            throw new AisException(400, "인자가 하나 필요하다: " + usage);
         }
         String id = pos.get(0);
         if (!IdGenerator.isValidAgendaId(id)) {
-            throw new WlException(400, "아젠다 id 모양이 아니다: " + id);
+            throw new AisException(400, "아젠다 id 모양이 아니다: " + id);
         }
         return id;
     }
@@ -53,13 +53,13 @@ final class AgendaArgs {
             return null;
         }
         if (!AgendaReader.HUES.contains(hue)) {
-            throw new WlException(400, "hue 값이 아니다: " + hue);
+            throw new AisException(400, "hue 값이 아니다: " + hue);
         }
         return hue;
     }
 
     /**
-     * 방금 맞춘 색인(이번 호출이 훑은 아젠다 파일)에서 id로 아젠다를 찾습니다. 없으면 WL-404입니다.
+     * 방금 맞춘 색인(이번 호출이 훑은 아젠다 파일)에서 id로 아젠다를 찾습니다. 없으면 AIS-404입니다.
      */
     static AgendaTable.AgendaInfo find(NoteIndex noteIndex, String id) {
         return find(noteIndex.agendaTable(), id);
@@ -68,7 +68,7 @@ final class AgendaArgs {
     static AgendaTable.AgendaInfo find(AgendaTable table, String id) {
         AgendaTable.AgendaInfo info = table.idToAgenda().get(id);
         if (info == null) {
-            throw new WlException(404, "Agenda not found: " + id);
+            throw new AisException(404, "Agenda not found: " + id);
         }
         return info;
     }

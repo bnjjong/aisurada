@@ -1,5 +1,5 @@
 //! 10장 10.6: 세션 입력창에 붙인 그림을 앱 데이터 폴더의 `session-images/<세션 id>/` 에 쓴다.
-//! 바이트는 IPC 본문 그대로, 세션 id와 이름은 헤더 `x-wl-session-id`, `x-wl-name` 으로 받는다(2부 설명서 3.4).
+//! 바이트는 IPC 본문 그대로, 세션 id와 이름은 헤더 `x-ais-session-id`, `x-ais-name` 으로 받는다(2부 설명서 3.4).
 use crate::ipc;
 use std::path::{Path, PathBuf};
 use tauri::Manager;

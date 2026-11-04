@@ -4,11 +4,11 @@ import java.io.*;
 import java.nio.ByteBuffer;
 
 /**
- * 설명서 4.2 규격에 따른 소켓 응답 프레임 (WLG1) 읽기 및 쓰기.
+ * 설명서 4.2 규격에 따른 소켓 응답 프레임 (AIG1) 읽기 및 쓰기.
  */
 public final class ResponseFrame {
 
-    public static final int MAGIC = 0x574C4731; // "WLG1"
+    public static final int MAGIC = 0x41494731; // "AIG1"
     public static final int VERSION = 1;
     public static final int DB_SCHEMA = 5;
     public static final int MAX_BODY_LEN = 67_108_864; // 64 MiB

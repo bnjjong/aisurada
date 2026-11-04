@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
@@ -31,7 +31,7 @@ public final class FactsBrief {
         if (to == null) to = TestApparatus.today(ZoneId.systemDefault());
         if (from == null) from = to.minusDays(6);
         if (from.isAfter(to)) {
-            throw new WlException(400, "날짜 구간이 뒤집혔다: " + from + " ~ " + to);
+            throw new AisException(400, "날짜 구간이 뒤집혔다: " + from + " ~ " + to);
         }
 
         String first = from.toString();
@@ -85,7 +85,7 @@ public final class FactsBrief {
         try {
             return LocalDate.parse(value);
         } catch (DateTimeParseException e) {
-            throw new WlException(400, field + " 은 YYYY-MM-DD 모양이어야 한다: " + value);
+            throw new AisException(400, field + " 은 YYYY-MM-DD 모양이어야 한다: " + value);
         }
     }
 
@@ -96,9 +96,9 @@ public final class FactsBrief {
         try {
             number = Integer.parseInt(value);
         } catch (NumberFormatException e) {
-            throw new WlException(400, "min-new-file 은 숫자여야 한다: " + value);
+            throw new AisException(400, "min-new-file 은 숫자여야 한다: " + value);
         }
-        if (number < 1) throw new WlException(400, "min-new-file 은 1 이상이어야 한다: " + number);
+        if (number < 1) throw new AisException(400, "min-new-file 은 1 이상이어야 한다: " + number);
         return number;
     }
 

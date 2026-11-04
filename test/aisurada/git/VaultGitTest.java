@@ -74,7 +74,7 @@ public final class VaultGitTest {
         write(v,"notes/demo/root/note.md",note(ID,"외부 편집")); write(v,"a/deep/half.tmp","temporary");
         outcome(g.commit("startup"),"committed",null);
         check(!Files.exists(v.resolve("hook-ran")),"post-commit hook disabled; signing config overridden");
-        eq(message(v),"wl(outside): 노트 1개, 파일 1개\n\nAisurada-Writer: outside\nAisurada-Reason: startup\nAisurada-Notes: "+ID+"\n","startup bytes");
+        eq(message(v),"ais(outside): 노트 1개, 파일 1개\n\nAisurada-Writer: outside\nAisurada-Reason: startup\nAisurada-Notes: "+ID+"\n","startup bytes");
         eq(git(v,"show","-s","--format=%an <%ae>|%cn <%ce>","HEAD").trim(),"aisurada-auto <noreply@aisurada.local>|aisurada-auto <noreply@aisurada.local>","author and committer");
         check(git(v,"status","--porcelain").contains("a/"),"tmp remains unstaged");
         write(v,"notes/demo/root/note.md",note(ID,"도구 편집")); g.afterWrite(true,"session-A");
@@ -94,7 +94,7 @@ public final class VaultGitTest {
         check(message(v).contains("Aisurada-Reason: overdue"),"overdue message");
         outcome(g.commit("shutdown"),"nothing",null);
         write(v,"last","shutdown");outcome(g.commit("shutdown"),"committed",null);
-        check(message(v).contains("wl(outside)"),"pending cleared after success");
+        check(message(v).contains("ais(outside)"),"pending cleared after success");
     }
     private static void blocking() throws Exception {
         Path v=repo();TestClock clock=new TestClock();VaultGit g=new VaultGit(v,true,0,clock,null);
@@ -133,7 +133,7 @@ public final class VaultGitTest {
             clock.advance(wait-1);g.beforeWrite(true,"new");g.tick();eq(calls.size(),n+2,"retry backoff");clock.advance(1);
         }
         fail[0]=false;g.afterWrite(true,"new");g.tick();
-        check(messages.get(0).startsWith("wl(app,tool): 노트 0개, 파일 1개\n"),"mixed writers retained in order");
+        check(messages.get(0).startsWith("ais(app,tool): 노트 0개, 파일 1개\n"),"mixed writers retained in order");
         check(messages.get(0).contains("Aisurada-Session: new\n"),"session retained after failures");
         g.afterWrite(false,null);fail[0]=true;int n=calls.size();g.tick();eq(calls.size(),n+2,"failure counter reset");clock.advance(30);g.tick();eq(calls.size(),n+4,"reset backoff is 30 seconds");
         // 강제 시작/종료는 미룬 시각보다 앞서도 시도한다.
@@ -148,12 +148,12 @@ public final class VaultGitTest {
         write(v,"notes/demo/bom/note.md","\ufeff"+note("bom","x"));
         write(v,"notes/demo/json/note.json",note("json","x"));
         g.afterWrite(true,"one");outcome(g.commit("shutdown"),"committed",null);
-        check(message(v).startsWith("wl(tool): 노트 1개, 파일 4개\n"),"deleted HEAD id deduplicated with new path; BOM/json excluded");
+        check(message(v).startsWith("ais(tool): 노트 1개, 파일 4개\n"),"deleted HEAD id deduplicated with new path; BOM/json excluded");
         for(String text:List.of("---\nid: good\n---\n", "---\nid: '\"한글_1-\"'\n---\n"))check(VaultGit.headerId(text.getBytes(StandardCharsets.UTF_8))!=null,"header id accepted");
         for(String text:List.of("\ufeff---\nid: good\n---\n", "---\n id: good\n---\n", "---\nid: x y\n---\n", "---\nid: good\n", "---\nid: bad!\nid: good\n---\n"))eq(VaultGit.headerId(text.getBytes(StandardCharsets.UTF_8)),null,"header id rejected");
         for(int i=0;i<201;i++)write(v,"bulk/"+i+"/note.md","---\nid: note_"+i+"\n---\n");
         outcome(g.commit("startup"),"committed",null);String msg=message(v);
-        check(msg.startsWith("wl(outside): 노트 201개, 파일 201개\n"),"full note count");
+        check(msg.startsWith("ais(outside): 노트 201개, 파일 201개\n"),"full note count");
         eq(msg.substring(msg.indexOf("Aisurada-Notes: ")+15).trim().split(" ").length,200,"notes trailer capped");
     }
     private static void pendingValues() throws Exception {
@@ -167,9 +167,9 @@ public final class VaultGitTest {
         VaultGit pending=new VaultGit(v,true,-1,clock,runner);
         pending.afterWrite(true,"");pending.afterWrite(true,"raw\nOther: injected  ");pending.afterWrite(true,"");pending.afterWrite(false,"ignored");
         pending.tick();
-        eq(messages.getFirst(),"wl(tool,app): 노트 0개, 파일 1개\n\nAisurada-Writer: tool app\nAisurada-Reason: idle\nAisurada-Session:  raw\nOther: injected  \n","pending keeps insertion order, deduplicates and preserves raw empty/newline sessions");
+        eq(messages.getFirst(),"ais(tool,app): 노트 0개, 파일 1개\n\nAisurada-Writer: tool app\nAisurada-Reason: idle\nAisurada-Session:  raw\nOther: injected  \n","pending keeps insertion order, deduplicates and preserves raw empty/newline sessions");
         outcome(pending.commit("restore"),"committed",null);
-        check(messages.getLast().startsWith("wl(outside)"),"successful attempt cleared pending writers");
+        check(messages.getLast().startsWith("ais(outside)"),"successful attempt cleared pending writers");
         VaultGit warning=new VaultGit(v,true,0,clock,(args,input)->result(0,"warning\nrefs/heads/main\n"));
         outcome(warning.commit("restore"),"skipped","not-main");
     }
@@ -185,7 +185,7 @@ public final class VaultGitTest {
         write(v,"changed","reconcile");VaultGit.serving(v).commit("shutdown");check(message(v).contains("Aisurada-Writer: outside"),"reconcile failure not tracked");
         write(v,"changed","semantic");run(v,400,"create-comment","bad-id","body=x");
         int n=count(v);run(v,400,"create_doc","{}");eq(count(v),n,"tool schema validation does not commit");
-        run(v,400,"create_doc","{\"agenda\":\"demo\",\"type\":\"bad\",\"title\":\"x\",\"body\":\"x\"}","\u0000wl-session-id","raw");
+        run(v,400,"create_doc","{\"agenda\":\"demo\",\"type\":\"bad\",\"title\":\"x\",\"body\":\"x\"}","\u0000ais-session-id","raw");
         eq(count(v),n+1,"semantic failure marked before next writer");check(message(v).contains("Aisurada-Writer: app"),"previous app writer");
         write(v,"changed","part4");run(v,409,"append-chat-turn");
         check(message(v).contains("Aisurada-Session: raw"),"raw tool session committed before part4");
@@ -222,7 +222,7 @@ public final class VaultGitTest {
         outcome(VaultGit.serving(v).commit("shutdown"),"nothing",null);
         run(v,0,"facts-brief","from=2026-06-16","to=2026-06-25");
         write(v,"outside","external change after brief");
-        run(v,400,"create_doc","{\"agenda\":\"demo\",\"type\":\"bad\",\"title\":\"x\",\"body\":\"x\"}","\u0000wl-session-id","facts-session");
+        run(v,400,"create_doc","{\"agenda\":\"demo\",\"type\":\"bad\",\"title\":\"x\",\"body\":\"x\"}","\u0000ais-session-id","facts-session");
         eq(count(v),before+1,"brief pending writer triggers next tool transition");
         check(message(v).contains("Aisurada-Writer: app\n"),"brief records app writer");
         VaultGit.serving(v).commit("shutdown"); // 도구의 의미 검사 실패 기록을 비운다.
@@ -247,7 +247,7 @@ public final class VaultGitTest {
     }
     private static void templatesPipeline() throws Exception {
         Path v=repo();EngineConfig.activate(new EngineConfig(v.toString(),v.toString(),null,false,10,true,300,true));
-        run(v,0,"save_template","{\"name\":\"template\",\"body\":\"body\"}","\u0000wl-session-id","template-session");
+        run(v,0,"save_template","{\"name\":\"template\",\"body\":\"body\"}","\u0000ais-session-id","template-session");
         outcome(VaultGit.serving(v).commit("shutdown"),"committed",null);
         check(message(v).contains("Aisurada-Writer: tool\n") && message(v).contains("Aisurada-Session: template-session\n"),"template tool records writer and session");
         String id;

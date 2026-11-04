@@ -47,7 +47,7 @@ public final class Part4ReviewTest {
         Path v = t.vault();
         System.clearProperty("aisurada.enable.part4");
         check(EngineExecutor.isPart4Enabled(), "H1: part4 jar is on without any switch");
-        eq(error(v, 400, "get-ask").errorCode(), 400, "H1: get-ask runs instead of WL-409");
+        eq(error(v, 400, "get-ask").errorCode(), 400, "H1: get-ask runs instead of AIS-409");
         System.setProperty("aisurada.enable.part4", "false");
         check(EngineExecutor.isPart4Enabled(), "N1: property false cannot disable the enabled build");
         error(v, 400, "get-ask");
@@ -59,14 +59,14 @@ public final class Part4ReviewTest {
         Path v = t.vault();
         root(v, "mynote", 1, "2026-06-16", "", "# T\nbody\n");
 
-        // L1. 없는 노트여도 이름 인자가 틀렸으면 WL-400 이다
+        // L1. 없는 노트여도 이름 인자가 틀렸으면 AIS-400 이다
         String[] bad = {"append-ask-turn", "ndfixture-99999999", "session-id=s", "turn-id=t", "mark-id=m", "asked-at=a", "question=q", "answer=a", "model=m", "effort=e", "elapsed-ms=x"};
         error(v, 400, bad);
         error(v, 400, "append-chat-turn", "ndfixture-99999999", "chat-id=c1", "source-session=s", "turn-id=t", "asked-at=a", "question=q", "answer=a", "model=m", "effort=e", "elapsed-ms=x");
         // 인자가 맞으면 그제야 노트를 찾아 404 다
         error(v, 404, "append-ask-turn", "ndfixture-99999999", "session-id=s", "turn-id=t", "mark-id=m", "asked-at=a", "question=q", "answer=a", "model=m", "effort=e", "elapsed-ms=1");
 
-        // L2. 32비트를 넘는 elapsed-ms 는 WL-400 이다
+        // L2. 32비트를 넘는 elapsed-ms 는 AIS-400 이다
         error(v, 400, "append-ask-turn", NOTE, "session-id=s", "turn-id=t", "mark-id=m", "asked-at=a", "question=q", "answer=a", "model=m", "effort=e", "elapsed-ms=3000000000");
         error(v, 400, "append-chat-turn", NOTE, "chat-id=c1", "source-session=s", "turn-id=t", "asked-at=a", "question=q", "answer=a", "model=m", "effort=e", "elapsed-ms=3000000000");
 

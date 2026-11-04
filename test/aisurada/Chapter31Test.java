@@ -44,11 +44,11 @@ public final class Chapter31Test {
         Path v = t.vault(); Files.delete(v.resolve(".aisurada/workspace.json"));
         eq(ok(v, "history", "missing"), Map.of("id", "missing", "count", 0L, "versions", List.of()), "history needs neither workspace nor index");
         eq(ok(v, "commit-vault"), Map.of("outcome", "disabled", "blocked", "not-repo"), "not repo successful outcome");
-        eq(stderr(error(v, 400, "history", "x", "bad", "extra", "unknown=x")), "WL-400 history 이 모르는 옵션이다: unknown. 쓸 수 있는 것은 [commit, query] 뿐이다.\n", "unknown option before positions");
+        eq(stderr(error(v, 400, "history", "x", "bad", "extra", "unknown=x")), "AIS-400 history 이 모르는 옵션이다: unknown. 쓸 수 있는 것은 [commit, query] 뿐이다.\n", "unknown option before positions");
         check(stderr(error(v, 400, "history", "x", "bad", "extra")).contains("자리 인자는 2"), "extra position before number");
         for (String value : List.of("0", "-2", "2147483648", "", " 1", "1 ", "+", "𝟐"))
-            eq(stderr(error(v, 400, "history", "", value, "commit=bad")), "WL-400 판 번호는 1 이상의 정수여야 한다: " + value + "\n", "number validated first");
-        eq(stderr(error(v, 400, "history", "", "commit= BAD ")), "WL-400 커밋은 40 자리 16 진수여야 한다: BAD\n", "trimmed commit before id");
+            eq(stderr(error(v, 400, "history", "", value, "commit=bad")), "AIS-400 판 번호는 1 이상의 정수여야 한다: " + value + "\n", "number validated first");
+        eq(stderr(error(v, 400, "history", "", "commit= BAD ")), "AIS-400 커밋은 40 자리 16 진수여야 한다: BAD\n", "trimmed commit before id");
         String hash = "a".repeat(40);
         check(stderr(error(v, 400, "history", "", "+1", "commit=" + hash)).contains("함께 줄 수 없다"), "mutual exclusion before id");
         check(stderr(error(v, 400, "history")).contains(HistoryUsage()), "missing id usage");
@@ -63,8 +63,8 @@ public final class Chapter31Test {
         error(v, 400, "history", "x", "commit=" + "A".repeat(40));
         check(!ok(v, "history", "missing", "query=\u3000").containsKey("matches"), "blank query omitted");
         eq(ok(v, "history", "missing", "query=x").get("matches"), List.of(), "nonempty query includes empty matches");
-        eq(stderr(error(v, 400, "commit-vault", "extra", "unknown=x")), "WL-400 commit-vault 이 모르는 옵션이다: unknown. 쓸 수 있는 것은 [] 뿐이다.\n", "commit option before extra positional");
-        eq(stderr(error(v, 400, "commit-vault", "extra")), "WL-400 commit-vault 이 받는 자리 인자는 0 개인데 1 개를 받았다: commit-vault\n", "commit no arguments");
+        eq(stderr(error(v, 400, "commit-vault", "extra", "unknown=x")), "AIS-400 commit-vault 이 모르는 옵션이다: unknown. 쓸 수 있는 것은 [] 뿐이다.\n", "commit option before extra positional");
+        eq(stderr(error(v, 400, "commit-vault", "extra")), "AIS-400 commit-vault 이 받는 자리 인자는 0 개인데 1 개를 받았다: commit-vault\n", "commit no arguments");
         eq(run(v, "commit_vault").status(), 2, "no tool commit surface");
         eq(run(v, "history_tool").status(), 2, "no history tool surface");
     }
@@ -79,7 +79,7 @@ public final class Chapter31Test {
         eq(ok(v, "commit-vault").get("outcome"), "committed", "explicit commit");
         String auto = git(v, "rev-parse", "HEAD").trim();
         check(git(v, "show", "-s", "--format=%B", "HEAD").contains("Aisurada-Reason: restore"), "explicit reason restore");
-        check(git(v, "show", "-s", "--format=%B", "HEAD").startsWith("wl(outside)"), "oneshot writer outside");
+        check(git(v, "show", "-s", "--format=%B", "HEAD").startsWith("ais(outside)"), "oneshot writer outside");
         var result = ok(v, "history", ID);
         eq(result.keySet().stream().toList(), List.of("id", "count", "versions"), "history root key order");
         eq(result.get("count"), 2L, "manual and auto combined");
@@ -144,7 +144,7 @@ public final class Chapter31Test {
         eq(git(v, "show", snapshotRef(v, ID) + ":note.md"), old, "derived root card removal snapshot");
         String refBefore = snapshotRef(v, ID);
         var rejected = run(v, "update-doc", ID, "body=stale", "f1=f1:stale");
-        eq(rejected.status(), 5, "stale precondition exit"); eq(rejected.errorCode(), 412, "stale precondition WL code");
+        eq(rejected.status(), 5, "stale precondition exit"); eq(rejected.errorCode(), 412, "stale precondition AIS code");
         eq(snapshotRef(v, ID), refBefore, "rejected write has no snapshot");
         config(v, false, false); eq(ok(v, "history", subId).get("count"), 1L, "snapshot readable when feature off");
         EngineConfig.activate(null);
@@ -164,7 +164,7 @@ public final class Chapter31Test {
         // 31.5 is read-flagged: it shares pending state in serve, without registering itself as app.
         config(v, true, false); put(v, "external", "serve tool"); VaultGit.serving(v).afterWrite(true, "session raw");
         var r = EngineExecutor.execute(v, new String[]{"commit-vault"}, true, System.currentTimeMillis()); eq(r.status(), 0, "serve explicit commit success");
-        String msg = git(v, "show", "-s", "--format=%B", "HEAD"); check(msg.startsWith("wl(tool)"), "explicit keeps pending writer"); check(msg.contains("Aisurada-Session: session raw"), "explicit keeps raw session");
+        String msg = git(v, "show", "-s", "--format=%B", "HEAD"); check(msg.startsWith("ais(tool)"), "explicit keeps pending writer"); check(msg.contains("Aisurada-Session: session raw"), "explicit keeps raw session");
         Files.delete(v.resolve(".aisurada/workspace.json")); put(v, "notes/poison/note.md", "---\nmins: !!int bad\n---\n");
         eq(ok(v, "commit-vault").get("outcome"), "committed", "explicit ignores workspace and poisoned index");
         Files.writeString(v.resolve(".git/index"), "corrupt index");

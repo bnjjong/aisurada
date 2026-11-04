@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.TemplateReader;
 
@@ -28,14 +28,14 @@ public final class GetTemplate {
             Map<String, Object> opts = parsed.toolOptions();
             id = (opts != null) ? (String) opts.get("id") : null;
             if (id == null) {
-                throw new WlException(400, "인자 검증 실패(get_template): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_template): id 가 필요하다.");
             }
         } else {
             if (parsed.positionalArgs().isEmpty()) {
-                throw new WlException(400, "인자가 하나 필요하다: get-template <템플릿 id>");
+                throw new AisException(400, "인자가 하나 필요하다: get-template <템플릿 id>");
             }
             if (parsed.positionalArgs().size() > 1) {
-                throw new WlException(400, "get-template 이 받는 자리 인자는 1 개인데 " +
+                throw new AisException(400, "get-template 이 받는 자리 인자는 1 개인데 " +
                         parsed.positionalArgs().size() + " 개를 받았다: get-template <템플릿 id>");
             }
             id = parsed.positionalArgs().get(0);
@@ -43,10 +43,10 @@ public final class GetTemplate {
 
         // 값 검증 (다듬지 않는다)
         if (id.isEmpty() || Trim.isBlank(id)) {
-            throw new WlException(400, "인자가 하나 필요하다: get-template <템플릿 id>");
+            throw new AisException(400, "인자가 하나 필요하다: get-template <템플릿 id>");
         }
         if (!ID_PATTERN.matcher(id).matches()) {
-            throw new WlException(400, "템플릿 id 모양이 아니다: " + id);
+            throw new AisException(400, "템플릿 id 모양이 아니다: " + id);
         }
 
         // 템플릿 스캔
@@ -59,6 +59,6 @@ public final class GetTemplate {
             }
         }
 
-        throw new WlException(404, "Template not found: " + id);
+        throw new AisException(404, "Template not found: " + id);
     }
 }

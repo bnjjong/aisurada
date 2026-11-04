@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.Diagnostics;
 import aisurada.engine.WritePipeline;
 import aisurada.text.Utf16;
@@ -37,7 +37,7 @@ public final class ShardNotes {
         if (Files.isDirectory(notes)) {
             List<Path> agendas;
             try { agendas = children(notes); }
-            catch (IOException e) { throw new WlException(500, "노트 폴더를 읽지 못했다: " + notes); }
+            catch (IOException e) { throw new AisException(500, "노트 폴더를 읽지 못했다: " + notes); }
             for (Path agenda : agendas) if (Files.isDirectory(agenda)) collect(vault, agenda, agenda.getFileName().toString(), 0, sharded, candidates);
         }
         Map<String, Integer> totals = new HashMap<>(); for (var c : candidates) totals.merge(c.agenda(), 1, Integer::sum);

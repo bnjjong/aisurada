@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,20 +27,20 @@ public final class TrashArchive {
         }
         // 5-3: 옮길 자리가 차 있으면 덮지 않는다
         if (Files.exists(target)) {
-            throw new WlException(500, "옮길 자리에 이미 무엇이 있어 옮기지 않았다: " + target);
+            throw new AisException(500, "옮길 자리에 이미 무엇이 있어 옮기지 않았다: " + target);
         }
         // 5-4: 휴지통 폴더를 위쪽까지 만든다. 실패한 조각이 위여도 만들려던 폴더 전체를 찍는다
         Path trashDir = target.getParent();
         try {
             Files.createDirectories(trashDir);
         } catch (IOException e) {
-            throw new WlException(500, "폴더를 만들지 못했다: " + trashDir);
+            throw new AisException(500, "폴더를 만들지 못했다: " + trashDir);
         }
         // 5-5: 이름 바꾸기 1번. 폴더는 폴더째, 심볼릭 링크는 링크 자신을 옮긴다
         try {
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            throw new WlException(500, "옮기지 못했다: " + source + " -> " + target);
+            throw new AisException(500, "옮기지 못했다: " + source + " -> " + target);
         }
     }
 }

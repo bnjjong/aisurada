@@ -341,7 +341,7 @@ export function SessionComposer({
             return snapshot.status === 'ok' ? snapshot.sessions : null;
           },
           firstCwd: readFirstCwd,
-          writeImage: (id, name, data) => invoke<string>('write_session_image', data, { headers: { 'x-wl-session-id': encodeURIComponent(id), 'x-wl-name': encodeURIComponent(name) } }),
+          writeImage: (id, name, data) => invoke<string>('write_session_image', data, { headers: { 'x-ais-session-id': encodeURIComponent(id), 'x-ais-name': encodeURIComponent(name) } }),
           askClaude: (args) => askClaudeBridge(args),
         },
         { sessionId, text, images: bytes, vault, model: askNow().model, effort: askNow().effort, timeoutSeconds: timeoutSeconds() }

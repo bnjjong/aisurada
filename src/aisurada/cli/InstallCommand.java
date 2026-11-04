@@ -82,7 +82,7 @@ public final class InstallCommand {
             return;
         }
 
-        // 2. wl-sidecar.jar 원본 후보 결정
+        // 2. ais-sidecar.jar 원본 후보 결정
         String sidecarSource = null;
         if (sidecarArg != null) {
             sidecarSource = toAbsolutePath(sidecarArg, userDir);
@@ -93,10 +93,10 @@ public final class InstallCommand {
             } else if (cliSource.matches(".*/ais-cli/build/libs/[^/]+\\.jar")) {
                 int idx = cliSource.indexOf("/ais-cli/build/libs/");
                 String root = cliSource.substring(0, idx);
-                sidecarSource = root + "/wl-sidecar/build/libs/wl-sidecar.jar";
+                sidecarSource = root + "/ais-sidecar/build/libs/ais-sidecar.jar";
             } else if (cliSource.endsWith("/dist/ais-cli.jar")) {
-                Path distSidecar = Paths.get(cliSource).getParent().resolve("wl-sidecar.jar");
-                Path distEngine = Paths.get(cliSource).getParent().resolve("wl-engine.jar");
+                Path distSidecar = Paths.get(cliSource).getParent().resolve("ais-sidecar.jar");
+                Path distEngine = Paths.get(cliSource).getParent().resolve("ais-engine.jar");
                 if (Files.isRegularFile(distSidecar)) {
                     sidecarSource = distSidecar.toAbsolutePath().normalize().toString();
                 } else {
@@ -144,7 +144,7 @@ public final class InstallCommand {
             System.out.println("# (dry-run) 아무것도 안 바꿈 — 복사될 것 미리보기");
             System.out.println("# 자리: " + destDir);
             System.out.println("  ais-cli.jar  " + cliSize + " 바이트  ← " + cliPath);
-            System.out.println("  wl-sidecar.jar  " + sidecarSize + " 바이트  ← " + sidecarPath);
+            System.out.println("  ais-sidecar.jar  " + sidecarSize + " 바이트  ← " + sidecarPath);
             System.exit(0);
             return;
         }
@@ -164,9 +164,9 @@ public final class InstallCommand {
             }
             try { Files.deleteIfExists(cliInstalling); } catch (Exception ignored) {}
 
-            // wl-sidecar.jar 설치
-            Path sidecarInstalling = destDir.resolve("wl-sidecar.jar.installing");
-            Path sidecarTarget = destDir.resolve("wl-sidecar.jar");
+            // ais-sidecar.jar 설치
+            Path sidecarInstalling = destDir.resolve("ais-sidecar.jar.installing");
+            Path sidecarTarget = destDir.resolve("ais-sidecar.jar");
             Files.copy(sidecarPath, sidecarInstalling, StandardCopyOption.REPLACE_EXISTING);
             try {
                 Files.move(sidecarInstalling, sidecarTarget, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -181,7 +181,7 @@ public final class InstallCommand {
             System.out.println("✓ jar 둘을 설치함");
             System.out.println("  자리: " + destDir);
             System.out.println("  ais-cli.jar  " + installedCliSize + " 바이트  ← " + cliPath);
-            System.out.println("  wl-sidecar.jar  " + installedSidecarSize + " 바이트  ← " + sidecarPath);
+            System.out.println("  ais-sidecar.jar  " + installedSidecarSize + " 바이트  ← " + sidecarPath);
             System.out.println("  래퍼와 plist 가 이 자리를 박게 하려면 `schedule on` 을 한 번 돌린다.");
             System.exit(0);
         } catch (Exception e) {

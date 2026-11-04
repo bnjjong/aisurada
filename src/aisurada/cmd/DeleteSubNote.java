@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.NoteIndex;
 import aisurada.vault.NoteScanner;
@@ -39,10 +39,10 @@ public final class DeleteSubNote {
         // 6. 자리 인자 2칸, 부모 참조, 하위 id의 3가지 검사. 17.5 지우기 1번이라 카드를 걷기 전에 다 본다
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
         if (pos.size() < 2 || Trim.isBlank(pos.get(1))) {
-            throw new WlException(400, "인자가 둘 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 둘 필요하다: " + USAGE);
         }
         SubNoteChain.Parent parent = SubNoteChain.resolveParent(noteIndex, pos.get(0));
         NoteScanner.NoteRecord sub = SubNoteChain.resolveTarget(parent, pos.get(1));
@@ -50,7 +50,7 @@ public final class DeleteSubNote {
         // 2번, 3번: 직계 컨테이너가 markdown이 아니면 카드가 있든 없든 아무것도 안 지운다
         NoteScanner.NoteRecord container = parent.container();
         if (!"markdown".equals(container.format())) {
-            throw new WlException(409, "본문이 markdown 이 아니라 하위 페이지 카드를 걷어낼 수 없다(포맷="
+            throw new AisException(409, "본문이 markdown 이 아니라 하위 페이지 카드를 걷어낼 수 없다(포맷="
                     + container.format().toUpperCase(Locale.ROOT) + "): " + container.id());
         }
 

@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.AttachText;
 import aisurada.vault.CommentsReader;
@@ -41,10 +41,10 @@ public final class GetSubNote {
 
         // 1. 자리 인자 개수 및 공백 검사
         if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: get-sub-note <부모 노트 id> <하위 노트 id>");
+            throw new AisException(400, "인자가 하나 필요하다: get-sub-note <부모 노트 id> <하위 노트 id>");
         }
         if (pos.size() < 2 || pos.get(1) == null || Trim.isBlank(pos.get(1))) {
-            throw new WlException(400, "인자가 둘 필요하다: get-sub-note <부모 노트 id> <하위 노트 id>");
+            throw new AisException(400, "인자가 둘 필요하다: get-sub-note <부모 노트 id> <하위 노트 id>");
         }
 
         String rawParent = pos.get(0);
@@ -62,13 +62,13 @@ public final class GetSubNote {
 
         if (segments.isEmpty()) {
             String origin = parsed.rawParentSubNote() != null ? parsed.rawParentSubNote() : rawParent;
-            throw new WlException(400, "부모 노트 참조가 비었다: " + origin);
+            throw new AisException(400, "부모 노트 참조가 비었다: " + origin);
         }
 
         // 3. 첫 조각은 노트 id 모양
         String rootId = segments.get(0);
         if (!NOTE_ID_PATTERN.matcher(rootId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rootId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rootId);
         }
 
         NoteScanner.NoteRecord rootNote = scanResult.notesById().get(rootId);
@@ -78,42 +78,42 @@ public final class GetSubNote {
         for (int i = 1; i < segments.size(); i++) {
             String seg = segments.get(i);
             if (!SUB_NOTE_ID_PATTERN.matcher(seg).matches()) {
-                throw new WlException(400, "하위 노트 id 모양이 아니다: " + seg);
+                throw new AisException(400, "하위 노트 id 모양이 아니다: " + seg);
             }
             if (rootNote == null || !rootNote.subNotes().containsKey(seg)) {
-                throw new WlException(404, "SubNote not found: " + rootId + "/" + seg);
+                throw new AisException(404, "SubNote not found: " + rootId + "/" + seg);
             }
             NoteScanner.NoteRecord sub = rootNote.subNotes().get(seg);
             if (!prevId.equals(sub.directParentId())) {
-                throw new WlException(404, "SubNote not found: " + seg);
+                throw new AisException(404, "SubNote not found: " + seg);
             }
             prevId = seg;
         }
 
         // 5. 대상 id 검증
         if (!SUB_NOTE_ID_PATTERN.matcher(rawTargetId).matches()) {
-            throw new WlException(400, "하위 노트 id 모양이 아니다: " + rawTargetId);
+            throw new AisException(400, "하위 노트 id 모양이 아니다: " + rawTargetId);
         }
 
         if (rootNote == null || !rootNote.subNotes().containsKey(rawTargetId)) {
-            throw new WlException(404, "SubNote not found: " + rootId + "/" + rawTargetId);
+            throw new AisException(404, "SubNote not found: " + rootId + "/" + rawTargetId);
         }
 
         NoteScanner.NoteRecord targetSub = rootNote.subNotes().get(rawTargetId);
         if (!prevId.equals(targetSub.directParentId())) {
-            throw new WlException(404, "SubNote not found: " + rawTargetId);
+            throw new AisException(404, "SubNote not found: " + rawTargetId);
         }
 
         // 6. 도구 표면이면 루트 노트 존재 및 층 검사 (11.8, 11.9의 17번)
         if (parsed.isToolSurface()) {
             if (rootNote == null) {
-                throw new WlException(404, "Note not found: " + rootId);
+                throw new AisException(404, "Note not found: " + rootId);
             }
             // 11.8 & 11.9 17번: 도구 표면에서 루트 층을 볼 때 루트의 HTML 첨부까지 읽음 (입출력 오류 시 예상 밖 실패)
             AttachText.extract(vaultRoot, rootNote);
 
             if ("record".equals(rootNote.meta().tier())) {
-                throw new WlException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rootId +
+                throw new AisException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rootId +
                         ". 기계가 남긴 기록 노트는 앱에서만 열립니다.");
             }
         }

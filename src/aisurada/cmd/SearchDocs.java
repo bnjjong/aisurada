@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.NoteRow;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
@@ -40,11 +40,11 @@ public final class SearchDocs {
             Map<String, Object> opts = parsed.toolOptions();
             rawQuery = opts != null ? (String) opts.get("query") : null;
             if (rawQuery == null) {
-                throw new WlException(400, "인자 검증 실패(search_docs): query 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(search_docs): query 가 필요하다.");
             }
             determinedQuery = Trim.trim(rawQuery);
             if (determinedQuery.isEmpty()) {
-                throw new WlException(400, "검색어가 필요하다: " + usage);
+                throw new AisException(400, "검색어가 필요하다: " + usage);
             }
         } else {
             // 명령 표면: 10.3 3단계 결정
@@ -56,7 +56,7 @@ public final class SearchDocs {
                 determinedQuery = "";
             }
             if (determinedQuery.isEmpty()) {
-                throw new WlException(400, "검색어가 필요하다: " + usage);
+                throw new AisException(400, "검색어가 필요하다: " + usage);
             }
         }
 
@@ -115,11 +115,11 @@ public final class SearchDocs {
             if (opts != null && opts.containsKey("limit")) {
                 Long toolLimitLong = (Long) opts.get("limit");
                 if (toolLimitLong > Integer.MAX_VALUE) {
-                    throw new WlException(400, "limit 은 숫자여야 한다: " + toolLimitLong);
+                    throw new AisException(400, "limit 은 숫자여야 한다: " + toolLimitLong);
                 }
                 int l = toolLimitLong.intValue();
                 if (l < 1 || l > 200) {
-                    throw new WlException(400, "받을 건수가 범위를 벗어났다: " + l);
+                    throw new AisException(400, "받을 건수가 범위를 벗어났다: " + l);
                 }
                 limit = l;
             }
@@ -133,15 +133,15 @@ public final class SearchDocs {
                     try {
                         long parsedLimit = Long.parseLong(trimmedLimit);
                         if (parsedLimit > Integer.MAX_VALUE || parsedLimit < Integer.MIN_VALUE) {
-                            throw new WlException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
+                            throw new AisException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
                         }
                         int l = (int) parsedLimit;
                         if (l < 1 || l > 200) {
-                            throw new WlException(400, "받을 건수가 범위를 벗어났다: " + l);
+                            throw new AisException(400, "받을 건수가 범위를 벗어났다: " + l);
                         }
                         limit = l;
                     } catch (NumberFormatException e) {
-                        throw new WlException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
+                        throw new AisException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
                     }
                 }
             }

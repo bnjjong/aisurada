@@ -74,10 +74,10 @@ fn ipc_probe() {
     .unwrap();
     assert_eq!(out["status"], 3);
     assert_eq!(out["stdout"], "");
-    assert!(out["stderr"].as_str().unwrap().starts_with("WL-404"));
+    assert!(out["stderr"].as_str().unwrap().starts_with("AIS-404"));
     let out = invoke(&main, "sidecar_call", json!({"argv":["get-ask"]})).unwrap();
     assert_eq!(out["status"], 3);
-    assert!(out["stderr"].as_str().unwrap().starts_with("WL-409"));
+    assert!(out["stderr"].as_str().unwrap().starts_with("AIS-409"));
     let out = invoke(
         &main,
         "sidecar_call",
@@ -85,7 +85,7 @@ fn ipc_probe() {
     )
     .unwrap();
     assert_eq!(out["status"], 5);
-    assert!(out["stderr"].as_str().unwrap().starts_with("WL-412"));
+    assert!(out["stderr"].as_str().unwrap().starts_with("AIS-412"));
     let out=invoke(&main,"sidecar_call",json!({"argv":["create_doc","{\"agenda\":\"demo\",\"type\":\"free\",\"title\":\"호스트 기록\",\"body\":\"새 글\"}"]})).unwrap();
     assert_eq!(out["status"], 0);
     let created: Value = serde_json::from_str(out["stdout"].as_str().unwrap()).unwrap();
@@ -130,7 +130,7 @@ fn quote(value: &str) -> String {
 fn real_engine_round_trip_uses_isolated_home_and_socket() {
     use std::os::unix::fs::PermissionsExt;
     let temp = tempfile::Builder::new()
-        .prefix("wl-host-")
+        .prefix("ais-host-")
         .tempdir_in("/tmp")
         .unwrap();
     let home = temp.path().join("home");
@@ -152,8 +152,8 @@ fn real_engine_round_trip_uses_isolated_home_and_socket() {
         .parent()
         .unwrap();
     let cli = repo.join("dist/ais-cli.jar");
-    // 이 시험은 4부를 뺀 판의 답(WL-409)을 재므로 4부를 뺀 사이드카를 띄운다(1장 1.1)
-    let engine = repo.join("dist/wl-sidecar-noclaude.jar");
+    // 이 시험은 4부를 뺀 판의 답(AIS-409)을 재므로 4부를 뺀 사이드카를 띄운다(1장 1.1)
+    let engine = repo.join("dist/ais-sidecar-noclaude.jar");
     assert!(
         cli.is_file() && engine.is_file(),
         "run bash test-native.sh to build Java jars first"

@@ -89,9 +89,9 @@ public final class AgendaFactsTest {
     }
     private static void error(Path v, int code, String message, String... args) {
         EngineResult r = run(v, args);
-        eq(r.status(), 3, "error status " + args[0]); eq(r.errorCode(), code, "WL code");
+        eq(r.status(), 3, "error status " + args[0]); eq(r.errorCode(), code, "AIS code");
         eq(r.stdoutBytes().length, 0, "failure stdout");
-        eq(new String(r.stderrBytes(), StandardCharsets.UTF_8), "WL-" + code + " " + message + "\n", "error bytes");
+        eq(new String(r.stderrBytes(), StandardCharsets.UTF_8), "AIS-" + code + " " + message + "\n", "error bytes");
     }
     @SuppressWarnings("unchecked")
     private static Map<String, Object> object(byte[] bytes) {
@@ -399,8 +399,8 @@ public final class AgendaFactsTest {
 
     private static void serveAndCli() throws Exception {
         Path v = vault(), home = Files.createTempDirectory(temp, "home-");
-        Path socket = Path.of("/tmp", "wl-facts-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
-        Path engine = Path.of("dist/wl-engine.jar").toAbsolutePath(), cli = Path.of("dist/ais-cli.jar").toAbsolutePath();
+        Path socket = Path.of("/tmp", "ais-facts-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
+        Path engine = Path.of("dist/ais-engine.jar").toAbsolutePath(), cli = Path.of("dist/ais-cli.jar").toAbsolutePath();
         String java = Path.of(System.getProperty("java.home"), "bin/java").toString();
         List<String> prefix = List.of(java, "-Duser.home=" + home, "-Duser.timezone=Asia/Seoul", "-jar");
         Map<String, String> environment = Map.of("HOME", home.toString(), "TZ", "Asia/Seoul", "AISURADA_VAULT", v.toString(), "AISURADA_SIDECAR_SOCKET", socket.toString());

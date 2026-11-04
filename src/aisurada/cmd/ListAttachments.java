@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Uri;
 import aisurada.text.Utf16;
@@ -41,7 +41,7 @@ public final class ListAttachments {
 
         // 1. 공통 인자 검사
         if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: list-attachments <노트 id> [하위 노트 id]");
+            throw new AisException(400, "인자가 하나 필요하다: list-attachments <노트 id> [하위 노트 id]");
         }
 
         String rawRootId = pos.get(0);
@@ -54,23 +54,23 @@ public final class ListAttachments {
 
         // 2. id 모양 검증
         if (!NOTE_ID_PATTERN.matcher(rawRootId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawRootId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawRootId);
         }
         if (rawSubId != null && !SUB_NOTE_ID_PATTERN.matcher(rawSubId).matches()) {
-            throw new WlException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
+            throw new AisException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
         }
 
         // 3. 색인 조회
         NoteScanner.NoteRecord rootNote = noteIndex.notesById().get(rawRootId);
         if (rootNote == null) {
-            throw new WlException(404, "Note not found: " + rawRootId);
+            throw new AisException(404, "Note not found: " + rawRootId);
         }
 
         NoteScanner.NoteRecord targetSub = null;
         if (rawSubId != null) {
             targetSub = rootNote.subNotes().get(rawSubId);
             if (targetSub == null) {
-                throw new WlException(404, "SubNote not found: " + rawRootId + "/" + rawSubId);
+                throw new AisException(404, "SubNote not found: " + rawRootId + "/" + rawSubId);
             }
         }
 

@@ -36,7 +36,7 @@ public final class DoctorCommand {
         // 1. AISURADA_VAULT 확인
         String envVault = System.getenv("AISURADA_VAULT");
         if (envVault == null || Trim.isBlank(envVault)) {
-            System.err.println("WL-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
+            System.err.println("AIS-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
             System.exit(2);
             return;
         }
@@ -61,14 +61,14 @@ public final class DoctorCommand {
         // 2. 소켓 경로 결정 및 길이 검사
         String rawSocket = System.getenv("AISURADA_SIDECAR_SOCKET");
         if (rawSocket == null || Trim.isBlank(rawSocket)) {
-            rawSocket = userHome + "/Library/Caches/aisurada/wl-" + hash16 + ".sock";
+            rawSocket = userHome + "/Library/Caches/aisurada/ais-" + hash16 + ".sock";
         } else {
             rawSocket = Trim.trim(rawSocket);
         }
         Path socketPath = Paths.get(VaultPath.normalize(rawSocket));
         byte[] socketBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
         if (socketBytes.length > 102) {
-            System.err.println("WL-400 소켓 경로가 102 바이트를 넘는다(" + socketBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+            System.err.println("AIS-400 소켓 경로가 102 바이트를 넘는다(" + socketBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(2);
             return;
         }
@@ -198,8 +198,8 @@ public final class DoctorCommand {
         // --plist 옵션 처리
         if (showPlist) {
             if (sidecarJar == null) {
-                System.err.println("WL-400 AISURADA_SIDECAR_JAR 가 없고 설치된 wl-sidecar.jar 도 없다(" +
-                        Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "wl-sidecar.jar") +
+                System.err.println("AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다(" +
+                        Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "ais-sidecar.jar") +
                         "). `install` 을 돌리거나 jar 의 절대 경로를 AISURADA_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
                 System.exit(2);
                 return;
@@ -301,7 +301,7 @@ public final class DoctorCommand {
 
     private static void printConcurrencyAndSweep(String userHome, String vaultKey, String label) {
         Path runDir = Paths.get(userHome, "Library", "Application Support", "aisurada", "run");
-        int limit = WlCliMain.getConcurrencyLimit();
+        int limit = AisCliMain.getConcurrencyLimit();
         int aliveCount = 0;
         int traceCount = 0;
         if (Files.isDirectory(runDir)) {
@@ -319,7 +319,7 @@ public final class DoctorCommand {
 
         List<SweepCommand.Target> toEvict;
         try {
-            toEvict = WlCliMain.findConcurrencyEvictionTargets(runDir, vaultKey, limit);
+            toEvict = AisCliMain.findConcurrencyEvictionTargets(runDir, vaultKey, limit);
         } catch (Exception e) {
             toEvict = Collections.emptyList();
         }

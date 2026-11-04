@@ -32,13 +32,13 @@ node fixtures/expect/run.mjs --self-check [--mutants] --out <폴더> [--jobs <n>
 4. 읽기 레인이면 vault와 HOME을 다시 읽어 입력 나무와 바이트로 맞대고 다르면 경고로 남긴다.
 5. `<out>/report.json`을 쓰고 stderr에 요약을 찍는다.
 
-구현 환경은 새로 짓는다. 부모 셸에서는 `PATH`와 `WLX_IMPL_`로 시작하는 변수만 넘어가고, `AISURADA_VAULT`, `HOME`, `TMPDIR`, `WLX_STATE_DIR`, `TZ=Asia/Seoul`, `LANG=LC_ALL=en_US.UTF-8`을 준다. 구현은 제 프로세스 그룹으로 뜨고 1번에 120초까지 기다린다.
+구현 환경은 새로 짓는다. 부모 셸에서는 `PATH`와 `AISX_IMPL_`로 시작하는 변수만 넘어가고, `AISURADA_VAULT`, `HOME`, `TMPDIR`, `AISX_STATE_DIR`, `TZ=Asia/Seoul`, `LANG=LC_ALL=en_US.UTF-8`을 준다. 구현은 제 프로세스 그룹으로 뜨고 1번에 120초까지 기다린다.
 
 ## 판정
 
-처음 걸린 검사 이름이 남는다: `spawn`, `timeout`, `code`, `wl`(기대값에 `wl`이 있을 때만), `utf8`, `stdout`, `token`(출력 1개 안), `format`(JSON 값은 같은데 바이트가 다름), `token`(케이스 사이).
+처음 걸린 검사 이름이 남는다: `spawn`, `timeout`, `code`, `ais`(기대값에 `ais`이 있을 때만), `utf8`, `stdout`, `token`(출력 1개 안), `format`(JSON 값은 같은데 바이트가 다름), `token`(케이스 사이).
 
-- `wl`은 stderr에서 처음 나온 `WL-` 3자리 번호를 맞댄다. 뒤에 숫자가 이어지면(`WL-4044`) 3자리 번호가 아니다.
+- `ais`은 stderr에서 처음 나온 `AIS-` 3자리 번호를 맞댄다. 뒤에 숫자가 이어지면(`AIS-4044`) 3자리 번호가 아니다.
 - `stdout` 기대값은 자리표 없이 글자 그대로 맞댄다. 그 글에 자리표 모양 글자(`⟦…⟧`)가 들면 기대값을 잘못 적은 것으로 보고 구현을 부르기 전에 선다.
 - `report.json`의 `detail`은 1줄이다. node의 JSON 읽기 오류처럼 줄바꿈이 든 글은 `\n` 꼴로 적는다.
 - 입력 나무는 `format`과 `version`만 맞대고 받은 `dirs`와 `files`를 차례로 펼친다. 펼칠 자리 밖을 가리키는 경로에서는 선다.
@@ -49,11 +49,11 @@ node fixtures/expect/run.mjs --self-check [--mutants] --out <폴더> [--jobs <n>
 
 ```json
 {
-  "format": "wlx-adapter",
+  "format": "aisx-adapter",
   "version": 1,
   "surface": "engine",
   "name": "my-engine",
-  "prefix": ["${WLX_IMPL_BIN}"],
+  "prefix": ["${AISX_IMPL_BIN}"],
   "suffix": []
 }
 ```

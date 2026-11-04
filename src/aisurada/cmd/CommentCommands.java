@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.CommentsReader;
 import aisurada.vault.NoteIndex;
@@ -42,19 +42,19 @@ public final class CommentCommands {
         var ids = CommentTarget.parse(parsed, usage);
         Map<String, String> opts = parsed.namedOptions();
         String id = opts.containsKey("comment_id") ? Trim.trim(opts.get("comment_id")) : "";
-        if (!create && id.isEmpty()) throw new WlException(400, "comment_id 이 필요하다: " + usage);
+        if (!create && id.isEmpty()) throw new AisException(400, "comment_id 이 필요하다: " + usage);
         String body = opts.get("body");
         if (!delete) checkBody(body, usage);
         String quote = opts.get("anchor_quote");
         if (create && quote != null && quote.length() > 2_000) {
-            throw new WlException(400, "앵커 인용문이 너무 길다. 상한은 2000자다.");
+            throw new AisException(400, "앵커 인용문이 너무 길다. 상한은 2000자다.");
         }
 
         // 옵션 검사가 끝난 뒤에 대상을 찾고 코멘트 파일을 연다(19.8 공통 6~7번).
         var target = CommentTarget.resolve(vault, index, ids);
         var envelope = CommentsReader.readComments(vault, target.file());
         if ("unreadable".equals(envelope.get("state"))) {
-            throw new WlException(409, "코멘트 파일을 못 읽어서 아무것도 안 썼다: " + envelope.get("reason")
+            throw new AisException(409, "코멘트 파일을 못 읽어서 아무것도 안 썼다: " + envelope.get("reason")
                     + ". 여기서 쓰면 그 파일에 있던 코멘트가 통째로 사라진다. 파일을 먼저 고치거나 치운다.");
         }
         List<Map<String, Object>> comments = "loaded".equals(envelope.get("state"))
@@ -64,8 +64,8 @@ public final class CommentCommands {
         for (var item : comments) {
             if (id.equals(item.get("id"))) { found = item; break; }
         }
-        if (create && found != null) throw new WlException(409, "이미 그 식별자를 쓰는 코멘트가 있다: " + id);
-        if (!create && found == null) throw new WlException(409, "그 코멘트가 없다: " + id);
+        if (create && found != null) throw new AisException(409, "이미 그 식별자를 쓰는 코멘트가 있다: " + id);
+        if (!create && found == null) throw new AisException(409, "그 코멘트가 없다: " + id);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", id);
@@ -86,7 +86,7 @@ public final class CommentCommands {
         } else {
             String format = target.owner().format();
             if (!"markdown".equals(format)) {
-                throw new WlException(409, "본문이 markdown 이 아니라 코멘트 앵커를 걷어낼 수 없다(포맷="
+                throw new AisException(409, "본문이 markdown 이 아니라 코멘트 앵커를 걷어낼 수 없다(포맷="
                         + format.toUpperCase(Locale.ROOT) + "): " + target.owner().id());
             }
             // 1.13/19.7: 확장자로 끝나는 폴더의 읽기 버그는 본문을 빈 글로 본다.
@@ -113,9 +113,9 @@ public final class CommentCommands {
     }
 
     private static void checkBody(String body, String usage) {
-        if (body == null) throw new WlException(400, "body 이 필요하다: " + usage);
-        if (Trim.isBlank(body)) throw new WlException(400, "코멘트 본문이 비었다.");
-        if (body.length() > 20_000) throw new WlException(400, "코멘트 본문이 너무 길다(" + body.length() + "자). 상한은 20000자다.");
+        if (body == null) throw new AisException(400, "body 이 필요하다: " + usage);
+        if (Trim.isBlank(body)) throw new AisException(400, "코멘트 본문이 비었다.");
+        if (body.length() > 20_000) throw new AisException(400, "코멘트 본문이 너무 길다(" + body.length() + "자). 상한은 20000자다.");
     }
 
     /** 19.9.4의 현행 호환 동작: 프로세스 벽시계에 +09:00 문자열을 붙인다. */

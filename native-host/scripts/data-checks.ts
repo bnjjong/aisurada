@@ -8,7 +8,7 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { VaultBanner } from '../src/data/VaultBanner.tsx';
 
-const cfg = (window as unknown as { __WL_FIXTURE__: Record<string, string> }).__WL_FIXTURE__;
+const cfg = (window as unknown as { __AIS_FIXTURE__: Record<string, string> }).__AIS_FIXTURE__;
 const assert = (value: unknown, message: string) => { if (!value) throw new Error(message); };
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(predicate: () => unknown | Promise<unknown>, label: string) {

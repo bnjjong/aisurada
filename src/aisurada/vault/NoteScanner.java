@@ -1,6 +1,6 @@
 package aisurada.vault;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.write.PathConfinement;
@@ -109,7 +109,7 @@ public final class NoteScanner {
             try (var entries = Files.newDirectoryStream(notes)) {
                 for (Path entry : entries) if (Files.isDirectory(entry)) dirs.add(entry);
             } catch (IOException e) {
-                throw new WlException(500, "노트 폴더를 읽지 못했다: " + notes);
+                throw new AisException(500, "노트 폴더를 읽지 못했다: " + notes);
             }
             dirs.sort((a,b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
             for (Path dir : dirs) collectFolder(dir, dir.getFileName().toString(), 0);

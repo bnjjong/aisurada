@@ -485,7 +485,7 @@ export class VaultData {
       this.markOwn(asText(response.path));
       if (action === 'delete' && response.markerStripped === true) {
         this.markOwn(asText(this.note(ref)?.path));
-        this.acceptDerived(ref, response.bodyBefore, response.bodyAfter, text => text.replace(/<!--\/?wlc:(cm[a-z0-9]+-[a-z0-9]{1,8})-->/gi, (marker, found: string) => found === cid ? '' : marker));
+        this.acceptDerived(ref, response.bodyBefore, response.bodyAfter, text => text.replace(/<!--\/?aisc:(cm[a-z0-9]+-[a-z0-9]{1,8})-->/gi, (marker, found: string) => found === cid ? '' : marker));
       }
     });
     const result = await this.queues.run('comments:' + key, () => action === 'delete' ? this.queues.run(key, work, false) : work());

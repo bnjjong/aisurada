@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.ReportReader;
 
@@ -56,7 +56,7 @@ public final class ListReports {
                 } else if ("false".equals(trimmedBodies)) {
                     includeBodies = false;
                 } else {
-                    throw new WlException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
+                    throw new AisException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
                 }
             }
         }
@@ -68,7 +68,7 @@ public final class ListReports {
             if (!trimmedKind.isEmpty()) {
                 String lowerKind = trimmedKind.toLowerCase(Locale.ROOT);
                 if (!ReportReader.ALLOWED_KINDS.contains(lowerKind)) {
-                    throw new WlException(400, "모르는 회고 종류 이다: " + trimmedKind +
+                    throw new AisException(400, "모르는 회고 종류 이다: " + trimmedKind +
                             ". 쓸 수 있는 것은 [morning, evening, weekly] 뿐이다.");
                 }
                 targetKind = lowerKind;
@@ -81,7 +81,7 @@ public final class ListReports {
             String trimmedFrom = Trim.trim(rawFrom);
             if (!trimmedFrom.isEmpty()) {
                 if (!DATE_PATTERN.matcher(trimmedFrom).matches()) {
-                    throw new WlException(400, "from 은 YYYY-MM-DD 모양이어야 한다: " + trimmedFrom);
+                    throw new AisException(400, "from 은 YYYY-MM-DD 모양이어야 한다: " + trimmedFrom);
                 }
                 targetFrom = trimmedFrom;
             }
@@ -93,7 +93,7 @@ public final class ListReports {
             String trimmedTo = Trim.trim(rawTo);
             if (!trimmedTo.isEmpty()) {
                 if (!DATE_PATTERN.matcher(trimmedTo).matches()) {
-                    throw new WlException(400, "to 은 YYYY-MM-DD 모양이어야 한다: " + trimmedTo);
+                    throw new AisException(400, "to 은 YYYY-MM-DD 모양이어야 한다: " + trimmedTo);
                 }
                 targetTo = trimmedTo;
             }
@@ -102,7 +102,7 @@ public final class ListReports {
         // 5. 날짜 구간 검증 (25.3 5번)
         if (targetFrom != null && targetTo != null) {
             if (targetFrom.compareTo(targetTo) > 0) {
-                throw new WlException(400, "날짜 구간이 뒤집혔다: " + targetFrom + " ~ " + targetTo);
+                throw new AisException(400, "날짜 구간이 뒤집혔다: " + targetFrom + " ~ " + targetTo);
             }
         }
 

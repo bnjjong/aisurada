@@ -14,8 +14,8 @@ public final class Chapter33Test {
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && args[0].equals("probe")) {
             if (Boolean.getBoolean("chapter33.cli")) {
-                var method = aisurada.cli.WlCliMain.class.getDeclaredMethod("getReadyTimeoutSeconds"); method.setAccessible(true);
-                System.out.println(method.invoke(null) + "|" + aisurada.cli.WlCliMain.getConcurrencyLimit() + "|" + aisurada.cli.SweepCommand.getQuietHours());
+                var method = aisurada.cli.AisCliMain.class.getDeclaredMethod("getReadyTimeoutSeconds"); method.setAccessible(true);
+                System.out.println(method.invoke(null) + "|" + aisurada.cli.AisCliMain.getConcurrencyLimit() + "|" + aisurada.cli.SweepCommand.getQuietHours());
                 return;
             }
             var c = EngineConfig.loadAndValidate(EngineConfig.parseCliOptions(Arrays.copyOfRange(args, 1, args.length)));
@@ -91,7 +91,7 @@ public final class Chapter33Test {
         eq(config(v, home, Map.of(), List.of(), "--aisurada.notes.shard.by.month", "--aisurada.notes.shard.by.month")[2], "null", "flags without = alone leave shard unset");
     }
     private static void gate(Path v, Path home) throws Exception {
-        List<String> cmd = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Daisurada.vault=" + v, "-jar", Path.of("dist/wl-engine.jar").toAbsolutePath().toString(), "history", "missing");
+        List<String> cmd = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Daisurada.vault=" + v, "-jar", Path.of("dist/ais-engine.jar").toAbsolutePath().toString(), "history", "missing");
         ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true); b.environment().remove("AISURADA_VAULT"); Process p = b.start();
         check(p.waitFor(10, TimeUnit.SECONDS), "engine gate exits"); eq(p.exitValue(), 2, "system property alone does not pass vault gate");
         List<String> withVault = new ArrayList<>(cmd); withVault.add("--aisurada.vault=" + v); b = new ProcessBuilder(withVault).redirectErrorStream(true); b.environment().remove("AISURADA_VAULT"); p = b.start();

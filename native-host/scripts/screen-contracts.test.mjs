@@ -8,7 +8,7 @@ import { assertScreenBundle, PART4_COMMANDS } from './screen-contracts.mjs';
 const valid = '<!doctype html><html lang="ko"><head><script type="module" src="/assets/app.js"></script><link rel="stylesheet" href="/assets/app.css"></head><body><div id="root"></div></body></html>';
 
 function bundle(t, html = valid) {
-  const directory = mkdtempSync(join(tmpdir(), 'wl-screen-contract-'));
+  const directory = mkdtempSync(join(tmpdir(), 'ais-screen-contract-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(join(directory, 'assets/workers'), { recursive: true });
   writeFileSync(join(directory, 'index.html'), html);

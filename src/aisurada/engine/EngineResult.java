@@ -20,7 +20,7 @@ public record EngineResult(
         return new EngineResult(2, 0, EMPTY_BYTES, stderrBytes);
     }
 
-    public static EngineResult wlError(int status, int errorCode, byte[] stderrBytes) {
+    public static EngineResult aisError(int status, int errorCode, byte[] stderrBytes) {
         return new EngineResult(status, errorCode, EMPTY_BYTES, stderrBytes);
     }
 

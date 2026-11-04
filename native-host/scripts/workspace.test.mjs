@@ -118,7 +118,7 @@ test('creation initializes twice but fails visibly if its first initialization f
   assert.equal(h.controller.getSnapshot().recent[0].created, true);
   assert.deepEqual(lastWorkspace(h.services.storage), { path: '/parent/새 공간', name: '새 공간' });
   const broken = harness(t, { invoke: async (cmd, args) => {
-    if (cmd === 'sidecar_call' && args.argv[0] === 'init-workspace') return { status: 3, stdout: '', stderr: 'WL-400' };
+    if (cmd === 'sidecar_call' && args.argv[0] === 'init-workspace') return { status: 3, stdout: '', stderr: 'AIS-400' };
   } }); await broken.controller.boot(); broken.controller.setHome('/parent');
   assert.equal(await broken.controller.create('broken'), false);
   assert.equal(broken.controller.getSnapshot().workspace, null);

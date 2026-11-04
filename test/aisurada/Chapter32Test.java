@@ -13,7 +13,7 @@ import static aisurada.ChapterTestSupport.*;
 /** 4부 없는 명령의 검사 순서와 1부가 모르는 파일의 수명주기를 검사한다. */
 public final class Chapter32Test {
     private static final String ID = "ndfixture-00000001", SUB = "snfixture-00000001";
-    private static final String NO_PART4 = "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
+    private static final String NO_PART4 = "AIS-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 ais-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
     private static final Map<String, List<String>> OPTIONS = Map.of(
             "get-ask", List.of(),
             "append-ask-turn", List.of("session-id", "turn-id", "mark-id", "asked-at", "quote", "question", "answer", "error", "model", "effort", "elapsed-ms", "session-lines", "images"),
@@ -34,11 +34,11 @@ public final class Chapter32Test {
         Path v = t.vault();
         for (var entry : OPTIONS.entrySet()) {
             String name = entry.getKey();
-            eq(stderr(error(v, 409, name)), NO_PART4, "missing positional returns WL-409: " + name);
+            eq(stderr(error(v, 409, name)), NO_PART4, "missing positional returns AIS-409: " + name);
             for (String option : entry.getValue()) eq(stderr(error(v, 409, name, option + "=x")), NO_PART4, "allowed option " + name + " " + option);
             var unknown = error(v, 400, name, "unknown=x"); check(stderr(unknown).contains("모르는 옵션이다: unknown"), "unknown option first");
             eq(run(v, name.replace('-', '_')).status(), 2, "no tool surface " + name);
-            eq(stderr(error(v, 409, name, "\u0000wl-session-id", "session")), NO_PART4, "command surface discards session marker");
+            eq(stderr(error(v, 409, name, "\u0000ais-session-id", "session")), NO_PART4, "command surface discards session marker");
         }
         for (String name : List.of("get-ask", "list-chats", "append-ask-turn", "append-chat-turn")) {
             var r = error(v, 400, name, "one", "two", "three");
@@ -121,19 +121,19 @@ public final class Chapter32Test {
         put(v, "outside", "first");
         EngineResult syntax = EngineExecutor.execute(v, new String[]{"append-ask-turn", "unknown=x"}, true, 0);
         eq(syntax.errorCode(), 400, "syntax failure in serve"); VaultGit.serving(v).commit("restore");
-        check(git(v, "show", "-s", "--format=%B", "HEAD").startsWith("wl(outside)"), "syntax failure leaves no writer record");
+        check(git(v, "show", "-s", "--format=%B", "HEAD").startsWith("ais(outside)"), "syntax failure leaves no writer record");
         put(v, "outside", "second");
-        EngineResult missing = EngineExecutor.execute(v, new String[]{"append-chat-turn", "\u0000wl-session-id", "discarded"}, true, 0);
+        EngineResult missing = EngineExecutor.execute(v, new String[]{"append-chat-turn", "\u0000ais-session-id", "discarded"}, true, 0);
         eq(missing.errorCode(), 409, "unavailable write in serve"); eq(stderr(missing), NO_PART4, "serve error bytes"); VaultGit.serving(v).commit("restore");
         String message = git(v, "show", "-s", "--format=%B", "HEAD");
-        check(message.startsWith("wl(app)"), "unavailable write records app writer"); check(!message.contains("Aisurada-Session"), "command discards session marker");
+        check(message.startsWith("ais(app)"), "unavailable write records app writer"); check(!message.contains("Aisurada-Session"), "command discards session marker");
     }
     private static void doctor(ChapterTestSupport t) throws Exception {
         Path v = t.vault(), home = Files.createDirectory(t.temp.resolve("doctor-home"));
         ProcessBuilder b = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-jar", Path.of("dist/ais-cli.jar").toAbsolutePath().toString(), "doctor").redirectErrorStream(true);
         b.environment().put("AISURADA_VAULT", v.toString()); b.environment().put("AISURADA_AGENT_SOCKET", "/");
-        b.environment().put("AISURADA_SIDECAR_SOCKET", "/tmp/wl-ch32-doctor.sock");
+        b.environment().put("AISURADA_SIDECAR_SOCKET", "/tmp/ais-ch32-doctor.sock");
         Process p = b.start(); check(p.waitFor(15, TimeUnit.SECONDS), "doctor returns"); String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        eq(p.exitValue(), 0, "part 1 doctor exits normally: " + output); check(!output.contains("wl-agent 소켓") && !output.contains("wl-agent 로그"), "part 1 doctor omits optional part4 lines");
+        eq(p.exitValue(), 0, "part 1 doctor exits normally: " + output); check(!output.contains("ais-agent 소켓") && !output.contains("ais-agent 로그"), "part 1 doctor omits optional part4 lines");
     }
 }

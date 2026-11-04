@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 
 import java.nio.file.Path;
@@ -19,14 +19,14 @@ public final class PathConfinement {
      *
      * @param base 기준 폴더 경로
      * @param segment 결합할 경로 조각
-     * @throws WlException 유효하지 않은 조각일 때 WL-400
+     * @throws AisException 유효하지 않은 조각일 때 AIS-400
      */
     public static void checkSegment(Path base, String segment) {
         if (segment == null || Trim.isBlank(segment)) {
-            throw new WlException(400, "빈 경로 조각은 결합할 수 없다: 기준=" + base.toAbsolutePath().normalize());
+            throw new AisException(400, "빈 경로 조각은 결합할 수 없다: 기준=" + base.toAbsolutePath().normalize());
         }
         if (hasUnusablePathCharacters(segment)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + segment);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + segment);
         }
     }
 
@@ -35,13 +35,13 @@ public final class PathConfinement {
      *
      * @param base 기준 폴더 경로
      * @param target 결합된 결과 경로
-     * @throws WlException 기준 폴더를 벗어날 때 WL-400
+     * @throws AisException 기준 폴더를 벗어날 때 AIS-400
      */
     public static void checkConfinement(Path base, Path target) {
         Path normBase = base.toAbsolutePath().normalize();
         Path normTarget = target.toAbsolutePath().normalize();
         if (!normTarget.startsWith(normBase)) {
-            throw new WlException(400, "기준 폴더 밖을 가리키는 경로다: " + normTarget);
+            throw new AisException(400, "기준 폴더 밖을 가리키는 경로다: " + normTarget);
         }
     }
 

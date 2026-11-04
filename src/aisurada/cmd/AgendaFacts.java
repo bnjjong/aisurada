@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.text.Trim;
 import aisurada.vault.AgendaReader;
@@ -40,11 +40,11 @@ public final class AgendaFacts {
         NoteIndex index = WritePipeline.index(vaultRoot);
         String id = AgendaArgs.requireId(parsed, UPDATE_USAGE);
         if (!parsed.namedOptions().containsKey("facts")) {
-            throw new WlException(400, "facts 가 필요하다. 사실층을 지우려면 빈 값을 준다.");
+            throw new AisException(400, "facts 가 필요하다. 사실층을 지우려면 빈 값을 준다.");
         }
         String facts = Trim.trim(parsed.namedOptions().get("facts"));
         if (facts.length() > FactsReader.LIMIT) {
-            throw new WlException(400, "사실층이 상한을 넘었다: " + facts.length() +
+            throw new AisException(400, "사실층이 상한을 넘었다: " + facts.length() +
                     " 자. 상한은 " + FactsReader.LIMIT + " 자다.");
         }
         AgendaTable.AgendaInfo agenda = AgendaArgs.find(index, id);
@@ -54,7 +54,7 @@ public final class AgendaFacts {
                 // 링크를 따라가지 않는다. 빈 폴더도 지우며, 부모가 일반 파일이면 실패한다.
                 Files.deleteIfExists(file);
             } catch (IOException e) {
-                throw new WlException(500, "파일을 지우지 못했다: " + file.toAbsolutePath().normalize());
+                throw new AisException(500, "파일을 지우지 못했다: " + file.toAbsolutePath().normalize());
             }
         } else {
             AtomicWriter.writeAtomic(file, (facts + "\n").getBytes(StandardCharsets.UTF_8));

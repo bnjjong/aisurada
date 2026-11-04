@@ -1,6 +1,6 @@
 package aisurada.vault;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 
@@ -67,7 +67,7 @@ public final class NoteFilter {
                     }
                 }
                 if (matchedType == null) {
-                    throw new WlException(400, "모르는 유형 이다: " + trimmedType +
+                    throw new AisException(400, "모르는 유형 이다: " + trimmedType +
                             ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
                 }
                 targetType = matchedType;
@@ -85,7 +85,7 @@ public final class NoteFilter {
                     String piece = Trim.trim(part);
                     if (!piece.isEmpty()) {
                         if (piece.contains("\r") || piece.contains("\n")) {
-                            throw new WlException(400, "태그에 줄바꿈이 있다: '" + piece + "'");
+                            throw new AisException(400, "태그에 줄바꿈이 있다: '" + piece + "'");
                         }
                         tagSet.add(piece);
                     }
@@ -113,7 +113,7 @@ public final class NoteFilter {
                 } else if ("false".equals(lowerFav)) {
                     favoriteFilter = null; // false는 필터 안 건 것과 같음
                 } else {
-                    throw new WlException(400, "모르는 즐겨찾기 값 이다: " + lowerFav +
+                    throw new AisException(400, "모르는 즐겨찾기 값 이다: " + lowerFav +
                             ". 쓸 수 있는 것은 [true, false] 뿐이다.");
                 }
             }
@@ -154,7 +154,7 @@ public final class NoteFilter {
         }
 
         if (lower != null && upper != null && lower.isAfter(upper)) {
-            throw new WlException(400, "날짜 구간이 뒤집혔다: " + lower + " ~ " + upper);
+            throw new AisException(400, "날짜 구간이 뒤집혔다: " + lower + " ~ " + upper);
         }
 
         String lowerBoundStr = lower != null ? lower.toString() : null;
@@ -178,7 +178,7 @@ public final class NoteFilter {
         try {
             return LocalDate.parse(trimmed);
         } catch (DateTimeParseException e) {
-            throw new WlException(400, fieldName + " 은 YYYY-MM-DD 모양이어야 한다: " + trimmed);
+            throw new AisException(400, fieldName + " 은 YYYY-MM-DD 모양이어야 한다: " + trimmed);
         }
     }
 
@@ -202,7 +202,7 @@ public final class NoteFilter {
         }
 
         if (matchingSlugs.isEmpty()) {
-            throw new WlException(404, "아젠다 not found: " + input);
+            throw new AisException(404, "아젠다 not found: " + input);
         }
 
         // 복수 매칭 시 slug의 UTF-16 차례로 맨 앞

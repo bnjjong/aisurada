@@ -30,7 +30,7 @@ public final class Chapter24Test {
         return ok(v, "save_template", json(Map.of("name", name, "body", body)));
     }
     private static void message(Path v, int code, String expected, String... args) {
-        eq(stderr(error(v, code, args)), "WL-" + code + " " + expected + "\n", "exact failure text");
+        eq(stderr(error(v, code, args)), "AIS-" + code + " " + expected + "\n", "exact failure text");
     }
     public static void main(String[] args) throws Exception {
         try (var t = new ChapterTestSupport("chapter24")) {
@@ -188,7 +188,7 @@ public final class Chapter24Test {
         var result = ok(v, "list_templates", "{\"type\":\"meeting\"}"); eq(((Map<String, Object>) result.get("incomplete")).get("skipped"), 1, "type filters ritual skipped, not doc skipped");
         result = ok(v, "list-templates", "category=ritual"); eq(((Map<String, Object>) result.get("incomplete")).get("skipped"), 1, "category filters skipped");
         String failure = stderr(error(v, 400, "list-templates", "bodies=bad", "category=doc"));
-        check(failure.startsWith("템플릿 1건을 못 읽어 목록에서 뺐다.\n  .aisurada/templates/doc/README.md — 프론트매터가 없거나 문법이 어긋난다\nWL-400"), "diagnostic before bodies error");
+        check(failure.startsWith("템플릿 1건을 못 읽어 목록에서 뺐다.\n  .aisurada/templates/doc/README.md — 프론트매터가 없거나 문법이 어긋난다\nAIS-400"), "diagnostic before bodies error");
         check(!stderr(error(v, 400, "list-templates", "category=bogus", "bodies=bad")).contains("README.md"), "category error before scan diagnostics");
         eq(stderr(run(v, "list_templates", "{}")), "템플릿 2건을 못 읽어 목록에서 뺐다.\n  .aisurada/templates/doc/README.md — 프론트매터가 없거나 문법이 어긋난다\n  .aisurada/templates/ritual/bad.md — 프론트매터가 없거나 문법이 어긋난다\n", "tool list writes the same diagnostics as the command list");
         eq(run(v, "get-template", "user").stderrBytes().length, 0, "get suppresses unrelated skipped-file diagnostics");
@@ -261,10 +261,10 @@ public final class Chapter24Test {
     private static void socket(ChapterTestSupport t) throws Exception {
         Path v = t.vault(), home = Files.createDirectory(t.temp.resolve("socket-home"));
         ritual(v, "morning.md", "ritual", "morning", "ritual body");
-        Path socket = Path.of("/tmp", "wl-templates-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
+        Path socket = Path.of("/tmp", "ais-templates-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
         List<String> prefix = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-jar");
         Map<String, String> env = Map.of("HOME", home.toString(), "AISURADA_VAULT", v.toString(), "AISURADA_SIDECAR_SOCKET", socket.toString(), "AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
-        List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/wl-engine.jar").toAbsolutePath().toString()); command.add("serve");
+        List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/ais-engine.jar").toAbsolutePath().toString()); command.add("serve");
         ProcessBuilder builder = new ProcessBuilder(command); builder.environment().clear(); builder.environment().putAll(env);
         builder.redirectOutput(home.resolve("out.log").toFile()); builder.redirectError(home.resolve("err.log").toFile()); Process server = builder.start();
         try {
@@ -279,7 +279,7 @@ public final class Chapter24Test {
             eq(request(prefix, env, 0, "get_template", "{\"id\":\"ritual\"}").object().get("name"), "소켓 모닝", "socket ritual update");
             put(v, ".aisurada/templates/doc/README.md", "broken");
             Reply response = request(prefix, env, 3, "list-templates", "bodies=yes");
-            check(response.err.startsWith("템플릿 1건") && response.err.contains("\nWL-400 bodies"), "socket diagnostic precedes WL error");
+            check(response.err.startsWith("템플릿 1건") && response.err.contains("\nAIS-400 bodies"), "socket diagnostic precedes AIS error");
             request(prefix, env, 0, "delete-doc-template", id); request(prefix, env, 3, "get-template", id);
         } finally {
             server.destroy(); if (!server.waitFor(5, TimeUnit.SECONDS)) server.destroyForcibly().waitFor(); Files.deleteIfExists(socket);

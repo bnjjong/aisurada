@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,7 +39,7 @@ public final class NoteMover {
             }
         }
         if (chosen == null) {
-            throw new WlException(500, "옮길 자리를 못 찾았다(같은 이름이 99 개까지 차 있다): " + canonicalRel);
+            throw new AisException(500, "옮길 자리를 못 찾았다(같은 이름이 99 개까지 차 있다): " + canonicalRel);
         }
         move(current, vaultRoot.resolve(chosen));
         return chosen;
@@ -50,20 +50,20 @@ public final class NoteMover {
         Path src = source.toAbsolutePath().normalize();
         Path dst = target.toAbsolutePath().normalize();
         if (Files.exists(dst)) {
-            throw new WlException(500, "옮길 자리에 이미 무엇이 있어 옮기지 않았다: " + dst);
+            throw new AisException(500, "옮길 자리에 이미 무엇이 있어 옮기지 않았다: " + dst);
         }
         Path parent = dst.getParent();
         if (parent != null && !Files.isDirectory(parent)) {
             try {
                 Files.createDirectories(parent);
             } catch (IOException e) {
-                throw new WlException(500, "폴더를 만들지 못했다: " + parent);
+                throw new AisException(500, "폴더를 만들지 못했다: " + parent);
             }
         }
         try {
             Files.move(src, dst, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            throw new WlException(500, "옮기지 못했다: " + src + " -> " + dst);
+            throw new AisException(500, "옮기지 못했다: " + src + " -> " + dst);
         }
     }
 }

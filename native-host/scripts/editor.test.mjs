@@ -55,9 +55,9 @@ test('9.9 fence judge: one-line fences close themselves, closers must be at leas
  assert.equal(foldParagraphs('설명\n  ```js\n  a\n  b\n  ```\n뒤\n줄'),'설명\n  ```js\n  a\n  b\n  ```\n뒤 줄');
 });
 test('C182: marker syntax inside code survives placeholders and stripping; markers outside still pair',()=>{
- const text='`<!--wlc:cmab-12345678-->` 앞 <!--wlc:cmcd-12345678-->글<!--/wlc:cmcd-12345678-->\n```\n<!--wla:akab-12345678-->x<!--/wla:akab-12345678-->\n```';
- const placed=markerPlaceholders(text);assert.deepEqual(placed.pairs.map(pair=>pair.id),['cmcd-12345678']);assert.ok(placed.text.startsWith('`<!--wlc:cmab-12345678-->`'));assert.ok(placed.text.includes('<!--wla:akab-12345678-->x'));
- assert.equal(stripMarkers(text),'`<!--wlc:cmab-12345678-->` 앞 글\n```\n<!--wla:akab-12345678-->x<!--/wla:akab-12345678-->\n```');
+ const text='`<!--aisc:cmab-12345678-->` 앞 <!--aisc:cmcd-12345678-->글<!--/aisc:cmcd-12345678-->\n```\n<!--aisa:akab-12345678-->x<!--/aisa:akab-12345678-->\n```';
+ const placed=markerPlaceholders(text);assert.deepEqual(placed.pairs.map(pair=>pair.id),['cmcd-12345678']);assert.ok(placed.text.startsWith('`<!--aisc:cmab-12345678-->`'));assert.ok(placed.text.includes('<!--aisa:akab-12345678-->x'));
+ assert.equal(stripMarkers(text),'`<!--aisc:cmab-12345678-->` 앞 글\n```\n<!--aisa:akab-12345678-->x<!--/aisa:akab-12345678-->\n```');
 });
 test('C74: the language is the first word in the reading-view shape, else the old [\\w-] run, and the rest stays on the fence',()=>{
  assert.deepEqual(codeInfo('c++'),{language:'c++',tail:''});assert.deepEqual(codeInfo('ts title="x"'),{language:'ts',tail:' title="x"'});
@@ -103,7 +103,7 @@ test('목록 6번과 7번: 회고 본문은 태그 이름 뒤가 빈칸, >, /일
  for(const html of ['<p>안녕</p>','  <div class="a">x','</div>','<br/>','<br>','<h1-x>','<My-Tag a=1>'])assert.equal(REPORT_HTML.test(html),true,html);
  for(const markdown of ['<https://example.com> 링크','<!-- 메모 -->','<!DOCTYPE html>','<3 마음','글 <b>굵게</b>','','<a','<mailto:a@b.c>'])assert.equal(REPORT_HTML.test(markdown),false,markdown);
  for(const link of ['http://a.b','https://a.b/c?d','mailto:a@b.c','tel:+8210','HTTPS://A.B'])assert.equal(FRAME_LINK.test(link),true,link);
- for(const link of ['attach/report.pdf','javascript:alert(1)','file:///etc/hosts','//a.b','wlframe://localhost/x','data:text/html,x',' https://a.b'])assert.equal(FRAME_LINK.test(link),false,link);
+ for(const link of ['attach/report.pdf','javascript:alert(1)','file:///etc/hosts','//a.b','aisframe://localhost/x','data:text/html,x',' https://a.b'])assert.equal(FRAME_LINK.test(link),false,link);
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});
@@ -122,5 +122,5 @@ test('첨부 HTML/SVG 외부 열기는 확인 실패 시 닫힌다',async()=>{
  await openEditorLink('x.html',f);await openEditorLink('x.svg',f);assert.deepEqual(calls,[]);
  await openEditorLink('x.pdf',f);await openEditorLink('https://example.com',f);await openEditorLink('javascript:alert(1)',f);assert.deepEqual(calls,['/vault/note/x.pdf','https://example.com']);
 });
-test('주석은 마지막 같은 ID 열기와 첫 닫기를 짝짓는다',()=>{const p=markerPlaceholders('<!--wlc:cm1-a-->a<!--wlc:cm1-a-->b<!--/wlc:cm1-a-->c');assert.equal(p.pairs.length,1);assert.equal(p.pairs[0].open,1);});
+test('주석은 마지막 같은 ID 열기와 첫 닫기를 짝짓는다',()=>{const p=markerPlaceholders('<!--aisc:cm1-a-->a<!--aisc:cm1-a-->b<!--/aisc:cm1-a-->c');assert.equal(p.pairs.length,1);assert.equal(p.pairs[0].open,1);});
 test('표 전용 복사는 앱 JSON에서도 문단을 걷고 표 노드만 남긴다',()=>{const table={type:'table',children:[{type:'tablerow'}]};assert.deepEqual(JSON.parse(tablesOnlyJSON(JSON.stringify({namespace:'aisurada-editor',nodes:[{type:'paragraph',text:'제외'},table]}))),{namespace:'aisurada-editor',nodes:[table]});assert.equal(tablesOnlyJSON('broken'),undefined);});

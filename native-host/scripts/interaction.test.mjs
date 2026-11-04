@@ -88,18 +88,18 @@ test('shortcuts use physical codes for digits and brackets and ignore Alt, Shift
 
 test('new-workspace menu retains the vault and launcher ignores terminal, close and search shortcuts', async t => {
   const h = await fixture(t), last = h.values.get(KEYS.last);
-  await h.controller.handleMenu('wl_new_workspace');
+  await h.controller.handleMenu('ais_new_workspace');
   assert.equal(h.controller.getSnapshot().route,'/launcher?mode=create'); assert.equal(h.values.get(KEYS.last),last); assert.ok(h.controller.getSnapshot().workspace);
   const count = h.calls.length;
-  assert.equal(await h.controller.handleMenu('wl_open_terminal'),false); assert.equal(await h.controller.handleMenu('wl_close_tab'),false);
+  assert.equal(await h.controller.handleMenu('ais_open_terminal'),false); assert.equal(await h.controller.handleMenu('ais_close_tab'),false);
   assert.equal(h.controller.handleKey(key({key:'k'})),false); assert.equal(h.calls.length,count);
 });
 
 test('menu open cancellation is silent while a selected folder reuses common opening', async t => {
   const h = await fixture(t); const count=h.calls.length;
-  assert.equal(await h.controller.handleMenu('wl_open_workspace'),false); assert.equal(h.controller.getSnapshot().notice,null); assert.equal(h.calls.length,count);
+  assert.equal(await h.controller.handleMenu('ais_open_workspace'),false); assert.equal(h.controller.getSnapshot().notice,null); assert.equal(h.calls.length,count);
   h.services.host.chooseDirectory = async () => '/selected';
-  assert.equal(await h.controller.handleMenu('wl_open_workspace'),true);
+  assert.equal(await h.controller.handleMenu('ais_open_workspace'),true);
   assert.equal(h.controller.getSnapshot().workspace.path,'/selected'); assert.equal(h.controller.getSnapshot().route,'/calendar');
 });
 
@@ -107,23 +107,23 @@ test('menu open failure returns to launcher but unsaved-data cancellation retain
   let reject=false;
   const h=await fixture(t,{handler:async cmd=>{if(reject&&cmd==='allow_workspace')throw 'refused';}});
   h.controller.navigate('/doc/a'); h.services.host.chooseDirectory=async()=>'/new'; h.services.pending.unsavedNotes=()=>1;
-  assert.equal(await h.controller.handleMenu('wl_open_workspace'),false); assert.equal(h.controller.getSnapshot().route,'/doc/a');
+  assert.equal(await h.controller.handleMenu('ais_open_workspace'),false); assert.equal(h.controller.getSnapshot().route,'/doc/a');
   h.services.pending.unsavedNotes=()=>0; reject=true;
-  assert.equal(await h.controller.handleMenu('wl_open_workspace'),false); assert.equal(h.controller.getSnapshot().route,'/launcher'); assert.match(h.controller.getSnapshot().notice,/폴더를 열 수/);
+  assert.equal(await h.controller.handleMenu('ais_open_workspace'),false); assert.equal(h.controller.getSnapshot().route,'/launcher'); assert.match(h.controller.getSnapshot().notice,/폴더를 열 수/);
 });
 
 test('welcome closes note windows, clears last workspace and leaves the host root untouched', async t => {
-  const h=await fixture(t); await h.controller.handleMenu('wl_welcome');
+  const h=await fixture(t); await h.controller.handleMenu('ais_welcome');
   assert.equal(h.controller.getSnapshot().workspace,null); assert.equal(h.values.get(KEYS.last),'null'); assert.equal(commands(h,'close_note_windows').length,1);
   assert.equal(await h.services.host.invoke('vault_root'),'/fixture');
 });
 
 test('terminal and close menus respect active tabs and intentionally denied main-window close', async t => {
-  const h=await fixture(t); await h.controller.handleMenu('wl_open_terminal'); assert.equal(h.controller.getSnapshot().route,'/terminal');
-  await h.controller.handleMenu('wl_close_tab'); assert.ok(!h.controller.getSnapshot().tabs.openIds.includes('term:main'));
+  const h=await fixture(t); await h.controller.handleMenu('ais_open_terminal'); assert.equal(h.controller.getSnapshot().route,'/terminal');
+  await h.controller.handleMenu('ais_close_tab'); assert.ok(!h.controller.getSnapshot().tabs.openIds.includes('term:main'));
   assert.equal(commands(h,'pty_detach')[0].args.key,'term:main');
-  await h.controller.handleMenu('wl_close_tab'); assert.equal(commands(h,'window.close').length,1);
-  h.controller.navigate('/terminal/session'); await h.controller.handleMenu('wl_close_tab'); assert.equal(commands(h,'window.close').length,2);
+  await h.controller.handleMenu('ais_close_tab'); assert.equal(commands(h,'window.close').length,1);
+  h.controller.navigate('/terminal/session'); await h.controller.handleMenu('ais_close_tab'); assert.equal(commands(h,'window.close').length,2);
 });
 
 test('global shortcuts wrap tabs, skip redundant history entries, select last, and distinguish native Cmd+W', async t => {
@@ -155,7 +155,7 @@ test('목록 14번: 노트 창은 옮기거나 크기를 바꾸면 마지막 바
 test('목록 15번(C149): 노트 창이 vault에 붙기 전 화면에서는 Cmd+W가 아무 일도 안 하고 창 자리도 안 적는다',async t=>{
   const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true,noBoot:true});
   h.services.noteGeometryChanged=async changed=>{h.report=changed;return()=>{}};
-  assert.equal(await h.controller.handleMenu('wl_close_tab'),false);assert.equal(h.calls.filter(call=>call.command==='destroy_current_window').length,0);
+  assert.equal(await h.controller.handleMenu('ais_close_tab'),false);assert.equal(h.calls.filter(call=>call.command==='destroy_current_window').length,0);
   h.controller.saveNoteGeometry({width:700,height:500,x:1,y:2});assert.equal(h.values.get(KEYS.noteWindow),undefined);
   assert.equal(h.calls.filter(call=>call.command==='remember_note_window').length,0);
 });
@@ -192,14 +192,14 @@ test('목록 28번과 4.8: 링크로 하위 페이지를 열며 같은 주소로
 test('note window receives only close, flushes before destroy, and never subscribes to deep links', async t => {
   const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true});
   assert.ok(h.listeners.menu); assert.equal(h.listeners.links,undefined); assert.equal(h.listeners.development,undefined);
-  assert.equal(await h.controller.handleMenu('wl_new_workspace'),false); assert.equal(h.controller.handleKey(key({key:'k'})),false);
+  assert.equal(await h.controller.handleMenu('ais_new_workspace'),false); assert.equal(h.controller.handleKey(key({key:'k'})),false);
   let flushed=false; h.services.pending.flushEditors=async()=>{flushed=true;};
-  assert.equal(await h.controller.handleMenu('wl_close_tab'),true); assert.equal(flushed,true); assert.equal(commands(h,'destroy_current_window').length,1); assert.deepEqual(h.writes,[]);
+  assert.equal(await h.controller.handleMenu('ais_close_tab'),true); assert.equal(flushed,true); assert.equal(commands(h,'destroy_current_window').length,1); assert.deepEqual(h.writes,[]);
 });
 
 test('note close can be cancelled when unsaved data remains', async t => {
   const h=await fixture(t,{context:{kind:'note',docId:'a'}}); h.services.pending.unsavedNotes=()=>1;
-  assert.equal(await h.controller.handleMenu('wl_close_tab'),false); assert.equal(commands(h,'destroy_current_window').length,0);
+  assert.equal(await h.controller.handleMenu('ais_close_tab'),false); assert.equal(commands(h,'destroy_current_window').length,0);
 });
 
 test('links wait for boot and the newest accepted link replaces the pending one', async t => {

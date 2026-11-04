@@ -1,6 +1,6 @@
 package aisurada.args;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 
@@ -18,7 +18,7 @@ public final class ArgsParser {
      * @param toolOrCmdName 첫 번째 argv 칸 (도구명 또는 명령명)
      * @param rawArgs 명령명 뒤의 argv 칸 목록
      * @return 파싱된 ParsedArgs 객체
-     * @throws WlException WL-400 문법 오류 발생 시
+     * @throws AisException AIS-400 문법 오류 발생 시
      */
     public static ParsedArgs parse(String toolOrCmdName, List<String> rawArgs) {
         // 도구 이름인지 판별
@@ -42,7 +42,7 @@ public final class ArgsParser {
 
         // 남은 칸이 2개 이상이면 에러
         if (filtered.size() >= 2) {
-            throw new WlException(400, toolName + " 이 받는 인자는 JSON 한 덩어리인데 " + filtered.size() +
+            throw new AisException(400, toolName + " 이 받는 인자는 JSON 한 덩어리인데 " + filtered.size() +
                     " 개를 받았다. 셸에서 따옴표로 감쌌는지 본다: " + toolName + " '{\"키\":\"값\"}'");
         }
 
@@ -56,11 +56,11 @@ public final class ArgsParser {
         try {
             jsonVal = JsonReader.parse(trimmed);
         } catch (Exception e) {
-            throw new WlException(400, "인자 JSON 파싱 실패(" + toolName + "): " + trimmed);
+            throw new AisException(400, "인자 JSON 파싱 실패(" + toolName + "): " + trimmed);
         }
 
         if (!(jsonVal instanceof JsonValue.JsonObject jsonObj)) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): 인자는 JSON 객체여야 한다: " + trimmed);
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): 인자는 JSON 객체여야 한다: " + trimmed);
         }
 
         Map<String, JsonValue> props = jsonObj.properties();
@@ -69,11 +69,11 @@ public final class ArgsParser {
             // 허용 키: id
             validateKeys(toolName, props.keySet(), List.of("id"));
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(get_doc): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_doc): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString strVal)) {
-                throw new WlException(400, "인자 검증 실패(get_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(get_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
             String id = strVal.value(); // 안 다듬음
             return new ParsedArgs(true, "get-doc", List.of(id), Collections.emptyMap(), null);
@@ -81,18 +81,18 @@ public final class ArgsParser {
             // 허용 키: parent, id (스키마 순서: parent, id)
             validateKeys(toolName, props.keySet(), List.of("parent", "id"));
             if (!props.containsKey("parent")) {
-                throw new WlException(400, "인자 검증 실패(get_sub_note): parent 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_sub_note): parent 가 필요하다.");
             }
             JsonValue parentVal = props.get("parent");
             if (!(parentVal instanceof JsonValue.JsonString strParent)) {
-                throw new WlException(400, "인자 검증 실패(get_sub_note): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
+                throw new AisException(400, "인자 검증 실패(get_sub_note): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
             }
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(get_sub_note): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_sub_note): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString strId)) {
-                throw new WlException(400, "인자 검증 실패(get_sub_note): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(get_sub_note): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
             String rawParent = strParent.value();
             String rawId = strId.value();
@@ -100,11 +100,11 @@ public final class ArgsParser {
         } else if ("list_attachments".equals(toolName) || "list_comments".equals(toolName)) {
             validateKeys(toolName, props.keySet(), List.of("parent"));
             if (!props.containsKey("parent")) {
-                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(" + toolName + "): parent 가 필요하다.");
             }
             JsonValue parentVal = props.get("parent");
             if (!(parentVal instanceof JsonValue.JsonString strParent)) {
-                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
+                throw new AisException(400, "인자 검증 실패(" + toolName + "): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
             }
             String rawParent = strParent.value();
             String[] split = rawParent.split("/");
@@ -115,18 +115,18 @@ public final class ArgsParser {
                 }
             }
             if (segments.isEmpty() || segments.size() >= 3) {
-                throw new WlException(400, "인자 검증 실패(" + toolName + "): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
+                throw new AisException(400, "인자 검증 실패(" + toolName + "): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
             }
             return new ParsedArgs(true, toolName.replace('_', '-'), segments, Collections.emptyMap(), rawParent);
         } else if ("write_attachment".equals(toolName)) {
             // 18.8의 1번: 칸을 parent, name, content 차례로 1개씩 끝까지 본다. parent는 그 자리에서 자른다
             validateKeys(toolName, props.keySet(), List.of("parent", "name", "content"));
             if (!props.containsKey("parent")) {
-                throw new WlException(400, "인자 검증 실패(write_attachment): parent 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(write_attachment): parent 가 필요하다.");
             }
             JsonValue parentVal = props.get("parent");
             if (!(parentVal instanceof JsonValue.JsonString strParent)) {
-                throw new WlException(400, "인자 검증 실패(write_attachment): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
+                throw new AisException(400, "인자 검증 실패(write_attachment): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
             }
             String rawParent = strParent.value();
             List<String> segments = new ArrayList<>();
@@ -136,19 +136,19 @@ public final class ArgsParser {
                 }
             }
             if (segments.isEmpty() || segments.size() >= 3) {
-                throw new WlException(400, "인자 검증 실패(write_attachment): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
+                throw new AisException(400, "인자 검증 실패(write_attachment): parent 는 `노트id` 이거나 `노트id/하위노트id` 여야 한다: " + rawParent);
             }
             Map<String, Object> toolOpts = new LinkedHashMap<>();
             for (String key : List.of("name", "content")) {
                 if (!props.containsKey(key)) {
-                    throw new WlException(400, "인자 검증 실패(write_attachment): " + key + " 가 필요하다.");
+                    throw new AisException(400, "인자 검증 실패(write_attachment): " + key + " 가 필요하다.");
                 }
                 JsonValue v = props.get(key);
                 if (!(v instanceof JsonValue.JsonString sv)) {
-                    throw new WlException(400, "인자 검증 실패(write_attachment): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
+                    throw new AisException(400, "인자 검증 실패(write_attachment): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
                 }
                 if ("content".equals(key) && sv.value().length() > 200000) {
-                    throw new WlException(400, "인자 검증 실패(write_attachment): content 가 너무 길다(최대 200000자): " + sv.value().length() + "자");
+                    throw new AisException(400, "인자 검증 실패(write_attachment): content 가 너무 길다(최대 200000자): " + sv.value().length() + "자");
                 }
                 toolOpts.put(key, sv.value());
             }
@@ -156,11 +156,11 @@ public final class ArgsParser {
         } else if ("list_sub_notes".equals(toolName)) {
             validateKeys(toolName, props.keySet(), List.of("parent"));
             if (!props.containsKey("parent")) {
-                throw new WlException(400, "인자 검증 실패(list_sub_notes): parent 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(list_sub_notes): parent 가 필요하다.");
             }
             JsonValue parentVal = props.get("parent");
             if (!(parentVal instanceof JsonValue.JsonString strParent)) {
-                throw new WlException(400, "인자 검증 실패(list_sub_notes): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
+                throw new AisException(400, "인자 검증 실패(list_sub_notes): parent 는 문자열 여야 한다: " + JsonCompact.compact(parentVal));
             }
             String rawParent = strParent.value();
             return new ParsedArgs(true, "list-sub-notes", List.of(rawParent), Collections.emptyMap(), rawParent);
@@ -177,11 +177,11 @@ public final class ArgsParser {
                         if (v instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
                             toolOpts.put("favorite", Boolean.valueOf(lit.raw()));
                         } else {
-                            throw new WlException(400, "인자 검증 실패(list_docs): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
+                            throw new AisException(400, "인자 검증 실패(list_docs): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
                         }
                     } else {
                         if (!(v instanceof JsonValue.JsonString strVal)) {
-                            throw new WlException(400, "인자 검증 실패(list_docs): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
+                            throw new AisException(400, "인자 검증 실패(list_docs): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
                         }
                         toolOpts.put(key, strVal.value());
                     }
@@ -196,7 +196,7 @@ public final class ArgsParser {
             if (props.containsKey("query")) {
                 JsonValue qVal = props.get("query");
                 if (!(qVal instanceof JsonValue.JsonString strVal)) {
-                    throw new WlException(400, "인자 검증 실패(list_tags): query 는 문자열 여야 한다: " + JsonCompact.compact(qVal));
+                    throw new AisException(400, "인자 검증 실패(list_tags): query 는 문자열 여야 한다: " + JsonCompact.compact(qVal));
                 }
                 toolOpts.put("query", strVal.value());
             }
@@ -212,11 +212,11 @@ public final class ArgsParser {
             Map<String, Object> toolOpts = new LinkedHashMap<>();
             // 1. query (필수)
             if (!props.containsKey("query")) {
-                throw new WlException(400, "인자 검증 실패(search_docs): query 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(search_docs): query 가 필요하다.");
             }
             JsonValue qVal = props.get("query");
             if (!(qVal instanceof JsonValue.JsonString strVal)) {
-                throw new WlException(400, "인자 검증 실패(search_docs): query 는 문자열 여야 한다: " + JsonCompact.compact(qVal));
+                throw new AisException(400, "인자 검증 실패(search_docs): query 는 문자열 여야 한다: " + JsonCompact.compact(qVal));
             }
             toolOpts.put("query", strVal.value());
 
@@ -235,11 +235,11 @@ public final class ArgsParser {
                         if (v instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
                             toolOpts.put("favorite", Boolean.valueOf(lit.raw()));
                         } else {
-                            throw new WlException(400, "인자 검증 실패(search_docs): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
+                            throw new AisException(400, "인자 검증 실패(search_docs): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
                         }
                     } else {
                         if (!(v instanceof JsonValue.JsonString sVal)) {
-                            throw new WlException(400, "인자 검증 실패(search_docs): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
+                            throw new AisException(400, "인자 검증 실패(search_docs): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
                         }
                         toolOpts.put(key, sVal.value());
                     }
@@ -254,14 +254,14 @@ public final class ArgsParser {
             if (props.containsKey("category")) {
                 JsonValue cVal = props.get("category");
                 if (!(cVal instanceof JsonValue.JsonString sVal)) {
-                    throw new WlException(400, "인자 검증 실패(list_templates): category 는 문자열 여야 한다: " + JsonCompact.compact(cVal));
+                    throw new AisException(400, "인자 검증 실패(list_templates): category 는 문자열 여야 한다: " + JsonCompact.compact(cVal));
                 }
                 toolOpts.put("category", sVal.value());
             }
             if (props.containsKey("type")) {
                 JsonValue tVal = props.get("type");
                 if (!(tVal instanceof JsonValue.JsonString sVal)) {
-                    throw new WlException(400, "인자 검증 실패(list_templates): type 는 문자열 여야 한다: " + JsonCompact.compact(tVal));
+                    throw new AisException(400, "인자 검증 실패(list_templates): type 는 문자열 여야 한다: " + JsonCompact.compact(tVal));
                 }
                 toolOpts.put("type", sVal.value());
             }
@@ -271,11 +271,11 @@ public final class ArgsParser {
             validateKeys(toolName, props.keySet(), allowed);
 
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(get_template): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_template): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString sVal)) {
-                throw new WlException(400, "인자 검증 실패(get_template): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(get_template): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
             Map<String, Object> toolOpts = Map.of("id", sVal.value());
             return new ParsedArgs(true, "get-template", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
@@ -287,21 +287,21 @@ public final class ArgsParser {
             if (props.containsKey("kind")) {
                 JsonValue kVal = props.get("kind");
                 if (!(kVal instanceof JsonValue.JsonString sVal)) {
-                    throw new WlException(400, "인자 검증 실패(list_reports): kind 는 문자열 여야 한다: " + JsonCompact.compact(kVal));
+                    throw new AisException(400, "인자 검증 실패(list_reports): kind 는 문자열 여야 한다: " + JsonCompact.compact(kVal));
                 }
                 toolOpts.put("kind", sVal.value());
             }
             if (props.containsKey("dateFrom")) {
                 JsonValue dfVal = props.get("dateFrom");
                 if (!(dfVal instanceof JsonValue.JsonString sVal)) {
-                    throw new WlException(400, "인자 검증 실패(list_reports): dateFrom 는 문자열 여야 한다: " + JsonCompact.compact(dfVal));
+                    throw new AisException(400, "인자 검증 실패(list_reports): dateFrom 는 문자열 여야 한다: " + JsonCompact.compact(dfVal));
                 }
                 toolOpts.put("dateFrom", sVal.value());
             }
             if (props.containsKey("dateTo")) {
                 JsonValue dtVal = props.get("dateTo");
                 if (!(dtVal instanceof JsonValue.JsonString sVal)) {
-                    throw new WlException(400, "인자 검증 실패(list_reports): dateTo 는 문자열 여야 한다: " + JsonCompact.compact(dtVal));
+                    throw new AisException(400, "인자 검증 실패(list_reports): dateTo 는 문자열 여야 한다: " + JsonCompact.compact(dtVal));
                 }
                 toolOpts.put("dateTo", sVal.value());
             }
@@ -311,11 +311,11 @@ public final class ArgsParser {
             validateKeys(toolName, props.keySet(), allowed);
 
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(get_report): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_report): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString sVal)) {
-                throw new WlException(400, "인자 검증 실패(get_report): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(get_report): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
             Map<String, Object> toolOpts = Map.of("id", sVal.value());
             return new ParsedArgs(true, "get-report", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
@@ -331,44 +331,44 @@ public final class ArgsParser {
 
             // 1. agenda
             if (!props.containsKey("agenda")) {
-                throw new WlException(400, "인자 검증 실패(create_doc): agenda 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(create_doc): agenda 가 필요하다.");
             }
             JsonValue agendaVal = props.get("agenda");
             if (!(agendaVal instanceof JsonValue.JsonString sAgenda)) {
-                throw new WlException(400, "인자 검증 실패(create_doc): agenda 는 문자열 여야 한다: " + JsonCompact.compact(agendaVal));
+                throw new AisException(400, "인자 검증 실패(create_doc): agenda 는 문자열 여야 한다: " + JsonCompact.compact(agendaVal));
             }
             toolOpts.put("agenda", sAgenda.value());
 
             // 2. type
             if (!props.containsKey("type")) {
-                throw new WlException(400, "인자 검증 실패(create_doc): type 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(create_doc): type 가 필요하다.");
             }
             JsonValue typeVal = props.get("type");
             if (!(typeVal instanceof JsonValue.JsonString sType)) {
-                throw new WlException(400, "인자 검증 실패(create_doc): type 는 문자열 여야 한다: " + JsonCompact.compact(typeVal));
+                throw new AisException(400, "인자 검증 실패(create_doc): type 는 문자열 여야 한다: " + JsonCompact.compact(typeVal));
             }
             toolOpts.put("type", sType.value());
 
             // 3. title
             if (!props.containsKey("title")) {
-                throw new WlException(400, "인자 검증 실패(create_doc): title 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(create_doc): title 가 필요하다.");
             }
             JsonValue titleVal = props.get("title");
             if (!(titleVal instanceof JsonValue.JsonString sTitle)) {
-                throw new WlException(400, "인자 검증 실패(create_doc): title 는 문자열 여야 한다: " + JsonCompact.compact(titleVal));
+                throw new AisException(400, "인자 검증 실패(create_doc): title 는 문자열 여야 한다: " + JsonCompact.compact(titleVal));
             }
             toolOpts.put("title", sTitle.value());
 
             // 4. body
             if (!props.containsKey("body")) {
-                throw new WlException(400, "인자 검증 실패(create_doc): body 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(create_doc): body 가 필요하다.");
             }
             JsonValue bodyVal = props.get("body");
             if (!(bodyVal instanceof JsonValue.JsonString sBody)) {
-                throw new WlException(400, "인자 검증 실패(create_doc): body 는 문자열 여야 한다: " + JsonCompact.compact(bodyVal));
+                throw new AisException(400, "인자 검증 실패(create_doc): body 는 문자열 여야 한다: " + JsonCompact.compact(bodyVal));
             }
             if (sBody.value().length() > 200_000) {
-                throw new WlException(400, "인자 검증 실패(create_doc): body 가 너무 길다(최대 200000자): " + sBody.value().length() + "자");
+                throw new AisException(400, "인자 검증 실패(create_doc): body 가 너무 길다(최대 200000자): " + sBody.value().length() + "자");
             }
             toolOpts.put("body", sBody.value());
 
@@ -376,7 +376,7 @@ public final class ArgsParser {
             if (props.containsKey("date")) {
                 JsonValue dateVal = props.get("date");
                 if (!(dateVal instanceof JsonValue.JsonString sDate)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): date 는 문자열 여야 한다: " + JsonCompact.compact(dateVal));
+                    throw new AisException(400, "인자 검증 실패(create_doc): date 는 문자열 여야 한다: " + JsonCompact.compact(dateVal));
                 }
                 toolOpts.put("date", sDate.value());
             }
@@ -385,7 +385,7 @@ public final class ArgsParser {
             if (props.containsKey("time")) {
                 JsonValue timeVal = props.get("time");
                 if (!(timeVal instanceof JsonValue.JsonString sTime)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): time 는 문자열 여야 한다: " + JsonCompact.compact(timeVal));
+                    throw new AisException(400, "인자 검증 실패(create_doc): time 는 문자열 여야 한다: " + JsonCompact.compact(timeVal));
                 }
                 toolOpts.put("time", sTime.value());
             }
@@ -394,7 +394,7 @@ public final class ArgsParser {
             if (props.containsKey("format")) {
                 JsonValue formatVal = props.get("format");
                 if (!(formatVal instanceof JsonValue.JsonString sFormat)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): format 는 문자열 여야 한다: " + JsonCompact.compact(formatVal));
+                    throw new AisException(400, "인자 검증 실패(create_doc): format 는 문자열 여야 한다: " + JsonCompact.compact(formatVal));
                 }
                 toolOpts.put("format", sFormat.value());
             }
@@ -403,15 +403,15 @@ public final class ArgsParser {
             if (props.containsKey("links")) {
                 JsonValue linksVal = props.get("links");
                 if (!(linksVal instanceof JsonValue.JsonArray arr)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + JsonCompact.compact(linksVal));
+                    throw new AisException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + JsonCompact.compact(linksVal));
                 }
                 for (JsonValue el : arr.elements()) {
                     if (!(el instanceof JsonValue.JsonObject)) {
-                        throw new WlException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + JsonCompact.compact(linksVal));
+                        throw new AisException(400, "인자 검증 실패(create_doc): links 는 객체 배열 여야 한다: " + JsonCompact.compact(linksVal));
                     }
                 }
                 if (arr.elements().size() > 200) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): links 항목이 너무 많다(최대 200개): " + arr.elements().size() + "개");
+                    throw new AisException(400, "인자 검증 실패(create_doc): links 항목이 너무 많다(최대 200개): " + arr.elements().size() + "개");
                 }
                 List<Object> rawLinks = new ArrayList<>();
                 for (JsonValue el : arr.elements()) {
@@ -433,15 +433,15 @@ public final class ArgsParser {
             if (props.containsKey("tags")) {
                 JsonValue tagsVal = props.get("tags");
                 if (!(tagsVal instanceof JsonValue.JsonArray arr)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                    throw new AisException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
                 }
                 for (JsonValue el : arr.elements()) {
                     if (!(el instanceof JsonValue.JsonString)) {
-                        throw new WlException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                        throw new AisException(400, "인자 검증 실패(create_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
                     }
                 }
                 if (arr.elements().size() > 50) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): tags 항목이 너무 많다(최대 50개): " + arr.elements().size() + "개");
+                    throw new AisException(400, "인자 검증 실패(create_doc): tags 항목이 너무 많다(최대 50개): " + arr.elements().size() + "개");
                 }
                 List<String> rawTags = new ArrayList<>();
                 for (JsonValue el : arr.elements()) {
@@ -454,10 +454,10 @@ public final class ArgsParser {
             if (props.containsKey("template")) {
                 JsonValue templateVal = props.get("template");
                 if (!(templateVal instanceof JsonValue.JsonString sTemplate)) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): template 는 문자열 여야 한다: " + JsonCompact.compact(templateVal));
+                    throw new AisException(400, "인자 검증 실패(create_doc): template 는 문자열 여야 한다: " + JsonCompact.compact(templateVal));
                 }
                 if (sTemplate.value().length() > 200) {
-                    throw new WlException(400, "인자 검증 실패(create_doc): template 가 너무 길다(최대 200자): " + sTemplate.value().length() + "자");
+                    throw new AisException(400, "인자 검증 실패(create_doc): template 가 너무 길다(최대 200자): " + sTemplate.value().length() + "자");
                 }
                 toolOpts.put("template", sTemplate.value());
             }
@@ -469,11 +469,11 @@ public final class ArgsParser {
             validateKeys(toolName, props.keySet(), allowed);
 
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(update_doc): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(update_doc): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString sId)) {
-                throw new WlException(400, "인자 검증 실패(update_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(update_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
             Map<String, Object> toolOpts = new LinkedHashMap<>();
             toolOpts.put("id", sId.value());
@@ -481,32 +481,32 @@ public final class ArgsParser {
             if (props.containsKey("body")) {
                 JsonValue bodyVal = props.get("body");
                 if (!(bodyVal instanceof JsonValue.JsonString sBody)) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): body 는 문자열 여야 한다: " + JsonCompact.compact(bodyVal));
+                    throw new AisException(400, "인자 검증 실패(update_doc): body 는 문자열 여야 한다: " + JsonCompact.compact(bodyVal));
                 }
                 if (sBody.value().length() > 200000) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): body 가 너무 길다(최대 200000자): " + sBody.value().length() + "자");
+                    throw new AisException(400, "인자 검증 실패(update_doc): body 가 너무 길다(최대 200000자): " + sBody.value().length() + "자");
                 }
                 toolOpts.put("body", sBody.value());
             }
             if (props.containsKey("title")) {
                 JsonValue titleVal = props.get("title");
                 if (!(titleVal instanceof JsonValue.JsonString sTitle)) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): title 는 문자열 여야 한다: " + JsonCompact.compact(titleVal));
+                    throw new AisException(400, "인자 검증 실패(update_doc): title 는 문자열 여야 한다: " + JsonCompact.compact(titleVal));
                 }
                 toolOpts.put("title", sTitle.value());
             }
             if (props.containsKey("tags")) {
                 JsonValue tagsVal = props.get("tags");
                 if (!(tagsVal instanceof JsonValue.JsonArray arr)) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                    throw new AisException(400, "인자 검증 실패(update_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
                 }
                 for (JsonValue el : arr.elements()) {
                     if (!(el instanceof JsonValue.JsonString)) {
-                        throw new WlException(400, "인자 검증 실패(update_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
+                        throw new AisException(400, "인자 검증 실패(update_doc): tags 는 문자열 배열 여야 한다: " + JsonCompact.compact(tagsVal));
                     }
                 }
                 if (arr.elements().size() > 50) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): tags 항목이 너무 많다(최대 50개): " + arr.elements().size() + "개");
+                    throw new AisException(400, "인자 검증 실패(update_doc): tags 항목이 너무 많다(최대 50개): " + arr.elements().size() + "개");
                 }
                 List<String> rawTags = new ArrayList<>();
                 for (JsonValue el : arr.elements()) {
@@ -517,17 +517,17 @@ public final class ArgsParser {
             if (props.containsKey("template")) {
                 JsonValue templateVal = props.get("template");
                 if (!(templateVal instanceof JsonValue.JsonString sTemplate)) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): template 는 문자열 여야 한다: " + JsonCompact.compact(templateVal));
+                    throw new AisException(400, "인자 검증 실패(update_doc): template 는 문자열 여야 한다: " + JsonCompact.compact(templateVal));
                 }
                 if (sTemplate.value().length() > 200) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): template 가 너무 길다(최대 200자): " + sTemplate.value().length() + "자");
+                    throw new AisException(400, "인자 검증 실패(update_doc): template 가 너무 길다(최대 200자): " + sTemplate.value().length() + "자");
                 }
                 toolOpts.put("template", sTemplate.value());
             }
             if (props.containsKey("f1")) {
                 JsonValue f1Val = props.get("f1");
                 if (!(f1Val instanceof JsonValue.JsonString sF1)) {
-                    throw new WlException(400, "인자 검증 실패(update_doc): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                    throw new AisException(400, "인자 검증 실패(update_doc): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
                 }
                 toolOpts.put("f1", sF1.value());
             }
@@ -537,11 +537,11 @@ public final class ArgsParser {
             validateKeys(toolName, props.keySet(), allowed);
 
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(set_favorite): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(set_favorite): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString sId)) {
-                throw new WlException(400, "인자 검증 실패(set_favorite): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(set_favorite): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
 
             Map<String, Object> toolOpts = new LinkedHashMap<>();
@@ -552,14 +552,14 @@ public final class ArgsParser {
                 if (favVal instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
                     toolOpts.put("favorite", Boolean.valueOf(lit.raw()));
                 } else {
-                    throw new WlException(400, "인자 검증 실패(set_favorite): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(favVal));
+                    throw new AisException(400, "인자 검증 실패(set_favorite): favorite 는 true 나 false 여야 한다: " + JsonCompact.compact(favVal));
                 }
             }
 
             if (props.containsKey("category")) {
                 JsonValue catVal = props.get("category");
                 if (!(catVal instanceof JsonValue.JsonString sCat)) {
-                    throw new WlException(400, "인자 검증 실패(set_favorite): category 는 문자열 여야 한다: " + JsonCompact.compact(catVal));
+                    throw new AisException(400, "인자 검증 실패(set_favorite): category 는 문자열 여야 한다: " + JsonCompact.compact(catVal));
                 }
                 toolOpts.put("category", sCat.value());
             }
@@ -567,7 +567,7 @@ public final class ArgsParser {
             if (props.containsKey("f1")) {
                 JsonValue f1Val = props.get("f1");
                 if (!(f1Val instanceof JsonValue.JsonString sF1)) {
-                    throw new WlException(400, "인자 검증 실패(set_favorite): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                    throw new AisException(400, "인자 검증 실패(set_favorite): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
                 }
                 toolOpts.put("f1", sF1.value());
             }
@@ -578,11 +578,11 @@ public final class ArgsParser {
             validateKeys(toolName, props.keySet(), allowed);
 
             if (!props.containsKey("id")) {
-                throw new WlException(400, "인자 검증 실패(evaluate_doc): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(evaluate_doc): id 가 필요하다.");
             }
             JsonValue idVal = props.get("id");
             if (!(idVal instanceof JsonValue.JsonString sId)) {
-                throw new WlException(400, "인자 검증 실패(evaluate_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
+                throw new AisException(400, "인자 검증 실패(evaluate_doc): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
             }
 
             Map<String, Object> toolOpts = new LinkedHashMap<>();
@@ -596,17 +596,17 @@ public final class ArgsParser {
                         double d = Double.parseDouble(lit.raw());
                         toolOpts.put("score", d);
                     } catch (NumberFormatException e) {
-                        throw new WlException(400, "인자 검증 실패(evaluate_doc): score 는 숫자 여야 한다: " + JsonCompact.compact(scoreVal));
+                        throw new AisException(400, "인자 검증 실패(evaluate_doc): score 는 숫자 여야 한다: " + JsonCompact.compact(scoreVal));
                     }
                 } else {
-                    throw new WlException(400, "인자 검증 실패(evaluate_doc): score 는 숫자 여야 한다: " + JsonCompact.compact(scoreVal));
+                    throw new AisException(400, "인자 검증 실패(evaluate_doc): score 는 숫자 여야 한다: " + JsonCompact.compact(scoreVal));
                 }
             }
 
             if (props.containsKey("note")) {
                 JsonValue noteVal = props.get("note");
                 if (!(noteVal instanceof JsonValue.JsonString sNote)) {
-                    throw new WlException(400, "인자 검증 실패(evaluate_doc): note 는 문자열 여야 한다: " + JsonCompact.compact(noteVal));
+                    throw new AisException(400, "인자 검증 실패(evaluate_doc): note 는 문자열 여야 한다: " + JsonCompact.compact(noteVal));
                 }
                 toolOpts.put("note", sNote.value());
             }
@@ -616,14 +616,14 @@ public final class ArgsParser {
                 if (clearVal instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
                     toolOpts.put("clear", Boolean.valueOf(lit.raw()));
                 } else {
-                    throw new WlException(400, "인자 검증 실패(evaluate_doc): clear 는 true 나 false 여야 한다: " + JsonCompact.compact(clearVal));
+                    throw new AisException(400, "인자 검증 실패(evaluate_doc): clear 는 true 나 false 여야 한다: " + JsonCompact.compact(clearVal));
                 }
             }
 
             if (props.containsKey("f1")) {
                 JsonValue f1Val = props.get("f1");
                 if (!(f1Val instanceof JsonValue.JsonString sF1)) {
-                    throw new WlException(400, "인자 검증 실패(evaluate_doc): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                    throw new AisException(400, "인자 검증 실패(evaluate_doc): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
                 }
                 toolOpts.put("f1", sF1.value());
             }
@@ -634,19 +634,19 @@ public final class ArgsParser {
             validateKeys(toolName, props.keySet(), allowed);
 
             if (!props.containsKey("from")) {
-                throw new WlException(400, "인자 검증 실패(link_docs): from 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(link_docs): from 가 필요하다.");
             }
             JsonValue fromVal = props.get("from");
             if (!(fromVal instanceof JsonValue.JsonString sFrom)) {
-                throw new WlException(400, "인자 검증 실패(link_docs): from 는 문자열 여야 한다: " + JsonCompact.compact(fromVal));
+                throw new AisException(400, "인자 검증 실패(link_docs): from 는 문자열 여야 한다: " + JsonCompact.compact(fromVal));
             }
 
             if (!props.containsKey("to")) {
-                throw new WlException(400, "인자 검증 실패(link_docs): to 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(link_docs): to 가 필요하다.");
             }
             JsonValue toVal = props.get("to");
             if (!(toVal instanceof JsonValue.JsonString sTo)) {
-                throw new WlException(400, "인자 검증 실패(link_docs): to 는 문자열 여야 한다: " + JsonCompact.compact(toVal));
+                throw new AisException(400, "인자 검증 실패(link_docs): to 는 문자열 여야 한다: " + JsonCompact.compact(toVal));
             }
 
             Map<String, Object> toolOpts = new LinkedHashMap<>();
@@ -656,7 +656,7 @@ public final class ArgsParser {
             if (props.containsKey("kind")) {
                 JsonValue kindVal = props.get("kind");
                 if (!(kindVal instanceof JsonValue.JsonString sKind)) {
-                    throw new WlException(400, "인자 검증 실패(link_docs): kind 는 문자열 여야 한다: " + JsonCompact.compact(kindVal));
+                    throw new AisException(400, "인자 검증 실패(link_docs): kind 는 문자열 여야 한다: " + JsonCompact.compact(kindVal));
                 }
                 toolOpts.put("kind", sKind.value());
             }
@@ -666,14 +666,14 @@ public final class ArgsParser {
                 if (removeVal instanceof JsonValue.JsonLiteral lit && ("true".equals(lit.raw()) || "false".equals(lit.raw()))) {
                     toolOpts.put("remove", Boolean.valueOf(lit.raw()));
                 } else {
-                    throw new WlException(400, "인자 검증 실패(link_docs): remove 는 true 나 false 여야 한다: " + JsonCompact.compact(removeVal));
+                    throw new AisException(400, "인자 검증 실패(link_docs): remove 는 true 나 false 여야 한다: " + JsonCompact.compact(removeVal));
                 }
             }
 
             if (props.containsKey("f1")) {
                 JsonValue f1Val = props.get("f1");
                 if (!(f1Val instanceof JsonValue.JsonString sF1)) {
-                    throw new WlException(400, "인자 검증 실패(link_docs): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
+                    throw new AisException(400, "인자 검증 실패(link_docs): f1 는 문자열 여야 한다: " + JsonCompact.compact(f1Val));
                 }
                 toolOpts.put("f1", sF1.value());
             }
@@ -722,7 +722,7 @@ public final class ArgsParser {
                 if (key.equals("kind") || key.equals("date")) named.put(key, requiredString(toolName, props, key));
                 else if (props.containsKey(key)) {
                     String value = optionalString(toolName, props, key);
-                    if (value.length() > 200_000) throw new WlException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 너무 길다(최대 200000자): " + value.length() + "자");
+                    if (value.length() > 200_000) throw new AisException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 너무 길다(최대 200000자): " + value.length() + "자");
                     named.put(key, value);
                 }
             }
@@ -742,7 +742,7 @@ public final class ArgsParser {
                 if (key.equals("dryRun")) {
                     JsonValue v = props.get(key);
                     if (!(v instanceof JsonValue.JsonLiteral l) || !(l.raw().equals("true") || l.raw().equals("false")))
-                        throw new WlException(400, "인자 검증 실패(plan_day): dryRun 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
+                        throw new AisException(400, "인자 검증 실패(plan_day): dryRun 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
                     named.put(key, ((JsonValue.JsonLiteral) v).raw());
                 } else named.put(key, optionalString(toolName, props, key));
             }
@@ -753,7 +753,7 @@ public final class ArgsParser {
             String id = requiredString(toolName, props, "id");
             return new ParsedArgs(true, "delete-sub-note", List.of(parent, id), Collections.emptyMap(), parent);
         } else {
-            throw new WlException(400, "미지원 도구: " + toolName);
+            throw new AisException(400, "미지원 도구: " + toolName);
         }
     }
 
@@ -768,7 +768,7 @@ public final class ArgsParser {
             unknown.sort(Utf16::compare);
             String unknownJoined = String.join(", ", unknown);
             String allowedJoined = String.join(", ", allowedSchemaKeys);
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): 모르는 키다: [" + unknownJoined +
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): 모르는 키다: [" + unknownJoined +
                     "]. 쓸 수 있는 것은 [" + allowedJoined + "] 뿐이다.");
         }
     }
@@ -776,7 +776,7 @@ public final class ArgsParser {
     /** 필수 문자열 칸입니다. 없으면 `<키> 가 필요하다.`, 문자열이 아니면(JSON null 포함) 갈래 실패입니다(5.4의 6번). */
     private static String requiredString(String toolName, Map<String, JsonValue> props, String key) {
         if (!props.containsKey(key)) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 필요하다.");
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 필요하다.");
         }
         return optionalString(toolName, props, key);
     }
@@ -785,7 +785,7 @@ public final class ArgsParser {
     private static String optionalString(String toolName, Map<String, JsonValue> props, String key) {
         JsonValue v = props.get(key);
         if (!(v instanceof JsonValue.JsonString s)) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): " + key + " 는 문자열 여야 한다: " + JsonCompact.compact(v));
         }
         return s.value();
     }
@@ -793,31 +793,31 @@ public final class ArgsParser {
     /** 본문 칸의 글자 수 상한 200,000(B.8)을 UTF-16 코드 단위로 봅니다. */
     private static String withinBodyLimit(String toolName, String body) {
         if (body.length() > 200_000) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): body 가 너무 길다(최대 200000자): " + body.length() + "자");
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): body 가 너무 길다(최대 200000자): " + body.length() + "자");
         }
         return body;
     }
 
     public static long parseToolLimit(JsonValue value, String toolName) {
         if (!(value instanceof JsonValue.JsonLiteral lit)) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
         }
         String raw = lit.raw();
         if ("true".equals(raw) || "false".equals(raw) || "null".equals(raw)) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
         }
         double x;
         try {
             x = Double.parseDouble(raw);
         } catch (NumberFormatException e) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
         }
         if (Double.isNaN(x) || Double.isInfinite(x)) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
         }
         long asLong = (long) x;
         if ((double) asLong != x || asLong < 1) {
-            throw new WlException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
+            throw new AisException(400, "인자 검증 실패(" + toolName + "): limit 는 1 이상의 정수 여야 한다: " + JsonCompact.compact(value));
         }
         return asLong;
     }
@@ -1105,7 +1105,7 @@ public final class ArgsParser {
                     // 허용되지 않은 옵션 즉시 실패
                     List<String> sortedAllowed = new ArrayList<>(allowedOptions);
                     sortedAllowed.sort(Utf16::compare);
-                    throw new WlException(400, cmdName + " 이 모르는 옵션이다: " + optName +
+                    throw new AisException(400, cmdName + " 이 모르는 옵션이다: " + optName +
                             ". 쓸 수 있는 것은 [" + String.join(", ", sortedAllowed) + "] 뿐이다.");
                 }
                 options.put(optName, optVal);
@@ -1116,7 +1116,7 @@ public final class ArgsParser {
         }
 
         if (maxPositional != Integer.MAX_VALUE && positional.size() > maxPositional) {
-            throw new WlException(400, cmdName + " 이 받는 자리 인자는 " + maxPositional +
+            throw new AisException(400, cmdName + " 이 받는 자리 인자는 " + maxPositional +
                     " 개인데 " + positional.size() + " 개를 받았다: " + usage);
         }
 

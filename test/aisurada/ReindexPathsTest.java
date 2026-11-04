@@ -107,7 +107,7 @@ public final class ReindexPathsTest {
         result=index(v,args);eq(result.get("skipped"),List.of(),"fallback excludes template diagnostics");
         check(!Reindex.execute(v,System.currentTimeMillis()).get("skipped").equals(List.of()),"full reindex still includes template diagnostics");
         EngineResult r=run(v,"reindex-paths","abc=def"); eq(r.errorCode(),400,"unknown option");
-        eq(new String(r.stderrBytes(),StandardCharsets.UTF_8),"WL-400 reindex-paths 이 모르는 옵션이다: abc. 쓸 수 있는 것은 [] 뿐이다.\n","option bytes");
+        eq(new String(r.stderrBytes(),StandardCharsets.UTF_8),"AIS-400 reindex-paths 이 모르는 옵션이다: abc. 쓸 수 있는 것은 [] 뿐이다.\n","option bytes");
         r=run(v,"reindex-paths","--unknown=x","notes/demo/a"); eq(r.status(),0,"double dash setting discarded");
         r=run(v,"reindex_paths"); eq(r.status(),2,"no tool surface");
     }

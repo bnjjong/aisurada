@@ -10,7 +10,7 @@ const head = (id, title = '한글 Test', created = "'2026-06-04T09:30:00+09:00'"
 const exists = async path => { try { await fs.access(path); return true; } catch { return false; } };
 
 async function fixture(t) {
-  const root = await fs.mkdtemp(join(tmpdir(), 'wl-migration-'));
+  const root = await fs.mkdtemp(join(tmpdir(), 'ais-migration-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const write = async (relative, text) => { const path = join(root, relative); await fs.mkdir(dirname(path), { recursive: true }); await fs.writeFile(path, text); };
   const files = { exists, readDir: async path => (await fs.readdir(path, { withFileTypes: true })).map(entry => ({ name: entry.name,

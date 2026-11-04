@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.AgendaRow;
 import aisurada.text.Trim;
 import aisurada.vault.AgendaReader;
@@ -48,7 +48,7 @@ public final class CreateAgenda {
         Map<String, String> opts = parsed.namedOptions();
         String title = Trim.trim(opts.get("title"));
         if (title.isEmpty()) {
-            throw new WlException(400, "title 이 필요하다");
+            throw new AisException(400, "title 이 필요하다");
         }
         String hue = AgendaArgs.hue(opts.get("hue"));
         String project = Trim.trim(opts.get("project"));
@@ -56,7 +56,7 @@ public final class CreateAgenda {
             // create에서 공백뿐인 project는 안 준 것이고 미분류다(20.9의 7번)
             project = null;
         } else if (!AgendaReader.isValidSlugSegment(project)) {
-            throw new WlException(400, "project 값이 안전한 이름이 아니다: " + project);
+            throw new AisException(400, "project 값이 안전한 이름이 아니다: " + project);
         }
         String repo = Trim.trim(opts.get("repo"));
         if (repo.isEmpty()) {
@@ -77,7 +77,7 @@ public final class CreateAgenda {
         }
         String slug = AgendaFile.pickFreeSlug(SlugBuilder.build(title, 50), taken);
         if (slug == null) {
-            throw new WlException(400, "같은 이름의 아젠다가 " + AgendaFile.MAX_SLUG_SUFFIX +
+            throw new AisException(400, "같은 이름의 아젠다가 " + AgendaFile.MAX_SLUG_SUFFIX +
                     " 개까지 차 있어 새로 만들 수 없다: " + title);
         }
         if (hue == null) {
@@ -87,7 +87,7 @@ public final class CreateAgenda {
         // 8. 파일 쓰기. 50단위 자르기가 서로게이트 쌍을 가른 slug는 경로를 못 지어 아무것도 안 쓴다(20.9의 11번)
         String fileName = slug + ".md";
         if (PathConfinement.hasUnusablePathCharacters(fileName)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + fileName);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + fileName);
         }
         AtomicWriter.writeAtomic(vaultRoot.resolve(AgendaFile.relPath(slug)),
                 AgendaFile.render(id, slug, title, hue, repo, project, summary));

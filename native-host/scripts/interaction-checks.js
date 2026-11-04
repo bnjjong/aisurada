@@ -1,5 +1,5 @@
 /* Injected by the isolated host harness; never shipped with the app. */
-const cfg = window.__WL_FIXTURE__;
+const cfg = window.__AIS_FIXTURE__;
 const invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);
 const assert = (value, message) => { if (!value) throw Error(message || 'assertion failed'); };
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -9,7 +9,7 @@ async function until(predicate, label = 'interaction') {
   throw Error(`timed out: ${label}; path=${location.pathname}; title=${document.querySelector('#screen-content h1')?.textContent}`);
 }
 const post = (path, data) => fetch(path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-const menu = (payload, label = 'main') => invoke('plugin:event|emit_to', {target:{kind:'AnyLabel',label},event:'wl://menu',payload});
+const menu = (payload, label = 'main') => invoke('plugin:event|emit_to', {target:{kind:'AnyLabel',label},event:'ais://menu',payload});
 const links = payload => invoke('plugin:event|emit', {event:'deep-link://new-url',payload});
 const link = (id, ws = cfg.raw, extra = '') => `aisurada://doc/${encodeURIComponent(id)}?ws=${encodeURIComponent(ws)}${extra}`;
 const file = path => 'file://' + path.split('/').map(encodeURIComponent).join('/');
@@ -19,7 +19,7 @@ const tab = id => [...document.querySelectorAll('.tab-item[data-tab-id]')].find(
 const press = options => dispatchEvent(new KeyboardEvent('keydown',{metaKey:true,bubbles:true,cancelable:true,...options}));
 
 if(location.pathname.startsWith('/note-window/')) {
-  try { await until(()=>document.querySelector('.note-body')); assert(!document.querySelector('.tab-bar'),'note has tabs'); assert(!window.__WL_WRITES__.length,'note wrote main storage'); await post('/note-result',{ok:true}); }
+  try { await until(()=>document.querySelector('.note-body')); assert(!document.querySelector('.tab-bar'),'note has tabs'); assert(!window.__AIS_WRITES__.length,'note wrote main storage'); await post('/note-result',{ok:true}); }
   catch(error){await post('/note-result',{ok:false,error:String(error)});}
 } else {
   const results=[];
@@ -27,9 +27,9 @@ if(location.pathname.startsWith('/note-window/')) {
   try {
     await until(()=>document.querySelector('[data-rail-section="nav"]'));
     await test('main-menu-terminal-and-close',async()=>{
-      await menu('wl_open_terminal');await until(()=>tab('term:main'));
-      await menu('wl_close_tab');await until(()=>!tab('term:main'));
-      await menu('wl_close_tab');assert(document.querySelector('.tab-main'),'main frame disappeared');
+      await menu('ais_open_terminal');await until(()=>tab('term:main'));
+      await menu('ais_close_tab');await until(()=>!tab('term:main'));
+      await menu('ais_close_tab');assert(document.querySelector('.tab-main'),'main frame disappeared');
     });
     await test('global-shortcuts-and-search',async()=>{
       go(doc(cfg.id));await until(()=>tab(cfg.id));go(doc(cfg.legacyId));await until(()=>tab(cfg.legacyId));
@@ -47,8 +47,8 @@ if(location.pathname.startsWith('/note-window/')) {
       await until(async()=> (await invoke('note_windows')).includes(cfg.id));
       let note;await until(async()=>{note=await(await fetch('/note-result')).json();return note;});assert(note.ok,note.error);
       const before=location.pathname;assert(tab(cfg.legacyId),'main tab missing before close');
-      await menu('wl_new_workspace','note-'+cfg.id);assert(location.pathname===before,'note accepted main-only menu');
-      await menu('wl_close_tab','note-'+cfg.id);
+      await menu('ais_new_workspace','note-'+cfg.id);assert(location.pathname===before,'note accepted main-only menu');
+      await menu('ais_close_tab','note-'+cfg.id);
       await until(async()=>!(await invoke('note_windows')).length,'close target note window');
       assert(tab(cfg.legacyId)&&location.pathname===before,'note Cmd+W also closed main tab');
     });
@@ -80,14 +80,14 @@ if(location.pathname.startsWith('/note-window/')) {
       await links([link(cfg.legacyId,before)]);await until(()=>location.pathname===doc(cfg.legacyId));
     });
     await test('new-workspace-keeps-vault-and-disables-tab-menus',async()=>{
-      const before=localStorage.getItem('aisurada.lastWorkspace.v1');await menu('wl_new_workspace');await until(()=>location.pathname+location.search==='/launcher?mode=create');
-      await menu('wl_open_terminal');await menu('wl_close_tab');assert(location.pathname==='/launcher','tab menu ran in launcher');
+      const before=localStorage.getItem('aisurada.lastWorkspace.v1');await menu('ais_new_workspace');await until(()=>location.pathname+location.search==='/launcher?mode=create');
+      await menu('ais_open_terminal');await menu('ais_close_tab');assert(location.pathname==='/launcher','tab menu ran in launcher');
       assert(localStorage.getItem('aisurada.lastWorkspace.v1')===before,'new-workspace menu cleared vault');
       press({key:'k',code:'KeyK'});assert(!document.querySelector('.cmdk-panel'),'launcher accepted Cmd+K');
       await links([link(cfg.legacyId,await invoke('vault_root'))]);await until(()=>location.pathname===doc(cfg.legacyId));
     });
     await test('welcome-and-external-file-without-vault',async()=>{
-      const root=await invoke('vault_root');await menu('wl_welcome');await until(()=>location.pathname==='/launcher'&&localStorage.getItem('aisurada.lastWorkspace.v1')==='null');
+      const root=await invoke('vault_root');await menu('ais_welcome');await until(()=>location.pathname==='/launcher'&&localStorage.getItem('aisurada.lastWorkspace.v1')==='null');
       assert(await invoke('vault_root')===root,'welcome changed host root');
       await links([file(cfg.external)]);await until(()=>document.querySelector('.notice')?.textContent.includes('워크스페이스가 필요'));
       assert(location.pathname==='/launcher'&&!document.querySelector('.ext-md'),'external file bypassed workspace gate');

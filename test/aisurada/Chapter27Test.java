@@ -7,7 +7,7 @@ import static aisurada.ChapterTestSupport.*;
 public final class Chapter27Test {
     public static void main(String[] args) throws Exception {
         try (var t = new ChapterTestSupport("chapter27")) {
-            Path v = t.vault(); root(v, "hand-renamed", 1, "2026-06-16", "", "# exact\r\n\r\nattach/x #sub:id <!--wlc:c-->\n");
+            Path v = t.vault(); root(v, "hand-renamed", 1, "2026-06-16", "", "# exact\r\n\r\nattach/x #sub:id <!--aisc:c-->\n");
             note(v, "notes/demo/old.md", "ndfixture-00000002", "demo", "2026-06-17", "", "no final newline");
             note(v, "notes/demo/html/note.html", "ndfixture-00000003", "demo", "2026-06-18", "", "<p>html</p>");
             note(v, "notes/demo/json/note.json", "ndfixture-00000004", "demo", "2026-06-19", "", "{}");
@@ -20,7 +20,7 @@ public final class Chapter27Test {
             eq(response.get("totalNotes"), 6, "reading roots only"); eq(response.get("exported"), 3, "three markdown writes");
             eq(response.get("skippedUnsafe"), 1, "unsafe path skipped"); eq(response.get("skippedHtml"), 1, "html skipped"); eq(response.get("skippedJson"), 1, "json skipped");
             Path dest = v.resolve(".aisurada/md-export");
-            eq(Files.readString(dest.resolve("demo/hand-renamed.md")), "# exact\r\n\r\nattach/x #sub:id <!--wlc:c-->\n", "exact body including engine references");
+            eq(Files.readString(dest.resolve("demo/hand-renamed.md")), "# exact\r\n\r\nattach/x #sub:id <!--aisc:c-->\n", "exact body including engine references");
             eq(Files.readString(dest.resolve("demo/old.md")), "no final newline", "single file body no added LF");
             eq(Files.size(dest.resolve("demo/folder.md")), 0, "folder extension compatibility produces empty file");
             check(!Files.exists(dest.resolve("stale.md")), "previous export removed");

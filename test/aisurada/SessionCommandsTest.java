@@ -1,6 +1,6 @@
 package aisurada;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.EngineExecutor;
 import aisurada.engine.EngineResult;
 import aisurada.session.SessionCommands;

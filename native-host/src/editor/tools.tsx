@@ -140,7 +140,7 @@ export function EditorTools(props: EditorProps) {
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '') : text;
           setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)) });
         } else if (!composeRef.current) setBar(null);
-        if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('wl:import') || tags.has('wl:repair') || tags.has('wl:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
+        if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('ais:import') || tags.has('ais:repair') || tags.has('ais:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
         if ($isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
           const before = node.getTextContent().slice(0, selected.anchor.offset);
           const pair = /(?:^|[^\[])\[\[$/.test(before);

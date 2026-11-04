@@ -1,6 +1,6 @@
 package aisurada.vault;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.write.IdGenerator;
@@ -36,7 +36,7 @@ public final class ProjectReader {
 
     /**
      * {@code .aisurada/projects/} 아래 {@code .md} 파일을 이름 차례로 읽어 프로젝트를 id마다 1개로 모읍니다.
-     * 폴더가 없거나 폴더가 아니면 빈 목록이다. 목록을 못 열면 WL-500이다.
+     * 폴더가 없거나 폴더가 아니면 빈 목록이다. 목록을 못 열면 AIS-500이다.
      * <p>
      * 행 고르기는 색인 표에 이름 차례로 넣는 것과 같다. 같은 id의 파일 2개는 뒤 파일이 행을 덮고,
      * 이미 다른 id가 쓰는 slug를 든 파일은 slug 유일 제약에 걸린 것처럼 건너뛴다. 아젠다와 달리
@@ -60,7 +60,7 @@ public final class ProjectReader {
                 }
             }
         } catch (IOException e) {
-            throw new WlException(500, "프로젝트 폴더를 읽지 못했다: " + projectsDir.toAbsolutePath().normalize());
+            throw new AisException(500, "프로젝트 폴더를 읽지 못했다: " + projectsDir.toAbsolutePath().normalize());
         }
         files.sort((a, b) -> Utf16.compare(a.getFileName().toString(), b.getFileName().toString()));
 

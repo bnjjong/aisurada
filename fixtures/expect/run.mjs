@@ -175,8 +175,8 @@ function readAdapter(file) {
   }
   const strings = a => Array.isArray(a) && a.every(x => typeof x === 'string');
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new RunnerError('어댑터가 JSON 객체가 아니다');
-  if (doc.format !== 'wlx-adapter' || doc.version !== 1 || doc.surface !== 'engine') {
-    throw new RunnerError('어댑터는 format wlx-adapter, version 1, surface engine 이어야 한다');
+  if (doc.format !== 'aisx-adapter' || doc.version !== 1 || doc.surface !== 'engine') {
+    throw new RunnerError('어댑터는 format aisx-adapter, version 1, surface engine 이어야 한다');
   }
   if ('name' in doc && typeof doc.name !== 'string') throw new RunnerError('어댑터의 name 은 문자열이어야 한다');
   if (!strings(doc.prefix) || doc.prefix.length === 0) throw new RunnerError('어댑터의 prefix 는 1칸 이상의 문자열 배열이어야 한다');
@@ -196,13 +196,13 @@ function substitute(cell, env) {
 // 11. 구현 부르기
 // ---------------------------------------------------------------------------
 
-/** 구현 환경은 처음부터 새로 짓는다. 부모 셸에서는 PATH와 WLX_IMPL_로 시작하는 변수만 넘어간다. */
+/** 구현 환경은 처음부터 새로 짓는다. 부모 셸에서는 PATH와 AISX_IMPL_로 시작하는 변수만 넘어간다. */
 function implEnv(dirs, extra = {}) {
   const env = {
-    AISURADA_VAULT: dirs.vault, HOME: dirs.home, TMPDIR: dirs.tmp, WLX_STATE_DIR: dirs.state,
+    AISURADA_VAULT: dirs.vault, HOME: dirs.home, TMPDIR: dirs.tmp, AISX_STATE_DIR: dirs.state,
     TZ: 'Asia/Seoul', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8', PATH: process.env.PATH ?? '/usr/bin:/bin'
   };
-  for (const [k, v] of Object.entries(process.env)) if (k.startsWith('WLX_IMPL_')) env[k] = v;
+  for (const [k, v] of Object.entries(process.env)) if (k.startsWith('AISX_IMPL_')) env[k] = v;
   return { ...env, ...extra };
 }
 
@@ -273,13 +273,13 @@ async function pool(items, jobs, worker) {
 // 판정(34.1의 표)
 // ---------------------------------------------------------------------------
 
-/** `WL-` 3자리 번호. 뒤에 숫자가 이어지면(WL-4044) 3자리 번호가 아니다. */
-const WL_CODE = /WL-\d{3}(?!\d)/;
+/** `AIS-` 3자리 번호. 뒤에 숫자가 이어지면(AIS-4044) 3자리 번호가 아니다. */
+const AIS_CODE = /AIS-\d{3}(?!\d)/;
 
-/** stderr에서 고른 1줄. WL- 번호가 든 첫 줄, 없으면 마지막 줄, 200자까지. */
+/** stderr에서 고른 1줄. AIS- 번호가 든 첫 줄, 없으면 마지막 줄, 200자까지. */
 function stderrLine(buf) {
   const lines = buf.toString('utf8').split('\n').filter(l => l !== '');
-  const line = lines.find(l => WL_CODE.test(l)) ?? lines[lines.length - 1] ?? '';
+  const line = lines.find(l => AIS_CODE.test(l)) ?? lines[lines.length - 1] ?? '';
   return line.slice(0, 200);
 }
 
@@ -296,9 +296,9 @@ function judge(expect, r, vars) {
     const got = r.code === null ? `신호 ${r.signal}` : String(r.code);
     return { check: 'code', detail: `종료 코드 기대 ${expect.code}, 실제 ${got}. stderr: ${stderrLine(r.stderr)}` };
   }
-  if ('wl' in expect) {
-    const m = WL_CODE.exec(r.stderr.toString('utf8'));
-    if (!m || m[0] !== expect.wl) return { check: 'wl', detail: `기대 ${expect.wl}, 실제 ${m ? m[0] : '(없음)'}` };
+  if ('ais' in expect) {
+    const m = AIS_CODE.exec(r.stderr.toString('utf8'));
+    if (!m || m[0] !== expect.ais) return { check: 'ais', detail: `기대 ${expect.ais}, 실제 ${m ? m[0] : '(없음)'}` };
   }
   let text;
   try {
@@ -522,7 +522,7 @@ async function selfCheck(opts, outDir, jobs) {
     fs.mkdirSync(mutantOut);
     const impl = {
       ...replay,
-      extraEnv: c => (c ? { WLX_SELFTEST_MUTANT: m.name, WLX_SELFTEST_TARGETS: ids.join('\n') } : {})
+      extraEnv: c => (c ? { AISX_SELFTEST_MUTANT: m.name, AISX_SELFTEST_TARGETS: ids.join('\n') } : {})
     };
     const { report } = await runAll(files, new Set(ids), mutantOut, impl, jobs, true);
     const caught = ids.filter(id => report.failures.some(f => f.id === id && m.checks.includes(f.check)));

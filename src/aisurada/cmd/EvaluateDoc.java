@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.vault.NoteIndex;
@@ -49,11 +49,11 @@ public final class EvaluateDoc {
         }
 
         if (rawId == null || Trim.isBlank(rawId)) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
 
         if (!NOTE_ID_PATTERN.matcher(rawId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawId);
         }
 
         String noteId = rawId;
@@ -77,7 +77,7 @@ public final class EvaluateDoc {
                     } else if ("false".equals(trimmed)) {
                         clear = false;
                     } else {
-                        throw new WlException(400, "clear 은 true 나 false 여야 한다: " + trimmed);
+                        throw new AisException(400, "clear 은 true 나 false 여야 한다: " + trimmed);
                     }
                 }
             }
@@ -88,34 +88,34 @@ public final class EvaluateDoc {
         if (!clear) {
             if (isTool) {
                 if (!parsed.toolOptions().containsKey("score")) {
-                    throw new WlException(400, "score 를 주거나 clear=true 를 지정한다: " + USAGE);
+                    throw new AisException(400, "score 를 주거나 clear=true 를 지정한다: " + USAGE);
                 }
                 Object sObj = parsed.toolOptions().get("score");
                 if (sObj instanceof Number num) {
                     parsedScore = num.doubleValue();
                 } else {
                     // 도구 표면에서 문자열이면 타입 검사(5.4)에서 이미 걸림
-                    throw new WlException(400, "score 는 숫자 여야 한다: " + sObj);
+                    throw new AisException(400, "score 는 숫자 여야 한다: " + sObj);
                 }
             } else {
                 if (!parsed.namedOptions().containsKey("score")) {
-                    throw new WlException(400, "score 를 주거나 clear=true 를 지정한다: " + USAGE);
+                    throw new AisException(400, "score 를 주거나 clear=true 를 지정한다: " + USAGE);
                 }
                 String sStr = parsed.namedOptions().get("score");
                 String trimmed = Trim.trim(sStr);
                 if (trimmed.isEmpty()) {
-                    throw new WlException(400, "score 를 주거나 clear=true 를 지정한다: " + USAGE);
+                    throw new AisException(400, "score 를 주거나 clear=true 를 지정한다: " + USAGE);
                 }
                 try {
                     parsedScore = Double.valueOf(trimmed);
                 } catch (NumberFormatException e) {
-                    throw new WlException(400, "score 은 숫자여야 한다: " + trimmed);
+                    throw new AisException(400, "score 은 숫자여야 한다: " + trimmed);
                 }
             }
 
             // 12. 범위 검사 (0 이상 100 이하)
             if (parsedScore.isNaN() || parsedScore < 0.0 || parsedScore > 100.0) {
-                throw new WlException(400, "평가 점수는 0 에서 100 사이여야 한다: " + parsedScore);
+                throw new AisException(400, "평가 점수는 0 에서 100 사이여야 한다: " + parsedScore);
             }
         }
 
@@ -154,7 +154,7 @@ public final class EvaluateDoc {
         // 16. 색인에서 노트 검색 (15.4 row 16)
         NoteScanner.NoteRecord note = noteIndex.notesById().get(noteId);
         if (note == null) {
-            throw new WlException(404, "Note not found: " + noteId);
+            throw new AisException(404, "Note not found: " + noteId);
         }
 
         // 새 평가 구성

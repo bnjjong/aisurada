@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.JsonWriter;
 import aisurada.vault.CommentsReader;
 import java.io.IOException;
@@ -33,7 +33,7 @@ public final class CommentsWriter {
         Path parent = file.toAbsolutePath().normalize().getParent();
         if (!Files.isDirectory(parent)) {
             try { Files.createDirectories(parent); }
-            catch (IOException e) { throw new WlException(500, "폴더를 만들지 못했다: " + parent); }
+            catch (IOException e) { throw new AisException(500, "폴더를 만들지 못했다: " + parent); }
         }
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("v", 1);
@@ -42,7 +42,7 @@ public final class CommentsWriter {
         catch (IOException e) { throw failed(file); }
     }
 
-    private static WlException failed(Path file) {
-        return new WlException(500, "파일을 쓰지 못했다: " + file.toAbsolutePath().normalize());
+    private static AisException failed(Path file) {
+        return new AisException(500, "파일을 쓰지 못했다: " + file.toAbsolutePath().normalize());
     }
 }

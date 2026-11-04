@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.vault.NoteScanner;
 import aisurada.vault.StrictUtf8;
 
@@ -25,7 +25,7 @@ public final class PreconditionChecker {
      * @param providedToken 호출자가 제공한 f1 토큰 (생략/공백이면 null)
      * @param writeSnippet 실패 문구에 들어갈 동작 조각 (예: "메타를 저장하지", "고치지")
      * @return 파일 전체 바이트
-     * @throws WlException WL-500(읽기 실패), WL-412(토큰 누락, 형식 불일치, 변경 충돌)
+     * @throws AisException AIS-500(읽기 실패), AIS-412(토큰 누락, 형식 불일치, 변경 충돌)
      */
     public static byte[] check(
             Path vaultRoot,
@@ -41,22 +41,22 @@ public final class PreconditionChecker {
         byte[] fileBytes;
         try {
             if (!Files.exists(contentPath) || !Files.isRegularFile(contentPath)) {
-                throw new WlException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
+                throw new AisException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
             }
             long size = Files.size(contentPath);
             if (size > 1_000_000) {
-                throw new WlException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
+                throw new AisException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
             }
             fileBytes = Files.readAllBytes(contentPath);
             try {
                 StrictUtf8.decodeStrict(fileBytes);
             } catch (Exception e) {
-                throw new WlException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
+                throw new AisException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
             }
-        } catch (WlException e) {
+        } catch (AisException e) {
             throw e;
         } catch (IOException e) {
-            throw new WlException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
+            throw new AisException(500, "노트 본문 파일을 못 읽어 " + writeSnippet + " 않았다: " + targetRelPath);
         }
 
         // 포맷 확인 (1.2, 7.2 면제 규칙)
@@ -67,20 +67,20 @@ public final class PreconditionChecker {
         // 7.2의 3번: 토큰이 없고, 본문 파일 이름이 json 포맷이 아님 (MISSING)
         if (providedToken == null || providedToken.isEmpty()) {
             if (!isJsonFormat) {
-                throw new WlException(412, buildMissingMessage(targetRelPath));
+                throw new AisException(412, buildMissingMessage(targetRelPath));
             }
             return fileBytes;
         }
 
         // 7.2의 4번: 토큰이 f1:로 시작하지 않음 (MALFORMED)
         if (!providedToken.startsWith("f1:")) {
-            throw new WlException(412, buildMalformedMessage(targetRelPath));
+            throw new AisException(412, buildMalformedMessage(targetRelPath));
         }
 
         // 7.2의 5번: 읽은 바이트로 계산한 토큰과 글자 그대로 다름 (STALE)
         String currentToken = DocToken.compute(fileBytes);
         if (!providedToken.equals(currentToken)) {
-            throw new WlException(412, buildStaleMessage(targetRelPath));
+            throw new AisException(412, buildStaleMessage(targetRelPath));
         }
 
         return fileBytes;

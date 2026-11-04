@@ -119,7 +119,7 @@ export function TableTools(props: EditorProps) {
       const keys: string[] = [];
       editor.read(() => { const find = (node: LexicalNode) => { if ($isTableNode(node) && !scaled.current.has(node.getKey())) keys.push(node.getKey()); if ($isElementNode(node)) node.getChildren().forEach(find); }; find($getRoot()); });
       if (!keys.length) return;
-      editor.update(() => { $addUpdateTag('wl:repair');
+      editor.update(() => { $addUpdateTag('ais:repair');
       const walk = (node: LexicalNode) => {
         if ($isTableNode(node) && !scaled.current.has(node.getKey())) {
           scaled.current.add(node.getKey()); const widths = node.getColWidths();

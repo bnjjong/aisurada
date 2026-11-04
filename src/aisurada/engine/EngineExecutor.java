@@ -2,7 +2,7 @@ package aisurada.engine;
 
 import aisurada.args.ArgsParser;
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.cmd.*;
 import aisurada.out.JsonWriter;
 import aisurada.vault.NoteIndex;
@@ -20,7 +20,7 @@ import java.util.*;
 public final class EngineExecutor {
 
     public static final String NO_PART4_MESSAGE =
-            "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
+            "AIS-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 ais-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
 
     /** 빌드가 jar에 싣는 스위치 자원. 4부를 켠 jar는 part4=true, 4부를 뺀 jar는 part4=false다. */
     private static final String BUILD_FLAGS_RESOURCE = "/aisurada/engine-build.properties";
@@ -62,7 +62,7 @@ public final class EngineExecutor {
         String sessionId = null;
         if (argv.size() >= 2) {
             int secondFromLast = argv.size() - 2;
-            if ("\u0000wl-session-id".equals(argv.get(secondFromLast))) {
+            if ("\u0000ais-session-id".equals(argv.get(secondFromLast))) {
                 sessionId = argv.get(secondFromLast + 1);
                 argv.remove(secondFromLast + 1);
                 argv.remove(secondFromLast);
@@ -93,8 +93,8 @@ public final class EngineExecutor {
 
         boolean isPart4 = CommandRegistry.isPart4Command(firstArg);
         if (!isPart4 && !CommandRegistry.isSupported(firstArg)) {
-            byte[] err = ("WL-409 이 판에는 " + firstArg + "이 없다\n").getBytes(StandardCharsets.UTF_8);
-            return EngineResult.wlError(3, 409, err);
+            byte[] err = ("AIS-409 이 판에는 " + firstArg + "이 없다\n").getBytes(StandardCharsets.UTF_8);
+            return EngineResult.aisError(3, 409, err);
         }
 
         List<String> commandArgs = argv.subList(1, argv.size());
@@ -107,7 +107,7 @@ public final class EngineExecutor {
                 if (isPart4 && !isPart4Enabled()) {
                     // 5. 4부가 없음 (32.2)
                     byte[] err = NO_PART4_MESSAGE.getBytes(StandardCharsets.UTF_8);
-                    return EngineResult.wlError(3, 409, err);
+                    return EngineResult.aisError(3, 409, err);
                 }
 
                 Object response;
@@ -239,9 +239,9 @@ public final class EngineExecutor {
                 return new EngineResult(0, 0, stdoutBytes, diagnostics.text().getBytes(StandardCharsets.UTF_8));
             }
 
-        } catch (WlException e) {
-            byte[] err = (diagnostics.text() + e.toWlLine() + "\n").getBytes(StandardCharsets.UTF_8);
-            return EngineResult.wlError(e.getExitCode(), e.getWlCode(), err);
+        } catch (AisException e) {
+            byte[] err = (diagnostics.text() + e.toAisLine() + "\n").getBytes(StandardCharsets.UTF_8);
+            return EngineResult.aisError(e.getExitCode(), e.getAisCode(), err);
         } catch (Throwable t) {
             if (isServeMode) {
                 // 설명서 4.3: 상태 3, 오류 코드 0, stdout 0바이트, stderr 1줄

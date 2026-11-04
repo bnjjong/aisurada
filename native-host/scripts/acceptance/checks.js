@@ -44,7 +44,7 @@ async function frame(path, expect) {
     const f = document.createElement("iframe");
     f.sandbox = "allow-scripts";
     f.src =
-      "wlframe://localhost" + path.split("/").map(encodeURIComponent).join("/");
+      "aisframe://localhost" + path.split("/").map(encodeURIComponent).join("/");
     let timer = setTimeout(
       () => {
         removeEventListener("message", listener);
@@ -56,15 +56,15 @@ async function frame(path, expect) {
     function listener(e) {
       if (
         e.source !== f.contentWindow ||
-        typeof e.data?.wlframeHeight !== "number"
+        typeof e.data?.aisframeHeight !== "number"
       )
         return;
       clearTimeout(timer);
       removeEventListener("message", listener);
       f.remove();
-      expect && e.data.wlframeHeight === 321
+      expect && e.data.aisframeHeight === 321
         ? resolve()
-        : reject(Error("unexpected frame height " + e.data.wlframeHeight));
+        : reject(Error("unexpected frame height " + e.data.aisframeHeight));
     }
     addEventListener("message", listener);
     document.body.append(f);
@@ -77,9 +77,9 @@ function test(id, fn) {
 let self = [],
   windows = [],
   navigations = [];
-await listen("wl://self-write", (e) => self.push(e.payload));
-await listen("wl://note-windows", (e) => windows.push(e.payload));
-await listen("wl://navigate", (e) => navigations.push(e.payload));
+await listen("ais://self-write", (e) => self.push(e.payload));
+await listen("ais://note-windows", (e) => windows.push(e.payload));
+await listen("ais://navigate", (e) => navigations.push(e.payload));
 if (location.pathname.startsWith("/note-window/")) {
   const id = location.pathname.split("/").pop();
   await until(
@@ -161,8 +161,8 @@ if (location.pathname.startsWith("/note-window/")) {
     const data = Uint8Array.from(atob(cfg.png), (c) => c.charCodeAt(0));
     const path = await invoke("write_attachment_bytes", data, {
       headers: {
-        "x-wl-note-dir": encodeURIComponent(cfg.noteDir),
-        "x-wl-name": "part2-check.png",
+        "x-ais-note-dir": encodeURIComponent(cfg.noteDir),
+        "x-ais-name": "part2-check.png",
       },
     });
     const img = await image(cfg.vault + "/" + path);
@@ -170,21 +170,21 @@ if (location.pathname.startsWith("/note-window/")) {
     for (const name of ["x.txt", "../x.png"])
       await refused("write_attachment_bytes", data, {
         headers: {
-          "x-wl-note-dir": encodeURIComponent(cfg.noteDir),
-          "x-wl-name": encodeURIComponent(name),
+          "x-ais-note-dir": encodeURIComponent(cfg.noteDir),
+          "x-ais-name": encodeURIComponent(name),
         },
       });
     await refused("write_attachment_bytes", data, {
       headers: {
-        "x-wl-note-dir": encodeURIComponent(cfg.root),
-        "x-wl-name": "x.png",
+        "x-ais-note-dir": encodeURIComponent(cfg.root),
+        "x-ais-name": "x.png",
       },
     });
     try {
       await invoke("write_attachment_bytes", new Uint8Array(5000001), {
         headers: {
-          "x-wl-note-dir": encodeURIComponent(cfg.noteDir),
-          "x-wl-name": "x.png",
+          "x-ais-note-dir": encodeURIComponent(cfg.noteDir),
+          "x-ais-name": "x.png",
         },
       });
     } catch {
@@ -246,7 +246,7 @@ if (location.pathname.startsWith("/note-window/")) {
       assert(String(e).includes("image refused"));
     }
   });
-  test("wlframe", async () => {
+  test("aisframe", async () => {
     await frame(cfg.frame, true);
     await frame(cfg.outsideFrame, false);
   });
@@ -268,7 +268,7 @@ if (location.pathname.startsWith("/note-window/")) {
     ));
   test("engine-part4", async () => {
     const r = await invoke("sidecar_call", { argv: ["get-ask", cfg.id] });
-    assert(r.status === 3 && r.stderr.includes("WL-409"));
+    assert(r.status === 3 && r.stderr.includes("AIS-409"));
     for (const name of [
       "ask_claude",
       "ask_runtime",

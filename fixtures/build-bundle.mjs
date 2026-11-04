@@ -35,7 +35,7 @@ for (const f of readLaneFiles(BUNDLE, laneNames(BUNDLE))) {
   counts[`lanes/${f.lane}/${f.name}`] = f.cases.length;
 }
 const manifest = {
-  format: 'wlx-bundle',
+  format: 'aisx-bundle',
   version: 1,
   node: '>=20',
   note: old.note ?? '',

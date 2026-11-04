@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.NoteRow;
 import aisurada.text.Trim;
 import aisurada.vault.AttachText;
@@ -33,7 +33,7 @@ public final class ListSubNotes {
 
         // 1. 첫 자리 인자 공백 검사 (16.3 1번). 「부모 노트 참조가 비었다」는 조각이 0개일 때(2번)만이다
         if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
 
         String rawParent = pos.get(0);
@@ -50,13 +50,13 @@ public final class ListSubNotes {
 
         if (segments.isEmpty()) {
             String origin = parsed.rawParentSubNote() != null ? parsed.rawParentSubNote() : rawParent;
-            throw new WlException(400, "부모 노트 참조가 비었다: " + origin);
+            throw new AisException(400, "부모 노트 참조가 비었다: " + origin);
         }
 
         // 3. 첫 조각은 노트 id 모양
         String rootId = segments.get(0);
         if (!NOTE_ID_PATTERN.matcher(rootId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rootId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rootId);
         }
 
         NoteScanner.NoteRecord rootNote = noteIndex.notesById().get(rootId);
@@ -66,14 +66,14 @@ public final class ListSubNotes {
         for (int i = 1; i < segments.size(); i++) {
             String seg = segments.get(i);
             if (!SUB_NOTE_ID_PATTERN.matcher(seg).matches()) {
-                throw new WlException(400, "하위 노트 id 모양이 아니다: " + seg);
+                throw new AisException(400, "하위 노트 id 모양이 아니다: " + seg);
             }
             if (rootNote == null || !rootNote.subNotes().containsKey(seg)) {
-                throw new WlException(404, "SubNote not found: " + rootId + "/" + seg);
+                throw new AisException(404, "SubNote not found: " + rootId + "/" + seg);
             }
             NoteScanner.NoteRecord sub = rootNote.subNotes().get(seg);
             if (!prevId.equals(sub.directParentId())) {
-                throw new WlException(404, "SubNote not found: " + seg);
+                throw new AisException(404, "SubNote not found: " + seg);
             }
             prevId = seg;
         }
@@ -81,19 +81,19 @@ public final class ListSubNotes {
         // 5. 도구 표면이면 메인 노트 색인 조회 및 층 검사 (16.3 4번)
         if (parsed.isToolSurface()) {
             if (rootNote == null) {
-                throw new WlException(404, "Note not found: " + rootId);
+                throw new AisException(404, "Note not found: " + rootId);
             }
             // 16.5, 16.9의 7번: 메인 노트를 찾을 때 HTML 첨부까지 읽는다(입출력 오류면 예상 밖 실패)
             AttachText.extract(vaultRoot, rootNote);
             if ("record".equals(rootNote.meta().tier())) {
-                throw new WlException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rootId +
+                throw new AisException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rootId +
                         ". 기계가 남긴 기록 노트는 앱에서만 열립니다.");
             }
         } else {
             // 명령 표면이고 컨테이너가 메인 노트인 경우 메인 노트 색인 검사 (16.3 5번)
             if (segments.size() == 1) {
                 if (rootNote == null) {
-                    throw new WlException(404, "Note not found: " + rootId);
+                    throw new AisException(404, "Note not found: " + rootId);
                 }
                 // 16.9의 7번: 명령 표면은 컨테이너가 메인 노트일 때만 메인 노트를 찾는다
                 AttachText.extract(vaultRoot, rootNote);
@@ -110,7 +110,7 @@ public final class ListSubNotes {
             } else if ("false".equals(trimmedBodies) || trimmedBodies.isEmpty()) {
                 includeBodies = false;
             } else {
-                throw new WlException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
+                throw new AisException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
             }
         }
 

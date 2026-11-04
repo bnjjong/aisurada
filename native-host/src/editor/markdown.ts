@@ -31,11 +31,11 @@ import { foldParagraphs, closeBlockEmphasis, doubleListIndent, fenceTracker, map
 export const EDITOR_NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, CodeHighlightNode,
   TableNode, TableRowNode, TableCellNode, MarkNode, AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
   { replace: LinkNode, with: (node: LinkNode) => new RelativeLinkNode(node.getURL(), { rel: node.getRel(), target: node.getTarget(), title: node.getTitle() }), withKlass: RelativeLinkNode }];
-export const pendingState = createState('wlPending', { parse: value => value === '/' || value === '-' ? value : '' });
-const dividerState = createState('wlDivider', { parse: value => value === true });
+export const pendingState = createState('aisPending', { parse: value => value === '/' || value === '-' ? value : '' });
+const dividerState = createState('aisDivider', { parse: value => value === true });
 
-const fenceState = createState('wlFence', { parse: value => typeof value === 'string' && /^`{3,}$/.test(value) ? value : '```' });
-const tailState = createState('wlFenceTail', { parse: value => typeof value === 'string' ? value : '' });
+const fenceState = createState('aisFence', { parse: value => typeof value === 'string' && /^`{3,}$/.test(value) ? value : '```' });
+const tailState = createState('aisFenceTail', { parse: value => typeof value === 'string' ? value : '' });
 // C74: the language is the info string's first word when it has the reading view's
 // language shape (1-30 of [A-Za-z0-9+#._-]), otherwise the [\w-] run as before. The
 // rest stays on the fence line; spaces between the backticks and the language do not.
@@ -69,7 +69,7 @@ const CODE_BLOCK: MultilineElementTransformer = {
   },
   export: node => {
     if (!$isCodeNode(node)) return null;
-    const raw = (item: LexicalNode): string => $isAnnotation(item) ? `<!--wl${item.getKind()}:${item.getIDs()[0]}-->${item.getChildren().map(raw).join('')}<!--/wl${item.getKind()}:${item.getIDs()[0]}-->`
+    const raw = (item: LexicalNode): string => $isAnnotation(item) ? `<!--ais${item.getKind()}:${item.getIDs()[0]}-->${item.getChildren().map(raw).join('')}<!--/ais${item.getKind()}:${item.getIDs()[0]}-->`
       : $isElementNode(item) ? item.getChildren().map(raw).join('') : item.getTextContent();
     const body = node.getChildren().map(raw).join(''), runs = body.match(/`{3,}/g);
     let fence = $getState(node, fenceState);
@@ -226,7 +226,7 @@ const CHIP_RUN: TextMatchTransformer = {
 const ANNOTATION: TextMatchTransformer = {
   type: 'text-match', dependencies: [AnnotationNode], regExp: /$^/,
   export: (node, children) => $isAnnotation(node) && node.getIDs()[0]
-    ? `<!--wl${node.getKind()}:${node.getIDs()[0]}-->${children(node)}<!--/wl${node.getKind()}:${node.getIDs()[0]}-->` : null,
+    ? `<!--ais${node.getKind()}:${node.getIDs()[0]}-->${children(node)}<!--/ais${node.getKind()}:${node.getIDs()[0]}-->` : null,
 };
 const CARD: ElementTransformer = {
   type: 'element', dependencies: [ReferenceNode], regExp: /^\[([^\]\ue000]+)\]\(#sub:([^\s)]+)\)$/,
@@ -357,7 +357,7 @@ function $wrapPlaceholders(root: ElementNode, pairs: ReturnType<typeof markerPla
   }
 }
 export function $importDocument(markdown: string) {
-  $addUpdateTag('wl:import');
+  $addUpdateTag('ais:import');
   const anchors = markerPlaceholders(markdown), root = $getRoot();
   importInto(anchors.text, root, false, true);
   if (anchors.marked) $wrapPlaceholders(root, anchors.pairs);

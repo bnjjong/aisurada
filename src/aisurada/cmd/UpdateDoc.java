@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.vault.Frontmatter;
@@ -63,10 +63,10 @@ public final class UpdateDoc {
         String rawId = isTool ? (String) toolOpts.get("id")
                 : (parsed.positionalArgs().isEmpty() ? null : parsed.positionalArgs().get(0));
         if (rawId == null || Trim.isBlank(rawId)) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
         if (!NOTE_ID_PATTERN.matcher(rawId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawId);
         }
         String noteId = rawId;
 
@@ -88,10 +88,10 @@ public final class UpdateDoc {
 
         String givenTitle = isTool ? (String) toolOpts.get("title") : opts.get("title");
         if (givenTitle != null && Trim.isBlank(givenTitle)) {
-            throw new WlException(400, "노트 제목이 비었다: " + noteId);
+            throw new AisException(400, "노트 제목이 비었다: " + noteId);
         }
         if (givenMins != null && givenMins < 0) {
-            throw new WlException(400, "노트 소요 시간이 음수다: " + givenMins);
+            throw new AisException(400, "노트 소요 시간이 음수다: " + givenMins);
         }
 
         String givenBody = isTool ? (String) toolOpts.get("body") : opts.get("body");
@@ -105,10 +105,10 @@ public final class UpdateDoc {
         // 8. 색인에서 노트를 찾는다 (14.4의 12번)
         NoteScanner.NoteRecord note = noteIndex.notesById().get(noteId);
         if (note == null) {
-            throw new WlException(404, "Note not found: " + noteId);
+            throw new AisException(404, "Note not found: " + noteId);
         }
         if (note.vaultRelPath() == null || note.contentFilePath() == null) {
-            throw new WlException(409, "저장 위치를 모르는 노트라 고칠 수 없다: " + noteId);
+            throw new AisException(409, "저장 위치를 모르는 노트라 고칠 수 없다: " + noteId);
         }
 
         // 14.5의 2번: 준 칸만 갈아 낀 다음 값. 못 고치는 값은 색인의 값이 따라온다
@@ -144,7 +144,7 @@ public final class UpdateDoc {
 
         // 14.5의 3번: json 노트에 본문을 주면 파일을 읽기 전에 선다
         if ("json".equals(format) && givenBody != null) {
-            throw new WlException(500, "Lexical JSON 노트의 본문은 고칠 수 없다(마크다운을 editorState 로 바꾸는 일이라 사이드카에 없다): " + noteId);
+            throw new AisException(500, "Lexical JSON 노트의 본문은 고칠 수 없다(마크다운을 editorState 로 바꾸는 일이라 사이드카에 없다): " + noteId);
         }
 
         // 14.5의 4번, 5번: 본문 파일을 읽고 토큰을 맞댄다
@@ -156,15 +156,15 @@ public final class UpdateDoc {
         try {
             content = StrictUtf8.decodeStrict(fileBytes);
         } catch (Exception e) {
-            throw new WlException(500, "노트 본문 파일을 못 읽어 고치지 않았다: " + contentRel);
+            throw new AisException(500, "노트 본문 파일을 못 읽어 고치지 않았다: " + contentRel);
         }
         MetaWriter.FileParts parts = MetaWriter.split(content);
         if (!parts.fenceFound() || parts.yamlPart() == null || parts.yamlPart().length() > 16_000) {
-            throw new WlException(500, "프론트매터가 없어 고치지 않았다: " + contentRel);
+            throw new AisException(500, "프론트매터가 없어 고치지 않았다: " + contentRel);
         }
         Map<String, Object> rawYamlMap = Frontmatter.parse(parts.yamlPart());
         if (rawYamlMap == null) {
-            throw new WlException(500, "프론트매터가 없어 고치지 않았다: " + contentRel);
+            throw new AisException(500, "프론트매터가 없어 고치지 않았다: " + contentRel);
         }
         String oldBody = parts.body();
 
@@ -270,7 +270,7 @@ public final class UpdateDoc {
     /** 14.4의 21번: 경로로 못 짓는 이름과 vault 밖을 가리키는 아젠다 글자(7.4의 경로 검사). */
     private static void checkPath(Path vaultRoot, String rel) {
         if (PathConfinement.hasUnusablePathCharacters(rel)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + rel);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + rel);
         }
         PathConfinement.checkConfinement(vaultRoot, vaultRoot.resolve(rel));
     }
@@ -278,7 +278,7 @@ public final class UpdateDoc {
     /** 14.4의 24번: 파일 전체가 1,000,000 UTF-16 코드 단위를 넘으면 안 쓴다(7.4의 크기 상한). */
     private static void checkSize(String fileText, String rel) {
         if (fileText.length() > 1_000_000) {
-            throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + rel);
+            throw new AisException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + rel);
         }
     }
 

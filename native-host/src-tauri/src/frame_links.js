@@ -5,6 +5,6 @@ document.addEventListener('click', function (event) {
   const url = (anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '').trim();
   if (/^(https?:|mailto:|tel:)/i.test(url)) {
     event.preventDefault();
-    parent.postMessage({wlframeOpen: url}, '*');
+    parent.postMessage({aisframeOpen: url}, '*');
   }
 });

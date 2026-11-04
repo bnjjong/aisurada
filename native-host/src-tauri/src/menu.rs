@@ -26,14 +26,14 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
         &[
             &MenuItem::with_id(
                 app,
-                "wl_new_workspace",
+                "ais_new_workspace",
                 "새 워크스페이스…",
                 true,
                 Some("CmdOrCtrl+Shift+N"),
             )?,
             &MenuItem::with_id(
                 app,
-                "wl_open_workspace",
+                "ais_open_workspace",
                 "워크스페이스 열기…",
                 true,
                 Some("CmdOrCtrl+O"),
@@ -41,7 +41,7 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
             &P::separator(app)?,
             &MenuItem::with_id(
                 app,
-                "wl_welcome",
+                "ais_welcome",
                 "시작 화면으로 돌아가기",
                 true,
                 None::<&str>,
@@ -49,12 +49,12 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
             &P::separator(app)?,
             &MenuItem::with_id(
                 app,
-                "wl_open_terminal",
+                "ais_open_terminal",
                 "터미널 열기",
                 true,
                 Some("CmdOrCtrl+Shift+T"),
             )?,
-            &MenuItem::with_id(app, "wl_close_tab", "탭 닫기", true, Some("CmdOrCtrl+W"))?,
+            &MenuItem::with_id(app, "ais_close_tab", "탭 닫기", true, Some("CmdOrCtrl+W"))?,
         ],
     )?;
     let edit = Submenu::with_items(
@@ -86,14 +86,14 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
 
 pub fn clicked(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
     let id = event.id().as_ref();
-    if !id.starts_with("wl_") {
+    if !id.starts_with("ais_") {
         return;
     }
     let focused = app
         .webview_windows()
         .into_values()
         .find(|w| w.is_focused().unwrap_or(false));
-    if id == "wl_close_tab" {
+    if id == "ais_close_tab" {
         if let Some(window) = focused {
             let _ = crate::ipc::emit_window(app, window.label(), crate::ipc::MENU, id);
         }

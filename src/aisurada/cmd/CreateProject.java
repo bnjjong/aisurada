@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.out.ProjectRow;
 import aisurada.text.Trim;
@@ -46,7 +46,7 @@ public final class CreateProject {
         Map<String, String> opts = parsed.namedOptions();
         String title = Trim.trim(opts.get("title"));
         if (title.isEmpty()) {
-            throw new WlException(400, "title 이 필요하다");
+            throw new AisException(400, "title 이 필요하다");
         }
         String hue = AgendaArgs.hue(opts.get("hue"));
         String summary = opts.getOrDefault("summary", "");
@@ -66,7 +66,7 @@ public final class CreateProject {
         }
         String slug = AgendaFile.pickFreeSlug(SlugBuilder.build(title, 50), taken);
         if (slug == null) {
-            throw new WlException(400, "같은 이름의 프로젝트가 " + AgendaFile.MAX_SLUG_SUFFIX +
+            throw new AisException(400, "같은 이름의 프로젝트가 " + AgendaFile.MAX_SLUG_SUFFIX +
                     " 개까지 차 있어 새로 만들 수 없다: " + title);
         }
         if (hue == null) {
@@ -76,7 +76,7 @@ public final class CreateProject {
         // 8. 파일 쓰기. 50단위 자르기가 서로게이트 쌍을 가른 slug는 경로를 못 지어 아무것도 안 쓴다(21.9의 8번)
         String fileName = slug + ".md";
         if (PathConfinement.hasUnusablePathCharacters(fileName)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + fileName);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + fileName);
         }
         AtomicWriter.writeAtomic(vaultRoot.resolve(ProjectFile.relPath(slug)),
                 ProjectFile.render(id, slug, title, hue, summary));

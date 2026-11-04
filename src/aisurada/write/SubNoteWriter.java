@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Utf16;
 import aisurada.vault.Frontmatter;
 import aisurada.vault.NoteScanner;
@@ -108,12 +108,12 @@ public final class SubNoteWriter {
         String canonicalRel = currentRel.substring(0, currentRel.lastIndexOf('/') + 1)
                 + folderName(sub.meta().created(), title, sub.id());
         if (PathConfinement.hasUnusablePathCharacters(canonicalRel)) {
-            throw new WlException(400, "경로로 쓸 수 없는 값이다: " + canonicalRel);
+            throw new AisException(400, "경로로 쓸 수 없는 값이다: " + canonicalRel);
         }
         PathConfinement.checkConfinement(vaultRoot, vaultRoot.resolve(canonicalRel));
         String finalRel = NoteMover.placeFolder(vaultRoot, currentRel, canonicalRel);
         if (fileText.length() > 1_000_000) {
-            throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + finalRel);
+            throw new AisException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + finalRel);
         }
         byte[] bytes = Utf16.toUtf8BytesWithQuestionForUnpaired(fileText);
         Path target = vaultRoot.resolve(finalRel).resolve(sub.contentFilePath().getFileName().toString());
@@ -128,11 +128,11 @@ public final class SubNoteWriter {
      */
     public static void requireMarkdownFolder(NoteScanner.NoteRecord sub) {
         if (!"markdown".equals(sub.format())) {
-            throw new WlException(500, "markdown 이 아닌 하위 노트는 저장하지 않는다(포맷="
+            throw new AisException(500, "markdown 이 아닌 하위 노트는 저장하지 않는다(포맷="
                     + sub.format().toUpperCase(Locale.ROOT) + "): " + sub.id());
         }
         if (sub.isSingleFile()) {
-            throw new WlException(500, SINGLE_FILE_MESSAGE + sub.vaultRelPath());
+            throw new AisException(500, SINGLE_FILE_MESSAGE + sub.vaultRelPath());
         }
     }
 }

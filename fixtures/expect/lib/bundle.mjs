@@ -96,7 +96,7 @@ export function readLaneFiles(root, lanes) {
         throw new RunnerError(`${where}: JSON 이 아니다 (${e.message})`);
       }
       if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new RunnerError(`${where}: JSON 객체가 아니다`);
-      if (doc.format !== 'wlx-cases' || doc.version !== 1) throw new RunnerError(`${where}: format 이 wlx-cases 이고 version 이 1 이어야 한다`);
+      if (doc.format !== 'aisx-cases' || doc.version !== 1) throw new RunnerError(`${where}: format 이 aisx-cases 이고 version 이 1 이어야 한다`);
       if ('lane' in doc && doc.lane !== lane) throw new RunnerError(`${where}: lane 이 폴더 이름과 다르다: ${JSON.stringify(doc.lane)}`);
       const tree = readTree(root, doc.tree, where);
       const home = 'home' in doc ? readTree(root, doc.home, where) : null;
@@ -128,7 +128,7 @@ function checkCase(c, where, ids) {
   if (kinds.length !== 1) throw new RunnerError(`${where} (${c.id}): stdoutJson, stdoutText, stdout 가운데 정확히 1개가 있어야 한다`);
   if ('stdoutText' in e && typeof e.stdoutText !== 'string') throw new RunnerError(`${where} (${c.id}): stdoutText 는 글자여야 한다`);
   if ('stdout' in e && typeof e.stdout !== 'string') throw new RunnerError(`${where} (${c.id}): stdout 은 글자여야 한다`);
-  if ('wl' in e && !(typeof e.wl === 'string' && /^WL-\d{3}$/.test(e.wl))) throw new RunnerError(`${where} (${c.id}): wl 은 "WL-409" 같은 글자여야 한다`);
+  if ('ais' in e && !(typeof e.ais === 'string' && /^AIS-\d{3}$/.test(e.ais))) throw new RunnerError(`${where} (${c.id}): ais 은 "AIS-409" 같은 글자여야 한다`);
   checkExpectation(e, `${where} (${c.id})`);
   return { id: c.id, part: c.part, argv: c.argv, expect: e };
 }

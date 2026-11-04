@@ -40,21 +40,21 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 | `update_sub_note` | 하위 노트의 제목, 본문, 태그(명령 표면만)를 고치고 다시 계산한 폴더 이름으로 같은 `sub/` 안에서 폴더째 옮긴다. 본문만 주면 첫 헤딩이 제목이 된다 |
 | `delete_sub_note` | 직계 컨테이너 본문에서 그 하위 노트의 카드 줄을 걷고 하위 노트 폴더를 휴지통 없이 통째로 지운다. 카드를 걷었으면 컨테이너의 앞뒤 토큰을 함께 답한다 |
 
-도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.aisurada/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `WL-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `WL-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`는 노트의 git 판과 옛 스냅숏을 합쳐 조회하고, `commit-vault`는 현재 변경의 커밋 결과를 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 기본 jar에서 실행됩니다. `wl-sidecar-noclaude.jar`는 4부 클래스를 싣지 않으며 이름 인자와 자리 인자 검사를 거친 뒤 `WL-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. 런타임 속성과 환경 변수는 이 빌드 경계를 바꾸지 못합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `aisurada.test.now`(시계. 도장과 평가 시각도 따른다)와 `aisurada.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
+도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.aisurada/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `AIS-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `AIS-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`는 노트의 git 판과 옛 스냅숏을 합쳐 조회하고, `commit-vault`는 현재 변경의 커밋 결과를 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 기본 jar에서 실행됩니다. `ais-sidecar-noclaude.jar`는 4부 클래스를 싣지 않으며 이름 인자와 자리 인자 검사를 거친 뒤 `AIS-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. 런타임 속성과 환경 변수는 이 빌드 경계를 바꾸지 못합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `aisurada.test.now`(시계. 도장과 평가 시각도 따른다)와 `aisurada.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
 
 ## 19장 코멘트
 
 코멘트 읽기 `list_comments`(도구) / `list-comments`(명령)와 명령 전용 쓰기 `create-comment`, `update-comment`, `delete-comment`를 지원합니다. 위 18장까지의 기본 명령 목록에 추가된 범위입니다.
 
 ```bash
-java -jar dist/wl-engine.jar list_comments '{"parent":"nddemo-00000001"}' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar list-comments nddemo-00000001 sndemo-00000001 --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar create-comment nddemo-00000001 'body=확인했습니다' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar update-comment nddemo-00000001 'comment_id=<코멘트id>' 'body=고친 글' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘트id>' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list_comments '{"parent":"nddemo-00000001"}' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list-comments nddemo-00000001 sndemo-00000001 --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar create-comment nddemo-00000001 'body=확인했습니다' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar update-comment nddemo-00000001 'comment_id=<코멘트id>' 'body=고친 글' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘트id>' --aisurada.vault=/path/to/vault
 ```
 
-목록은 `absent`, `loaded`, `unreadable` 봉투를 구별합니다. 하위 노트 코멘트는 직계 컨테이너의 `sub-comments/<하위 id>.json`에서 읽고 씁니다. 쓰기 3개는 못 읽은 파일을 덮지 않고 WL-409로 서며, f1을 받지 않습니다. 삭제는 코멘트가 달린 본문 마커를 먼저 걷고 코멘트 항목을 지웁니다. 본문이 바뀌었으면 앞뒤 토큰을 답하고, JSON/HTML 본문은 마커가 없어도 거절합니다.
+목록은 `absent`, `loaded`, `unreadable` 봉투를 구별합니다. 하위 노트 코멘트는 직계 컨테이너의 `sub-comments/<하위 id>.json`에서 읽고 씁니다. 쓰기 3개는 못 읽은 파일을 덮지 않고 AIS-409로 서며, f1을 받지 않습니다. 삭제는 코멘트가 달린 본문 마커를 먼저 걷고 코멘트 항목을 지웁니다. 본문이 바뀌었으면 앞뒤 토큰을 답하고, JSON/HTML 본문은 마커가 없어도 거절합니다.
 
 코멘트 파일은 전체를 다시 쓰고 링크는 따라 씁니다. 짝 없는 서로게이트는 파일에서 소문자 탈출로 보존하고 stdout에서는 `?`로 냅니다. 쓰기 크기 상한 부재와 읽기에서 탈락한 항목의 다음 쓰기 소실 등 19.9의 미결정 호환 동작은 유지합니다.
 
@@ -67,10 +67,10 @@ java -jar dist/wl-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘�
 아젠다를 읽고 만들고 고치고 지우는 명령 4개 `list-agendas`, `create-agenda`, `update-agenda`, `delete-agenda`를 지원합니다. 명령 표면(하이픈 이름)에만 있고, `list_agendas` 같은 밑줄 이름은 모르는 명령(종료 코드 2)입니다.
 
 ```bash
-java -jar dist/wl-engine.jar list-agendas --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar create-agenda 'title=광고 플랫폼' 'summary=광고 지표와 입찰을 다룬다.' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar update-agenda <아젠다 id> 'title=새 이름' 'repo=' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar delete-agenda <아젠다 id> --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list-agendas --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar create-agenda 'title=광고 플랫폼' 'summary=광고 지표와 입찰을 다룬다.' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar update-agenda <아젠다 id> 'title=새 이름' 'repo=' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar delete-agenda <아젠다 id> --aisurada.vault=/path/to/vault
 ```
 
 - `list-agendas`는 읽기라 워크스페이스 표식이 없어도 답하고, slug 차례로 냅니다. `repo`와 `project`는 값이 없으면 키째 뺍니다.
@@ -86,10 +86,10 @@ java -jar dist/wl-engine.jar delete-agenda <아젠다 id> --aisurada.vault=/path
 아젠다를 묶는 프로젝트를 읽고 만들고 고치고 지우는 명령 4개 `list-projects`, `create-project`, `update-project`, `delete-project`를 지원합니다. 아젠다 명령처럼 명령 표면에만 있고, `list_projects` 같은 밑줄 이름은 모르는 명령(종료 코드 2)입니다.
 
 ```bash
-java -jar dist/wl-engine.jar list-projects --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar create-project 'title=광고 플랫폼' 'summary=광고 쪽 아젠다를 묶는다.' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar update-project <프로젝트 id> 'title=새 이름' hue=teal --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar delete-project <프로젝트 id> --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list-projects --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar create-project 'title=광고 플랫폼' 'summary=광고 쪽 아젠다를 묶는다.' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar update-project <프로젝트 id> 'title=새 이름' hue=teal --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=/path/to/vault
 ```
 
 - 프로젝트는 `.aisurada/projects/<slug>.md` 파일 1개가 1개입니다. 키는 `id`, `slug`, `title`, `hue` 4개이고 본문이 `summary`입니다. 응답은 `id`, `slug`, `title`, `hue`, `summary` 차례이고 `deepLink`가 없습니다.
@@ -105,9 +105,9 @@ java -jar dist/wl-engine.jar delete-project <프로젝트 id> --aisurada.vault=/
 명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.aisurada/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
 
 ```bash
-java -jar dist/wl-engine.jar get-agenda-facts <아젠다 id> --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar update-agenda-facts <아젠다 id> 'facts=지금도 참인 것' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar facts-brief from=2026-06-16 to=2026-06-25 --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar get-agenda-facts <아젠다 id> --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar update-agenda-facts <아젠다 id> 'facts=지금도 참인 것' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar facts-brief from=2026-06-16 to=2026-06-25 --aisurada.vault=/path/to/vault
 ```
 
 - 저장은 다듬은 글 2,000 UTF-16 단위까지 받고, LF 1개를 붙여 원자적으로 씁니다. `facts=`는 파일을 지웁니다.
@@ -122,7 +122,7 @@ java -jar dist/wl-engine.jar facts-brief from=2026-06-16 to=2026-06-25 --aisurad
 vault 폴더 1개를 워크스페이스로 갖추는 `init-workspace`를 지원합니다. 명령 표면에만 있고 `init_workspace`는 모르는 명령(종료 코드 2)입니다.
 
 ```bash
-java -jar dist/wl-engine.jar init-workspace name=새-vault 'templates=[]' --aisurada.vault=/path/to/new-vault
+java -jar dist/ais-engine.jar init-workspace name=새-vault 'templates=[]' --aisurada.vault=/path/to/new-vault
 ```
 
 - 골격 폴더 `.aisurada/agendas`, `.aisurada/templates/doc`, `.aisurada/templates/ritual`, `notes`를 만들고, `templates=`로 받은 템플릿 가운데 그 파일 자리가 빈 것만 심고, 맨 마지막에 `.aisurada/workspace.json`을 없을 때만 씁니다. 아무것도 덮지 않아서 몇 번을 불러도 안전합니다.
@@ -137,10 +137,10 @@ java -jar dist/wl-engine.jar init-workspace name=새-vault 'templates=[]' --aisu
 읽기 `list_templates` / `list-templates`, `get_template` / `get-template`에 쓰기 `save_template` / `save-template`, 명령 전용 `delete-doc-template`, `save-ritual-template`를 지원합니다.
 
 ```bash
-java -jar dist/wl-engine.jar save_template '{"name":"조사 노트","type":"research","body":"# 조사\n"}' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar save-template id=<템플릿 id> 'desc=고친 설명' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar save-ritual-template t-morning 'name=내 모닝' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar delete-doc-template <템플릿 id> --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar save_template '{"name":"조사 노트","type":"research","body":"# 조사\n"}' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar save-template id=<템플릿 id> 'desc=고친 설명' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar save-ritual-template t-morning 'name=내 모닝' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar delete-doc-template <템플릿 id> --aisurada.vault=/path/to/vault
 ```
 
 새 문서 템플릿은 본문과 이름이 필요하고, 기존 템플릿은 준 칸만 바꿉니다. HTML·JSON에서 마크다운으로 고칠 때는 새 파일을 쓴 뒤 옛 확장자 파일을 지웁니다. 빌트인·리추얼 삭제는 거절하고, 리추얼 고치기는 같은 rev가 여러 파일에 있으면 거절합니다. 목록의 `bodies=true`와 못 읽은 파일의 진단도 지원합니다.
@@ -163,24 +163,24 @@ java -jar dist/wl-engine.jar delete-doc-template <템플릿 id> --aisurada.vault
 | 30 | `check-notes` — [노트 점검](docs/rebuild-p1-chapter30-complete.md) |
 
 ```bash
-java -jar dist/wl-engine.jar save-report kind=evening date=2026-06-16 'body=오늘의 회고' --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar plan-day date=2026-06-22 dryRun=true --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar check-notes date=2026-06-22 --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar save-report kind=evening date=2026-06-16 'body=오늘의 회고' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar plan-day date=2026-06-22 dryRun=true --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar check-notes date=2026-06-22 --aisurada.vault=/path/to/vault
 ```
 
 샤드는 방향을 못박아 계획을 확인한 뒤 적용하고 기준값과 대조합니다. `ais-cli` 뒤의 설정 옵션은 이미 뜬 엔진의 방향을 바꾸지 않으므로, 방향을 정하는 이관은 단발 모드로 실행합니다.
 
 ```bash
-java -jar dist/wl-engine.jar shard-notes --aisurada.notes.shard.by.month=true --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar shard-notes apply=true --aisurada.notes.shard.by.month=true --aisurada.vault=/path/to/vault
-java -jar dist/wl-engine.jar verify-shard --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar shard-notes --aisurada.notes.shard.by.month=true --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar shard-notes apply=true --aisurada.notes.shard.by.month=true --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar verify-shard --aisurada.vault=/path/to/vault
 ```
 
 회고·휴지통의 목록 진단, 플랜의 같은 제목 경고, 샤드의 불일치 진단은 소켓 응답의 stderr에도 전달합니다. `bash test.sh`는 장별 시험과 실제 serve·ais-cli 왕복을 함께 실행합니다.
 
 ## 32장 4부 이음매
 
-4부 명령 7개는 인자 문법과 쓰기 준비를 먼저 검사한 뒤 4부가 없으면 `WL-409`로 답합니다. 노트 안의 `ask.json`과 `chats/`는 노트 폴더와 함께 이동·보관하고 색인과 마크다운 내보내기에서는 제외합니다. [32장 완료 문서](docs/rebuild-p1-chapter32-complete.md)에 검사 순서와 검증 결과를 기록했습니다.
+4부 명령 7개는 인자 문법과 쓰기 준비를 먼저 검사한 뒤 4부가 없으면 `AIS-409`로 답합니다. 노트 안의 `ask.json`과 `chats/`는 노트 폴더와 함께 이동·보관하고 색인과 마크다운 내보내기에서는 제외합니다. [32장 완료 문서](docs/rebuild-p1-chapter32-complete.md)에 검사 순서와 검증 결과를 기록했습니다.
 
 ## 33장 설정과 기기 위 파일
 
@@ -192,9 +192,9 @@ java -jar dist/wl-engine.jar verify-shard --aisurada.vault=/path/to/vault
 
 ```bash
 ./build.sh
-WLX_IMPL_JAVA="$(command -v java)" WLX_IMPL_JAR="$PWD/dist/wl-engine.jar" \
-  node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out /tmp/wlx-run-1
-node fixtures/expect/run.mjs --self-check --mutants --out /tmp/wlx-self-1
+AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$PWD/dist/ais-engine.jar" \
+  node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out /tmp/aisx-run-1
+node fixtures/expect/run.mjs --self-check --mutants --out /tmp/aisx-self-1
 node fixtures/runner-test.mjs
 ```
 
@@ -210,7 +210,7 @@ node fixtures/runner-test.mjs
 `reindex-paths`와 공통 쓰기의 자동 커밋·작성자 기록을 구현했습니다. 경로별 재색인은 명령 표면에서만 받고, 옵션 없이 경로 argv를 그대로 보냅니다.
 
 ```bash
-java -jar dist/wl-engine.jar reindex-paths notes/demo/hello/note.md --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar reindex-paths notes/demo/hello/note.md --aisurada.vault=/path/to/vault
 ```
 
 노트 내부 경로는 루트 노트로 접고 중복은 한 번만 엽니다. 200개를 넘겨 `mode: full`이 되어도 템플릿·회고·휴지통은 검사하지 않습니다. 색인이 없는 구현이므로 `indexed`는 이번에 읽은 노트 수, `unchanged`와 `removed`는 0입니다(8.6).
@@ -231,8 +231,8 @@ SnakeYAML 2.4는 처음 빌드할 때 Maven Central에서 내려받아 체크섬
 
 | 파일 | 쓰임 |
 |---|---|
-| `dist/wl-engine.jar` | 엔진. 단발 모드와 serve 모드 |
-| `dist/wl-sidecar.jar` | `wl-engine.jar`와 같은 파일. `ais-cli`가 설치하고 띄우는 이름 |
+| `dist/ais-engine.jar` | 엔진. 단발 모드와 serve 모드 |
+| `dist/ais-sidecar.jar` | `ais-engine.jar`와 같은 파일. `ais-cli`가 설치하고 띄우는 이름 |
 | `dist/ais-cli.jar` | 클라이언트 |
 
 ## 실행
@@ -244,12 +244,12 @@ vault 폴더의 절대 경로를 환경 변수나 인자로 줍니다.
 ```bash
 export AISURADA_VAULT=/path/to/vault
 
-java -jar dist/wl-engine.jar list-docs
-java -jar dist/wl-engine.jar search-docs 첫
-java -jar dist/wl-engine.jar get_doc '{"id":"nddemo-00000001"}'
-java -jar dist/wl-engine.jar list_tags '{}'
+java -jar dist/ais-engine.jar list-docs
+java -jar dist/ais-engine.jar search-docs 첫
+java -jar dist/ais-engine.jar get_doc '{"id":"nddemo-00000001"}'
+java -jar dist/ais-engine.jar list_tags '{}'
 
-java -jar dist/wl-engine.jar list-docs --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list-docs --aisurada.vault=/path/to/vault
 ```
 
 가장 작은 vault는 아젠다 파일 1개와 노트 1개입니다.
@@ -288,7 +288,7 @@ tags: [예시]
 export AISURADA_VAULT=/path/to/vault
 
 # 터미널 1: 엔진을 띄운다. Ctrl-C로 내린다
-java -jar dist/wl-engine.jar serve
+java -jar dist/ais-engine.jar serve
 
 # 터미널 2: 떠 있는 엔진에 묻는다
 java -jar dist/ais-cli.jar list_tags '{}'
@@ -299,7 +299,7 @@ java -jar dist/ais-cli.jar doctor
 떠 있는 엔진이 없을 때 `ais-cli`는 `AISURADA_SIDECAR_JAR`가 가리키는 jar나 `install`로 깐 jar를 launchd로 띄웁니다.
 
 ```bash
-export AISURADA_SIDECAR_JAR=$PWD/dist/wl-sidecar.jar
+export AISURADA_SIDECAR_JAR=$PWD/dist/ais-sidecar.jar
 java -jar dist/ais-cli.jar list_tags '{}'
 ```
 
@@ -317,7 +317,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 |---|---|
 | `doctor` | 키, 레이블, 소켓, plist, 실행 상태, 동시 상한, 하루 청소를 진단한다. `--plist`는 쓸 plist를 보여 주고, `--prune`은 vault 폴더가 사라진 LaunchAgent를 지운다 |
 | `sweep` | 24시간 넘게 조용한 엔진을 내리고 죽은 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
-| `install` | `ais-cli.jar`와 `wl-sidecar.jar`를 `~/Library/Application Support/aisurada/bin/`에 깐다. `--cli`, `--sidecar`로 원본을 고른다 |
+| `install` | `ais-cli.jar`와 `ais-sidecar.jar`를 `~/Library/Application Support/aisurada/bin/`에 깐다. `--cli`, `--sidecar`로 원본을 고른다 |
 | `--help`, `--list` | 사용법과 이름 목록 |
 
 ### 환경 변수
@@ -325,7 +325,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | 이름 | 쓰임 | 기본값 |
 |---|---|---|
 | `AISURADA_VAULT` | vault 폴더 | 없음 |
-| `AISURADA_SIDECAR_SOCKET` | 소켓 자리. 102바이트 이하 | `~/Library/Caches/aisurada/wl-<해시>.sock` |
+| `AISURADA_SIDECAR_SOCKET` | 소켓 자리. 102바이트 이하 | `~/Library/Caches/aisurada/ais-<해시>.sock` |
 | `AISURADA_SIDECAR_JAR` | plist에 실을 엔진 jar | `install`로 깐 jar |
 | `AISURADA_SIDECAR_JAVA` | plist에 실을 `java` | `ais-cli`를 돌리는 JVM의 `java` |
 | `AISURADA_CLI_JAR` | `install`이 깔 `ais-cli.jar` 원본 | 없음 |
@@ -344,7 +344,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | 0 | 성공. 답은 stdout에 JSON 하나와 줄바꿈 1개입니다 |
 | 1 | 예상 밖 실패. stderr에 스택 트레이스가 나옵니다 |
 | 2 | vault를 못 찾았거나 모르는 명령입니다 |
-| 3 | `WL-…` 코드가 붙은 실패 (`WL-404` 노트 없음, `WL-400` 인자 오류 등). stderr에 한 줄이 나오고 stdout은 비어 있습니다 |
+| 3 | `AIS-…` 코드가 붙은 실패 (`AIS-404` 노트 없음, `AIS-400` 인자 오류 등). stderr에 한 줄이 나오고 stdout은 비어 있습니다 |
 | 4 | `ais-cli`만 냅니다. 엔진에 못 닿았거나, 띄우지 못했거나, 응답 프레임이 어긋났습니다 |
 
 serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으로 끝납니다.
@@ -359,7 +359,7 @@ serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으�
 | `config` | 설정 이름과 값 읽기 |
 | `engine` | 명령 1개를 돌려 상태, stdout, stderr로 돌려줌. 단발 모드와 serve 모드가 같이 씀 |
 | `serve` | 소켓, 잠금, 실행 상태 파일, 유휴 종료 |
-| `frame` | 소켓 위의 요청 프레임(`WLQ1`)과 응답 프레임(`WLG1`) |
+| `frame` | 소켓 위의 요청 프레임(`AIQ1`)과 응답 프레임(`AIG1`) |
 | `args` | 도구 표면의 JSON 인자와 명령 표면의 `key=value` 인자 읽기 |
 | `cmd` | 명령 실행기와 이름 목록, 하위 노트 부모 사슬 풀기 |
 | `write` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 프론트매터 YAML, 경고, 선결 조건 토큰, 편집 도장, 메타 쓰기, 하위 노트 쓰기, 카드 걷기, 폴더 지우기 |

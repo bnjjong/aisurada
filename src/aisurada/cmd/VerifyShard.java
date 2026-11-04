@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.Diagnostics;
 import aisurada.text.Trim;
 import aisurada.vault.FileSize;
@@ -21,9 +21,9 @@ public final class VerifyShard {
         String given = Trim.trim(args.namedOptions().get("file"));
         Path directory = vault.resolve(".aisurada/migration").toAbsolutePath().normalize(), file;
         if (!given.isEmpty()) {
-            if (!Files.isDirectory(directory)) throw new WlException(404, "shard map not found: " + given);
+            if (!Files.isDirectory(directory)) throw new AisException(404, "shard map not found: " + given);
             file = directory.resolve(Objects.requireNonNull(Path.of(given).getFileName()).toString());
-            if (!Files.isRegularFile(file)) throw new WlException(404, "shard map not found: " + given);
+            if (!Files.isRegularFile(file)) throw new AisException(404, "shard map not found: " + given);
         } else {
             List<Path> paths = new ArrayList<>();
             if (Files.isDirectory(directory)) try (var entries = Files.newDirectoryStream(directory)) {
@@ -35,8 +35,8 @@ public final class VerifyShard {
                 var rows = read(p); long moving = rows.stream().filter(r -> !r.newRel().isEmpty() && !r.newRel().equals(r.oldRel())).count();
                 details.add("  " + p.getFileName() + " (줄 " + rows.size() + ", 자리 바뀜 " + moving + ")");
             }
-            if (paths.isEmpty()) throw new WlException(404, "shard map not found: (이 vault 에 기준값 파일이 없다)");
-            if (paths.size() > 1) throw new WlException(409, "기준값 파일이 " + paths.size() + " 개다. 어느 회차와 맞댈지 file= 로 못박아야 한다.\n" + String.join("\n", details) + "\n자리 바뀜이 0 인 회차는 한 건도 안 옮겼다. 그 파일의 크기 값은 이동 뒤에 잰 것이라 기준값이 아니다.");
+            if (paths.isEmpty()) throw new AisException(404, "shard map not found: (이 vault 에 기준값 파일이 없다)");
+            if (paths.size() > 1) throw new AisException(409, "기준값 파일이 " + paths.size() + " 개다. 어느 회차와 맞댈지 file= 로 못박아야 한다.\n" + String.join("\n", details) + "\n자리 바뀜이 0 인 회차는 한 건도 안 옮겼다. 그 파일의 크기 값은 이동 뒤에 잰 것이라 기준값이 아니다.");
             file = paths.getFirst();
         }
         var rows = read(file); int checked = 0;
@@ -60,7 +60,7 @@ public final class VerifyShard {
         if (!Files.exists(file)) return List.of();
         String text;
         try { text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8); }
-        catch (IOException e) { throw new WlException(500, "파일을 읽지 못했다: " + file); }
+        catch (IOException e) { throw new AisException(500, "파일을 읽지 못했다: " + file); }
         List<Row> rows = new ArrayList<>(); String[] lines = text.split("\r\n|\r|\n", -1);
         for (int i = 1; i < lines.length; i++) {
             if (Trim.isBlank(lines[i])) continue;

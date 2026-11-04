@@ -31,7 +31,7 @@ if (dataCheck || autosaveCheck) {
   for (const asset of output) probeAssets.set('/' + asset.fileName, asset.type === 'chunk' ? asset.code : asset.source);
 }
 assertScreenBundle(join(host, 'dist'), { part4: part4Check });
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'wl-p3-'))), home = join(root, 'home'), vault = join(root, 'vault');
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'ais-p3-'))), home = join(root, 'home'), vault = join(root, 'vault');
 const mkdir = path => mkdirSync(path, { recursive: true });
 const write = (path, text) => { mkdir(resolve(path, '..')); writeFileSync(path, text); };
 const id = 'ndfixture-00000001', legacyId = 'ndfixture-00000002';
@@ -68,7 +68,7 @@ if (viewsCheck) {
   write(join(root, 'external/pic one.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6n8AAAAASUVORK5CYII=', 'base64'));
 }
 if (askMarksCheck) {
-  write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n격리된 vault의 본문이에요.\n\n| 열 | 값 |\n| --- | --- |\n| <!--wla:akfixture-12345678-->표 문답<!--/wla:akfixture-12345678--> | 값 |\n\n[하위](#sub:' + childId + ')\n');
+  write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n격리된 vault의 본문이에요.\n\n| 열 | 값 |\n| --- | --- |\n| <!--aisa:akfixture-12345678-->표 문답<!--/aisa:akfixture-12345678--> | 값 |\n\n[하위](#sub:' + childId + ')\n');
   const fakeClaude = join(root, 'fake-claude');
   write(fakeClaude, `#!/bin/sh\nif [ "$1" = agents ]; then printf '[]\\n'; else cat >/dev/null; printf 'fixture answer\\n'; fi\n`);
   chmodSync(fakeClaude, 0o700);
@@ -87,14 +87,14 @@ const env = { ...process.env, HOME: home, ZDOTDIR: join(root, 'zdot'), HISTFILE:
   AISURADA_SIDECAR_SOCKET: join(root, 'engine.sock'), AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
 if (askMarksCheck) env.AISURADA_CLAUDE_BIN = join(root, 'fake-claude');
 for (const key of ['AISURADA_SIDECAR_JAR', 'CLAUDE_CODE_SESSION_ID', 'AISURADA_ASK_RUNTIME', 'AISURADA_ASK_USE_AGENT']) delete env[key];
-if (!existsSync(join(repo, 'dist/wl-sidecar.jar'))) throw Error('Run bash build.sh first');
+if (!existsSync(join(repo, 'dist/ais-sidecar.jar'))) throw Error('Run bash build.sh first');
 let finish, noteResult;
 const completed = new Promise(resolve => { finish = resolve; });
-const boot = `window.__WL_FIXTURE__=${JSON.stringify(cfg)};
-window.__WL_WRITES__=[];
-if(!location.pathname.startsWith('/note-window/')){localStorage.setItem('aisurada.lastWorkspace.v1',JSON.stringify({path:window.__WL_FIXTURE__.raw,name:'검증 공간'}));localStorage.setItem('aisurada.prefs.v1',JSON.stringify({state:{theme:'dark'},version:1}));}
-if(window.__WL_FIXTURE__.navigationCheck&&!location.pathname.startsWith('/note-window/')&&!sessionStorage.getItem('navigation-seeded')){localStorage.setItem('aisurada.tabs.v1',JSON.stringify({state:{workspaceRoot:window.__WL_FIXTURE__.raw,openIds:[window.__WL_FIXTURE__.id,window.__WL_FIXTURE__.id,'term:old','ext:/old.md','sess:old']},version:1}));sessionStorage.setItem('navigation-seeded','yes');}
-const originalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){window.__WL_WRITES__.push(key);return originalSet.call(this,key,value)};`;
+const boot = `window.__AIS_FIXTURE__=${JSON.stringify(cfg)};
+window.__AIS_WRITES__=[];
+if(!location.pathname.startsWith('/note-window/')){localStorage.setItem('aisurada.lastWorkspace.v1',JSON.stringify({path:window.__AIS_FIXTURE__.raw,name:'검증 공간'}));localStorage.setItem('aisurada.prefs.v1',JSON.stringify({state:{theme:'dark'},version:1}));}
+if(window.__AIS_FIXTURE__.navigationCheck&&!location.pathname.startsWith('/note-window/')&&!sessionStorage.getItem('navigation-seeded')){localStorage.setItem('aisurada.tabs.v1',JSON.stringify({state:{workspaceRoot:window.__AIS_FIXTURE__.raw,openIds:[window.__AIS_FIXTURE__.id,window.__AIS_FIXTURE__.id,'term:old','ext:/old.md','sess:old']},version:1}));sessionStorage.setItem('navigation-seeded','yes');}
+const originalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){window.__AIS_WRITES__.push(key);return originalSet.call(this,key,value)};`;
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (req.method === 'POST') {
@@ -160,7 +160,7 @@ try {
       if (await new Promise(resolve => git.on('exit', resolve))) throw Error('Fixture second version failed');
     }
   }
-  const engine = start(wrapper, ['-jar', join(repo, 'dist/wl-sidecar.jar'), 'serve']);
+  const engine = start(wrapper, ['-jar', join(repo, 'dist/ais-sidecar.jar'), 'serve']);
   for (let n = 0; n < 600 && !existsSync(env.AISURADA_SIDECAR_SOCKET); n++) {
     if (engine.exitCode !== null) throw Error('engine exited');
     await new Promise(resolve => setTimeout(resolve, 25));

@@ -26,7 +26,7 @@ import java.util.*;
 /**
  * aisurada CLI 클라이언트 진입점 (설명서 3.3).
  */
-public final class WlCliMain {
+public final class AisCliMain {
 
     public static final List<String> CLI_TOOL_NAMES = List.of(
             "create_doc", "update_doc", "set_favorite", "evaluate_doc", "link_docs",
@@ -192,7 +192,7 @@ public final class WlCliMain {
         // 1. AISURADA_VAULT 확인
         String envVault = System.getenv("AISURADA_VAULT");
         if (envVault == null || Trim.isBlank(envVault)) {
-            System.err.println("WL-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
+            System.err.println("AIS-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
             System.exit(2);
             return;
         }
@@ -214,14 +214,14 @@ public final class WlCliMain {
         // 2. 소켓 경로 결정 및 길이 검사
         String rawSocket = System.getenv("AISURADA_SIDECAR_SOCKET");
         if (rawSocket == null || Trim.isBlank(rawSocket)) {
-            rawSocket = userHome + "/Library/Caches/aisurada/wl-" + hash16 + ".sock";
+            rawSocket = userHome + "/Library/Caches/aisurada/ais-" + hash16 + ".sock";
         } else {
             rawSocket = Trim.trim(rawSocket);
         }
         Path socketPath = Paths.get(VaultPath.normalize(rawSocket));
         byte[] socketPathBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
         if (socketPathBytes.length > 102) {
-            System.err.println("WL-400 소켓 경로가 102 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+            System.err.println("AIS-400 소켓 경로가 102 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(2);
             return;
         }
@@ -265,7 +265,7 @@ public final class WlCliMain {
         if (rawSid != null) {
             String sid = Trim.trim(rawSid);
             if (!sid.isEmpty()) {
-                reqArgs.add("\u0000wl-session-id");
+                reqArgs.add("\u0000ais-session-id");
                 reqArgs.add(sid);
             }
         }
@@ -380,8 +380,8 @@ public final class WlCliMain {
         // 3.4: AISURADA_SIDECAR_JAR는 상대 경로든 없는 파일이든 확인 없이 싣는다. 못 정했을 때만 선다
         String sidecarJar = PlistGenerator.resolveSidecarJar(userHome);
         if (sidecarJar == null) {
-            Path installed = Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "wl-sidecar.jar");
-            System.err.println("WL-400 AISURADA_SIDECAR_JAR 가 없고 설치된 wl-sidecar.jar 도 없다(" + installed + "). `install` 을 돌리거나 jar 의 절대 경로를 AISURADA_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
+            Path installed = Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "ais-sidecar.jar");
+            System.err.println("AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다(" + installed + "). `install` 을 돌리거나 jar 의 절대 경로를 AISURADA_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
             System.exit(2);
             return;
         }

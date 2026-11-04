@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // fixtures/expect 실행기를 재는 시험. 설명서 34.1의 옵션 문법, 무결성, --out, 거르개, 어댑터, 준비 걸음,
 // 판정 9가지, 경고, 구현 환경, 신호를 시험용 작은 묶음과 대본대로 답하는 가짜 엔진으로 잰다.
-// 그다음 진짜 묶음의 자가 점검(--mutants)과, dist/wl-engine.jar가 있으면 이 엔진 회차를 돈다.
+// 그다음 진짜 묶음의 자가 점검(--mutants)과, dist/ais-engine.jar가 있으면 이 엔진 회차를 돈다.
 // 마지막 [11]은 34장 판 확인이 짚은 갈래를 지금 실행기에 맞춘 것을 잰다.
 //
 //   node fixtures/runner-test.mjs
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BUNDLE = path.join(HERE, 'expect');
 const REPO = path.dirname(HERE);
-const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wlx-runner-test-')));
+const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'aisx-runner-test-')));
 let pass = 0;
 let fail = 0;
 
@@ -72,7 +72,7 @@ function rehash(dir) {
     }
   };
   walk('');
-  writeJson(path.join(dir, 'bundle.json'), { format: 'wlx-bundle', version: 1, node: '>=20', note: 'test', counts: {}, provenance: {}, history: [], files });
+  writeJson(path.join(dir, 'bundle.json'), { format: 'aisx-bundle', version: 1, node: '>=20', note: 'test', counts: {}, provenance: {}, history: [], files });
 }
 
 function writeJson(file, value) {
@@ -80,22 +80,22 @@ function writeJson(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
 }
 
-const TINY = { format: 'wlx-tree', version: 1, source: 'test', note: '', dirs: ['notes', 'empty'], files: [
+const TINY = { format: 'aisx-tree', version: 1, source: 'test', note: '', dirs: ['notes', 'empty'], files: [
   { path: 'notes/a.md', lines: ['---', 'id: a', '---', '본문'], eol: true },
   { path: 'bin.dat', base64: Buffer.from([0xff, 0x00, 0xfe]).toString('base64') }
 ] };
-const HOME_TREE = { format: 'wlx-tree', version: 1, source: 'test', note: '', dirs: ['.claude'], files: [{ path: '.claude/x.txt', lines: ['h'], eol: false }] };
+const HOME_TREE = { format: 'aisx-tree', version: 1, source: 'test', note: '', dirs: ['.claude'], files: [{ path: '.claude/x.txt', lines: ['h'], eol: false }] };
 
-const lane = (cases, extra = {}) => ({ format: 'wlx-cases', version: 1, lane: 'read', note: '', tree: 'tiny.v1', prepare: [['reindex']], cases, ...extra });
+const lane = (cases, extra = {}) => ({ format: 'aisx-cases', version: 1, lane: 'read', note: '', tree: 'tiny.v1', prepare: [['reindex']], cases, ...extra });
 const kase = (id, argv, expect, part = 1) => ({ id, part, argv, expect });
 
-// 가짜 엔진: 받은 argv를 대본(WLX_IMPL_SCRIPT의 JSON)에서 찾아 그대로 답한다
+// 가짜 엔진: 받은 argv를 대본(AISX_IMPL_SCRIPT의 JSON)에서 찾아 그대로 답한다
 const FAKE = path.join(TMP, 'fake-engine.mjs');
 fs.writeFileSync(FAKE, `
 import fs from 'node:fs';
 import path from 'node:path';
 const argv = process.argv.slice(2);
-const script = JSON.parse(fs.readFileSync(process.env.WLX_IMPL_SCRIPT, 'utf8'));
+const script = JSON.parse(fs.readFileSync(process.env.AISX_IMPL_SCRIPT, 'utf8'));
 const a = script[JSON.stringify(argv)] ?? (argv[0] === 'reindex' ? { code: 0 } : { code: 99, stderr: 'no script for ' + JSON.stringify(argv) });
 if (a.writeVault) fs.writeFileSync(path.join(process.env.AISURADA_VAULT, a.writeVault), 'x');
 if (a.pidFile) fs.writeFileSync(a.pidFile, String(process.pid));
@@ -103,7 +103,7 @@ let stdin = '';
 try { stdin = fs.readFileSync(0, 'utf8'); } catch { stdin = 'unreadable'; }
 let out = a.stdout ?? '';
 if (a.envDump) out = JSON.stringify({ vault: process.env.AISURADA_VAULT, home: process.env.HOME, tz: process.env.TZ, lang: process.env.LANG,
-  lcAll: process.env.LC_ALL, state: !!process.env.WLX_STATE_DIR, tmp: !!process.env.TMPDIR, impl: process.env.WLX_IMPL_EXTRA ?? null,
+  lcAll: process.env.LC_ALL, state: !!process.env.AISX_STATE_DIR, tmp: !!process.env.TMPDIR, impl: process.env.AISX_IMPL_EXTRA ?? null,
   leak: process.env.LEAK_ME ?? null, stdin, cwd: process.cwd() }, null, 2) + '\\n';
 if (a.stderr) process.stderr.write(a.stderr + '\\n');
 const bytes = a.stdoutBase64 ? Buffer.from(a.stdoutBase64, 'base64') : Buffer.from(out, 'utf8');
@@ -111,7 +111,7 @@ const finish = () => process.stdout.write(bytes, () => process.exit(a.code));
 if (a.sleepMs) setTimeout(finish, a.sleepMs); else finish();
 `);
 const ADAPTER = path.join(TMP, 'fake.adapter.json');
-writeJson(ADAPTER, { format: 'wlx-adapter', version: 1, surface: 'engine', name: 'fake', prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'] });
+writeJson(ADAPTER, { format: 'aisx-adapter', version: 1, surface: 'engine', name: 'fake', prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'] });
 
 function script(map) {
   const file = path.join(TMP, `script-${crypto.randomUUID()}.json`);
@@ -195,7 +195,7 @@ console.log('\n[4] 거르개와 케이스 꼴');
     kase('get_doc/a', ['a'], { code: 0, stdout: '' }),
     kase('session/b', ['b'], { code: 0, stdout: '' }, 4)
   ]) }, { 'tiny.v1': TINY });
-  const run = args => why(runner(copy, ['--engine', ADAPTER, '--out', freshOut(), ...args], { WLX_IMPL_SCRIPT: script([]) }));
+  const run = args => why(runner(copy, ['--engine', ADAPTER, '--out', freshOut(), ...args], { AISX_IMPL_SCRIPT: script([]) }));
   check('--lanes 에 없는 레인', run(['--lanes', 'write']), '--lanes 의 항목에 걸리는 케이스가 없다: write');
   check('--parts 에 안 걸리는 파트', run(['--parts', '1,2']), '--parts 의 항목에 걸리는 케이스가 없다: 2');
   check('--only 에 안 걸리는 머리', run(['--only', 'get_doc/,zz']), '--only 의 항목에 걸리는 케이스가 없다: zz');
@@ -216,16 +216,16 @@ console.log('\n[5] 어댑터와 준비 걸음');
   const ad = (name, doc) => { const f = path.join(TMP, name); writeJson(f, doc); return f; };
   const run = (adapter, env = {}) => runner(copy, ['--engine', adapter, '--out', freshOut()], env);
   check('어댑터 파일이 없으면 2', run(path.join(TMP, 'none.json')).code, 2);
-  check('format 이 틀리면 2', why(run(ad('a1.json', { format: 'x', version: 1, surface: 'engine', prefix: ['a'] }))), '어댑터는 format wlx-adapter, version 1, surface engine 이어야 한다');
-  check('prefix 가 비면 2', why(run(ad('a2.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [] }))), '어댑터의 prefix 는 1칸 이상의 문자열 배열이어야 한다');
-  check('환경에 없는 ${이름}은 첫 준비 걸음에서 2', why(run(ad('a3.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: ['${WLX_IMPL_NOPE}'] }))), '어댑터의 ${WLX_IMPL_NOPE} 를 채울 환경 변수가 없다');
-  check('구현을 못 띄우면 준비 걸음에서 2', run(ad('a4.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [path.join(TMP, 'no-such-bin')] })).code, 2);
-  const failPrep = script([[['reindex'], { code: 7, stderr: 'WL-500 색인을 못 지었다' }]]);
-  check('준비 걸음이 0이 아니면 2', why(runner(copy, ['--engine', ad('a5.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE] }), '--out', freshOut()], { WLX_IMPL_SCRIPT: failPrep })), '준비 걸음 ["reindex"] 이 종료 코드 7 로 끝났다. stderr: WL-500 색인을 못 지었다');
-  const noName = ad('my-engine.adapter.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'], unknownKey: 1 });
+  check('format 이 틀리면 2', why(run(ad('a1.json', { format: 'x', version: 1, surface: 'engine', prefix: ['a'] }))), '어댑터는 format aisx-adapter, version 1, surface engine 이어야 한다');
+  check('prefix 가 비면 2', why(run(ad('a2.json', { format: 'aisx-adapter', version: 1, surface: 'engine', prefix: [] }))), '어댑터의 prefix 는 1칸 이상의 문자열 배열이어야 한다');
+  check('환경에 없는 ${이름}은 첫 준비 걸음에서 2', why(run(ad('a3.json', { format: 'aisx-adapter', version: 1, surface: 'engine', prefix: ['${AISX_IMPL_NOPE}'] }))), '어댑터의 ${AISX_IMPL_NOPE} 를 채울 환경 변수가 없다');
+  check('구현을 못 띄우면 준비 걸음에서 2', run(ad('a4.json', { format: 'aisx-adapter', version: 1, surface: 'engine', prefix: [path.join(TMP, 'no-such-bin')] })).code, 2);
+  const failPrep = script([[['reindex'], { code: 7, stderr: 'AIS-500 색인을 못 지었다' }]]);
+  check('준비 걸음이 0이 아니면 2', why(runner(copy, ['--engine', ad('a5.json', { format: 'aisx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE] }), '--out', freshOut()], { AISX_IMPL_SCRIPT: failPrep })), '준비 걸음 ["reindex"] 이 종료 코드 7 로 끝났다. stderr: AIS-500 색인을 못 지었다');
+  const noName = ad('my-engine.adapter.json', { format: 'aisx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'], unknownKey: 1 });
   const o = freshOut();
   const vault = path.join(o, 'read-0', 'vault');
-  runner(copy, ['--engine', noName, '--out', o], { WLX_IMPL_SCRIPT: script([[withSuffix(['a'], vault), { code: 0 }]]) });
+  runner(copy, ['--engine', noName, '--out', o], { AISX_IMPL_SCRIPT: script([[withSuffix(['a'], vault), { code: 0 }]]) });
   check('name 이 없으면 어댑터 파일 이름을 확장자까지, 모르는 키는 무시', report(o).engine, 'my-engine.adapter.json');
   check('펼친 vault 는 realpath 를 지난 경로이고 빈 폴더도 만든다', [fs.existsSync(path.join(vault, 'empty')), fs.readFileSync(path.join(vault, 'bin.dat')).toString('hex')], [true, 'ff00fe']);
 }
@@ -238,7 +238,7 @@ console.log('\n[6] 판정 9가지와 보고서');
     kase('ok/text', ['ok-text'], { code: 0, stdoutText: 'vault=⟦vault⟧ home=⟦home⟧\n' }),
     kase('ok/share', ['ok-share'], { code: 0, stdoutJson: { p: tok } }),
     kase('bad/code', ['code'], { code: 0, stdout: '' }),
-    kase('bad/wl', ['wl'], { code: 3, stdout: '', wl: 'WL-404' }),
+    kase('bad/ais', ['ais'], { code: 3, stdout: '', ais: 'AIS-404' }),
     kase('bad/utf8', ['utf8'], { code: 0, stdout: '' }),
     kase('bad/json', ['json'], { code: 0, stdoutJson: { a: 1 } }),
     kase('bad/keys', ['keys'], { code: 0, stdoutJson: { a: 1, b: 2 } }),
@@ -260,8 +260,8 @@ console.log('\n[6] 판정 9가지와 보고서');
     [withSuffix(['ok-json'], vault), { code: 0, stdout: J({ a: 1, link: `w://x?ws=${uri}`, p: 'f1:abc' }) }],
     [withSuffix(['ok-text'], vault), { code: 0, stdout: `vault=${vault} home=${home}\n` }],
     [withSuffix(['ok-share'], vault), { code: 0, stdout: J({ p: 'f1:abc' }), sleepMs: 300 }],
-    [withSuffix(['code'], vault), { code: 3, stderr: '로그 줄\nWL-404 Not found: x\n마지막 줄' }],
-    [withSuffix(['wl'], vault), { code: 3, stderr: 'WL-400 다른 번호' }],
+    [withSuffix(['code'], vault), { code: 3, stderr: '로그 줄\nAIS-404 Not found: x\n마지막 줄' }],
+    [withSuffix(['ais'], vault), { code: 3, stderr: 'AIS-400 다른 번호' }],
     [withSuffix(['utf8'], vault), { code: 0, stdoutBase64: Buffer.from([0xc3, 0x28]).toString('base64') }],
     [withSuffix(['json'], vault), { code: 0, stdout: '{"a":' }],
     [withSuffix(['keys'], vault), { code: 0, stdout: J({ b: 2, a: 1 }) }],
@@ -272,22 +272,22 @@ console.log('\n[6] 판정 9가지와 보고서');
     [withSuffix(['token-space'], vault), { code: 0, stdout: J({ p: 'f1 abc' }) }],
     [withSuffix(['token-cross'], vault), { code: 0, stdout: J({ p: 'f1:zzz' }), sleepMs: 900 }]
   ]);
-  const r = runner(copy, ['--engine', ADAPTER, '--out', o, '--jobs', '4'], { WLX_IMPL_SCRIPT: s });
+  const r = runner(copy, ['--engine', ADAPTER, '--out', o, '--jobs', '4'], { AISX_IMPL_SCRIPT: s });
   const rep = report(o);
   const byId = Object.fromEntries(rep.failures.map(f => [f.id, f]));
   check('어긋난 케이스가 있으면 종료 코드 1', r.code, 1);
   check('맞은 케이스: JSON 자리표, 글 자리표(⟦vault⟧, ⟦home⟧), 같은 토큰', ['ok/json', 'ok/text', 'ok/share'].map(id => byId[id] ?? 'pass'), ['pass', 'pass', 'pass']);
   check('검사 이름', Object.fromEntries(rep.failures.map(f => [f.id, f.check])), {
-    'bad/code': 'code', 'bad/wl': 'wl', 'bad/utf8': 'utf8', 'bad/json': 'stdout', 'bad/keys': 'stdout', 'bad/negzero': 'stdout',
+    'bad/code': 'code', 'bad/ais': 'ais', 'bad/utf8': 'utf8', 'bad/json': 'stdout', 'bad/keys': 'stdout', 'bad/negzero': 'stdout',
     'bad/format': 'format', 'bad/bom': 'stdout', 'bad/token-inner': 'token', 'bad/token-space': 'stdout', 'bad/token-cross': 'token'
   });
-  check('code 의 detail 은 stderr 에서 WL 번호가 든 첫 줄을 고른다', byId['bad/code'].detail, '종료 코드 기대 0, 실제 3. stderr: WL-404 Not found: x');
+  check('code 의 detail 은 stderr 에서 AIS 번호가 든 첫 줄을 고른다', byId['bad/code'].detail, '종료 코드 기대 0, 실제 3. stderr: AIS-404 Not found: x');
   check('detail 은 1줄이다. BOM 붙은 JSON 의 읽기 오류 글도 줄바꿈을 \\n 으로 적는다', [rep.failures.every(f => !/[\r\n]/.test(f.detail)), byId['bad/bom'].detail.startsWith('JSON 이 아니다: ')], [true, true]);
   check('failures 는 케이스 차례', rep.failures.map(f => f.id)[0], 'bad/code');
   check('totals', [rep.totals.cases, rep.totals.passed, rep.totals.failed, rep.totals.launches], [14, 3, 11, 15]);
   check('report.json 키 차례', [Object.keys(rep), Object.keys(rep.totals)], [['engine', 'totals', 'failures', 'warnings'], ['cases', 'passed', 'failed', 'launches', 'wallMs']]);
   check('stderr 요약 첫 줄', r.stderr.split('\n')[0].replace(/[0-9.]+초\)$/, 'N초)'), '엔진 fake: 케이스 14건 중 3건 맞음, 11건 어긋남 (구현 호출 15번, N초)');
-  check('요약에 어긋난 케이스 줄', r.stderr.includes('  ✗ bad/wl [wl] 기대 WL-404, 실제 WL-400'), true);
+  check('요약에 어긋난 케이스 줄', r.stderr.includes('  ✗ bad/ais [ais] 기대 AIS-404, 실제 AIS-400'), true);
 }
 
 console.log('\n[7] 구현 환경과 경고');
@@ -302,9 +302,9 @@ console.log('\n[7] 구현 환경과 경고');
     [withSuffix(['env'], vault), { code: 0, envDump: true }],
     [withSuffix(['write'], vault), { code: 0, writeVault: 'notes/new.md' }]
   ]);
-  const r = runner(copy, ['--engine', ADAPTER, '--out', o], { WLX_IMPL_SCRIPT: s, WLX_IMPL_EXTRA: 'yes', LEAK_ME: 'secret', AISURADA_VAULT: path.join(TMP, 'parent-vault') });
+  const r = runner(copy, ['--engine', ADAPTER, '--out', o], { AISX_IMPL_SCRIPT: s, AISX_IMPL_EXTRA: 'yes', LEAK_ME: 'secret', AISURADA_VAULT: path.join(TMP, 'parent-vault') });
   const rep = report(o);
-  check('PATH 와 WLX_IMPL_* 만 넘어가고, 부모의 AISURADA_VAULT 와 다른 변수는 안 닿는다. stdin 은 빈 입력, 작업 폴더는 실행기의 것', rep.failures, []);
+  check('PATH 와 AISX_IMPL_* 만 넘어가고, 부모의 AISURADA_VAULT 와 다른 변수는 안 닿는다. stdin 은 빈 입력, 작업 폴더는 실행기의 것', rep.failures, []);
   check('읽기 레인이 vault 를 바꾸면 경고로만 남고 종료 코드는 0', [r.code, rep.warnings], [0, ['vault notes/new.md: 파일이 새로 생겼다']]);
   check('요약에 경고 줄', r.stderr.includes('  ⚠ vault notes/new.md: 파일이 새로 생겼다'), true);
 }
@@ -316,7 +316,7 @@ await (async () => {
   const pidFile = path.join(TMP, 'slow.pid');
   const vault = path.join(o, 'read-0', 'vault');
   const s = script([[withSuffix(['slow'], vault), { code: 0, sleepMs: 60000, pidFile }]]);
-  const child = spawn(process.execPath, [path.join(copy, 'run.mjs'), '--engine', ADAPTER, '--out', o], { env: { PATH: process.env.PATH, WLX_IMPL_SCRIPT: s }, stdio: 'ignore' });
+  const child = spawn(process.execPath, [path.join(copy, 'run.mjs'), '--engine', ADAPTER, '--out', o], { env: { PATH: process.env.PATH, AISX_IMPL_SCRIPT: s }, stdio: 'ignore' });
   const deadline = Date.now() + 20000;
   while (!fs.existsSync(pidFile) && Date.now() < deadline) await new Promise(res => setTimeout(res, 100));
   const pid = Number(fs.readFileSync(pidFile, 'utf8'));
@@ -334,12 +334,12 @@ console.log('\n[9] 진짜 묶음: 자가 점검과 변형 8가지');
   check('자가 점검 종료 코드 0, 변형 8가지를 모두 잡음', [r.code, /변형 8가지 가운데 8가지를 잡았다/.test(r.stderr)], [0, true]);
 }
 
-const jar = path.join(REPO, 'dist', 'wl-engine.jar');
+const jar = path.join(REPO, 'dist', 'ais-engine.jar');
 if (fs.existsSync(jar)) {
-  console.log('\n[10] 진짜 묶음: 이 엔진(dist/wl-engine.jar)');
+  console.log('\n[10] 진짜 묶음: 이 엔진(dist/ais-engine.jar)');
   const javaBin = spawnSync('sh', ['-c', 'command -v java'], { encoding: 'utf8' }).stdout.trim();
   const o = freshOut();
-  const r = runner(BUNDLE, ['--engine', path.join(HERE, 'aisurada.adapter.json'), '--out', o], { WLX_IMPL_JAVA: javaBin, WLX_IMPL_JAR: jar });
+  const r = runner(BUNDLE, ['--engine', path.join(HERE, 'aisurada.adapter.json'), '--out', o], { AISX_IMPL_JAVA: javaBin, AISX_IMPL_JAR: jar });
   const rep = report(o);
   check('묶음의 케이스가 모두 맞고 vault 와 HOME 을 안 바꾼다', [r.code, rep.totals.passed === rep.totals.cases, rep.failures.map(f => `${f.id} [${f.check}] ${f.detail}`), rep.warnings], [0, true, [], []]);
 }
@@ -366,20 +366,20 @@ console.log('\n[11] 지금 실행기와 맞춘 갈래(34장 판 확인 후속)')
   check('문법 오류(1번)면 --out 을 안 만든다', [runner(base, ['--engine', ADAPTER, '--out', syntax, '--jobs=4']).code, fs.existsSync(syntax)], [2, false]);
 
   const o1 = freshOut();
-  const dup = runner(base, ['--engine', ADAPTER, '--out', o1, '--lanes', 'read,read', '--parts', '1,1.0', '--only', 't/,t/'], { WLX_IMPL_SCRIPT: answer(o1) });
+  const dup = runner(base, ['--engine', ADAPTER, '--out', o1, '--lanes', 'read,read', '--parts', '1,1.0', '--only', 't/,t/'], { AISX_IMPL_SCRIPT: answer(o1) });
   check('겹친 목록 항목은 1번만 센다(--lanes read,read)', [dup.code, report(o1).totals.cases], [0, 1]);
 
-  const wl = makeBundle('wl4044', { 'read/t.json': lane([
-    kase('w/long', ['long'], { code: 3, stdout: '', wl: 'WL-404' }),
-    kase('w/later', ['later'], { code: 3, stdout: '', wl: 'WL-404' })
+  const ais = makeBundle('ais4044', { 'read/t.json': lane([
+    kase('w/long', ['long'], { code: 3, stdout: '', ais: 'AIS-404' }),
+    kase('w/later', ['later'], { code: 3, stdout: '', ais: 'AIS-404' })
   ]) }, { 'tiny.v1': TINY });
   const o2 = freshOut();
   const v2 = path.join(o2, 'read-0', 'vault');
-  runner(wl, ['--engine', ADAPTER, '--out', o2], { WLX_IMPL_SCRIPT: script([
-    [withSuffix(['long'], v2), { code: 3, stderr: 'WL-4044 Not found' }],
-    [withSuffix(['later'], v2), { code: 3, stderr: 'WL-4044 앞줄\nWL-404 Not found' }]
+  runner(ais, ['--engine', ADAPTER, '--out', o2], { AISX_IMPL_SCRIPT: script([
+    [withSuffix(['long'], v2), { code: 3, stderr: 'AIS-4044 Not found' }],
+    [withSuffix(['later'], v2), { code: 3, stderr: 'AIS-4044 앞줄\nAIS-404 Not found' }]
   ]) });
-  check('WL- 뒤에 숫자가 4개면 3자리 번호가 아니다(WL-4044)', report(o2).failures, [{ id: 'w/long', check: 'wl', detail: '기대 WL-404, 실제 (없음)' }]);
+  check('AIS- 뒤에 숫자가 4개면 3자리 번호가 아니다(AIS-4044)', report(o2).failures, [{ id: 'w/long', check: 'ais', detail: '기대 AIS-404, 실제 (없음)' }]);
 
   const o3 = freshOut();
   fs.mkdirSync(o3, { recursive: true });
@@ -397,7 +397,7 @@ console.log('\n[11] 지금 실행기와 맞춘 갈래(34장 판 확인 후속)')
 
   const strDirs = makeBundle('strdirs', { 'read/t.json': lane([kase('t/a', ['a'], { code: 0, stdout: '' })]) }, { 'tiny.v1': { ...TINY, dirs: 'notes' } });
   const o6 = freshOut();
-  const r6 = runner(strDirs, ['--engine', ADAPTER, '--out', o6], { WLX_IMPL_SCRIPT: answer(o6) });
+  const r6 = runner(strDirs, ['--engine', ADAPTER, '--out', o6], { AISX_IMPL_SCRIPT: answer(o6) });
   check('나무는 format 과 version 만 맞대서 dirs 가 글이어도 돈다', [r6.code, report(o6).warnings], [0, []]);
 
   const o7 = freshOut();

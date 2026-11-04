@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Uri;
 import aisurada.vault.*;
@@ -35,30 +35,30 @@ public final class GetDoc {
             NoteScanner.ScanResult scanResult
     ) {
         if (parsed.positionalArgs().isEmpty()) {
-            throw new WlException(400, "인자가 하나 필요하다: get-doc <노트 id>");
+            throw new AisException(400, "인자가 하나 필요하다: get-doc <노트 id>");
         }
 
         String rawId = parsed.positionalArgs().get(0);
         if (rawId == null || Trim.isBlank(rawId)) {
-            throw new WlException(400, "인자가 하나 필요하다: get-doc <노트 id>");
+            throw new AisException(400, "인자가 하나 필요하다: get-doc <노트 id>");
         }
 
         if (!ID_PATTERN.matcher(rawId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawId);
         }
 
         NoteScanner.NoteRecord note = scanResult.notesById().get(rawId);
         if (note == null) {
-            throw new WlException(404, "Note not found: " + rawId);
+            throw new AisException(404, "Note not found: " + rawId);
         }
 
         // 11.5 & 11.9의 6·13번: 메인 노트의 HTML 첨부를 읽음 (입출력 오류면 예상 밖 실패)
-        // 도구 표면에서 기록 층 노트를 WL-409로 거절하기 전에 이 읽기가 먼저임 (11.9 13번)
+        // 도구 표면에서 기록 층 노트를 AIS-409로 거절하기 전에 이 읽기가 먼저임 (11.9 13번)
         AttachText.extract(vaultRoot, note);
 
-        // 도구 표면이고 층이 record인 경우 WL-409 거절
+        // 도구 표면이고 층이 record인 경우 AIS-409 거절
         if (parsed.isToolSurface() && "record".equals(note.meta().tier())) {
-            throw new WlException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rawId +
+            throw new AisException(409, "도구 표면이 읽을 수 없는 노트다(층=record): " + rawId +
                     ". 기계가 남긴 기록 노트는 앱에서만 열립니다.");
         }
 

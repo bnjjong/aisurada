@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.vault.TemplateReader;
@@ -49,7 +49,7 @@ public final class ListTemplates {
             if (!trimmedCat.isEmpty()) {
                 String lowerCat = trimmedCat.toLowerCase(Locale.ROOT);
                 if (!"doc".equals(lowerCat) && !"ritual".equals(lowerCat)) {
-                    throw new WlException(400, "모르는 템플릿 갈래 이다: " + trimmedCat +
+                    throw new AisException(400, "모르는 템플릿 갈래 이다: " + trimmedCat +
                             ". 쓸 수 있는 것은 [doc, ritual] 뿐이다.");
                 }
                 targetCategory = lowerCat;
@@ -64,7 +64,7 @@ public final class ListTemplates {
                 String lowerType = trimmedType.toLowerCase(Locale.ROOT);
                 Set<String> allowed = Set.of("plan", "build", "report", "research", "meeting", "free");
                 if (!allowed.contains(lowerType)) {
-                    throw new WlException(400, "모르는 템플릿 유형 이다: " + trimmedType +
+                    throw new AisException(400, "모르는 템플릿 유형 이다: " + trimmedType +
                             ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
                 }
                 targetType = lowerType;
@@ -85,7 +85,7 @@ public final class ListTemplates {
                 } else if ("false".equals(trimmedBodies)) {
                     includeBodies = false;
                 } else {
-                    throw new WlException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
+                    throw new AisException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
                 }
             }
         }

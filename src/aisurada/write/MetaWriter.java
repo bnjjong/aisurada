@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 import aisurada.vault.Frontmatter;
@@ -64,7 +64,7 @@ public final class MetaWriter {
         try {
             content = StrictUtf8.decodeStrict(fileBytes);
         } catch (Exception e) {
-            throw new WlException(500, "노트 본문 파일을 못 읽어 메타를 저장하지 않았다: " + targetRelPath);
+            throw new AisException(500, "노트 본문 파일을 못 읽어 메타를 저장하지 않았다: " + targetRelPath);
         }
         FileParts fileParts = split(content);
         String yamlPart = fileParts.yamlPart();
@@ -73,12 +73,12 @@ public final class MetaWriter {
 
         // 4. 프론트매터 확인 (7.2 step 6)
         if (!fenceFound || yamlPart == null || yamlPart.length() > 16_000) {
-            throw new WlException(500, "프론트매터가 없어 메타를 저장하지 않았다: " + targetRelPath);
+            throw new AisException(500, "프론트매터가 없어 메타를 저장하지 않았다: " + targetRelPath);
         }
 
         Map<String, Object> rawYamlMap = Frontmatter.parse(yamlPart);
         if (rawYamlMap == null) {
-            throw new WlException(500, "프론트매터가 없어 메타를 저장하지 않았다: " + targetRelPath);
+            throw new AisException(500, "프론트매터가 없어 메타를 저장하지 않았다: " + targetRelPath);
         }
 
         // 5. 프론트매터 재구성 (15.5 5번)
@@ -139,7 +139,7 @@ public final class MetaWriter {
 
         // 7. 저장 상한 검증 (1.6 714행, 723행: UTF-16 길이가 1,000,000을 넘으면 실패)
         if (newFileText.length() > 1_000_000) {
-            throw new WlException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + targetRelPath);
+            throw new AisException(500, "노트가 저장 상한을 넘어 저장하지 않았다: " + targetRelPath);
         }
 
         // 원자적 파일 쓰기 (7.4)

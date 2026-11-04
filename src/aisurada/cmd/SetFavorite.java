@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.NoteIndex;
 import aisurada.vault.NoteScanner;
@@ -46,11 +46,11 @@ public final class SetFavorite {
         }
 
         if (rawId == null || Trim.isBlank(rawId)) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
 
         if (!NOTE_ID_PATTERN.matcher(rawId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawId);
         }
 
         String noteId = rawId;
@@ -71,7 +71,7 @@ public final class SetFavorite {
                     } else if ("false".equals(trimmed)) {
                         favoriteOpt = false;
                     } else {
-                        throw new WlException(400, "favorite 은 true 나 false 여야 한다: " + trimmed);
+                        throw new AisException(400, "favorite 은 true 나 false 여야 한다: " + trimmed);
                     }
                 }
             }
@@ -115,7 +115,7 @@ public final class SetFavorite {
         // 16. 색인에서 노트 검색 (15.4 row 16)
         NoteScanner.NoteRecord note = noteIndex.notesById().get(noteId);
         if (note == null) {
-            throw new WlException(404, "Note not found: " + noteId);
+            throw new AisException(404, "Note not found: " + noteId);
         }
 
         // 새 favorite 및 category 결정 (15.3, 15.5)

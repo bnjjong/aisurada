@@ -1,6 +1,6 @@
 package aisurada.write;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -237,7 +237,7 @@ public final class FrontmatterWriter {
 
     /**
      * 설명서 1.10 Form B를 위해 임의의 YAML 맵을 1.9의 규격에 맞춰 직렬화합니다.
-     * 잘못된 타입(Double, BigInteger, Date 등)이나 비문자열 내부 맵 키가 있으면 WlException을 발생시킵니다.
+     * 잘못된 타입(Double, BigInteger, Date 등)이나 비문자열 내부 맵 키가 있으면 AisException을 발생시킵니다.
      *
      * @param rawMap 파싱된 원본 YAML 맵
      * @return 직렬화된 YAML 문자열
@@ -269,24 +269,24 @@ public final class FrontmatterWriter {
             return;
         }
         if (val instanceof Double || val instanceof Float) {
-            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: Double (" + val + ")");
+            throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: Double (" + val + ")");
         }
         if (val instanceof java.math.BigInteger || val instanceof java.math.BigDecimal) {
-            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: BigInteger (" + val + ")");
+            throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: BigInteger (" + val + ")");
         }
         if (val instanceof java.util.Date) {
-            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: Date (" + val + ")");
+            throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: Date (" + val + ")");
         }
         if (val instanceof byte[]) {
-            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: ByteArray (" + Arrays.toString((byte[]) val) + ")");
+            throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: ByteArray (" + Arrays.toString((byte[]) val) + ")");
         }
         if (val instanceof Set) {
-            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
+            throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
         }
         if (val.getClass().isArray()) {
-            throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: Array (" + val + ")");
+            throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: Array (" + val + ")");
         }
-        throw new WlException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
+        throw new AisException(400, "frontmatter 에 쓸 수 없는 값이다: " + val.getClass().getSimpleName() + " (" + val + ")");
     }
 
     /** 키의 `:` 뒤에 값을 잇습니다. 비지 않은 맵과 목록은 다음 줄부터 적고, 나머지는 공백 1개 뒤에 적습니다(1.9). */
@@ -313,7 +313,7 @@ public final class FrontmatterWriter {
                 String indent = "  ".repeat(depth);
                 for (Map.Entry<?, ?> entry : m.entrySet()) {
                     if (!(entry.getKey() instanceof String k)) {
-                        throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                        throw new AisException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                     }
                     sb.append(indent).append(dumpKey(k)).append(":");
                     appendGeneralValue(sb, entry.getValue(), depth + 1);
@@ -334,7 +334,7 @@ public final class FrontmatterWriter {
                             boolean first = true;
                             for (Map.Entry<?, ?> entry : mapItem.entrySet()) {
                                 if (!(entry.getKey() instanceof String k)) {
-                                    throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                                    throw new AisException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                                 }
                                 if (first) {
                                     sb.append(indent).append("- ").append(dumpKey(k)).append(":");
@@ -382,7 +382,7 @@ public final class FrontmatterWriter {
             String indent = "  ".repeat(depth + 1);
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 if (!(entry.getKey() instanceof String k)) {
-                    throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                    throw new AisException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                 }
                 sb.append(indent).append(dumpKey(k)).append(":");
                 appendGeneralValue(sb, entry.getValue(), depth + 2);
@@ -406,7 +406,7 @@ public final class FrontmatterWriter {
                 String mapIndent = "  ".repeat(depth + 1);
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
                     if (!(entry.getKey() instanceof String k)) {
-                        throw new WlException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
+                        throw new AisException(400, "frontmatter 의 키는 문자열이어야 한다: " + entry.getKey());
                     }
                     sb.append(mapIndent).append(dumpKey(k)).append(":");
                     appendGeneralValue(sb, entry.getValue(), depth + 2);

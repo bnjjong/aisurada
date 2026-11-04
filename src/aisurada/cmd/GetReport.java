@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.ReportReader;
 
@@ -31,14 +31,14 @@ public final class GetReport {
             Map<String, Object> opts = parsed.toolOptions();
             id = (opts != null) ? (String) opts.get("id") : null;
             if (id == null) {
-                throw new WlException(400, "인자 검증 실패(get_report): id 가 필요하다.");
+                throw new AisException(400, "인자 검증 실패(get_report): id 가 필요하다.");
             }
         } else {
             if (parsed.positionalArgs().isEmpty()) {
-                throw new WlException(400, "인자가 하나 필요하다: get-report <회고 id. 예: rv-evening-2026-06-04>");
+                throw new AisException(400, "인자가 하나 필요하다: get-report <회고 id. 예: rv-evening-2026-06-04>");
             }
             if (parsed.positionalArgs().size() > 1) {
-                throw new WlException(400, "get-report 이 받는 자리 인자는 1 개인데 " +
+                throw new AisException(400, "get-report 이 받는 자리 인자는 1 개인데 " +
                         parsed.positionalArgs().size() + " 개를 받았다: get-report <회고 id. 예: rv-evening-2026-06-04>");
             }
             id = parsed.positionalArgs().get(0);
@@ -46,24 +46,24 @@ public final class GetReport {
 
         // 값 검증 (다듬지 않는다)
         if (id.isEmpty() || Trim.isBlank(id)) {
-            throw new WlException(400, "인자가 하나 필요하다: get-report <회고 id. 예: rv-evening-2026-06-04>");
+            throw new AisException(400, "인자가 하나 필요하다: get-report <회고 id. 예: rv-evening-2026-06-04>");
         }
 
         Matcher m = ID_PATTERN.matcher(id);
         if (!m.matches()) {
-            throw new WlException(400, "회고 id 모양이 아니다: " + id);
+            throw new AisException(400, "회고 id 모양이 아니다: " + id);
         }
 
         String kind = m.group(1);
         String date = m.group(2);
 
         if (!ReportReader.ALLOWED_KINDS.contains(kind)) {
-            throw new WlException(404, "Review not found: " + id);
+            throw new AisException(404, "Review not found: " + id);
         }
 
         Path file = vaultRoot.resolve(".aisurada").resolve("reports").resolve(id + ".json");
         if (!Files.isRegularFile(file)) {
-            throw new WlException(404, "Review not found: " + id);
+            throw new AisException(404, "Review not found: " + id);
         }
 
         String relPath = ".aisurada/reports/" + id + ".json";
@@ -79,13 +79,13 @@ public final class GetReport {
             return resp;
         } else if (res instanceof ReportReader.ParseResult.Failed fail) {
             if (fail.step() == 6) {
-                // 껍데기는 WL-404
-                throw new WlException(404, "Review not found: " + id);
+                // 껍데기는 AIS-404
+                throw new AisException(404, "Review not found: " + id);
             } else {
-                throw new WlException(500, "회고 파일이 자리에 있는데 읽지 못했다: " + relPath + " (" + fail.reason() + ")");
+                throw new AisException(500, "회고 파일이 자리에 있는데 읽지 못했다: " + relPath + " (" + fail.reason() + ")");
             }
         }
 
-        throw new WlException(404, "Review not found: " + id);
+        throw new AisException(404, "Review not found: " + id);
     }
 }

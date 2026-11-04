@@ -11,7 +11,7 @@ import { ImageView } from './media.tsx';
 import { calloutStyle, relativePath } from './grammar.ts';
 
 export class RelativeLinkNode extends LinkNode {
-  static getType() { return 'wl-link'; }
+  static getType() { return 'ais-link'; }
   static clone(node: RelativeLinkNode) { return new RelativeLinkNode(node.__url, { rel: node.__rel, target: node.__target, title: node.__title }, node.__key); }
   static importJSON(value: SerializedLinkNode) { return new RelativeLinkNode(value.url).updateFromJSON(value); }
   sanitizeUrl(url: string) { return relativePath(url) || url.startsWith('#') ? url : super.sanitizeUrl(url); }
@@ -22,7 +22,7 @@ type CalloutJSON = SerializedElementNode & { kind: string };
 export class CalloutNode extends ElementNode {
   __kind: string;
   constructor(kind = 'info', key?: NodeKey) { super(key); this.__kind = kind; }
-  static getType() { return 'wl-callout'; }
+  static getType() { return 'ais-callout'; }
   static clone(node: CalloutNode) { return new CalloutNode(node.__kind, node.__key); }
   static importJSON(value: CalloutJSON) { return new CalloutNode(value.kind).updateFromJSON(value); }
   exportJSON(): CalloutJSON { return { ...super.exportJSON(), kind: this.getKind() }; }
@@ -43,7 +43,7 @@ type AnnotationJSON = SerializedMarkNode & { kind: 'c' | 'a' };
 export class AnnotationNode extends MarkNode {
   __kind: 'c' | 'a';
   constructor(ids: readonly string[] = [], kind: 'c' | 'a' = 'c', key?: NodeKey) { super(ids, key); this.__kind = kind; }
-  static getType() { return 'wl-annotation'; }
+  static getType() { return 'ais-annotation'; }
   static clone(node: AnnotationNode) { return new AnnotationNode(node.__ids, node.__kind, node.__key); }
   static importJSON(value: AnnotationJSON) { return new AnnotationNode(value.ids, value.kind).updateFromJSON(value); }
   updateFromJSON(value: LexicalUpdateJSON<AnnotationJSON>) { super.updateFromJSON(value); this.getWritable().__kind = value.kind; return this; }
@@ -83,7 +83,7 @@ export class ReferenceNode extends DecoratorNode<ReactNode> {
   constructor(target = '', label = '', card = false, formats: ChipFormat[] = [], key?: NodeKey) {
     super(key); this.__target = target; this.__label = label; this.__card = card; this.__formats = card ? [] : chipFormats(formats);
   }
-  static getType() { return 'wl-reference'; }
+  static getType() { return 'ais-reference'; }
   static clone(node: ReferenceNode) { return new ReferenceNode(node.__target, node.__label, node.__card, node.__formats, node.__key); }
   static importJSON(value: ReferenceJSON) { return new ReferenceNode(value.target, value.label, value.card, chipFormats(value.formats)); }
   exportJSON(): ReferenceJSON {
@@ -109,7 +109,7 @@ type ImageJSON = SerializedLexicalNode & { source: string; alt: string };
 export class ImageNode extends DecoratorNode<ReactNode> {
   __source: string; __alt: string;
   constructor(source = '', alt = '', key?: NodeKey) { super(key); this.__source = source; this.__alt = alt; }
-  static getType() { return 'wl-image'; }
+  static getType() { return 'ais-image'; }
   static clone(node: ImageNode) { return new ImageNode(node.__source, node.__alt, node.__key); }
   static importJSON(value: ImageJSON) { return new ImageNode(value.source, value.alt); }
   exportJSON(): ImageJSON { return { ...super.exportJSON(), source: this.getSource(), alt: this.getAlt() }; }

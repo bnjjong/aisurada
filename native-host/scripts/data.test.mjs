@@ -13,7 +13,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { resolve, promise }; };
 const ok = value => ({ status: 0, stdout: JSON.stringify(value), stderr: '' });
-const fail = status => ({ status, stdout: '', stderr: '  WL-412: changed\n' });
+const fail = status => ({ status, stdout: '', stderr: '  AIS-412: changed\n' });
 const note = (id='a', fields={}) => ({ id, title:id, body:'# '+id+'\n\nold', agenda:'demo', agendaId:'ag', created:'2026-11-01T09:00:00+09:00', date:'2026-11-01', time:'09:00', format:'markdown', path:'notes/demo/'+id, precondition:'T0', ...fields });
 
 function fixture(t, options={}) {
@@ -79,8 +79,8 @@ test('normalization and comment ids preserve their bounded contracts',()=>{
 test('bridge errors retain status and trimmed stderr while refusal commands return every nonzero status verbatim',async()=>{
   for(const status of [1,2,3,4,5,-1]){
     const host={invoke:async()=>fail(status)};
-    await assert.rejects(engineCall(host,['update-doc','a']),error=>error instanceof SidecarCommandError&&error.status===status&&error.stderr==='WL-412: changed');
-    assert.deepEqual(await engineRefusal(host,['delete-agenda','a']),{ok:false,reason:'WL-412: changed'});
+    await assert.rejects(engineCall(host,['update-doc','a']),error=>error instanceof SidecarCommandError&&error.status===status&&error.stderr==='AIS-412: changed');
+    assert.deepEqual(await engineRefusal(host,['delete-agenda','a']),{ok:false,reason:'AIS-412: changed'});
   }
   await assert.rejects(engineCall({invoke:async()=>({status:0,stdout:'not json',stderr:''})},['list-docs']));
   await assert.rejects(engineCall({invoke:async()=>{throw 'host rejected';}},['list-docs']),e=>e==='host rejected');
@@ -229,8 +229,8 @@ test('unreadable comments block all three writes and failed on-demand reads pres
   assert.equal(h.argv().length,1);h.setHandler(async()=>fail(4));await h.data.loadComments({id:'a'});assert.equal(h.data.getSnapshot().comments.a.state,'unreadable');
 });
 test('derived deletion accepts a matching before token and strips only the specified marker',async t=>{
-  const h=fixture(t,{workspace:{notes:[note('a',{body:'<!--wlc:cmtest-1-->keep<!--/wlc:cmtest-1-->\n<!--wlc:cmother-1-->other'})]},handler:async argv=>argv[0]==='delete-comment'?ok({path:'notes/demo/a/comments.json',markerStripped:true,bodyBefore:'T0',bodyAfter:'T2'}):undefined});
-  await h.data.loadComments({id:'a'});await h.data.comment({id:'a'},'delete','','cmtest-1');assert.equal(h.workspace.notes[0].precondition,'T2');assert.equal(h.workspace.notes[0].body,'keep\n<!--wlc:cmother-1-->other');
+  const h=fixture(t,{workspace:{notes:[note('a',{body:'<!--aisc:cmtest-1-->keep<!--/aisc:cmtest-1-->\n<!--aisc:cmother-1-->other'})]},handler:async argv=>argv[0]==='delete-comment'?ok({path:'notes/demo/a/comments.json',markerStripped:true,bodyBefore:'T0',bodyAfter:'T2'}):undefined});
+  await h.data.loadComments({id:'a'});await h.data.comment({id:'a'},'delete','','cmtest-1');assert.equal(h.workspace.notes[0].precondition,'T2');assert.equal(h.workspace.notes[0].body,'keep\n<!--aisc:cmother-1-->other');
 });
 test('failed comment deletion restores its position without dropping a newer queued comment',async t=>{
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='delete-comment'?gate.promise:undefined});await h.data.loadComments({id:'a'});
@@ -270,7 +270,7 @@ test('C28: entity updates retain optimistic values on failure and send a given e
 });
 test('entity deletion refusal exposes full stderr and keeps preceding note deletions',async t=>{
   const h=fixture(t,{handler:async argv=>argv[0]==='delete-doc'?ok({trashId:'tr2',file:'a'}):argv[0]==='delete-agenda'?fail(-1):undefined});
-  const result=await h.data.deleteEntity('agenda','ag');assert.equal(result.reason,'WL-412: changed');assert.equal(h.workspace.agendas.length,1);assert.equal(h.workspace.notes.length,0);
+  const result=await h.data.deleteEntity('agenda','ag');assert.equal(result.reason,'AIS-412: changed');assert.equal(h.workspace.agendas.length,1);assert.equal(h.workspace.notes.length,0);
 });
 test('C32: a refused creation never enters memory and returns the failure; template creation failure leaves templates unchanged',async t=>{
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='create-doc'?(await gate.promise,fail(4)):argv[0]==='save-template'?fail(4):undefined});

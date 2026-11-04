@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const host = resolve(fileURLToPath(new URL("..", import.meta.url))),
   repo = resolve(host, "..");
-const root = realpathSync(mkdtempSync(join(tmpdir(), "wl-p2-"))),
+const root = realpathSync(mkdtempSync(join(tmpdir(), "ais-p2-"))),
   home = join(root, "home"),
   vault = join(root, "vault"),
   zdot = join(root, "zdot");
@@ -223,7 +223,7 @@ try {
   const engine = start(wrapper, [
     "-jar",
     // 이 점검은 4부를 뺀 합성(호스트 --no-default-features)이라 엔진도 4부를 뺀 사이드카를 띄운다
-    join(repo, "dist/wl-sidecar-noclaude.jar"),
+    join(repo, "dist/ais-sidecar-noclaude.jar"),
     "serve",
   ]);
   for (let i = 0; i < 600 && !existsSync(env.AISURADA_SIDECAR_SOCKET); i++) {

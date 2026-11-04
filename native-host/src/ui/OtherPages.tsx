@@ -992,7 +992,7 @@ export function Guide() {
       "2. ais-cli를 셸에 두기",
       [
         'APP="/Applications/aisurada.app/Contents/Resources"',
-        'java -jar "$APP/ais-cli.jar" install --cli "$APP/ais-cli.jar" --sidecar "$APP/wl-sidecar.jar"',
+        'java -jar "$APP/ais-cli.jar" install --cli "$APP/ais-cli.jar" --sidecar "$APP/ais-sidecar.jar"',
         "mkdir -p ~/.local/bin",
         `printf '#!/bin/sh\\nexec java -jar "$HOME/Library/Application Support/aisurada/bin/ais-cli.jar" "$@"\\n' > ~/.local/bin/ais-cli`,
         "chmod +x ~/.local/bin/ais-cli",

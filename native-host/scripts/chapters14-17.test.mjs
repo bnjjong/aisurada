@@ -228,7 +228,7 @@ test('Chapter 17: Q&A marker wrap with turnId and OPEN_ASK_COMMAND', () => {
   assert.ok(OPEN_ASK_COMMAND);
   const editor = createHeadlessEditor({ namespace: 'ask-test', nodes: EDITOR_NODES, onError: e => { throw e; } });
   const turnId = `ak${Date.now().toString(36)}-abcdef12`;
-  const markdown = `# 질문 테스트\n\n<!--wla:${turnId}-->선택한 본문 질문 문장<!--/wla:${turnId}-->\n`;
+  const markdown = `# 질문 테스트\n\n<!--aisa:${turnId}-->선택한 본문 질문 문장<!--/aisa:${turnId}-->\n`;
   editor.update(() => {
     $importDocument(markdown);
   }, { discrete: true });

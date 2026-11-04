@@ -4,7 +4,7 @@ import aisurada.args.JsonCompact;
 import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.JsonWriter;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
@@ -76,7 +76,7 @@ public final class InitWorkspace {
         String name = opts.get("name");
         if (name != null && Trim.isBlank(name)) {
             // 안 준 것은 「알아서 정하라」이고 빈 글은 「이름 없는 워크스페이스」라서 뜻이 다르다
-            throw new WlException(400, "워크스페이스 이름이 비었다. 이름을 주거나 아예 빼서 폴더 이름을 쓰게 한다.");
+            throw new AisException(400, "워크스페이스 이름이 비었다. 이름을 주거나 아예 빼서 폴더 이름을 쓰게 한다.");
         }
 
         // 5. 골격 폴더. 있는 폴더는 그대로 두고, 그 자리가 폴더가 아니면 선다
@@ -85,7 +85,7 @@ public final class InitWorkspace {
             try {
                 Files.createDirectories(path);
             } catch (IOException e) {
-                throw new WlException(500, "폴더를 만들지 못했다: " + path);
+                throw new AisException(500, "폴더를 만들지 못했다: " + path);
             }
         }
 
@@ -107,7 +107,7 @@ public final class InitWorkspace {
         for (Seed seed : docs) {
             // 경로 안전 검사는 그 항목을 쓰는 차례에, 자리가 차 있는지 보기 전에 한다(23.9의 1번)
             if (!AgendaReader.isValidSlugSegment(seed.id())) {
-                throw new WlException(400, "템플릿 id 가 안전한 경로 세그먼트가 아니다: " + seed.id());
+                throw new AisException(400, "템플릿 id 가 안전한 경로 세그먼트가 아니다: " + seed.id());
             }
             plant(vaultRoot, TemplateFileBytes.docRelPath(seed.id(), seed.format()),
                     TemplateFileBytes.renderDoc(seed.id(), seed.name(), seed.type(), seed.format(), seed.desc(),
@@ -151,10 +151,10 @@ public final class InitWorkspace {
             value = null;
         }
         if (!(value instanceof JsonValue.JsonArray array)) {
-            throw new WlException(400, "templates 은 JSON 배열이어야 한다: " + raw);
+            throw new AisException(400, "templates 은 JSON 배열이어야 한다: " + raw);
         }
         if (array.elements().size() > MAX_TEMPLATES) {
-            throw new WlException(400, "templates 항목이 너무 많다(최대 " + MAX_TEMPLATES + "건): "
+            throw new AisException(400, "templates 항목이 너무 많다(최대 " + MAX_TEMPLATES + "건): "
                     + array.elements().size() + "건");
         }
         List<Seed> seeds = new ArrayList<>(array.elements().size());
@@ -167,12 +167,12 @@ public final class InitWorkspace {
     /** 항목 1개를 객체인지, category, 모르는 키, 칸 차례로 본다(23.4의 8번). */
     private static Seed readSeed(JsonValue element) {
         if (!(element instanceof JsonValue.JsonObject object)) {
-            throw new WlException(400, "templates 항목이 객체가 아니다: " + JsonCompact.compact(element));
+            throw new AisException(400, "templates 항목이 객체가 아니다: " + JsonCompact.compact(element));
         }
         Map<String, JsonValue> props = object.properties();
         JsonValue categoryValue = props.get("category");
         if (!(categoryValue instanceof JsonValue.JsonString category)) {
-            throw new WlException(400, "templates 항목의 category 가 문자열이 아니다: " + compactOrNull(categoryValue));
+            throw new AisException(400, "templates 항목의 category 가 문자열이 아니다: " + compactOrNull(categoryValue));
         }
         boolean doc;
         if ("doc".equals(category.value())) {
@@ -180,7 +180,7 @@ public final class InitWorkspace {
         } else if ("ritual".equals(category.value())) {
             doc = false;
         } else {
-            throw new WlException(400, "templates 항목의 category 를 모른다: " + category.value()
+            throw new AisException(400, "templates 항목의 category 를 모른다: " + category.value()
                     + ". 쓸 수 있는 것은 [doc, ritual] 뿐이다.");
         }
 
@@ -197,7 +197,7 @@ public final class InitWorkspace {
         }
         if (!unknown.isEmpty()) {
             unknown.sort(Utf16::compare);
-            throw new WlException(400, "templates 항목에 모르는 키가 있다: [" + String.join(", ", unknown)
+            throw new AisException(400, "templates 항목에 모르는 키가 있다: [" + String.join(", ", unknown)
                     + "]. 쓸 수 있는 것은 [" + String.join(", ", allowed) + "] 뿐이다.");
         }
 
@@ -209,12 +209,12 @@ public final class InitWorkspace {
                 // 따옴표 없는 true와 false 글자만 불리언이다. True와 "true"는 거절한다
                 if (!(v instanceof JsonValue.JsonLiteral literal)
                         || !("true".equals(literal.raw()) || "false".equals(literal.raw()))) {
-                    throw new WlException(400, "templates 항목의 builtin 가 boolean 이 아니다: " + compactOrNull(v));
+                    throw new AisException(400, "templates 항목의 builtin 가 boolean 이 아니다: " + compactOrNull(v));
                 }
                 builtin = "true".equals(literal.raw());
             } else {
                 if (!(v instanceof JsonValue.JsonString s)) {
-                    throw new WlException(400, "templates 항목의 " + field + " 가 문자열이 아니다: " + compactOrNull(v));
+                    throw new AisException(400, "templates 항목의 " + field + " 가 문자열이 아니다: " + compactOrNull(v));
                 }
                 strings.put(field, s.value());
             }
@@ -235,28 +235,28 @@ public final class InitWorkspace {
      */
     private static void checkValues(Seed seed) {
         if (Trim.isBlank(seed.id()) || !ID_SHAPE.matcher(seed.id()).matches()) {
-            throw new WlException(400, "템플릿 id 모양이 아니다: " + seed.id());
+            throw new AisException(400, "템플릿 id 모양이 아니다: " + seed.id());
         }
         if (Trim.isBlank(seed.name())) {
-            throw new WlException(400, "템플릿 이름이 비었다");
+            throw new AisException(400, "템플릿 이름이 비었다");
         }
         if (!FORMATS.contains(seed.format())) {
-            throw new WlException(400, "모르는 템플릿 포맷이다: " + seed.format()
+            throw new AisException(400, "모르는 템플릿 포맷이다: " + seed.format()
                     + ". 쓸 수 있는 것은 [markdown, html, json] 뿐이다.");
         }
         if ("doc".equals(seed.category())) {
             if (!TYPES.contains(seed.type())) {
-                throw new WlException(400, "모르는 노트 유형이다: " + seed.type()
+                throw new AisException(400, "모르는 노트 유형이다: " + seed.type()
                         + ". 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.");
             }
             return;
         }
         if (!REVS.contains(seed.rev())) {
-            throw new WlException(400, "모르는 리추얼 종류다: " + seed.rev()
+            throw new AisException(400, "모르는 리추얼 종류다: " + seed.rev()
                     + ". 쓸 수 있는 것은 [morning, evening, weekly] 뿐이다.");
         }
         if (!ICON_SHAPE.matcher(seed.icon()).matches()) {
-            throw new WlException(400, "아이콘 이름 모양이 아니다: " + seed.icon());
+            throw new AisException(400, "아이콘 이름 모양이 아니다: " + seed.icon());
         }
     }
 

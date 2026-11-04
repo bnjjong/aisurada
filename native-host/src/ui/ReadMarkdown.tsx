@@ -28,7 +28,7 @@ const OPENERS = new RegExp(`[${TAGS.map(([open]) => open).join("")}]`);
 const reader = new Marked({
   tokenizer: { emStrong: () => undefined, del: () => undefined } as never,
   extensions: [{
-    name: "wlFormat",
+    name: "aisFormat",
     level: "inline",
     start: (src: string) => { const at = src.search(OPENERS); return at < 0 ? undefined : at; },
     tokenizer(src: string) {
@@ -38,7 +38,7 @@ const reader = new Marked({
       for (let i = 0; i < src.length; i++) {
         if (src[i] === kind[0]) depth++;
         else if (src[i] === kind[1] && --depth === 0)
-          return { type: "wlFormat", raw: src.slice(0, i + 1), tag: kind[2], tokens: this.lexer.inlineTokens(src.slice(1, i)) };
+          return { type: "aisFormat", raw: src.slice(0, i + 1), tag: kind[2], tokens: this.lexer.inlineTokens(src.slice(1, i)) };
       }
       return undefined;
     },

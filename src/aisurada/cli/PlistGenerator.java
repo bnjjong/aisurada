@@ -31,7 +31,7 @@ public final class PlistGenerator {
 
     /**
      * 실행할 사이드카 jar 경로를 결정합니다.
-     * 환경변수 AISURADA_SIDECAR_JAR -> 설치본 bin/wl-sidecar.jar
+     * 환경변수 AISURADA_SIDECAR_JAR -> 설치본 bin/ais-sidecar.jar
      */
     public static String resolveSidecarJar(String userHome) {
         String env = System.getenv("AISURADA_SIDECAR_JAR");
@@ -41,7 +41,7 @@ public final class PlistGenerator {
                 return trimmed;
             }
         }
-        Path installed = Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "wl-sidecar.jar");
+        Path installed = Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "ais-sidecar.jar");
         if (Files.isRegularFile(installed)) {
             return installed.toAbsolutePath().normalize().toString();
         }

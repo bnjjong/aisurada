@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.engine.WritePipeline;
 import aisurada.out.JsonWriter;
 import aisurada.text.Trim;
@@ -23,12 +23,12 @@ public final class SaveReport {
         Map<String, String> options = args.namedOptions();
         String rawKind = Trim.trim(options.get("kind"));
         String kind = rawKind.toLowerCase(Locale.ROOT);
-        if (kind.isEmpty()) throw new WlException(400, "kind 이 필요하다: " + USAGE);
-        if (!ReportReader.ALLOWED_KINDS.contains(kind)) throw new WlException(400,
+        if (kind.isEmpty()) throw new AisException(400, "kind 이 필요하다: " + USAGE);
+        if (!ReportReader.ALLOWED_KINDS.contains(kind)) throw new AisException(400,
                 "모르는 회고 종류 이다: " + rawKind + ". 쓸 수 있는 것은 [morning, evening, weekly] 뿐이다.");
         String date = Trim.trim(options.get("date"));
-        if (date.isEmpty()) throw new WlException(400, "date 이 필요하다: " + USAGE);
-        if (!date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) throw new WlException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + date);
+        if (date.isEmpty()) throw new AisException(400, "date 이 필요하다: " + USAGE);
+        if (!date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) throw new AisException(400, "date 은 YYYY-MM-DD 모양이어야 한다: " + date);
         String id = "rv-" + kind + "-" + date, relative = ".aisurada/reports/" + id + ".json";
         Path file = vault.resolve(relative);
         Map<String, Object> content = new LinkedHashMap<>();
@@ -39,7 +39,7 @@ public final class SaveReport {
         Map<String, Object> result = new LinkedHashMap<>();
         if (content.isEmpty()) {
             try { Files.deleteIfExists(file); }
-            catch (IOException e) { throw new WlException(500, "파일을 지우지 못했다: " + file.toAbsolutePath().normalize()); }
+            catch (IOException e) { throw new AisException(500, "파일을 지우지 못했다: " + file.toAbsolutePath().normalize()); }
             result.put("saved", false); result.put("deleted", true); result.put("id", id);
         } else {
             AtomicWriter.writeAtomic(file, JsonWriter.toFileBytes(content));

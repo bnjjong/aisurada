@@ -25,7 +25,7 @@ export function renderDiagram(source: string, theme: string): Promise<string> {
         flowchart: { htmlLabels: false },
       });
       const result = await mermaid.render(
-        "wl-mermaid-" + crypto.randomUUID(),
+        "ais-mermaid-" + crypto.randomUUID(),
         source,
       );
       return DOMPurify.sanitize(result.svg, {
@@ -128,7 +128,7 @@ function Preview({
       outer = root?.closest<HTMLElement>(".lex-editor");
     if (!code || !outer) return;
     const layout = () => {
-      code.classList.toggle("wl-mermaid-source-folded", !expanded);
+      code.classList.toggle("ais-mermaid-source-folded", !expanded);
       const height = surface.current?.getBoundingClientRect().height || 180;
       code.style.paddingBottom = height + 16 + "px";
       const rect = code.getBoundingClientRect(),
@@ -151,7 +151,7 @@ function Preview({
     return () => {
       observer.disconnect();
       document.removeEventListener("selectionchange", focus);
-      code.classList.remove("wl-mermaid-source-folded");
+      code.classList.remove("ais-mermaid-source-folded");
       code.style.paddingBottom = "";
     };
   }, [editor, nodeKey, expanded, svg, error]);

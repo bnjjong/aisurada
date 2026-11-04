@@ -50,7 +50,7 @@ final class ChapterTestSupport implements AutoCloseable {
     @SuppressWarnings("unchecked") static Map<String, Object> ok(Path v, String... args) { return (Map<String, Object>) success(v, args); }
     @SuppressWarnings("unchecked") static List<Map<String, Object>> list(Path v, String... args) { return (List<Map<String, Object>>) success(v, args); }
     static EngineResult error(Path v, int code, String... args) {
-        EngineResult result = run(v, args); eq(result.status(), 3, "failure status " + args[0]); eq(result.errorCode(), code, "WL code: " + stderr(result)); eq(result.stdoutBytes().length, 0, "failure stdout"); return result;
+        EngineResult result = run(v, args); eq(result.status(), 3, "failure status " + args[0]); eq(result.errorCode(), code, "AIS code: " + stderr(result)); eq(result.stdoutBytes().length, 0, "failure stdout"); return result;
     }
     static String stderr(EngineResult r) { return new String(r.stderrBytes(), StandardCharsets.UTF_8); }
     static String stdout(EngineResult r) { return new String(r.stdoutBytes(), StandardCharsets.UTF_8); }

@@ -26,28 +26,28 @@
 터미널 1(엔진). 저장소 루트에서 실행한다.
 
 ```bash
-export WL=$HOME/wl-hand-check
-/bin/rm -rf "$WL"; mkdir -p "$WL/home/.claude/projects" "$WL/vault"
-printf '#!/bin/sh\nexec /usr/bin/java -Duser.home="%s" "$@"\n' "$WL/home" > "$WL/java"; chmod 755 "$WL/java"
-printf '#!/bin/sh\ncat >/dev/null\necho "가짜 claude의 답이에요."\n' > "$WL/fake-claude"; chmod 755 "$WL/fake-claude"
+export HC_DIR=$HOME/ais-hand-check
+/bin/rm -rf "$HC_DIR"; mkdir -p "$HC_DIR/home/.claude/projects" "$HC_DIR/vault"
+printf '#!/bin/sh\nexec /usr/bin/java -Duser.home="%s" "$@"\n' "$HC_DIR/home" > "$HC_DIR/java"; chmod 755 "$HC_DIR/java"
+printf '#!/bin/sh\ncat >/dev/null\necho "가짜 claude의 답이에요."\n' > "$HC_DIR/fake-claude"; chmod 755 "$HC_DIR/fake-claude"
 
-java -Duser.home="$WL/home" -jar dist/wl-engine.jar init-workspace name=손확인 'templates=[]' --aisurada.vault="$WL/vault"
-export AISURADA_VAULT="$WL/vault" AISURADA_SIDECAR_SOCKET="$WL/engine.sock"
-java -Duser.home="$WL/home" -jar dist/wl-engine.jar serve
+java -Duser.home="$HC_DIR/home" -jar dist/ais-engine.jar init-workspace name=손확인 'templates=[]' --aisurada.vault="$HC_DIR/vault"
+export AISURADA_VAULT="$HC_DIR/vault" AISURADA_SIDECAR_SOCKET="$HC_DIR/engine.sock"
+java -Duser.home="$HC_DIR/home" -jar dist/ais-engine.jar serve
 ```
 
-터미널 2(앱). 같은 `WL`을 쓴다.
+터미널 2(앱). 같은 `HC_DIR`을 쓴다.
 
 ```bash
-export WL=$HOME/wl-hand-check
+export HC_DIR=$HOME/ais-hand-check
 cd /Users/df/github/aisurada
-AISURADA_VAULT="$WL/vault" AISURADA_SIDECAR_SOCKET="$WL/engine.sock" \
-HOME="$WL/home" AISURADA_CLI_JAR="$PWD/dist/ais-cli.jar" AISURADA_SIDECAR_JAVA="$WL/java" \
-AISURADA_CLAUDE_BIN="$WL/fake-claude" \
+AISURADA_VAULT="$HC_DIR/vault" AISURADA_SIDECAR_SOCKET="$HC_DIR/engine.sock" \
+HOME="$HC_DIR/home" AISURADA_CLI_JAR="$PWD/dist/ais-cli.jar" AISURADA_SIDECAR_JAVA="$HC_DIR/java" \
+AISURADA_CLAUDE_BIN="$HC_DIR/fake-claude" \
 native-host/src-tauri/target/debug/bundle/macos/aisurada.app/Contents/MacOS/aisurada-host
 ```
 
-앱이 뜨면 「열기」로 `$HOME/wl-hand-check/vault`를 고르고, 아젠다 하나와 노트 하나를 만든다. 끝나면 `Ctrl-C`로 엔진과 앱을 내리고 `/bin/rm -rf "$HOME/wl-hand-check"`로 지운다. 확인은 `ls ~/Library/LaunchAgents | grep -i aisurada`가 비어 있는지로 한다.
+앱이 뜨면 「열기」로 `$HOME/ais-hand-check/vault`를 고르고, 아젠다 하나와 노트 하나를 만든다. 끝나면 `Ctrl-C`로 엔진과 앱을 내리고 `/bin/rm -rf "$HOME/ais-hand-check"`로 지운다. 확인은 `ls ~/Library/LaunchAgents | grep -i aisurada`가 비어 있는지로 한다.
 
 > 이 방법의 엔진 기동과 앱 기동은 이 문서를 쓰면서 한 번 돌려 확인했다. 앱이 8초 뒤에도 떠 있었고 `ais-cli list-docs`가 소켓으로 답했으며 LaunchAgent는 생기지 않았다. 아래 점검 자체는 아직 아무도 하지 않았다.
 
@@ -79,7 +79,7 @@ native-host/src-tauri/target/debug/bundle/macos/aisurada.app/Contents/MacOS/aisu
 1. 노트 본문에서 글을 드래그하고 「AI에게 묻기」를 누른다.
 2. 묻는 칸에 질문을 쓰고 「묻기」(또는 Cmd+Enter)를 누른다.
 3. 기대: 「요청 중」 줄이 잠깐 보이고, 노트 아래 「AI 문답」 칸과 밑줄 카드에 `가짜 claude의 답이에요.`가 나온다. 다른 탭에 있으면 탭에 「AI 답이 왔어요」 점이 뜬다.
-4. 터미널에서 `ls "$HOME/wl-hand-check/vault/notes/"*/*/ask.json`이 파일을 보여야 한다.
+4. 터미널에서 `ls "$HOME/ais-hand-check/vault/notes/"*/*/ask.json`이 파일을 보여야 한다.
 5. 같은 대목에 이어 묻기를 한 번 더 한다. 같은 밑줄 아래 묶여야 한다.
 6. 표 줄과 HTML 상자에서도 묻기가 되는지 본다(해당 노트가 있으면).
 
@@ -88,15 +88,15 @@ native-host/src-tauri/target/debug/bundle/macos/aisurada.app/Contents/MacOS/aisu
 세션 화면은 `~/.claude/projects`의 전사가 있어야 보인다. 격리 HOME에 가짜 전사를 하나 둔다.
 
 ```bash
-export WL=$HOME/wl-hand-check
+export HC_DIR=$HOME/ais-hand-check
 SID=f1a50000-0000-4000-8000-000000000001
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-mkdir -p "$WL/home/.claude/projects/-Users-test-vault"
+mkdir -p "$HC_DIR/home/.claude/projects/-Users-test-vault"
 printf '%s\n' \
   "{\"type\":\"user\",\"entrypoint\":\"cli\",\"cwd\":\"/Users/test/vault\",\"timestamp\":\"$NOW\",\"message\":{\"content\":\"세션 점검용 첫 물음\"}}" \
   "{\"type\":\"assistant\",\"timestamp\":\"$NOW\",\"message\":{\"model\":\"claude-opus-4\",\"content\":[{\"type\":\"text\",\"text\":\"세션 점검용 첫 답\"}]}}" \
   "{\"type\":\"custom-title\",\"customTitle\":\"손확인 세션\"}" \
-  > "$WL/home/.claude/projects/-Users-test-vault/$SID.jsonl"
+  > "$HC_DIR/home/.claude/projects/-Users-test-vault/$SID.jsonl"
 ```
 
 1. 레일의 PROJECTS에 「손확인 세션」이 보이는지 본다(앱을 다시 열거나 목록을 새로 읽는다).

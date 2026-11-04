@@ -9,11 +9,11 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 설명서 4.1 규격에 따른 소켓 요청 프레임 (WLQ1) 읽기 및 쓰기.
+ * 설명서 4.1 규격에 따른 소켓 요청 프레임 (AIQ1) 읽기 및 쓰기.
  */
 public final class RequestFrame {
 
-    public static final int MAGIC = 0x574C5131; // "WLQ1"
+    public static final int MAGIC = 0x41495131; // "AIQ1"
     public static final int VERSION = 1;
     public static final int MAX_ARGS = 64;
     public static final int MAX_ARG_LEN = 1_048_576; // 1 MiB

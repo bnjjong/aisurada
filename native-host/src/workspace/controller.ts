@@ -267,18 +267,18 @@ export class WorkspaceController {
     if (this.disposed) return false;
     // 15.14 (1), C149: the menu is heard only once the window is attached to the vault;
     // the waiting and failure screens close with the window's own button.
-    if (this.context.kind === 'note') return id === 'wl_close_tab' && this.state.workspace ? this.closeNoteWindow() : false;
-    if (id === 'wl_new_workspace') { this.navigate('/launcher?mode=create'); return true; }
-    if (id === 'wl_welcome') return this.launcher();
-    if (id === 'wl_open_workspace') {
+    if (this.context.kind === 'note') return id === 'ais_close_tab' && this.state.workspace ? this.closeNoteWindow() : false;
+    if (id === 'ais_new_workspace') { this.navigate('/launcher?mode=create'); return true; }
+    if (id === 'ais_welcome') return this.launcher();
+    if (id === 'ais_open_workspace') {
       try {
         const path = await this.services.host.chooseDirectory();
         return path ? this.open(path, true) : false;
       } catch (error) { this.notify(`폴더를 열 수 없어요: ${String(error)}`); this.navigate('/launcher'); return false; }
     }
     if (!this.showingTabs()) return false;
-    if (id === 'wl_open_terminal') { this.navigate('/terminal'); return true; }
-    if (id === 'wl_close_tab') {
+    if (id === 'ais_open_terminal') { this.navigate('/terminal'); return true; }
+    if (id === 'ais_close_tab') {
       const active = activeTab(this.state.route);
       if (active !== null) this.closeTab(active);
       else if (this.services.native) { try { await this.services.closeWindow?.(); } catch { /* The host intentionally denies main close. */ } }
@@ -304,8 +304,8 @@ export class WorkspaceController {
     const shortcut = shortcutFor(event, this.services.mac ?? true, this.services.native ?? false);
     if (!shortcut) return false;
     if (shortcut.kind === 'search') { event.preventDefault(); this.patch({ searchOpen: !this.state.searchOpen }); return true; }
-    if (shortcut.kind === 'terminal') { event.preventDefault(); void this.handleMenu('wl_open_terminal'); return true; }
-    if (shortcut.kind === 'close') { event.preventDefault(); void this.handleMenu('wl_close_tab'); return true; }
+    if (shortcut.kind === 'terminal') { event.preventDefault(); void this.handleMenu('ais_open_terminal'); return true; }
+    if (shortcut.kind === 'close') { event.preventDefault(); void this.handleMenu('ais_close_tab'); return true; }
     const tabs: (string | null)[] = [null, ...this.state.tabs.openIds];
     let target: string | null | undefined;
     if (shortcut.kind === 'cycle') {

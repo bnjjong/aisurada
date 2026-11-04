@@ -7,10 +7,10 @@ use tauri::{
     Emitter, EventTarget, Runtime,
 };
 
-pub const MENU: &str = "wl://menu";
-pub const NAVIGATE: &str = "wl://navigate";
-pub const NOTE_WINDOWS: &str = "wl://note-windows";
-pub const SELF_WRITE: &str = "wl://self-write";
+pub const MENU: &str = "ais://menu";
+pub const NAVIGATE: &str = "ais://navigate";
+pub const NOTE_WINDOWS: &str = "ais://note-windows";
+pub const SELF_WRITE: &str = "ais://self-write";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -40,13 +40,13 @@ pub fn header(request: &Request<'_>, key: &str) -> Result<String, String> {
     decode_header(
         request
             .headers()
-            .get(format!("x-wl-{key}"))
+            .get(format!("x-ais-{key}"))
             .map(|v| v.as_bytes()),
         key,
     )
 }
 fn decode_header(value: Option<&[u8]>, key: &str) -> Result<String, String> {
-    let name = format!("x-wl-{key}");
+    let name = format!("x-ais-{key}");
     let bytes = value.ok_or_else(|| format!("요청에 {name} 이 없어요"))?;
     if !bytes.is_ascii() {
         return Err(format!("{name} 이 ASCII 가 아니에요"));
@@ -99,7 +99,7 @@ mod tests {
         note.listen(MENU, move |_| {
             copy.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         });
-        emit_window(app.handle(), "note-test", MENU, "wl_close_tab").unwrap();
+        emit_window(app.handle(), "note-test", MENU, "ais_close_tab").unwrap();
         assert_eq!(main_count.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert_eq!(note_count.load(std::sync::atomic::Ordering::SeqCst), 1);
     }

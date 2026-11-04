@@ -322,43 +322,43 @@
   },
   {
     "id": "N1",
-    "input": "앞 <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> 뒤",
-    "expected": "앞 <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> 뒤"
+    "input": "앞 <!--aisc:cm1-a-->글<!--/aisc:cm1-a--> 뒤",
+    "expected": "앞 <!--aisc:cm1-a-->글<!--/aisc:cm1-a--> 뒤"
   },
   {
     "id": "N2",
-    "input": "<!--wlc:cm1-a-->하나\n\n둘<!--/wlc:cm1-a-->",
-    "expected": "<!--wlc:cm1-a-->하나<!--/wlc:cm1-a-->\n\n<!--wlc:cm1-a-->둘<!--/wlc:cm1-a-->"
+    "input": "<!--aisc:cm1-a-->하나\n\n둘<!--/aisc:cm1-a-->",
+    "expected": "<!--aisc:cm1-a-->하나<!--/aisc:cm1-a-->\n\n<!--aisc:cm1-a-->둘<!--/aisc:cm1-a-->"
   },
   {
     "id": "N3",
-    "input": "<!--wlc:cm1-a-->- 글<!--/wlc:cm1-a-->",
-    "expected": "<!--wlc:cm1-a-->- 글<!--/wlc:cm1-a-->"
+    "input": "<!--aisc:cm1-a-->- 글<!--/aisc:cm1-a-->",
+    "expected": "<!--aisc:cm1-a-->- 글<!--/aisc:cm1-a-->"
   },
   {
     "id": "N4",
-    "input": "<!--wlc:cm1-a-->![그림](attach/a.png) [노트](#doc:nd1-a)<!--/wlc:cm1-a-->",
-    "expected": "<!--wlc:cm1-a-->![그림](attach/a.png) [노트](#doc:nd1-a)<!--/wlc:cm1-a-->"
+    "input": "<!--aisc:cm1-a-->![그림](attach/a.png) [노트](#doc:nd1-a)<!--/aisc:cm1-a-->",
+    "expected": "<!--aisc:cm1-a-->![그림](attach/a.png) [노트](#doc:nd1-a)<!--/aisc:cm1-a-->"
   },
   {
     "id": "N5",
-    "input": "<!--wlc:cm1-a-->가<!--wla:ak1-a-->나<!--/wla:ak1-a-->다<!--/wlc:cm1-a-->\n\n**굵<!--wlc:cm3-c-->게<!--/wlc:cm3-c-->**",
-    "expected": "<!--wlc:cm1-a-->가<!--wla:ak1-a-->나<!--/wla:ak1-a-->다<!--/wlc:cm1-a-->\n\n**굵**<!--wlc:cm3-c-->**게**<!--/wlc:cm3-c-->"
+    "input": "<!--aisc:cm1-a-->가<!--aisa:ak1-a-->나<!--/aisa:ak1-a-->다<!--/aisc:cm1-a-->\n\n**굵<!--aisc:cm3-c-->게<!--/aisc:cm3-c-->**",
+    "expected": "<!--aisc:cm1-a-->가<!--aisa:ak1-a-->나<!--/aisa:ak1-a-->다<!--/aisc:cm1-a-->\n\n**굵**<!--aisc:cm3-c-->**게**<!--/aisc:cm3-c-->"
   },
   {
     "id": "N6",
-    "input": "<!--wlc:cm1-a-->가<!--wlc:cm2-b-->나<!--/wlc:cm1-a-->다<!--/wlc:cm2-b-->",
-    "expected": "<!--wlc:cm1-a-->가<!--wlc:cm2-b-->나<!--/wlc:cm2-b--><!--/wlc:cm1-a--><!--wlc:cm2-b-->다<!--/wlc:cm2-b-->"
+    "input": "<!--aisc:cm1-a-->가<!--aisc:cm2-b-->나<!--/aisc:cm1-a-->다<!--/aisc:cm2-b-->",
+    "expected": "<!--aisc:cm1-a-->가<!--aisc:cm2-b-->나<!--/aisc:cm2-b--><!--/aisc:cm1-a--><!--aisc:cm2-b-->다<!--/aisc:cm2-b-->"
   },
   {
     "id": "N7",
-    "input": "<!--wlc:ak1-a-->남김<!--/wlc:ak1-a--> <!--wlc:cm1-a-->홀로 유삭제지",
+    "input": "<!--aisc:ak1-a-->남김<!--/aisc:ak1-a--> <!--aisc:cm1-a-->홀로 유삭제지",
     "expected": "남김 홀로 유지"
   },
   {
     "id": "N8",
-    "input": "|<!--wlc:cm1-a-->글<!--/wlc:cm1-a-->|x|\n|---|---|",
-    "expected": "| <!--wlc:cm1-a-->글<!--/wlc:cm1-a--> | x |\n| --- | --- |"
+    "input": "|<!--aisc:cm1-a-->글<!--/aisc:cm1-a-->|x|\n|---|---|",
+    "expected": "| <!--aisc:cm1-a-->글<!--/aisc:cm1-a--> | x |\n| --- | --- |"
   },
   {
     "id": "C69a",
@@ -413,13 +413,13 @@
   },
   {
     "id": "C182a",
-    "input": "표식 설명: `<!--wlc:cmab-12345678-->` 를 여는 표식이라 한다",
-    "expected": "표식 설명: `<!--wlc:cmab-12345678-->` 를 여는 표식이라 한다"
+    "input": "표식 설명: `<!--aisc:cmab-12345678-->` 를 여는 표식이라 한다",
+    "expected": "표식 설명: `<!--aisc:cmab-12345678-->` 를 여는 표식이라 한다"
   },
   {
     "id": "C182b",
-    "input": "```html\n<!--wlc:cmab-12345678-->글<!--/wlc:cmab-12345678-->\n```",
-    "expected": "```html\n<!--wlc:cmab-12345678-->글<!--/wlc:cmab-12345678-->\n```"
+    "input": "```html\n<!--aisc:cmab-12345678-->글<!--/aisc:cmab-12345678-->\n```",
+    "expected": "```html\n<!--aisc:cmab-12345678-->글<!--/aisc:cmab-12345678-->\n```"
   },
   {
     "id": "C183a",
@@ -464,8 +464,8 @@
   },
   {
     "id": "C200a",
-    "input": "<!--wlc:cmab-12345678-->**주의.**<!--/wlc:cmab-12345678--> 뒤",
-    "expected": "<!--wlc:cmab-12345678-->**주의.**<!--/wlc:cmab-12345678--> 뒤"
+    "input": "<!--aisc:cmab-12345678-->**주의.**<!--/aisc:cmab-12345678--> 뒤",
+    "expected": "<!--aisc:cmab-12345678-->**주의.**<!--/aisc:cmab-12345678--> 뒤"
   },
   {
     "id": "C198a",

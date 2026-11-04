@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.out.NoteRow;
 import aisurada.text.Trim;
 import aisurada.vault.AttachText;
@@ -101,12 +101,12 @@ public final class ListDocs {
                     try {
                         long parsedLimit = Long.parseLong(trimmedLimit);
                         if (parsedLimit > Integer.MAX_VALUE || parsedLimit < Integer.MIN_VALUE) {
-                            throw new WlException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
+                            throw new AisException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
                         }
                         int lim = (int) parsedLimit;
                         limit = (lim <= 0) ? -1 : lim;
                     } catch (NumberFormatException e) {
-                        throw new WlException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
+                        throw new AisException(400, "limit 은 숫자여야 한다: " + trimmedLimit);
                     }
                 }
             } else {
@@ -146,7 +146,7 @@ public final class ListDocs {
             } else if ("false".equals(trimmedBodies) || trimmedBodies.isEmpty()) {
                 includeBodies = false;
             } else {
-                throw new WlException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
+                throw new AisException(400, "bodies 은 true 나 false 여야 한다: " + trimmedBodies);
             }
         }
 

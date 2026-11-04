@@ -144,7 +144,7 @@ public final class VaultGit {
         var ids = noteIds(changes);
         String actors = writers.isEmpty() ? "outside" : String.join(",", writers);
         String actorValues = writers.isEmpty() ? "outside" : String.join(" ", writers);
-        StringBuilder message = new StringBuilder("wl(" + actors + "): 노트 " + ids.size() + "개, 파일 " + changes.size() + "개\n\n")
+        StringBuilder message = new StringBuilder("ais(" + actors + "): 노트 " + ids.size() + "개, 파일 " + changes.size() + "개\n\n")
                 .append("Aisurada-Writer: ").append(actorValues).append('\n').append("Aisurada-Reason: ").append(reason).append('\n');
         if (!sessions.isEmpty()) message.append("Aisurada-Session: ").append(String.join(" ", sessions)).append('\n');
         if (!ids.isEmpty()) message.append("Aisurada-Notes: ").append(String.join(" ", ids.stream().limit(200).toList())).append('\n');

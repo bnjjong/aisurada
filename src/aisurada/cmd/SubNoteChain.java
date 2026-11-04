@@ -1,6 +1,6 @@
 package aisurada.cmd;
 
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.NoteIndex;
 import aisurada.vault.NoteScanner;
@@ -39,11 +39,11 @@ final class SubNoteChain {
             }
         }
         if (segments.isEmpty()) {
-            throw new WlException(400, "부모 노트 참조가 비었다: " + rawParent);
+            throw new AisException(400, "부모 노트 참조가 비었다: " + rawParent);
         }
         String rootId = segments.get(0);
         if (!NOTE_ID_PATTERN.matcher(rootId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rootId);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rootId);
         }
         NoteScanner.NoteRecord root = noteIndex.notesById().get(rootId);
         NoteScanner.NoteRecord container = root;
@@ -63,18 +63,18 @@ final class SubNoteChain {
         return directChild(parent.root(), parent.rootId(), containerId, rawId);
     }
 
-    /** 모양(WL-400), 그 루트 아래 색인(WL-404 `<루트 id>/<하위 id>`), 직계 부모(WL-404 `<하위 id>`) 차례입니다. */
+    /** 모양(AIS-400), 그 루트 아래 색인(AIS-404 `<루트 id>/<하위 id>`), 직계 부모(AIS-404 `<하위 id>`) 차례입니다. */
     private static NoteScanner.NoteRecord directChild(
             NoteScanner.NoteRecord root, String rootId, String parentId, String subId) {
         if (!SUB_NOTE_ID_PATTERN.matcher(subId).matches()) {
-            throw new WlException(400, "하위 노트 id 모양이 아니다: " + subId);
+            throw new AisException(400, "하위 노트 id 모양이 아니다: " + subId);
         }
         NoteScanner.NoteRecord sub = root == null ? null : root.subNotes().get(subId);
         if (sub == null) {
-            throw new WlException(404, "SubNote not found: " + rootId + "/" + subId);
+            throw new AisException(404, "SubNote not found: " + rootId + "/" + subId);
         }
         if (!parentId.equals(sub.directParentId())) {
-            throw new WlException(404, "SubNote not found: " + subId);
+            throw new AisException(404, "SubNote not found: " + subId);
         }
         return sub;
     }

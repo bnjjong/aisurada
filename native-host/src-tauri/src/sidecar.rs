@@ -176,7 +176,7 @@ fn execute(
         {
             Vec::new()
         } else {
-            module_candidates(context, "wl-sidecar")
+            module_candidates(context, "ais-sidecar")
         }
     });
     env.insert("AISURADA_VAULT".into(), vault.into());
@@ -420,7 +420,7 @@ mod tests {
             ("AISURADA_CLI_JAR", jar.to_str().unwrap()),
             ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
         ]);
-        let sidecar = c.resource.as_ref().unwrap().join("wl-sidecar.jar");
+        let sidecar = c.resource.as_ref().unwrap().join("ais-sidecar.jar");
         touch(&sidecar);
         assert_eq!(
             execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout,
@@ -436,7 +436,7 @@ mod tests {
             temp.path()
                 .join("target/debug/bundle/macos/app/Contents/Resources"),
         );
-        touch(&c.resource.as_ref().unwrap().join("wl-sidecar.jar"));
+        touch(&c.resource.as_ref().unwrap().join("ais-sidecar.jar"));
         assert_eq!(
             execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout,
             "unset"

@@ -1,5 +1,5 @@
 import {VaultData} from '../src/data/vault.ts';import {EditorSession} from '../src/editor/session.ts';import {sampleWorkspace} from '../src/workspace/sample.ts';
-export const ok=value=>({status:0,stdout:JSON.stringify(value),stderr:''}),fail=status=>({status,stdout:'',stderr:'WL-fixture failure'});
+export const ok=value=>({status:0,stdout:JSON.stringify(value),stderr:''}),fail=status=>({status,stdout:'',stderr:'AIS-fixture failure'});
 export const spin=async()=>{for(let i=0;i<50;i++)await Promise.resolve()},deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{resolve,promise}};
 const clone=x=>JSON.parse(JSON.stringify(x));
 export function fixture(t,options={}){

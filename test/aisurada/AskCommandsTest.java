@@ -142,7 +142,7 @@ public final class AskCommandsTest {
                 "question=" + oversizedText, "answer=ok", "model=sonnet", "effort=low", "elapsed-ms=100");
         check(stderr(errTooLong).contains("질문이 상한을 넘었다"), "oversized question 400");
 
-        // 2. D1 고침 (cc12691b): 전체 문답 파일 1,000,000 바이트 상한 초과시 WL-500 거절 및 원본 보존
+        // 2. D1 고침 (cc12691b): 전체 문답 파일 1,000,000 바이트 상한 초과시 AIS-500 거절 및 원본 보존
         // 먼저 정상 턴 1개 작성
         run(v, "append-ask-turn", noteId,
                 "session-id=sess-1234", "turn-id=t-init", "mark-id=m-init", "asked-at=2026-11-03T00:00:00Z",

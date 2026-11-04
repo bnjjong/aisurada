@@ -4,7 +4,7 @@ import java.util.regex.Pattern;
 
 /** 19.8: 키워드의 대소문자는 무시하되 잡힌 id는 글자 그대로 비교한다. */
 public final class CommentAnchors {
-    private static final Pattern MARKER = Pattern.compile("<!--(/?)wlc:(cm[a-z0-9]+-[a-z0-9]{1,8})-->",
+    private static final Pattern MARKER = Pattern.compile("<!--(/?)aisc:(cm[a-z0-9]+-[a-z0-9]{1,8})-->",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private CommentAnchors() {}
 

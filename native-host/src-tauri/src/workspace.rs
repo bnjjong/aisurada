@@ -324,7 +324,7 @@ mod ipc_tests {
             InvokeBody::Json(json!([0, 255, 7])),
         ] {
             let mut headers = tauri::http::HeaderMap::new();
-            headers.insert("x-wl-name", "%ED%95%9C.png".parse().unwrap());
+            headers.insert("x-ais-name", "%ED%95%9C.png".parse().unwrap());
             assert_eq!(
                 call(&main, "attachment_transport", payload, headers).unwrap(),
                 json!({"name":"한.png","bytes":[0,255,7]})

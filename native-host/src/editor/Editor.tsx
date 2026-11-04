@@ -249,7 +249,7 @@ function EditorBridge(props: EditorProps) {
   useEffect(() => {
     editor.update(
       () => {
-        $addUpdateTag("wl:repair");
+        $addUpdateTag("ais:repair");
         $repairDocument();
         $setSelection(null);
       },
@@ -367,9 +367,9 @@ function EditorBridge(props: EditorProps) {
             group.at(-1)?.classList.add("lex-comment-end");
           if (
             !initialized.current ||
-            tags.has("wl:import") ||
-            tags.has("wl:repair") ||
-            tags.has("wl:mirror") ||
+            tags.has("ais:import") ||
+            tags.has("ais:repair") ||
+            tags.has("ais:mirror") ||
             tags.has("aisurada-mirror")
           ) {
             last.current = body;
@@ -451,7 +451,7 @@ function EditorBridge(props: EditorProps) {
         editor.update(() => {
           for (const node of $getRoot().getAllTextNodes())
             for (const mark of node.getParents())
-              if (mark.getType() === "wl-annotation" && "deleteID" in mark) {
+              if (mark.getType() === "ais-annotation" && "deleteID" in mark) {
                 const annotation = mark as import("./nodes.tsx").AnnotationNode;
                 annotation.deleteID(id);
                 if (!annotation.getIDs().length) {
@@ -467,7 +467,7 @@ function EditorBridge(props: EditorProps) {
           const walk = (element: import("lexical").ElementNode) => {
             for (const node of element.getChildren()) {
               if (
-                node.getType() === "wl-reference" &&
+                node.getType() === "ais-reference" &&
                 (node as import("./nodes.tsx").ReferenceNode).isCard() &&
                 (node as import("./nodes.tsx").ReferenceNode).getTarget() === id
               )

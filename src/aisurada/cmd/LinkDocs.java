@@ -1,7 +1,7 @@
 package aisurada.cmd;
 
 import aisurada.args.ParsedArgs;
-import aisurada.cli.WlException;
+import aisurada.cli.AisException;
 import aisurada.text.Trim;
 import aisurada.vault.NoteIndex;
 import aisurada.vault.NoteScanner;
@@ -45,7 +45,7 @@ public final class LinkDocs {
         }
 
         if (rawFrom == null || Trim.isBlank(rawFrom)) {
-            throw new WlException(400, "인자가 하나 필요하다: " + USAGE);
+            throw new AisException(400, "인자가 하나 필요하다: " + USAGE);
         }
 
         // 5. to 검증 (15.4 row 5, 7)
@@ -57,17 +57,17 @@ public final class LinkDocs {
         }
 
         if (rawTo == null || Trim.isBlank(rawTo)) {
-            throw new WlException(400, "대상 노트 id 가 필요하다: " + USAGE);
+            throw new AisException(400, "대상 노트 id 가 필요하다: " + USAGE);
         }
 
         // 6. from 모양 검증
         if (!NOTE_ID_PATTERN.matcher(rawFrom).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawFrom);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawFrom);
         }
 
         // 7. to 모양 검증
         if (!NOTE_ID_PATTERN.matcher(rawTo).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawTo);
+            throw new AisException(400, "노트 id 모양이 아니다: " + rawTo);
         }
 
         String fromId = rawFrom;
@@ -82,7 +82,7 @@ public final class LinkDocs {
                 if (!trimmed.isEmpty()) {
                     String lower = trimmed.toLowerCase(Locale.ROOT);
                     if (!ALLOWED_KINDS.contains(lower)) {
-                        throw new WlException(400, "모르는 관계 종류 이다: " + trimmed + ". 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.");
+                        throw new AisException(400, "모르는 관계 종류 이다: " + trimmed + ". 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.");
                     }
                     canonicalKind = lower;
                 }
@@ -94,7 +94,7 @@ public final class LinkDocs {
                 if (!trimmed.isEmpty()) {
                     String lower = trimmed.toLowerCase(Locale.ROOT);
                     if (!ALLOWED_KINDS.contains(lower)) {
-                        throw new WlException(400, "모르는 관계 종류 이다: " + trimmed + ". 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.");
+                        throw new AisException(400, "모르는 관계 종류 이다: " + trimmed + ". 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.");
                     }
                     canonicalKind = lower;
                 }
@@ -120,7 +120,7 @@ public final class LinkDocs {
                     } else if ("false".equals(trimmed)) {
                         remove = false;
                     } else {
-                        throw new WlException(400, "remove 은 true 나 false 여야 한다: " + trimmed);
+                        throw new AisException(400, "remove 은 true 나 false 여야 한다: " + trimmed);
                     }
                 }
             }
@@ -128,7 +128,7 @@ public final class LinkDocs {
 
         // 15. 자기 자신과 연결 검증 (15.4 row 15)
         if (fromId.equals(toId)) {
-            throw new WlException(400, "자기 자신과는 연결할 수 없다: " + fromId);
+            throw new AisException(400, "자기 자신과는 연결할 수 없다: " + fromId);
         }
 
         // f1 토큰 파싱
@@ -154,7 +154,7 @@ public final class LinkDocs {
         // 16. 색인에서 from 노트 검색 (15.4 row 16)
         NoteScanner.NoteRecord note = noteIndex.notesById().get(fromId);
         if (note == null) {
-            throw new WlException(404, "Note not found: " + fromId);
+            throw new AisException(404, "Note not found: " + fromId);
         }
 
         // 기존 연결 여부 확인 (15.5)

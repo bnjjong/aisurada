@@ -1,5 +1,5 @@
 // Full production React UI + real Tauri/Java, using only the isolated fixture.
-const cfg = window.__WL_FIXTURE__,
+const cfg = window.__AIS_FIXTURE__,
   invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const assert = (yes, why) => {
@@ -886,7 +886,7 @@ if (location.pathname.startsWith("/note-window/")) {
       assert($$(".guide-step button").length === 3, "guide copy");
       const step2 = $$(".guide-step")[1].textContent;
       assert(!step2.includes("aisurada-mcp.js") && !step2.includes("mcpServers"), "C119 guide still registers the removed MCP server");
-      assert(step2.includes('install --cli "$APP/ais-cli.jar" --sidecar "$APP/wl-sidecar.jar"') && step2.includes("export AISURADA_VAULT="), "C119 guide lacks the CLI mode setup");
+      assert(step2.includes('install --cli "$APP/ais-cli.jar" --sidecar "$APP/ais-sidecar.jar"') && step2.includes("export AISURADA_VAULT="), "C119 guide lacks the CLI mode setup");
       assert(!$(".set-ask-timeout"), "AI control visible");
     });
     // Last on purpose: a selection left in the template editor disturbs later navigation.

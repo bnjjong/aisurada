@@ -23,7 +23,7 @@ public final class Chapter29Test {
             eq(draft.get("body"), expected, "weekend previous day and differing section sort"); eq(draft.get("saved"), false, "dry run with agenda does not save");
             check(!Files.exists(v.resolve(".aisurada/agendas/존재-안-함.md")), "dry run does not create agenda");
             random("0c1d2e3f,1c2d3e4f");
-            var saved = ok(v, "plan_day", "{\"date\":\"2026-06-22\",\"agenda\":\"데모\"}", "\u0000wl-session-id", "plan-session");
+            var saved = ok(v, "plan_day", "{\"date\":\"2026-06-22\",\"agenda\":\"데모\"}", "\u0000ais-session-id", "plan-session");
             eq(saved.keySet().stream().toList(), List.of("saved", "id", "agenda", "agendaCreated", "path", "body"), "saved shape omits date");
             eq(saved.get("body"), expected, "saved body drafted before inserting itself"); eq(saved.get("agenda"), "demo", "agenda title lookup");
             String file = Files.readString(v.resolve(saved.get("path") + "/note.md"));
