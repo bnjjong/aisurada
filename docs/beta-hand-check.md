@@ -9,7 +9,7 @@
 | 엔진 `bash test.sh` | 전부 통과 |
 | 화면·호스트 `bash test-native.sh` | Node 422건, cargo 88건 통과 |
 | 실제 WKWebView acceptance (4부를 뺀 판) | host 26, workspace 9, navigation 11, interaction 12, data 12, editor 114, autosave 16 통과. views는 첫 실행에서 `favorites-category-and-graph-accessible-node`가 `timeout: graph`로 실패했고 재실행에서 29/29 통과(간헐 실패, 원인 미상) |
-| 4부를 켠 판의 실제 창 acceptance | **시험이 없다.** 하네스가 `build:noclaude`만 받는다 |
+| 4부를 켠 판의 실제 창 acceptance | `test:part4:acceptance` 7/7 통과(묻기 왕복, 전사가 있는 세션 화면 포함). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다 |
 | 사람이 앱을 직접 조작한 확인 | **0건** |
 
 아래 점검은 위 마지막 두 줄을 메우는 일이다.

@@ -1,8 +1,8 @@
 # aisurada 개발자 사용 가이드
 
-이 문서는 저장소를 처음 받은 개발자가 빌드하고, 돌려 보고, 시험하고, 고치는 데 필요한 것을 모았다. 2026-11-04 판(`rename-wl-to-ais` 브랜치, 이름 변경 두 번을 모두 반영한 판)을 기준으로 쓰고, 명령과 수치는 이 판에서 직접 확인한 것만 적었다. 읽어서만 확인한 것은 「확인 방법」을 함께 적었다.
+이 문서는 저장소를 처음 받은 개발자가 빌드하고, 돌려 보고, 시험하고, 고치는 데 필요한 것을 모았다. 2026-11-04 판(`main` 브랜치)을 기준으로 쓰고, 명령과 수치는 이 판에서 직접 확인한 것만 적었다. 읽어서만 확인한 것은 「확인 방법」을 함께 적었다.
 
-> 이 저장소는 withlog 설명서(1~4부)를 보고 다시 지은 구현이다. 이름은 2026-11-04에 두 번 바꿨다. 먼저 `withlog`를 `aisurada`로, 이어서 `wl` 접두를 `ais`로 바꿨다(`wl-cli`는 `ais-cli`, `wl-engine.jar`는 `ais-engine.jar`, `WL-409`는 `AIS-409`). `docs/` 아래 기록은 옛 이름 그대로라서 거기서 옛 이름을 보면 [§10의 대응표](#10-docs-읽는-법)로 바꿔 읽는다.
+> `docs/` 아래 기록은 이름을 바꾸기 전에 쓴 것이라 옛 이름이 그대로 적혀 있다. 읽다가 낯선 이름이 나오면 [§10의 대응표](#10-docs-읽는-법)로 바꿔 읽는다.
 
 ## 1. 구성 한눈에 보기
 
@@ -310,11 +310,20 @@ node fixtures/runner-test.mjs
 | 4부 | `scripts/chapter03-04.test.mjs`, `chapter06`, `chapter08`, `chapter09`, `chapter10`, `part4-ask-run.test.mjs` | `test-native.sh`가 부른다 |
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
-| 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩 |
+| 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다 |
+| 실제 창(4부) | `test:part4:acceptance`(켠 판 7건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 
 실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·소켓·빈 `ZDOTDIR`를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 `Diagnostics retained: <경로>`를 찍는다. `AISURADA_WORKSPACE_REPORT=<절대 경로>.json`이나 `AISURADA_CHECK_REPORT=<절대 경로>.json`으로 결과를 JSON으로 남길 수 있다. `--only=<사례 id>`로 일부만 돌릴 수 있다(편집기 왕복).
 
-**4부를 켠 판의 실제 창 점검은 아직 없다.** 위 acceptance는 모두 4부를 뺀 판(`build:noclaude`, `--no-default-features`)을 재고, 4부 화면은 Node 시험과 `cargo test`로만 검증돼 있다.
+**4부 점검.** 위 8종은 4부를 뺀 판(`build:noclaude`, `--no-default-features`)을 잰다. 4부를 켠 판은 `pnpm test:part4:acceptance`가 잰다(`pnpm build`로 4부 화면을 짓고 호스트를 기본 기능으로 띄운다). 가짜 `claude`(`AISURADA_CLAUDE_BIN`)와 격리 HOME의 가짜 전사(`~/.claude/projects/…/<세션 id>.jsonl`)를 쓰므로 토큰을 쓰지 않는다. 점검 코드는 `native-host/scripts/part4-checks.js`다.
+
+| 재는 것 | 안 재는 것 |
+|---|---|
+| 노트 화면이 렌더 루프 없이 뜸, 표 줄 점, 하위 노트 | 노트 옆 세션 레일과 레일 대화 |
+| **묻기 왕복**: 글 선택 → 「AI에게 묻기」 → 「묻기」 → 가짜 `claude`의 답이 「AI 문답」 칸에 붙음 → 엔진의 `ask.json`과 본문 표식까지 | 세션 입력창으로 보내기, 받아쓰기, 굳히기 |
+| 세션 화면: 전사 없음 안내와 CLI 칸, **전사가 있는 세션**의 대화(`recent-sessions`와 화면) | PROJECTS 레일, 실제 `claude` |
+
+`test:ask-marks:acceptance`는 4부를 끈 판에서 호스트에 `ask_runtime`이 없고 노트의 문답 표식이 그대로 남는지 잰다.
 
 ### 동시에 돌리면 안 되는 것
 
@@ -377,7 +386,7 @@ node fixtures/runner-test.mjs
 | 앱을 켰더니 진짜 launchd에 plist가 생길 것 같다 | §6처럼 엔진을 먼저 띄우고 격리 HOME으로 앱을 띄운다 |
 | 4부 명령이 `AIS-409`로 선다 | 4부를 뺀 jar(`ais-sidecar-noclaude.jar`)를 쓰고 있다 |
 | `cargo test --locked`가 락 파일 때문에 선다 | 패키지 이름이나 의존성을 바꿨다. 한 번 `cargo build`(락 없이)로 `Cargo.lock`을 갱신해 커밋한다 |
-| acceptance 뒤 `$TMPDIR/ais-p3-*`가 쌓인다(옛 판은 `wl-p3-*`) | 실패한 점검의 진단 보존이다. 원인을 본 뒤 지운다 |
+| acceptance 뒤 `$TMPDIR/ais-p3-*`가 쌓인다 | 실패한 점검의 진단 보존이다. 원인을 본 뒤 지운다 |
 | 이름이나 문구를 바꿨더니 HTML 노트를 못 읽는다 | 글자 수를 숫자로 박아 둔 코드다(예: 마커 `<!--aisurada`의 길이). 숫자 대신 문자열의 `length()`를 쓴다 |
 | 이 셸의 `rm`이 확인을 묻는다 | `rm`이 `-i` 별칭이다. `/bin/rm -rf`를 쓴다 |
 | zsh에서 `echo ====`가 `not found` | `=`로 시작하는 낱말을 zsh가 명령으로 푼다. 따옴표로 감싼다 |
@@ -386,5 +395,5 @@ node fixtures/runner-test.mjs
 
 - 엔진 시험, 화면·호스트 시험, 34장 받아들임, 4부를 뺀 실제 창 점검 8종은 통과한다. 수치는 `README.md`와 각 완료 기록에 있다.
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
-- 4부를 켠 판의 실제 창 점검, 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
+- 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복과 세션 화면 7건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
 - 설명서 원문이 제공되지 않은 부분(3부 18장, 4부 `ais-agent` 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.
