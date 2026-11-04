@@ -25,7 +25,7 @@
      - `createdAt` 시간(ISO Instant/OffsetDateTime) 오름차순 정렬, 동일 시각 시 `chatId` 오름차순.
      - 반환: `{"chats": [...], "unreadable": [...]}` (원소에서 최상위 `v`는 제외).
   2. `append-chat-turn <노트id> [하위노트id] chat-id=... source-session=... turn-id=... asked-at=... question=... answer=... [error=...] model=... effort=... elapsed-ms=... [images=...]`:
-     - 필수/선택 인자 및 한국어 조사 오류 메시지 일치 (`chat-id 가 필요하다`, `source-session 이 필요하다` 등).
+     - 필수/선택 인자 및 한국어 조사 오류 메시지는 설명서 8.13을 따른다(`answer 가 필요하다`와 `elapsed-ms 가 필요하다`만 「가」이고 `chat-id 이 필요하다`, `source-session 이 필요하다` 따위는 「이」다). 자리 인자와 이름 인자는 노트를 찾기 전에 먼저 잰다(리뷰 2026-11-04 L1, 기록 2번 정정).
      - 질문/답변 20,000자 상한 검사.
      - 기존 파일이 존재하면 읽고 회차 추가 (`sourceSessionId`와 `createdAt`은 기존 파일 것이 우선).
      - **D19 결함 고침**: 직렬화된 파일 데이터가 1,000,000 바이트 초과 시 쓰기를 진행하지 않고 에러 반환 (`"레일 대화 파일이 상한을 넘어 붙일 수 없다: 붙이면 ...바이트다. 상한은 1000000바이트다: <경로>"`).

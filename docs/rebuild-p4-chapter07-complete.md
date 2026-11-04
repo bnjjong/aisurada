@@ -20,7 +20,7 @@
   - 시스템 프로퍼티 `withlog.claude.home` 지원으로 격리된 테스트 환경 지원.
 - **D18 고침 (UTF-8 대체 문자 디코딩)**:
   - `CharsetDecoder`의 `onMalformedInput(CodingErrorAction.REPLACE)` 및 `onUnmappableCharacter(CodingErrorAction.REPLACE)` 적용.
-  - 끝이 끊기거나 깨진 바이트가 있는 줄은 JSON 문법 오류로 간주하여 `source.skipped` 카운트만 올리고 나머지 전체 대화는 정상 보존.
+  - 깨진 바이트는 U+FFFD로 바뀌어 그 줄은 JSON 글 안의 깨진 글자가 든 회차로 남는다. 끝이 글자 한가운데서 끊긴 줄만 JSON이 아니어서 `source.skipped`에 들고 건너뛰며, 나머지 대화는 그대로 보존된다(7.9, 리뷰 2026-11-04 기록 3번 정정).
 - **`read-session` 훑기 및 파싱**:
   - user / assistant 줄의 content(문자열 및 블록 배열)를 글 회차와 도구 회차로 변환.
   - 2,000자 초과 글 자르기(UTF-16 기준) 및 `truncated: true`, `chars: 원본길이`.
