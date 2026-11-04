@@ -1,5 +1,5 @@
 // Hover card appearing above/below ask mark in note editor.
-// Adheres to Chapter 4 (4.5, 4.7) of withlog Part 4 Claude integration specifications.
+// Adheres to Chapter 4 (4.5, 4.7) of aisurada Part 4 Claude integration specifications.
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { AskTurnView, FollowUpRow, PendingLine } from './askParts.tsx';

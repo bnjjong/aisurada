@@ -8,9 +8,9 @@ fn main() {
         "secret-names.sample.txt"
     };
     let root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    println!("cargo:rustc-env=WITHLOG_SECRET_TABLE={root}/{source}");
+    println!("cargo:rustc-env=AISURADA_SECRET_TABLE={root}/{source}");
     println!(
-        "cargo:rustc-env=WITHLOG_SECRET_TABLE_SOURCE={}",
+        "cargo:rustc-env=AISURADA_SECRET_TABLE_SOURCE={}",
         if real { "real" } else { "sample" }
     );
     tauri_build::build()

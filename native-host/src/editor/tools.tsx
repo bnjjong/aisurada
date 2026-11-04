@@ -16,8 +16,8 @@ import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock
 
 type Trigger = { key: string; start: number; size: number };
 type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; x: number; y: number };
-export const OPEN_COMMENT_COMMAND = createCommand<void>('withlog:comment-compose');
-export const OPEN_ASK_COMMAND = createCommand<void>('withlog:ask-compose');
+export const OPEN_COMMENT_COMMAND = createCommand<void>('aisurada:comment-compose');
+export const OPEN_ASK_COMMAND = createCommand<void>('aisurada:ask-compose');
 const formats = ['bold', 'italic', 'strikethrough', 'code'] as const;
 const imageTypes: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
 const languages = ['plaintext', 'kotlin', 'java', 'typescript', 'javascript', 'python', 'sql', 'bash', 'yaml', 'json', 'xml', 'groovy', 'dockerfile', 'properties', 'diff', 'mermaid'];
@@ -140,7 +140,7 @@ export function EditorTools(props: EditorProps) {
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '') : text;
           setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)) });
         } else if (!composeRef.current) setBar(null);
-        if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('wl:import') || tags.has('wl:repair') || tags.has('wl:mirror') || tags.has('withlog-mirror') || menuRef.current) return;
+        if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('wl:import') || tags.has('wl:repair') || tags.has('wl:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
         if ($isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
           const before = node.getTextContent().slice(0, selected.anchor.offset);
           const pair = /(?:^|[^\[])\[\[$/.test(before);

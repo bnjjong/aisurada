@@ -63,14 +63,14 @@ test('C10: a file without front matter or id is neither backed up nor moved, on 
   for (let round = 0; round < 2; round++) {
     const result = await h.run(); assert.equal(result.moved, 0); assert.equal(result.failures.length, 2); assert.equal(result.backup, null);
   }
-  assert.equal(await exists(join(h.root, '.withlog/backup')), false);
+  assert.equal(await exists(join(h.root, '.aisurada/backup')), false);
   assert.equal(await fs.readFile(join(h.root, 'notes/demo/README.md'), 'utf8'), '# Not a note\n');
 });
 
-test('C10 with the <!--withlog head: an HTML note with an id moves once, one without an id is never backed up', async t => {
+test('C10 with the <!--aisurada head: an HTML note with an id moves once, one without an id is never backed up', async t => {
   const h = await fixture(t);
-  await h.write('notes/demo/old.html', '<!--withlog\nid: ndtest-0001\ntitle: HTML\ncreated: \'2026-06-04T09:30:00+09:00\'\n-->\n<h1>기록</h1>\n');
-  await h.write('notes/demo/noid.html', '<!--withlog\ntitle: x\n-->\n<p>x</p>\n');
+  await h.write('notes/demo/old.html', '<!--aisurada\nid: ndtest-0001\ntitle: HTML\ncreated: \'2026-06-04T09:30:00+09:00\'\n-->\n<h1>기록</h1>\n');
+  await h.write('notes/demo/noid.html', '<!--aisurada\ntitle: x\n-->\n<p>x</p>\n');
   const first = await h.run(); assert.equal(first.moved, 1); assert.equal(first.failures.length, 1);
   assert.equal(await fs.readFile(join(h.root, 'notes/demo/2026-06-04-0930-html-0001/attach/index.html'), 'utf8'), '<h1>기록</h1>\n');
   assert.deepEqual(await fs.readdir(join(first.backup, 'demo')), ['old.html']);

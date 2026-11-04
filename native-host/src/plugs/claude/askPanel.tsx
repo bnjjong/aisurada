@@ -1,5 +1,5 @@
 // AI Q&A panel rendered below note body.
-// Adheres to Chapter 4 (4.1, 4.2, 4.3, 4.4, 4.9, 4.12) of withlog Part 4 Claude integration specifications.
+// Adheres to Chapter 4 (4.1, 4.2, 4.3, 4.4, 4.9, 4.12) of aisurada Part 4 Claude integration specifications.
 import { useEffect, useState } from 'react';
 import { AskTurnView, FollowUpRow, PendingLine } from './askParts.tsx';
 import { groupTurns } from './askText.ts';

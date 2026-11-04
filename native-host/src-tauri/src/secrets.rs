@@ -29,9 +29,9 @@ pub struct SecretState {
 impl Default for SecretState {
     fn default() -> Self {
         Self {
-            text: include_str!(env!("WITHLOG_SECRET_TABLE")),
+            text: include_str!(env!("AISURADA_SECRET_TABLE")),
             #[cfg(test)]
-            source: env!("WITHLOG_SECRET_TABLE_SOURCE"),
+            source: env!("AISURADA_SECRET_TABLE_SOURCE"),
             table: Mutex::new(Table::Empty),
         }
     }

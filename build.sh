@@ -54,22 +54,22 @@ find "$SCRIPT_DIR/src" -name "*.java" > "$BUILD_DIR/sources.txt"
 "$JAVAC" -encoding UTF-8 --release 21 -d "$CLASSES_DIR" -cp "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
 
 # 4부 스위치. 켠 판(wl-engine.jar, wl-sidecar.jar)은 part4=true를, 뺀 판은 part4=false를 싣는다
-printf 'part4=true\n' > "$CLASSES_DIR/withlog/engine-build.properties"
+printf 'part4=true\n' > "$CLASSES_DIR/aisurada/engine-build.properties"
 
 # Build fat jars
-"$JAR" --create --file "$DIST_DIR/wl-engine.jar" --main-class withlog.cli.Main -C "$CLASSES_DIR" .
-"$JAR" --create --file "$DIST_DIR/wl-cli.jar" --main-class withlog.cli.WlCliMain -C "$CLASSES_DIR" .
+"$JAR" --create --file "$DIST_DIR/wl-engine.jar" --main-class aisurada.cli.Main -C "$CLASSES_DIR" .
+"$JAR" --create --file "$DIST_DIR/ais-cli.jar" --main-class aisurada.cli.WlCliMain -C "$CLASSES_DIR" .
 cp "$DIST_DIR/wl-engine.jar" "$DIST_DIR/wl-sidecar.jar"
 
 # 4부를 뺀 판은 4부 클래스(ask, chat, session)를 아예 안 싣고 4부 명령 7개에 WL-409로 답한다
 NOCLAUDE_DIR="$BUILD_DIR/classes-noclaude"
 rm -rf "$NOCLAUDE_DIR"
 cp -R "$CLASSES_DIR" "$NOCLAUDE_DIR"
-rm -rf "$NOCLAUDE_DIR/withlog/ask" "$NOCLAUDE_DIR/withlog/chat" "$NOCLAUDE_DIR/withlog/session"
-printf 'part4=false\n' > "$NOCLAUDE_DIR/withlog/engine-build.properties"
-"$JAR" --create --file "$DIST_DIR/wl-sidecar-noclaude.jar" --main-class withlog.cli.Main -C "$NOCLAUDE_DIR" .
+rm -rf "$NOCLAUDE_DIR/aisurada/ask" "$NOCLAUDE_DIR/aisurada/chat" "$NOCLAUDE_DIR/aisurada/session"
+printf 'part4=false\n' > "$NOCLAUDE_DIR/aisurada/engine-build.properties"
+"$JAR" --create --file "$DIST_DIR/wl-sidecar-noclaude.jar" --main-class aisurada.cli.Main -C "$NOCLAUDE_DIR" .
 
 echo "Build successful: $DIST_DIR/wl-engine.jar"
-echo "Build successful: $DIST_DIR/wl-cli.jar"
+echo "Build successful: $DIST_DIR/ais-cli.jar"
 echo "Build successful: $DIST_DIR/wl-sidecar.jar"
 echo "Build successful: $DIST_DIR/wl-sidecar-noclaude.jar"

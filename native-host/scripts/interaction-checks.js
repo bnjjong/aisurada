@@ -11,7 +11,7 @@ async function until(predicate, label = 'interaction') {
 const post = (path, data) => fetch(path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
 const menu = (payload, label = 'main') => invoke('plugin:event|emit_to', {target:{kind:'AnyLabel',label},event:'wl://menu',payload});
 const links = payload => invoke('plugin:event|emit', {event:'deep-link://new-url',payload});
-const link = (id, ws = cfg.raw, extra = '') => `withlog://doc/${encodeURIComponent(id)}?ws=${encodeURIComponent(ws)}${extra}`;
+const link = (id, ws = cfg.raw, extra = '') => `aisurada://doc/${encodeURIComponent(id)}?ws=${encodeURIComponent(ws)}${extra}`;
 const file = path => 'file://' + path.split('/').map(encodeURIComponent).join('/');
 const go = path => {history.pushState({},'',path);dispatchEvent(new PopStateEvent('popstate'));};
 const doc = id => `/doc/${encodeURIComponent(id)}`;
@@ -54,7 +54,7 @@ if(location.pathname.startsWith('/note-window/')) {
     });
     await test('live-links-select-last-valid-url',async()=>{
       await links([link(cfg.id),'unsupported://ignored',link(cfg.legacyId),'not a link']);await until(()=>location.pathname===doc(cfg.legacyId));
-      await links([`WITHLOG://AGENDA/demo?ws=${encodeURIComponent(cfg.raw)}`]);await until(()=>location.pathname==='/agenda/demo');
+      await links([`AISURADA://AGENDA/demo?ws=${encodeURIComponent(cfg.raw)}`]);await until(()=>location.pathname==='/agenda/demo');
       assert(document.querySelector('#screen-content h1').textContent==='검증 아젠다','agenda slug failed');
     });
     await test('markdown-note-and-child-chain',async()=>{
@@ -71,7 +71,7 @@ if(location.pathname.startsWith('/note-window/')) {
     });
     await test('same-folder-different-spelling-reopens-workspace',async()=>{
       const alias=cfg.raw+'/';await links([link(cfg.legacyId,alias)]);
-      await until(()=>JSON.parse(localStorage.getItem('withlog.lastWorkspace.v1')).path===alias&&location.pathname===doc(cfg.legacyId));
+      await until(()=>JSON.parse(localStorage.getItem('aisurada.lastWorkspace.v1')).path===alias&&location.pathname===doc(cfg.legacyId));
       assert(await invoke('vault_root')===alias,'host path normalized');
     });
     await test('non-workspace-links-do-not-change-host-root',async()=>{
@@ -80,14 +80,14 @@ if(location.pathname.startsWith('/note-window/')) {
       await links([link(cfg.legacyId,before)]);await until(()=>location.pathname===doc(cfg.legacyId));
     });
     await test('new-workspace-keeps-vault-and-disables-tab-menus',async()=>{
-      const before=localStorage.getItem('withlog.lastWorkspace.v1');await menu('wl_new_workspace');await until(()=>location.pathname+location.search==='/launcher?mode=create');
+      const before=localStorage.getItem('aisurada.lastWorkspace.v1');await menu('wl_new_workspace');await until(()=>location.pathname+location.search==='/launcher?mode=create');
       await menu('wl_open_terminal');await menu('wl_close_tab');assert(location.pathname==='/launcher','tab menu ran in launcher');
-      assert(localStorage.getItem('withlog.lastWorkspace.v1')===before,'new-workspace menu cleared vault');
+      assert(localStorage.getItem('aisurada.lastWorkspace.v1')===before,'new-workspace menu cleared vault');
       press({key:'k',code:'KeyK'});assert(!document.querySelector('.cmdk-panel'),'launcher accepted Cmd+K');
       await links([link(cfg.legacyId,await invoke('vault_root'))]);await until(()=>location.pathname===doc(cfg.legacyId));
     });
     await test('welcome-and-external-file-without-vault',async()=>{
-      const root=await invoke('vault_root');await menu('wl_welcome');await until(()=>location.pathname==='/launcher'&&localStorage.getItem('withlog.lastWorkspace.v1')==='null');
+      const root=await invoke('vault_root');await menu('wl_welcome');await until(()=>location.pathname==='/launcher'&&localStorage.getItem('aisurada.lastWorkspace.v1')==='null');
       assert(await invoke('vault_root')===root,'welcome changed host root');
       await links([file(cfg.external)]);await until(()=>document.querySelector('.notice')?.textContent.includes('워크스페이스가 필요'));
       assert(location.pathname==='/launcher'&&!document.querySelector('.ext-md'),'external file bypassed workspace gate');

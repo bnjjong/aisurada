@@ -28,16 +28,16 @@ test('8.7 persona: the heading or no name, the sub note place, and the end of th
   const named = railPersona({ heading: railHeading('# 테스트 노트\n본문', 'markdown'), noteId: 'ndtest-00000001', sessionId: session, hasBundle: false });
   const lines = named.split('\n');
   assert.equal(lines.length, 4);
-  assert.equal(lines[0], '너는 사용자의 withlog 앱에서, 노트 옆 세션 레일로 질문을 받는다. 노트는 「테스트 노트」(ndtest-00000001)이다.');
+  assert.equal(lines[0], '너는 사용자의 aisurada 앱에서, 노트 옆 세션 레일로 질문을 받는다. 노트는 「테스트 노트」(ndtest-00000001)이다.');
   assert.ok(lines[1].endsWith('그 세션의 대화는 실리지 않았다.'));
-  assert.match(lines[2], /wl-cli get_doc '\{"id":"ndtest-00000001"\}'` 로 읽는다.*`wl-cli update_doc` 로 고친다\.$/);
+  assert.match(lines[2], /ais-cli get_doc '\{"id":"ndtest-00000001"\}'` 로 읽는다.*`ais-cli update_doc` 로 고친다\.$/);
   const bundled = railPersona({ heading: null, noteId: 'ndtest-00000001', sessionId: session, hasBundle: true });
   assert.ok(bundled.split('\n')[0].endsWith('노트는 ndtest-00000001이다.'), 'no heading: the name is left out');
   assert.ok(bundled.split('\n')[1].endsWith('첫 물음 앞에 그 세션의 최근 대화가 실려 있다.'));
   const sub = railPersona({ heading: '하위', noteId: 'ndtest-00000001', subId: 'sntest-00000002', sessionId: session, hasBundle: false });
   assert.match(sub.split('\n')[0], /\(노트 ndtest-00000001의 하위 노트 sntest-00000002\)이다\.$/);
-  assert.match(sub, /wl-cli get_sub_note '\{"parent":"ndtest-00000001","id":"sntest-00000002"\}'/);
-  assert.match(sub, /wl-cli update_sub_note/);
+  assert.match(sub, /ais-cli get_sub_note '\{"parent":"ndtest-00000001","id":"sntest-00000002"\}'/);
+  assert.match(sub, /ais-cli update_sub_note/);
   assert.equal(railHeading('# 제목', 'json'), null, 'a json note has no name');
 });
 

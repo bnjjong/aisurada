@@ -1,5 +1,5 @@
 {
-  "name": "withlog-native-host",
+  "name": "aisurada-native-host",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.4",

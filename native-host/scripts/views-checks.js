@@ -137,7 +137,7 @@ if (location.pathname.startsWith("/note-window/")) {
         "toggle count",
       );
       $(".set-switch input").click();
-      const s = JSON.parse(localStorage.getItem("withlog.prefs.v1")).state;
+      const s = JSON.parse(localStorage.getItem("aisurada.prefs.v1")).state;
       assert(
         (s.titleDatePrefix ?? s.titleDate) === false,
         "immediate preference",
@@ -567,24 +567,24 @@ if (location.pathname.startsWith("/note-window/")) {
       await until(() => !$(".note-preview"), "close graph preview");
       click("목록", $(".list-tools"));
       assert(
-        localStorage.getItem("withlog.connMode.v3") === "list",
+        localStorage.getItem("aisurada.connMode.v3") === "list",
         "graph persistence",
       );
     });
     await test("connection-keys-are-written-on-open-and-on-change", async () => {
       go("/guide");
       await until(() => $$(".guide-step").length === 3, "left connections");
-      localStorage.removeItem("withlog.connMode.v3");
-      localStorage.removeItem("withlog.connFilter.v2");
+      localStorage.removeItem("aisurada.connMode.v3");
+      localStorage.removeItem("aisurada.connFilter.v2");
       go("/connections");
       await until(
-        () => localStorage.getItem("withlog.connMode.v3") === "map" && localStorage.getItem("withlog.connFilter.v2") === "0",
+        () => localStorage.getItem("aisurada.connMode.v3") === "map" && localStorage.getItem("aisurada.connFilter.v2") === "0",
         "keys written on open",
       );
       click("목록", $(".list-tools"));
-      await until(() => localStorage.getItem("withlog.connMode.v3") === "list", "mode key on change");
+      await until(() => localStorage.getItem("aisurada.connMode.v3") === "list", "mode key on change");
       click("지도", $(".list-tools"));
-      await until(() => localStorage.getItem("withlog.connMode.v3") === "map", "mode key back");
+      await until(() => localStorage.getItem("aisurada.connMode.v3") === "map", "mode key back");
     });
     await test("template-2000ms-save-unmount-and-delete-dirty", async () => {
       go("/templates?open=tplfixture-00000001");
@@ -885,8 +885,8 @@ if (location.pathname.startsWith("/note-window/")) {
       await until(() => $$(".guide-step").length === 3, "guide");
       assert($$(".guide-step button").length === 3, "guide copy");
       const step2 = $$(".guide-step")[1].textContent;
-      assert(!step2.includes("withlog-mcp.js") && !step2.includes("mcpServers"), "C119 guide still registers the removed MCP server");
-      assert(step2.includes('install --cli "$APP/wl-cli.jar" --sidecar "$APP/wl-sidecar.jar"') && step2.includes("export WITHLOG_VAULT="), "C119 guide lacks the CLI mode setup");
+      assert(!step2.includes("aisurada-mcp.js") && !step2.includes("mcpServers"), "C119 guide still registers the removed MCP server");
+      assert(step2.includes('install --cli "$APP/ais-cli.jar" --sidecar "$APP/wl-sidecar.jar"') && step2.includes("export AISURADA_VAULT="), "C119 guide lacks the CLI mode setup");
       assert(!$(".set-ask-timeout"), "AI control visible");
     });
     // Last on purpose: a selection left in the template editor disturbs later navigation.

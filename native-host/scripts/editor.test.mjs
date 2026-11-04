@@ -123,4 +123,4 @@ test('첨부 HTML/SVG 외부 열기는 확인 실패 시 닫힌다',async()=>{
  await openEditorLink('x.pdf',f);await openEditorLink('https://example.com',f);await openEditorLink('javascript:alert(1)',f);assert.deepEqual(calls,['/vault/note/x.pdf','https://example.com']);
 });
 test('주석은 마지막 같은 ID 열기와 첫 닫기를 짝짓는다',()=>{const p=markerPlaceholders('<!--wlc:cm1-a-->a<!--wlc:cm1-a-->b<!--/wlc:cm1-a-->c');assert.equal(p.pairs.length,1);assert.equal(p.pairs[0].open,1);});
-test('표 전용 복사는 앱 JSON에서도 문단을 걷고 표 노드만 남긴다',()=>{const table={type:'table',children:[{type:'tablerow'}]};assert.deepEqual(JSON.parse(tablesOnlyJSON(JSON.stringify({namespace:'withlog-editor',nodes:[{type:'paragraph',text:'제외'},table]}))),{namespace:'withlog-editor',nodes:[table]});assert.equal(tablesOnlyJSON('broken'),undefined);});
+test('표 전용 복사는 앱 JSON에서도 문단을 걷고 표 노드만 남긴다',()=>{const table={type:'table',children:[{type:'tablerow'}]};assert.deepEqual(JSON.parse(tablesOnlyJSON(JSON.stringify({namespace:'aisurada-editor',nodes:[{type:'paragraph',text:'제외'},table]}))),{namespace:'aisurada-editor',nodes:[table]});assert.equal(tablesOnlyJSON('broken'),undefined);});

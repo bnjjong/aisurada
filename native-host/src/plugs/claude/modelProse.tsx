@@ -1,5 +1,5 @@
 // Markdown rendering for model answers with symbol chips and folding.
-// Adheres to Chapter 4 (4.11, 4.12) of withlog Part 4 Claude integration specifications.
+// Adheres to Chapter 4 (4.11, 4.12) of aisurada Part 4 Claude integration specifications.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { message } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -91,7 +91,7 @@ export function ModelProse({ content, className = '', foldable = false }: ModelP
     if (link.kind === 'browser') {
       void openUrl(link.url).catch(() => {});
     } else if (link.kind === 'doc') {
-      if (!openDocLink(link.id)) void message('노트를 찾을 수 없어요', { title: 'withlog', kind: 'warning' }).catch(() => {});
+      if (!openDocLink(link.id)) void message('노트를 찾을 수 없어요', { title: 'aisurada', kind: 'warning' }).catch(() => {});
     }
   };
 

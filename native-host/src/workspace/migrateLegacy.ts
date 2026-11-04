@@ -20,7 +20,7 @@ export function legacyFolderName(meta: Record<string, unknown>): string {
 
 export async function migrateLegacy(root: string, files: FilePort, now: Date, uuid: () => string,
   warn: (message: string, error?: unknown) => void) {
-  const backup = `${root}/.withlog/backup/notes-${now.toISOString().replace(/[:.]/g, '-')}`;
+  const backup = `${root}/.aisurada/backup/notes-${now.toISOString().replace(/[:.]/g, '-')}`;
   const candidates: { agenda: string; relative: string }[] = [];
   async function collect(agenda: string, relative: string, entries: FileEntry[], depth: number) {
     for (const entry of entries.sort(sortNames)) {
@@ -51,8 +51,8 @@ export async function migrateLegacy(root: string, files: FilePort, now: Date, uu
       if (front && front[1].length <= 16000) {
         frontYaml = front[1];
         frontLen = front[0].length;
-      } else if (text.startsWith('<!--withlog')) {
-        const htmlFront = /^<!--withlog\r?\n([\s\S]*?)\r?\n-->(?:\r?\n|$)/.exec(text);
+      } else if (text.startsWith('<!--aisurada')) {
+        const htmlFront = /^<!--aisurada\r?\n([\s\S]*?)\r?\n-->(?:\r?\n|$)/.exec(text);
         if (htmlFront && htmlFront[1].length <= 16000) {
           frontYaml = htmlFront[1];
           frontLen = htmlFront[0].length;

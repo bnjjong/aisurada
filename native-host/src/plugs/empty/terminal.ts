@@ -1,5 +1,5 @@
 // Empty implementation of @claude-plug/terminal for Part 4-free builds.
-// Adheres to Chapter 17 (17.6) of withlog Part 3 screen specifications.
+// Adheres to Chapter 17 (17.6) of aisurada Part 3 screen specifications.
 
 export type SessionShellPlan =
   | { kind: 'plain' }

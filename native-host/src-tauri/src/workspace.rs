@@ -59,7 +59,7 @@ pub fn allow_workspace<R: Runtime>(
                 .allow_directory(path, true)
                 .map_err(|e| e.to_string())?;
             app.fs_scope()
-                .allow_directory(format!("{path}/.withlog"), true)
+                .allow_directory(format!("{path}/.aisurada"), true)
                 .map_err(|e| e.to_string())?;
             app.asset_protocol_scope()
                 .allow_directory(path, true)
@@ -76,7 +76,7 @@ pub fn vault_root(state: State<'_, HostState>) -> Option<String> {
 
 #[tauri::command]
 pub fn is_workspace(root: String) -> bool {
-    Path::new(&root).join(".withlog/workspace.json").is_file()
+    Path::new(&root).join(".aisurada/workspace.json").is_file()
 }
 
 #[tauri::command]
@@ -194,8 +194,8 @@ mod tests {
     fn workspace_marker_must_be_a_file_and_is_not_parsed() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().to_string_lossy().into_owned();
-        std::fs::create_dir(temp.path().join(".withlog")).unwrap();
-        let marker = temp.path().join(".withlog/workspace.json");
+        std::fs::create_dir(temp.path().join(".aisurada")).unwrap();
+        let marker = temp.path().join(".aisurada/workspace.json");
         std::fs::create_dir(&marker).unwrap();
         assert!(!is_workspace(root.clone()));
         std::fs::remove_dir(&marker).unwrap();
@@ -284,7 +284,7 @@ mod ipc_tests {
             .is_allowed(temp.path().join("notes/a/note.md")));
         assert!(app
             .fs_scope()
-            .is_allowed(temp.path().join(".withlog/workspace.json")));
+            .is_allowed(temp.path().join(".aisurada/workspace.json")));
         assert!(app
             .asset_protocol_scope()
             .is_allowed(temp.path().join("notes/a/image.png")));

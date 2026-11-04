@@ -18,7 +18,7 @@ export type ScreenRoute =
 export function parseRoute(address: string): ScreenRoute {
   try {
     if (!address.startsWith('/') || address.startsWith('//')) return { kind: 'unknown' };
-    const url = new URL(address, 'http://withlog.local');
+    const url = new URL(address, 'http://aisurada.local');
     const path = url.pathname, query = url.searchParams;
     if (path === '/') return { kind: 'root' };
     if (path === '/launcher') return { kind: 'launcher', create: query.get('mode') === 'create' };

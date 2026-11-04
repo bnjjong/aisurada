@@ -3,8 +3,8 @@ export type AppLink =
   | { kind: 'agenda'; slug: string; ws: string | null }
   | { kind: 'external'; path: string; ws: null };
 
-export function parseWithlog(value: string): Exclude<AppLink, { kind: 'external' }> | null {
-  const match = /^withlog:\/\/(doc|agenda)\/([^/?#]+)(?:\?([^#]*))?(?:#.*)?$/i.exec(value.trim());
+export function parseAisurada(value: string): Exclude<AppLink, { kind: 'external' }> | null {
+  const match = /^aisurada:\/\/(doc|agenda)\/([^/?#]+)(?:\?([^#]*))?(?:#.*)?$/i.exec(value.trim());
   if (!match) return null;
   try {
     const id = decodeURIComponent(match[2]);
@@ -29,7 +29,7 @@ export function latestInput(values: string[]): { link: AppLink } | { file: strin
   for (let index = values.length - 1; index >= 0; index--) {
     const value = values[index];
     if (typeof value !== 'string') continue;
-    const link = parseWithlog(value);
+    const link = parseAisurada(value);
     if (link) return { link };
     const file = fileURLPath(value);
     if (file) return { file };

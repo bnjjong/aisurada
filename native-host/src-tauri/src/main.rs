@@ -114,7 +114,7 @@ fn main() {
         })
         .on_window_event(lifecycle::window_event)
         .run(tauri::generate_context!())
-        .expect("withlog native host failed to start");
+        .expect("aisurada native host failed to start");
 }
 
 #[cfg(test)]

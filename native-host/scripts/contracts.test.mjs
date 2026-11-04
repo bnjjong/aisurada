@@ -4,13 +4,13 @@ import {readFileSync, existsSync} from 'node:fs';
 const read = name => JSON.parse(readFileSync(new URL('../src-tauri/' + name, import.meta.url)));
 const config = read('tauri.conf.json');
 test('bundle identity, deferred main creation and flat resource map', () => {
-  assert.equal(config.identifier, 'co.kcd.withlog');
-  assert.equal(config.productName, 'withlog');
-  assert.deepEqual(config.app.windows, [{title:'withlog',width:800,height:600,create:false}]);
-  assert.equal(config.bundle.resources['../../dist/wl-cli.jar'], 'wl-cli.jar');
+  assert.equal(config.identifier, 'co.kcd.aisurada');
+  assert.equal(config.productName, 'aisurada');
+  assert.deepEqual(config.app.windows, [{title:'aisurada',width:800,height:600,create:false}]);
+  assert.equal(config.bundle.resources['../../dist/ais-cli.jar'], 'ais-cli.jar');
   assert.equal(config.bundle.resources['../../dist/wl-sidecar.jar'], 'wl-sidecar.jar');
   for (const source of Object.keys(config.bundle.resources)) assert.ok(existsSync(new URL('../src-tauri/' + source, import.meta.url)));
-  assert.deepEqual(config.plugins['deep-link'].desktop.schemes, ['withlog']);
+  assert.deepEqual(config.plugins['deep-link'].desktop.schemes, ['aisurada']);
   assert.deepEqual(config.bundle.fileAssociations[0].ext, ['md','markdown']);
 });
 test('empty filesystem scope and exact distinct window capabilities', () => {

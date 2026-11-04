@@ -725,8 +725,8 @@ export class WorkspaceController {
     this.stopWatch();
     const workspace = sampleWorkspace();
     workspace.templates = readSampleTemplates(this.services.storage).map(item => ({ category: 'doc', ...item }));
-    const edits = asRow(readJSON(this.services.storage, 'withlog.reportEdits.v1')) || {};
-    const memos = asRow(readJSON(this.services.storage, 'withlog.reportMemos.v1')) || {};
+    const edits = asRow(readJSON(this.services.storage, 'aisurada.reportEdits.v1')) || {};
+    const memos = asRow(readJSON(this.services.storage, 'aisurada.reportMemos.v1')) || {};
     const ids = new Set([...workspace.reports.map(row => asText(row.id)), ...Object.keys(edits), ...Object.keys(memos)]);
     workspace.reports = [...ids].map(id => ({ id, body: asText(edits[id]), memo: asText(memos[id]) }))
       .filter(row => row.body.trim() || row.memo.trim());
@@ -737,7 +737,7 @@ export class WorkspaceController {
     let documents = '~/Documents';
     try { documents = (await this.services.host.documentDir()).replace(/\/+$/, '') || documents; } catch { /* fallback */ }
     this.patch({ recent: addRecent(this.services.storage,
-      { path: `${documents}/withlog-sample`, name: '샘플 워크스페이스', sample: true }) });
+      { path: `${documents}/aisurada-sample`, name: '샘플 워크스페이스', sample: true }) });
     if (!await this.canLeave()) return false;
     await this.sendCollectedReports();
     this.stopWatch(); this.data.invalidate(); await this.data.idle();

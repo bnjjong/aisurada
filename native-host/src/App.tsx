@@ -33,7 +33,7 @@ function WorkspaceApp() {
     const changed = () => controller.locationChanged(location.pathname + location.search);
     const focus = () => { controller.refreshTheme(); void controller.refresh(); };
     const visible = () => { if (document.visibilityState === 'visible') focus(); };
-    const storage = (event: StorageEvent) => { if (event.key === 'withlog.prefs.v1') controller.refreshTheme(); };
+    const storage = (event: StorageEvent) => { if (event.key === 'aisurada.prefs.v1') controller.refreshTheme(); };
     const keydown = (event: KeyboardEvent) => { controller.handleKey(event); };
     let unlistenClose: (() => void) | undefined;
     if (context.kind === 'note') {
@@ -107,7 +107,7 @@ function WorkspaceApp() {
   </>;
 }
 
-function Brand() { return <div className="brand"><span className="brand-mark" aria-hidden="true">w.</span><span>withlog</span></div>; }
+function Brand() { return <div className="brand"><span className="brand-mark" aria-hidden="true">w.</span><span>aisurada</span></div>; }
 
 function Launcher({ controller, state }: { controller: WorkspaceController; state: WorkspaceState }) {
   const [mode, setMode] = useState<'create' | 'open' | null>(() => new URLSearchParams(state.route.split('?')[1]).get('mode') === 'create' ? 'create' : null);
@@ -143,7 +143,7 @@ function Launcher({ controller, state }: { controller: WorkspaceController; stat
         <label>{mode === 'create' ? '저장 위치' : '폴더 경로'}<span className="path-input">
           <input name={mode === 'create' ? 'parent' : 'path'} value={mode === 'create' ? state.home : path}
             onChange={e => mode === 'create' ? controller.setHome(e.target.value) : setPath(e.target.value)}
-            placeholder="/Users/me/Documents/withlog" autoFocus={mode === 'open'} disabled={state.busy} required />
+            placeholder="/Users/me/Documents/aisurada" autoFocus={mode === 'open'} disabled={state.busy} required />
           <button type="button" className="button-subtle" onClick={() => void choose()} disabled={state.busy}>찾아보기</button>
         </span></label>
         <button className="button-primary" type="submit" disabled={state.busy || !(mode === 'create' ? name.trim() && state.home : path.trim())}>

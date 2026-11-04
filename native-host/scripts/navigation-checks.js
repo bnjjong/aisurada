@@ -16,7 +16,7 @@ const file = path => `/file?path=${encodeURIComponent(path)}`;
 const tabIds = () => [...document.querySelectorAll('.tab-item[data-tab-id]')].map(element => element.dataset.tabId);
 const tab = id => [...document.querySelectorAll('.tab-item[data-tab-id]')].find(element => element.dataset.tabId === id);
 const close = id => { assert(tab(id), 'missing tab ' + id); tab(id).querySelector('.tab-close').click(); };
-const saved = () => JSON.parse(localStorage.getItem('withlog.tabs.v1'));
+const saved = () => JSON.parse(localStorage.getItem('aisurada.tabs.v1'));
 const h1 = () => document.querySelector('#screen-content h1')?.textContent;
 const ready = () => document.querySelector('.tab-bar');
 
@@ -62,8 +62,8 @@ if (location.pathname.startsWith('/note-window/')) {
         go('/file'); await until(() => h1() === '이 파일을 열 수 없어요'); assert(!document.querySelector('.workspace-rail'), 'file has rail');
       });
       await test('replacement-guards-preserve-workspace', async () => {
-        const last = localStorage.getItem('withlog.lastWorkspace.v1'); go('/typo'); await until(() => location.pathname === '/launcher');
-        assert(localStorage.getItem('withlog.lastWorkspace.v1') === last, 'unknown route cleared last workspace');
+        const last = localStorage.getItem('aisurada.lastWorkspace.v1'); go('/typo'); await until(() => location.pathname === '/launcher');
+        assert(localStorage.getItem('aisurada.lastWorkspace.v1') === last, 'unknown route cleared last workspace');
         go('/'); await until(() => location.pathname === '/calendar' && ready());
         go(doc('missing')); await until(() => location.pathname === doc(cfg.id));
       });

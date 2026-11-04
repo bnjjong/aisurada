@@ -12,7 +12,7 @@ function bundle(t, html = valid) {
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(join(directory, 'assets/workers'), { recursive: true });
   writeFileSync(join(directory, 'index.html'), html);
-  writeFileSync(join(directory, 'assets/app.js'), 'console.log("withlog");');
+  writeFileSync(join(directory, 'assets/app.js'), 'console.log("aisurada");');
   writeFileSync(join(directory, 'assets/app.css'), 'body { margin: 0; }');
   return directory;
 }

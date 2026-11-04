@@ -1,5 +1,5 @@
 // Implementation of @claude-plug/session for Part 4 Claude-enabled builds.
-// Adheres to Chapters 8, 9, 10 and 17 of withlog Part 4 Claude integration specifications.
+// Adheres to Chapters 8, 9, 10 and 17 of aisurada Part 4 Claude integration specifications.
 // The decisions live in sessionLogic.ts and transcriptLines.ts; this file draws them and calls the host.
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';

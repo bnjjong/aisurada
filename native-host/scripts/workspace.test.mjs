@@ -138,7 +138,7 @@ test('sample stops watching, preserves last real workspace and makes no invoke c
   assert.equal(sample.sample, true); assert.equal(sample.today, '2026-06-04');
   assert.equal(sample.notes.find(n => n.id === 'md1').format, 'markdown');
   assert.ok(sample.notes.find(n => n.id === 'md1').body.includes('\n\n'));
-  assert.equal(h.controller.getSnapshot().recent[0].path, '/documents/withlog-sample');
+  assert.equal(h.controller.getSnapshot().recent[0].path, '/documents/aisurada-sample');
 });
 
 test('C202: a failed initialization of a new vault puts the host back on the old vault and keeps the old vault on screen', async t => {
@@ -160,7 +160,7 @@ test('C202: a failed initialization of a new vault puts the host back on the old
 });
 
 test('목록 25번: 샘플로 바꿀 때도 400ms 안에 모아 둔 회고 쓰기를 먼저 보낸다',async t=>{
-  for(const change of [h=>h.controller.sample(),h=>h.controller.openRecent({path:'/documents/withlog-sample',name:'샘플',sample:true})]){
+  for(const change of [h=>h.controller.sample(),h=>h.controller.openRecent({path:'/documents/aisurada-sample',name:'샘플',sample:true})]){
     const h=harness(t);setLast(h);await h.controller.boot();await tick();
     h.controller.data.saveReport('rv-morning-2026-06-04','아침 회고','');
     await change(h);await tick();

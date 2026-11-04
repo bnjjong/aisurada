@@ -1,7 +1,7 @@
 // What the session screen and the note rail decide without touching React or the host: how the engine's
 // `read-session` answer is read (7.7), the session header (9.3), whether the composer is open (10.1), the rail chat's
 // question and turn (8.6 to 8.10) and the note a transcript is pinned into (9.8).
-// Adheres to Chapters 7 to 10 of withlog Part 4 Claude integration specifications.
+// Adheres to Chapters 7 to 10 of aisurada Part 4 Claude integration specifications.
 import { cutText, TEXT_LIMIT } from './askText.ts';
 import type { EngineTurn } from './transcriptLines.ts';
 import type { ClaudeSession } from './sessionTypes.ts';
@@ -291,10 +291,10 @@ export function railHeading(markdown: string | undefined, format?: string): stri
 export function railPersona(input: { heading: string | null; noteId: string; subId?: string; sessionId: string; hasBundle: boolean }): string {
   const place = input.subId ? `노트 ${input.noteId}의 하위 노트 ${input.subId}` : input.noteId;
   const name = input.heading ? `「${input.heading}」(${place})` : place;
-  const read = input.subId ? `wl-cli get_sub_note '{"parent":"${input.noteId}","id":"${input.subId}"}'` : `wl-cli get_doc '{"id":"${input.noteId}"}'`;
-  const update = input.subId ? 'wl-cli update_sub_note' : 'wl-cli update_doc';
+  const read = input.subId ? `ais-cli get_sub_note '{"parent":"${input.noteId}","id":"${input.subId}"}'` : `ais-cli get_doc '{"id":"${input.noteId}"}'`;
+  const update = input.subId ? 'ais-cli update_sub_note' : 'ais-cli update_doc';
   return [
-    `너는 사용자의 withlog 앱에서, 노트 옆 세션 레일로 질문을 받는다. 노트는 ${name}이다.`,
+    `너는 사용자의 aisurada 앱에서, 노트 옆 세션 레일로 질문을 받는다. 노트는 ${name}이다.`,
     `이 대화는 Claude Code 세션 ${input.sessionId} 와 그 세션이 쓴 이 노트를 두고 묻는다. ${input.hasBundle ? '첫 물음 앞에 그 세션의 최근 대화가 실려 있다.' : '그 세션의 대화는 실리지 않았다.'}`,
     `노트 내용이 필요하면 \`${read}\` 로 읽는다. 노트를 고쳐 달라고 하면 그 응답의 precondition 값을 f1 으로 실어 \`${update}\` 로 고친다.`,
     '작업 폴더는 그 세션이 돌던 폴더다. 코드나 다른 파일을 고쳐 달라는 말이 없으면 노트 밖 파일은 고치지 않는다.',

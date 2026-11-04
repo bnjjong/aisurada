@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseWithlog, fileURLPath, latestInput, connectLinkSource } from '../src/interaction/links.ts';
+import { parseAisurada, fileURLPath, latestInput, connectLinkSource } from '../src/interaction/links.ts';
 import { shortcutFor } from '../src/interaction/shortcuts.ts';
 import { WorkspaceController } from '../src/workspace/controller.ts';
 import { sampleWorkspace } from '../src/workspace/sample.ts';
@@ -10,7 +10,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const key = options => ({ key: '', code: '', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false,
   preventDefault() { this.defaultPrevented = true; }, ...options });
-const url = (id, ws = '/fixture', extra = '') => `withlog://doc/${encodeURIComponent(id)}${ws === null ? '' : '?ws=' + encodeURIComponent(ws)}${extra}`;
+const url = (id, ws = '/fixture', extra = '') => `aisurada://doc/${encodeURIComponent(id)}${ws === null ? '' : '?ws=' + encodeURIComponent(ws)}${extra}`;
 const commands = (h, command) => h.calls.filter(call => call.command === command);
 
 async function fixture(t, options = {}) {
@@ -52,15 +52,15 @@ async function fixture(t, options = {}) {
   return { controller, services, calls, writes, values, warnings, locations, listeners, disposed: () => disposed };
 }
 
-test('withlog parsing preserves raw ws, case-insensitive kinds, encoded targets and exact window flag', () => {
-  assert.deepEqual(parseWithlog('  WITHLOG://DOC/a%20b?ws=%2Fv%2F.%2F&window=1#ignored  '), { kind:'doc', id:'a b', ws:'/v/./', window:true, chain:[] });
-  assert.deepEqual(parseWithlog('withlog://AGENDA/a%2Fb?ws=&window=1'), { kind:'agenda', slug:'a/b', ws:null });
-  assert.equal(parseWithlog('withlog://doc/a?window=true').window, false);
-  assert.equal(parseWithlog('withlog://doc/a?ws=/a+b').ws, '/a b');
+test('aisurada parsing preserves raw ws, case-insensitive kinds, encoded targets and exact window flag', () => {
+  assert.deepEqual(parseAisurada('  AISURADA://DOC/a%20b?ws=%2Fv%2F.%2F&window=1#ignored  '), { kind:'doc', id:'a b', ws:'/v/./', window:true, chain:[] });
+  assert.deepEqual(parseAisurada('aisurada://AGENDA/a%2Fb?ws=&window=1'), { kind:'agenda', slug:'a/b', ws:null });
+  assert.equal(parseAisurada('aisurada://doc/a?window=true').window, false);
+  assert.equal(parseAisurada('aisurada://doc/a?ws=/a+b').ws, '/a b');
 });
 
 test('malformed targets and trailing path separators are rejected', () => {
-  for (const value of ['withlog://doc/', 'withlog://doc/a/', 'withlog://doc/a/b', 'withlog://doc/%ZZ', 'withlog://other/a', 'https://doc/a']) assert.equal(parseWithlog(value), null, value);
+  for (const value of ['aisurada://doc/', 'aisurada://doc/a/', 'aisurada://doc/a/b', 'aisurada://doc/%ZZ', 'aisurada://other/a', 'https://doc/a']) assert.equal(parseAisurada(value), null, value);
 });
 
 test('file parsing accepts local Markdown only and latest input ignores unsupported trailing URLs', () => {
@@ -270,7 +270,7 @@ test('host-classified child chains survive the one arrival and close on the next
 });
 
 test('window links reuse existing windows with null title and validated remembered geometry', async t => {
-  const h=await fixture(t,{values:{'withlog.noteWindow.v1':JSON.stringify({width:900,height:800,x:10,y:20})}}); h.controller.setNoteWindows(['a']);
+  const h=await fixture(t,{values:{'aisurada.noteWindow.v1':JSON.stringify({width:900,height:800,x:10,y:20})}}); h.controller.setNoteWindows(['a']);
   await h.controller.receiveURLs([url('a','/fixture','&window=1')]);
   assert.deepEqual(commands(h,'open_note_window').at(-1).args,{docId:'a',title:null,geometry:{width:900,height:800,x:10,y:20}});
 });

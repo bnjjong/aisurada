@@ -1,5 +1,5 @@
 // Empty implementation of @claude-plug/session for Part 4-free builds.
-// Adheres to Chapter 17 (17.5) of withlog Part 3 screen specifications.
+// Adheres to Chapter 17 (17.5) of aisurada Part 3 screen specifications.
 import React from 'react';
 
 /**

@@ -112,14 +112,14 @@ function nearestExisting(p) {
   return cur;
 }
 
-/** 지킬 폴더. 묶음 폴더와 부모 셸의 WITHLOG_VAULT다. 아직 없는 WITHLOG_VAULT는 가장 가까운 있는 위 폴더로 잰다. */
+/** 지킬 폴더. 묶음 폴더와 부모 셸의 AISURADA_VAULT다. 아직 없는 AISURADA_VAULT는 가장 가까운 있는 위 폴더로 잰다. */
 function outGuards() {
   const guards = [{ label: '묶음 폴더', dir: BUNDLE, exists: true }];
-  const vault = process.env.WITHLOG_VAULT;
+  const vault = process.env.AISURADA_VAULT;
   if (vault) {
     const abs = path.resolve(vault);
     const exists = fs.existsSync(abs);
-    guards.push({ label: 'WITHLOG_VAULT', dir: exists ? abs : nearestExisting(abs), exists });
+    guards.push({ label: 'AISURADA_VAULT', dir: exists ? abs : nearestExisting(abs), exists });
   }
   return guards;
 }
@@ -130,7 +130,7 @@ function hitsGuard(out, guard) {
 }
 
 /**
- * 있는데 폴더가 아니거나 비어 있지 않으면 선다. 묶음 폴더나 부모 셸의 WITHLOG_VAULT와 겹치면 선다.
+ * 있는데 폴더가 아니거나 비어 있지 않으면 선다. 묶음 폴더나 부모 셸의 AISURADA_VAULT와 겹치면 선다.
  * 없으면 만들고 realpath를 지난 실제 자리로 1번 더 잰다. 그때 겹치면 방금 만든 폴더를 지우고 선다.
  */
 function prepareOut(raw) {
@@ -199,7 +199,7 @@ function substitute(cell, env) {
 /** 구현 환경은 처음부터 새로 짓는다. 부모 셸에서는 PATH와 WLX_IMPL_로 시작하는 변수만 넘어간다. */
 function implEnv(dirs, extra = {}) {
   const env = {
-    WITHLOG_VAULT: dirs.vault, HOME: dirs.home, TMPDIR: dirs.tmp, WLX_STATE_DIR: dirs.state,
+    AISURADA_VAULT: dirs.vault, HOME: dirs.home, TMPDIR: dirs.tmp, WLX_STATE_DIR: dirs.state,
     TZ: 'Asia/Seoul', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8', PATH: process.env.PATH ?? '/usr/bin:/bin'
   };
   for (const [k, v] of Object.entries(process.env)) if (k.startsWith('WLX_IMPL_')) env[k] = v;

@@ -1,4 +1,4 @@
-export const ignoredWatchPath = /\.tmp$|[/\\]\.withlog[/\\]cache[/\\]|[/\\]\.git([/\\]|$)/;
+export const ignoredWatchPath = /\.tmp$|[/\\]\.aisurada[/\\]cache[/\\]|[/\\]\.git([/\\]|$)/;
 
 export class SelfWrites {
   private entries = new Map<string, number>();

@@ -124,7 +124,7 @@ fn create<R: Runtime>(
         label(id)?,
         tauri::WebviewUrl::App(format!("note-window/{id}").into()),
     )
-    .title(title.filter(|t| !t.trim().is_empty()).unwrap_or("withlog"))
+    .title(title.filter(|t| !t.trim().is_empty()).unwrap_or("aisurada"))
     .min_inner_size(520., 420.)
     .inner_size(g.width, g.height)
     .focused(focus);

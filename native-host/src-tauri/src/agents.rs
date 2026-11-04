@@ -48,7 +48,7 @@ fn run_list_agents() -> AgentsResponse {
         Some(bin) => bin,
         None => {
             return failure(
-                "claude 실행 파일을 못 찾았다. WITHLOG_CLAUDE_BIN 으로 자리를 알려 줄 수 있다.".into(),
+                "claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다.".into(),
             );
         }
     };

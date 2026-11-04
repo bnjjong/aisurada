@@ -1,20 +1,20 @@
 {
   "format": "wlx-tree",
   "version": 1,
-  "source": "withlog-p1-rebuild/selftest/vault",
+  "source": "aisurada-p1-rebuild/selftest/vault",
   "note": "다시 짜기 개발 폴더의 픽스처 vault. 설명서 34.1의 fixture.v1(파일 149개, 폴더 149개)이 이 기기에 없어서 대신 담았다.",
   "dirs": [
-    ".withlog",
-    ".withlog/agendas",
-    ".withlog/reports",
-    ".withlog/templates",
-    ".withlog/templates/doc",
-    ".withlog/templates/ritual",
-    ".withlog/trash",
-    ".withlog/trash/files",
-    ".withlog/trash/files/trfixture-00000001",
-    ".withlog/trash/files/trfixture-00000002",
-    ".withlog/trash/files/trfixture-00000003",
+    ".aisurada",
+    ".aisurada/agendas",
+    ".aisurada/reports",
+    ".aisurada/templates",
+    ".aisurada/templates/doc",
+    ".aisurada/templates/ritual",
+    ".aisurada/trash",
+    ".aisurada/trash/files",
+    ".aisurada/trash/files/trfixture-00000001",
+    ".aisurada/trash/files/trfixture-00000002",
+    ".aisurada/trash/files/trfixture-00000003",
     "notes",
     "notes/bulk",
     "notes/bulk/2026-07-01-0900-대량-노트-1-0101",
@@ -147,7 +147,7 @@
   ],
   "files": [
     {
-      "path": ".withlog/agendas/bulk.md",
+      "path": ".aisurada/agendas/bulk.md",
       "lines": [
         "---",
         "id: agfixture-0000000b",
@@ -160,7 +160,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/agendas/kotlin-ref.md",
+      "path": ".aisurada/agendas/kotlin-ref.md",
       "lines": [
         "---",
         "id: agfixture-0000000c",
@@ -173,7 +173,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/agendas/serving.md",
+      "path": ".aisurada/agendas/serving.md",
       "lines": [
         "---",
         "id: agfixture-0000000a",
@@ -187,7 +187,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/reports/rv-evening-2026-06-04.json",
+      "path": ".aisurada/reports/rv-evening-2026-06-04.json",
       "lines": [
         "{",
         "  \"body\": \"픽스처에 미리 있는 저녁 회고.\"",
@@ -196,7 +196,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/templates/doc/m-plan.md",
+      "path": ".aisurada/templates/doc/m-plan.md",
       "lines": [
         "---",
         "id: m-plan",
@@ -210,7 +210,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/templates/doc/t-legacy.html",
+      "path": ".aisurada/templates/doc/t-legacy.html",
       "lines": [
         "---",
         "id: t-legacy",
@@ -224,7 +224,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/templates/doc/tpl-halfmoved.html",
+      "path": ".aisurada/templates/doc/tpl-halfmoved.html",
       "lines": [
         "---",
         "id: tpl-halfmoved",
@@ -238,7 +238,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/templates/doc/tpl-halfmoved.md",
+      "path": ".aisurada/templates/doc/tpl-halfmoved.md",
       "lines": [
         "---",
         "id: tpl-halfmoved",
@@ -252,7 +252,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/templates/doc/tpl-seeded.md",
+      "path": ".aisurada/templates/doc/tpl-seeded.md",
       "lines": [
         "---",
         "id: tpl-seeded",
@@ -266,7 +266,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/templates/ritual/morning.md",
+      "path": ".aisurada/templates/ritual/morning.md",
       "lines": [
         "---",
         "id: t-morning",
@@ -281,42 +281,42 @@
       "eol": true
     },
     {
-      "path": ".withlog/trash/files/trfixture-00000001/note.md",
+      "path": ".aisurada/trash/files/trfixture-00000001/note.md",
       "lines": [
         "# 버린 노트 1"
       ],
       "eol": true
     },
     {
-      "path": ".withlog/trash/files/trfixture-00000002/note.md",
+      "path": ".aisurada/trash/files/trfixture-00000002/note.md",
       "lines": [
         "# 버린 노트 2"
       ],
       "eol": true
     },
     {
-      "path": ".withlog/trash/files/trfixture-00000003/note.md",
+      "path": ".aisurada/trash/files/trfixture-00000003/note.md",
       "lines": [
         "# 버린 노트 3"
       ],
       "eol": true
     },
     {
-      "path": ".withlog/trash/files/trfixture-00000005.md",
+      "path": ".aisurada/trash/files/trfixture-00000005.md",
       "lines": [
         "# 버린 단일 파일 5"
       ],
       "eol": true
     },
     {
-      "path": ".withlog/trash/files/trfixture-00000006.html",
+      "path": ".aisurada/trash/files/trfixture-00000006.html",
       "lines": [
         "<h1>버린 HTML 6</h1>"
       ],
       "eol": true
     },
     {
-      "path": ".withlog/trash/trash.json",
+      "path": ".aisurada/trash/trash.json",
       "lines": [
         "[",
         "  {",
@@ -402,7 +402,7 @@
       "eol": true
     },
     {
-      "path": ".withlog/workspace.json",
+      "path": ".aisurada/workspace.json",
       "lines": [
         "{",
         "  \"schemaVersion\": 1,",
@@ -2146,7 +2146,7 @@
     {
       "path": "notes/serving/2026-06-19-0905-옛-html-노트-0004.html",
       "lines": [
-        "<!--withlog",
+        "<!--aisurada",
         "id: ndfixture-00000004",
         "agenda: serving",
         "type: report",

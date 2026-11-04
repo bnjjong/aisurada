@@ -65,13 +65,13 @@ pub fn resolve_md_target(path: String, known_roots: Vec<String>) -> Result<Targe
         .iter()
         .find_map(|r| {
             let p = Path::new(r).canonicalize().ok()?;
-            (path.starts_with(&p) && p.join(".withlog/workspace.json").is_file())
+            (path.starts_with(&p) && p.join(".aisurada/workspace.json").is_file())
                 .then(|| (p, r.trim_end_matches('/').to_owned()))
         })
         .or_else(|| {
             path.parent()?
                 .ancestors()
-                .find(|p| p.join(".withlog/workspace.json").is_file())
+                .find(|p| p.join(".aisurada/workspace.json").is_file())
                 .map(|p| (p.to_path_buf(), p.to_string_lossy().into_owned()))
         });
     let Some((root, ws)) = root else {
@@ -171,8 +171,8 @@ mod tests {
     fn classify_subnotes_links_raw_roots_and_external() {
         let t = tempfile::tempdir().unwrap();
         let r = t.path();
-        fs::create_dir_all(r.join(".withlog")).unwrap();
-        fs::write(r.join(".withlog/workspace.json"), "{}").unwrap();
+        fs::create_dir_all(r.join(".aisurada")).unwrap();
+        fs::write(r.join(".aisurada/workspace.json"), "{}").unwrap();
         let p = r.join("notes/a/sub/b");
         fs::create_dir_all(&p).unwrap();
         fs::write(

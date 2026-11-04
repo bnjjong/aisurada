@@ -1,5 +1,5 @@
 // Pure helpers for the drag-ask screen: model and effort lists, text cutting, the question text and the
-// persona. Adheres to Chapters 2, 3 of withlog Part 4 Claude integration specifications.
+// persona. Adheres to Chapters 2, 3 of aisurada Part 4 Claude integration specifications.
 // Nothing here touches React or the host, so the node tests can run it as it is.
 
 // 3.3: the two lists are contract, the labels are not.
@@ -168,8 +168,8 @@ export function noteHeading(markdown: string | undefined, format: string | undef
 export function askPersona(target: AskTarget, heading: string | null): string {
   const place = targetPlace(target);
   const first = heading
-    ? `너는 사용자의 withlog 노트 안에서 질문을 받는다. 노트는 「${heading}」(${place})이다.`
-    : `너는 사용자의 withlog 노트 안에서 질문을 받는다. 노트는 ${place}이다.`;
+    ? `너는 사용자의 aisurada 노트 안에서 질문을 받는다. 노트는 「${heading}」(${place})이다.`
+    : `너는 사용자의 aisurada 노트 안에서 질문을 받는다. 노트는 ${place}이다.`;
   return [
     first,
     '질문은 늘 이 노트의 특정 문장이나 사용자가 드래그한 대목에 대한 것이다.',
@@ -180,9 +180,9 @@ export function askPersona(target: AskTarget, heading: string | null): string {
 /** 3.6: the note id line, in its note form or its sub note form. */
 export function noteIdLine(target: AskTarget): string {
   if (target.parent) {
-    return `이 대목을 고른 노트: 노트 ${target.parent} 의 하위 노트 ${target.id}. 답하기 전에 \`wl-cli get_sub_note '{"parent":"${target.parent}","id":"${target.id}"}'\` 로 이 노트를 먼저 읽고, 대목의 앞뒤 글을 보고 답해라.`;
+    return `이 대목을 고른 노트: 노트 ${target.parent} 의 하위 노트 ${target.id}. 답하기 전에 \`ais-cli get_sub_note '{"parent":"${target.parent}","id":"${target.id}"}'\` 로 이 노트를 먼저 읽고, 대목의 앞뒤 글을 보고 답해라.`;
   }
-  return `이 대목을 고른 노트의 id: ${target.id}. 답하기 전에 \`wl-cli get_doc '{"id":"${target.id}"}'\` 로 이 노트를 먼저 읽고, 대목의 앞뒤 글을 보고 답해라.`;
+  return `이 대목을 고른 노트의 id: ${target.id}. 답하기 전에 \`ais-cli get_doc '{"id":"${target.id}"}'\` 로 이 노트를 먼저 읽고, 대목의 앞뒤 글을 보고 답해라.`;
 }
 
 export interface AskPromptInput {

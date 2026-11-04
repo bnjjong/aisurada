@@ -209,14 +209,14 @@ export function Connections({
   // and each time a value changes; a saved text this screen does not know is kept as it is.
   const [savedMode, setMode] = useState(() => {
       try {
-        return localStorage.getItem("withlog.connMode.v3") ?? "map";
+        return localStorage.getItem("aisurada.connMode.v3") ?? "map";
       } catch {
         return "map";
       }
     }),
     [only, setOnly] = useState(() => {
       try {
-        return localStorage.getItem("withlog.connFilter.v2") === "1";
+        return localStorage.getItem("aisurada.connFilter.v2") === "1";
       } catch {
         return false;
       }
@@ -226,8 +226,8 @@ export function Connections({
   const mode = savedMode === "list" ? "list" : "map";
   useEffect(() => {
     try {
-      localStorage.setItem("withlog.connMode.v3", savedMode);
-      localStorage.setItem("withlog.connFilter.v2", only ? "1" : "0");
+      localStorage.setItem("aisurada.connMode.v3", savedMode);
+      localStorage.setItem("aisurada.connFilter.v2", only ? "1" : "0");
     } catch {}
   }, [savedMode, only]);
   const all = visibleNotes(
@@ -258,7 +258,7 @@ export function Connections({
             onClick={() => {
               setMode(m);
               try {
-                localStorage.setItem("withlog.connMode.v3", m);
+                localStorage.setItem("aisurada.connMode.v3", m);
               } catch {}
             }}
           >
@@ -279,7 +279,7 @@ export function Connections({
                 setOnly(e.target.checked);
                 try {
                   localStorage.setItem(
-                    "withlog.connFilter.v2",
+                    "aisurada.connFilter.v2",
                     e.target.checked ? "1" : "0",
                   );
                 } catch {}
@@ -984,23 +984,23 @@ export function Guide() {
   const examples = [
     [
       "1. CLI 스킬",
-      `withlog의 노트는 wl-cli로 읽고 씁니다.\n목록: wl-cli list-docs limit=20\n읽기: wl-cli get-doc <노트 id>\n쓰기 전 토큰을 받고 f1=<precondition>을 함께 보냅니다.`,
+      `aisurada의 노트는 ais-cli로 읽고 씁니다.\n목록: ais-cli list-docs limit=20\n읽기: ais-cli get-doc <노트 id>\n쓰기 전 토큰을 받고 f1=<precondition>을 함께 보냅니다.`,
     ],
     // C119: step 2 sets up the CLI mode the step-1 skill assumes. `install`
     // copies only the two jars, so the wrapper script is written here.
     [
-      "2. wl-cli를 셸에 두기",
+      "2. ais-cli를 셸에 두기",
       [
-        'APP="/Applications/withlog.app/Contents/Resources"',
-        'java -jar "$APP/wl-cli.jar" install --cli "$APP/wl-cli.jar" --sidecar "$APP/wl-sidecar.jar"',
+        'APP="/Applications/aisurada.app/Contents/Resources"',
+        'java -jar "$APP/ais-cli.jar" install --cli "$APP/ais-cli.jar" --sidecar "$APP/wl-sidecar.jar"',
         "mkdir -p ~/.local/bin",
-        `printf '#!/bin/sh\\nexec java -jar "$HOME/Library/Application Support/withlog/bin/wl-cli.jar" "$@"\\n' > ~/.local/bin/wl-cli`,
-        "chmod +x ~/.local/bin/wl-cli",
+        `printf '#!/bin/sh\\nexec java -jar "$HOME/Library/Application Support/aisurada/bin/ais-cli.jar" "$@"\\n' > ~/.local/bin/ais-cli`,
+        "chmod +x ~/.local/bin/ais-cli",
         `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`,
-        `echo 'export WITHLOG_VAULT="<vault 경로>"' >> ~/.zshrc`,
+        `echo 'export AISURADA_VAULT="<vault 경로>"' >> ~/.zshrc`,
       ].join("\n"),
     ],
-    ["3. Claude에게 말하기", "withlog에서 오늘 작업한 노트를 찾아 요약해 줘."],
+    ["3. Claude에게 말하기", "aisurada에서 오늘 작업한 노트를 찾아 요약해 줘."],
   ];
   return (
     <Page title="연동 가이드">

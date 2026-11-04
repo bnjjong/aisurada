@@ -6,7 +6,7 @@ use tauri::{
 pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
     let application = Submenu::with_items(
         app,
-        "withlog",
+        "aisurada",
         true,
         &[
             &P::about(app, None, None)?,

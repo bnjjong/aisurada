@@ -1,5 +1,5 @@
 // Empty implementation of @claude-plug/ask for Part 4-free builds.
-// Adheres to Chapter 17 (17.4) of withlog Part 3 screen specifications.
+// Adheres to Chapter 17 (17.4) of aisurada Part 3 screen specifications.
 import type { ReactNode } from 'react';
 import type { Note } from '../../workspace/types.ts';
 

@@ -54,7 +54,7 @@
             "at": "2026-06-18T04:00:00.000Z"
           },
           "path": "notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003",
-          "deepLink": "withlog://doc/ndfixture-00000003?ws=⟦vault-uri⟧"
+          "deepLink": "aisurada://doc/ndfixture-00000003?ws=⟦vault-uri⟧"
         }
       }
     },
@@ -86,7 +86,7 @@
           "links": [],
           "tags": [],
           "path": "notes/serving/2026-06-19-0905-옛-html-노트-0004.html",
-          "deepLink": "withlog://doc/ndfixture-00000004?ws=⟦vault-uri⟧"
+          "deepLink": "aisurada://doc/ndfixture-00000004?ws=⟦vault-uri⟧"
         }
       }
     },

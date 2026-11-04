@@ -53,8 +53,8 @@ pub fn is_regular_file(path: &Path) -> bool {
 }
 
 pub fn resolve_claude() -> Option<PathBuf> {
-    // 1. WITHLOG_CLAUDE_BIN
-    if let Ok(bin) = env::var("WITHLOG_CLAUDE_BIN") {
+    // 1. AISURADA_CLAUDE_BIN
+    if let Ok(bin) = env::var("AISURADA_CLAUDE_BIN") {
         if !bin.is_empty() {
             let p = PathBuf::from(&bin);
             if is_regular_file(&p) {
@@ -115,7 +115,7 @@ pub fn augmented_path() -> String {
     }
 }
 
-/// 묻기 길. 다시 지은 호스트는 깃발 길(WITHLOG_ASK_VIA_HTTP, WITHLOG_ASK_VIA_AGENT_SDK)을 안 지었으므로
+/// 묻기 길. 다시 지은 호스트는 깃발 길(AISURADA_ASK_VIA_HTTP, AISURADA_ASK_VIA_AGENT_SDK)을 안 지었으므로
 /// 깃발이 있어도 기본 길 cli 하나다(1장 1.6, 부록 E E.8의 「늘 cli」).
 #[tauri::command]
 pub fn ask_runtime() -> &'static str {
@@ -203,7 +203,7 @@ fn run_claude_process(
 
     // 환경 변수 설정
     cmd.env("PATH", augmented_path());
-    cmd.env("WITHLOG_VAULT", vault);
+    cmd.env("AISURADA_VAULT", vault);
 
     match process::run_typed(
         &mut cmd,
@@ -296,7 +296,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
         Some(b) => b,
         None => {
             return failure(
-                "claude 실행 파일을 못 찾았다. WITHLOG_CLAUDE_BIN 으로 자리를 알려 줄 수 있다."
+                "claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다."
                     .to_string(),
                 0,
                 missing_cwd,
@@ -520,11 +520,11 @@ mod tests {
     #[test]
     fn ask_runtime_is_always_cli_even_with_flags() {
         let _lock = ENV_LOCK.lock().unwrap();
-        env::set_var("WITHLOG_ASK_VIA_HTTP", "1");
-        env::set_var("WITHLOG_ASK_VIA_AGENT_SDK", "1");
+        env::set_var("AISURADA_ASK_VIA_HTTP", "1");
+        env::set_var("AISURADA_ASK_VIA_AGENT_SDK", "1");
         let route = ask_runtime();
-        env::remove_var("WITHLOG_ASK_VIA_HTTP");
-        env::remove_var("WITHLOG_ASK_VIA_AGENT_SDK");
+        env::remove_var("AISURADA_ASK_VIA_HTTP");
+        env::remove_var("AISURADA_ASK_VIA_AGENT_SDK");
         assert_eq!(route, "cli");
     }
 
@@ -600,10 +600,10 @@ mod tests {
         let fake_bin = dir.path().join("fake_claude");
         File::create(&fake_bin).unwrap();
 
-        env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake_bin.to_str().unwrap());
         let resolved = resolve_claude();
         assert_eq!(resolved, Some(fake_bin));
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
     }
 
     fn create_executable_script(dir: &Path, name: &str, content: &str) -> PathBuf {
@@ -622,11 +622,11 @@ mod tests {
         // 스크립트: 전달받은 인자들과 표준입력을 출력
         let script = r#"#!/bin/sh
 echo "ARGS: $@"
-echo "VAULT: $WITHLOG_VAULT"
+echo "VAULT: $AISURADA_VAULT"
 echo "STDIN: $(cat)"
 "#;
         let fake_bin = create_executable_script(dir.path(), "fake_claude_success.sh", script);
-        env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake_bin.to_str().unwrap());
 
         let vault_dir = dir.path().join("vault");
         fs::create_dir(&vault_dir).unwrap();
@@ -650,7 +650,7 @@ echo "STDIN: $(cat)"
         };
 
         let resp = execute_ask(args);
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
 
         assert!(resp.ok, "should be ok: {:?}", resp.error);
         assert!(resp.error.is_none());
@@ -682,7 +682,7 @@ fi
         );
 
         let fake_bin = create_executable_script(dir.path(), "fake_claude_flip.sh", &script);
-        env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake_bin.to_str().unwrap());
 
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
@@ -702,7 +702,7 @@ fi
         };
 
         let resp = execute_ask(args);
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
 
         assert!(resp.ok, "flag flip should succeed on 2nd attempt: {:?}", resp.error);
         assert!(resp.answer.contains("--resume sess-already-in-use"));
@@ -717,7 +717,7 @@ echo "Error: No conversation found for session" >&2
 exit 1
 "#;
         let fake_bin = create_executable_script(dir.path(), "fake_claude_no_conv.sh", script);
-        env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake_bin.to_str().unwrap());
 
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
@@ -737,7 +737,7 @@ exit 1
         };
 
         let resp = execute_ask(args);
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
 
         assert!(!resp.ok, "should fail");
         let err = resp.error.unwrap();
@@ -755,7 +755,7 @@ exit 1
             pid_file.display()
         );
         let fake_bin = create_executable_script(dir.path(), "fake_claude_sleep.sh", &script);
-        env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake_bin.to_str().unwrap());
 
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
@@ -775,7 +775,7 @@ exit 1
         };
 
         let resp = execute_ask(args);
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
 
         assert!(!resp.ok, "should time out");
         let err = resp.error.unwrap();
@@ -801,7 +801,7 @@ exit 1
             warning_text
         );
         let fake_bin = create_executable_script(dir.path(), "fake_claude_d12.sh", &script);
-        env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake_bin.to_str().unwrap());
 
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
@@ -821,7 +821,7 @@ exit 1
         };
 
         let resp = execute_ask(args);
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
 
         assert!(!resp.ok);
         let err = resp.error.unwrap();
@@ -858,9 +858,9 @@ exit 1
             count.display()
         );
         let fake = create_executable_script(dir.path(), "fake_both.sh", &script);
-        env::set_var("WITHLOG_CLAUDE_BIN", fake.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake.to_str().unwrap());
         let resp = execute_ask(ask_args("sess-both", true, false));
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
         assert!(!resp.ok);
         assert_eq!(fs::read_to_string(count).unwrap().lines().count(), 1, "같은 플래그라 다시 안 건다");
     }
@@ -875,7 +875,7 @@ exit 1
             "fake_boom.sh",
             "#!/bin/sh\necho 'No conversation found'\necho 'Error: boom' >&2\nexit 1\n",
         );
-        env::set_var("WITHLOG_CLAUDE_BIN", stderr_boom.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", stderr_boom.to_str().unwrap());
         let resp = execute_ask(ask_args("sess-prefix", true, true));
         assert!(!resp.error.unwrap().starts_with("이 기계에서"), "표준오류가 비지 않으면 표준출력은 안 본다");
         // 표준오류가 비면 표준출력을 본다
@@ -884,7 +884,7 @@ exit 1
             "fake_stdout.sh",
             "#!/bin/sh\necho 'No conversation found'\nexit 1\n",
         );
-        env::set_var("WITHLOG_CLAUDE_BIN", stdout_only.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", stdout_only.to_str().unwrap());
         let resp = execute_ask(ask_args("sess-prefix", true, true));
         assert!(resp.error.unwrap().starts_with("이 기계에서"));
         // is already in use 가 함께 들면 안 붙인다
@@ -893,9 +893,9 @@ exit 1
             "fake_both2.sh",
             "#!/bin/sh\necho 'No conversation found; is already in use' >&2\nexit 1\n",
         );
-        env::set_var("WITHLOG_CLAUDE_BIN", both.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", both.to_str().unwrap());
         let resp = execute_ask(ask_args("sess-prefix", true, true));
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
         assert!(!resp.error.unwrap().starts_with("이 기계에서"));
     }
 
@@ -909,12 +909,12 @@ exit 1
             "fake_holder.sh",
             "#!/bin/sh\n(sleep 5 &) \nexit 0\n",
         );
-        env::set_var("WITHLOG_CLAUDE_BIN", fake.to_str().unwrap());
+        env::set_var("AISURADA_CLAUDE_BIN", fake.to_str().unwrap());
         let mut args = ask_args("sess-holder", false, false);
         args.timeout_seconds = 1;
         let started = Instant::now();
         let resp = execute_ask(args);
-        env::remove_var("WITHLOG_CLAUDE_BIN");
+        env::remove_var("AISURADA_CLAUDE_BIN");
         assert!(!resp.ok);
         assert!(resp.error.unwrap().contains("1초 안에 답이 안 왔다"));
         assert!(started.elapsed() < Duration::from_secs(4));

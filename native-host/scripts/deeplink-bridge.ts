@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
-import { parseWithlog } from '../src/interaction/links.ts';
+import { parseAisurada } from '../src/interaction/links.ts';
 
 export function handleDeepLinkRequest(req: IncomingMessage, res: ServerResponse,
   connected: () => boolean, send: (url: string) => void) {
@@ -20,7 +20,7 @@ export function handleDeepLinkRequest(req: IncomingMessage, res: ServerResponse,
     if (responded) return;
     const url = Buffer.concat(chunks).toString('utf8').trim();
     if (!url) { reply(400, '본문이 비었다.'); return; }
-    if (!parseWithlog(url)) { reply(400, `withlog:// 딥링크가 아니다: ${url.slice(0, 80)}`); return; }
+    if (!parseAisurada(url)) { reply(400, `aisurada:// 딥링크가 아니다: ${url.slice(0, 80)}`); return; }
     if (!connected()) { reply(503, '붙어 있는 페이지가 없다.'); return; }
     send(url); reply(200, `보냈다: ${url}`);
   });
@@ -28,11 +28,11 @@ export function handleDeepLinkRequest(req: IncomingMessage, res: ServerResponse,
 
 export function deepLinkBridge(): Plugin {
   return {
-    name: 'withlog-development-deep-links', apply: 'serve',
+    name: 'aisurada-development-deep-links', apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         if (new URL(req.url || '/', 'http://localhost').pathname !== '/__deeplink') { next(); return; }
-        handleDeepLinkRequest(req, res, () => server.ws.clients.size > 0, url => server.ws.send('withlog:deeplink', { url }));
+        handleDeepLinkRequest(req, res, () => server.ws.clients.size > 0, url => server.ws.send('aisurada:deeplink', { url }));
       });
     },
   };

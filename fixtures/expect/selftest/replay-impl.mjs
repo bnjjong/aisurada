@@ -22,7 +22,7 @@ if (!found) {
 
 const mutant = process.env.WLX_SELFTEST_MUTANT ?? '';
 const targeted = (process.env.WLX_SELFTEST_TARGETS ?? '').split('\n').includes(found.id);
-const vars = { vault: process.env.WITHLOG_VAULT, home: process.env.HOME };
+const vars = { vault: process.env.AISURADA_VAULT, home: process.env.HOME };
 const tokenFor = p => 'rp-' + crypto.createHash('sha256').update(targeted && mutant === 'token' ? `${p}\n${found.id}` : p).digest('hex').slice(0, 24);
 
 const e = found.expect;

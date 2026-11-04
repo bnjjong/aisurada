@@ -2,19 +2,19 @@ import { asRow, asText } from './types.ts';
 import type { RecentWorkspace, StoragePort, WorkspaceState } from './types.ts';
 
 export const KEYS = {
-  last: 'withlog.lastWorkspace.v1',
-  recent: 'withlog.workspaces.v1',
-  home: 'withlog.workspaceHome.v1',
-  prefs: 'withlog.prefs.v1',
-  tabs: 'withlog.tabs.v1',
-  noteWindow: 'withlog.noteWindow.v1',
-  sampleReport: 'withlog.sampleReport.v1',
-  connMode: 'withlog.connMode.v3',
-  connFilter: 'withlog.connFilter.v2',
-  sampleReportEdits: 'withlog.reportEdits.v1',
-  sampleReportMemos: 'withlog.reportMemos.v1',
-  sampleTemplates: 'withlog.templates.v1',
-  recentNotesPrefix: 'withlog.recentNotes.v1:',
+  last: 'aisurada.lastWorkspace.v1',
+  recent: 'aisurada.workspaces.v1',
+  home: 'aisurada.workspaceHome.v1',
+  prefs: 'aisurada.prefs.v1',
+  tabs: 'aisurada.tabs.v1',
+  noteWindow: 'aisurada.noteWindow.v1',
+  sampleReport: 'aisurada.sampleReport.v1',
+  connMode: 'aisurada.connMode.v3',
+  connFilter: 'aisurada.connFilter.v2',
+  sampleReportEdits: 'aisurada.reportEdits.v1',
+  sampleReportMemos: 'aisurada.reportMemos.v1',
+  sampleTemplates: 'aisurada.templates.v1',
+  recentNotesPrefix: 'aisurada.recentNotes.v1:',
 } as const;
 
 export interface AppPreferences {

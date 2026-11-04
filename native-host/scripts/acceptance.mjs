@@ -22,7 +22,7 @@ const root = realpathSync(mkdtempSync(join(tmpdir(), "wl-p2-"))),
   home = join(root, "home"),
   vault = join(root, "vault"),
   zdot = join(root, "zdot");
-const identifier = `co.kcd.withlog.part2.check${process.pid}`;
+const identifier = `co.kcd.aisurada.part2.check${process.pid}`;
 const data = join(home, "Library/Application Support", identifier);
 const mkdir = (p) => mkdirSync(p, { recursive: true }),
   write = (p, s) => {
@@ -36,9 +36,9 @@ const id = "ndfixture-00000001",
   restoreId = "ndfixture-00000002",
   noteDir = join(vault, "notes/demo/root"),
   note = join(noteDir, "note.md");
-write(join(vault, ".withlog/workspace.json"), "{}");
+write(join(vault, ".aisurada/workspace.json"), "{}");
 write(
-  join(vault, ".withlog/agendas/demo.md"),
+  join(vault, ".aisurada/agendas/demo.md"),
   "---\nid: agfixture-00000001\nslug: demo\ntitle: Demo\n---\n",
 );
 for (const [folder, nid] of [
@@ -112,21 +112,21 @@ const env = {
   HISTFILE: join(root, "history"),
   CARGO_HOME: process.env.CARGO_HOME || join(homedir(), ".cargo"),
   RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), ".rustup"),
-  WITHLOG_VAULT: vault,
-  WITHLOG_CLI_JAR: join(repo, "dist/wl-cli.jar"),
-  WITHLOG_SIDECAR_JAVA: wrapper,
-  WITHLOG_SIDECAR_SOCKET: join(root, "engine.sock"),
-  WITHLOG_VAULT_AUTOCOMMIT_ENABLED: "false",
+  AISURADA_VAULT: vault,
+  AISURADA_CLI_JAR: join(repo, "dist/ais-cli.jar"),
+  AISURADA_SIDECAR_JAVA: wrapper,
+  AISURADA_SIDECAR_SOCKET: join(root, "engine.sock"),
+  AISURADA_VAULT_AUTOCOMMIT_ENABLED: "false",
   PATH: join(root, "bin") + ":" + process.env.PATH,
 };
 for (const k of [
-  "WITHLOG_SIDECAR_JAR",
+  "AISURADA_SIDECAR_JAR",
   "CLAUDE_CODE_SESSION_ID",
-  "WITHLOG_ASK_RUNTIME",
-  "WITHLOG_ASK_USE_AGENT",
+  "AISURADA_ASK_RUNTIME",
+  "AISURADA_ASK_USE_AGENT",
 ])
   delete env[k];
-if (!existsSync(join(repo, "dist/wl-cli.jar")))
+if (!existsSync(join(repo, "dist/ais-cli.jar")))
   throw Error("Run bash build.sh first");
 const config = {
   root,
@@ -183,7 +183,7 @@ const server = createServer(async (req, res) => {
   }
   res.writeHead(200, { "Content-Type": "text/html" });
   res.end(
-    '<!doctype html><html><head><meta charset="utf-8"><title>withlog isolated native checks</title></head><body><h1>withlog native checks</h1><pre>Running…</pre><script type="module" src="/checks.js"></script></body></html>',
+    '<!doctype html><html><head><meta charset="utf-8"><title>aisurada isolated native checks</title></head><body><h1>aisurada native checks</h1><pre>Running…</pre><script type="module" src="/checks.js"></script></body></html>',
   );
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -226,11 +226,11 @@ try {
     join(repo, "dist/wl-sidecar-noclaude.jar"),
     "serve",
   ]);
-  for (let i = 0; i < 600 && !existsSync(env.WITHLOG_SIDECAR_SOCKET); i++) {
+  for (let i = 0; i < 600 && !existsSync(env.AISURADA_SIDECAR_SOCKET); i++) {
     if (engine.exitCode !== null) throw Error("engine exited");
     await new Promise((r) => setTimeout(r, 25));
   }
-  if (!existsSync(env.WITHLOG_SIDECAR_SOCKET)) throw Error("engine not ready");
+  if (!existsSync(env.AISURADA_SIDECAR_SOCKET)) throw Error("engine not ready");
   const native = start(join(host, "node_modules/.bin/tauri"), [
     "dev",
     "--config",
@@ -310,8 +310,8 @@ try {
   }
   server.close();
   const report = { results: result, ok: !failure, root, identifier };
-  if (process.env.WITHLOG_CHECK_REPORT)
-    write(process.env.WITHLOG_CHECK_REPORT, JSON.stringify(report, null, 2));
+  if (process.env.AISURADA_CHECK_REPORT)
+    write(process.env.AISURADA_CHECK_REPORT, JSON.stringify(report, null, 2));
   if (failure) {
     write(join(root, "host.log"), log);
     console.error(`Fixture diagnostics retained: ${root}`);

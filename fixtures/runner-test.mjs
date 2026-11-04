@@ -97,12 +97,12 @@ import path from 'node:path';
 const argv = process.argv.slice(2);
 const script = JSON.parse(fs.readFileSync(process.env.WLX_IMPL_SCRIPT, 'utf8'));
 const a = script[JSON.stringify(argv)] ?? (argv[0] === 'reindex' ? { code: 0 } : { code: 99, stderr: 'no script for ' + JSON.stringify(argv) });
-if (a.writeVault) fs.writeFileSync(path.join(process.env.WITHLOG_VAULT, a.writeVault), 'x');
+if (a.writeVault) fs.writeFileSync(path.join(process.env.AISURADA_VAULT, a.writeVault), 'x');
 if (a.pidFile) fs.writeFileSync(a.pidFile, String(process.pid));
 let stdin = '';
 try { stdin = fs.readFileSync(0, 'utf8'); } catch { stdin = 'unreadable'; }
 let out = a.stdout ?? '';
-if (a.envDump) out = JSON.stringify({ vault: process.env.WITHLOG_VAULT, home: process.env.HOME, tz: process.env.TZ, lang: process.env.LANG,
+if (a.envDump) out = JSON.stringify({ vault: process.env.AISURADA_VAULT, home: process.env.HOME, tz: process.env.TZ, lang: process.env.LANG,
   lcAll: process.env.LC_ALL, state: !!process.env.WLX_STATE_DIR, tmp: !!process.env.TMPDIR, impl: process.env.WLX_IMPL_EXTRA ?? null,
   leak: process.env.LEAK_ME ?? null, stdin, cwd: process.cwd() }, null, 2) + '\\n';
 if (a.stderr) process.stderr.write(a.stderr + '\\n');
@@ -111,7 +111,7 @@ const finish = () => process.stdout.write(bytes, () => process.exit(a.code));
 if (a.sleepMs) setTimeout(finish, a.sleepMs); else finish();
 `);
 const ADAPTER = path.join(TMP, 'fake.adapter.json');
-writeJson(ADAPTER, { format: 'wlx-adapter', version: 1, surface: 'engine', name: 'fake', prefix: [process.execPath, FAKE], suffix: ['--x=${WITHLOG_VAULT}'] });
+writeJson(ADAPTER, { format: 'wlx-adapter', version: 1, surface: 'engine', name: 'fake', prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'] });
 
 function script(map) {
   const file = path.join(TMP, `script-${crypto.randomUUID()}.json`);
@@ -176,11 +176,11 @@ console.log('\n[3] --out');
   check('그때 묶음 안에 폴더를 안 남긴다', fs.existsSync(path.join(BUNDLE, 'zz-out')), false);
   const vault = path.join(TMP, 'parent-vault');
   fs.mkdirSync(vault, { recursive: true });
-  check('부모 셸의 WITHLOG_VAULT 안이면 2', runner(BUNDLE, ['--self-check', '--out', path.join(vault, 'o')], { WITHLOG_VAULT: vault }).code, 2);
-  check('부모 셸의 WITHLOG_VAULT 자체(빈 폴더)여도 2', why(runner(BUNDLE, ['--self-check', '--out', vault], { WITHLOG_VAULT: vault })), `--out 이 WITHLOG_VAULT와 겹친다: ${vault}`);
+  check('부모 셸의 AISURADA_VAULT 안이면 2', runner(BUNDLE, ['--self-check', '--out', path.join(vault, 'o')], { AISURADA_VAULT: vault }).code, 2);
+  check('부모 셸의 AISURADA_VAULT 자체(빈 폴더)여도 2', why(runner(BUNDLE, ['--self-check', '--out', vault], { AISURADA_VAULT: vault })), `--out 이 AISURADA_VAULT와 겹친다: ${vault}`);
   const link = path.join(TMP, 'link-to-vault');
   fs.symlinkSync(vault, link);
-  const viaLink = runner(BUNDLE, ['--self-check', '--out', path.join(link, 'n')], { WITHLOG_VAULT: vault });
+  const viaLink = runner(BUNDLE, ['--self-check', '--out', path.join(link, 'n')], { AISURADA_VAULT: vault });
   check('링크로 돌아 들어가도 장치와 inode로 잡는다', [viaLink.code, fs.existsSync(path.join(vault, 'n'))], [2, false]);
   const upper = path.join(BUNDLE.replace(/expect$/, 'EXPECT'), 'zz-upper');
   if (fs.existsSync(path.dirname(upper))) {
@@ -222,7 +222,7 @@ console.log('\n[5] 어댑터와 준비 걸음');
   check('구현을 못 띄우면 준비 걸음에서 2', run(ad('a4.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [path.join(TMP, 'no-such-bin')] })).code, 2);
   const failPrep = script([[['reindex'], { code: 7, stderr: 'WL-500 색인을 못 지었다' }]]);
   check('준비 걸음이 0이 아니면 2', why(runner(copy, ['--engine', ad('a5.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE] }), '--out', freshOut()], { WLX_IMPL_SCRIPT: failPrep })), '준비 걸음 ["reindex"] 이 종료 코드 7 로 끝났다. stderr: WL-500 색인을 못 지었다');
-  const noName = ad('my-engine.adapter.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE], suffix: ['--x=${WITHLOG_VAULT}'], unknownKey: 1 });
+  const noName = ad('my-engine.adapter.json', { format: 'wlx-adapter', version: 1, surface: 'engine', prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'], unknownKey: 1 });
   const o = freshOut();
   const vault = path.join(o, 'read-0', 'vault');
   runner(copy, ['--engine', noName, '--out', o], { WLX_IMPL_SCRIPT: script([[withSuffix(['a'], vault), { code: 0 }]]) });
@@ -302,9 +302,9 @@ console.log('\n[7] 구현 환경과 경고');
     [withSuffix(['env'], vault), { code: 0, envDump: true }],
     [withSuffix(['write'], vault), { code: 0, writeVault: 'notes/new.md' }]
   ]);
-  const r = runner(copy, ['--engine', ADAPTER, '--out', o], { WLX_IMPL_SCRIPT: s, WLX_IMPL_EXTRA: 'yes', LEAK_ME: 'secret', WITHLOG_VAULT: path.join(TMP, 'parent-vault') });
+  const r = runner(copy, ['--engine', ADAPTER, '--out', o], { WLX_IMPL_SCRIPT: s, WLX_IMPL_EXTRA: 'yes', LEAK_ME: 'secret', AISURADA_VAULT: path.join(TMP, 'parent-vault') });
   const rep = report(o);
-  check('PATH 와 WLX_IMPL_* 만 넘어가고, 부모의 WITHLOG_VAULT 와 다른 변수는 안 닿는다. stdin 은 빈 입력, 작업 폴더는 실행기의 것', rep.failures, []);
+  check('PATH 와 WLX_IMPL_* 만 넘어가고, 부모의 AISURADA_VAULT 와 다른 변수는 안 닿는다. stdin 은 빈 입력, 작업 폴더는 실행기의 것', rep.failures, []);
   check('읽기 레인이 vault 를 바꾸면 경고로만 남고 종료 코드는 0', [r.code, rep.warnings], [0, ['vault notes/new.md: 파일이 새로 생겼다']]);
   check('요약에 경고 줄', r.stderr.includes('  ⚠ vault notes/new.md: 파일이 새로 생겼다'), true);
 }
@@ -383,14 +383,14 @@ console.log('\n[11] 지금 실행기와 맞춘 갈래(34장 판 확인 후속)')
 
   const o3 = freshOut();
   fs.mkdirSync(o3, { recursive: true });
-  check('아직 없는 WITHLOG_VAULT 가 있는 --out 안이면 2', why(runner(BUNDLE, ['--self-check', '--out', o3], { WITHLOG_VAULT: path.join(o3, 'vault') })), `--out 이 WITHLOG_VAULT와 겹친다: ${o3}`);
+  check('아직 없는 AISURADA_VAULT 가 있는 --out 안이면 2', why(runner(BUNDLE, ['--self-check', '--out', o3], { AISURADA_VAULT: path.join(o3, 'vault') })), `--out 이 AISURADA_VAULT와 겹친다: ${o3}`);
   const o4 = freshOut();
-  const r4 = runner(BUNDLE, ['--self-check', '--out', o4], { WITHLOG_VAULT: path.join(o4, 'deep', 'vault') });
+  const r4 = runner(BUNDLE, ['--self-check', '--out', o4], { AISURADA_VAULT: path.join(o4, 'deep', 'vault') });
   check('아직 없는 --out 안이면 만든 뒤 다시 재서 2, 만든 폴더는 지운다', [r4.code, fs.existsSync(o4)], [2, false]);
   const nv = path.join(TMP, 'not-yet-vault');
-  const r5 = runner(BUNDLE, ['--self-check', '--out', path.join(nv, 'o')], { WITHLOG_VAULT: nv });
-  check('--out 이 아직 없는 WITHLOG_VAULT 안이면 2, vault 자리를 안 남긴다', [r5.code, fs.existsSync(nv)], [2, false]);
-  check('아직 없는 WITHLOG_VAULT 의 위 폴더 안에 --out 이 있는 것만으로는 안 겹친다', runner(BUNDLE, ['--self-check', '--out', freshOut()], { WITHLOG_VAULT: path.join(TMP, 'elsewhere', 'vault') }).code, 0);
+  const r5 = runner(BUNDLE, ['--self-check', '--out', path.join(nv, 'o')], { AISURADA_VAULT: nv });
+  check('--out 이 아직 없는 AISURADA_VAULT 안이면 2, vault 자리를 안 남긴다', [r5.code, fs.existsSync(nv)], [2, false]);
+  check('아직 없는 AISURADA_VAULT 의 위 폴더 안에 --out 이 있는 것만으로는 안 겹친다', runner(BUNDLE, ['--self-check', '--out', freshOut()], { AISURADA_VAULT: path.join(TMP, 'elsewhere', 'vault') }).code, 0);
 
   const phOut = makeBundle('stdoutph', { 'read/t.json': lane([kase('x', ['x'], { code: 0, stdout: 'ws=⟦vault-uri⟧' })]) }, { 'tiny.v1': TINY });
   check('stdout 에 자리표 모양 글자가 들면 구현을 부르기 전에 2', why(runner(phOut, ['--engine', ADAPTER, '--out', freshOut()])), 'lanes/read/t.json 의 1번째 케이스 (x): stdout 은 자리표 없는 글이다. 자리표를 쓰려면 stdoutText 로 적는다');

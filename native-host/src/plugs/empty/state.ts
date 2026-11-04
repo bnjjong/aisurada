@@ -1,5 +1,5 @@
 // Empty implementation of @claude-plug/state for Part 4-free builds.
-// Adheres to Chapter 17 (17.3) of withlog Part 3 screen specifications.
+// Adheres to Chapter 17 (17.3) of aisurada Part 3 screen specifications.
 
 export const CLAUDE_ENABLED = false;
 

@@ -65,10 +65,10 @@ if (location.pathname.startsWith('/note-window/')) {
       await until(async () => !(await invoke('note_windows')).length);
     });
     await test('sample-preserves-real-vault', async () => {
-      const last = localStorage.getItem('withlog.lastWorkspace.v1');
+      const last = localStorage.getItem('aisurada.lastWorkspace.v1');
       navigate('/launcher'); await until(() => document.querySelector('.sample-button'));
       click('.sample-button'); await until(() => document.querySelector('.sample-badge'));
-      assert(localStorage.getItem('withlog.lastWorkspace.v1') === last, 'sample replaced last real vault');
+      assert(localStorage.getItem('aisurada.lastWorkspace.v1') === last, 'sample replaced last real vault');
       // An earlier focus refresh may finish while the transition waits in the
       // queue. From the moment the sample opens, no engine read may follow.
       sampleCallCount = (await calls()).length;
@@ -80,17 +80,17 @@ if (location.pathname.startsWith('/note-window/')) {
       assert((await calls()).length === sampleCallCount, 'sample note called engine');
       click('.tab-main .tab-button'); await until(() => document.querySelector('.rail-back'));
       click('.rail-back'); await until(() => document.querySelector('.launcher'));
-      assert(localStorage.getItem('withlog.lastWorkspace.v1') === 'null', 'launcher did not clear last workspace');
+      assert(localStorage.getItem('aisurada.lastWorkspace.v1') === 'null', 'launcher did not clear last workspace');
     });
     await test('folder-open-ui-and-recent', async () => {
       click('.workspace-option:nth-child(2)'); await until(() => document.querySelector('input[name="path"]'));
       fill('input[name="path"]', cfg.raw); await wait(0); click('.workspace-form button[type="submit"]');
       await until(() => document.querySelector('[data-rail-section="nav"]') && document.querySelector('.workspace-shell')?.getAttribute('aria-busy') === 'false');
-      assert(JSON.parse(localStorage.getItem('withlog.workspaces.v1'))[0].path === cfg.raw, 'recent real path missing');
+      assert(JSON.parse(localStorage.getItem('aisurada.workspaces.v1'))[0].path === cfg.raw, 'recent real path missing');
       click('.rail-back'); await until(() => document.querySelector('.recent-open'));
-      const order = localStorage.getItem('withlog.workspaces.v1');
+      const order = localStorage.getItem('aisurada.workspaces.v1');
       click('.recent-open'); await until(() => document.querySelector('[data-rail-section="nav"]'));
-      assert(localStorage.getItem('withlog.workspaces.v1') === order, 'recent click reordered list');
+      assert(localStorage.getItem('aisurada.workspaces.v1') === order, 'recent click reordered list');
     });
     await test('creation-ui-initializes-twice', async () => {
       click('.rail-back'); await until(() => document.querySelector('.launcher'));
@@ -100,8 +100,8 @@ if (location.pathname.startsWith('/note-window/')) {
       click('.workspace-form button[type="submit"]');
       await until(() => document.querySelector('.workspace-shell')?.getAttribute('aria-busy') === 'false');
       assert((await calls()).filter(c => c.args.argv[0] === 'init-workspace').length === before + 2, 'creation init count');
-      assert(JSON.parse(localStorage.getItem('withlog.workspaces.v1'))[0].created === true, 'created flag missing');
-      assert(JSON.parse(localStorage.getItem('withlog.lastWorkspace.v1')).path === cfg.vault, 'created path missing');
+      assert(JSON.parse(localStorage.getItem('aisurada.workspaces.v1'))[0].created === true, 'created flag missing');
+      assert(JSON.parse(localStorage.getItem('aisurada.lastWorkspace.v1')).path === cfg.vault, 'created path missing');
     });
   } catch { /* Stop dependent checks after their first failure. */ }
   await post('/result', results);

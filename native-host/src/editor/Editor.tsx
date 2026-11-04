@@ -132,7 +132,7 @@ export function Editor(props: EditorProps) {
   const [error, setError] = useState("");
   const initial = useRef(props);
   const config = useRef({
-    namespace: "withlog-editor",
+    namespace: "aisurada-editor",
     theme,
     nodes: EDITOR_NODES,
     editorState: (editor: LexicalEditor) => {
@@ -217,11 +217,11 @@ function EditorBridge(props: EditorProps) {
       if (parsed.isEmpty()) return;
     }
     if (external) editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
-    if (parsed) editor.setEditorState(parsed, { tag: "withlog-mirror" });
+    if (parsed) editor.setEditorState(parsed, { tag: "aisurada-mirror" });
     else
       editor.update(
         () => {
-          $addUpdateTag("withlog-mirror");
+          $addUpdateTag("aisurada-mirror");
           $importDocument(body);
           $repairDocument();
         },
@@ -370,7 +370,7 @@ function EditorBridge(props: EditorProps) {
             tags.has("wl:import") ||
             tags.has("wl:repair") ||
             tags.has("wl:mirror") ||
-            tags.has("withlog-mirror")
+            tags.has("aisurada-mirror")
           ) {
             last.current = body;
             return;

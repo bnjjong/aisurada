@@ -1,6 +1,6 @@
 // One drag question from the press to the saved turn (3.4 to 3.10), and the old thread move (2.10).
 // It has no React in it and reaches the host only through `AskHost`, so the node tests drive it with a fake.
-// Adheres to Chapters 2 and 3 of withlog Part 4 Claude integration specifications.
+// Adheres to Chapters 2 and 3 of aisurada Part 4 Claude integration specifications.
 import {
   IMAGE_MIME_EXTENSIONS,
   QUOTE_LIMIT,

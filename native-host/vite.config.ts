@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
       react(),
       deepLinkBridge(),
       {
-        name: 'withlog-screen-contracts',
+        name: 'aisurada-screen-contracts',
         apply: 'build',
         configResolved(config) {
           outputDirectory = resolve(config.root, config.build.outDir);

@@ -1,4 +1,4 @@
-//! Isolated subprocess test: native IPC -> real java wl-cli -> a test-owned serve engine.
+//! Isolated subprocess test: native IPC -> real java ais-cli -> a test-owned serve engine.
 use crate::{environment, lifecycle::HostState, sidecar, workspace};
 use serde_json::{json, Value};
 use std::{
@@ -35,7 +35,7 @@ fn invoke(window: &WebviewWindow<MockRuntime>, name: &str, value: Value) -> Resu
 #[test]
 #[ignore = "invoked only by the isolated real-engine test"]
 fn ipc_probe() {
-    let root = std::env::var("WITHLOG_VAULT").unwrap();
+    let root = std::env::var("AISURADA_VAULT").unwrap();
     let app = mock_builder()
         .plugin(tauri_plugin_fs::init())
         .manage(HostState::default())
@@ -137,11 +137,11 @@ fn real_engine_round_trip_uses_isolated_home_and_socket() {
     let vault = temp.path().join("vault");
     let socket = temp.path().join("engine.sock");
     fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(vault.join(".withlog/agendas")).unwrap();
+    fs::create_dir_all(vault.join(".aisurada/agendas")).unwrap();
     fs::create_dir_all(vault.join("notes/demo/root")).unwrap();
-    fs::write(vault.join(".withlog/workspace.json"), "{}").unwrap();
+    fs::write(vault.join(".aisurada/workspace.json"), "{}").unwrap();
     fs::write(
-        vault.join(".withlog/agendas/demo.md"),
+        vault.join(".aisurada/agendas/demo.md"),
         "---\nid: agfixture-00000001\nslug: demo\ntitle: 데모\n---\n",
     )
     .unwrap();
@@ -151,7 +151,7 @@ fn real_engine_round_trip_uses_isolated_home_and_socket() {
         .unwrap()
         .parent()
         .unwrap();
-    let cli = repo.join("dist/wl-cli.jar");
+    let cli = repo.join("dist/ais-cli.jar");
     // 이 시험은 4부를 뺀 판의 답(WL-409)을 재므로 4부를 뺀 사이드카를 띄운다(1장 1.1)
     let engine = repo.join("dist/wl-sidecar-noclaude.jar");
     assert!(
@@ -183,15 +183,15 @@ fn real_engine_round_trip_uses_isolated_home_and_socket() {
     let mut env: BTreeMap<OsString, OsString> = BTreeMap::new();
     for (key, value) in [
         ("HOME", home.as_os_str()),
-        ("WITHLOG_VAULT", vault.as_os_str()),
-        ("WITHLOG_SIDECAR_SOCKET", socket.as_os_str()),
-        ("WITHLOG_CLI_JAR", cli.as_os_str()),
-        ("WITHLOG_SIDECAR_JAVA", wrapper.as_os_str()),
+        ("AISURADA_VAULT", vault.as_os_str()),
+        ("AISURADA_SIDECAR_SOCKET", socket.as_os_str()),
+        ("AISURADA_CLI_JAR", cli.as_os_str()),
+        ("AISURADA_SIDECAR_JAVA", wrapper.as_os_str()),
     ] {
         env.insert(key.into(), value.into());
     }
     env.insert("PATH".into(), "/usr/bin:/bin".into());
-    env.insert("WITHLOG_VAULT_AUTOCOMMIT_ENABLED".into(), "false".into());
+    env.insert("AISURADA_VAULT_AUTOCOMMIT_ENABLED".into(), "false".into());
     let error_log = temp.path().join("engine.err");
     let child = Command::new(&wrapper)
         .arg("-jar")

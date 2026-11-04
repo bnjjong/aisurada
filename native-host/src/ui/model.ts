@@ -71,7 +71,7 @@ export function preferences(storage: StoragePort): Preferences {
   try {
     const state =
       asRow(
-        asRow(JSON.parse(storage.getItem("withlog.prefs.v1") || "null"))?.state,
+        asRow(JSON.parse(storage.getItem("aisurada.prefs.v1") || "null"))?.state,
       ) || {};
     return {
       ...defaultPrefs,

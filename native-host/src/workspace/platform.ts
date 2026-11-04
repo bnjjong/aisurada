@@ -46,8 +46,8 @@ export function workspaceServices(): WorkspaceServices {
     ...(import.meta.hot ? { developmentLinks: (received: (urls: string[]) => void) => {
       const hot = import.meta.hot!;
       const handler = (value: { url: string }) => received([value.url]);
-      hot.on('withlog:deeplink', handler);
-      return () => hot.off('withlog:deeplink', handler);
+      hot.on('aisurada:deeplink', handler);
+      return () => hot.off('aisurada:deeplink', handler);
     } } : {}),
     // 15.8: the window's logical pixels, not rounded. innerWidth and screenX are integers.
     noteGeometryChanged: changed => {

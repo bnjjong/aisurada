@@ -205,7 +205,7 @@ export function NoteMeta({
             <button
               onClick={() =>
                 void navigator.clipboard.writeText(
-                  `withlog://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
+                  `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
                 )
               }
             >

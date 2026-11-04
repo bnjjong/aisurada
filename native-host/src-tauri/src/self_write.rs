@@ -56,7 +56,7 @@ mod tests {
         assert!(validate_relative(&"한".repeat(682)).is_ok());
         assert!(validate_relative(&"한".repeat(683)).is_err());
         for path in [
-            ".withlog/facts/a.md",
+            ".aisurada/facts/a.md",
             "uncreated/place",
             "a\\b",
             "a\0b",

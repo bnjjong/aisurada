@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "withlog",
+  "productName": "aisurada",
   "version": "0.1.0",
-  "identifier": "co.kcd.withlog",
+  "identifier": "co.kcd.aisurada",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "withlog",
+        "title": "aisurada",
         "width": 800,
         "height": 600,
         "create": false
@@ -31,7 +31,7 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "withlog"
+          "aisurada"
         ]
       }
     }
@@ -54,7 +54,7 @@
       }
     ],
     "resources": {
-      "../../dist/wl-cli.jar": "wl-cli.jar",
+      "../../dist/ais-cli.jar": "ais-cli.jar",
       "../../dist/wl-sidecar.jar": "wl-sidecar.jar"
     },
     "icon": [

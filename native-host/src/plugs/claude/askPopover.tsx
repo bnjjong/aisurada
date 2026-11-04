@@ -1,5 +1,5 @@
 // The question box that opens over a selection, a table row or an HTML box.
-// Adheres to Chapter 3 (3.2, 3.3) of withlog Part 4 Claude integration specifications.
+// Adheres to Chapter 3 (3.2, 3.3) of aisurada Part 4 Claude integration specifications.
 // It is the part 3 comment compose box with three additions: the pickers, a picture strip and picture paste.
 import { useContext, useEffect, useRef, useState } from 'react';
 import { AskContext } from './askContext.ts';

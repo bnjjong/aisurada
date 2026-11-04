@@ -207,7 +207,7 @@ mod tests {
     fn canonical_notes_boundary_refuses_trash_sibling_and_symlink_escape() {
         let (temp, note) = setup();
         let outside = tempfile::tempdir().unwrap();
-        let trash = temp.path().join(".withlog/trash/files/n");
+        let trash = temp.path().join(".aisurada/trash/files/n");
         let sibling = temp.path().join("notes-other");
         fs::create_dir_all(&trash).unwrap();
         fs::create_dir(&sibling).unwrap();

@@ -1,5 +1,5 @@
 // Implementation of @claude-plug/terminal for Part 4 Claude-enabled builds.
-// Adheres to Chapter 10 (10.9, 10.10, 10.11) of withlog Part 4 Claude integration specifications.
+// Adheres to Chapter 10 (10.9, 10.10, 10.11) of aisurada Part 4 Claude integration specifications.
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { refreshSessions, getSessionStoreSnapshot } from './projects.tsx';
 
@@ -9,7 +9,7 @@ export type SessionShellPlan =
   | { kind: 'session'; start: (cols: number, rows: number, onData: (bytes: Uint8Array) => void) => Promise<{ fellBack: boolean }> };
 
 export const LIVE_ELSEWHERE_NOTICE = '이 세션은 지금 다른 터미널에서 돌고 있어요. 그 터미널에서 이어 가 주세요. 여기서 이어 열면 두 곳이 한 대화에 써서 대화가 갈라져요.';
-export const AGENT_BUSY_NOTICE = 'withlog 가 이 세션에서 답을 쓰고 있어요. 답이 끝나면 탭을 다시 열어 주세요.';
+export const AGENT_BUSY_NOTICE = 'aisurada 가 이 세션에서 답을 쓰고 있어요. 답이 끝나면 탭을 다시 열어 주세요.';
 
 function decode(base64: string): Uint8Array {
   const raw = atob(base64);

@@ -1,5 +1,5 @@
 // The parts the first question box and every follow-up row share: the model and effort pickers (3.3) and the
-// picture strip with its paste rules (3.2, 4.4). Adheres to Chapters 3 and 4 of withlog Part 4 specifications.
+// picture strip with its paste rules (3.2, 4.4). Adheres to Chapters 3 and 4 of aisurada Part 4 specifications.
 import { useCallback, useState } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
 import { ASK_EFFORTS, ASK_MODELS, IMAGE_MIME_EXTENSIONS, MAX_IMAGES, MAX_IMAGE_BYTES } from './askText.ts';

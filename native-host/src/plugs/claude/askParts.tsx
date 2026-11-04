@@ -1,5 +1,5 @@
 // The parts the note panel and the underline cards draw the same way: one turn (4.2), the "요청 중" line (4.9)
-// and the follow-up row (4.4). Adheres to Chapter 4 of withlog Part 4 Claude integration specifications.
+// and the follow-up row (4.4). Adheres to Chapter 4 of aisurada Part 4 Claude integration specifications.
 import { useContext, useEffect, useRef, useState } from 'react';
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { AskContext } from './askContext.ts';

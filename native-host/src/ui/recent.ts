@@ -1,5 +1,5 @@
 import type { StoragePort } from "../workspace/types.ts";
-export const recentKey = (root: string) => "withlog.recentNotes.v1:" + root;
+export const recentKey = (root: string) => "aisurada.recentNotes.v1:" + root;
 export function recentNotes(storage: StoragePort, root: string) {
   if (!root) return [];
   try {

@@ -81,7 +81,7 @@ test('Chapter 3.6: the question text of a new underline, a follow-up, an HTML bo
   const first = buildAskPrompt({ target, quote: '  노트를 다시 열 때 비운다 ', question: ' 언제 비우나? ', repo: 'example/cache-service' });
   assert.equal(first, [
     '이 노트가 속한 아젠다의 소스 저장소: example/cache-service',
-    '이 대목을 고른 노트의 id: ndm1abcd-00000001. 답하기 전에 `wl-cli get_doc \'{"id":"ndm1abcd-00000001"}\'` 로 이 노트를 먼저 읽고, 대목의 앞뒤 글을 보고 답해라.',
+    '이 대목을 고른 노트의 id: ndm1abcd-00000001. 답하기 전에 `ais-cli get_doc \'{"id":"ndm1abcd-00000001"}\'` 로 이 노트를 먼저 읽고, 대목의 앞뒤 글을 보고 답해라.',
     '',
     '[대목] 「노트를 다시 열 때 비운다」',
     '',
@@ -115,9 +115,9 @@ test('Chapter 3.6: the persona has three lines, the heading from the editor buff
   assert.equal(noteHeading('# 제목', 'json'), null, 'a json note never has a heading');
   const lines = askPersona({ id: 'ndm1abcd-00000001' }, '캐시 정리').split('\n');
   assert.equal(lines.length, 3);
-  assert.equal(lines[0], '너는 사용자의 withlog 노트 안에서 질문을 받는다. 노트는 「캐시 정리」(ndm1abcd-00000001)이다.');
+  assert.equal(lines[0], '너는 사용자의 aisurada 노트 안에서 질문을 받는다. 노트는 「캐시 정리」(ndm1abcd-00000001)이다.');
   assert.equal(lines[2], '질문마다 [대목] 줄이 붙는다. 그 대목을 기준으로 답하고, 같은 대화에서 다른 대목을 두고 오간 문답과 섞지 않는다.');
-  assert.equal(askPersona({ id: 'ndm1abcd-00000001' }, null).split('\n')[0], '너는 사용자의 withlog 노트 안에서 질문을 받는다. 노트는 ndm1abcd-00000001이다.');
+  assert.equal(askPersona({ id: 'ndm1abcd-00000001' }, null).split('\n')[0], '너는 사용자의 aisurada 노트 안에서 질문을 받는다. 노트는 ndm1abcd-00000001이다.');
   assert.match(askPersona({ id: 'snm1abcd-00000001', parent: 'ndm1abcd-00000001' }, '하위').split('\n')[0], /\(노트 ndm1abcd-00000001의 하위 노트 snm1abcd-00000001\)이다\.$/);
 });
 
@@ -146,8 +146,8 @@ function memoryStorage(initial = {}) {
 }
 
 test('Chapter 3.11: the storage key of a note window is its own', () => {
-  assert.equal(askStorageKey('/calendar'), 'withlog.ask.v1');
-  assert.equal(askStorageKey('/note-window/ndm1abcd-00000001'), 'withlog.ask.note-ndm1abcd-00000001.v1');
+  assert.equal(askStorageKey('/calendar'), 'aisurada.ask.v1');
+  assert.equal(askStorageKey('/note-window/ndm1abcd-00000001'), 'aisurada.ask.note-ndm1abcd-00000001.v1');
 });
 
 test('Chapter 3.11: restore turns pending into abandoned, drops bad records and clears what is not saved', () => {
@@ -204,12 +204,12 @@ test('Chapter 3.11: only pending, abandoned, model and effort are saved, in the 
 
 test('Chapter 3.11: a note window borrows model and effort from the main key once', () => {
   const storage = memoryStorage({ [ASK_MAIN_KEY]: JSON.stringify({ state: { model: 'claude-opus-5', effort: 'high' }, version: 0 }) });
-  const note = createAskStore(storage, 'withlog.ask.note-n1.v1');
+  const note = createAskStore(storage, 'aisurada.ask.note-n1.v1');
   assert.equal(note.get().model, 'claude-opus-5');
   assert.equal(note.get().effort, 'high');
   note.update((s) => ({ ...s, model: 'claude-fable-5' }));
   assert.equal(JSON.parse(storage.getItem(ASK_MAIN_KEY)).state.model, 'claude-opus-5', 'a pick in the note window does not go back to main');
-  assert.equal(createAskStore(storage, 'withlog.ask.note-n1.v1').get().model, 'claude-fable-5', 'the note window keeps its own value afterwards');
+  assert.equal(createAskStore(storage, 'aisurada.ask.note-n1.v1').get().model, 'claude-fable-5', 'the note window keeps its own value afterwards');
 });
 
 test('Chapter 3.10 and 4.10: unsaved answers are counted from the threads, and the unseen mark is a key to a root id', () => {

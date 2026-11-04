@@ -182,12 +182,12 @@ fn self_write_broadcasts_actual_sender_to_every_window_and_silently_drops_stale_
     assert_eq!(
         notify(
             &note,
-            json!({"root":"/vault/","relPath":".withlog/facts/a.md","from":"main"})
+            json!({"root":"/vault/","relPath":".aisurada/facts/a.md","from":"main"})
         )
         .unwrap(),
         Value::Null
     );
-    let expected = json!({"root":"/vault/","relPath":".withlog/facts/a.md","from":"note-id"});
+    let expected = json!({"root":"/vault/","relPath":".aisurada/facts/a.md","from":"note-id"});
     assert_eq!(*main_events.lock().unwrap(), vec![expected.clone()]);
     assert_eq!(*note_events.lock().unwrap(), vec![expected]);
     notify(

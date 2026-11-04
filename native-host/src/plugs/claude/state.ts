@@ -1,22 +1,22 @@
 // Implementation of @claude-plug/state for Part 4 Claude-enabled builds.
-// Adheres to Chapters 3 (3.3, 3.10, 3.11), 4 (4.10) and 17 of withlog Part 4 Claude integration specifications.
+// Adheres to Chapters 3 (3.3, 3.10, 3.11), 4 (4.10) and 17 of aisurada Part 4 Claude integration specifications.
 import { useSyncExternalStore } from 'react';
 import { DEFAULT_EFFORT, DEFAULT_MODEL, normalizeEffort, normalizeModel } from './askText.ts';
 import type { AskThread } from './askText.ts';
 
 export const CLAUDE_ENABLED = true;
 
-/** 3.11: the main window's key. A note window keeps its own key (`withlog.ask.note-<note id>.v1`). */
-export const ASK_MAIN_KEY = 'withlog.ask.v1';
+/** 3.11: the main window's key. A note window keeps its own key (`aisurada.ask.note-<note id>.v1`). */
+export const ASK_MAIN_KEY = 'aisurada.ask.v1';
 /** 2.10: the old threads of the main window's stored value are set aside here as they are. */
-export const ASK_LEGACY_KEY = 'withlog.ask.legacy.v1';
+export const ASK_LEGACY_KEY = 'aisurada.ask.legacy.v1';
 
 /** 3.11: the storage key of a window. A note window path is `/note-window/<note id>`. */
 export function askStorageKey(pathname: string | undefined): string {
   const match = /^\/note-window\/([^/]+)$/.exec(pathname ?? '');
   if (match) {
     try {
-      return `withlog.ask.note-${decodeURIComponent(match[1])}.v1`;
+      return `aisurada.ask.note-${decodeURIComponent(match[1])}.v1`;
     } catch {
       /* a malformed address belongs to the main key */
     }

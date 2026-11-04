@@ -15,7 +15,7 @@ use tauri::{Manager, Runtime, State};
 
 pub type Environment = BTreeMap<OsString, OsString>;
 const TIMEOUT: Duration = Duration::from_secs(120);
-const TIMEOUT_MESSAGE: &str = "wl-cli 가 120초 안에 안 끝나서 끊었다. 사이드카가 답하지 않는다.";
+const TIMEOUT_MESSAGE: &str = "ais-cli 가 120초 안에 안 끝나서 끊었다. 사이드카가 답하지 않는다.";
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Reply {
     pub status: i32,
@@ -84,7 +84,7 @@ fn module_candidates(context: &Context, module: &str) -> Vec<PathBuf> {
             candidates.push(resource.join(format!("{module}.jar")));
         }
     }
-    let relative = format!("withlog-backend/{module}/build/libs/{module}.jar");
+    let relative = format!("aisurada-backend/{module}/build/libs/{module}.jar");
     if let Some(parent) = context.cwd.parent() {
         candidates.push(parent.join(&relative));
     }
@@ -92,7 +92,7 @@ fn module_candidates(context: &Context, module: &str) -> Vec<PathBuf> {
     // This reconstruction builds Java jars in dist/, rather than the original Gradle modules.
     // Only a recognizable source checkout may supply this additional development candidate.
     for root in context.cwd.ancestors().take(3) {
-        if root.join("build.sh").is_file() && root.join("src/withlog").is_dir() {
+        if root.join("build.sh").is_file() && root.join("src/aisurada").is_dir() {
             candidates.push(root.join(format!("dist/{module}.jar")));
             break;
         }
@@ -159,15 +159,15 @@ fn execute(
     argv: &[String],
     timeout: Duration,
 ) -> Result<Reply, String> {
-    let (jar, paths) = choose_with(&env, "WITHLOG_CLI_JAR", || {
-        module_candidates(context, "wl-cli")
+    let (jar, paths) = choose_with(&env, "AISURADA_CLI_JAR", || {
+        module_candidates(context, "ais-cli")
     });
-    let jar = jar.ok_or_else(|| missing("wl-cli.jar", "WITHLOG_CLI_JAR", &paths))?;
-    let (java, paths) = choose_with(&env, "WITHLOG_SIDECAR_JAVA", || {
+    let jar = jar.ok_or_else(|| missing("ais-cli.jar", "AISURADA_CLI_JAR", &paths))?;
+    let (java, paths) = choose_with(&env, "AISURADA_SIDECAR_JAVA", || {
         java_candidates(context, &env)
     });
-    let java = java.ok_or_else(|| missing("자바 실행 파일", "WITHLOG_SIDECAR_JAVA", &paths))?;
-    let (sidecar, _) = choose_with(&env, "WITHLOG_SIDECAR_JAR", || {
+    let java = java.ok_or_else(|| missing("자바 실행 파일", "AISURADA_SIDECAR_JAVA", &paths))?;
+    let (sidecar, _) = choose_with(&env, "AISURADA_SIDECAR_JAR", || {
         if !context.bundled
             || context
                 .resource
@@ -179,10 +179,10 @@ fn execute(
             module_candidates(context, "wl-sidecar")
         }
     });
-    env.insert("WITHLOG_VAULT".into(), vault.into());
-    env.remove(std::ffi::OsStr::new("WITHLOG_SIDECAR_JAR"));
+    env.insert("AISURADA_VAULT".into(), vault.into());
+    env.remove(std::ffi::OsStr::new("AISURADA_SIDECAR_JAR"));
     if let Some(path) = sidecar {
-        env.insert("WITHLOG_SIDECAR_JAR".into(), path.into_os_string());
+        env.insert("AISURADA_SIDECAR_JAR".into(), path.into_os_string());
     }
     let mut command = Command::new(&java);
     command
@@ -193,7 +193,7 @@ fn execute(
         .envs(env);
     match process::run(&mut command, None, timeout).map_err(|e| {
         format!(
-            "wl-cli 를 못 띄웠어요: {e} (java={}, jar={})",
+            "ais-cli 를 못 띄웠어요: {e} (java={}, jar={})",
             java.display(),
             jar.display()
         )
@@ -237,19 +237,19 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let dev = context(temp.path(), false);
         let bundle = context(temp.path(), true);
-        let resources = dev.resource.as_ref().unwrap().join("wl-cli.jar");
+        let resources = dev.resource.as_ref().unwrap().join("ais-cli.jar");
         touch(&resources);
         let parent = temp
             .path()
-            .join("withlog-backend/wl-cli/build/libs/wl-cli.jar");
+            .join("aisurada-backend/ais-cli/build/libs/ais-cli.jar");
         touch(&parent);
-        let local = dev.cwd.join("withlog-backend/wl-cli/build/libs/wl-cli.jar");
+        let local = dev.cwd.join("aisurada-backend/ais-cli/build/libs/ais-cli.jar");
         touch(&local);
         assert_eq!(
             choose(
                 &env(&[]),
-                "WITHLOG_CLI_JAR",
-                module_candidates(&dev, "wl-cli")
+                "AISURADA_CLI_JAR",
+                module_candidates(&dev, "ais-cli")
             )
             .0,
             Some(parent.clone())
@@ -257,24 +257,24 @@ mod tests {
         assert_eq!(
             choose(
                 &env(&[]),
-                "WITHLOG_CLI_JAR",
-                module_candidates(&bundle, "wl-cli")
+                "AISURADA_CLI_JAR",
+                module_candidates(&bundle, "ais-cli")
             )
             .0,
             Some(resources)
         );
         assert!(choose(
-            &env(&[("WITHLOG_CLI_JAR", "/no-such-jar")]),
-            "WITHLOG_CLI_JAR",
-            module_candidates(&dev, "wl-cli")
+            &env(&[("AISURADA_CLI_JAR", "/no-such-jar")]),
+            "AISURADA_CLI_JAR",
+            module_candidates(&dev, "ais-cli")
         )
         .0
         .is_none());
         let directory = dev.cwd.clone();
         assert_eq!(
             choose(
-                &env(&[("WITHLOG_CLI_JAR", directory.to_str().unwrap())]),
-                "WITHLOG_CLI_JAR",
+                &env(&[("AISURADA_CLI_JAR", directory.to_str().unwrap())]),
+                "AISURADA_CLI_JAR",
                 vec![]
             )
             .0,
@@ -284,8 +284,8 @@ mod tests {
         assert_eq!(
             choose(
                 &env(&[]),
-                "WITHLOG_CLI_JAR",
-                module_candidates(&dev, "wl-cli")
+                "AISURADA_CLI_JAR",
+                module_candidates(&dev, "ais-cli")
             )
             .0,
             Some(local)
@@ -326,7 +326,7 @@ mod tests {
         );
         touch(&c.resource.as_ref().unwrap().join("runtime/bin/java"));
         assert_eq!(
-            choose(&env(&[]), "WITHLOG_SIDECAR_JAVA", candidates).0,
+            choose(&env(&[]), "AISURADA_SIDECAR_JAVA", candidates).0,
             Some(c.resource.unwrap().join("runtime/bin/java"))
         );
     }
@@ -345,11 +345,11 @@ mod tests {
         let jar = temp.path().join("cli.jar");
         touch(&jar);
         let java = temp.path().join("java");
-        script(&java,"printf '%s\\n' \"$@\"; printf '%s|%s|%s|%s' \"$WITHLOG_VAULT\" \"${WITHLOG_SIDECAR_JAR-unset}\" \"$WITHLOG_CLI_JAR\" \"$WITHLOG_SIDECAR_JAVA\" >&2; exit 5");
+        script(&java,"printf '%s\\n' \"$@\"; printf '%s|%s|%s|%s' \"$AISURADA_VAULT\" \"${AISURADA_SIDECAR_JAR-unset}\" \"$AISURADA_CLI_JAR\" \"$AISURADA_SIDECAR_JAVA\" >&2; exit 5");
         let e = env(&[
-            ("WITHLOG_CLI_JAR", jar.to_str().unwrap()),
-            ("WITHLOG_SIDECAR_JAVA", java.to_str().unwrap()),
-            ("WITHLOG_SIDECAR_JAR", "/missing"),
+            ("AISURADA_CLI_JAR", jar.to_str().unwrap()),
+            ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
+            ("AISURADA_SIDECAR_JAR", "/missing"),
         ]);
         let result = execute(
             &c,
@@ -378,8 +378,8 @@ mod tests {
         touch(&jar);
         let java = temp.path().join("java");
         let e = env(&[
-            ("WITHLOG_CLI_JAR", jar.to_str().unwrap()),
-            ("WITHLOG_SIDECAR_JAVA", java.to_str().unwrap()),
+            ("AISURADA_CLI_JAR", jar.to_str().unwrap()),
+            ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
         ]);
         script(&java, "printf '\\377'; printf '\\376' >&2; exit 3");
         let r = execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap();
@@ -415,10 +415,10 @@ mod tests {
         let jar = temp.path().join("cli.jar");
         touch(&jar);
         let java = temp.path().join("java");
-        script(&java, "printf '%s' \"${WITHLOG_SIDECAR_JAR-unset}\"");
+        script(&java, "printf '%s' \"${AISURADA_SIDECAR_JAR-unset}\"");
         let e = env(&[
-            ("WITHLOG_CLI_JAR", jar.to_str().unwrap()),
-            ("WITHLOG_SIDECAR_JAVA", java.to_str().unwrap()),
+            ("AISURADA_CLI_JAR", jar.to_str().unwrap()),
+            ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
         ]);
         let sidecar = c.resource.as_ref().unwrap().join("wl-sidecar.jar");
         touch(&sidecar);
@@ -442,7 +442,7 @@ mod tests {
             "unset"
         );
         let mut e = e;
-        e.insert("WITHLOG_SIDECAR_JAR".into(), sidecar.as_os_str().into());
+        e.insert("AISURADA_SIDECAR_JAR".into(), sidecar.as_os_str().into());
         assert_eq!(
             execute(&c, e, "/v", &[], TIMEOUT).unwrap().stdout,
             sidecar.to_string_lossy()
@@ -453,22 +453,22 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let mut c = context(temp.path(), false);
         c.cwd = temp.path().join("native-host/src-tauri");
-        let jar = temp.path().join("dist/wl-cli.jar");
+        let jar = temp.path().join("dist/ais-cli.jar");
         touch(&jar);
         assert!(choose(
             &env(&[]),
-            "WITHLOG_CLI_JAR",
-            module_candidates(&c, "wl-cli")
+            "AISURADA_CLI_JAR",
+            module_candidates(&c, "ais-cli")
         )
         .0
         .is_none());
         touch(&temp.path().join("build.sh"));
-        fs::create_dir_all(temp.path().join("src/withlog")).unwrap();
+        fs::create_dir_all(temp.path().join("src/aisurada")).unwrap();
         assert_eq!(
             choose(
                 &env(&[]),
-                "WITHLOG_CLI_JAR",
-                module_candidates(&c, "wl-cli")
+                "AISURADA_CLI_JAR",
+                module_candidates(&c, "ais-cli")
             )
             .0,
             Some(jar)
@@ -476,8 +476,8 @@ mod tests {
     }
     #[test]
     fn explicit_override_never_evaluates_fallback_candidates() {
-        let e = env(&[("WITHLOG_CLI_JAR", "\u{3000}/missing-override\u{3000}")]);
-        let result = choose_with(&e, "WITHLOG_CLI_JAR", || panic!("fallback evaluated"));
+        let e = env(&[("AISURADA_CLI_JAR", "\u{3000}/missing-override\u{3000}")]);
+        let result = choose_with(&e, "AISURADA_CLI_JAR", || panic!("fallback evaluated"));
         assert!(result.0.is_none());
         assert_eq!(result.1, vec![PathBuf::from("/missing-override")]);
     }

@@ -514,7 +514,7 @@ export class VaultData {
     const report = { id, body, memo }, existing = workspace.reports.some(item => item.id === id);
     this.emit({ ...workspace, reports: existing ? workspace.reports.map(item => item.id === id ? report : item) : [...workspace.reports, report] });
     if (workspace.sample) {
-      for (const [key, value] of [['withlog.reportEdits.v1', body], ['withlog.reportMemos.v1', memo]]) {
+      for (const [key, value] of [['aisurada.reportEdits.v1', body], ['aisurada.reportMemos.v1', memo]]) {
         writeJSON(this.services.storage, key, { ...asRow(readJSON(this.services.storage, key)), [id]: value });
       }
       return;
@@ -531,7 +531,7 @@ export class VaultData {
       let argv: string[];
       try { argv = write.report(id, asText(report.body), asText(report.memo)); }
       catch (error) { this.services.warn('리포트 저장', error); this.failure(`리포트 저장: ${id}`); return { ok: false }; }
-      return this.perform(argv, `리포트 저장: ${id}`, response => this.markOwn(asText(response.path) || `.withlog/reports/${id}.json`));
+      return this.perform(argv, `리포트 저장: ${id}`, response => this.markOwn(asText(response.path) || `.aisurada/reports/${id}.json`));
     });
   }
   async flushReports() { await Promise.allSettled([...this.reports.keys()].map(id => this.sendReport(id))); }
@@ -542,7 +542,7 @@ export class VaultData {
     const index = workspace.notes.indexOf(note);
     this.emit({ ...workspace, notes: workspace.notes.filter(item => item.id !== id) });
     const result = await this.queues.run(id, () => !this.valid(generation) ? Promise.resolve({ ok: false }) : this.perform(write.deleteDoc(id), `휴지통 이동: ${note.title || '제목 없음'}`, response => {
-      this.markOwn(asText(note.path)); this.markOwn(`.withlog/trash/files/${asText(response.file)}`); this.markOwn('.withlog/trash/trash.json');
+      this.markOwn(asText(note.path)); this.markOwn(`.aisurada/trash/files/${asText(response.file)}`); this.markOwn('.aisurada/trash/trash.json');
       this.setFlag('editing', id, false); this.setFlag('unsaved', id, false); this.clearConflict({ id });
       const current = this.workspace()!;
       this.emit({ ...current, trash: [...current.trash, { ...note, ...response, docId: id }] });
@@ -559,7 +559,7 @@ export class VaultData {
     const index = workspace.trash.indexOf(item);
     this.emit({ ...workspace, trash: workspace.trash.filter(row => row.trashId !== id) });
     const result = await this.perform(action === 'restore' ? write.restore(id) : write.purge(id), `${action === 'restore' ? '복구' : '완전 삭제'}: ${asText(item.title) || '제목 없음'}`, () => {
-      if (action === 'purge') { this.markOwn(`.withlog/trash/files/${asText(item.file)}`); this.markOwn('.withlog/trash/trash.json'); }
+      if (action === 'purge') { this.markOwn(`.aisurada/trash/files/${asText(item.file)}`); this.markOwn('.aisurada/trash/trash.json'); }
     });
     if (!this.valid(generation)) return result;
     if (!result.ok) { const current = this.workspace()!; this.emit({ ...current, trash: [...current.trash.slice(0, index), item, ...current.trash.slice(index)] }); }
@@ -571,8 +571,8 @@ export class VaultData {
     const original = workspace.trash; this.emit({ ...workspace, trash: [] });
     const result = await this.perform(write.emptyTrash(), '휴지통 비우기', response => {
       const failed = new Set(rows(response.failed).map(row => row.trashId));
-      for (const item of original) if (!failed.has(item.trashId)) this.markOwn(`.withlog/trash/files/${asText(item.file)}`);
-      this.markOwn('.withlog/trash/trash.json');
+      for (const item of original) if (!failed.has(item.trashId)) this.markOwn(`.aisurada/trash/files/${asText(item.file)}`);
+      this.markOwn('.aisurada/trash/trash.json');
     });
     if (!this.valid(generation)) return result;
     if (!result.ok) this.emit({ ...this.workspace()!, trash: original });
@@ -592,7 +592,7 @@ export class VaultData {
     const result = await this.perform(argv, `${kind === 'agenda' ? '아젠다' : '프로젝트'} 저장: ${asText(fields.title) || '제목 없음'}`, response => {
       const current = this.workspace()!;
       this.emit({ ...current, [key]: current[key].map(row => row.id === nid ? { ...row, ...response } : row) } as Workspace);
-      if (asText(response.slug)) this.markOwn(`.withlog/${key}/${asText(response.slug)}.md`);
+      if (asText(response.slug)) this.markOwn(`.aisurada/${key}/${asText(response.slug)}.md`);
     });
     return { ...result, value: { ...result.value, id: asText(result.value?.id) || nid } };
   }
@@ -607,7 +607,7 @@ export class VaultData {
       if (!result.ok) return { ok: false, reason: result.reason };
       const response = asRow(result.value) || {};
       this.emit({ ...this.workspace()!, [key]: this.workspace()![key].filter(row => row.id !== id) });
-      if (asText(response.slug)) this.markOwn(`.withlog/${key}/${asText(response.slug)}.md`);
+      if (asText(response.slug)) this.markOwn(`.aisurada/${key}/${asText(response.slug)}.md`);
       this.markOwn(asText(response.archivedPath)); this.success(); return { ok: true };
     } catch (error) { this.services.warn('지우지 못했어요', error); this.failure(`${kind === 'agenda' ? '아젠다' : '프로젝트'} 삭제: ${asText(item.title)}`); return { ok: false, reason: `${kind === 'agenda' ? '아젠다' : '프로젝트'}를 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.` }; }
   }

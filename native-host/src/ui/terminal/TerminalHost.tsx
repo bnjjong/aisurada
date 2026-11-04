@@ -1,4 +1,4 @@
-// Terminal Host component adhering to Chapter 14 of withlog Part 3 screen specifications.
+// Terminal Host component adhering to Chapter 14 of aisurada Part 3 screen specifications.
 // The terminal itself is xterm 6.0.0 (14.13): it keeps the screen buffer, the 10,000 line
 // scrollback, Unicode 11 widths (Hangul is two cells) and draws with WebGL when it can.
 import React, { useState, useEffect, useRef } from 'react';

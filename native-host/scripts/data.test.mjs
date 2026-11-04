@@ -37,7 +37,7 @@ function fixture(t, options={}) {
       if(cmd==='reindex')return ok({skipped:copy(disk.skipped),conflicts:copy(disk.conflicts)});
       if(cmd==='list-sub-notes')return ok({subNotes:copy(sub[argv[1]]||[])});
       if(cmd==='list-comments')return ok({state:'loaded',comments:[{id:'cmtest-1',body:'before'}]});
-      if(cmd==='get-agenda-facts')return ok({id:argv[1],facts:'facts',path:'.withlog/agendas/demo.facts.md'});
+      if(cmd==='get-agenda-facts')return ok({id:argv[1],facts:'facts',path:'.aisurada/agendas/demo.facts.md'});
       return ok({path:'notes/demo/a',precondition:'T1'});
     }}};
   const data=new VaultData(services,()=>workspace,(state,next)=>{if(next)workspace=next;commits.push({state,workspace});});
@@ -254,7 +254,7 @@ test('facts save reads immediately before writing and refuses changed or unreada
 test('report edits debounce into one latest write and flush before workspace departure',async t=>{
   const h=fixture(t);h.data.saveReport('rv-morning-2026-11-01','one','memo');h.data.saveReport('rv-morning-2026-11-01','last','');assert.equal(h.argv().length,0);
   await h.data.flushReports();assert.deepEqual(h.argv(),[['save-report','kind=morning','date=2026-11-01','body=last']]);
-  assert.equal(h.data.selfWrites.has('/fixture/.withlog/reports/rv-morning-2026-11-01.json'),false); // Response path takes precedence.
+  assert.equal(h.data.selfWrites.has('/fixture/.aisurada/reports/rv-morning-2026-11-01.json'),false); // Response path takes precedence.
   h.data.saveReport('rv-morning-2026-11-01','abandoned','');h.setWorkspace({...h.workspace,path:'/other'});await h.data.flushReports();assert.equal(h.argv().length,1);
 });
 test('trash writes restore optimistic removals on failure and restoration waits for reconciliation',async t=>{
@@ -311,7 +311,7 @@ test('C188: a renaming title write drops only the engine title-mismatch notice, 
   const h=fixture(t,{handler:async argv=>argv[0]==='update-doc'?ok({path:'notes/demo/moved',precondition:'T1',renamed:true,warning}):undefined});
   await h.data.updateNote({id:'a'},{title:'snake_case'});assert.deepEqual(h.data.getSnapshot().failures.map(line=>line.text),['옛 노트 삭제 실패 — 같은 id가 둘 남았을 수 있어요(정리 필요): notes/demo/a']);
   h.data.dismissFailures();warning=mismatch;await h.data.updateNote({id:'a'},{title:'snake_case 2'});assert.deepEqual(h.data.getSnapshot().failures,[]);
-  const engine=readFileSync(new URL('../../src/withlog/write/WarningsDetector.java',import.meta.url),'utf8');
+  const engine=readFileSync(new URL('../../src/aisurada/write/WarningsDetector.java',import.meta.url),'utf8');
   assert.ok(engine.includes('return "'+TITLE_MISMATCH_HEAD.replace('"','\\"')+'"'),'engine title-mismatch sentence head changed');
 });
 test('failure banner deduplicates to ten lines and success retains only active conflict failures',async t=>{
@@ -327,13 +327,13 @@ test('reset discards queued writes and late results from the previous workspace'
 });
 test('samples mutate only memory and report storage, never invoke the host',async t=>{
   const h=fixture(t,{workspace:{sample:true,path:''}});await h.data.favorite('a',true);await h.data.updateNote({id:'a'},{body:'sample'});h.data.saveReport('rv-morning-2026-11-01','sample','memo');await h.data.reconcile();
-  assert.deepEqual(h.calls,[]);assert.equal(JSON.parse(h.values.get('withlog.reportEdits.v1'))['rv-morning-2026-11-01'],'sample');
+  assert.deepEqual(h.calls,[]);assert.equal(JSON.parse(h.values.get('aisurada.reportEdits.v1'))['rv-morning-2026-11-01'],'sample');
 });
 test('self-write paths honor expiry, segment boundaries and exact root spelling',()=>{
   let now=0;const own=new SelfWrites(()=>now);own.record('/v','');assert.equal(own.has('/v/anything'),false);own.record('/v','notes/a');
   assert.equal(own.has('/v/notes/a/note.md'),true);assert.equal(own.has('/v/notes/a-2'),false);now=2000;assert.equal(own.has('/v/notes/a'),false);
   own.record('/v/','notes/a');assert.equal(own.has('/v/notes/a'),false);assert.equal(own.has('/v//notes/a'),true);
-  assert.deepEqual(own.external(['/v/x.tmp','/v/.git','/v/.git/a','/v/.withlog/cache/a','/v/.gitignore']),['/v/.gitignore']);own.clear();assert.equal(own.has('/v//notes/a'),false);
+  assert.deepEqual(own.external(['/v/x.tmp','/v/.git','/v/.git/a','/v/.aisurada/cache/a','/v/.gitignore']),['/v/.gitignore']);own.clear();assert.equal(own.has('/v//notes/a'),false);
 });
 test('cross-window self-write receipts do not echo and ignore own labels or different roots',t=>{
   const h=fixture(t);h.data.receiveOwn({root:'/fixture',relPath:'notes/a',from:'note-a'});assert.equal(h.data.selfWrites.has('/fixture/notes/a'),true);assert.equal(h.calls.length,0);

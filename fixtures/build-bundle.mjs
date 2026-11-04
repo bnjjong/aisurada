@@ -17,7 +17,7 @@ const TREE_NAME = 'rebuild-fixture.v1';
 const args = process.argv.slice(2);
 if (args[0] === '--tree-from') {
   const src = path.resolve(args[1]);
-  const tree = treeFromDisk(src, 'withlog-p1-rebuild/selftest/vault',
+  const tree = treeFromDisk(src, 'aisurada-p1-rebuild/selftest/vault',
     '다시 짜기 개발 폴더의 픽스처 vault. 설명서 34.1의 fixture.v1(파일 149개, 폴더 149개)이 이 기기에 없어서 대신 담았다.');
   fs.writeFileSync(path.join(BUNDLE, 'trees', `${TREE_NAME}.json`), JSON.stringify(tree, null, 2) + '\n');
   process.stdout.write(`trees/${TREE_NAME}.json: 파일 ${tree.files.length}개, 폴더 ${tree.dirs.length}개\n`);

@@ -1,5 +1,5 @@
 // Implementation of @claude-plug/ask for Part 4 Claude-enabled builds.
-// Adheres to Chapters 2, 3, 4 of withlog Part 4 Claude integration specifications.
+// Adheres to Chapters 2, 3, 4 of aisurada Part 4 Claude integration specifications.
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Note } from '../../workspace/types.ts';
