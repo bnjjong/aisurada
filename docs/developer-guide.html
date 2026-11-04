@@ -113,7 +113,7 @@ footer.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);co
 <li><a href="#4-저장소-구조">4. 저장소 구조</a><ul><li><a href="#엔진-패키지-srcaisurada">엔진 패키지 (src/aisurada/)</a></li><li><a href="#호스트-모듈-native-hostsrc-taurisrc">호스트 모듈 (native-host/src-tauri/src/)</a></li><li><a href="#화면-모듈-native-hostsrc">화면 모듈 (native-host/src/)</a></li></ul></li>
 <li><a href="#5-엔진-쓰는-법">5. 엔진 쓰는 법</a><ul><li><a href="#두-가지-모양">두 가지 모양</a></li><li><a href="#두-가지-표면">두 가지 표면</a></li><li><a href="#설정">설정</a></li><li><a href="#종료-코드">종료 코드</a></li><li><a href="#vault의-모양">vault의 모양</a></li><li><a href="#쓰기-규칙-고칠-때-지킬-것">쓰기 규칙 (고칠 때 지킬 것)</a></li><li><a href="#명령을-새로-넣는-길">명령을 새로 넣는 길</a></li></ul></li>
 <li><a href="#6-ais-cli와-launchd-건드리기-전에">6. ais-cli와 launchd — 건드리기 전에</a></li>
-<li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#4부-스위치-3개">4부 스위치 3개</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
+<li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#4부-스위치-3개">4부 스위치 3개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
 <li><a href="#8-시험">8. 시험</a><ul><li><a href="#한눈에">한눈에</a></li><li><a href="#엔진-시험-쓰기">엔진 시험 쓰기</a></li><li><a href="#받아들임-묶음-34장">받아들임 묶음 (34장)</a></li><li><a href="#화면호스트-시험">화면·호스트 시험</a></li><li><a href="#동시에-돌리면-안-되는-것">동시에 돌리면 안 되는 것</a></li></ul></li>
 <li><a href="#9-앱-손-확인">9. 앱 손 확인</a></li>
 <li><a href="#10-docs-읽는-법">10. docs/ 읽는 법</a><ul><li><a href="#옛-이름-대응표">옛 이름 대응표</a></li></ul></li>
@@ -212,7 +212,7 @@ test-native.sh         화면·호스트 시험 전체</code></pre></div>
 <h3 id="호스트-모듈-native-hostsrc-taurisrc"><a class="anchor" href="#호스트-모듈-native-hostsrc-taurisrc" aria-label="이 절의 링크">#</a>호스트 모듈 (<code>native-host/src-tauri/src/</code>)</h3>
 <p><code>workspace.rs</code>(vault 허용·만들기), <code>sidecar.rs</code>(<code>sidecar_call</code>), <code>files.rs</code>(그림 첨부 쓰기, 기본 앱 열기), <code>markdown.rs</code>(외부 마크다운), <code>notes.rs</code>(노트 창), <code>terminal.rs</code>(PTY), <code>secrets.rs</code>(비밀 가림), <code>menu.rs</code>, <code>layout.rs</code>(창 자리), <code>frame.rs</code>(<code>aisframe://</code>), <code>self_write.rs</code>, <code>process.rs</code>(자식 실행과 시간 상한), <code>ipc.rs</code>(이벤트 이름). 4부는 <code>ask.rs</code>, <code>agents.rs</code>, <code>session_image.rs</code>, <code>dictation.rs</code>, <code>session_shell.rs</code>이고 cargo 기능 <code>claude</code> 아래에 있다.</p>
 <h3 id="화면-모듈-native-hostsrc"><a class="anchor" href="#화면-모듈-native-hostsrc" aria-label="이 절의 링크">#</a>화면 모듈 (<code>native-host/src/</code>)</h3>
-<p><code>workspace/</code>(controller, 부팅, 저장 키, 엔진 다리), <code>data/</code>(vault 스토어, 쓰기 큐, 자기 쓰기), <code>editor/</code>(Lexical 편집기와 마크다운 왕복), <code>navigation/</code>(주소, 탭, 스크롤), <code>interaction/</code>(단축키, 링크), <code>ui/</code>(화면들, 터미널), <code>plugs/claude/</code>(4부 화면)와 <code>plugs/empty/</code>(4부 없는 판의 빈 구현).</p>
+<p><code>workspace/</code>(controller, 부팅, 저장 키, 엔진 다리), <code>data/</code>(vault 스토어, 쓰기 큐, 자기 쓰기), <code>editor/</code>(Lexical 편집기와 마크다운 왕복), <code>navigation/</code>(주소, 탭, 스크롤), <code>interaction/</code>(단축키, 링크), <code>ui/</code>(화면들, 터미널), <code>plugs/claude/</code>(4부 화면)와 <code>plugs/empty/</code>(4부 없는 판의 빈 구현). 화면 모양 CSS는 <code>src/styles.css</code>(기본 모양)와 <code>src/skin-tactile.css</code>(물성)다(§7 「화면 모양」).</p>
 <h2 id="5-엔진-쓰는-법"><a class="anchor" href="#5-엔진-쓰는-법" aria-label="이 절의 링크">#</a>5. 엔진 쓰는 법</h2>
 <h3 id="두-가지-모양"><a class="anchor" href="#두-가지-모양" aria-label="이 절의 링크">#</a>두 가지 모양</h3>
 <ul>
@@ -322,6 +322,22 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 <tr><td>화면</td><td><code>pnpm build</code>, <code>pnpm dev</code></td><td><code>pnpm build:noclaude</code> (<code>vite build --mode noclaude</code>)</td></tr>
 </tbody></table></div>
 <p>화면은 <code>@claude-plug/*</code> 별칭을 모드에 따라 <code>src/plugs/claude/</code> 또는 <code>src/plugs/empty/</code>로 돌린다. 빌드 뒤에는 <code>scripts/screen-contracts.mjs</code>가 번들을 검사한다. 끈 판에는 4부 커맨드 이름이 하나도 없어야 하고, 켠 판에는 하나 이상 있어야 한다.</p>
+<h3 id="화면-모양-skin"><a class="anchor" href="#화면-모양-skin" aria-label="이 절의 링크">#</a>화면 모양 (skin)</h3>
+<p>설정 → 「화면 모양」에서 <strong>물성</strong>(기본값)과 <strong>기본</strong>(이전 모양) 중에서 고른다. 밝게·어둡게(<code>data-theme</code>, 레일의 ◐)와는 따로 고르므로 두 모양 모두 밝게와 어둡게가 있다.</p>
+<div class="table-wrap"><table><thead><tr><th>무엇</th><th>어디</th></tr></thead><tbody>
+<tr><td>저장</td><td><code>aisurada.prefs.v1</code>의 <code>state.skin</code>(<code>&#39;tactile&#39;</code> 또는 <code>&#39;classic&#39;</code>). 16장의 설정 21개에 들어가지 않는 <strong>확장 값</strong>이라, 고르기 전에는 <code>readPreferences</code> 결과에 나타나지 않는다. <code>readSkin</code>이 읽고, 없거나 모르는 값이면 물성이다</td></tr>
+<tr><td>적용</td><td><code>&lt;html data-skin&gt;</code>. <code>main.tsx</code>가 첫 그리기 전에 걸고, <code>App.tsx</code>가 <code>state.skin</code>을 따라간다. 다른 창은 <code>storage</code> 이벤트와 포커스에서 <code>refreshTheme</code>으로 따라온다. 노트 창은 설정을 쓰지 않는다</td></tr>
+<tr><td>기본 모양</td><td><code>src/styles.css</code>. 설정의 모양 고르기 카드(<code>.set-skin*</code>, <code>.skin-preview</code>)도 여기에 둔다. 카드의 미리보기 그림은 지금 켠 모양과 상관없이 각자의 모양을 그린다</td></tr>
+<tr><td>물성</td><td><code>src/skin-tactile.css</code>. 모든 규칙이 <code>:root[data-skin=&quot;tactile&quot;]</code> 아래에 있어서 기본 모양에는 영향이 없다. 파일 맨 위에 다섯 규칙(깊이가 역할, 반경은 높이의 절반, 선 대신 면, 위에서 한 방향의 빛, 회색에도 색)과 토큰이 있다</td></tr>
+</tbody></table></div>
+<p><strong>지킬 것.</strong></p>
+<ul>
+<li>전역 규칙(<code>button</code>, <code>input</code> …)은 <code>:where()</code>로 특이도를 낮춰 썼다. 그래야 <code>styles.css</code>의 개별 클래스(<code>border: 0</code>, <code>background: transparent</code>)를 덮어쓰지 않는다.</li>
+<li><code>styles.css</code>에서 <code>background: transparent</code>나 <code>border: 0</code>으로 맨살로 만든 버튼을 새로 더하면 <code>skin-tactile.css</code>의 「평평한 버튼」 선택자 목록에도 넣는다. 빠뜨리면 물성에서 그 버튼만 볼록한 알약으로 보인다.</li>
+<li>물성은 토큰(<code>--bg</code>, <code>--soft</code>, <code>--surface</code>, <code>--sunken</code>, <code>--accent</code> …)을 바꿔서 기본 모양의 규칙까지 같이 물든다. 기본 모양의 색을 <code>#rrggbb</code>로 박은 곳은 물성에서도 그 색이다.</li>
+<li>설정 화면 인수 시험이 <code>.set-switch</code>를 3개로 센다. 모양 고르기 카드는 그래서 다른 클래스(<code>.set-skin-option</code>)를 쓴다.</li>
+</ul>
+<p>새 모양을 더하려면 <code>types.ts</code>의 <code>Skin</code>, <code>storage.ts</code>의 <code>SKINS</code>, <code>Settings.tsx</code>의 <code>SKIN_OPTIONS</code>, <code>src/skin-&lt;이름&gt;.css</code>와 <code>main.tsx</code>의 import, 미리보기 그림 규칙(<code>styles.css</code>)을 함께 고친다. 시험은 <code>scripts/chapters14-17.test.mjs</code>의 「화면 모양」과 <code>scripts/views-checks.js</code>의 설정 점검이다.</p>
 <h3 id="계약을-건드릴-때"><a class="anchor" href="#계약을-건드릴-때" aria-label="이 절의 링크">#</a>계약을 건드릴 때</h3>
 <p>호스트 커맨드(2부 29개, 4부 9개)와 이벤트 4개(<code>ais://menu</code>, <code>ais://navigate</code>, <code>ais://note-windows</code>, <code>ais://self-write</code>), 번들 식별자, 권한 파일(<code>src-tauri/capabilities/main.json</code>·<code>note.json</code>)은 시험이 글자까지 잰다(<code>scripts/contracts.test.mjs</code>). 커맨드를 더하거나 권한을 바꾸면 이 시험과 <code>capabilities/</code>를 함께 고친다. <code>main</code>과 <code>note-*</code> 창의 권한은 일부러 다르다.</p>
 <p><strong>설명서와 일부러 다르게 둔 것.</strong> <code>create_workspace_dir({parent, name})</code>는 설명서대로라면 저장 위치(<code>parent</code>)가 없을 때 실패해야 하지만, 지금은 이름 검사를 모두 통과한 뒤 저장 위치를 만든다(<code>mkdir -p</code>). 새 워크스페이스 화면에서 없는 폴더를 적으면 「저장 위치를 찾을 수 없어요」로 막히던 것을 2026-11-04에 바꿨다. 저장 위치가 파일이면 여전히 실패하고, 잘못된 이름은 저장 위치를 만들기 전에 거절한다(<code>workspace.rs</code>의 <code>create_dir_makes_a_missing_parent_after_validating_the_name</code>).</p>
@@ -432,6 +448,7 @@ node fixtures/runner-test.mjs</code></pre></div>
 <li>엔진 시험, 화면·호스트 시험, 34장 받아들임, 4부를 뺀 실제 창 점검 8종은 통과한다. 수치는 <code>README.md</code>와 각 완료 기록에 있다.</li>
 <li>사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.</li>
 <li>4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복과 세션 화면 7건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 <code>launchctl</code>로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.</li>
+<li>물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 토큰과 반경만 손봤고 눈으로 확인하지 못했다.</li>
 <li>설명서 원문이 제공되지 않은 부분(3부 18장, 4부 <code>ais-agent</code> 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.</li>
 </ul>
 
