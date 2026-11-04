@@ -222,7 +222,8 @@ let failure;
 try {
   const engine = start(wrapper, [
     "-jar",
-    join(repo, "dist/wl-sidecar.jar"),
+    // 이 점검은 4부를 뺀 합성(호스트 --no-default-features)이라 엔진도 4부를 뺀 사이드카를 띄운다
+    join(repo, "dist/wl-sidecar-noclaude.jar"),
     "serve",
   ]);
   for (let i = 0; i < 600 && !existsSync(env.WITHLOG_SIDECAR_SOCKET); i++) {

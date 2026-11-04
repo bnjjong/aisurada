@@ -41,6 +41,24 @@ impl SessionAction {
     }
 }
 
+/// 로그인 셸 `-c` 에 넘기는 첫 명령(10.10). `;` 둘레에 빈칸을 둔다.
+/// 알림 글에는 작은따옴표와 경로를 넣지 않는다. 셸 주입 자리가 되기 때문이다.
+fn first_command(action: &SessionAction, fell_back: bool) -> String {
+    const NOTICE: &str = "원래 작업 폴더가 없어서 홈 폴더에서 이어 가요. 이어 간 대화의 파일 명령은 홈을 기준으로 돌아요.";
+    match action {
+        SessionAction::Resume { session_id, .. } => {
+            if fell_back {
+                format!("printf '%s\\n' '{}' ; claude --resume {} ; exec zsh -l -i", NOTICE, session_id)
+            } else {
+                format!("claude --resume {} ; exec zsh -l -i", session_id)
+            }
+        }
+        SessionAction::Attach { session_id } => {
+            format!("claude attach {} ; exec zsh -l -i", session_id)
+        }
+    }
+}
+
 #[tauri::command]
 pub fn pty_start_session(
     state: State<'_, HostState>,
@@ -89,19 +107,7 @@ pub fn pty_start_session(
     };
 
     // 2-3. 첫 명령 구성
-    const NOTICE: &str = "원래 작업 폴더가 없어서 홈 폴더에서 이어 가요. 이어 간 대화의 파일 명령은 홈을 기준으로 돌아요.";
-    let first_cmd = match &session_action {
-        SessionAction::Resume { session_id, .. } => {
-            if fell_back {
-                format!("printf '%s\\n' '{}';claude --resume {};exec zsh -l -i", NOTICE, session_id)
-            } else {
-                format!("claude --resume {};exec zsh -l -i", session_id)
-            }
-        }
-        SessionAction::Attach { session_id } => {
-            format!("claude attach {};exec zsh -l -i", session_id)
-        }
-    };
+    let first_cmd = first_command(&session_action, fell_back);
 
     // 2-4. 로그인 셸 /bin/zsh -l -i -c '<첫명령>'
     let mut c = CommandBuilder::new("/bin/zsh");
@@ -120,4 +126,21 @@ pub fn pty_start_session(
     )?;
 
     Ok(Started { fell_back })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_command_has_spaces_around_semicolons() {
+        let resume = SessionAction::Resume { session_id: "3f2a9c4e-1b2d".into(), cwd: None };
+        assert_eq!(first_command(&resume, false), "claude --resume 3f2a9c4e-1b2d ; exec zsh -l -i");
+        assert_eq!(
+            first_command(&resume, true),
+            "printf '%s\\n' '원래 작업 폴더가 없어서 홈 폴더에서 이어 가요. 이어 간 대화의 파일 명령은 홈을 기준으로 돌아요.' ; claude --resume 3f2a9c4e-1b2d ; exec zsh -l -i"
+        );
+        let attach = SessionAction::Attach { session_id: "753ecd82".into() };
+        assert_eq!(first_command(&attach, false), "claude attach 753ecd82 ; exec zsh -l -i");
+    }
 }

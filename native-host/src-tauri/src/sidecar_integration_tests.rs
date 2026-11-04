@@ -152,7 +152,8 @@ fn real_engine_round_trip_uses_isolated_home_and_socket() {
         .parent()
         .unwrap();
     let cli = repo.join("dist/wl-cli.jar");
-    let engine = repo.join("dist/wl-engine.jar");
+    // 이 시험은 4부를 뺀 판의 답(WL-409)을 재므로 4부를 뺀 사이드카를 띄운다(1장 1.1)
+    let engine = repo.join("dist/wl-sidecar-noclaude.jar");
     assert!(
         cli.is_file() && engine.is_file(),
         "run bash test-native.sh to build Java jars first"

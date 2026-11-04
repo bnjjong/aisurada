@@ -1,17 +1,13 @@
+use crate::process::{self, Outcome, RunError};
 use serde::{Deserialize, Serialize};
 use std::{
-    env,
-    fs,
-    io::Write,
+    env, fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    sync::mpsc,
-    thread,
+    process::Command,
     time::{Duration, Instant},
 };
 
 const CAUSE_CHARS: usize = 400;
-const TERM_GRACE: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,26 +115,11 @@ pub fn augmented_path() -> String {
     }
 }
 
-pub fn ask_route() -> &'static str {
-    let http = env::var("WITHLOG_ASK_VIA_HTTP")
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false);
-    let sdk = env::var("WITHLOG_ASK_VIA_AGENT_SDK")
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false);
-
-    if http {
-        "http"
-    } else if sdk {
-        "agent-sdk"
-    } else {
-        "cli"
-    }
-}
-
+/// 묻기 길. 다시 지은 호스트는 깃발 길(WITHLOG_ASK_VIA_HTTP, WITHLOG_ASK_VIA_AGENT_SDK)을 안 지었으므로
+/// 깃발이 있어도 기본 길 cli 하나다(1장 1.6, 부록 E E.8의 「늘 cli」).
 #[tauri::command]
 pub fn ask_runtime() -> &'static str {
-    ask_route()
+    "cli"
 }
 
 fn determine_work_dir(vault: &str, raw_cwd: Option<&str>) -> (PathBuf, Option<String>) {
@@ -156,6 +137,17 @@ fn determine_work_dir(vault: &str, raw_cwd: Option<&str>) -> (PathBuf, Option<St
     }
 }
 
+/// 실패 글의 꼬리. 걷은 글이 400자 이하이면 그대로이고, 넘으면 … 뒤에 마지막 400자를 붙인다(5.8).
+pub fn tail_chars(text: &str) -> String {
+    let count = text.chars().count();
+    if count <= CAUSE_CHARS {
+        text.to_string()
+    } else {
+        let tail: String = text.chars().skip(count - CAUSE_CHARS).collect();
+        format!("…{}", tail)
+    }
+}
+
 fn format_cause(stderr: &str, stdout: &str) -> String {
     let raw = if !stderr.trim().is_empty() {
         stderr.trim()
@@ -166,13 +158,7 @@ fn format_cause(stderr: &str, stdout: &str) -> String {
         return String::new();
     }
 
-    let tail = if raw.chars().count() <= CAUSE_CHARS {
-        raw.to_string()
-    } else {
-        let count = raw.chars().count();
-        let tail_slice: String = raw.chars().skip(count - CAUSE_CHARS).collect();
-        format!("…{}", tail_slice)
-    };
+    let tail = tail_chars(raw);
 
     let first_line = raw
         .lines()
@@ -201,6 +187,8 @@ struct ExecResult {
     stderr: String,
 }
 
+/// claude 를 한 번 띄워 끝나기를 기다린다. 상한에 닿으면 2부의 `process::run` 이 SIGTERM, 3초, SIGKILL로
+/// 끝내고, 출력 파이프를 다른 프로세스가 쥐고 있어도 상한에서 답한다(5.6).
 fn run_claude_process(
     claude_bin: &Path,
     work_dir: &Path,
@@ -208,7 +196,7 @@ fn run_claude_process(
     args: &[String],
     input_text: &str,
     timeout_secs: u64,
-) -> Result<ExecResult, String> {
+) -> Result<ExecResult, RunError> {
     let mut cmd = Command::new(claude_bin);
     cmd.current_dir(work_dir);
     cmd.args(args);
@@ -217,98 +205,102 @@ fn run_claude_process(
     cmd.env("PATH", augmented_path());
     cmd.env("WITHLOG_VAULT", vault);
 
-    cmd.stdin(Stdio::piped());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("claude 를 못 띄웠다: {}", e))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let text_bytes = input_text.as_bytes().to_vec();
-        thread::spawn(move || {
-            let _ = stdin.write_all(&text_bytes);
-            let _ = stdin.flush();
-            drop(stdin);
-        });
+    match process::run_typed(
+        &mut cmd,
+        Some(input_text.as_bytes().to_vec()),
+        Duration::from_secs(timeout_secs),
+    )? {
+        Outcome::Finished(output) => Ok(ExecResult {
+            exit_code: output.status.code(),
+            timed_out: false,
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        }),
+        Outcome::TimedOut => Ok(ExecResult {
+            exit_code: None,
+            timed_out: true,
+            stdout: String::new(),
+            stderr: String::new(),
+        }),
     }
+}
 
-    let (tx, rx) = mpsc::channel();
-    let child_id = child.id();
+/// 첫 부름의 표준오류로 다시 걸 세션 플래그를 가른다(5.4). true 는 --resume, false 는 --session-id 다.
+/// 두 글자가 함께 들면 「is already in use」를 먼저 본다.
+fn flip_target(stderr: &str) -> Option<bool> {
+    if stderr.contains("is already in use") {
+        Some(true)
+    } else if stderr.contains("No conversation found") {
+        Some(false)
+    } else {
+        None
+    }
+}
 
-    let timeout_duration = Duration::from_secs(timeout_secs);
-    let wait_handle = thread::spawn(move || {
-        let output = child.wait_with_output();
-        let _ = tx.send(output);
-    });
-
-    match rx.recv_timeout(timeout_duration) {
-        Ok(output_res) => {
-            let output = output_res.map_err(|e| format!("claude 를 기다리던 일꾼이 끊겼다: {}", e))?;
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            Ok(ExecResult {
-                exit_code: output.status.code(),
-                timed_out: false,
-                stdout,
-                stderr,
-            })
+/// 새 세션을 여는 부름의 물음 글. 앞 문답이 실릴 것이 있으면 물음 앞에 싣고, 없으면 물음 글 그대로다(5.3, 8.8).
+/// 앞뒤 공백을 걷어 빈 content 와 user, assistant 가 아닌 role 은 건너뛴다.
+fn seed_prompt(seed: &[SeedMessage], prompt: &str) -> String {
+    let mut body = String::new();
+    for message in seed {
+        let head = match message.role.as_str() {
+            "user" => "### 사용자",
+            "assistant" => "### Claude",
+            _ => continue,
+        };
+        let content = message.content.trim();
+        if content.is_empty() {
+            continue;
         }
-        Err(_) => {
-            // 타임아웃 종료: SIGTERM -> 3초 유예 -> SIGKILL
-            unsafe {
-                libc::kill(child_id as libc::pid_t, libc::SIGTERM);
-            }
-            if rx.recv_timeout(TERM_GRACE).is_err() {
-                unsafe {
-                    libc::kill(child_id as libc::pid_t, libc::SIGKILL);
-                }
-            }
-            let _ = wait_handle.join();
-            Ok(ExecResult {
-                exit_code: None,
-                timed_out: true,
-                stdout: String::new(),
-                stderr: String::new(),
-            })
-        }
+        body.push_str(head);
+        body.push_str("\n\n");
+        body.push_str(content);
+        body.push_str("\n\n");
+    }
+    if body.is_empty() {
+        return prompt.to_string();
+    }
+    format!(
+        "## 앞 대화\n\n이 대화는 다른 길에서 시작해 여기로 옮겨 왔다. 아래가 앞서 오간 문답이다. 이 문답을 이어서 답하라.\n\n{}## 이번 물음\n\n{}",
+        body, prompt
+    )
+}
+
+fn failure(error: String, elapsed_ms: u64, missing_cwd: Option<String>) -> AskClaudeResponse {
+    AskClaudeResponse {
+        ok: false,
+        answer: String::new(),
+        error: Some(error),
+        elapsed_ms,
+        missing_cwd,
+    }
+}
+
+/// 받은 `route` 를 검사한다. 값이 없거나 http 하나만 받고(http 도 기본 길 claude -p 로 간다),
+/// 다른 값은 커맨드째 거절한다(1장 1.6).
+fn check_route(route: Option<&str>) -> Result<(), String> {
+    match route {
+        None | Some("http") => Ok(()),
+        Some(other) => Err(format!(
+            "모르는 묻기 길이다: {}. 받는 값은 http 하나다.",
+            other
+        )),
     }
 }
 
 pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let start_time = Instant::now();
 
-    if let Some(route) = &args.route {
-        if route != "http" {
-            return AskClaudeResponse {
-                ok: false,
-                answer: String::new(),
-                error: Some(format!(
-                    "모르는 묻기 길이다: {}. 받는 값은 http 하나다.",
-                    route
-                )),
-                elapsed_ms: 0,
-                missing_cwd: None,
-            };
-        }
-    }
-
     let (work_dir, missing_cwd) = determine_work_dir(&args.vault, args.cwd.as_deref());
 
     let claude_bin = match resolve_claude() {
         Some(b) => b,
         None => {
-            return AskClaudeResponse {
-                ok: false,
-                answer: String::new(),
-                error: Some(
-                    "claude 실행 파일을 못 찾았다. WITHLOG_CLAUDE_BIN 으로 자리를 알려 줄 수 있다."
-                        .to_string(),
-                ),
-                elapsed_ms: 0,
+            return failure(
+                "claude 실행 파일을 못 찾았다. WITHLOG_CLAUDE_BIN 으로 자리를 알려 줄 수 있다."
+                    .to_string(),
+                0,
                 missing_cwd,
-            }
+            )
         }
     };
 
@@ -342,24 +334,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let assemble_input = |is_resume: bool| -> String {
         if !is_resume {
             if let Some(seed) = &args.seed {
-                if !seed.is_empty() {
-                    let mut b = String::new();
-                    b.push_str("## 앞 대화\n\n이 대화는 다른 길에서 시작해 여기로 옮겨 왔다. 아래가 앞서 오간 문답이다. 이 문답을 이어서 답하라.\n\n");
-                    for msg in seed {
-                        let role_head = if msg.role == "user" {
-                            "### 사용자"
-                        } else {
-                            "### Claude"
-                        };
-                        b.push_str(role_head);
-                        b.push('\n');
-                        b.push_str(&msg.content);
-                        b.push_str("\n\n");
-                    }
-                    b.push_str("## 이번 물음\n\n");
-                    b.push_str(&args.prompt);
-                    return b;
-                }
+                return seed_prompt(seed, &args.prompt);
             }
         }
         args.prompt.clone()
@@ -383,45 +358,39 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
             args.timeout_seconds,
         ) {
             Ok(res) => {
-                if res.timed_out {
-                    last_result = Some(res);
-                    break;
-                }
-                if res.exit_code == Some(0) {
+                if res.timed_out || res.exit_code == Some(0) {
                     last_result = Some(res);
                     break;
                 }
 
-                // 종료 코드 0이 아닐 때 뒤집기 판정 (5.4)
-                let stderr = &res.stderr;
-                let should_flip_to_resume = stderr.contains("is already in use");
-                let should_flip_to_session_id = stderr.contains("No conversation found");
-
+                // 종료 코드 0이 아닐 때 뒤집기 판정 (5.4). 표준오류만 본다
+                let target = flip_target(&res.stderr);
                 last_result = Some(res);
 
                 if attempt == 1 {
-                    if should_flip_to_resume && !current_resume {
-                        current_resume = true;
-                        continue;
-                    } else if should_flip_to_session_id
-                        && current_resume
-                        && !args.resume_only.unwrap_or(false)
-                    {
-                        current_resume = false;
-                        continue;
+                    if let Some(next_resume) = target {
+                        // 다시 걸 플래그가 첫 부름과 같으면 안 건다. 이어 가기만 하는 물음은 --session-id 로 안 뒤집는다
+                        if next_resume != current_resume
+                            && (next_resume || !args.resume_only.unwrap_or(false))
+                        {
+                            current_resume = next_resume;
+                            continue;
+                        }
                     }
                 }
                 break;
             }
-            Err(e) => {
+            Err(RunError::Spawn(e)) => {
                 let elapsed = start_time.elapsed().as_millis() as u64;
-                return AskClaudeResponse {
-                    ok: false,
-                    answer: String::new(),
-                    error: Some(e),
-                    elapsed_ms: elapsed,
+                return failure(format!("claude 를 못 띄웠다: {}", e), elapsed, missing_cwd);
+            }
+            Err(RunError::Io(e)) => {
+                // 기다리던 일꾼이 끊겼다. 5.8 표에서 이 실패의 elapsed_ms 는 0이다
+                return failure(
+                    format!("claude 를 기다리던 일꾼이 끊겼다: {}", e),
+                    0,
                     missing_cwd,
-                };
+                );
             }
         }
     }
@@ -430,13 +399,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let res = match last_result {
         Some(r) => r,
         None => {
-            return AskClaudeResponse {
-                ok: false,
-                answer: String::new(),
-                error: Some("실행 결과를 얻지 못했다.".to_string()),
-                elapsed_ms: elapsed,
-                missing_cwd,
-            }
+            return failure("실행 결과를 얻지 못했다.".to_string(), elapsed, missing_cwd);
         }
     };
 
@@ -445,13 +408,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
             "{}초 안에 답이 안 왔다. 터미널에서 `claude --resume {}` 로 이어 볼 수 있다.",
             args.timeout_seconds, args.session_id
         );
-        return AskClaudeResponse {
-            ok: false,
-            answer: String::new(),
-            error: Some(msg),
-            elapsed_ms: elapsed,
-            missing_cwd,
-        };
+        return failure(msg, elapsed, missing_cwd);
     }
 
     if res.exit_code == Some(0) {
@@ -472,19 +429,21 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let cause = format_cause(&res.stderr, &res.stdout);
     let mut err_msg = format!("claude 가 종료 코드 {} 로 끝났다: {}", code_str, cause);
 
-    // 5.4: resumeOnly 인 물음이 실패했고 No conversation found 가 들면 앞붙임 글 추가
-    if args.resume_only.unwrap_or(false) && (res.stderr.contains("No conversation found") || res.stdout.contains("No conversation found")) {
-        let prefix = "이 기계에서 그 세션의 대화 기록을 못 찾아서 안 보냈다. 새 대화로 바꿔 보내면 앞 맥락 없는 대화가 같은 id 로 생긴다. ";
-        err_msg = format!("{}{}", prefix, err_msg);
+    // 5.4: resumeOnly 인 물음이 실패했고 No conversation found 가 들면 앞붙임 글을 더한다. 판정은 자르기 전의
+    // 표준오류 전체를 보고, 걷어서 비었을 때만 표준출력 전체를 본다. is already in use 가 함께 들면 안 붙인다
+    if args.resume_only.unwrap_or(false) {
+        let judged = if res.stderr.trim().is_empty() {
+            &res.stdout
+        } else {
+            &res.stderr
+        };
+        if judged.contains("No conversation found") && !judged.contains("is already in use") {
+            let prefix = "이 기계에서 그 세션의 대화 기록을 못 찾아서 안 보냈다. 새 대화로 바꿔 보내면 앞 맥락 없는 대화가 같은 id 로 생긴다. ";
+            err_msg = format!("{}{}", prefix, err_msg);
+        }
     }
 
-    AskClaudeResponse {
-        ok: false,
-        answer: String::new(),
-        error: Some(err_msg),
-        elapsed_ms: elapsed,
-        missing_cwd,
-    }
+    failure(err_msg, elapsed, missing_cwd)
 }
 
 #[tauri::command]
@@ -504,6 +463,9 @@ pub async fn ask_claude(
     resume_only: Option<bool>,
     persona: Option<String>,
 ) -> Result<AskClaudeResponse, String> {
+    // route 는 일을 시작하기 전에 거른다. 모르는 값이면 커맨드째 거절한다
+    check_route(route.as_deref())?;
+
     let args = AskClaudeArgs {
         vault,
         session_id,
@@ -521,15 +483,16 @@ pub async fn ask_claude(
         persona,
     };
 
-    // async 일꾼 밖의 blocking thread 에서 실행 (5.1 4번)
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let resp = execute_ask(args);
-        let _ = tx.send(resp);
-    });
-
-    rx.recv()
-        .map_err(|e| format!("claude 를 기다리던 일꾼이 끊겼다: {}", e))
+    // async 일꾼 밖의 blocking 일꾼에서 실행하고 await 로 기다린다. recv() 로 막으면 상한(1~2시간) 동안
+    // async 일꾼 하나를 붙잡는다(5.1 4번). 일꾼이 끊겨도 실패는 ok: false 답 객체로 준다(5.8, elapsed_ms 0)
+    match tauri::async_runtime::spawn_blocking(move || execute_ask(args)).await {
+        Ok(response) => Ok(response),
+        Err(e) => Ok(failure(
+            format!("claude 를 기다리던 일꾼이 끊겼다: {}", e),
+            0,
+            None,
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -555,8 +518,49 @@ mod tests {
     }
 
     #[test]
-    fn test_ask_route_default_is_cli() {
-        assert_eq!(ask_route(), "cli");
+    fn ask_runtime_is_always_cli_even_with_flags() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        env::set_var("WITHLOG_ASK_VIA_HTTP", "1");
+        env::set_var("WITHLOG_ASK_VIA_AGENT_SDK", "1");
+        let route = ask_runtime();
+        env::remove_var("WITHLOG_ASK_VIA_HTTP");
+        env::remove_var("WITHLOG_ASK_VIA_AGENT_SDK");
+        assert_eq!(route, "cli");
+    }
+
+    #[test]
+    fn route_accepts_http_and_rejects_the_rest_as_a_command() {
+        assert!(check_route(None).is_ok());
+        assert!(check_route(Some("http")).is_ok());
+        assert_eq!(
+            check_route(Some("sdk")).unwrap_err(),
+            "모르는 묻기 길이다: sdk. 받는 값은 http 하나다."
+        );
+    }
+
+    #[test]
+    fn seed_trims_skips_unknown_roles_and_empty_content() {
+        let seed = vec![
+            SeedMessage { role: "user".into(), content: "  레일 폭을 왜?  \n".into() },
+            SeedMessage { role: "system".into(), content: "건너뜀".into() },
+            SeedMessage { role: "assistant".into(), content: " \n ".into() },
+            SeedMessage { role: "assistant".into(), content: "목업의 폭이에요.".into() },
+        ];
+        assert_eq!(
+            seed_prompt(&seed, "그럼 960px?"),
+            "## 앞 대화\n\n이 대화는 다른 길에서 시작해 여기로 옮겨 왔다. 아래가 앞서 오간 문답이다. 이 문답을 이어서 답하라.\n\n### 사용자\n\n레일 폭을 왜?\n\n### Claude\n\n목업의 폭이에요.\n\n## 이번 물음\n\n그럼 960px?"
+        );
+        let nothing = vec![SeedMessage { role: "user".into(), content: "  ".into() }];
+        assert_eq!(seed_prompt(&nothing, "물음 그대로"), "물음 그대로");
+        assert_eq!(seed_prompt(&[], "물음 그대로"), "물음 그대로");
+    }
+
+    #[test]
+    fn flip_checks_already_in_use_first() {
+        assert_eq!(flip_target("Error: x is already in use"), Some(true));
+        assert_eq!(flip_target("No conversation found"), Some(false));
+        assert_eq!(flip_target("No conversation found; is already in use"), Some(true));
+        assert_eq!(flip_target("boom"), None);
     }
 
     #[test]
@@ -745,11 +749,12 @@ exit 1
     fn test_fake_claude_timeout_reaps_child() {
         let _lock = ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
-        let script = r#"#!/bin/sh
-sleep 10
-echo "Late answer"
-"#;
-        let fake_bin = create_executable_script(dir.path(), "fake_claude_sleep.sh", script);
+        let pid_file = dir.path().join("pid");
+        let script = format!(
+            "#!/bin/sh\necho $$ > \"{}\"\nexec sleep 10\n",
+            pid_file.display()
+        );
+        let fake_bin = create_executable_script(dir.path(), "fake_claude_sleep.sh", &script);
         env::set_var("WITHLOG_CLAUDE_BIN", fake_bin.to_str().unwrap());
 
         let args = AskClaudeArgs {
@@ -775,6 +780,10 @@ echo "Late answer"
         assert!(!resp.ok, "should time out");
         let err = resp.error.unwrap();
         assert!(err.contains("1초 안에 답이 안 왔다. 터미널에서 `claude --resume sess-timeout` 로 이어 볼 수 있다."));
+        // 5.6: the process is really ended and reaped, not only left behind
+        let pid: i32 = fs::read_to_string(&pid_file).unwrap().trim().parse().unwrap();
+        let gone = unsafe { libc::kill(pid, 0) } == -1;
+        assert!(gone, "상한에 끊긴 claude 프로세스가 아직 산다: {pid}");
     }
 
     #[test]
@@ -818,5 +827,96 @@ exit 1
         let err = resp.error.unwrap();
         assert!(err.contains("Fatal: Invalid configuration detected"), "First line cause must be preserved (D12)");
         assert!(err.contains("…"), "Tail must be truncated with ellipsis");
+    }
+
+    fn ask_args(session: &str, resume: bool, resume_only: bool) -> AskClaudeArgs {
+        AskClaudeArgs {
+            vault: "/tmp".to_string(),
+            session_id: session.to_string(),
+            model: "claude-sonnet-5-5".to_string(),
+            effort: "low".to_string(),
+            prompt: "질문".to_string(),
+            resume,
+            timeout_seconds: 5,
+            keep_alive: None,
+            seed: None,
+            system: None,
+            route: None,
+            cwd: None,
+            resume_only: Some(resume_only),
+            persona: None,
+        }
+    }
+
+    #[test]
+    fn both_letters_on_a_resume_call_do_not_flip_to_session_id() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let dir = tempdir().unwrap();
+        let count = dir.path().join("count");
+        let script = format!(
+            "#!/bin/sh\necho x >> \"{}\"\necho 'Session is already in use / No conversation found' >&2\nexit 1\n",
+            count.display()
+        );
+        let fake = create_executable_script(dir.path(), "fake_both.sh", &script);
+        env::set_var("WITHLOG_CLAUDE_BIN", fake.to_str().unwrap());
+        let resp = execute_ask(ask_args("sess-both", true, false));
+        env::remove_var("WITHLOG_CLAUDE_BIN");
+        assert!(!resp.ok);
+        assert_eq!(fs::read_to_string(count).unwrap().lines().count(), 1, "같은 플래그라 다시 안 건다");
+    }
+
+    #[test]
+    fn prefix_is_judged_on_stdout_only_when_stderr_is_blank_and_skipped_with_already_in_use() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let dir = tempdir().unwrap();
+        // 표준오류가 비어 있지 않으면 표준출력은 안 본다
+        let stderr_boom = create_executable_script(
+            dir.path(),
+            "fake_boom.sh",
+            "#!/bin/sh\necho 'No conversation found'\necho 'Error: boom' >&2\nexit 1\n",
+        );
+        env::set_var("WITHLOG_CLAUDE_BIN", stderr_boom.to_str().unwrap());
+        let resp = execute_ask(ask_args("sess-prefix", true, true));
+        assert!(!resp.error.unwrap().starts_with("이 기계에서"), "표준오류가 비지 않으면 표준출력은 안 본다");
+        // 표준오류가 비면 표준출력을 본다
+        let stdout_only = create_executable_script(
+            dir.path(),
+            "fake_stdout.sh",
+            "#!/bin/sh\necho 'No conversation found'\nexit 1\n",
+        );
+        env::set_var("WITHLOG_CLAUDE_BIN", stdout_only.to_str().unwrap());
+        let resp = execute_ask(ask_args("sess-prefix", true, true));
+        assert!(resp.error.unwrap().starts_with("이 기계에서"));
+        // is already in use 가 함께 들면 안 붙인다
+        let both = create_executable_script(
+            dir.path(),
+            "fake_both2.sh",
+            "#!/bin/sh\necho 'No conversation found; is already in use' >&2\nexit 1\n",
+        );
+        env::set_var("WITHLOG_CLAUDE_BIN", both.to_str().unwrap());
+        let resp = execute_ask(ask_args("sess-prefix", true, true));
+        env::remove_var("WITHLOG_CLAUDE_BIN");
+        assert!(!resp.error.unwrap().starts_with("이 기계에서"));
+    }
+
+    #[test]
+    fn pipe_holder_after_claude_exit_answers_at_the_limit() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let dir = tempdir().unwrap();
+        // claude 는 끝났는데 자식이 출력 파이프를 쥐고 있다. 상한에서 「상한에 끊긴 것」으로 답해야 한다
+        let fake = create_executable_script(
+            dir.path(),
+            "fake_holder.sh",
+            "#!/bin/sh\n(sleep 5 &) \nexit 0\n",
+        );
+        env::set_var("WITHLOG_CLAUDE_BIN", fake.to_str().unwrap());
+        let mut args = ask_args("sess-holder", false, false);
+        args.timeout_seconds = 1;
+        let started = Instant::now();
+        let resp = execute_ask(args);
+        env::remove_var("WITHLOG_CLAUDE_BIN");
+        assert!(!resp.ok);
+        assert!(resp.error.unwrap().contains("1초 안에 답이 안 왔다"));
+        assert!(started.elapsed() < Duration::from_secs(4));
     }
 }

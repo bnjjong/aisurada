@@ -17,11 +17,39 @@ pub enum Outcome {
     TimedOut,
 }
 
+/// 띄우지 못한 실패와, 띄운 뒤 기다리다 난 입출력 실패를 가른다. 4부 묻기가 두 실패에 다른 글과
+/// 다른 elapsed_ms 를 답해서(5장 5.8) 둘을 구분해야 한다.
+#[derive(Debug)]
+pub enum RunError {
+    Spawn(std::io::Error),
+    Io(std::io::Error),
+}
+impl RunError {
+    pub fn into_io(self) -> std::io::Error {
+        match self {
+            RunError::Spawn(error) | RunError::Io(error) => error,
+        }
+    }
+}
+impl From<std::io::Error> for RunError {
+    fn from(error: std::io::Error) -> Self {
+        RunError::Io(error)
+    }
+}
+
 pub fn run(
     command: &mut Command,
     input: Option<Vec<u8>>,
     timeout: Duration,
 ) -> std::io::Result<Outcome> {
+    run_typed(command, input, timeout).map_err(RunError::into_io)
+}
+
+pub fn run_typed(
+    command: &mut Command,
+    input: Option<Vec<u8>>,
+    timeout: Duration,
+) -> Result<Outcome, RunError> {
     run_with_grace(command, input, timeout, Duration::from_secs(3))
 }
 
@@ -30,7 +58,7 @@ fn run_with_grace(
     input: Option<Vec<u8>>,
     timeout: Duration,
     grace: Duration,
-) -> std::io::Result<Outcome> {
+) -> Result<Outcome, RunError> {
     let has_input = input.as_ref().is_some_and(|bytes| !bytes.is_empty());
     command
         .stdin(if has_input {
@@ -40,7 +68,7 @@ fn run_with_grace(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = command.spawn()?;
+    let mut child = command.spawn().map_err(RunError::Spawn)?;
     let deadline = Instant::now() + timeout;
     if let Some(mut stdin) = child.stdin.take() {
         thread::spawn(move || {
@@ -75,7 +103,7 @@ fn run_with_grace(
                 Ok(None) => {}
                 Err(error) => {
                     terminate(&mut child, grace);
-                    return Err(error);
+                    return Err(RunError::Io(error));
                 }
             }
         }
@@ -92,7 +120,9 @@ fn run_with_grace(
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
                     terminate(&mut child, grace);
-                    return Err(std::io::Error::other("child output reader disconnected"));
+                    return Err(RunError::Io(std::io::Error::other(
+                        "child output reader disconnected",
+                    )));
                 }
             }
         }

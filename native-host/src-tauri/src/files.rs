@@ -27,18 +27,9 @@ pub async fn write_attachment_bytes(
         .await
         .map_err(|e| format!("첨부 쓰기가 끊겼어요: {e}"))?
 }
-fn canonical_vault(vault: &str) -> Result<PathBuf, String> {
-    Path::new(vault)
-        .canonicalize()
-        .map_err(|e| format!("vault 경로 확인 실패: {e}"))
-}
-fn write_attachment(
-    vault: &str,
-    note_dir: &str,
-    name: &str,
-    bytes: &[u8],
-) -> Result<String, String> {
-    let vault = canonical_vault(vault)?;
+/// 그림 첨부 이름 검사(2부 설명서 7.1). 파일 이름 하나여야 하고, 점으로 시작하면 안 되고, 확장자가 그림 8가지
+/// 가운데 하나여야 한다. 4부의 세션 입력창 그림(`write_session_image`)도 같은 검사를 쓴다(10장 10.6).
+pub(crate) fn check_attachment_name(name: &str) -> Result<(), String> {
     let mut components = Path::new(name).components();
     if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
         return Err(format!(
@@ -56,6 +47,21 @@ fn write_attachment(
     if !IMAGE_EXTENSIONS.contains(&extension.as_str()) {
         return Err(format!("그림 파일이 아니에요(쓸 수 있는 확장자: svg, png, jpg, jpeg, gif, webp, avif, bmp): {name}"));
     }
+    Ok(())
+}
+fn canonical_vault(vault: &str) -> Result<PathBuf, String> {
+    Path::new(vault)
+        .canonicalize()
+        .map_err(|e| format!("vault 경로 확인 실패: {e}"))
+}
+fn write_attachment(
+    vault: &str,
+    note_dir: &str,
+    name: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
+    let vault = canonical_vault(vault)?;
+    check_attachment_name(name)?;
     let note_dir = Path::new(note_dir)
         .canonicalize()
         .map_err(|e| format!("노트 폴더를 찾을 수 없어요: {note_dir} ({e})"))?;

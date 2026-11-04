@@ -19,8 +19,11 @@ mod self_write;
 mod sidecar;
 mod terminal;
 mod workspace;
+#[cfg(feature = "claude")]
 mod session_image;
+#[cfg(feature = "claude")]
 mod dictation;
+#[cfg(feature = "claude")]
 mod session_shell;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -88,8 +91,11 @@ fn main() {
             agents::held_agent_sessions,
             #[cfg(feature = "claude")]
             agents::release_agent_session,
+            #[cfg(feature = "claude")]
             session_image::write_session_image,
+            #[cfg(feature = "claude")]
             dictation::start_dictation,
+            #[cfg(feature = "claude")]
             session_shell::pty_start_session
         ])
         .setup(|app| {
