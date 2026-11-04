@@ -73,7 +73,7 @@ public final class ChatCommandsTest {
 
         // 필수 인자 누락 검사
         var r1 = error(v, 400, "append-chat-turn", noteId);
-        check(stderr(r1).contains("chat-id 가 필요하다"), "missing chat-id error");
+        check(stderr(r1).contains("chat-id 이 필요하다"), "missing chat-id error");
 
         var r2 = error(v, 400, "append-chat-turn", noteId, "chat-id=" + chatId);
         check(stderr(r2).contains("source-session 이 필요하다"), "missing source-session error");

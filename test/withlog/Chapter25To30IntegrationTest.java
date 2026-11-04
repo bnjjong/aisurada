@@ -22,7 +22,7 @@ public final class Chapter25To30IntegrationTest {
             put(v, "notes/demo/root/comments.json", "[{\"id\":\"cmfixture-00000001\",\"createdAt\":\"2026-06-18T10:00Z\",\"body\":\"reply\"}]");
             Path socket = Path.of("/tmp", "wl-ch25-30-" + UUID.randomUUID().toString().substring(0, 8) + ".sock");
             cli = Path.of("dist/wl-cli.jar").toAbsolutePath();
-            prefix = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Dwithlog.test.now=" + System.getProperty("withlog.test.now"), "-Duser.timezone=Asia/Seoul", "-jar");
+            prefix = List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-Duser.home=" + home, "-Dwithlog.test.now=" + System.getProperty("withlog.test.now"), "-Duser.timezone=Asia/Seoul", "-Dwithlog.enable.part4=false", "-jar");
             environment = Map.of("HOME", home.toString(), "WITHLOG_VAULT", v.toString(), "WITHLOG_SIDECAR_SOCKET", socket.toString(), "WITHLOG_VAULT_AUTOCOMMIT_ENABLED", "false");
             List<String> command = new ArrayList<>(prefix); command.add(Path.of("dist/wl-engine.jar").toAbsolutePath().toString()); command.addAll(List.of("serve", "--withlog.notes.shard.by.month=true"));
             ProcessBuilder builder = new ProcessBuilder(command); builder.environment().clear(); builder.environment().putAll(environment);

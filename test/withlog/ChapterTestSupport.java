@@ -58,7 +58,11 @@ final class ChapterTestSupport implements AutoCloseable {
         if (v instanceof JsonValue.JsonString s) return s.value();
         if (v instanceof JsonValue.JsonArray a) return a.elements().stream().map(ChapterTestSupport::value).toList();
         if (v instanceof JsonValue.JsonObject o) { Map<String, Object> r = new LinkedHashMap<>(); o.properties().forEach((k, x) -> r.put(k, value(x))); return r; }
-        return switch (((JsonValue.JsonLiteral) v).raw()) { case "true" -> true; case "false" -> false; case "null" -> null; default -> Long.valueOf(((JsonValue.JsonLiteral) v).raw()); };
+        String raw = ((JsonValue.JsonLiteral) v).raw();
+        return switch (raw) { case "true" -> true; case "false" -> false; case "null" -> null; default -> number(raw); };
+    }
+    private static Object number(String raw) {
+        try { return Long.valueOf(raw); } catch (NumberFormatException e) { return Double.valueOf(raw); }
     }
     static void check(boolean condition, String label) { checks++; if (!condition) throw new AssertionError(label); }
     static void eq(Object actual, Object expected, String label) {

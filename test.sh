@@ -17,5 +17,6 @@ done
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.AskCommandsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.SessionCommandsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.ChatCommandsTest
+"$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Part4ReviewTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Chapter25To30IntegrationTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Chapter31IntegrationTest

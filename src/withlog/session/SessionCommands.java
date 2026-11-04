@@ -2,6 +2,7 @@ package withlog.session;
 
 import withlog.args.ParsedArgs;
 import withlog.cli.WlException;
+import withlog.text.Trim;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -29,7 +30,8 @@ public final class SessionCommands {
             throw new WlException(400, "인자가 하나 필요하다: " + READ_SESSION_USAGE);
         }
 
-        String sessionId = pos.get(0).trim();
+        // 자리 인자는 안 걷는다. 앞뒤에 공백이 붙은 세션 id는 꼴이 아니라서 WL-400이다(7.2)
+        String sessionId = pos.get(0);
         validateSessionId(sessionId);
 
         Map<String, String> opts = parsed.namedOptions();
@@ -38,7 +40,7 @@ public final class SessionCommands {
         int limit = 100;
         String rawLimit = opts.get("limit");
         if (rawLimit != null) {
-            String trimmed = rawLimit.trim();
+            String trimmed = Trim.trim(rawLimit);
             if (!trimmed.isEmpty()) {
                 try {
                     limit = Integer.parseInt(trimmed);
@@ -52,7 +54,7 @@ public final class SessionCommands {
         Integer before = null;
         String rawBefore = opts.get("before");
         if (rawBefore != null) {
-            String trimmed = rawBefore.trim();
+            String trimmed = Trim.trim(rawBefore);
             if (!trimmed.isEmpty()) {
                 try {
                     before = Integer.parseInt(trimmed);
@@ -66,11 +68,11 @@ public final class SessionCommands {
         boolean includeUrls = false;
         String rawUrls = opts.get("urls");
         if (rawUrls != null) {
-            String trimmed = rawUrls.trim();
+            String trimmed = Trim.trim(rawUrls);
             if (!trimmed.isEmpty()) {
-                if ("true".equalsIgnoreCase(trimmed)) {
+                if ("true".equals(trimmed)) {
                     includeUrls = true;
-                } else if ("false".equalsIgnoreCase(trimmed)) {
+                } else if ("false".equals(trimmed)) {
                     includeUrls = false;
                 } else {
                     throw new WlException(400, "urls 은 true 나 false 여야 한다: " + rawUrls);
@@ -82,7 +84,7 @@ public final class SessionCommands {
         String noteId = null;
         String rawNote = opts.get("note");
         if (rawNote != null) {
-            String trimmed = rawNote.trim();
+            String trimmed = Trim.trim(rawNote);
             if (!trimmed.isEmpty()) {
                 validateNoteId(trimmed);
                 noteId = trimmed;
@@ -93,7 +95,7 @@ public final class SessionCommands {
         List<String> authorNotes = null;
         String rawAuthor = opts.get("author");
         if (rawAuthor != null) {
-            String trimmed = rawAuthor.trim();
+            String trimmed = Trim.trim(rawAuthor);
             if (!trimmed.isEmpty()) {
                 String[] parts = trimmed.split(",", -1);
                 if (parts.length < 1 || parts.length > 8) {
@@ -129,10 +131,10 @@ public final class SessionCommands {
         resp.put("runningAgents", res.runningAgents());
         resp.put("todos", res.todos());
         resp.put("runState", res.runState());
-        if (rawNote != null && !rawNote.trim().isEmpty()) {
+        if (rawNote != null && !Trim.isBlank(rawNote)) {
             resp.put("noteMentions", res.noteMentions());
         }
-        if (rawAuthor != null && !rawAuthor.trim().isEmpty()) {
+        if (rawAuthor != null && !Trim.isBlank(rawAuthor)) {
             resp.put("author", res.author());
         }
         resp.put("turns", res.turns());
@@ -154,7 +156,7 @@ public final class SessionCommands {
 
         // 읽기 전에 모두 검증 (7.10)
         for (String id : pos) {
-            validateSessionId(id.trim());
+            validateSessionId(id);
         }
 
         if (pos.isEmpty()) {
@@ -164,7 +166,7 @@ public final class SessionCommands {
         Path projectsDir = SessionTranscript.getClaudeProjectsDir();
         List<Map<String, Object>> sessions = new ArrayList<>();
         for (String id : pos) {
-            String sId = id.trim();
+            String sId = id;
             SessionTranscript.SessionTitleInfo info = SessionTranscript.readTitleInfo(projectsDir, sId);
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("sessionId", info.sessionId());
@@ -191,7 +193,7 @@ public final class SessionCommands {
         Map<String, String> opts = parsed.namedOptions();
         String rawDays = opts.get("days");
         if (rawDays != null) {
-            String trimmed = rawDays.trim();
+            String trimmed = Trim.trim(rawDays);
             if (!trimmed.isEmpty()) {
                 try {
                     days = Integer.parseInt(trimmed);

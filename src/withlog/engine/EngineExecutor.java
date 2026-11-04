@@ -22,12 +22,34 @@ public final class EngineExecutor {
     public static final String NO_PART4_MESSAGE =
             "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
 
+    /** 빌드가 jar에 싣는 스위치 자원. 4부를 켠 jar는 part4=true, 4부를 뺀 jar는 part4=false다. */
+    private static final String BUILD_FLAGS_RESOURCE = "/withlog/engine-build.properties";
+
+    /**
+     * 이 엔진이 4부 명령 7개를 도는지 판정합니다.
+     * 시스템 속성 withlog.enable.part4, 환경 변수 WITHLOG_ENABLE_PART4 순으로 값이 있으면 그 값이 이기고,
+     * 둘 다 없으면 jar에 실린 빌드 스위치를 따릅니다(4부를 켠 wl-sidecar.jar는 늘 켜짐).
+     */
     public static boolean isPart4Enabled() {
         String sys = System.getProperty("withlog.enable.part4");
-        if ("true".equalsIgnoreCase(sys)) return true;
+        if (sys != null) return "true".equalsIgnoreCase(sys.trim());
         String env = System.getenv("WITHLOG_ENABLE_PART4");
-        if ("true".equalsIgnoreCase(env) || "1".equals(env)) return true;
-        return false;
+        if (env != null && !env.isBlank()) {
+            String value = env.trim();
+            return "true".equalsIgnoreCase(value) || "1".equals(value);
+        }
+        return builtWithPart4();
+    }
+
+    private static boolean builtWithPart4() {
+        try (java.io.InputStream in = EngineExecutor.class.getResourceAsStream(BUILD_FLAGS_RESOURCE)) {
+            if (in == null) return false;
+            Properties flags = new Properties();
+            flags.load(in);
+            return "true".equalsIgnoreCase(flags.getProperty("part4", "false").trim());
+        } catch (java.io.IOException e) {
+            return false;
+        }
     }
 
     private EngineExecutor() {}

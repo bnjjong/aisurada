@@ -27,11 +27,7 @@ public final class ChatCommands {
     public static final long MAX_CHAT_FILE_BYTES = 1_000_000L;
     private static final int MAX_TEXT_CHARS = 20_000;
     private static final int MAX_IMAGES = 8;
-    private static final int MAX_ATTACHMENT_NAME_LENGTH = 120;
     private static final Pattern CHAT_ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
-    private static final Set<String> ALLOWED_IMAGE_EXTS = Set.of(
-            "svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp"
-    );
 
     private ChatCommands() {}
 
@@ -50,21 +46,24 @@ public final class ChatCommands {
      * @return 검증된 대상 노 정보
      */
     public static ChatTarget resolveTarget(Path vaultRoot, ParsedArgs parsed, NoteScanner.ScanResult scanResult, String commandName) {
-        List<String> pos = parsed.positionalArgs();
-        if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
-            throw new WlException(400, "인자가 하나 필요하다: " + commandName + " <노트 id> [하위 노트 id]");
-        }
+        return locateTarget(vaultRoot, checkPositionalIds(parsed, commandName), scanResult);
+    }
 
-        String rawRootId = pos.get(0);
-        if (pos.size() > 1 && (pos.get(1) == null || Trim.isBlank(pos.get(1)))) {
-            throw new WlException(400, "하위 노트 id 칸이 비어 있다. 노트에 붙이려면 그 칸을 빼라");
-        }
+    /**
+     * 자리 인자의 있고 없음과 id 모양만 검사합니다. 문답 파일 쪽과 같은 규칙이고 색인을 안 봅니다.
+     */
+    public static String[] checkPositionalIds(ParsedArgs parsed, String commandName) {
+        return withlog.ask.AskCommands.checkPositionalIds(parsed, commandName);
+    }
 
-        if (!IdShape.NOTE.matcher(rawRootId).matches()) {
-            throw new WlException(400, "노트 id 모양이 아니다: " + rawRootId);
-        }
+    /**
+     * 검사를 마친 id로 색인에서 대상 노트의 폴더와 chats 폴더 자리를 찾습니다.
+     */
+    public static ChatTarget locateTarget(Path vaultRoot, String[] ids, NoteScanner.ScanResult scanResult) {
+        String rawRootId = ids[0];
+        String rawSubId = ids[1];
 
-        if (pos.size() == 1) {
+        if (rawSubId == null) {
             NoteScanner.NoteRecord note = scanResult.notesById().get(rawRootId);
             if (note == null) {
                 throw new WlException(404, "Note not found: " + rawRootId);
@@ -75,11 +74,6 @@ public final class ChatCommands {
             Path noteDir = note.contentFilePath().getParent();
             Path chatsDir = noteDir.resolve("chats");
             return new ChatTarget(rawRootId, noteDir, chatsDir);
-        }
-
-        String rawSubId = pos.get(1);
-        if (!IdShape.SUB_NOTE.matcher(rawSubId).matches()) {
-            throw new WlException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
         }
 
         NoteScanner.NoteRecord rootNote = scanResult.notesById().get(rawRootId);
@@ -193,10 +187,11 @@ public final class ChatCommands {
      * @return 갱신된 chat 객체와 vault 상대 경로를 담은 Map
      */
     public static Map<String, Object> executeAppendChatTurn(Path vaultRoot, ParsedArgs parsed, NoteIndex noteIndex) {
-        ChatTarget target = resolveTarget(vaultRoot, parsed, noteIndex.noteScan(), "append-chat-turn");
+        // 자리 인자 모양, 이름 인자 순으로 먼저 재고 나서야 색인에서 노트를 찾는다(8.13의 붙이는 차례)
+        String[] ids = checkPositionalIds(parsed, "append-chat-turn");
         Map<String, String> opts = parsed.namedOptions();
 
-        String chatId = requireTrimmed(opts, "chat-id", "chat-id 가 필요하다");
+        String chatId = requireTrimmed(opts, "chat-id", "chat-id 이 필요하다");
         if (!CHAT_ID_PATTERN.matcher(chatId).matches()) {
             throw new WlException(400, "대화 id 모양이 아니다: " + chatId);
         }
@@ -206,7 +201,7 @@ public final class ChatCommands {
             throw new WlException(400, "source-session 은 128자 이하여야 한다");
         }
 
-        String turnId = requireTrimmed(opts, "turn-id", "turn-id 가 필요하다");
+        String turnId = requireTrimmed(opts, "turn-id", "turn-id 이 필요하다");
         String askedAt = requireTrimmed(opts, "asked-at", "asked-at 이 필요하다");
 
         String question = requireRaw(opts, "question", "question 이 필요하다");
@@ -214,7 +209,7 @@ public final class ChatCommands {
             throw new WlException(400, "질문은 " + MAX_TEXT_CHARS + "자 이하여야 한다");
         }
 
-        String answer = requireRaw(opts, "answer", "answer 이 필요하다");
+        String answer = requireRaw(opts, "answer", "answer 가 필요하다");
         if (answer.length() > MAX_TEXT_CHARS) {
             throw new WlException(400, "답은 " + MAX_TEXT_CHARS + "자 이하여야 한다");
         }
@@ -225,9 +220,10 @@ public final class ChatCommands {
         String effort = requireTrimmed(opts, "effort", "effort 이 필요하다");
 
         String elapsedMsStr = requireTrimmed(opts, "elapsed-ms", "elapsed-ms 가 필요하다");
-        long elapsedMs;
+        int elapsedMs;
         try {
-            elapsedMs = Long.parseLong(elapsedMsStr);
+            // 정수는 32비트다. 문답 파일의 elapsed-ms 와 같은 범위다(2.7)
+            elapsedMs = Integer.parseInt(elapsedMsStr);
             if (elapsedMs < 0) {
                 throw new WlException(400, "elapsed-ms 는 0 이상의 정수여야 한다");
             }
@@ -238,14 +234,16 @@ public final class ChatCommands {
         List<String> imageList = null;
         String rawImages = opts.get("images");
         if (rawImages != null && !Trim.isBlank(rawImages)) {
-            String[] parts = rawImages.split(",");
-            if (parts.length > MAX_IMAGES) {
+            // 쉼표로 가르고 조각마다 앞뒤 공백을 걷고 빈 조각을 버린 뒤에 센다(2.7)
+            List<String> valid = new ArrayList<>();
+            for (String p : rawImages.split(",", -1)) {
+                String img = Trim.trim(p);
+                if (!img.isEmpty()) valid.add(img);
+            }
+            if (valid.size() > MAX_IMAGES) {
                 throw new WlException(400, "그림 첨부는 " + MAX_IMAGES + "개까지만 가능하다");
             }
-            List<String> valid = new ArrayList<>();
-            for (String p : parts) {
-                String img = p.trim();
-                if (img.isEmpty()) continue;
+            for (String img : valid) {
                 if (!img.startsWith("attach/")) {
                     throw new WlException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
                 }
@@ -253,12 +251,14 @@ public final class ChatCommands {
                 if (!isValidAttachmentName(name)) {
                     throw new WlException(400, "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: " + img);
                 }
-                valid.add(img);
             }
             if (!valid.isEmpty()) {
                 imageList = valid;
             }
         }
+
+        // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 WL-404, 단일 파일 노트면 WL-500
+        ChatTarget target = locateTarget(vaultRoot, ids, noteIndex.noteScan());
 
         Path chatFile = target.chatsDir.resolve(chatId + ".json");
         String vaultRelPath = vaultRoot.relativize(chatFile).toString().replace('\\', '/');
@@ -297,8 +297,8 @@ public final class ChatCommands {
         newTurn.put("askedAt", askedAt);
         newTurn.put("question", question);
         newTurn.put("answer", answer);
-        if (error != null && !error.isEmpty()) {
-            newTurn.put("error", error);
+        if (error != null) {
+            newTurn.put("error", error); // 빈 error= 도 "error": "" 로 쓴다. 읽을 때 빈 글은 없는 칸이다
         }
         newTurn.put("model", model);
         newTurn.put("effort", effort);
@@ -348,7 +348,8 @@ public final class ChatCommands {
      */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> readChatFile(Path chatFile, String fallbackNoteId, String fileChatId) throws IOException {
-        String content = Files.readString(chatFile, StandardCharsets.UTF_8);
+        // 깨진 UTF-8 바이트는 U+FFFD로 바꿔 읽는다. 바이트 하나로 대화 전체를 못 읽는 파일로 치지 않는다(8.11)
+        String content = new String(Files.readAllBytes(chatFile), StandardCharsets.UTF_8);
         JsonValue parsed = JsonReader.parseFile(content);
         if (!(parsed instanceof JsonValue.JsonObject)) {
             throw new WlException(500, "최상위 객체가 아니다");
@@ -361,7 +362,7 @@ public final class ChatCommands {
 
         String noteId = fallbackNoteId;
         Object rawNoteId = root.get("noteId");
-        if (rawNoteId instanceof String s && !s.isBlank()) {
+        if (rawNoteId instanceof String s && !Trim.isBlank(s)) {
             noteId = s;
         }
 
@@ -394,8 +395,8 @@ public final class ChatCommands {
 
                     long elapsedMs = 0L;
                     Object el = m.get("elapsedMs");
-                    if (el instanceof Number num) {
-                        elapsedMs = num.longValue();
+                    if (el instanceof Long num) {
+                        elapsedMs = num; // 7600.5 와 1e3 는 정수 글자가 아니라 수로 안 읽는다
                     } else if (el instanceof String str) {
                         try { elapsedMs = Long.parseLong(str); } catch (NumberFormatException ignored) {}
                     }
@@ -424,7 +425,7 @@ public final class ChatCommands {
 
         String createdAt = "";
         Object rawCreatedAt = root.get("createdAt");
-        if (rawCreatedAt instanceof String s && !s.isBlank()) {
+        if (rawCreatedAt instanceof String s && !Trim.isBlank(s)) {
             createdAt = s;
         } else if (!turns.isEmpty()) {
             String firstAskedAt = (String) turns.get(0).get("askedAt");
@@ -487,7 +488,7 @@ public final class ChatCommands {
     }
 
     private static Instant parseInstantSafe(String s) {
-        if (s == null || s.isBlank()) {
+        if (s == null || Trim.isBlank(s)) {
             return null;
         }
         try {
@@ -503,10 +504,10 @@ public final class ChatCommands {
 
     private static String requireTrimmed(Map<String, String> opts, String key, String errorMsg) {
         String val = opts.get(key);
-        if (val == null || val.trim().isEmpty()) {
+        if (val == null || Trim.isBlank(val)) {
             throw new WlException(400, errorMsg);
         }
-        return val.trim();
+        return Trim.trim(val);
     }
 
     private static String requireRaw(Map<String, String> opts, String key, String errorMsg) {
@@ -518,15 +519,7 @@ public final class ChatCommands {
     }
 
     private static boolean isValidAttachmentName(String name) {
-        if (name == null || name.isEmpty() || name.length() > MAX_ATTACHMENT_NAME_LENGTH) {
-            return false;
-        }
-        int dot = name.lastIndexOf('.');
-        if (dot < 0 || dot == name.length() - 1) {
-            return false;
-        }
-        String ext = name.substring(dot + 1).toLowerCase(Locale.ROOT);
-        return ALLOWED_IMAGE_EXTS.contains(ext);
+        return withlog.ask.AskCommands.isValidAttachmentName(name);
     }
 
     private static void atomicWrite(Path targetFile, byte[] data) {

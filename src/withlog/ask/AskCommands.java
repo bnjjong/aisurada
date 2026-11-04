@@ -41,6 +41,14 @@ public final class AskCommands {
      * 자리 인자로부터 문답 대상 노트를 검증하고 찾습니다.
      */
     public static NoteTarget resolveTarget(Path vaultRoot, ParsedArgs parsed, NoteScanner.ScanResult scanResult, String commandName) {
+        return locateTarget(vaultRoot, checkPositionalIds(parsed, commandName), scanResult);
+    }
+
+    /**
+     * 자리 인자의 있고 없음과 id 모양만 검사해 뿌리 노트 id와 하위 노트 id(없으면 null)를 돌려줍니다.
+     * 색인을 안 보므로 이름 인자 검사 앞에 세울 수 있습니다(2.7의 하는 일).
+     */
+    public static String[] checkPositionalIds(ParsedArgs parsed, String commandName) {
         List<String> pos = parsed.positionalArgs();
         if (pos.isEmpty() || pos.get(0) == null || Trim.isBlank(pos.get(0))) {
             throw new WlException(400, "인자가 하나 필요하다: " + commandName + " <노트 id> [하위 노트 id]");
@@ -56,6 +64,24 @@ public final class AskCommands {
         }
 
         if (pos.size() == 1) {
+            return new String[]{rawRootId, null};
+        }
+
+        String rawSubId = pos.get(1);
+        if (!IdShape.SUB_NOTE.matcher(rawSubId).matches()) {
+            throw new WlException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
+        }
+        return new String[]{rawRootId, rawSubId};
+    }
+
+    /**
+     * 검사를 마친 id로 색인에서 대상 노트의 폴더와 ask.json 자리를 찾습니다.
+     */
+    public static NoteTarget locateTarget(Path vaultRoot, String[] ids, NoteScanner.ScanResult scanResult) {
+        String rawRootId = ids[0];
+        String rawSubId = ids[1];
+
+        if (rawSubId == null) {
             NoteScanner.NoteRecord note = scanResult.notesById().get(rawRootId);
             if (note == null) {
                 throw new WlException(404, "Note not found: " + rawRootId);
@@ -67,11 +93,6 @@ public final class AskCommands {
             Path askFile = noteDir.resolve("ask.json");
             String rel = vaultRoot.relativize(askFile).toString().replace('\\', '/');
             return new NoteTarget(rawRootId, noteDir, askFile, rel);
-        }
-
-        String rawSubId = pos.get(1);
-        if (!IdShape.SUB_NOTE.matcher(rawSubId).matches()) {
-            throw new WlException(400, "하위 노트 id 모양이 아니다: " + rawSubId);
         }
 
         NoteScanner.NoteRecord rootNote = scanResult.notesById().get(rawRootId);
@@ -122,7 +143,8 @@ public final class AskCommands {
 
         String content;
         try {
-            content = Files.readString(askFile, StandardCharsets.UTF_8);
+            // 깨진 UTF-8 바이트는 U+FFFD로 바꿔 읽는다. 바이트 하나로 문답 전체를 잃지 않게 한다(2.5)
+            content = new String(Files.readAllBytes(askFile), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new WlException(500, "문답 파일을 못 읽었다: " + e.getMessage());
         }
@@ -211,17 +233,17 @@ public final class AskCommands {
         // elapsedMs
         Object elVal = turnMap.get("elapsedMs");
         long elapsed = 0;
-        if (elVal instanceof Number n) {
-            elapsed = n.longValue();
+        if (elVal instanceof Long n) {
+            elapsed = n; // 7600.5 와 1e3 는 정수 글자가 아니라 수로 안 읽는다
         } else if (elVal instanceof String s) {
             try { elapsed = Long.parseLong(s); } catch (Exception ignored) {}
         }
         t.put("elapsedMs", elapsed);
 
-        // sessionLines
+        // sessionLines: 정수 글자만 받는다. "21" 과 21.0 은 없는 칸이다
         Object slVal = turnMap.get("sessionLines");
-        if (slVal instanceof Number n && n.intValue() > 0) {
-            t.put("sessionLines", n.intValue());
+        if (slVal instanceof Long n && n > 0) {
+            t.put("sessionLines", n);
         }
 
         // images
@@ -273,11 +295,16 @@ public final class AskCommands {
         return null;
     }
 
-    private static boolean isValidAttachmentName(String name) {
+    /**
+     * 그림 첨부 이름(2.8)인지 잽니다. 비지 않고, 120자를 넘지 않고, 빗금과 역빗금과 ..이 없고,
+     * 점으로 시작하지 않고, 제어 글자(U+0000~U+001F)가 없고, 확장자가 그림 8가지 가운데 하나여야 합니다.
+     * 문답 파일과 레일 대화 파일이 같은 규칙을 쓰도록 둘이 함께 부릅니다.
+     */
+    public static boolean isValidAttachmentName(String name) {
         if (name == null || name.isEmpty() || name.length() > MAX_ATTACHMENT_NAME_LENGTH) return false;
         if (name.startsWith(".") || name.contains("/") || name.contains("\\") || name.contains("..")) return false;
         for (char c : name.toCharArray()) {
-            if (c < 32 || c == 127) return false;
+            if (c < 32) return false;
         }
         int dot = name.lastIndexOf('.');
         if (dot < 0) return false;
@@ -289,7 +316,8 @@ public final class AskCommands {
      * append-ask-turn 명령 실행.
      */
     public static Map<String, Object> executeAppendAskTurn(Path vaultRoot, ParsedArgs parsed, NoteIndex noteIndex) {
-        NoteTarget target = resolveTarget(vaultRoot, parsed, noteIndex.noteScan(), "append-ask-turn");
+        // 자리 인자 모양, 이름 인자 순으로 먼저 재고 나서야 색인에서 노트를 찾는다(2.7의 하는 일)
+        String[] ids = checkPositionalIds(parsed, "append-ask-turn");
         Map<String, String> opts = parsed.namedOptions();
 
         // 1. 필수 인자 검사
@@ -303,9 +331,10 @@ public final class AskCommands {
         String effort = requireOption(opts, "effort");
         String rawElapsed = requireOption(opts, "elapsed-ms");
 
-        long elapsedMs;
+        int elapsedMs;
         try {
-            elapsedMs = Long.parseLong(rawElapsed);
+            // 정수는 32비트다. 2.3의 elapsedMs 와 같은 범위로 쓰고 읽는다
+            elapsedMs = Integer.parseInt(rawElapsed);
             if (elapsedMs < 0) throw new NumberFormatException();
         } catch (Exception e) {
             throw new WlException(400, "elapsed-ms 은 숫자여야 한다: " + rawElapsed);
@@ -327,9 +356,9 @@ public final class AskCommands {
 
         Integer sessionLines = null;
         String rawSessionLines = opts.get("session-lines");
-        if (rawSessionLines != null) {
+        if (rawSessionLines != null && !Trim.isBlank(rawSessionLines)) { // 걷어서 비면 안 준 인자다
             try {
-                int lines = Integer.parseInt(rawSessionLines.trim());
+                int lines = Integer.parseInt(Trim.trim(rawSessionLines));
                 if (lines < 1) throw new NumberFormatException();
                 sessionLines = lines;
             } catch (Exception e) {
@@ -343,7 +372,7 @@ public final class AskCommands {
             String[] parts = rawImages.split(",");
             List<String> valid = new ArrayList<>();
             for (String p : parts) {
-                String trimmed = p.trim();
+                String trimmed = Trim.trim(p);
                 if (!trimmed.isEmpty()) {
                     valid.add(trimmed);
                 }
@@ -364,6 +393,9 @@ public final class AskCommands {
                 imageList = valid;
             }
         }
+
+        // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 WL-404, 단일 파일 노트면 WL-500
+        NoteTarget target = locateTarget(vaultRoot, ids, noteIndex.noteScan());
 
         // 기존 ask.json 읽기 또는 새 구조체 생성
         Map<String, Object> currentThread;
@@ -432,10 +464,10 @@ public final class AskCommands {
 
     private static String requireOption(Map<String, String> opts, String key) {
         String val = opts.get(key);
-        if (val == null || val.trim().isEmpty()) {
+        if (val == null || Trim.isBlank(val)) {
             throw new WlException(400, key + " 이 필요하다");
         }
-        return val.trim();
+        return Trim.trim(val);
     }
 
     private static String requireOptionRaw(Map<String, String> opts, String key) {

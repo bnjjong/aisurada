@@ -2,9 +2,9 @@ package withlog.session;
 
 import withlog.args.JsonReader;
 import withlog.args.JsonValue;
+import withlog.text.Trim;
 
 import java.io.*;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.CharsetDecoder;
@@ -29,13 +29,13 @@ public final class SessionTranscript {
     private static final int MAX_TEXT_CHARS = 2000;
     private static final int CHUNK_BYTES = 65536;
 
-    private static final Pattern URL_PATTERN = Pattern.compile("https?://[^ \\t\\r\\n<>\"'`)\\]}]+");
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://[^\\s<>\"'`)\\]}]+");
     private static final Pattern ENTRYPOINT_PATTERN = Pattern.compile("\"entrypoint\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("\"timestamp\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern GIT_BRANCH_PATTERN = Pattern.compile("\"gitBranch\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern CWD_PATTERN = Pattern.compile("\"cwd\"\\s*:\\s*\"([^\"]*)\"");
-    private static final Pattern TASK_CREATE_PATTERN = Pattern.compile("^Task #(\\d+) created successfully:\\s*(.*)$");
-    private static final Pattern TASK_UPDATE_PATTERN = Pattern.compile("^Updated task #(\\d+).*$");
+    private static final Pattern TASK_CREATE_PATTERN = Pattern.compile("^Task #(\\d+) created successfully:\\s*(.*)$", Pattern.DOTALL);
+    private static final Pattern TASK_UPDATE_PATTERN = Pattern.compile("^Updated task #(\\d+).*$", Pattern.DOTALL);
 
     private static final Set<String> LOCAL_HOSTS = Set.of(
             "localhost", "ipc.localhost", "asset.localhost", "127.0.0.1"
@@ -74,18 +74,11 @@ public final class SessionTranscript {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(projectsDir)) {
             for (Path projectDir : stream) {
                 if (Files.isDirectory(projectDir)) {
+                    // 폴더마다 그 이름의 파일이 보통 파일로 있는지만 본다(7.1). 폴더 안을 나열하지 않는다
                     Path candidate = projectDir.resolve(targetFileName);
                     if (Files.isRegularFile(candidate)) {
                         return candidate;
                     }
-                    // 대소문자 매칭을 위해 디렉토리 내부 검색 (대소문자 보존/구분 환경 호환)
-                    try (DirectoryStream<Path> fileStream = Files.newDirectoryStream(projectDir, "*.jsonl")) {
-                        for (Path f : fileStream) {
-                            if (Files.isRegularFile(f) && f.getFileName().toString().equalsIgnoreCase(targetFileName)) {
-                                return f;
-                            }
-                        }
-                    } catch (IOException ignored) {}
                 }
             }
         } catch (IOException ignored) {}
@@ -188,7 +181,7 @@ public final class SessionTranscript {
             String line;
             while ((line = reader.readLine()) != null) {
                 lineCount++;
-                if (line.trim().isEmpty()) {
+                if (Trim.isBlank(line)) {
                     continue; // 빈 줄은 안 센다 (7.4)
                 }
 
@@ -212,19 +205,6 @@ public final class SessionTranscript {
                 }
 
                 boolean isUserOrAssistant = "user".equals(type) || "assistant".equals(type);
-
-                // user / assistant 줄에서 원문 노트 ID 매칭 (7.8)
-                if (isUserOrAssistant && !notesToTrack.isEmpty() && !allTurns.isEmpty()) {
-                    int lastTurnIdx = allTurns.size() - 1;
-                    for (String nid : notesToTrack) {
-                        if (line.contains(nid)) {
-                            List<Integer> list = noteMentionsMap.get(nid);
-                            if (list.isEmpty() || list.get(list.size() - 1) != lastTurnIdx) {
-                                list.add(lastTurnIdx);
-                            }
-                        }
-                    }
-                }
 
                 String timestamp = getStringProp(props, "timestamp");
 
@@ -263,47 +243,46 @@ public final class SessionTranscript {
                                                 try {
                                                     Instant start = Instant.parse(toolTurn.at);
                                                     Instant end = Instant.parse(timestamp);
-                                                    double diffSec = (double) Duration.between(start, end).toMillis() / 1000.0;
-                                                    if (diffSec < 0) diffSec = 0.0;
-                                                    toolTurn.toolSeconds = diffSec;
+                                                    // 결과 줄이 호출 줄보다 앞서면 음수 그대로다(7.4)
+                                                    toolTurn.toolSeconds = (double) Duration.between(start, end).toMillis() / 1000.0;
                                                 } catch (Exception ignored) {}
                                             }
 
-                                            // TaskCreate / TaskUpdate 분석 (7.6)
-                                            if (resultContent instanceof JsonValue.JsonString resStr) {
-                                                String resText = resStr.value();
+                                            // TaskCreate / TaskUpdate 분석 (7.6). 결과 글은 수, 참거짓, null도 글자로 읽고
+                                            // 배열과 객체만 건너뛴다
+                                            String resText = primitiveText(resultContent);
+                                            if (resText != null) {
                                                 String firstLine = getFirstLine(resText);
                                                 String toolName = toolTurn.toolName;
                                                 if ("TaskCreate".equals(toolName)) {
                                                     Matcher m = TASK_CREATE_PATTERN.matcher(firstLine);
-                                                    if (m.matches()) {
-                                                        int num = Integer.parseInt(m.group(1));
-                                                        String tTitle = m.group(2).trim();
+                                                    Integer num = m.matches() ? parseIntOrNull(m.group(1)) : null;
+                                                    if (num != null) {
+                                                        String tTitle = Trim.trim(m.group(2));
                                                         Map<String, Object> todo = new LinkedHashMap<>();
                                                         todo.put("number", num);
                                                         todo.put("title", tTitle);
                                                         todo.put("status", "pending");
                                                         todosMap.put(num, todo);
                                                     } else {
-                                                        // Task #N created successfully 꼴이 아니면 skipped++ (7.4)
+                                                        // Task #N created successfully 꼴이 아니면 skipped++ (7.4).
+                                                        // 번호가 32비트를 넘는 것도 꼴이 아닌 것으로 보고 그 줄만 지나간다
                                                         skippedCount++;
                                                     }
                                                 } else if ("TaskUpdate".equals(toolName)) {
                                                     Matcher m = TASK_UPDATE_PATTERN.matcher(firstLine);
-                                                    if (m.matches()) {
-                                                        int num = Integer.parseInt(m.group(1));
+                                                    Integer num = m.matches() ? parseIntOrNull(m.group(1)) : null;
+                                                    if (num != null) {
                                                         Map<String, JsonValue> inProps = toolTurn.toolInputProps;
-                                                        if (inProps != null) {
+                                                        if (inProps != null && todosMap.containsKey(num)) {
                                                             String status = getStringProp(inProps, "status");
                                                             String subject = getStringProp(inProps, "subject");
-                                                            if ("deleted".equals(status)) {
-                                                                todosMap.remove(num);
-                                                            } else if (todosMap.containsKey(num)) {
-                                                                Map<String, Object> todo = todosMap.get(num);
-                                                                if (subject != null) todo.put("title", subject);
-                                                                if (status != null && Set.of("pending", "in_progress", "completed").contains(status)) {
-                                                                    todo.put("status", status);
-                                                                }
+                                                            Map<String, Object> todo = todosMap.get(num);
+                                                            if (subject != null) todo.put("title", subject);
+                                                            // deleted 도 상태 값이다. 목록에서만 걷고 번호는 둬서,
+                                                            // 뒤의 고침이 다시 세우면 그 할 일이 되살아난다
+                                                            if (status != null && Set.of("pending", "in_progress", "completed", "deleted").contains(status)) {
+                                                                todo.put("status", status);
                                                             }
                                                         }
                                                     }
@@ -413,6 +392,19 @@ public final class SessionTranscript {
                         }
                     }
                 }
+
+                // 노트 id가 나온 자리는 그 줄의 글 회차와 도구 회차를 다 담은 뒤의 마지막 순번이다(7.8)
+                if (isUserOrAssistant && !notesToTrack.isEmpty() && !allTurns.isEmpty()) {
+                    int lastTurnIdx = allTurns.size() - 1;
+                    for (String nid : notesToTrack) {
+                        if (line.contains(nid)) {
+                            List<Integer> list = noteMentionsMap.get(nid);
+                            if (list.isEmpty() || list.get(list.size() - 1) != lastTurnIdx) {
+                                list.add(lastTurnIdx);
+                            }
+                        }
+                    }
+                }
             }
         } catch (IOException e) {
             throw new RuntimeException("사이드카 안에서 실패했다: " + e.getMessage() + ". 자세한 것은 사이드카 로그에 있다.", e);
@@ -462,7 +454,12 @@ public final class SessionTranscript {
         }
 
         // todos 리스트 (7.6)
-        List<Map<String, Object>> todosList = new ArrayList<>(todosMap.values());
+        List<Map<String, Object>> todosList = new ArrayList<>();
+        for (Map<String, Object> todo : todosMap.values()) {
+            if (!"deleted".equals(todo.get("status"))) {
+                todosList.add(todo);
+            }
+        }
 
         // runState 객체 (7.6)
         Map<String, Object> runStateObj = null;
@@ -585,7 +582,7 @@ public final class SessionTranscript {
     }
 
     private static void addTextTurn(List<RawTurn> turns, String who, String at, String rawText) {
-        if (rawText == null || rawText.trim().isEmpty()) {
+        if (rawText == null || Trim.isBlank(rawText)) {
             return; // 공백뿐인 글은 버린다 (7.4)
         }
         RawTurn turn = new RawTurn();
@@ -606,17 +603,17 @@ public final class SessionTranscript {
     private static String summarizeToolArg(Map<String, JsonValue> inputProps) {
         if (inputProps == null || inputProps.isEmpty()) return null;
         String[] candidateKeys = {"description", "file_path", "pattern", "query", "command", "url"};
+        // 차례로 처음 찾은 글 값을 고른다. 빈 글도 글 값이라 뒤 키로 안 넘어가고, 수와 참거짓은 글 값이 아니다(7.4)
         String found = null;
         for (String k : candidateKeys) {
-            String val = getStringProp(inputProps, k);
-            if (val != null && !val.trim().isEmpty()) {
-                found = val;
+            if (inputProps.get(k) instanceof JsonValue.JsonString str) {
+                found = str.value();
                 break;
             }
         }
         if (found == null) return null;
 
-        String firstLine = getFirstLine(found.trim()).trim();
+        String firstLine = Trim.trim(getFirstLine(Trim.trim(found)));
         if (firstLine.isEmpty()) return null;
 
         if (firstLine.length() <= 120) {
@@ -644,19 +641,15 @@ public final class SessionTranscript {
             }
             if (candidate.length() <= 10) continue;
 
-            try {
-                URI uri = URI.create(candidate);
-                String host = uri.getHost();
-                if (host != null && LOCAL_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
-                    continue;
-                }
-            } catch (Exception e) {
-                // URI 파싱 실패 시 localhost 문자열 체크
-                String lower = candidate.toLowerCase(Locale.ROOT);
-                if (lower.contains("://localhost") || lower.contains("://127.0.0.1") ||
-                        lower.contains("://ipc.localhost") || lower.contains("://asset.localhost")) {
-                    continue;
-                }
+            // 호스트는 :// 뒤에서 첫 빗금 앞까지를 자르고 첫 : 앞까지만 둔 글이다. 글자 그대로 맞대어
+            // 대문자 호스트, 사용자 정보가 붙은 호스트, 빗금 없이 ?가 붙은 호스트는 앱이 거는 주소로 안 본다(7.6)
+            String afterScheme = candidate.substring(candidate.indexOf("://") + 3);
+            int slash = afterScheme.indexOf('/');
+            String authority = slash >= 0 ? afterScheme.substring(0, slash) : afterScheme;
+            int colon = authority.indexOf(':');
+            String host = colon >= 0 ? authority.substring(0, colon) : authority;
+            if (LOCAL_HOSTS.contains(host)) {
+                continue;
             }
 
             map.put(candidate, map.getOrDefault(candidate, 0) + 1);
@@ -716,33 +709,40 @@ public final class SessionTranscript {
             }
         }
 
-        // size > 65536: 머리와 꼬리를 각각 읽고 가장자리 불완전 줄 제거
+        // size > 65536: 머리와 꼬리를 각각 읽는다. 줄은 가장자리의 불완전한 줄을 버린 바이트로 나누고,
+        // 글자 대체(정규식)는 버린 가장자리 조각까지 든 창의 바이트 전체에서 찾는다(7.10)
         try (FileChannel ch = FileChannel.open(file, StandardOpenOption.READ)) {
             // 머리 읽기
-            ByteBuffer headBuf = ByteBuffer.allocate(CHUNK_BYTES);
-            ch.read(headBuf);
-            byte[] headBytes = headBuf.array();
+            byte[] headBytes = readFully(ch, 0, CHUNK_BYTES);
             int lastNl = lastIndexOfByte(headBytes, (byte) '\n');
             byte[] validHead = (lastNl >= 0) ? Arrays.copyOf(headBytes, lastNl + 1) : new byte[0];
-            String headText = decodeUtf8Flexible(validHead);
-            List<String> headLines = splitLines(headText);
+            String headText = decodeUtf8Flexible(headBytes);
+            List<String> headLines = splitLines(decodeUtf8Flexible(validHead));
 
             // 꼬리 읽기
-            ByteBuffer tailBuf = ByteBuffer.allocate(CHUNK_BYTES);
-            ch.position(size - CHUNK_BYTES);
-            ch.read(tailBuf);
-            byte[] tailBytes = tailBuf.array();
+            byte[] tailBytes = readFully(ch, size - CHUNK_BYTES, CHUNK_BYTES);
             int firstNl = indexOfByte(tailBytes, (byte) '\n');
             byte[] validTail = (firstNl >= 0 && firstNl + 1 < tailBytes.length)
                     ? Arrays.copyOfRange(tailBytes, firstNl + 1, tailBytes.length)
                     : new byte[0];
-            String tailText = decodeUtf8Flexible(validTail);
-            List<String> tailLines = splitLines(tailText);
+            String tailText = decodeUtf8Flexible(tailBytes);
+            List<String> tailLines = splitLines(decodeUtf8Flexible(validTail));
 
             return new HeadAndTail(headText, tailText, headLines, tailLines);
         } catch (IOException e) {
             return new HeadAndTail("", "", Collections.emptyList(), Collections.emptyList());
         }
+    }
+
+    private static byte[] readFully(FileChannel ch, long position, int length) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(length);
+        long at = position;
+        while (buf.hasRemaining()) {
+            int n = ch.read(buf, at);
+            if (n < 0) break;
+            at += n;
+        }
+        return Arrays.copyOf(buf.array(), buf.position());
     }
 
     private static String resolveTitle(Path transcriptFile, HeadAndTail ht) {
@@ -763,7 +763,7 @@ public final class SessionTranscript {
                     JsonValue jv = JsonReader.parse(content);
                     if (jv instanceof JsonValue.JsonObject obj) {
                         String title = getStringProp(obj.properties(), "customTitle");
-                        if (title != null && !title.trim().isEmpty()) {
+                        if (title != null && !Trim.isBlank(title)) {
                             return title;
                         }
                     }
@@ -799,7 +799,7 @@ public final class SessionTranscript {
             if (jv instanceof JsonValue.JsonObject obj) {
                 if (expectedType.equals(getStringProp(obj.properties(), "type"))) {
                     String title = getStringProp(obj.properties(), key);
-                    if (title != null && !title.trim().isEmpty()) {
+                    if (title != null && !Trim.isBlank(title)) {
                         return title;
                     }
                 }
@@ -816,8 +816,8 @@ public final class SessionTranscript {
         }
 
         // 2. 꼬리 창 글자에서 마지막 "gitBranch":"…"
-        String tailRegexBranch = findLastRegexMatch(ht.tailText, GIT_BRANCH_PATTERN);
-        if (tailRegexBranch != null) return unescapeJson(tailRegexBranch);
+        String tailRegexBranch = nonBlank(unescapeJson(findLastRegexMatch(ht.tailText, GIT_BRANCH_PATTERN)));
+        if (tailRegexBranch != null) return tailRegexBranch;
 
         // 3. 머리 창에서 첫 gitBranch 줄
         for (String line : ht.headLines) {
@@ -826,8 +826,8 @@ public final class SessionTranscript {
         }
 
         // 4. 머리 창 글자에서 첫 "gitBranch":"…"
-        String headRegexBranch = findFirstRegexMatch(ht.headText, GIT_BRANCH_PATTERN);
-        if (headRegexBranch != null) return unescapeJson(headRegexBranch);
+        String headRegexBranch = nonBlank(unescapeJson(findFirstRegexMatch(ht.headText, GIT_BRANCH_PATTERN)));
+        if (headRegexBranch != null) return headRegexBranch;
 
         return null;
     }
@@ -840,8 +840,8 @@ public final class SessionTranscript {
         }
 
         // 2. 머리 창 글자에서 첫 "cwd":"…"
-        String headRegexCwd = findFirstRegexMatch(ht.headText, CWD_PATTERN);
-        if (headRegexCwd != null) return unescapeJson(headRegexCwd);
+        String headRegexCwd = nonBlank(unescapeJson(findFirstRegexMatch(ht.headText, CWD_PATTERN)));
+        if (headRegexCwd != null) return headRegexCwd;
 
         // 꼬리는 안 본다!
         return null;
@@ -853,7 +853,7 @@ public final class SessionTranscript {
             JsonValue jv = JsonReader.parseFile(line);
             if (jv instanceof JsonValue.JsonObject obj) {
                 String val = getStringProp(obj.properties(), key);
-                if (val != null && !val.trim().isEmpty()) {
+                if (val != null && !Trim.isBlank(val)) {
                     return val;
                 }
             }
@@ -1077,11 +1077,33 @@ public final class SessionTranscript {
         return sb.toString();
     }
 
+    /** 글의 첫 줄. 줄은 \r\n, \r, \n 어느 것으로도 끊는다(7.4). */
     private static String getFirstLine(String text) {
         if (text == null) return "";
-        int nl = text.indexOf('\n');
-        if (nl < 0) return text;
-        return text.substring(0, nl);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\n' || c == '\r') return text.substring(0, i);
+        }
+        return text;
+    }
+
+    /** 글, 수, 참거짓, null은 글자로 읽는다. 배열과 객체는 글자가 아니라 null이다. */
+    private static String primitiveText(JsonValue value) {
+        if (value instanceof JsonValue.JsonString str) return str.value();
+        if (value instanceof JsonValue.JsonLiteral lit) return lit.raw();
+        return null;
+    }
+
+    private static Integer parseIntOrNull(String digits) {
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String nonBlank(String value) {
+        return (value == null || Trim.isBlank(value)) ? null : value;
     }
 
     private static String getStringProp(Map<String, JsonValue> props, String key) {
