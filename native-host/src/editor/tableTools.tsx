@@ -10,6 +10,7 @@ import type { LexicalNode } from 'lexical';
 import type { EditorProps } from './Editor.tsx';
 import { $exportSelection, $tableMarkdown, $tableTSV } from './markdown.ts';
 import { OPEN_COMMENT_COMMAND, OPEN_ASK_COMMAND } from './tools.tsx';
+import { AskHoverCard } from '@claude-plug/ask';
 
 type Cell = { key: string; x: number; y: number; right: number; tableRight: number; tableTop: number; tableBottom: number };
 export function tablesOnlyJSON(raw?: string): string | undefined {
@@ -23,7 +24,7 @@ export function tablesOnlyJSON(raw?: string): string | undefined {
 export function TableTools(props: EditorProps) {
   const [editor] = useLexicalComposerContext();
   const [cell, setCell] = useState<Cell | null>(null), [open, setOpen] = useState(false), copyMode = useRef(false);
-  const [dots, setDots] = useState<{ key: string; x: number; y: number; ids: string[] }[]>([]), [rowCard, setRowCard] = useState<string | null>(null);
+  const [dots, setDots] = useState<{ key: string; x: number; y: number; ids: string[]; asks: string[] }[]>([]), [rowCard, setRowCard] = useState<string | null>(null);
   const fixedWidths = useRef(new Map<string, number>());
   const scaled = useRef(new Set<string>());
   const stopResize = useRef<(() => void) | null>(null);
@@ -99,10 +100,12 @@ export function TableTools(props: EditorProps) {
       const base = container.getBoundingClientRect(), next: typeof dots = [];
       root.querySelectorAll<HTMLTableRowElement>('tr').forEach(row => {
         const ids = [...new Set([...row.querySelectorAll<HTMLElement>('[data-comment-id]')].map(mark => mark.dataset.commentId!))];
-        if (!ids.length) return;
+        // 17.4: with askDocId the row also draws a dot for its question marks and its card carries them.
+        const asks = props.askDocId ? [...new Set([...row.querySelectorAll<HTMLElement>('[data-ask-id]')].map(mark => mark.dataset.askId!))] : [];
+        if (!ids.length && !asks.length) return;
         const rect = row.getBoundingClientRect(); let key = '';
         editor.read(() => { key = $getNearestNodeFromDOMNode(row)?.getKey() || ''; });
-        if (key) next.push({ key, ids, x: rect.left - base.left - 14, y: rect.top - base.top + 8 });
+        if (key) next.push({ key, ids, asks, x: rect.left - base.left - 14, y: rect.top - base.top + 8 });
       });
       setDots(next);
     };
@@ -178,8 +181,9 @@ export function TableTools(props: EditorProps) {
       <div className="lex-table-grip" style={{ left: cell.tableRight - 3, top: cell.tableTop, height: cell.tableBottom - cell.tableTop }} onPointerDown={event => resize(event, true)} onDoubleClick={() => operation('fit')} /></>}
     {open && cell && <div className="lex-table-menu" style={{ left: cell.x, top: cell.y + 26 }}>{operations.map(([id, title]) => <button key={id} onClick={() => operation(id)}>{title}</button>)}</div>}
     {dots.map(dot => <div className="lex-row-dot" key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => setRowCard(dot.key)} onMouseLeave={() => setRowCard(null)}>
-      <button aria-label="이 줄의 코멘트" onClick={() => props.features?.openComment?.(dot.ids[0])}>●</button>
-      {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}</div>}
+      <button aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'} onClick={() => { if (dot.ids.length) props.features?.openComment?.(dot.ids[0]); }}>●</button>
+      {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}
+        {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => setRowCard(null)} pinned={false} />)}</div>}
     </div>)}
     {cell && props.features?.comment && <button className="lex-row-comment" style={{ left: cell.x - 35, top: cell.y }} title="이 줄에 코멘트 달기" aria-label="이 줄에 코멘트 달기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
       const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();

@@ -1,5 +1,5 @@
 import { CLAUDE_ENABLED } from "@claude-plug/state";
-import { EditorAskPlugins, AskHoverCard } from "@claude-plug/ask";
+import { EditorAskPlugins } from "@claude-plug/ask";
 import { useEffect, useRef, useState } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
@@ -181,7 +181,6 @@ export function Editor(props: EditorProps) {
           <TableTools {...props} />
           <MermaidLayer open={props.diagramsOpen || false} />
           <EditorAskPlugins docId={props.askDocId} onAsk={props.onAskAi} onFollowUp={props.onAskFollowUp} />
-          <AskHoverCard docId={props.askDocId || ""} turnId="" />
         </LexicalComposer>
       </div>
     </EditorContext.Provider>

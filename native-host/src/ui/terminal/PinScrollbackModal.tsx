@@ -8,6 +8,8 @@ import type { Agenda } from '../../workspace/types.ts';
 interface PinScrollbackModalProps {
   logicalLines: string[];
   selectionIndices?: [number, number];
+  /** Why 「고른 부분」 cannot be used (14.9): TUI up, nothing selected, or not found. */
+  selectionNotice?: string;
   hadTui: boolean;
   agendas: Agenda[];
   onClose: () => void;
@@ -18,6 +20,7 @@ interface PinScrollbackModalProps {
 export function PinScrollbackModal({
   logicalLines,
   selectionIndices,
+  selectionNotice,
   hadTui,
   agendas,
   onClose,
@@ -182,6 +185,7 @@ export function PinScrollbackModal({
           <button
             type="button"
             disabled={loading || submitting || hadTui || !selectionIndices}
+            title={selectionNotice}
             className={`btn btn-sm ${range === 'selection' ? 'btn-active' : ''}`}
             onClick={() => handleRangeChange('selection')}
           >
@@ -189,6 +193,9 @@ export function PinScrollbackModal({
           </button>
         </div>
 
+        {selectionNotice && (
+          <div className="pin-selection-note" style={{ fontSize: 12, color: '#d97706', marginBottom: 8 }}>{selectionNotice}</div>
+        )}
         <div className="pin-hint" style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginBottom: 12 }}>
           실제로 굳힐 줄은 {currentLines.length}줄이에요. 빈 꼬리는 빼고 세요.
         </div>
@@ -226,26 +233,29 @@ export function PinScrollbackModal({
           <div className="pin-warn" style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
             {masked.short.length > 0 && (
               <div style={{ color: '#d97706' }}>
-                짧아서 못 지킨 이름 {masked.short.length}개: {masked.short.join(', ')}
+                짧아서 못 지킨 이름 {masked.short.length}: {masked.short.join(', ')}
               </div>
             )}
             {masked.unreadable.length > 0 && (
               <div style={{ color: '#dc2626' }}>
-                값을 못 읽은 이름 {masked.unreadable.length}개: {masked.unreadable.join(', ')}
+                값을 못 읽은 이름 {masked.unreadable.length}: {masked.unreadable.join(', ')}
               </div>
             )}
             {shapesSum > 0 ? (
               <div style={{ color: '#dc2626' }}>
-                표에 없는데 비밀처럼 생긴 것이 {shapesSum}건이에요. 안 가려졌어요.
+                표에 없는데 비밀처럼 생긴 것이 {shapesSum} 건이에요. 안 가려졌어요.
+                {masked.shapes.filter(shape => shape.count > 0).map(shape => (
+                  <div className="pin-shape" key={shape.kind || shape.label}>{shape.label} {shape.count} 건</div>
+                ))}
               </div>
             ) : (
               <div style={{ color: '#059669' }}>
-                모양 검사를 지났고 걸린 것이 0건이에요. 채택한 패턴 밖의 모양은 못 봐요.
+                모양 검사를 지났고 걸린 것이 0 건이에요. 채택한 패턴 밖의 모양은 못 봐요.
               </div>
             )}
             {hadTui && (
               <div style={{ color: '#d97706' }}>
-                굳힐 때 TUI가 떠 있었어요. 여기 담기는 것은 그 아래 쌓인 기록이라 보던 화면과 달라요.
+                굳힐 때 TUI 가 떠 있었어요. 여기 담기는 것은 그 아래 쌓인 기록이라 보던 화면과 달라요.
               </div>
             )}
           </div>
@@ -282,6 +292,13 @@ export function PinScrollbackModal({
             ))}
           </select>
         </div>
+
+        {/* 14.9 저장: the final body's size in UTF-8 bytes against the 300,000 limit */}
+        {masked && (
+          <div className="pin-bytes" style={{ fontSize: 12, marginBottom: 10, color: bodyBytes > 300000 ? '#dc2626' : 'var(--text-secondary, #666)' }}>
+            본문 {bodyBytes.toLocaleString('en-US')} 바이트 / 상한 300,000 바이트{bodyBytes > 300000 ? ' — 범위를 줄여 주세요.' : ''}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="ndf-foot" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

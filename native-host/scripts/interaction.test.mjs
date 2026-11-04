@@ -183,6 +183,12 @@ test('목록 28번(11.7): 하위 페이지는 같은 주소로 옮겨도 닫히�
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes.root,'a');assert.equal(h.controller.getSnapshot().subNotes.arrival,null);
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null);
 });
+test('목록 28번과 4.8: 링크로 하위 페이지를 열며 같은 주소로 가는 이동 1번은 봐주고 그다음 이동은 센다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');
+  h.controller.openSubNotes('a',['child'],true);assert.equal(h.controller.getSnapshot().subNotes.arrival,'/doc/a');
+  h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes.root,'a','the link flow own navigation closed it');
+  h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null);
+});
 test('note window receives only close, flushes before destroy, and never subscribes to deep links', async t => {
   const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true});
   assert.ok(h.listeners.menu); assert.equal(h.listeners.links,undefined); assert.equal(h.listeners.development,undefined);

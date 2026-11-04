@@ -103,6 +103,22 @@ if (location.pathname.startsWith('/note-window/')) {
         assert(location.pathname === '/terminal/session', 'inactive session close navigated');
         close('term:main'); go('/calendar'); await until(() => h1() === '캘린더');
       });
+      await test('xterm-terminal-starts-a-shell-and-the-pin-dialog-reads-its-logical-lines', async () => {
+        go('/terminal'); await until(() => document.querySelector('[data-terminal-key="term:main"] .xterm .xterm-screen'), 40000, 'xterm mounted');
+        const bar = () => document.querySelector('[data-terminal-key="term:main"] .term-bar-btn');
+        await until(() => bar() && !bar().disabled, 40000, 'shell started');
+        for (const n of [1, 2, 3, 4, 5]) await invoke('pty_write', { key: 'term:main', data: `echo wl-xterm-marker-${n}\r` });
+        const hinted = () => Number(/(\d+)줄이에요/.exec(document.querySelector('.pin-hint')?.textContent || '')?.[1] || 0);
+        let lines = 0;
+        await until(async () => {
+          document.querySelector('.pin-hint') ? document.querySelector('.pin-modal .btn-secondary')?.click() : 0;
+          await wait(300); bar().click(); await until(() => document.querySelector('.pin-hint'), 5000, 'pin dialog');
+          lines = hinted(); return lines >= 10;
+        }, 40000, 'shell output in the logical lines');
+        assert(document.querySelector('.pin-selection-note')?.textContent.includes('드래그'), 'no reason for the disabled selection button');
+        document.querySelector('.pin-modal .btn-secondary').click(); await until(() => !document.querySelector('.pin-modal'));
+        close('term:main'); go('/calendar'); await until(() => h1() === '캘린더');
+      });
       await test('agenda-query-and-template-initial-open', async () => {
         go(`/agenda/demo?open=${cfg.id},${cfg.legacyId}`); await until(() => document.querySelectorAll('.agenda-note').length === 2);
         assert(document.querySelector('.tab-main [aria-selected="true"]'), 'agenda pane made a note tab active');

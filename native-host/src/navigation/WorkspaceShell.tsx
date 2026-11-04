@@ -9,6 +9,7 @@ import { TabBar } from "./TabBar.tsx";
 import { InteractionOverlays } from "../interaction/Overlays.tsx";
 import { VaultBanner } from "../data/VaultBanner.tsx";
 import { Rail } from "../ui/Rail.tsx";
+import { agendaOrder } from "../ui/model.ts";
 import { Preview } from "../ui/Preview.tsx";
 import { Calendar, AgendaPage } from "../ui/CalendarAgenda.tsx";
 import {
@@ -94,7 +95,8 @@ export function WorkspaceShell({ controller, state }: Props) {
                 key={id}
                 tabKey={id}
                 isVisible={route.kind === "terminal" && routeTab(route) === id}
-                agendas={ws.agendas}
+                // 14.9: the first agenda is the rail's first (12.1), not the engine's first
+                agendas={agendaOrder(ws.agendas, ws.notes)}
                 onCreateDoc={async (agendaSlug, title, body) => {
                   try {
                     const agendaObj = ws.agendas.find((a) => a.slug === agendaSlug);

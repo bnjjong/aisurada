@@ -358,8 +358,10 @@ export class WorkspaceController {
   private flushEditors = async (root?: string) => {
     await Promise.allSettled([...this.editorFlushers.values()].filter(editor => !root || editor.root === root).map(editor => editor.flush()));
   };
-  openSubNotes = (root: string, ids: string[]) => { if (!ids.length) { this.patch({ subNotes: null }); return; } if (this.isPoppedOut(root)) { this.focusNoteWindow(root); return; } this.patch({ subNotes: {
-    root, ids, arrival: this.state.route === docAddress(root) ? null : docAddress(root),
+  // 4.8: a link that opens sub-pages always writes the arrival address /doc/<root>, so the one
+  // address change its own navigation makes is forgiven. Other ways write it only when not already there.
+  openSubNotes = (root: string, ids: string[], alwaysArrive = false) => { if (!ids.length) { this.patch({ subNotes: null }); return; } if (this.isPoppedOut(root)) { this.focusNoteWindow(root); return; } this.patch({ subNotes: {
+    root, ids, arrival: !alwaysArrive && this.state.route === docAddress(root) ? null : docAddress(root),
   } }); };
   popSubNote = () => {
     const current = this.state.subNotes;
@@ -540,7 +542,7 @@ export class WorkspaceController {
       const opened = await this.openLinkWindow(link.id, revision);
       if (opened || revision !== this.linkRevision) return;
     }
-    if (link.chain.length && !this.state.noteWindows.includes(link.id)) this.openSubNotes(link.id, link.chain);
+    if (link.chain.length && !this.state.noteWindows.includes(link.id)) this.openSubNotes(link.id, link.chain, true);
     this.navigate(docAddress(link.id));
   }
 

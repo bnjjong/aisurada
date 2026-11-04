@@ -1,7 +1,14 @@
 // Terminal Host component adhering to Chapter 14 of withlog Part 3 screen specifications.
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// The terminal itself is xterm 6.0.0 (14.13): it keeps the screen buffer, the 10,000 line
+// scrollback, Unicode 11 widths (Hangul is two cells) and draws with WebGL when it can.
+import React, { useState, useEffect, useRef } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import '@xterm/xterm/css/xterm.css';
+import type { Terminal } from '@xterm/xterm';
+import type { FitAddon } from '@xterm/addon-fit';
 import { ptyStart, ptyWrite, ptyResize, ptyDetach, secretTableProbe } from './ptyBridge.ts';
 import { extractLogicalLines } from './logicalLines.ts';
+import { readLogicalLines, selectionToLines } from './terminalBuffer.ts';
 import { PinScrollbackModal } from './PinScrollbackModal.tsx';
 import type { Agenda } from '../../workspace/types.ts';
 import { planSessionShell } from '@claude-plug/terminal';
@@ -14,329 +21,127 @@ interface TerminalHostProps {
   onNavigate: (path: string) => void;
 }
 
-const ANSI_COLORS: Record<number, string> = {
-  30: '#1e1e1e', 31: '#ef4444', 32: '#22c55e', 33: '#eab308',
-  34: '#3b82f6', 35: '#a855f7', 36: '#06b6d4', 37: '#f8fafc',
-  90: '#71717a', 91: '#f87171', 92: '#4ade80', 93: '#fde047',
-  94: '#60a5fa', 95: '#c084fc', 96: '#22d3ee', 97: '#ffffff',
+// 14.8: the CSS token --font-mono is the font list, read here because the terminal library
+// does not read CSS. D2Coding goes first: macOS's monospace fonts have no Hangul.
+const FALLBACK_FONTS = "'D2Coding', ui-monospace, Menlo, monospace";
+const terminalFontFamily = () => {
+  try { return getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || FALLBACK_FONTS; }
+  catch { return FALLBACK_FONTS; }
+};
+// 14.3 (2): the normal and the bold weight are loaded at 12px, and 2,000ms is the longest it waits.
+const loadFonts = (family: string) => Promise.race([
+  Promise.all([document.fonts.load(`12px ${family}`), document.fonts.load(`bold 12px ${family}`)]).catch(() => {}),
+  new Promise(resolve => setTimeout(resolve, 2000)),
+]);
+
+const decodeChunk = (base64: string) => {
+  const raw = atob(base64), bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
 };
 
-function renderAnsiLine(raw: string): React.ReactNode {
-  if (!raw.includes('\x1b')) return raw || '\u00A0';
-  const parts: React.ReactNode[] = [];
-  const regex = /\x1b\[([0-9;]*)m/g;
-  let lastIndex = 0;
-  let currentColor: string | undefined;
-  let isBold = false;
-  let isDim = false;
-  let match: RegExpExecArray | null;
+interface PinSnapshot { lines: string[]; hadTui: boolean; selectionIndices?: [number, number]; selectionNotice?: string; }
 
-  while ((match = regex.exec(raw)) !== null) {
-    if (match.index > lastIndex) {
-      const text = raw.substring(lastIndex, match.index).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-      if (text) {
-        parts.push(
-          <span
-            key={lastIndex}
-            style={{
-              color: currentColor,
-              fontWeight: isBold ? 'bold' : undefined,
-              opacity: isDim ? 0.6 : undefined,
-            }}
-          >
-            {text}
-          </span>
-        );
-      }
-    }
-    const codes = match[1] ? match[1].split(';').map(Number) : [0];
-    for (const code of codes) {
-      if (code === 0) {
-        currentColor = undefined;
-        isBold = false;
-        isDim = false;
-      } else if (code === 1) {
-        isBold = true;
-      } else if (code === 2) {
-        isDim = true;
-      } else if (ANSI_COLORS[code]) {
-        currentColor = ANSI_COLORS[code];
-      }
-    }
-    lastIndex = regex.lastIndex;
-  }
-
-  if (lastIndex < raw.length) {
-    const text = raw.substring(lastIndex).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-    if (text) {
-      parts.push(
-        <span
-          key={lastIndex}
-          style={{
-            color: currentColor,
-            fontWeight: isBold ? 'bold' : undefined,
-            opacity: isDim ? 0.6 : undefined,
-          }}
-        >
-          {text}
-        </span>
-      );
-    }
-  }
-
-  return parts.length ? parts : '\u00A0';
-}
-
-export function TerminalHost({
-  tabKey,
-  isVisible,
-  agendas,
-  onCreateDoc,
-  onNavigate,
-}: TerminalHostProps): React.JSX.Element {
+export function TerminalHost({ tabKey, isVisible, agendas, onCreateDoc, onNavigate }: TerminalHostProps): React.JSX.Element {
   const [started, setStarted] = useState(false);
   const [fellBack, setFellBack] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [rawLines, setRawLines] = useState<string[]>([]);
-  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pin, setPin] = useState<PinSnapshot | null>(null);
 
-  const screenRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const startedRef = useRef(false);
-  const decoderRef = useRef<TextDecoder | null>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  const launched = useRef(false);
+  const alive = useRef(true);
+  const visibleRef = useRef(isVisible);
+  visibleRef.current = isVisible;
 
-  // Buffer lines: cap to 10,000 lines (14.3)
-  const appendOutput = useCallback((text: string) => {
-    setRawLines(prev => {
-      const split = text.split('\n');
-      if (split.length === 0) return prev;
-      let next: string[];
-      if (prev.length === 0) {
-        next = split;
-      } else {
-        const last = prev[prev.length - 1];
-        next = [...prev.slice(0, -1), last + split[0], ...split.slice(1)];
-      }
-      if (next.length > 10000) {
-        return next.slice(next.length - 10000);
-      }
-      return next;
-    });
-  }, []);
-
-  // Launch PTY on mount, keep alive while tab exists in openIds
+  // 14.3: the shell starts once, the first time the cell is shown. A cell taken down while
+  // starting does not cancel the start; only the terminal built at step 7 is cleared.
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-    if (!decoderRef.current) {
-      decoderRef.current = new TextDecoder('utf-8');
-    }
-
-    let active = true;
-    async function start() {
-      // 14.2: Wait up to 2000ms for monospace fonts to load before starting PTY
-      if (typeof document !== 'undefined' && 'fonts' in document) {
-        try {
-          await Promise.race([
-            document.fonts.ready,
-            new Promise(resolve => setTimeout(resolve, 2000)),
-          ]);
-        } catch {
-          // ignore font loading race failure
-        }
-      }
-      if (!active) return;
-      void secretTableProbe().catch(() => {});
-
+    if (!isVisible || launched.current) return;
+    launched.current = true;
+    void (async () => {
+      if (!isTauri()) { setErrorText('내장 터미널은 데스크톱 앱에서만 열립니다.'); return; }
       try {
         const sessionId = tabKey.startsWith('term:') ? tabKey.slice(5) : undefined;
         const plan = await planSessionShell(tabKey, sessionId === 'main' ? undefined : sessionId);
-
-        if (plan.kind === 'refuse') {
-          if (active) setErrorText(plan.notice || '터미널을 시작할 수 없어요.');
-          return;
-        }
-
-        const cols = 80;
-        const rows = 24;
-
-        const res = await ptyStart(tabKey, cols, rows, (b64) => {
-          if (!active) return;
-          try {
-            const decoded = atob(b64);
-            const bytes = new Uint8Array(decoded.length);
-            for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
-            const str = decoderRef.current?.decode(bytes, { stream: true }) || '';
-            if (str) appendOutput(str);
-          } catch {
-            // decode failure
-          }
+        if (plan.kind === 'refuse') { if (alive.current) setErrorText(plan.notice || '터미널을 시작할 수 없어요.'); return; }
+        const family = terminalFontFamily();
+        const [xterm, fit, unicode] = await Promise.all([
+          import('@xterm/xterm'), import('@xterm/addon-fit'), import('@xterm/addon-unicode11'), loadFonts(family),
+        ]);
+        if (!alive.current || !hostRef.current) return;
+        const term = new xterm.Terminal({ fontSize: 12, fontFamily: family, scrollback: 10000, cursorBlink: true, allowProposedApi: true });
+        const fitAddon = new fit.FitAddon();
+        term.loadAddon(fitAddon);
+        term.loadAddon(new unicode.Unicode11Addon());
+        term.unicode.activeVersion = '11';
+        term.open(hostRef.current);
+        try {
+          const { WebglAddon } = await import('@xterm/addon-webgl');
+          const webgl = new WebglAddon();
+          webgl.onContextLoss(() => webgl.dispose());
+          term.loadAddon(webgl);
+        } catch { /* WebGL is not available: the DOM renderer draws */ }
+        fitAddon.fit();
+        void secretTableProbe().catch(() => {}); // 14.3 (5): not waited for, a failure is dropped
+        let sent = { cols: term.cols, rows: term.rows };
+        const result = await ptyStart(tabKey, term.cols, term.rows, base64 => {
+          try { term.write(decodeChunk(base64)); } catch { /* a chunk that is not base64 is dropped */ }
         });
-
-        if (active) {
-          setStarted(true);
-          setFellBack(res.fellBack);
-        }
-      } catch (err: any) {
-        if (active) setErrorText(err?.message || String(err));
+        if (!alive.current) { term.dispose(); return; } // 14.3 (7)
+        termRef.current = term; fitRef.current = fitAddon;
+        setFellBack(result.fellBack);
+        // 14.5: what the terminal writes goes to the shell as it is. onBinary (the default
+        // form of mouse reports) is not sent. A size is sent only when it differs.
+        term.onData(data => { void ptyWrite(tabKey, data).catch(() => {}); });
+        term.onResize(({ cols, rows }) => {
+          if (cols === sent.cols && rows === sent.rows) return;
+          sent = { cols, rows };
+          void ptyResize(tabKey, cols, rows).catch(() => {});
+        });
+        setStarted(true);
+        term.focus();
+      } catch (error) {
+        if (alive.current) setErrorText(`터미널을 띄우지 못했습니다. ${error instanceof Error ? error.message : String(error)}`);
       }
-    }
+    })();
+  }, [isVisible, tabKey]);
 
-    void start();
-
+  // 14.6: taking the cell down detaches the shell (only if it was started) and clears the terminal.
+  useEffect(() => {
+    alive.current = true;
     return () => {
-      active = false;
-      // pty_detach on unmount (when tab is closed) (14.6)
-      void ptyDetach(tabKey).catch(() => {});
+      alive.current = false;
+      if (launched.current) void ptyDetach(tabKey).catch(() => {});
+      termRef.current?.dispose(); termRef.current = null; fitRef.current = null;
     };
-  }, [tabKey, appendOutput]);
+  }, [tabKey]);
 
-  const isComposingRef = useRef(false);
-
-  // Focus and keyboard input listener
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
-    if (!started) return;
-
-    // Handle Cmd+V paste (macOS metaKey)
-    if (e.metaKey && (e.key === 'v' || e.key === 'V')) {
-      e.stopPropagation();
-      e.preventDefault();
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
-        navigator.clipboard.readText().then(text => {
-          if (text) void ptyWrite(tabKey, text).catch(() => {});
-        }).catch(() => {});
-      }
-      return;
-    }
-
-    // Ignore other meta key combinations (Cmd+C, Cmd+W, etc.) so raw characters are not sent to shell
-    if (e.metaKey) return;
-
-    // If IME is composing, do not handle keydown - let IME compose into textarea.
-    // In WebKit (macOS), the first IME keystroke may carry keyCode 229 or 'Process' before compositionstart.
-    const isIme =
-      (e.nativeEvent as KeyboardEvent).isComposing ||
-      e.key === 'Process' ||
-      e.keyCode === 229 ||
-      e.which === 229 ||
-      isComposingRef.current ||
-      /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/.test(e.key);
-    if (isIme) {
-      return;
-    }
-
-    let data = e.key;
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\r';
-    } else if (e.key === 'Backspace') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\x7f';
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\t';
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\x1b[A';
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\x1b[B';
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\x1b[C';
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\x1b[D';
-    } else if (e.key === 'Escape') {
-      // Yield Escape to open dialogs/modals if one is present
-      if (typeof document !== 'undefined' && document.querySelector('.ps-modal, .pin-scrollback-modal, .modal-card, [role="dialog"], .doc-eval-pop')) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      data = '\x1b';
-    } else if (e.ctrlKey && e.key.length === 1) {
-      e.preventDefault();
-      e.stopPropagation();
-      const code = e.key.charCodeAt(0);
-      if (code >= 97 && code <= 122) {
-        data = String.fromCharCode(code - 96);
-      }
-    } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
-      // Intercept single printable character with preventDefault so textarea doesn't duplicate it in onInput
-      e.preventDefault();
-      e.stopPropagation();
-      data = e.key;
-    } else {
-      return; // Ignore other non-printable keys
-    }
-
-    void ptyWrite(tabKey, data).catch(() => {});
-  }, [started, tabKey]);
-
-  // Handle native paste event
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLElement>) => {
-    if (!started) return;
-    e.stopPropagation();
-    e.preventDefault();
-    const text = e.clipboardData.getData('text');
-    if (text) {
-      void ptyWrite(tabKey, text).catch(() => {});
-    }
-  }, [started, tabKey]);
-
-  // Resize observer
+  // 14.5: the size is measured when the cell is shown again and while it is shown and its size
+  // changes (window size, rail width). Not while hidden: a hidden box has no cell size.
   useEffect(() => {
-    if (!started || !screenRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        const cols = Math.max(20, Math.floor(width / 7.2));
-        const rows = Math.max(5, Math.floor(height / 15));
-        void ptyResize(tabKey, cols, rows).catch(() => {});
-      }
-    });
-    observer.observe(screenRef.current);
+    if (!started || !hostRef.current) return;
+    if (isVisible) fitRef.current?.fit();
+    const observer = new ResizeObserver(() => { if (visibleRef.current) fitRef.current?.fit(); });
+    observer.observe(hostRef.current);
     return () => observer.disconnect();
-  }, [started, tabKey]);
+  }, [started, isVisible]);
 
-  // Scroll to bottom on new output
-  useEffect(() => {
-    if (screenRef.current && isVisible) {
-      screenRef.current.scrollTop = screenRef.current.scrollHeight;
-    }
-  }, [rawLines, isVisible]);
-
-  // Focus only when tab becomes newly visible and user is not focused on an input/modal
-  const prevVisible = useRef(isVisible);
-  useEffect(() => {
-    if (!prevVisible.current && isVisible) {
-      const active = document.activeElement;
-      const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.closest?.('.cmdk-panel, .modal-card, .ps-modal'));
-      if (!isInput) {
-        if (inputRef.current) {
-          inputRef.current.focus();
-        } else {
-          screenRef.current?.focus();
-        }
-      }
-    }
-    prevVisible.current = isVisible;
-  }, [isVisible]);
-
-  const logicalLines = extractLogicalLines(rawLines);
+  // 14.9: opening the dialog reads the scrollback once, as logical lines of the normal buffer.
+  const openPin = () => {
+    const term = termRef.current;
+    if (!term) return;
+    const hadTui = term.buffer.active.type === 'alternate';
+    const { lines, rowToLine } = readLogicalLines(term.buffer.normal);
+    const picked = selectionToLines(term.getSelectionPosition(), rowToLine, hadTui);
+    setPin({ lines: extractLogicalLines(lines), hadTui,
+      ...('range' in picked ? { selectionIndices: picked.range } : { selectionNotice: picked.reason }) });
+  };
 
   return (
     <div
-      ref={containerRef}
       className={`term-host ${!isVisible ? 'is-hidden' : ''}`}
       data-terminal-key={tabKey}
       data-tab-key={tabKey}
@@ -349,102 +154,18 @@ export function TerminalHost({
         width: '100%',
         background: 'var(--bg-primary, #1e1e1e)',
         color: 'var(--text-primary, #f0f0f0)',
-        fontFamily: 'D2Coding, Menlo, SF Mono, ui-monospace, monospace',
-        fontSize: 12,
         outline: 'none',
       }}
     >
-      <textarea
-        ref={inputRef}
-        className="term-input xterm-helper-textarea"
-        aria-label="터미널 입력"
-        autoCapitalize="off"
-        autoComplete="off"
-        spellCheck={false}
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-        onCompositionStart={() => {
-          isComposingRef.current = true;
-        }}
-        onCompositionEnd={(e) => {
-          isComposingRef.current = false;
-          const target = e.currentTarget;
-          const val = target.value;
-          if (val) {
-            void ptyWrite(tabKey, val).catch(() => {});
-            target.value = '';
-          }
-        }}
-        onInput={(e) => {
-          if (isComposingRef.current || (e.nativeEvent as InputEvent).isComposing) return;
-          const target = e.currentTarget;
-          const val = target.value;
-          if (val) {
-            void ptyWrite(tabKey, val).catch(() => {});
-            target.value = '';
-          }
-        }}
-        onPaste={handlePaste}
-        style={{
-          position: 'absolute',
-          opacity: 0,
-          left: -9999,
-          top: 0,
-          width: 1,
-          height: 1,
-          zIndex: -1,
-        }}
-      />
-      {/* Terminal Screen Area */}
-      <div
-        ref={screenRef}
-        className="term-screen"
-        tabIndex={-1}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        onClick={() => {
-          if (inputRef.current) {
-            inputRef.current.focus();
-          } else {
-            screenRef.current?.focus();
-          }
-        }}
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '8px 12px',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all',
-          cursor: 'text',
-          outline: 'none',
-        }}
-      >
-        {errorText ? (
-          <div className="term-empty" style={{ color: '#ef4444' }}>
-            {errorText}
-          </div>
-        ) : rawLines.length === 0 ? (
-          <div className="term-empty" style={{ color: '#888' }}>
-            터미널을 시작하는 중…
-          </div>
-        ) : (
-          rawLines.map((line, idx) => (
-            <div key={idx}>{renderAnsiLine(line)}</div>
-          ))
-        )}
+      <div ref={hostRef} className="term-screen" style={{ flex: 1, minHeight: 0, padding: '8px 12px', overflow: 'hidden' }}>
+        {errorText && <div className="term-empty" style={{ color: '#ef4444' }}>{errorText}</div>}
       </div>
 
-      {/* Terminal Bar */}
       <div
         className="term-bar"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '6px 12px',
-          borderTop: '1px solid var(--border-color, #333)',
-          background: 'var(--bg-secondary, #252525)',
-          fontSize: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px',
+          borderTop: '1px solid var(--border-color, #333)', background: 'var(--bg-secondary, #252525)', fontSize: 12,
         }}
       >
         <div>
@@ -455,24 +176,18 @@ export function TerminalHost({
           )}
         </div>
         <div>
-          <button
-            type="button"
-            className="term-bar-btn btn btn-sm"
-            disabled={!started}
-            onClick={() => setPinModalOpen(true)}
-          >
-            굳히기
-          </button>
+          <button type="button" className="term-bar-btn btn btn-sm" disabled={!started} onClick={openPin}>굳히기</button>
         </div>
       </div>
 
-      {/* Pin Modal */}
-      {pinModalOpen && (
+      {pin && (
         <PinScrollbackModal
-          logicalLines={logicalLines}
-          hadTui={false}
+          logicalLines={pin.lines}
+          selectionIndices={pin.selectionIndices}
+          selectionNotice={pin.selectionNotice}
+          hadTui={pin.hadTui}
           agendas={agendas}
-          onClose={() => setPinModalOpen(false)}
+          onClose={() => setPin(null)}
           onCreateDoc={onCreateDoc}
           onNavigate={onNavigate}
         />

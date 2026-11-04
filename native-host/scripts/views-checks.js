@@ -571,12 +571,35 @@ if (location.pathname.startsWith("/note-window/")) {
         "graph persistence",
       );
     });
+    await test("connection-keys-are-written-on-open-and-on-change", async () => {
+      go("/guide");
+      await until(() => $$(".guide-step").length === 3, "left connections");
+      localStorage.removeItem("withlog.connMode.v3");
+      localStorage.removeItem("withlog.connFilter.v2");
+      go("/connections");
+      await until(
+        () => localStorage.getItem("withlog.connMode.v3") === "map" && localStorage.getItem("withlog.connFilter.v2") === "0",
+        "keys written on open",
+      );
+      click("목록", $(".list-tools"));
+      await until(() => localStorage.getItem("withlog.connMode.v3") === "list", "mode key on change");
+      click("지도", $(".list-tools"));
+      await until(() => localStorage.getItem("withlog.connMode.v3") === "map", "mode key back");
+    });
     await test("template-2000ms-save-unmount-and-delete-dirty", async () => {
       go("/templates?open=tplfixture-00000001");
       await until(
         () => $(".tpl-name-input")?.value === "화면 검증 템플릿",
         "template",
       );
+      // 12.10: an emptied name is sent as 제목 없는 템플릿 and the name field stays empty.
+      fill($(".tpl-name-input"), "");
+      await until(
+        async () => (await engine(["list-templates"])).some((t) => t.name === "제목 없는 템플릿"),
+        "empty name sent as untitled",
+      );
+      await pause(300);
+      assert($(".tpl-name-input").value === "", "name field was filled after the save");
       fill($(".tpl-name-input"), "이름 고친 템플릿");
       await until(
         async () =>
