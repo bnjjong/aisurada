@@ -47,6 +47,7 @@ export interface Preferences {
   docSortMode?: "structure" | "time";
   docSortDir?: "desc" | "asc";
   collapsedProjects: string[];
+  expandedSessionProjects?: string[];
   previewSize: { width: number; height: number } | null;
   [key: string]: unknown;
 }
@@ -63,6 +64,7 @@ export const defaultPrefs: Preferences = {
   docSortMode: "structure",
   docSortDir: "desc",
   collapsedProjects: [],
+  expandedSessionProjects: [],
   previewSize: null,
 };
 export function preferences(storage: StoragePort): Preferences {

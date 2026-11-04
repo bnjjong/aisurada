@@ -1,5 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod desktop;
+#[cfg(feature = "claude")]
+pub mod ask;
+#[cfg(feature = "claude")]
+pub mod agents;
 mod environment;
 mod files;
 mod frame;
@@ -68,7 +72,19 @@ fn main() {
             secrets::secret_table_probe,
             secrets::secret_table_status,
             secrets::mask_scrollback,
-            secrets::scan_text_shapes
+            secrets::scan_text_shapes,
+            #[cfg(feature = "claude")]
+            ask::ask_claude,
+            #[cfg(feature = "claude")]
+            ask::ask_runtime,
+            #[cfg(feature = "claude")]
+            agents::list_claude_agents,
+            #[cfg(feature = "claude")]
+            agents::alive_pids,
+            #[cfg(feature = "claude")]
+            agents::held_agent_sessions,
+            #[cfg(feature = "claude")]
+            agents::release_agent_session
         ])
         .setup(|app| {
             lifecycle::create_main(app.handle())?;

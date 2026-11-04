@@ -18,6 +18,7 @@ import {
 } from "./model.ts";
 import { stripMarkers } from "../editor/grammar.ts";
 import { agendaAddress, docAddress } from "../navigation/routes.ts";
+import { openNoteRail, CLAUDE_ENABLED } from "@claude-plug/state";
 export type NoteMode = "tab" | "window" | "agenda" | "preview" | "sub";
 const go = (c: WorkspaceController, path: string) => {
   if (c.context.kind === "note")
@@ -148,6 +149,16 @@ export function NoteMeta({
         <button onClick={() => setIdentity(!identity)}>
           {parent ? "경로" : "ID"}
         </button>
+        <NoteSessionChips
+          note={live}
+          onOpenRail={CLAUDE_ENABLED ? (sessId) => {
+            openNoteRail(note.id, sessId);
+            if (mode === "agenda" || mode === "preview") {
+              if (mode === "preview") controller.showPreview(null);
+              go(controller, docAddress(note.id));
+            }
+          } : undefined}
+        />
         {!parent &&
           controller.isNative() &&
           controller.context.kind === "main" && (
@@ -869,5 +880,80 @@ function Comments({
         />
       )}
     </section>
+  );
+}
+
+function NoteSessionChips({
+  note,
+  onOpenRail,
+}: {
+  note: Note;
+  onOpenRail?: (sessionId: string) => void;
+}) {
+  const createdSess = asText(note.sessionId)?.trim() || "";
+  const editedSess = asText(note.editedSessionId)?.trim() || "";
+
+  if (!createdSess && !editedSess) return null;
+
+  type ChipInfo = {
+    role: "one" | "created" | "edited";
+    label: string;
+    id: string;
+  };
+
+  const chips: ChipInfo[] = [];
+  if (createdSess && editedSess && createdSess !== editedSess) {
+    chips.push({ role: "created", label: "작성 세션", id: createdSess });
+    chips.push({ role: "edited", label: "편집 세션", id: editedSess });
+  } else {
+    const singleId = editedSess || createdSess;
+    chips.push({ role: "one", label: "세션", id: singleId });
+  }
+
+  return (
+    <span className="doc-meta-sessions">
+      {chips.map((chip) => (
+        <SessionChipItem key={chip.role + chip.id} chip={chip} onOpenRail={onOpenRail} />
+      ))}
+    </span>
+  );
+}
+
+function SessionChipItem({
+  chip,
+  onOpenRail,
+}: {
+  chip: { role: string; label: string; id: string };
+  onOpenRail?: (sessionId: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(chip.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <span className="doc-meta-id" data-session-role={chip.role}>
+      <span className="doc-meta-id-label">{chip.label}</span>
+      <span className="doc-meta-id-val">{chip.id}</span>
+      {onOpenRail && (
+        <button
+          type="button"
+          className="doc-meta-id-open"
+          onClick={() => onOpenRail(chip.id)}
+        >
+          열기
+        </button>
+      )}
+      <button
+        type="button"
+        className="doc-meta-id-copy"
+        onClick={handleCopy}
+      >
+        {copied ? "복사됨" : "복사"}
+      </button>
+    </span>
   );
 }

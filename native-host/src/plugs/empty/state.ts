@@ -30,6 +30,9 @@ export function noteRailNow(): typeof EMPTY_RAIL_STATE {
   return EMPTY_RAIL_STATE;
 }
 
+export function openNoteRail(_noteKey: string, _sessionId: string): void {}
+export function closeNoteRail(_noteKey?: string): void {}
+
 export function waitingAnswers(_noteKeys?: Set<string>): number {
   return 0;
 }

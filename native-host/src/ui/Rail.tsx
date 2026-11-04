@@ -171,7 +171,7 @@ export function Rail({
           LOOSE_GROUP_KEY,
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
-        <RailProjects />
+        <RailProjects controller={controller} state={state} />
       </section>
       <footer className="rail-footer">
         <button

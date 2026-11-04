@@ -14,5 +14,8 @@ mkdir -p build/test-classes
 for chapter in 24 25 26 27 28 29 30 31 32 33; do
     "$JAVA" -cp dist/wl-engine.jar:build/test-classes "withlog.Chapter${chapter}Test"
 done
+"$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.AskCommandsTest
+"$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.SessionCommandsTest
+"$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.ChatCommandsTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Chapter25To30IntegrationTest
 "$JAVA" -cp dist/wl-engine.jar:build/test-classes withlog.Chapter31IntegrationTest

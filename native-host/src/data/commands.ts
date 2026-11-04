@@ -15,6 +15,8 @@ export const read = {
   facts: (id: string) => ['get-agenda-facts', id], history: (id: string, fields: Fields = {}) => command('history', [id], fields),
   commit: () => ['commit-vault'], schedule: () => ['schedule', 'status', '--json'],
   sessionTitles: (ids: string[]) => ['session-titles', ...new Set(ids)],
+  readSession: (sessionId: string, limit = 100, urls = true) => ['read-session', sessionId, `limit=${limit}`, `urls=${urls}`],
+  listChats: (noteId: string, subId?: string) => ['list-chats', noteId, ...(subId ? [subId] : [])],
 };
 
 export interface NewDoc {
@@ -50,6 +52,8 @@ export const write = {
     return command('save-report', [], { kind: match[1], date: match[2], body: body.trim() ? body : undefined, memo: memo.trim() ? memo : undefined });
   },
   facts: (id: string, facts: string) => command('update-agenda-facts', [id], { facts: facts.trim() }),
+  appendChatTurn: (noteId: string, subId: string | undefined, fields: Fields) =>
+    command('append-chat-turn', [noteId, ...(subId ? [subId] : [])], fields),
 };
 
 export function cleanTags(value: unknown): string[] {

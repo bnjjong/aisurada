@@ -22,6 +22,14 @@ public final class EngineExecutor {
     public static final String NO_PART4_MESSAGE =
             "WL-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 wl-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n";
 
+    public static boolean isPart4Enabled() {
+        String sys = System.getProperty("withlog.enable.part4");
+        if ("true".equalsIgnoreCase(sys)) return true;
+        String env = System.getenv("WITHLOG_ENABLE_PART4");
+        if ("true".equalsIgnoreCase(env) || "1".equals(env)) return true;
+        return false;
+    }
+
     private EngineExecutor() {}
 
     /**
@@ -82,7 +90,7 @@ public final class EngineExecutor {
             ParsedArgs parsed = ArgsParser.parse(firstArg, commandArgs);
 
             try (WritePipeline scope = WritePipeline.begin(vaultRoot, parsed.commandName(), isTool, isServeMode, sessionId)) {
-                if (isPart4) {
+                if (isPart4 && !isPart4Enabled()) {
                     // 5. 4부가 없음 (32.2)
                     byte[] err = NO_PART4_MESSAGE.getBytes(StandardCharsets.UTF_8);
                     return EngineResult.wlError(3, 409, err);
@@ -90,7 +98,25 @@ public final class EngineExecutor {
 
                 Object response;
 
-                if ("reindex".equals(parsed.commandName())) {
+                if ("get-ask".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = withlog.ask.AskCommands.executeGetAsk(vaultRoot, parsed, noteIndex);
+                } else if ("append-ask-turn".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = withlog.ask.AskCommands.executeAppendAskTurn(vaultRoot, parsed, noteIndex);
+                } else if ("read-session".equals(parsed.commandName())) {
+                    response = withlog.session.SessionCommands.executeReadSession(parsed);
+                } else if ("session-titles".equals(parsed.commandName())) {
+                    response = withlog.session.SessionCommands.executeSessionTitles(parsed);
+                } else if ("recent-sessions".equals(parsed.commandName())) {
+                    response = withlog.session.SessionCommands.executeRecentSessions(parsed);
+                } else if ("list-chats".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = withlog.chat.ChatCommands.executeListChats(vaultRoot, parsed, noteIndex);
+                } else if ("append-chat-turn".equals(parsed.commandName())) {
+                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    response = withlog.chat.ChatCommands.executeAppendChatTurn(vaultRoot, parsed, noteIndex);
+                } else if ("reindex".equals(parsed.commandName())) {
                     response = Reindex.execute(vaultRoot, startTime);
                 } else if ("history".equals(parsed.commandName())) {
                     response = History.execute(vaultRoot, parsed);

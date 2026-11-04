@@ -5611,6 +5611,7 @@ name = "withlog-host"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "libc",
  "objc2",
  "percent-encoding",
  "portable-pty",

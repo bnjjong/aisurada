@@ -5,8 +5,8 @@ import { defineConfig } from 'vite';
 import { assertScreenBundle } from './scripts/screen-contracts.mjs';
 import { deepLinkBridge } from './scripts/deeplink-bridge.ts';
 
-// The matching Java engine and Rust host both exclude Part 4.
-export default defineConfig(() => {
+// Mode switches between empty stub and Claude Part 4 plugs.
+export default defineConfig(({ mode }) => {
   const host = process.env.TAURI_DEV_HOST;
   const tauri = JSON.parse(readFileSync(new URL('./src-tauri/tauri.conf.json', import.meta.url), 'utf8'));
   let outputDirectory: string;
@@ -23,13 +23,17 @@ export default defineConfig(() => {
           outputDirectory = resolve(config.root, config.build.outDir);
         },
         closeBundle() {
-          assertScreenBundle(outputDirectory);
+          if (mode === 'noclaude') {
+            assertScreenBundle(outputDirectory);
+          }
         },
       },
     ],
     resolve: {
       alias: {
-        '@claude-plug': resolve(__dirname, 'src/plugs/empty'),
+        '@claude-plug': mode === 'noclaude'
+          ? resolve(__dirname, 'src/plugs/empty')
+          : resolve(__dirname, 'src/plugs/claude'),
       },
     },
     server: {
