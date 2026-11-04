@@ -1,0 +1,302 @@
+/* 물성(tactile) 화면 모양.
+   눌리는 것은 떠 있고, 쓰는 것은 파여 있다. 규칙 다섯 가지에서 모든 값이 나온다.
+     1. 깊이가 역할이다   누르는 것은 볼록(--sh-*), 쓰는 것은 오목(--in), 읽는 것은 평평. 비활성은 평평해진다.
+     2. 반경은 높이에서   라벨 있는 컨트롤은 높이의 절반(캡슐). 안쪽 반경 = 바깥 반경 − 여백.
+     3. 선 대신 면        테두리 없이 톤 네 단(--bg 바닥 · --soft 면 · --surface 볼록 · --sunken 오목)으로 가른다.
+     4. 빛은 위에서 하나  그림자는 두 겹 + 위쪽 1px 하이라이트. 높이는 1 · 2 · 3단계뿐.
+     5. 회색에도 색       모든 중립색에 차체 네이비의 색조를 섞고, 강조색은 레이싱 블루 하나.
+
+   styles.css(기본 모양) 위에 덧씌운다. <html data-skin="tactile">일 때만 적용되므로 이 파일을
+   지우거나 data-skin을 바꾸면 기본 모양으로 돌아간다.
+   전역 규칙(button · input 등)은 :where()로 감싸 특이도를 낮췄다. 그래야 styles.css의 개별
+   클래스가 정한 값(border: 0 · background: transparent 등)을 덮어쓰지 않는다. */
+
+/* ───────── 토큰 ───────── */
+:root[data-skin="tactile"] {
+  --bg: #e6ebf5;
+  --soft: #f1f4fa;
+  --surface: #ffffff;
+  --sunken: #dae1ee;
+  --hover: rgba(255, 255, 255, .65);
+  --tab-idle: rgba(255, 255, 255, .42);
+  --ink: #0a1633;
+  --muted: #4c5873;
+  --ink-3: #8590a6;
+  --line: rgba(10, 22, 51, .10);
+  --accent: #1e4fd8;
+  --accent-ink: #ffffff;
+  --accent-h: #2d5fe8;
+  --accent-d: #1840b8;
+  --accent-soft: #dce6fc;
+  --accent-text: #1a3fae;
+  --err: #b91c17;
+  --err-bg: #fbe3e1;
+  --sh-1: 0 1px 2px rgba(10, 22, 51, .08), 0 2px 6px -1px rgba(10, 22, 51, .10), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --sh-2: 0 2px 4px rgba(10, 22, 51, .06), 0 10px 24px -6px rgba(10, 22, 51, .20), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --sh-3: 0 4px 8px rgba(10, 22, 51, .08), 0 24px 56px -12px rgba(10, 22, 51, .30), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --in: inset 0 1px 3px rgba(10, 22, 51, .18), inset 0 0 0 1px rgba(10, 22, 51, .04);
+  --sh-acc: 0 1px 2px rgba(18, 48, 160, .40), 0 6px 14px -4px rgba(30, 79, 216, .55), inset 0 1px 0 rgba(255, 255, 255, .28);
+  --sh-acc-h: 0 2px 4px rgba(18, 48, 160, .40), 0 10px 20px -4px rgba(30, 79, 216, .60), inset 0 1px 0 rgba(255, 255, 255, .32);
+  --in-acc: inset 0 2px 4px rgba(6, 20, 100, .50);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234c5873' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background: var(--bg);
+}
+:root[data-skin="tactile"][data-theme="dark"] {
+  --bg: #070c1c;
+  --soft: #0d1530;
+  --surface: #18244a;
+  --sunken: #040815;
+  --hover: rgba(255, 255, 255, .07);
+  --tab-idle: rgba(255, 255, 255, .05);
+  --ink: #e8eefa;
+  --muted: #9aa8c6;
+  --ink-3: #5a678a;
+  --line: rgba(232, 238, 250, .10);
+  --accent: #7fa3ff;
+  --accent-ink: #061030;
+  --accent-h: #96b3ff;
+  --accent-d: #6288f0;
+  --accent-soft: #1b2b5c;
+  --accent-text: #a9c0ff;
+  --err: #ff9a92;
+  --err-bg: #44201d;
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 6px -1px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .07);
+  --sh-2: 0 2px 4px rgba(0, 0, 0, .4), 0 10px 24px -6px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .07);
+  --sh-3: 0 4px 8px rgba(0, 0, 0, .4), 0 24px 56px -12px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .07);
+  --in: inset 0 1px 3px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .03);
+  --sh-acc: 0 1px 2px rgba(0, 0, 0, .5), 0 6px 14px -4px rgba(127, 163, 255, .35), inset 0 1px 0 rgba(255, 255, 255, .35);
+  --sh-acc-h: 0 2px 4px rgba(0, 0, 0, .5), 0 10px 20px -4px rgba(127, 163, 255, .45), inset 0 1px 0 rgba(255, 255, 255, .4);
+  --in-acc: inset 0 2px 4px rgba(4, 8, 40, .60);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239aa8c6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="tactile"]:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg: #070c1c; --soft: #0d1530; --surface: #18244a; --sunken: #040815; --hover: rgba(255, 255, 255, .07); --tab-idle: rgba(255, 255, 255, .05);
+    --ink: #e8eefa; --muted: #9aa8c6; --ink-3: #5a678a; --line: rgba(232, 238, 250, .10);
+    --accent: #7fa3ff; --accent-ink: #061030; --accent-h: #96b3ff; --accent-d: #6288f0; --accent-soft: #1b2b5c; --accent-text: #a9c0ff;
+    --err: #ff9a92; --err-bg: #44201d;
+    --sh-1: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 6px -1px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .07);
+    --sh-2: 0 2px 4px rgba(0, 0, 0, .4), 0 10px 24px -6px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .07);
+    --sh-3: 0 4px 8px rgba(0, 0, 0, .4), 0 24px 56px -12px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .07);
+    --in: inset 0 1px 3px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .03);
+    --sh-acc: 0 1px 2px rgba(0, 0, 0, .5), 0 6px 14px -4px rgba(127, 163, 255, .35), inset 0 1px 0 rgba(255, 255, 255, .35);
+    --sh-acc-h: 0 2px 4px rgba(0, 0, 0, .5), 0 10px 20px -4px rgba(127, 163, 255, .45), inset 0 1px 0 rgba(255, 255, 255, .4);
+    --in-acc: inset 0 2px 4px rgba(4, 8, 40, .60);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239aa8c6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  }
+}
+
+/* ───────── 전역: 버튼은 볼록, 입력은 오목 ───────── */
+:where(:root[data-skin="tactile"]) button {
+  border: 0; border-radius: 999px; background: var(--surface); box-shadow: var(--sh-1);
+  padding: 9px 16px; font-weight: 500;
+  transition: box-shadow .12s, background-color .12s;
+}
+:where(:root[data-skin="tactile"]) button:hover:not(:disabled) { background: var(--surface); box-shadow: var(--sh-2); }
+:where(:root[data-skin="tactile"]) button:active:not(:disabled) { background: var(--sunken); box-shadow: var(--in); }
+:where(:root[data-skin="tactile"]) button:disabled { opacity: 1; box-shadow: none; background: var(--sunken); color: var(--ink-3); cursor: not-allowed; }
+:where(:root[data-skin="tactile"]) input { border: 0; border-radius: 999px; background: var(--sunken); box-shadow: var(--in); padding: 11px 16px; }
+:where(:root[data-skin="tactile"]) textarea { border: 0; border-radius: 20px; background: var(--sunken); box-shadow: var(--in); padding: 12px 16px; }
+:where(:root[data-skin="tactile"]) select { border: 0; border-radius: 999px; background-color: var(--sunken); box-shadow: var(--in); }
+:root[data-skin="tactile"] select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 30px; background-image: var(--chevron); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px;
+}
+:root[data-skin="tactile"] input::placeholder, :root[data-skin="tactile"] textarea::placeholder { color: var(--muted); opacity: .75; }
+:root[data-skin="tactile"] button:focus-visible, :root[data-skin="tactile"] input:focus-visible,
+:root[data-skin="tactile"] textarea:focus-visible, :root[data-skin="tactile"] select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 강조 버튼: 레이싱 블루 한 색 */
+:root[data-skin="tactile"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active) {
+  background: var(--accent); color: var(--accent-ink); box-shadow: var(--sh-acc);
+}
+:root[data-skin="tactile"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active):hover:not(:disabled) {
+  background: var(--accent-h); filter: none; box-shadow: var(--sh-acc-h);
+}
+:root[data-skin="tactile"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active):active:not(:disabled) {
+  background: var(--accent-d); box-shadow: var(--in-acc);
+}
+:root[data-skin="tactile"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send):disabled { background: var(--sunken); color: var(--ink-3); box-shadow: none; opacity: 1; }
+:root[data-skin="tactile"] :is(.calendar-controls button, .nhist-mode)[aria-pressed="true"] {
+  background: var(--accent); color: var(--accent-ink); box-shadow: var(--in-acc);
+}
+
+/* ───────── 평평한 버튼(목록 행 · 아이콘 · 글자 버튼) — 볼록하게 만들지 않는다 ─────────
+   styles.css에서 background: transparent 나 border: 0 으로 맨살로 만든 버튼들. 새로 그런 버튼을
+   추가하면 여기에도 넣는다. */
+:root[data-skin="tactile"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+) { box-shadow: none; background: transparent; }
+:root[data-skin="tactile"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+):hover:not(:disabled) { box-shadow: none; background: var(--soft); }
+:root[data-skin="tactile"] :where(.workspace-rail nav button, .rail-footer button, .rail-back, .agenda-summary button, .sess-toggle):hover:not(:disabled) { background: var(--hover); }
+
+/* ───────── 체크 · 라디오 · 스위치 ───────── */
+:root[data-skin="tactile"] input[type="checkbox"], :root[data-skin="tactile"] input[type="radio"] {
+  appearance: none; -webkit-appearance: none; display: inline-grid; place-items: center; flex: none;
+  width: 20px; height: 20px; padding: 0; margin: 0; border: 0; background: var(--sunken); box-shadow: var(--in); cursor: pointer; vertical-align: middle;
+}
+:root[data-skin="tactile"] input[type="checkbox"] { border-radius: 6px; }
+:root[data-skin="tactile"] input[type="radio"] { border-radius: 50%; }
+:root[data-skin="tactile"] input[type="checkbox"]:checked, :root[data-skin="tactile"] input[type="radio"]:checked { background: var(--accent); box-shadow: var(--sh-acc); }
+:root[data-skin="tactile"] input[type="checkbox"]:checked::after {
+  content: ""; width: 9px; height: 5px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: translateY(-1px) rotate(-45deg);
+}
+:root[data-skin="tactile"] input[type="radio"]:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-ink); }
+:root[data-skin="tactile"] input:disabled { opacity: 1; background: var(--bg); box-shadow: none; cursor: not-allowed; }
+:root[data-skin="tactile"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; background: transparent; box-shadow: none; border-radius: 0; accent-color: var(--accent); }
+/* 설정의 켜고 끄는 항목은 스위치로 그린다. 동작은 그대로 체크박스다. */
+:root[data-skin="tactile"] .set-switch input[type="checkbox"] { position: relative; width: 44px; height: 24px; border-radius: 999px; display: block; }
+:root[data-skin="tactile"] .set-switch input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: 0; border-radius: 50%;
+  background: var(--surface); box-shadow: var(--sh-1); transform: none; transition: transform .15s;
+}
+:root[data-skin="tactile"] .set-switch input[type="checkbox"]:checked { background: var(--accent); box-shadow: var(--in-acc); }
+:root[data-skin="tactile"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(20px); background: var(--accent-ink); border: 0; }
+
+/* 설정: 화면 모양 고르기 카드 */
+:root[data-skin="tactile"] .set-skin { border-bottom: 0; }
+:root[data-skin="tactile"] .set-skin-option { border: 0; border-radius: 20px; background: var(--soft); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .set-skin-option:has(input:checked) { background: var(--accent-soft); box-shadow: var(--sh-1), 0 0 0 2px var(--accent); }
+:root[data-skin="tactile"] .set-skin-option input { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 20px; opacity: 0; background: transparent; box-shadow: none; }
+:root[data-skin="tactile"] .skin-preview { border-radius: 14px; }
+
+/* ───────── 화면 골격: 바닥 위에 탭 쟁반 · 레일 · 흰 카드 ───────── */
+:root[data-skin="tactile"] .workspace-frame { background: var(--bg); }
+/* 탭 줄: 오목한 쟁반 안에 탭마다 알약 하나. 안 고른 탭도 옅은 면을 가져서 경계가 보이고,
+   고른 탭은 볼록하게 뜬다. × 는 알약 안쪽 글자 바로 옆에 붙는다. 스크롤바는 숨기고 스크롤은 그대로 된다. */
+:root[data-skin="tactile"] .tab-bar {
+  align-items: stretch; margin: 8px 8px 0; padding: 4px; gap: 3px; min-height: 0; border: 0; border-radius: 999px;
+  background: var(--sunken); box-shadow: var(--in); scrollbar-width: none;
+}
+:root[data-skin="tactile"] .tab-bar::-webkit-scrollbar { display: none; }
+:root[data-skin="tactile"] .tab-item { align-items: stretch; border: 0; border-top: 0; border-radius: 999px; background: var(--tab-idle); transition: background-color .12s, box-shadow .12s; }
+:root[data-skin="tactile"] .tab-item:hover:not(.tab-selected) { background: var(--hover); }
+:root[data-skin="tactile"] .tab-item.tab-selected { background: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .tab-button { min-width: 0; gap: 8px; padding: 5px 6px 5px 16px; border-radius: 999px; font-weight: 600; line-height: 1.25; }
+:root[data-skin="tactile"] .tab-main .tab-button { min-width: 0; padding-right: 18px; }
+:root[data-skin="tactile"] .tab-main .tab-button > span:first-child { font-size: 16px; }
+:root[data-skin="tactile"] .tab-button[aria-selected="true"] { color: var(--ink); }
+:root[data-skin="tactile"] .tab-button:hover:not(:disabled) { background: transparent; }
+:root[data-skin="tactile"] .tab-button:focus-visible { outline-offset: -2px; }
+:root[data-skin="tactile"] .tab-label small { margin-bottom: 1px; line-height: 12px; font-weight: 500; }
+:root[data-skin="tactile"] .tab-close { align-self: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
+:root[data-skin="tactile"] .tab-close:hover:not(:disabled) { background: var(--line); }
+:root[data-skin="tactile"] .workspace-screen { padding: 8px; gap: 0; }
+:root[data-skin="tactile"] .workspace-rail { background: transparent; border-right: 0; padding: 20px 12px 12px; }
+:root[data-skin="tactile"] .workspace-rail nav button { padding: 10px 16px; border-radius: 999px; font-weight: 600; }
+:root[data-skin="tactile"] .workspace-rail nav button.active { background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .screen-content { border-radius: 24px; background: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .note-window { background: var(--surface); }
+:root[data-skin="tactile"] .read-failure, :root[data-skin="tactile"] .vault-warning, :root[data-skin="tactile"] .vault-write-failures { margin: 8px 8px 0; border: 0; border-radius: 16px; background: var(--soft); }
+:root[data-skin="tactile"] .vault-write-failures { background: var(--err-bg); color: var(--err); }
+:root[data-skin="tactile"] .sample-badge, :root[data-skin="tactile"] .format-badge, :root[data-skin="tactile"] .record-badge {
+  border: 0; border-radius: 999px; padding: 3px 10px; background: var(--bg); font-weight: 600;
+}
+:root[data-skin="tactile"] .brand-mark { border-radius: 50%; box-shadow: var(--sh-acc); }
+
+/* ───────── 시작 화면 ───────── */
+:root[data-skin="tactile"] .launcher { background: var(--bg); }
+:root[data-skin="tactile"] .launcher-intro { background: transparent; }
+:root[data-skin="tactile"] .launcher-content { margin: 16px; max-width: 720px; border-radius: 32px; background: var(--surface); box-shadow: var(--sh-2); }
+:root[data-skin="tactile"] .workspace-option { border: 0; border-radius: 24px; background: var(--soft); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .workspace-option:hover:not(:disabled) { background: var(--soft); box-shadow: var(--sh-2); }
+:root[data-skin="tactile"] .workspace-option.selected { background: var(--accent-soft); box-shadow: var(--sh-1), 0 0 0 2px var(--accent); }
+:root[data-skin="tactile"] .option-symbol { color: var(--accent); }
+:root[data-skin="tactile"] .recent-workspaces, :root[data-skin="tactile"] .launcher-footer { border-top-color: var(--line); }
+:root[data-skin="tactile"] .recent-open { border-radius: 16px; }
+
+/* ───────── 목록 · 카드 ───────── */
+:root[data-skin="tactile"] .note-list { border-top: 0; display: grid; gap: 4px; }
+:root[data-skin="tactile"] .note-row { border-bottom: 0; border-radius: 20px; padding: 18px 16px; }
+:root[data-skin="tactile"] .doc-listitem { border-bottom: 0; border-radius: 16px; }
+:root[data-skin="tactile"] .doc-listitem:hover { background: var(--soft); }
+:root[data-skin="tactile"] .fav-row, :root[data-skin="tactile"] .connection-row { border-bottom-color: var(--line); }
+:root[data-skin="tactile"] .tag-chip { border-radius: 999px; background: var(--bg); padding-left: 12px; }
+:root[data-skin="tactile"] .session-chip { border: 0; border-radius: 999px; background: var(--bg); padding: 3px 10px; }
+:root[data-skin="tactile"] .vb-savestate { border-radius: 999px; padding: 3px 12px; }
+:root[data-skin="tactile"] .ag-facts, :root[data-skin="tactile"] .link-picker, :root[data-skin="tactile"] .category-picker, :root[data-skin="tactile"] .ask-mark-group {
+  border: 0; border-radius: 20px; background: var(--soft);
+}
+:root[data-skin="tactile"] .child-page-card { border: 0; border-radius: 16px; background: var(--soft); }
+:root[data-skin="tactile"] .week-columns { border: 0; border-radius: 20px; background: var(--soft); overflow: hidden; }
+:root[data-skin="tactile"] .month-grid { border: 0; border-radius: 20px; overflow: hidden; background: var(--soft); }
+:root[data-skin="tactile"] .month-cell { border-right-color: var(--line); border-bottom-color: var(--line); }
+:root[data-skin="tactile"] .month-cell .mchip { border-radius: 999px; background: var(--surface); }
+:root[data-skin="tactile"] .day-timeline .tl-block { border: 0; border-radius: 12px; background: var(--accent-soft); }
+:root[data-skin="tactile"] .report-bar { border-radius: 999px; background: var(--bg); }
+:root[data-skin="tactile"] .note-composition span { border-radius: 999px; background: var(--bg); }
+:root[data-skin="tactile"] .note-toc { border: 0; border-radius: 16px; box-shadow: var(--sh-2); }
+
+/* ───────── 대화상자 · 팝오버 · 알림: 가장 높이 떠 있다 ───────── */
+:root[data-skin="tactile"] :is(.ui-modal, .note-preview, .subnote-page, .cmdk-panel) { border: 0; border-radius: 28px; box-shadow: var(--sh-3); }
+:root[data-skin="tactile"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: rgba(10, 22, 51, .38); }
+:root[data-skin="tactile"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) { border-bottom: 0; padding: 20px 24px 8px; }
+:root[data-skin="tactile"] .ui-modal > header h2 { font-size: 17px; font-weight: 700; }
+:root[data-skin="tactile"] :is(.ui-modal > footer, .ui-modal form > footer) { border-top: 0; }
+:root[data-skin="tactile"] .cmdk-input { width: calc(100% - 24px); margin: 12px; padding: 13px 20px; border: 0; border-radius: 999px; background: var(--sunken); box-shadow: var(--in); }
+:root[data-skin="tactile"] .cmdk-results { padding: 4px 8px 8px; }
+:root[data-skin="tactile"] .cmdk-item { border-radius: 16px; }
+:root[data-skin="tactile"] .cmdk-item[aria-selected="true"] { background: var(--accent-soft); }
+:root[data-skin="tactile"] .cmdk-item mark { background: var(--accent-soft); color: var(--accent-text); border-radius: 4px; }
+:root[data-skin="tactile"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard) {
+  border: 0; border-radius: 20px; box-shadow: var(--sh-2);
+}
+:root[data-skin="tactile"] .sel-bar { border-radius: 999px; padding: 4px; }
+:root[data-skin="tactile"] .sel-bar button { border-radius: 999px; }
+:root[data-skin="tactile"] :is(.slash-item, .note-picker-item, .lex-table-menu button) { border-radius: 12px; }
+:root[data-skin="tactile"] :is(.slash-item, .note-picker-item)[aria-selected="true"] { background: var(--accent-soft); }
+:root[data-skin="tactile"] .notice { border: 0; border-radius: 24px; background: var(--ink); color: var(--surface); box-shadow: 0 8px 24px -6px rgba(10, 22, 51, .45); }
+:root[data-skin="tactile"] .agenda-filter summary { border: 0; border-radius: 999px; background: var(--sunken); box-shadow: var(--in); padding: 8px 14px; }
+:root[data-skin="tactile"] .agenda-filter[open] { border-radius: 20px; box-shadow: var(--sh-2); }
+
+/* ───────── 편집기 ───────── */
+:root[data-skin="tactile"] .lex-toolbar { border-bottom-color: var(--line); gap: 2px; }
+:root[data-skin="tactile"] .lex-toolbar button { border-radius: 999px; padding: 5px 11px; }
+:root[data-skin="tactile"] .lex-toolbar select { padding: 5px 28px 5px 12px; font-size: 12px; }
+:root[data-skin="tactile"] .lex-code { border: 0; border-radius: 16px; background: var(--soft); }
+:root[data-skin="tactile"] .lex-inline-code { border-radius: 6px; }
+:root[data-skin="tactile"] .lex-callout { border-radius: 16px; }
+:root[data-skin="tactile"] .lex-table { border-radius: 8px; }
+:root[data-skin="tactile"] .lex-image img { border-radius: 12px; }
+:root[data-skin="tactile"] .ndf .lex-editor { border: 0; border-radius: 20px; background: var(--sunken); box-shadow: var(--in); }
+:root[data-skin="tactile"] .ais-html-frame { border: 0; border-radius: 16px; box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .read-markdown pre { border-radius: 16px; }
+:root[data-skin="tactile"] .doc-conflict-banner { border: 0; border-radius: 16px; background: var(--err-bg); }
+
+/* ───────── Claude 연동: 묻기 · 세션 ───────── */
+:root[data-skin="tactile"] .lex-ask, :root[data-skin="tactile"] [data-ask-id] { border-radius: 6px; }
+:root[data-skin="tactile"] .ask-panel { border-top-color: var(--line); }
+:root[data-skin="tactile"] .ask-followup-input, :root[data-skin="tactile"] .ask-hovercard-followup input { border-radius: 999px; }
+:root[data-skin="tactile"] .ask-load-error, :root[data-skin="tactile"] .ask-error, :root[data-skin="tactile"] .ask-pending, :root[data-skin="tactile"] .ask-abandoned { border-radius: 12px; }
+:root[data-skin="tactile"] .sess-turn { border-radius: 16px; }
+:root[data-skin="tactile"] .sess-turn-assistant { border: 0; background: var(--soft); }
+:root[data-skin="tactile"] .sess-turn-user { background: var(--accent-soft); }
+:root[data-skin="tactile"] .sess-composer-input { border: 0; border-radius: 20px; background: var(--sunken); box-shadow: var(--in); }
+:root[data-skin="tactile"] .sess-composer-input:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root[data-skin="tactile"] .sess-dock-row, :root[data-skin="tactile"] .relnote { border: 0; border-radius: 16px; background: var(--soft); }
+:root[data-skin="tactile"] .prev-tabs { border-bottom: 0; margin: 8px; padding: 4px; gap: 4px; border-radius: 999px; background: var(--sunken); box-shadow: var(--in); }
+:root[data-skin="tactile"] .prev-tab { border-radius: 999px; padding: 6px 10px; }
+:root[data-skin="tactile"] .prev-tab.on { border-bottom: 0; background: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .sess-item.is-active { background: var(--accent-soft); color: var(--accent-text); }
+:root[data-skin="tactile"] .sess-row, :root[data-skin="tactile"] .sess-item, :root[data-skin="tactile"] .sess-toggle { border-radius: 12px; }
+:root[data-skin="tactile"] .sess-page-status, :root[data-skin="tactile"] .sess-turn-cut, :root[data-skin="tactile"] .sess-turn-model { border-radius: 999px; padding-left: 8px; padding-right: 8px; }
+:root[data-skin="tactile"] .term-screen { border-radius: 16px; }

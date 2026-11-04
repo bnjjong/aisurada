@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extractLogicalLines, calculateBacktickFence, formatPinnedNoteBody, sliceLogicalLines } from '../src/ui/terminal/logicalLines.ts';
 import { readLogicalLines, selectionToLines, SELECTION_REASONS } from '../src/ui/terminal/terminalBuffer.ts';
-import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry, KEYS, homePath, readTheme, readSampleTemplates, writeSampleTemplates } from '../src/workspace/storage.ts';
+import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry, KEYS, homePath, readTheme, readSkin, readSampleTemplates, writeSampleTemplates } from '../src/workspace/storage.ts';
 import { CLAUDE_ENABLED, waitingAnswers, unsavedAnswers } from '@claude-plug/state';
 import { planSessionShell } from '@claude-plug/terminal';
 import { NoteAskFrame, EditorAskPlugins, AskComposePopover, AskHoverCard } from '@claude-plug/ask';
@@ -241,6 +241,26 @@ test('목록 18번(C157): 테마의 처음 값은 light이고 모르는 글자�
   assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:'dark'},version:1})})),'dark');
   assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:'purple'},version:1})})),'purple');
   assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:3},version:1})})),'light');
+});
+
+test('화면 모양: 처음 값은 물성이고 모르는 값은 기본으로 읽으며, 고른 값은 prefs에 함께 저장된다',()=>{
+  const saved=value=>createStorage({[KEYS.prefs]:JSON.stringify({state:{skin:value},version:1})});
+  assert.equal(readSkin(createStorage()),'tactile');
+  assert.equal(readSkin(saved('classic')),'classic');
+  assert.equal(readSkin(saved('tactile')),'tactile');
+  assert.equal(readSkin(saved('purple')),'tactile');
+  assert.equal(readSkin(saved(3)),'tactile');
+  // 16장의 설정 21개는 그대로다. skin은 고르기 전에는 나타나지 않는다.
+  assert.equal('skin' in readPreferences(createStorage()),false);
+  assert.equal(Object.keys(readPreferences(createStorage())).length,21);
+  const storage=createStorage();
+  writePreferences(storage,{skin:'classic'});
+  assert.equal(readSkin(storage),'classic');
+  assert.equal(readPreferences(storage).skin,'classic');
+  // 다른 설정을 바꿔도 고른 모양은 남는다.
+  writePreferences(storage,{theme:'dark'});
+  assert.equal(readSkin(storage),'classic');
+  assert.equal(readTheme(storage),'dark');
 });
 
 test('목록 19번(16.3): 판이 1이 아닌 수일 때만 이관해 곧바로 판 1로 다시 쓰고, 판이 없거나 수가 아니면 그대로 읽고 안 쓴다',()=>{

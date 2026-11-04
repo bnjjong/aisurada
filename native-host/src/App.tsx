@@ -56,6 +56,7 @@ function WorkspaceApp() {
     };
   }, [controller]);
   useEffect(() => { document.documentElement.dataset.theme = state.theme; }, [state.theme]);
+  useEffect(() => { document.documentElement.dataset.skin = state.skin; }, [state.skin]);
   if (state.booting) return <main className="status-screen" role="status"><Brand />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
   if (state.fatal) {

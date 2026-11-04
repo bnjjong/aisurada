@@ -755,3 +755,24 @@ code.is-symbol { font-weight: 700; }
 .sess-composer-box[data-drop='window'] { outline: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
 .sess-composer-box[data-drop='over'] { outline: 2px solid var(--accent); }
 .pin-shapes, .pin-size { font-size: 12px; color: var(--muted); margin: 6px 0; }
+
+/* 설정: 화면 모양 고르기. 두 모양 모두에서 보이도록 기본 규칙은 여기에 둔다.
+   미리보기 그림은 지금 켜 둔 모양과 상관없이 각자의 모양을 그린다. */
+.set-skin { margin: 24px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.set-skin legend { padding: 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
+.set-skin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.set-skin-option { position: relative; display: grid; align-content: start; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.set-skin-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+.set-skin-option:has(input:checked) { border-color: var(--accent); background: var(--soft); }
+.set-skin-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+.set-skin-text strong { display: block; font-size: 14px; font-weight: 600; }
+.set-skin-text small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.skin-preview { display: flex; align-items: center; gap: 10px; height: 68px; padding: 0 14px; border-radius: 8px; overflow: hidden; }
+.skin-preview i { display: block; width: 52px; height: 24px; flex: none; }
+.skin-preview b { display: block; width: 76px; height: 20px; }
+.skin-preview[data-skin-preview="classic"] { background: #f3f5ee; }
+.skin-preview[data-skin-preview="classic"] i { border-radius: 8px; background: #2f5542; }
+.skin-preview[data-skin-preview="classic"] b { border: 1px solid #d5dccb; border-radius: 8px; background: #fdfdfa; }
+.skin-preview[data-skin-preview="tactile"] { background: #e6ebf5; }
+.skin-preview[data-skin-preview="tactile"] i { border-radius: 999px; background: #1e4fd8; box-shadow: 0 1px 2px rgba(18,48,160,.4), 0 6px 14px -4px rgba(30,79,216,.55), inset 0 1px 0 rgba(255,255,255,.28); }
+.skin-preview[data-skin-preview="tactile"] b { border-radius: 999px; background: #dae1ee; box-shadow: inset 0 1px 3px rgba(10,22,51,.18), inset 0 0 0 1px rgba(10,22,51,.04); }

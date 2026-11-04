@@ -105,6 +105,9 @@ export interface Workspace {
 }
 
 export interface RecentWorkspace { path: string; name: string; opened: string; created?: boolean; sample?: boolean; }
+/** 설정에서 고르는 화면 모양. 'tactile'은 물성, 'classic'은 이전 모양. */
+export type Skin = 'tactile' | 'classic';
+
 export interface WorkspaceState {
   prefs: import('../ui/model.ts').Preferences;
   settingsOpen: boolean;
@@ -120,6 +123,8 @@ export interface WorkspaceState {
   recent: RecentWorkspace[];
   home: string;
   theme: 'light' | 'dark' | 'system';
+  /** 화면 모양. 밝기(theme)와는 따로 고른다. */
+  skin: Skin;
   tabs: TabsSnapshot;
   noteWindows: string[];
   searchOpen: boolean;

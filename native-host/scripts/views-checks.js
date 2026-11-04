@@ -136,6 +136,24 @@ if (location.pathname.startsWith("/note-window/")) {
         $$(".set-switch").length === 3 && !$(".set-ask-timeout"),
         "toggle count",
       );
+      // 화면 모양: 처음은 물성이고, 고르면 바로 바뀌어 저장된다.
+      assert($$(".set-skin-option").length === 2, "skin option count");
+      assert(document.documentElement.dataset.skin === "tactile", "default skin");
+      $('.set-skin-option input[value="classic"]').click();
+      await until(
+        () => document.documentElement.dataset.skin === "classic",
+        "skin classic",
+      );
+      assert(
+        JSON.parse(localStorage.getItem("aisurada.prefs.v1")).state.skin ===
+          "classic",
+        "skin saved",
+      );
+      $('.set-skin-option input[value="tactile"]').click();
+      await until(
+        () => document.documentElement.dataset.skin === "tactile",
+        "skin tactile",
+      );
       $(".set-switch input").click();
       const s = JSON.parse(localStorage.getItem("aisurada.prefs.v1")).state;
       assert(

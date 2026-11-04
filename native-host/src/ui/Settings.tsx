@@ -1,7 +1,21 @@
 import type { WorkspaceController } from "../workspace/controller.ts";
-import type { WorkspaceState } from "../workspace/types.ts";
+import type { Skin, WorkspaceState } from "../workspace/types.ts";
 import { Modal } from "./Modal.tsx";
 import { displayTitle } from "./model.ts";
+/** 설정에서 고를 수 있는 화면 모양. 순서가 곧 화면에 나오는 순서다. */
+const SKIN_OPTIONS: readonly { id: Skin; label: string; hint: string }[] = [
+  {
+    id: "tactile",
+    label: "물성",
+    hint: "눌리는 것은 떠 있고, 쓰는 것은 파여 있는 둥근 모양이에요.",
+  },
+  {
+    id: "classic",
+    label: "기본",
+    hint: "얇은 테두리와 평평한 면으로 그린 이전 모양이에요.",
+  },
+];
+
 export function Settings({
   controller,
   state,
@@ -16,6 +30,30 @@ export function Settings({
       className="settings-modal"
     >
       <p>이 기기에만 적용되는 설정이에요. 노트 파일은 바뀌지 않아요.</p>
+      <fieldset className="set-skin">
+        <legend>화면 모양</legend>
+        <div className="set-skin-grid">
+        {SKIN_OPTIONS.map((option) => (
+          <label className="set-skin-option" key={option.id}>
+            <input
+              type="radio"
+              name="skin"
+              value={option.id}
+              checked={state.skin === option.id}
+              onChange={() => controller.preference({ skin: option.id })}
+            />
+            <span className="skin-preview" data-skin-preview={option.id} aria-hidden="true">
+              <i />
+              <b />
+            </span>
+            <span className="set-skin-text">
+              <strong>{option.label}</strong>
+              <small>{option.hint}</small>
+            </span>
+          </label>
+        ))}
+        </div>
+      </fieldset>
       {(
         [
           [

@@ -1,7 +1,7 @@
 import { engineCall, readWorkspace } from './engine.ts';
 import { migrateLegacy } from './migrateLegacy.ts';
 import { sampleWorkspace } from './sample.ts';
-import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readSampleTemplates, readTheme, recentWorkspaces,
+import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readSampleTemplates, readSkin, readTheme, recentWorkspaces,
   removeRecent, savedOpenIds, writeJSON } from './storage.ts';
 import { waitingAnswers, unsavedAnswers, noteRailNow } from '@claude-plug/state';
 import { asRow, asText, workspaceName } from './types.ts';
@@ -12,7 +12,7 @@ import { connectLinkSource, latestInput } from '../interaction/links.ts';
 import type { AppLink } from '../interaction/links.ts';
 import { shortcutFor } from '../interaction/shortcuts.ts';
 import type { KeyInput } from '../interaction/shortcuts.ts';
-import type { RecentWorkspace, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import type { RecentWorkspace, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
@@ -63,7 +63,7 @@ export class WorkspaceController {
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
       prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
-      theme: readTheme(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
+      theme: readTheme(services.storage), skin: readSkin(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
 
   getSnapshot = () => this.state;
@@ -142,11 +142,11 @@ export class WorkspaceController {
   };
   closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
   reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
-  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
   // 15.14 (5), C153: a setting changed in a note window lives only in that window. It
   // is applied to this window's memory and is never written to the shared store.
   private windowPrefs?: StoragePort;
-  preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark' }) => {
+  preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark'; skin?: Skin }) => {
     if (this.context.kind !== 'main') {
       if (!this.windowPrefs) {
         const values = new Map<string, string>(), saved = this.services.storage.getItem(KEYS.prefs);

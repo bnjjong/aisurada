@@ -1,5 +1,5 @@
 import { asRow, asText } from './types.ts';
-import type { RecentWorkspace, StoragePort, WorkspaceState } from './types.ts';
+import type { RecentWorkspace, Skin, StoragePort, WorkspaceState } from './types.ts';
 
 export const KEYS = {
   last: 'aisurada.lastWorkspace.v1',
@@ -297,6 +297,15 @@ export function homePath(value: unknown): string | null {
 export function readTheme(storage: StoragePort): WorkspaceState['theme'] {
   const theme = asRow(asRow(readJSON(storage, KEYS.prefs))?.state)?.theme;
   return (typeof theme === 'string' ? theme : 'light') as WorkspaceState['theme'];
+}
+
+// 화면 모양(skin)은 16장의 설정 21개에 들어가지 않는 확장 값이다. 기본 설정을 읽을 때는
+// 나타나지 않고, 사용자가 고른 뒤에만 prefs에 함께 저장된다. 알 수 없는 값은 기본으로 읽는다.
+export const SKINS: readonly Skin[] = ['tactile', 'classic'];
+export const DEFAULT_SKIN: Skin = 'tactile';
+export function readSkin(storage: StoragePort): Skin {
+  const skin = asRow(asRow(readJSON(storage, KEYS.prefs))?.state)?.skin;
+  return SKINS.find(id => id === skin) ?? DEFAULT_SKIN;
 }
 
 // 16.10: the sample keeps its templates as {overrides, custom}. The sample has no default
