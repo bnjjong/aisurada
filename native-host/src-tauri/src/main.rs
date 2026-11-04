@@ -19,6 +19,9 @@ mod self_write;
 mod sidecar;
 mod terminal;
 mod workspace;
+mod session_image;
+mod dictation;
+mod session_shell;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 
@@ -84,7 +87,10 @@ fn main() {
             #[cfg(feature = "claude")]
             agents::held_agent_sessions,
             #[cfg(feature = "claude")]
-            agents::release_agent_session
+            agents::release_agent_session,
+            session_image::write_session_image,
+            dictation::start_dictation,
+            session_shell::pty_start_session
         ])
         .setup(|app| {
             lifecycle::create_main(app.handle())?;

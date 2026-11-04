@@ -948,10 +948,447 @@ export function NoteSessionRail({
 // Chapter 9: Session Route Component (/session/:id)
 // --------------------------------------------------------------------------
 
+export interface AskResult {
+  ok: boolean;
+  answer?: string;
+  error?: string;
+  missing_cwd?: boolean;
+}
+
 export interface SessionRouteProps {
   sessionId?: string;
   controller?: any;
   state?: any;
+}
+
+export interface ComposerImage {
+  id: string;
+  name: string;
+  bytes: Uint8Array;
+  dataUrl: string;
+  size: number;
+}
+
+export interface ComposerState {
+  text: string;
+  images: ComposerImage[];
+  notice: string | null;
+  error: string | null;
+  sending: boolean;
+}
+
+const sessionComposerMap = new Map<string, ComposerState>();
+
+export function getSessionComposerState(id: string): ComposerState {
+  let s = sessionComposerMap.get(id);
+  if (!s) {
+    s = { text: '', images: [], notice: null, error: null, sending: false };
+    sessionComposerMap.set(id, s);
+  }
+  return s;
+}
+
+export function SessionComposer({
+  sessionId,
+  sessionData,
+  sessionItem,
+  sessionLoaded,
+  transcriptFile,
+  state,
+  onSent,
+}: {
+  sessionId: string;
+  sessionData: any | null;
+  sessionItem: any | undefined;
+  sessionLoaded: boolean;
+  transcriptFile: string | null | undefined;
+  state: any;
+  onSent: () => void;
+}): React.JSX.Element {
+  const [composerState, setComposerState] = useState<ComposerState>(() =>
+    getSessionComposerState(sessionId)
+  );
+
+  useEffect(() => {
+    setComposerState({ ...getSessionComposerState(sessionId) });
+  }, [sessionId]);
+
+  const updateState = (updater: (prev: ComposerState) => ComposerState) => {
+    const cur = getSessionComposerState(sessionId);
+    const next = updater(cur);
+    sessionComposerMap.set(sessionId, next);
+    setComposerState({ ...next });
+  };
+
+  // 10.1 입력창을 여는 판정
+  const processAlive = Boolean(sessionItem?.processAlive);
+  const isBackground = sessionItem?.kind === 'background';
+  const heldByAgent = Boolean(sessionItem?.heldByAgent);
+
+  // 2. 살아있는 프로세스인 경우 닫는다 (기본 길에서는 heldByAgent 없음)
+  if (processAlive && !heldByAgent) {
+    const blockKind = isBackground ? 'live-background' : 'live-terminal';
+    const msg = isBackground
+      ? '이 세션은 백그라운드에서 돌고 있어요. 도는 동안에는 claude 가 이어 쓰기를 거절해서 입력창을 닫아 뒀어요. 끝나면 여기서 이어 쓸 수 있어요.'
+      : '이 세션은 다른 터미널에서 열려 있어요. 여기서도 보내면 대화가 둘로 갈라져서 입력창을 닫아 뒀어요. 그 터미널에서 claude 를 끝내고 돌아오면 여기서 이어 쓸 수 있어요.';
+    return (
+      <div className="sess-composer-blocked" data-block={blockKind}>
+        {msg}
+      </div>
+    );
+  }
+
+  // 3. 대화를 다 읽었는데 응답의 file이 null이면 닫는다 (no-record)
+  if (sessionLoaded && transcriptFile === null) {
+    return (
+      <div className="sess-composer-blocked" data-block="no-record">
+        이 기계에 이 세션의 대화 기록이 없어서 이어 쓸 수 없어요.
+      </div>
+    );
+  }
+
+  // 4. 그 밖에는 연다.
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // 크기 상한 검사 (5,000,000 바이트)
+        if (file.size > 5_000_000) {
+          updateState((prev) => ({
+            ...prev,
+            error: `그림이 너무 커요: ${file.size} 바이트. 상한은 5000000 바이트예요`,
+          }));
+          return;
+        }
+
+        // 개수 상한 검사 (한 물음 8장)
+        if (composerState.images.length >= 8) {
+          updateState((prev) => ({
+            ...prev,
+            error: '한 물음에 그림은 8장까지 붙일 수 있어요',
+          }));
+          return;
+        }
+
+        const ext = file.type.replace('image/', '') || 'png';
+        const time36 = Date.now().toString(36);
+        const rand8 = Math.random().toString(36).substring(2, 10).padEnd(8, '0');
+        const name = `ask-${time36}-${rand8}.${ext}`;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const buffer = reader.result as ArrayBuffer;
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let b = 0; b < bytes.length; b++) {
+            binary += String.fromCharCode(bytes[b]);
+          }
+          const dataUrl = `data:${file.type};base64,${btoa(binary)}`;
+          updateState((prev) => ({
+            ...prev,
+            error: null,
+            images: [
+              ...prev.images,
+              {
+                id: name,
+                name,
+                bytes,
+                dataUrl,
+                size: file.size,
+              },
+            ],
+          }));
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    updateState((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleDictation = async () => {
+    try {
+      await safeInvoke('start_dictation');
+    } catch (err) {
+      console.error('start_dictation failed', err);
+    }
+  };
+
+  const handleSend = async () => {
+    if (composerState.sending) return;
+    if (!composerState.text.trim() && composerState.images.length === 0) return;
+
+    updateState((prev) => ({ ...prev, sending: true, error: null }));
+
+    try {
+      // 10.3 보내기 전 세션 목록 재판정
+      const recent = await callEngine<any[]>(['recent-sessions']).catch(() => []);
+      const curRow = (recent || []).find((s: any) => s.sessionId === sessionId || s.id === sessionId);
+      if (curRow?.processAlive) {
+        updateState((prev) => ({
+          ...prev,
+          sending: false,
+          error:
+            '이 세션이 지금 다른 터미널에서 돌고 있어서 안 보냈어요. 그 터미널에서 이어 가 주세요. 여기서 보내면 대화가 갈라져요.',
+        }));
+        return;
+      }
+
+      // 붙인 그림 저장
+      const savedPaths: string[] = [];
+      for (const img of composerState.images) {
+        try {
+          const p = await safeInvoke<string>('write_session_image', {
+            sessionId,
+            name: img.name,
+            bytes: Array.from(img.bytes),
+          });
+          savedPaths.push(p);
+        } catch (imgErr: any) {
+          updateState((prev) => ({
+            ...prev,
+            sending: false,
+            error: `붙인 그림을 못 저장해서 안 보냈어요: ${imgErr?.message || imgErr}`,
+          }));
+          return;
+        }
+      }
+
+      // 본문 구성 (10.6 경로 줄)
+      let fullPrompt = composerState.text;
+      if (savedPaths.length > 0) {
+        const countStr = savedPaths.length === 1 ? '1' : `${savedPaths.length}`;
+        const imgBlock =
+          `[첨부 그림] 이 물음에 그림 ${countStr}장을 붙였다. 답하기 전에 Read 도구로 하나씩 열어 본다.\n` +
+          savedPaths.map((p) => `- ${p}`).join('\n');
+        fullPrompt = composerState.text ? `${composerState.text}\n\n${imgBlock}` : imgBlock;
+      }
+
+      // ask_claude 호출 (10.3: 페르소나 미포함, resume=true, resumeOnly=true, keepAlive=true)
+      const res = await safeInvoke<AskResult>('ask_claude', {
+        sessionId,
+        prompt: fullPrompt,
+        resume: true,
+        resumeOnly: true,
+        keepAlive: true,
+        cwd: sessionData?.cwd,
+        model: state?.model,
+        effort: state?.effort,
+      });
+
+      if (res && res.ok) {
+        // 성공: 입력칸 및 그림 비움
+        updateState((prev) => ({
+          ...prev,
+          text: '',
+          images: [],
+          error: null,
+          sending: false,
+          notice: res.missing_cwd
+            ? `이 세션이 처음 돌던 폴더(${sessionData?.cwd || ''})가 없어서 vault 에서 이어 갔어요.`
+            : null,
+        }));
+        onSent();
+      } else {
+        // 실패: 입력 내용 유지
+        updateState((prev) => ({
+          ...prev,
+          sending: false,
+          error: res?.error || '까닭을 못 받았다',
+        }));
+      }
+    } catch (err: any) {
+      updateState((prev) => ({
+        ...prev,
+        sending: false,
+        error: String(err?.message || err),
+      }));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="sess-composer">
+      {composerState.notice && (
+        <div className="sess-composer-notice">{composerState.notice}</div>
+      )}
+      {composerState.error && (
+        <div className="sess-composer-error">{composerState.error}</div>
+      )}
+
+      {composerState.images.length > 0 && (
+        <div className="sess-composer-images">
+          {composerState.images.map((img, idx) => (
+            <div key={img.id} className="sess-composer-image-item">
+              <img src={img.dataUrl} alt={img.name} />
+              <button
+                type="button"
+                className="sess-composer-image-remove"
+                onClick={() => handleRemoveImage(idx)}
+                aria-label="그림 빼기"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="sess-composer-box">
+        <textarea
+          className="sess-composer-input"
+          aria-label="세션으로 보내기"
+          placeholder="Claude에게 이어 물어보기... (⌘V로 그림 붙이기, ⌘Enter로 보내기)"
+          value={composerState.text}
+          onChange={(e) =>
+            updateState((prev) => ({ ...prev, text: e.target.value }))
+          }
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          disabled={composerState.sending}
+          rows={3}
+        />
+        <div className="sess-composer-actions">
+          <button
+            type="button"
+            className="sess-composer-mic"
+            onClick={handleDictation}
+            title="받아쓰기"
+            aria-label="받아쓰기"
+          >
+            🎤
+          </button>
+          <button
+            type="button"
+            className="sess-composer-send"
+            onClick={handleSend}
+            disabled={
+              composerState.sending ||
+              (!composerState.text.trim() && composerState.images.length === 0)
+            }
+            aria-label="보내기"
+          >
+            {composerState.sending ? '보내는 중...' : '보내기'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SessionCliPane({
+  sessionId,
+  sessionCwd,
+  sessionItem,
+  controller: _controller,
+}: {
+  sessionId: string;
+  sessionCwd?: string;
+  sessionItem?: any;
+  controller?: any;
+}): React.JSX.Element {
+  const termKey = `term:${sessionId}`;
+
+  // 10.9 판정: 동기 계산으로 깜빡임 및 SSR 보장
+  const processAlive = Boolean(sessionItem?.processAlive);
+  const shortId = sessionItem?.shortId || (sessionItem?.kind === 'background' ? sessionItem?.id : undefined);
+  const heldByAgent = Boolean(sessionItem?.heldByAgent);
+
+  const blockedMsg = useMemo(() => {
+    // 3. 살아 있고 shortId 없고 heldByAgent 아니면 => 띄우지 말라
+    if (processAlive && !shortId && !heldByAgent) {
+      return '이 세션은 지금 다른 터미널에서 돌고 있어요. 그 터미널에서 이어 가 주세요. 여기서 이어 열면 두 곳이 한 대화에 써서 대화가 갈라져요.';
+    }
+    return null;
+  }, [processAlive, shortId, heldByAgent]);
+
+  const [fellBackNotice, setFellBackNotice] = useState<string | null>(null);
+  const [termOutput, setTermOutput] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (blockedMsg) return;
+
+    let mode = 'resume';
+    let targetSid = sessionId;
+    if (processAlive && shortId) {
+      mode = 'attach';
+      targetSid = shortId;
+    }
+
+    let onData: any = null;
+    try {
+      const core = require('@tauri-apps/api/core');
+      if (core && core.Channel) {
+        onData = new core.Channel();
+        onData.onmessage = (chunk: string) => {
+          try {
+            const decoded = atob(chunk);
+            setTermOutput((prev) => [...prev, decoded]);
+          } catch {
+            setTermOutput((prev) => [...prev, chunk]);
+          }
+        };
+      }
+    } catch {
+      onData = {
+        onmessage: () => {},
+      };
+    }
+
+    safeInvoke<{ fellBack: boolean }>('pty_start_session', {
+      key: termKey,
+      cols: 80,
+      rows: 24,
+      sessionAction: {
+        mode,
+        sessionId: targetSid,
+        cwd: sessionCwd,
+      },
+      onData,
+    })
+      .then((res) => {
+        if (res?.fellBack) {
+          setFellBackNotice('원래 작업 폴더가 없어서 홈 폴더에서 이어 가요.');
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to start session shell:', err);
+      });
+  }, [sessionId, sessionItem, blockedMsg, termKey, sessionCwd, processAlive, shortId]);
+
+  if (blockedMsg) {
+    return (
+      <div className="prev-pane is-cli term-host" data-tab-key={termKey}>
+        <div className="term-empty">{blockedMsg}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="prev-pane is-cli term-host" data-tab-key={termKey}>
+      {fellBackNotice && <div className="term-bar-note">{fellBackNotice}</div>}
+      <div className="term-screen">
+        <pre className="term-lines">{termOutput.join('')}</pre>
+      </div>
+    </div>
+  );
 }
 
 export function formatDuration(sec: number): string {
@@ -1206,10 +1643,47 @@ export function SessionRoute({
 
   const isAlive = sessionItem?.status === 'running';
 
+  const [composerUpdateKey, setComposerUpdateKey] = useState(0);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    const paths = files.map((f: any) => f.path || f.name).filter(Boolean);
+    if (paths.length === 0) return;
+
+    const formatted = paths
+      .map((p) => (p.includes(' ') || p.includes('"') ? `"${p.replace(/"/g, '\\"')}"` : p))
+      .join(' ');
+
+    const cur = getSessionComposerState(sessionId);
+    let newText = cur.text;
+    if (newText.length > 0 && !newText.endsWith(' ')) {
+      newText += ' ';
+    }
+    newText += formatted + ' ';
+
+    sessionComposerMap.set(sessionId, {
+      ...cur,
+      text: newText,
+      error: null,
+    });
+    setComposerUpdateKey((k) => k + 1);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
   return (
     <div className={`sess-screen ${!isRailVisible ? 'no-preview' : ''}`}>
-      {/* 메인 영역 */}
-      <div className="sess-main-area">
+      {/* 메인 영역 (가운데 기둥: 머리, 대화 칸, 하단 독) */}
+      <div
+        className="sess-main-area"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
         {/* 머리 (9.3) */}
         <header className="sess-page-header">
           <div className="sess-page-head-row">
@@ -1450,6 +1924,18 @@ export function SessionRoute({
                 </div>
               </div>
             )}
+
+            {/* 10장 세션 입력창 (.sess-composer, 10.1, 10.13) */}
+            <SessionComposer
+              key={`${sessionId}-${composerUpdateKey}`}
+              sessionId={sessionId}
+              sessionData={sessionData}
+              sessionItem={sessionItem}
+              sessionLoaded={!sessionLoading}
+              transcriptFile={sessionData?.file}
+              state={state}
+              onSent={() => loadTranscript(100)}
+            />
           </footer>
         </section>
       </div>
@@ -1533,11 +2019,14 @@ export function SessionRoute({
             )}
           </div>
 
-          {/* CLI 패널 */}
-          <div className="prev-pane is-cli" style={{ display: tab === 'cli' ? 'block' : 'none' }}>
-            <div className="cli-placeholder">
-              터미널 뷰어 (`claude --resume {sessionId}`)
-            </div>
+          {/* CLI 패널 (10.9 ~ 10.12, 10.13) */}
+          <div style={{ display: tab === 'cli' ? 'contents' : 'none' }}>
+            <SessionCliPane
+              sessionId={sessionId}
+              sessionCwd={sessionData?.cwd}
+              sessionItem={sessionItem}
+              controller={controller}
+            />
           </div>
         </aside>
       )}

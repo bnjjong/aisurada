@@ -93,7 +93,7 @@ impl Registry {
             e.terminate();
         }
     }
-    fn entry(&self, key: &str) -> Result<Arc<Entry>, String> {
+    pub(crate) fn entry(&self, key: &str) -> Result<Arc<Entry>, String> {
         self.0
             .lock()
             .unwrap()
@@ -204,7 +204,7 @@ impl Registry {
         self.0.lock().unwrap().insert(key, entry);
         Ok(fell_back)
     }
-    fn write(&self, key: &str, data: Vec<u8>) -> Result<(), String> {
+    pub(crate) fn write(&self, key: &str, data: Vec<u8>) -> Result<(), String> {
         let e = self.entry(key)?;
         let input = e.input.lock().unwrap();
         input
@@ -228,6 +228,15 @@ impl Registry {
                 e.terminate();
             }
         });
+    }
+    pub(crate) fn is_alive(&self, key: &str) -> bool {
+        self.entry(key).ok().is_some_and(|e| {
+            e.child
+                .lock()
+                .unwrap()
+                .as_mut()
+                .is_some_and(|c| c.try_wait().ok().is_some_and(|s| s.is_none()))
+        })
     }
     fn stats(&self, key: &str) -> Stats {
         self.entry(key)
@@ -265,7 +274,7 @@ fn size(cols: u16, rows: u16) -> PtySize {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Started {
-    fell_back: bool,
+    pub fell_back: bool,
 }
 #[tauri::command]
 pub fn pty_start(
@@ -310,13 +319,7 @@ pub fn pty_detach(state: State<'_, HostState>, key: String) {
 }
 #[tauri::command]
 pub fn pty_alive(state: State<'_, HostState>, key: String) -> bool {
-    state.terminals.entry(&key).ok().is_some_and(|e| {
-        e.child
-            .lock()
-            .unwrap()
-            .as_mut()
-            .is_some_and(|c| c.try_wait().ok().is_some_and(|s| s.is_none()))
-    })
+    state.terminals.is_alive(&key)
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
