@@ -63,6 +63,8 @@ export interface WorkspaceServices {
   developmentLinks?(received: (urls: string[]) => void): () => void;
   closeWindow?(): Promise<void>;
   closeRequested?(handler: () => void): Promise<() => void>;
+  /** The note window's logical size and position, each time it is moved or resized. */
+  noteGeometryChanged?(changed: (geometry: { width: number; height: number; x: number; y: number }) => void): Promise<() => void>;
   native?: boolean;
   mac?: boolean;
   navigate(path: string, replace: boolean): void;

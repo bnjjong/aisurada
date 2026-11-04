@@ -35,6 +35,7 @@ export function ImageView({ source, alt }: { source: string; alt: string }) {
   const url = path && features.noteDirectory && features.host?.native ? convertFileSrc(`${features.noteDirectory}/${path}`) : source;
   return <img src={url} alt={alt} loading="lazy" draggable="false" />;
 }
+export const FRAME_LINK = /^(?:https?|mailto|tel):/i;
 function HTMLFrame({ path, label }: { path: string; label: string }) {
   const features = useContext(EditorContext), frame = useRef<HTMLIFrameElement>(null);
   const url = 'wlframe://localhost' + `${features.noteDirectory}/${path}`.split('/').map(encodeURIComponent).join('/');
@@ -45,8 +46,9 @@ function HTMLFrame({ path, label }: { path: string; label: string }) {
     const message = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || !event.data || typeof event.data !== 'object') return;
       if (typeof event.data.wlframeHeight === 'number' && Number.isFinite(event.data.wlframeHeight)) setHeight(frameHeight(url, event.data.wlframeHeight));
-      const link = event.data.wlframeOpen, now = Date.now();
-      if (typeof link === 'string' && link.length <= 8192 && document.activeElement === frame.current
+      // 8.7: only http:, https:, mailto: and tel: open, after trimming; anything else is dropped.
+      const link = typeof event.data.wlframeOpen === 'string' ? event.data.wlframeOpen.trim() : null, now = Date.now();
+      if (typeof link === 'string' && link.length <= 8192 && FRAME_LINK.test(link) && document.activeElement === frame.current
         && (navigator.userActivation?.isActive || now - lastInput.current < 1500) && now - lastOpen.current >= 1000) {
         lastOpen.current = now; void openEditorLink(link, features).catch(() => {});
       }

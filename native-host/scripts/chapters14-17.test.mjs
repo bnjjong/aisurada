@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { extractLogicalLines, calculateBacktickFence, formatPinnedNoteBody } from '../src/ui/terminal/logicalLines.ts';
-import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry, KEYS, homePath } from '../src/workspace/storage.ts';
+import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry, KEYS, homePath, readTheme, readSampleTemplates, writeSampleTemplates } from '../src/workspace/storage.ts';
 import { CLAUDE_ENABLED, waitingAnswers, unsavedAnswers } from '@claude-plug/state';
 import { planSessionShell } from '@claude-plug/terminal';
 import { NoteAskFrame, EditorAskPlugins, AskComposePopover, AskHoverCard } from '@claude-plug/ask';
@@ -232,4 +232,35 @@ test('Chapter 17: Q&A marker wrap with turnId and OPEN_ASK_COMMAND', () => {
   }, { discrete: true });
   const exported = editor.getEditorState().read($exportDocument);
   assert.equal(exported.trim(), markdown.trim());
+});
+
+test('목록 18번(C157): 테마의 처음 값은 light이고 모르는 글자도 그대로 data-theme에 건다',()=>{
+  assert.equal(readTheme(createStorage()),'light');
+  assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:'dark'},version:1})})),'dark');
+  assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:'purple'},version:1})})),'purple');
+  assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:3},version:1})})),'light');
+});
+
+test('목록 19번(16.3): 판이 1이 아닌 수일 때만 이관해 곧바로 판 1로 다시 쓰고, 판이 없거나 수가 아니면 그대로 읽고 안 쓴다',()=>{
+  for(const version of [undefined,null,'1','x']){
+    const raw=JSON.stringify({state:{railWidth:9999,askTimeoutSeconds:1200},...(version===undefined?{}:{version})}),storage=createStorage({[KEYS.prefs]:raw});
+    const prefs=readPreferences(storage,true);
+    assert.equal(storage.getItem(KEYS.prefs),raw,'rewrote a '+String(version)+' version');assert.equal(prefs.railWidth,420);
+  }
+  const old=createStorage({[KEYS.prefs]:JSON.stringify({state:{railWidth:9999,askTimeoutSeconds:1200},version:0})});
+  assert.equal(readPreferences(old,true).askTimeoutSeconds,3600);
+  assert.deepEqual(JSON.parse(old.getItem(KEYS.prefs)),{state:{railWidth:9999},version:1},'written from the values before the reading corrections');
+  const newer=createStorage({[KEYS.prefs]:JSON.stringify({state:{askTimeoutSeconds:1200,railWidth:300},version:2})});
+  readPreferences(newer,true);assert.deepEqual(JSON.parse(newer.getItem(KEYS.prefs)),{state:{askTimeoutSeconds:1200,railWidth:300},version:1});
+  const one=createStorage({[KEYS.prefs]:JSON.stringify({state:{railWidth:9999},version:1})});readPreferences(one,true);assert.equal(JSON.parse(one.getItem(KEYS.prefs)).state.railWidth,9999);
+  const noteWindow=createStorage({[KEYS.prefs]:JSON.stringify({state:{},version:0})});readPreferences(noteWindow,false);assert.equal(JSON.parse(noteWindow.getItem(KEYS.prefs)).version,0);
+});
+
+test('목록 21번(16.10): 샘플의 템플릿 키는 {overrides, custom} 꼴이고 옛 배열도 읽는다',()=>{
+  const storage=createStorage();
+  writeSampleTemplates(storage,[{id:'tpl-a',category:'doc',name:'이름',type:'free',desc:'',body:'본문',format:'markdown',builtin:false,path:'x'},{id:'rit',category:'ritual',name:'리추얼'}]);
+  assert.deepEqual(JSON.parse(storage.getItem(KEYS.sampleTemplates)),{overrides:{},custom:[{id:'tpl-a',name:'이름',type:'free',desc:'',body:'본문',format:'markdown'}]});
+  assert.deepEqual(readSampleTemplates(storage),[{id:'tpl-a',name:'이름',type:'free',desc:'',body:'본문',format:'markdown'}]);
+  const legacy=createStorage({[KEYS.sampleTemplates]:JSON.stringify([{id:'t1',name:'n'},{name:'id 없음'},7])});
+  assert.deepEqual(readSampleTemplates(legacy),[{id:'t1',name:'n'}]);assert.deepEqual(readSampleTemplates(createStorage({[KEYS.sampleTemplates]:'{broken'})),[]);
 });

@@ -6,6 +6,16 @@ import { Modal } from "./Modal.tsx";
 import { compareBodies } from "../editor/diff.ts";
 import type { DiffRow } from "../editor/diff.ts";
 import { stripMarkers } from "../editor/grammar.ts";
+// 13.4: why the note's present text could not be recorded first, from the first
+// commit-vault answer. The table is read top to bottom.
+export function restoreReason(commit: { outcome?: unknown; blocked?: unknown } | null | undefined): string {
+  if (!commit || commit.outcome === "failed") return "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.";
+  if (commit.outcome === "disabled") return "자동 커밋이 꺼져 있거나 vault가 git 저장소가 아니에요.";
+  if (commit.blocked === "index-lock") return "vault의 git이 잠겨 있어요(.git/index.lock).";
+  if (commit.blocked === "in-progress") return "vault에서 git 병합이나 리베이스가 진행 중이에요.";
+  if (commit.blocked === "not-main") return "vault의 git이 main 브랜치에 있지 않아요.";
+  return "vault에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.";
+}
 export function DiffTable({
   left,
   right,
@@ -268,16 +278,7 @@ export function History({
       if (result.startsWith("replaced-"))
         setCurrent(controller.readBuffer(keyValue, fallback));
       const commit = controller.lastRestoreCommit;
-      const reason =
-        commit?.blocked === "index-lock"
-          ? "vault의 git이 잠겨 있어요(.git/index.lock)."
-          : commit?.blocked === "in-progress"
-            ? "vault에서 git 병합이나 리베이스가 진행 중이에요."
-            : commit?.blocked === "not-main"
-              ? "vault의 git이 main 브랜치에 있지 않아요."
-              : commit?.outcome === "disabled"
-                ? "자동 커밋이 꺼져 있거나 vault가 git 저장소가 아니에요."
-                : "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.";
+      const reason = restoreReason(commit);
       setNotice(
         (
           {

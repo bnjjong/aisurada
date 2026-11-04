@@ -15,8 +15,9 @@ export type Shortcut =
   | { kind: 'cycle'; direction: -1 | 1 }
   | { kind: 'index'; index: number };
 
-export function shortcutFor(event: KeyInput, mac: boolean, native: boolean): Shortcut | null {
-  if (event.defaultPrevented || event.altKey || !(mac ? event.metaKey : event.ctrlKey)) return null;
+export function shortcutFor(event: KeyInput, _mac: boolean, native: boolean): Shortcut | null {
+  // 4.3: the modifier is Cmd or Ctrl, whatever the operating system. Ctrl+K and Ctrl+2 work on macOS too.
+  if (event.defaultPrevented || event.altKey || !(event.metaKey || event.ctrlKey)) return null;
   if (event.key === 'k' || event.key === 'K') return { kind: 'search' };
   if (!native && event.shiftKey && (event.key === 't' || event.key === 'T' || event.code === 'KeyT')) return { kind: 'terminal' };
   if (!native && !event.shiftKey && event.key.toLowerCase() === 'w') return { kind: 'close' };

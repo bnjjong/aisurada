@@ -205,11 +205,11 @@ export function Connections({
   state: WorkspaceState;
   controller: WorkspaceController;
 }) {
-  const [mode, setMode] = useState(() => {
+  // 16.9, C161: the two keys are plain text and are written again when the screen opens
+  // and each time a value changes; a saved text this screen does not know is kept as it is.
+  const [savedMode, setMode] = useState(() => {
       try {
-        return localStorage.getItem("withlog.connMode.v3") === "list"
-          ? "list"
-          : "map";
+        return localStorage.getItem("withlog.connMode.v3") ?? "map";
       } catch {
         return "map";
       }
@@ -223,6 +223,13 @@ export function Connections({
     }),
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState("");
+  const mode = savedMode === "list" ? "list" : "map";
+  useEffect(() => {
+    try {
+      localStorage.setItem("withlog.connMode.v3", savedMode);
+      localStorage.setItem("withlog.connFilter.v2", only ? "1" : "0");
+    } catch {}
+  }, [savedMode, only]);
   const all = visibleNotes(
       state.workspace!.notes,
       state.prefs.showRecords,
@@ -527,10 +534,12 @@ function TemplateEditor({
     clearTimeout(timer.current);
     if (!dirty.current || epoch.current !== controller.data.epoch()) return;
     dirty.current = false;
-    last.current = JSON.stringify(draft.current);
+    // 12.10: an empty name is sent as 제목 없는 템플릿, and the name field stays empty. What the
+    // list sends back is then the same as what was sent, so it is not taken for an outside change.
+    last.current = JSON.stringify({ ...draft.current, name: draft.current.name || TEMPLATE_UNTITLED });
     const v = draft.current,
       input = {
-        name: v.name || "제목 없는 템플릿",
+        name: v.name || TEMPLATE_UNTITLED,
         desc: v.desc,
         body: v.body,
       };
@@ -970,6 +979,7 @@ export function Trash({
     </Page>
   );
 }
+const TEMPLATE_UNTITLED = "제목 없는 템플릿";
 export function Guide() {
   const examples = [
     [

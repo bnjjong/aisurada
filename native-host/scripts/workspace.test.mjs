@@ -159,6 +159,14 @@ test('C202: a failed initialization of a new vault puts the host back on the old
   assert.equal(h.watches[0].stopped, true); assert.equal(h.watches.at(-1).root, shown.path); assert.equal(h.watches.at(-1).stopped, false);
 });
 
+test('목록 25번: 샘플로 바꿀 때도 400ms 안에 모아 둔 회고 쓰기를 먼저 보낸다',async t=>{
+  for(const change of [h=>h.controller.sample(),h=>h.controller.openRecent({path:'/documents/withlog-sample',name:'샘플',sample:true})]){
+    const h=harness(t);setLast(h);await h.controller.boot();await tick();
+    h.controller.data.saveReport('rv-morning-2026-06-04','아침 회고','');
+    await change(h);await tick();
+    assert.ok(h.calls.some(call=>call.command==='sidecar_call'&&call.args.argv[0]==='save-report'),'the collected report was dropped');
+  }
+});
 test('C174: retrospective edits waiting to be written go to the old vault before opening or creating another vault', async t => {
   for (const change of [h => h.controller.create('new'), h => h.controller.open('/other')]) {
     const h = harness(t); setLast(h); await h.controller.boot(); await tick(); h.controller.setHome('/parent');

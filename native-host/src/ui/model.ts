@@ -278,3 +278,12 @@ export function scheduleNotice(value: unknown): string {
   }
   return [...new Set(messages)].join(" ");
 }
+
+const LOOSE_GROUP_KEY = "(미분류)";
+// 12.1: with no project there is no group header and the agendas are simply listed, so a
+// saved fold of 「미분류」 must not hide them where nothing can open it again.
+export const railGroupCollapsed = (collapsed: readonly string[], projectCount: number, slug: string) => {
+  if (projectCount === 0) return false;
+  const loose = slug === LOOSE_GROUP_KEY || slug === "" || slug === "__none__";
+  return loose ? [LOOSE_GROUP_KEY, "", "__none__"].some((key) => collapsed.includes(key)) : collapsed.includes(slug);
+};

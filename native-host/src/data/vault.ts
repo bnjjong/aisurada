@@ -6,7 +6,7 @@ import type { Fields, NewDoc } from './commands.ts';
 import { SelfWrites } from './selfWrites.ts';
 import { WriteQueues } from './writeQueues.ts';
 import type { WriteStamp } from './writeQueues.ts';
-import { readJSON, writeJSON } from '../workspace/storage.ts';
+import { readJSON, writeJSON, writeSampleTemplates } from '../workspace/storage.ts';
 import { extractTitle } from './title.ts';
 import { withoutTitleMismatch } from './titleWarning.ts';
 
@@ -333,7 +333,9 @@ export class VaultData {
         const titleCell = !ref.parent && argv.find(cell => cell.startsWith('title='));
         if (titleCell) this.savedTitles.set(key, titleCell.slice(6));
         this.replaceNote(ref, update);
-        if (bodyWrite) this.setFlag('unsaved', key, false);
+        // 10.4: the unsaved mark comes down only when a write that carried the body succeeds.
+        // A sub-note's title-only write succeeding leaves it as it was.
+        if (has(fields, 'body')) this.setFlag('unsaved', key, false);
         this.success();
         const warning = argv.some(cell => cell.startsWith('title=')) ? withoutTitleMismatch(asText(response.warning)) : asText(response.warning);
         if (response.renamed === true && warning) this.failure(warning);
@@ -617,7 +619,7 @@ export class VaultData {
       const current = this.workspace()!, value = { ...old, ...input, ...response, id: asText(response.id) || id, category: ritualId ? 'ritual' : 'doc' };
       this.emit({ ...current, templates: old ? current.templates.map(row => row.id === id ? value : row) : [...current.templates, value] });
       this.markOwn(asText(response.path));
-      if (current.sample) writeJSON(this.services.storage, 'withlog.templates.v1', this.workspace()!.templates);
+      if (current.sample) writeSampleTemplates(this.services.storage, this.workspace()!.templates);
     });
     if (result.ok) this.unsavedTemplates.delete(id);
     else if (old && this.valid(generation)) this.unsavedTemplates.set(id, { ...this.unsavedTemplates.get(id), ...input });
@@ -627,7 +629,7 @@ export class VaultData {
     return this.perform(write.deleteTemplate(id), `템플릿 삭제: ${id}`, response => {
       const current = this.workspace()!; this.emit({ ...current, templates: current.templates.filter(row => row.id !== id) });
       if (Array.isArray(response.removed)) response.removed.forEach(path => { if (typeof path === 'string') this.markOwn(path); });
-      if (current.sample) writeJSON(this.services.storage, 'withlog.templates.v1', this.workspace()!.templates);
+      if (current.sample) writeSampleTemplates(this.services.storage, this.workspace()!.templates);
     });
   }
 }

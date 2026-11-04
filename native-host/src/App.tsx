@@ -39,22 +39,8 @@ function WorkspaceApp() {
     if (context.kind === 'note') {
       void controller.listenCloseRequested(() => { void controller.closeNoteWindow(); })?.then(fn => { unlistenClose = fn; });
     }
-    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
-    const handleResize = () => {
-      if (context.kind !== 'note') return;
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        controller.saveNoteGeometry({
-          width: window.innerWidth,
-          height: window.innerHeight,
-          x: window.screenX,
-          y: window.screenY,
-        });
-      }, 400);
-    };
-    if (context.kind === 'note') {
-      window.addEventListener('resize', handleResize);
-    }
+    let unlistenGeometry: (() => void) | undefined;
+    if (context.kind === 'note') void controller.listenNoteGeometry()?.then(fn => { unlistenGeometry = fn; });
     addEventListener('popstate', changed);
     addEventListener('focus', focus);
     addEventListener('storage', storage);
@@ -63,9 +49,7 @@ function WorkspaceApp() {
     void controller.boot(context.kind === 'main' && import.meta.env.DEV && new URLSearchParams(location.search).get('seed') === 'sample',
       context.kind === 'main' && import.meta.env.DEV ? new URLSearchParams(location.search).get('deeplink') || undefined : undefined);
     return () => {
-      unlistenClose?.();
-      clearTimeout(resizeTimer);
-      if (context.kind === 'note') window.removeEventListener('resize', handleResize);
+      unlistenClose?.(); unlistenGeometry?.();
       removeEventListener('popstate', changed); removeEventListener('focus', focus); removeEventListener('storage', storage);
       removeEventListener('keydown', keydown); removeEventListener('keydown', captureEscape, true);
       document.removeEventListener('visibilitychange', visible); controller.dispose();

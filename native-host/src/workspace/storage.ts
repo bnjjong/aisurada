@@ -113,7 +113,7 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
   delete (merged as any).agendaDesc;
   delete (merged as any).previewSize;
 
-  merged.theme = stateRow.theme === 'dark' ? 'dark' : 'light';
+  merged.theme = (typeof stateRow.theme === 'string' ? stateRow.theme : 'light') as AppPreferences['theme'];
   merged.weekLayout = stateRow.weekLayout === 'stack' || stateRow.weekLayout === 'dates' ? 'stack' : 'swimlane';
   merged.railWidth = clampInt(stateRow.railWidth, 200, 420, 264);
   merged.detailListWidth = clampInt(stateRow.detailListWidth, 260, 560, 340);
@@ -184,10 +184,14 @@ export const readNoteGeometry = readNoteWindowGeometry;
 export function readPreferences(storage: StoragePort, isMain = true): AppPreferences {
   const json = readJSON(storage, KEYS.prefs);
   const normalized = normalizePreferences(json);
-  const row = asRow(json);
-  if (isMain && row && row.version !== 1) {
-    const sanitized = sanitizePreferences(normalized.state as any);
-    writeJSON(storage, KEYS.prefs, { state: sanitized, version: 1 });
+  const row = asRow(json), version = row?.version;
+  // 16.3: a saved version that is a number other than 1 is migrated and written back as
+  // version 1 at once, from the values before the reading's corrections. A missing or
+  // non-numeric version is read as it is and not written.
+  if (isMain && row && typeof version === 'number' && Number.isFinite(version) && version !== 1) {
+    const state = { ...(asRow(row.state) || {}) };
+    if (version < 1 && state.askTimeoutSeconds === 1200) delete state.askTimeoutSeconds;
+    writeJSON(storage, KEYS.prefs, { state: sanitizePreferences(state), version: 1 });
   }
   return normalized.state;
 }
@@ -288,9 +292,24 @@ export function homePath(value: unknown): string | null {
   return path;
 }
 
+// 16.3, C157: the first value is light, and any other saved text goes to <html data-theme>
+// as it is. The reading does not correct it (16.14, item 1).
 export function readTheme(storage: StoragePort): WorkspaceState['theme'] {
   const theme = asRow(asRow(readJSON(storage, KEYS.prefs))?.state)?.theme;
-  return theme === 'dark' || theme === 'light' ? theme : 'system';
+  return (typeof theme === 'string' ? theme : 'light') as WorkspaceState['theme'];
+}
+
+// 16.10: the sample keeps its templates as {overrides, custom}. The sample has no default
+// templates, so only `custom` is used. An older array of templates is read as `custom`.
+const TEMPLATE_FIELDS = ['id', 'name', 'type', 'desc', 'body', 'format'] as const;
+export function readSampleTemplates(storage: StoragePort): Record<string, unknown>[] {
+  const value = readJSON(storage, KEYS.sampleTemplates);
+  const custom = Array.isArray(value) ? value : asRow(value)?.custom;
+  return Array.isArray(custom) ? custom.filter((item): item is Record<string, unknown> => !!asRow(item) && typeof asRow(item)!.id === 'string' && !!asRow(item)!.id) : [];
+}
+export function writeSampleTemplates(storage: StoragePort, templates: readonly Record<string, unknown>[]) {
+  const custom = templates.filter(item => item.category !== 'ritual').map(item => Object.fromEntries(TEMPLATE_FIELDS.filter(field => item[field] !== undefined).map(field => [field, item[field]])));
+  writeJSON(storage, KEYS.sampleTemplates, { overrides: {}, custom });
 }
 
 export function savedOpenIds(storage: StoragePort, root: string): Set<string> {

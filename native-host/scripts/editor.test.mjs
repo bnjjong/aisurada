@@ -10,7 +10,8 @@ import { $convertFromMarkdownString } from '@lexical/markdown';
 import { $createCodeNode } from '@lexical/code';
 import { $createTextNode } from 'lexical';
 import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs, closeBlockEmphasis } from '../src/editor/grammar.ts';
-import { frameHeight, openEditorLink } from '../src/editor/media.tsx';
+import { frameHeight, openEditorLink, FRAME_LINK } from '../src/editor/media.tsx';
+import { REPORT_HTML } from '../src/workspace/engine.ts';
 import { tablesOnlyJSON } from '../src/editor/tableTools.tsx';
 const cases=JSON.parse(readFileSync(new URL('../fixtures/editor-roundtrip/cases.json',import.meta.url),'utf8'));
 for(const c of cases) test(`PDF에서 독립 재구성한 왕복 ${c.id}: headless`,()=>{
@@ -97,6 +98,12 @@ test('C201: B and I format the chips in the selection with the text, and pressed
  half.update(()=>$importDocument('**앞**[노트](#doc:nd1)**뒤**'),{discrete:true});
  half.update(()=>{const texts=$getRoot().getAllTextNodes(),range=$createRangeSelection();range.anchor.set(texts[0].getKey(),0,'text');range.focus.set(texts.at(-1).getKey(),texts.at(-1).getTextContentSize(),'text');$setSelection(range);
   assert.equal($selectionHasFormat('bold'),false,'an unformatted chip keeps the button off');},{discrete:true});
+});
+test('목록 6번과 7번: 회고 본문은 태그 이름 뒤가 빈칸, >, /일 때만 HTML이고, HTML 상자는 네 가지 주소만 연다',()=>{
+ for(const html of ['<p>안녕</p>','  <div class="a">x','</div>','<br/>','<br>','<h1-x>','<My-Tag a=1>'])assert.equal(REPORT_HTML.test(html),true,html);
+ for(const markdown of ['<https://example.com> 링크','<!-- 메모 -->','<!DOCTYPE html>','<3 마음','글 <b>굵게</b>','','<a','<mailto:a@b.c>'])assert.equal(REPORT_HTML.test(markdown),false,markdown);
+ for(const link of ['http://a.b','https://a.b/c?d','mailto:a@b.c','tel:+8210','HTTPS://A.B'])assert.equal(FRAME_LINK.test(link),true,link);
+ for(const link of ['attach/report.pdf','javascript:alert(1)','file:///etc/hosts','//a.b','wlframe://localhost/x','data:text/html,x',' https://a.b'])assert.equal(FRAME_LINK.test(link),false,link);
 });
 test('mounted 표 정리는 짧은 행을 패딩하고 마지막 폭을 반복한다',()=>{
  const editor=createHeadlessEditor({namespace:'repair',nodes:EDITOR_NODES,onError:e=>{throw e}});

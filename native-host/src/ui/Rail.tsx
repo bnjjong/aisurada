@@ -1,7 +1,7 @@
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
-import { agendaOrder, HUE_COLORS } from "./model.ts";
+import { agendaOrder, HUE_COLORS, railGroupCollapsed } from "./model.ts";
 import { RailProjects, useProjectsList } from "@claude-plug/projects";
 import { useSessionBadge } from "@claude-plug/session";
 export function Rail({
@@ -23,11 +23,7 @@ export function Rail({
     id?: string,
   ) => {
     const isNone = slug === LOOSE_GROUP_KEY || slug === "" || slug === "__none__";
-    const collapsed = isNone
-      ? state.prefs.collapsedProjects.includes(LOOSE_GROUP_KEY) ||
-        state.prefs.collapsedProjects.includes("") ||
-        state.prefs.collapsedProjects.includes("__none__")
-      : state.prefs.collapsedProjects.includes(slug);
+    const collapsed = railGroupCollapsed(state.prefs.collapsedProjects, ws.projects.length, slug);
     return (
       <section key={slug || LOOSE_GROUP_KEY} className="rail-group">
         {ws.projects.length > 0 && (

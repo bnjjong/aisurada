@@ -49,6 +49,17 @@ export function workspaceServices(): WorkspaceServices {
       hot.on('withlog:deeplink', handler);
       return () => hot.off('withlog:deeplink', handler);
     } } : {}),
+    // 15.8: the window's logical pixels, not rounded. innerWidth and screenX are integers.
+    noteGeometryChanged: changed => {
+      if (!isTauri()) return Promise.resolve(() => {});
+      const window = getCurrentWindow();
+      const report = async () => {
+        const [position, size, scale] = await Promise.all([window.outerPosition(), window.innerSize(), window.scaleFactor()]);
+        changed({ width: size.width / scale, height: size.height / scale, x: position.x / scale, y: position.y / scale });
+      };
+      return Promise.all([window.onMoved(() => { void report(); }), window.onResized(() => { void report(); })])
+        .then(([moved, resized]) => () => { moved(); resized(); });
+    },
     closeWindow: () => getCurrentWindow().close(),
     closeRequested: isTauri()
       ? handler => getCurrentWindow().onCloseRequested(event => { event.preventDefault(); handler(); })

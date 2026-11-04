@@ -194,6 +194,14 @@ test('C45: protected sub-notes keep their text but follow the disk path; disk de
   assert.equal(h.data.getSnapshot().subNotes.a[0].path,'moved');assert.equal(h.data.getSnapshot().subNotes.a[0].body,'local');assert.deepEqual(h.data.getSnapshot().conflicted,['a:child']);
   h.sub.a=[];await h.data.loadSubNotes('a');assert.deepEqual(h.data.getSnapshot().subNotes.a,[]);assert.ok(!h.data.getSnapshot().editing.includes('a:child'));
 });
+test('목록 22번(10.4): 하위 노트의 제목만 실은 쓰기가 성공해도 못 쓴 글 표시는 본문을 실은 쓰기가 성공할 때만 내린다',async t=>{
+  const h=fixture(t);await h.data.loadSubNotes('a');
+  h.setHandler(async argv=>argv[0]==='update-sub-note'&&argv.some(cell=>cell.startsWith('body='))?fail(4):undefined);
+  await h.data.updateNote({parent:'a',id:'child'},{body:'new'});assert.ok(h.data.getSnapshot().unsaved.includes('a:child'));
+  h.setHandler(undefined);await h.data.updateNote({parent:'a',id:'child'},{title:'renamed'});
+  assert.ok(h.data.getSnapshot().unsaved.includes('a:child'),'a title-only success lowered the mark');
+  await h.data.updateNote({parent:'a',id:'child'},{body:'new'});assert.ok(!h.data.getSnapshot().unsaved.includes('a:child'));
+});
 test('sub-note body writes include the current title and token; subtitle failure is unsaved',async t=>{
   const h=fixture(t);await h.data.loadSubNotes('a');await h.data.updateNote({parent:'a',id:'child'},{body:'new'});
   assert.deepEqual(h.argv().at(-1),['update-sub-note','a','child','body=new','title=child','f1=S0']);

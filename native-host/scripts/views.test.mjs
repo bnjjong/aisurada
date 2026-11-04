@@ -18,6 +18,7 @@ import {
   preferences,
   scheduleNotice,
   agendaRepoField,
+  railGroupCollapsed,
 } from "../src/ui/model.ts";
 import { RecentNotes, recentNotes, recentKey } from "../src/ui/recent.ts";
 import {
@@ -29,6 +30,7 @@ import {
 } from "../src/ui/CalendarAgenda.tsx";
 import { reportIds } from "../src/ui/OtherPages.tsx";
 import { readingHTML } from "../src/ui/ReadMarkdown.tsx";
+import { restoreReason } from "../src/ui/History.tsx";
 import {
   addLayer,
   topLayer,
@@ -280,15 +282,23 @@ test("외부 md 상대 링크 한 번 디코드·점 경로, URL과 다른 파�
   for (const s of ["https://a/x.md", "/x.md", "#x", "x.png", "%ZZ.md"])
     assert.equal(relativeFile("/a/start.md", s), null);
 });
-test("C193: 일 보기 화살표는 15분 그대로, 끌기는 격자로 옮기고 누른 쪽의 반대로 가둔 값은 안 쓴다", () => {
-  assert.equal(movedTime("14:37", 15, false), "14:52");
-  assert.equal(movedTime("14:37", -15, false), "14:22");
-  assert.equal(movedTime("23:30", 15, false), "23:45");
-  assert.equal(movedTime("23:50", 15, false), null);
-  assert.equal(movedTime("23:50", 40 / 0.8, true), null);
-  assert.equal(movedTime("00:05", -15, false), "00:00");
-  assert.equal(movedTime("09:30", 20, true), "09:45");
-  assert.equal(movedTime("09:44", 6, true), "09:45");
+test("C193, 목록 5번: 일 보기 화살표는 15분 그대로, 끌기는 끈 거리를 15분 단위로 반올림해 더하고 시작은 23:00에서 소요 시간을 뺀 때까지 가둔다", () => {
+  assert.equal(movedTime("14:37", 0, 15, false), "14:52");
+  assert.equal(movedTime("14:37", 0, -15, false), "14:22");
+  assert.equal(movedTime("14:37", 0, 30, true), "15:07");
+  assert.equal(movedTime("14:37", 0, 7, true), "14:37");
+  assert.equal(movedTime("14:37", 0, 8, true), "14:52");
+  assert.equal(movedTime("22:30", 30, 15, false), "22:30"); // already at the held end: same time, nothing is written
+  assert.equal(movedTime("22:00", 30, 15, false), "22:15");
+  assert.equal(movedTime("22:40", 60, 15, false), null);
+  assert.equal(movedTime("21:30", 60, 60, true), "22:00");
+  assert.equal(movedTime("21:30", 60, 90, true), "22:00");
+  assert.equal(movedTime("23:30", 0, 15, false), null);
+  assert.equal(movedTime("23:30", 0, 40 / 0.8, true), null);
+  assert.equal(movedTime("00:05", 0, -15, false), "00:00");
+  assert.equal(movedTime("23:00", 0, 15, false), "23:00");
+  assert.equal(movedTime("09:00", 90, 8 * 60, true), "17:00");
+  assert.equal(movedTime("09:00", 90, 13 * 60, true), "21:30");
 });
 test("C28: 아젠다 폼은 연 때 저장소가 있던 아젠다에서 비운 칸만 repo= 로 싣는다", () => {
   assert.deepEqual(agendaRepoField("git@x:a.git", ""), { repo: "" });
@@ -316,6 +326,25 @@ test("C198: 읽기 화면도 블록 안에서 줄을 넘는 서식을 편집기�
   assert.equal(html("**굵게  \n이어짐** 끝"), "<p><strong>굵게</strong><br><strong>이어짐</strong> 끝</p>");
   assert.equal(html("긴 **문단\n이어짐** 끝", true), "<p>긴 <strong>문단</strong>⏎<strong>이어짐</strong> 끝</p>");
   assert.equal(html("> **a\n>\n> b**"), "<blockquote>⏎<p>**a</p>⏎<p>b**</p>⏎</blockquote>");
+});
+test("목록 27번(13.4): 되돌리기를 막은 까닭은 첫 commit-vault의 답으로 표의 차례대로 가른다", () => {
+  assert.equal(restoreReason(null), "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.");
+  assert.equal(restoreReason({ outcome: "failed" }), "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.");
+  assert.equal(restoreReason({ outcome: "disabled", blocked: "off" }), "자동 커밋이 꺼져 있거나 vault가 git 저장소가 아니에요.");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "index-lock" }), "vault의 git이 잠겨 있어요(.git/index.lock).");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "in-progress" }), "vault에서 git 병합이나 리베이스가 진행 중이에요.");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "not-main" }), "vault의 git이 main 브랜치에 있지 않아요.");
+  assert.equal(restoreReason({ outcome: "skipped" }), "vault에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "off" }), "vault에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.");
+});
+test("목록 29번(12.1): 프로젝트가 0개면 접어 둔 「미분류」도 아젠다를 숨기지 않는다", () => {
+  assert.equal(railGroupCollapsed(["(미분류)"], 0, "(미분류)"), false);
+  assert.equal(railGroupCollapsed(["(미분류)"], 0, ""), false);
+  assert.equal(railGroupCollapsed(["(미분류)"], 1, "(미분류)"), true);
+  assert.equal(railGroupCollapsed(["", "x"], 2, "__none__"), true);
+  assert.equal(railGroupCollapsed(["p1"], 2, "p1"), true);
+  assert.equal(railGroupCollapsed(["p1"], 2, "p2"), false);
+  assert.equal(railGroupCollapsed([], 2, "(미분류)"), false);
 });
 test("캘린더 15분 스냅·경계·한 시간 겹침 레인", () => {
   assert.equal(timeAt(67), "01:00");

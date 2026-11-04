@@ -78,7 +78,10 @@ test('shortcuts use physical codes for digits and brackets and ignore Alt, Shift
   assert.deepEqual(shortcutFor(key({ code:'Digit2', key:'é' }), true, true), {kind:'index',index:1});
   assert.deepEqual(shortcutFor(key({ code:'Numpad9' }), true, true), {kind:'index',index:-1});
   assert.deepEqual(shortcutFor(key({ code:'BracketLeft', key:'{', shiftKey:true }), true, true), {kind:'cycle',direction:-1});
-  for (const event of [key({code:'Digit1',shiftKey:true}),key({key:'k',altKey:true}),key({key:'k',metaKey:false,ctrlKey:true})]) assert.equal(shortcutFor(event,true,true),null);
+  for (const event of [key({code:'Digit1',shiftKey:true}),key({key:'k',altKey:true}),key({key:'k',metaKey:false,ctrlKey:false})]) assert.equal(shortcutFor(event,true,true),null);
+  // 목록 30번(4.3): Ctrl works like Cmd on macOS too.
+  assert.deepEqual(shortcutFor(key({key:'k',metaKey:false,ctrlKey:true}),true,true),{kind:'search'});
+  assert.deepEqual(shortcutFor(key({code:'Digit2',key:'2',metaKey:false,ctrlKey:true}),true,true),{kind:'index',index:1});
   assert.deepEqual(shortcutFor(key({key:'K',metaKey:false,ctrlKey:true}),false,true),{kind:'search'});
   assert.equal(shortcutFor(key({key:'w'}),true,true),null); assert.deepEqual(shortcutFor(key({key:'w'}),true,false),{kind:'close'});
 });
@@ -140,6 +143,46 @@ test('search toggles over editable focus and Escape honors already-consumed inne
   h.controller.handleKey(key({key:'Escape'})); assert.equal(h.controller.getSnapshot().searchOpen,false);
 });
 
+test('목록 14번: 노트 창은 옮기거나 크기를 바꾸면 마지막 바뀜에서 400ms 뒤 소수점 그대로 자리를 적는다',async t=>{
+  const h=await fixture(t,{context:{kind:'note',docId:'a'}});let report;
+  h.services.noteGeometryChanged=async changed=>{report=changed;return()=>{}};
+  t.mock.timers.enable({apis:['setTimeout']});await h.controller.listenNoteGeometry();
+  report({width:800.5,height:600.25,x:10.75,y:20});t.mock.timers.tick(399);assert.equal(h.values.get(KEYS.noteWindow),undefined);
+  report({width:812.5,height:600.25,x:30.5,y:20.125});t.mock.timers.tick(399);assert.equal(h.values.get(KEYS.noteWindow),undefined);
+  t.mock.timers.tick(1);assert.deepEqual(JSON.parse(h.values.get(KEYS.noteWindow)),{width:812.5,height:600.25,x:30.5,y:20.125});
+  const saved=h.calls.filter(call=>call.command==='remember_note_window');assert.equal(saved.length,1);assert.deepEqual(saved[0].args.geometry,{width:812.5,height:600.25,x:30.5,y:20.125});
+});
+test('목록 15번(C149): 노트 창이 vault에 붙기 전 화면에서는 Cmd+W가 아무 일도 안 하고 창 자리도 안 적는다',async t=>{
+  const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true,noBoot:true});
+  h.services.noteGeometryChanged=async changed=>{h.report=changed;return()=>{}};
+  assert.equal(await h.controller.handleMenu('wl_close_tab'),false);assert.equal(h.calls.filter(call=>call.command==='destroy_current_window').length,0);
+  h.controller.saveNoteGeometry({width:700,height:500,x:1,y:2});assert.equal(h.values.get(KEYS.noteWindow),undefined);
+  assert.equal(h.calls.filter(call=>call.command==='remember_note_window').length,0);
+});
+test('목록 16번(C153): 노트 창에서 바꾼 설정은 그 창 안에서만 살고 공유 저장소에는 안 쓴다',async t=>{
+  const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true});
+  const before=h.values.get(KEYS.prefs);
+  h.controller.preference({previewWidth:900,previewHeight:700});
+  assert.deepEqual(h.controller.getSnapshot().prefs.previewSize,{width:900,height:700});
+  h.controller.refreshTheme();assert.deepEqual(h.controller.getSnapshot().prefs.previewSize,{width:900,height:700});
+  assert.equal(h.values.get(KEYS.prefs),before);assert.ok(!h.writes.includes(KEYS.prefs));
+  const main=await fixture(t,{});main.controller.preference({previewWidth:640,previewHeight:480});assert.ok(main.writes.includes(KEYS.prefs));
+});
+test('목록 17번(C156): 노트 탭의 「새 창으로」는 open_note_window를 2번 보내고, 탭이 아니면 1번이다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');
+  const opens=()=>h.calls.filter(call=>call.command==='open_note_window');
+  assert.equal(await h.controller.moveNoteWindow('a'),'opened');assert.equal(opens().length,2);
+  assert.deepEqual(opens()[1].args,{docId:'a',title:null,geometry:null});
+  assert.equal(await h.controller.moveNoteWindow('b'),'opened');assert.equal(opens().length,3);
+});
+test('목록 28번(11.7): 하위 페이지는 같은 주소로 옮겨도 닫히고, 도착할 주소에 닿는 바뀜 1번만 봐준다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');h.controller.openSubNotes('a',['child']);
+  assert.equal(h.controller.getSnapshot().subNotes.root,'a');assert.equal(h.controller.getSnapshot().subNotes.arrival,null);
+  h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null,'moving to the same address did not close it');
+  h.controller.navigate('/calendar');h.controller.openSubNotes('a',['child']);assert.equal(h.controller.getSnapshot().subNotes.arrival,'/doc/a');
+  h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes.root,'a');assert.equal(h.controller.getSnapshot().subNotes.arrival,null);
+  h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null);
+});
 test('note window receives only close, flushes before destroy, and never subscribes to deep links', async t => {
   const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true});
   assert.ok(h.listeners.menu); assert.equal(h.listeners.links,undefined); assert.equal(h.listeners.development,undefined);
