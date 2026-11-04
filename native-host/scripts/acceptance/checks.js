@@ -131,6 +131,15 @@ if (location.pathname.startsWith("/note-window/")) {
         })
       ).endsWith("/created"),
     );
+    // 저장 위치가 아직 없으면 호스트가 만든 뒤 그 안에 이름 폴더를 만든다.
+    assert(
+      (
+        await invoke("create_workspace_dir", {
+          parent: `${cfg.root}/missing/parent`,
+          name: "created",
+        })
+      ).endsWith("/missing/parent/created"),
+    );
     await refused("create_workspace_dir", {
       parent: cfg.root,
       name: "../escape",

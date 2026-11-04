@@ -96,6 +96,12 @@ pub fn create_workspace_dir(parent: String, name: String) -> Result<String, Stri
             "워크스페이스 이름은 점으로 시작할 수 없어요: {name}"
         ));
     }
+    // 저장 위치가 아직 없으면 만든다. 없는 폴더를 적었다는 것은 거기에 두겠다는 뜻이다. 이름 검사가 모두 끝난
+    // 뒤에 만들어서 잘못된 이름이 빈 폴더를 남기지 않는다. 있는 파일을 가리키면 아래 단계가 실패한다.
+    if !parent_path.exists() {
+        std::fs::create_dir_all(parent_path)
+            .map_err(|e| format!("저장 위치를 만들 수 없어요: {parent} ({e})"))?;
+    }
     let canonical = parent_path
         .canonicalize()
         .map_err(|e| format!("저장 위치를 찾을 수 없어요: {parent} ({e})"))?;
@@ -189,6 +195,28 @@ mod tests {
             .contains("점으로 시작"));
         std::fs::write(temp.path().join("file"), b"data").unwrap();
         assert!(create_workspace_dir(parent, "file".into()).is_err());
+    }
+    #[test]
+    fn create_dir_makes_a_missing_parent_after_validating_the_name() {
+        let temp = tempfile::tempdir().unwrap();
+        let parent = temp.path().join("new/parent");
+        let parent_text = parent.to_string_lossy().into_owned();
+        // 잘못된 이름은 저장 위치를 만들기 전에 거절하므로 빈 폴더를 남기지 않는다.
+        assert!(create_workspace_dir(parent_text.clone(), "..".into()).is_err());
+        assert!(create_workspace_dir(parent_text.clone(), ".hidden".into()).is_err());
+        assert!(!parent.exists());
+        let path = create_workspace_dir(parent_text.clone(), "df-ai".into()).unwrap();
+        assert!(path.ends_with("/new/parent/df-ai"));
+        assert!(Path::new(&path).is_dir());
+        // 같은 요청을 다시 해도 그대로 성공한다.
+        assert_eq!(
+            create_workspace_dir(parent_text, "df-ai".into()).unwrap(),
+            path
+        );
+        // 저장 위치가 파일이면 만들지 않고 실패한다.
+        let file = temp.path().join("plain-file");
+        std::fs::write(&file, b"data").unwrap();
+        assert!(create_workspace_dir(file.to_string_lossy().into_owned(), "x".into()).is_err());
     }
     #[test]
     fn workspace_marker_must_be_a_file_and_is_not_parsed() {

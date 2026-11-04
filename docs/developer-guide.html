@@ -319,6 +319,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 <p>화면은 <code>@claude-plug/*</code> 별칭을 모드에 따라 <code>src/plugs/claude/</code> 또는 <code>src/plugs/empty/</code>로 돌린다. 빌드 뒤에는 <code>scripts/screen-contracts.mjs</code>가 번들을 검사한다. 끈 판에는 4부 커맨드 이름이 하나도 없어야 하고, 켠 판에는 하나 이상 있어야 한다.</p>
 <h3 id="계약을-건드릴-때"><a class="anchor" href="#계약을-건드릴-때" aria-label="이 절의 링크">#</a>계약을 건드릴 때</h3>
 <p>호스트 커맨드(2부 29개, 4부 9개)와 이벤트 4개(<code>ais://menu</code>, <code>ais://navigate</code>, <code>ais://note-windows</code>, <code>ais://self-write</code>), 번들 식별자, 권한 파일(<code>src-tauri/capabilities/main.json</code>·<code>note.json</code>)은 시험이 글자까지 잰다(<code>scripts/contracts.test.mjs</code>). 커맨드를 더하거나 권한을 바꾸면 이 시험과 <code>capabilities/</code>를 함께 고친다. <code>main</code>과 <code>note-*</code> 창의 권한은 일부러 다르다.</p>
+<p><strong>설명서와 일부러 다르게 둔 것.</strong> <code>create_workspace_dir({parent, name})</code>는 설명서대로라면 저장 위치(<code>parent</code>)가 없을 때 실패해야 하지만, 지금은 이름 검사를 모두 통과한 뒤 저장 위치를 만든다(<code>mkdir -p</code>). 새 워크스페이스 화면에서 없는 폴더를 적으면 「저장 위치를 찾을 수 없어요」로 막히던 것을 2026-11-04에 바꿨다. 저장 위치가 파일이면 여전히 실패하고, 잘못된 이름은 저장 위치를 만들기 전에 거절한다(<code>workspace.rs</code>의 <code>create_dir_makes_a_missing_parent_after_validating_the_name</code>).</p>
 <h2 id="8-시험"><a class="anchor" href="#8-시험" aria-label="이 절의 링크">#</a>8. 시험</h2>
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
