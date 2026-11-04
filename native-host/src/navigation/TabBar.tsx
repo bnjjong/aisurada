@@ -4,6 +4,7 @@ import type { WorkspaceController } from '../workspace/controller.ts';
 import type { WorkspaceState } from '../workspace/types.ts';
 import { activeTab, isNoteTab } from './routes.ts';
 import { displayTitle } from '../ui/model.ts';
+import { useAskState } from '@claude-plug/state';
 
 interface Drag {
   id: string;
@@ -21,6 +22,8 @@ export function tabTitle(id: string, state: WorkspaceState): string {
 
 export function TabBar({ controller, state }: { controller: WorkspaceController; state: WorkspaceState }) {
   const active = activeTab(state.route);
+  // 4.10: the key of an unseen answer maps to the root note id; the root note's own tab shows the dot.
+  const unseen = useAskState((ask) => ask.unseen);
   const buttons = useRef(new Map<string | null, HTMLButtonElement>());
   const list = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -98,7 +101,7 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
         onPointerCancel={() => { drag.current = null; setDragging(null); }}>
         <button role="tab" aria-selected={active === id} aria-controls="screen-content" tabIndex={active === id ? 0 : -1}
           className="tab-button" title={title} data-tab-id={id ?? undefined} ref={element => { if (element) buttons.current.set(id, element); else buttons.current.delete(id); }}
-          onKeyDown={event => keydown(event, id)}>{id === null && <span aria-hidden="true">w.</span>}<span className="tab-label">{note && state.prefs.titleDate ? <><small>{note.date}</small>{displayTitle(note,true).replace(/^\d{8}-?/,'')}</> : title}</span></button>
+          onKeyDown={event => keydown(event, id)}>{id === null && <span aria-hidden="true">w.</span>}<span className="tab-label">{note && state.prefs.titleDate ? <><small>{note.date}</small>{displayTitle(note,true).replace(/^\d{8}-?/,'')}</> : title}</span>{id !== null && Object.values(unseen).includes(id) && <span className="tab-ask-dot" role="img" aria-label={Object.keys(unseen).some(key => key === id && unseen[key] === id) ? 'AI 답이 왔어요' : '하위 노트에 AI 답이 왔어요'} />}</button>
         {id !== null && <button className="tab-close tabx-close" tabIndex={-1} aria-label={`${title} 탭 닫기`} onClick={() => controller.closeTab(id)}>×</button>}
       </div>;
     })}

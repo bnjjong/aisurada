@@ -1,8 +1,11 @@
 // Markdown rendering for model answers with symbol chips and folding.
 // Adheres to Chapter 4 (4.11, 4.12) of withlog Part 4 Claude integration specifications.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { message } from '@tauri-apps/plugin-dialog';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { sanitizeHtml } from '../../lib/sanitize.ts';
 import { readingHTML } from '../../ui/ReadMarkdown.tsx';
+import { openDocLink } from './docLinks.ts';
 
 interface ModelProseProps {
   content: string;
@@ -10,77 +13,85 @@ interface ModelProseProps {
   foldable?: boolean;
 }
 
-// 4.11: 기호만 든 인라인 코드(*, \ 따위)는 is-symbol 클래스를 부여해 굵게 그림
+// 4.11: a code span with no letter or digit in it is a symbol chip (`is-symbol`). A character reference
+// such as `&lt;` counts as one symbol.
 function tagSymbolCodeSpans(html: string): string {
-  return html.replace(/<code>([^<]+)<\/code>/g, (match, codeText) => {
-    // 디코딩 후 영문/숫자/한글이 전혀 없고 기호만 있는지 판별
-    const clean = codeText
-      .replace(/&amp;/g, '&')
+  return html.replace(/<code>([^<]+)<\/code>/g, (match, codeText: string) => {
+    const decoded = codeText
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
       .trim();
-    const hasAlphaNumeric = /[a-zA-Z0-9\u3131-\uD79D]/.test(clean);
-    if (!hasAlphaNumeric && clean.length > 0) {
-      return `<code class="is-symbol">${codeText}</code>`;
-    }
+    if (decoded.length > 0 && !/[\p{L}\p{N}]/u.test(decoded)) return `<code class="is-symbol">${codeText}</code>`;
     return match;
   });
+}
+
+/** What a click on a link in an answer does (4.11): outside addresses open in the browser, `#doc:` previews. */
+export type ProseLink =
+  | { kind: 'browser'; url: string }
+  | { kind: 'doc'; id: string }
+  | { kind: 'none' };
+
+export function classifyProseLink(rawHref: string | null): ProseLink {
+  const href = (rawHref ?? '').trim();
+  if (/^(?:https?|mailto|tel):/i.test(href)) return { kind: 'browser', url: href };
+  const doc = /^#doc:(.+)$/i.exec(href);
+  if (doc) return { kind: 'doc', id: doc[1] };
+  return { kind: 'none' };
+}
+
+const cache = new Map<string, string>();
+
+/** The same text is not converted again: a card re-renders every time the pointer enters it (4.11). */
+export function proseHtml(content: string): string {
+  const hit = cache.get(content);
+  if (hit !== undefined) return hit;
+  const html = sanitizeHtml(tagSymbolCodeSpans(readingHTML(content)));
+  if (cache.size > 200) cache.clear();
+  cache.set(content, html);
+  return html;
+}
+
+function cssPixels(element: Element, name: string, fallback: number): number {
+  const value = parseFloat(getComputedStyle(element).getPropertyValue(name));
+  return Number.isFinite(value) ? value : fallback;
 }
 
 export function ModelProse({ content, className = '', foldable = false }: ModelProseProps) {
   const [folded, setFolded] = useState(foldable);
   const [needsFold, setNeedsFold] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const html = useMemo(() => proseHtml(content), [content]);
 
-  const rawHtml = React.useMemo(() => {
-    const rendered = readingHTML(content);
-    const tagged = tagSymbolCodeSpans(rendered);
-    return sanitizeHtml(tagged);
-  }, [content]);
-
-  // 4.12: 접는 높이 126px + 여유 21px = 147px 초과 시 접기 버튼 제공
+  // 4.12: fold when the rendered height is over the fold height plus one line of slack. Both numbers live in
+  // CSS variables (`--ask-fold-height`, `--ask-fold-slack`) and are read here, so there is one copy of them.
   useEffect(() => {
     if (!foldable) return;
-    const elem = containerRef.current;
-    if (!elem) return;
-
-    const checkHeight = () => {
-      const scrollHeight = elem.scrollHeight;
-      if (scrollHeight > 147) {
-        setNeedsFold(true);
-      } else {
-        setNeedsFold(false);
-      }
+    const element = containerRef.current;
+    if (!element) return;
+    const measure = () => {
+      const limit = cssPixels(element, '--ask-fold-height', 126) + cssPixels(element, '--ask-fold-slack', 21);
+      setNeedsFold(element.scrollHeight > limit);
     };
-
-    checkHeight();
-    const observer = new ResizeObserver(checkHeight);
-    observer.observe(elem);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
     return () => observer.disconnect();
   }, [content, foldable]);
 
-  // 4.11: 바깥 링크는 기본 브라우저로 열기
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const anchor = target.closest('a');
+  const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (event.target as HTMLElement).closest('a');
     if (!anchor) return;
-
-    const href = anchor.getAttribute('href');
-    if (!href) return;
-
-    if (href.startsWith('http://') || href.startsWith('https://')) {
-      e.preventDefault();
-      // open in default browser
-      import('@tauri-apps/api/core')
-        .then(({ invoke }) => invoke('open_target', { path: href }))
-        .catch(() => {});
-    } else if (href.startsWith('#doc:')) {
-      // #doc:<노트id> 링크는 기본 처리
-    } else {
-      // 세션 대화의 [파일:줄] 링크 등 상대경로는 무시
-      e.preventDefault();
+    const link = classifyProseLink(anchor.getAttribute('href'));
+    // Any other link does nothing: a relative `[file:line](path)` has no folder to resolve against here.
+    event.preventDefault();
+    if (link.kind === 'browser') {
+      void openUrl(link.url).catch(() => {});
+    } else if (link.kind === 'doc') {
+      if (!openDocLink(link.id)) void message('노트를 찾을 수 없어요', { title: 'withlog', kind: 'warning' }).catch(() => {});
     }
   };
 
@@ -89,16 +100,11 @@ export function ModelProse({ content, className = '', foldable = false }: ModelP
       <div
         ref={containerRef}
         className={`model-prose ${foldable && needsFold && folded ? 'ask-fold is-folded' : ''}`}
-        style={foldable && needsFold && folded ? { maxHeight: '126px', overflow: 'hidden' } : undefined}
-        dangerouslySetInnerHTML={{ __html: rawHtml }}
+        dangerouslySetInnerHTML={{ __html: html }}
         onClick={handleClick}
       />
       {foldable && needsFold && (
-        <button
-          type="button"
-          className="ask-fold-toggle"
-          onClick={() => setFolded(!folded)}
-        >
+        <button type="button" className="ask-fold-toggle" onClick={() => setFolded(!folded)}>
           {folded ? '펼치기' : '접기'}
         </button>
       )}

@@ -27,7 +27,7 @@ function check(condition, message) {
   if (!condition) throw new Error(`화면 빌드 계약 위반: ${message}`);
 }
 
-export function assertScreenBundle(directory) {
+export function assertScreenBundle(directory, { part4 = false } = {}) {
   const root = resolve(directory);
   const html = readFileSync(join(root, 'index.html'), 'utf8');
   const nodes = [...elements(parse(html, { sourceCodeLocationInfo: true }))];
@@ -64,11 +64,18 @@ export function assertScreenBundle(directory) {
   check(scripts > 0 && stylesheets > 0, 'JS와 CSS 자원 파일이 필요합니다.');
   const javascript = [...files(join(root, 'assets'))].filter(path => extname(path) === '.js');
   check(javascript.length > 0, 'assets/에 JS 파일이 필요합니다.');
+  let part4Commands = 0;
   for (const path of javascript) {
     const source = readFileSync(path, 'utf8');
     for (const command of PART4_COMMANDS) {
-      check(!source.includes(command), `${relative(root, path)}에 4부 커맨드 ${command}가 남았습니다.`);
+      if (part4) {
+        if (source.includes(command)) part4Commands++;
+      } else {
+        check(!source.includes(command), `${relative(root, path)}에 4부 커맨드 ${command}가 남았습니다.`);
+      }
     }
   }
-  return { javascript: javascript.length, inlineStyles: 0, part4Commands: 0 };
+  // 1.8: the Part 4 screen names a Part 4 command in at least one .js file.
+  if (part4) check(part4Commands > 0, '4부를 켠 화면 번들에 4부 커맨드 이름이 하나도 없습니다.');
+  return { javascript: javascript.length, inlineStyles: 0, part4Commands };
 }

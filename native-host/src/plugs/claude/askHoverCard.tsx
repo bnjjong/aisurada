@@ -1,160 +1,100 @@
 // Hover card appearing above/below ask mark in note editor.
 // Adheres to Chapter 4 (4.5, 4.7) of withlog Part 4 Claude integration specifications.
-import React, { useEffect, useRef, useState } from 'react';
-import { ModelProse } from './modelProse.tsx';
-import { ASK_MODELS } from './askPopover.tsx';
+import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { AskTurnView, FollowUpRow, PendingLine } from './askParts.tsx';
+import { turnsForUnderline } from './askText.ts';
+import type { AskThread } from './askText.ts';
+import { useAskState } from './state.ts';
 
 export interface AskHoverCardProps {
+  /** The store key of the note: the note id, or the sub note id. */
   docId: string;
+  /** An underline id, or the id of a follow-up turn (it moves to its underline). */
   turnId: string;
-  turns?: Array<{
-    id: string;
-    markId: string;
-    quote?: string;
-    question: string;
-    answer: string;
-    error?: string;
-    model: string;
-    effort: string;
-    elapsedMs: number;
-    sessionLines?: number;
-    images?: string[];
-  }>;
   onFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
   onFocusInput?: () => void;
   onClose?: () => void;
   pinned?: boolean;
-  boundaryRef?: React.RefObject<HTMLElement | null>;
+  boundaryRef?: RefObject<HTMLElement | null>;
 }
 
-export function AskHoverCard({
-  turnId,
-  turns,
-  onFollowUp,
-  onClose,
-  pinned = false,
-}: AskHoverCardProps) {
+/** 4.5: the delay before a card that is not pinned closes once the pointer has left. */
+export const CARD_CLOSE_DELAY_MS = 180;
+
+export function AskHoverCard({ docId, turnId, onFollowUp, onClose, pinned = false }: AskHoverCardProps) {
+  const thread = useAskState((state) => state.threads[docId] ?? null) as AskThread | null;
+  const pendingByMark = useAskState((state) => state.pending[docId]);
   const [isPinned, setIsPinned] = useState(pinned);
-  const [followUpText, setFollowUpText] = useState('');
-  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const card = useRef<HTMLDivElement>(null);
 
-  // 현재 밑줄(turnId 또는 markId)에 연결된 회차들 필터링
-  const matchingTurns = (turns || []).filter(
-    (t) => t.id === turnId || t.markId === turnId
-  );
+  // 4.5: the card picks the turns of one underline; a follow-up's id moves to the underline it belongs to.
+  const turns = turnsForUnderline(thread?.turns ?? [], turnId);
+  const underline = turns.length ? (turns[0].markId || turns[0].id) : turnId;
+  const record = pendingByMark?.[underline] ?? pendingByMark?.[turnId];
 
-  const handleMouseEnter = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isPinned) return;
-    // 4.5: 180ms 지연 닫기
-    closeTimerRef.current = setTimeout(() => {
-      onClose?.();
-    }, 180);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
+  useEffect(() => setIsPinned(pinned), [pinned]);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
   }, []);
 
-  const handleFollowUpSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmed = followUpText.trim();
-    if (!trimmed) return;
-    onFollowUp?.(trimmed, turnId);
-    setFollowUpText('');
+  // 4.5: a press outside a pinned card closes it.
+  useEffect(() => {
+    if (!isPinned) return;
+    const outside = (event: PointerEvent) => {
+      if (card.current && !card.current.contains(event.target as Node)) onClose?.();
+    };
+    document.addEventListener('pointerdown', outside, true);
+    return () => document.removeEventListener('pointerdown', outside, true);
+  }, [isPinned, onClose]);
+
+  const cancelClose = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    if (isPinned) return;
+    cancelClose();
+    timer.current = setTimeout(() => onClose?.(), CARD_CLOSE_DELAY_MS);
   };
 
   return (
     <div
-      className={`ask-hovercard ${isPinned ? 'is-pinned' : ''}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      ref={card}
+      className={`ask-hovercard${isPinned ? ' is-pinned' : ''}`}
+      data-ask-card={underline}
+      onMouseEnter={cancelClose}
+      onMouseLeave={scheduleClose}
+      // Any press inside the card pins it; a focus that lands in its box does the same.
+      onPointerDown={() => setIsPinned(true)}
+      onFocus={() => setIsPinned(true)}
+      onKeyDown={(event) => {
+        // 4.5: Esc inside the card closes it and stops the native propagation, so a preview modal around it stays.
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          event.nativeEvent.stopImmediatePropagation();
+          onClose?.();
+        }
+      }}
     >
-      <div className="ask-hovercard-header">
-        <span className="ask-hovercard-title">문답</span>
-        <button
-          type="button"
-          className="ask-hovercard-pin-btn"
-          title={isPinned ? '핀 풀기' : '카드 고정'}
-          onClick={() => setIsPinned(!isPinned)}
-        >
-          {isPinned ? '📌' : '📍'}
-        </button>
-        {onClose && (
-          <button
-            type="button"
-            className="ask-hovercard-close-btn"
-            onClick={onClose}
-            aria-label="닫기"
-          >
-            ×
-          </button>
-        )}
-      </div>
-
-      <div className="ask-hovercard-body">
-        {matchingTurns.length === 0 ? (
-          <div className="ask-hovercard-empty">
-            <p>이 대목의 문답을 불러오는 중이거나 찾을 수 없어요.</p>
-          </div>
-        ) : (
-          matchingTurns.map((turn) => {
-            const modelLabel =
-              ASK_MODELS.find((m) => m.id === turn.model)?.label || turn.model;
-            const elapsedSec = (turn.elapsedMs / 1000).toFixed(1);
-
-            return (
-              <div
-                key={turn.id}
-                className={`ask-turn ${turn.error ? 'is-error' : ''}`}
-              >
-                {turn.quote && (
-                  <div className="ask-quote" title={turn.quote}>
-                    “{turn.quote}”
-                  </div>
-                )}
-                <div className="ask-question">{turn.question}</div>
-                {turn.error ? (
-                  <div className="ask-error">{turn.error}</div>
-                ) : (
-                  <div className="ask-answer">
-                    <ModelProse content={turn.answer} foldable={false} />
-                  </div>
-                )}
-                <div className="ask-meta">
-                  {modelLabel} · {turn.effort} · {elapsedSec}초
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {onFollowUp && (
-        <form className="ask-hovercard-followup" onSubmit={handleFollowUpSubmit}>
-          <input
-            type="text"
-            value={followUpText}
-            onChange={(e) => setFollowUpText(e.target.value)}
-            placeholder="이 대목에 이어 묻기"
-          />
-          <button type="submit" disabled={!followUpText.trim()}>
-            묻기
-          </button>
-        </form>
+      {turns.length === 0 && !record ? (
+        <div className="ask-hovercard-empty">이 기기에 그 문답이 없어요. 밑줄만 남아 있어요.</div>
+      ) : (
+        <div className="ask-hovercard-body">
+          {turns.map((turn) => (
+            <AskTurnView key={turn.id} turn={turn} fold={false} />
+          ))}
+          {record && <PendingLine record={record} />}
+        </div>
       )}
-
-      <div className="ask-hovercard-hint">
-        {isPinned ? '카드가 고정됨' : '바깥으로 마우스를 빼면 닫혀요'}
-      </div>
+      {turns.length > 0 && !isPinned && <div className="ask-hovercard-hint">눌러서 고정하면 이어 물을 수 있어요</div>}
+      {turns.length > 0 && isPinned && !record && onFollowUp && (
+        <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} />
+      )}
     </div>
   );
 }

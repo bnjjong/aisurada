@@ -87,9 +87,12 @@ export function TerminalHost({ tabKey, isVisible, agendas, onCreateDoc, onNaviga
         fitAddon.fit();
         void secretTableProbe().catch(() => {}); // 14.3 (5): not waited for, a failure is dropped
         let sent = { cols: term.cols, rows: term.rows };
-        const result = await ptyStart(tabKey, term.cols, term.rows, base64 => {
-          try { term.write(decodeChunk(base64)); } catch { /* a chunk that is not base64 is dropped */ }
-        });
+        // 10.11: a plain shell starts with pty_start; a session plan starts its own shell (pty_start_session).
+        const result = plan.kind === 'session'
+          ? await plan.start(term.cols, term.rows, bytes => { try { term.write(bytes); } catch { /* a bad chunk is dropped */ } })
+          : await ptyStart(tabKey, term.cols, term.rows, base64 => {
+            try { term.write(decodeChunk(base64)); } catch { /* a chunk that is not base64 is dropped */ }
+          });
         if (!alive.current) { term.dispose(); return; } // 14.3 (7)
         termRef.current = term; fitRef.current = fitAddon;
         setFellBack(result.fellBack);

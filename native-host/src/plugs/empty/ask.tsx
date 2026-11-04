@@ -36,7 +36,13 @@ export interface NoteAskInput {
   doc: Note;
   port: NoteBodyPort;
   baseDir?: string;
+  vault?: string;
   currentDraft: () => string;
+  timeoutSeconds?: () => number;
+  repo?: string;
+  root?: string;
+  rootSessionId?: string;
+  openDoc?: (id: string) => boolean | void;
   onFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
 }
 
@@ -60,6 +66,7 @@ export function EditorAskPlugins(_props?: {
   docId?: string;
   onAsk?: (quote: string, question: string, turnId: string, images?: File[]) => void;
   onFollowUp?: (question: string, underlineId: string, images?: File[]) => void;
+  onOpenCompose?: (quote: string, rect: { left: number; top: number }, markId?: string) => void;
 }): null {
   return null;
 }
@@ -68,6 +75,7 @@ export interface AskComposeState {
   left: number;
   top: number;
   quote: string;
+  markId?: string;
 }
 
 export interface AskComposePopoverProps {

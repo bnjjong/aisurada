@@ -2,159 +2,137 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import {
-  SessionComposer,
-  SessionCliPane,
-  getSessionComposerState,
-} from '../src/plugs/claude/session.tsx';
+import { SessionComposer, formatDroppedPaths, insertDropped, patchComposer, getSessionComposerState } from '../src/plugs/claude/session.tsx';
+import { AGENT_BUSY_NOTICE, LIVE_ELSEWHERE_NOTICE, planSessionShellWith } from '../src/plugs/claude/terminal.ts';
+import { COMPOSER_BLOCK_TEXT, composerBlock, pictureLines, sendToSession } from '../src/plugs/claude/sessionLogic.ts';
 
-test('Chapter 10: SessionComposer blocks rendering based on 10.1 decision rules', () => {
-  const sessionId = '3f2a9c4e-1b2d-4c3e-8f40-00000000a001';
+const ID = '3f2a9c4e-1b2d-4c3e-8f40-00000000a001';
 
-  // 1. live-terminal: 살아있는 대화형 터미널 세션인 경우 차단
-  const htmlTerminal = renderToString(
-    React.createElement(SessionComposer, {
-      sessionId,
-      sessionData: { turns: [] },
-      sessionItem: { sessionId, processAlive: true, kind: 'terminal' },
-      sessionLoaded: true,
-      transcriptFile: '/tmp/session.jsonl',
-      state: {},
-      onSent: () => {},
-    })
-  );
-  assert(
-    htmlTerminal.includes('class="sess-composer-blocked"'),
-    'Blocked container rendered for live terminal'
-  );
-  assert(
-    htmlTerminal.includes('data-block="live-terminal"'),
-    'data-block attribute set to live-terminal'
-  );
-  assert(
-    htmlTerminal.includes('이 세션은 다른 터미널에서 열려 있어요.'),
-    'Contains live-terminal warning text'
-  );
-
-  // 2. live-background: 살아있는 백그라운드 세션인 경우 차단
-  const htmlBackground = renderToString(
-    React.createElement(SessionComposer, {
-      sessionId,
-      sessionData: { turns: [] },
-      sessionItem: { sessionId, processAlive: true, kind: 'background' },
-      sessionLoaded: true,
-      transcriptFile: '/tmp/session.jsonl',
-      state: {},
-      onSent: () => {},
-    })
-  );
-  assert(
-    htmlBackground.includes('data-block="live-background"'),
-    'data-block attribute set to live-background'
-  );
-  assert(
-    htmlBackground.includes('이 세션은 백그라운드에서 돌고 있어요.'),
-    'Contains live-background warning text'
-  );
-
-  // 3. no-record: 대화를 읽었으나 기록 파일이 없는 경우 차단
-  const htmlNoRecord = renderToString(
-    React.createElement(SessionComposer, {
-      sessionId,
-      sessionData: { turns: [], file: null },
-      sessionItem: { sessionId, processAlive: false },
-      sessionLoaded: true,
-      transcriptFile: null,
-      state: {},
-      onSent: () => {},
-    })
-  );
-  assert(
-    htmlNoRecord.includes('data-block="no-record"'),
-    'data-block attribute set to no-record'
-  );
-  assert(
-    htmlNoRecord.includes('이 기계에 이 세션의 대화 기록이 없어서 이어 쓸 수 없어요.'),
-    'Contains no-record text'
-  );
-
-  // 4. 정상 세션: 입력창 활성화
-  const htmlNormal = renderToString(
-    React.createElement(SessionComposer, {
-      sessionId,
-      sessionData: { turns: [], file: '/tmp/session.jsonl' },
-      sessionItem: { sessionId, processAlive: false },
-      sessionLoaded: true,
-      transcriptFile: '/tmp/session.jsonl',
-      state: {},
-      onSent: () => {},
-    })
-  );
-  assert(htmlNormal.includes('class="sess-composer"'), 'Composer form rendered');
-  assert(
-    htmlNormal.includes('aria-label="세션으로 보내기"'),
-    'Composer textarea has aria-label="세션으로 보내기"'
-  );
-  assert(htmlNormal.includes('class="sess-composer-send"'), 'Send button rendered');
-  assert(htmlNormal.includes('class="sess-composer-mic"'), 'Mic button rendered');
+test('10.1: the composer decision table', () => {
+  assert.equal(composerBlock({ processAlive: true, kind: 'interactive' }, { done: false, file: undefined }), 'live-terminal');
+  assert.equal(composerBlock({ processAlive: true, kind: 'background' }, { done: false, file: undefined }), 'live-background');
+  assert.equal(composerBlock({ processAlive: true, heldByAgent: true, kind: 'interactive' }, { done: true, file: '/x' }), null);
+  assert.equal(composerBlock(undefined, { done: true, file: null }), 'no-record');
+  assert.equal(composerBlock(undefined, { done: false, file: null }), null, 'no record is only decided after the conversation was read');
+  assert.equal(composerBlock({ processAlive: false, kind: 'interactive' }, { done: true, file: '/x' }), null);
+  assert.equal(composerBlock({ kind: 'interactive' }, { done: true, file: '/x' }), null, 'not knowing opens it');
+  assert.equal(composerBlock({ processAlive: true, kind: 'interactive' }, { done: true, file: null }), 'live-terminal', 'alive is seen before no-record');
 });
 
-test('Chapter 10: SessionComposer state persistence per session (10.2)', () => {
-  const sidA = 'aaaaaaaa-1111-4000-8000-000000000001';
-  const sidB = 'bbbbbbbb-2222-4000-8000-000000000002';
-
-  const stateA = getSessionComposerState(sidA);
-  stateA.text = '작업하던 글 A';
-  stateA.notice = '알림 A';
-
-  const stateB = getSessionComposerState(sidB);
-  assert.equal(stateB.text, '', 'State B is initially empty');
-
-  // Re-read A
-  const stateA2 = getSessionComposerState(sidA);
-  assert.equal(stateA2.text, '작업하던 글 A', 'State A preserved across lookups');
-  assert.equal(stateA2.notice, '알림 A', 'Notice preserved');
+test('10.1: a closed composer draws its reason on the line with data-block', () => {
+  const draw = (row, file) => renderToString(React.createElement(SessionComposer, { sessionId: ID, sessionItem: row, sessionLoaded: true, transcriptFile: file, vault: '/v', timeoutSeconds: () => 3600 }));
+  for (const [row, file, block] of [[{ sessionId: ID, processAlive: true, kind: 'interactive' }, '/x', 'live-terminal'], [{ sessionId: ID, processAlive: true, kind: 'background' }, '/x', 'live-background'], [undefined, null, 'no-record']]) {
+    const html = draw(row, file);
+    assert.match(html, new RegExp(`class="sess-composer-blocked" data-block="${block}"`));
+    assert.ok(html.includes(COMPOSER_BLOCK_TEXT[block]));
+  }
+  const open = draw({ sessionId: ID, processAlive: false, kind: 'interactive' }, '/x');
+  assert.match(open, /class="sess-composer"/);
+  assert.match(open, /aria-label="세션으로 보내기"/);
+  assert.match(open, /aria-label="받아쓰기"/);
 });
 
-test('Chapter 10: SessionCliPane conforms to 10.9 & 10.13 terminal pane contracts', () => {
-  const sessionId = '3f2a9c4e-1b2d-4c3e-8f40-00000000a001';
+function fakeDeps(options = {}) {
+  const calls = { ask: [], images: [] };
+  return {
+    calls,
+    readList: async () => options.list ?? [],
+    firstCwd: async () => options.cwd ?? null,
+    writeImage: async (id, name, bytes) => { calls.images.push([id, name, bytes.length]); if (options.imageFails) throw new Error('디스크가 가득 찼다'); return `/data/session-images/${id}/${name}`; },
+    askClaude: async (args) => { calls.ask.push(args); return options.answer ?? { ok: true, answer: 'x' }; },
+  };
+}
+const base = { sessionId: ID, text: '  이어서 해 줘  ', images: [], vault: '/v', model: 'claude-sonnet-5-5', effort: 'low', timeoutSeconds: 7200 };
 
-  // 1. 다른 터미널에서 돌고 있는 대화형 세션인 경우 차단
-  const htmlBlocked = renderToString(
-    React.createElement(SessionCliPane, {
-      sessionId,
-      sessionCwd: '/tmp/cwd',
-      sessionItem: { sessionId, processAlive: true, kind: 'terminal' },
-    })
-  );
-  assert(
-    htmlBlocked.includes('data-tab-key="term:3f2a9c4e-1b2d-4c3e-8f40-00000000a001"'),
-    'data-tab-key attribute matches term:<sessionId>'
-  );
-  assert(
-    htmlBlocked.includes('class="term-empty"'),
-    'term-empty container rendered'
-  );
-  assert(
-    htmlBlocked.includes('이 세션은 지금 다른 터미널에서 돌고 있어요.'),
-    'Contains 10.9-3 blocked message'
-  );
+test('10.4 H1: the send calls ask_claude with the eight keys, the first folder only when it was read, and no persona', async () => {
+  const deps = fakeDeps({ cwd: '/Users/me/app' });
+  const result = await sendToSession(deps, base);
+  assert.deepEqual(result, { ok: true, notice: null });
+  const args = deps.calls.ask[0];
+  assert.deepEqual(Object.keys(args).sort(), ['cwd', 'effort', 'keepAlive', 'model', 'prompt', 'resume', 'resumeOnly', 'sessionId', 'timeoutSeconds', 'vault']);
+  assert.equal(args.vault, '/v');
+  assert.equal(args.prompt, '이어서 해 줘');
+  assert.equal(args.resume, true);
+  assert.equal(args.resumeOnly, true);
+  assert.equal(args.keepAlive, true);
+  assert.equal(args.timeoutSeconds, 7200);
+  assert.equal(args.cwd, '/Users/me/app');
+  const noCwd = fakeDeps();
+  await sendToSession(noCwd, base);
+  assert.equal('cwd' in noCwd.calls.ask[0], false, 'no first folder: the key is not sent');
+});
 
-  // 2. 정상 세션의 CLI 패널
-  const htmlNormal = renderToString(
-    React.createElement(SessionCliPane, {
-      sessionId,
-      sessionCwd: '/tmp/cwd',
-      sessionItem: { sessionId, processAlive: false },
-    })
-  );
-  assert(
-    htmlNormal.includes('data-tab-key="term:3f2a9c4e-1b2d-4c3e-8f40-00000000a001"'),
-    'data-tab-key present'
-  );
-  assert(
-    htmlNormal.includes('class="prev-pane is-cli term-host"'),
-    'Rendered with .prev-pane.is-cli.term-host'
-  );
-  assert(htmlNormal.includes('class="term-screen"'), 'term-screen rendered');
+test('10.3 / 10.5: the list is read again before sending; a live row refuses before any picture is written; failures keep the box', async () => {
+  const live = fakeDeps({ list: [{ sessionId: ID, processAlive: true, kind: 'interactive' }] });
+  const image = { name: 'a.png', bytes: new Uint8Array(3) };
+  const refused = await sendToSession(live, { ...base, images: [image] });
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, /이 세션이 지금 다른 터미널에서 돌고 있어서 안 보냈어요/);
+  assert.equal(live.calls.images.length, 0);
+  assert.equal(live.calls.ask.length, 0);
+  const unreadable = fakeDeps({ list: null });
+  assert.equal((await sendToSession(unreadable, base)).ok, true, 'a list that could not be read sends');
+  const badImage = fakeDeps({ imageFails: true });
+  assert.deepEqual(await sendToSession(badImage, { ...base, images: [image] }), { ok: false, error: '붙인 그림을 못 저장해서 안 보냈어요: 디스크가 가득 찼다' });
+  const withPicture = fakeDeps();
+  await sendToSession(withPicture, { ...base, images: [image] });
+  assert.ok(withPicture.calls.ask[0].prompt.endsWith(pictureLines([`/data/session-images/${ID}/a.png`])));
+  assert.deepEqual(await sendToSession(fakeDeps({ answer: { ok: false, error: null } }), base), { ok: false, error: '까닭을 못 받았다' });
+  const missing = await sendToSession(fakeDeps({ answer: { ok: true, missing_cwd: '/gone' } }), base);
+  assert.deepEqual(missing, { ok: true, notice: '이 세션이 처음 돌던 폴더(/gone)가 없어서 vault 에서 이어 갔어요.' });
+});
+
+test('10.2: the box of each session is in a store and is removed when it is empty again', () => {
+  patchComposer('s-a', { text: '쓰던 글' });
+  assert.equal(getSessionComposerState('s-a').text, '쓰던 글');
+  assert.equal(getSessionComposerState('s-b').text, '', 'another session is untouched');
+  patchComposer('s-a', { text: '' });
+  assert.equal(getSessionComposerState('s-a'), getSessionComposerState('s-never'), 'an emptied box is the shared empty one');
+});
+
+test('10.7: dropped paths are quoted when they hold a space or a quote and go in at the selection or the end', () => {
+  assert.equal(formatDroppedPaths(['/a/b.txt', '/Users/me/my file.png', '/q"x']), '/a/b.txt "/Users/me/my file.png" "/q\\"x"');
+  assert.deepEqual(insertDropped('열어 줘', ['/a'], null), { text: '열어 줘 /a ', caret: 8 });
+  assert.deepEqual(insertDropped('앞 뒤', ['/a'], { start: 1, end: 2 }), { text: '앞 /a 뒤', caret: 5 }, 'the selection is replaced');
+  assert.deepEqual(insertDropped('', ['/a'], null), { text: '/a ', caret: 3 });
+});
+
+function planHost(options = {}) {
+  const calls = { release: [], start: [] };
+  return {
+    calls,
+    alive: async () => options.alive ?? false,
+    vault: async () => ('vault' in options ? options.vault : '/v'),
+    refresh: async () => {},
+    rows: () => options.rows ?? [],
+    firstCwd: async () => options.firstCwd ?? null,
+    release: async (v, id) => { calls.release.push([v, id]); return options.release ?? 'not_live'; },
+    start: async (key, cols, rows, action) => { calls.start.push(action); return { fellBack: false }; },
+  };
+}
+
+test('10.9: the shell plan for term:<session id>', async () => {
+  assert.deepEqual(await planSessionShellWith(planHost(), 'term:main', undefined), { kind: 'plain' });
+  assert.deepEqual(await planSessionShellWith(planHost({ alive: true }), `term:${ID}`, ID), { kind: 'plain' }, 'a shell that is alive is reattached and nothing is planted');
+  const live = await planSessionShellWith(planHost({ rows: [{ sessionId: ID, processAlive: true, cwd: '/x' }] }), `term:${ID}`, ID);
+  assert.deepEqual(live, { kind: 'refuse', notice: LIVE_ELSEWHERE_NOTICE });
+  const attach = planHost({ rows: [{ sessionId: ID, processAlive: true, id: '753ecd82', cwd: '/x' }] });
+  const plan = await planSessionShellWith(attach, `term:${ID}`, ID);
+  await plan.start(80, 24, () => {});
+  assert.deepEqual(attach.calls.start[0], { mode: 'attach', sessionId: '753ecd82' }, 'the short id, not the session id');
+  assert.equal(attach.calls.release.length, 0);
+  const resume = planHost({ rows: [{ sessionId: ID, cwd: '/row' }], firstCwd: '/first' });
+  await (await planSessionShellWith(resume, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.deepEqual(resume.calls.start[0], { mode: 'resume', sessionId: ID, cwd: '/first' }, 'the first folder wins over the row folder');
+  assert.deepEqual(resume.calls.release, [['/v', ID]]);
+  const rowOnly = planHost({ rows: [{ sessionId: ID, cwd: '/row' }] });
+  await (await planSessionShellWith(rowOnly, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.equal(rowOnly.calls.start[0].cwd, '/row');
+  const held = planHost({ rows: [{ sessionId: ID, cwd: '/row', heldByAgent: true }] });
+  await (await planSessionShellWith(held, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.equal('cwd' in held.calls.start[0], false, 'an agent-held row gives no folder');
+  assert.deepEqual(await planSessionShellWith(planHost({ release: 'busy' }), `term:${ID}`, ID), { kind: 'refuse', notice: AGENT_BUSY_NOTICE });
+  const noVault = planHost({ vault: null, rows: [{ sessionId: ID, cwd: '/row' }] });
+  await (await planSessionShellWith(noVault, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.equal(noVault.calls.release.length, 0, 'without a vault nothing is released');
 });

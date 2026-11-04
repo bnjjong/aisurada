@@ -22,7 +22,13 @@ export function NoteSessionRail(_props?: {
   chat?: {
     target: { noteId: string; subId?: string };
     noteMarkdown?: string;
+    noteFormat?: string;
     noteDir?: string;
+    vault?: string;
+    timeoutSeconds?: () => number;
+    onOpenSession?: (sessionId: string) => void;
+    width?: number;
+    onWidthChange?: (width: number) => void;
   };
 }): null {
   return null;

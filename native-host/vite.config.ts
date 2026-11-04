@@ -23,9 +23,9 @@ export default defineConfig(({ mode }) => {
           outputDirectory = resolve(config.root, config.build.outDir);
         },
         closeBundle() {
-          if (mode === 'noclaude') {
-            assertScreenBundle(outputDirectory);
-          }
+          // 1.1: the screen is the Part 4 screen unless the mode is noclaude. The off build must carry no Part 4
+          // command name; the on build must carry at least one.
+          assertScreenBundle(outputDirectory, { part4: mode !== 'noclaude' });
         },
       },
     ],

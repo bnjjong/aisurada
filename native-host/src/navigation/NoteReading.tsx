@@ -14,11 +14,14 @@ export function NoteReading({
   note,
   controller,
   parent,
+  root,
   mode,
 }: {
   note: Note;
   controller?: WorkspaceController;
   parent?: string;
+  /** The root note of a sub page chain. The ask target uses it, not the nearest parent (3.13). */
+  root?: string;
   mode?: NoteMode;
 }) {
   const live = controller?.data.note({ id: note.id, parent }) || note;
@@ -75,11 +78,32 @@ export function NoteReading({
     },
   }), [controller, note.id, parent]);
 
+  const workspace = controller?.getSnapshot().workspace;
   const askWire = useNoteAsk({
     doc: live,
     port,
     baseDir: noteDir || "",
+    vault: workspace && !workspace.sample ? workspace.path : "",
     currentDraft: () => draftGetter.current(),
+    // 3.12: the wait limit is read at the moment of the press, not when the screen was drawn.
+    timeoutSeconds: () => Number(controller?.getSnapshot().prefs.askTimeoutSeconds) || 3600,
+    repo: (() => {
+      const agenda = workspace?.agendas.find((item) => item.id === live.agendaId);
+      return typeof agenda?.repo === "string" && agenda.repo.trim() ? agenda.repo : undefined;
+    })(),
+    root,
+    rootSessionId: parent
+      ? (() => {
+          const value = controller?.data.note({ id: root ?? parent })?.sessionId;
+          return typeof value === "string" && value.trim() ? value.trim() : undefined;
+        })()
+      : undefined,
+    // 4.11: a #doc: link in a model answer opens that note's preview; an unknown note is reported by the answer.
+    openDoc: (id: string) => {
+      if (!controller || !controller.getSnapshot().workspace?.notes.some((item) => item.id === id)) return false;
+      controller.showPreview(id);
+      return true;
+    },
   });
   useEffect(() => {
     if (parent || !controller) return;
@@ -121,23 +145,27 @@ export function NoteReading({
               onDraftBuffer={(fn) => {
                 draftGetter.current = fn;
               }}
-              onOpenAskCompose={(quote, rect, wrapMark) => {
-                setComposeState({ quote, left: rect.left, top: rect.top, wrapMark });
+              onOpenAskCompose={(quote, rect, wrapMark, markId) => {
+                setComposeState({ quote, left: rect.left, top: rect.top, wrapMark, markId });
               }}
             />
           </NoteAskFrame>
           {askWire?.panel}
           {composeState && (
-            <AskComposePopover
-              state={composeState}
-              onSubmit={(question, images) => {
-                const turnId = `ak${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-                composeState.wrapMark?.(turnId);
-                askWire?.editor?.onAskAi?.(composeState.quote, question, turnId, images);
-                setComposeState(null);
-              }}
-              onCancel={() => setComposeState(null)}
-            />
+            <NoteAskFrame baseDir={noteDir} noteId={note.id}>
+              <AskComposePopover
+                state={composeState}
+                onSubmit={(question, images) => {
+                  // 2.1: an HTML box asks with its own id and plants no underline; any other question gets a new id,
+                  // whose tail is eight hexadecimal digits of a random UUID.
+                  const turnId = composeState.markId ?? `ak${Date.now().toString(36)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+                  if (!composeState.markId) composeState.wrapMark?.(turnId);
+                  askWire?.editor?.onAskAi?.(composeState.quote, question, turnId, images);
+                  setComposeState(null);
+                }}
+                onCancel={() => setComposeState(null)}
+              />
+            </NoteAskFrame>
           )}
         </div>
       ) : (
@@ -146,6 +174,7 @@ export function NoteReading({
           <pre className="note-body">{note.body}</pre>
         </>
       )}
+      {parent && controller && <NoteRail note={note} controller={controller} noteDir={noteDir} root={root ?? parent} />}
     </article>
   );
 }
@@ -157,8 +186,6 @@ export function NoteScreen({
   note: Note;
   controller: WorkspaceController;
 }) {
-  const { rails, closeRail } = useNoteRail();
-  const sessionId = rails?.[note.id];
   const noteDir = controller?.getSnapshot().workspace?.path && note.path
     ? `${controller.getSnapshot().workspace!.path}/${note.path}`
     : undefined;
@@ -187,17 +214,52 @@ export function NoteScreen({
       aria-label={`${note.title} 본문`}
     >
       <NoteReading note={note} controller={controller} />
-      {sessionId && (
-        <NoteSessionRail
-          sessionId={sessionId}
-          onClose={() => closeRail?.(note.id)}
-          chat={{
-            target: { noteId: note.id },
-            noteMarkdown: note.body,
-            noteDir,
-          }}
-        />
-      )}
+      <NoteRail note={note} controller={controller} noteDir={noteDir} />
     </div>
+  );
+}
+
+/**
+ * 8.1, 8.2: the session rail of a note or of a sub page. A note's rail is asked for by `openNoteRail(<note id>, <session id>)`; a sub note
+ * opens it with its own id, and its chats are those of the pair (root id, sub id).
+ */
+function NoteRail({
+  note,
+  controller,
+  noteDir,
+  root,
+}: {
+  note: Note;
+  controller: WorkspaceController;
+  noteDir?: string;
+  /** The root note id when this is a sub page. */
+  root?: string;
+}) {
+  const { rails, closeRail } = useNoteRail();
+  const sessionId = rails[note.id];
+  if (!sessionId) return null;
+  const snapshot = controller.getSnapshot();
+  return (
+    <NoteSessionRail
+      // 8.2, 8.5: the rail's state is per note and session; a different session starts a fresh rail.
+      key={`${note.id}|${sessionId}`}
+      sessionId={sessionId}
+      onClose={() => closeRail?.(note.id)}
+      chat={{
+        target: root ? { noteId: root, subId: note.id } : { noteId: note.id },
+        noteMarkdown: note.body,
+        noteFormat: note.format,
+        noteDir,
+        vault: snapshot.workspace && !snapshot.workspace.sample ? snapshot.workspace.path : "",
+        timeoutSeconds: () => Number(controller.getSnapshot().prefs.askTimeoutSeconds) || 3600,
+        // 8.4: a sub page closes first; a note window hands the address to the main window (the controller does).
+        onOpenSession: (id: string) => {
+          if (root) controller.openSubNotes?.(root, []);
+          controller.navigate(`/session/${encodeURIComponent(id)}`);
+        },
+        width: Number(snapshot.prefs.noteRailWidth) || 392,
+        onWidthChange: (width: number) => controller.preference({ noteRailWidth: width }),
+      }}
+    />
   );
 }

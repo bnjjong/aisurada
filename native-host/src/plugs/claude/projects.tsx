@@ -3,24 +3,10 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { WorkspaceController } from "../../workspace/controller.ts";
 import type { WorkspaceState, Agenda, Row } from "../../workspace/types.ts";
 import { asText } from "../../workspace/types.ts";
-import { HUE_COLORS } from "../../ui/model.ts";
+import { HUE_COLORS, railAgendaOrder } from "../../ui/model.ts";
 
-export interface ClaudeSession {
-  sessionId: string;
-  cwd: string;
-  startedAt: number;
-  kind: "interactive" | "background" | "unknown";
-  name?: string;
-  id?: string;
-  pid?: number;
-  status: "running" | "blocked" | "idle" | "unknown";
-  title?: string;
-  branch?: string;
-  processAlive?: boolean;
-  heldByAgent?: boolean;
-  endedAt?: number;
-  isEndedRow?: boolean;
-}
+import type { ClaudeSession } from './sessionTypes.ts';
+export type { ClaudeSession };
 
 interface AgentsResponse {
   ok: boolean;
@@ -168,14 +154,15 @@ export async function refreshSessions(vaultPath?: string) {
       status = "idle";
     }
 
+    // 6.3: a text is a "비지 않은 글" and is kept as it is; it is not trimmed (a leading space would change the key)
     const session: ClaudeSession = {
-      sessionId: sessionId.trim(),
-      cwd: cwd.trim(),
+      sessionId,
+      cwd,
       startedAt,
       kind,
       status,
-      name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : undefined,
-      id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : undefined,
+      name: typeof item.name === "string" && item.name.trim() ? item.name : undefined,
+      id: typeof item.id === "string" && item.id.trim() ? item.id : undefined,
       pid: typeof item.pid === "number" && Number.isFinite(item.pid) ? item.pid : undefined,
     };
     validRows.push(session);
@@ -209,8 +196,8 @@ export async function refreshSessions(vaultPath?: string) {
           )
         )
       : Promise.resolve([]),
-    // C. held_agent_sessions (6.6)
-    vaultPath
+    // C. held_agent_sessions (6.6): only when a vault is open and there is at least one row
+    vaultPath && validRows.length > 0
       ? invoke<string[]>("held_agent_sessions", { vault: vaultPath }).catch(() => [])
       : Promise.resolve([]),
     // D. recent-sessions (6.5)
@@ -317,29 +304,42 @@ export function useProjectsList(): ClaudeSession[] {
   return store.sessions;
 }
 
+/** Puts a list into the store. For the node tests; the real list comes from `refreshSessions`. */
+export function setSessionStoreState(next: Partial<SessionStoreState>): void {
+  storeState = { ...storeState, ...next };
+  notify();
+}
+
+export function getSessionStoreSnapshot(): SessionStoreState {
+  return storeState;
+}
+
 export function useSessionStore() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-function stripTrailingSlash(path: string): string {
-  return path.endsWith("/") ? path.slice(0, -1) : path;
+function stripTrailingSlashes(path: string): string {
+  return path.replace(/\/+$/, "");
 }
 
 /**
- * 6.8 아젠다 매칭: cwd와 repo 매칭
+ * 6.8 붙이기: strip every trailing `/` from the cwd and the repo; the session belongs to an agenda when the two are equal or the
+ * cwd starts with `<repo>/`. An agenda with no repo, or a repo that is nothing but slashes, is not looked at. The longest repo
+ * wins; on equal length the agenda earlier in the rail's order wins. Case is not folded and spaces are not trimmed.
  */
-function matchAgenda(sessionCwd: string, agendas: Agenda[]): Agenda | null {
-  const normCwd = stripTrailingSlash(sessionCwd);
+export function matchAgenda(sessionCwd: string, orderedAgendas: Agenda[]): Agenda | null {
+  const cwd = stripTrailingSlashes(sessionCwd);
   let bestMatch: Agenda | null = null;
   let bestLen = -1;
 
-  for (const a of agendas) {
+  for (const a of orderedAgendas) {
     const rawRepo = asText(a.repo);
-    if (!rawRepo || !rawRepo.trim()) continue;
-    const normRepo = stripTrailingSlash(rawRepo.trim());
-    if (normCwd === normRepo || normCwd.startsWith(normRepo + "/")) {
-      if (normRepo.length > bestLen) {
-        bestLen = normRepo.length;
+    if (!rawRepo) continue;
+    const repo = stripTrailingSlashes(rawRepo);
+    if (!repo) continue;
+    if (cwd === repo || cwd.startsWith(repo + "/")) {
+      if (repo.length > bestLen) {
+        bestLen = repo.length;
         bestMatch = a;
       }
     }
@@ -403,7 +403,8 @@ export function RailProjects({
 
   const ws = state?.workspace;
   const projects: Row[] = ws?.projects || [];
-  const agendas: Agenda[] = ws?.agendas || [];
+  // 6.8: the groups and their order are the left rail's agenda section's, not a second rule of our own.
+  const agendas: Agenda[] = railAgendaOrder(ws?.agendas || [], ws?.notes || [], projects);
 
   // 아젠다별 세션 맵핑 (6.8)
   const agendaSessionsMap = new Map<string, ClaudeSession[]>();
@@ -547,6 +548,11 @@ export function RailProjects({
   };
 
   const currentRoute = state?.route || (typeof location !== "undefined" ? location.pathname : "");
+
+  // 6.10: with no session to show and no line to write (failure, skipped, cut), the section is not drawn.
+  if (store.sessions.length === 0 && !store.error && store.skippedCount === 0 && store.endedDroppedCount === 0) {
+    return <></>;
+  }
 
   return (
     <section data-rail-section="projects" className="rail-projects-section">

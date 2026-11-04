@@ -35,7 +35,7 @@ export function NoteEditor({
   mode?: NoteMode;
   askEditor?: AskEditorProps;
   onDraftBuffer?: (fn: () => string) => void;
-  onOpenAskCompose?: (quote: string, rect: { left: number; top: number }, wrapMark?: (turnId: string) => void) => void;
+  onOpenAskCompose?: (quote: string, rect: { left: number; top: number }, wrapMark?: (turnId: string) => void, markId?: string) => void;
 }) {
   const [session] = useState(
     () => new EditorSession(controller, { id: note.id, parent }, note.body),

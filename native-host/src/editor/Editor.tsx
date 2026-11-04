@@ -78,7 +78,7 @@ export interface EditorProps {
   askDocId?: string;
   onAskAi?(quote: string, question: string, turnId: string, images?: File[]): void;
   onAskFollowUp?(question: string, underlineId: string, images?: File[]): void;
-  onOpenAskCompose?(quote: string, rect: { left: number; top: number }, wrapMark?: (turnId: string) => void): void;
+  onOpenAskCompose?(quote: string, rect: { left: number; top: number }, wrapMark?: (turnId: string) => void, markId?: string): void;
 }
 const theme = {
   paragraph: "lex-paragraph",
@@ -180,7 +180,7 @@ export function Editor(props: EditorProps) {
           <EditorTools {...props} />
           <TableTools {...props} />
           <MermaidLayer open={props.diagramsOpen || false} />
-          <EditorAskPlugins docId={props.askDocId} onAsk={props.onAskAi} onFollowUp={props.onAskFollowUp} />
+          <EditorAskPlugins docId={props.askDocId} onAsk={props.onAskAi} onFollowUp={props.onAskFollowUp} onOpenCompose={(quote, rect, markId) => props.onOpenAskCompose?.(quote, rect, undefined, markId)} />
         </LexicalComposer>
       </div>
     </EditorContext.Provider>

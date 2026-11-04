@@ -1,6 +1,6 @@
 # withlog 네이티브 호스트
 
-2부 1~18장의 Tauri 2 호스트와 3부 React 화면이다. 2부 커맨드 29개, 이벤트 4개, `wlframe` 프로토콜을 구현했다. 화면은 제공된 13장까지 연결하여 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·댓글·연결, 캘린더와 목록, 검색·이력 복원·외부 Markdown·설정을 지원한다. [3부 구현 순서](../docs/rebuild-p3-plan.md)와 [11~13장 기록](../docs/rebuild-p3-chapters11-13-complete.md)을 참고한다. 14~18장과 부록 본문, 원본 가이드 스킬·검색 골든 파일이 없어 그 범위는 별도 판정한다. 4부 Rust 모듈은 포함하지 않으며 `--no-default-features`로 빌드할 수 있다.
+2부 1~18장의 Tauri 2 호스트와 3부 React 화면이다. 2부 커맨드 29개, 이벤트 4개, `wlframe` 프로토콜을 구현했다. 화면은 제공된 13장까지 연결하여 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·댓글·연결, 캘린더와 목록, 검색·이력 복원·외부 Markdown·설정을 지원한다. [3부 구현 순서](../docs/rebuild-p3-plan.md)와 [11~13장 기록](../docs/rebuild-p3-chapters11-13-complete.md)을 참고한다. 14~18장과 부록 본문, 원본 가이드 스킬·검색 골든 파일이 없어 그 범위는 별도 판정한다. 4부 Rust 모듈 6개(cargo 기능 `claude`)는 기본으로 켜져 있고, `--no-default-features`로 끄면 4부 커맨드 9개가 빠진다.
 
 ```bash
 bash build.sh
@@ -9,7 +9,7 @@ pnpm install --frozen-lockfile
 pnpm tauri dev
 ```
 
-Node.js 22.12 이상과 pnpm 10.33.4를 사용한다. `pnpm dev`는 Vite 서버만, `pnpm tauri dev`는 실제 앱까지 띄운다. `pnpm build`는 타입 검사 후 4부 없는 화면을 `dist/`에 만들고 빌드 계약을 검사한다. `pnpm preview`는 호스트 없이 화면을 보며 번들 CSP를 적용한다. 개발 서버 포트는 1420이며 충돌 시 실패한다.
+Node.js 22.12 이상과 pnpm 10.33.4를 사용한다. `pnpm dev`는 Vite 서버만, `pnpm tauri dev`는 실제 앱까지 띄운다. `pnpm build`는 타입 검사 후 4부를 켠 화면을 `dist/`에 만들고 빌드 계약을 검사한다. 4부를 뺀 화면은 `pnpm build:noclaude`(`vite build --mode noclaude`)다. `pnpm preview`는 호스트 없이 화면을 보며 번들 CSP를 적용한다. 개발 서버 포트는 1420이며 충돌 시 실패한다.
 
 macOS 앱은 `pnpm tauri build --debug --bundles app`으로 만든다. 산출물은 `src-tauri/target/debug/bundle/macos/withlog.app`이다. 최적화 빌드는 `--debug`를 뺀다. 번들 빌드는 화면과 저장소의 Java jar도 새로 짓는다. 앱 설치나 launchd 등록은 하지 않는다.
 

@@ -262,7 +262,7 @@ function SubNotePages({
             <button onClick={controller.popSubNote}>한 단계 뒤로</button>
           </div>
         ) : top ? (
-          <NoteReading note={top} controller={controller} parent={parent} />
+          <NoteReading note={top} controller={controller} parent={parent} root={trail.root} />
         ) : (
           <p role="status">하위 노트를 여는 중…</p>
         )}

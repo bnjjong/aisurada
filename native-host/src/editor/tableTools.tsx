@@ -180,7 +180,7 @@ export function TableTools(props: EditorProps) {
       <div className="lex-col-grip" style={{ left: cell.right - 3, top: cell.y - 2, height: 28 }} onPointerDown={event => resize(event, false)} />
       <div className="lex-table-grip" style={{ left: cell.tableRight - 3, top: cell.tableTop, height: cell.tableBottom - cell.tableTop }} onPointerDown={event => resize(event, true)} onDoubleClick={() => operation('fit')} /></>}
     {open && cell && <div className="lex-table-menu" style={{ left: cell.x, top: cell.y + 26 }}>{operations.map(([id, title]) => <button key={id} onClick={() => operation(id)}>{title}</button>)}</div>}
-    {dots.map(dot => <div className="lex-row-dot" key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => setRowCard(dot.key)} onMouseLeave={() => setRowCard(null)}>
+    {dots.map(dot => <div className={`lex-row-dot lex-rownote-dot${dot.asks.length ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}`} key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => setRowCard(dot.key)} onMouseLeave={() => setRowCard(null)}>
       <button aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'} onClick={() => { if (dot.ids.length) props.features?.openComment?.(dot.ids[0]); }}>●</button>
       {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}
         {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => setRowCard(null)} pinned={false} />)}</div>}

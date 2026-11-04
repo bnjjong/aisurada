@@ -1,131 +1,485 @@
 // Implementation of @claude-plug/session for Part 4 Claude-enabled builds.
-// Adheres to Chapter 8, 9, 17 of withlog Part 4 Claude integration specifications.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+// Adheres to Chapters 8, 9, 10 and 17 of withlog Part 4 Claude integration specifications.
+// The decisions live in sessionLogic.ts and transcriptLines.ts; this file draws them and calls the host.
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { agendaOrder } from '../../ui/model.ts';
+import { AskContext } from './askContext.ts';
+import { askClaudeBridge, tauriAskHost } from './askHost.ts';
+import { AskImageStrip, useAskImages } from './askPickers.tsx';
+import type { PickedImage } from './askPickers.tsx';
+import { writePictures } from './askRun.ts';
+import { ASK_EFFORTS, ASK_MODELS, MAX_IMAGES, modelLabel, normalizeEffort, normalizeModel, randomUuid } from './askText.ts';
 import { ModelProse } from './modelProse.tsx';
-import { useProjectsList } from './projects.tsx';
+import { PendingLine } from './askParts.tsx';
+import { getSessionStoreSnapshot, refreshSessions, useProjectsList, useSessionStore } from './projects.tsx';
+import { askNow, setAskEffort, setAskModel, useAskState } from './state.ts';
+import {
+  COMPOSER_BLOCK_TEXT,
+  agentBarText,
+  composerBlock,
+  formatBytes,
+  formatDuration,
+  formatTurnTime,
+  kindLabel,
+  normalizeReadSession,
+  pinBody,
+  pinDefaultTitle,
+  pinScanText,
+  railChatSessionId,
+  railHeading,
+  railPersona,
+  railPrompt,
+  railSeed,
+  railTurnFrom,
+  railTurnId,
+  sendToSession,
+  sinceText,
+  statusCell,
+  todoBarText,
+} from './sessionLogic.ts';
+import type { ComposerBlock, RailChat, RailTurn, ReadSessionView } from './sessionLogic.ts';
+import type { ClaudeSession } from './sessionTypes.ts';
+import { railBundleText } from './transcriptLines.ts';
+import type { EngineTurn } from './transcriptLines.ts';
+
+export { formatBytes, formatDuration, formatTurnTime };
+
+// The terminal cell brings its own style sheet and the xterm library; it is loaded when a CLI pane first shows it.
+const TerminalHost = lazy(() => import('../../ui/terminal/TerminalHost.tsx').then((module) => ({ default: module.TerminalHost })));
 
 // --------------------------------------------------------------------------
-// Safe Tauri Invoke
+// The engine and the host
 // --------------------------------------------------------------------------
-
-async function safeInvoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  try {
-    return await invoke<T>(cmd, args);
-  } catch (err) {
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-      throw err;
-    }
-    return undefined as unknown as T;
-  }
-}
 
 async function callEngine<T = any>(argv: string[]): Promise<T> {
-  const res = await safeInvoke<{ status: number; stdout: string; stderr: string }>('sidecar_call', { argv });
-  if (res && res.status === 0 && res.stdout) {
-    return JSON.parse(res.stdout) as T;
-  }
-  throw new Error(res?.stderr || '사이드카 명령 실패');
+  const reply = await tauriAskHost.engine(argv);
+  if (reply.status === 0 && reply.stdout) return JSON.parse(reply.stdout) as T;
+  throw new Error(reply.stderr?.trim() || '사이드카 명령 실패');
 }
 
-// --------------------------------------------------------------------------
-// D22 결함 고침: 시각은 기기 시간대 YYYY-MM-DD HH:mm으로 변환
-// --------------------------------------------------------------------------
-
-export function formatTurnTime(iso: string): string {
-  if (!iso) return '';
+/** `session-titles <id>` and its `cwd`; `null` when it cannot be read or is absent (7.10). */
+async function readFirstCwd(sessionId: string): Promise<string | null> {
   try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) {
-      return iso.slice(0, 16).replace('T', ' ');
-    }
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+    const reply = await callEngine<{ sessions?: Array<{ cwd?: string | null }> }>(['session-titles', sessionId]);
+    const cwd = reply.sessions?.[0]?.cwd;
+    return typeof cwd === 'string' && cwd ? cwd : null;
   } catch {
-    return iso.slice(0, 16).replace('T', ' ');
+    return null;
   }
 }
 
-// --------------------------------------------------------------------------
-// Model & Effort Choices (Chapter 3.3, 8.9)
-// --------------------------------------------------------------------------
-
-export const MODEL_OPTIONS = [
-  { id: 'claude-sonnet-5-5', label: 'Sonnet 3.5' },
-  { id: 'claude-opus-5-5', label: 'Opus 3.5' },
-  { id: 'claude-haiku-5-5', label: 'Haiku 3.5' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 3.0' },
-  { id: 'claude-opus-4-6', label: 'Opus 3.0' },
-  { id: 'claude-haiku-4-6', label: 'Haiku 3.0' },
-];
-
-export const EFFORT_OPTIONS = [
-  { id: 'low', label: 'low' },
-  { id: 'med', label: 'med' },
-  { id: 'high', label: 'high' },
-];
-
-export function modelLabel(id: string): string {
-  const found = MODEL_OPTIONS.find((m) => m.id === id);
-  return found ? found.label : id;
+function vaultPathOf(state: any): string {
+  const workspace = state?.workspace;
+  return workspace && !workspace.sample ? String(workspace.path ?? '') : '';
 }
 
 // --------------------------------------------------------------------------
-// Types
+// 9.2: reading a session, with a generation number and no flash of the old conversation
 // --------------------------------------------------------------------------
 
-export interface ChatTurn {
-  id: string;
-  askedAt: string;
-  question: string;
-  answer: string;
-  error?: string;
-  model: string;
-  effort: string;
-  elapsedMs: number;
-  images?: string[];
-  unsaved?: boolean;
+interface ReadState {
+  sessionId: string;
+  view: ReadSessionView | null;
+  error: string | null;
 }
 
-export interface ChatRecord {
-  noteId: string;
-  chatId: string;
-  sourceSessionId: string;
-  createdAt: string;
-  turns: ChatTurn[];
+/**
+ * Reads `read-session <id> limit=<n> urls=true`. A read that is still running when the session changes, the screen goes
+ * away or a newer read starts is not shown (the generation number). While a re-read runs the old conversation stays; if the
+ * re-read fails the old one is kept, and with none to keep the failure is shown. A held value that belongs to another session
+ * reads as "loading".
+ */
+export function useReadSession(sessionId: string, limit: number, signal: number): { view: ReadSessionView | null; loading: boolean; error: string | null } {
+  const [held, setHeld] = useState<ReadState>({ sessionId: '', view: null, error: null });
+  const generation = useRef(0);
+  useEffect(() => {
+    if (!sessionId || !isTauri()) {
+      setHeld({ sessionId, view: null, error: sessionId ? '이 화면에서는 대화를 읽을 수 없어요(앱에서만 돼요).' : null });
+      return;
+    }
+    const mine = ++generation.current;
+    callEngine(['read-session', sessionId, `limit=${limit}`, 'urls=true'])
+      .then((raw) => {
+        if (generation.current === mine) setHeld({ sessionId, view: normalizeReadSession(raw), error: null });
+      })
+      .catch((error) => {
+        if (generation.current !== mine) return;
+        setHeld((prev) => (prev.sessionId === sessionId && prev.view ? prev : { sessionId, view: null, error: error?.message || String(error) }));
+      });
+    return () => {
+      generation.current += 1;
+    };
+  }, [sessionId, limit, signal]);
+  const mine = held.sessionId === sessionId;
+  return { view: mine ? held.view : null, loading: !mine || (!held.view && !held.error), error: mine ? held.error : null };
 }
 
-export interface SessionTurn {
-  turnId?: string;
-  user?: string;
-  assistant?: string;
-  tools?: Array<{ name: string; args?: string }>;
-  failed?: boolean;
-  seconds?: number;
+// --------------------------------------------------------------------------
+// 9.4: a transcript turn
+// --------------------------------------------------------------------------
+
+export function TranscriptTurn({ turn }: { turn: EngineTurn }): React.JSX.Element | null {
+  if (turn.who === 'tool') {
+    if (!turn.tool) return null;
+    const failed = turn.tool.failed === true;
+    const seconds = turn.tool.seconds;
+    return (
+      <div className={`toolrow${failed ? ' is-failed' : ''}`}>
+        <span className="tr-ic" data-state={failed ? 'failed' : seconds != null ? 'done' : 'unknown'}>{failed ? '✕' : seconds != null ? '✓' : '○'}</span>
+        <span className="tr-name">{turn.tool.name}</span>
+        {turn.tool.arg && <span className="tr-arg" title={turn.tool.arg}>{turn.tool.arg}</span>}
+        {seconds != null && <span className="tr-ms">{formatDuration(seconds)}</span>}
+      </div>
+    );
+  }
+  const user = turn.who === 'user';
+  return (
+    <div className={`sess-turn ${user ? 'sess-turn-user' : 'sess-turn-assistant'}`}>
+      <div className="sess-turn-head">
+        <span className="sess-turn-author">{user ? '나' : '클로드'}</span>
+        <span className="sess-turn-at">{formatTurnTime(turn.at)}</span>
+        {turn.truncated && <span className="sess-turn-cut">{turn.chars ?? 2000}자 중 앞부분</span>}
+      </div>
+      <div className="sess-turn-text">{user ? turn.text : <ModelProse content={turn.text ?? ''} />}</div>
+    </div>
+  );
 }
 
-export interface SessionData {
-  file: string | null;
-  sizeBytes?: number;
-  linesTotal?: number;
-  linesDropped?: number;
-  turns: SessionTurn[];
-  hasMore?: boolean;
-  title?: string;
-  branch?: string;
-  cwd?: string;
-  runState?: {
-    model?: string;
-    effort?: string;
-    contextTokens?: number;
-    quotaBlocked?: boolean;
-    quotaResetsAt?: string;
+/** The four states of the conversation column (9.4). */
+export function TranscriptBody({ read }: { read: { view: ReadSessionView | null; loading: boolean; error: string | null } }): React.JSX.Element {
+  const { view, loading, error } = read;
+  if (error && !view) return <div className="sess-page-empty" title={error}>대화 기록을 못 읽었어요. 사이드카가 안 떠 있을 수 있어요.</div>;
+  if (loading || !view) return <div className="sess-page-empty">대화 기록을 읽는 중이에요.</div>;
+  if (view.file === null) return <div className="sess-page-empty">이 기계에 그 세션의 기록이 없어요. 다른 기기에서 돌던 세션일 수 있어요.</div>;
+  if (view.turns.length === 0) return <div className="sess-page-empty">기록은 있는데 주고받은 말이 없어요.</div>;
+  return (
+    <>
+      <div className="sess-page-source">
+        {formatBytes(view.source.bytes)} 중에서 골랐어요 · {view.source.lines}줄에서 {view.turns.length}건
+        {view.source.skipped > 0 && <strong> · 못 읽은 줄 {view.source.skipped}</strong>}
+      </div>
+      {view.hasMore && <div className="sess-page-hasmore">앞의 대화가 더 있어요. 지금은 최근 건만 보여요.</div>}
+      <div className="sess-page-turns">
+        {view.turns.map((turn) => (
+          <TranscriptTurn key={turn.index} turn={turn} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+// --------------------------------------------------------------------------
+// 9.3, 8.4: the session's title and status, one part for the header and the rail
+// --------------------------------------------------------------------------
+
+export function sessionTitle(row: ClaudeSession | undefined): string {
+  if (!row) return '지금 안 돌고 있는 세션';
+  return row.title || row.name || '(이름 없는 세션)';
+}
+
+function StatusCell({ row }: { row: ClaudeSession }): React.JSX.Element {
+  const cell = statusCell(row);
+  return <span className={`sess-page-status${cell.ended ? ' sess-ended' : ''}`}>{cell.text}</span>;
+}
+
+/** The last-turn line (9.3): drawn from `runState` whether or not the session is in the list. */
+function RunStateLine({ runState }: { runState: ReadSessionView['runState'] }): React.JSX.Element | null {
+  if (!runState) return null;
+  return (
+    <div className="sess-page-runstate">
+      <span>마지막 회차</span>
+      {runState.model && <span>{runState.model}</span>}
+      {runState.effort && <span>{runState.effort}</span>}
+      {runState.contextTokens !== undefined && <span>컨텍스트 {runState.contextTokens.toLocaleString()}토큰</span>}
+      {runState.quotaBlocked && (
+        <span className="sess-page-runstate-quota" title={runState.quotaResetsAt ? `재설정 예정: ${formatTurnTime(new Date(runState.quotaResetsAt * 1000).toISOString())}` : undefined}>
+          사용량 한도에 걸린 적 있음
+        </span>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// 10.2: the composer state of each session lives in a store, keyed by session id
+// --------------------------------------------------------------------------
+
+export interface ComposerState {
+  text: string;
+  /** Sending: set at the press, cleared with the result. */
+  sending: boolean;
+  error: string | null;
+  notice: string | null;
+  images: PickedImage[];
+  imageNotice: string | null;
+}
+
+const EMPTY_COMPOSER: ComposerState = { text: '', sending: false, error: null, notice: null, images: [], imageNotice: null };
+const composers = new Map<string, ComposerState>();
+const composerListeners = new Set<() => void>();
+/** The answer signal: how many answers each session has received (10.2, 9.2). */
+const replySignals = new Map<string, number>();
+const composerInputs = new Map<string, HTMLTextAreaElement>();
+
+function emitComposers() {
+  for (const listener of [...composerListeners]) listener();
+}
+
+export function getSessionComposerState(sessionId: string): ComposerState {
+  return composers.get(sessionId) ?? EMPTY_COMPOSER;
+}
+
+/** 10.2: a session's box is removed when every field is empty again, or sent boxes would pile up. */
+export function patchComposer(sessionId: string, patch: Partial<ComposerState>): void {
+  const next = { ...getSessionComposerState(sessionId), ...patch };
+  const empty = next.text === '' && !next.sending && next.error === null && next.notice === null && next.images.length === 0 && next.imageNotice === null;
+  if (empty) composers.delete(sessionId);
+  else composers.set(sessionId, next);
+  emitComposers();
+}
+
+function useComposer(sessionId: string): ComposerState {
+  return useSyncExternalStore(
+    (listener) => {
+      composerListeners.add(listener);
+      return () => composerListeners.delete(listener);
+    },
+    () => getSessionComposerState(sessionId),
+    () => getSessionComposerState(sessionId)
+  );
+}
+
+function useReplySignal(sessionId: string): number {
+  return useSyncExternalStore(
+    (listener) => {
+      composerListeners.add(listener);
+      return () => composerListeners.delete(listener);
+    },
+    () => replySignals.get(sessionId) ?? 0,
+    () => replySignals.get(sessionId) ?? 0
+  );
+}
+
+/** 10.7: dropped paths: each one quoted when it holds a space or a quote, joined by one space, put at the selection or the end. */
+export function formatDroppedPaths(paths: string[]): string {
+  return paths.map((path) => (/[\s"]/.test(path) ? `"${path.replace(/"/g, '\\"')}"` : path)).join(' ');
+}
+
+export function insertDropped(text: string, paths: string[], selection: { start: number; end: number } | null): { text: string; caret: number } {
+  const insert = formatDroppedPaths(paths);
+  const start = selection ? selection.start : text.length;
+  const end = selection ? selection.end : text.length;
+  const before = text.slice(0, start);
+  const after = text.slice(end);
+  const lead = before && !/\s$/.test(before) ? ' ' : '';
+  const trail = after === '' ? ' ' : /^\s/.test(after) ? '' : ' ';
+  const piece = `${lead}${insert}${trail}`;
+  return { text: before + piece + after, caret: before.length + piece.length };
+}
+
+// --------------------------------------------------------------------------
+// 10: the composer
+// --------------------------------------------------------------------------
+
+export function SessionComposer({
+  sessionId,
+  sessionItem,
+  sessionLoaded,
+  transcriptFile,
+  vault,
+  timeoutSeconds,
+}: {
+  sessionId: string;
+  sessionItem: ClaudeSession | undefined;
+  sessionLoaded: boolean;
+  transcriptFile: string | null | undefined;
+  vault: string;
+  timeoutSeconds: () => number;
+  /** Kept for the callers that still pass them. */
+  sessionData?: unknown;
+  state?: unknown;
+  onSent?: () => void;
+}): React.JSX.Element {
+  const composer = useComposer(sessionId);
+  const pictures = useAskImages({ hasNoteFolder: true, http: false });
+  const input = useRef<HTMLTextAreaElement>(null);
+  const block: ComposerBlock | null = composerBlock(sessionItem, { done: sessionLoaded, file: transcriptFile });
+
+  // The picture strip lives in the store so it follows the session, not the box (10.2).
+  useEffect(() => {
+    if (input.current) composerInputs.set(sessionId, input.current);
+    return () => {
+      composerInputs.delete(sessionId);
+    };
+  }, [sessionId, block]);
+
+  if (block) {
+    return (
+      <div className="sess-composer-blocked" data-block={block}>
+        {COMPOSER_BLOCK_TEXT[block]}
+      </div>
+    );
+  }
+
+  const send = () => {
+    // 10.3 step 1: read the box from the store again, so two presses in one tick are stopped.
+    const current = getSessionComposerState(sessionId);
+    const text = current.text.trim();
+    if (!text || !vault || current.sending) return;
+    const held = current.images; // 10.3 step 2
+    patchComposer(sessionId, { sending: true, error: null, notice: null });
+    void (async () => {
+      const bytes = await Promise.all(held.map(async (image) => ({ name: pictureFileName(image.file), bytes: new Uint8Array(await image.file.arrayBuffer()) })));
+      const result = await sendToSession(
+        {
+          readList: async () => {
+            await refreshSessions(vault);
+            const snapshot = getSessionStoreSnapshot();
+            return snapshot.status === 'ok' ? snapshot.sessions : null;
+          },
+          firstCwd: readFirstCwd,
+          writeImage: (id, name, data) => invoke<string>('write_session_image', data, { headers: { 'x-wl-session-id': encodeURIComponent(id), 'x-wl-name': encodeURIComponent(name) } }),
+          askClaude: (args) => askClaudeBridge(args),
+        },
+        { sessionId, text, images: bytes, vault, model: askNow().model, effort: askNow().effort, timeoutSeconds: timeoutSeconds() }
+      );
+      if (result.ok) {
+        // 10.5: the box, its pictures and the picture notice are emptied; the answer signal rises so the screen reads again.
+        replySignals.set(sessionId, (replySignals.get(sessionId) ?? 0) + 1);
+        patchComposer(sessionId, { text: '', sending: false, error: null, notice: result.notice, images: [], imageNotice: null });
+      } else {
+        patchComposer(sessionId, { sending: false, error: result.error });
+      }
+    })();
   };
+
+  const startDictation = async () => {
+    // 10.8: the press does not take focus from the box (mousedown is stopped below); it is a no-op while sending.
+    if (getSessionComposerState(sessionId).sending) return;
+    input.current?.focus();
+    try {
+      const turnedOn = await invoke<boolean>('start_dictation');
+      if (!turnedOn) patchComposer(sessionId, { error: '받아쓰기를 못 켰어요. 입력칸에 커서를 두고 시스템 받아쓰기 단축키를 눌러 주세요.' });
+    } catch (error) {
+      patchComposer(sessionId, { error: `받아쓰기를 못 켰어요. ${typeof error === 'string' ? error : error instanceof Error ? error.message : String(error)}` });
+    }
+  };
+
+  const held = composer.images;
+  return (
+    <div className="sess-composer">
+      {composer.notice && <div className="sess-composer-notice">{composer.notice}</div>}
+      {composer.error && <div className="sess-composer-error">{composer.error}</div>}
+      <AskImageStrip images={held} refusal={composer.imageNotice ?? pictures.refusal} onRemove={(index) => patchComposer(sessionId, { images: held.filter((_, at) => at !== index) })} />
+      <div className="sess-composer-box">
+        <textarea
+          ref={input}
+          className="sess-composer-input"
+          aria-label="세션으로 보내기"
+          placeholder="Claude에게 이어 물어보기… (⌘V로 그림 붙이기, ⌘/Ctrl+Enter로 보내기)"
+          value={composer.text}
+          disabled={composer.sending}
+          rows={3}
+          onChange={(event) => patchComposer(sessionId, { text: event.target.value, error: null })}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              send();
+            }
+          }}
+          onPaste={(event) => {
+            const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
+            if (files.length === 0) return;
+            event.preventDefault();
+            // The picture goes to the session of the moment of pasting, even if the screen moves on while it is read.
+            void (async () => {
+              let taken = getSessionComposerState(sessionId).images;
+              let notice: string | null = null;
+              for (const file of files) {
+                if (taken.length >= MAX_IMAGES) {
+                  notice = '한 물음에 그림은 8장까지예요.';
+                  continue;
+                }
+                if (!(file.type in IMAGE_TYPES)) {
+                  notice = `${file.name || '이 파일'} 은 못 붙여요.`;
+                  continue;
+                }
+                if (file.size > 5_000_000) {
+                  notice = `그림 한 장은 5.0MB까지예요(이 그림은 ${(file.size / 1_000_000).toFixed(1)}MB).`;
+                  continue;
+                }
+                taken = [...taken, { file, preview: await readAsDataUrl(file) }];
+              }
+              patchComposer(sessionId, { images: taken, imageNotice: notice });
+            })();
+          }}
+        />
+        <div className="sess-composer-actions">
+          <ModelEffortPicks />
+          <button
+            type="button"
+            className="sess-composer-mic"
+            title="받아쓰기"
+            aria-label="받아쓰기"
+            disabled={composer.sending}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => void startDictation()}
+          >
+            🎤
+          </button>
+          <button type="button" className="sess-composer-send" aria-label="보내기" disabled={composer.sending || !composer.text.trim()} onClick={send}>
+            {composer.sending ? '보내는 중...' : '보내기'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+const IMAGE_TYPES: Record<string, true> = { 'image/png': true, 'image/jpeg': true, 'image/gif': true, 'image/webp': true, 'image/avif': true, 'image/bmp': true, 'image/svg+xml': true };
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+
+const EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
+
+/** 10.6: `ask-<time in base 36>-<8 hex of a UUID>.<extension from the MIME>`. */
+export function pictureFileName(file: { type: string; name: string }, now: number = Date.now()): string {
+  return `ask-${now.toString(36)}-${randomUuid().replace(/-/g, '').slice(0, 8)}.${EXTENSIONS[file.type] ?? 'png'}`;
+}
+
+/** The two pickers above the composer: the window's one model and effort (3.3, 10.4). */
+function ModelEffortPicks(): React.JSX.Element {
+  const model = useAskState((state) => state.model);
+  const effort = useAskState((state) => state.effort);
+  return (
+    <span className="rchat-options">
+      <select className="ask-option" aria-label="모델" value={model} onChange={(event) => setAskModel(event.target.value)}>
+        {ASK_MODELS.map((item) => (
+          <option key={item.id} value={item.id}>{item.label}</option>
+        ))}
+      </select>
+      <select className="ask-option" aria-label="effort" value={effort} onChange={(event) => setAskEffort(event.target.value)}>
+        {ASK_EFFORTS.map((item) => (
+          <option key={item.id} value={item.id}>{item.label}</option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+// --------------------------------------------------------------------------
+// 8: the rail beside a note
+// --------------------------------------------------------------------------
 
 export interface NoteSessionRailProps {
   sessionId: string;
@@ -134,826 +488,382 @@ export interface NoteSessionRailProps {
   chat?: {
     target: { noteId: string; subId?: string };
     noteMarkdown?: string;
+    noteFormat?: string;
     noteDir?: string;
+    vault?: string;
+    /** The wait limit setting at the moment of the press (3.12). */
+    timeoutSeconds?: () => number;
+    /** Opens `/session/<id>`; a sub page closes first (8.4). */
+    onOpenSession?: (sessionId: string) => void;
+    /** The saved width (8.3) and the way to save a new one. */
+    width?: number;
+    onWidthChange?: (width: number) => void;
   };
 }
 
-// --------------------------------------------------------------------------
-// 8.7 Transcript Bundle & Persona Generation
-// --------------------------------------------------------------------------
+interface Running {
+  chatId: string;
+  startedAt: number;
+  images: number;
+  question: string;
+  timeoutSeconds: number;
+}
 
-export function buildTranscriptBundle(
-  sessionId: string,
-  turns: SessionTurn[]
-): { bundle: string; truncated: boolean } {
-  if (!turns || turns.length === 0) return { bundle: '', truncated: false };
-
-  const lines: string[] = [];
-  for (const t of turns) {
-    if (t.user) {
-      lines.push(`사용자: ${t.user}`);
-    }
-    if (t.assistant) {
-      lines.push(`클로드: ${t.assistant}`);
-    }
-    if (t.tools && Array.isArray(t.tools) && t.tools.length > 0) {
-      const counts: Record<string, number> = {};
-      const order: string[] = [];
-      for (const tool of t.tools) {
-        const name = tool.name || String(tool);
-        if (!counts[name]) {
-          counts[name] = 0;
-          order.push(name);
-        }
-        counts[name]++;
-      }
-      const toolStr = order.map((n) => (counts[n] > 1 ? `${n}×${counts[n]}` : n)).join(', ');
-      lines.push(`(도구: ${toolStr})`);
-    }
+/** 8.14: the file's list with the memory's laid over it. */
+export function mergeChats(file: RailChat[], memory: RailChat[], hadBeforeRead: Set<string>): RailChat[] {
+  const byId = new Map(file.map((chat) => [chat.chatId, chat]));
+  const merged = file.map((chat) => {
+    const mem = memory.find((item) => item.chatId === chat.chatId);
+    return mem && mem.turns.length > chat.turns.length ? mem : chat;
+  });
+  for (const mem of memory) {
+    if (byId.has(mem.chatId)) continue;
+    if (!hadBeforeRead.has(mem.chatId)) merged.push(mem); // created while the read ran
   }
+  return merged;
+}
 
-  if (lines.length === 0) return { bundle: '', truncated: false };
+export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailProps): React.JSX.Element {
+  const [width, setWidth] = useState(() => Math.max(392, Math.min(960, chat?.width ?? 392)));
+  const widthRef = useRef(width);
+  const dragging = useRef(false);
 
-  // 뒤에서부터 24,000자까지 담는다
-  let totalLen = 0;
-  const selected: string[] = [];
-  let truncated = false;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const lineLen = lines[i].length + 1;
-    if (totalLen + lineLen > 24000) {
-      truncated = true;
+  const rows = useProjectsList();
+  const store = useSessionStore();
+  const vault = chat?.vault ?? '';
+  const sessionItem = useMemo(() => rows.find((row) => row.sessionId === sessionId), [rows, sessionId]);
+  // 8.4: the list is read once when the rail opens if it has never been read (a note window has no left rail).
+  useEffect(() => {
+    if (store.status === 'idle') void refreshSessions(vault || undefined);
+  }, [store.status, vault]);
+
+  const read = useReadSession(sessionId, 100, 0);
+  const noteId = chat?.target.noteId ?? '';
+  const subId = chat?.target.subId;
+
+  const [chats, setChats] = useState<RailChat[]>([]);
+  const chatsRef = useRef<RailChat[]>([]);
+  chatsRef.current = chats;
+  const [unreadable, setUnreadable] = useState<string[]>([]);
+  const [chatsError, setChatsError] = useState<string | null>(null);
+  const [lastSent, setLastSent] = useState<string | null>(null);
+  const [newChat, setNewChat] = useState(false);
+  const [running, setRunning] = useState<Running | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const pictures = useAskImages({ hasNoteFolder: Boolean(chat?.noteDir), http: false });
+  const [picked, setPicked] = useState<{ model?: string; effort?: string }>({});
+  const body = useRef<HTMLDivElement>(null);
+
+  const reloadChats = useCallback(async () => {
+    if (!noteId) return;
+    const before = new Set(chatsRef.current.map((item) => item.chatId));
+    try {
+      const reply = await callEngine<{ chats: RailChat[]; unreadable: string[] }>(['list-chats', noteId, ...(subId ? [subId] : [])]);
+      setChats(mergeChats(reply.chats ?? [], chatsRef.current, before));
+      setUnreadable(reply.unreadable ?? []);
+      setChatsError(null);
+    } catch (error: any) {
+      // 8.12: a failed read keeps the chats that are already drawn and writes the reason.
+      setChatsError(`대화 기록을 못 읽었어요: ${error?.message ?? error}`);
+    }
+  }, [noteId, subId]);
+  useEffect(() => {
+    void reloadChats();
+  }, [reloadChats]);
+
+  // 8.5: the chat shown and asked on: the one running, then the last one sent, then none after "새 대화 열기", then the
+  // last chat of the file whose source is this session (the list is in order of start).
+  const active = useMemo(() => {
+    const id = running?.chatId ?? lastSent;
+    if (id) return chats.find((item) => item.chatId === id) ?? null;
+    if (newChat) return null;
+    const mine = chats.filter((item) => item.sourceSessionId === sessionId);
+    return mine.length ? mine[mine.length - 1] : null;
+  }, [chats, running, lastSent, newChat, sessionId]);
+  const turns = active?.turns ?? [];
+  const answeredBefore = turns.some((turn) => !turn.error && turn.answer.trim() !== '');
+  const first = !answeredBefore;
+
+  // 8.9: picked, then the last turn of this chat, then the session's last run state, then the window's drag-ask value.
+  const choice = useMemo(() => {
+    const last = turns[turns.length - 1];
+    const state = read.view?.runState;
+    const sessionModel = state?.model ? state.model.replace(/\s*\[.*\]$/, '') : undefined;
+    const model = picked.model ?? (last ? normalizeModel(last.model) : undefined) ?? (sessionModel && ASK_MODELS.some((item) => item.id === sessionModel) ? sessionModel : undefined);
+    const effort = picked.effort ?? (last ? normalizeEffort(last.effort) : undefined) ?? (state?.effort && ASK_EFFORTS.some((item) => item.id === state.effort) ? state.effort : undefined);
+    const sources = {
+      model: picked.model ? 'picked' : last ? 'chat' : model ? 'session' : 'default',
+      effort: picked.effort ? 'picked' : last ? 'chat' : effort ? 'session' : 'default',
+    };
+    const hint = sources.model === sources.effort ? (sources.model === 'chat' ? '이 대화의 값' : sources.model === 'session' ? '세션 값' : '') : '';
+    return { model: model ?? askNow().model, effort: effort ?? askNow().effort, hint };
+  }, [picked, turns, read.view?.runState]);
+
+  // 8.4: once the conversation is read the column goes to the bottom, once per session; not while the user is scrolled up.
+  const scrolled = useRef<string>('');
+  useEffect(() => {
+    if (read.view && scrolled.current !== sessionId && body.current) {
+      body.current.scrollTop = body.current.scrollHeight;
+      scrolled.current = sessionId;
+    }
+  }, [read.view, sessionId]);
+
+  const startResize = (event: React.MouseEvent) => {
+    dragging.current = true;
+    const startX = event.clientX;
+    const startW = widthRef.current;
+    const move = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const next = Math.max(392, Math.min(960, startW + (startX - e.clientX)));
+      widthRef.current = next;
+      setWidth(next);
+    };
+    const up = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      chat?.onWidthChange?.(widthRef.current);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  const send = async () => {
+    const question = text.trim();
+    // 8.6 step 1
+    if (!question || !vault || running || (first && read.loading)) return;
+    const files = pictures.images.map((image) => image.file);
+    setText('');
+    pictures.clear();
+    const chatId = active?.chatId ?? randomUuid(); // 3
+    const prior = active?.turns ?? []; // 4
+    const timeoutSeconds = chat?.timeoutSeconds?.() ?? 3600; // 6
+    const askedAt = new Date().toISOString(); // the time of 8.6 step 9
+    const turnId = railTurnId(Date.now(), randomUuid());
+    setRunning({ chatId, startedAt: Date.now(), images: files.length, question, timeoutSeconds }); // 7
+    setLastSent(chatId);
+    setNewChat(false);
+    setNotice(null);
+    const model = choice.model;
+    const effort = choice.effort;
+    try {
+      const written = await writePictures(tauriAskHost, chat?.noteDir, files); // 8
+      const bundle = read.view ? railBundleText(sessionId, read.view.turns) : '';
+      const prompt = railPrompt({ bundle, question, first, imagePaths: written.written.map((relative) => `${chat?.noteDir}/${relative}`) });
+      let runtime: string = askNow().runtime ?? 'cli';
+      if (!askNow().runtime) {
+        try {
+          runtime = (await tauriAskHost.askRuntime()) || 'cli';
+        } catch {
+          runtime = 'cli';
+        }
+      }
+      let result: { ok: boolean; answer?: string; error?: string | null; elapsed_ms?: number; missing_cwd?: string | null };
+      if (written.failure) result = { ok: false, error: `붙인 그림을 못 저장해서 묻지 않았어요: ${written.failure}`, elapsed_ms: 0 };
+      else if (files.length > 0 && runtime === 'http') result = { ok: false, error: '지금 묻기 길(HTTP)은 그림을 못 실어서 묻지 않았어요.', elapsed_ms: 0 };
+      else {
+        const cwd = await readFirstCwd(sessionId);
+        const seed = first ? undefined : railSeed(prior, bundle);
+        result = await askClaudeBridge({
+          vault,
+          sessionId: await railChatSessionId(chatId),
+          model,
+          effort,
+          prompt,
+          resume: prior.length > 0,
+          timeoutSeconds,
+          keepAlive: false,
+          persona: railPersona({ heading: railHeading(chat?.noteMarkdown, chat?.noteFormat), noteId, subId, sessionId, hasBundle: bundle !== '' }),
+          ...(cwd ? { cwd } : {}),
+          ...(seed ? { seed } : {}),
+        });
+        if (result.ok && result.missing_cwd) setNotice(`이 세션이 처음 돌던 폴더(${result.missing_cwd})가 없어서 vault 에서 답했어요.`);
+      }
+      const turn = railTurnFrom({ id: turnId, askedAt, question, model, effort, images: written.written, answer: result });
+      await appendTurns(vault, { noteId, subId, chatId, sessionId }, active, [turn], setChats);
+    } finally {
+      setRunning(null); // 14
+      requestAnimationFrame(() => {
+        if (body.current) body.current.scrollTop = body.current.scrollHeight;
+      });
+    }
+  };
+
+  const querying = running !== null;
+  const baseDir = chat?.noteDir;
+  return (
+    <AskContext.Provider value={{ baseDir, noteId }}>
+      <aside className="nsrail" data-at-min={width <= 392 ? true : undefined} style={{ width: `${width}px` }}>
+        <div className="nsrail-resizer" role="separator" aria-orientation="vertical" onMouseDown={startResize} onDoubleClick={() => { widthRef.current = 392; setWidth(392); chat?.onWidthChange?.(392); }} />
+        <header className="nsrail-header">
+          <div className="nsrail-title-row">
+            <span className="nsrail-title">{sessionTitle(sessionItem)}</span>
+            {sessionItem?.status === 'running' && <span className="sess-run" />}
+            <button type="button" className="nsrail-close" aria-label="세션 레일 닫기" onClick={onClose}>✕</button>
+          </div>
+          {sessionItem && (
+            <div className="nsrail-meta-row">
+              <span className="nsrail-kind">{kindLabel(sessionItem.kind)}</span>
+              <StatusCell row={sessionItem} />
+              <span className="nsrail-started">{sinceText(sessionItem.startedAt)}에 시작</span>
+              {sessionItem.cwd && <span className="nsrail-cwd">{sessionItem.cwd}</span>}
+            </div>
+          )}
+          <RunStateLine runState={read.view?.runState ?? null} />
+          <div className="nsrail-actions">
+            <button type="button" className="nsrail-open-session" onClick={() => chat?.onOpenSession?.(sessionId)}>세션 화면에서 보기</button>
+          </div>
+        </header>
+
+        <div className="nsrail-body" ref={body}>
+          <section className="nsrail-session-section">
+            <TranscriptBody read={read} />
+          </section>
+
+          <section className="rchat">
+            <div className="rchat-header">
+              <h4>새 대화</h4>
+              {(turns.length > 0 || querying) && (
+                <button type="button" className="rchat-new" disabled={querying} onClick={() => { setNewChat(true); setLastSent(null); setNotice(null); }}>새 대화 열기</button>
+              )}
+            </div>
+            {chatsError && <div className="rchat-warn">{chatsError}</div>}
+            {unreadable.length > 0 && <div className="rchat-warn">못 읽은 대화 파일이 있어요: {unreadable.join(', ')}</div>}
+            {turns.length === 0 && !querying && (
+              <div className="rchat-empty">이 세션에는 보내지 않아요. 새 대화를 열고, 이 세션의 최근 대화와 노트를 함께 실어 물어요.</div>
+            )}
+            <div className="rchat-turns">
+              {turns.map((turn) => (
+                <RailTurnPair key={turn.id} turn={turn} />
+              ))}
+              {running && (
+                <div className="rchat-turn-pair rchat-pending">
+                  <div className="sess-turn sess-turn-user">
+                    <div className="sess-turn-head"><span className="sess-turn-author">나</span></div>
+                    <div className="sess-turn-body">{running.question}</div>
+                    {running.images > 0 && <div className="sess-turn-images">그림 {running.images}장 붙임</div>}
+                  </div>
+                  <div className="sess-turn sess-turn-assistant">
+                    <div className="sess-turn-body"><PendingLine record={{ at: running.startedAt, sessionId: '', timeoutSeconds: running.timeoutSeconds }} /></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <footer className="sess-composer nsrail-composer">
+          <div className="rchat-options">
+            <select className="ask-option" aria-label="모델" value={choice.model} onChange={(event) => setPicked((prev) => ({ ...prev, model: event.target.value }))}>
+              {ASK_MODELS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            <select className="ask-option" aria-label="effort" value={choice.effort} onChange={(event) => setPicked((prev) => ({ ...prev, effort: event.target.value }))}>
+              {ASK_EFFORTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            {choice.hint && <span className="rchat-options-hint">{choice.hint}</span>}
+          </div>
+          {notice && <div className="sess-composer-notice">{notice}</div>}
+          <AskImageStrip images={pictures.images} refusal={pictures.refusal} onRemove={pictures.remove} />
+          <textarea
+            className="sess-composer-input"
+            aria-label="새 대화로 묻기"
+            placeholder="이 세션과 노트에 대해 물어요… (⌘V로 그림 붙이기, ⌘/Ctrl+Enter로 보내기)"
+            value={text}
+            rows={3}
+            disabled={querying}
+            onChange={(event) => setText(event.target.value)}
+            onPaste={pictures.paste}
+            onKeyDown={(event) => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault();
+                void send();
+              }
+            }}
+          />
+          <div className="sess-composer-footer">
+            <button type="button" className="sess-composer-send" disabled={querying || !text.trim() || (first && read.loading)} onClick={() => void send()}>
+              {querying ? '요청 중…' : first && read.loading ? '세션 대화를 읽는 중…' : '묻기'}
+            </button>
+          </div>
+        </footer>
+      </aside>
+    </AskContext.Provider>
+  );
+}
+
+function RailTurnPair({ turn }: { turn: RailTurn }): React.JSX.Element {
+  return (
+    <div className="rchat-turn-pair">
+      <div className="sess-turn sess-turn-user">
+        <div className="sess-turn-head">
+          <span className="sess-turn-author">나</span>
+          <span className="sess-turn-time">{formatTurnTime(turn.askedAt)}</span>
+        </div>
+        <div className="sess-turn-body">{turn.question}</div>
+        {turn.images && turn.images.length > 0 && <div className="sess-turn-images">그림 {turn.images.length}장 붙임</div>}
+      </div>
+      <div className={`sess-turn sess-turn-assistant${turn.error ? ' rchat-failed' : ''}`}>
+        <div className="sess-turn-head">
+          <span className="sess-turn-author">클로드</span>
+          <span className="sess-turn-model">{modelLabel(turn.model)}</span>
+          <span className="sess-turn-effort">{turn.effort}</span>
+          <span className="sess-turn-time">{(turn.elapsedMs / 1000).toFixed(1)}초</span>
+        </div>
+        <div className="sess-turn-body">{turn.error ? <div className="rchat-error">못 받았어요: {turn.error}</div> : <ModelProse content={turn.answer} />}</div>
+        {turn.unsaved && <div className="rchat-unsaved">이 답은 vault 에 못 적었어요. 앱을 끄면 사라져요.</div>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 8.10: turns that could not be written before go first, in order, then the new one. A success registers the written path as our
+ * own write and sets the chat from the response; a failure that would repeat marks that turn "못 적음" and goes on; a failure that
+ * may pass on a retry (the engine unreachable, the host cut it off, the bridge did not run) marks it and every turn behind it and stops.
+ */
+export async function appendTurns(
+  vault: string,
+  at: { noteId: string; subId?: string; chatId: string; sessionId: string },
+  current: RailChat | null,
+  fresh: RailTurn[],
+  setChats: React.Dispatch<React.SetStateAction<RailChat[]>>
+): Promise<void> {
+  const queue: RailTurn[] = [...(current?.turns.filter((turn) => turn.unsaved) ?? []), ...fresh];
+  const base: RailChat = current ?? { noteId: at.subId ?? at.noteId, chatId: at.chatId, sourceSessionId: at.sessionId, createdAt: fresh[0]?.askedAt ?? new Date().toISOString(), turns: [] };
+  let shown: RailChat = { ...base, turns: base.turns.filter((turn) => !turn.unsaved) };
+  const unsaved: RailTurn[] = [];
+  for (let index = 0; index < queue.length; index++) {
+    const turn = queue[index];
+    const { unsaved: _unsaved, ...plain } = turn;
+    const argv = ['append-chat-turn', at.noteId, ...(at.subId ? [at.subId] : []), `chat-id=${at.chatId}`, `source-session=${at.sessionId}`, `turn-id=${plain.id}`, `asked-at=${plain.askedAt}`, `question=${plain.question}`, `answer=${plain.answer}`, ...(plain.error ? [`error=${plain.error}`] : []), `model=${plain.model}`, `effort=${plain.effort}`, `elapsed-ms=${Math.min(2_147_483_647, plain.elapsedMs)}`, ...(plain.images?.length ? [`images=${plain.images.join(',')}`] : [])];
+    let retryable = false;
+    try {
+      const reply = await tauriAskHost.engine(argv);
+      if (reply.status === 0) {
+        const body = JSON.parse(reply.stdout);
+        if (typeof body.path === 'string') tauriAskHost.announceSelfWrite(vault, body.path);
+        shown = { ...(body.chat as RailChat), turns: [...(body.chat as RailChat).turns] };
+        continue;
+      }
+      retryable = reply.status === 4 || reply.status < 0;
+    } catch {
+      retryable = true;
+    }
+    if (retryable) {
+      unsaved.push(...queue.slice(index).map((item) => ({ ...item, unsaved: true })));
       break;
     }
-    selected.unshift(lines[i]);
-    totalLen += lineLen;
+    unsaved.push({ ...turn, unsaved: true });
   }
-
-  if (selected.length === 0) return { bundle: '', truncated: false };
-
-  const header = [
-    `사용자가 노트 옆에서 연 Claude Code 세션 \`${sessionId}\`의 대화다. 최신 쪽부터 24,000자까지 실었다. 도구 호출은 이름만 남겼다.`,
-    `이것은 읽은 순간의 스냅샷이라 가장 최근 활동이 빠졌을 수 있다.`,
-    `아래 대화만으로 답이 모자라면 짐작하지 말고 모자라다고 말하라.`,
-  ];
-  if (truncated) {
-    header[0] = header[0].replace('실었다.', '실었다 (앞쪽은 뺐다).');
-  }
-
-  const bundle = [
-    header.join('\n'),
-    '<session-transcript>',
-    selected.join('\n'),
-    '</session-transcript>',
-  ].join('\n\n');
-
-  return { bundle, truncated };
-}
-
-export function extractNoteHeading(markdown?: string): string {
-  if (!markdown) return '';
-  const clean = markdown.replace(/<!--[\s\S]*?-->/g, '');
-  const m = clean.match(/^#\s+(.+)$/m);
-  return m ? m[1].trim() : '';
-}
-
-export function buildRailPersona(opts: {
-  noteMarkdown?: string;
-  noteId: string;
-  subId?: string;
-  sessionId: string;
-  hasTranscript: boolean;
-}): string {
-  const heading = extractNoteHeading(opts.noteMarkdown);
-  const noteName = heading ? `「${heading}」` : '';
-  const noteTargetText = opts.subId
-    ? `노트 ${opts.noteId}의 하위 노트 ${opts.subId}`
-    : opts.noteId;
-  const noteDesc = `노트는 ${noteName}(${noteTargetText})이다.`;
-  const readCmd = opts.subId
-    ? `wl-cli get_sub_note '{"parent":"${opts.noteId}","id":"${opts.subId}"}'`
-    : `wl-cli get_doc '{"id":"${opts.noteId}"}'`;
-  const updateCmd = opts.subId ? 'wl-cli update_sub_note' : 'wl-cli update_doc';
-  
-  // D20 고침 (c5b929ea): 둘째 줄 끝 가르기
-  const transcriptNotice = opts.hasTranscript
-    ? '첫 물음 앞에 그 세션의 최근 대화가 실려 있다.'
-    : '그 세션의 대화는 실리지 않았다.';
-
-  return [
-    `너는 사용자의 withlog 앱에서, 노트 옆 세션 레일로 질문을 받는다. ${noteDesc}`,
-    `이 대화는 Claude Code 세션 ${opts.sessionId}와 그 세션이 쓴 이 노트를 두고 묻는다. ${transcriptNotice}`,
-    `노트 내용이 필요하면 \`${readCmd}\`로 읽는다. 노트를 고쳐 달라고 하면 그 응답의 precondition 값을 f1으로 실어 \`${updateCmd}\`로 고친다.`,
-    `작업 폴더는 그 세션이 돌던 폴더다. 코드나 다른 파일을 고쳐 달라는 말이 없으면 노트 밖 파일은 고치지 않는다.`,
-  ].join('\n');
+  const finished: RailChat = { ...shown, turns: [...shown.turns, ...unsaved] };
+  // The written chat moves to the end of the memory list; reading again puts it back in order of start (8.12).
+  setChats((prev) => [...prev.filter((item) => item.chatId !== at.chatId), finished]);
 }
 
 // --------------------------------------------------------------------------
-// NoteSessionRail Component
+// 9: the session screen
 // --------------------------------------------------------------------------
-
-export function NoteSessionRail({
-  sessionId,
-  onClose,
-  onLeave: _onLeave,
-  chat,
-}: NoteSessionRailProps): React.JSX.Element {
-  // 8.3 폭 조절: 392px ~ 960px, 더블클릭 392px
-  const [width, setWidth] = useState(392);
-  const isResizing = useRef(false);
-  const startX = useRef(0);
-  const startW = useRef(width);
-
-  // 6장 세션 프로젝트 목록에서 해당 세션 정보 조회
-  const projectSessions = useProjectsList();
-  const sessionItem = useMemo(
-    () => projectSessions.find((s) => s.sessionId === sessionId || s.id === sessionId),
-    [projectSessions, sessionId]
-  );
-
-  // 세션 대화 읽기 상태
-  const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-
-  // 레일 대화 목록 상태
-  const [chats, setChats] = useState<ChatRecord[]>([]);
-  const [unreadableChats, setUnreadableChats] = useState<string[]>([]);
-  const [chatsError, setChatsError] = useState<string | null>(null);
-
-  // 지금 보는 대화 id (없으면 새 대화)
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [pendingTurn, setPendingTurn] = useState<ChatTurn | null>(null);
-  const [composerNotice, setComposerNotice] = useState<string | null>(null);
-
-  // 입력 및 옵션
-  const [inputText, setInputText] = useState('');
-  const [attachedImages, setAttachedImages] = useState<File[]>([]);
-  const [pickedModel, setPickedModel] = useState<string | null>(null);
-  const [pickedEffort, setPickedEffort] = useState<string | null>(null);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const targetNoteId = chat?.target?.noteId || '';
-  const targetSubId = chat?.target?.subId;
-
-  // 1. 세션 전사 1회 읽기
-  useEffect(() => {
-    let active = true;
-    setSessionLoading(true);
-    setSessionError(null);
-
-    callEngine<SessionData>(['read-session', sessionId, 'limit=100', 'urls=true'])
-      .then((data) => {
-        if (!active) return;
-        setSessionData(data);
-        setSessionLoading(false);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setSessionError(err?.message || '대화 기록을 못 읽었어요.');
-        setSessionLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [sessionId]);
-
-  // 2. 레일 대화 목록 읽기 (list-chats)
-  const reloadChats = () => {
-    if (!targetNoteId) return;
-    const argv = ['list-chats', targetNoteId];
-    if (targetSubId) argv.push(targetSubId);
-
-    callEngine<{ chats: ChatRecord[]; unreadable: string[] }>(argv)
-      .then((res) => {
-        setChats(res.chats || []);
-        setUnreadableChats(res.unreadable || []);
-        setChatsError(null);
-      })
-      .catch((err) => {
-        setChatsError(err?.message || '대화 목록을 읽지 못했어요.');
-      });
-  };
-
-  useEffect(() => {
-    reloadChats();
-  }, [targetNoteId, targetSubId]);
-
-  // 지금 보고 있는 대화 객체 결정 (8.5)
-  const activeChat = useMemo(() => {
-    if (pendingTurn && currentChatId) {
-      const found = chats.find((c) => c.chatId === currentChatId);
-      if (found) return found;
-    }
-    if (currentChatId) {
-      const found = chats.find((c) => c.chatId === currentChatId);
-      if (found) return found;
-    }
-    // 밑감 세션이 이 레일 세션인 대화 중 마지막 것
-    const match = chats.filter((c) => c.sourceSessionId === sessionId);
-    if (match.length > 0) {
-      return match[match.length - 1];
-    }
-    return null;
-  }, [chats, currentChatId, pendingTurn, sessionId]);
-
-  // 대화의 모든 턴 (activeChat의 턴들 + 화면에만 있는 pendingTurn)
-  const currentTurns = useMemo(() => {
-    const list: ChatTurn[] = activeChat ? [...activeChat.turns] : [];
-    return list;
-  }, [activeChat]);
-
-  // 첫 물음 여부 (성공한 회차가 없으면 첫 물음)
-  const isFirstQuestion = useMemo(() => {
-    if (!activeChat || activeChat.turns.length === 0) return true;
-    return !activeChat.turns.some((t) => !t.error && t.answer);
-  }, [activeChat]);
-
-  // 8.9 모델 및 effort 우선순위 계산
-  const { chosenModel, chosenEffort, hint } = useMemo(() => {
-    let m = 'claude-sonnet-5-5';
-    let e = 'low';
-    let mSource = 'default';
-    let eSource = 'default';
-
-    // 1. picked
-    if (pickedModel) {
-      m = pickedModel;
-      mSource = 'picked';
-    }
-    if (pickedEffort) {
-      e = pickedEffort;
-      eSource = 'picked';
-    }
-
-    // 2. chat (마지막 회차 값)
-    const lastTurn = currentTurns.length > 0 ? currentTurns[currentTurns.length - 1] : null;
-    if (mSource === 'default' && lastTurn?.model) {
-      m = lastTurn.model;
-      mSource = 'chat';
-    }
-    if (eSource === 'default' && lastTurn?.effort) {
-      e = lastTurn.effort;
-      eSource = 'chat';
-    }
-
-    // 3. session (runState)
-    const rs = sessionData?.runState;
-    if (mSource === 'default' && rs?.model) {
-      const cleanM = rs.model.replace(/\s*\[.*\]$/, '');
-      if (MODEL_OPTIONS.some((opt) => opt.id === cleanM)) {
-        m = cleanM;
-        mSource = 'session';
-      }
-    }
-    if (eSource === 'default' && rs?.effort) {
-      if (EFFORT_OPTIONS.some((opt) => opt.id === rs.effort)) {
-        e = rs.effort;
-        eSource = 'session';
-      }
-    }
-
-    let h = '';
-    if (mSource === eSource) {
-      if (mSource === 'chat') h = '이 대화의 값';
-      else if (mSource === 'session') h = '세션 값';
-    }
-
-    return { chosenModel: m, chosenEffort: e, hint: h };
-  }, [pickedModel, pickedEffort, currentTurns, sessionData?.runState]);
-
-  // 폭 리사이징 핸들러
-  const handleMouseDown = (e: React.MouseEvent) => {
-    isResizing.current = true;
-    startX.current = e.clientX;
-    startW.current = width;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizing.current) return;
-      const delta = startX.current - ev.clientX; // 왼쪽으로 끌면 커짐
-      const newW = Math.max(392, Math.min(960, startW.current + delta));
-      setWidth(newW);
-    };
-
-    const onMouseUp = () => {
-      isResizing.current = false;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  };
-
-  // 새 대화 열기 (8.5)
-  const handleNewChat = () => {
-    setCurrentChatId(null);
-    setComposerNotice(null);
-  };
-
-  // 물음 전송 (8.6)
-  const handleSend = async () => {
-    const q = inputText.trim();
-    if (!q || pendingTurn) return;
-    if (sessionLoading) return; // 첫 물음인데 읽는 중이면 무시
-
-    setInputText('');
-    const imgsToSend = [...attachedImages];
-    setAttachedImages([]);
-
-    // 대화 id 결정 (없으면 새 UUID)
-    const chatId = currentChatId || activeChat?.chatId || crypto.randomUUID();
-    setCurrentChatId(chatId);
-
-    // 앞 회차 확인 (첫 물음 여부)
-    const existingTurns = activeChat ? activeChat.turns : [];
-
-    // 묶음 글 생성
-    const { bundle } = buildTranscriptBundle(sessionId, sessionData?.turns || []);
-    const hasTranscript = bundle.length > 0;
-
-    // 페르소나 생성
-    const persona = buildRailPersona({
-      noteMarkdown: chat?.noteMarkdown,
-      noteId: targetNoteId,
-      subId: targetSubId,
-      sessionId,
-      hasTranscript,
-    });
-
-    // 프롬프트 생성
-    let prompt = q;
-    if (isFirstQuestion && hasTranscript) {
-      prompt = `## 이 세션의 최근 대화\n\n${bundle}\n\n## 물음\n\n${q}`;
-    }
-
-    const askedAt = new Date().toISOString();
-    const turnId = `rt${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-
-    // 임시 도는 물음 등록
-    setPendingTurn({
-      id: turnId,
-      askedAt,
-      question: q,
-      answer: '',
-      model: chosenModel,
-      effort: chosenEffort,
-      elapsedMs: 0,
-      images: imgsToSend.length > 0 ? imgsToSend.map((f) => `attach/${f.name}`) : undefined,
-    });
-
-    // 이미지 첨부 저장 (attach/ 폴더)
-    const savedImagePaths: string[] = [];
-    for (const f of imgsToSend) {
-      try {
-        const ext = f.name.split('.').pop()?.toLowerCase() || 'png';
-        const imgName = `ask-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-        const arrayBuf = await f.arrayBuffer();
-        await safeInvoke('write_attachment_bytes', {
-          parent: targetSubId ? `${targetNoteId}/${targetSubId}` : targetNoteId,
-          name: imgName,
-          bytes: Array.from(new Uint8Array(arrayBuf)),
-        });
-        savedImagePaths.push(`attach/${imgName}`);
-      } catch {
-        // 이미지 저장 실패
-      }
-    }
-
-    // ask_claude 호출
-    const req = {
-      vault: '',
-      sessionId: chatId,
-      model: chosenModel,
-      effort: chosenEffort,
-      prompt,
-      resume: existingTurns.length > 0,
-      timeoutSeconds: 120,
-      persona,
-      cwd: sessionData?.cwd || sessionItem?.cwd,
-    };
-
-    let answer = '';
-    let error: string | undefined;
-    let elapsedMs = 0;
-
-    try {
-      const askRes = await safeInvoke<{
-        answer?: string;
-        error?: string;
-        elapsed_ms?: number;
-        missing_cwd?: boolean;
-      }>('ask_claude', { request: req });
-
-      if (askRes) {
-        answer = askRes.answer || '';
-        error = askRes.error;
-        elapsedMs = askRes.elapsed_ms || 0;
-        if (askRes.missing_cwd && sessionData?.cwd) {
-          setComposerNotice(`이 세션이 처음 돌던 폴더(${sessionData.cwd})가 없어서 vault 에서 답했어요.`);
-        }
-      } else {
-        error = '호스트 응답이 비어 있습니다.';
-      }
-    } catch (err: any) {
-      error = err?.message || '요청 실패';
-    }
-
-    // append-chat-turn 인자 구성
-    const appendArgv = ['append-chat-turn', targetNoteId];
-    if (targetSubId) appendArgv.push(targetSubId);
-    appendArgv.push(
-      `chat-id=${chatId}`,
-      `source-session=${sessionId}`,
-      `turn-id=${turnId}`,
-      `asked-at=${askedAt}`,
-      `question=${q}`,
-      `answer=${answer}`,
-      `model=${chosenModel}`,
-      `effort=${chosenEffort}`,
-      `elapsed-ms=${elapsedMs}`
-    );
-    if (error) appendArgv.push(`error=${error}`);
-    if (savedImagePaths.length > 0) appendArgv.push(`images=${savedImagePaths.join(',')}`);
-
-    try {
-      await callEngine(appendArgv);
-      reloadChats();
-    } catch {
-      // 실패 시 화면에 unsaved로 남김 (8.10)
-      setChats((prev) => {
-        const found = prev.find((c) => c.chatId === chatId);
-        const newTurn: ChatTurn = {
-          id: turnId,
-          askedAt,
-          question: q,
-          answer,
-          error,
-          model: chosenModel,
-          effort: chosenEffort,
-          elapsedMs,
-          images: savedImagePaths.length > 0 ? savedImagePaths : undefined,
-          unsaved: true,
-        };
-        if (found) {
-          return prev.map((c) =>
-            c.chatId === chatId ? { ...c, turns: [...c.turns, newTurn] } : c
-          );
-        }
-        return [
-          ...prev,
-          {
-            noteId: targetNoteId,
-            chatId,
-            sourceSessionId: sessionId,
-            createdAt: askedAt,
-            turns: [newTurn],
-          },
-        ];
-      });
-    }
-
-    setPendingTurn(null);
-
-    // 스크롤 맨 아래로 이동
-    setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
-    }, 50);
-  };
-
-  const isQuerying = pendingTurn !== null;
-
-  return (
-    <aside
-      className="nsrail"
-      data-at-min={width <= 392 ? true : undefined}
-      style={{ width: `${width}px` }}
-    >
-      {/* 8.3 리사이저 손잡이 */}
-      <div
-        className="nsrail-resizer"
-        role="separator"
-        aria-orientation="vertical"
-        onMouseDown={handleMouseDown}
-        onDoubleClick={() => setWidth(392)}
-      />
-
-      {/* 8.4 레일 머리 */}
-      <header className="nsrail-header">
-        <div className="nsrail-title-row">
-          <span className="nsrail-title">
-            {sessionItem ? sessionItem.title || '(제목 없는 세션)' : '지금 안 돌고 있는 세션'}
-          </span>
-          {sessionItem?.status === 'running' && <span className="sess-run" />}
-          <button
-            type="button"
-            className="nsrail-close"
-            aria-label="세션 레일 닫기"
-            onClick={onClose}
-          >
-            ✕
-          </button>
-        </div>
-
-        {sessionItem && (
-          <div className="nsrail-meta-row">
-            <span className="nsrail-kind">
-              {sessionItem.kind === 'interactive'
-                ? '터미널'
-                : sessionItem.kind === 'background'
-                  ? '백그라운드'
-                  : '알 수 없음'}
-            </span>
-            {sessionItem.cwd && <span className="nsrail-cwd">{sessionItem.cwd}</span>}
-          </div>
-        )}
-
-        <div className="nsrail-actions">
-          <button
-            type="button"
-            className="nsrail-open-session"
-            onClick={() => {
-              window.location.hash = `/session/${encodeURIComponent(sessionId)}`;
-            }}
-          >
-            세션 화면에서 보기
-          </button>
-        </div>
-      </header>
-
-      {/* 스크롤 본문 칸 (.nsrail-body) */}
-      <div className="nsrail-body" ref={scrollRef}>
-        {/* 1. 세션 대화 칸 */}
-        <section className="nsrail-session-section">
-          {sessionLoading && (
-            <div className="nsrail-msg">대화 기록을 읽는 중이에요.</div>
-          )}
-          {sessionError && !sessionLoading && (
-            <div className="nsrail-msg">대화 기록을 못 읽었어요. 사이드카가 안 떠 있을 수 있어요.</div>
-          )}
-          {!sessionLoading && !sessionError && sessionData && (
-            <>
-              {sessionData.file === null ? (
-                <div className="nsrail-msg">이 기계에 그 세션의 기록이 없어요. 다른 기기에서 돌던 세션일 수 있어요.</div>
-              ) : sessionData.turns.length === 0 ? (
-                // D20 결함 고침: 기록은 있는데 주고받은 말이 없어요
-                <div className="nsrail-msg">기록은 있는데 주고받은 말이 없어요.</div>
-              ) : (
-                <>
-                  <div className="nsrail-source">
-                    {sessionData.sizeBytes ?? 0}B · {sessionData.linesTotal ?? 0}줄 · {sessionData.turns.length}회차
-                    {Number(sessionData.linesDropped || 0) > 0 ? ` · 못 읽은 줄 ${sessionData.linesDropped}개` : ''}
-                  </div>
-                  {sessionData.hasMore && (
-                    <div className="nsrail-has-more">앞의 대화가 더 있어요</div>
-                  )}
-                  <div className="sess-turns">
-                    {sessionData.turns.map((t, idx) => (
-                      <div key={t.turnId || idx} className="sess-turn-group">
-                        {t.user && (
-                          <div className="sess-turn sess-turn-user">
-                            <span className="sess-turn-author">사용자</span>
-                            <div className="sess-turn-body">{t.user}</div>
-                          </div>
-                        )}
-                        {t.assistant && (
-                          <div className="sess-turn sess-turn-assistant">
-                            <span className="sess-turn-author">클로드</span>
-                            <div className="sess-turn-body">
-                              <ModelProse content={t.assistant} />
-                            </div>
-                          </div>
-                        )}
-                        {t.tools && t.tools.length > 0 && (
-                          <div className="sess-tool-line">
-                            (도구: {t.tools.map((tl) => tl.name || tl).join(', ')})
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* 2. 레일 대화 칸 (.rchat) */}
-        <section className="rchat">
-          <div className="rchat-header">
-            <h4>새 대화</h4>
-            {(currentTurns.length > 0 || isQuerying) && (
-              <button
-                type="button"
-                className="rchat-new"
-                disabled={isQuerying}
-                onClick={handleNewChat}
-              >
-                새 대화 열기
-              </button>
-            )}
-          </div>
-
-          {chatsError && <div className="rchat-warn">{chatsError}</div>}
-          {unreadableChats.length > 0 && (
-            <div className="rchat-warn">
-              못 읽은 대화 파일이 있어요: {unreadableChats.join(', ')}
-            </div>
-          )}
-
-          {currentTurns.length === 0 && !isQuerying && (
-            <div className="rchat-empty">
-              이 세션에는 보내지 않아요. 새 대화를 열고, 이 세션의 최근 대화와 노트를 함께 실어 물어요.
-            </div>
-          )}
-
-          {/* 회차 목록 */}
-          <div className="rchat-turns">
-            {currentTurns.map((turn) => (
-              <div key={turn.id} className="rchat-turn-pair">
-                {/* 물음 줄 */}
-                <div className="sess-turn sess-turn-user">
-                  <div className="sess-turn-head">
-                    <span className="sess-turn-author">나</span>
-                    <span className="sess-turn-time">{formatTurnTime(turn.askedAt)}</span>
-                  </div>
-                  <div className="sess-turn-body">{turn.question}</div>
-                  {turn.images && turn.images.length > 0 && (
-                    <div className="sess-turn-images">
-                      {turn.images.map((img) => (
-                        <span key={img} className="sess-image-chip">{img}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 답 줄 */}
-                <div className={`sess-turn sess-turn-assistant ${turn.error ? 'rchat-failed' : ''}`}>
-                  <div className="sess-turn-head">
-                    <span className="sess-turn-author">클로드</span>
-                    <span className="sess-turn-model">{modelLabel(turn.model)}</span>
-                    <span className="sess-turn-effort">{turn.effort}</span>
-                    <span className="sess-turn-time">
-                      {(turn.elapsedMs / 1000).toFixed(1)}초
-                    </span>
-                  </div>
-                  <div className="sess-turn-body">
-                    {turn.error ? (
-                      <div className="rchat-error">못 받았어요: {turn.error}</div>
-                    ) : (
-                      <ModelProse content={turn.answer} />
-                    )}
-                  </div>
-                  {turn.unsaved && (
-                    <div className="rchat-unsaved">
-                      이 답은 vault 에 못 적었어요. 앱을 끄면 사라져요.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* 도는 물음 (.rchat-pending) */}
-            {pendingTurn && (
-              <div className="rchat-turn-pair rchat-pending">
-                <div className="sess-turn sess-turn-user">
-                  <div className="sess-turn-head">
-                    <span className="sess-turn-author">나</span>
-                    <span className="sess-turn-time">{formatTurnTime(pendingTurn.askedAt)}</span>
-                  </div>
-                  <div className="sess-turn-body">{pendingTurn.question}</div>
-                </div>
-                <div className="sess-turn sess-turn-assistant">
-                  <div className="sess-turn-head">
-                    <span className="sess-turn-author">클로드</span>
-                    <span className="sess-turn-model">{modelLabel(pendingTurn.model)}</span>
-                    <span className="sess-turn-effort">{pendingTurn.effort}</span>
-                  </div>
-                  <div className="sess-turn-body">
-                    요청 중…
-                    {attachedImages.length > 0 && ` (그림 ${attachedImages.length}장 붙임)`}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* 3. 하단 입력창 (.sess-composer.nsrail-composer) */}
-      <footer className="sess-composer nsrail-composer">
-        {/* 고르개 줄 */}
-        <div className="rchat-options">
-          <select
-            value={chosenModel}
-            onChange={(e) => setPickedModel(e.target.value)}
-          >
-            {MODEL_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={chosenEffort}
-            onChange={(e) => setPickedEffort(e.target.value)}
-          >
-            {EFFORT_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
-          {hint && <span className="rchat-options-hint">{hint}</span>}
-        </div>
-
-        {/* 안내 줄 (missing_cwd 알림 등) */}
-        {composerNotice && (
-          <div className="sess-composer-notice">{composerNotice}</div>
-        )}
-
-        {/* 첨부 그림 썸네일 줄 */}
-        {attachedImages.length > 0 && (
-          <div className="sess-composer-images">
-            {attachedImages.map((f, idx) => (
-              <span key={idx} className="sess-composer-img">
-                {f.name}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAttachedImages((prev) => prev.filter((_, i) => i !== idx))
-                  }
-                >
-                  ✕
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* 입력 textarea */}
-        <textarea
-          className="sess-composer-input"
-          aria-label="새 대화로 묻기"
-          placeholder="이 세션과 노트에 대해 물어요… (⌘V로 그림 붙이기, ⌘/Ctrl+Enter로 보내기)"
-          value={inputText}
-          rows={3}
-          onChange={(e) => setInputText(e.target.value)}
-          onPaste={(e) => {
-            const items = e.clipboardData?.items;
-            if (!items) return;
-            for (let i = 0; i < items.length; i++) {
-              if (items[i].type.startsWith('image/')) {
-                const file = items[i].getAsFile();
-                if (file) {
-                  setAttachedImages((prev) => [...prev, file].slice(0, 8));
-                }
-              }
-            }
-          }}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              e.preventDefault();
-              void handleSend();
-            }
-          }}
-        />
-
-        {/* 전송 버튼 */}
-        <div className="sess-composer-footer">
-          <button
-            type="button"
-            className="sess-composer-send"
-            disabled={isQuerying || (!inputText.trim() && attachedImages.length === 0) || (isFirstQuestion && sessionLoading)}
-            onClick={() => void handleSend()}
-          >
-            {isQuerying
-              ? '요청 중…'
-              : sessionLoading && isFirstQuestion
-                ? '세션 대화를 읽는 중…'
-                : '묻기'}
-          </button>
-        </div>
-      </footer>
-    </aside>
-  );
-}
-
-// --------------------------------------------------------------------------
-// Chapter 9: Session Route Component (/session/:id)
-// --------------------------------------------------------------------------
-
-export interface AskResult {
-  ok: boolean;
-  answer?: string;
-  error?: string;
-  missing_cwd?: boolean;
-}
 
 export interface SessionRouteProps {
   sessionId?: string;
@@ -961,1172 +871,478 @@ export interface SessionRouteProps {
   state?: any;
 }
 
-export interface ComposerImage {
-  id: string;
-  name: string;
-  bytes: Uint8Array;
-  dataUrl: string;
-  size: number;
-}
-
-export interface ComposerState {
-  text: string;
-  images: ComposerImage[];
-  notice: string | null;
-  error: string | null;
-  sending: boolean;
-}
-
-const sessionComposerMap = new Map<string, ComposerState>();
-
-export function getSessionComposerState(id: string): ComposerState {
-  let s = sessionComposerMap.get(id);
-  if (!s) {
-    s = { text: '', images: [], notice: null, error: null, sending: false };
-    sessionComposerMap.set(id, s);
-  }
-  return s;
-}
-
-export function SessionComposer({
-  sessionId,
-  sessionData,
-  sessionItem,
-  sessionLoaded,
-  transcriptFile,
-  state,
-  onSent,
-}: {
-  sessionId: string;
-  sessionData: any | null;
-  sessionItem: any | undefined;
-  sessionLoaded: boolean;
-  transcriptFile: string | null | undefined;
-  state: any;
-  onSent: () => void;
-}): React.JSX.Element {
-  const [composerState, setComposerState] = useState<ComposerState>(() =>
-    getSessionComposerState(sessionId)
-  );
-
-  useEffect(() => {
-    setComposerState({ ...getSessionComposerState(sessionId) });
-  }, [sessionId]);
-
-  const updateState = (updater: (prev: ComposerState) => ComposerState) => {
-    const cur = getSessionComposerState(sessionId);
-    const next = updater(cur);
-    sessionComposerMap.set(sessionId, next);
-    setComposerState({ ...next });
-  };
-
-  // 10.1 입력창을 여는 판정
-  const processAlive = Boolean(sessionItem?.processAlive);
-  const isBackground = sessionItem?.kind === 'background';
-  const heldByAgent = Boolean(sessionItem?.heldByAgent);
-
-  // 2. 살아있는 프로세스인 경우 닫는다 (기본 길에서는 heldByAgent 없음)
-  if (processAlive && !heldByAgent) {
-    const blockKind = isBackground ? 'live-background' : 'live-terminal';
-    const msg = isBackground
-      ? '이 세션은 백그라운드에서 돌고 있어요. 도는 동안에는 claude 가 이어 쓰기를 거절해서 입력창을 닫아 뒀어요. 끝나면 여기서 이어 쓸 수 있어요.'
-      : '이 세션은 다른 터미널에서 열려 있어요. 여기서도 보내면 대화가 둘로 갈라져서 입력창을 닫아 뒀어요. 그 터미널에서 claude 를 끝내고 돌아오면 여기서 이어 쓸 수 있어요.';
-    return (
-      <div className="sess-composer-blocked" data-block={blockKind}>
-        {msg}
-      </div>
-    );
-  }
-
-  // 3. 대화를 다 읽었는데 응답의 file이 null이면 닫는다 (no-record)
-  if (sessionLoaded && transcriptFile === null) {
-    return (
-      <div className="sess-composer-blocked" data-block="no-record">
-        이 기계에 이 세션의 대화 기록이 없어서 이어 쓸 수 없어요.
-      </div>
-    );
-  }
-
-  // 4. 그 밖에는 연다.
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (!file) continue;
-
-        // 크기 상한 검사 (5,000,000 바이트)
-        if (file.size > 5_000_000) {
-          updateState((prev) => ({
-            ...prev,
-            error: `그림이 너무 커요: ${file.size} 바이트. 상한은 5000000 바이트예요`,
-          }));
-          return;
-        }
-
-        // 개수 상한 검사 (한 물음 8장)
-        if (composerState.images.length >= 8) {
-          updateState((prev) => ({
-            ...prev,
-            error: '한 물음에 그림은 8장까지 붙일 수 있어요',
-          }));
-          return;
-        }
-
-        const ext = file.type.replace('image/', '') || 'png';
-        const time36 = Date.now().toString(36);
-        const rand8 = Math.random().toString(36).substring(2, 10).padEnd(8, '0');
-        const name = `ask-${time36}-${rand8}.${ext}`;
-
-        const reader = new FileReader();
-        reader.onload = () => {
-          const buffer = reader.result as ArrayBuffer;
-          const bytes = new Uint8Array(buffer);
-          let binary = '';
-          for (let b = 0; b < bytes.length; b++) {
-            binary += String.fromCharCode(bytes[b]);
-          }
-          const dataUrl = `data:${file.type};base64,${btoa(binary)}`;
-          updateState((prev) => ({
-            ...prev,
-            error: null,
-            images: [
-              ...prev.images,
-              {
-                id: name,
-                name,
-                bytes,
-                dataUrl,
-                size: file.size,
-              },
-            ],
-          }));
-        };
-        reader.readAsArrayBuffer(file);
-      }
-    }
-  };
-
-  const handleRemoveImage = (index: number) => {
-    updateState((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, idx) => idx !== index),
-    }));
-  };
-
-  const handleDictation = async () => {
-    try {
-      await safeInvoke('start_dictation');
-    } catch (err) {
-      console.error('start_dictation failed', err);
-    }
-  };
-
-  const handleSend = async () => {
-    if (composerState.sending) return;
-    if (!composerState.text.trim() && composerState.images.length === 0) return;
-
-    updateState((prev) => ({ ...prev, sending: true, error: null }));
-
-    try {
-      // 10.3 보내기 전 세션 목록 재판정
-      const recent = await callEngine<any[]>(['recent-sessions']).catch(() => []);
-      const curRow = (recent || []).find((s: any) => s.sessionId === sessionId || s.id === sessionId);
-      if (curRow?.processAlive) {
-        updateState((prev) => ({
-          ...prev,
-          sending: false,
-          error:
-            '이 세션이 지금 다른 터미널에서 돌고 있어서 안 보냈어요. 그 터미널에서 이어 가 주세요. 여기서 보내면 대화가 갈라져요.',
-        }));
-        return;
-      }
-
-      // 붙인 그림 저장
-      const savedPaths: string[] = [];
-      for (const img of composerState.images) {
-        try {
-          const p = await safeInvoke<string>('write_session_image', {
-            sessionId,
-            name: img.name,
-            bytes: Array.from(img.bytes),
-          });
-          savedPaths.push(p);
-        } catch (imgErr: any) {
-          updateState((prev) => ({
-            ...prev,
-            sending: false,
-            error: `붙인 그림을 못 저장해서 안 보냈어요: ${imgErr?.message || imgErr}`,
-          }));
-          return;
-        }
-      }
-
-      // 본문 구성 (10.6 경로 줄)
-      let fullPrompt = composerState.text;
-      if (savedPaths.length > 0) {
-        const countStr = savedPaths.length === 1 ? '1' : `${savedPaths.length}`;
-        const imgBlock =
-          `[첨부 그림] 이 물음에 그림 ${countStr}장을 붙였다. 답하기 전에 Read 도구로 하나씩 열어 본다.\n` +
-          savedPaths.map((p) => `- ${p}`).join('\n');
-        fullPrompt = composerState.text ? `${composerState.text}\n\n${imgBlock}` : imgBlock;
-      }
-
-      // ask_claude 호출 (10.3: 페르소나 미포함, resume=true, resumeOnly=true, keepAlive=true)
-      const res = await safeInvoke<AskResult>('ask_claude', {
-        sessionId,
-        prompt: fullPrompt,
-        resume: true,
-        resumeOnly: true,
-        keepAlive: true,
-        cwd: sessionData?.cwd,
-        model: state?.model,
-        effort: state?.effort,
-      });
-
-      if (res && res.ok) {
-        // 성공: 입력칸 및 그림 비움
-        updateState((prev) => ({
-          ...prev,
-          text: '',
-          images: [],
-          error: null,
-          sending: false,
-          notice: res.missing_cwd
-            ? `이 세션이 처음 돌던 폴더(${sessionData?.cwd || ''})가 없어서 vault 에서 이어 갔어요.`
-            : null,
-        }));
-        onSent();
-      } else {
-        // 실패: 입력 내용 유지
-        updateState((prev) => ({
-          ...prev,
-          sending: false,
-          error: res?.error || '까닭을 못 받았다',
-        }));
-      }
-    } catch (err: any) {
-      updateState((prev) => ({
-        ...prev,
-        sending: false,
-        error: String(err?.message || err),
-      }));
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  return (
-    <div className="sess-composer">
-      {composerState.notice && (
-        <div className="sess-composer-notice">{composerState.notice}</div>
-      )}
-      {composerState.error && (
-        <div className="sess-composer-error">{composerState.error}</div>
-      )}
-
-      {composerState.images.length > 0 && (
-        <div className="sess-composer-images">
-          {composerState.images.map((img, idx) => (
-            <div key={img.id} className="sess-composer-image-item">
-              <img src={img.dataUrl} alt={img.name} />
-              <button
-                type="button"
-                className="sess-composer-image-remove"
-                onClick={() => handleRemoveImage(idx)}
-                aria-label="그림 빼기"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="sess-composer-box">
-        <textarea
-          className="sess-composer-input"
-          aria-label="세션으로 보내기"
-          placeholder="Claude에게 이어 물어보기... (⌘V로 그림 붙이기, ⌘Enter로 보내기)"
-          value={composerState.text}
-          onChange={(e) =>
-            updateState((prev) => ({ ...prev, text: e.target.value }))
-          }
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          disabled={composerState.sending}
-          rows={3}
-        />
-        <div className="sess-composer-actions">
-          <button
-            type="button"
-            className="sess-composer-mic"
-            onClick={handleDictation}
-            title="받아쓰기"
-            aria-label="받아쓰기"
-          >
-            🎤
-          </button>
-          <button
-            type="button"
-            className="sess-composer-send"
-            onClick={handleSend}
-            disabled={
-              composerState.sending ||
-              (!composerState.text.trim() && composerState.images.length === 0)
-            }
-            aria-label="보내기"
-          >
-            {composerState.sending ? '보내는 중...' : '보내기'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function SessionCliPane({
-  sessionId,
-  sessionCwd,
-  sessionItem,
-  controller: _controller,
-}: {
-  sessionId: string;
-  sessionCwd?: string;
-  sessionItem?: any;
-  controller?: any;
-}): React.JSX.Element {
-  const termKey = `term:${sessionId}`;
-
-  // 10.9 판정: 동기 계산으로 깜빡임 및 SSR 보장
-  const processAlive = Boolean(sessionItem?.processAlive);
-  const shortId = sessionItem?.shortId || (sessionItem?.kind === 'background' ? sessionItem?.id : undefined);
-  const heldByAgent = Boolean(sessionItem?.heldByAgent);
-
-  const blockedMsg = useMemo(() => {
-    // 3. 살아 있고 shortId 없고 heldByAgent 아니면 => 띄우지 말라
-    if (processAlive && !shortId && !heldByAgent) {
-      return '이 세션은 지금 다른 터미널에서 돌고 있어요. 그 터미널에서 이어 가 주세요. 여기서 이어 열면 두 곳이 한 대화에 써서 대화가 갈라져요.';
-    }
-    return null;
-  }, [processAlive, shortId, heldByAgent]);
-
-  const [fellBackNotice, setFellBackNotice] = useState<string | null>(null);
-  const [termOutput, setTermOutput] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (blockedMsg) return;
-
-    let mode = 'resume';
-    let targetSid = sessionId;
-    if (processAlive && shortId) {
-      mode = 'attach';
-      targetSid = shortId;
-    }
-
-    let onData: any = null;
-    try {
-      const core = require('@tauri-apps/api/core');
-      if (core && core.Channel) {
-        onData = new core.Channel();
-        onData.onmessage = (chunk: string) => {
-          try {
-            const decoded = atob(chunk);
-            setTermOutput((prev) => [...prev, decoded]);
-          } catch {
-            setTermOutput((prev) => [...prev, chunk]);
-          }
-        };
-      }
-    } catch {
-      onData = {
-        onmessage: () => {},
-      };
-    }
-
-    safeInvoke<{ fellBack: boolean }>('pty_start_session', {
-      key: termKey,
-      cols: 80,
-      rows: 24,
-      sessionAction: {
-        mode,
-        sessionId: targetSid,
-        cwd: sessionCwd,
-      },
-      onData,
-    })
-      .then((res) => {
-        if (res?.fellBack) {
-          setFellBackNotice('원래 작업 폴더가 없어서 홈 폴더에서 이어 가요.');
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to start session shell:', err);
-      });
-  }, [sessionId, sessionItem, blockedMsg, termKey, sessionCwd, processAlive, shortId]);
-
-  if (blockedMsg) {
-    return (
-      <div className="prev-pane is-cli term-host" data-tab-key={termKey}>
-        <div className="term-empty">{blockedMsg}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="prev-pane is-cli term-host" data-tab-key={termKey}>
-      {fellBackNotice && <div className="term-bar-note">{fellBackNotice}</div>}
-      <div className="term-screen">
-        <pre className="term-lines">{termOutput.join('')}</pre>
-      </div>
-    </div>
-  );
-}
-
-export function formatDuration(sec: number): string {
-  if (sec < 60) {
-    return `${sec.toFixed(1)}초`;
-  }
-  if (sec < 3600) {
-    return `${Math.round(sec / 60)}분`;
-  }
-  return `${(sec / 3600).toFixed(1)}시간`;
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes >= 1048576) {
-    return `${(bytes / 1048576).toFixed(1)}MB`;
-  }
-  if (bytes >= 1024) {
-    return `${Math.round(bytes / 1024)}KB`;
-  }
-  return `${bytes}B`;
-}
-
-export function buildPinTranscriptMarkdown(opts: {
-  title: string;
-  turns: any[];
-  findingsCount: number;
-}): string {
-  const lines: string[] = [];
-  lines.push(`# ${opts.title}`);
-  lines.push('');
-
-  // 콜아웃
-  if (opts.findingsCount > 0) {
-    lines.push(`> [!danger] 표에 없는데 비밀처럼 생긴 것 ${opts.findingsCount}건`);
-    lines.push('> 이 검사는 도구 결과 본문은 보지 못해요.');
-  } else {
-    lines.push('> [!success] 모양 검사에 걸린 것이 0건입니다.');
-    lines.push('> 이 검사는 도구 결과 본문은 보지 못해요.');
-  }
-  lines.push('');
-
-  for (const t of opts.turns) {
-    if (t.who === 'user' || t.user) {
-      const text = t.text || t.user || '';
-      lines.push('**나**');
-      lines.push('');
-      lines.push('```');
-      lines.push(text);
-      lines.push('```');
-      lines.push('');
-    } else if (t.who === 'assistant' || t.assistant) {
-      const text = t.text || t.assistant || '';
-      lines.push('**클로드**');
-      lines.push('');
-      lines.push('```');
-      lines.push(text);
-      lines.push('```');
-      lines.push('');
-    } else if (t.who === 'tool' || t.tools) {
-      const tools = t.tools || (t.tool ? [t.tool] : []);
-      for (const tool of tools) {
-        const name = tool.name || String(tool);
-        const arg = tool.arg ? ` — \`${tool.arg.replace(/\r?\n/g, ' ')}\`` : '';
-        lines.push(`- \`${name}\`${arg}`);
-      }
-    }
-  }
-
-  return lines.join('\n');
-}
-
-export function SessionRoute({
-  sessionId: rawSessionId,
-  controller,
-  state,
-}: SessionRouteProps): React.JSX.Element {
-  // 세션 id 추출 (props 우선, 없으면 URL hash/path 파싱)
+export function SessionRoute({ sessionId: rawSessionId, controller, state }: SessionRouteProps): React.JSX.Element {
   const sessionId = useMemo(() => {
     if (rawSessionId) return rawSessionId;
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname || window.location.hash;
-      const m = path.match(/\/session\/([^/?#]+)/);
-      if (m) return decodeURIComponent(m[1]);
-    }
-    return '';
+    const match = /\/session\/([^/?#]+)/.exec(typeof window !== 'undefined' ? window.location.pathname : '');
+    return match ? decodeURIComponent(match[1]) : '';
   }, [rawSessionId]);
+  const vault = vaultPathOf(state);
 
-  // 세션 목록
-  const projectSessions = useProjectsList();
-  const sessionItem = useMemo(
-    () => projectSessions.find((s) => s.sessionId === sessionId || s.id === sessionId),
-    [projectSessions, sessionId]
-  );
-
-  // 전사 데이터 상태
-  const [sessionData, setSessionData] = useState<any | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-
-  // 오른쪽 레일 상태: 'notes' | 'links' | 'cli'
-  const [tab, setTab] = useState<'notes' | 'links' | 'cli'>('notes');
-  const [previewOpen, setPreviewOpen] = useState(true);
-
-  // 세션 id 변경 시 오른쪽 탭을 'notes'로 리셋 (9.7)
+  const rows = useProjectsList();
+  const store = useSessionStore();
+  const sessionItem = useMemo(() => rows.find((row) => row.sessionId === sessionId), [rows, sessionId]);
+  // 9.2: the list is read once when it has never been read.
   useEffect(() => {
-    setTab('notes');
-  }, [sessionId]);
+    if (store.status === 'idle') void refreshSessions(vault || undefined);
+  }, [store.status, vault]);
 
-  // 굳히기 모달 상태
-  const [pinModalOpen, setPinModalOpen] = useState(false);
-  const [pinCount, setPinCount] = useState<100 | 200 | 500>(100);
-  const [pinTitle, setPinTitle] = useState('');
-  const [pinAgenda, setPinAgenda] = useState('');
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [pinLoading, setPinLoading] = useState(false);
+  // 9.2: the conversation is read again only when the answer signal of this session changes.
+  const signal = useReplySignal(sessionId);
+  const [limit, setLimit] = useState(100);
+  const read = useReadSession(sessionId, limit, signal);
+  const view = read.view;
 
-  // 대화 읽기 (read-session)
-  const loadTranscript = (limit = 100) => {
-    if (!sessionId) return;
-    setSessionLoading(true);
-    setSessionError(null);
+  // 9.7: the chosen tab is not saved and goes back to "관련 노트" when the session changes, in this very render.
+  const [tabFor, setTabFor] = useState<{ id: string; tab: 'notes' | 'links' | 'cli' }>({ id: sessionId, tab: 'notes' });
+  const tab = tabFor.id === sessionId ? tabFor.tab : 'notes';
+  if (tabFor.id !== sessionId) setTabFor({ id: sessionId, tab: 'notes' });
+  const chooseTab = (next: 'notes' | 'links' | 'cli') => setTabFor({ id: sessionId, tab: next });
 
-    callEngine(['read-session', sessionId, `limit=${limit}`, 'urls=true'])
-      .then((data) => {
-        setSessionData(data);
-        setSessionLoading(false);
-      })
-      .catch((err) => {
-        setSessionError(err?.message || '대화 기록을 못 읽었어요.');
-        setSessionLoading(false);
-      });
-  };
-
+  const previewOpen = state?.prefs?.sessionPreviewOpen !== false;
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 1100);
   useEffect(() => {
-    loadTranscript(100);
-  }, [sessionId]);
-
-  // 창 너비 감시 (1100px 이하 시 오른쪽 레일 자동 접힘, 9.7)
-  const [windowNarrow, setWindowNarrow] = useState(false);
-  useEffect(() => {
-    const checkWidth = () => {
-      setWindowNarrow(window.innerWidth <= 1100);
-    };
-    checkWidth();
-    window.addEventListener('resize', checkWidth);
-    return () => window.removeEventListener('resize', checkWidth);
+    const check = () => setNarrow(window.innerWidth <= 1100);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
+  const railVisible = previewOpen && !narrow;
+  const setPreviewOpen = (open: boolean) => controller?.preference?.({ sessionPreviewOpen: open });
 
-  const isRailVisible = previewOpen && !windowNarrow;
+  const alive = sessionItem?.processAlive === true;
+  const [copied, setCopied] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [agentsOpen, setAgentsOpen] = useState(false);
+  const [todosOpen, setTodosOpen] = useState(false);
 
-  // 관련 노트 목록 (9.7)
-  const relatedNotes = useMemo(() => {
-    const notes: any[] = state?.workspace?.notes || [];
+  const related = useMemo(() => {
+    const notes: any[] = state?.workspace?.notes ?? [];
     return notes
-      .filter((n) => n.sessionId === sessionId || n.editedSessionId === sessionId)
-      .map((n) => {
-        const isCreated = n.sessionId === sessionId;
-        const why = isCreated ? '이 세션이 만들었어요.' : '이 세션이 고쳤어요.';
-        return { ...n, why };
-      })
-      .sort((a, b) => {
-        const d1 = String(a.created || '');
-        const d2 = String(b.created || '');
-        const c = d2.localeCompare(d1);
-        if (c !== 0) return c;
-        return String(a.id || '').localeCompare(String(b.id || ''));
-      });
+      .filter((note) => note.sessionId === sessionId || note.editedSessionId === sessionId)
+      .map((note) => ({ note, made: note.sessionId === sessionId }))
+      .sort((a, b) => String(b.note.created ?? '').localeCompare(String(a.note.created ?? '')) || String(a.note.id).localeCompare(String(b.note.id)));
   }, [state?.workspace?.notes, sessionId]);
 
-  // 링크 목록 (9.7)
-  const urlsList = useMemo(() => {
-    const urls: any[] = sessionData?.urls || [];
-    return urls.map((u) => {
-      if (typeof u === 'string') {
-        try {
-          const parsed = new URL(u);
-          return { url: u, host: parsed.host, path: parsed.pathname + parsed.search, count: 1 };
-        } catch {
-          return { url: u, host: u, path: '', count: 1 };
-        }
-      }
-      try {
-        const parsed = new URL(u.url);
-        return { url: u.url, host: parsed.host, path: parsed.pathname + parsed.search, count: u.count || 1 };
-      } catch {
-        return { url: u.url, host: u.url, path: '', count: u.count || 1 };
-      }
-    });
-  }, [sessionData?.urls]);
+  // 10.7: a file dropped on the middle column puts its path in the box. The Tauri event, not the browser's drop.
+  const middle = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isTauri() || !sessionId) return;
+    let off: (() => void) | undefined;
+    let live = true;
+    void getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const payload: any = event.payload;
+        const mode = payload.type;
+        const area = middle.current?.querySelector('.sess-composer-box');
+        if (!area) return;
+        const rect = middle.current!.getBoundingClientRect();
+        const over = payload.position && payload.position.x >= rect.left && payload.position.x <= rect.right && payload.position.y >= rect.top && payload.position.y <= rect.bottom;
+        area.setAttribute('data-drop', mode === 'drop' || mode === 'leave' ? 'none' : over ? 'over' : 'window');
+        if (mode !== 'drop' || !over || !Array.isArray(payload.paths) || payload.paths.length === 0) return;
+        const current = getSessionComposerState(sessionId);
+        if (current.sending) return; // 10.7: not while sending
+        const box = composerInputs.get(sessionId);
+        const focused = box && document.activeElement === box ? { start: box.selectionStart, end: box.selectionEnd } : null;
+        const next = insertDropped(current.text, payload.paths, focused);
+        patchComposer(sessionId, { text: next.text, error: null });
+        requestAnimationFrame(() => {
+          const element = composerInputs.get(sessionId);
+          if (element) {
+            element.focus();
+            element.setSelectionRange(next.caret, next.caret);
+          }
+        });
+      })
+      .then((fn) => {
+        if (live) off = fn;
+        else fn();
+      });
+    return () => {
+      live = false;
+      off?.();
+    };
+  }, [sessionId]);
 
-  // 전사 굳히기 열기
-  const handleOpenPinModal = () => {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    setPinTitle(`세션대화 ${hh}:${mm}`);
-    const agendas: any[] = state?.workspace?.agendas || [];
-    if (agendas.length > 0) {
-      setPinAgenda(agendas[0].slug || agendas[0].id);
-    }
-    setPinError(null);
-    setPinModalOpen(true);
+  const openTerminal = () => {
+    setPreviewOpen(true);
+    chooseTab('cli');
   };
 
-  // 전사 굳히기 저장 (create-doc, D29)
-  const handleSavePin = async () => {
-    if (!pinTitle.trim() || !sessionData) return;
-    setPinLoading(true);
-    setPinError(null);
-
-    const body = buildPinTranscriptMarkdown({
-      title: pinTitle,
-      turns: sessionData.turns || [],
-      findingsCount: 0,
-    });
-
-    const utf8Bytes = new TextEncoder().encode(body).length;
-    // D29 결함 고침: 1,000,000 바이트 초과 사전 검사
-    if (utf8Bytes > 1000000) {
-      setPinError(`본문이 1000000바이트를 넘어 저장할 수 없어요: ${utf8Bytes}바이트`);
-      setPinLoading(false);
-      return;
-    }
-
-    const now = new Date();
-    const date = now.toISOString().slice(0, 10);
-    const time = now.toISOString().slice(11, 16);
-
-    try {
-      const argv = [
-        'create-doc',
-        `agenda=${pinAgenda}`,
-        `title=${pinTitle}`,
-        `body=${body}`,
-        `date=${date}`,
-        `time=${time}`,
-        'format=markdown',
-        'tier=record',
-      ];
-      const res = await callEngine<{ id?: string }>(argv);
-      setPinLoading(false);
-      setPinModalOpen(false);
-
-      if (res?.id && controller?.navigate) {
-        controller.navigate(`/doc/${res.id}`);
-      }
-    } catch (err: any) {
-      setPinError(err?.message || '노트를 만들지 못했어요.');
-      setPinLoading(false);
-    }
-  };
-
-  const isAlive = sessionItem?.status === 'running';
-
-  const [composerUpdateKey, setComposerUpdateKey] = useState(0);
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-
-    const paths = files.map((f: any) => f.path || f.name).filter(Boolean);
-    if (paths.length === 0) return;
-
-    const formatted = paths
-      .map((p) => (p.includes(' ') || p.includes('"') ? `"${p.replace(/"/g, '\\"')}"` : p))
-      .join(' ');
-
-    const cur = getSessionComposerState(sessionId);
-    let newText = cur.text;
-    if (newText.length > 0 && !newText.endsWith(' ')) {
-      newText += ' ';
-    }
-    newText += formatted + ' ';
-
-    sessionComposerMap.set(sessionId, {
-      ...cur,
-      text: newText,
-      error: null,
-    });
-    setComposerUpdateKey((k) => k + 1);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+  const meta = sessionItem ? (
+    <>
+      <span className="sess-page-kind">{kindLabel(sessionItem.kind)}</span>
+      <StatusCell row={sessionItem} />
+      <span className="sess-page-started">{sinceText(sessionItem.startedAt)}에 시작</span>
+      {sessionItem.pid !== undefined && <span className="sess-page-pid">pid {sessionItem.pid}</span>}
+      {sessionItem.branch && <span className="sess-page-branch">{sessionItem.branch}</span>}
+    </>
+  ) : (
+    <span>{store.status === 'idle' || store.status === 'loading' ? '세션 목록을 읽는 중이에요.' : '끝났거나 다른 기기의 세션이에요. 대화는 디스크에 남아 있어서 아래 명령으로 이어 갈 수 있어요.'}</span>
+  );
 
   return (
-    <div className={`sess-screen ${!isRailVisible ? 'no-preview' : ''}`}>
-      {/* 메인 영역 (가운데 기둥: 머리, 대화 칸, 하단 독) */}
-      <div
-        className="sess-main-area"
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-      >
-        {/* 머리 (9.3) */}
+    <div className={`sess-screen${railVisible ? '' : ' no-preview'}`}>
+      <div className="sess-main-area" ref={middle}>
         <header className="sess-page-header">
           <div className="sess-page-head-row">
             <h1 className="sess-page-title">
-              {sessionItem ? sessionItem.title || '(이름 없는 세션)' : '지금 안 돌고 있는 세션'}
               {sessionItem?.status === 'running' && <span className="sess-run" />}
+              {sessionTitle(sessionItem)}
             </h1>
-
             <div className="sess-page-actions">
-              {!windowNarrow && (
-                <button
-                  type="button"
-                  className="open-cli"
-                  onClick={() => {
-                    setPreviewOpen(true);
-                    setTab('cli');
-                  }}
-                >
-                  터미널 열기
-                </button>
-              )}
+              {!narrow && <button type="button" className="open-cli" onClick={openTerminal}>터미널 열기</button>}
               <button
                 type="button"
                 className="sess-page-resume"
-                onClick={handleOpenPinModal}
+                title={`claude --resume ${sessionId}`}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(`claude --resume ${sessionId}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1600);
+                }}
+              >
+                {copied ? '복사됨' : '이어 가기 명령 복사'}
+              </button>
+              <button
+                type="button"
+                className="sess-page-pin"
+                disabled={read.loading || !view || view.turns.length < 1}
+                title={!view || view.turns.length < 1 ? '대화가 없으면 굳힐 것이 없어요.' : undefined}
+                onClick={() => setPinOpen(true)}
               >
                 노트로 굳히기
               </button>
-              {!windowNarrow && (
-                <button
-                  type="button"
-                  className="prev-toggle"
-                  onClick={() => setPreviewOpen(!previewOpen)}
-                >
-                  {previewOpen ? '레일 접기' : '레일 펴기'}
-                </button>
-              )}
+              {!narrow && <button type="button" className="prev-toggle" onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? '레일 접기' : '레일 펴기'}</button>}
             </div>
           </div>
-
-          <div className="sess-page-meta">
-            {sessionItem ? (
-              <>
-                <span className="sess-page-kind">
-                  {sessionItem.kind === 'interactive'
-                    ? '터미널'
-                    : sessionItem.kind === 'background'
-                      ? '백그라운드'
-                      : '알 수 없음'}
-                </span>
-                <span className={`sess-page-status ${sessionItem.status === 'running' ? '' : 'sess-ended'}`}>
-                  {sessionItem.status === 'running' ? '도는 중' : '끝남'}
-                </span>
-                {sessionItem.startedAt && (
-                  <span className="sess-page-started">
-                    {formatTurnTime(new Date(sessionItem.startedAt).toISOString())}에 시작
-                  </span>
-                )}
-                {sessionItem.pid && <span className="sess-page-pid">pid {sessionItem.pid}</span>}
-                {sessionItem.branch && <span className="sess-page-branch">{sessionItem.branch}</span>}
-              </>
-            ) : (
-              <span>
-                {sessionLoading
-                  ? '세션 목록을 읽는 중이에요.'
-                  : '끝났거나 다른 기기의 세션이에요. 대화는 디스크에 남아 있어서 아래 명령으로 이어 갈 수 있어요.'}
-              </span>
-            )}
-          </div>
-
+          <div className="sess-page-meta">{meta}</div>
           {sessionItem?.cwd && <div className="sess-page-cwd">{sessionItem.cwd}</div>}
-
-          {/* 마지막 회차 줄 (runState) */}
-          {sessionData?.runState && (
-            <div className="sess-page-runstate">
-              <span>마지막 회차</span>
-              {sessionData.runState.model && <span>{sessionData.runState.model}</span>}
-              {sessionData.runState.effort && <span>{sessionData.runState.effort}</span>}
-              {sessionData.runState.contextTokens && (
-                <span>컨텍스트 {sessionData.runState.contextTokens.toLocaleString()}토큰</span>
-              )}
-              {sessionData.runState.quotaBlocked && (
-                <span
-                  className="sess-page-runstate-quota"
-                  title={
-                    sessionData.runState.quotaResetsAt
-                      ? `재설정 예정: ${formatTurnTime(sessionData.runState.quotaResetsAt)}`
-                      : undefined
-                  }
-                >
-                  사용량 한도에 걸린 적 있음
-                </span>
-              )}
-            </div>
-          )}
+          <RunStateLine runState={view?.runState ?? null} />
         </header>
 
-        {/* 대화 칸 (.sess-page-talk, 9.4) */}
         <section className="sess-page-talk">
           <div className="sess-page-talk-head">
             <h2>대화</h2>
-            {sessionData?.linesTotal != null && (
-              <span className="sess-count">{sessionData.linesTotal}</span>
-            )}
+            {view && <span className="sess-count">{view.source.messages}</span>}
           </div>
+          <TranscriptBody read={read} />
 
-          {sessionLoading && (
-            <div className="sess-page-empty">대화 기록을 읽는 중이에요.</div>
-          )}
-          {sessionError && !sessionLoading && (
-            <div className="sess-page-empty" title={sessionError}>
-              대화 기록을 못 읽었어요. 사이드카가 안 떠 있을 수 있어요.
-            </div>
-          )}
-          {!sessionLoading && !sessionError && sessionData && (
-            <>
-              {sessionData.file === null ? (
-                <div className="sess-page-empty">
-                  이 기계에 그 세션의 기록이 없어요. 다른 기기에서 돌던 세션일 수 있어요.
-                </div>
-              ) : sessionData.turns?.length === 0 ? (
-                // D20 결함 고침: 말이 없을 때 정직한 명시
-                <div className="sess-page-empty">기록은 있는데 주고받은 말이 없어요.</div>
-              ) : (
-                <>
-                  <div className="sess-page-source">
-                    {formatBytes(sessionData.sizeBytes || 0)} 중에서 골랐어요 ·{' '}
-                    {sessionData.linesTotal || 0}줄에서 {sessionData.turns?.length || 0}건
-                    {Number(sessionData.linesDropped || 0) > 0 && (
-                      <strong> · 못 읽은 줄 {sessionData.linesDropped}개</strong>
-                    )}
-                  </div>
-
-                  {sessionData.hasMore && (
-                    <div className="sess-page-hasmore">
-                      앞의 대화가 더 있어요. 지금은 최근 건만 보여요.
-                    </div>
-                  )}
-
-                  {/* 회차 목록 (.sess-page-turns) */}
-                  <div className="sess-page-turns">
-                    {sessionData.turns.map((t: any, idx: number) => {
-                      const atStr = formatTurnTime(t.askedAt || t.at || '');
-                      if (t.who === 'user' || t.user) {
-                        return (
-                          <div key={idx} className="sess-turn sess-turn-user">
-                            <div className="sess-turn-head">
-                              <span className="sess-turn-author">나</span>
-                              <span className="sess-turn-at">{atStr}</span>
-                            </div>
-                            <div className="sess-turn-text">{t.user || t.text}</div>
-                          </div>
-                        );
-                      }
-                      if (t.who === 'assistant' || t.assistant) {
-                        return (
-                          <div key={idx} className="sess-turn sess-turn-assistant">
-                            <div className="sess-turn-head">
-                              <span className="sess-turn-author">클로드</span>
-                              <span className="sess-turn-at">{atStr}</span>
-                              {t.truncated && <span className="sess-turn-cut">2,000자 중 앞부분</span>}
-                            </div>
-                            <div className="sess-turn-text">
-                              <ModelProse content={t.assistant || t.text || ''} />
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (t.who === 'tool' || t.tools) {
-                        const tools = t.tools || (t.tool ? [t.tool] : []);
-                        return tools.map((tl: any, ti: number) => {
-                          const failed = tl.failed || t.failed;
-                          const sec = tl.seconds != null ? tl.seconds : t.seconds;
-                          return (
-                            <div key={`${idx}-${ti}`} className={`toolrow ${failed ? 'is-failed' : ''}`}>
-                              <span
-                                className="tr-ic"
-                                data-state={failed ? 'failed' : sec != null ? 'done' : 'running'}
-                              >
-                                {failed ? '✕' : sec != null ? '✓' : '●'}
-                              </span>
-                              <span className="tr-name">{tl.name}</span>
-                              {tl.arg && <span className="tr-arg" title={tl.arg}>{tl.arg}</span>}
-                              {sec != null && <span className="tr-ms">{formatDuration(sec)}</span>}
-                            </div>
-                          );
-                        });
-                      }
-                      return null;
-                    })}
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {/* 하단 독 (.sess-dock, 9.5) */}
           <footer className="sess-dock">
-            {/* 서브에이전트 바 (D26 결함 고침) */}
-            {sessionData?.runningAgents && sessionData.runningAgents.length > 0 && (
+            {view && view.runningAgents.length > 0 && (
               <div className="subagent-bar sess-dock-row">
-                <div className="sess-dock-head">
-                  {isAlive && <span className="sess-run" />}
-                  <span>
-                    {isAlive
-                      ? `서브에이전트 ${sessionData.runningAgents.length}개가 도는 중`
-                      : `결과가 안 온 서브에이전트 ${sessionData.runningAgents.length}개, 지금 도는지는 몰라요`}
-                  </span>
-                </div>
-                <div className="sess-dock-list">
-                  {sessionData.runningAgents.map((ag: any, ai: number) => (
-                    <div key={ai} className="sess-dock-item">
-                      <span className="sess-dock-what">{ag.name || ag.task || '에이전트'}</span>
-                      {ag.startedAt && (
-                        <span className="sess-dock-at">{formatTurnTime(ag.startedAt)}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <button type="button" className="sess-dock-head" aria-expanded={agentsOpen} onClick={() => setAgentsOpen(!agentsOpen)}>
+                  {alive && <span className="sess-run" />}
+                  <span>{agentBarText(view.runningAgents.length, alive)}</span>
+                </button>
+                {!narrow && <button type="button" className="open-cli" onClick={openTerminal}>터미널 열기</button>}
+                {agentsOpen && (
+                  <div className="sess-dock-list">
+                    {view.runningAgents.map((agent, index) => (
+                      <div key={index} className="sess-dock-item">
+                        <span className="sess-dock-what">{agent.what ?? '(무엇을 하는지 안 적힌 호출)'}</span>
+                        {agent.at && !Number.isNaN(new Date(agent.at).getTime()) && <span className="sess-dock-at">{sinceText(new Date(agent.at).getTime())}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-
-            {/* 할 일 바 (9.5) */}
-            {sessionData?.todos && sessionData.todos.length > 0 && (
+            {view && view.todos.length > 0 && (
               <div className="todo-bar sess-dock-row">
-                <div className="sess-dock-head">
-                  <span>할 일 ({sessionData.todos.length})</span>
-                </div>
-                <div className="sess-dock-list">
-                  {sessionData.todos.map((td: any, ti: number) => (
-                    <div key={ti} className="sess-dock-item">
-                      <span className="todo-status" data-status={td.status}>
-                        {td.status === 'completed' ? '완료' : '진행 중'}
-                      </span>
-                      <span className="sess-dock-what">{td.content}</span>
-                    </div>
-                  ))}
-                </div>
+                <button type="button" className="sess-dock-head" aria-expanded={todosOpen} onClick={() => setTodosOpen(!todosOpen)}>{todoBarText(view.todos)}</button>
+                {todosOpen && (
+                  <div className="sess-dock-list">
+                    {view.todos.map((todo) => (
+                      <div key={todo.number} className="sess-dock-item">
+                        <span className="todo-status" data-status={todo.status}>{todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '●' : '○'}</span>
+                        <span className="sess-dock-what">{todo.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-
-            {/* 10장 세션 입력창 (.sess-composer, 10.1, 10.13) */}
             <SessionComposer
-              key={`${sessionId}-${composerUpdateKey}`}
+              key={sessionId}
               sessionId={sessionId}
-              sessionData={sessionData}
               sessionItem={sessionItem}
-              sessionLoaded={!sessionLoading}
-              transcriptFile={sessionData?.file}
-              state={state}
-              onSent={() => loadTranscript(100)}
+              sessionLoaded={!read.loading && !read.error}
+              transcriptFile={view?.file}
+              vault={vault}
+              timeoutSeconds={() => Number(state?.prefs?.askTimeoutSeconds) || 3600}
             />
           </footer>
         </section>
       </div>
 
-      {/* 오른쪽 레일 (.prevcol, 9.7) */}
-      {isRailVisible && (
+      {railVisible && (
         <aside className="prevcol">
-          {/* 탭 헤더 */}
           <div className="prev-tabs">
-            <button
-              type="button"
-              className={`prev-tab ${tab === 'notes' ? 'on' : ''}`}
-              onClick={() => setTab('notes')}
-            >
-              관련 노트 <span className="prev-tab-n">{relatedNotes.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`prev-tab ${tab === 'links' ? 'on' : ''}`}
-              onClick={() => setTab('links')}
-            >
-              링크 <span className="prev-tab-n">{urlsList.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`prev-tab ${tab === 'cli' ? 'on' : ''}`}
-              onClick={() => setTab('cli')}
-            >
-              CLI
-            </button>
+            <button type="button" className={`prev-tab${tab === 'notes' ? ' on' : ''}`} onClick={() => chooseTab('notes')}>관련 노트 <span className="prev-tab-n">{related.length}</span></button>
+            <button type="button" className={`prev-tab${tab === 'links' ? ' on' : ''}`} onClick={() => chooseTab('links')}>링크 <span className="prev-tab-n">{view?.urls.length ?? 0}</span></button>
+            <button type="button" className={`prev-tab${tab === 'cli' ? ' on' : ''}`} onClick={() => chooseTab('cli')}>CLI</button>
           </div>
 
-          {/* 관련 노트 패널 */}
-          <div className="prev-pane" style={{ display: tab === 'notes' ? 'block' : 'none' }}>
-            {relatedNotes.length === 0 ? (
-              <div className="prev-empty">
-                이 세션이 만들거나 고친 노트가 없어요. 노트에 세션 도장이 찍히기 시작한 것이 2026-09-12 이라, 그보다 이른 세션은 만들었어도 안 적혀 있어요.
-              </div>
+          <div className="prev-pane" hidden={tab !== 'notes'}>
+            {related.length === 0 ? (
+              <div className="prev-empty">이 세션이 만들거나 고친 노트가 없어요. 노트에 세션 도장이 찍히기 시작한 것이 2026-09-12 이라, 그보다 이른 세션은 만들었어도 안 적혀 있어요.</div>
             ) : (
               <div className="relnotes-list">
-                {relatedNotes.map((n) => (
-                  <div
-                    key={n.id}
-                    className="relnote"
-                    onClick={() => controller?.navigate?.(`/doc/${n.id}`)}
-                  >
-                    <div className="relnote-title">{n.title || '(제목 없는 노트)'}</div>
-                    <div className="relnote-why">{n.why}</div>
-                    <div className="relnote-date">{n.date || String(n.created || '').slice(0, 10)}</div>
+                {related.map(({ note, made }) => (
+                  <div key={note.id} className="relnote" onClick={() => controller?.navigate?.(`/doc/${note.id}`)}>
+                    <div className="relnote-title">{note.title || '(제목 없는 노트)'}</div>
+                    <div className="relnote-why">{made ? '이 세션이 만들었어요.' : '이 세션이 고쳤어요.'}</div>
+                    <div className="relnote-date">{String(note.created ?? '').slice(0, 10)}</div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* 링크 패널 */}
-          <div className="prev-pane" style={{ display: tab === 'links' ? 'block' : 'none' }}>
-            {urlsList.length === 0 ? (
+          <div className="prev-pane" hidden={tab !== 'links'}>
+            {read.loading ? (
+              <div className="prev-empty">대화 기록을 읽는 중이에요.</div>
+            ) : read.error && !view ? (
+              <div className="prev-empty">대화 기록을 못 읽어서 링크도 못 모았어요.</div>
+            ) : !view || view.urls.length === 0 ? (
               <div className="prev-empty">그 세션에서 오간 링크가 없어요.</div>
             ) : (
               <div className="sess-links-list">
-                {urlsList.map((u, ui) => (
-                  <div
-                    key={ui}
-                    className="sess-page-link"
-                    title={u.url}
-                    onClick={() => {
-                      safeInvoke('open_external', { url: u.url }).catch(() => {
-                        window.open(u.url, '_blank');
-                      });
-                    }}
-                  >
-                    <strong>{u.host}</strong>
-                    <span>{u.path}</span>
-                    {u.count > 1 && (
-                      <span className="sess-page-link-count">({u.count})</span>
-                    )}
-                  </div>
-                ))}
+                {view.urls.map((item) => {
+                  const url = splitUrl(item.url);
+                  return (
+                    <div key={item.url} className="sess-page-link" title={item.url} onClick={() => void openUrl(item.url).catch(() => {})}>
+                      <strong>{url.host}</strong>
+                      <span>{url.rest}</span>
+                      {item.count > 1 && <span className="sess-page-link-count">({item.count})</span>}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* CLI 패널 (10.9 ~ 10.12, 10.13) */}
-          <div style={{ display: tab === 'cli' ? 'contents' : 'none' }}>
-            <SessionCliPane
-              sessionId={sessionId}
-              sessionCwd={sessionData?.cwd}
-              sessionItem={sessionItem}
-              controller={controller}
-            />
-          </div>
+          <SessionCliPane key={sessionId} sessionId={sessionId} visible={tab === 'cli'} controller={controller} state={state} />
         </aside>
       )}
 
-      {/* 9.8 전사 굳히기 모달 (.ndf) */}
-      {pinModalOpen && (
-        <div className="modal-backdrop">
-          <div className="ndf modal-content">
-            <header className="modal-header">
-              <h3>노트로 굳히기</h3>
-              <button type="button" onClick={() => setPinModalOpen(false)}>✕</button>
-            </header>
-
-            <div className="ndf-body">
-              {/* 회차 수 선택 */}
-              <div className="pin-ranges">
-                <button
-                  type="button"
-                  className={`btn-range ${pinCount === 100 ? 'active' : ''}`}
-                  onClick={() => {
-                    setPinCount(100);
-                    loadTranscript(100);
-                  }}
-                >
-                  최근 100건
-                </button>
-                <button
-                  type="button"
-                  className={`btn-range ${pinCount === 200 ? 'active' : ''}`}
-                  onClick={() => {
-                    setPinCount(200);
-                    loadTranscript(200);
-                  }}
-                >
-                  최근 200건
-                </button>
-                <button
-                  type="button"
-                  className={`btn-range ${pinCount === 500 ? 'active' : ''}`}
-                  onClick={() => {
-                    setPinCount(500);
-                    loadTranscript(500);
-                  }}
-                >
-                  최근 500건
-                </button>
-              </div>
-
-              <div className="pin-hint">
-                실제로 담을 회차는 {sessionData?.turns?.length || 0}건이에요.
-              </div>
-
-              {/* 제목 입력 */}
-              <div className="form-group">
-                <label>노트 제목</label>
-                <input
-                  type="text"
-                  value={pinTitle}
-                  onChange={(e) => setPinTitle(e.target.value)}
-                />
-              </div>
-
-              {/* 아젠다 선택 */}
-              <div className="form-group">
-                <label>아젠다</label>
-                <select
-                  value={pinAgenda}
-                  onChange={(e) => setPinAgenda(e.target.value)}
-                >
-                  {(state?.workspace?.agendas || []).map((ag: any) => (
-                    <option key={ag.id} value={ag.slug || ag.id}>
-                      {ag.title || ag.slug}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {pinError && <div className="pin-warn">{pinError}</div>}
-            </div>
-
-            <footer className="ndf-foot modal-footer">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setPinModalOpen(false)}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={pinLoading || !pinTitle.trim()}
-                onClick={() => void handleSavePin()}
-              >
-                {pinLoading ? '저장 중…' : '기록 노트로 만들기'}
-              </button>
-            </footer>
-          </div>
-        </div>
+      {pinOpen && view && (
+        <PinSessionModal
+          sessionId={sessionId}
+          controller={controller}
+          state={state}
+          onClose={() => setPinOpen(false)}
+          onLimit={(next) => setLimit(next)}
+        />
       )}
+    </div>
+  );
+}
+
+function splitUrl(url: string): { host: string; rest: string } {
+  try {
+    const parsed = new URL(url);
+    return { host: parsed.host, rest: parsed.pathname + parsed.search + parsed.hash };
+  } catch {
+    return { host: url, rest: '' };
+  }
+}
+
+// --------------------------------------------------------------------------
+// 10.9, 10.11: the CLI pane is the part 3 terminal cell with the key term:<session id>
+// --------------------------------------------------------------------------
+
+export function SessionCliPane({
+  sessionId,
+  visible,
+  controller,
+  state,
+}: {
+  sessionId: string;
+  visible: boolean;
+  controller?: any;
+  state?: any;
+  /** Kept for the callers that still pass them. */
+  sessionCwd?: string;
+  sessionItem?: unknown;
+}): React.JSX.Element {
+  const key = `term:${sessionId}`;
+  // The shell starts the first time the cell is shown, and not for a session that was only opened (9.7, 10.9).
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (visible) setOpened(true);
+  }, [visible]);
+  const tabOpen = Boolean(state?.tabs?.openIds?.includes(key));
+  const workspace = state?.workspace;
+
+  if (tabOpen) {
+    return (
+      <div className="prev-pane is-cli term-host" data-tab-key={key} hidden={!visible}>
+        <div className="term-empty">이 세션의 터미널이 탭으로 열려 있어요. 그 탭에서 이어 쓰세요.</div>
+        <button type="button" onClick={() => controller?.navigate?.(`/terminal/${encodeURIComponent(sessionId)}`)}>그 탭으로 가기</button>
+      </div>
+    );
+  }
+  if (!opened || !workspace) return <div className="prev-pane is-cli term-host" data-tab-key={key} hidden={!visible} />;
+  return (
+    <div className="prev-pane is-cli term-host" data-tab-key={key} hidden={!visible}>
+      <Suspense fallback={null}>
+        <TerminalHost
+          tabKey={key}
+          isVisible={visible}
+          agendas={agendaOrder(workspace.agendas, workspace.notes)}
+          onCreateDoc={async (agendaSlug, title, body) => createPinnedDoc(controller, state, agendaSlug, title, body, ['터미널기록'])}
+          onNavigate={(path) => controller?.navigate?.(path)}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+/** 9.8: `create-doc` through the screen's data layer: `type=free`, `mins=0`, `tier=record`; the memory is not touched on a failure. */
+async function createPinnedDoc(controller: any, state: any, agendaSlug: string, title: string, body: string, tags: string[]): Promise<{ ok: boolean; id?: string; error?: string }> {
+  try {
+    const workspace = state?.workspace;
+    const agenda = workspace?.agendas.find((item: any) => item.slug === agendaSlug);
+    const result = await controller.data.createDoc({
+      agendaId: agenda?.id || agendaSlug,
+      type: 'free',
+      title,
+      body,
+      date: workspace.today,
+      time: new Date().toTimeString().slice(0, 5),
+      mins: 0,
+      tags,
+      tier: 'record',
+    });
+    if (result.ok && result.value?.id) return { ok: true, id: String(result.value.id) };
+    return { ok: false, error: '노트 생성에 실패했어요.' };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || String(error) };
+  }
+}
+
+// --------------------------------------------------------------------------
+// 9.8: pin the transcript into a note
+// --------------------------------------------------------------------------
+
+interface ShapeCount {
+  kind: string;
+  label: string;
+  count: number;
+}
+
+export function PinSessionModal({
+  sessionId,
+  controller,
+  state,
+  onClose,
+  onLimit,
+}: {
+  sessionId: string;
+  controller: any;
+  state: any;
+  onClose: () => void;
+  onLimit: (limit: number) => void;
+}): React.JSX.Element {
+  const agendas = useMemo(() => agendaOrder(state?.workspace?.agendas ?? [], state?.workspace?.notes ?? []), [state?.workspace?.agendas, state?.workspace?.notes]);
+  const [count, setCount] = useState<100 | 200 | 500>(100);
+  const [title, setTitle] = useState(() => pinDefaultTitle());
+  const [agenda, setAgenda] = useState(() => agendas[0]?.slug ?? ''); // decided once, when the window opens
+  const [view, setView] = useState<ReadSessionView | null>(null);
+  const [shapes, setShapes] = useState<ShapeCount[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const generation = useRef(0);
+
+  // 9.8 steps 2 and 3: read without links, then scan the lines for shapes. Overlapping reads are told apart by a number.
+  useEffect(() => {
+    const mine = ++generation.current;
+    setView(null);
+    setShapes(null);
+    setError(null);
+    (async () => {
+      try {
+        const raw = await callEngine(['read-session', sessionId, `limit=${count}`]);
+        const next = normalizeReadSession(raw);
+        const found = await invoke<ShapeCount[]>('scan_text_shapes', { text: pinScanText(next.turns) });
+        if (generation.current !== mine) return;
+        setView(next);
+        setShapes(found);
+      } catch (cause: any) {
+        if (generation.current === mine) setError(typeof cause === 'string' ? cause : cause?.message || '대화를 읽지 못했어요.');
+      }
+    })();
+    return () => {
+      generation.current += 1;
+    };
+  }, [sessionId, count]);
+
+  const findings = shapes ? shapes.reduce((sum, shape) => sum + shape.count, 0) : 0;
+  const body = useMemo(
+    () => (view && shapes ? pinBody({ title: title.trim() || '세션 대화', sessionId, turns: view.turns, source: view.source, shapeFindings: findings, shapeLines: shapes.map((shape) => `${shape.label} ${shape.count} 건`) }) : ''),
+    [view, shapes, title, sessionId, findings]
+  );
+  const bytes = new TextEncoder().encode(body).length;
+  const canSave = Boolean(view && shapes && body && bytes <= 300_000 && agenda && title.trim() && !saving);
+
+  const save = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    const result = await createPinnedDoc(controller, state, agenda, title.trim(), body, ['세션전사']);
+    setSaving(false);
+    if (result.ok && result.id) {
+      onClose();
+      controller?.navigate?.(`/doc/${result.id}`);
+    } else {
+      setError(result.error || '노트를 만들지 못했어요.'); // the window stays open (C32)
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="ndf modal-content" role="dialog" aria-label="노트로 굳히기">
+        <header className="modal-header">
+          <h3>노트로 굳히기</h3>
+          <button type="button" aria-label="닫기" onClick={onClose}>✕</button>
+        </header>
+        <div className="ndf-body">
+          <div className="pin-ranges">
+            {([100, 200, 500] as const).map((n) => (
+              <button key={n} type="button" className={`btn-range${count === n ? ' active' : ''}`} onClick={() => { setCount(n); onLimit(n); }}>최근 {n}건</button>
+            ))}
+          </div>
+          <div className="pin-hint">실제로 담을 회차는 {view?.turns.length ?? 0}건이에요.</div>
+          {shapes && (
+            <div className="pin-shapes">
+              {findings > 0
+                ? `표에 없는데 비밀처럼 생긴 것이 ${findings} 건이에요. 안 가려졌어요. ${shapes.map((shape) => `${shape.label} ${shape.count} 건`).join(', ')}`
+                : '걸린 것이 0 건이에요. 도구 결과 본문은 애초에 안 담아서, 이 굳히기는 값 표를 안 써요.'}
+            </div>
+          )}
+          <div className="form-group">
+            <label>노트 제목</label>
+            <input type="text" value={title} onChange={(event) => setTitle(event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>아젠다</label>
+            <select value={agenda} onChange={(event) => setAgenda(event.target.value)}>
+              {agendas.map((item) => (
+                <option key={item.id} value={item.slug}>{item.title || item.slug}</option>
+              ))}
+            </select>
+          </div>
+          <div className="pin-size">
+            본문 {bytes} 바이트 / 상한 300,000 바이트{bytes > 300_000 ? ' — 회차 수를 줄여 주세요.' : ''}
+          </div>
+          {error && <div className="pin-warn">{error}</div>}
+        </div>
+        <footer className="ndf-foot modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose}>취소</button>
+          <button type="button" className="btn-primary" disabled={!canSave} onClick={() => void save()}>{saving ? '저장 중…' : '굳히기'}</button>
+        </footer>
+      </div>
     </div>
   );
 }
