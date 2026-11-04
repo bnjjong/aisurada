@@ -343,7 +343,9 @@ node fixtures/runner-test.mjs
 | `rebuild-p<부>-*-fixes-complete.md`, `-review-*` | 리뷰 반영 기록 |
 | `rebuild-p4-plan.md`, `rebuild-p3-plan.md` | 부별 구현 순서 |
 | `review-*`, `plan-*`, `prompt-*` | 초기 장 작업의 리뷰·계획·지시 기록 |
-| `beta-hand-check.md`, `developer-guide.md` | 지금 쓰는 안내서 |
+| `beta-hand-check.md`, `developer-guide.md` | 지금 쓰는 안내서. 가이드의 HTML 사본은 `pnpm --dir native-host docs:guide`로 다시 만든다 |
+
+작업 규칙(커밋과 푸시, 작업 뒤 정리, 문서 갱신, 이름 규칙)은 저장소 루트의 [`CommonRule.md`](../CommonRule.md) 한 곳에서 관리한다. `CLAUDE.md`는 그 파일을 가져다 쓴다.
 
 설명서 원문(PDF, 로컬 md)은 이 저장소 밖에 있다. `docs/`의 사본은 원문을 다시 쓴 판이라 문구·종료 코드·바이트 예시가 원문과 다른 곳이 있다. **다를 때는 원문과 현재 코드의 시험이 기준이다.** 완료 기록은 그날의 상태를 적은 것이라 이름 변경 이후 코드와 글자가 다를 수 있다.
 
