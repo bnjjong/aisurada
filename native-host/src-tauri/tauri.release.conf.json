@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "resources": {
+      "../.release/runtime/": "runtime/",
+      "../runtime-lock.json": "runtime-source.json",
+      "../../LICENSE": "LICENSE.txt",
+      "../../docs/user-guide.html": "user-guide.html"
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "-",
+      "hardenedRuntime": false
+    }
+  }
+}

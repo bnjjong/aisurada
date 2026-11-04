@@ -68,3 +68,19 @@ PTY 커맨드는 `pty_start`, `pty_write`, `pty_resize`, `pty_detach`, `pty_aliv
 
 
 4부 2차 리뷰 회귀 검사는 `pnpm test:part4:acceptance`(켜진 화면과 호스트), `pnpm test:ask-marks:acceptance`(꺼진 화면과 호스트)로 실행한다. 두 검사는 임시 vault, HOME, 로컬 가짜 Claude를 쓰는 실제 WKWebView 검사다. React 효과와 요청 중 화면 이동을 따로 보려면 Vite 개발 서버의 `/scripts/part4-review.html`을 연다. 검증 범위와 결과는 [2차 리뷰 반영 기록](../docs/rebuild-p4-second-review-complete.md)에 있다.
+
+
+## 0.0.1 시험 배포
+
+Apple Silicon Mac에서 JDK 21과 개발 도구를 준비한 뒤 실행합니다.
+
+```bash
+pnpm --dir native-host install --frozen-lockfile
+pnpm --dir native-host release:build
+```
+
+`release:build`는 고정된 Temurin JRE 아카이브의 SHA-256을 확인하고, Java·JAR·라이선스·사용자 가이드를 포함한 ad-hoc 서명 앱과 DMG를 만듭니다. 번들 검증 및 별도 프로세스의 노트 저장·재시작 검사를 통과하면 `native-host/.release/artifacts/`에 업로드 파일과 체크섬을 준비합니다. Java 런타임·원본 소스 아카이브는 `.release/cache/`에 캐시하며 Git에 넣지 않습니다. 기본 개발 번들 설정은 그대로 사용하고, 시험 배포는 `src-tauri/tauri.release.conf.json`을 덧씌웁니다.
+
+이 시험판의 macOS 최소 설정은 13.0이며, Java는 포함하지만 Git·Claude CLI는 포함하지 않습니다. Apple 공증은 하지 않습니다. 공개 빌드는 개인 `secret-names.txt`를 포함하지 않는 견본 분류표를 사용합니다. [설치 안내와 제한 사항](../docs/releases/0.0.1.md)을 참고하세요.
+
+GitHub Actions의 **Build trial release → Run workflow**에서 기존 버전 태그를 지정하면, 기존 검사와 동일한 배포 빌드를 실행하고 GitHub Pre-release 초안을 만듭니다. 설치 확인 후 공개합니다. 이미 공개된 릴리스는 덮어쓰지 않습니다. 새 버전에서는 앱 버전 3곳과 Cargo.lock, 릴리스 본문 `docs/releases/<버전>.md`를 함께 갱신합니다.

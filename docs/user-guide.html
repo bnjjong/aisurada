@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+<title>aisurada 사용자 가이드</title><meta name="description" content="aisurada의 시작, 노트 작성과 검색, Claude 문답과 세션, 터미널, 복구와 CLI를 안내하는 사용자 가이드입니다.">
+<style>
+:root{--bg:#f5f6f2;--paper:#fff;--ink:#20352f;--text:#394c45;--muted:#67766e;--line:#dce3dc;--accent:#25634e;--tint:#e9f2eb;--warm:#fbf3e4;--warm-line:#e9d5ac;--code:#172f28;--code-ink:#e4eee8;--shadow:0 20px 70px #233a2f0a;color-scheme:light}
+:root[data-theme=dark]{--bg:#131d19;--paper:#1a2721;--ink:#e8f0e8;--text:#c4d0c6;--muted:#9aafa0;--line:#34483b;--accent:#9bd2b1;--tint:#263c2f;--warm:#382f22;--warm-line:#655333;--code:#101a15;--code-ink:#dcebe0;--shadow:none;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:105px}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:16px;line-height:1.8;word-break:keep-all;overflow-wrap:anywhere}button,input{font:inherit}button,a,input{touch-action:manipulation}a{color:var(--accent);text-underline-offset:4px}a:hover{text-decoration-thickness:2px}button{cursor:pointer}button:disabled{cursor:default}button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:4px}p{margin:0 0 17px}h1,h2,h3{color:var(--ink);line-height:1.3;letter-spacing:-.035em;word-break:keep-all}h1{font-size:clamp(37px,4.2vw,61px);font-weight:750;margin:18px 0 25px;line-height:1.17}h2{font-size:29px;margin:0 0 15px}h3{font-size:19px;margin:30px 0 12px}ul,ol{margin:12px 0 22px;padding-left:24px}li{padding-left:3px;margin:7px 0}b,strong{color:var(--ink);font-weight:650}small,.muted{color:var(--muted);font-size:14px}.skip{position:fixed;top:-70px;left:16px;background:var(--paper);padding:8px 16px;z-index:100}.skip:focus{top:10px}.topbar{position:sticky;top:0;z-index:30;background:var(--paper);border-bottom:1px solid var(--line)}.topbar-inner{max-width:1520px;padding:16px 35px;margin:auto;display:flex;align-items:center;gap:20px;min-height:81px}.brand{display:flex;align-items:center;gap:11px;flex-shrink:0;color:var(--ink);text-decoration:none;font-size:20px;font-weight:750;letter-spacing:-.05em}.brand-symbol{display:grid;place-items:center;width:36px;height:36px;background:var(--accent);color:var(--paper);border-radius:11px;font-size:25px}.brand-divider{width:1px;height:23px;background:var(--line);margin-left:5px}.guide-label{font-size:14px;color:var(--muted);font-weight:550;letter-spacing:0}.search-wrap{margin-left:auto;width:min(380px,34vw);position:relative}.search-wrap input{width:100%;padding:9px 35px 9px 14px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-size:14px}.clear-search{position:absolute;right:8px;top:7px;border:0;background:none;color:var(--muted);line-height:24px;font-size:18px}.toolbar{display:flex;gap:8px}.tool{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:8px 12px;font-size:13px;color:var(--ink);white-space:nowrap}.tool:hover{background:var(--tint)}#menu-toggle{display:none}.layout{max-width:1420px;margin:0 auto;display:grid;grid-template-columns:245px minmax(0,1fr);gap:52px;padding:0 35px}.sidebar{position:sticky;top:104px;height:calc(100vh - 125px);overflow:auto;padding:25px 0 32px;scrollbar-width:thin}.nav-eyebrow{font-size:11px;letter-spacing:.13em;font-weight:750;color:var(--muted);margin:0 0 14px 11px}.toc{list-style:none;padding:0;margin:0}.toc li{padding:0;margin:2px 0}.toc a{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--muted);font-size:14px;padding:8px 11px;border-radius:7px;line-height:1.45}.toc a span{font-size:10px;font-variant-numeric:tabular-nums;opacity:.75;letter-spacing:.06em;min-width:18px}.toc a:hover,.toc a[aria-current=true]{background:var(--tint);color:var(--accent)}.toc a[aria-current=true]{font-weight:700}.sidebar-foot{border-top:1px solid var(--line);margin:24px 11px 0;padding-top:18px;font-size:12px;color:var(--muted);line-height:1.8}.content{min-width:0;max-width:1000px;padding-bottom:50px}.hero{padding:59px 0 39px;border-bottom:1px solid var(--line);margin-bottom:34px}.eyebrow{color:var(--accent);font-size:11px;letter-spacing:.16em;font-weight:750}.hero-deck{font-size:18px;max-width:660px;line-height:1.9;color:var(--muted)}.hero-meta{display:flex;gap:9px;flex-wrap:wrap;margin:22px 0}.pill{padding:4px 10px;background:var(--tint);border-radius:50px;color:var(--accent);font-size:12px}.hero-actions{display:flex;gap:14px;align-items:center;margin-top:26px;flex-wrap:wrap}.primary{padding:10px 18px;border:0;background:var(--accent);color:var(--paper);border-radius:8px;text-decoration:none;font-size:14px;font-weight:650}.secondary{font-size:14px}.chapter{background:var(--paper);border:1px solid var(--line);padding:39px 43px 30px;border-radius:13px;margin:0 0 24px;box-shadow:var(--shadow);scroll-margin-top:106px}.chapter-head{margin-bottom:27px}.chapter-index{color:var(--accent);font-size:11px;letter-spacing:.14em;font-weight:750;display:block;margin-bottom:11px}.chapter-deck{font-size:16px;color:var(--muted);margin:0}.chapter p:last-child{margin-bottom:0}.cards{display:grid;gap:14px;margin:24px 0}.cards.three{grid-template-columns:repeat(3,minmax(0,1fr))}.cards>div{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:20px}.cards h3{margin:8px 0 10px;font-size:18px}.cards p{font-size:14px;line-height:1.8}.mini-label{font-size:9px;letter-spacing:.08em;color:var(--accent);font-weight:700}.callout{background:var(--tint);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:19px 22px;margin:24px 0}.callout p{font-size:14px;line-height:1.9;margin:7px 0 0}.callout.warm{background:var(--warm);border-color:var(--warm-line)}.steps{list-style:none;counter-reset:step;padding:0;margin:25px 0}.steps>li{counter-increment:step;position:relative;padding:0 0 22px 44px;margin:0}.steps>li:before{content:counter(step,decimal-leading-zero);position:absolute;left:0;top:1px;color:var(--accent);font-size:12px;font-weight:750;border-bottom:2px solid var(--line);padding-bottom:4px}.steps>li p{font-size:15px;margin:7px 0 0;line-height:1.85}.example{border:1px solid var(--line);border-radius:9px;background:var(--bg);padding:22px 25px;margin:24px 0}.example-label{font-size:11px;letter-spacing:.07em;color:var(--muted)}.example h3{margin:9px 0 14px}.example p,.example li{font-size:15px}.example ul{margin-bottom:0}.table-wrap{overflow-x:auto;margin:24px 0;border:1px solid var(--line);border-radius:9px}table{width:100%;border-collapse:collapse;text-align:left;font-size:14px;line-height:1.8}caption{text-align:left;padding:13px 17px;font-size:12px;color:var(--muted);background:var(--paper);border-bottom:1px solid var(--line)}th,td{padding:13px 17px;border-bottom:1px solid var(--line);vertical-align:top}thead{background:var(--bg);color:var(--ink)}th{font-weight:650}tbody tr:last-child td{border-bottom:none}td:first-child{min-width:112px}kbd{display:inline-block;white-space:nowrap;vertical-align:baseline;background:var(--bg);border:1px solid var(--line);border-bottom-width:2px;padding:0 5px;min-width:23px;line-height:1.65;font-size:12px;border-radius:4px;color:var(--ink);font-family:inherit;text-align:center}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em;border-radius:4px;background:var(--tint);color:var(--accent);padding:2px 5px;word-break:break-word}.code-block{margin:24px 0;background:var(--code);color:var(--code-ink);border-radius:10px;overflow:hidden}.code-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;padding:11px 17px;border-bottom:1px solid #ffffff16;color:#bbd0c2}.copy-code{background:transparent;color:#d8e9dd;border:1px solid #ffffff35;border-radius:5px;font-size:12px;padding:2px 9px}.copy-code:hover{background:#ffffff12}pre{margin:0;padding:20px;overflow-x:auto;line-height:1.8;font-size:13px;tab-size:2}pre code{background:none;color:inherit;padding:0;font-size:inherit;word-break:normal}.status-list{margin:23px 0;border-top:1px solid var(--line)}.status-list>div{display:grid;grid-template-columns:185px minmax(0,1fr);gap:18px;align-items:start;border-bottom:1px solid var(--line);padding:15px 0}.status-list p{font-size:14px;margin:0}.status{font-size:12px;background:var(--bg);color:var(--muted);padding:4px 9px;border-radius:5px;width:fit-content}.status.good{color:var(--accent);background:var(--tint)}.status.warn{background:var(--warm)}details{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:var(--paper)}summary{cursor:pointer;color:var(--ink);font-weight:600;padding:16px 19px;font-size:15px}details[open] summary{border-bottom:1px solid var(--line)}.details-body{padding:18px 20px;font-size:15px}.details-body>.code-block{margin-bottom:18px}.closing{border-top:1px solid var(--line);margin-top:35px;padding-top:5px}.checklist{list-style:none;padding:0}.checklist input{accent-color:var(--accent);width:15px;height:15px;margin-right:9px}.checklist li{font-size:14px}.app-map{margin:26px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}.map-tabs{padding:11px 16px;display:flex;gap:17px;align-items:center;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}.map-brand{font-size:18px;font-weight:750;color:var(--accent)}.map-tab{border:1px solid var(--line);border-radius:5px;padding:3px 9px;background:var(--paper)}.map-grid{display:grid;grid-template-columns:1.1fr 2fr 1fr;min-height:215px}.map-grid>div{padding:20px 18px}.map-nav{border-right:1px solid var(--line);display:flex;flex-direction:column;font-size:11px;gap:5px}.map-nav>b,.map-rail>b,.map-note>b{font-size:12px;margin-bottom:8px}.map-nav hr{border:0;border-top:1px solid var(--line);margin:6px 0}.map-note{background:var(--paper)}.map-note small{display:block;font-size:10px;margin-top:8px}.map-note h3{font-size:15px;margin:20px 0 9px}.map-note p{font-size:11px}.map-rail{border-left:1px solid var(--line);font-size:11px}.map-rail p{margin-top:12px}.map-rail small{font-size:11px}.map-line{height:5px;background:var(--line);border-radius:3px;margin:10px 0;max-width:85%}.map-line.short{max-width:60%}.map-answer{display:block;margin-top:25px;border-top:1px solid var(--line);padding-top:12px;font-size:10px;color:var(--accent)}figcaption{border-top:1px solid var(--line);padding:11px 16px;color:var(--muted);font-size:11px;line-height:1.7}.doc-footer{padding:25px 5px 20px;color:var(--muted);font-size:12px}.doc-footer p{margin:8px 0}.search-status{display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:14px;color:var(--muted);padding:12px 0 20px}.search-status[hidden],.chapter[hidden],.toc li[hidden]{display:none}.search-status button{background:none;border:0;color:var(--accent);font-size:13px;text-decoration:underline}.no-results{padding:35px;text-align:center;background:var(--paper);border:1px solid var(--line);border-radius:10px}.no-results[hidden]{display:none}#nav-shade{display:none}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.nojs{padding:10px 20px;background:var(--warm);font-size:14px}.top-link{display:inline-block;margin-top:12px}.progress{height:2px;position:absolute;bottom:-1px;left:0;background:var(--accent);width:0}
+@media(min-width:1450px){.layout{gap:65px}.chapter{padding:44px 50px 35px}.hero{padding-top:70px}}
+@media(max-width:1100px){.layout{grid-template-columns:215px minmax(0,1fr);gap:25px;padding:0 24px}.topbar-inner{padding:14px 24px}.chapter{padding:31px 28px 24px}.guide-label,.brand-divider{display:none}.cards.three{grid-template-columns:1fr}.hero{padding-top:40px}.status-list>div{grid-template-columns:160px minmax(0,1fr)}}
+@media(max-width:850px){.layout{display:block;padding:0 22px}.content{max-width:800px;margin:auto}.sidebar{display:none}.topbar-inner{gap:12px;padding:13px 20px;min-height:74px}.brand{font-size:19px}.brand-symbol{width:32px;height:32px;font-size:23px}.search-wrap{width:auto;flex:1;min-width:0}#menu-toggle{display:block}.toolbar{gap:6px}.tool{padding:7px 10px}.hero{padding-top:35px}.hero h1 br{display:none}.hero-deck{font-size:16px}.nav-open .sidebar{display:block;position:fixed;z-index:42;top:83px;left:15px;bottom:15px;height:auto;width:min(315px,calc(100vw - 30px));padding:20px 17px;background:var(--paper);border:1px solid var(--line);border-radius:11px;box-shadow:0 15px 50px #0004}.nav-open #nav-shade{display:block;position:fixed;inset:74px 0 0;z-index:40;border:0;background:#0005;width:100%}.sidebar-foot{margin-bottom:0}.chapter{scroll-margin-top:95px}}
+@media(max-width:560px){body{font-size:15px;line-height:1.85}.topbar-inner{flex-wrap:wrap;padding:10px 16px;gap:10px;min-height:114px}.brand{margin-right:auto}.toolbar{margin-left:auto}.search-wrap{order:3;flex-basis:100%;width:100%;margin:0}.search-wrap input{padding-top:7px;padding-bottom:7px}.tool{font-size:12px;padding:6px 9px}.layout{padding:0 13px}.hero{padding:30px 8px}.hero h1{font-size:37px}.hero-meta{margin:18px 0}.chapter{padding:27px 21px 22px;border-radius:10px;scroll-margin-top:137px}h2{font-size:25px}h3{font-size:18px}p{margin-bottom:14px}.steps>li{padding-left:36px}.callout,.example{padding:17px 18px}.status-list>div{grid-template-columns:1fr;gap:8px}.map-grid{grid-template-columns:1fr 1.6fr}.map-rail{display:none}.map-grid>div{padding:15px 12px}.map-tabs{gap:10px;flex-wrap:wrap}.map-tab{font-size:10px}.cards>div{padding:17px}th,td{padding:11px 12px}td:first-child{min-width:90px}pre{padding:16px;font-size:12px}.nav-open .sidebar{top:129px}.nav-open #nav-shade{top:117px}html{scroll-padding-top:137px}.doc-footer{padding:20px 9px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@page{size:A4;margin:17mm 16mm}
+@media print{:root,:root[data-theme=dark]{--bg:#f5f6f2;--paper:#fff;--ink:#20352f;--text:#394c45;--muted:#67766e;--line:#dce3dc;--accent:#25634e;--tint:#e9f2eb;--warm:#fbf3e4;--warm-line:#e9d5ac;color-scheme:light}html{scroll-behavior:auto}body{background:white!important;color:#222;font-size:10pt;line-height:1.65}.topbar,.sidebar,#nav-shade,.hero-actions,.copy-code,.search-status,.no-results,.top-link,.progress,.nojs{display:none!important}.layout{display:block;max-width:none;padding:0}.content{max-width:none;padding:0}.hero{padding:0 0 16px;margin-bottom:24px}.hero h1{font-size:30pt}.hero-deck{font-size:12pt}.pill{background:#f0f3f0!important;color:#333!important}.chapter,.chapter[hidden]{display:block!important;border:0;border-top:1px solid #bbc7be;border-radius:0;box-shadow:none;padding:22px 0 12px;margin:0 0 14px}.chapter-head{break-after:avoid}h2{font-size:20pt}h3{font-size:13pt;break-after:avoid}p,li{orphans:3;widows:3}a{color:inherit;text-decoration:underline}.chapter-index{color:#444}.callout,.example,.cards>div{background:#f5f7f4!important;color:#222;box-shadow:none}.callout,.example,.app-map,.code-block,tr,.status-list>div{break-inside:avoid}.cards.three{grid-template-columns:repeat(3,1fr)}.table-wrap{overflow:visible;border-color:#ccc}table{font-size:9pt}th,td,caption{color:#222;border-color:#ccc}thead{display:table-header-group}.code-block{background:#f0f2ef!important;color:#222;border:1px solid #ccc}.code-head{color:#333;border-color:#ccc}pre{white-space:pre-wrap;overflow:visible;word-break:break-word}code{color:inherit;background:#f0f2ef}kbd{color:#222;background:#f5f5f5;border-color:#bbb}.details-body{display:block!important}details{border-color:#ccc;break-inside:auto}summary{color:#222;padding:12px 15px}.muted,small,.chapter-deck,.doc-footer,figcaption{color:#555}.map-grid{grid-template-columns:1.1fr 2fr 1fr}.map-rail{display:block}.map-note,.map-rail,.map-nav{color:#222}.doc-footer{border-top:1px solid #ccc;font-size:9pt}.checklist input{appearance:none;width:10px;height:10px;border:1px solid #666}.checklist input:checked:after{content:'✓';font-size:9px;display:block;line-height:8px}}
+</style></head>
+<body id="top"><a class="skip" href="#main">본문으로 바로 가기</a>
+<noscript><p class="nojs">본문 전체를 읽을 수 있습니다. 문서 검색·테마·코드 복사 단추는 JavaScript를 켜면 사용할 수 있습니다. 인쇄는 브라우저 메뉴에서 실행하세요.</p></noscript>
+<header class="topbar"><div class="topbar-inner"><a class="brand" href="#top" aria-label="aisurada 가이드 처음으로"><span class="brand-symbol" aria-hidden="true">a.</span>aisurada<span class="brand-divider" aria-hidden="true"></span><span class="guide-label">사용자 가이드</span></a>
+<button class="tool" id="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">목차</button>
+<div class="search-wrap" role="search"><label for="guide-search" class="sr-only">이 가이드에서 검색</label><input id="guide-search" type="search" placeholder="가이드 검색 · 예: 저장, AI, 복구" autocomplete="off" aria-controls="main"><button class="clear-search" id="clear-search" type="button" aria-label="검색어 지우기" hidden>×</button></div>
+<div class="toolbar"><button class="tool" id="theme-toggle" type="button" aria-label="화면 테마 전환">어둡게</button><button class="tool" id="print-guide" type="button">인쇄 / PDF</button></div></div><div class="progress" id="progress" aria-hidden="true"></div></header>
+<button id="nav-shade" type="button" aria-label="목차 닫기"></button>
+<div class="layout"><aside class="sidebar" id="sidebar"><p class="nav-eyebrow">IN THIS GUIDE</p><nav aria-label="사용자 가이드 목차"><ol class="toc"><li><a href="#start"><span>01</span>처음 10분</a></li>
+<li><a href="#workspace"><span>02</span>워크스페이스와 화면</a></li>
+<li><a href="#organize"><span>03</span>프로젝트·아젠다로 정리</a></li>
+<li><a href="#notes"><span>04</span>노트 만들기와 저장</a></li>
+<li><a href="#editor"><span>05</span>본문 편집과 하위 페이지</a></li>
+<li><a href="#find"><span>06</span>찾기·캘린더·즐겨찾기</a></li>
+<li><a href="#templates"><span>07</span>템플릿과 데일리 리포트</a></li>
+<li><a href="#ask"><span>08</span>노트의 대목을 AI에게 묻기</a></li>
+<li><a href="#sessions"><span>09</span>Claude 세션 읽고 이어 가기</a></li>
+<li><a href="#terminal"><span>10</span>터미널과 작업 기록 남기기</a></li>
+<li><a href="#recover"><span>11</span>충돌·이력·삭제에서 복구</a></li>
+<li><a href="#settings"><span>12</span>설정과 개인화</a></li>
+<li><a href="#shortcuts"><span>13</span>단축키 모아 보기</a></li>
+<li><a href="#claude-setup"><span>14</span>Claude 연결 준비</a></li>
+<li><a href="#setup"><span>15</span>설치와 실행</a></li>
+<li><a href="#cli"><span>16</span>CLI로 기록 읽고 내보내기</a></li>
+<li><a href="#help"><span>17</span>막혔을 때 확인할 것</a></li></ol></nav><div class="sidebar-foot">문서 안에서 찾기 <kbd>⌘</kbd> <kbd>K</kbd><br>인터넷 없이 읽는 단일 HTML<br>macOS 데스크톱 개발판 기준</div></aside>
+<main class="content" id="main" tabindex="-1"><header class="hero"><span class="eyebrow">AISURADA / USER GUIDE</span><h1>작업의 흐름을,<br> 내 기록으로 이어가기.</h1><p class="hero-deck">첫 노트부터 Claude와 나눈 대화까지.<br>지금 구현된 기능을 실제 사용하는 순서로 정리했습니다.</p><div class="hero-meta"><span class="pill">한국어 사용자 가이드</span><span class="pill">2026.11.04 기준</span><span class="pill">오프라인 · 인쇄 지원</span></div><div class="hero-actions"><a class="primary" href="#start">처음 10분 따라 하기 ↗</a><a class="secondary" href="#ask">AI 문답부터 보기 →</a></div></header>
+<div class="search-status" id="search-status" role="status" hidden><span id="search-count"></span><button id="reset-search" type="button">전체 가이드 보기</button></div>
+<div class="no-results" id="no-results" hidden><h2>일치하는 장이 없습니다.</h2><p>‘문답’, ‘저장’, ‘세션’, ‘터미널’처럼 짧은 단어로 다시 찾아보세요.</p></div>
+<section class="chapter" id="start" data-keywords="빠른 시작 시작하기 첫 노트 샘플 새 문서" aria-labelledby="start-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 01</span><h2 id="start-title">처음 10분</h2><p class="chapter-deck">샘플을 둘러본 다음, 내 폴더에 첫 기록을 남겨 보세요.</p></header>
+
+<div class="callout"><strong>이미 앱이 준비되어 있나요?</strong><p>바로 아래 순서로 시작하세요. 소스에서 직접 실행하려면 <a href="#setup">설치와 실행</a>을 먼저 확인하세요.</p></div>
+<ol class="steps">
+<li><strong>샘플로 화면을 익힙니다.</strong><p>시작 화면에서 <b>샘플로 둘러보기</b>를 누릅니다. 캘린더의 문서를 눌러 미리보기를 열고, <b>탭으로 띄우기</b>로 편집 화면을 확인합니다. 샘플은 실제 vault 파일을 바꾸지 않습니다.</p></li>
+<li><strong>내 워크스페이스를 만듭니다.</strong><p><b>시작 화면 → 새 워크스페이스</b>에서 이름과 저장 위치를 정하고 <b>만들기</b>를 누릅니다. 이미 기록 폴더가 있다면 <b>폴더 열기</b>를 선택합니다.</p></li>
+<li><strong>아젠다를 하나 만듭니다.</strong><p>왼쪽 <b>아젠다 ＋</b>에서 예를 들어 ‘제품 개발’을 만듭니다. 프로젝트는 아젠다가 여러 개로 늘었을 때 추가해도 됩니다.</p></li>
+<li><strong>첫 문서를 씁니다.</strong><p><b>캘린더 → 새 문서</b>에서 아젠다·유형·제목을 정합니다. 본문에 오늘 할 일을 적고 문서를 만듭니다.</p></li>
+<li><strong>저장과 찾기를 확인합니다.</strong><p>본문을 수정한 뒤 <b>저장됨</b>을 확인합니다. <kbd>⌘</kbd> + <kbd>K</kbd>로 제목을 검색하면 방금 쓴 노트를 다시 열 수 있습니다.</p></li>
+</ol>
+<div class="example"><span class="example-label">첫 노트 예시</span><h3>오늘의 작업 계획</h3><p>목표: 검색 결과의 빈 화면을 개선한다.</p><ul><li>현재 화면에서 막히는 지점 정리</li><li>작은 수정 하나 구현</li><li>확인한 결과와 다음 작업 기록</li></ul></div>
+<p class="muted">샘플은 연습용입니다. 실제 작업 기록은 본인이 만든 워크스페이스에 남기세요.</p>
+
+</section>
+<section class="chapter" id="workspace" data-keywords="vault 폴더 열기 최근 기록 탭 미리보기 창 전환" aria-labelledby="workspace-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 02</span><h2 id="workspace-title">워크스페이스와 화면</h2><p class="chapter-deck">기록은 컴퓨터의 폴더에, 탐색은 앱 안에 모입니다.</p></header>
+
+<div class="cards three"><div><span class="mini-label">WORKSPACE</span><h3>워크스페이스</h3><p>노트·첨부·아젠다·리포트를 모아 두는 폴더입니다. 이 가이드에서는 같은 폴더를 <b>vault</b>라고도 부릅니다.</p></div><div><span class="mini-label">PROJECT → AGENDA</span><h3>프로젝트와 아젠다</h3><p>프로젝트는 아젠다의 묶음이고, 아젠다는 노트가 속하는 작업 주제입니다.</p></div><div><span class="mini-label">NOTE</span><h3>노트</h3><p>제목·날짜·유형·본문을 가진 기록입니다. 필요하면 하위 페이지와 첨부를 함께 둡니다.</p></div></div>
+<figure class="app-map" aria-label="화면 구성 예시: 왼쪽 탐색, 위쪽 탭, 가운데 노트, 선택적으로 여는 세션 레일">
+<div class="map-tabs"><span class="map-brand">a.</span><span>내 기록</span><span class="map-tab">오늘의 작업 계획 ×</span></div>
+<div class="map-grid"><div class="map-nav"><b>① 왼쪽 탐색</b><span>캘린더</span><span>즐겨찾기</span><span>연결 · 데일리 리포트</span><span>템플릿 · 휴지통</span><hr><span>프로젝트 / 아젠다</span><span>PROJECTS</span></div><div class="map-note"><b>② 현재 문서</b><small>계획 · 저장됨</small><h3>오늘의 작업 계획</h3><p>작업의 배경과 다음 걸음을 적습니다.</p><div class="map-line"></div><div class="map-line short"></div><span class="map-answer">AI 문답 · 이 대목에 이어 묻기</span></div><div class="map-rail"><b>③ 세션 레일</b><p>노트의 작성·편집 세션 칩으로 엽니다.</p><small>최근 대화<br>새 대화로 묻기</small></div></div>
+<figcaption>화면 구성을 설명한 도식입니다. 노트 탭에서는 왼쪽 탐색이 숨겨지고, 세션 레일은 필요할 때 엽니다.</figcaption></figure>
+<h3>열기와 전환</h3><ul><li><b>새 워크스페이스:</b> 부모 폴더 아래에 입력한 이름의 폴더를 만듭니다.</li><li><b>폴더 열기:</b> 사용할 작업 폴더를 선택합니다. 기존 파일이 있는 폴더라면 먼저 사본을 보관해 두는 편이 좋습니다.</li><li><b>최근 워크스페이스:</b> 지난 폴더를 다시 엽니다. 최근 목록의 ×는 목록에서만 제거합니다.</li><li><b>다른 폴더로 전환:</b> 저장 상태를 확인하고 따로 열린 노트 창을 닫은 다음 전환합니다.</li></ul>
+<h3>미리보기, 탭, 별도 창</h3><p>목록에서 노트를 누르면 미리보기를 열 수 있습니다. <b>탭으로 띄우기</b>는 메인 창의 탭으로, <b>새 창으로</b>는 별도 노트 창으로 옮깁니다. 새 창은 데스크톱 앱에서 사용합니다. 본문 복사와 이력은 노트 머리의 메뉴에서 찾을 수 있습니다.</p>
+
+</section>
+<section class="chapter" id="organize" data-keywords="아젠다 프로젝트 저장소 repo 사실층 분류 삭제" aria-labelledby="organize-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 03</span><h2 id="organize-title">프로젝트·아젠다로 정리</h2><p class="chapter-deck">프로젝트는 큰 묶음, 아젠다는 계속 기록할 주제입니다.</p></header>
+
+<ol><li>왼쪽의 <b>프로젝트 ＋</b>로 큰 작업 묶음을 만듭니다. 이름·색·설명을 정합니다.</li><li><b>아젠다 ＋</b>로 주제를 만들고, 필요하면 프로젝트에 넣습니다.</li><li>아젠다 옆 <b>⋯</b>에서 이름·색·프로젝트·저장소·설명을 바꿉니다.</li></ol>
+<div class="example"><span class="example-label">정리 예시</span><p><b>프로젝트: 고객 포털</b> → 아젠다: 화면 개선 / API 정리 / 운영 이슈 → 각 주제의 계획·리서치·구현 노트</p></div>
+<h3>저장소 경로와 Claude 세션</h3><p>아젠다의 <b>저장소</b>에 <code>/Users/me/projects/customer-portal</code>처럼 로컬 작업 폴더의 절대 경로를 적으면, 그 폴더에서 실행한 Claude 세션을 PROJECTS 영역에 연결하는 데 쓰입니다. URL로 자동 Git 동기화를 켜는 설정은 아닙니다.</p>
+<h3>사실층: 다음 작업에도 필요한 배경</h3><p>아젠다 화면의 <b>사실층</b>에는 매번 반복해 설명하는 내용을 짧게 적습니다. 프로젝트의 목적, 현재 운영 환경, 확정된 제약 같은 내용이 적합합니다. <b>적기 / 고치기</b>로 편집한 뒤 저장합니다. 저장 한도는 다듬은 글 기준 2,000자이며 화면에 글자 수가 표시됩니다.</p>
+<p>편집 중 다른 곳에서 사실층이 바뀌면 차이를 확인한 뒤 저장 방향을 결정합니다.</p>
+<div class="callout warm"><strong>묶음을 지울 때</strong><p>프로젝트 삭제는 소속 아젠다를 미분류로 옮깁니다. 아젠다 삭제는 소속 노트도 휴지통으로 옮기는 흐름이므로 확인 창의 내용을 읽고 진행하세요.</p></div>
+
+</section>
+<section class="chapter" id="notes" data-keywords="문서 작성 저장 자동저장 메타 태그 평가 즐겨찾기 제목 소요 시간" aria-labelledby="notes-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 04</span><h2 id="notes-title">노트 만들기와 저장</h2><p class="chapter-deck">적고, 저장 상태를 확인하고, 태그와 연결을 붙입니다.</p></header>
+
+<h3>새 문서</h3><p><b>캘린더 → 새 문서</b> 또는 아젠다 화면의 문서 만들기에서 시작합니다. 아젠다가 하나 이상 필요합니다.</p>
+<div class="table-wrap"><table><caption>문서의 기본 정보</caption><thead><tr><th>항목</th><th>사용 방법</th></tr></thead><tbody><tr><td>아젠다</td><td>어느 주제의 기록인지 고릅니다.</td></tr><tr><td>유형</td><td>계획, 리서치, 구현, 회의, 보고, 자유 중에서 고릅니다.</td></tr><tr><td>템플릿</td><td>선택한 유형에 맞는 문서 템플릿을 적용합니다.</td></tr><tr><td>제목·날짜·시각</td><td>찾기 쉬운 제목과 기록 시점을 정합니다. 소요 시간은 분 단위입니다.</td></tr><tr><td>태그</td><td>새 문서에서는 쉼표로 나눠 입력합니다. 만든 뒤에도 태그를 추가·제거할 수 있습니다.</td></tr></tbody></table></div>
+<h3>자동 저장 읽는 법</h3><p>본문 입력이 잠시 멈추면 약 0.6초 뒤 저장합니다. 제목은 첫 헤딩과 본문 편집 흐름에 맞춰 반영됩니다. 파일 이름을 직접 바꾸기보다 앱 안에서 수정하세요.</p>
+<div class="status-list"><div><span class="status good">저장됨</span><p>현재 편집 내용의 저장이 끝났습니다.</p></div><div><span class="status">저장 중…</span><p>전송 또는 저장이 진행 중입니다. 이동하거나 닫기 전에 결과를 확인하세요.</p></div><div><span class="status warn">저장 실패 — 다시 시도 중</span><p>글은 편집 상태에 남고 재시도합니다. 경로·권한·엔진 상태와 상단 알림을 확인하세요.</p></div><div><span class="status warn">외부 변경됨</span><p>다른 앱이나 창이 파일을 먼저 바꿨습니다. <a href="#recover">차이를 보고 어느 글을 유지할지</a> 결정해야 합니다.</p></div></div>
+<h3>노트 머리의 도구</h3><ul><li><b>☆:</b> 즐겨찾기에 넣거나 뺍니다. 즐겨찾기 화면에서는 카테고리도 관리합니다.</li><li><b>평가:</b> 평가와 메모를 남깁니다. 필요하면 평가를 지울 수 있습니다.</li><li><b>본문 복사:</b> 현재 편집 본문을 복사합니다. 문답·코멘트의 내부 표식은 복사에서 제외합니다.</li><li><b>ID / 경로:</b> CLI나 링크에서 사용할 식별자를 확인합니다. 루트 노트에는 <b>새 창 링크</b> 복사가 있습니다.</li><li><b>이력:</b> 저장된 이전 판과 현재 글을 비교합니다.</li></ul>
+
+</section>
+<section class="chapter" id="editor" data-keywords="마크다운 Markdown 편집 표 코드 콜아웃 그림 HTML 하위 후속 페이지 코멘트 댓글 링크" aria-labelledby="editor-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 05</span><h2 id="editor-title">본문 편집과 하위 페이지</h2><p class="chapter-deck">글, 표, 코드, 그림을 하나의 기록으로 묶습니다.</p></header>
+
+<div class="table-wrap"><table><caption>편집기에서 자주 하는 작업</caption><thead><tr><th>하고 싶은 일</th><th>방법</th></tr></thead><tbody><tr><td>글 강조</td><td>본문의 대목을 선택해 뜨는 도구 줄에서 굵게·기울임·취소선·인라인 코드를 고릅니다.</td></tr><tr><td>블록 추가</td><td>문단에서 <code>/</code>를 입력해 페이지·노트 링크·표·콜아웃·코드 블록 메뉴를 엽니다. 해당 문맥에서 가능한 항목이 표시됩니다.</td></tr><tr><td>표 편집</td><td>표 셀의 <b>⋯</b>에서 행·열 추가/삭제, 너비 맞춤, 표 복사를 선택합니다. 경계 손잡이로 열 또는 표 전체 너비를 조절합니다.</td></tr><tr><td>시트나 Slack으로 표 복사</td><td>표 메뉴의 <b>표 복사 — Slack과 시트</b>를 씁니다. 마크다운 표 복사도 별도로 있습니다.</td></tr><tr><td>코드와 다이어그램</td><td>코드 블록에서 언어를 선택합니다. Mermaid는 다이어그램 표시 설정과 함께 사용합니다.</td></tr><tr><td>그림 첨부</td><td>노트 편집기에 클립보드 그림을 붙여 넣습니다. 실제 폴더와 파일 저장이 가능한 데스크톱 앱에서 사용합니다.</td></tr><tr><td>목차 이동</td><td>헤딩이 여러 개면 노트 옆 목차로 해당 대목에 이동합니다.</td></tr></tbody></table></div>
+<h3>하위 페이지</h3><p>노트 안의 <b>/ → 페이지</b> 또는 아래 <b>후속 노트 → 추가</b>로 작은 페이지를 만듭니다. 본문의 하위 페이지 카드나 후속 노트 목록을 누르면 열립니다. 하위 페이지 안에서도 다음 하위 페이지를 만들 수 있습니다.</p>
+<div class="callout warm"><strong>하위 페이지 삭제는 바로 반영됩니다.</strong><p>루트 노트 삭제와 달리 하위 페이지는 휴지통을 거치지 않습니다. 남길 내용이 있다면 먼저 본문을 복사하거나 상위 기록에 옮기세요.</p></div>
+<h3>코멘트와 노트 연결</h3><p>대목을 선택해 코멘트를 달거나 노트 아래 코멘트 목록에서 글을 남깁니다. 본문에서 노트 링크를 삽입하거나 아래 <b>연결 추가</b>를 눌러 다른 노트와 관계를 만듭니다. <b>연결</b> 화면에서는 이 관계를 지도 또는 목록으로 봅니다.</p>
+<h3>HTML 첨부와 외부 Markdown</h3><p>노트에 넣은 HTML 첨부는 상자로 표시할 수 있습니다. 파일 연결이나 파일 링크로 연 vault 밖의 Markdown은 <b>읽기 전용</b>입니다. 외부 파일을 열었다고 작업 노트로 자동 편입되지는 않습니다. 외부 Markdown 읽기는 UTF-8, 2 MiB 이하 파일을 대상으로 합니다.</p>
+
+</section>
+<section class="chapter" id="find" data-keywords="빠른 검색 최근 캘린더 필터 지도 연결 정렬 카테고리 기록노트" aria-labelledby="find-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 06</span><h2 id="find-title">찾기·캘린더·즐겨찾기</h2><p class="chapter-deck">기록을 다시 찾는 방법을 작업 상황에 맞게 고릅니다.</p></header>
+
+<h3>빠른 검색</h3><ol><li><kbd>⌘</kbd> + <kbd>K</kbd> 또는 <kbd>Ctrl</kbd> + <kbd>K</kbd>를 누릅니다.</li><li>제목, 아젠다 이름, 태그, 본문 내용, 노트 ID로 찾습니다. 읽어 둔 첨부 텍스트도 검색에 쓰입니다.</li><li>위·아래 방향키로 결과를 고르고 <kbd>Enter</kbd>로 탭을 엽니다. <kbd>Esc</kbd>로 닫습니다.</li></ol>
+<p>검색어가 비어 있으면 최근 연 노트와 최근 만든 노트가 표시됩니다. 결과는 최대 20개입니다. 빠른 검색의 본문은 읽기용으로 정리한 텍스트이므로 코드 블록 안의 문자열을 찾을 때는 본문이나 CLI 검색도 함께 확인하세요.</p>
+<h3>캘린더</h3><p><b>월 / 주 / 일</b>로 보기 범위를 바꾸고, <b>이전 / 다음 / 오늘</b> 또는 기준 날짜로 이동합니다. 아젠다 필터로 특정 주제만 보세요. 일 보기에서는 노트 블록을 끌어 시각을 조정할 수 있으며 15분 단위 이동이 적용됩니다.</p>
+<h3>즐겨찾기</h3><p>노트의 별을 켠 뒤 <b>즐겨찾기</b>에서 제목 검색·정렬·묶음별 보기를 이용합니다. 카테고리 이름을 정하면 여러 아젠다에 흩어진 중요 기록도 한데 모아 볼 수 있습니다.</p>
+<h3>연결</h3><p><b>지도 / 목록</b>으로 노트 관계를 살펴보고 선택한 기록을 엽니다. 관계는 노트의 <b>연결 추가</b>에서 만듭니다. 단순히 같은 태그를 가진 노트가 자동으로 연결되는 것은 아닙니다.</p>
+<div class="callout"><strong>분명 저장했는데 목록에 없나요?</strong><p>터미널이나 세션에서 굳힌 노트는 <b>기록 노트</b>로 저장됩니다. 설정에서 <b>기록 노트</b>를 켜면 목록과 검색에 포함됩니다.</p></div>
+
+</section>
+<section class="chapter" id="templates" data-keywords="템플릿 리포트 모닝 회고 주간 데일리 AI 원본" aria-labelledby="templates-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 07</span><h2 id="templates-title">템플릿과 데일리 리포트</h2><p class="chapter-deck">자주 쓰는 문서 틀과 하루의 정리 화면을 활용합니다.</p></header>
+
+<h3>내 문서 템플릿 만들기</h3><ol><li><b>템플릿 → 새 템플릿</b>을 누릅니다.</li><li>이름·유형·설명·본문을 고칩니다. 편집은 자동 저장됩니다.</li><li>새 문서에서 같은 유형을 선택하고 해당 템플릿을 고릅니다.</li></ol><p>본문에 <code>[제목]</code>을 넣으면 새 문서를 만들 때 입력한 제목으로 바뀝니다. 새 문서의 선택 목록에는 유형이 맞는 Markdown 문서 템플릿이 나옵니다. 기본 템플릿과 데일리 리포트 템플릿은 삭제할 수 없습니다.</p>
+<div class="code-block"><div class="code-head"><span>회의 템플릿 예시</span><button class="copy-code" type="button">복사</button></div><pre><code># [제목]
+
+## 논의한 것
+- 
+
+## 결정한 것
+- 
+
+## 다음 행동
+- 담당자 / 할 일 / 기한</code></pre></div>
+<h3>데일리 리포트</h3><p><b>데일리 리포트</b>에서 모닝·마무리 회고·주간 리포트를 펼쳐 읽습니다. 캘린더의 리포트 막대에서도 열 수 있습니다. 표시된 기록을 <b>편집 → 저장</b>하거나 별도 메모를 남깁니다.</p>
+<p>저장된 리포트 본문이 없으면 해당 기간의 노트 링크를 모은 기본 내용이 표시됩니다. ‘AI 원본’은 사용자 편집 본문을 비워 원본/기본 표시로 돌아가는 버튼입니다. 이 버튼이 새 Claude 요청을 보내지는 않습니다. 사용자 편집본이 필요하다면 먼저 복사해 두세요.</p>
+
+</section>
+<section class="chapter" id="ask" data-keywords="Claude 클로드 AI 묻기 문답 질문 그림 이어 묻기 밑줄 카드 모델 effort" aria-labelledby="ask-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 08</span><h2 id="ask-title">노트의 대목을 AI에게 묻기</h2><p class="chapter-deck">선택한 글과 노트 맥락을 함께 보내고, 답을 노트 곁에 남깁니다.</p></header>
+
+<div class="callout"><strong>사용 조건</strong><p>Claude 연동이 포함된 데스크톱 앱, 실제로 열린 워크스페이스, 실행 가능한 Claude Code CLI가 필요합니다. 브라우저 미리보기와 샘플에서는 실제 노트 문답을 보낼 수 없습니다. 준비 방법은 <a href="#claude-setup">Claude 연결 준비</a>에 있습니다.</p></div>
+<ol class="steps"><li><strong>대목을 선택합니다.</strong><p>본문 글을 드래그하고 <b>AI에게 묻기</b>를 누릅니다. 표에서는 줄 옆 AI 단추, HTML 첨부에서는 상자 머리의 묻기 단추로 시작합니다.</p></li><li><strong>질문과 옵션을 정합니다.</strong><p>질문을 적고 모델·effort를 고릅니다. 이 개발판 고르개의 기본값은 <b>sonnet 5.5 / low</b>입니다. 실제 실행 가능 여부는 설치한 Claude CLI와 계정에 따라 확인하세요.</p></li><li><strong>묻기를 보냅니다.</strong><p><b>묻기</b> 또는 <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd>를 누릅니다. 같은 노트에 여러 물음을 보내면 앞 물음이 끝날 때까지 차례를 기다립니다.</p></li><li><strong>답을 읽고 이어 묻습니다.</strong><p>노트 아래 <b>AI 문답</b> 또는 밑줄 카드에서 답을 봅니다. <b>이 대목에 이어 묻기</b>로 같은 맥락을 이어 갑니다.</p></li></ol>
+<h3>어떤 맥락이 함께 가나요?</h3><p>질문에 선택한 대목, 노트의 식별자와 읽기 안내, 아젠다의 저장소 정보가 붙습니다. 기록을 만든 Claude 세션이 확인되면 관련 대화의 일부도 첫 물음에 실릴 수 있습니다. HTML 질문과 붙인 그림은 파일을 읽으라는 안내와 경로가 함께 갑니다.</p>
+<h3>카드와 그림</h3><ul><li>본문 밑줄에 마우스를 올리면 카드가 열립니다. 카드 안을 누르면 고정되어 이어 묻는 글을 쓸 수 있습니다.</li><li>고정 카드 밖을 누르거나 카드 안에서 <kbd>Esc</kbd>를 누르면 닫습니다. 크기 손잡이로 폭·높이를 조절할 수 있습니다.</li><li>질문 그림은 클립보드 붙여넣기로 추가합니다. 한 물음에 <b>8장</b>, 한 장에 <b>5,000,000바이트</b>까지입니다.</li><li>PNG, JPEG, GIF, WebP, AVIF, BMP, SVG를 받습니다. 그림을 저장할 노트 폴더가 없거나 현재 실행 경로가 그림을 받지 않으면 이유를 표시합니다.</li></ul>
+<h3>응답을 기다리는 동안</h3><p>다른 탭으로 이동할 수 있습니다. 답이 오면 해당 노트 탭에 알림 점이 나타납니다. 저장하지 못한 답에는 안내가 붙습니다. <b>메모리에만 남은 답은 앱을 닫으면 사라질 수 있으므로</b> 필요한 내용은 복사하고 저장 문제를 해결하세요.</p><p>앱을 닫는 사이에 끝나지 않은 물음은 다음 실행 때 안내가 나옵니다. 표시된 <code>claude --resume …</code> 명령으로 대화를 확인하거나, 아직 전송되지 않은 질문은 같은 대목에서 다시 물으세요.</p>
+
+</section>
+<section class="chapter" id="sessions" data-keywords="세션 PROJECTS 작성 편집 레일 대화 resume 세션전사 굳히기 CLI" aria-labelledby="sessions-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 09</span><h2 id="sessions-title">Claude 세션 읽고 이어 가기</h2><p class="chapter-deck">원래 세션에 이어 쓰는 일과, 세션을 참고해 새로 묻는 일을 구분합니다.</p></header>
+
+<h3>PROJECTS에서 세션 찾기</h3><p>왼쪽 <b>PROJECTS</b>에서 Claude 세션 목록을 읽고 새로고침합니다. 아젠다의 로컬 저장소 경로와 세션의 작업 폴더가 맞으면 주제별로 묶입니다. 세션 줄을 누르면 대화 화면으로 이동합니다. 실행 상태와 프로세스 생존 여부는 서로 다른 정보이므로 실제 입력창의 안내를 따르세요.</p>
+<div class="table-wrap"><table><caption>두 가지 질문 경로</caption><thead><tr><th>구분</th><th>노트 옆 세션 레일</th><th>세션 화면의 하단 입력창</th></tr></thead><tbody><tr><td>여는 곳</td><td>노트의 <b>작성 세션 / 편집 세션</b> 칩</td><td>PROJECTS의 세션 목록</td></tr><tr><td>목적</td><td>최근 세션 대화와 노트를 참고해 <b>별도 대화</b>로 질문</td><td><b>원래 Claude 세션</b>을 이어 쓰기</td></tr><tr><td>시작 방법</td><td>‘새 대화로 묻기’ 입력창에 질문</td><td>세션 하단 입력창에서 보내기</td></tr><tr><td>주의할 상태</td><td>도는 요청은 한 레일에서 한 번에 하나. 탭을 옮겨도 요청·초안·그림을 창 메모리에 유지</td><td>다른 터미널이 세션을 실행 중이거나 이 기기에 기록이 없으면 입력을 막을 수 있음</td></tr></tbody></table></div>
+<h3>노트 옆 세션 레일</h3><p>노트에 세션 칩이 있을 때 열 수 있습니다. 원래 세션의 최근 대화를 읽고, 새 질문에는 노트와 세션 맥락을 함께 보냅니다. <b>새 대화 열기</b>는 앞 대화에서 벗어나 새 문답을 시작합니다. <b>세션 화면에서 보기</b>로 전체 세션 화면에 이동할 수 있습니다.</p><p>레일 경계로 폭을 조절합니다. 레일을 닫거나 탭을 바꿔도 작성 중인 내용과 요청 상태를 유지하지만, 이는 <b>앱 실행 중의 창 메모리</b>입니다. 앱 재시작까지 모든 초안을 보존한다는 뜻은 아닙니다.</p>
+<h3>세션 화면</h3><p>머리에서 상태·작업 폴더·모델 관련 정보를 보고 가운데에서 사람 말, Claude 답, 도구 호출을 읽습니다. <b>관련 노트 / 링크 / CLI</b> 탭으로 결과를 살펴봅니다. 도구 결과 본문 전체를 보여 주는 화면은 아닙니다.</p><ul><li><b>이어 가기 명령 복사:</b> <code>claude --resume &lt;세션 id&gt;</code>를 복사합니다.</li><li><b>하단 입력:</b> 질문을 적고 보냅니다. 파일을 끌어 놓으면 경로를 입력에 넣고, 클립보드 그림도 붙일 수 있습니다. 받아쓰기는 시스템에서 지원할 때 사용합니다.</li><li><b>터미널 열기 / CLI:</b> 실제 셸에서 해당 세션을 이어 갑니다. CLI 칸을 처음 보여 줄 때 시작하며, 오른쪽 레일을 접는 것만으로 칸을 해제하지 않습니다.</li><li><b>좁은 창:</b> 1,100px 이하에서는 오른쪽 레일을 숨깁니다. 필요한 탭이 안 보이면 창을 넓히세요.</li></ul>
+<h3>세션 대화를 노트로 굳히기</h3><ol><li><b>노트로 굳히기</b>를 누릅니다.</li><li>최근 <b>100 / 200 / 500건</b> 중 범위를 정하고 실제 회차 수와 모양 검사 결과를 봅니다.</li><li>제목과 아젠다를 정하고 <b>굳히기</b>를 누릅니다. 본문은 300,000바이트 이하여야 합니다.</li></ol><p>태그 <code>세션전사</code>가 붙은 기록 노트가 만들어집니다. 도구 결과 본문은 담지 않고, 사람 말과 답·도구 호출 요약을 남깁니다. 모양 검사는 값을 자동으로 가리는 작업이 아니므로 표시된 결과를 검토하세요.</p>
+
+</section>
+<section class="chapter" id="terminal" data-keywords="터미널 셸 zsh 스크롤백 굳히기 비밀 마스킹 표" aria-labelledby="terminal-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 10</span><h2 id="terminal-title">터미널과 작업 기록 남기기</h2><p class="chapter-deck">앱 안에서 셸을 쓰고, 필요한 출력만 노트로 옮깁니다.</p></header>
+
+<p>앱의 <b>파일 → 터미널 열기</b> 또는 <kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd>로 터미널 탭을 엽니다. 데스크톱 앱의 실제 로그인 zsh 셸이므로 입력한 명령은 컴퓨터에서 실행됩니다.</p>
+<h3>터미널 닫기와 세션 유지</h3><p>터미널 탭을 닫으면 연결을 분리하고 호스트가 약 5분의 재연결 유예를 둡니다. 그 안에 같은 터미널로 돌아오면 출력 기록을 재생할 수 있습니다. 레일을 접는 것과 화면을 떠나는 것은 동작이 다르므로, 오래 실행할 명령은 상태를 확인하며 사용하세요.</p>
+<h3>출력을 노트로 굳히기</h3><ol><li>터미널 하단의 <b>굳히기</b>를 누릅니다.</li><li><b>마지막 100 / 500 / 2,000 / 10,000줄</b> 또는 <b>고른 부분</b>을 선택합니다. TUI 화면이 떠 있거나 선택 범위를 복원할 수 없으면 ‘고른 부분’을 쓰지 못할 수 있습니다.</li><li>값 가림 결과, 못 읽은 이름, 모양 검사 안내를 확인합니다.</li><li>제목·아젠다를 정하고 기록 노트로 저장합니다.</li></ol>
+<div class="callout warm"><strong>가림 표가 없으면 굳히기가 막힐 수 있습니다.</strong><p>‘표 다시 뜨기’로 재확인합니다. 비밀 이름 분류표가 없는 견본 빌드나 값을 읽지 못한 환경에서는 기능이 제한될 수 있습니다. 화면의 안내를 확인하세요. ‘모양 검사 0건’은 모든 비밀이 제거됐다는 보증이 아닙니다.</p></div>
+<p><b>세션 대화 굳히기</b>는 도구 결과 본문을 제외하고 모양을 검사합니다. <b>터미널 스크롤백 굳히기</b>는 선택한 출력에 값 일치 가림을 적용합니다. 서로 다른 두 기능입니다.</p>
+
+</section>
+<section class="chapter" id="recover" data-keywords="복원 복구 이력 충돌 저장 실패 휴지통 삭제 백업 Git" aria-labelledby="recover-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 11</span><h2 id="recover-title">충돌·이력·삭제에서 복구</h2><p class="chapter-deck">저장이 멈춘 까닭을 확인하고, 필요한 내용을 먼저 확보합니다.</p></header>
+
+<h3>다른 곳에서 파일이 바뀌었을 때</h3><p>같은 노트를 다른 창, 에디터, CLI 또는 Claude가 먼저 고치면 <b>외부 변경됨</b> 상태가 됩니다. 충돌을 해결하기 전에는 자동 저장을 멈춥니다.</p><div class="table-wrap"><table><caption>충돌 처리 선택</caption><thead><tr><th>선택</th><th>결과</th></tr></thead><tbody><tr><td>차이 보기</td><td>편집 중인 글과 디스크 글을 비교합니다.</td></tr><tr><td>디스크 버전 불러오기</td><td>디스크 내용을 받아옵니다. 현재 편집 내용 중 필요한 부분은 먼저 복사해 두세요.</td></tr><tr><td>내 편집 유지</td><td>현재 편집 중인 글을 기준으로 저장을 시도합니다. 디스크에서 바뀐 내용이 필요하면 먼저 합쳐 두세요.</td></tr></tbody></table></div>
+<h3>이전 판으로 되돌리기</h3><ol><li>노트 머리의 <b>이력</b>을 엽니다.</li><li>과거 판을 고르고 <b>지금 글과 / 바로 앞 판과</b>로 본문 차이를 비교합니다.</li><li>선택한 내용을 확인한 뒤 <b>이 판으로 되돌리기</b>를 누릅니다.</li></ol><p>이력은 vault에 Git 커밋 또는 사용 가능한 이전 스냅숏이 있을 때 나타납니다. 파일 저장 자체가 매번 즉시 새 이력을 만드는 것은 아닙니다. 자동 커밋은 Git 저장소의 <code>main</code> 브랜치 등 조건이 맞을 때 동작하며, 기본 유휴 커밋 시간은 5분입니다.</p><p>Git이 잠겨 있거나 병합·리베이스 중이거나 자동 커밋이 꺼져 있으면 복원을 진행하지 못할 수 있습니다. 화면의 이유를 확인하고 해당 Git 작업을 마친 뒤 다시 시도하세요.</p>
+<h3>휴지통</h3><p>루트 노트에서 <b>삭제 → 휴지통으로</b>를 선택하면 휴지통으로 이동합니다. <b>휴지통 → 복구</b>로 되돌립니다. <b>완전 삭제</b>와 <b>휴지통 비우기</b>는 확인 후 영구 삭제하므로, 복구할 자료가 없는지 먼저 확인하세요.</p><div class="callout warm"><strong>복구 범위가 다릅니다.</strong><p>하위 페이지 삭제는 휴지통을 거치지 않습니다. 폴더 백업은 <code>notes/</code>만이 아니라 숨김 폴더 <code>.aisurada/</code>와 첨부·대화 파일을 포함한 워크스페이스 전체를 보관하세요.</p></div>
+
+</section>
+<section class="chapter" id="settings" data-keywords="설정 테마 다크 밝기 기록노트 다이어그램 Mermaid" aria-labelledby="settings-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 12</span><h2 id="settings-title">설정과 개인화</h2><p class="chapter-deck">화면 설정은 이 기기에 적용되고, 노트 본문은 그대로입니다.</p></header>
+
+<p>왼쪽 아래 <b>⚙ 설정</b>을 엽니다. 별도의 밝기 단추로 밝은 화면과 어두운 화면을 전환할 수 있습니다.</p>
+<div class="table-wrap"><table><caption>설정 화면의 항목</caption><thead><tr><th>항목</th><th>어디에 적용되나요?</th></tr></thead><tbody><tr><td>제목 앞 날짜</td><td>목록, 즐겨찾기, 빠른 검색, 연결 화면의 제목 표시</td></tr><tr><td>기록 노트</td><td>목록과 검색에 터미널·세션에서 굳힌 기록층 노트를 포함</td></tr><tr><td>다이어그램</td><td>노트의 Mermaid 코드를 그림과 함께 펼치는 표시</td></tr></tbody></table></div>
+<p>레일과 카드의 크기는 해당 손잡이로 조절합니다. 노트 창의 위치·크기도 앱이 기억할 수 있습니다. 이 표시 설정은 다른 컴퓨터로 노트 파일을 옮긴다고 똑같이 따라가는 설정은 아닙니다.</p>
+
+</section>
+<section class="chapter" id="shortcuts" data-keywords="단축키 키보드 shortcut 검색 탭 닫기" aria-labelledby="shortcuts-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 13</span><h2 id="shortcuts-title">단축키 모아 보기</h2><p class="chapter-deck">macOS 기준이며, 앱이 제공하는 항목은 Ctrl 조합도 지원합니다.</p></header>
+
+<div class="table-wrap"><table><caption>앱 단축키</caption><thead><tr><th>작업</th><th>키</th><th>설명</th></tr></thead><tbody><tr><td>노트 빠른 검색</td><td><kbd>⌘</kbd> + <kbd>K</kbd></td><td>열린 워크스페이스의 노트 찾기</td></tr><tr><td>새 워크스페이스</td><td><kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></td><td>데스크톱 앱의 파일 메뉴</td></tr><tr><td>워크스페이스 열기</td><td><kbd>⌘</kbd> + <kbd>O</kbd></td><td>데스크톱 앱의 파일 메뉴</td></tr><tr><td>터미널 열기</td><td><kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd></td><td>실제 셸이 연결된 탭</td></tr><tr><td>현재 탭 / 노트 창 닫기</td><td><kbd>⌘</kbd> + <kbd>W</kbd></td><td>저장 확인이나 닫기 안내가 나오면 먼저 처리</td></tr><tr><td>이전 / 다음 탭</td><td><kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>[</kbd> / <kbd>]</kbd></td><td>열린 탭 사이 이동</td></tr><tr><td>번호로 탭 이동</td><td><kbd>⌘</kbd> + <kbd>1</kbd> … <kbd>8</kbd></td><td>탭 순서대로 이동. <kbd>⌘</kbd> + <kbd>9</kbd>는 마지막 탭</td></tr><tr><td>AI 물음 보내기</td><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>묻는 칸 또는 세션 입력창에서</td></tr><tr><td>검색·카드·대화 상자 닫기</td><td><kbd>Esc</kbd></td><td>현재 입력칸과 겹쳐 열린 화면의 상태에 따라 처리</td></tr><tr><td>블록 메뉴</td><td><kbd>/</kbd></td><td>본문 문단에서 입력</td></tr></tbody></table></div>
+<p class="muted">터미널 내부에서는 셸·실행 프로그램이 처리하는 키도 있습니다. 브라우저 미리보기의 단축키와 데스크톱 메뉴 단축키는 실행 환경에 따라 다를 수 있습니다.</p>
+
+</section>
+<section class="chapter" id="claude-setup" data-keywords="Claude 설치 로그인 실행 파일 인증 ais-cli PATH 환경 변수 연동" aria-labelledby="claude-setup-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 14</span><h2 id="claude-setup-title">Claude 연결 준비</h2><p class="chapter-deck">노트 AI 문답은 설치된 Claude Code CLI를 통해 실행됩니다.</p></header>
+
+<ol><li><b>터미널에서 Claude Code가 먼저 실행되는지 확인합니다.</b> 아래 명령이 실행되고, 자신의 계정에서 대화를 사용할 수 있어야 합니다.</li></ol>
+<div class="code-block"><div class="code-head"><span>터미널에서 확인</span><button class="copy-code" type="button">복사</button></div><pre><code>claude --version
+claude</code></pre></div>
+<ol start="2"><li><b>실제 워크스페이스를 엽니다.</b> 샘플이나 브라우저 미리보기 대신 Claude 연동을 포함한 데스크톱 앱을 사용합니다.</li><li><b>실행 파일 위치를 확인합니다.</b> 앱이 CLI를 못 찾으면 실행 환경에 <code>AISURADA_CLAUDE_BIN</code>으로 절대 경로를 지정할 수 있습니다. 별도 터미널에 설정한 값이 이미 실행 중인 앱에 자동 전달되지는 않으므로 해당 환경에서 앱을 다시 실행해야 합니다.</li><li><b>작은 질문으로 확인합니다.</b> 노트의 한 문장을 선택하고 짧은 질문을 보냅니다. 실패하면 표시된 오류를 확인합니다.</li></ol>
+<h3>CLI로 노트도 읽고 쓰게 하려면</h3><p>앱의 <b>연동 가이드</b>에는 <code>ais-cli</code> 설치와 셸 경로 예시가 있습니다. Claude가 노트 맥락을 읽거나 수정하려면 그 실행 환경에서 <code>ais-cli</code>가 동작해야 합니다. 예시는 다음처럼 지시할 수 있습니다.</p>
+<div class="example"><span class="example-label">Claude에게 요청하는 예시</span><p>“ais-cli로 오늘 노트를 찾아 작업 내용을 요약해 줘. 노트를 수정할 때는 먼저 읽어서 받은 precondition을 f1으로 보내 줘.”</p></div>
+<p>일반 묻기 경로는 <code>claude -p</code>입니다. 별도 <code>ais-agent</code> 데몬을 먼저 설치해야 하는 구조가 아닙니다. 노트와 그림 내용이 질문 맥락으로 사용되므로, 보내려는 자료를 확인하고 이용 중인 Claude 계정의 사용 조건에 맞게 사용하세요.</p>
+
+</section>
+<section class="chapter" id="setup" data-keywords="설치 실행 빌드 개발 macOS JDK Java Node pnpm Rust Tauri 포트" aria-labelledby="setup-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 15</span><h2 id="setup-title">설치와 실행 · 소스 기준</h2><p class="chapter-deck">현재 저장소에서 macOS 데스크톱 앱을 실행하는 방법입니다.</p></header>
+
+<p>이미 빌드된 앱을 받은 사용자는 앱을 실행하고 <a href="#start">처음 10분</a>부터 따라 하면 됩니다. 아래는 저장소에서 직접 실행하는 경우입니다.</p>
+<div class="table-wrap"><table><caption>소스 실행 준비물</caption><thead><tr><th>도구</th><th>저장소의 기준</th></tr></thead><tbody><tr><td>macOS / Xcode 개발 도구</td><td>이 가이드는 현재 macOS 네이티브 호스트를 기준으로 작성했습니다.</td></tr><tr><td>Java JDK</td><td>21 이상. <code>JAVA_HOME</code> 또는 PATH의 javac·jar를 사용합니다.</td></tr><tr><td>Node.js / pnpm</td><td>Node.js 22.12.0 이상, pnpm 10.33.4</td></tr><tr><td>Rust / Cargo</td><td>Tauri 네이티브 호스트 빌드에 필요합니다.</td></tr><tr><td>Claude Code CLI</td><td>노트와 세션의 AI 기능을 사용할 때 필요합니다.</td></tr></tbody></table></div>
+<div class="code-block"><div class="code-head"><span>저장소 루트에서 · 개발 실행</span><button class="copy-code" type="button">복사</button></div><pre><code>bash build.sh
+cd native-host
+pnpm install --frozen-lockfile
+pnpm tauri dev</code></pre></div>
+<p>처음 빌드할 때 필요한 의존성을 내려받습니다. <code>pnpm tauri dev</code>는 화면 서버와 실제 앱을 함께 실행하며, 개발 서버의 기본 포트는 1420입니다.</p>
+<div class="code-block"><div class="code-head"><span>native-host 폴더에서 · 앱 번들 만들기</span><button class="copy-code" type="button">복사</button></div><pre><code>pnpm tauri build --debug --bundles app</code></pre></div>
+<p>개발 번들은 <code>native-host/src-tauri/target/debug/bundle/macos/aisurada.app</code>에 만들어집니다. 최적화 빌드는 <code>--debug</code>를 빼고 만듭니다. 빌드가 끝났다고 앱이 자동 설치되는 것은 아닙니다.</p>
+<h3>실행 방식의 차이</h3><div class="table-wrap"><table><thead><tr><th>명령</th><th>사용 목적</th></tr></thead><tbody><tr><td><code>pnpm tauri dev</code></td><td>파일·네이티브 명령·터미널을 연결한 실제 앱</td></tr><tr><td><code>pnpm dev</code></td><td>브라우저에서 화면 개발/미리보기. 네이티브 기능은 제한</td></tr><tr><td><code>pnpm build</code></td><td>Claude 연동을 포함한 화면 번들 생성. 실제 앱 실행 명령은 아님</td></tr><tr><td><code>pnpm build:noclaude</code></td><td>Claude 화면 기능을 뺀 화면 번들 생성. 화면·호스트·엔진은 각각 대응하는 빌드를 사용해야 함</td></tr></tbody></table></div>
+
+</section>
+<section class="chapter" id="cli" data-keywords="CLI 엔진 ais-cli ais-engine 내보내기 export backup doctor install 토큰 f1 precondition" aria-labelledby="cli-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 16</span><h2 id="cli-title">CLI로 기록 읽고 내보내기</h2><p class="chapter-deck">자동화나 터미널 작업이 필요할 때 사용하는 선택 기능입니다.</p></header>
+
+<p>아래 예시는 저장소 루트에서 실행합니다. <code>/absolute/path/to/vault</code>를 자신의 워크스페이스 경로로 바꾸세요. 폴더의 절대 경로를 따옴표로 감싸면 공백이 있는 경로도 사용할 수 있습니다.</p>
+<div class="code-block"><div class="code-head"><span>엔진으로 직접 읽기 · launchd 기동 없이</span><button class="copy-code" type="button">복사</button></div><pre><code>export AISURADA_VAULT="/absolute/path/to/vault"
+java -jar dist/ais-engine.jar list-docs limit=20
+java -jar dist/ais-engine.jar search-docs "검색어"
+java -jar dist/ais-engine.jar get-doc "노트-id"
+java -jar dist/ais-engine.jar export-markdown</code></pre></div>
+<p><code>export-markdown</code>은 내보낸 위치 등 결과를 JSON으로 알려 줍니다. 노트의 원래 폴더 전체 백업과는 별개이며 문답·대화 파일을 모두 복사하는 명령은 아닙니다.</p>
+<h3>계속 떠 있는 엔진에 연결하기</h3><div class="code-block"><div class="code-head"><span>터미널 1 · 워크스페이스 경로 설정 후</span><button class="copy-code" type="button">복사</button></div><pre><code>java -jar dist/ais-engine.jar serve</code></pre></div>
+<div class="code-block"><div class="code-head"><span>터미널 2 · 같은 AISURADA_VAULT 설정 후</span><button class="copy-code" type="button">복사</button></div><pre><code>java -jar dist/ais-cli.jar list-docs limit=20
+java -jar dist/ais-cli.jar doctor
+java -jar dist/ais-cli.jar --help</code></pre></div>
+<p>직접 띄운 serve가 있으면 클라이언트가 그 소켓으로 연결합니다. 엔진이 없을 때 클라이언트는 설치된 사이드카를 launchd로 띄울 수 있습니다. 이때 사용자 LaunchAgent를 등록할 수 있습니다.</p>
+<details><summary>ais-cli 설치와 쓰기 명령의 토큰</summary><div class="details-body"><p>앱 안의 <b>연동 가이드</b>에서 셸 래퍼와 PATH 설정 예시를 확인합니다. 소스 빌드의 두 jar만 설치하려면 아래 명령을 사용할 수 있습니다. 설치만으로 <code>ais-cli</code>라는 셸 명령이 생기는 것은 아니므로 래퍼와 PATH 설정을 별도로 합니다.</p><div class="code-block"><div class="code-head"><span>저장소 루트에서</span><button class="copy-code" type="button">복사</button></div><pre><code>java -jar dist/ais-cli.jar install   --cli "$PWD/dist/ais-cli.jar"   --sidecar "$PWD/dist/ais-sidecar.jar"</code></pre></div><p>설치 위치는 <code>~/Library/Application Support/aisurada/bin/</code>입니다. 기존 노트를 고치는 명령에는 직전에 읽은 <code>precondition</code> 값을 <code>f1=…</code>로 함께 보냅니다. 이는 다른 곳에서 바뀐 글을 덮지 않기 위한 검사입니다. <code>AIS-412</code>가 나오면 다시 읽고 차이를 반영한 뒤 쓰세요.</p></div></details>
+
+</section>
+<section class="chapter" id="help" data-keywords="문제 해결 오류 FAQ GitHub 연결 없음 권한 손실 포트" aria-labelledby="help-title">
+<header class="chapter-head"><span class="chapter-index">CHAPTER 17</span><h2 id="help-title">막혔을 때 확인할 것</h2><p class="chapter-deck">증상에서 시작해 필요한 화면으로 돌아가세요.</p></header>
+
+<details open><summary>‘AI에게 묻기’가 보이지 않거나 실제 전송이 안 됩니다.</summary><div class="details-body"><p>Claude 기능을 포함한 <b>데스크톱 앱</b>인지, 샘플 대신 실제 워크스페이스를 열었는지 먼저 확인합니다. 대상이 없는 단일 파일 하위 페이지에는 묻기 기능이 표시되지 않을 수 있습니다. CLI를 찾지 못하거나 로그인/실행 오류가 표시되면 <a href="#claude-setup">Claude 연결 준비</a>를 확인하세요.</p></div></details>
+<details><summary>‘다른 터미널에서 열려 있어요’라며 세션 입력을 막습니다.</summary><div class="details-body"><p>같은 Claude 세션에 두 실행이 이어 쓰면 대화가 갈라질 수 있어 막는 안내입니다. 원래 터미널에서 이어 가거나 그 실행을 끝낸 뒤 목록을 다시 읽으세요. 세션 목록을 읽지 못한 상태와 다른 기기에만 기록이 있는 상태도 구분해서 확인합니다.</p></div></details>
+<details><summary>굳힌 노트가 목록이나 검색에 없습니다.</summary><div class="details-body"><p><b>설정 → 기록 노트</b>를 켭니다. 날짜와 아젠다 필터도 확인하세요. 생성된 노트가 현재 보고 있는 날과 다른 날짜에 있을 수 있습니다.</p></div></details>
+<details><summary>저장 실패 또는 외부 변경 알림이 계속 나옵니다.</summary><div class="details-body"><p>편집 내용부터 복사하고 폴더 접근 권한·디스크 상태·엔진 연결을 확인합니다. 충돌이라면 <b>차이 보기</b>로 디스크 글과 비교합니다. 알림의 ‘닫기’는 실패 원인 자체를 해결하지 않습니다. <a href="#recover">복구 절차</a>를 참고하세요.</p></div></details>
+<details><summary>이력 목록이 비어 있거나 되돌리기를 못 합니다.</summary><div class="details-body"><p>vault의 Git 저장소와 커밋이 있는지 확인합니다. 기본 자동 커밋에는 유휴 시간이 필요합니다. Git의 main 브랜치 여부, 진행 중인 병합·리베이스, 잠금, 자동 커밋 설정에 따라 복원이 제한될 수 있습니다. 원인을 확인하지 않은 채 잠금 파일을 지우는 방식으로 해결하지 마세요.</p></div></details>
+<details><summary>세션의 관련 노트·링크·CLI 탭이 안 보입니다.</summary><div class="details-body"><p>창을 1,100px보다 넓게 하고 <b>레일 펴기</b>를 누릅니다. 노트 옆 레일을 찾는 경우에는 작성/편집 세션 칩이 있는 노트인지 확인하세요.</p></div></details>
+<details><summary>터미널 출력 굳히기에서 ‘표가 없어 굳힐 수 없어요’가 나옵니다.</summary><div class="details-body"><p><b>표 다시 뜨기</b>를 누르고 표시된 원인을 확인합니다. 이름 분류표가 없는 견본 빌드라면 앱 배포자에게 필요한 설정을 문의하세요. 세션 전사를 노트로 굳히는 기능과 터미널 출력 굳히기는 검사 방식이 다릅니다.</p></div></details>
+<details><summary>시작 화면의 GitHub 연동 버튼으로 연결이 되지 않습니다.</summary><div class="details-body"><p>현재 시작 화면의 해당 버튼은 안내를 표시하는 단계입니다. GitHub 로그인이나 원격 저장소 동기화를 완료하는 흐름은 구현되어 있지 않습니다. 필요하면 별도로 Git 저장소와 원격 백업을 관리하세요.</p></div></details>
+<details><summary>개발 서버가 1420 포트 충돌로 시작하지 않습니다.</summary><div class="details-body"><p>이미 실행 중인 개발 서버가 있는지 확인합니다. 필요 없는 기존 개발 실행을 종료한 뒤 다시 시작하세요. 다른 프로그램의 프로세스를 이름만 보고 종료하지 마세요.</p></div></details>
+<details><summary>폴더는 있는데 열 수 없거나 일부 파일을 읽지 못합니다.</summary><div class="details-body"><p>워크스페이스 경로와 읽기 권한을 확인합니다. 앱 상단의 <b>읽지 못한 파일</b> 또는 <b>충돌 사본</b>을 펼쳐 파일별 이유를 봅니다. 원본을 보관한 뒤 해당 파일 형식이나 메타데이터를 점검하세요.</p></div></details>
+<div class="closing"><h3>다음 작업을 위한 작은 마무리</h3><ul class="checklist"><li><label><input type="checkbox"> 저장 상태와 실패 알림을 확인했다.</label></li><li><label><input type="checkbox"> 오늘 한 일과 다음 행동을 적었다.</label></li><li><label><input type="checkbox"> 메모리에만 남은 답이나 초안을 따로 보관했다.</label></li><li><label><input type="checkbox"> 중요한 기록은 워크스페이스 전체로 백업했다.</label></li></ul><p class="muted">이 체크 목록은 문서에서 잠깐 확인하는 용도이며 저장되지 않습니다.</p></div>
+
+</section>
+<footer class="doc-footer"><strong>aisurada 사용자 가이드</strong><p>내용 기준: 저장소 <code>4e01b72</code> · 2026-11-04. 화면 이름과 기본값은 해당 구현을 기준으로 정리했습니다. 실행 환경·계정·빌드에 따라 제공 기능이 달라질 수 있습니다.</p><p>이 문서는 앱의 기능을 설명하는 독립 HTML입니다. 검색·목차·코드 복사·테마 전환은 이 문서 안에서 동작하며, 앱의 파일을 변경하거나 AI 요청을 보내지 않습니다. 인쇄 시 전체 장과 접힌 도움말도 함께 출력합니다.</p><a class="top-link" href="#top">처음으로 ↑</a></footer></main></div>
+<div id="action-status" class="sr-only" role="status" aria-live="polite"></div>
+<script>
+(()=>{
+ 'use strict';
+ const $=(s)=>document.querySelector(s);
+ const chapters=[...document.querySelectorAll('.chapter')];
+ const nav=[...document.querySelectorAll('.toc a')];
+ const input=$('#guide-search'),status=$('#search-status'),count=$('#search-count'),empty=$('#no-results');
+ const index=chapters.map(el=>({el,text:(el.textContent+' '+el.dataset.keywords).normalize('NFKC').toLocaleLowerCase('ko-KR')}));
+ let filtering=false;
+ function filter(){
+  const terms=input.value.normalize('NFKC').trim().toLocaleLowerCase('ko-KR').split(/\s+/).filter(Boolean);
+  filtering=terms.length>0;let shown=0;
+  index.forEach(({el,text},i)=>{const match=terms.every(term=>text.includes(term));el.hidden=!match;nav[i].parentElement.hidden=!match;if(match)shown++;});
+  status.hidden=!filtering;empty.hidden=!filtering||shown>0;$('#clear-search').hidden=!filtering;
+  count.textContent=shown+'개 장에서 관련 내용을 찾았습니다. 단어를 추가하면 범위를 좁힐 수 있습니다.';
+  current();
+ }
+ input.addEventListener('input',filter);
+ function clear(){input.value='';filter();}
+ $('#clear-search').addEventListener('click',()=>{clear();input.focus();});
+ $('#reset-search').addEventListener('click',()=>{clear();input.focus();});
+ function drawer(open){document.body.classList.toggle('nav-open',open);$('#menu-toggle').setAttribute('aria-expanded',String(open));}
+ $('#menu-toggle').addEventListener('click',()=>drawer(!document.body.classList.contains('nav-open')));
+ $('#nav-shade').addEventListener('click',()=>drawer(false));
+ document.addEventListener('keydown',event=>{
+  if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();input.focus();input.select();}
+  if(event.key==='Escape'){
+   if(document.body.classList.contains('nav-open')){drawer(false);$('#menu-toggle').focus();}
+   else if(document.activeElement===input&&input.value){clear();}
+  }
+ });
+ document.addEventListener('click',event=>{
+  const a=event.target.closest('a[href^="#"]');if(!a)return;
+  const id=a.getAttribute('href').slice(1),target=document.getElementById(id);if(!target)return;
+  if(filtering){clear();requestAnimationFrame(()=>target.scrollIntoView({block:'start'}));}
+  drawer(false);
+ });
+ function current(){
+  const shown=chapters.filter(el=>!el.hidden),top=window.innerWidth<=560?155:110;
+  let active=shown[0];for(const el of shown){if(el.getBoundingClientRect().top<=top)active=el;else break;}
+  nav.forEach(a=>{if(active&&a.hash==='#'+active.id)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current');});
+  const doc=document.documentElement,total=doc.scrollHeight-innerHeight;
+  $('#progress').style.width=(total>0?Math.min(100,Math.max(0,scrollY/total*100)):0)+'%';
+ }
+ let queued=false;
+ addEventListener('scroll',()=>{if(!queued){queued=true;requestAnimationFrame(()=>{current();queued=false;});}},{passive:true});
+ addEventListener('resize',()=>{if(innerWidth>850)drawer(false);current();});current();
+ const theme=$('#theme-toggle');
+ function applyTheme(value){document.documentElement.dataset.theme=value;theme.textContent=value==='dark'?'밝게':'어둡게';theme.setAttribute('aria-label',value==='dark'?'밝은 화면으로 바꾸기':'어두운 화면으로 바꾸기');}
+ let preference;try{preference=localStorage.getItem('aisurada-user-guide-theme');}catch{}
+ applyTheme(preference==='dark'||preference==='light'?preference:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+ theme.addEventListener('click',()=>{const value=document.documentElement.dataset.theme==='dark'?'light':'dark';applyTheme(value);try{localStorage.setItem('aisurada-user-guide-theme',value);}catch{}});
+ $('#print-guide').addEventListener('click',()=>window.print());
+ let details=[];
+ addEventListener('beforeprint',()=>{details=[...document.querySelectorAll('details')].filter(el=>!el.open);details.forEach(el=>el.open=true);});
+ addEventListener('afterprint',()=>{details.forEach(el=>el.open=false);details=[];});
+ for(const button of document.querySelectorAll('.copy-code'))button.addEventListener('click',async()=>{
+  const text=button.closest('.code-block').querySelector('code').textContent;
+  let ok=false;
+  try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);ok=true;}}catch{}
+  if(!ok){const field=document.createElement('textarea');field.value=text;field.style.cssText='position:fixed;left:-10000px;top:0';document.body.append(field);field.select();try{ok=document.execCommand('copy');}catch{}field.remove();button.focus();}
+  button.textContent=ok?'복사됨':'직접 선택해 복사';$('#action-status').textContent=ok?'예제 코드를 복사했습니다.':'자동 복사를 사용할 수 없습니다. 코드 본문을 선택해 복사하세요.';
+  setTimeout(()=>button.textContent='복사',2200);
+ });
+})();
+</script></body></html>

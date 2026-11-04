@@ -1,0 +1,68 @@
+name: Build trial release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build (for example v0.0.1)
+        required: true
+        default: v0.0.1
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trial-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  macos-arm64:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      AISURADA_RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Check tag and architecture
+        shell: bash
+        run: |
+          [[ "$AISURADA_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(uname -m)" = arm64
+          test "$(git rev-parse "refs/tags/$AISURADA_RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up build tools
+        run: |
+          npm install --global pnpm@10.33.4
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          pnpm --dir native-host install --frozen-lockfile
+      - name: Test engine and host
+        run: |
+          bash test.sh
+          bash test-native.sh
+      - name: Build and verify Java-inclusive trial DMG
+        run: pnpm --dir native-host release:build
+      - name: Prepare GitHub pre-release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version="${AISURADA_RELEASE_TAG#v}"
+          assets=(native-host/.release/artifacts/*.dmg native-host/.release/artifacts/SHA256SUMS native-host/.release/artifacts/validation.json native-host/.release/artifacts/user-guide.html native-host/.release/artifacts/OpenJDK*-sources_*.tar.gz)
+          if gh release view "$AISURADA_RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(gh release view "$AISURADA_RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+            gh release upload "$AISURADA_RELEASE_TAG" "${assets[@]}" --clobber
+            gh release edit "$AISURADA_RELEASE_TAG" --title "aisurada $version — 시험판" --notes-file "docs/releases/$version.md" --prerelease
+          else
+            gh release create "$AISURADA_RELEASE_TAG" "${assets[@]}" --verify-tag --draft --prerelease --title "aisurada $version — 시험판" --notes-file "docs/releases/$version.md"
+          fi

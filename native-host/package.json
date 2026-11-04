@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "version": "0.1.0",
+  "version": "0.0.1",
   "scripts": {
     "dev": "vite",
     "postinstall": "node scripts/setup-plugs.mjs",
@@ -25,6 +25,9 @@
     "test:navigation:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --navigation",
     "test:workspace:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs",
     "backend:jars": "bash ../build.sh",
+    "release:runtime": "node scripts/prepare-runtime.mjs",
+    "release:build": "node scripts/release-build.mjs",
+    "release:verify": "node scripts/verify-release.mjs",
     "tauri": "tauri",
     "test:acceptance": "node scripts/acceptance.mjs",
     "test:editor": "node --import tsx --test scripts/editor.test.mjs",

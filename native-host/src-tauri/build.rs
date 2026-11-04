@@ -1,7 +1,10 @@
 fn main() {
     println!("cargo:rerun-if-changed=secret-names.txt");
     println!("cargo:rerun-if-changed=secret-names.sample.txt");
-    let real = std::path::Path::new("secret-names.txt").is_file();
+    println!("cargo:rerun-if-env-changed=AISURADA_RELEASE_BUILD");
+    // Public artifacts must not embed this machine's private classification table.
+    let real = std::env::var("AISURADA_RELEASE_BUILD").as_deref() != Ok("1")
+        && std::path::Path::new("secret-names.txt").is_file();
     let source = if real {
         "secret-names.txt"
     } else {

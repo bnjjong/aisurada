@@ -1,5 +1,9 @@
 # aisurada
 
+**macOS Apple Silicon 시험판:** [0.0.1 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.0.1) · Java 포함 · [설치 안내와 제한 사항](docs/releases/0.0.1.md)
+
+사용 방법은 [HTML 사용자 가이드](docs/user-guide.html)에 정리했습니다. 파일을 내려받아 브라우저에서 열면 검색·목차·코드 복사·인쇄를 사용할 수 있습니다.
+
 aisurada vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그 엔진을 띄워 두고 부르는 클라이언트 `ais-cli`입니다. Java 21 하나와 SnakeYAML만으로 짓습니다.
 
 데스크톱 앱은 [native-host](native-host/README.md)에 있습니다. 2부 Tauri 호스트 위에 3부 React 화면을 단계별로 연결하고 있습니다. 제공된 13장까지 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·목록·검색·이력 복원·외부 Markdown·설정 화면을 연결했습니다. [3부 구현 순서](docs/rebuild-p3-plan.md)와 [11~13장 기록](docs/rebuild-p3-chapters11-13-complete.md)에 구현·검증 및 미제공 자료 때문에 재구성한 범위를 구분했습니다. 14~18장과 부록의 본문은 제공되지 않았습니다.

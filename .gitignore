@@ -12,3 +12,4 @@ lib/
 /native-host/src-tauri/target/
 /native-host/src-tauri/gen/
 /native-host/src-tauri/secret-names.txt
+/native-host/.release/
