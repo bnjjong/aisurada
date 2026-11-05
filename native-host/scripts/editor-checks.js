@@ -41,7 +41,8 @@ try{
   assert(!document.querySelector('.lex-line-hint'),'hint hides while the menu is open');
   const items=[...document.querySelectorAll('.slash-item')];
   assert(['표','콜아웃','코드 블록'].every(label=>items.some(item=>item.querySelector('.slash-item-label').firstChild.textContent===label)),'table, callout and code are in the menu');
-  assert(items.every(item=>item.querySelector('.slash-item-icon')&&item.querySelector('.slash-item-label small')),'every item has an icon and a one-line description');
+  assert(items.every(item=>item.querySelector('.slash-item-icon svg path')&&item.querySelector('.slash-item-label small')),'every item has a drawn icon and a one-line description');
+  assert(items.every(item=>!item.querySelector('.slash-item-icon').textContent.trim()),'icons are drawn lines, not characters (no Hanja or symbols in the Korean UI)');
   document.querySelector('[data-slash-id="table"]').click();await until(()=>content().querySelector('table'),'table');assert(content().querySelectorAll('table tr').length===3,'rows');assert(content().querySelectorAll('table th').length===3,'header');
   content().querySelector('td,th').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>document.querySelector('.lex-cell-menu-btn'),'cell hover');document.querySelector('.lex-cell-menu-btn').click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');assert(document.querySelectorAll('.lex-table-menu button').length===10,'menu order/count');
   document.querySelector('.lex-table-menu button').click();await until(()=>content().querySelectorAll('table tr').length===4,'insert row');

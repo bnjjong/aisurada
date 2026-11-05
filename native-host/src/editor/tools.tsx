@@ -22,6 +22,17 @@ const formats = ['bold', 'italic', 'strikethrough', 'code'] as const;
 const imageTypes: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
 const languages = ['plaintext', 'kotlin', 'java', 'typescript', 'javascript', 'python', 'sql', 'bash', 'yaml', 'json', 'xml', 'groovy', 'dockerfile', 'properties', 'diff', 'mermaid'];
 
+// 슬래시 메뉴의 아이콘. 글자(한자, 기호)가 아니라 선으로 그려서 한글 화면에 낯선 글자가 섞이지 않고, 글꼴과 상관없이 같게 보인다.
+const slashIcons: Record<string, string> = {
+  page: 'M4 2.5h5l3 3v8H4v-11zM9 2.5v3h3',
+  link: 'M6.8 9.2l2.4-2.4M5.6 7.6l-.9.9a2.3 2.3 0 003.3 3.3l.9-.9M10.4 8.4l.9-.9A2.3 2.3 0 008 4.2l-.9.9',
+  table: 'M3.5 3.5h9a1 1 0 011 1v7a1 1 0 01-1 1h-9a1 1 0 01-1-1v-7a1 1 0 011-1zM2.5 7h11M6.5 7v5.5',
+  callout: 'M3.5 3.5h9a1 1 0 011 1v7a1 1 0 01-1 1h-9a1 1 0 01-1-1v-7a1 1 0 011-1zM5 6.5h6M5 9.5h4',
+  code: 'M6 5L3 8l3 3M10 5l3 3-3 3',
+};
+function SlashIcon({ name }: { name: string }) {
+  return <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={slashIcons[name]} /></svg>;
+}
 function tableRowCells(selection: BaseSelection): ElementNode[] {
   const rows = new Map<string, ElementNode>();
   for (const node of selection.getNodes()) {
@@ -48,11 +59,11 @@ export function EditorTools(props: EditorProps) {
     return { x: Math.max(8, Math.min(rect.left - box.left, box.width - 260)), y: Math.max(0, rect.top - box.top - 42) };
   };
   const slashItems = [
-    ...(props.features?.createChild ? [{ id: 'page', icon: '↳', label: '페이지', desc: '하위 노트를 만들어 카드로 넣어요', aliases: 'page 후속 하위 노트 새 페이지' }] : []),
-    ...(props.features?.notes ? [{ id: 'note', icon: '[[', label: '노트 링크', desc: '다른 노트로 가는 링크', aliases: 'note link 링크 기록' }] : []),
-    { id: 'table', icon: '表', label: '표', desc: '3×3 표를 넣어요', aliases: 'table 테이블 시트' },
-    { id: 'callout', icon: '▣', label: '콜아웃', desc: '눈에 띄는 안내 상자', aliases: 'callout 정보 강조 안내' },
-    { id: 'code', icon: '</>', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
+    ...(props.features?.createChild ? [{ id: 'page', icon: 'page', label: '페이지', desc: '하위 노트를 만들어 카드로 넣어요', aliases: 'page 후속 하위 노트 새 페이지' }] : []),
+    ...(props.features?.notes ? [{ id: 'note', icon: 'link', label: '노트 링크', desc: '다른 노트로 가는 링크', aliases: 'note link 링크 기록' }] : []),
+    { id: 'table', icon: 'table', label: '표', desc: '3×3 표를 넣어요', aliases: 'table 테이블 시트' },
+    { id: 'callout', icon: 'callout', label: '콜아웃', desc: '눈에 띄는 안내 상자', aliases: 'callout 정보 강조 안내' },
+    { id: 'code', icon: 'code', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
   ].filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(menu?.query.toLowerCase() || ''));
   const notes = (props.features?.notes || []).filter(note => note.id !== props.features?.currentId && note.title.trim()
     && (props.features?.showRecords || note.tier !== 'record') && note.title.toLowerCase().includes(menu?.query.toLowerCase() || ''))
@@ -279,7 +290,7 @@ export function EditorTools(props: EditorProps) {
         }} />
       {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id} data-slash-id={item.id}
         aria-selected={menu.selected === index} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setMenu({ ...menu, selected: index })} onClick={() => void choose(item.id)}>
-        {'icon' in item && <span className="slash-item-icon" aria-hidden="true">{item.icon}</span>}
+        {'icon' in item && <span className="slash-item-icon" aria-hidden="true"><SlashIcon name={item.icon} /></span>}
         <span className="slash-item-label">{item.label}{'desc' in item && <small>{item.desc}</small>}</span>{'hint' in item && <small>{item.hint}</small>}</button>) : <p>일치하는 {menu.kind === 'note' ? '노트가' : '블록이'} 없어요.</p>}
     </div>}
     {card && <div className="comment-card" style={{ left: card.x, top: card.y }} onMouseEnter={() => clearTimeout(closeCard.current)}

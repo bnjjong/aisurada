@@ -1,5 +1,5 @@
 /*
- * 편집기에서 블록을 넣는 길. 상시 글리프 줄(表 ▣ </>)을 없애고 노션처럼 슬래시 메뉴를 중심에 둔다.
+ * 편집기에서 블록을 넣는 길. 맨 위에 늘 떠 있던 버튼 줄을 없애고 노션처럼 슬래시 메뉴를 중심에 둔다.
  *  - 빈 줄: 왼쪽에 「+」, 줄에는 `/` 안내 (커서가 빈 줄에 있을 때만)
  *  - 코드·콜아웃 안: 그 블록 오른쪽 위에 언어·종류 선택 줄이 뜬다 (자리를 차지하지 않으므로 본문이 밀리지 않는다)
  *  - 슬래시 메뉴: 항목마다 아이콘과 한 줄 설명
@@ -26,5 +26,6 @@
   flex: 0 0 32px; display: grid; place-items: center; height: 32px; font-size: 12px; color: var(--muted);
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
 }
+.slash-item-icon svg { display: block; width: 16px; height: 16px; }
 .slash-item-label { display: grid; gap: 1px; min-width: 0; }
 .slash-item-label small { color: var(--muted); font-size: 11px; font-weight: 400; }
