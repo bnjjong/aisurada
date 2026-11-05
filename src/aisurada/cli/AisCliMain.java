@@ -28,6 +28,68 @@ import java.util.*;
  */
 public final class AisCliMain {
 
+    /**
+     * 같은 JVM에서 도구를 여러 번 부르는 mcp 모드가 쓰는 종료 대용입니다.
+     * 켜져 있으면 프로세스를 끝내지 않고 종료 코드만 실어 던집니다. 일반 실행은 그대로 {@link System#exit}입니다.
+     */
+    static final class CliExit extends RuntimeException {
+        final int code;
+
+        CliExit(int code) {
+            super("exit " + code, null, false, false);
+            this.code = code;
+        }
+    }
+
+    /** 한 번의 도구 호출 결과입니다. 종료 코드는 단발 실행의 종료 코드와 같습니다. */
+    record Call(int status, String stdout, String stderr) {}
+
+    private static volatile boolean embedded;
+
+    private static void exit(int code) {
+        if (embedded) {
+            throw new CliExit(code);
+        }
+        System.exit(code);
+    }
+
+    /** mcp 모드가 시작할 때 한 번 켭니다. 이 뒤로는 종료 호출이 프로세스를 끝내지 않고 {@link CliExit}을 던집니다. */
+    static void enableEmbedded() {
+        embedded = true;
+    }
+
+    /**
+     * 단발 실행과 같은 길(소켓 찾기, 엔진 띄우기, 요청 왕복)로 도구나 명령 하나를 부르고, 프로세스를 끝내지 않고 결과를 돌려줍니다.
+     * 이 길이 표준 출력과 표준 오류에 쓰는 글은 모두 모아서 돌려주므로 mcp 모드의 프로토콜 출력과 섞이지 않습니다.
+     * 한 번에 하나씩만 부릅니다.
+     */
+    static synchronized Call callEmbedded(String[] args) {
+        java.io.PrintStream oldOut = System.out;
+        java.io.PrintStream oldErr = System.err;
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        java.io.ByteArrayOutputStream err = new java.io.ByteArrayOutputStream();
+        int status = 0;
+        boolean wasEmbedded = embedded;
+        embedded = true;
+        try {
+            System.setOut(new java.io.PrintStream(out, true, StandardCharsets.UTF_8));
+            System.setErr(new java.io.PrintStream(err, true, StandardCharsets.UTF_8));
+            runEnginePipeline(args);
+        } catch (CliExit e) {
+            status = e.code;
+        } catch (RuntimeException e) {
+            System.err.println("ais-cli 안에서 예외가 났다: " + e);
+            status = 1;
+        } finally {
+            System.out.flush();
+            System.err.flush();
+            System.setOut(oldOut);
+            System.setErr(oldErr);
+            embedded = wasEmbedded;
+        }
+        return new Call(status, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
+    }
+
     public static final List<String> CLI_TOOL_NAMES = List.of(
             "create_doc", "update_doc", "set_favorite", "evaluate_doc", "link_docs",
             "list_docs", "search_docs", "list_tags", "get_doc", "delete_doc",
@@ -71,7 +133,7 @@ public final class AisCliMain {
     );
 
     public static final List<String> DIRECT_COMMANDS = List.of(
-            "doctor", "sweep", "report", "schedule", "install"
+            "doctor", "sweep", "report", "schedule", "install", "mcp"
     );
 
     public static final List<String> ENGINE_COMMANDS_61 = List.of(
@@ -93,13 +155,13 @@ public final class AisCliMain {
     public static void main(String[] args) {
         if (args.length == 0 || "--help".equals(args[0]) || "-h".equals(args[0])) {
             printUsageAndList();
-            System.exit(0);
+            exit(0);
             return;
         }
 
         if ("--list".equals(args[0]) || "-l".equals(args[0])) {
             printListOnly();
-            System.exit(0);
+            exit(0);
             return;
         }
 
@@ -115,10 +177,13 @@ public final class AisCliMain {
         } else if ("install".equals(firstArg)) {
             InstallCommand.run(Arrays.copyOfRange(args, 1, args.length));
             return;
+        } else if ("mcp".equals(firstArg)) {
+            McpServer.run(Arrays.copyOfRange(args, 1, args.length));
+            return;
         } else if ("report".equals(firstArg) || "schedule".equals(firstArg)) {
             // 결정 3: 모르는 이름으로 간주하여 종료 코드 2
             printUnknownName(firstArg);
-            System.exit(2);
+            exit(2);
             return;
         }
 
@@ -128,7 +193,7 @@ public final class AisCliMain {
 
         if (!isTool && !isCmd) {
             printUnknownName(firstArg);
-            System.exit(2);
+            exit(2);
             return;
         }
 
@@ -154,6 +219,7 @@ public final class AisCliMain {
         System.out.println("report — 리포트 작업을 다룹니다");
         System.out.println("schedule — 주기적 작업을 다룹니다");
         System.out.println("install — 실행에 필요한 jar 파일을 설치합니다");
+        System.out.println("mcp — Claude 같은 MCP 클라이언트가 노트를 읽도록 MCP 서버로 선다(표준 입출력). 쓰기 도구는 --write를 줄 때만 연다");
         System.out.println();
         System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61));
         System.out.println("  앱이 쓰는 배선입니다. 이름이 하이픈인 것이 표시이고, 도구 이름(밑줄)과 다른 표면입니다.");
@@ -165,7 +231,7 @@ public final class AisCliMain {
             return Launchctl.getUid();
         } catch (Launchctl.LaunchctlException e) {
             System.err.println(e.getMessage());
-            System.exit(4);
+            exit(4);
             return null;
         }
     }
@@ -175,7 +241,7 @@ public final class AisCliMain {
         Launchctl.Result r = Launchctl.runLaunchctl(args);
         if (r.error() != null) {
             System.err.println(r.error());
-            System.exit(4);
+            exit(4);
         }
         return r;
     }
@@ -193,7 +259,7 @@ public final class AisCliMain {
         String envVault = System.getenv("AISURADA_VAULT");
         if (envVault == null || Trim.isBlank(envVault)) {
             System.err.println("AIS-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
-            System.exit(2);
+            exit(2);
             return;
         }
 
@@ -222,7 +288,7 @@ public final class AisCliMain {
         byte[] socketPathBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
         if (socketPathBytes.length > 102) {
             System.err.println("AIS-400 소켓 경로가 102 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
-            System.exit(2);
+            exit(2);
             return;
         }
 
@@ -246,7 +312,7 @@ public final class AisCliMain {
         // 6. 소켓 연결 및 요청 전송
         if (!Files.exists(socketPath, LinkOption.NOFOLLOW_LINKS)) {
             System.err.println("사이드카가 안 떠 있다. 소켓 파일이 없다: " + socketPath);
-            System.exit(4);
+            exit(4);
             return;
         }
 
@@ -255,7 +321,7 @@ public final class AisCliMain {
             clientChannel = SocketChannel.open(UnixDomainSocketAddress.of(socketPath));
         } catch (IOException e) {
             System.err.println("소켓 파일은 있는데 못 붙는다: " + socketPath + ". 사이드카가 죽었거나 아직 뜨는 중이다. 이유=" + e.getMessage());
-            System.exit(4);
+            exit(4);
             return;
         }
 
@@ -292,11 +358,11 @@ public final class AisCliMain {
             header = ResponseFrame.streamRead(in, System.out, System.err);
         } catch (FrameException fe) {
             System.err.println("사이드카와 말이 안 통한다: " + fe.getMessage());
-            System.exit(4);
+            exit(4);
             return;
         } catch (IOException e) {
             e.printStackTrace(System.err);
-            System.exit(1);
+            exit(1);
             return;
         } finally {
             try { clientChannel.close(); } catch (IOException ignored) {}
@@ -306,7 +372,7 @@ public final class AisCliMain {
         SweepCommand.runDailySweepIfDue(vaultKey);
 
         // 10. 종료 코드 반환 (아래 8비트)
-        System.exit(header.status() % 256);
+        exit(header.status() % 256);
     }
 
     private static void checkRestart(String userHome, String vaultKey, String label, Path socketPath) {
@@ -372,7 +438,7 @@ public final class AisCliMain {
             if (!r.output().trim().isEmpty()) {
                 System.err.println(r.output().trim());
             }
-            System.exit(4);
+            exit(4);
         }
     }
 
@@ -382,7 +448,7 @@ public final class AisCliMain {
         if (sidecarJar == null) {
             Path installed = Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "ais-sidecar.jar");
             System.err.println("AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다(" + installed + "). `install` 을 돌리거나 jar 의 절대 경로를 AISURADA_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
-            System.exit(2);
+            exit(2);
             return;
         }
 
@@ -401,7 +467,7 @@ public final class AisCliMain {
                 }
             } catch (Exception e) {
                 e.printStackTrace(System.err);
-                System.exit(1);
+                exit(1);
                 return;
             }
         }
@@ -414,7 +480,7 @@ public final class AisCliMain {
                 Files.writeString(plistFile, plistContent, StandardCharsets.UTF_8);
             } catch (Exception e) {
                 e.printStackTrace(System.err);
-                System.exit(1);
+                exit(1);
                 return;
             }
             // bootout의 종료 코드는 안 본다. 못 돌렸거나 10초를 넘기면 종료 코드 4다
@@ -456,7 +522,7 @@ public final class AisCliMain {
             System.err.println("plist=" + plistFile);
             System.err.println("로그=" + logPath);
             System.err.println(kr.output().trim());
-            System.exit(4);
+            exit(4);
             return;
         }
 
@@ -527,7 +593,7 @@ public final class AisCliMain {
             quietTargets = findConcurrencyEvictionTargets(runDir, currentVaultKey, limit);
         } catch (IOException e) {
             e.printStackTrace(System.err);
-            System.exit(1);
+            exit(1);
             return;
         }
         for (SweepCommand.Target t : quietTargets) {
@@ -579,7 +645,7 @@ public final class AisCliMain {
             printOut = printOut.substring(0, 1200);
         }
         System.err.println(printOut);
-        System.exit(4);
+        exit(4);
     }
 
     private static long getReadyTimeoutSeconds() {
