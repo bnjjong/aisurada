@@ -188,8 +188,9 @@
 <div class="code-block"><div class="code-head"><span>터미널에서 확인</span><button class="copy-code" type="button">복사</button></div><pre><code>claude --version
 claude</code></pre></div>
 <ol start="2"><li><b>실제 워크스페이스를 엽니다.</b> 샘플이나 브라우저 미리보기 대신 Claude 연동을 포함한 데스크톱 앱을 사용합니다.</li><li><b>실행 파일 위치를 확인합니다.</b> 앱이 CLI를 못 찾으면 실행 환경에 <code>AISURADA_CLAUDE_BIN</code>으로 절대 경로를 지정할 수 있습니다. 별도 터미널에 설정한 값이 이미 실행 중인 앱에 자동 전달되지는 않으므로 해당 환경에서 앱을 다시 실행해야 합니다.</li><li><b>작은 질문으로 확인합니다.</b> 노트의 한 문장을 선택하고 짧은 질문을 보냅니다. 실패하면 표시된 오류를 확인합니다.</li></ol>
-<h3>CLI로 노트도 읽고 쓰게 하려면</h3><p>앱의 <b>연동 가이드</b>에는 <code>ais-cli</code> 설치와 셸 경로 예시가 있습니다. Claude가 노트 맥락을 읽거나 수정하려면 그 실행 환경에서 <code>ais-cli</code>가 동작해야 합니다. 예시는 다음처럼 지시할 수 있습니다.</p>
+<h3>CLI로 노트도 읽고 쓰게 하려면</h3><p>앱 안에서 묻기를 쓸 때는 앱에 든 <code>ais-cli</code>가 자동으로 쓰이므로 따로 설치할 것이 없습니다. 터미널의 Claude Code에서 쓰려면 앱의 <b>연동 가이드</b>에 있는 링크 한 줄이 필요합니다. 어느 쪽이든 앱에 든 Java로 동작하므로 Java를 따로 설치하지 않아도 됩니다. 예시는 다음처럼 지시할 수 있습니다.</p>
 <div class="example"><span class="example-label">Claude에게 요청하는 예시</span><p>“ais-cli로 오늘 노트를 찾아 작업 내용을 요약해 줘. 노트를 수정할 때는 먼저 읽어서 받은 precondition을 f1으로 보내 줘.”</p></div>
+<h3>Claude Code에서 노트를 도구로 쓰려면</h3><p>설정(톱니바퀴)의 <b>Claude 연결</b>에서 <b>Claude Code에 연결</b>을 누르면 Claude Code가 지금 연 워크스페이스의 노트를 도구로 찾고 읽을 수 있습니다. 기본은 읽기만 허용합니다. <b>노트를 만들고 고치는 것도 허용</b>을 켜면 쓰기도 됩니다. 영구 삭제는 어느 쪽이든 할 수 없습니다. 연결은 워크스페이스 하나에 묶이므로 다른 워크스페이스에서 다시 연결하면 그쪽으로 바뀝니다. 같은 영역에서 Claude Desktop용 설정 조각을 복사할 수 있지만, Claude Desktop과의 연결은 아직 확인하지 못했습니다.</p>
 <p>일반 묻기 경로는 <code>claude -p</code>입니다. 별도 <code>ais-agent</code> 데몬을 먼저 설치해야 하는 구조가 아닙니다. 노트와 그림 내용이 질문 맥락으로 사용되므로, 보내려는 자료를 확인하고 이용 중인 Claude 계정의 사용 조건에 맞게 사용하세요.</p>
 
 </section>

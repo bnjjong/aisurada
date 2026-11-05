@@ -9,7 +9,7 @@
 | 엔진 `bash test.sh` | 전부 통과 |
 | 화면·호스트 `bash test-native.sh` | Node 422건, cargo 88건 통과 |
 | 실제 WKWebView acceptance (4부를 뺀 판) | host 26, workspace 9, navigation 11, interaction 12, data 12, editor 114, autosave 16 통과. views는 첫 실행에서 `favorites-category-and-graph-accessible-node`가 `timeout: graph`로 실패했고 재실행에서 29/29 통과(간헐 실패, 원인 미상) |
-| 4부를 켠 판의 실제 창 acceptance | `test:part4:acceptance` 7/7 통과(묻기 왕복, 전사가 있는 세션 화면 포함). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다 |
+| 4부를 켠 판의 실제 창 acceptance | `test:part4:acceptance` 8/8 통과(묻기 왕복, 전사가 있는 세션 화면, 설정의 Claude 연결 포함. 연결은 등록 상태를 파일에 두는 가짜 claude로 잰다). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다 |
 | 사람이 앱을 직접 조작한 확인 | **0건** |
 
 아래 점검은 위 마지막 두 줄을 메우는 일이다.
@@ -111,6 +111,18 @@ printf '%s\n' \
 ### 4-3. 진짜 claude 한 번 (선택)
 
 토큰을 쓰고 진짜 `~/.claude`를 쓴다. 가짜로 끝까지 확인한 뒤에만 한다. 격리 HOME 대신 평소 HOME으로 앱을 띄우되, 엔진 소켓과 vault는 같은 방식으로 격리하고 `AISURADA_CLAUDE_BIN`은 빼면 된다. 질문 한 번이면 충분하다.
+
+### 4-4. Claude 연결 (진짜 claude, 토큰 안 씀)
+
+설정의 「Claude 연결」은 `claude mcp add-json`을 부를 뿐이라 토큰을 쓰지 않는다. 위의 가짜 claude(`fake-claude`)는 `mcp` 하위 명령을 흉내 내지 못하므로, 이 점검만 `AISURADA_CLAUDE_BIN`을 **진짜 claude**로 바꿔 앱을 다시 띄운다. `HOME`은 격리 그대로라서 등록은 `$HC_DIR/home/.claude.json`에만 쓰이고 진짜 `~/.claude.json`은 그대로다.
+
+1. 설정(톱니바퀴)을 열어 「Claude 연결」 영역이 보이는지, 처음에 「연결되어 있지 않아요」인지 본다.
+2. 「Claude Code에 연결」을 누른다. 기대: 「연결되어 있어요 · 노트를 읽기만 해요」.
+3. 「노트를 만들고 고치는 것도 허용」을 켜고 「이 설정으로 다시 연결」을 누른다. 기대: 「노트를 읽고 쓸 수 있어요」.
+4. 「연결 끊기」를 누른다. 기대: 「연결되어 있지 않아요」로 돌아온다.
+5. 끝난 뒤 `grep -c aisurada ~/.claude.json`이 이 점검 전과 같은지 본다(진짜 설정이 안 바뀌어야 한다).
+
+> 명령줄로는 같은 일을 이 문서를 쓰면서 한 번 돌려 확인했다. 진짜 Claude Code 2.1.318이 격리 HOME에서 등록과 쓰기 모드로 바꿔 끼우기를 받았고 `claude mcp get`이 `✔ Connected`를 답했으며 끊기까지 됐다. 화면의 단추로 누르는 점검 자체는 아직 아무도 하지 않았다.
 
 ## 5. 기록 방법
 

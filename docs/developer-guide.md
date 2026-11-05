@@ -92,7 +92,7 @@ test-native.sh         화면·호스트 시험 전체
 
 | 패키지 | 맡은 일 |
 |---|---|
-| `cli` | 진입점(`Main`, `AisCliMain`), `doctor`·`sweep`·`install`, launchctl 부르기 |
+| `cli` | 진입점(`Main`, `AisCliMain`), `doctor`·`sweep`·`install`·`mcp`·`claude-mcp`, launchctl 부르기 |
 | `config` | 설정 이름과 값 읽기 (`EngineConfig`) |
 | `engine` | 명령 1개를 돌려 상태·stdout·stderr로 돌려줌 (`EngineExecutor`). 단발과 serve가 같이 씀 |
 | `serve` | 소켓, 잠금, 실행 상태 파일, 유휴 종료 |
@@ -209,6 +209,18 @@ HTML 노트와 템플릿은 `---` 대신 `<!--aisurada` … `-->` 머리를 쓴�
 3. 시험을 `test/aisurada/`에 두고 `test.sh`에 한 줄 넣는다(§8).
 4. 설명서 장이 있으면 그 장의 바이트 예시와 맞는지 대조하고, 받아들임 묶음에 케이스를 더할 수 있으면 더한다(§8).
 
+### MCP 서버 (`ais-cli mcp`)
+
+Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다. 표준 입출력으로 한 줄에 JSON-RPC 메시지 하나씩 주고받고(`initialize`, `ping`, `tools/list`, `tools/call`), 입력이 닫히면 끝난다. 프로토콜은 `src/aisurada/cli/McpServer.java`, 도구 정의는 `McpTools.java`에 있다. 이것은 설명서 밖의 확장이다. 외부 설명서에는 MCP가 없고, 예전 Node MCP 서버는 C119에서 지웠다.
+
+- **도구.** 이름은 엔진 도구 29개와 같다. 기본은 읽기 13개만 내놓고 `--write`를 주면 28개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
+- **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`runEnginePipeline`: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 `System.exit`을 부르는데, `AisCliMain`의 종료 호출은 모두 `exit()` 하나를 거친다. mcp 모드에서만 `exit()`이 프로세스를 끝내는 대신 `CliExit`을 던지고, 그 호출만 `isError`로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.
+- **vault.** `AISURADA_VAULT` 하나다. 서버 하나가 vault 하나를 맡는다.
+- **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 29개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
+- **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`ClaudeMcpCommand`)가 Claude Code에 서버를 등록한다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.
+
+시험은 `bash test.sh`에 들어 있다. `McpServerTest`는 스키마 대조, 노출 규칙, 가짜 호출기로 프로토콜, 진짜 엔진과 진짜 `mcp` 프로세스의 왕복(읽기·쓰기·낡은 `f1` 거절·휴지통·영구 삭제 거절·vault 없는 환경에서도 서버가 사는지)을 잰다. `ClaudeMcpCommandTest`는 등록 상태를 파일에 두는 가짜 `claude`로 `status`·`add`·`remove`·`config`를 잰다.
+
 ## 6. `ais-cli`와 launchd — 건드리기 전에
 
 `ais-cli`는 떠 있는 엔진이 없으면 **`~/Library/LaunchAgents/co.kcd.aisurada.sidecar.<키>.plist`를 쓰고 `launchctl`을 부른다.** 엔진이 동시 상한(3개)을 넘으면 가장 오래 조용한 엔진을 내리고, 하루 한 번 24시간 넘게 조용한 엔진도 내린다. 이 저장소의 시험은 모두 임시 HOME과 가짜 `launchctl`로 돌아서 진짜 launchd는 쓴 적이 없다.
@@ -255,6 +267,17 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 ```
 
 `--debug`를 빼면 최적화 빌드다. `beforeBuildCommand`가 화면과 `build.sh`를 새로 돌려서 `dist/`를 지웠다 다시 만든다. **설치나 launchd 등록은 하지 않는다.** 단 번들은 `.md`/`.markdown`의 기본 편집기로 등록되므로(`fileAssociations`) `open 문서.md`가 이 앱을 진짜 HOME으로 띄운다.
+
+### 앱에 든 `ais-cli`
+
+`native-host/src-tauri/resources/ais-cli`(셸 스크립트)가 번들의 `Contents/Resources/bin/ais-cli`로 들어간다(`tauri.conf.json`의 `resources`).
+
+- 같은 앱의 Java(`Resources/runtime/bin/java`)로 같은 앱의 `ais-cli.jar`를 돈다. 번들 Java는 릴리스 설정(`tauri.release.conf.json`)으로 지은 번들에만 있고, 없으면 PATH의 `java`를 쓴다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다. 엔진 jar는 `AISURADA_SIDECAR_JAR`로 앱의 `ais-sidecar.jar`를 넘긴다. 단 `target/…/bundle` 아래의 개발용 빌드는 낡은 사본을 쓰지 않으려고 넘기지 않는다(호스트 `sidecar.rs`의 규칙과 같다).
+- **셸 내장 기능만 쓴다.** Finder나 launchd가 띄운 환경은 PATH가 비어 있다. 실제 번들 검증에서 `dirname` 때문에 서던 것을 고쳤다. 외부 명령은 절대 경로로 부르는 `readlink` 하나뿐이다.
+- 호스트는 앱이 뜰 때 이 폴더를 `ask.rs`의 `set_tools_dir`로 알려 두고, `claude -p`를 띄울 때 PATH 맨 앞에 얹는다. 그래서 앱 안에서 묻는 Claude는 사용자가 래퍼를 만들거나 Java를 깔지 않아도 `ais-cli`를 부를 수 있다. 앱 안 터미널(`pty_start_session`)의 PATH는 바꾸지 않았다. 사용자의 로그인 셸 환경을 따른다.
+- 터미널에서 쓰려면 연동 가이드 2단계의 링크 한 줄이면 된다. 예전 가이드로 만든 `~/.local/bin/ais-cli`(시스템 `java`)가 있어도 앱이 띄우는 Claude에게는 번들 것이 먼저 잡힌다.
+- 시험은 스크립트 `test:cli-script`(가짜 앱 폴더에서 진짜 셸 스크립트를 돌린다. PATH가 비었을 때, 링크로 불렀을 때, 개발용 빌드일 때 포함), PATH 얹기 `ask.rs`의 `bundled_tools_dir_comes_first_only_when_it_exists`, 실제 번들 `scripts/verify-release.mjs`(PATH 없이 스크립트로 노트를 읽고, MCP 등록 명령이 번들 Java를 가리키는지)다.
+- **못 한 것.** Java가 없는 Mac에서는 돌려 보지 않았다. 이 기계에는 JDK가 있다. 스크립트가 번들 Java를 절대 경로로 고르는 것(`sh -x`)과 PATH를 비운 채 도는 것까지만 확인했다.
 
 ### 4부 스위치 3개
 
@@ -320,7 +343,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
 | 엔진 전체 | `bash test.sh` | 수 분 | 실제 임시 vault, 실제 serve와 `ais-cli` 왕복 |
-| 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 429건, `cargo test` 88건(무시 1건) |
+| 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 449건, `cargo test` 90건(무시 1건) |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 29건과 실행기 자체 |
 | 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 실제 Java 엔진, 격리 HOME |
 
@@ -341,6 +364,7 @@ try (ChapterTestSupport t = new ChapterTestSupport("chapter99")) {
 
 - 시계와 id는 JVM 속성으로 고정한다: `aisurada.test.now`(시각, 도장과 평가 시각도 따름), `aisurada.test.random`(id의 무작위 조각). 속성을 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.
 - 새 시험 클래스는 `test.sh`에 `java -cp dist/ais-engine.jar:build/test-classes aisurada.<클래스>` 한 줄을 더한다. 더하지 않으면 안 돈다.
+- `test/aisurada/cli/`의 시험(`McpServerTest`, `ClaudeMcpCommandTest`)은 `aisurada.cli` 패키지에 있어서 `AisCliMain`의 패키지 비공개 부분(`CliExit`, `Call`)을 직접 본다. `ChapterTestSupport`는 쓰지 않고 자체 `check`/`eq`를 가진다. 클래스 이름은 `aisurada.cli.<클래스>`다.
 - 임시 HOME·vault·소켓만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.
 
 ### 받아들임 묶음 (34장)
@@ -361,7 +385,7 @@ node fixtures/runner-test.mjs
 
 | 종류 | 진입점 | 비고 |
 |---|---|---|
-| 순수 로직(Node) | `test:screen`, `test:workspace`, `test:navigation`, `test:interaction`, `test:data`, `test:editor`, `test:views`, `test:autosave`, `test:chapters` | 호스트 없이 돈다 |
+| 순수 로직(Node) | `test:screen`, `test:workspace`, `test:navigation`, `test:interaction`, `test:data`, `test:editor`, `test:views`, `test:autosave`, `test:chapters`, `test:cli-script`, `test:connect` | 호스트 없이 돈다. `test:cli-script`는 앱에 든 `ais-cli` 스크립트를, `test:connect`는 설정의 Claude 연결 화면을 잰다 |
 | 4부 | `scripts/chapter03-04.test.mjs`, `chapter06`, `chapter08`, `chapter09`, `chapter10`, `part4-ask-run.test.mjs` | `test-native.sh`가 부른다 |
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
@@ -440,6 +464,8 @@ node fixtures/runner-test.mjs
 | `소켓 경로가 102 바이트를 넘는다` | `AISURADA_SIDECAR_SOCKET`을 `$HOME` 바로 아래 같은 짧은 경로로 준다 |
 | 앱에서 `워크스페이스 생성 실패 … AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다` | 개발 실행의 앱이 엔진을 띄우려는데 jar를 못 찾는다(§7). 앱을 띄우는 터미널에서 `AISURADA_SIDECAR_JAR`를 절대 경로로 주고, §3 예시의 `AISURADA_VAULT`와 `AISURADA_SIDECAR_SOCKET`은 `unset`한 뒤 앱을 다시 띄운다 |
 | `ais-cli.jar를 못 찾았어요 … 찾아본 자리: …/dist/ais-cli.jar` | `./build.sh`를 안 돌렸거나, 다른 곳에서 `build.sh`가 `dist/`를 지우는 중이다(§8) |
+| 앱 안에서 묻는데 Claude가 `ais-cli`를 못 찾거나 `java`가 없다고 한다 | 개발 실행에는 번들 스크립트도 번들 Java도 없다. 릴리스 설정으로 지은 번들(`tauri.release.conf.json`)만 둘 다 싣는다. 개발 중에는 PATH에 `java`와 `ais-cli`가 있어야 한다(§7) |
+| MCP 클라이언트가 `aisurada` 서버에 못 붙거나 곧 끊는다 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊는다. mcp 모드에서 엔진 길의 출력은 호출마다 모아서 돌려주게 되어 있다(§5). 새로 출력을 더하는 코드는 `System.err`로 쓴다. 직접 보려면 `AISURADA_VAULT`를 주고 `java -jar dist/ais-cli.jar mcp`를 띄운 뒤 표준 입력에 `initialize` 요청 한 줄을 넣어 본다 |
 | 문서를 `open`했더니 앱이 떴다 | 번들이 `.md` 기본 편집기로 등록돼 있다. 에디터나 브라우저로 연다 |
 | 앱을 켰더니 진짜 launchd에 plist가 생길 것 같다 | §6처럼 엔진을 먼저 띄우고 격리 HOME으로 앱을 띄운다 |
 | 4부 명령이 `AIS-409`로 선다 | 4부를 뺀 jar(`ais-sidecar-noclaude.jar`)를 쓰고 있다 |
@@ -453,6 +479,9 @@ node fixtures/runner-test.mjs
 
 - 엔진 시험, 화면·호스트 시험, 34장 받아들임, 4부를 뺀 실제 창 점검 8종은 통과한다. 수치는 `README.md`와 각 완료 기록에 있다.
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
-- 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복과 세션 화면 7건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
+- MCP 서버(`ais-cli mcp`)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(`✔ Connected`), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).
+- 설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).
+- 앱에 든 Java로 도는 `ais-cli`는 릴리스 설정의 디버그 번들에서 실제로 확인했다(`verify-release.mjs` 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.
+- 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
 - 물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.
 - 설명서 원문이 제공되지 않은 부분(3부 18장, 4부 `ais-agent` 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.
