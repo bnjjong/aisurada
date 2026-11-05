@@ -211,13 +211,13 @@ export function NoteEditor({
                 data-level={h.level}
                 title={h.text}
                 onClick={() => {
-                  setToc(true);
+                  setToc(false);
                   handle.current?.heading(h.key);
                 }}
                 aria-label={h.text}
               >
                 <span className="toc-dash" data-level={h.level} />
-                <span className="toc-tooltip">{h.text}</span>
+                <span className="toc-text">{h.text}</span>
               </button>
             ))}
           </nav>
