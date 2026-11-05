@@ -1,0 +1,170 @@
+/* 모던(modern) 화면 모양. 정돈되고 조용하다.
+     1. 선은 얇게     1px 옅은 선(--line)으로 가르고, 컨트롤 테두리(--strong)는 한 단계만 진하게 쓴다.
+     2. 곡률은 8      컨트롤은 8px, 떠 있는 것은 12~14px. 알약은 쓰지 않는다.
+     3. 색은 하나     네이비에 가까운 검정과 회색, 블루(--accent) 하나. 블루는 포커스와 선택에만 쓴다.
+     4. 그림자는 숨결  평소엔 1px 그림자(--sh-1), 떠 있는 것만 부드러운 그림자(--sh-2). 두 가지뿐이다.
+     5. 가볍게 빽빽하게 컨트롤 높이를 줄이고, 장식 대신 여백으로 숨을 쉰다.
+
+   styles.css(기본 모양) 위에 덧씌운다. <html data-skin="modern">일 때만 적용된다.
+   전역 규칙은 :where()로 특이도를 낮춰, styles.css의 개별 클래스가 정한 값을 덮어쓰지 않게 했다. */
+
+/* ───────── 토큰 ───────── */
+:root[data-skin="modern"] {
+  --soft: #f6f7f9;
+  --surface: #ffffff;
+  --sunken: #eef0f4;
+  --ink: #0b1220;
+  --ink-h: #263248;
+  --muted: #5b6578;
+  --ink-3: #99a1b2;
+  --line: #e6e9ef;
+  --strong: #cfd4dd;
+  --accent: #1e4fd8;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8eefc;
+  --accent-text: #1a3fae;
+  --err: #b91c17;
+  --err-bg: #fbe3e1;
+  --sh-1: 0 1px 2px rgba(11, 18, 32, .06);
+  --sh-2: 0 12px 32px -12px rgba(11, 18, 32, .28), 0 0 0 1px rgba(11, 18, 32, .06);
+  --ring: 0 0 0 3px rgba(30, 79, 216, .2);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%235b6578' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+:root[data-skin="modern"][data-theme="dark"] {
+  --soft: #10161f;
+  --surface: #0b0f17;
+  --sunken: #171e2b;
+  --ink: #e7ebf3;
+  --ink-h: #ffffff;
+  --muted: #98a2b5;
+  --ink-3: #5c6678;
+  --line: #1c2432;
+  --strong: #2a3446;
+  --accent: #6c93ff;
+  --accent-ink: #08101f;
+  --accent-soft: #16213d;
+  --accent-text: #9db7ff;
+  --err: #ff8a80;
+  --err-bg: #3a1a18;
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --sh-2: 0 12px 32px -12px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .06);
+  --ring: 0 0 0 3px rgba(108, 147, 255, .3);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a2b5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="modern"]:not([data-theme="light"]):not([data-theme="dark"]) {
+    --soft: #10161f; --surface: #0b0f17; --sunken: #171e2b; --ink: #e7ebf3; --ink-h: #ffffff; --muted: #98a2b5; --ink-3: #5c6678;
+    --line: #1c2432; --strong: #2a3446; --accent: #6c93ff; --accent-ink: #08101f; --accent-soft: #16213d; --accent-text: #9db7ff;
+    --err: #ff8a80; --err-bg: #3a1a18;
+    --sh-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --sh-2: 0 12px 32px -12px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .06);
+    --ring: 0 0 0 3px rgba(108, 147, 255, .3);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a2b5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  }
+}
+
+/* ───────── 버튼 · 입력: 얇은 선, 곡률 8 ───────── */
+:where(:root[data-skin="modern"]) button { border: 1px solid var(--strong); border-radius: 8px; background: var(--surface); box-shadow: var(--sh-1); padding: 7px 12px; font-weight: 500; transition: background-color .1s, border-color .1s; }
+:where(:root[data-skin="modern"]) button:hover:not(:disabled) { background: var(--soft); }
+:where(:root[data-skin="modern"]) button:active:not(:disabled) { background: var(--sunken); }
+:where(:root[data-skin="modern"]) button:disabled { opacity: 1; color: var(--ink-3); background: var(--soft); box-shadow: none; cursor: not-allowed; }
+:where(:root[data-skin="modern"]) input { border: 1px solid var(--strong); border-radius: 8px; background: var(--surface); box-shadow: var(--sh-1); padding: 9px 12px; }
+:where(:root[data-skin="modern"]) textarea { border: 1px solid var(--strong); border-radius: 8px; background: var(--surface); box-shadow: var(--sh-1); padding: 10px 12px; }
+:where(:root[data-skin="modern"]) select { border: 1px solid var(--strong); border-radius: 8px; background-color: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="modern"] select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 30px; background-image: var(--chevron); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px;
+}
+:root[data-skin="modern"] input::placeholder, :root[data-skin="modern"] textarea::placeholder { color: var(--muted); opacity: .75; }
+:root[data-skin="modern"] :is(input, textarea, select):focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+:root[data-skin="modern"] button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root[data-skin="modern"] :is(input, textarea, select):disabled { background: var(--soft); box-shadow: none; color: var(--ink-3); }
+
+/* 강조 버튼은 검정에 가까운 네이비. 선택된 토글은 옅은 블루 */
+:root[data-skin="modern"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send) {
+  background: var(--ink); color: var(--surface); border-color: var(--ink);
+}
+:root[data-skin="modern"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send):hover:not(:disabled) { background: var(--ink-h); filter: none; }
+:root[data-skin="modern"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send):disabled { background: var(--sunken); color: var(--ink-3); border-color: var(--line); opacity: 1; }
+:root[data-skin="modern"] :is(.calendar-controls button, .nhist-mode)[aria-pressed="true"], :root[data-skin="modern"] .btn-range.active {
+  background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-soft);
+}
+
+/* ───────── 맨살 버튼(목록 행 · 아이콘 · 글자 버튼): 눌린 면만 ─────────
+   styles.css에서 background: transparent 나 border: 0 으로 맨살로 만든 버튼들. 새로 그런 버튼을
+   추가하면 여기에도 넣는다. */
+:root[data-skin="modern"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+) { background: transparent; box-shadow: none; }
+:root[data-skin="modern"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+):is(:hover, :active):not(:disabled) { background: var(--sunken); }
+:root[data-skin="modern"] :is(.workspace-rail nav button, .tab-button, .tab-close, .lex-toolbar button, .sel-bar button, .doc-meta button) { border-radius: 8px; }
+
+/* ───────── 체크 · 라디오 · 스위치 ───────── */
+:root[data-skin="modern"] input[type="checkbox"], :root[data-skin="modern"] input[type="radio"] {
+  appearance: none; -webkit-appearance: none; display: inline-grid; place-items: center; flex: none;
+  width: 16px; height: 16px; padding: 0; margin: 0; border: 1px solid var(--strong); background: var(--surface); box-shadow: var(--sh-1); cursor: pointer; vertical-align: middle;
+}
+:root[data-skin="modern"] input[type="checkbox"] { border-radius: 4px; }
+:root[data-skin="modern"] input[type="radio"] { border-radius: 50%; }
+:root[data-skin="modern"] input[type="checkbox"]:checked, :root[data-skin="modern"] input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); box-shadow: none; }
+:root[data-skin="modern"] input[type="checkbox"]:checked::after {
+  content: ""; width: 8px; height: 4px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: translateY(-1px) rotate(-45deg);
+}
+:root[data-skin="modern"] input[type="radio"]:checked::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-ink); }
+:root[data-skin="modern"] input:disabled { opacity: .5; box-shadow: none; cursor: not-allowed; }
+:root[data-skin="modern"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; border: 0; background: transparent; box-shadow: none; accent-color: var(--accent); }
+:root[data-skin="modern"] .set-switch input[type="checkbox"] { position: relative; display: block; width: 36px; height: 20px; border-radius: 999px; background: var(--strong); border-color: var(--strong); box-shadow: none; }
+:root[data-skin="modern"] .set-switch input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border: 0; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 1px 2px rgba(11, 18, 32, .3); transform: none; transition: transform .15s;
+}
+:root[data-skin="modern"] .set-switch input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+:root[data-skin="modern"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(16px); background: #ffffff; border: 0; }
+
+/* 설정: 화면 모양 고르기 카드 */
+:root[data-skin="modern"] .set-skin-option { border-radius: 10px; }
+:root[data-skin="modern"] .set-skin-option input { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; background: transparent; box-shadow: none; }
+:root[data-skin="modern"] .set-skin-option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+
+/* ───────── 탭 줄 · 레일: 아래 줄로 현재 위치를 말한다 ───────── */
+:root[data-skin="modern"] .tab-item { border-right: 0; border-top: 0; border-bottom: 2px solid transparent; }
+:root[data-skin="modern"] .tab-item.tab-selected { background: var(--surface); border-bottom-color: var(--accent); }
+:root[data-skin="modern"] .tab-button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+:root[data-skin="modern"] .workspace-rail nav button { padding: 9px 12px; }
+:root[data-skin="modern"] .workspace-rail nav button.active { background: var(--sunken); color: var(--ink); font-weight: 600; }
+:root[data-skin="modern"] .brand-mark { border-radius: 9px; }
+:root[data-skin="modern"] :is(.sample-badge, .format-badge, .record-badge, .tag-chip, .session-chip, .vb-savestate) { border-radius: 6px; }
+
+/* ───────── 카드 · 떠 있는 것 ───────── */
+:root[data-skin="modern"] :is(.workspace-option, .child-page-card, .ag-facts, .link-picker, .category-picker, .ask-mark-group, .sess-dock-row, .relnote, .ais-html-frame, .week-columns, .month-grid) { border-radius: 10px; }
+:root[data-skin="modern"] .workspace-option { border-color: var(--line); }
+:root[data-skin="modern"] .workspace-option.selected { border-color: var(--accent); background: var(--accent-soft); }
+:root[data-skin="modern"] .tl-block { border: 1px solid var(--line); border-radius: 8px; background: var(--accent-soft); }
+:root[data-skin="modern"] :is(.ui-modal, .note-preview, .subnote-page, .cmdk-panel) { border: 0; border-radius: 14px; box-shadow: var(--sh-2); }
+:root[data-skin="modern"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc) {
+  border: 0; border-radius: 12px; box-shadow: var(--sh-2);
+}
+:root[data-skin="modern"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: rgba(11, 18, 32, .4); }
+:root[data-skin="modern"] .cmdk-item { border-radius: 8px; }
+:root[data-skin="modern"] .cmdk-item[aria-selected="true"], :root[data-skin="modern"] :is(.slash-item, .note-picker-item)[aria-selected="true"] { background: var(--sunken); }
+:root[data-skin="modern"] .notice { border: 0; border-radius: 10px; box-shadow: var(--sh-2); }
+:root[data-skin="modern"] .lex-code { border-radius: 10px; }
+:root[data-skin="modern"] .vault-write-failures, :root[data-skin="modern"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }

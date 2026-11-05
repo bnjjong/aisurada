@@ -15,9 +15,14 @@ const SKIN_OPTIONS: readonly { id: Skin; label: string; hint: string }[] = [
     hint: "4px 격자와 또렷한 먹선, 각진 모서리로 정확하게 그린 모양이에요.",
   },
   {
-    id: "page",
-    label: "지면",
-    hint: "글이 먼저 보이도록 명조 본문과 밑줄, 시안 형광펜으로 그린 모양이에요.",
+    id: "glass",
+    label: "유리",
+    hint: "반투명 유리 패널과 은은한 빛번짐으로 가볍게 그린 모양이에요.",
+  },
+  {
+    id: "modern",
+    label: "모던",
+    hint: "얇은 선과 차분한 회색, 작은 곡률로 정돈한 모양이에요.",
   },
   {
     id: "classic",

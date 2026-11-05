@@ -1,0 +1,264 @@
+/* 유리(glass) 화면 모양. 가볍고 빛이 번진다.
+     1. 유리는 반투명   패널은 뒤의 빛을 비치는 반투명 흰 면(--surface)에 흐림(blur)을 건다.
+     2. 빛은 가장자리에 1px 흰 테두리(--rim)와 위쪽 하이라이트로 유리의 모서리를 만든다.
+     3. 곡률은 크게     컨트롤 12px, 패널 24px.
+     4. 색은 빛으로     블루·시안·레드는 배경의 은은한 빛번짐으로만 풀고, 강조색은 블루 하나다.
+     5. 글자는 또렷하게  유리 위에서도 대비를 지킨다. 글자 색은 불투명하다.
+
+   styles.css(기본 모양) 위에 덧씌운다. <html data-skin="glass">일 때만 적용된다.
+   전역 규칙은 :where()로 특이도를 낮춰, styles.css의 개별 클래스가 정한 값을 덮어쓰지 않게 했다. */
+
+/* ───────── 토큰 · 배경 빛 ───────── */
+:root[data-skin="glass"] {
+  --surface: rgba(255, 255, 255, .66);
+  --soft: rgba(255, 255, 255, .42);
+  --sunken: rgba(10, 22, 51, .06);
+  --hover: rgba(255, 255, 255, .6);
+  --field: rgba(255, 255, 255, .55);
+  --field-line: rgba(10, 22, 51, .16);
+  --tab-on: rgba(255, 255, 255, .9);
+  --glass-solid: rgba(255, 255, 255, .84);
+  --ink: #0a1633;
+  --ink-h: #2b3a5e;
+  --muted: #44506b;
+  --ink-3: #8590a6;
+  --line: rgba(10, 22, 51, .09);
+  --rim: rgba(255, 255, 255, .78);
+  --accent: #1e4fd8;
+  --accent-ink: #ffffff;
+  --accent-h: #3a6bf0;
+  --accent-d: #1840b8;
+  --accent-soft: rgba(30, 79, 216, .12);
+  --accent-text: #1a3fae;
+  --err: #b91c17;
+  --err-bg: rgba(185, 28, 23, .1);
+  --notice-bg: rgba(10, 22, 51, .9);
+  --notice-ink: #ffffff;
+  --ring: rgba(30, 79, 216, .28);
+  --sh-1: 0 1px 2px rgba(10, 22, 51, .06), inset 0 1px 0 rgba(255, 255, 255, .8);
+  --sh-hover: 0 6px 16px -6px rgba(10, 22, 51, .22), inset 0 1px 0 rgba(255, 255, 255, .9);
+  --sh-tab: 0 1px 3px rgba(10, 22, 51, .14), inset 0 1px 0 #ffffff;
+  --sh-glass: 0 10px 40px -14px rgba(10, 22, 51, .3), inset 0 1px 0 rgba(255, 255, 255, .7);
+  --sh-float: 0 28px 72px -18px rgba(10, 22, 51, .45), inset 0 1px 0 rgba(255, 255, 255, .85);
+  --sh-acc: 0 8px 20px -8px rgba(30, 79, 216, .7), inset 0 1px 0 rgba(255, 255, 255, .35);
+  --overlay: rgba(10, 22, 51, .24);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2344506b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-color: #e8eefa;
+  background-image:
+    radial-gradient(1000px 700px at 6% -8%, rgba(30, 79, 216, .30), transparent 62%),
+    radial-gradient(900px 650px at 100% 2%, rgba(25, 194, 224, .34), transparent 60%),
+    radial-gradient(1000px 750px at 72% 108%, rgba(208, 31, 26, .15), transparent 62%);
+  background-attachment: fixed;
+}
+:root[data-skin="glass"][data-theme="dark"] {
+  --surface: rgba(255, 255, 255, .07);
+  --soft: rgba(255, 255, 255, .045);
+  --sunken: rgba(0, 0, 0, .28);
+  --hover: rgba(255, 255, 255, .1);
+  --field: rgba(0, 0, 0, .26);
+  --field-line: rgba(255, 255, 255, .18);
+  --tab-on: rgba(255, 255, 255, .16);
+  --glass-solid: rgba(18, 26, 54, .78);
+  --ink: #e9eef8;
+  --ink-h: #ffffff;
+  --muted: #a3afc8;
+  --ink-3: #5f6c8c;
+  --line: rgba(255, 255, 255, .09);
+  --rim: rgba(255, 255, 255, .15);
+  --accent: #7fa3ff;
+  --accent-ink: #061030;
+  --accent-h: #9bb8ff;
+  --accent-d: #6288f0;
+  --accent-soft: rgba(127, 163, 255, .18);
+  --accent-text: #a9c0ff;
+  --err: #ff8078;
+  --err-bg: rgba(255, 128, 120, .14);
+  --notice-bg: rgba(233, 238, 248, .92);
+  --notice-ink: #0a1633;
+  --ring: rgba(127, 163, 255, .35);
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .1);
+  --sh-hover: 0 6px 16px -6px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .16);
+  --sh-tab: 0 1px 3px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .18);
+  --sh-glass: 0 10px 40px -14px rgba(0, 0, 0, .65), inset 0 1px 0 rgba(255, 255, 255, .1);
+  --sh-float: 0 28px 72px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .14);
+  --sh-acc: 0 8px 20px -8px rgba(127, 163, 255, .55), inset 0 1px 0 rgba(255, 255, 255, .4);
+  --overlay: rgba(0, 0, 0, .45);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a3afc8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-color: #060b18;
+  background-image:
+    radial-gradient(1000px 700px at 6% -8%, rgba(60, 100, 255, .38), transparent 62%),
+    radial-gradient(900px 650px at 100% 2%, rgba(25, 194, 224, .26), transparent 60%),
+    radial-gradient(1000px 750px at 72% 108%, rgba(255, 70, 60, .16), transparent 62%);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="glass"]:not([data-theme="light"]):not([data-theme="dark"]) {
+    --surface: rgba(255, 255, 255, .07); --soft: rgba(255, 255, 255, .045); --sunken: rgba(0, 0, 0, .28); --hover: rgba(255, 255, 255, .1);
+    --field: rgba(0, 0, 0, .26); --field-line: rgba(255, 255, 255, .18); --tab-on: rgba(255, 255, 255, .16); --glass-solid: rgba(18, 26, 54, .78);
+    --ink: #e9eef8; --ink-h: #ffffff; --muted: #a3afc8; --ink-3: #5f6c8c; --line: rgba(255, 255, 255, .09); --rim: rgba(255, 255, 255, .15);
+    --accent: #7fa3ff; --accent-ink: #061030; --accent-h: #9bb8ff; --accent-d: #6288f0; --accent-soft: rgba(127, 163, 255, .18); --accent-text: #a9c0ff;
+    --err: #ff8078; --err-bg: rgba(255, 128, 120, .14); --notice-bg: rgba(233, 238, 248, .92); --notice-ink: #0a1633; --ring: rgba(127, 163, 255, .35);
+    --sh-1: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .1);
+    --sh-hover: 0 6px 16px -6px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .16);
+    --sh-tab: 0 1px 3px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .18);
+    --sh-glass: 0 10px 40px -14px rgba(0, 0, 0, .65), inset 0 1px 0 rgba(255, 255, 255, .1);
+    --sh-float: 0 28px 72px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .14);
+    --sh-acc: 0 8px 20px -8px rgba(127, 163, 255, .55), inset 0 1px 0 rgba(255, 255, 255, .4);
+    --overlay: rgba(0, 0, 0, .45);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a3afc8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-color: #060b18;
+    background-image:
+      radial-gradient(1000px 700px at 6% -8%, rgba(60, 100, 255, .38), transparent 62%),
+      radial-gradient(900px 650px at 100% 2%, rgba(25, 194, 224, .26), transparent 60%),
+      radial-gradient(1000px 750px at 72% 108%, rgba(255, 70, 60, .16), transparent 62%);
+  }
+}
+
+/* ───────── 큰 유리 패널 ───────── */
+:root[data-skin="glass"] .screen-content {
+  border: 1px solid var(--rim); border-radius: 24px; background: var(--surface); box-shadow: var(--sh-glass);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
+}
+:root[data-skin="glass"] .workspace-screen { padding: 8px 12px 12px 4px; gap: 4px; }
+:root[data-skin="glass"] .workspace-screen.without-rail { padding: 8px 12px 12px; }
+:root[data-skin="glass"] .workspace-rail { background: transparent; border-right: 0; padding: 20px 12px 12px; }
+:root[data-skin="glass"] .launcher-intro { background: transparent; }
+:root[data-skin="glass"] .launcher-content {
+  margin: 16px; border: 1px solid var(--rim); border-radius: 32px; background: var(--surface); box-shadow: var(--sh-glass);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
+}
+:root[data-skin="glass"] .cdiff { background: var(--glass-solid); -webkit-backdrop-filter: blur(36px); backdrop-filter: blur(36px); }
+
+/* ───────── 버튼 · 입력: 반투명 유리 조각 ───────── */
+:where(:root[data-skin="glass"]) button { border: 1px solid var(--rim); border-radius: 12px; background: var(--hover); box-shadow: var(--sh-1); padding: 8px 14px; font-weight: 500; transition: background-color .12s, box-shadow .12s; }
+:where(:root[data-skin="glass"]) button:hover:not(:disabled) { background: var(--tab-on); box-shadow: var(--sh-hover); }
+:where(:root[data-skin="glass"]) button:active:not(:disabled) { background: var(--sunken); box-shadow: none; }
+:where(:root[data-skin="glass"]) button:disabled { opacity: .5; box-shadow: none; cursor: not-allowed; }
+:where(:root[data-skin="glass"]) input { border: 1px solid var(--field-line); border-radius: 12px; background: var(--field); box-shadow: inset 0 1px 2px rgba(10, 22, 51, .07); padding: 10px 14px; }
+:where(:root[data-skin="glass"]) textarea { border: 1px solid var(--field-line); border-radius: 16px; background: var(--field); box-shadow: inset 0 1px 2px rgba(10, 22, 51, .07); padding: 12px 14px; }
+:where(:root[data-skin="glass"]) select { border: 1px solid var(--field-line); border-radius: 12px; background-color: var(--field); box-shadow: inset 0 1px 2px rgba(10, 22, 51, .07); }
+:root[data-skin="glass"] select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 30px; background-image: var(--chevron); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px;
+}
+:root[data-skin="glass"] input::placeholder, :root[data-skin="glass"] textarea::placeholder { color: var(--muted); opacity: .75; }
+:root[data-skin="glass"] :is(input, textarea, select):focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+:root[data-skin="glass"] button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root[data-skin="glass"] :is(input, textarea, select):disabled { opacity: .55; }
+
+/* 강조 버튼: 블루 유리구슬 */
+:root[data-skin="glass"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active),
+:root[data-skin="glass"] :is(.calendar-controls button, .nhist-mode)[aria-pressed="true"] {
+  border-color: rgba(255, 255, 255, .3); background: linear-gradient(180deg, var(--accent-h), var(--accent)); color: var(--accent-ink); box-shadow: var(--sh-acc);
+}
+:root[data-skin="glass"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active):hover:not(:disabled) { background: linear-gradient(180deg, var(--accent-h), var(--accent)); filter: brightness(1.08); }
+:root[data-skin="glass"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active):active:not(:disabled) { background: var(--accent-d); filter: none; box-shadow: none; }
+
+/* ───────── 맨살 버튼(목록 행 · 아이콘 · 글자 버튼): 유리 조각 없이 눌린 면만 ─────────
+   styles.css에서 background: transparent 나 border: 0 으로 맨살로 만든 버튼들. 새로 그런 버튼을
+   추가하면 여기에도 넣는다. */
+:root[data-skin="glass"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+) { background: transparent; box-shadow: none; }
+:root[data-skin="glass"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+):is(:hover, :active):not(:disabled) { background: var(--hover); box-shadow: none; }
+:root[data-skin="glass"] :is(.workspace-rail nav button, .tab-button, .tab-close, .lex-toolbar button, .sel-bar button, .doc-meta button, .note-row, .recent-open) { border-radius: 12px; }
+
+/* ───────── 체크 · 라디오 · 스위치 ───────── */
+:root[data-skin="glass"] input[type="checkbox"], :root[data-skin="glass"] input[type="radio"] {
+  appearance: none; -webkit-appearance: none; display: inline-grid; place-items: center; flex: none;
+  width: 18px; height: 18px; padding: 0; margin: 0; border: 1px solid var(--field-line); background: var(--field); box-shadow: inset 0 1px 2px rgba(10, 22, 51, .1); cursor: pointer; vertical-align: middle;
+}
+:root[data-skin="glass"] input[type="checkbox"] { border-radius: 6px; }
+:root[data-skin="glass"] input[type="radio"] { border-radius: 50%; }
+:root[data-skin="glass"] input[type="checkbox"]:checked, :root[data-skin="glass"] input[type="radio"]:checked {
+  border-color: rgba(255, 255, 255, .3); background: linear-gradient(180deg, var(--accent-h), var(--accent)); box-shadow: var(--sh-acc);
+}
+:root[data-skin="glass"] input[type="checkbox"]:checked::after {
+  content: ""; width: 9px; height: 5px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: translateY(-1px) rotate(-45deg);
+}
+:root[data-skin="glass"] input[type="radio"]:checked::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-ink); }
+:root[data-skin="glass"] input:disabled { opacity: .5; cursor: not-allowed; }
+:root[data-skin="glass"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; border: 0; background: transparent; box-shadow: none; accent-color: var(--accent); }
+:root[data-skin="glass"] .set-switch input[type="checkbox"] { position: relative; display: block; width: 44px; height: 26px; border-radius: 999px; }
+:root[data-skin="glass"] .set-switch input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: 0; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 2px 6px rgba(10, 22, 51, .3); transform: none; transition: transform .18s;
+}
+:root[data-skin="glass"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(18px); background: #ffffff; border: 0; }
+
+/* 설정: 화면 모양 고르기 카드 */
+:root[data-skin="glass"] .set-skin-option { border: 1px solid var(--rim); border-radius: 18px; background: var(--soft); }
+:root[data-skin="glass"] .set-skin-option input { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; background: transparent; box-shadow: none; }
+:root[data-skin="glass"] .set-skin-option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent-soft); }
+:root[data-skin="glass"] .skin-preview { border-radius: 12px; }
+
+/* ───────── 탭 줄 · 레일 ───────── */
+:root[data-skin="glass"] .tab-bar {
+  align-items: stretch; margin: 12px 12px 0; padding: 4px; gap: 4px; min-height: 0; border: 1px solid var(--rim); border-radius: 16px;
+  background: var(--soft); box-shadow: var(--sh-1); scrollbar-width: none;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+}
+:root[data-skin="glass"] .tab-bar::-webkit-scrollbar { display: none; }
+:root[data-skin="glass"] .tab-item { align-items: stretch; border: 0; border-top: 0; border-radius: 12px; }
+:root[data-skin="glass"] .tab-item:hover:not(.tab-selected) { background: var(--hover); }
+:root[data-skin="glass"] .tab-item.tab-selected { background: var(--tab-on); box-shadow: var(--sh-tab); }
+:root[data-skin="glass"] .tab-button { min-width: 0; gap: 8px; padding: 6px 6px 6px 14px; font-weight: 600; line-height: 1.25; }
+:root[data-skin="glass"] .tab-main .tab-button { min-width: 0; padding-right: 16px; }
+:root[data-skin="glass"] .tab-button[aria-selected="true"] { color: var(--ink); }
+:root[data-skin="glass"] .tab-button:hover:not(:disabled) { background: transparent; }
+:root[data-skin="glass"] .tab-button:focus-visible { outline-offset: -2px; }
+:root[data-skin="glass"] .tab-label small { margin-bottom: 1px; line-height: 12px; }
+:root[data-skin="glass"] .tab-close { align-self: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
+:root[data-skin="glass"] .workspace-rail nav button { padding: 10px 14px; font-weight: 600; }
+:root[data-skin="glass"] .workspace-rail nav button.active { background: var(--tab-on); color: var(--ink); box-shadow: var(--sh-tab); }
+:root[data-skin="glass"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--tab-on); box-shadow: var(--sh-tab); }
+:root[data-skin="glass"] .brand-mark { border-radius: 12px; box-shadow: var(--sh-acc); }
+
+/* ───────── 카드 · 칩 ───────── */
+:root[data-skin="glass"] .workspace-option { border: 1px solid var(--rim); border-radius: 20px; background: var(--soft); box-shadow: var(--sh-1); }
+:root[data-skin="glass"] .workspace-option.selected { border-color: var(--accent); background: var(--accent-soft); }
+:root[data-skin="glass"] :is(.child-page-card, .ag-facts, .link-picker, .category-picker, .ask-mark-group, .sess-dock-row, .relnote) { border: 1px solid var(--rim); border-radius: 16px; background: var(--soft); }
+:root[data-skin="glass"] :is(.week-columns, .month-grid, .ais-html-frame) { border-radius: 16px; overflow: hidden; }
+:root[data-skin="glass"] .tl-block { border: 1px solid var(--rim); border-radius: 12px; background: var(--accent-soft); }
+:root[data-skin="glass"] :is(.sample-badge, .format-badge, .record-badge, .tag-chip, .session-chip, .vb-savestate, .report-bar, .note-composition span) { border-radius: 999px; }
+:root[data-skin="glass"] :is(.sample-badge, .format-badge, .record-badge, .session-chip) { border: 1px solid var(--rim); background: var(--soft); padding-left: 10px; padding-right: 10px; }
+:root[data-skin="glass"] .lex-code { border: 1px solid var(--rim); border-radius: 14px; background: var(--soft); }
+
+/* ───────── 떠 있는 유리: 가장 불투명하고 가장 크게 둥글다 ───────── */
+:root[data-skin="glass"] :is(.ui-modal, .note-preview, .subnote-page, .cmdk-panel) {
+  border: 1px solid var(--rim); border-radius: 28px; background: var(--glass-solid); box-shadow: var(--sh-float);
+  -webkit-backdrop-filter: blur(36px) saturate(1.7); backdrop-filter: blur(36px) saturate(1.7);
+}
+:root[data-skin="glass"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc) {
+  border: 1px solid var(--rim); border-radius: 20px; background: var(--glass-solid); box-shadow: var(--sh-float);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6);
+}
+:root[data-skin="glass"] .sel-bar { border-radius: 16px; }
+:root[data-skin="glass"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+:root[data-skin="glass"] .ui-modal > header { padding: 20px 24px 12px; }
+:root[data-skin="glass"] .cmdk-input { border-bottom-color: var(--line); background: transparent; box-shadow: none; }
+:root[data-skin="glass"] .cmdk-item { border-radius: 14px; }
+:root[data-skin="glass"] .cmdk-item[aria-selected="true"], :root[data-skin="glass"] :is(.slash-item, .note-picker-item)[aria-selected="true"] { background: var(--accent-soft); }
+:root[data-skin="glass"] :is(.slash-item, .note-picker-item) { border-radius: 12px; }
+:root[data-skin="glass"] .notice {
+  border: 1px solid var(--rim); border-radius: 20px; background: var(--notice-bg); color: var(--notice-ink); box-shadow: var(--sh-float);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+}
+:root[data-skin="glass"] .vault-write-failures, :root[data-skin="glass"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }

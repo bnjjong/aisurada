@@ -105,8 +105,8 @@ export interface Workspace {
 }
 
 export interface RecentWorkspace { path: string; name: string; opened: string; created?: boolean; sample?: boolean; }
-/** 설정에서 고르는 화면 모양. 물성(tactile), 격자(grid), 지면(page), 이전 모양(classic). */
-export type Skin = 'tactile' | 'grid' | 'page' | 'classic';
+/** 설정에서 고르는 화면 모양. 물성(tactile), 격자(grid), 유리(glass), 모던(modern), 이전 모양(classic). */
+export type Skin = 'tactile' | 'grid' | 'glass' | 'modern' | 'classic';
 
 export interface WorkspaceState {
   prefs: import('../ui/model.ts').Preferences;

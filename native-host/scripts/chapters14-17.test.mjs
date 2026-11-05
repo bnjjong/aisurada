@@ -249,7 +249,10 @@ test('화면 모양: 처음 값은 물성이고 모르는 값은 기본으로 �
   assert.equal(readSkin(saved('classic')),'classic');
   assert.equal(readSkin(saved('tactile')),'tactile');
   assert.equal(readSkin(saved('grid')),'grid');
-  assert.equal(readSkin(saved('page')),'page');
+  assert.equal(readSkin(saved('glass')),'glass');
+  assert.equal(readSkin(saved('modern')),'modern');
+  // 없앤 모양(지면)이 저장돼 있어도 기본으로 읽는다.
+  assert.equal(readSkin(saved('page')),'tactile');
   assert.equal(readSkin(saved('purple')),'tactile');
   assert.equal(readSkin(saved(3)),'tactile');
   // 16장의 설정 21개는 그대로다. skin은 고르기 전에는 나타나지 않는다.

@@ -137,9 +137,9 @@ if (location.pathname.startsWith("/note-window/")) {
         "toggle count",
       );
       // 화면 모양: 처음은 물성이고, 고르면 바로 바뀌어 저장된다.
-      assert($$(".set-skin-option").length === 4, "skin option count");
+      assert($$(".set-skin-option").length === 5, "skin option count");
       assert(document.documentElement.dataset.skin === "tactile", "default skin");
-      for (const skin of ["grid", "page", "classic", "tactile"]) {
+      for (const skin of ["grid", "glass", "modern", "classic", "tactile"]) {
         $(`.set-skin-option input[value="${skin}"]`).click();
         await until(
           () => document.documentElement.dataset.skin === skin,

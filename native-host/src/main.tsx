@@ -3,7 +3,8 @@ import { App } from './App';
 import './styles.css';
 import './skin-tactile.css';
 import './skin-grid.css';
-import './skin-page.css';
+import './skin-glass.css';
+import './skin-modern.css';
 import { readSkin } from './workspace/storage.ts';
 
 // 첫 화면부터 고른 모양으로 그린다. 저장소를 못 읽으면 기본 모양을 쓴다.
