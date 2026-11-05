@@ -1,5 +1,6 @@
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Skin, WorkspaceState } from "../workspace/types.ts";
+import { ClaudeConnect } from "@claude-plug/connect";
 import { Modal } from "./Modal.tsx";
 import { displayTitle } from "./model.ts";
 /** 설정에서 고를 수 있는 화면 모양. 순서가 곧 화면에 나오는 순서다. */
@@ -102,6 +103,7 @@ export function Settings({
           state.prefs.titleDatePrefix ?? state.prefs.titleDate,
         )}
       </p>
+      <ClaudeConnect />
     </Modal>
   );
 }

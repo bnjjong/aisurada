@@ -13,6 +13,7 @@ pnpm --dir native-host test:views
 pnpm --dir native-host test:autosave
 pnpm --dir native-host test:chapters
 pnpm --dir native-host test:cli-script
+pnpm --dir native-host test:connect
 node --test native-host/scripts/contracts.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/chapter03-04.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/chapter06.test.mjs

@@ -96,5 +96,33 @@ try {
     assert(turns.some(turn => turn.includes('세션 점검용 첫 물음')), 'user turn missing');
     assert(turns.some(turn => turn.includes('세션 점검용 첫 답')), 'assistant turn missing');
   });
+  // 설정의 「Claude 연결」: 실제 창에서 눌러 보고, 진짜 ais-cli(claude-mcp)가 가짜 claude에 등록하는 왕복을 잰다
+  if (cfg.part4Check) await test('enabled-claude-connect-real-host', async () => {
+    go('/');
+    await until(() => document.querySelector('button.iconbtn[title="설정"]'));
+    document.querySelector('button.iconbtn[title="설정"]').click();
+    await until(() => document.querySelector('.settings-modal .set-connect'));
+    const status = () => document.querySelector('.set-connect-status')?.textContent || '';
+    await until(() => status().includes('연결되어 있지 않아요'));
+    assert(!document.querySelector('.set-connect-actions button:not(.button-primary)'), '연결 전에는 끊기 단추가 없어야 한다');
+    // 데스크톱용 조각은 등록 없이도 보인다
+    await until(() => document.querySelector('.set-connect-desktop pre')?.textContent.includes('mcpServers'));
+    const snippet = () => document.querySelector('.set-connect-desktop pre').textContent;
+    assert(snippet().includes('"mcp"') && !snippet().includes('--write'), '읽기 전용 조각이어야 한다');
+    // 읽기 전용으로 연결
+    document.querySelector('.set-connect-actions .button-primary').click();
+    await until(() => status().includes('노트를 읽기만 해요'));
+    // 쓰기를 켜고 다시 연결
+    document.querySelector('.set-connect-write input').click();
+    await until(() => snippet().includes('--write'));
+    document.querySelector('.set-connect-actions .button-primary').click();
+    await until(() => status().includes('노트를 읽고 쓸 수 있어요'));
+    // 끊기
+    [...document.querySelectorAll('.set-connect-actions button')].find(b => b.textContent.includes('연결 끊기')).click();
+    await until(() => status().includes('연결되어 있지 않아요'));
+    assert(!document.querySelector('.set-connect-error'), `오류 글이 남았다: ${document.querySelector('.set-connect-error')?.textContent}`);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await until(() => !document.querySelector('.settings-modal'));
+  });
 } catch { /* failing check is already in results */ }
 await post('/result', results);

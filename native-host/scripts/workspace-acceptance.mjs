@@ -70,7 +70,19 @@ if (viewsCheck) {
 if (askMarksCheck) {
   write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n격리된 vault의 본문이에요.\n\n| 열 | 값 |\n| --- | --- |\n| <!--aisa:akfixture-12345678-->표 문답<!--/aisa:akfixture-12345678--> | 값 |\n\n[하위](#sub:' + childId + ')\n');
   const fakeClaude = join(root, 'fake-claude');
-  write(fakeClaude, `#!/bin/sh\nif [ "$1" = agents ]; then printf '[]\\n'; else cat >/dev/null; printf 'fixture answer\\n'; fi\n`);
+  // `claude mcp get|remove|add-json`는 등록 상태를 파일 하나에 두고 흉내 낸다(설정 화면의 Claude 연결 점검용).
+  write(fakeClaude, [
+    '#!/bin/sh',
+    `if [ "$1" = agents ]; then printf '[]\\n'`,
+    `elif [ "$1" = mcp ]; then state="$(dirname "$0")/mcp-state"`,
+    `  case "$2" in`,
+    `    get) if [ -f "$state" ]; then printf 'aisurada:\\n  Status: Connected\\n  Args: %s\\n' "$(cat "$state")"; else echo none >&2; exit 1; fi ;;`,
+    `    remove) rm -f "$state" ;;`,
+    `    add-json) printf '%s' "$4" > "$state" ;;`,
+    `  esac`,
+    `else cat >/dev/null; printf 'fixture answer\\n'; fi`,
+    '',
+  ].join('\n'));
   chmodSync(fakeClaude, 0o700);
 }
 // 4부를 켠 판만 전사를 쓴다. 엔진은 격리 HOME의 ~/.claude/projects를 읽는다(래퍼가 -Duser.home을 준다).

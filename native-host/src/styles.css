@@ -768,6 +768,16 @@ code.is-symbol { font-weight: 700; }
    미리보기 그림은 지금 켜 둔 모양과 상관없이 각자의 모양을 그린다. */
 .set-skin { margin: 24px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
 .set-skin legend { padding: 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
+.set-connect { margin: 24px; padding: 0 0 20px; border: 0; border-top: 1px solid var(--line); min-width: 0; }
+.set-connect legend { padding: 16px 0 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
+.set-connect p { margin: 0 0 12px; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.set-connect .set-connect-status { color: var(--ink); font-size: 13px; }
+.set-connect .set-switch { margin: 0 0 14px; padding-bottom: 14px; }
+.set-connect-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.set-connect .set-connect-error { margin-top: 12px; color: #b67537; }
+.set-connect-desktop { margin-top: 16px; font-size: 12px; }
+.set-connect-desktop summary { cursor: pointer; color: var(--muted); }
+.set-connect-desktop pre { margin: 10px 0; padding: 12px; overflow-x: auto; background: var(--soft); border: 1px solid var(--line); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
 .set-skin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .set-skin-option { position: relative; display: grid; align-content: start; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
 .set-skin-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
