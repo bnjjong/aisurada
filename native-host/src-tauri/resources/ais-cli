@@ -1,0 +1,46 @@
+#!/bin/sh
+# aisurada.app 안의 ais-cli. 같은 앱에 든 Java로 같은 앱의 ais-cli.jar를 돌린다.
+# 그래서 Java를 따로 깔지 않아도 되고, 어디서 심볼릭 링크로 불러도 앱 안의 진짜 자리를 찾아 간다.
+#   ln -s /Applications/aisurada.app/Contents/Resources/bin/ais-cli ~/.local/bin/ais-cli
+#
+# PATH가 비어 있어도(Finder나 launchd가 띄운 환경) 돌아야 하므로 셸 내장 기능만 쓴다.
+# 외부 명령은 절대 경로로 부르는 readlink 하나뿐이다.
+
+self=$0
+while [ -h "$self" ]; do
+  link=$(/usr/bin/readlink "$self")
+  case $self in
+    */*) dir=${self%/*} ;;
+    *) dir=. ;;
+  esac
+  case $link in
+    /*) self=$link ;;
+    *) self=$dir/$link ;;
+  esac
+done
+case $self in
+  */*) dir=${self%/*} ;;
+  *) dir=. ;;
+esac
+resources=$(cd "$dir/.." && pwd -P)
+
+if [ -x "$resources/runtime/bin/java" ]; then
+  java=$resources/runtime/bin/java
+else
+  # 개발용 빌드에는 Java가 들어 있지 않다. 호스트(sidecar.rs)와 같은 차례로 시스템 Java를 쓴다.
+  java=$(command -v java 2>/dev/null || echo /usr/bin/java)
+fi
+
+# 엔진을 띄울 때 쓸 jar는 앱에 든 것으로 한다. 단 개발용 빌드(target/…/bundle)의 사본은 낡을 수 있어
+# 넘기지 않는다. 호스트가 jar를 넘기는 규칙과 같다.
+case $resources in
+  */target/debug/bundle/*|*/target/release/bundle/*) ;;
+  *)
+    if [ -z "${AISURADA_SIDECAR_JAR:-}" ] && [ -f "$resources/ais-sidecar.jar" ]; then
+      AISURADA_SIDECAR_JAR=$resources/ais-sidecar.jar
+      export AISURADA_SIDECAR_JAR
+    fi
+    ;;
+esac
+
+exec "$java" -jar "$resources/ais-cli.jar" "$@"

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
@@ -80,6 +80,19 @@ try {
   const doc = runCli('get_doc', JSON.stringify({ id }));
   assert.ok(JSON.stringify(doc).includes('Java 동봉 검증.'));
   pass('bundled CLI and separate engine create/read a note over a Unix socket');
+  // 앱에 든 ais-cli 스크립트: PATH에 Java가 없어도(위 env의 PATH는 /nonexistent) 번들 Java로 같은 앱의 jar를 돈다
+  const script = join(resources, 'bin/ais-cli');
+  assert.ok(existsSync(script) && (statSync(script).mode & 0o111) !== 0, 'bin/ais-cli is missing or not executable');
+  const viaScript = JSON.parse(execFileSync(script, ['get_doc', JSON.stringify({ id })], { env, encoding: 'utf8', timeout: 30000 }));
+  assert.ok(JSON.stringify(viaScript).includes('Java 동봉 검증.'));
+  pass('bundled bin/ais-cli script reads the note with the bundled Java and no Java on PATH');
+  // Claude에 등록될 MCP 서버 명령도 번들 Java와 번들 jar여야 한다(등록은 하지 않고 조각만 본다)
+  const registered = JSON.parse(execFileSync(script, ['claude-mcp', 'config'], { env, encoding: 'utf8', timeout: 30000 })).mcpServers.aisurada;
+  assert.equal(realpathSync(registered.command), realpathSync(java));
+  assert.deepEqual(registered.args.slice(0, 1), ['-jar']);
+  assert.equal(realpathSync(registered.args[1]), realpathSync(cli));
+  assert.equal(registered.args[2], 'mcp');
+  pass('Claude MCP registration points at the bundled Java and CLI jar');
   await stop();
   await start();
   const persisted = runCli('get_doc', JSON.stringify({ id }));

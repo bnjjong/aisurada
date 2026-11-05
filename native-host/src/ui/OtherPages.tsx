@@ -986,16 +986,15 @@ export function Guide() {
       "1. CLI 스킬",
       `aisurada의 노트는 ais-cli로 읽고 씁니다.\n목록: ais-cli list-docs limit=20\n읽기: ais-cli get-doc <노트 id>\n쓰기 전 토큰을 받고 f1=<precondition>을 함께 보냅니다.`,
     ],
-    // C119: step 2 sets up the CLI mode the step-1 skill assumes. `install`
-    // copies only the two jars, so the wrapper script is written here.
+    // Step 2 sets up the CLI mode the step-1 skill assumes. The app ships an
+    // `ais-cli` script (Contents/Resources/bin) that runs the Java bundled in the
+    // app, so nothing here needs a system Java: linking it is enough.
     [
       "2. ais-cli를 셸에 두기",
       [
         'APP="/Applications/aisurada.app/Contents/Resources"',
-        'java -jar "$APP/ais-cli.jar" install --cli "$APP/ais-cli.jar" --sidecar "$APP/ais-sidecar.jar"',
         "mkdir -p ~/.local/bin",
-        `printf '#!/bin/sh\\nexec java -jar "$HOME/Library/Application Support/aisurada/bin/ais-cli.jar" "$@"\\n' > ~/.local/bin/ais-cli`,
-        "chmod +x ~/.local/bin/ais-cli",
+        'ln -sf "$APP/bin/ais-cli" ~/.local/bin/ais-cli',
         `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`,
         `echo 'export AISURADA_VAULT="<vault 경로>"' >> ~/.zshrc`,
       ].join("\n"),

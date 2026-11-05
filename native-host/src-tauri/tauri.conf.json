@@ -55,7 +55,8 @@
     ],
     "resources": {
       "../../dist/ais-cli.jar": "ais-cli.jar",
-      "../../dist/ais-sidecar.jar": "ais-sidecar.jar"
+      "../../dist/ais-sidecar.jar": "ais-sidecar.jar",
+      "resources/ais-cli": "bin/ais-cli"
     },
     "icon": [
       "icons/32x32.png",

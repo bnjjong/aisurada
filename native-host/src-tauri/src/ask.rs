@@ -4,10 +4,20 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 
 const CAUSE_CHARS: usize = 400;
+
+/// 앱에 든 도구 폴더(`Contents/Resources/bin`). 앱이 뜰 때 한 번 정한다. 개발 실행에서는 정해지지 않는다.
+static TOOLS_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// 앱에 든 `ais-cli` 스크립트가 있는 폴더를 알려 준다. 이 뒤로 claude를 띄울 때 PATH 맨 앞에 얹혀서,
+/// 사용자가 손으로 래퍼를 만들거나 Java를 깔지 않아도 claude가 `ais-cli`를 부를 수 있다.
+pub fn set_tools_dir(dir: PathBuf) {
+    let _ = TOOLS_DIR.set(dir);
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -92,7 +102,16 @@ pub fn resolve_claude() -> Option<PathBuf> {
 }
 
 pub fn augmented_path() -> String {
+    augmented_path_with(TOOLS_DIR.get().map(PathBuf::as_path))
+}
+
+/// [`augmented_path`]의 몸. 도구 폴더가 실제로 있는 폴더일 때만 맨 앞에 얹는다. 사용자가 예전 가이드대로 만든
+/// `~/.local/bin/ais-cli`(시스템 Java를 부른다)보다 앱에 든 것이 먼저 잡히게 하려는 것이다.
+fn augmented_path_with(tools: Option<&Path>) -> String {
     let mut prefixes: Vec<String> = Vec::new();
+    if let Some(dir) = tools.filter(|d| d.is_dir()) {
+        prefixes.push(dir.to_string_lossy().into_owned());
+    }
     if let Ok(home) = env::var("HOME") {
         if !home.is_empty() {
             prefixes.push(format!("{}/.local/bin", home));
@@ -509,6 +528,22 @@ mod tests {
                 assert!(p.starts_with(&format!("{}/.local/bin", home)));
             }
         }
+    }
+
+    #[test]
+    fn bundled_tools_dir_comes_first_only_when_it_exists() {
+        let temp = tempfile::tempdir().unwrap();
+        let tools = temp.path().join("bin");
+        // 없는 폴더는 얹지 않는다(개발 실행이나 지워진 앱)
+        let without = augmented_path_with(Some(&tools));
+        assert!(!without.contains(tools.to_str().unwrap()));
+        assert_eq!(without, augmented_path_with(None));
+        // 있는 폴더는 `~/.local/bin`보다도 앞이다
+        fs::create_dir_all(&tools).unwrap();
+        let with = augmented_path_with(Some(&tools));
+        assert!(with.starts_with(&format!("{}:", tools.display())));
+        assert!(with.contains("/opt/homebrew/bin") && with.contains("/usr/local/bin"));
+        assert_eq!(with.matches(tools.to_str().unwrap()).count(), 1);
     }
 
     #[test]

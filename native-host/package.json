@@ -36,6 +36,7 @@
     "test:autosave:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --autosave",
     "test:views": "node --import tsx --test scripts/views.test.mjs",
     "test:chapters": "node --import tsx --test scripts/chapters14-17.test.mjs",
+    "test:cli-script": "node --test scripts/ais-cli-script.test.mjs",
     "docs:guide": "node scripts/guide2html.mjs ../docs/developer-guide.md ../docs/developer-guide.html",
     "test:views:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --views",
     "test:part4:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --part4",

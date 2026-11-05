@@ -99,6 +99,11 @@ fn main() {
             session_shell::pty_start_session
         ])
         .setup(|app| {
+            // 앱에 든 ais-cli 스크립트 폴더를 claude의 PATH에 얹는다(ask.rs)
+            #[cfg(feature = "claude")]
+            if let Ok(resources) = app.path().resource_dir() {
+                ask::set_tools_dir(resources.join("bin"));
+            }
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;
             let handle = app.handle().clone();

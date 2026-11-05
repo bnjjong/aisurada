@@ -953,7 +953,9 @@ if (location.pathname.startsWith("/note-window/")) {
       assert($$(".guide-step button").length === 3, "guide copy");
       const step2 = $$(".guide-step")[1].textContent;
       assert(!step2.includes("aisurada-mcp.js") && !step2.includes("mcpServers"), "C119 guide still registers the removed MCP server");
-      assert(step2.includes('install --cli "$APP/ais-cli.jar" --sidecar "$APP/ais-sidecar.jar"') && step2.includes("export AISURADA_VAULT="), "C119 guide lacks the CLI mode setup");
+      assert(step2.includes('ln -sf "$APP/bin/ais-cli" ~/.local/bin/ais-cli') && step2.includes("export AISURADA_VAULT="), "C119 guide lacks the CLI mode setup");
+      // The app ships its own Java, so the guide must not send people to a system Java.
+      assert(!/\bjava\b/.test(step2) && !step2.includes("install --cli"), "guide step 2 still needs a system Java");
       assert(!$(".set-ask-timeout"), "AI control visible");
     });
     // Last on purpose: a selection left in the template editor disturbs later navigation.
