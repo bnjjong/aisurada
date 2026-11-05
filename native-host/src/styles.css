@@ -107,9 +107,17 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .note-back { margin: 32px 0 0 40px; }
 .note-body { font: inherit; font-size: 15px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 32px; }
 .workspace-frame { height: 100vh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.workspace-screen { flex: 1; min-height: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr); }
+/* 좌측 메뉴 폭은 --rail-width(설정 railWidth, 기본 264)다. 끌어서 조절하는 손잡이는 RailResizer.
+   손잡이는 레일 안이 아니라 이 격자 위에 얹는다. 레일은 스크롤 상자라 안에 두면 같이 밀려 올라간다.
+   --screen-pad는 모양(skin)이 이 격자에 준 왼쪽 여백이다. 손잡이를 레일 오른쪽 가장자리에 맞추는 데 쓴다. */
+.workspace-screen { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: var(--rail-width, 264px) minmax(0, 1fr); }
 .workspace-screen.without-rail { grid-template-columns: minmax(0, 1fr); }
 .workspace-screen .workspace-rail { min-height: 0; overflow: auto; }
+.rail-resize { position: absolute; z-index: 6; top: 0; bottom: 0; left: calc(var(--screen-pad, 0px) + var(--rail-width, 264px) - 4px); width: 8px; cursor: col-resize; touch-action: none; outline: none; }
+.rail-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color .12s; }
+.rail-resize:hover::after, .rail-resize:focus-visible::after, body.is-resizing .rail-resize::after { background: var(--accent); }
+body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+@media (max-width: 750px) { .rail-resize { display: none; } }
 .workspace-rail nav { display: grid; gap: 3px; }
 .agenda-summary button { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: 0; background: transparent; padding: 10px 0; text-align: left; font-size: 12px; }
 .screen-content { min-height: 0; min-width: 0; overflow: hidden; }

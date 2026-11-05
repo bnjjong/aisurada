@@ -118,7 +118,7 @@
   border: 1px solid var(--rim); border-radius: 24px; background: var(--surface); box-shadow: var(--sh-glass);
   -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
 }
-:root[data-skin="glass"] .workspace-screen { padding: 8px 12px 12px 4px; gap: 4px; }
+:root[data-skin="glass"] .workspace-screen { --screen-pad: 4px; padding: 8px 12px 12px 4px; gap: 4px; }
 :root[data-skin="glass"] .workspace-screen.without-rail { padding: 8px 12px 12px; }
 :root[data-skin="glass"] .workspace-rail { background: transparent; border-right: 0; padding: 20px 12px 12px; }
 :root[data-skin="glass"] .launcher-intro { background: transparent; }

@@ -1,5 +1,5 @@
 import { Component } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
 import { parseRoute, routeTab } from "./routes.ts";
@@ -9,7 +9,8 @@ import { TabBar } from "./TabBar.tsx";
 import { InteractionOverlays } from "../interaction/Overlays.tsx";
 import { VaultBanner } from "../data/VaultBanner.tsx";
 import { Rail } from "../ui/Rail.tsx";
-import { agendaOrder } from "../ui/model.ts";
+import { agendaOrder, clampRailWidth } from "../ui/model.ts";
+import { RailResizer } from "../ui/RailResizer.tsx";
 import { Preview } from "../ui/Preview.tsx";
 import { Calendar, AgendaPage } from "../ui/CalendarAgenda.tsx";
 import {
@@ -59,7 +60,8 @@ export function WorkspaceShell({ controller, state }: Props) {
   useAskState();
   const route = parseRoute(state.route),
     ws = state.workspace!,
-    rail = route.kind !== "doc" && route.kind !== "file";
+    rail = route.kind !== "doc" && route.kind !== "file",
+    railWidth = clampRailWidth(state.prefs.railWidth);
   return (
     <div className="workspace-shell workspace-frame" aria-busy={state.busy}>
       <TabBar controller={controller} state={state} />
@@ -73,8 +75,12 @@ export function WorkspaceShell({ controller, state }: Props) {
         state={state}
         dismiss={() => controller.data.dismissFailures()}
       />
-      <div className={`workspace-screen ${rail ? "" : "without-rail"}`}>
+      <div
+        className={`workspace-screen ${rail ? "" : "without-rail"}`}
+        style={rail ? ({ "--rail-width": `${railWidth}px` } as CSSProperties) : undefined}
+      >
         {rail && <Rail controller={controller} state={state} />}
+        {rail && <RailResizer controller={controller} width={railWidth} />}
         <main className="screen-content" id="screen-content" role="tabpanel">
           <RouteBoundary
             controller={controller}

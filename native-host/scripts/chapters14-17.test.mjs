@@ -12,6 +12,7 @@ import { RailProjects } from '@claude-plug/projects';
 import { createHeadlessEditor } from '@lexical/headless';
 import { EDITOR_NODES, $importDocument, $exportDocument } from '../src/editor/markdown.ts';
 import { OPEN_ASK_COMMAND } from '../src/editor/tools.tsx';
+import { clampRailWidth, RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from '../src/ui/model.ts';
 
 // Mock in-memory storage port
 function createStorage(initial = {}) {
@@ -241,6 +242,20 @@ test('목록 18번(C157): 테마의 처음 값은 light이고 모르는 글자�
   assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:'dark'},version:1})})),'dark');
   assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:'purple'},version:1})})),'purple');
   assert.equal(readTheme(createStorage({[KEYS.prefs]:JSON.stringify({state:{theme:3},version:1})})),'light');
+});
+
+test('레일 폭: 범위는 설정 railWidth의 보정 범위(200~420, 기본 264)와 같고, 숫자가 아니면 기본으로 읽는다',()=>{
+  assert.deepEqual([RAIL_WIDTH_MIN,RAIL_WIDTH_MAX,RAIL_WIDTH_DEFAULT],[200,420,264]);
+  assert.equal(clampRailWidth(300),300);
+  assert.equal(clampRailWidth(300.6),301);
+  assert.equal(clampRailWidth(50),200);
+  assert.equal(clampRailWidth(9999),420);
+  for(const bad of [undefined,null,'300',NaN,Infinity,{}]) assert.equal(clampRailWidth(bad),264);
+  // 저장소의 보정과 어긋나지 않는다.
+  for(const value of [0,199,200,264,420,421,5000]){
+    const storage=createStorage({[KEYS.prefs]:JSON.stringify({state:{railWidth:value},version:1})});
+    assert.equal(clampRailWidth(readPreferences(storage).railWidth),readPreferences(storage).railWidth);
+  }
 });
 
 test('화면 모양: 처음 값은 물성이고 모르는 값은 기본으로 읽으며, 고른 값은 prefs에 함께 저장된다',()=>{

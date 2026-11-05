@@ -199,7 +199,7 @@
 :root[data-skin="tactile"] .tab-label small { margin-bottom: 1px; line-height: 12px; font-weight: 500; }
 :root[data-skin="tactile"] .tab-close { align-self: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
 :root[data-skin="tactile"] .tab-close:hover:not(:disabled) { background: var(--line); }
-:root[data-skin="tactile"] .workspace-screen { padding: 8px; gap: 0; }
+:root[data-skin="tactile"] .workspace-screen { --screen-pad: 8px; padding: 8px; gap: 0; }
 :root[data-skin="tactile"] .workspace-rail { background: transparent; border-right: 0; padding: 20px 12px 12px; }
 :root[data-skin="tactile"] .workspace-rail nav button { padding: 10px 16px; border-radius: 999px; font-weight: 600; }
 :root[data-skin="tactile"] .workspace-rail nav button.active { background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); }

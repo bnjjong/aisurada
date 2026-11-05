@@ -164,6 +164,58 @@ if (location.pathname.startsWith("/note-window/")) {
         "settings invoked engine",
       );
     });
+    await test("rail-resize-drag-keyboard-reset-and-persist", async () => {
+      const handle = () => $(".rail-resize"),
+        width = () => Math.round($(".workspace-rail").getBoundingClientRect().width),
+        saved = () =>
+          JSON.parse(localStorage.getItem("aisurada.prefs.v1") || "null")?.state
+            ?.railWidth;
+      const pointer = (target, type, x) =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            clientX: x,
+            button: 0,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      await until(() => handle(), "rail handle");
+      assert(handle().getAttribute("role") === "separator", "separator role");
+      assert(width() === 264, "default rail width " + width());
+      // 끌기: 끄는 동안은 저장하지 않고, 손을 떼면 한 번 저장한다.
+      const x0 = Math.round(handle().getBoundingClientRect().left + 4);
+      pointer(handle(), "pointerdown", x0);
+      pointer(document, "pointermove", x0 + 60);
+      assert(width() === 324, "dragged width " + width());
+      assert(saved() !== 324, "saved while dragging");
+      pointer(document, "pointerup", x0 + 60);
+      await until(() => saved() === 324, "dragged width saved");
+      // 범위: 아무리 끌어도 200~420
+      pointer(handle(), "pointerdown", x0 + 60);
+      pointer(document, "pointermove", x0 + 900);
+      pointer(document, "pointerup", x0 + 900);
+      await until(() => saved() === 420, "max width saved");
+      assert(width() === 420, "max width " + width());
+      pointer(handle(), "pointerdown", x0 + 900);
+      pointer(document, "pointermove", x0 - 900);
+      pointer(document, "pointerup", x0 - 900);
+      await until(() => saved() === 200, "min width saved");
+      assert(width() === 200, "min width " + width());
+      // 키보드: ←/→는 16px, Shift는 48px. 캘린더의 날짜는 그대로다.
+      const date = $(".calendar-date, .calendar-controls")?.textContent;
+      handle().focus();
+      key(handle(), "ArrowRight");
+      await until(() => saved() === 216, "arrow right");
+      key(handle(), "ArrowRight", { shiftKey: true });
+      await until(() => saved() === 264, "shift arrow right");
+      key(handle(), "ArrowLeft");
+      await until(() => saved() === 248, "arrow left");
+      assert($(".calendar-date, .calendar-controls")?.textContent === date, "arrow moved calendar");
+      // 더블클릭: 기본 폭으로
+      handle().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      await until(() => saved() === 264, "reset saved");
+      assert(width() === 264, "reset width " + width());
+    });
     await open();
     await test("note-meta-toc-and-quiet-open", async () => {
       assert($(".doc-meta-history"), "history button");

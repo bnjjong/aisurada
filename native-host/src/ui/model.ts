@@ -34,6 +34,15 @@ export const TYPE_NAMES: Record<string, string> = {
   report: "보고",
   free: "자유",
 };
+/** 좌측 메뉴(레일) 폭의 범위와 기본값. 설정 `railWidth`의 보정 범위(200~420, 기본 264)와 같다. */
+export const RAIL_WIDTH_MIN = 200;
+export const RAIL_WIDTH_MAX = 420;
+export const RAIL_WIDTH_DEFAULT = 264;
+/** 저장된 [value]를 레일 폭으로 읽는다. 숫자가 아니면 기본값, 범위를 넘으면 가장자리로 맞춘다. */
+export function clampRailWidth(value: unknown): number {
+  const width = typeof value === "number" && Number.isFinite(value) ? value : RAIL_WIDTH_DEFAULT;
+  return Math.min(RAIL_WIDTH_MAX, Math.max(RAIL_WIDTH_MIN, Math.round(width)));
+}
 export interface Preferences {
   titleDatePrefix?: boolean;
   showRecordTier?: boolean;
