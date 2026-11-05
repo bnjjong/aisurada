@@ -239,14 +239,19 @@ export function NoteEditor({
         >
           {headings.slice(1).map((h) => (
             <button
+              type="button"
               aria-current={section === h.key}
               key={h.key}
+              data-level={h.level}
+              title={h.text}
               onClick={() => {
                 setToc(true);
                 handle.current?.heading(h.key);
               }}
+              aria-label={h.text}
             >
-              {toc ? h.text : "━"}
+              <span className="toc-dash" data-level={h.level} />
+              <span className="toc-tooltip">{h.text}</span>
             </button>
           ))}
         </nav>
