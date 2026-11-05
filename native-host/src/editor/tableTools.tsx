@@ -12,7 +12,14 @@ import { $exportSelection, $tableMarkdown, $tableTSV } from './markdown.ts';
 import { OPEN_COMMENT_COMMAND, OPEN_ASK_COMMAND } from './tools.tsx';
 import { AskHoverCard } from '@claude-plug/ask';
 
+// x, y는 마우스가 있는 「줄」의 오른쪽 끝 자리(AI, 코멘트, ⋯ 버튼이 줄마다 한 벌 뜬다). right는 마우스가 있는 칸의 오른쪽 가장자리(열 너비 손잡이용)다.
 type Cell = { key: string; x: number; y: number; right: number; tableRight: number; tableTop: number; tableBottom: number };
+// 줄 단위 버튼은 마우스가 어느 열에 있는지 알 수 없으므로, 열 작업은 커서가 놓인 칸의 열에 한다. 그 표 안에 커서가 없으면 null이다.
+function $caretCellIn(table: TableNode): TableCellNode | null {
+  const selected = $getSelection(), at = $isRangeSelection(selected) || $isTableSelection(selected) ? selected.anchor.getNode() : null;
+  const found = at ? ($isTableCellNode(at) ? at : at.getParents().find($isTableCellNode)) : undefined;
+  return found && found.getParents().find($isTableNode)?.is(table) ? found : null;
+}
 export function tablesOnlyJSON(raw?: string): string | undefined {
   if (!raw) return undefined;
   try {
@@ -52,13 +59,16 @@ export function TableTools(props: EditorProps) {
     editor.update(() => {
       const target = cell && $getNodeByKey<TableCellNode>(cell.key); if (!$isTableCellNode(target)) return;
       const table = target.getParents().find($isTableNode)!;
-      target.selectStart();
+      // 줄 작업은 버튼이 뜬 줄(target의 줄)에, 열 작업은 커서가 놓인 칸의 열에 한다.
+      const column = $caretCellIn(table);
+      if (name.endsWith('-col') && !column) return;
+      (name.endsWith('-col') ? column! : target).selectStart();
       if (name === 'before-row' || name === 'after-row') $insertTableRowAtNode(target, name === 'after-row');
       if (name === 'remove-row') $deleteTableRowAtSelection();
-      if (name === 'before-col' || name === 'after-col') {
-        const widths = [...(table.getColWidths() || target.getParent()!.getChildren().map(node => editor.getElementByKey(node.getKey())!.getBoundingClientRect().width))];
-        const index = target.getIndexWithinParent(), insertion = index + (name === 'after-col' ? 1 : 0);
-        $insertTableColumnAtNode(target, name === 'after-col'); widths.splice(insertion, 0, widths[index]); table.setColWidths(widths);
+      if (column && (name === 'before-col' || name === 'after-col')) {
+        const widths = [...(table.getColWidths() || column.getParent()!.getChildren().map(node => editor.getElementByKey(node.getKey())!.getBoundingClientRect().width))];
+        const index = column.getIndexWithinParent(), insertion = index + (name === 'after-col' ? 1 : 0);
+        $insertTableColumnAtNode(column, name === 'after-col'); widths.splice(insertion, 0, widths[index]); table.setColWidths(widths);
       }
       if (name === 'remove-col') $deleteTableColumnAtSelection();
       if (name === 'fit') {
@@ -144,9 +154,10 @@ export function TableTools(props: EditorProps) {
       const tableElem = element.closest('table');
       if (!tableElem) return;
       const base = container.getBoundingClientRect(), rect = element.getBoundingClientRect(), table = tableElem.getBoundingClientRect();
+      const row = (element.closest('tr') ?? element).getBoundingClientRect(); // 버튼은 칸이 아니라 줄에 붙인다. 마우스가 같은 줄의 다른 열로 가도 제자리에 있다.
       editor.read(() => {
         const node = $getNearestNodeFromDOMNode(element);
-        if ($isTableCellNode(node)) setCell({ key: node.getKey(), x: rect.right - base.left - 28, y: rect.top - base.top + 2, right: rect.right - base.left,
+        if ($isTableCellNode(node)) setCell({ key: node.getKey(), x: row.right - base.left - 28, y: row.top - base.top + 2, right: rect.right - base.left,
           tableRight: table.right - base.left, tableTop: table.top - base.top, tableBottom: table.bottom - base.top });
       });
     };
@@ -181,12 +192,17 @@ export function TableTools(props: EditorProps) {
     }, COMMAND_PRIORITY_HIGH);
     return () => { active = false; cancelAnimationFrame(rafId); stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
   }, [editor, open, props.askDocId]);
-  const operations = [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제'], ['before-col', '왼쪽에 열 추가'], ['after-col', '오른쪽에 열 추가'], ['remove-col', '열 삭제'], ['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']];
+  const operations = [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제'], ['before-col', '커서 열 왼쪽에 추가'], ['after-col', '커서 열 오른쪽에 추가'], ['remove-col', '커서 열 삭제'], ['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']];
+  // 메뉴가 열려 있을 때만 읽는다. 커서가 이 표 안에 없으면 열 작업 항목은 눌러도 할 일이 없으므로 꺼 둔다.
+  const hasCaret = open && cell ? editor.getEditorState().read(() => { const table = $getNodeByKey(cell.key)?.getParents().find($isTableNode); return !!table && !!$caretCellIn(table); }) : false;
   return <>
     {cell && <><button className="lex-cell-menu-btn" title="표 편집" aria-label="표 편집" style={{ left: cell.x, top: cell.y }} onMouseDown={event => event.preventDefault()} onClick={() => setOpen(!open)}>⋯</button>
       <div className="lex-col-grip" style={{ left: cell.right - 3, top: cell.y - 2, height: 28 }} onPointerDown={event => resize(event, false)} />
       <div className="lex-table-grip" style={{ left: cell.tableRight - 3, top: cell.tableTop, height: cell.tableBottom - cell.tableTop }} onPointerDown={event => resize(event, true)} onDoubleClick={() => operation('fit')} /></>}
-    {open && cell && <div className="lex-table-menu" style={{ left: cell.x, top: cell.y + 26 }}>{operations.map(([id, title]) => <button key={id} onClick={() => operation(id)}>{title}</button>)}</div>}
+    {open && cell && <div className="lex-table-menu" style={{ left: cell.x, top: cell.y + 26 }}>{operations.map(([id, title]) => {
+      const needsCaret = id.endsWith('-col') && !hasCaret;
+      return <button key={id} disabled={needsCaret} title={needsCaret ? '열 작업은 표 안의 칸을 눌러 커서를 둔 뒤에 쓸 수 있어요' : undefined} onClick={() => operation(id)}>{title}</button>;
+    })}</div>}
     {dots.map(dot => <div className={`lex-row-dot lex-rownote-dot${dot.asks.length ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}`} key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => { cancelRowClose(); if (!rowPinned.current) setRowCard(dot.key); }} onMouseLeave={closeRowSoon}>
       <button aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'} onClick={() => { if (dot.ids.length) props.features?.openComment?.(dot.ids[0]); }}>●</button>
       {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}

@@ -47,6 +47,34 @@ try{
   content().querySelector('td,th').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>document.querySelector('.lex-cell-menu-btn'),'cell hover');document.querySelector('.lex-cell-menu-btn').click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');assert(document.querySelectorAll('.lex-table-menu button').length===10,'menu order/count');
   document.querySelector('.lex-table-menu button').click();await until(()=>content().querySelectorAll('table tr').length===4,'insert row');
  });
+ await test('table-row-controls-sit-on-the-row-and-column-actions-follow-the-caret',async()=>{
+  const table=content().querySelector('table'),rows=()=>[...table.querySelectorAll('tr')];
+  const hover=async el=>{el.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await pause(80)};
+  const menuBtn=()=>document.querySelector('.lex-cell-menu-btn'),at=()=>{const r=menuBtn().getBoundingClientRect();return [Math.round(r.left),Math.round(r.top)]};
+  await hover(rows()[1].cells[0]);await until(menuBtn,'row controls');const first=at();
+  await hover(rows()[1].cells[1]);const second=at();await hover(rows()[1].cells[2]);const third=at();
+  assert(first.join()===second.join()&&second.join()===third.join(),'row controls stay put while the pointer crosses the columns of one row: '+JSON.stringify([first,second,third]));
+  assert(first[0]>rows()[1].cells[2].getBoundingClientRect().left,'row controls sit at the row end (last column): '+first[0]);
+  await hover(rows()[2].cells[0]);assert(at()[1]>first[1],'the next row gets its own controls lower down');
+  assert(document.querySelectorAll('.lex-cell-menu-btn').length===1,'one set of controls, not one per column');
+  const type=async(cell,text)=>{const p=cell.querySelector('p')||cell,r=document.createRange();r.setStart(p,0);r.collapse(true);content().focus({preventScroll:true});getSelection().removeAllRanges();getSelection().addRange(r);assert(document.execCommand('insertText',false,text),'type '+text);await pause(150)};
+  const heads=()=>[...rows()[0].cells].map(c=>c.textContent.trim()).join();
+  const choose=async(label,hoverCell)=>{await hover(hoverCell);menuBtn().click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');const b=[...document.querySelectorAll('.lex-table-menu button')].find(x=>x.textContent===label);assert(b,'menu item '+label);return b};
+  await type(rows()[0].cells[2],'열3');await type(rows()[0].cells[1],'열2'); // 커서는 두 번째 열에 남는다
+  assert(heads()===',열2,열3','markers typed: '+heads());
+  let item=await choose('커서 열 오른쪽에 추가',rows()[2].cells[2]); // 마우스는 마지막 열, 커서는 두 번째 열
+  assert(!item.disabled,'column action is on while the caret is in the table');item.click();
+  await until(()=>rows()[0].cells.length===4,'column added');assert(heads()===',열2,,열3','column went in after the caret column, not the hovered one: '+heads());
+  await type(rows()[0].cells[2],'새');
+  item=await choose('커서 열 삭제',rows()[2].cells[3]);item.click();
+  await until(()=>rows()[0].cells.length===3,'column removed');assert(heads()===',열2,열3','the caret column was removed: '+heads());
+  edit('ⓓ','가 나'); // 커서를 표 밖으로
+  item=await choose('커서 열 오른쪽에 추가',rows()[1].cells[1]);
+  assert(item.disabled&&item.title.includes('커서'),'column actions are off while the caret is outside the table');
+  assert(![...document.querySelectorAll('.lex-table-menu button')].filter(b=>!b.textContent.startsWith('커서 열')).some(b=>b.disabled),'row and table actions stay on');
+  document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));await until(()=>!document.querySelector('.lex-table-menu'),'menu closed');
+  await hover(rows()[0].cells[0]); // 다음 시험이 첫 칸에서 시작하므로 마우스를 거기로 돌려 둔다
+ });
  await test('code-and-callout-controls-float-over-their-block',async()=>{
   const top=()=>content().querySelector('h1').getBoundingClientRect().top-content().closest('.lex-editor').getBoundingClientRect().top;
   const rest=top();edit('ⓑ','ⓐ');assert(document.execCommand('insertParagraph'),'new line for code');await until(()=>document.querySelector('.lex-line-hint'),'hint on the new line');
@@ -80,7 +108,7 @@ try{
   const clipboard=new DataTransfer();root.dispatchEvent(new ClipboardEvent('copy',{bubbles:true,cancelable:true,clipboardData:clipboard}));assert(clipboard.getData('text/plain').includes('| --- |'),'copy lacks GFM divider');assert(clipboard.getData('text/html').includes('<table'),'copy lost HTML');assert(!clipboard.getData('text/plain').includes('<!--aisc:'),'copy leaked annotations');
  });
  await test('table-pair-resize-keeps-total-and-persists-ratio',async()=>{
-  const table=content().querySelector('table');table.querySelector('th,td').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>document.querySelector('.lex-col-grip'),'resize handle');const before=[...table.querySelectorAll('tr:first-of-type>*')].map(cell=>cell.getBoundingClientRect().width),grip=document.querySelector('.lex-col-grip');grip.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:100}));document.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:160}));document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));await pause(100);const after=[...table.querySelectorAll('tr:first-of-type>*')].map(cell=>cell.getBoundingClientRect().width);assert(Math.abs(before.reduce((a,b)=>a+b,0)-after.reduce((a,b)=>a+b,0))<2,'pair resize changed total');assert(after.every(width=>width>=47),'column below minimum');assert(after[0]>before[0]+40,'resize did not move boundary');
+  const table=content().querySelector('table');table.querySelector('th,td').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await pause(80);await until(()=>document.querySelector('.lex-col-grip'),'resize handle');const before=[...table.querySelectorAll('tr:first-of-type>*')].map(cell=>cell.getBoundingClientRect().width),grip=document.querySelector('.lex-col-grip');grip.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:100}));document.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:160}));document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));await pause(100);const after=[...table.querySelectorAll('tr:first-of-type>*')].map(cell=>cell.getBoundingClientRect().width);assert(Math.abs(before.reduce((a,b)=>a+b,0)-after.reduce((a,b)=>a+b,0))<2,'pair resize changed total');assert(after.every(width=>width>=47),'column below minimum');assert(after[0]>before[0]+40,'resize did not move boundary '+JSON.stringify({before,after}));
  });
  await test('html-frame-sandbox-height-source-and-hidden-ask',async()=>{
   go('/doc/'+cfg.id);await until(()=>content()?.querySelector('iframe'),'HTML frame');const frame=content().querySelector('iframe');assert(frame.getAttribute('sandbox')==='allow-scripts','sandbox');assert(frame.getAttribute('referrerpolicy')==='no-referrer','referrer');assert(frame.getAttribute('loading')==='lazy','lazy');assert(frame.src.startsWith('aisframe://localhost/'),'protocol');assert(document.querySelector('.ais-html-frame-ask').hidden,'ask visible');
