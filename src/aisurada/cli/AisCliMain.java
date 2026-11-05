@@ -133,7 +133,7 @@ public final class AisCliMain {
     );
 
     public static final List<String> DIRECT_COMMANDS = List.of(
-            "doctor", "sweep", "report", "schedule", "install", "mcp"
+            "doctor", "sweep", "report", "schedule", "install", "mcp", "claude-mcp"
     );
 
     public static final List<String> ENGINE_COMMANDS_61 = List.of(
@@ -180,6 +180,9 @@ public final class AisCliMain {
         } else if ("mcp".equals(firstArg)) {
             McpServer.run(Arrays.copyOfRange(args, 1, args.length));
             return;
+        } else if ("claude-mcp".equals(firstArg)) {
+            ClaudeMcpCommand.run(Arrays.copyOfRange(args, 1, args.length));
+            return;
         } else if ("report".equals(firstArg) || "schedule".equals(firstArg)) {
             // 결정 3: 모르는 이름으로 간주하여 종료 코드 2
             printUnknownName(firstArg);
@@ -220,6 +223,7 @@ public final class AisCliMain {
         System.out.println("schedule — 주기적 작업을 다룹니다");
         System.out.println("install — 실행에 필요한 jar 파일을 설치합니다");
         System.out.println("mcp — Claude 같은 MCP 클라이언트가 노트를 읽도록 MCP 서버로 선다(표준 입출력). 쓰기 도구는 --write를 줄 때만 연다");
+        System.out.println("claude-mcp — Claude Code에 이 MCP 서버를 등록한다(status, add [--write], remove)");
         System.out.println();
         System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61));
         System.out.println("  앱이 쓰는 배선입니다. 이름이 하이픈인 것이 표시이고, 도구 이름(밑줄)과 다른 표면입니다.");

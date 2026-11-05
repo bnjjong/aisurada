@@ -22,3 +22,4 @@ done
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.Chapter25To30IntegrationTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.Chapter31IntegrationTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.cli.McpServerTest
+"$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.cli.ClaudeMcpCommandTest
