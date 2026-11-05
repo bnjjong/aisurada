@@ -10,6 +10,16 @@ const SKIN_OPTIONS: readonly { id: Skin; label: string; hint: string }[] = [
     hint: "눌리는 것은 떠 있고, 쓰는 것은 파여 있는 둥근 모양이에요.",
   },
   {
+    id: "grid",
+    label: "격자",
+    hint: "4px 격자와 또렷한 먹선, 각진 모서리로 정확하게 그린 모양이에요.",
+  },
+  {
+    id: "page",
+    label: "지면",
+    hint: "글이 먼저 보이도록 명조 본문과 밑줄, 시안 형광펜으로 그린 모양이에요.",
+  },
+  {
     id: "classic",
     label: "기본",
     hint: "얇은 테두리와 평평한 면으로 그린 이전 모양이에요.",

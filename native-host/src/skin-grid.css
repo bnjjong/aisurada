@@ -1,0 +1,150 @@
+/* 격자(grid) 화면 모양. 도구는 정확해야 한다.
+     1. 4의 격자      길이는 4px의 배수. 컨트롤 높이는 28 · 36 · 44.
+     2. 선은 두 가지  먹선(--strong)은 '누를 수 있는 것', 옅은 선(--line)은 '나누는 것'. 그림자는 쓰지 않는다.
+     3. 모서리는 한 값  반경 2px 하나. 원은 '여럿 중 하나'인 라디오와 점에만 쓴다.
+     4. 빨강은 '여기 보라'만  포커스 · 현재 위치 · 눌림 · 삭제. 켜짐과 선택은 네이비로 채운다.
+     5. 불가는 점선    비활성은 흐리게 하지 않고 실선을 점선으로 바꾼다.
+
+   styles.css(기본 모양) 위에 덧씌운다. <html data-skin="grid">일 때만 적용된다.
+   전역 규칙은 :where()로 특이도를 낮춰, styles.css의 개별 클래스가 정한 값을 덮어쓰지 않게 했다. */
+
+/* ───────── 토큰 ───────── */
+:root[data-skin="grid"] {
+  --soft: #eef2f8;
+  --surface: #ffffff;
+  --sunken: #e2e8f2;
+  --ink: #0a1633;
+  --ink-h: #2b3a5e;
+  --muted: #4c5873;
+  --ink-3: #8590a6;
+  --line: #cdd5e3;
+  --strong: #0a1633;
+  --accent: #0a1633;
+  --accent-ink: #ffffff;
+  --signal: #d01f1a;
+  --on-signal: #ffffff;
+  --err: #b91c17;
+  --err-bg: #fbe3e1;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230a1633' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+:root[data-skin="grid"][data-theme="dark"] {
+  --soft: #0a1226;
+  --surface: #0f1730;
+  --sunken: #18223f;
+  --ink: #e9eef8;
+  --ink-h: #ffffff;
+  --muted: #9aa6c0;
+  --ink-3: #5a6788;
+  --line: #232e4d;
+  --strong: #e9eef8;
+  --accent: #e9eef8;
+  --accent-ink: #060b18;
+  --signal: #ff5148;
+  --on-signal: #060b18;
+  --err: #ff8078;
+  --err-bg: #3a1517;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23e9eef8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="grid"]:not([data-theme="light"]):not([data-theme="dark"]) {
+    --soft: #0a1226; --surface: #0f1730; --sunken: #18223f; --ink: #e9eef8; --ink-h: #ffffff; --muted: #9aa6c0; --ink-3: #5a6788;
+    --line: #232e4d; --strong: #e9eef8; --accent: #e9eef8; --accent-ink: #060b18; --signal: #ff5148; --on-signal: #060b18;
+    --err: #ff8078; --err-bg: #3a1517;
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23e9eef8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  }
+}
+
+/* ───────── 모서리 2px 하나, 그림자 없음 ───────── */
+:root[data-skin="grid"] * { border-radius: 2px; box-shadow: none; }
+:root[data-skin="grid"] :is(
+  input[type="radio"], .agenda-dot, .sess-dot, .sess-run, .tab-ask-dot, .sess-composer-image-remove, .ask-image-thumb button
+) { border-radius: 50%; }
+:root[data-skin="grid"] :focus-visible { outline-color: var(--signal); }
+:root[data-skin="grid"] input::placeholder, :root[data-skin="grid"] textarea::placeholder { color: var(--muted); opacity: .8; }
+
+/* ───────── 버튼은 먹선 상자, 입력도 먹선 상자 ───────── */
+:where(:root[data-skin="grid"]) button { border: 1px solid var(--strong); border-radius: 2px; background: var(--surface); padding: 8px 14px; font-weight: 500; }
+:where(:root[data-skin="grid"]) button:hover:not(:disabled) { background: var(--sunken); }
+:where(:root[data-skin="grid"]) button:active:not(:disabled) { background: var(--signal); border-color: var(--signal); color: var(--on-signal); }
+:where(:root[data-skin="grid"]) button:disabled { opacity: 1; border: 1px dashed var(--ink-3); background: transparent; color: var(--ink-3); cursor: not-allowed; }
+:where(:root[data-skin="grid"]) input { border: 1px solid var(--strong); border-radius: 2px; background: var(--surface); padding: 10px 12px; }
+:where(:root[data-skin="grid"]) textarea { border: 1px solid var(--strong); border-radius: 2px; background: var(--surface); padding: 10px 12px; }
+:where(:root[data-skin="grid"]) select { border: 1px solid var(--strong); border-radius: 2px; background-color: var(--surface); }
+:root[data-skin="grid"] select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 30px; background-image: var(--chevron); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px;
+}
+:root[data-skin="grid"] :is(input, textarea, select):disabled { border: 1px dashed var(--ink-3); background: transparent; color: var(--ink-3); }
+
+/* 강조 버튼: 네이비로 채운다. 눌리면 빨강 */
+:root[data-skin="grid"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active) {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+:root[data-skin="grid"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active):hover:not(:disabled) { background: var(--ink-h); filter: none; }
+:root[data-skin="grid"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send, .btn-range.active):active:not(:disabled) { background: var(--signal); border-color: var(--signal); color: var(--on-signal); }
+:root[data-skin="grid"] :is(.button-primary, .link-popover-btn.primary, .sess-composer-send):disabled { background: transparent; color: var(--ink-3); border: 1px dashed var(--ink-3); opacity: 1; }
+
+/* ───────── 맨살 버튼(목록 행 · 아이콘 · 글자 버튼): 상자 없이 눌린 면만 ─────────
+   styles.css에서 background: transparent 나 border: 0 으로 맨살로 만든 버튼들. 새로 그런 버튼을
+   추가하면 여기에도 넣는다. */
+:root[data-skin="grid"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+) { background: transparent; }
+:root[data-skin="grid"] :where(
+  .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
+  .rail-agenda .agenda-dot, .tag-chip button, .doc-listitem > button:first-child, .ask-followup-open, .ask-abandoned-x,
+  .ask-hovercard-pin-btn, .ask-hovercard-close-btn, .ask-image-tag button, .ask-fold-toggle, .sess-rail-head .nav-add,
+  .sess-toggle, .sess-item, .sess-more, .doc-meta-id-open, .doc-meta-id-copy, .nsrail-close, .sess-composer-img button,
+  .sess-dock-head, .prev-tab, .ask-image-thumb, .recent-open, .recent-remove, .workspace-rail nav button, .note-row,
+  .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
+  .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
+  .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+):is(:hover, :active):not(:disabled) { background: var(--sunken); color: inherit; border-color: transparent; }
+:root[data-skin="grid"] .doc-meta button { border-color: transparent; }
+
+/* ───────── 체크 · 라디오 · 스위치: 네이비로 채운다 ───────── */
+:root[data-skin="grid"] input[type="checkbox"], :root[data-skin="grid"] input[type="radio"] {
+  appearance: none; -webkit-appearance: none; display: inline-grid; place-items: center; flex: none;
+  width: 16px; height: 16px; padding: 0; margin: 0; border: 1px solid var(--strong); background: var(--surface); cursor: pointer; vertical-align: middle;
+}
+:root[data-skin="grid"] input[type="checkbox"]:checked, :root[data-skin="grid"] input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }
+:root[data-skin="grid"] input[type="checkbox"]:checked::after {
+  content: ""; width: 8px; height: 4px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: translateY(-1px) rotate(-45deg);
+}
+:root[data-skin="grid"] input[type="radio"]:checked { box-shadow: inset 0 0 0 3px var(--surface); }
+:root[data-skin="grid"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; border: 0; background: transparent; accent-color: var(--accent); }
+:root[data-skin="grid"] .set-switch input[type="checkbox"] { position: relative; display: block; width: 36px; height: 20px; }
+:root[data-skin="grid"] .set-switch input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border: 0; border-radius: 1px;
+  background: var(--strong); transform: none; transition: transform .15s;
+}
+:root[data-skin="grid"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(16px); background: var(--accent-ink); border: 0; }
+
+/* 설정: 화면 모양 고르기 카드 */
+:root[data-skin="grid"] .set-skin-option input { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; background: transparent; }
+:root[data-skin="grid"] .set-skin-option:has(input:checked) { border-color: var(--strong); box-shadow: inset 0 0 0 1px var(--strong); }
+
+/* ───────── 현재 위치는 빨간 줄 ───────── */
+:root[data-skin="grid"] .tab-item.tab-selected { border-top-color: var(--signal); }
+:root[data-skin="grid"] .workspace-rail nav button.active { box-shadow: inset 0 -2px 0 var(--signal); }
+:root[data-skin="grid"] .prev-tab.on { border-bottom-color: var(--signal); }
+:root[data-skin="grid"] .now-line { border-top-color: var(--signal); }
+
+/* ───────── 떠 있는 것은 먹선으로 둘러싼다 ───────── */
+:root[data-skin="grid"] :is(
+  .ui-modal, .note-preview, .subnote-page, .cmdk-panel, .sel-bar, .comment-compose-popover, .slash-menu, .note-picker,
+  .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc
+) { border-color: var(--strong); }
+:root[data-skin="grid"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: rgba(10, 22, 51, .45); }
+:root[data-skin="grid"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) { border-bottom-color: var(--strong); }
+:root[data-skin="grid"] .notice { border: 1px solid var(--strong); }
+:root[data-skin="grid"] .vault-write-failures, :root[data-skin="grid"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }

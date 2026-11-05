@@ -767,12 +767,19 @@ code.is-symbol { font-weight: 700; }
 .set-skin-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
 .set-skin-text strong { display: block; font-size: 14px; font-weight: 600; }
 .set-skin-text small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.skin-preview { display: flex; align-items: center; gap: 10px; height: 68px; padding: 0 14px; border-radius: 8px; overflow: hidden; }
+/* 미리보기 그림은 격자·지면의 「모든 요소 반경·그림자 덮기」 규칙에도 흔들리지 않도록 반경과 그림자에만 !important를 쓴다. */
+.skin-preview { display: flex; align-items: center; gap: 10px; height: 68px; padding: 0 14px; border-radius: 8px !important; overflow: hidden; }
 .skin-preview i { display: block; width: 52px; height: 24px; flex: none; }
 .skin-preview b { display: block; width: 76px; height: 20px; }
 .skin-preview[data-skin-preview="classic"] { background: #f3f5ee; }
-.skin-preview[data-skin-preview="classic"] i { border-radius: 8px; background: #2f5542; }
-.skin-preview[data-skin-preview="classic"] b { border: 1px solid #d5dccb; border-radius: 8px; background: #fdfdfa; }
+.skin-preview[data-skin-preview="classic"] i { border-radius: 8px !important; background: #2f5542; }
+.skin-preview[data-skin-preview="classic"] b { border: 1px solid #d5dccb; border-radius: 8px !important; background: #fdfdfa; }
 .skin-preview[data-skin-preview="tactile"] { background: #e6ebf5; }
-.skin-preview[data-skin-preview="tactile"] i { border-radius: 999px; background: #1e4fd8; box-shadow: 0 1px 2px rgba(18,48,160,.4), 0 6px 14px -4px rgba(30,79,216,.55), inset 0 1px 0 rgba(255,255,255,.28); }
-.skin-preview[data-skin-preview="tactile"] b { border-radius: 999px; background: #dae1ee; box-shadow: inset 0 1px 3px rgba(10,22,51,.18), inset 0 0 0 1px rgba(10,22,51,.04); }
+.skin-preview[data-skin-preview="tactile"] i { border-radius: 999px !important; background: #1e4fd8; box-shadow: 0 1px 2px rgba(18,48,160,.4), 0 6px 14px -4px rgba(30,79,216,.55), inset 0 1px 0 rgba(255,255,255,.28) !important; }
+.skin-preview[data-skin-preview="tactile"] b { border-radius: 999px !important; background: #dae1ee; box-shadow: inset 0 1px 3px rgba(10,22,51,.18), inset 0 0 0 1px rgba(10,22,51,.04) !important; }
+.skin-preview[data-skin-preview="grid"] { background: #eef2f8; }
+.skin-preview[data-skin-preview="grid"] i { border-radius: 2px !important; background: #0a1633; }
+.skin-preview[data-skin-preview="grid"] b { border: 1px solid #0a1633; border-radius: 2px !important; background: #fff; }
+.skin-preview[data-skin-preview="page"] { background: #fafbfd; }
+.skin-preview[data-skin-preview="page"] i { border-radius: 0 !important; background: #0a1633; }
+.skin-preview[data-skin-preview="page"] b { height: 24px; border-bottom: 1px solid #0a1633; background: #6fe3f2; }
