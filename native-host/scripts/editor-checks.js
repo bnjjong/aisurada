@@ -65,7 +65,9 @@ try{
   await type(rows()[0].cells[2],'열3');await type(rows()[0].cells[1],'열2'); // 커서는 두 번째 열에 남는다
   assert(heads()===',열2,열3','markers typed: '+heads());
   let item=await choose('커서 열 오른쪽에 추가',rows()[2].cells[2]); // 마우스는 마지막 열, 커서는 두 번째 열
-  assert(!item.disabled,'column action is on while the caret is in the table');item.click();
+  assert(!item.disabled,'column action is on while the caret is in the table');
+  const pinned=at();await hover(rows()[3].cells[0]);assert(at().join()===pinned.join()&&document.querySelectorAll('.lex-row-outline').length===1,'the selected row stays put while the menu is open: '+pinned+' -> '+at());
+  item.click();
   await until(()=>rows()[0].cells.length===4,'column added');assert(heads()===',열2,,열3','column went in after the caret column, not the hovered one: '+heads());
   await type(rows()[0].cells[2],'새');
   item=await choose('커서 열 삭제',rows()[2].cells[3]);item.click();

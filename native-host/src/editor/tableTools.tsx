@@ -67,7 +67,7 @@ export function TableTools(props: EditorProps) {
       const target = cell && $getNodeByKey<TableCellNode>(cell.key); if (!$isTableCellNode(target)) return;
       const table = target.getParents().find($isTableNode)!;
       // 줄 작업은 버튼이 뜬 줄(target의 줄)에, 열 작업은 커서가 놓인 칸의 열에 한다.
-      const column = $caretCellIn(table);
+      const column = $caretCellIn(table), previous = $getSelection()?.clone() ?? null; // 끼워 넣기는 하던 자리의 커서를 그대로 둔다
       if (name.endsWith('-col') && !column) return;
       (name.endsWith('-col') ? column! : target).selectStart();
       if (name === 'before-row' || name === 'after-row') $insertTableRowAtNode(target, name === 'after-row');
@@ -78,6 +78,7 @@ export function TableTools(props: EditorProps) {
         $insertTableColumnAtNode(column, name === 'after-col'); widths.splice(insertion, 0, widths[index]); table.setColWidths(widths);
       }
       if (name === 'remove-col') $deleteTableColumnAtSelection();
+      if (previous && ['before-row', 'after-row', 'before-col', 'after-col'].includes(name)) $setSelection(previous);
       if (name === 'fit') {
         const root = editor.getRootElement();
         if (!root) return;
@@ -155,6 +156,7 @@ export function TableTools(props: EditorProps) {
     // The document can already be in the DOM before this listener is installed.
     rafId = requestAnimationFrame(() => { if (active && editor.getRootElement()) collect(); });
     const over = (event: MouseEvent) => {
+      if (open) return; // 메뉴가 열려 있는 동안은 고른 줄에 고정한다. 마우스가 메뉴로 가다가 다른 줄을 지나도 따라가지 않는다.
       const container = outer();
       if (!root || !container) return;
       const element = (event.target as Element).closest<HTMLTableCellElement>('td,th'); if (!element || !root.contains(element)) return;
@@ -217,7 +219,7 @@ export function TableTools(props: EditorProps) {
       {open && <div className="lex-row-outline" style={{ left: cell.rowLeft - 1, top: cell.rowTop - 1, width: cell.rowWidth + 2, height: cell.rowHeight + 2 }} />}
       <div className="lex-col-grip" style={{ left: cell.right - 3, top: cell.rowTop, height: 28 }} onPointerDown={event => resize(event, false)} />
       <div className="lex-table-grip" style={{ left: cell.tableRight - 3, top: cell.tableTop, height: cell.tableBottom - cell.tableTop }} onPointerDown={event => resize(event, true)} onDoubleClick={() => operation('fit')} /></>}
-    {open && cell && <div className="lex-table-menu" style={{ left: cell.rowLeft + 16, top: cell.rowTop + cell.rowHeight / 2 - 14 }}>{groups.map((group, index) => <div key={index} className="lex-table-menu-group">{group.map(([id, title]) => {
+    {open && cell && <div className="lex-table-menu" style={{ left: cell.rowLeft + 16, top: cell.rowTop + cell.rowHeight / 2 - 14 }} onMouseDown={event => event.preventDefault()}>{groups.map((group, index) => <div key={index} className="lex-table-menu-group">{group.map(([id, title]) => {
       const needsCaret = id.endsWith('-col') && !hasCaret;
       return <button key={id} disabled={needsCaret} title={needsCaret ? '열 작업은 표 안의 칸을 눌러 커서를 둔 뒤에 쓸 수 있어요' : undefined} onClick={() => operation(id)}>{title}</button>;
     })}</div>)}</div>}
