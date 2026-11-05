@@ -28,10 +28,42 @@ try{
  });
  await test('body-write-count-has-no-open-or-repair-writes',async()=>{const calls=await fetch('/calls').then(r=>r.json());const writes=calls.filter(c=>c.args.argv[0]==='update-doc'&&c.args.argv.some(a=>a.startsWith('body=')));assert(writes.length===saves,`expected ${saves} body writes, got ${writes.length}`)});
  const c=cases[0];await open(c);
- await test('native-toolbar-table-and-ten-menu-actions',async()=>{
-  edit('추가');document.querySelector('[title="표 삽입"]').click();await until(()=>content().querySelector('table'),'table');assert(content().querySelectorAll('table tr').length===3,'rows');assert(content().querySelectorAll('table th').length===3,'header');
+ await test('slash-menu-inserts-table-and-ten-menu-actions',async()=>{
+  edit('ⓐ','편집됨'); // 문단 맨 끝에 글자를 넣어 에디터가 아는 커서도 문단 끝에 놓는다(줄바꿈은 그 위치를 쓴다)
+  assert(!document.querySelector('.lex-tool-btn,[title="표 삽입"]'),'the always-on glyph row (表 ▣ </>) is gone');
+  assert(!document.querySelector('.lex-toolbar'),'no toolbar row while the caret is in a plain paragraph');
+  assert(!document.querySelector('.lex-line-hint'),'no empty-line hint on a line that has text');
+  assert(document.execCommand('insertParagraph'),'new empty line');
+  await until(()=>document.querySelector('.lex-line-hint .lex-line-plus'),'empty-line plus and hint').catch(e=>{const g=getSelection();throw Error(e.message+' '+JSON.stringify({active:document.activeElement?.tagName+'.'+document.activeElement?.className,anchor:g?.anchorNode?.nodeName+'/'+g?.anchorNode?.parentNode?.nodeName,off:g?.anchorOffset,tail:content().innerHTML.slice(-300)}))});
+  assert(document.querySelector('.lex-line-hint').textContent.includes('/'),'hint names the slash key');
+  document.querySelector('.lex-line-plus').click();
+  await until(()=>document.querySelector('.slash-menu'),'slash menu opened by the plus');
+  assert(!document.querySelector('.lex-line-hint'),'hint hides while the menu is open');
+  const items=[...document.querySelectorAll('.slash-item')];
+  assert(['표','콜아웃','코드 블록'].every(label=>items.some(item=>item.querySelector('.slash-item-label').firstChild.textContent===label)),'table, callout and code are in the menu');
+  assert(items.every(item=>item.querySelector('.slash-item-icon')&&item.querySelector('.slash-item-label small')),'every item has an icon and a one-line description');
+  document.querySelector('[data-slash-id="table"]').click();await until(()=>content().querySelector('table'),'table');assert(content().querySelectorAll('table tr').length===3,'rows');assert(content().querySelectorAll('table th').length===3,'header');
   content().querySelector('td,th').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>document.querySelector('.lex-cell-menu-btn'),'cell hover');document.querySelector('.lex-cell-menu-btn').click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');assert(document.querySelectorAll('.lex-table-menu button').length===10,'menu order/count');
   document.querySelector('.lex-table-menu button').click();await until(()=>content().querySelectorAll('table tr').length===4,'insert row');
+ });
+ await test('code-and-callout-controls-float-over-their-block',async()=>{
+  const top=()=>content().querySelector('h1').getBoundingClientRect().top-content().closest('.lex-editor').getBoundingClientRect().top;
+  const rest=top();edit('ⓑ','ⓐ');assert(document.execCommand('insertParagraph'),'new line for code');await until(()=>document.querySelector('.lex-line-hint'),'hint on the new line');
+  assert(document.execCommand('insertText',false,'/'),'type slash');await until(()=>document.querySelector('.slash-menu'),'slash menu by typing');
+  document.querySelector('[data-slash-id="code"]').click();
+  await until(()=>document.querySelector('.lex-block-bar select[aria-label="코드 언어"]'),'language select over the code block');
+  const bar=document.querySelector('.lex-block-bar');assert(getComputedStyle(bar).position==='absolute','the bar does not take a row of its own');
+  assert(content().querySelector('code,pre'),'code block exists');assert(Math.abs(top()-rest)<1,'text did not move when the bar appeared');
+  const select=bar.querySelector('select');select.value='kotlin';select.dispatchEvent(new Event('change',{bubbles:true}));
+  await until(()=>content().querySelector('[data-language="kotlin"]'),'language applied');
+  edit('ⓒ','ⓑ');await until(()=>!document.querySelector('.lex-block-bar'),'bar leaves with the caret');assert(Math.abs(top()-rest)<1,'text did not move when the bar left');
+  assert(document.execCommand('insertParagraph'),'new line for callout');await until(()=>document.querySelector('.lex-line-hint'),'hint for callout');
+  assert(document.execCommand('insertText',false,'/'),'type slash again');await until(()=>document.querySelector('.slash-menu'),'slash menu again');
+  document.querySelector('[data-slash-id="callout"]').click();
+  await until(()=>document.querySelectorAll('.lex-block-bar button').length===4,'four callout kinds over the callout');
+  const kinds=[...document.querySelectorAll('.lex-block-bar button')];assert(kinds.map(b=>b.textContent).join()==='정보,성공,주의,위험','kind order');
+  kinds[2].dispatchEvent(new MouseEvent('click',{bubbles:true}));await until(()=>document.querySelectorAll('.lex-block-bar button')[2].getAttribute('aria-pressed')==='true','warn kind pressed');
+  assert(Math.abs(top()-rest)<1,'text did not move for the callout bar');
  });
  await test('plain-text-paste-keeps-markdown-literal',async()=>{
   edit('貼');const data=new DataTransfer();data.setData('text/plain','**그대로**');content().dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));await until(()=>content().textContent.includes('**그대로**'),'plain paste');assert(![...content().querySelectorAll('strong')].some(n=>n.textContent==='그대로'),'plain text became bold');

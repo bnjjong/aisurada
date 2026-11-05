@@ -5,7 +5,7 @@ import { $isCodeNode } from '@lexical/code';
 import { $isTableSelection, $isTableCellNode, $isTableNode } from '@lexical/table';
 import {
   $getRoot, $getSelection, $setSelection, $isRangeSelection, $isTextNode, $getNodeByKey, $createRangeSelection,
-  $createParagraphNode, $isParagraphNode,
+  $createParagraphNode, $isParagraphNode, $isRootNode,
   FORMAT_TEXT_COMMAND, PASTE_COMMAND, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_LOW, createCommand,
 } from 'lexical';
 import type { BaseSelection, ElementNode, TextNode } from 'lexical';
@@ -37,6 +37,8 @@ export function EditorTools(props: EditorProps) {
   const selection = useRef<BaseSelection | null>(null), composeRef = useRef(compose); composeRef.current = compose;
   const [menu, setMenu] = useState<Menu | null>(null), menuRef = useRef(menu); menuRef.current = menu;
   const [code, setCode] = useState<{ key: string; language: string } | null>(null), [callout, setCallout] = useState<{ key: string; kind: string } | null>(null);
+  // 코드·콜아웃 안에 있을 때만 그 블록 오른쪽 위에 뜨는 선택 줄의 자리, 그리고 커서가 빈 줄에 있을 때 보이는 「+」와 안내의 자리.
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null), [line, setLine] = useState<{ x: number; y: number } | null>(null);
   const [card, setCard] = useState<{ ids: string[]; x: number; y: number; pinned: boolean } | null>(null);
   const closeCard = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), closeCompose = () => { setCompose(null); setComment(''); };
   const outer = () => editor.getRootElement()?.closest<HTMLElement>('.lex-editor') ?? null;
@@ -46,10 +48,11 @@ export function EditorTools(props: EditorProps) {
     return { x: Math.max(8, Math.min(rect.left - box.left, box.width - 260)), y: Math.max(0, rect.top - box.top - 42) };
   };
   const slashItems = [
-    ...(props.features?.createChild ? [{ id: 'page', label: '페이지', aliases: 'page 후속 하위 노트 새 페이지' }] : []),
-    ...(props.features?.notes ? [{ id: 'note', label: '노트 링크', aliases: 'note link 링크 기록' }] : []),
-    { id: 'table', label: '표', aliases: 'table 테이블 시트' }, { id: 'callout', label: '콜아웃', aliases: 'callout 정보 강조 안내' },
-    { id: 'code', label: '코드 블록', aliases: 'code 코드 소스' },
+    ...(props.features?.createChild ? [{ id: 'page', icon: '↳', label: '페이지', desc: '하위 노트를 만들어 카드로 넣어요', aliases: 'page 후속 하위 노트 새 페이지' }] : []),
+    ...(props.features?.notes ? [{ id: 'note', icon: '[[', label: '노트 링크', desc: '다른 노트로 가는 링크', aliases: 'note link 링크 기록' }] : []),
+    { id: 'table', icon: '表', label: '표', desc: '3×3 표를 넣어요', aliases: 'table 테이블 시트' },
+    { id: 'callout', icon: '▣', label: '콜아웃', desc: '눈에 띄는 안내 상자', aliases: 'callout 정보 강조 안내' },
+    { id: 'code', icon: '</>', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
   ].filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(menu?.query.toLowerCase() || ''));
   const notes = (props.features?.notes || []).filter(note => note.id !== props.features?.currentId && note.title.trim()
     && (props.features?.showRecords || note.tier !== 'record') && note.title.toLowerCase().includes(menu?.query.toLowerCase() || ''))
@@ -57,6 +60,8 @@ export function EditorTools(props: EditorProps) {
   function restore() { if (selection.current) $setSelection(selection.current.clone()); }
   function format(value: typeof formats[number]) { editor.update(() => { restore(); editor.dispatchCommand(FORMAT_TEXT_COMMAND, value); }); }
   const block = $insertBlock;
+  // 빈 줄의 「+」: 슬래시를 대신 쳐 준다. 그러면 직접 `/`를 칠 때와 같은 길로 메뉴가 열린다.
+  function insertSlash() { editor.update(() => { const selected = $getSelection(); if ($isRangeSelection(selected)) selected.insertText('/'); }); editor.focus(); }
   function removeTrigger(trigger: Trigger) {
     const node = $getNodeByKey<TextNode>(trigger.key); if (!$isTextNode(node)) return null;
     const range = $createRangeSelection(); range.anchor.set(trigger.key, trigger.start, 'text'); range.focus.set(trigger.key, trigger.start + trigger.size, 'text');
@@ -132,6 +137,14 @@ export function EditorTools(props: EditorProps) {
         const inCallout = node && [node, ...node.getParents()].find($isCallout);
         setCode(inCode ? { key: inCode.getKey(), language: inCode.getLanguage() || '' } : null);
         setCallout(inCallout ? { key: inCallout.getKey(), kind: inCallout.getKind() } : null);
+        const box = outer()?.getBoundingClientRect(), activeBlock = inCode || inCallout;
+        const blockRect = activeBlock && box ? editor.getElementByKey(activeBlock.getKey())?.getBoundingClientRect() : null;
+        const place = blockRect && box ? { top: Math.max(0, Math.round(blockRect.top - box.top - 34)), right: Math.max(0, Math.round(box.right - blockRect.right)) } : null;
+        setAnchor(previous => previous?.top === place?.top && previous?.right === place?.right ? previous : place);
+        const emptyLine = $isRangeSelection(selected) && selected.isCollapsed() && $isParagraphNode(node) && node.isEmpty() && $isRootNode(node.getParent()) ? node : null;
+        const lineRect = emptyLine && box && root.contains(document.activeElement) ? editor.getElementByKey(emptyLine.getKey())?.getBoundingClientRect() : null;
+        const spot = lineRect && box ? { x: Math.round(lineRect.left - box.left), y: Math.round(lineRect.top - box.top) } : null;
+        setLine(previous => previous?.x === spot?.x && previous?.y === spot?.y ? previous : spot);
         const text = selected?.getTextContent() || '';
         if (selected && text.trim() && ($isRangeSelection(selected) && !selected.isCollapsed() || $isTableSelection(selected))) {
           if (!composeRef.current) selection.current = selected.clone();
@@ -230,20 +243,23 @@ export function EditorTools(props: EditorProps) {
     };
     const drop = (event: DragEvent) => { if (event.dataTransfer?.files.length) event.preventDefault(); };
     const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { closeCompose(); setMenu(null); setCard(null); } };
-    root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop);
+    const blur = () => setLine(null);
+    root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop); root.addEventListener('blur', blur);
     document.addEventListener('pointerdown', outside);
-    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); askCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); document.removeEventListener('pointerdown', outside); };
+    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); askCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); root.removeEventListener('blur', blur); document.removeEventListener('pointerdown', outside); };
   }, [editor]);
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>
-    <div className="lex-toolbar">
-      {[['table', '表', '표 삽입'], ['callout', '▣', '콜아웃'], ['code', '</>', '코드 블록']].map(([id, icon, title]) =>
-        <button className="lex-tool-btn" title={title} aria-label={title} key={id} onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => block(id))}>{icon}</button>)}
+    {(code || callout) && anchor && <div className="lex-toolbar lex-block-bar" style={{ top: anchor.top, right: anchor.right }}>
       {code && <select aria-label="코드 언어" value={code.language} onChange={event => editor.update(() => { const node = $getNodeByKey(code.key); if ($isCodeNode(node)) node.setLanguage(event.target.value); })}>
         {!languages.includes(code.language) && <option value={code.language}>{code.language || '언어 없음'}</option>}{languages.map(language => <option key={language}>{language}</option>)}</select>}
       {callout && ['info', 'success', 'warn', 'danger'].map((kind, index) => <button key={kind} aria-pressed={calloutStyle(callout.kind) === kind}
         onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => { const node = $getNodeByKey(callout.key); if ($isCallout(node)) node.setKind(kind); })}>{['정보', '성공', '주의', '위험'][index]}</button>)}
-    </div>
+    </div>}
+    {line && !menu && <div className="lex-line-hint" style={{ left: line.x, top: line.y }}>
+      <button type="button" className="lex-line-plus" title="블록 넣기" aria-label="블록 넣기" onMouseDown={event => event.preventDefault()} onClick={insertSlash}>+</button>
+      <span aria-hidden="true">/ 를 눌러 표, 콜아웃, 코드 블록을 넣어요</span>
+    </div>}
     {selectionBar && !compose && !menu && <div className="sel-bar" style={{ left: selectionBar.x, top: selectionBar.y }} onMouseDown={event => event.preventDefault()}>
       {!selectionBar.special && formats.map((value, index) => <button className={`sel-format-btn sel-format-${value}`} aria-pressed={selectionBar.formats[index]} key={value} onClick={() => format(value)}>{['B', 'I', 'S', '</>'][index]}</button>)}
       {props.features?.comment && <button className="comment-add-btn" onClick={beginComment}>코멘트</button>}
@@ -263,7 +279,8 @@ export function EditorTools(props: EditorProps) {
         }} />
       {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id} data-slash-id={item.id}
         aria-selected={menu.selected === index} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setMenu({ ...menu, selected: index })} onClick={() => void choose(item.id)}>
-        <span className="slash-item-label">{item.label}</span>{'hint' in item && <small>{item.hint}</small>}</button>) : <p>일치하는 {menu.kind === 'note' ? '노트가' : '블록이'} 없어요.</p>}
+        {'icon' in item && <span className="slash-item-icon" aria-hidden="true">{item.icon}</span>}
+        <span className="slash-item-label">{item.label}{'desc' in item && <small>{item.desc}</small>}</span>{'hint' in item && <small>{item.hint}</small>}</button>) : <p>일치하는 {menu.kind === 'note' ? '노트가' : '블록이'} 없어요.</p>}
     </div>}
     {card && <div className="comment-card" style={{ left: card.x, top: card.y }} onMouseEnter={() => clearTimeout(closeCard.current)}
       onMouseLeave={() => { if (!card.pinned) setCard(null); }} tabIndex={-1} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setCard(null); } }}>

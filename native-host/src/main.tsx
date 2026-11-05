@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
+import './editor-insert.css';
 import './skin-tactile.css';
 import './skin-grid.css';
 import './skin-glass.css';
