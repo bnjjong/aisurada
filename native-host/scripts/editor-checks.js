@@ -44,22 +44,24 @@ try{
   assert(items.every(item=>item.querySelector('.slash-item-icon svg path')&&item.querySelector('.slash-item-label small')),'every item has a drawn icon and a one-line description');
   assert(items.every(item=>!item.querySelector('.slash-item-icon').textContent.trim()),'icons are drawn lines, not characters (no Hanja or symbols in the Korean UI)');
   document.querySelector('[data-slash-id="table"]').click();await until(()=>content().querySelector('table'),'table');assert(content().querySelectorAll('table tr').length===3,'rows');assert(content().querySelectorAll('table th').length===3,'header');
-  content().querySelector('td,th').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>document.querySelector('.lex-cell-menu-btn'),'cell hover');document.querySelector('.lex-cell-menu-btn').click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');assert(document.querySelectorAll('.lex-table-menu button').length===10,'menu order/count');
-  document.querySelector('.lex-table-menu button').click();await until(()=>content().querySelectorAll('table tr').length===4,'insert row');
+  content().querySelector('td,th').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>document.querySelector('.lex-row-grip'),'row hover');document.querySelector('.lex-row-grip').click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');
+  const labels=[...document.querySelectorAll('.lex-table-menu button')].map(b=>b.textContent),ten=['위에 행 추가','아래에 행 추가','행 삭제','커서 열 왼쪽에 추가','커서 열 오른쪽에 추가','커서 열 삭제','표 너비 화면에 맞춤','표 복사 — 마크다운','표 복사 — Slack과 시트','표 삭제'];
+  assert(labels.filter(l=>ten.includes(l)).join()===ten.join(),'ten table actions in order: '+labels.join('|')); // 줄 메뉴 맨 앞에는 이 줄의 AI·코멘트 항목이 더 있을 수 있다
+  [...document.querySelectorAll('.lex-table-menu button')].find(b=>b.textContent==='위에 행 추가').click();await until(()=>content().querySelectorAll('table tr').length===4,'insert row');
  });
  await test('table-row-controls-sit-on-the-row-and-column-actions-follow-the-caret',async()=>{
   const table=content().querySelector('table'),rows=()=>[...table.querySelectorAll('tr')];
   const hover=async el=>{el.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await pause(80)};
-  const menuBtn=()=>document.querySelector('.lex-cell-menu-btn'),at=()=>{const r=menuBtn().getBoundingClientRect();return [Math.round(r.left),Math.round(r.top)]};
+  const menuBtn=()=>document.querySelector('.lex-row-grip'),at=()=>{const r=menuBtn().getBoundingClientRect();return [Math.round(r.left),Math.round(r.top)]};
   await hover(rows()[1].cells[0]);await until(menuBtn,'row controls');const first=at();
   await hover(rows()[1].cells[1]);const second=at();await hover(rows()[1].cells[2]);const third=at();
   assert(first.join()===second.join()&&second.join()===third.join(),'row controls stay put while the pointer crosses the columns of one row: '+JSON.stringify([first,second,third]));
-  assert(first[0]>rows()[1].cells[2].getBoundingClientRect().left,'row controls sit at the row end (last column): '+first[0]);
+  assert(Math.abs(first[0]+9-Math.round(rows()[1].getBoundingClientRect().left))<=2,'the row grip sits on the left edge of its row (Notion style), not over the cell text: '+first[0]);
   await hover(rows()[2].cells[0]);assert(at()[1]>first[1],'the next row gets its own controls lower down');
-  assert(document.querySelectorAll('.lex-cell-menu-btn').length===1,'one set of controls, not one per column');
+  assert(document.querySelectorAll('.lex-row-grip').length===1,'one grip, not one per column');assert(!document.querySelector('.lex-row-outline'),'no outline until the menu opens');
   const type=async(cell,text)=>{const p=cell.querySelector('p')||cell,r=document.createRange();r.setStart(p,0);r.collapse(true);content().focus({preventScroll:true});getSelection().removeAllRanges();getSelection().addRange(r);assert(document.execCommand('insertText',false,text),'type '+text);await pause(150)};
   const heads=()=>[...rows()[0].cells].map(c=>c.textContent.trim()).join();
-  const choose=async(label,hoverCell)=>{await hover(hoverCell);menuBtn().click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');const b=[...document.querySelectorAll('.lex-table-menu button')].find(x=>x.textContent===label);assert(b,'menu item '+label);return b};
+  const choose=async(label,hoverCell)=>{await hover(hoverCell);menuBtn().click();await until(()=>document.querySelector('.lex-table-menu'),'table menu');assert(document.querySelector('.lex-row-outline'),'the selected row is outlined while the menu is open');const b=[...document.querySelectorAll('.lex-table-menu button')].find(x=>x.textContent===label);assert(b,'menu item '+label);return b};
   await type(rows()[0].cells[2],'열3');await type(rows()[0].cells[1],'열2'); // 커서는 두 번째 열에 남는다
   assert(heads()===',열2,열3','markers typed: '+heads());
   let item=await choose('커서 열 오른쪽에 추가',rows()[2].cells[2]); // 마우스는 마지막 열, 커서는 두 번째 열

@@ -12,8 +12,9 @@ import { $exportSelection, $tableMarkdown, $tableTSV } from './markdown.ts';
 import { OPEN_COMMENT_COMMAND, OPEN_ASK_COMMAND } from './tools.tsx';
 import { AskHoverCard } from '@claude-plug/ask';
 
-// x, y는 마우스가 있는 「줄」의 오른쪽 끝 자리(AI, 코멘트, ⋯ 버튼이 줄마다 한 벌 뜬다). right는 마우스가 있는 칸의 오른쪽 가장자리(열 너비 손잡이용)다.
-type Cell = { key: string; x: number; y: number; right: number; tableRight: number; tableTop: number; tableBottom: number };
+// row*는 마우스가 있는 「줄」의 자리다. 줄 손잡이(점 여섯 개)가 그 줄 왼쪽 가장자리에 줄마다 한 개 뜨고, 메뉴를 열면 이 자리에 파란 테두리를 두른다.
+// right는 마우스가 있는 칸의 오른쪽 가장자리(열 너비 손잡이용)다.
+type Cell = { key: string; rowLeft: number; rowTop: number; rowWidth: number; rowHeight: number; right: number; tableRight: number; tableTop: number; tableBottom: number };
 // 줄 단위 버튼은 마우스가 어느 열에 있는지 알 수 없으므로, 열 작업은 커서가 놓인 칸의 열에 한다. 그 표 안에 커서가 없으면 null이다.
 function $caretCellIn(table: TableNode): TableCellNode | null {
   const selected = $getSelection(), at = $isRangeSelection(selected) || $isTableSelection(selected) ? selected.anchor.getNode() : null;
@@ -56,6 +57,12 @@ export function TableTools(props: EditorProps) {
   };
   function operation(name: string) {
     if (name === 'markdown' || name === 'tsv') { copyTable(name === 'tsv'); setOpen(false); return; }
+    if (name === 'ask' || name === 'comment') {
+      editor.update(() => {
+        const target = cell && $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();
+        if (table && row) { $setSelection($createTableSelectionFrom(table, row.getFirstChild<TableCellNode>()!, row.getLastChild<TableCellNode>()!)); editor.dispatchCommand(name === 'ask' ? OPEN_ASK_COMMAND : OPEN_COMMENT_COMMAND, undefined); }
+      }); setOpen(false); return;
+    }
     editor.update(() => {
       const target = cell && $getNodeByKey<TableCellNode>(cell.key); if (!$isTableCellNode(target)) return;
       const table = target.getParents().find($isTableNode)!;
@@ -120,7 +127,7 @@ export function TableTools(props: EditorProps) {
         if (!ids.length && !asks.length) return;
         const rect = row.getBoundingClientRect(); let key = '';
         editor.read(() => { key = $getNearestNodeFromDOMNode(row)?.getKey() || ''; });
-        if (key) next.push({ key, ids, asks, x: rect.left - base.left - 14, y: rect.top - base.top + 8 });
+        if (key) next.push({ key, ids, asks, x: rect.left - base.left - 26, y: rect.top - base.top + 8 });
       });
       setDots(next);
     };
@@ -154,14 +161,14 @@ export function TableTools(props: EditorProps) {
       const tableElem = element.closest('table');
       if (!tableElem) return;
       const base = container.getBoundingClientRect(), rect = element.getBoundingClientRect(), table = tableElem.getBoundingClientRect();
-      const row = (element.closest('tr') ?? element).getBoundingClientRect(); // 버튼은 칸이 아니라 줄에 붙인다. 마우스가 같은 줄의 다른 열로 가도 제자리에 있다.
+      const row = (element.closest('tr') ?? element).getBoundingClientRect(); // 손잡이는 칸이 아니라 줄에 붙인다. 마우스가 같은 줄의 다른 열로 가도 제자리에 있다.
       editor.read(() => {
         const node = $getNearestNodeFromDOMNode(element);
-        if ($isTableCellNode(node)) setCell({ key: node.getKey(), x: row.right - base.left - 28, y: row.top - base.top + 2, right: rect.right - base.left,
+        if ($isTableCellNode(node)) setCell({ key: node.getKey(), rowLeft: row.left - base.left, rowTop: row.top - base.top, rowWidth: row.width, rowHeight: row.height, right: rect.right - base.left,
           tableRight: table.right - base.left, tableTop: table.top - base.top, tableBottom: table.bottom - base.top });
       });
     };
-    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.lex-table-menu,.lex-cell-menu-btn')) setOpen(false); };
+    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.lex-table-menu,.lex-row-grip')) setOpen(false); };
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); } };
     root.addEventListener('mouseover', over); document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape, true);
     const copy = (event: ClipboardEvent | null, cut = false) => {
@@ -192,29 +199,32 @@ export function TableTools(props: EditorProps) {
     }, COMMAND_PRIORITY_HIGH);
     return () => { active = false; cancelAnimationFrame(rafId); stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
   }, [editor, open, props.askDocId]);
-  const operations = [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제'], ['before-col', '커서 열 왼쪽에 추가'], ['after-col', '커서 열 오른쪽에 추가'], ['remove-col', '커서 열 삭제'], ['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']];
+  // 줄 메뉴: AI와 코멘트는 이 줄에 대한 것이고, 행 작업은 이 줄에, 열 작업은 커서가 놓인 칸의 열에, 표 작업은 표 전체에 한다.
+  const groups = [
+    [...(props.onAskAi ? [['ask', '이 줄을 AI에게 묻기']] : []), ...(props.features?.comment ? [['comment', '이 줄에 코멘트 달기']] : [])],
+    [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제']],
+    [['before-col', '커서 열 왼쪽에 추가'], ['after-col', '커서 열 오른쪽에 추가'], ['remove-col', '커서 열 삭제']],
+    [['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']],
+  ].filter(group => group.length);
   // 메뉴가 열려 있을 때만 읽는다. 커서가 이 표 안에 없으면 열 작업 항목은 눌러도 할 일이 없으므로 꺼 둔다.
   const hasCaret = open && cell ? editor.getEditorState().read(() => { const table = $getNodeByKey(cell.key)?.getParents().find($isTableNode); return !!table && !!$caretCellIn(table); }) : false;
   return <>
-    {cell && <><button className="lex-cell-menu-btn" title="표 편집" aria-label="표 편집" style={{ left: cell.x, top: cell.y }} onMouseDown={event => event.preventDefault()} onClick={() => setOpen(!open)}>⋯</button>
-      <div className="lex-col-grip" style={{ left: cell.right - 3, top: cell.y - 2, height: 28 }} onPointerDown={event => resize(event, false)} />
+    {cell && <>
+      <button className={`lex-row-grip${open ? ' is-active' : ''}`} title="줄 메뉴" aria-label="줄 메뉴" aria-expanded={open}
+        style={{ left: cell.rowLeft - 9, top: cell.rowTop + cell.rowHeight / 2 - 14 }} onMouseDown={event => event.preventDefault()} onClick={() => setOpen(!open)}>
+        <svg viewBox="0 0 8 14" width="8" height="14" fill="currentColor" aria-hidden="true">{[2, 7, 12].flatMap(y => [1.8, 6.2].map(x => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.2" />))}</svg>
+      </button>
+      {open && <div className="lex-row-outline" style={{ left: cell.rowLeft - 1, top: cell.rowTop - 1, width: cell.rowWidth + 2, height: cell.rowHeight + 2 }} />}
+      <div className="lex-col-grip" style={{ left: cell.right - 3, top: cell.rowTop, height: 28 }} onPointerDown={event => resize(event, false)} />
       <div className="lex-table-grip" style={{ left: cell.tableRight - 3, top: cell.tableTop, height: cell.tableBottom - cell.tableTop }} onPointerDown={event => resize(event, true)} onDoubleClick={() => operation('fit')} /></>}
-    {open && cell && <div className="lex-table-menu" style={{ left: cell.x, top: cell.y + 26 }}>{operations.map(([id, title]) => {
+    {open && cell && <div className="lex-table-menu" style={{ left: cell.rowLeft + 16, top: cell.rowTop + cell.rowHeight / 2 - 14 }}>{groups.map((group, index) => <div key={index} className="lex-table-menu-group">{group.map(([id, title]) => {
       const needsCaret = id.endsWith('-col') && !hasCaret;
       return <button key={id} disabled={needsCaret} title={needsCaret ? '열 작업은 표 안의 칸을 눌러 커서를 둔 뒤에 쓸 수 있어요' : undefined} onClick={() => operation(id)}>{title}</button>;
-    })}</div>}
+    })}</div>)}</div>}
     {dots.map(dot => <div className={`lex-row-dot lex-rownote-dot${dot.asks.length ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}`} key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => { cancelRowClose(); if (!rowPinned.current) setRowCard(dot.key); }} onMouseLeave={closeRowSoon}>
       <button aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'} onClick={() => { if (dot.ids.length) props.features?.openComment?.(dot.ids[0]); }}>●</button>
       {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}
         {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => { cancelRowClose(); rowPinned.current = false; setRowCard(null); }} onPin={() => { cancelRowClose(); rowPinned.current = true; }} pinned={false} />)}</div>}
     </div>)}
-    {cell && props.features?.comment && <button className="lex-row-comment" style={{ left: cell.x - 35, top: cell.y }} title="이 줄에 코멘트 달기" aria-label="이 줄에 코멘트 달기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
-      const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();
-      if (table && row) { $setSelection($createTableSelectionFrom(table, row.getFirstChild<TableCellNode>()!, row.getLastChild<TableCellNode>()!)); editor.dispatchCommand(OPEN_COMMENT_COMMAND, undefined); }
-    })}>＋</button>}
-    {cell && props.onAskAi && <button className="lex-row-ask lex-row-comment ask-add-btn" style={{ left: cell.x - (props.features?.comment ? 65 : 35), top: cell.y }} title="이 줄을 AI에게 묻기" aria-label="이 줄을 AI에게 묻기" onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => {
-      const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();
-      if (table && row) { $setSelection($createTableSelectionFrom(table, row.getFirstChild<TableCellNode>()!, row.getLastChild<TableCellNode>()!)); editor.dispatchCommand(OPEN_ASK_COMMAND, undefined); }
-    })}>AI</button>}
   </>;
 }
