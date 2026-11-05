@@ -194,6 +194,35 @@ export function NoteEditor({
         </div>
       )}
       {snapshot.discarding && <p role="status">디스크 버전을 불러오는 중…</p>}
+      {headings.length >= 2 && (
+        <div className="note-toc-wrapper">
+          <nav
+            className={`note-toc ${toc ? "expanded" : ""}`}
+            aria-label="목차"
+            onMouseEnter={() => setToc(true)}
+            onMouseLeave={() => setToc(false)}
+            onFocus={() => setToc(true)}
+          >
+            {headings.slice(1).map((h) => (
+              <button
+                type="button"
+                aria-current={section === h.key}
+                key={h.key}
+                data-level={h.level}
+                title={h.text}
+                onClick={() => {
+                  setToc(true);
+                  handle.current?.heading(h.key);
+                }}
+                aria-label={h.text}
+              >
+                <span className="toc-dash" data-level={h.level} />
+                <span className="toc-tooltip">{h.text}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
       {note.format === "html" ? (
         <div className="doc-prose">
           <ReadMarkdown
@@ -228,33 +257,6 @@ export function NoteEditor({
           onAskFollowUp={askEditor?.onAskFollowUp}
           onOpenAskCompose={onOpenAskCompose}
         />
-      )}
-      {headings.length >= 3 && (
-        <nav
-          className={`note-toc ${toc ? "expanded" : ""}`}
-          aria-label="목차"
-          onMouseEnter={() => setToc(true)}
-          onMouseLeave={() => setToc(false)}
-          onFocus={() => setToc(true)}
-        >
-          {headings.slice(1).map((h) => (
-            <button
-              type="button"
-              aria-current={section === h.key}
-              key={h.key}
-              data-level={h.level}
-              title={h.text}
-              onClick={() => {
-                setToc(true);
-                handle.current?.heading(h.key);
-              }}
-              aria-label={h.text}
-            >
-              <span className="toc-dash" data-level={h.level} />
-              <span className="toc-tooltip">{h.text}</span>
-            </button>
-          ))}
-        </nav>
       )}
       {difference !== null && (
         <ConflictDiff

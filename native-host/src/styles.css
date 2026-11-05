@@ -271,6 +271,22 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .child-note-list { display: grid; gap: 6px; }.child-note-list .subnote-row { display: flex; align-items: center; justify-content: space-between; text-align: left; gap: 15px; padding: 12px; }.subnote-row strong { font-weight: 500; }.subnote-row small { color: var(--muted); white-space: nowrap; }
 .comment-row { padding: 14px 12px; border-bottom: 1px solid var(--line); transition: background .2s; }.comment-row header { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--muted); }.comment-row header time { margin-right: auto; }.comment-row header button { padding: 3px 5px; font-size: 10px; }.comment-body { font-size: 13px; line-height: 1.8; }.comment-quote { text-align: left; border: 0; border-left: 2px solid var(--line); border-radius: 0; margin-top: 10px; color: var(--muted); }.comment-flash { background: #d8be6f22; }.note-comment-thread > textarea { margin-top: 15px; font-size: 13px; }.note-comment-thread > button { display: block; margin: 8px 0 0 auto; }
 /* Notion-style Table of Contents (TOC) Mini-map */
+.note-toc-wrapper {
+  position: sticky;
+  top: 96px;
+  float: right;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 20;
+}
+.note-toc-wrapper .note-toc {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  float: none;
+  margin-right: 0;
+}
 .note-toc {
   position: sticky;
   top: 96px;
