@@ -199,6 +199,12 @@ public final class McpServerTest {
         eq(text(unknown, "result", "serverInfo", "name"), "aisurada", "서버 이름");
         check(at(unknown, "result", "capabilities", "tools") != null, "tools 기능을 알린다");
         check(at(unknown, "result", "capabilities", "resources") == null, "안 하는 기능은 알리지 않는다");
+        // 엔진은 마크다운 노트를 고칠 때 f1을 꼭 요구한다. 선택처럼 읽히는 안내는 모델이 한 번 실패한 뒤에야 알게 만든다.
+        String instructions = text(unknown, "result", "instructions");
+        check(instructions != null && instructions.contains("f1이 꼭 필요"), "접속 안내가 f1이 꼭 필요하다고 말한다");
+        for (String name : List.of("update_doc", "set_favorite", "evaluate_doc", "link_docs", "update_sub_note")) {
+            check(McpTools.find(name).inputSchema().contains("꼭 필요한 쓰기 전 토큰"), name + "의 f1 설명이 꼭 필요하다고 말한다");
+        }
 
         // 알림에는 답이 없다
         check(readOnly.handle("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}") == null, "알림에는 답하지 않는다");
@@ -384,8 +390,11 @@ public final class McpServerTest {
                 check(!mcp.isError(updated), "update_doc 성공: " + mcp.resultText(updated));
                 JsonValue stale = mcp.call("update_doc", "{\"id\":\"" + id + "\",\"body\":\"낡은 토큰으로 덮기\",\"f1\":\"" + precondition + "\"}");
                 check(mcp.isError(stale), "낡은 토큰으로는 덮어쓰지 못한다: " + mcp.resultText(stale));
+                JsonValue noToken = mcp.call("update_doc", "{\"id\":\"" + id + "\",\"body\":\"토큰 없이 덮기\"}");
+                check(mcp.isError(noToken) && mcp.resultText(noToken).contains("AIS-412"), "f1 없이는 고치지 못한다: " + mcp.resultText(noToken));
                 String reread = mcp.resultText(mcp.call("get_doc", "{\"id\":\"" + id + "\"}"));
-                check(reread.contains("고친 본문") && !reread.contains("두 번째 줄") && !reread.contains("낡은 토큰"), "본문은 통째로 바뀌었고 낡은 쓰기는 안 먹었다");
+                check(reread.contains("고친 본문") && !reread.contains("두 번째 줄") && !reread.contains("낡은 토큰") && !reread.contains("토큰 없이"),
+                        "본문은 통째로 바뀌었고 낡은 쓰기와 토큰 없는 쓰기는 안 먹었다");
 
                 check(mcp.resultText(mcp.call("list_docs", "{}")).contains(id), "list_docs에 보인다");
                 check(mcp.resultText(mcp.call("search_docs", "{\"query\":\"고친\"}")).contains(id), "search_docs로 찾는다");

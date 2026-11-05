@@ -40,8 +40,9 @@ final class McpServer {
     private static final int INTERNAL_ERROR = -32603;
 
     private static final String INSTRUCTIONS =
-            "aisurada vault의 노트를 읽고 쓰는 도구들이다. 노트를 고치기 전에는 get_doc으로 읽어 precondition 값을 얻고, "
-                    + "update_doc 등에 f1으로 넘기면 그 사이 다른 곳에서 고쳐진 내용을 덮어쓰지 않는다. "
+            "aisurada vault의 노트를 읽고 쓰는 도구들이다. 기존 노트를 고치는 도구(update_doc, set_favorite, evaluate_doc, "
+                    + "link_docs, update_sub_note)는 f1이 꼭 필요하다. 고치기 전에 get_doc으로 읽어 precondition 값을 얻어 f1으로 넘긴다. "
+                    + "방금 create_doc이나 update_doc을 했다면 그 응답의 precondition을 쓴다. 그 사이 다른 곳에서 고쳐졌으면 덮어쓰지 않고 멈춘다. "
                     + "id는 list_docs나 search_docs가 준 값을 그대로 쓴다.";
 
     private final boolean allowWrite;

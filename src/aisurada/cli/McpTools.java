@@ -135,7 +135,9 @@ final class McpTools {
         return new Schema();
     }
 
-    private static final String F1 = "직전에 get_doc 등으로 읽은 노트의 precondition 값(f1:…). 주면 그 사이에 다른 곳에서 고쳐진 노트를 덮어쓰지 않고 멈춘다.";
+    private static final String F1 = "기존 노트를 고칠 때 꼭 필요한 쓰기 전 토큰. 직전에 get_doc으로 읽은 노트의 precondition 값(f1:…)을 그대로 넣는다. "
+            + "방금 create_doc이나 update_doc을 했다면 그 응답의 precondition을 쓴다. 안 주면 AIS-412로 거절되고, "
+            + "그 사이 다른 곳에서 고쳐진 노트도 덮어쓰지 않고 멈춘다.";
 
     /** list_docs와 search_docs가 같이 받는 거름 조건 8개를 붙입니다. */
     private static Schema filters(Schema s) {
