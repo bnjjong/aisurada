@@ -290,6 +290,7 @@ java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표�
 </ol>
 <h3 id="mcp-서버-ais-cli-mcp"><a class="anchor" href="#mcp-서버-ais-cli-mcp" aria-label="이 절의 링크">#</a>MCP 서버 (<code>ais-cli mcp</code>)</h3>
 <p>Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다. 표준 입출력으로 한 줄에 JSON-RPC 메시지 하나씩 주고받고(<code>initialize</code>, <code>ping</code>, <code>tools/list</code>, <code>tools/call</code>), 입력이 닫히면 끝난다. 프로토콜은 <code>src/aisurada/cli/McpServer.java</code>, 도구 정의는 <code>McpTools.java</code>에 있다. 이것은 설명서 밖의 확장이다. 외부 설명서에는 MCP가 없고, 예전 Node MCP 서버는 C119에서 지웠다.</p>
+<p>연결하는 법, 도구 28개의 인자, 안전장치, 응답과 오류 예시는 <a href="mcp-guide.md"><code>mcp-guide.md</code></a>에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.</p>
 <ul>
 <li><strong>도구.</strong> 이름은 엔진 도구 29개와 같다. 기본은 읽기 13개만 내놓고 <code>--write</code>를 주면 28개를 내놓는다. <code>purge_doc</code>(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 <code>CommandRegistry.WRITE_COMMANDS</code>에서 나오므로 두 곳이 어긋나지 않는다.</li>
 <li><strong>호출 길.</strong> 도구 호출은 단발 <code>ais-cli</code>와 같은 길(<code>runEnginePipeline</code>: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 <code>System.exit</code>을 부르는데, <code>AisCliMain</code>의 종료 호출은 모두 <code>exit()</code> 하나를 거친다. mcp 모드에서만 <code>exit()</code>이 프로세스를 끝내는 대신 <code>CliExit</code>을 던지고, 그 호출만 <code>isError</code>로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.</li>

@@ -322,7 +322,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | `doctor` | 키, 레이블, 소켓, plist, 실행 상태, 동시 상한, 하루 청소를 진단한다. `--plist`는 쓸 plist를 보여 주고, `--prune`은 vault 폴더가 사라진 LaunchAgent를 지운다 |
 | `sweep` | 24시간 넘게 조용한 엔진을 내리고 죽은 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
 | `install` | `ais-cli.jar`와 `ais-sidecar.jar`를 `~/Library/Application Support/aisurada/bin/`에 깐다. `--cli`, `--sidecar`로 원본을 고른다 |
-| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 13개만 내놓고, `--write`를 주면 쓰기 도구까지 28개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`로 정한다 |
+| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 13개만 내놓고, `--write`를 주면 쓰기 도구까지 28개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`로 정한다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
 | `claude-mcp` | Claude Code에 위 서버를 등록한다. `status`, `add [--write]`, `remove`는 `claude mcp`를 부르고, `config [--write]`는 Claude Desktop 설정에 붙여 넣을 조각만 출력한다 |
 | `--help`, `--list` | 사용법과 이름 목록 |
 
