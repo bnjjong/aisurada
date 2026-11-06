@@ -37,7 +37,6 @@ export function NoteMeta({
   mode?: NoteMode;
 }) {
   const state = controller.getSnapshot(),
-    [identity, setIdentity] = useState(false),
     [evaluating, setEvaluating] = useState(false),
     [history, setHistory] = useState(false),
     [deleting, setDeleting] = useState(false),
@@ -63,161 +62,169 @@ export function NoteMeta({
   };
   return (
     <>
+      <header className="doc-meta-bar">
       <div className="doc-meta">
-        <span>
-          {TYPE_NAMES[asText(note.type) || "free"] || asText(note.type)} ·{" "}
-          {note.date} {note.time}
-        </span>
-        {Boolean(note.format && note.format !== "markdown") && (
-          <span className="format-badge">{String(note.format).toUpperCase()}</span>
-        )}
-        {live.tier === "record" && <span className="record-badge">기록</span>}
-        {!parent && (
-          <>
-            <button
-              className="fav-toggle"
-              aria-label="즐겨찾기"
-              aria-pressed={live.favorite === true}
-              onClick={() =>
-                void controller.data.favorite(note.id, live.favorite !== true)
-              }
-            >
-              {live.favorite === true ? "★" : "☆"}
-            </button>
-            <button
-              className="doc-eval-badge"
-              onClick={() => setEvaluating(!evaluating)}
-            >
-              {asRow(live.evaluation)
-                ? String(asRow(live.evaluation)?.score)
-                : "평가"}
-            </button>
-          </>
-        )}
-        {note.format === "markdown" && (
-          <>
-            <button
-              className="doc-meta-body-copy"
-              onClick={() =>
-                void navigator.clipboard.writeText(
-                  stripMarkers(controller.readBuffer(key, live.body)),
-                )
-              }
-            >
-              본문 복사
-            </button>
-            <button
-              className="doc-meta-history"
-              onClick={() => setHistory(true)}
-            >
-              이력
-            </button>
-          </>
-        )}
-        <button onClick={() => setIdentity(!identity)}>
-          {parent ? "경로" : "ID"}
-        </button>
-        <NoteSessionChips
-          note={live}
-          onOpenRail={CLAUDE_ENABLED ? (sessId) => {
-            openNoteRail(note.id, sessId);
-            if (mode === "agenda" || mode === "preview") {
-              if (mode === "preview") controller.showPreview(null);
-              go(controller, docAddress(note.id));
-            }
-          } : undefined}
-        />
-        {!parent &&
-          controller.isNative() &&
-          controller.context.kind === "main" && (
-            <button
-              className="pane-pop"
-              onClick={() =>
-                void controller
-                  .moveNoteWindow(note.id)
-                  .then((result) =>
-                    setMoveError(
-                      result === "opened"
-                        ? ""
-                        : result === "unsaved"
-                          ? "저장하지 못한 글이 있어서 새 창으로 옮기지 않았어요. 충돌 배너를 먼저 풀어 주세요."
-                          : "새 창을 열지 못했어요. 앱을 다시 켜고 해 보세요.",
-                    ),
-                  )
-              }
-            >
-              새 창으로
-            </button>
-          )}
-        {(mode === "agenda" || mode === "preview") && (
-          <button
-            onClick={() => {
-              if (mode === "preview") controller.showPreview(null);
-              go(controller, docAddress(note.id));
-            }}
-          >
-            탭으로 띄우기
-          </button>
-        )}
-        <button onClick={() => setDeleting(true)}>삭제</button>
-      </div>
-      {identity && (
-        <div className="doc-id-chip">
-          <span>
-            {parent ? "경로" : "ID"} <code>{chain}</code>
+        <div className="doc-meta-left">
+          <span className="doc-meta-time">
+            {TYPE_NAMES[asText(note.type) || "free"] || asText(note.type)} ·{" "}
+            {note.date} {note.time}
           </span>
-          <button onClick={() => void navigator.clipboard.writeText(chain)}>
-            복사
-          </button>
-          {!parent && state.workspace?.path && (
-            <button
-              onClick={() =>
-                void navigator.clipboard.writeText(
-                  `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
-                )
-              }
-            >
-              새 창 링크
-            </button>
+          {Boolean(note.format && note.format !== "markdown") && (
+            <span className="format-badge">{String(note.format).toUpperCase()}</span>
+          )}
+          {live.tier === "record" && <span className="record-badge">기록</span>}
+          {!parent && (
+            <>
+              <button
+                className="fav-toggle"
+                aria-label="즐겨찾기"
+                aria-pressed={live.favorite === true}
+                onClick={() =>
+                  void controller.data.favorite(note.id, live.favorite !== true)
+                }
+              >
+                {live.favorite === true ? "★" : "☆"}
+              </button>
+              <button
+                className="doc-eval-badge"
+                onClick={() => setEvaluating(!evaluating)}
+              >
+                {asRow(live.evaluation)
+                  ? String(asRow(live.evaluation)?.score)
+                  : "평가"}
+              </button>
+            </>
+          )}
+          {note.format === "markdown" && (
+            <>
+              <button
+                className="doc-meta-body-copy"
+                onClick={() =>
+                  void navigator.clipboard.writeText(
+                    stripMarkers(controller.readBuffer(key, live.body)),
+                  )
+                }
+              >
+                본문 복사
+              </button>
+              <button
+                className="doc-meta-history"
+                onClick={() => setHistory(true)}
+              >
+                이력
+              </button>
+            </>
           )}
         </div>
-      )}
-      <div className="doc-context-chips">
-        {!parent &&
-          agenda &&
-          (mode === "preview" ? (
-            <span>{agenda.title}</span>
-          ) : (
-            <button onClick={() => go(controller, agendaAddress(agenda.id))}>
-              {project ? asText(project.title) + " / " : ""}
-              {agenda.title}
-            </button>
-          ))}
-        {!!note.template &&
-          !parent &&
-          (template ? (
+        <div className="doc-meta-right">
+          <span className="doc-meta-id doc-meta-note-id">
+            <span className="doc-meta-id-label">{parent ? "경로" : "ID"}</span>
+            <span className="doc-meta-id-val">{chain}</span>
             <button
-              onClick={() =>
-                go(
-                  controller,
-                  "/templates?open=" + encodeURIComponent(asText(template.id)),
-                )
-              }
+              type="button"
+              className="doc-meta-id-copy"
+              onClick={() => void navigator.clipboard.writeText(chain)}
             >
-              {asText(template.name)}
-            </button>
-          ) : (
-            <span>알 수 없음 ({asText(note.template)})</span>
-          ))}
-        {sessionChips(live).map((s) => (
-          <span className="session-chip" key={s.id}>
-            {s.label} <code>{s.id}</code>
-            <button onClick={() => void navigator.clipboard.writeText(s.id)}>
               복사
             </button>
+            {!parent && state.workspace?.path && (
+              <button
+                type="button"
+                className="doc-meta-id-open"
+                onClick={() =>
+                  void navigator.clipboard.writeText(
+                    `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
+                  )
+                }
+              >
+                새 창 링크
+              </button>
+            )}
           </span>
-        ))}
+          <NoteSessionChips
+            note={live}
+            onOpenRail={CLAUDE_ENABLED ? (sessId) => {
+              openNoteRail(note.id, sessId);
+              if (mode === "agenda" || mode === "preview") {
+                if (mode === "preview") controller.showPreview(null);
+                go(controller, docAddress(note.id));
+              }
+            } : undefined}
+          />
+          {!parent &&
+            controller.isNative() &&
+            controller.context.kind === "main" && (
+              <button
+                className="pane-pop"
+                onClick={() =>
+                  void controller
+                    .moveNoteWindow(note.id)
+                    .then((result) =>
+                      setMoveError(
+                        result === "opened"
+                          ? ""
+                          : result === "unsaved"
+                            ? "저장하지 못한 글이 있어서 새 창으로 옮기지 않았어요. 충돌 배너를 먼저 풀어 주세요."
+                            : "새 창을 열지 못했어요. 앱을 다시 켜고 해 보세요.",
+                      ),
+                    )
+                }
+              >
+                새 창으로
+              </button>
+            )}
+          {(mode === "agenda" || mode === "preview") && (
+            <button
+              onClick={() => {
+                if (mode === "preview") controller.showPreview(null);
+                go(controller, docAddress(note.id));
+              }}
+            >
+              탭으로 띄우기
+            </button>
+          )}
+          <button onClick={() => setDeleting(true)}>삭제</button>
+        </div>
       </div>
+      {(!parent && (agenda || !!note.template) || sessionChips(live).length > 0) && (
+        <div className="doc-context-chips">
+          {!parent &&
+            agenda &&
+            (mode === "preview" ? (
+              <span>{agenda.title}</span>
+            ) : (
+              <button onClick={() => go(controller, agendaAddress(agenda.id))}>
+                {project ? asText(project.title) + " / " : ""}
+                {agenda.title}
+              </button>
+            ))}
+          {!!note.template &&
+            !parent &&
+            (template ? (
+              <button
+                onClick={() =>
+                  go(
+                    controller,
+                    "/templates?open=" + encodeURIComponent(asText(template.id)),
+                  )
+                }
+              >
+                {asText(template.name)}
+              </button>
+            ) : (
+              <span>알 수 없음 ({asText(note.template)})</span>
+            ))}
+          {sessionChips(live).map((s) => (
+            <span className="session-chip" key={s.id}>
+              {s.label} <code>{s.id}</code>
+              <button onClick={() => void navigator.clipboard.writeText(s.id)}>
+                복사
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </header>
       {moveError && <p role="status">{moveError}</p>}
       {evaluating && (
         <Evaluation

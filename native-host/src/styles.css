@@ -103,7 +103,7 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .empty-state { padding: 70px 16px; text-align: center; color: var(--muted); }
 .empty-state > span { font-size: 32px; }.empty-state h2 { font-size: 17px; font-weight: 500; }.empty-state p { font-size: 13px; }
 .read-failure { background: var(--soft); border-bottom: 1px solid var(--line); color: var(--ink); padding: 16px 24px; font-size: 12px; line-height: 1.8; }
-.note-reading { padding: 48px clamp(24px, 6vw, 88px); max-width: 1000px; margin: 0 auto; }
+.note-reading { padding: 0 clamp(24px, 6vw, 88px) 48px; max-width: 1000px; margin: 0 auto; }
 .note-back { margin: 32px 0 0 40px; }
 .note-body { font: inherit; font-size: 15px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 32px; }
 .workspace-frame { height: 100vh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -252,9 +252,14 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .hidden-agenda .agenda-dot { opacity: .25; }.hidden-agenda .agenda-name { color: var(--muted); }
 .agenda-filter { position: relative; font-size: 12px; }.agenda-filter summary { cursor: pointer; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
 .agenda-filter[open] { background: var(--surface); z-index: 3; }.agenda-filter[open] > section { padding: 12px; border-bottom: 1px solid var(--line); }.agenda-filter label { display: inline-flex; align-items: center; gap: 8px; }.agenda-filter button { padding: 6px; }
-.doc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); position: relative; }
-.doc-meta button { padding: 5px 8px; font-size: 11px; border-color: transparent; }
-.doc-meta > span:first-child { margin-right: auto; }
+.doc-meta-bar { position: sticky; top: 0; z-index: 15; background: var(--surface); border-bottom: 1px solid var(--line); padding: 14px 0 12px; margin-bottom: 24px; }
+.doc-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.doc-meta-left { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.doc-meta-right { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.doc-meta-time { font-weight: 500; color: var(--muted); white-space: nowrap; margin-right: 2px; }
+.doc-meta button { padding: 4px 8px; font-size: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 5px; cursor: pointer; transition: background 0.15s; }
+.doc-meta button:hover { background: var(--soft); }
+.doc-meta .fav-toggle { border-color: transparent; background: transparent; font-size: 13px; padding: 2px 4px; }
 .doc-meta label { display: inline-flex; align-items: center; white-space: nowrap; gap: 3px; }
 
 .format-badge, .record-badge { font-size: 10px; padding: 3px 6px; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
@@ -610,13 +615,14 @@ code.is-symbol { font-weight: 700; }
  * -------------------------------------------------------------------------- */
 
 .doc-meta-sessions { display: inline-flex; align-items: center; gap: 6px; }
-.doc-meta-id { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; background: var(--soft); }
+.doc-meta-id { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; font-size: 11px; background: var(--soft); line-height: 1.4; }
 .doc-meta-id-label { color: var(--muted); font-size: 10px; font-weight: 500; }
 .doc-meta-id-val { font-family: var(--font-mono); font-size: 10px; color: var(--ink); }
-.doc-meta-id-open { border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 10px; padding: 0 2px; }
+.doc-meta-id button { border: 0 !important; background: transparent !important; padding: 0 3px !important; font-size: 10px !important; border-radius: 3px !important; }
+.doc-meta-id-open { color: var(--accent) !important; cursor: pointer; }
 .doc-meta-id-open:hover { text-decoration: underline; }
-.doc-meta-id-copy { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; padding: 0 2px; }
-.doc-meta-id-copy:hover { color: var(--ink); }
+.doc-meta-id-copy { color: var(--muted) !important; cursor: pointer; }
+.doc-meta-id-copy:hover { color: var(--ink) !important; }
 
 .nsrail { position: relative; display: flex; flex-direction: column; height: 100%; border-left: 1px solid var(--line); background: var(--surface); box-sizing: border-box; flex-shrink: 0; max-width: max(392px, calc(100% - 480px)); }
 .nsrail-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 10; }
