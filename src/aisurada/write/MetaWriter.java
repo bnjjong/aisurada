@@ -120,7 +120,6 @@ public final class MetaWriter {
                 asIndexed(note.meta().title()),
                 note.meta().created(),
                 finalSessionId,
-                note.meta().mins(),
                 note.meta().tier(),
                 note.meta().editedBy(),
                 note.meta().editedAt(),

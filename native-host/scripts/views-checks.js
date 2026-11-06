@@ -221,7 +221,6 @@ if (location.pathname.startsWith("/note-window/")) {
       assert($(".doc-meta-history"), "history button");
       await until(() => $(".note-toc button"), "initial headings");
       assert($$(".note-toc button").length === 2, "first heading excluded");
-      assert(!$(".doc-meta-mins-input"), "the minutes input is gone");
       const calls = await fetch("/calls").then((r) => r.json());
       assert(
         !calls.some((c) => c.args.argv[0] === "update-doc"),
@@ -244,9 +243,6 @@ if (location.pathname.startsWith("/note-window/")) {
           (await engine(["get-doc", cfg.id])).evaluation?.score === 83,
         "evaluation",
       );
-      // 소요 시간 입력칸은 없앴다. 뒤의 점검이 이 노트에 35분이 있다고 보므로 엔진으로 맞춰 둔다.
-      const current = await engine(["get-doc", cfg.id]);
-      await engine(["update-doc", cfg.id, "mins=35", "f1=" + current.precondition]);
     });
     await test("C110-evaluation-escape-keeps-the-preview-open", async () => {
       go("/calendar?mode=day&date=" + cfg.today);
@@ -432,7 +428,7 @@ if (location.pathname.startsWith("/note-window/")) {
         "restore disk",
       );
       assert(
-        n.favorite === true && n.mins === 35 && n.evaluation?.score === 83,
+        n.favorite === true && n.evaluation?.score === 83,
         "restore changed metadata",
       );
       $(".nhist-close").click();

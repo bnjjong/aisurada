@@ -128,7 +128,7 @@ if (location.pathname.startsWith('/note-window/')) {
       assert((await data.deleteTemplate(asText(template.value?.id))).ok, 'template delete failed');
     });
     await test('real-trash-restore-and-permanent-delete', async () => {
-      const note = await data.createDoc({ agendaId: current().agendas[0].id, type: 'free', title: '휴지통 검증', body: '# 휴지통 검증\n', date: cfg.today, time: '12:30', mins: 0, tags: [] });
+      const note = await data.createDoc({ agendaId: current().agendas[0].id, type: 'free', title: '휴지통 검증', body: '# 휴지통 검증\n', date: cfg.today, time: '12:30', tags: [] });
       const id = asText(note.value?.id); assert(note.ok, 'doc creation failed');
       const moved = await data.deleteDoc(id); assert(moved.ok, 'trash failed');
       assert((await data.trashAction(asText(moved.value?.trashId), 'restore')).ok, 'restore failed');

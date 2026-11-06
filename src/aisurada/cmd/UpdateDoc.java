@@ -43,7 +43,7 @@ public final class UpdateDoc {
     private UpdateDoc() {}
 
     public static final String USAGE = "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] " +
-            "[template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [mins=<분>] [f1=<직전에 읽은 토큰>]";
+            "[template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [f1=<직전에 읽은 토큰>]";
 
     private static final Pattern NOTE_ID_PATTERN = aisurada.text.IdShape.NOTE;
 
@@ -59,7 +59,7 @@ public final class UpdateDoc {
 
         NoteIndex noteIndex = WritePipeline.index(vaultRoot);
 
-        // 7. 값 읽기: id, id 모양, tags, date, time, mins, 그다음 제목 공백과 음수 소요 시간
+        // 7. 값 읽기: id, id 모양, tags, date, time, 그다음 제목 공백
         String rawId = isTool ? (String) toolOpts.get("id")
                 : (parsed.positionalArgs().isEmpty() ? null : parsed.positionalArgs().get(0));
         if (rawId == null || Trim.isBlank(rawId)) {
@@ -78,20 +78,9 @@ public final class UpdateDoc {
         String rawTime = isTool ? null : opts.get("time");
         LocalTime givenTime = rawTime != null ? CreateDoc.validateAndParseTime(rawTime) : null;
 
-        Integer givenMins = null;
-        if (!isTool && opts.containsKey("mins")) {
-            String trimmedMins = Trim.trim(opts.get("mins"));
-            if (!trimmedMins.isEmpty()) {
-                givenMins = CreateDoc.parseMins(trimmedMins);
-            }
-        }
-
         String givenTitle = isTool ? (String) toolOpts.get("title") : opts.get("title");
         if (givenTitle != null && Trim.isBlank(givenTitle)) {
             throw new AisException(400, "노트 제목이 비었다: " + noteId);
-        }
-        if (givenMins != null && givenMins < 0) {
-            throw new AisException(400, "노트 소요 시간이 음수다: " + givenMins);
         }
 
         String givenBody = isTool ? (String) toolOpts.get("body") : opts.get("body");
@@ -123,7 +112,6 @@ public final class UpdateDoc {
                 template = trimmedTpl;
             }
         }
-        int mins = givenMins != null ? givenMins : note.meta().mins();
 
         // 14.3: 날짜와 시각은 준 쪽만 갈아 끼우고, 오프셋은 노트의 지금 값을 지킨다
         OffsetDateTime current = OffsetDateTime.parse(note.meta().created());
@@ -190,7 +178,7 @@ public final class UpdateDoc {
         Map<String, Object> evaluation = MetaWriter.asIndexed(note.meta().evaluation());
         StampJudgment.JudgmentResult judgment = StampJudgment.judge(
                 format, body, oldBody, rawYamlMap,
-                noteId, agendaSlug, note.meta().type(), title, created, fileSessionId, mins, note.meta().tier(),
+                noteId, agendaSlug, note.meta().type(), title, created, fileSessionId, note.meta().tier(),
                 note.meta().editedBy(), note.meta().editedAt(), note.meta().editedSessionId(),
                 tags, note.meta().favorite(), indexedCategory, template, evaluation, note.meta().links(),
                 isTool, sessionId);

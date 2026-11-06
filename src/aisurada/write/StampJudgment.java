@@ -37,7 +37,6 @@ public final class StampJudgment {
             String title,
             String created,
             String sessionId,
-            int mins,
             String tier,
             String oldEditedBy,
             String oldEditedAt,
@@ -51,7 +50,7 @@ public final class StampJudgment {
             boolean isToolSurface,
             String currentSessionId
     ) {
-        return judge(format, body, body, rawYamlMapFromFile, id, agenda, type, title, created, sessionId, mins, tier,
+        return judge(format, body, body, rawYamlMapFromFile, id, agenda, type, title, created, sessionId, tier,
                 oldEditedBy, oldEditedAt, oldEditedSessionId, tags, favorite, favoriteCategory, template,
                 evaluation, links, isToolSurface, currentSessionId);
     }
@@ -71,7 +70,6 @@ public final class StampJudgment {
             String title,
             String created,
             String sessionId,
-            int mins,
             String tier,
             String oldEditedBy,
             String oldEditedAt,
@@ -97,7 +95,7 @@ public final class StampJudgment {
 
         // 1. Form A: 옛 도장을 넣은 새 파일 글
         String frontmatterA = FrontmatterWriter.buildFullNoteFrontmatter(
-                id, agenda, type, title, created, sessionId, mins, tier,
+                id, agenda, type, title, created, sessionId, tier,
                 oldEditedBy, oldEditedAt, oldEditedSessionId,
                 tags, favorite, favoriteCategory, template, evaluation, links
         );
@@ -123,7 +121,7 @@ public final class StampJudgment {
         String newEditedSessionId = (isToolSurface && currentSessionId != null) ? currentSessionId : null;
 
         String frontmatterC = FrontmatterWriter.buildFullNoteFrontmatter(
-                id, agenda, type, title, created, sessionId, mins, tier,
+                id, agenda, type, title, created, sessionId, tier,
                 newEditedBy, newEditedAt, newEditedSessionId,
                 tags, favorite, favoriteCategory, template, evaluation, links
         );

@@ -36,7 +36,7 @@ public final class PlanDay {
         if (agenda.isEmpty() || dryRun) {
             result.put("saved", false); result.put("date", date.toString());
         } else {
-            Map<String, String> values = Map.of("agenda", agenda, "type", "plan", "title", title, "body", body.toString(), "date", date.toString(), "time", "09:00", "mins", "0");
+            Map<String, String> values = Map.of("agenda", agenda, "type", "plan", "title", title, "body", body.toString(), "date", date.toString(), "time", "09:00");
             var saved = CreateDoc.execute(vault, new ParsedArgs(false, "create-doc", List.of(), values, null), null);
             result.put("saved", true);
             for (String key : List.of("id", "agenda", "agendaCreated", "path")) result.put(key, saved.get(key));

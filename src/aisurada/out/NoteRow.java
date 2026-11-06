@@ -49,7 +49,6 @@ public final class NoteRow {
 
         resp.put("date", note.meta().date());
         resp.put("time", note.meta().time());
-        resp.put("mins", note.meta().mins());
 
         if (!isToolSurface && "record".equals(note.meta().tier())) {
             resp.put("tier", "record");
@@ -123,7 +122,6 @@ public final class NoteRow {
 
         resp.put("date", note.meta().date());
         resp.put("time", note.meta().time());
-        resp.put("mins", note.meta().mins());
 
         if (!isToolSurface && "record".equals(note.meta().tier())) {
             resp.put("tier", "record");
@@ -211,7 +209,6 @@ public final class NoteRow {
         resp.put("created", sub.meta().created());
         resp.put("date", sub.meta().date());
         resp.put("time", sub.meta().time());
-        resp.put("mins", sub.meta().mins());
 
         if (!isJson && sub.meta().editedBy() != null && sub.meta().editedAt() != null) {
             resp.put("editedBy", sub.meta().editedBy());
@@ -257,7 +254,6 @@ public final class NoteRow {
         resp.put("created", sub.meta().created());
         resp.put("date", sub.meta().date());
         resp.put("time", sub.meta().time());
-        resp.put("mins", sub.meta().mins());
 
         if (!isJson && sub.meta().editedBy() != null && sub.meta().editedAt() != null) {
             resp.put("editedBy", sub.meta().editedBy());

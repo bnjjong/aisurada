@@ -37,7 +37,6 @@ public final class NoteMeta {
             String date,
             String time,
             String sessionId,
-            int mins,
             String tier,
             String editedBy,
             String editedAt,
@@ -147,24 +146,6 @@ public final class NoteMeta {
                 if (!trimmed.isEmpty()) {
                     sessionId = Utf16.cut(trimmed, 128);
                 }
-            }
-        }
-
-        // 7. mins
-        Object rawMins = map.get("mins");
-        int mins = 0;
-        if (rawMins instanceof Number num) {
-            double d = num.doubleValue();
-            if (Double.isNaN(d)) {
-                throw new IllegalStateException("Cannot round NaN value.");
-            }
-            if (d < 0) {
-                mins = 0;
-            } else {
-                long rounded = Math.round(d);
-                if (rounded < 0) mins = 0;
-                else if (rounded > Integer.MAX_VALUE) mins = Integer.MAX_VALUE;
-                else mins = (int) rounded;
             }
         }
 
@@ -325,7 +306,7 @@ public final class NoteMeta {
         return new MetaData(
                 id, agendaSlug, type, title,
                 createdResult.formattedCreated, createdResult.date, createdResult.time,
-                sessionId, mins, tier,
+                sessionId, tier,
                 editedBy, editedAt, editedSessionId,
                 tags, links, favorite, favoriteCategory, template, evaluation
         );

@@ -101,7 +101,6 @@ function NewNote({
               body: bodyRef.current.replace(/\[제목\]/g, title.trim()),
               date,
               time,
-              mins: 0,
               tags: tags
                 .split(",")
                 .map((t) => t.trim())

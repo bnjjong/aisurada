@@ -113,7 +113,6 @@ export function WorkspaceShell({ controller, state }: Props) {
                       body,
                       date: ws.today,
                       time: new Date().toTimeString().slice(0, 5),
-                      mins: 0,
                       tags: ["터미널기록"],
                       tier: "record",
                     });

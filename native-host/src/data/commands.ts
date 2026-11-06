@@ -21,12 +21,12 @@ export const read = {
 
 export interface NewDoc {
   agenda: string; type: string; title: string; body: string; date: string; time: string;
-  mins: number; tags: string[]; template?: string; tier?: string;
+  tags: string[]; template?: string; tier?: string;
 }
 export const write = {
   init: (name: string) => command('init-workspace', [], { name, templates: [] }),
   createDoc: (doc: NewDoc) => command('create-doc', [], { agenda: doc.agenda, type: doc.type, title: doc.title,
-    body: doc.body, date: doc.date, time: doc.time, format: 'markdown', mins: doc.mins, tags: doc.tags,
+    body: doc.body, date: doc.date, time: doc.time, format: 'markdown', tags: doc.tags,
     template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined }),
   updateDoc: (id: string, fields: Fields, token?: string) => command('update-doc', [id], fields, token),
   favorite: (id: string, fields: Fields, token?: string) => command('set-favorite', [id], fields, token),

@@ -62,11 +62,11 @@ public final class SubNoteWriter {
 
     /**
      * 하위 노트 파일 글을 옛 도장 그대로 짓습니다(1.10의 A). 도장을 안 찍는 카드 걷기가 씁니다.
-     * 키는 `id`, `agenda`, `type`, `title`, `created`, `mins`, 도장 3개, `tags`, `links`뿐이라 다른 키는 사라집니다.
+     * 키는 `id`, `agenda`, `type`, `title`, `created`, 도장 3개, `tags`, `links`뿐이라 다른 키는 사라집니다.
      */
     public static String fileText(NoteScanner.NoteRecord sub, String agenda, String title, List<String> tags, String body) {
         String frontmatter = FrontmatterWriter.buildFullNoteFrontmatter(
-                sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, sub.meta().mins(), null,
+                sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, null,
                 sub.meta().editedBy(), sub.meta().editedAt(), sub.meta().editedSessionId(),
                 tags, false, null, null, null, sub.meta().links());
         return "---\n" + frontmatter + "---\n" + body;

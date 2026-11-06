@@ -918,7 +918,7 @@ public final class ArgsParser {
             }
             case "create-doc" -> {
                 allowedOptions = List.of(
-                        "agenda", "body", "date", "format", "links", "mins", "tags", "template", "tier", "time", "title", "type"
+                        "agenda", "body", "date", "format", "links", "tags", "template", "tier", "time", "title", "type"
                 );
                 maxPositional = 0;
                 usage = aisurada.cmd.CreateDoc.USAGE;
@@ -929,7 +929,7 @@ public final class ArgsParser {
                 usage = aisurada.cmd.WriteAttachment.USAGE;
             }
             case "update-doc" -> {
-                allowedOptions = List.of("body", "date", "f1", "mins", "tags", "template", "time", "title");
+                allowedOptions = List.of("body", "date", "f1", "tags", "template", "time", "title");
                 maxPositional = 1;
                 usage = aisurada.cmd.UpdateDoc.USAGE;
             }

@@ -319,7 +319,7 @@ public final class NoteScanner {
             effectiveMeta = new NoteMeta.MetaData(
                     meta.id(), meta.agendaSlug(), meta.type(), meta.title(),
                     meta.created(), meta.date(), meta.time(),
-                    null, meta.mins(), meta.tier(),
+                    null, meta.tier(),
                     null, null, null,
                     meta.tags(), meta.links(), meta.favorite(), meta.favoriteCategory(),
                     meta.template(), meta.evaluation()
@@ -342,7 +342,7 @@ public final class NoteScanner {
                 try {
                     scanSubNotes(vaultRoot, candidatePath, meta.id(), meta.id(), folderAgendaSlug, 1, subNotes, skipped, haltOnFatal);
                 } catch (ScanHaltedException e) {
-                    // 8.4: 하위 노트에서 서면 그 메인 노트부터 노트가 아니다(1.15의 6번, mins: .nan 같은 것)
+                    // 8.4: 하위 노트에서 서면 그 메인 노트부터 노트가 아니다(1.15의 6번, 읽을 수 없는 프론트매터 같은 것)
                     notesById.remove(meta.id());
                     throw e;
                 }

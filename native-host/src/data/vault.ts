@@ -368,7 +368,6 @@ export class VaultData {
   async updateNote(ref: NoteRef, input: Fields, retryTitle = true): Promise<WriteResult> {
     const fields: Fields = { ...input };
     if (has(fields, 'tags')) fields.tags = cleanTags(fields.tags);
-    if (has(fields, 'mins')) fields.mins = Math.max(0, Math.round(Number(fields.mins) || 0));
     const bodyWrite = has(fields, 'body') || !!ref.parent && has(fields, 'title');
     const title = this.note(ref)?.title || '제목 없음', beforeHeading = heading(this.note(ref)?.body || '');
     const existing = this.note(ref);
@@ -413,7 +412,7 @@ export class VaultData {
     const workspace = this.workspace(); if (!workspace) return { ok: false };
     const agenda = workspace.agendas.find(item => item.id === input.agendaId)?.slug || '';
     const id = `nd${this.services.now().getTime().toString(36)}-${this.services.uuid().slice(0, 8)}`;
-    const doc = { ...input, agenda, mins: Math.max(0, Math.round(input.mins)), tags: cleanTags(input.tags) };
+    const doc = { ...input, agenda, tags: cleanTags(input.tags) };
     const note = this.toNote({ ...doc, id, created: `${doc.date}T${doc.time}:00`, format: 'markdown' }, input.agendaId);
     // C32: the note enters memory only after the engine accepted it, so a
     // refusal leaves no local-only note behind and the caller sees the failure.

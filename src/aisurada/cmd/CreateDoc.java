@@ -47,7 +47,7 @@ public final class CreateDoc {
     static final DateTimeFormatter CREATED_MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
 
     public static final String USAGE = "create-doc agenda=<slug 또는 이름> type=<유형> title=<제목> body=<본문> " +
-            "[date=<YYYY-MM-DD>] [time=<HH:MM>] [mins=<분>] [format=markdown] [links=<JSON 배열>] " +
+            "[date=<YYYY-MM-DD>] [time=<HH:MM>] [format=markdown] [links=<JSON 배열>] " +
             "[tags=<JSON 배열>] [template=<템플릿 id>] [tier=reading|record]";
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
@@ -143,16 +143,6 @@ public final class CreateDoc {
         // Row 19: tags 검증 및 중복 정리
         List<String> validatedTags = parseAndValidateTags(isTool, toolOpts, opts);
 
-        // Row 20 & 23: mins 검증 (명령 표면만 받음)
-        int mins = 0;
-        if (!isTool && opts.containsKey("mins")) {
-            String rawMins = opts.get("mins");
-            String trimmedMins = Trim.trim(rawMins);
-            if (!trimmedMins.isEmpty()) {
-                mins = parseMins(trimmedMins);
-            }
-        }
-
         // Row 21: tier 검증 (명령 표면만 받음)
         String tier = "reading";
         if (!isTool && opts.containsKey("tier")) {
@@ -170,11 +160,6 @@ public final class CreateDoc {
         // Row 22: title 공백 여부 검증
         if (Trim.isBlank(rawTitle)) {
             throw new AisException(400, "노트 제목이 비었다");
-        }
-
-        // Row 23: mins 음수 검증
-        if (mins < 0) {
-            throw new AisException(400, "노트 소요 시간이 음수다: " + mins);
         }
 
         // template 처리: 다듬어서 regex 일치 시 사용, 불일치 시 버림 (13.3)
@@ -256,7 +241,6 @@ public final class CreateDoc {
                 rawTitle,
                 createdStr,
                 isTool ? sessionId : null,
-                mins,
                 tier,
                 validatedTags,
                 validatedTemplate,
@@ -349,41 +333,6 @@ public final class CreateDoc {
         int hour = Integer.parseInt(timeStr.substring(0, colon));
         int minute = Integer.parseInt(timeStr.substring(colon + 1));
         return LocalTime.of(hour, minute);
-    }
-
-    static int parseMins(String trimmed) {
-        // 부호 0~1개 뒤 Unicode Nd 숫자 1개 이상
-        int start = 0;
-        boolean negative = false;
-        if (trimmed.startsWith("+")) {
-            start = 1;
-        } else if (trimmed.startsWith("-")) {
-            start = 1;
-            negative = true;
-        }
-
-        if (start >= trimmed.length()) {
-            throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
-        }
-
-        long val = 0;
-        for (int i = start; i < trimmed.length(); i++) {
-            char c = trimmed.charAt(i);
-            int digit = Character.digit(c, 10);
-            if (digit < 0) {
-                throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
-            }
-            val = val * 10 + digit;
-            if (val > (long) Integer.MAX_VALUE + 1L) {
-                throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
-            }
-        }
-
-        long signed = negative ? -val : val;
-        if (signed < Integer.MIN_VALUE || signed > Integer.MAX_VALUE) {
-            throw new AisException(400, "mins 은 숫자여야 한다: " + trimmed);
-        }
-        return (int) signed;
     }
 
     @SuppressWarnings("unchecked")

@@ -38,7 +38,6 @@ public final class FrontmatterWriter {
      * @param title 노트 제목 (4)
      * @param created 시각 문자열 (5)
      * @param sessionId 세션 식별자 (6, 있을 때만)
-     * @param mins 소요 시간 (7)
      * @param tier 층 (8, record일 때만)
      * @param editedBy 마지막 편집자 (9, 도장 있을 때만)
      * @param editedAt 마지막 편집 시각 (10, 도장 있을 때만)
@@ -58,7 +57,6 @@ public final class FrontmatterWriter {
             String title,
             String created,
             String sessionId,
-            int mins,
             String tier,
             String editedBy,
             String editedAt,
@@ -91,9 +89,6 @@ public final class FrontmatterWriter {
         if (sessionId != null) {
             appendKeyVal(sb, "sessionId", sessionId, 1);
         }
-
-        // 7. mins
-        sb.append("mins: ").append(mins).append("\n");
 
         // 8. tier
         if ("record".equalsIgnoreCase(tier)) {
@@ -186,14 +181,13 @@ public final class FrontmatterWriter {
             String title,
             String created,
             String sessionId,
-            int mins,
             String tier,
             List<String> tags,
             String template,
             List<Map<String, String>> links
     ) {
         return buildFullNoteFrontmatter(
-                id, agenda, type, title, created, sessionId, mins, tier,
+                id, agenda, type, title, created, sessionId, tier,
                 null, null, null, tags, false, null, template, null, links
         );
     }

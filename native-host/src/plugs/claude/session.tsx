@@ -1249,7 +1249,7 @@ export function SessionCliPane({
   );
 }
 
-/** 9.8: `create-doc` through the screen's data layer: `type=free`, `mins=0`, `tier=record`; the memory is not touched on a failure. */
+/** 9.8: `create-doc` through the screen's data layer: `type=free`, `tier=record`; the memory is not touched on a failure. */
 async function createPinnedDoc(controller: any, state: any, agendaSlug: string, title: string, body: string, tags: string[]): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const workspace = state?.workspace;
@@ -1261,7 +1261,6 @@ async function createPinnedDoc(controller: any, state: any, agendaSlug: string, 
       body,
       date: workspace.today,
       time: new Date().toTimeString().slice(0, 5),
-      mins: 0,
       tags,
       tier: 'record',
     });

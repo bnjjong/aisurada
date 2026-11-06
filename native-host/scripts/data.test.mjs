@@ -46,9 +46,9 @@ function fixture(t, options={}) {
 }
 
 test('argv preserves whitespace, newlines, quotes, equals, empty fields and places opaque tokens last',()=>{
-  assert.deepEqual(write.updateDoc(' id ',{body:'a\n"b"=c',tags:[],mins:0},'opaque token'),['update-doc',' id ','body=a\n"b"=c','tags=[]','mins=0','f1=opaque token']);
+  assert.deepEqual(write.updateDoc(' id ',{body:'a\n"b"=c',tags:[]},'opaque token'),['update-doc',' id ','body=a\n"b"=c','tags=[]','f1=opaque token']);
   assert.deepEqual(write.updateSub('a/c','d',{title:'',body:''},''),['update-sub-note','a/c','d','title=','body=']);
-  assert.deepEqual(write.createDoc({agenda:'s',type:'free',title:'',body:'',date:'d',time:'t',mins:0,tags:[],tier:'other'}),['create-doc','agenda=s','type=free','title=','body=','date=d','time=t','format=markdown','mins=0','tags=[]']);
+  assert.deepEqual(write.createDoc({agenda:'s',type:'free',title:'',body:'',date:'d',time:'t',tags:[],tier:'other'}),['create-doc','agenda=s','type=free','title=','body=','date=d','time=t','format=markdown','tags=[]']);
   assert.deepEqual(read.docs(),['list-docs','limit=0','bodies=true']);
   assert.deepEqual(read.comments('root','child'),['list-comments','root','child']);
   assert.deepEqual(write.report('rv-weekly-2026-11-01','  ','\n'),['save-report','kind=weekly','date=2026-11-01']);
@@ -274,7 +274,7 @@ test('entity deletion refusal exposes full stderr and keeps preceding note delet
 });
 test('C32: a refused creation never enters memory and returns the failure; template creation failure leaves templates unchanged',async t=>{
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='create-doc'?(await gate.promise,fail(4)):argv[0]==='save-template'?fail(4):undefined});
-  const creating=h.data.createDoc({agendaId:'ag',type:'free',title:'Local',body:'body',date:'2026-11-01',time:'12:30',mins:0,tags:[]});
+  const creating=h.data.createDoc({agendaId:'ag',type:'free',title:'Local',body:'body',date:'2026-11-01',time:'12:30',tags:[]});
   await tick();assert.deepEqual(h.workspace.notes.map(n=>n.id),['a','b']);gate.resolve();
   const result=await creating;assert.equal(result.ok,false);assert.equal(result.value,undefined);assert.deepEqual(h.workspace.notes.map(n=>n.id),['a','b']);
   assert.deepEqual(h.data.getSnapshot().failures.map(line=>line.text),['문서 저장: Local']);
@@ -295,14 +295,14 @@ test('C95: a template whose save failed keeps the typed text across reconciliati
 });
 test('a successful create registers its real id even if an older reconciliation pruned the provisional note',async t=>{
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='create-doc'?gate.promise:undefined});
-  const creating=h.data.createDoc({agendaId:'ag',type:'free',title:'New',body:'new',date:'2026-11-01',time:'12:30',mins:0,tags:[]});
+  const creating=h.data.createDoc({agendaId:'ag',type:'free',title:'New',body:'new',date:'2026-11-01',time:'12:30',tags:[]});
   await h.data.reconcile();assert.equal(h.workspace.notes.length,2);
   gate.resolve(ok({id:'real',path:'notes/demo/real',precondition:'CREATED'}));await creating;
   assert.equal(h.workspace.notes.at(-1).id,'real');assert.equal(h.workspace.notes.at(-1).precondition,'CREATED');
 });
 test('a read started before creation cannot remove the real id after the create response arrives',async t=>{
   const gate=deferred(),h=fixture(t,{handler:async argv=>argv[0]==='list-docs'?(await gate.promise,ok([note(),note('b')])):argv[0]==='create-doc'?ok({id:'real',path:'notes/demo/real',precondition:'CREATED'}):undefined});
-  const reading=h.data.reconcile();await tick();await h.data.createDoc({agendaId:'ag',type:'free',title:'New',body:'new',date:'2026-11-01',time:'12:30',mins:0,tags:[]});
+  const reading=h.data.reconcile();await tick();await h.data.createDoc({agendaId:'ag',type:'free',title:'New',body:'new',date:'2026-11-01',time:'12:30',tags:[]});
   gate.resolve();await reading;assert.ok(h.workspace.notes.some(note=>note.id==='real'&&note.precondition==='CREATED'));
 });
 test('C188: a renaming title write drops only the engine title-mismatch notice, whose head matches the engine source',async t=>{

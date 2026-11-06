@@ -28,7 +28,6 @@
           "created": "2026-06-18T12:30:00+09:00",
           "date": "2026-06-18",
           "time": "12:30",
-          "mins": 90,
           "format": "markdown",
           "precondition": "⟦token:notes/serving/2026-06-18-1230-메타가-다-찬-노트-0003/note.md⟧",
           "comments": {
@@ -76,7 +75,6 @@
           "created": "2026-06-19T09:05:00+09:00",
           "date": "2026-06-19",
           "time": "09:05",
-          "mins": 15,
           "format": "html",
           "precondition": "⟦token:notes/serving/2026-06-19-0905-옛-html-노트-0004.html⟧",
           "comments": {

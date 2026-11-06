@@ -282,23 +282,20 @@ test("외부 md 상대 링크 한 번 디코드·점 경로, URL과 다른 파�
   for (const s of ["https://a/x.md", "/x.md", "#x", "x.png", "%ZZ.md"])
     assert.equal(relativeFile("/a/start.md", s), null);
 });
-test("C193, 목록 5번: 일 보기 화살표는 15분 그대로, 끌기는 끈 거리를 15분 단위로 반올림해 더하고 시작은 23:00에서 소요 시간을 뺀 때까지 가둔다", () => {
-  assert.equal(movedTime("14:37", 0, 15, false), "14:52");
-  assert.equal(movedTime("14:37", 0, -15, false), "14:22");
-  assert.equal(movedTime("14:37", 0, 30, true), "15:07");
-  assert.equal(movedTime("14:37", 0, 7, true), "14:37");
-  assert.equal(movedTime("14:37", 0, 8, true), "14:52");
-  assert.equal(movedTime("22:30", 30, 15, false), "22:30"); // already at the held end: same time, nothing is written
-  assert.equal(movedTime("22:00", 30, 15, false), "22:15");
-  assert.equal(movedTime("22:40", 60, 15, false), null);
-  assert.equal(movedTime("21:30", 60, 60, true), "22:00");
-  assert.equal(movedTime("21:30", 60, 90, true), "22:00");
-  assert.equal(movedTime("23:30", 0, 15, false), null);
-  assert.equal(movedTime("23:30", 0, 40 / 0.8, true), null);
-  assert.equal(movedTime("00:05", 0, -15, false), "00:00");
-  assert.equal(movedTime("23:00", 0, 15, false), "23:00");
-  assert.equal(movedTime("09:00", 90, 8 * 60, true), "17:00");
-  assert.equal(movedTime("09:00", 90, 13 * 60, true), "21:30");
+test("C193, 목록 5번: 일 보기 화살표는 15분 그대로, 끌기는 끈 거리를 15분 단위로 반올림해 더하고 시작은 00:00에서 23:00까지 가둔다", () => {
+  assert.equal(movedTime("14:37", 15, false), "14:52");
+  assert.equal(movedTime("14:37", -15, false), "14:22");
+  assert.equal(movedTime("14:37", 30, true), "15:07");
+  assert.equal(movedTime("14:37", 7, true), "14:37");
+  assert.equal(movedTime("14:37", 8, true), "14:52");
+  assert.equal(movedTime("22:00", 15, false), "22:15");
+  assert.equal(movedTime("23:30", 15, false), null); // held value on the other side of the pressed direction: nothing is written
+  assert.equal(movedTime("23:30", 40 / 0.8, true), null);
+  assert.equal(movedTime("00:05", -15, false), "00:00");
+  assert.equal(movedTime("23:00", 15, false), "23:00"); // already at the held end: same time, nothing is written
+  assert.equal(movedTime("09:00", 8 * 60, true), "17:00");
+  assert.equal(movedTime("09:00", 13 * 60, true), "22:00");
+  assert.equal(movedTime("09:00", 15 * 60, true), "23:00");
 });
 test("C28: 아젠다 폼은 연 때 저장소가 있던 아젠다에서 비운 칸만 repo= 로 싣는다", () => {
   assert.deepEqual(agendaRepoField("git@x:a.git", ""), { repo: "" });
@@ -448,15 +445,15 @@ test("리포트 배너는 문서화한 작업별 상태를 읽는다", () => {
   assert.equal(scheduleNotice({ kinds: [] }), "");
 });
 
-test("빈 칸 이동은 긴 카드와의 겹침도 막고 다른 레인은 허용한다", () => {
+test("빈 칸 이동은 같은 레인의 겹침을 막고 다른 레인은 허용한다", () => {
   const ns = [
-      note("a", { time: "09:00", mins: 120 }),
+      note("a", { time: "09:00" }),
       note("b", { time: "11:00" }),
       note("c", { time: "09:30" }),
     ],
     l = lanes(ns);
-  assert.equal(canPlaceAt(ns[1], ns, l, "10:30"), false);
-  assert.equal(canPlaceAt(ns[1], ns, l, "11:00"), true);
+  assert.equal(canPlaceAt(ns[1], ns, l, "09:30"), false);
+  assert.equal(canPlaceAt(ns[1], ns, l, "10:00"), true);
   assert.equal(canPlaceAt(ns[2], ns, l, "10:30"), true);
 });
 

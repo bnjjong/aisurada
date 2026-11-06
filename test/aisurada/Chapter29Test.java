@@ -27,7 +27,7 @@ public final class Chapter29Test {
             eq(saved.keySet().stream().toList(), List.of("saved", "id", "agenda", "agendaCreated", "path", "body"), "saved shape omits date");
             eq(saved.get("body"), expected, "saved body drafted before inserting itself"); eq(saved.get("agenda"), "demo", "agenda title lookup");
             String file = Files.readString(v.resolve(saved.get("path") + "/note.md"));
-            check(file.contains("type: plan\n") && file.contains("created: '2026-06-22T09:00:00+09:00'\n") && file.contains("mins: 0\n"), "fixed plan metadata");
+            check(file.contains("type: plan\n") && file.contains("created: '2026-06-22T09:00:00+09:00'\n") && !file.contains("mins:"), "fixed plan metadata");
             check(!file.contains("sessionId:"), "plan tool session deliberately omitted"); check(file.endsWith(expected), "file body identical to response");
             var second = run(v, "plan-day", "date=2026-06-22", "agenda=demo", "dryRun=");
             eq(second.status(), 0, "empty dryRun is false"); check(stdout(second).contains("데일리 플랜 · 데모 (plan)"), "prior saved plan in next draft");

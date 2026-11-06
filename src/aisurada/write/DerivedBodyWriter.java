@@ -85,7 +85,7 @@ public final class DerivedBodyWriter {
         }
         String frontmatter = FrontmatterWriter.buildFullNoteFrontmatter(
                 root.id(), agenda, root.meta().type(), MetaWriter.asIndexed(root.meta().title()), root.meta().created(),
-                fileSessionId, root.meta().mins(), root.meta().tier(),
+                fileSessionId, root.meta().tier(),
                 root.meta().editedBy(), root.meta().editedAt(), root.meta().editedSessionId(),
                 SubNoteWriter.indexedTags(root), root.meta().favorite(), MetaWriter.asIndexed(root.meta().favoriteCategory()),
                 root.meta().template(), evaluation, root.meta().links());

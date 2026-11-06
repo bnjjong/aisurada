@@ -28,13 +28,14 @@ export const timeAt = (n: number) =>
   clockAt(Math.max(0, Math.min(1425, Math.round(Math.round(n / 15) * 15))));
 // 12.4: arrows move exactly 15 minutes. A drag moves the dragged distance rounded to
 // 15 minutes (14:37 dragged 30 minutes is 15:07). The start is held between 00:00 and
-// 23:00 minus the duration. C193: a held value on the other side of the pressed
-// direction is not written.
-export const movedTime = (time: string, mins: number, delta: number, snap: boolean): string | null => {
-  const from = minute(time), top = Math.max(0, 1380 - (Number(mins) || 0));
+// 23:00. C193: a held value on the other side of the pressed direction is not written.
+export const movedTime = (time: string, delta: number, snap: boolean): string | null => {
+  const from = minute(time), top = 1380;
   const next = Math.max(0, Math.min(top, from + (snap ? Math.round(delta / 15) * 15 : delta)));
   return (delta > 0 && next < from) || (delta < 0 && next > from) ? null : clockAt(next);
 };
+// 일정 하나가 일 보기에서 자리를 잡는 분. 서로 겹치는지 줄을 나눌 때 쓴다.
+const SLOT = 60;
 export function lanes(notes: Note[]) {
   const ends: number[] = [],
     map = new Map<string, number>();
@@ -42,7 +43,7 @@ export function lanes(notes: Note[]) {
     const start = minute(n.time),
       i = ends.findIndex((end) => end <= start);
     const lane = i < 0 ? ends.length : i;
-    ends[lane] = start + Math.max(60, Number(n.mins) || 0);
+    ends[lane] = start + SLOT;
     map.set(n.id, lane);
   }
   return { map, count: ends.length };
@@ -54,12 +55,12 @@ export function canPlaceAt(
   time: string,
 ) {
   const start = minute(time),
-    end = start + Math.max(60, Number(note.mins) || 0);
+    end = start + SLOT;
   return !notes.some(
     (other) =>
       other.id !== note.id &&
       layout.map.get(other.id) === layout.map.get(note.id) &&
-      start < minute(other.time) + Math.max(60, Number(other.mins) || 0) &&
+      start < minute(other.time) + SLOT &&
       minute(other.time) < end,
   );
 }
@@ -218,7 +219,7 @@ export function Calendar({
                       top: (minute(n.time) - start * 60) * 0.8,
                       left: `calc(55px + ${((layout.map.get(n.id) || 0) * 90) / Math.max(1, layout.count)}%)`,
                       width: `calc(${90 / Math.max(1, layout.count)}% - 14px)`,
-                      minHeight: Math.max(35, (Number(n.mins) || 30) * 0.8),
+                      minHeight: 35,
                       transform:
                         dragged?.id === n.id
                           ? `translateY(${dragged.delta}px)`
@@ -235,7 +236,6 @@ export function Calendar({
                         e.preventDefault();
                         const next = movedTime(
                           n.time,
-                          Number(n.mins),
                           e.key === "ArrowUp" ? -15 : 15,
                           false,
                         );
@@ -286,7 +286,6 @@ export function Calendar({
                       } else {
                         const next = movedTime(
                           n.time,
-                          Number(n.mins),
                           (e.clientY - d.y) / 0.8,
                           true,
                         );
@@ -691,8 +690,7 @@ export function AgendaPage({
         <section className="agenda-overview page-scroll">
           <h2>{agenda.title}</h2>
           <p>
-            {asText(agenda.repo)} · 노트 {notes.length}개 ·{" "}
-            {notes.reduce((sum, n) => sum + (Number(n.mins) || 0), 0)}분
+            {asText(agenda.repo)} · 노트 {notes.length}개
           </p>
           <p>{asText(agenda.summary)}</p>
           {!ws.sample && (
