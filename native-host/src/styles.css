@@ -156,8 +156,37 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .page-actions { display: flex; gap: 10px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
 .note-preview-overlay { position: fixed; inset: 0; background: #0005; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .note-preview { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; width: min(860px, 100%); max-height: 88vh; overflow: auto; box-shadow: 0 20px 80px #0003; }
-.note-preview > header { display: flex; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.note-preview > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--line); }
 .note-preview > header button { font-size: 12px; }
+.ui-modal-controls { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ui-modal-controls .modal-ctrl-btn,
+.ui-modal > header .modal-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.ui-modal-controls .modal-ctrl-btn:hover,
+.ui-modal > header .modal-ctrl-btn:hover {
+  background: var(--soft);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.ui-modal-controls .modal-ctrl-btn.modal-ctrl-close:hover,
+.ui-modal > header .modal-ctrl-btn.modal-ctrl-close:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.25);
+}
 .cmdk-overlay, .subnote-overlay { position: fixed; inset: 0; background: #0005; display: flex; justify-content: center; padding: min(12vh, 90px) 24px 24px; }
 .cmdk-overlay { z-index: 12; align-items: flex-start; }
 .cmdk-panel { width: min(640px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 80px #0003; overflow: hidden; }

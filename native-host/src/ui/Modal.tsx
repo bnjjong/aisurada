@@ -8,12 +8,14 @@ export function Modal({
   children,
   className = "",
   wide = false,
+  headerActions,
 }: {
   title: string;
   close(): void;
   children: ReactNode;
   className?: string;
   wide?: boolean;
+  headerActions?: ReactNode;
 }) {
   const token = useRef(Symbol()),
     callbacks = useRef(close);
@@ -59,13 +61,17 @@ export function Modal({
       >
         <header>
           <h2>{title}</h2>
-          <button
-            aria-label={`${title} 닫기`}
-            className={className.includes("nhist") ? "nhist-close" : undefined}
-            onClick={close}
-          >
-            {className.includes("nhist") ? "이력 닫기" : "닫기"}
-          </button>
+          {headerActions ? (
+            <div className="ui-modal-controls">{headerActions}</div>
+          ) : (
+            <button
+              aria-label={`${title} 닫기`}
+              className={className.includes("nhist") ? "nhist-close" : undefined}
+              onClick={close}
+            >
+              {className.includes("nhist") ? "이력 닫기" : "닫기"}
+            </button>
+          )}
         </header>
         {children}
       </section>

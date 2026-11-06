@@ -153,7 +153,8 @@ export function NoteMeta({
           />
           {!parent &&
             controller.isNative() &&
-            controller.context.kind === "main" && (
+            controller.context.kind === "main" &&
+            mode !== "preview" && (
               <button
                 className="pane-pop"
                 onClick={() =>
@@ -173,10 +174,9 @@ export function NoteMeta({
                 새 창으로
               </button>
             )}
-          {(mode === "agenda" || mode === "preview") && (
+          {mode === "agenda" && (
             <button
               onClick={() => {
-                if (mode === "preview") controller.showPreview(null);
                 go(controller, docAddress(note.id));
               }}
             >
