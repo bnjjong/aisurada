@@ -288,8 +288,10 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .doc-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 11px; color: var(--muted); }
 .doc-meta-left { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .doc-meta-right { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.doc-meta-time { font-weight: 500; color: var(--muted); white-space: nowrap; margin-right: 6px; }
-.doc-meta button { padding: 6px 11px; font-size: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; cursor: pointer; transition: background 0.15s; }
+.doc-meta-time { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--muted); white-space: nowrap; margin-right: 6px; }
+.doc-meta-time svg { display: block; flex-shrink: 0; opacity: 0.8; }
+.doc-meta button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; font-size: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; cursor: pointer; transition: background 0.15s; }
+.doc-meta button svg { display: block; flex-shrink: 0; }
 .doc-meta button:hover { background: var(--soft); }
 .doc-meta .fav-toggle { border-color: transparent; background: transparent; font-size: 13px; padding: 2px 4px; }
 .doc-meta label { display: inline-flex; align-items: center; white-space: nowrap; gap: 4px; }
@@ -333,7 +335,8 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .fav-toggle[aria-pressed=true] { color: #b38b2c; }
 .doc-id-chip, .doc-context-chips { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 11px; margin: 10px 0; }
 .doc-id-chip code, .session-chip code { overflow-wrap: anywhere; }
-.doc-id-chip button, .doc-context-chips button { font-size: 11px; padding: 5px 10px; border-radius: 6px; }
+.doc-id-chip button, .doc-context-chips button { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 5px 10px; border-radius: 6px; }
+.doc-id-chip button svg, .doc-context-chips button svg { display: block; flex-shrink: 0; }
 .session-chip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; }
 .doc-eval-pop { position: absolute; z-index: 18; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(360px, calc(100vw - 40px)); box-shadow: 0 12px 45px #0002; font-size: 13px; }
 .doc-eval-pop label { display: flex; flex-direction: column; gap: 10px; }.doc-eval-pop input { width: 100%; }.doc-eval-pop textarea { margin: 15px 0; }.doc-eval-pop > div { display: flex; gap: 7px; justify-content: flex-end; }.doc-eval-pop button { font-size: 11px; } .doc-eval-pop .doc-eval-cancel { color: var(--muted); } .doc-eval-pop .doc-eval-clear { color: var(--err, #b9473a); border-color: color-mix(in srgb, var(--err, #b9473a) 38%, var(--line)); } .doc-eval-pop .doc-eval-clear:hover:not(:disabled) { background: var(--err-bg, color-mix(in srgb, #b9473a 12%, transparent)); } .doc-eval-pop .doc-eval-save { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; } .doc-eval-pop .doc-eval-save:hover:not(:disabled) { background: var(--accent-h, color-mix(in srgb, var(--accent) 88%, white)); }

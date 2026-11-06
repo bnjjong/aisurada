@@ -66,6 +66,20 @@ export function NoteMeta({
       <div className="doc-meta">
         <div className="doc-meta-left">
           <span className="doc-meta-time">
+            <svg
+              viewBox="0 0 16 16"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="8" cy="8" r="6" />
+              <path d="M8 5v3.5l2 1" />
+            </svg>
             {TYPE_NAMES[asText(note.type) || "free"] || asText(note.type)} ·{" "}
             {note.date} {note.time}
           </span>
@@ -89,6 +103,20 @@ export function NoteMeta({
                 className="doc-eval-badge"
                 onClick={() => setEvaluating(!evaluating)}
               >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="2.5" width="10" height="11" rx="1.5" />
+                  <path d="M5.5 6h5M5.5 9h3" />
+                </svg>
                 {asRow(live.evaluation)
                   ? String(asRow(live.evaluation)?.score)
                   : "평가"}
@@ -105,12 +133,41 @@ export function NoteMeta({
                   )
                 }
               >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.5" />
+                  <path d="M3.5 10.5V4a1.5 1.5 0 0 1 1.5-1.5h6.5" />
+                </svg>
                 본문 복사
               </button>
               <button
                 className="doc-meta-history"
                 onClick={() => setHistory(true)}
               >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2.5 7.5A5.5 5.5 0 1 1 3.2 10.5" />
+                  <path d="M2.5 3.5v4h4" />
+                  <path d="M8 5v3.5l2 1" />
+                </svg>
                 이력
               </button>
             </>
@@ -125,6 +182,20 @@ export function NoteMeta({
               className="doc-meta-id-copy"
               onClick={() => void navigator.clipboard.writeText(chain)}
             >
+              <svg
+                viewBox="0 0 16 16"
+                width="11"
+                height="11"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.5" />
+                <path d="M3.5 10.5V4a1.5 1.5 0 0 1 1.5-1.5h6.5" />
+              </svg>
               복사
             </button>
             {!parent && state.workspace?.path && (
@@ -137,6 +208,19 @@ export function NoteMeta({
                   )
                 }
               >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="11"
+                  height="11"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M7 3.5H4a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 4 13.5h7a1.5 1.5 0 0 0 1.5-1.5v-3M9.5 2.5h4v4M6.5 9.5l7-7" />
+                </svg>
                 새 창 링크
               </button>
             )}
@@ -933,6 +1017,20 @@ function SessionChipItem({
           className="doc-meta-id-open"
           onClick={() => onOpenRail(chip.id)}
         >
+          <svg
+            viewBox="0 0 16 16"
+            width="11"
+            height="11"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="10" height="10" rx="1.5" />
+            <path d="M3 6.5h10" />
+          </svg>
           열기
         </button>
       )}
@@ -941,6 +1039,20 @@ function SessionChipItem({
         className="doc-meta-id-copy"
         onClick={handleCopy}
       >
+        <svg
+          viewBox="0 0 16 16"
+          width="11"
+          height="11"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.5" />
+          <path d="M3.5 10.5V4a1.5 1.5 0 0 1 1.5-1.5h6.5" />
+        </svg>
         {copied ? "복사됨" : "복사"}
       </button>
     </span>
