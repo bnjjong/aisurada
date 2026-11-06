@@ -237,8 +237,8 @@
 :root[data-skin="glass"] :is(.child-page-card, .ag-facts, .link-picker, .category-picker, .ask-mark-group, .sess-dock-row, .relnote) { border: 1px solid var(--rim); border-radius: 16px; background: var(--soft); }
 :root[data-skin="glass"] :is(.week-columns, .month-grid, .ais-html-frame) { border-radius: 16px; overflow: hidden; }
 :root[data-skin="glass"] .tl-block { border: 1px solid var(--rim); border-radius: 12px; background: var(--accent-soft); }
-:root[data-skin="glass"] :is(.sample-badge, .format-badge, .record-badge, .tag-chip, .session-chip, .vb-savestate, .report-bar, .note-composition span) { border-radius: 999px; }
-:root[data-skin="glass"] :is(.sample-badge, .format-badge, .record-badge, .session-chip) { border: 1px solid var(--rim); background: var(--soft); padding-left: 10px; padding-right: 10px; }
+:root[data-skin="glass"] :is(.sample-badge, .format-badge, .record-badge, .tag-chip, .session-chip, .doc-agenda-chip, .vb-savestate, .report-bar, .note-composition span) { border-radius: 999px; }
+:root[data-skin="glass"] :is(.sample-badge, .format-badge, .record-badge, .session-chip, .doc-agenda-chip) { border: 1px solid var(--rim); background: var(--soft); padding-left: 10px; padding-right: 10px; }
 :root[data-skin="glass"] .lex-code { border: 1px solid var(--rim); border-radius: 14px; background: var(--soft); }
 
 /* ───────── 떠 있는 유리: 가장 불투명하고 가장 크게 둥글다 ───────── */

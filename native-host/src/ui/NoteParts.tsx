@@ -286,7 +286,7 @@ export function NoteMeta({
           {!parent &&
             agenda &&
             (mode === "preview" ? (
-              <span>{agenda.title}</span>
+              <span className="doc-agenda-chip">{agenda.title}</span>
             ) : (
               <button onClick={() => go(controller, agendaAddress(agenda.id))}>
                 {project ? asText(project.title) + " / " : ""}
