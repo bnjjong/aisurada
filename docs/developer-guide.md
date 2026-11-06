@@ -479,6 +479,7 @@ node fixtures/runner-test.mjs
 | 이 셸의 `rm`이 확인을 묻는다 | `rm`이 `-i` 별칭이다. `/bin/rm -rf`를 쓴다 |
 | zsh에서 `echo ====`가 `not found` | `=`로 시작하는 낱말을 zsh가 명령으로 푼다. 따옴표로 감싼다 |
 | HTML 첨부 상자 안에서 외부 스크립트나 지도 타일이 안 뜬다(Leaflet 지도가 「지도를 불러오지 못했습니다」로 나온다) | 상자(`aisframe://`) 응답에 붙는 고정 CSP(`frame.rs`의 `CSP`)가 허용하지 않은 곳이다. 지도(Leaflet)용으로 `cdnjs.cloudflare.com`(스크립트·스타일·그림)과 타일 서버 `xdworld.vworld.kr`·`server.arcgisonline.com`(그림)만 열어 두었다. 다른 호스트가 필요하면 `CSP`에 더하고 다시 짓는다. 와일드카드, `https:` 같은 스킴만 쓴 출처, `connect-src`는 열지 않으며 `frame.rs`의 `csp_tests`가 이를 지킨다 |
+| HTML 첨부 상자 아래에 빈 띠가 생기거나 상자가 늘 1600px로 나온다 | 상자 높이는 주입 스크립트 `frame_height.js`가 `<body>` 자손의 아래쪽 끝 최댓값으로 잰다. `overflow`가 `hidden`·`clip`·`scroll`·`auto`(또는 `contain: paint`)인 조상 안에서 잘려 안 보이는 부분은 빼고, 절대 위치 자손은 위치 기준 조상이 그 잘림 요소 안에 있을 때만 뺀다. 이를 빼지 않던 빌드에서는 지도 타일이 상자 밖으로 삐져나온 만큼(최대 타일 1장, 256px) 빈 띠가 생겼다. 화면에서는 측정값을 160~1600px로 자르므로 내용이 더 길면 상자 안에서 스크롤한다 |
 
 ## 13. 지금 상태와 한계
 
