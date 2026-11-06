@@ -378,8 +378,9 @@ function Evaluation({
         onChange={(e) => setMemo(e.target.value)}
       />
       <div>
-        <button onClick={close}>취소</button>
+        <button className="doc-eval-cancel" onClick={close}>취소</button>
         <button
+          className="doc-eval-clear"
           onClick={() => {
             void controller.data.evaluate(note.id, null);
             close();
@@ -387,7 +388,7 @@ function Evaluation({
         >
           평가 지우기
         </button>
-        <button onClick={save}>저장</button>
+        <button className="doc-eval-save" onClick={save}>저장</button>
       </div>
     </div>
   );
