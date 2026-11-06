@@ -1,7 +1,20 @@
-//! Chapter 10. No broad asset scope, CORS, network, or parent capabilities.
+//! Chapter 10. No broad asset scope, CORS, or parent capabilities. Network is limited to the hosts
+//! named in `CSP`: the Leaflet CDN and the map tile servers, so an attached HTML can show a map.
 use std::{fs, path::Path};
 use tauri::http::{Response, StatusCode};
-pub const CSP:&str="default-src 'none'; script-src 'unsafe-inline' aisframe: http://aisframe.localhost; style-src 'unsafe-inline' aisframe: http://aisframe.localhost; img-src data: blob: aisframe: http://aisframe.localhost; font-src data: aisframe: http://aisframe.localhost; media-src data: blob: aisframe: http://aisframe.localhost; sandbox allow-scripts";
+/// Sent with every `aisframe://` response. Besides the box's own files, only the Leaflet CDN
+/// (`cdnjs.cloudflare.com`: script, style, images) and the tile hosts (`xdworld.vworld.kr`,
+/// `server.arcgisonline.com`: images) are reachable. For another host, add it here and rebuild.
+/// Keep `connect-src` closed (it falls back to `default-src 'none'`) and use no wildcard or bare scheme.
+pub const CSP: &str = concat!(
+    "default-src 'none'; ",
+    "script-src 'unsafe-inline' aisframe: http://aisframe.localhost https://cdnjs.cloudflare.com; ",
+    "style-src 'unsafe-inline' aisframe: http://aisframe.localhost https://cdnjs.cloudflare.com; ",
+    "img-src data: blob: aisframe: http://aisframe.localhost https://cdnjs.cloudflare.com https://xdworld.vworld.kr https://server.arcgisonline.com; ",
+    "font-src data: aisframe: http://aisframe.localhost; ",
+    "media-src data: blob: aisframe: http://aisframe.localhost; ",
+    "sandbox allow-scripts"
+);
 fn response(status: u16, mime: Option<&str>, body: Vec<u8>) -> Response<Vec<u8>> {
     let mut b = Response::builder()
         .status(StatusCode::from_u16(status).unwrap())
@@ -149,6 +162,33 @@ mod tests {
             serve(Some(root), p.join("huge.js").to_str().unwrap()).status(),
             413
         );
+    }
+}
+
+#[cfg(test)]
+mod csp_tests {
+    use super::*;
+    fn directive(name: &str) -> &'static str {
+        CSP.split("; ").find(|d| d.starts_with(name)).unwrap_or("")
+    }
+    #[test]
+    fn network_is_limited_to_the_leaflet_cdn_and_tile_hosts() {
+        assert!(CSP.starts_with("default-src 'none'; "));
+        assert!(CSP.ends_with("; sandbox allow-scripts"));
+        assert!(!CSP.contains("connect-src"));
+        for name in ["script-src ", "style-src "] {
+            assert!(directive(name).split(' ').any(|s| s == "https://cdnjs.cloudflare.com"), "{name}");
+        }
+        for host in ["https://cdnjs.cloudflare.com", "https://xdworld.vworld.kr", "https://server.arcgisonline.com"] {
+            assert!(directive("img-src ").split(' ').any(|s| s == host), "{host}");
+        }
+        for name in ["font-src ", "media-src "] {
+            assert!(!directive(name).contains("https://"), "{name}");
+        }
+        for source in CSP.split("; ").flat_map(|d| d.split(' ').skip(1)) {
+            assert!(!source.contains('*'), "{source}");
+            assert!(!matches!(source, "https:" | "http:"), "{source}");
+        }
     }
 }
 

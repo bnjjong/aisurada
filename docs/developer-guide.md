@@ -478,6 +478,7 @@ node fixtures/runner-test.mjs
 | 이름이나 문구를 바꿨더니 HTML 노트를 못 읽는다 | 글자 수를 숫자로 박아 둔 코드다(예: 마커 `<!--aisurada`의 길이). 숫자 대신 문자열의 `length()`를 쓴다 |
 | 이 셸의 `rm`이 확인을 묻는다 | `rm`이 `-i` 별칭이다. `/bin/rm -rf`를 쓴다 |
 | zsh에서 `echo ====`가 `not found` | `=`로 시작하는 낱말을 zsh가 명령으로 푼다. 따옴표로 감싼다 |
+| HTML 첨부 상자 안에서 외부 스크립트나 지도 타일이 안 뜬다(Leaflet 지도가 「지도를 불러오지 못했습니다」로 나온다) | 상자(`aisframe://`) 응답에 붙는 고정 CSP(`frame.rs`의 `CSP`)가 허용하지 않은 곳이다. 지도(Leaflet)용으로 `cdnjs.cloudflare.com`(스크립트·스타일·그림)과 타일 서버 `xdworld.vworld.kr`·`server.arcgisonline.com`(그림)만 열어 두었다. 다른 호스트가 필요하면 `CSP`에 더하고 다시 짓는다. 와일드카드, `https:` 같은 스킴만 쓴 출처, `connect-src`는 열지 않으며 `frame.rs`의 `csp_tests`가 이를 지킨다 |
 
 ## 13. 지금 상태와 한계
 
