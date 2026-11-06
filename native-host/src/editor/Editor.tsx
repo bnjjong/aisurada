@@ -11,6 +11,7 @@ import { CheckListPlugin } from "@lexical/react/LexicalCheckListPlugin";
 import { TablePlugin } from "@lexical/react/LexicalTablePlugin";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
+import { HorizontalRulePlugin } from "@lexical/react/LexicalHorizontalRulePlugin";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $isHeadingNode } from "@lexical/rich-text";
@@ -113,6 +114,7 @@ const theme = {
   tableCell: "lex-cell",
   tableCellHeader: "lex-cell-header",
   tableSelection: "lex-table-selection",
+  hr: "lex-hr",
 };
 export const stableJSON = (value: unknown): string =>
   JSON.stringify(
@@ -175,6 +177,7 @@ export function Editor(props: EditorProps) {
           />
           <TabIndentationPlugin />
           <LinkPlugin />
+          <HorizontalRulePlugin />
           <MarkdownShortcutPlugin transformers={transformers()} />
           <EditorBridge {...props} />
           <EditorTools {...props} />

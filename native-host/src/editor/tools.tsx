@@ -29,6 +29,7 @@ const slashIcons: Record<string, string> = {
   table: 'M3.5 3.5h9a1 1 0 011 1v7a1 1 0 01-1 1h-9a1 1 0 01-1-1v-7a1 1 0 011-1zM2.5 7h11M6.5 7v5.5',
   callout: 'M3.5 3.5h9a1 1 0 011 1v7a1 1 0 01-1 1h-9a1 1 0 01-1-1v-7a1 1 0 011-1zM5 6.5h6M5 9.5h4',
   code: 'M6 5L3 8l3 3M10 5l3 3-3 3',
+  divider: 'M2.5 8h11',
 };
 function SlashIcon({ name }: { name: string }) {
   return <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={slashIcons[name]} /></svg>;
@@ -64,6 +65,7 @@ export function EditorTools(props: EditorProps) {
     { id: 'table', icon: 'table', label: '표', desc: '3×3 표를 넣어요', aliases: 'table 테이블 시트' },
     { id: 'callout', icon: 'callout', label: '콜아웃', desc: '눈에 띄는 안내 상자', aliases: 'callout 정보 강조 안내' },
     { id: 'code', icon: 'code', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
+    { id: 'divider', icon: 'divider', label: '구분선', desc: '내용을 나누는 가로줄', aliases: 'divider hr line 선 구분선 수평선' },
   ].filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(menu?.query.toLowerCase() || ''));
   const notes = (props.features?.notes || []).filter(note => note.id !== props.features?.currentId && note.title.trim()
     && (props.features?.showRecords || note.tier !== 'record') && note.title.toLowerCase().includes(menu?.query.toLowerCase() || ''))

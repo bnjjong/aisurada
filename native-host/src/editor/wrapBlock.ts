@@ -7,6 +7,7 @@ import { $createParagraphNode, $createTextNode, $getSelection, $insertNodes, $is
 import type { ElementNode, LexicalNode, RangeSelection, TextFormatType } from 'lexical';
 import { $createCallout, $isCallout, $isReference, CHIP_FORMATS } from './nodes.tsx';
 import type { ReferenceNode } from './nodes.tsx';
+import { $createHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 
 // A list item whose only child is a list is the holder of a nested list, not an item of its own.
 const isHolder = (item: ListItemNode) => item.getChildrenSize() === 1 && $isListNode(item.getFirstChild());
@@ -61,6 +62,12 @@ export function $insertBlock(kind: string) {
   const selected = $getSelection(); if (!$isRangeSelection(selected)) return;
   if (kind === 'table') { $insertNodes([$createTableNodeWithDimensions(3, 3, { rows: true, columns: false })]); return; }
   const node = selected.anchor.getNode(), item = $currentListItem(node);
+  if (kind === 'divider') {
+    const hr = $createHorizontalRuleNode(), p = $createParagraphNode();
+    const top = node.getTopLevelElement();
+    if (top && top.getTextContentSize() === 0) top.replace(hr); else $insertNodes([hr]);
+    hr.insertAfter(p); p.selectStart(); return;
+  }
   if (kind === 'code') { if (item) $wrapListItem(item, 'code'); else $setBlocksType(selected, () => $createCodeNode('plaintext')); return; }
   if (node.getParents().some($isCallout) || $isCallout(node)) return;
   if (item) { $wrapListItem(item, 'callout'); return; }

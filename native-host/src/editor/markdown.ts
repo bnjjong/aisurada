@@ -10,6 +10,7 @@ import type { ListType } from '@lexical/list';
 import { CodeNode, CodeHighlightNode, $createCodeNode, $isCodeNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
 import { MarkNode, $wrapSelectionInMarkNode } from '@lexical/mark';
+import { HorizontalRuleNode, $createHorizontalRuleNode, $isHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 import {
   TableNode, TableRowNode, TableCellNode, $createTableNode, $createTableRowNode, $createTableCellNode,
   $isTableNode, $isTableCellNode, TableCellHeaderStates,
@@ -29,7 +30,7 @@ import type { FormatMatch, LinkMatch } from '../data/mdInline.ts';
 import { foldParagraphs, closeBlockEmphasis, doubleListIndent, fenceTracker, mapOutsideCode, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
 
 export const EDITOR_NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, CodeHighlightNode,
-  TableNode, TableRowNode, TableCellNode, MarkNode, AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
+  TableNode, TableRowNode, TableCellNode, MarkNode, AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode, HorizontalRuleNode,
   { replace: LinkNode, with: (node: LinkNode) => new RelativeLinkNode(node.getURL(), { rel: node.getRel(), target: node.getTarget(), title: node.getTitle() }), withKlass: RelativeLinkNode }];
 export const pendingState = createState('aisPending', { parse: value => value === '/' || value === '-' ? value : '' });
 const dividerState = createState('aisDivider', { parse: value => value === true });
@@ -300,8 +301,27 @@ const GUARDED_QUOTE: ElementTransformer = {
     return QUOTE.replace(parent, children, match, importing);
   },
 };
+const HORIZONTAL_RULE: ElementTransformer = {
+  type: 'element', dependencies: [HorizontalRuleNode], regExp: /^(?:---)\s*$/,
+  replace: (parent, children, match, importing) => {
+    if (isInCell(parent)) return false;
+    const previous = parent.getPreviousSibling();
+    if (importing && $isParagraphNode(previous) && previous.getTextContentSize() > 0) {
+      if ($isTextNode(children[0])) children[0].setTextContent(match[0]);
+      return false;
+    }
+    const hr = $createHorizontalRuleNode();
+    parent.replace(hr);
+    if (!importing) {
+      const p = $createParagraphNode();
+      hr.insertAfter(p);
+      p.selectStart();
+    }
+  },
+  export: (node: LexicalNode) => ($isHorizontalRuleNode(node) ? '---' : null),
+};
 export function transformers(cell = false, copy = false): Transformer[] {
-  return [CODE_BLOCK, ...(cell ? [] : [PARAGRAPH, { ...TABLE, export: (node: LexicalNode, _children: (node: ElementNode) => string, selected?: BaseSelection | null) => $isTableNode(node) ? $tableMarkdown(node, copy, selected) : null }]), CALLOUT, checklist(cell), ...(cell ? [] : [CARD]), HEADING,
+  return [CODE_BLOCK, ...(cell ? [] : [PARAGRAPH, HORIZONTAL_RULE, { ...TABLE, export: (node: LexicalNode, _children: (node: ElementNode) => string, selected?: BaseSelection | null) => $isTableNode(node) ? $tableMarkdown(node, copy, selected) : null }]), CALLOUT, checklist(cell), ...(cell ? [] : [CARD]), HEADING,
     cell ? QUOTE : GUARDED_QUOTE, cell ? UNORDERED_LIST : listRule(UNORDERED_LIST, 'bullet'), cell ? ORDERED_LIST : listRule(ORDERED_LIST, 'number'),
     HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, ...(copy ? [] : [CHIP_RUN]), IMAGE, CHIP, LINK, ANNOTATION];
 }
