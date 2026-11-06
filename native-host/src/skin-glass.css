@@ -269,10 +269,32 @@
   border-bottom: 1px solid rgba(10, 22, 51, .1);
   box-shadow: 0 4px 16px -4px rgba(10, 22, 51, .06);
 }
+:root[data-skin="glass"] .doc-meta .doc-meta-delete {
+  color: #c92a2a;
+  border: 1px solid rgba(201, 42, 42, .32);
+  background: rgba(201, 42, 42, .06);
+  border-radius: 10px;
+}
+:root[data-skin="glass"] .doc-meta .doc-meta-delete:hover {
+  background: #c92a2a;
+  color: #ffffff;
+  border-color: #c92a2a;
+  box-shadow: 0 3px 10px rgba(201, 42, 42, .3);
+}
 :root[data-skin="glass"][data-theme="dark"] .doc-meta-bar {
   background: #090f1e;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
   box-shadow: 0 4px 16px -4px rgba(0, 0, 0, .4);
+}
+:root[data-skin="glass"][data-theme="dark"] .doc-meta .doc-meta-delete {
+  color: #ff8787;
+  border: 1px solid rgba(255, 135, 135, .35);
+  background: rgba(255, 135, 135, .08);
+}
+:root[data-skin="glass"][data-theme="dark"] .doc-meta .doc-meta-delete:hover {
+  background: #e03131;
+  color: #ffffff;
+  border-color: #e03131;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-skin="glass"]:not([data-theme="light"]):not([data-theme="dark"]) .doc-meta-bar {

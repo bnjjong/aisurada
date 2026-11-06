@@ -141,16 +141,6 @@ export function NoteMeta({
               </button>
             )}
           </span>
-          <NoteSessionChips
-            note={live}
-            onOpenRail={CLAUDE_ENABLED ? (sessId) => {
-              openNoteRail(note.id, sessId);
-              if (mode === "agenda" || mode === "preview") {
-                if (mode === "preview") controller.showPreview(null);
-                go(controller, docAddress(note.id));
-              }
-            } : undefined}
-          />
           {!parent &&
             controller.isNative() &&
             controller.context.kind === "main" &&
@@ -183,7 +173,28 @@ export function NoteMeta({
               탭으로 띄우기
             </button>
           )}
-          <button onClick={() => setDeleting(true)}>삭제</button>
+          <button
+            type="button"
+            className="doc-meta-delete"
+            title="노트 삭제"
+            onClick={() => setDeleting(true)}
+          >
+            <svg
+              viewBox="0 0 16 16"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 4.5h10M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M12.5 4.5l-.8 8.5a1.5 1.5 0 0 1-1.5 1.5h-4.4a1.5 1.5 0 0 1-1.5-1.5L3.5 4.5" />
+              <path d="M6.5 7.5v4M9.5 7.5v4" />
+            </svg>
+            삭제
+          </button>
         </div>
       </div>
       {(!parent && (agenda || !!note.template) || sessionChips(live).length > 0) && (
@@ -214,14 +225,16 @@ export function NoteMeta({
             ) : (
               <span>알 수 없음 ({asText(note.template)})</span>
             ))}
-          {sessionChips(live).map((s) => (
-            <span className="session-chip" key={s.id}>
-              {s.label} <code>{s.id}</code>
-              <button onClick={() => void navigator.clipboard.writeText(s.id)}>
-                복사
-              </button>
-            </span>
-          ))}
+          <NoteSessionChips
+            note={live}
+            onOpenRail={CLAUDE_ENABLED ? (sessId) => {
+              openNoteRail(note.id, sessId);
+              if (mode === "agenda" || mode === "preview") {
+                if (mode === "preview") controller.showPreview(null);
+                go(controller, docAddress(note.id));
+              }
+            } : undefined}
+          />
         </div>
       )}
     </header>
