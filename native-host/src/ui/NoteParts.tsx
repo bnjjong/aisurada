@@ -37,8 +37,6 @@ export function NoteMeta({
   mode?: NoteMode;
 }) {
   const state = controller.getSnapshot(),
-    [mins, setMins] = useState(Math.max(0, Number(note.mins) || 0)),
-    [minsDirty, setMinsDirty] = useState(false),
     [identity, setIdentity] = useState(false),
     [evaluating, setEvaluating] = useState(false),
     [history, setHistory] = useState(false),
@@ -94,36 +92,6 @@ export function NoteMeta({
                 ? String(asRow(live.evaluation)?.score)
                 : "평가"}
             </button>
-            {mode === "preview" ? (
-              Number(note.mins) > 0 && <span>{String(note.mins)}분</span>
-            ) : (
-              <label>
-                소요 시간{" "}
-                <input
-                  className="doc-meta-mins-input"
-                  type="number"
-                  min={0}
-                  value={minsDirty ? mins : Math.max(0, Number(live.mins) || 0)}
-                  onChange={(e) => {
-                    setMinsDirty(true);
-                    setMins(
-                      Math.max(0, Math.round(Number(e.target.value) || 0)),
-                    );
-                  }}
-                  onBlur={() => {
-                    // C112: only typed minutes are written, and after leaving
-                    // the field it follows memory again.
-                    if (minsDirty && mins !== Number(live.mins || 0))
-                      void controller.data.updateNote(
-                        { id: note.id },
-                        { mins },
-                      );
-                    setMinsDirty(false);
-                  }}
-                />
-                분
-              </label>
-            )}
           </>
         )}
         {note.format === "markdown" && (

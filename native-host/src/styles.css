@@ -254,7 +254,7 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .doc-meta button { padding: 5px 8px; font-size: 11px; border-color: transparent; }
 .doc-meta > span:first-child { margin-right: auto; }
 .doc-meta label { display: inline-flex; align-items: center; white-space: nowrap; gap: 3px; }
-.doc-meta-mins-input { width: 55px; padding: 4px; font-size: 11px; text-align: right; }
+
 .format-badge, .record-badge { font-size: 10px; padding: 3px 6px; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
 .fav-toggle[aria-pressed=true] { color: #b38b2c; }
 .doc-id-chip, .doc-context-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 11px; margin: 8px 0; }

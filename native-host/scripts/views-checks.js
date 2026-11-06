@@ -221,14 +221,14 @@ if (location.pathname.startsWith("/note-window/")) {
       assert($(".doc-meta-history"), "history button");
       await until(() => $(".note-toc button"), "initial headings");
       assert($$(".note-toc button").length === 2, "first heading excluded");
-      assert($(".doc-meta-mins-input"), "mins input");
+      assert(!$(".doc-meta-mins-input"), "the minutes input is gone");
       const calls = await fetch("/calls").then((r) => r.json());
       assert(
         !calls.some((c) => c.args.argv[0] === "update-doc"),
         "open performed write",
       );
     });
-    await test("favorite-evaluation-and-minutes-use-current-tokens", async () => {
+    await test("favorite-and-evaluation-use-current-tokens", async () => {
       $(".doc-meta .fav-toggle").click();
       await until(
         async () => (await engine(["get-doc", cfg.id])).favorite === true,
@@ -244,41 +244,9 @@ if (location.pathname.startsWith("/note-window/")) {
           (await engine(["get-doc", cfg.id])).evaluation?.score === 83,
         "evaluation",
       );
-      const input = $(".doc-meta-mins-input");
-      input.focus();
-      fill(input, "35");
-      input.blur();
-      await until(
-        async () => (await engine(["get-doc", cfg.id])).mins === 35,
-        "minutes",
-      );
-    });
-    await test("C112-untouched-minutes-follow-memory-and-blur-writes-nothing", async () => {
+      // 소요 시간 입력칸은 없앴다. 뒤의 점검이 이 노트에 35분이 있다고 보므로 엔진으로 맞춰 둔다.
       const current = await engine(["get-doc", cfg.id]);
-      await engine(["update-doc", cfg.id, "mins=60", "f1=" + current.precondition]);
-      dispatchEvent(new Event("focus"));
-      await until(() => $(".doc-meta-mins-input")?.value === "60", "minutes follow outside change");
-      const before = (await fetch("/calls").then((r) => r.json())).length;
-      $(".doc-meta-mins-input").focus();
-      $(".doc-meta-mins-input").blur();
-      await pause(600);
-      const calls = (await fetch("/calls").then((r) => r.json())).slice(before);
-      assert(!calls.some((c) => c.args.argv[0] === "update-doc"), "blur without typing wrote");
-      assert((await engine(["get-doc", cfg.id])).mins === 60, "outside minutes overwritten");
-      const input = $(".doc-meta-mins-input");
-      input.focus();
-      fill(input, "45");
-      input.blur();
-      await until(async () => (await engine(["get-doc", cfg.id])).mins === 45, "typed minutes");
-      const after = await engine(["get-doc", cfg.id]);
-      await engine(["update-doc", cfg.id, "mins=70", "f1=" + after.precondition]);
-      dispatchEvent(new Event("focus"));
-      await until(() => $(".doc-meta-mins-input")?.value === "70", "follows memory again after typing");
-      // Later checks expect the minutes the previous check set.
-      $(".doc-meta-mins-input").focus();
-      fill($(".doc-meta-mins-input"), "35");
-      $(".doc-meta-mins-input").blur();
-      await until(async () => (await engine(["get-doc", cfg.id])).mins === 35, "minutes restored");
+      await engine(["update-doc", cfg.id, "mins=35", "f1=" + current.precondition]);
     });
     await test("C110-evaluation-escape-keeps-the-preview-open", async () => {
       go("/calendar?mode=day&date=" + cfg.today);

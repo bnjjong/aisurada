@@ -65,7 +65,6 @@ function NewNote({
     [title, setTitle] = useState(""),
     [date, setDate] = useState(ws.today),
     [time, setTime] = useState(now.toTimeString().slice(0, 5)),
-    [mins, setMins] = useState(0),
     [tags, setTags] = useState(""),
     [body, setBody] = useState(""),
     [revision, setRevision] = useState(0),
@@ -102,7 +101,7 @@ function NewNote({
               body: bodyRef.current.replace(/\[제목\]/g, title.trim()),
               date,
               time,
-              mins,
+              mins: 0,
               tags: tags
                 .split(",")
                 .map((t) => t.trim())
@@ -210,17 +209,6 @@ function NewNote({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-              />
-            </label>
-            <label>
-              소요 시간
-              <input
-                type="number"
-                min={0}
-                value={mins}
-                onChange={(e) =>
-                  setMins(Math.max(0, Math.round(Number(e.target.value) || 0)))
-                }
               />
             </label>
             <label>
