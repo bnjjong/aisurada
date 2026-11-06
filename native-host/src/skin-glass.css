@@ -262,3 +262,23 @@
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
 }
 :root[data-skin="glass"] .vault-write-failures, :root[data-skin="glass"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }
+
+/* ───────── 노트 상단 고정 바: 스크롤 시 본문 비침을 막는 불투명 면 ───────── */
+:root[data-skin="glass"] .doc-meta-bar {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(10, 22, 51, .1);
+  box-shadow: 0 4px 16px -4px rgba(10, 22, 51, .06);
+}
+:root[data-skin="glass"][data-theme="dark"] .doc-meta-bar {
+  background: #090f1e;
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, .4);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="glass"]:not([data-theme="light"]):not([data-theme="dark"]) .doc-meta-bar {
+    background: #090f1e;
+    border-bottom: 1px solid rgba(255, 255, 255, .1);
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, .4);
+  }
+}
+
