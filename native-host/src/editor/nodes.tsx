@@ -15,7 +15,7 @@ export class RelativeLinkNode extends LinkNode {
   static clone(node: RelativeLinkNode) { return new RelativeLinkNode(node.__url, { rel: node.__rel, target: node.__target, title: node.__title }, node.__key); }
   static importJSON(value: SerializedLinkNode) { return new RelativeLinkNode(value.url).updateFromJSON(value); }
   sanitizeUrl(url: string) {
-    return relativePath(url) || url.startsWith('#') || url.startsWith('/') || /^file:\/\//i.test(url)
+    return relativePath(url) || url.startsWith('#') || url.startsWith('/') || url.startsWith('~/') || /^file:\/\//i.test(url)
       ? url
       : super.sanitizeUrl(url);
   }
@@ -35,7 +35,7 @@ export class RelativeLinkNode extends LinkNode {
     const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
     const mod = isMac ? '⌘' : 'Ctrl';
     let action = '링크 열기';
-    if (url.startsWith('/') || /^file:\/\//i.test(url)) action = '기본 앱에서 파일 열기';
+    if (url.startsWith('/') || url.startsWith('~/') || /^file:\/\//i.test(url)) action = '기본 앱에서 파일 열기';
     else if (url.startsWith('#doc:')) action = '노트 열기';
     else if (url.startsWith('#sub:')) action = '하위 페이지 열기';
     else if (url.startsWith('#')) action = '소제목으로 이동';

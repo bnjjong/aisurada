@@ -22,7 +22,7 @@ export async function openEditorLink(url: string, features: EditorFeatures, head
   }
   if (url.startsWith('#')) { if (!heading?.(url.slice(1))) await features.host?.warn('절을 찾을 수 없어요'); return; }
   if (/^(https?:|mailto:|tel:)/i.test(url)) { await features.host?.openURL(url); return; }
-  if (url.startsWith('/') || /^file:\/\//i.test(url)) {
+  if (url.startsWith('/') || url.startsWith('~/') || /^file:\/\//i.test(url)) {
     let path = url;
     if (/^file:\/\//i.test(url)) {
       try { path = decodeURIComponent(new URL(url).pathname); }
@@ -33,8 +33,9 @@ export async function openEditorLink(url: string, features: EditorFeatures, head
     try {
       if (features.host?.openPath) await features.host.openPath(path);
       else await features.host?.openFile(path);
-    } catch {
-      await features.host?.warn(`파일을 열 수 없어요: ${path}`);
+    } catch (e) {
+      const msg = typeof e === 'string' ? e : (e instanceof Error ? e.message : '');
+      await features.host?.warn(msg ? `파일을 열 수 없어요: ${path}\n(${msg})` : `파일을 열 수 없어요: ${path}`);
     }
     return;
   }

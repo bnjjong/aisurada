@@ -57,6 +57,7 @@ fn main() {
             sidecar::sidecar_call,
             files::write_attachment_bytes,
             files::open_in_default_app,
+            files::open_external_path,
             self_write::announce_self_write,
             markdown::resolve_md_target,
             markdown::read_external_md,

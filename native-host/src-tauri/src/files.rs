@@ -111,6 +111,31 @@ pub fn open_in_default_app<R: Runtime>(
         .open_path(target.to_string_lossy(), None::<&str>)
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn open_external_path<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    path: String,
+) -> Result<(), String> {
+    let raw = if let Some(rest) = path.strip_prefix("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            Path::new(&home).join(rest)
+        } else {
+            PathBuf::from(&path)
+        }
+    } else {
+        PathBuf::from(&path)
+    };
+    let target = raw
+        .canonicalize()
+        .map_err(|_| format!("파일을 찾을 수 없어요: {path}"))?;
+    if is_executable(&target) {
+        return Err(format!("실행 파일은 열지 않아요: {}", target.display()));
+    }
+    app.opener()
+        .open_path(target.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
 fn open_target(vault: &str, path: &str) -> Result<PathBuf, String> {
     let vault = canonical_vault(vault)?;
     let target = Path::new(path)

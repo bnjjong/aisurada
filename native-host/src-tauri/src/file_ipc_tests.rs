@@ -140,6 +140,39 @@ fn attachments_decode_before_vault_check_and_support_both_windows_and_body_forms
     assert!(error.as_str().unwrap().contains("현재 vault 밖"));
 }
 #[test]
+fn open_external_path_rejects_missing_and_executables() {
+    let app = mock_builder()
+        .manage(HostState::default())
+        .invoke_handler(tauri::generate_handler![
+            files::open_external_path
+        ])
+        .build(mock_context(noop_assets()))
+        .unwrap();
+    let main = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let error = call(
+        &main,
+        "open_external_path",
+        InvokeBody::Json(json!({"path":"/nonexistent/path/for/sure/not/found"})),
+        Default::default(),
+    )
+    .unwrap_err();
+    assert!(error.as_str().unwrap().contains("파일을 찾을 수 없어요"));
+
+    let temp = tempfile::tempdir().unwrap();
+    let forbidden = temp.path().join("evil.command");
+    fs::write(&forbidden, b"exec").unwrap();
+    let error = call(
+        &main,
+        "open_external_path",
+        InvokeBody::Json(json!({"path":forbidden.to_str().unwrap()})),
+        Default::default(),
+    )
+    .unwrap_err();
+    assert!(error.as_str().unwrap().contains("실행 파일"));
+}
+#[test]
 fn self_write_broadcasts_actual_sender_to_every_window_and_silently_drops_stale_roots() {
     let app = mock_builder()
         .manage(HostState::default())
