@@ -55,7 +55,9 @@ export function ActionMenu({
 
   useEffect(() => {
     if (!place) return;
-    box.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    // 첫 항목이 아니라 메뉴 상자에 포커스를 둔다. 첫 항목에 두면 마우스로 열어도 포커스 테두리가 남아 선택된 것처럼 보인다.
+    // 키보드 사용자는 화살표나 Tab 으로 항목에 들어간다.
+    box.current?.focus();
     const outside = (e: PointerEvent) => {
       const target = e.target as Node;
       if (!box.current?.contains(target) && !anchor.current?.contains(target))
@@ -79,7 +81,9 @@ export function ActionMenu({
       const next =
         e.key === "ArrowDown"
           ? (at + 1) % buttons.length
-          : (at - 1 + buttons.length) % buttons.length;
+          : at <= 0
+            ? buttons.length - 1
+            : at - 1;
       buttons[next].focus();
     };
     document.addEventListener("pointerdown", outside);
@@ -100,6 +104,7 @@ export function ActionMenu({
       role="menu"
       aria-label={label}
       ref={box}
+      tabIndex={-1}
       style={
         place
           ? { top: place.top, right: place.right }
