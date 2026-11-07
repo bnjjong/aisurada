@@ -139,6 +139,41 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .tab-button[aria-selected="true"] { color: var(--accent); }
 .tab-main .tab-button { min-width: 156px; }
 .tab-mark { display: block; flex: none; width: 20px; height: 20px; border-radius: 6px; }
+/* 로고 상태 몸짓(시안: 로고 22). 상태는 svg의 is-idle, is-thinking, is-ok, is-error 클래스로 정해진다. */
+@property --bm-a { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+.bm * { transform-box: fill-box; transform-origin: center; }
+.bm .bm-neck, .bm .bm-cap, .bm .bm-pfl, .bm .bm-pfr { opacity: 0; }
+.bm .bm-neck, .bm .bm-cap { transition: opacity .25s; }
+.bm:not(.is-idle) .bm-neck, .bm.is-thinking .bm-cap { opacity: 1; }
+.bm .bm-led, .bm .bm-ledh { fill: #ff4d8d; }
+.bm.is-ok .bm-led, .bm.is-ok .bm-ledh { fill: #5be38f; }
+.bm.is-error .bm-led, .bm.is-error .bm-ledh { fill: #ff3b30; }
+.bm.is-error .bm-ring, .bm.is-error .bm-halo { stroke: #ff5148; }
+.bm.is-error .bm-lens { fill: #ff5148; }
+@keyframes bm-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .12; } }
+@keyframes bm-chase { 0%, 70%, 100% { opacity: .25; } 12%, 40% { opacity: 1; } }
+@keyframes bm-spin { 0%, 6% { --bm-a: 0deg; } 22%, 34% { --bm-a: 90deg; } 62%, 100% { --bm-a: 360deg; } }
+@keyframes bm-nod { 0%, 40%, 100% { transform: translateY(0) scaleY(1); } 12% { transform: translateY(12px) scaleY(.96); } 24% { transform: translateY(0) scaleY(1); } 32% { transform: translateY(9px) scaleY(.97); } }
+@keyframes bm-pop { 0%, 40%, 100% { transform: scale(1); } 12%, 32% { transform: scale(1.14); } }
+@keyframes bm-shake { 0%, 48%, 100% { transform: rotate(0deg); } 6% { transform: rotate(-9deg); } 12% { transform: rotate(9deg); } 18% { transform: rotate(-9deg); } 24% { transform: rotate(9deg); } 30% { transform: rotate(-6deg); } 36% { transform: rotate(5deg); } 42% { transform: rotate(-2deg); } }
+@keyframes bm-flash { 0%, 48%, 100% { opacity: 1; } 6%, 18%, 30% { opacity: .35; } 12%, 24%, 36% { opacity: 1; } }
+.bm.is-thinking { animation: bm-spin 7s ease-in-out infinite; }
+.bm.is-thinking .bm-led, .bm.is-thinking .bm-ledh { animation: bm-blink .8s linear infinite; }
+.bm.is-thinking .bm-ln { animation: bm-chase 1.6s ease-in-out infinite; }
+.bm.is-thinking .bm-face { transform: translateX(calc(sin(var(--bm-a)) * 110px)) scaleX(max(cos(var(--bm-a)), 0.3)); opacity: clamp(0, calc((cos(var(--bm-a)) + 0.2) * 5), 1); }
+.bm.is-thinking .bm-cap { transform: translate(calc(sin(var(--bm-a)) * -80px), calc((1 - cos(var(--bm-a))) * 11px)); }
+.bm.is-thinking .bm-pfl, .bm.is-thinking .bm-pbl { transform: translateX(calc((1 - cos(var(--bm-a))) * 143px)) scale(calc((0.7 + 0.3 * cos(var(--bm-a)) * cos(var(--bm-a))) * (1 + 0.18 * sin(var(--bm-a)))), calc(1 + 0.18 * sin(var(--bm-a)))); }
+.bm.is-thinking .bm-pfr, .bm.is-thinking .bm-pbr { transform: translateX(calc((cos(var(--bm-a)) - 1) * 143px)) scale(calc((0.7 + 0.3 * cos(var(--bm-a)) * cos(var(--bm-a))) * (1 - 0.18 * sin(var(--bm-a)))), calc(1 - 0.18 * sin(var(--bm-a)))); }
+.bm.is-thinking .bm-pfl { opacity: clamp(0, calc(sin(var(--bm-a)) * 99), 1); }
+.bm.is-thinking .bm-pbl { opacity: calc(1 - clamp(0, calc(sin(var(--bm-a)) * 99), 1)); }
+.bm.is-thinking .bm-pfr { opacity: clamp(0, calc(sin(var(--bm-a)) * -99), 1); }
+.bm.is-thinking .bm-pbr { opacity: calc(1 - clamp(0, calc(sin(var(--bm-a)) * -99), 1)); }
+.bm.is-ok .bm-hd { animation: bm-nod 3s ease-in-out 1; }
+.bm.is-ok .bm-ln { animation: bm-pop 3s ease-in-out 1; }
+.bm.is-error .bm-led, .bm.is-error .bm-ledh { animation: bm-blink .4s linear infinite; }
+.bm.is-error .bm-hd { animation: bm-shake 3s ease-in-out 1; }
+.bm.is-error .bm-pbl, .bm.is-error .bm-pbr { animation: bm-flash 3s linear 1; }
+@media (prefers-reduced-motion: reduce) { .bm, .bm * { animation: none !important; transition: none !important; } }
 .tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-close { border: 0; border-radius: 0; background: transparent; padding: 0 10px; font-size: 17px; color: var(--muted); }
 .tab-dragging { opacity: .45; }

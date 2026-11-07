@@ -317,6 +317,40 @@ export function useAskState<T = AskStoreState>(selector: (state: AskStoreState) 
   return selector(snapshot);
 }
 
+/** How the last question ended. The logo shows it as a gesture. */
+export type AskOutcome = 'ok' | 'error';
+
+const OUTCOME_SHOWN_MS = 3000;
+let askOutcome: AskOutcome | null = null;
+let askOutcomeTimer: ReturnType<typeof setTimeout> | undefined;
+const askOutcomeListeners = new Set<() => void>();
+
+function emitAskOutcome(): void {
+  askOutcomeListeners.forEach((listener) => listener());
+}
+
+function subscribeAskOutcome(listener: () => void): () => void {
+  askOutcomeListeners.add(listener);
+  return () => {
+    askOutcomeListeners.delete(listener);
+  };
+}
+
+/** Records how a question ended. The mark is kept for a few seconds and is never saved. */
+export function noteAskOutcome(kind: AskOutcome): void {
+  clearTimeout(askOutcomeTimer);
+  askOutcome = kind;
+  emitAskOutcome();
+  askOutcomeTimer = setTimeout(() => {
+    askOutcome = null;
+    emitAskOutcome();
+  }, OUTCOME_SHOWN_MS);
+}
+
+export function useAskOutcome(): AskOutcome | null {
+  return useSyncExternalStore(subscribeAskOutcome, () => askOutcome, () => null);
+}
+
 /** The number of questions in flight, for the vault leaving check (3부 설명서 17.5). */
 export function waitingAnswers(noteKeys?: Set<string>): number {
   let count = 0;

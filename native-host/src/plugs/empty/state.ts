@@ -14,6 +14,14 @@ export function useAskState<T = typeof EMPTY_ASK_STATE>(
   return selector(EMPTY_ASK_STATE);
 }
 
+export type AskOutcome = 'ok' | 'error';
+
+export function noteAskOutcome(_kind: AskOutcome): void {}
+
+export function useAskOutcome(): AskOutcome | null {
+  return null;
+}
+
 const EMPTY_RAIL_STATE = {
   rails: {} as Record<string, string>,
   openRail: null as ((noteKey: string, sessionId: string) => void) | null,

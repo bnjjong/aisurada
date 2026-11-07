@@ -11,6 +11,7 @@ import { VaultBanner } from './data/VaultBanner.tsx';
 import { captureEscape } from './ui/layers.ts';
 import { Preview } from './ui/Preview.tsx';
 import { BrandMark } from './ui/BrandMark.tsx';
+import type { BrandState } from './ui/BrandMark.tsx';
 
 // Window identity is decided once, before any internal navigation.
 const context = windowContext(window.location.pathname);
@@ -58,7 +59,7 @@ function WorkspaceApp() {
   }, [controller]);
   useEffect(() => { document.documentElement.dataset.theme = state.theme; }, [state.theme]);
   useEffect(() => { document.documentElement.dataset.skin = state.skin; }, [state.skin]);
-  if (state.booting) return <main className="status-screen" role="status"><Brand />
+  if (state.booting) return <main className="status-screen" role="status"><Brand state="thinking" />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
   if (state.fatal) {
     if (context.kind === 'note') {
@@ -71,7 +72,7 @@ function WorkspaceApp() {
         </main>
       );
     }
-    return <main className="status-screen"><Brand /><p role="alert">{state.fatal}</p></main>;
+    return <main className="status-screen"><Brand state="error" /><p role="alert">{state.fatal}</p></main>;
   }
   if (context.kind === 'note') {
     const note = state.workspace?.notes.find(n => n.id === context.docId);
@@ -109,7 +110,7 @@ function WorkspaceApp() {
   </>;
 }
 
-function Brand() { return <div className="brand"><BrandMark /><span>aisurada</span></div>; }
+function Brand({ state = 'idle' }: { state?: BrandState }) { return <div className="brand"><BrandMark state={state} /><span>aisurada</span></div>; }
 
 function Launcher({ controller, state }: { controller: WorkspaceController; state: WorkspaceState }) {
   const [mode, setMode] = useState<'create' | 'open' | null>(() => new URLSearchParams(state.route.split('?')[1]).get('mode') === 'create' ? 'create' : null);

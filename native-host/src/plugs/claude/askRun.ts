@@ -18,7 +18,7 @@ import {
   targetArgs,
 } from './askText.ts';
 import type { AskTarget, AskThread, AskTurn } from './askText.ts';
-import { askNow, markNoteUnseen, setAskRuntime, setAskThread, setPendingAsk } from './state.ts';
+import { askNow, markNoteUnseen, noteAskOutcome, setAskRuntime, setAskThread, setPendingAsk } from './state.ts';
 import type { AskRuntime, PendingAsk } from './state.ts';
 import { authorBundleText } from './transcriptLines.ts';
 import type { EngineAuthor } from './transcriptLines.ts';
@@ -331,6 +331,7 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
 
     // 3.10: the turn is made now, after the answer, so askedAt is the time the answer arrived.
     const failed = !result.ok;
+    noteAskOutcome(failed ? 'error' : 'ok');
     const turn: AskTurn = {
       id: request.turnId,
       markId: request.markId,
