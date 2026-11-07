@@ -1158,11 +1158,11 @@ code.is-symbol { font-weight: 700; }
    지우는 동작만 --del(빨강)로 떼어 놓는다. 스킨별 모양은 :where 로 낮춘 스킨의 기본 단추 위에 얹힌다. */
 :root { --del: #c92a2a; --del-bg: rgba(201, 42, 42, 0.07); }
 :root[data-theme="dark"] { --del: #ff8787; --del-bg: rgba(255, 135, 135, 0.1); }
-.ico-btn { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0; line-height: 0; }
-.ico-btn svg { display: block; }
-.ico-btn.has-text { display: inline-flex; align-items: center; gap: 5px; width: auto; padding: 0 9px; font-size: 11px; font-weight: 600; line-height: 1; }
-.doc-meta .ico-btn { width: 30px; height: 30px; padding: 0; gap: 0; }
-.doc-meta .ico-btn.has-text { width: auto; padding: 0 9px; gap: 5px; }
+/* 정보줄의 `.doc-meta button` 이 display 를 flex 로 정해 두므로, 가운데 맞춤은 grid 가 아니라 flex 로 한다.
+   (grid 로 하면 그 규칙에 밀려 아이콘이 왼쪽으로 쏠린다.) */
+.ico-btn, .doc-meta .ico-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; padding: 0; gap: 0; line-height: 0; }
+.ico-btn svg { display: block; flex: none; }
+.ico-btn.has-text, .doc-meta .ico-btn.has-text { width: auto; padding: 0 9px; gap: 5px; font-size: 11px; font-weight: 600; line-height: 1; }
 .doc-meta .fav-toggle svg { fill: none; }
 .doc-meta .fav-toggle[aria-pressed="true"] svg { fill: currentColor; }
 .doc-meta-right { gap: 6px; }
