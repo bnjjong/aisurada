@@ -51,9 +51,9 @@ public final class Chapter31IntegrationTest {
                 check(message().startsWith("ais(outside)"), "startup outside writer");
                 eq(request(null, "history", "ndfixture-00000001").get("count"), 1L, "history socket response");
                 request(null, "update-agenda-facts", "agfixture-00000001", "facts=approved");
-                request("session-A", "save_report", "{\"kind\":\"evening\",\"date\":\"2026-10-21\",\"body\":\"first tool\"}");
+                request("session-A", "save_template", "{\"name\":\"T1\",\"type\":\"plan\",\"body\":\"first tool\"}");
                 String message = message(); check(message.startsWith("ais(app)"), "tool request commits previous app"); check(message.contains("Aisurada-Reason: writer"), "writer reason through real request");
-                request("session-B", "save_report", "{\"kind\":\"evening\",\"date\":\"2026-10-21\",\"body\":\"second tool\"}");
+                request("session-B", "save_template", "{\"name\":\"T2\",\"type\":\"plan\",\"body\":\"second tool\"}");
                 message = message(); check(message.contains("Aisurada-Session: session-A"), "new tool session commits previous session");
                 deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12);
                 while (System.nanoTime() < deadline && !message().contains("Aisurada-Reason: idle")) Thread.sleep(100);

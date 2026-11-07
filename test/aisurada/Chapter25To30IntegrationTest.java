@@ -35,10 +35,6 @@ public final class Chapter25To30IntegrationTest {
                 eq(absent.err, "AIS-409 이 판에는 4부(Claude 연동)가 없다. 문답과 레일 대화와 세션 기록 명령은 ais-claude 모듈을 넣어 지은 사이드카에서만 돈다.\n", "part4 absence over socket");
                 check(request(3, "read-session", "id", "unknown=x").err.startsWith("AIS-400"), "part4 syntax failure over socket");
                 check(request(3, "append-chat-turn").err.startsWith("AIS-409"), "part4 write preparation over socket");
-                request(0, "save_report", "{\"kind\":\"evening\",\"date\":\"2026-06-16\",\"body\":\"회고\\n원문\"}");
-                eq(request(0, "get-report", "rv-evening-2026-06-16").object().get("body"), "회고\n원문", "socket report UTF8");
-                put(v, ".aisurada/reports/rv-morning-2026-06-17.json", "broken");
-                check(request(0, "list-reports").err.contains("회고 1건을 못 읽어"), "incomplete diagnostic returned over frame");
                 request(0, "plan-day", "date=2026-06-16", "agenda=demo");
                 check(request(0, "plan_day", "{\"date\":\"2026-06-16\",\"agenda\":\"demo\"}").err.contains("제목이 같은 노트"), "plan warning returned over frame");
                 var deleted = request(0, "delete_doc", "{\"id\":\"ndfixture-00000001\"}").object();

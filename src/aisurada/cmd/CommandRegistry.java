@@ -3,7 +3,7 @@ package aisurada.cmd;
 import java.util.*;
 
 /**
- * 도구 29개와 명령 61개 및 사용법 목록을 관리하는 레지스트리.
+ * 도구 26개와 명령 58개 및 사용법 목록을 관리하는 레지스트리.
  * 설명서 부록 A 및 B 규격을 준수합니다.
  */
 public final class CommandRegistry {
@@ -12,7 +12,7 @@ public final class CommandRegistry {
 
     /** 설명서 7.1의 쓰기 깃발. 도구 표면도 짝 명령의 깃발을 따른다. */
     public static final Set<String> WRITE_COMMANDS = Set.of(
-            "create-project", "update-project", "delete-project", "save-report", "save-template",
+            "create-project", "update-project", "delete-project", "save-template",
             "set-favorite", "evaluate-doc", "link-docs", "write-attachment", "delete-doc", "restore-doc",
             "purge-doc", "create-sub-note", "update-sub-note", "delete-sub-note", "export-markdown",
             "create-doc", "update-doc", "empty-trash", "create-agenda", "update-agenda", "delete-agenda",
@@ -23,8 +23,8 @@ public final class CommandRegistry {
     public static final Set<String> TOOL_NAMES = Collections.unmodifiableSet(new LinkedHashSet<>(List.of(
             "create_doc", "update_doc", "set_favorite", "evaluate_doc", "link_docs",
             "list_docs", "search_docs", "list_tags", "get_doc", "delete_doc",
-            "list_trash", "restore_doc", "purge_doc", "plan_day", "list_reports",
-            "get_report", "list_templates", "get_template", "save_report", "save_template",
+            "list_trash", "restore_doc", "purge_doc", "plan_day",
+            "list_templates", "get_template", "save_template",
             "create_sub_note", "list_sub_notes", "get_sub_note", "update_sub_note", "delete_sub_note",
             "write_attachment", "list_attachments", "list_comments", "export_markdown"
     )));
@@ -32,9 +32,9 @@ public final class CommandRegistry {
     public static final Set<String> COMMAND_NAMES = Collections.unmodifiableSet(new LinkedHashSet<>(List.of(
             "reindex", "reindex-paths", "list-docs", "search-docs", "get-doc",
             "list-sub-notes", "get-sub-note", "list-attachments", "list-comments", "list-tags",
-            "list-trash", "list-reports", "get-report", "list-templates", "get-template",
+            "list-trash", "list-templates", "get-template",
             "list-agendas", "list-projects", "create-project", "update-project", "delete-project",
-            "save-report", "save-template", "set-favorite", "evaluate-doc", "link-docs",
+            "save-template", "set-favorite", "evaluate-doc", "link-docs",
             "write-attachment", "delete-doc", "restore-doc", "purge-doc", "create-sub-note",
             "update-sub-note", "delete-sub-note", "export-markdown", "create-doc", "update-doc",
             "empty-trash", "create-agenda", "update-agenda", "delete-agenda", "save-ritual-template",
@@ -62,8 +62,6 @@ public final class CommandRegistry {
             "list-comments <노트 id> [하위 노트 id]",
             "list-tags [query=<태그 이름의 일부>] [limit=<받을 태그 수. 1 이상>]",
             "list-trash",
-            "list-reports [kind=morning|evening|weekly] [from=<YYYY-MM-DD>] [to=<YYYY-MM-DD>] [bodies=true. 본문과 메모까지 싣는다. 기본은 유무만]",
-            "get-report <회고 id. 예: rv-evening-2026-06-04>",
             "list-templates [category=doc|ritual] [type=<유형. 주면 리추얼이 빠진다>] [bodies=true. 본문까지 싣는다. 기본은 메타만]",
             "get-template <템플릿 id>",
             "list-agendas",
@@ -71,7 +69,6 @@ public final class CommandRegistry {
             "create-project title=<이름> [hue=<색>] [summary=<한 문단 설명>]",
             "update-project <프로젝트 id> [title=<이름>] [hue=<색>] [summary=<한 문단 설명>]",
             "delete-project <프로젝트 id>",
-            "save-report kind=<morning|evening|weekly> date=<YYYY-MM-DD> [body=<다듬은 본문>] [memo=<개인 메모>]",
             TemplateCommands.SAVE_USAGE,
             "set-favorite <노트 id> [favorite=true|false. 안 주면 지금 값을 뒤집는다] [category=<라벨. 빈 값이면 지운다>] [f1=<직전에 읽은 토큰>]",
             "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]",
@@ -123,7 +120,7 @@ public final class CommandRegistry {
         if (Set.of("save_template", "save-template", "delete-doc-template", "save-ritual-template").contains(name)) return true;
         if (Set.of("shard-notes", "verify-shard").contains(name)) return true;
         if (Set.of("delete_doc", "delete-doc", "restore_doc", "restore-doc", "purge_doc", "purge-doc", "empty-trash").contains(name)) return true;
-        if (Set.of("save_report", "save-report", "export_markdown", "export-markdown", "plan_day", "plan-day", "check-notes").contains(name)) return true;
+        if (Set.of("export_markdown", "export-markdown", "plan_day", "plan-day", "check-notes").contains(name)) return true;
         return "reindex".equals(name) || "reindex-paths".equals(name) ||
                 "list-agendas".equals(name) || "create-agenda".equals(name) ||
                 "update-agenda".equals(name) || "delete-agenda".equals(name) ||
@@ -148,8 +145,6 @@ public final class CommandRegistry {
                 "search_docs".equals(name) || "search-docs".equals(name) ||
                 "list_templates".equals(name) || "list-templates".equals(name) ||
                 "get_template".equals(name) || "get-template".equals(name) ||
-                "list_reports".equals(name) || "list-reports".equals(name) ||
-                "get_report".equals(name) || "get-report".equals(name) ||
                 "list_trash".equals(name) || "list-trash".equals(name) ||
                 "list-projects".equals(name) || "create-project".equals(name) ||
                 "update-project".equals(name) || "delete-project".equals(name) ||
@@ -173,7 +168,7 @@ public final class CommandRegistry {
         StringBuilder sb = new StringBuilder();
         sb.append("모르는 명령이다: ").append(name).append("\n");
         sb.append("도구 이름으로 부르려면 이렇게 한다: <도구> '<json>'\n");
-        sb.append("  list_docs, search_docs, list_tags, get_doc, list_trash, list_reports, get_report, list_templates, get_template, list_sub_notes, get_sub_note, list_attachments\n");
+        sb.append("  list_docs, search_docs, list_tags, get_doc, list_trash, list_templates, get_template, list_sub_notes, get_sub_note, list_attachments\n");
         sb.append("사이드카 고유 명령은 이렇다.\n");
         for (String line : USAGE_LINES) {
             sb.append("  ").append(line).append("\n");

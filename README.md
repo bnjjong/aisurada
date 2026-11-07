@@ -30,7 +30,6 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 | `list_sub_notes`, `get_sub_note` | 하위 노트 목록과 1건 |
 | `list_attachments` | 노트나 하위 노트의 첨부 |
 | `list_templates`, `get_template` | 문서·리추얼 템플릿 |
-| `list_reports`, `get_report` | 회고 |
 | `list_trash` | 휴지통 |
 | `reindex` | vault를 한 번 훑어 읽지 못한 파일이 있는지 알려 준다 |
 | `reindex-paths` | 지정한 경로만 훑는다. 받은 자리 인자가 200개를 넘으면 노트 전체로 전환한다 |
@@ -153,13 +152,12 @@ java -jar dist/ais-engine.jar delete-doc-template <템플릿 id> --aisurada.vaul
 
 설명서 원문 24장과 다시 맞댄 결과는 [24장 원문 맞대기](docs/rebuild-p1-chapter24-recheck.md)에 있습니다. 원문의 문구와 바이트로 짠 독립 시험 88건이 맞았고, 받아들임 묶음(`fixtures/expect`)에 진짜 묶음과 같은 자리의 템플릿 케이스 9건을 더했습니다.
 
-## 25~30장
+## 26~30장
 
-회고 저장, 휴지통의 보내기·복원·영구 삭제·비우기, 마크다운 내보내기, 샤드 이동과 검증, 하루 플랜, 답 없는 코멘트 점검을 지원합니다. 기준은 제공된 25~30장 PDF이며, 각 장의 미결정 호환 동작을 유지합니다.
+휴지통의 보내기·복원·영구 삭제·비우기, 마크다운 내보내기, 샤드 이동과 검증, 하루 플랜, 답 없는 코멘트 점검을 지원합니다. 기준은 제공된 26~30장 PDF이며, 각 장의 미결정 호환 동작을 유지합니다. (25장 회고/데일리 리포트 기능은 제거되었습니다.)
 
 | 장 | 명령과 완료 문서 |
 |---|---|
-| 25 | `list_reports`, `get_report`, `save_report`와 짝 명령 — [회고](docs/rebuild-p1-chapter25-complete.md) |
 | 26 | `list_trash`, `delete_doc`, `restore_doc`, `purge_doc`와 짝 명령, `empty-trash` — [휴지통](docs/rebuild-p1-chapter26-complete.md) |
 | 27 | `export_markdown` / `export-markdown` — [내보내기](docs/rebuild-p1-chapter27-complete.md) |
 | 28 | `shard-notes`, `verify-shard` — [샤드](docs/rebuild-p1-chapter28-complete.md) |
@@ -167,7 +165,6 @@ java -jar dist/ais-engine.jar delete-doc-template <템플릿 id> --aisurada.vaul
 | 30 | `check-notes` — [노트 점검](docs/rebuild-p1-chapter30-complete.md) |
 
 ```bash
-java -jar dist/ais-engine.jar save-report kind=evening date=2026-06-16 'body=오늘의 회고' --aisurada.vault=/path/to/vault
 java -jar dist/ais-engine.jar plan-day date=2026-06-22 dryRun=true --aisurada.vault=/path/to/vault
 java -jar dist/ais-engine.jar check-notes date=2026-06-22 --aisurada.vault=/path/to/vault
 ```

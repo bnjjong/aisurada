@@ -169,12 +169,6 @@ public final class EngineExecutor {
                     response = GetTemplate.execute(vaultRoot, parsed);
                 } else if (Set.of("save-template", "delete-doc-template", "save-ritual-template").contains(parsed.commandName())) {
                     response = TemplateCommands.execute(vaultRoot, parsed);
-                } else if ("list-reports".equals(parsed.commandName())) {
-                    response = ListReports.execute(vaultRoot, parsed);
-                } else if ("get-report".equals(parsed.commandName())) {
-                    response = GetReport.execute(vaultRoot, parsed);
-                } else if ("save-report".equals(parsed.commandName())) {
-                    response = SaveReport.execute(vaultRoot, parsed);
                 } else if ("export-markdown".equals(parsed.commandName())) {
                     response = ExportMarkdown.execute(vaultRoot);
                 } else if ("plan-day".equals(parsed.commandName())) {

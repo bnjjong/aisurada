@@ -93,8 +93,8 @@ public final class AisCliMain {
     public static final List<String> CLI_TOOL_NAMES = List.of(
             "create_doc", "update_doc", "set_favorite", "evaluate_doc", "link_docs",
             "list_docs", "search_docs", "list_tags", "get_doc", "delete_doc",
-            "list_trash", "restore_doc", "purge_doc", "plan_day", "list_reports",
-            "get_report", "list_templates", "get_template", "save_report", "save_template",
+            "list_trash", "restore_doc", "purge_doc", "plan_day",
+            "list_templates", "get_template", "save_template",
             "create_sub_note", "list_sub_notes", "get_sub_note", "update_sub_note", "delete_sub_note",
             "write_attachment", "list_attachments", "list_comments", "export_markdown"
     );
@@ -115,11 +115,8 @@ public final class AisCliMain {
             Map.entry("restore_doc", "휴지통의 노트를 되살린다"),
             Map.entry("purge_doc", "휴지통의 노트를 영구히 지운다"),
             Map.entry("plan_day", "하루 계획 초안을 짓고, 원하면 노트로 저장한다"),
-            Map.entry("list_reports", "회고 목록을 낸다"),
-            Map.entry("get_report", "회고 1건을 낸다"),
             Map.entry("list_templates", "문서와 리추얼 템플릿 목록을 낸다"),
             Map.entry("get_template", "템플릿 1건을 낸다"),
-            Map.entry("save_report", "회고를 저장한다"),
             Map.entry("save_template", "문서 템플릿을 저장한다"),
             Map.entry("create_sub_note", "하위 노트 1건을 만든다"),
             Map.entry("list_sub_notes", "바로 아래 하위 노트 목록을 낸다"),
@@ -133,15 +130,15 @@ public final class AisCliMain {
     );
 
     public static final List<String> DIRECT_COMMANDS = List.of(
-            "doctor", "sweep", "report", "schedule", "install", "mcp", "claude-mcp"
+            "doctor", "sweep", "schedule", "install", "mcp", "claude-mcp"
     );
 
     public static final List<String> ENGINE_COMMANDS_61 = List.of(
             "reindex", "reindex-paths", "list-docs", "search-docs", "get-doc",
             "list-sub-notes", "get-sub-note", "list-attachments", "list-comments", "list-tags",
-            "list-trash", "list-reports", "get-report", "list-templates", "get-template",
+            "list-trash", "list-templates", "get-template",
             "list-agendas", "list-projects", "create-project", "update-project", "delete-project",
-            "save-report", "save-template", "set-favorite", "evaluate-doc", "link-docs",
+            "save-template", "set-favorite", "evaluate-doc", "link-docs",
             "write-attachment", "delete-doc", "restore-doc", "purge-doc", "create-sub-note",
             "update-sub-note", "delete-sub-note", "export-markdown", "create-doc", "update-doc",
             "empty-trash", "create-agenda", "update-agenda", "delete-agenda", "save-ritual-template",
@@ -183,14 +180,14 @@ public final class AisCliMain {
         } else if ("claude-mcp".equals(firstArg)) {
             ClaudeMcpCommand.run(Arrays.copyOfRange(args, 1, args.length));
             return;
-        } else if ("report".equals(firstArg) || "schedule".equals(firstArg)) {
+        } else if ("schedule".equals(firstArg)) {
             // 결정 3: 모르는 이름으로 간주하여 종료 코드 2
             printUnknownName(firstArg);
             exit(2);
             return;
         }
 
-        // 도구 이름 29개 또는 사이드카 고유 명령 61개
+        // 도구 이름 26개 또는 사이드카 고유 명령 58개
         boolean isTool = CLI_TOOL_NAMES.contains(firstArg);
         boolean isCmd = ENGINE_COMMANDS_61.contains(firstArg);
 
@@ -219,7 +216,6 @@ public final class AisCliMain {
         System.out.println();
         System.out.println("doctor — 사이드카와 관련 파일의 상태를 진단합니다");
         System.out.println("sweep — 오래 조용한 사이드카를 정리합니다");
-        System.out.println("report — 리포트 작업을 다룹니다");
         System.out.println("schedule — 주기적 작업을 다룹니다");
         System.out.println("install — 실행에 필요한 jar 파일을 설치합니다");
         System.out.println("mcp — Claude 같은 MCP 클라이언트가 노트를 읽도록 MCP 서버로 선다(표준 입출력). 쓰기 도구는 --write를 줄 때만 연다");

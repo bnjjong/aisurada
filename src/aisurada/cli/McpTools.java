@@ -231,14 +231,6 @@ final class McpTools {
                 schema().str("date", "날짜(YYYY-MM-DD). 안 주면 오늘", false)
                         .str("agenda", "아젠다 slug나 이름", false)
                         .bool("dryRun", "true면 저장하지 않는다")));
-        t.add(tool("list_reports",
-                "회고(아침, 저녁, 주간)의 목록을 낸다.",
-                schema().str("kind", "morning, evening, weekly 중 하나", false)
-                        .str("dateFrom", "이 날짜(YYYY-MM-DD)부터", false)
-                        .str("dateTo", "이 날짜(YYYY-MM-DD)까지", false)));
-        t.add(tool("get_report",
-                "회고 1건을 읽는다.",
-                schema().str("id", "회고 id. 예: rv-evening-2026-06-04", true)));
         t.add(tool("list_templates",
                 "문서 템플릿과 리추얼 템플릿의 목록을 낸다.",
                 schema().str("category", "doc이나 ritual", false)
@@ -246,12 +238,6 @@ final class McpTools {
         t.add(tool("get_template",
                 "템플릿 1건을 읽는다.",
                 schema().str("id", "템플릿 id", true)));
-        t.add(tool("save_report",
-                "회고를 저장한다. 같은 종류와 날짜가 있으면 덮어쓴다.",
-                schema().str("kind", "morning, evening, weekly 중 하나", true)
-                        .str("date", "날짜(YYYY-MM-DD)", true)
-                        .str("body", "다듬은 본문", false)
-                        .str("memo", "개인 메모", false)));
         t.add(tool("save_template",
                 "문서 템플릿을 저장한다. id를 주면 그 템플릿을 고친다.",
                 schema().str("id", "고칠 템플릿 id", false)

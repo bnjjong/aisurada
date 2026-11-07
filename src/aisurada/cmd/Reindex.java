@@ -31,14 +31,11 @@ public final class Reindex {
         // 3. 템플릿 훑기 (2.4, 24장)
         TemplateReader.ScanResult templateScan = TemplateReader.scan(vaultRoot);
 
-        // 4. 회고 훑기 (2.5, 25장) - .aisurada/reports/ 폴더 목록 못 읽으면 AIS-500 던짐
-        ReportReader.ScanResult reportScan = ReportReader.scan(vaultRoot);
-
-        // 5. 휴지통 훑기 (2.6, 26장)
+        // 4. 휴지통 훑기 (2.6, 26장)
         TrashReader.ScanResult trashScan = TrashReader.scan(vaultRoot);
 
-        // 6. skipped 합치기 차례 (8.4):
-        // 아젠다, 노트 훑기 단계의 건너뜀 및 노트를 열다 생긴 건너뜀, 템플릿, 회고, 휴지통
+        // 5. skipped 합치기 차례 (8.4):
+        // 아젠다, 노트 훑기 단계의 건너뜀 및 노트를 열다 생긴 건너뜀, 템플릿, 휴지통
         List<Map<String, String>> allSkipped = new ArrayList<>();
         allSkipped.addAll(agendaScan.skipped());
         allSkipped.addAll(noteScan.skipped());
@@ -51,22 +48,6 @@ public final class Reindex {
             allSkipped.add(m);
         }
 
-        List<Map<String, String>> reviewConflicts = new ArrayList<>();
-        for (ReportReader.SkippedReport sr : reportScan.skipped()) {
-            if (sr.isConflict()) {
-                Map<String, String> m = new LinkedHashMap<>();
-                m.put("kind", "review");
-                m.put("path", sr.relPath());
-                reviewConflicts.add(m);
-            } else {
-                Map<String, String> m = new LinkedHashMap<>();
-                m.put("kind", "review");
-                m.put("path", sr.relPath());
-                m.put("reason", sr.reason());
-                allSkipped.add(m);
-            }
-        }
-
         for (TrashReader.SkippedTrash str : trashScan.skipped()) {
             Map<String, String> m = new LinkedHashMap<>();
             m.put("kind", "trash");
@@ -75,14 +56,12 @@ public final class Reindex {
             allSkipped.add(m);
         }
 
-        // conflicts: note conflicts 뒤에 review conflicts
         List<Map<String, String>> allConflicts = new ArrayList<>(noteScan.conflicts());
-        allConflicts.addAll(reviewConflicts);
 
         return response("full", startTimeMillis, agendaScan, noteScan, allSkipped, allConflicts);
     }
 
-    /** 8.5: 200칸 초과만 전체 노트로 물러서고, 두 갈래 모두 템플릿/회고/휴지통은 열지 않는다. */
+    /** 8.5: 200칸 초과만 전체 노트로 물러서고, 두 갈래 모두 템플릿/휴지통은 열지 않는다. */
     public static Map<String, Object> paths(Path vaultRoot, List<String> paths, long startTimeMillis) {
         var agendas = AgendaReader.scanAgendas(vaultRoot, true);
         boolean full = paths.size() > 200;

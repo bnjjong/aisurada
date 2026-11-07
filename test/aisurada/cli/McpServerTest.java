@@ -150,11 +150,11 @@ public final class McpServerTest {
 
     private static void exposureRules() {
         List<String> reads = McpTools.exposed(false).stream().map(McpTools.Tool::name).toList();
-        eq(reads, List.of("list_docs", "search_docs", "list_tags", "get_doc", "list_trash", "list_reports", "get_report",
+        eq(reads, List.of("list_docs", "search_docs", "list_tags", "get_doc", "list_trash",
                 "list_templates", "get_template", "list_sub_notes", "get_sub_note", "list_attachments", "list_comments"),
-                "기본은 읽기 도구 13개만");
+                "기본은 읽기 도구 11개만");
         List<String> all = McpTools.exposed(true).stream().map(McpTools.Tool::name).toList();
-        eq(all.size(), 28, "쓰기를 켜면 영구 삭제만 빼고 28개");
+        eq(all.size(), 25, "쓰기를 켜면 영구 삭제만 빼고 25개");
         check(!all.contains("purge_doc") && !reads.contains("purge_doc"), "purge_doc은 어느 모드에서도 안 내놓는다");
         for (McpTools.Tool tool : McpTools.all()) {
             eq(tool.write(), aisurada.cmd.CommandRegistry.WRITE_COMMANDS.contains(tool.name().replace('_', '-')),
@@ -217,13 +217,13 @@ public final class McpServerTest {
 
         // 목록
         JsonValue readTools = send(readOnly, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
-        eq(((JsonValue.JsonArray) at(readTools, "result", "tools")).elements().size(), 13, "읽기 모드 목록은 13개");
+        eq(((JsonValue.JsonArray) at(readTools, "result", "tools")).elements().size(), 11, "읽기 모드 목록은 11개");
         for (JsonValue t : ((JsonValue.JsonArray) at(readTools, "result", "tools")).elements()) {
             eq(text(t, "annotations", "readOnlyHint"), "true", text(t, "name") + " 은 읽기 힌트");
             check(at(t, "inputSchema", "properties") != null, text(t, "name") + " 에 inputSchema");
         }
         JsonValue writeTools = send(writable, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
-        eq(((JsonValue.JsonArray) at(writeTools, "result", "tools")).elements().size(), 28, "쓰기 모드 목록은 28개");
+        eq(((JsonValue.JsonArray) at(writeTools, "result", "tools")).elements().size(), 25, "쓰기 모드 목록은 25개");
         for (JsonValue t : ((JsonValue.JsonArray) at(writeTools, "result", "tools")).elements()) {
             String name = text(t, "name");
             if ("delete_doc".equals(name) || "update_doc".equals(name)) {
@@ -372,7 +372,7 @@ public final class McpServerTest {
                 JsonValue init = mcp.request("initialize", "{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}");
                 eq(text(init, "result", "serverInfo", "name"), "aisurada", "initialize");
                 in(mcp, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
-                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 28, "쓰기 모드 목록");
+                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 25, "쓰기 모드 목록");
 
                 JsonValue created = mcp.call("create_doc", "{\"agenda\":\"demo\",\"type\":\"free\",\"title\":\"한글 제목\",\"body\":\"첫 본문\\n두 번째 줄\",\"tags\":[\"mcp\"]}");
                 check(!mcp.isError(created), "create_doc 성공: " + mcp.resultText(created));
@@ -421,7 +421,7 @@ public final class McpServerTest {
 
             // 읽기 전용 모드: 쓰기 도구는 엔진에 닿지 않는다
             try (Mcp mcp = new Mcp(List.of(java, "-Duser.home=" + home, "-jar", cliJar, "mcp"), env, home.resolve("mcp-read.err"))) {
-                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 13, "읽기 모드 목록");
+                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 11, "읽기 모드 목록");
                 JsonValue refused = mcp.call("create_doc", "{\"agenda\":\"demo\",\"type\":\"free\",\"title\":\"막혀야 함\",\"body\":\"x\"}");
                 check(mcp.isError(refused), "읽기 전용은 create_doc을 거절");
                 check(!mcp.resultText(mcp.call("list_docs", "{}")).contains("막혀야 함"), "거절된 노트는 안 생겼다");

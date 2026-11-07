@@ -56,7 +56,7 @@ public final class Chapter28Test {
 
             Path collision = t.vault(); sharded(collision, false);
             root(collision, "g1/same", 1, "2026-06-16", "", "first"); root(collision, "g2/same", 2, "2026-06-17", "", "second");
-            put(collision, ".aisurada/reports/rv-evening-2026-06-16.json", "body: !!int abc");
+            put(collision, ".aisurada/templates/doc/bad.md", "---\ntitle: !!int abc\n---\nbody");
             String failure = stderr(error(collision, 500, "shard-notes", "apply=true"));
             check(failure.startsWith("색인을 못 맞췄다."), "final full reconciliation diagnostic precedes original AIS failure");
             check(failure.contains("\nAIS-500 옮길 자리에"), "original move failure preserved after final reconcile failure");

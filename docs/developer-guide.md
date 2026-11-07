@@ -182,7 +182,6 @@ vault/
 │   ├── projects/<slug>.md
 │   ├── facts/<slug>.md         아젠다 사실층
 │   ├── templates/{doc,ritual}/
-│   ├── reports/                회고
 │   └── trash/                  휴지통
 └── notes/<아젠다 slug>/<노트 폴더>/
     ├── note.md                 프론트매터(id, agenda, type, title, created, tags …) + 본문

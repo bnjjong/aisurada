@@ -279,46 +279,6 @@ public final class ArgsParser {
             }
             Map<String, Object> toolOpts = Map.of("id", sVal.value());
             return new ParsedArgs(true, "get-template", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
-        } else if ("list_reports".equals(toolName)) {
-            List<String> allowed = List.of("kind", "dateFrom", "dateTo");
-            validateKeys(toolName, props.keySet(), allowed);
-
-            Map<String, Object> toolOpts = new LinkedHashMap<>();
-            if (props.containsKey("kind")) {
-                JsonValue kVal = props.get("kind");
-                if (!(kVal instanceof JsonValue.JsonString sVal)) {
-                    throw new AisException(400, "인자 검증 실패(list_reports): kind 는 문자열 여야 한다: " + JsonCompact.compact(kVal));
-                }
-                toolOpts.put("kind", sVal.value());
-            }
-            if (props.containsKey("dateFrom")) {
-                JsonValue dfVal = props.get("dateFrom");
-                if (!(dfVal instanceof JsonValue.JsonString sVal)) {
-                    throw new AisException(400, "인자 검증 실패(list_reports): dateFrom 는 문자열 여야 한다: " + JsonCompact.compact(dfVal));
-                }
-                toolOpts.put("dateFrom", sVal.value());
-            }
-            if (props.containsKey("dateTo")) {
-                JsonValue dtVal = props.get("dateTo");
-                if (!(dtVal instanceof JsonValue.JsonString sVal)) {
-                    throw new AisException(400, "인자 검증 실패(list_reports): dateTo 는 문자열 여야 한다: " + JsonCompact.compact(dtVal));
-                }
-                toolOpts.put("dateTo", sVal.value());
-            }
-            return new ParsedArgs(true, "list-reports", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
-        } else if ("get_report".equals(toolName)) {
-            List<String> allowed = List.of("id");
-            validateKeys(toolName, props.keySet(), allowed);
-
-            if (!props.containsKey("id")) {
-                throw new AisException(400, "인자 검증 실패(get_report): id 가 필요하다.");
-            }
-            JsonValue idVal = props.get("id");
-            if (!(idVal instanceof JsonValue.JsonString sVal)) {
-                throw new AisException(400, "인자 검증 실패(get_report): id 는 문자열 여야 한다: " + JsonCompact.compact(idVal));
-            }
-            Map<String, Object> toolOpts = Map.of("id", sVal.value());
-            return new ParsedArgs(true, "get-report", Collections.emptyList(), Collections.emptyMap(), null, toolOpts);
         } else if ("list_trash".equals(toolName)) {
             List<String> allowed = Collections.emptyList();
             validateKeys(toolName, props.keySet(), allowed);
@@ -715,18 +675,6 @@ public final class ArgsParser {
                 named.put(key, key.equals("body") ? withinBodyLimit(toolName, value) : value);
             }
             return new ParsedArgs(true, "save-template", List.of(), named, null);
-        } else if ("save_report".equals(toolName)) {
-            validateKeys(toolName, props.keySet(), List.of("kind", "date", "body", "memo"));
-            Map<String, String> named = new LinkedHashMap<>();
-            for (String key : List.of("kind", "date", "body", "memo")) {
-                if (key.equals("kind") || key.equals("date")) named.put(key, requiredString(toolName, props, key));
-                else if (props.containsKey(key)) {
-                    String value = optionalString(toolName, props, key);
-                    if (value.length() > 200_000) throw new AisException(400, "인자 검증 실패(" + toolName + "): " + key + " 가 너무 길다(최대 200000자): " + value.length() + "자");
-                    named.put(key, value);
-                }
-            }
-            return new ParsedArgs(true, "save-report", List.of(), named, null);
         } else if (Set.of("delete_doc", "restore_doc", "purge_doc").contains(toolName)) {
             String key = toolName.equals("delete_doc") ? "id" : "trashId";
             validateKeys(toolName, props.keySet(), List.of(key));
@@ -903,15 +851,6 @@ public final class ArgsParser {
                 allowedOptions = List.of("name", "desc", "body"); maxPositional = 1;
                 usage = aisurada.cmd.TemplateCommands.RITUAL_USAGE;
             }
-            case "list-reports" -> {
-                allowedOptions = List.of("bodies", "from", "kind", "to");
-                maxPositional = 0;
-                usage = "list-reports [kind=morning|evening|weekly] [from=<YYYY-MM-DD>] [to=<YYYY-MM-DD>] [bodies=true. 본문과 메모까지 싣는다. 기본은 유무만]";
-            }
-            case "get-report" -> {
-                maxPositional = 1;
-                usage = "get-report <회고 id. 예: rv-evening-2026-06-04>";
-            }
             case "list-trash" -> {
                 maxPositional = 0;
                 usage = "list-trash";
@@ -1020,10 +959,6 @@ public final class ArgsParser {
             case "reindex" -> {
                 maxPositional = 0;
                 usage = "reindex";
-            }
-            case "save-report" -> {
-                allowedOptions = List.of("kind", "date", "body", "memo"); maxPositional = 0;
-                usage = aisurada.cmd.SaveReport.USAGE;
             }
             case "delete-doc", "restore-doc", "purge-doc" -> {
                 maxPositional = 1;
