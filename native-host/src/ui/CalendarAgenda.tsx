@@ -542,7 +542,8 @@ export function AgendaPage({
             type="button"
             className="ico-btn"
             aria-label="아젠다 목록으로"
-            title="아젠다 목록으로"
+            data-tip="아젠다 목록으로"
+            data-tip-align="start"
             onClick={() => controller.navigate("/calendar")}
           >
             <Icon name="back" />
@@ -553,7 +554,7 @@ export function AgendaPage({
             type="button"
             className="ico-btn"
             aria-label="이슈 보기"
-            title="이슈 보기"
+            data-tip="이슈 보기"
             disabled
           >
             <Icon name="issue" />
@@ -562,7 +563,7 @@ export function AgendaPage({
             type="button"
             className="ico-btn ag-add button-primary"
             aria-label="문서 추가"
-            title="문서 추가"
+            data-tip="문서 추가"
             onClick={() => controller.form({ kind: "note", agenda: agenda.id })}
           >
             <Icon name="plus" />
@@ -583,7 +584,7 @@ export function AgendaPage({
                 type="button"
                 aria-pressed={sortMode === mode}
                 aria-label={name}
-                title={name}
+                data-tip={name}
                 onClick={() => controller.preference({ docSortMode: mode })}
               >
                 <Icon name={icon} />
@@ -594,7 +595,7 @@ export function AgendaPage({
             type="button"
             className={`ico-btn ag-dir${newestFirst ? "" : " is-flipped"}`}
             aria-label={newestFirst ? "최신이 위" : "오래된 것이 위"}
-            title={newestFirst ? "최신이 위" : "오래된 것이 위"}
+            data-tip={newestFirst ? "최신이 위" : "오래된 것이 위"}
             onClick={() =>
               controller.preference({
                 docSortDir: newestFirst ? "asc" : "desc",
@@ -608,7 +609,8 @@ export function AgendaPage({
             type="button"
             className="ico-btn ag-ov-nav"
             aria-label="개요"
-            title="개요"
+            data-tip="개요"
+            data-tip-align="end"
             onClick={() => setOpen([])}
           >
             <Icon name="grid" />

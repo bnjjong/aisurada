@@ -158,7 +158,7 @@ export function NoteMeta({
               type="button"
               className="fav-toggle ico-btn"
               aria-label="즐겨찾기"
-              title="즐겨찾기"
+              data-tip="즐겨찾기"
               aria-pressed={live.favorite === true}
               onClick={() =>
                 void controller.data.favorite(note.id, live.favorite !== true)
@@ -174,7 +174,7 @@ export function NoteMeta({
               type="button"
               className={`doc-eval-badge ico-btn${score ? " has-text" : ""}`}
               aria-label={score ? `평가 ${score}점` : "평가"}
-              title="평가"
+              data-tip="평가"
               onClick={() => setEvaluating(!evaluating)}
             >
               <Icon name="evaluate" />
@@ -186,7 +186,7 @@ export function NoteMeta({
               type="button"
               className="doc-meta-history ico-btn"
               aria-label="이력"
-              title="이력"
+              data-tip="이력"
               onClick={() => setHistory(true)}
             >
               <Icon name="history" />
@@ -197,7 +197,7 @@ export function NoteMeta({
               type="button"
               className="ico-btn"
               aria-label="탭으로 띄우기"
-              title="탭으로 띄우기"
+              data-tip="탭으로 띄우기"
               onClick={() => {
                 go(controller, docAddress(note.id));
               }}
@@ -210,7 +210,7 @@ export function NoteMeta({
               type="button"
               className="pane-pop ico-btn"
               aria-label="새 창으로"
-              title="새 창으로"
+              data-tip="새 창으로"
               onClick={moveToWindow}
             >
               <Icon name="popout" />
@@ -221,7 +221,8 @@ export function NoteMeta({
             ref={moreButton}
             className="doc-meta-more ico-btn"
             aria-label="더 보기"
-            title="더 보기"
+            data-tip="더 보기"
+            data-tip-align="end"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(!menuOpen)}
@@ -235,7 +236,8 @@ export function NoteMeta({
                 type="button"
                 className="doc-meta-close ico-btn"
                 aria-label={closeLabel || "닫기"}
-                title="닫기"
+                data-tip="닫기"
+                data-tip-align="end"
                 onClick={onClose}
               >
                 <Icon name="close" />

@@ -1204,3 +1204,33 @@ code.is-symbol { font-weight: 700; }
 :root[data-skin="tactile"] .ag-seg button { border-radius: 999px; }
 :root[data-skin="tactile"] .ag-seg button[aria-pressed="true"], :root[data-skin="tactile"] .ag-seg button[aria-pressed="true"]:hover:not(:disabled) { box-shadow: var(--sh-1); }
 :root[data-skin="glass"] .act-menu { border-radius: 16px; box-shadow: var(--sh-float); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+
+/* ───────── 아이콘 단추의 즉시 툴팁 ─────────
+   브라우저 기본 title 은 1초쯤 늦게 떠서, 마우스를 올리면 바로 이름이 뜨도록 CSS 로 그린다.
+   뜻은 aria-label 이 따로 전하므로 title 은 두지 않는다(기본 툴팁과 겹쳐 두 번 뜨지 않게).
+   창 가장자리의 단추는 data-tip-align="start|end" 로 툴팁이 잘리지 않게 안쪽으로 붙인다. */
+.ico-btn[data-tip], .ag-seg button[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #101828;
+  color: #ffffff;
+  font: 600 11px/1.4 var(--font, system-ui, sans-serif);
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+:root[data-theme="dark"] [data-tip]::after { background: #e9eef8; color: #0b1220; }
+[data-tip][data-tip-align="start"]::after { left: 0; transform: none; }
+[data-tip][data-tip-align="end"]::after { left: auto; right: 0; transform: none; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; visibility: visible; }
+[data-tip][aria-expanded="true"]::after { display: none; }
