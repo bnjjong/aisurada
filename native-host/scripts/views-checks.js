@@ -686,11 +686,16 @@ if (location.pathname.startsWith("/note-window/")) {
         "HTML read",
       );
       assert(
-        !$(".lex-content") &&
-          !$(".doc-meta-history") &&
-          !$(".doc-meta-body-copy"),
+        !$(".lex-content") && !$(".doc-meta-history"),
         "HTML editing controls",
       );
+      // 본문 복사는 "더 보기" 메뉴 안에 있다. 메뉴를 열어 HTML 노트에는 그 항목이 없음을 본다.
+      click("더 보기", $(".doc-meta"));
+      assert(
+        $(".act-menu") && !button("본문 복사", $(".act-menu")),
+        "HTML note must not offer body copy",
+      );
+      click("더 보기", $(".doc-meta"));
       assert(
         !$(".read-markdown script") && !window.__UNSAFE__,
         "unsanitized HTML",

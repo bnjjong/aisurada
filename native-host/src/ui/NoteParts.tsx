@@ -99,7 +99,7 @@ export function NoteMeta({
             key: "body-copy",
             label: "본문 복사",
             icon: "copy" as const,
-            className: "doc-meta-body-copy",
+            className: "act-body-copy",
             onSelect: () =>
               void navigator.clipboard.writeText(
                 stripMarkers(controller.readBuffer(key, live.body)),
@@ -112,7 +112,7 @@ export function NoteMeta({
       label: parent ? "경로 복사" : "ID 복사",
       icon: "copy" as const,
       hint: chain.length > 12 ? chain.slice(0, 8) + "…" : chain,
-      className: "doc-meta-id-copy",
+      className: "act-id-copy",
       onSelect: () => void navigator.clipboard.writeText(chain),
     },
     ...(!parent && state.workspace?.path
@@ -121,7 +121,7 @@ export function NoteMeta({
             key: "window-link",
             label: "새 창 링크 복사",
             icon: "link" as const,
-            className: "doc-meta-id-open",
+            className: "act-window-link",
             onSelect: () =>
               void navigator.clipboard.writeText(
                 `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
@@ -135,7 +135,7 @@ export function NoteMeta({
       label: "삭제",
       icon: "trash" as const,
       danger: true,
-      className: "doc-meta-delete",
+      className: "act-delete",
       onSelect: () => setDeleting(true),
     },
   ];

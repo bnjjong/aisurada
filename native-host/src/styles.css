@@ -1176,7 +1176,7 @@ code.is-symbol { font-weight: 700; }
 .act-menu .act-item small { margin-left: auto; padding-left: 14px; color: var(--muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; }
 /* 마우스를 올리거나 키보드로 옮긴 항목: 면이 바뀌고 아이콘이 강조색으로 바뀐다. 누르면 한 칸 눌린다. 스킨별 모양은 아래에서 덮어쓴다. */
 .act-menu .act-item { cursor: pointer; transition: background 0.12s, box-shadow 0.12s, color 0.12s; }
-.act-menu .act-item:hover:not(:disabled), .act-menu .act-item:focus-visible { background: var(--soft); box-shadow: none; color: var(--ink); }
+.act-menu .act-item:hover:not(:disabled), .act-menu .act-item:focus-visible { background: color-mix(in srgb, var(--accent) 9%, var(--soft)); box-shadow: none; color: var(--ink); }
 .act-menu .act-item:hover:not(:disabled) svg, .act-menu .act-item:focus-visible svg { color: var(--accent); }
 .act-menu .act-item:hover:not(:disabled) small, .act-menu .act-item:focus-visible small { color: var(--ink); }
 .act-menu .act-item:active:not(:disabled) { transform: translateY(1px); }
@@ -1189,7 +1189,7 @@ code.is-symbol { font-weight: 700; }
 :root[data-skin="grid"] .act-menu .act-item:hover:not(:disabled), :root[data-skin="grid"] .act-menu .act-item:focus-visible { background: var(--sunken); box-shadow: inset 3px 0 0 var(--signal); }
 :root[data-skin="grid"] .act-menu .act-item:hover:not(:disabled) svg, :root[data-skin="grid"] .act-menu .act-item:focus-visible svg { color: var(--ink); }
 :root[data-skin="grid"] .act-menu .act-item:focus-visible { outline-color: var(--signal); }
-:root[data-skin="glass"] .act-menu .act-item:hover:not(:disabled), :root[data-skin="glass"] .act-menu .act-item:focus-visible { background: var(--tab-on); box-shadow: var(--sh-tab); }
+:root[data-skin="glass"] .act-menu .act-item:hover:not(:disabled), :root[data-skin="glass"] .act-menu .act-item:focus-visible { background: color-mix(in srgb, var(--accent) 13%, var(--tab-on)); box-shadow: var(--sh-tab); }
 :root[data-skin="glass"] .act-menu .act-item:hover:not(:disabled) svg, :root[data-skin="glass"] .act-menu .act-item:focus-visible svg { color: var(--accent-text); }
 :root[data-skin="modern"] .act-menu .act-item:hover:not(:disabled), :root[data-skin="modern"] .act-menu .act-item:focus-visible { background: var(--sunken); }
 :root[data-skin="modern"] .act-menu .act-item:hover:not(:disabled) svg, :root[data-skin="modern"] .act-menu .act-item:focus-visible svg { color: var(--accent-text); }
