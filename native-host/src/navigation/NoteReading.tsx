@@ -16,6 +16,8 @@ export function NoteReading({
   parent,
   root,
   mode,
+  onClose,
+  closeLabel,
 }: {
   note: Note;
   controller?: WorkspaceController;
@@ -23,6 +25,9 @@ export function NoteReading({
   /** The root note of a sub page chain. The ask target uses it, not the nearest parent (3.13). */
   root?: string;
   mode?: NoteMode;
+  /** 노트 여러 개를 나란히 띄운 칸에서 그 칸을 닫는 동작. 정보줄 오른쪽 끝의 닫기 단추로 이어집니다. */
+  onClose?: () => void;
+  closeLabel?: string;
 }) {
   const live = controller?.data.note({ id: note.id, parent }) || note;
   const noteDir = controller?.getSnapshot().workspace?.path && note.path
@@ -126,6 +131,8 @@ export function NoteReading({
           controller={controller}
           parent={parent}
           mode={context}
+          onClose={onClose}
+          closeLabel={closeLabel}
         />
       ) : (
         <p className="eyebrow">

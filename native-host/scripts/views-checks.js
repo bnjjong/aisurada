@@ -30,12 +30,21 @@ const go = (path) => {
 };
 const $ = (q, root = document) => root?.querySelector(q) || null,
   $$ = (q, root = document) => (root ? [...root.querySelectorAll(q)] : []);
+// 아이콘만 있는 단추는 글자가 없으므로 aria-label(단추 이름)도 같은 이름으로 본다.
 const button = (text, root = document) =>
-  $$("button", root).find((b) => b.textContent.trim() === text);
+  $$("button", root).find(
+    (b) =>
+      b.textContent.trim() === text || b.getAttribute("aria-label") === text,
+  );
 const click = (text, root = document) => {
   const b = button(text, root);
   assert(b, "button " + text + " absent");
   b.click();
+};
+// 노트 삭제는 정보줄의 "더 보기" 메뉴 맨 아래 항목이다. 메뉴는 body 바깥에 그려진다.
+const trashNote = (scope = document) => {
+  click("더 보기", $(".doc-meta", scope));
+  click("삭제", $(".act-menu"));
 };
 const fill = (node, text) => {
   assert(node, "missing input");
@@ -349,7 +358,7 @@ if (location.pathname.startsWith("/note-window/")) {
       esc();
       await until(() => !$(".nhist"), "history escape");
       assert($(".subnote-page"), "history Esc also closed sub");
-      click("삭제", $(".subnote-page .doc-meta"));
+      trashNote($(".subnote-page"));
       await until(
         () => $('[aria-label="하위 페이지를 삭제할까요?"]'),
         "sub delete confirm",
@@ -722,7 +731,7 @@ if (location.pathname.startsWith("/note-window/")) {
     });
     await test("trash-note-restore-purge-and-empty", async () => {
       await open(created.id);
-      click("삭제", $(".doc-meta"));
+      trashNote();
       await until(
         () => $('[aria-label="휴지통으로 옮길까요?"]'),
         "trash confirm",
@@ -740,7 +749,7 @@ if (location.pathname.startsWith("/note-window/")) {
         "restored note",
       );
       await open(created.id);
-      click("삭제", $(".doc-meta"));
+      trashNote();
       await until(
         () => $('[aria-label="휴지통으로 옮길까요?"]'),
         "delete again",
@@ -756,7 +765,7 @@ if (location.pathname.startsWith("/note-window/")) {
       click("삭제", $('[aria-label="완전히 삭제할까요?"]'));
       await until(() => !$(".trash-row"), "purged");
       await open(cfg.legacyId);
-      click("삭제", $(".doc-meta"));
+      trashNote();
       await until(
         () => $('[aria-label="휴지통으로 옮길까요?"]'),
         "legacy trash confirm",

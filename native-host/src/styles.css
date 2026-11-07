@@ -1152,3 +1152,55 @@ code.is-symbol { font-weight: 700; }
 .skin-preview[data-skin-preview="modern"] { background: #f6f7f9; }
 .skin-preview[data-skin-preview="modern"] i { border-radius: 8px !important; background: #0b1220; }
 .skin-preview[data-skin-preview="modern"] b { border: 1px solid #cfd4dd; border-radius: 8px !important; background: #fff; box-shadow: 0 1px 2px rgba(11,18,32,.06) !important; }
+
+/* ───────── 아이콘 단추 · 더 보기 메뉴 · 아젠다 화면 정리 ─────────
+   글자 단추를 아이콘으로 줄인 노트 정보줄과 아젠다 화면이 함께 쓴다. 색은 모두 토큰을 따르고,
+   지우는 동작만 --del(빨강)로 떼어 놓는다. 스킨별 모양은 :where 로 낮춘 스킨의 기본 단추 위에 얹힌다. */
+:root { --del: #c92a2a; --del-bg: rgba(201, 42, 42, 0.07); }
+:root[data-theme="dark"] { --del: #ff8787; --del-bg: rgba(255, 135, 135, 0.1); }
+.ico-btn { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0; line-height: 0; }
+.ico-btn svg { display: block; }
+.ico-btn.has-text { display: inline-flex; align-items: center; gap: 5px; width: auto; padding: 0 9px; font-size: 11px; font-weight: 600; line-height: 1; }
+.doc-meta .ico-btn { width: 30px; height: 30px; padding: 0; gap: 0; }
+.doc-meta .ico-btn.has-text { width: auto; padding: 0 9px; gap: 5px; }
+.doc-meta .fav-toggle svg { fill: none; }
+.doc-meta .fav-toggle[aria-pressed="true"] svg { fill: currentColor; }
+.doc-meta-right { gap: 6px; }
+.doc-meta-sep { flex: none; width: 1px; height: 18px; margin: 0 4px; background: var(--line); }
+
+.act-menu { position: fixed; z-index: 200; min-width: 220px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18); }
+.act-menu hr { height: 1px; margin: 6px 4px; border: 0; background: var(--line); }
+.act-menu .act-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; color: var(--ink); font-size: 12px; font-weight: 500; text-align: left; }
+.act-menu .act-item svg { flex: none; color: var(--muted); }
+.act-menu .act-item small { margin-left: auto; padding-left: 14px; color: var(--muted); font-family: var(--font-mono); font-size: 11px; font-weight: 400; }
+.act-menu .act-item:hover:not(:disabled), .act-menu .act-item:focus-visible { background: var(--soft); box-shadow: none; }
+.act-menu .act-item.is-danger, .act-menu .act-item.is-danger svg { color: var(--del); }
+.act-menu .act-item.is-danger:hover:not(:disabled), .act-menu .act-item.is-danger:focus-visible { background: var(--del-bg); }
+
+.detail-head { flex-wrap: nowrap; gap: 6px; }
+.detail-head > h2 { flex: 1; width: auto; min-width: 0; margin: 0; font-size: 20px; line-height: 1.3; overflow-wrap: anywhere; }
+.detail-head .ico-btn { padding: 0; }
+.agenda-sort { align-items: center; }
+.agenda-sort .ico-btn { padding: 0; }
+.ag-sp { flex: 1; }
+.ag-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--soft); border: 1px solid var(--line); }
+.ag-seg button { display: inline-grid; place-items: center; width: 32px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: none; color: var(--muted); line-height: 0; }
+.ag-seg button:hover:not(:disabled) { background: transparent; box-shadow: none; color: var(--ink); }
+.ag-seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+.ag-seg button[aria-pressed="true"]:hover:not(:disabled) { background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+.ag-dir.is-flipped svg { transform: scaleY(-1); }
+
+.agenda-danger { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 36px; padding: 8px 8px 8px 16px; border: 1px solid color-mix(in srgb, var(--del) 45%, transparent); border-radius: 12px; }
+.agenda-danger > span { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--del); }
+.agenda-danger button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: 8px; background: var(--del-bg); box-shadow: none; color: var(--del); font-size: 11px; font-weight: 600; }
+.agenda-danger button:hover:not(:disabled) { background: var(--del-bg); box-shadow: inset 0 0 0 1.5px var(--del); }
+:root[data-skin="tactile"] .agenda-danger, :root[data-skin="tactile"] .agenda-danger button { border-radius: 999px; }
+:root[data-skin="glass"] .agenda-danger { border-radius: 16px; }
+:root[data-skin="grid"] .agenda-danger, :root[data-skin="grid"] .agenda-danger button, :root[data-skin="grid"] .ag-seg, :root[data-skin="grid"] .ag-seg button, :root[data-skin="grid"] .act-menu, :root[data-skin="grid"] .act-menu .act-item { border-radius: 2px; }
+:root[data-skin="page"] .agenda-danger, :root[data-skin="page"] .agenda-danger button, :root[data-skin="page"] .ag-seg, :root[data-skin="page"] .ag-seg button, :root[data-skin="page"] .act-menu, :root[data-skin="page"] .act-menu .act-item { border-radius: 0; }
+:root[data-skin="tactile"] .act-menu { border: 0; border-radius: 20px; box-shadow: var(--sh-2); }
+:root[data-skin="tactile"] .act-menu .act-item { border-radius: 999px; }
+:root[data-skin="tactile"] .ag-seg { border: 0; border-radius: 999px; background: var(--sunken, var(--soft)); box-shadow: var(--in, none); }
+:root[data-skin="tactile"] .ag-seg button { border-radius: 999px; }
+:root[data-skin="tactile"] .ag-seg button[aria-pressed="true"], :root[data-skin="tactile"] .ag-seg button[aria-pressed="true"]:hover:not(:disabled) { box-shadow: var(--sh-1); }
+:root[data-skin="glass"] .act-menu { border-radius: 16px; box-shadow: var(--sh-float); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }

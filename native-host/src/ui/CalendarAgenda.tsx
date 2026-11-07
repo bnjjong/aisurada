@@ -13,6 +13,7 @@ import {
 import { AgendaFilter } from "./Rail.tsx";
 import { NoteReading } from "../navigation/NoteReading.tsx";
 import { Confirm, Modal } from "./Modal.tsx";
+import { Icon } from "./Icon.tsx";
 import { DiffTable } from "./History.tsx";
 export const addDays = (date: string, n: number) => {
   const d = new Date(date + "T12:00:00Z");
@@ -498,9 +499,14 @@ export function AgendaPage({
       ws.notes.filter((n) => n.agendaId === agenda.id),
       state.prefs.showRecordTier ?? (state.prefs as any).showRecords ?? false,
     ),
+    newestFirst = state.prefs.docSortDir === "desc" || Boolean((state.prefs as any).agendaDesc),
+    sortMode: "structure" | "time" =
+      (state.prefs.docSortMode || (state.prefs as any).agendaSort) === "time"
+        ? "time"
+        : "structure",
     sorted = [...notes].sort(
       (a, b) =>
-        ((state.prefs.docSortDir === "desc" || (state.prefs as any).agendaDesc) ? -1 : 1) *
+        (newestFirst ? -1 : 1) *
         (a.created || "").localeCompare(b.created || ""),
     );
   const toggle = (nid: string) =>
@@ -532,49 +538,84 @@ export function AgendaPage({
     <div className="agenda-route">
       <section className="agenda-list page-scroll">
         <div className="detail-head">
-          <button onClick={() => controller.navigate("/calendar")}>
-            아젠다
+          <button
+            type="button"
+            className="ico-btn"
+            aria-label="아젠다 목록으로"
+            title="아젠다 목록으로"
+            onClick={() => controller.navigate("/calendar")}
+          >
+            <Icon name="back" />
           </button>
           <h1 className="sr-only">{agenda.title}</h1>
           <h2>{agenda.title}</h2>
-          <button disabled>이슈 보기</button>
           <button
+            type="button"
+            className="ico-btn"
+            aria-label="이슈 보기"
+            title="이슈 보기"
+            disabled
+          >
+            <Icon name="issue" />
+          </button>
+          <button
+            type="button"
+            className="ico-btn ag-add button-primary"
+            aria-label="문서 추가"
+            title="문서 추가"
             onClick={() => controller.form({ kind: "note", agenda: agenda.id })}
           >
-            문서 추가
+            <Icon name="plus" />
           </button>
-          <button onClick={() => setDeleting(true)}>아젠다 삭제</button>
         </div>
         <p>{asText(agenda.repo)}</p>
         <p>{asText(agenda.summary)}</p>
         <div className="agenda-sort">
-          <select
-            aria-label="아젠다 정렬"
-            value={state.prefs.docSortMode || (state.prefs as any).agendaSort || "structure"}
-            onChange={(e) =>
-              controller.preference({
-                docSortMode: e.target.value as "structure" | "time",
-              })
-            }
-          >
-            <option value="structure">구조</option>
-            <option value="time">시간순</option>
-          </select>
+          <div className="ag-seg" role="group" aria-label="아젠다 정렬">
+            {(
+              [
+                ["structure", "구조", "tree"],
+                ["time", "시간순", "clock"],
+              ] as const
+            ).map(([mode, name, icon]) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={sortMode === mode}
+                aria-label={name}
+                title={name}
+                onClick={() => controller.preference({ docSortMode: mode })}
+              >
+                <Icon name={icon} />
+              </button>
+            ))}
+          </div>
           <button
+            type="button"
+            className={`ico-btn ag-dir${newestFirst ? "" : " is-flipped"}`}
+            aria-label={newestFirst ? "최신이 위" : "오래된 것이 위"}
+            title={newestFirst ? "최신이 위" : "오래된 것이 위"}
             onClick={() =>
               controller.preference({
-                docSortDir: ((state.prefs.docSortDir === "desc" || (state.prefs as any).agendaDesc)) ? "asc" : "desc",
+                docSortDir: newestFirst ? "asc" : "desc",
               })
             }
           >
-            {((state.prefs.docSortDir === "desc" || (state.prefs as any).agendaDesc)) ? "최신이 위" : "오래된 것이 위"}
+            <Icon name="sort" />
+          </button>
+          <span className="ag-sp" />
+          <button
+            type="button"
+            className="ico-btn ag-ov-nav"
+            aria-label="개요"
+            title="개요"
+            onClick={() => setOpen([])}
+          >
+            <Icon name="grid" />
           </button>
         </div>
-        <button className="ag-ov-nav" onClick={() => setOpen([])}>
-          개요
-        </button>
         <div className="doclist">
-          {(state.prefs.docSortMode || (state.prefs as any).agendaSort || "structure") === "structure"
+          {sortMode === "structure"
             ? TYPES.map((type) => {
                 const group = sorted.filter((n) => (n.type || "free") === type);
                 return group.length ? (
@@ -588,6 +629,13 @@ export function AgendaPage({
               })
             : sorted.map(row)}
         </div>
+        <div className="agenda-danger">
+          <span>위험 구역</span>
+          <button type="button" onClick={() => setDeleting(true)}>
+            <Icon name="trash" />
+            아젠다 삭제
+          </button>
+        </div>
       </section>
       {selected.length ? (
         selected.map((n) => (
@@ -596,15 +644,13 @@ export function AgendaPage({
             key={n.id}
             style={{ flexBasis: widths[n.id] || 620 }}
           >
-            {selected.length > 1 && (
-              <button
-                aria-label={`${n.title} 페인 닫기`}
-                onClick={() => toggle(n.id)}
-              >
-                닫기
-              </button>
-            )}
-            <NoteReading note={n} controller={controller} mode="agenda" />
+            <NoteReading
+              note={n}
+              controller={controller}
+              mode="agenda"
+              onClose={selected.length > 1 ? () => toggle(n.id) : undefined}
+              closeLabel={`${n.title} 페인 닫기`}
+            />
             <div
               className="pane-resize"
               onDoubleClick={() =>

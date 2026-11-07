@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Note, WorkspaceState } from "../workspace/types.ts";
 import { asRow, asText } from "../workspace/types.ts";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { EditorHandle } from "../editor/Editor.tsx";
 import { Confirm } from "./Modal.tsx";
+import { ActionMenu } from "./ActionMenu.tsx";
+import type { ActionMenuItem } from "./ActionMenu.tsx";
+import { Icon } from "./Icon.tsx";
 import { History } from "./History.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
 import {
@@ -30,17 +33,25 @@ export function NoteMeta({
   controller,
   parent,
   mode = "tab",
+  onClose,
+  closeLabel,
 }: {
   note: Note;
   controller: WorkspaceController;
   parent?: string;
   mode?: NoteMode;
+  /** 노트 여러 개를 나란히 띄운 칸에서 그 칸을 닫는 동작입니다. 있으면 정보줄 오른쪽 끝에 닫기 단추가 붙습니다. */
+  onClose?: () => void;
+  closeLabel?: string;
 }) {
   const state = controller.getSnapshot(),
     [evaluating, setEvaluating] = useState(false),
     [history, setHistory] = useState(false),
     [deleting, setDeleting] = useState(false),
-    [moveError, setMoveError] = useState("");
+    [menuOpen, setMenuOpen] = useState(false),
+    [moveError, setMoveError] = useState(""),
+    moreButton = useRef<HTMLButtonElement>(null),
+    closeMenu = useCallback(() => setMenuOpen(false), []);
   const live = controller.data.note({ id: note.id, parent }) || note,
     key = parent ? parent + ":" + note.id : note.id,
     agenda = state.workspace?.agendas.find((a) => a.id === note.agendaId),
@@ -60,26 +71,81 @@ export function NoteMeta({
       await controller.data.deleteDoc(note.id);
     }
   };
+  const score = asRow(live.evaluation)
+      ? String(asRow(live.evaluation)?.score)
+      : "",
+    canPopOut =
+      !parent &&
+      controller.isNative() &&
+      controller.context.kind === "main" &&
+      mode !== "preview",
+    moveToWindow = () =>
+      void controller
+        .moveNoteWindow(note.id)
+        .then((result) =>
+          setMoveError(
+            result === "opened"
+              ? ""
+              : result === "unsaved"
+                ? "저장하지 못한 글이 있어서 새 창으로 옮기지 않았어요. 충돌 배너를 먼저 풀어 주세요."
+                : "새 창을 열지 못했어요. 앱을 다시 켜고 해 보세요.",
+          ),
+        );
+  // 자주 쓰지 않는 동작은 "더 보기" 메뉴로 모으고, 지우기는 구분선 아래 빨간색으로 떼어 놓는다.
+  const menuItems: ActionMenuItem[] = [
+    ...(note.format === "markdown"
+      ? [
+          {
+            key: "body-copy",
+            label: "본문 복사",
+            icon: "copy" as const,
+            className: "doc-meta-body-copy",
+            onSelect: () =>
+              void navigator.clipboard.writeText(
+                stripMarkers(controller.readBuffer(key, live.body)),
+              ),
+          },
+        ]
+      : []),
+    {
+      key: "id-copy",
+      label: parent ? "경로 복사" : "ID 복사",
+      icon: "copy" as const,
+      hint: chain.length > 12 ? chain.slice(0, 8) + "…" : chain,
+      className: "doc-meta-id-copy",
+      onSelect: () => void navigator.clipboard.writeText(chain),
+    },
+    ...(!parent && state.workspace?.path
+      ? [
+          {
+            key: "window-link",
+            label: "새 창 링크 복사",
+            icon: "link" as const,
+            className: "doc-meta-id-open",
+            onSelect: () =>
+              void navigator.clipboard.writeText(
+                `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
+              ),
+          },
+        ]
+      : []),
+    "separator" as const,
+    {
+      key: "delete",
+      label: "삭제",
+      icon: "trash" as const,
+      danger: true,
+      className: "doc-meta-delete",
+      onSelect: () => setDeleting(true),
+    },
+  ];
   return (
     <>
       <header className="doc-meta-bar">
       <div className="doc-meta">
         <div className="doc-meta-left">
           <span className="doc-meta-time">
-            <svg
-              viewBox="0 0 16 16"
-              width="12"
-              height="12"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="8" cy="8" r="6" />
-              <path d="M8 5v3.5l2 1" />
-            </svg>
+            <Icon name="clock" size={12} />
             {TYPE_NAMES[asText(note.type) || "free"] || asText(note.type)} ·{" "}
             {note.date} {note.time}
           </span>
@@ -88,197 +154,94 @@ export function NoteMeta({
           )}
           {live.tier === "record" && <span className="record-badge">기록</span>}
           {!parent && (
-            <>
-              <button
-                className="fav-toggle"
-                aria-label="즐겨찾기"
-                aria-pressed={live.favorite === true}
-                onClick={() =>
-                  void controller.data.favorite(note.id, live.favorite !== true)
-                }
-              >
-                {live.favorite === true ? "★" : "☆"}
-              </button>
-              <button
-                className="doc-eval-badge"
-                onClick={() => setEvaluating(!evaluating)}
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="12"
-                  height="12"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="2.5" width="10" height="11" rx="1.5" />
-                  <path d="M5.5 6h5M5.5 9h3" />
-                </svg>
-                {asRow(live.evaluation)
-                  ? String(asRow(live.evaluation)?.score)
-                  : "평가"}
-              </button>
-            </>
-          )}
-          {note.format === "markdown" && (
-            <>
-              <button
-                className="doc-meta-body-copy"
-                onClick={() =>
-                  void navigator.clipboard.writeText(
-                    stripMarkers(controller.readBuffer(key, live.body)),
-                  )
-                }
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="12"
-                  height="12"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.5" />
-                  <path d="M3.5 10.5V4a1.5 1.5 0 0 1 1.5-1.5h6.5" />
-                </svg>
-                본문 복사
-              </button>
-              <button
-                className="doc-meta-history"
-                onClick={() => setHistory(true)}
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="12"
-                  height="12"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M2.5 7.5A5.5 5.5 0 1 1 3.2 10.5" />
-                  <path d="M2.5 3.5v4h4" />
-                  <path d="M8 5v3.5l2 1" />
-                </svg>
-                이력
-              </button>
-            </>
+            <button
+              type="button"
+              className="fav-toggle ico-btn"
+              aria-label="즐겨찾기"
+              title="즐겨찾기"
+              aria-pressed={live.favorite === true}
+              onClick={() =>
+                void controller.data.favorite(note.id, live.favorite !== true)
+              }
+            >
+              <Icon name="star" />
+            </button>
           )}
         </div>
         <div className="doc-meta-right">
-          <span className="doc-meta-id doc-meta-note-id">
-            <span className="doc-meta-id-label">{parent ? "경로" : "ID"}</span>
-            <span className="doc-meta-id-val">{chain}</span>
+          {!parent && (
             <button
               type="button"
-              className="doc-meta-id-copy"
-              onClick={() => void navigator.clipboard.writeText(chain)}
+              className={`doc-eval-badge ico-btn${score ? " has-text" : ""}`}
+              aria-label={score ? `평가 ${score}점` : "평가"}
+              title="평가"
+              onClick={() => setEvaluating(!evaluating)}
             >
-              <svg
-                viewBox="0 0 16 16"
-                width="11"
-                height="11"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.5" />
-                <path d="M3.5 10.5V4a1.5 1.5 0 0 1 1.5-1.5h6.5" />
-              </svg>
-              복사
+              <Icon name="evaluate" />
+              {score && <span>{score}</span>}
             </button>
-            {!parent && state.workspace?.path && (
-              <button
-                type="button"
-                className="doc-meta-id-open"
-                onClick={() =>
-                  void navigator.clipboard.writeText(
-                    `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
-                  )
-                }
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="11"
-                  height="11"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M7 3.5H4a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 4 13.5h7a1.5 1.5 0 0 0 1.5-1.5v-3M9.5 2.5h4v4M6.5 9.5l7-7" />
-                </svg>
-                새 창 링크
-              </button>
-            )}
-          </span>
-          {!parent &&
-            controller.isNative() &&
-            controller.context.kind === "main" &&
-            mode !== "preview" && (
-              <button
-                className="pane-pop"
-                onClick={() =>
-                  void controller
-                    .moveNoteWindow(note.id)
-                    .then((result) =>
-                      setMoveError(
-                        result === "opened"
-                          ? ""
-                          : result === "unsaved"
-                            ? "저장하지 못한 글이 있어서 새 창으로 옮기지 않았어요. 충돌 배너를 먼저 풀어 주세요."
-                            : "새 창을 열지 못했어요. 앱을 다시 켜고 해 보세요.",
-                      ),
-                    )
-                }
-              >
-                새 창으로
-              </button>
-            )}
+          )}
+          {note.format === "markdown" && (
+            <button
+              type="button"
+              className="doc-meta-history ico-btn"
+              aria-label="이력"
+              title="이력"
+              onClick={() => setHistory(true)}
+            >
+              <Icon name="history" />
+            </button>
+          )}
           {mode === "agenda" && (
             <button
+              type="button"
+              className="ico-btn"
+              aria-label="탭으로 띄우기"
+              title="탭으로 띄우기"
               onClick={() => {
                 go(controller, docAddress(note.id));
               }}
             >
-              탭으로 띄우기
+              <Icon name="tab" />
+            </button>
+          )}
+          {canPopOut && (
+            <button
+              type="button"
+              className="pane-pop ico-btn"
+              aria-label="새 창으로"
+              title="새 창으로"
+              onClick={moveToWindow}
+            >
+              <Icon name="popout" />
             </button>
           )}
           <button
             type="button"
-            className="doc-meta-delete"
-            title="노트 삭제"
-            onClick={() => setDeleting(true)}
+            ref={moreButton}
+            className="doc-meta-more ico-btn"
+            aria-label="더 보기"
+            title="더 보기"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(!menuOpen)}
           >
-            <svg
-              viewBox="0 0 16 16"
-              width="12"
-              height="12"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M3 4.5h10M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M12.5 4.5l-.8 8.5a1.5 1.5 0 0 1-1.5 1.5h-4.4a1.5 1.5 0 0 1-1.5-1.5L3.5 4.5" />
-              <path d="M6.5 7.5v4M9.5 7.5v4" />
-            </svg>
-            삭제
+            <Icon name="more" />
           </button>
+          {onClose && (
+            <>
+              <i className="doc-meta-sep" aria-hidden="true" />
+              <button
+                type="button"
+                className="doc-meta-close ico-btn"
+                aria-label={closeLabel || "닫기"}
+                title="닫기"
+                onClick={onClose}
+              >
+                <Icon name="close" />
+              </button>
+            </>
+          )}
         </div>
       </div>
       {(!parent && (agenda || !!note.template) || sessionChips(live).length > 0) && (
@@ -320,6 +283,14 @@ export function NoteMeta({
             } : undefined}
           />
         </div>
+      )}
+      {menuOpen && (
+        <ActionMenu
+          label="더 보기"
+          items={menuItems}
+          anchor={moreButton}
+          onClose={closeMenu}
+        />
       )}
     </header>
       {moveError && <p role="status">{moveError}</p>}
