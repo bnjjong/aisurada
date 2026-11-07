@@ -125,6 +125,7 @@ export function Rail({
       </div>
       <nav data-rail-section="nav" aria-label="워크스페이스 메뉴">
         {[
+          ["notes", "전체 노트"],
           ["calendar", "캘린더"],
           ["favorites", "즐겨찾기"],
           ["connections", "연결"],

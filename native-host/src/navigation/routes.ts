@@ -10,6 +10,7 @@ export type ScreenRoute =
   | { kind: 'file'; path: string }
   | { kind: 'calendar'; query: URLSearchParams }
   | { kind: 'agenda'; id: string; open: string[] }
+  | { kind: 'notes'; open: string[] }
   | { kind: 'templates'; open: string }
   | { kind: 'session'; id: string }
   | { kind: 'terminal'; id: string | null }
@@ -24,6 +25,10 @@ export function parseRoute(address: string): ScreenRoute {
     if (path === '/launcher') return { kind: 'launcher', create: query.get('mode') === 'create' };
     if (path === '/file') return { kind: 'file', path: query.get('path') || '' };
     if (path === '/calendar') return { kind: 'calendar', query };
+    if (path === '/notes') {
+      const open = (query.get('open') || '').split(',').filter(Boolean);
+      return { kind: 'notes', open };
+    }
     if (path === '/templates') return { kind: 'templates', open: query.get('open') || '' };
     if (path === '/terminal') return { kind: 'terminal', id: null };
     const plain = ['favorites', 'connections', 'review', 'trash', 'guide'] as const;
@@ -44,6 +49,8 @@ export function parseRoute(address: string): ScreenRoute {
 export const docAddress = (id: string) => `/doc/${encodeURIComponent(id)}`;
 export const fileAddress = (path: string) => `/file?path=${encodeURIComponent(path)}`;
 export const agendaAddress = (id: string) => `/agenda/${encodeURIComponent(id)}`;
+export const notesAddress = (open: string[] = []) =>
+  '/notes' + (open.length ? '?open=' + open.map(encodeURIComponent).join(',') : '');
 export const isNoteTab = (id: string) => !/^(term:|ext:|sess:)/.test(id);
 
 export function routeTab(route: ScreenRoute): string | null {

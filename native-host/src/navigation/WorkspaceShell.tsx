@@ -13,6 +13,7 @@ import { agendaOrder, clampRailWidth } from "../ui/model.ts";
 import { RailResizer } from "../ui/RailResizer.tsx";
 import { Preview } from "../ui/Preview.tsx";
 import { Calendar, AgendaPage } from "../ui/CalendarAgenda.tsx";
+import { NotesPage } from "../ui/NotesPage.tsx";
 import {
   Page,
   Favorites,
@@ -162,6 +163,14 @@ function RouteContent({
           state={state}
           controller={controller}
           id={route.id}
+          open={route.open}
+        />
+      );
+    case "notes":
+      return (
+        <NotesPage
+          state={state}
+          controller={controller}
           open={route.open}
         />
       );
