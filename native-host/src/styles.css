@@ -139,12 +139,12 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .tab-button[aria-selected="true"] { color: var(--accent); }
 .tab-main .tab-button { min-width: 156px; }
 .tab-mark { display: block; flex: none; width: 20px; height: 20px; border-radius: 6px; }
-/* 로고 상태 몸짓(시안: 로고 22). 상태는 svg의 is-idle, is-thinking, is-ok, is-error 클래스로 정해진다. */
+/* 로고 상태 몸짓(시안: 로고 22). 상태는 svg의 is-still, is-idle, is-thinking, is-ok, is-error 클래스로 정해진다. */
 @property --bm-a { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
 .bm * { transform-box: fill-box; transform-origin: center; }
 .bm .bm-neck, .bm .bm-cap, .bm .bm-pfl, .bm .bm-pfr { opacity: 0; }
 .bm .bm-neck, .bm .bm-cap { transition: opacity .25s; }
-.bm:not(.is-idle) .bm-neck, .bm.is-thinking .bm-cap { opacity: 1; }
+.bm:not(.is-still) .bm-neck, .bm.is-thinking .bm-cap { opacity: 1; }
 .bm .bm-led, .bm .bm-ledh { fill: #ff4d8d; }
 .bm.is-ok .bm-led, .bm.is-ok .bm-ledh { fill: #5be38f; }
 .bm.is-error .bm-led, .bm.is-error .bm-ledh { fill: #ff3b30; }
@@ -160,14 +160,22 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .bm.is-thinking { animation: bm-spin 7s ease-in-out infinite; }
 .bm.is-thinking .bm-led, .bm.is-thinking .bm-ledh { animation: bm-blink .8s linear infinite; }
 .bm.is-thinking .bm-ln { animation: bm-chase 1.6s ease-in-out infinite; }
-.bm.is-thinking .bm-face { transform: translateX(calc(sin(var(--bm-a)) * 110px)) scaleX(max(cos(var(--bm-a)), 0.3)); opacity: clamp(0, calc((cos(var(--bm-a)) + 0.2) * 5), 1); }
-.bm.is-thinking .bm-cap { transform: translate(calc(sin(var(--bm-a)) * -80px), calc((1 - cos(var(--bm-a))) * 11px)); }
-.bm.is-thinking .bm-pfl, .bm.is-thinking .bm-pbl { transform: translateX(calc((1 - cos(var(--bm-a))) * 143px)) scale(calc((0.7 + 0.3 * cos(var(--bm-a)) * cos(var(--bm-a))) * (1 + 0.18 * sin(var(--bm-a)))), calc(1 + 0.18 * sin(var(--bm-a)))); }
-.bm.is-thinking .bm-pfr, .bm.is-thinking .bm-pbr { transform: translateX(calc((cos(var(--bm-a)) - 1) * 143px)) scale(calc((0.7 + 0.3 * cos(var(--bm-a)) * cos(var(--bm-a))) * (1 - 0.18 * sin(var(--bm-a)))), calc(1 - 0.18 * sin(var(--bm-a)))); }
-.bm.is-thinking .bm-pfl { opacity: clamp(0, calc(sin(var(--bm-a)) * 99), 1); }
-.bm.is-thinking .bm-pbl { opacity: calc(1 - clamp(0, calc(sin(var(--bm-a)) * 99), 1)); }
-.bm.is-thinking .bm-pfr { opacity: clamp(0, calc(sin(var(--bm-a)) * -99), 1); }
-.bm.is-thinking .bm-pbr { opacity: calc(1 - clamp(0, calc(sin(var(--bm-a)) * -99), 1)); }
+.bm:is(.is-thinking, .is-idle) .bm-face { transform: translateX(calc(sin(var(--bm-a)) * 110px)) scaleX(max(cos(var(--bm-a)), 0.3)); opacity: clamp(0, calc((cos(var(--bm-a)) + 0.2) * 5), 1); }
+.bm:is(.is-thinking, .is-idle) .bm-cap { transform: translate(calc(sin(var(--bm-a)) * -80px), calc((1 - cos(var(--bm-a))) * 11px)); }
+.bm:is(.is-thinking, .is-idle) .bm-pfl, .bm:is(.is-thinking, .is-idle) .bm-pbl { transform: translateX(calc((1 - cos(var(--bm-a))) * 143px)) scale(calc((0.7 + 0.3 * cos(var(--bm-a)) * cos(var(--bm-a))) * (1 + 0.18 * sin(var(--bm-a)))), calc(1 + 0.18 * sin(var(--bm-a)))); }
+.bm:is(.is-thinking, .is-idle) .bm-pfr, .bm:is(.is-thinking, .is-idle) .bm-pbr { transform: translateX(calc((cos(var(--bm-a)) - 1) * 143px)) scale(calc((0.7 + 0.3 * cos(var(--bm-a)) * cos(var(--bm-a))) * (1 - 0.18 * sin(var(--bm-a)))), calc(1 - 0.18 * sin(var(--bm-a)))); }
+.bm:is(.is-thinking, .is-idle) .bm-pfl { opacity: clamp(0, calc(sin(var(--bm-a)) * 99), 1); }
+.bm:is(.is-thinking, .is-idle) .bm-pbl { opacity: calc(1 - clamp(0, calc(sin(var(--bm-a)) * 99), 1)); }
+.bm:is(.is-thinking, .is-idle) .bm-pfr { opacity: clamp(0, calc(sin(var(--bm-a)) * -99), 1); }
+.bm:is(.is-thinking, .is-idle) .bm-pbr { opacity: calc(1 - clamp(0, calc(sin(var(--bm-a)) * -99), 1)); }
+/* 평소(idle)에도 살아 있는 동작: 약 9초마다 좌우를 둘러보고, 5초마다 렌즈가 깜빡이고, 목 LED가 숨 쉰다. */
+@keyframes bm-look { 0%, 8% { --bm-a: 0deg; } 18%, 28% { --bm-a: 35deg; } 42%, 52% { --bm-a: -35deg; } 66%, 100% { --bm-a: 0deg; } }
+@keyframes bm-breathe { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes bm-blink-lens { 0%, 86%, 100% { transform: scaleY(1); } 90% { transform: scaleY(.1); } 94% { transform: scaleY(1); } }
+.bm.is-idle { animation: bm-look 9s ease-in-out infinite; }
+.bm.is-idle .bm-led, .bm.is-idle .bm-ledh { fill: #5be38f; animation: bm-breathe 2.8s ease-in-out infinite; }
+.bm.is-idle .bm-ln { animation: bm-blink-lens 5s ease-in-out infinite; }
+.bm.is-idle .bm-cap { transition: none; opacity: clamp(0, calc((1 - cos(var(--bm-a))) * 8), 1); }
 .bm.is-ok .bm-hd { animation: bm-nod 3s ease-in-out 1; }
 .bm.is-ok .bm-ln { animation: bm-pop 3s ease-in-out 1; }
 .bm.is-error .bm-led, .bm.is-error .bm-ledh { animation: bm-blink .4s linear infinite; }

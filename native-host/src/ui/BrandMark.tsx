@@ -2,12 +2,13 @@ import { useAskOutcome, useAskState } from '@claude-plug/state';
 
 /**
  * 헤드가 몸짓으로 보여 주는 상태다(시안: 로고 22). 모양은 `styles.css`의 `.bm` 규칙이 만든다.
- * - idle: 정면. 앱 아이콘과 같은 모습이다.
+ * - still: 움직이지 않는 정면. 앱 아이콘과 같은 모습이다. 작은 탭 아이콘에 쓴다.
+ * - idle: 평소. 목 LED가 초록으로 숨 쉬고, 렌즈가 가끔 깜빡이고, 약 9초마다 좌우를 둘러본다.
  * - thinking: Claude의 응답을 기다리는 중. 목 LED가 깜빡이고, 렌즈가 차례로 켜지고, 헤드가 돈다.
  * - ok: 방금 응답이 도착했다. 목 LED가 초록이고 고개를 끄덕인다.
  * - error: 방금 질문이 실패했다. 렌즈와 링이 붉어지고 고개를 가로젓는다.
  */
-export type BrandState = 'idle' | 'thinking' | 'ok' | 'error';
+export type BrandState = 'still' | 'idle' | 'thinking' | 'ok' | 'error';
 
 /** Claude에게 묻는 중이면 thinking, 방금 끝났으면 ok 또는 error, 아니면 idle이다. */
 export function useBrandState(): BrandState {
