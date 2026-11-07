@@ -53,7 +53,7 @@ function Panel({ className, d }: { className: string; d: string }) {
 export function BrandMark({ className = 'brand-mark', state = 'idle' }: { className?: string; state?: BrandState }) {
   return (
     <svg className={`${className} bm is-${state}`} viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-      <g fill="#fff" opacity=".8">
+      <g className="bm-stars" fill="#fff" opacity=".8">
         <circle cx="96" cy="118" r="5" />
         <circle cx="158" cy="74" r="4" />
         <circle cx="412" cy="96" r="6" />

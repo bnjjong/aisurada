@@ -1,0 +1,129 @@
+/*
+ * 사이드바를 아스라다 밤하늘로 만든다(시안: 사이드바 아스라다 배경).
+ * 색은 스킨마다 그 스킨이 이미 가진 토큰만 쓴다. 밝은 테마에서는 밤하늘 위에서 읽히도록
+ * 사이드바 안에서만 글자, 보조 글자, 선, 호버 색을 다시 정의하고, 어두운 테마는 스킨의 어두운 값을 그대로 쓴다.
+ * 스킨 CSS 뒤에 불러오므로 같은 우선순위의 스킨 규칙(투명 배경 등)을 이긴다.
+ */
+
+/* 공통: 별과 후광 위에 바탕을 깐다. 별 색, 후광, 바탕은 아래 스킨별 변수가 정한다. */
+:root[data-skin] .workspace-rail {
+  position: relative;
+  color: var(--ink);
+  background:
+    radial-gradient(1.6px 1.6px at 14% 6%, var(--rail-star-a) 55%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 82% 9%, var(--rail-star-a) 55%, transparent 60%),
+    radial-gradient(1.4px 1.4px at 30% 22%, var(--rail-star-b) 55%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 90% 30%, var(--rail-star-b) 55%, transparent 60%),
+    radial-gradient(1.4px 1.4px at 8% 44%, var(--rail-star-c) 55%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 70% 52%, var(--rail-star-c) 55%, transparent 60%),
+    radial-gradient(1.4px 1.4px at 22% 68%, var(--rail-star-c) 55%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 86% 78%, var(--rail-star-c) 55%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 40% 90%, var(--rail-star-c) 55%, transparent 60%),
+    radial-gradient(200px 200px at 50% 80px, var(--rail-glow), transparent),
+    var(--rail-base);
+}
+
+/* 로고는 사이드바의 하늘 위에 바로 놓는다. 타일 배경과 로고 안의 별은 뺀다. */
+.workspace-rail .brand .brand-mark.bm { --bs: 80px; background: none; box-shadow: none; border-radius: 0; }
+.workspace-rail .bm .bm-stars { display: none; }
+
+/* 밝은 배경 가정으로 박힌 색 두 곳 */
+.workspace-rail .sess-note.sess-note-bad { color: #ff9a92; background: rgba(255, 128, 120, .16); }
+.workspace-rail .sess-more { color: var(--rail-link); }
+
+/* ───────── 기본 (classic) ───────── */
+:root[data-skin="classic"] .workspace-rail { border-right: 1px solid var(--rail-edge); }
+:root[data-skin="classic"] .workspace-rail nav button { background: transparent; }
+:root[data-skin="classic"] .workspace-rail nav button:hover:not(:disabled) { background: var(--soft); }
+:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active,
+:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--surface); }
+:root[data-skin="classic"][data-theme="light"] .workspace-rail {
+  --rail-edge: #26352e; --rail-glow: rgba(183, 208, 183, .28); --rail-base: linear-gradient(180deg, #2f5542 0%, #26352e 100%);
+  --rail-star-a: #fdfdfa; --rail-star-b: #f3f5ee; --rail-star-c: #e5e9df; --rail-link: #b7d0b7;
+  --ink: #fdfdfa; --muted: rgba(253, 253, 250, .72); --line: rgba(253, 253, 250, .18); --soft: rgba(253, 253, 250, .10);
+}
+:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active,
+:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled) { background: #fdfdfa; color: #26352e; }
+:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active span { color: #7a847e; }
+:root[data-skin="classic"][data-theme="dark"] .workspace-rail {
+  --rail-edge: #344238; --rail-glow: rgba(183, 208, 183, .22); --rail-base: linear-gradient(180deg, #222d25 0%, #1b241f 100%);
+  --rail-star-a: #e0e8df; --rail-star-b: #e0e8df; --rail-star-c: #a4b3a7; --rail-link: var(--accent);
+}
+:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active { box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ───────── 모던 (modern) ───────── */
+:root[data-skin="modern"] .workspace-rail { border-right: 1px solid var(--rail-edge); }
+:root[data-skin="modern"][data-theme="light"] .workspace-rail {
+  --rail-edge: #0b1220; --rail-glow: rgba(30, 79, 216, .55); --rail-base: linear-gradient(180deg, #0b1220 0%, #08101f 100%);
+  --rail-star-a: #ffffff; --rail-star-b: #eef0f4; --rail-star-c: #cfd4dd; --rail-link: #9db7ff;
+  --ink: #f6f7f9; --muted: #cfd4dd; --line: rgba(246, 247, 249, .14); --soft: rgba(246, 247, 249, .10);
+}
+:root[data-skin="modern"][data-theme="dark"] .workspace-rail {
+  --rail-edge: #1c2432; --rail-glow: rgba(108, 147, 255, .30); --rail-base: linear-gradient(180deg, #171e2b 0%, #0b0f17 100%);
+  --rail-star-a: #e7ebf3; --rail-star-b: #98a2b5; --rail-star-c: #98a2b5; --rail-link: var(--accent);
+}
+:root[data-skin="modern"] .workspace-rail nav button.active,
+:root[data-skin="modern"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+:root[data-skin="modern"] .workspace-rail nav button.active span { color: var(--accent-text); }
+
+/* ───────── 격자 (grid): 각진 별과 격자선, 붉은 신호색 점 ───────── */
+:root[data-skin="grid"] .workspace-rail { border-right: 1px solid var(--rail-edge); }
+:root[data-skin="grid"] .workspace-rail {
+  background:
+    linear-gradient(var(--rail-star-a), var(--rail-star-a)) 14% 6% / 2px 2px no-repeat,
+    linear-gradient(var(--rail-star-a), var(--rail-star-a)) 82% 9% / 2px 2px no-repeat,
+    linear-gradient(var(--rail-star-b), var(--rail-star-b)) 30% 22% / 2px 2px no-repeat,
+    linear-gradient(var(--rail-signal), var(--rail-signal)) 88% 28% / 3px 3px no-repeat,
+    linear-gradient(var(--rail-star-b), var(--rail-star-b)) 8% 44% / 2px 2px no-repeat,
+    linear-gradient(var(--rail-star-c), var(--rail-star-c)) 70% 52% / 2px 2px no-repeat,
+    linear-gradient(var(--rail-signal), var(--rail-signal)) 16% 70% / 3px 3px no-repeat,
+    linear-gradient(var(--rail-star-c), var(--rail-star-c)) 86% 78% / 2px 2px no-repeat,
+    linear-gradient(var(--rail-star-c), var(--rail-star-c)) 40% 90% / 2px 2px no-repeat,
+    repeating-linear-gradient(90deg, var(--rail-grid) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(0deg, var(--rail-grid) 0 1px, transparent 1px 24px),
+    radial-gradient(200px 200px at 50% 80px, var(--rail-glow), transparent),
+    var(--rail-base);
+}
+:root[data-skin="grid"][data-theme="light"] .workspace-rail {
+  --rail-edge: #4c5873; --rail-glow: rgba(76, 88, 115, .60); --rail-base: linear-gradient(#0a1633, #0a1633); --rail-signal: #d01f1a;
+  --rail-grid: rgba(205, 213, 227, .07); --rail-star-a: #ffffff; --rail-star-b: #eef2f8; --rail-star-c: #cdd5e3; --rail-link: #eef2f8;
+  --ink: #eef2f8; --muted: #cdd5e3; --line: #4c5873; --soft: rgba(238, 242, 248, .12);
+}
+:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active,
+:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled) { background: #ffffff; color: #0a1633; }
+:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active span { color: #4c5873; }
+:root[data-skin="grid"][data-theme="dark"] .workspace-rail {
+  --rail-edge: #232e4d; --rail-glow: rgba(154, 166, 192, .30); --rail-base: linear-gradient(180deg, #0f1730 0%, #0a1226 100%); --rail-signal: #ff5148;
+  --rail-grid: rgba(233, 238, 248, .06); --rail-star-a: #e9eef8; --rail-star-b: #9aa6c0; --rail-star-c: #9aa6c0; --rail-link: var(--accent);
+}
+
+/* ───────── 물성 (tactile): 둥근 카드 ───────── */
+:root[data-skin="tactile"] .workspace-rail { border-radius: 24px; }
+:root[data-skin="tactile"][data-theme="light"] .workspace-rail {
+  --rail-glow: rgba(30, 79, 216, .65); --rail-base: linear-gradient(180deg, #0a1633 0%, #070c1c 100%);
+  --rail-star-a: #ffffff; --rail-star-b: #dce6fc; --rail-star-c: #dae1ee; --rail-link: #a9c0ff;
+  --ink: #ffffff; --muted: #dae1ee; --line: rgba(255, 255, 255, .14); --soft: rgba(255, 255, 255, .10);
+  --hover: rgba(255, 255, 255, .10); --surface: rgba(255, 255, 255, .14); --sh-1: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+:root[data-skin="tactile"][data-theme="dark"] .workspace-rail {
+  --rail-glow: rgba(127, 163, 255, .35); --rail-base: linear-gradient(180deg, #18244a 0%, #070c1c 100%);
+  --rail-star-a: #e8eefa; --rail-star-b: #9aa8c6; --rail-star-c: #9aa8c6; --rail-link: var(--accent);
+}
+
+/* ───────── 유리 (glass): 반투명 남색 유리 ───────── */
+:root[data-skin="glass"] .workspace-rail {
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16), inset 0 1px 0 rgba(255, 255, 255, .28);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+:root[data-skin="glass"][data-theme="light"] .workspace-rail {
+  --rail-glow: rgba(30, 79, 216, .60); --rail-base: linear-gradient(180deg, rgba(10, 22, 51, .92) 0%, rgba(10, 22, 51, .84) 100%);
+  --rail-star-a: #ffffff; --rail-star-b: rgba(255, 255, 255, .8); --rail-star-c: rgba(255, 255, 255, .6); --rail-link: #a9c0ff;
+  --ink: #ffffff; --muted: rgba(255, 255, 255, .74); --line: rgba(255, 255, 255, .12); --soft: rgba(255, 255, 255, .10);
+  --hover: rgba(255, 255, 255, .10); --tab-on: rgba(255, 255, 255, .16);
+}
+:root[data-skin="glass"][data-theme="dark"] .workspace-rail {
+  --rail-glow: rgba(127, 163, 255, .30); --rail-base: linear-gradient(180deg, rgba(18, 26, 54, .80) 0%, rgba(6, 11, 24, .92) 100%);
+  --rail-star-a: #e9eef8; --rail-star-b: rgba(233, 238, 248, .7); --rail-star-c: rgba(233, 238, 248, .5); --rail-link: var(--accent);
+}
