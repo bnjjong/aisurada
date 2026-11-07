@@ -36,7 +36,7 @@ button { border: 1px solid var(--line); background: var(--surface); border-radiu
 button:hover:not(:disabled) { background: var(--soft); }
 input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); color: var(--ink); }
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 650; font-size: 19px; letter-spacing: -.5px; }
-.brand-mark { --bs: 56px; display: block; flex: none; width: var(--bs); height: var(--bs); border-radius: calc(var(--bs) * .3); }
+.brand-mark { --bs: 56px; display: block; flex: none; width: var(--bs); height: var(--bs); border-radius: calc(var(--bs) * .22); }
 .launcher-intro .brand-mark, .status-screen .brand-mark { --bs: 72px; }
 .eyebrow { color: var(--muted); font-size: 10px; letter-spacing: 1.8px; font-weight: 600; }
 .muted { color: var(--muted); font-size: 14px; line-height: 1.7; }
@@ -82,7 +82,7 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .status-screen p { color: var(--muted); line-height: 1.8; }
 .workspace-shell { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr); }
 .workspace-rail { padding: 30px 20px; display: flex; flex-direction: column; background: var(--soft); border-right: 1px solid var(--line); }
-.workspace-rail .brand { font-size: 17px; padding: 0 8px; }
+.workspace-rail .brand { font-size: 17px; padding: 0 8px; justify-content: center; }
 .workspace-identity { margin: 32px 8px 28px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; overflow-wrap: anywhere; }
 .sample-badge { color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font-size: 9px; }
 .workspace-rail nav button { width: 100%; display: flex; justify-content: space-between; border: 0; text-align: left; font-size: 13px; }
@@ -142,6 +142,7 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .tab-mark { display: block; flex: none; width: 20px; height: 20px; border-radius: 6px; }
 /* 로고 상태 몸짓(시안: 로고 22). 상태는 svg의 is-still, is-idle, is-thinking, is-ok, is-error 클래스로 정해진다. */
 @property --bm-a { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+.bm { background: radial-gradient(circle closest-side at 50% 50%, rgba(58, 98, 240, .6), rgba(58, 98, 240, 0) 86%), linear-gradient(180deg, #14246a, #070b24); }
 .bm * { transform-box: fill-box; transform-origin: center; }
 .bm .bm-neck, .bm .bm-cap, .bm .bm-pfl, .bm .bm-pfr { opacity: 0; }
 .bm .bm-neck, .bm .bm-cap { transition: opacity .25s; }

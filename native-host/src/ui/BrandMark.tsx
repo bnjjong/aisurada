@@ -46,13 +46,23 @@ function Panel({ className, d }: { className: string; d: string }) {
 
 /**
  * 사이드바와 시작 화면에 쓰는 앱 로고(야간 헤드)다.
- * `src-tauri/icons/source.svg`와 같은 그림이고, 36px에서 보이지 않는 별과 그라데이션은 뺀 평면 버전이다.
- * 같은 화면에 여러 번 그려도 id가 겹치지 않도록 그라데이션을 쓰지 않는다.
+ * `src-tauri/icons/source.svg`와 같은 그림이다. 헤드는 그라데이션 없는 평면 색으로 그리고,
+ * 밤하늘 배경(남색 그라데이션과 후광)은 `styles.css`의 `.bm` 배경으로 깐다.
+ * 같은 화면에 여러 번 그려도 id가 겹치지 않도록 SVG 그라데이션을 쓰지 않는다.
  */
 export function BrandMark({ className = 'brand-mark', state = 'idle' }: { className?: string; state?: BrandState }) {
   return (
     <svg className={`${className} bm is-${state}`} viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-      <rect width="512" height="512" rx="112" fill="#10205f" />
+      <g fill="#fff" opacity=".8">
+        <circle cx="96" cy="118" r="5" />
+        <circle cx="158" cy="74" r="4" />
+        <circle cx="412" cy="96" r="6" />
+        <circle cx="452" cy="170" r="4" />
+        <circle cx="78" cy="404" r="5" />
+        <circle cx="438" cy="420" r="5" />
+        <circle cx="130" cy="452" r="4" />
+        <circle cx="380" cy="456" r="4" />
+      </g>
       <g className="bm-neck">
         <rect x="230" y="372" width="52" height="60" rx="14" fill="#121a38" stroke="#070b1c" strokeWidth="4" />
         <circle className="bm-ledh" cx="256" cy="414" r="34" fillOpacity=".28" />
