@@ -2,6 +2,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { agendaOrder, HUE_COLORS, railGroupCollapsed } from "./model.ts";
+import { BrandMark } from "./BrandMark.tsx";
 import { RailProjects, useProjectsList } from "@claude-plug/projects";
 import { useSessionBadge } from "@claude-plug/session";
 export function Rail({
@@ -116,7 +117,7 @@ export function Rail({
   return (
     <aside className="workspace-rail">
       <div className="brand">
-        <span className="brand-mark">w.</span>aisurada
+        <BrandMark />aisurada
       </div>
       <div className="workspace-identity">
         <strong>{ws.name}</strong>

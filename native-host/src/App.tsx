@@ -10,6 +10,7 @@ import { InteractionOverlays } from './interaction/Overlays.tsx';
 import { VaultBanner } from './data/VaultBanner.tsx';
 import { captureEscape } from './ui/layers.ts';
 import { Preview } from './ui/Preview.tsx';
+import { BrandMark } from './ui/BrandMark.tsx';
 
 // Window identity is decided once, before any internal navigation.
 const context = windowContext(window.location.pathname);
@@ -108,7 +109,7 @@ function WorkspaceApp() {
   </>;
 }
 
-function Brand() { return <div className="brand"><span className="brand-mark" aria-hidden="true">w.</span><span>aisurada</span></div>; }
+function Brand() { return <div className="brand"><BrandMark /><span>aisurada</span></div>; }
 
 function Launcher({ controller, state }: { controller: WorkspaceController; state: WorkspaceState }) {
   const [mode, setMode] = useState<'create' | 'open' | null>(() => new URLSearchParams(state.route.split('?')[1]).get('mode') === 'create' ? 'create' : null);

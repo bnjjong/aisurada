@@ -36,7 +36,7 @@ button { border: 1px solid var(--line); background: var(--surface); border-radiu
 button:hover:not(:disabled) { background: var(--soft); }
 input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); color: var(--ink); }
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 650; font-size: 19px; letter-spacing: -.5px; }
-.brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-size: 24px; padding-right: 3px; letter-spacing: -2px; }
+.brand-mark { display: block; flex: none; width: 36px; height: 36px; border-radius: 11px; }
 .eyebrow { color: var(--muted); font-size: 10px; letter-spacing: 1.8px; font-weight: 600; }
 .muted { color: var(--muted); font-size: 14px; line-height: 1.7; }
 .launcher { display: grid; grid-template-columns: 1fr 1.12fr; min-height: 100vh; }
@@ -138,7 +138,7 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .tab-button { display: flex; align-items: center; gap: 10px; min-width: 90px; max-width: 235px; border: 0; border-radius: 0; background: transparent; font-size: 12px; text-align: left; padding: 11px 16px; }
 .tab-button[aria-selected="true"] { color: var(--accent); }
 .tab-main .tab-button { min-width: 156px; }
-.tab-main .tab-button > span:first-child { font-size: 18px; font-weight: 700; letter-spacing: -1px; }
+.tab-mark { display: block; flex: none; width: 20px; height: 20px; border-radius: 6px; }
 .tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-close { border: 0; border-radius: 0; background: transparent; padding: 0 10px; font-size: 17px; color: var(--muted); }
 .tab-dragging { opacity: .45; }
