@@ -521,7 +521,6 @@ export class WorkspaceController {
           return;
         }
         if (!await this.canLeave()) return;
-        await this.data.flushReports();
         this.data.invalidate();
         await this.data.idle();
         await this.authorize(link.ws);
@@ -659,8 +658,6 @@ export class WorkspaceController {
 
   private async openWorkspace(path: string, requestedName = '') {
     const name = requestedName || workspaceName(path);
-    await this.services.pending.flushReports();
-    await this.data.flushReports();
     this.data.invalidate();
     await this.data.idle();
     await this.authorize(path);
@@ -689,8 +686,6 @@ export class WorkspaceController {
   create = (rawName: string): Promise<boolean> => this.action(async () => {
     const name = rawName.trim(), parent = this.state.home;
     if (!name || !await this.canLeave()) return false;
-    await this.services.pending.flushReports();
-    await this.data.flushReports();
     const path = await this.services.host.invoke<string>('create_workspace_dir', { parent, name });
     const before = await this.services.host.invoke<string | null>('vault_root').catch(() => null);
     this.data.invalidate();
@@ -717,20 +712,10 @@ export class WorkspaceController {
 
   // 5.4: a way that only lets go of the vault (the sample) also sends the retrospective
   // writes it has been collecting for 400ms, so a note typed just before is not lost.
-  private async sendCollectedReports() {
-    await this.services.pending.flushReports();
-    await this.data.flushReports();
-  }
-
   private openSample() {
     this.stopWatch();
     const workspace = sampleWorkspace();
     workspace.templates = readSampleTemplates(this.services.storage).map(item => ({ category: 'doc', ...item }));
-    const edits = asRow(readJSON(this.services.storage, 'aisurada.reportEdits.v1')) || {};
-    const memos = asRow(readJSON(this.services.storage, 'aisurada.reportMemos.v1')) || {};
-    const ids = new Set([...workspace.reports.map(row => asText(row.id)), ...Object.keys(edits), ...Object.keys(memos)]);
-    workspace.reports = [...ids].map(id => ({ id, body: asText(edits[id]), memo: asText(memos[id]) }))
-      .filter(row => row.body.trim() || row.memo.trim());
     this.patch({ workspace, fatal: null, vault: this.data.reset(workspace), subNotes: null, searchOpen: false });
   }
 
@@ -740,7 +725,6 @@ export class WorkspaceController {
     this.patch({ recent: addRecent(this.services.storage,
       { path: `${documents}/aisurada-sample`, name: '샘플 워크스페이스', sample: true }) });
     if (!await this.canLeave()) return false;
-    await this.sendCollectedReports();
     this.stopWatch(); this.data.invalidate(); await this.data.idle();
     this.openSample();
     this.navigate('/calendar');
@@ -749,7 +733,7 @@ export class WorkspaceController {
 
   openRecent = (item: RecentWorkspace): Promise<boolean> => this.action(async () => {
     if (!await this.canLeave()) return false;
-    if (item.sample) { await this.sendCollectedReports(); this.stopWatch(); this.data.invalidate(); await this.data.idle(); this.openSample(); }
+    if (item.sample) { this.stopWatch(); this.data.invalidate(); await this.data.idle(); this.openSample(); }
     else await this.openWorkspace(item.path, item.name);
     this.navigate('/calendar');
     return true;
@@ -761,8 +745,6 @@ export class WorkspaceController {
 
   launcher = (): Promise<boolean> => this.action(async () => {
     if (!await this.canLeave()) return false;
-    await this.services.pending.flushReports();
-    await this.data.flushReports();
     this.stopWatch();
     this.data.invalidate(); await this.data.idle();
     void this.services.host.invoke('close_note_windows').catch(() => {});

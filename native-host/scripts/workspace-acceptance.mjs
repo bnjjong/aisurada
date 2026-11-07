@@ -57,7 +57,6 @@ if (editorCheck) {
   write(join(vault, 'notes/demo/root/attach/frame.html'), '<!doctype html><html><body><p>격리된 HTML 첨부</p></body></html>');
 }
 if (navigationCheck) for (const key of ['one', 'two']) write(join(vault, `.aisurada/templates/doc/${key}.md`), `---\nid: ${key}\nname: 템플릿 ${key}\nformat: markdown\ntype: free\nbuiltin: false\n---\n본문 ${key}\n`);
-if (dataCheck) write(join(vault, `.aisurada/reports/rv-morning-${today}.json`), JSON.stringify({id:`rv-morning-${today}`,kind:'morning',date:today,body:'<p>안전한 회고<script>unsafe()</script></p>',memo:'  '}));
 if (viewsCheck) {
   write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n이전 판만의 문장\n');
   write(join(vault, '.aisurada/templates/doc/tplfixture-00000001.md'), '---\nid: tplfixture-00000001\nname: 화면 검증 템플릿\nformat: markdown\ntype: plan\nbuiltin: false\n---\n# [제목]\n\n템플릿 본문\n');

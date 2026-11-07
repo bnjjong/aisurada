@@ -65,7 +65,7 @@ export function workspaceServices(): WorkspaceServices {
       ? handler => getCurrentWindow().onCloseRequested(event => { event.preventDefault(); handler(); })
       : () => Promise.resolve(() => {}),
     navigate: (path, replace) => { window.history[replace ? 'replaceState' : 'pushState']({}, '', path); },
-    pending: { flushReports: async () => {}, flushEditors: async () => {}, waitForWrites: async () => true, unsavedNotes: () => 0 },
+    pending: { flushEditors: async () => {}, waitForWrites: async () => true, unsavedNotes: () => 0 },
     now: () => new Date(), uuid: () => crypto.randomUUID(), sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
     warn: (message, error) => console.warn(message, error ?? ''),
   };

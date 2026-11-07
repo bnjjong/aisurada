@@ -6,7 +6,7 @@ import type { Fields, NewDoc } from './commands.ts';
 import { SelfWrites } from './selfWrites.ts';
 import { WriteQueues } from './writeQueues.ts';
 import type { WriteStamp } from './writeQueues.ts';
-import { readJSON, writeJSON, writeSampleTemplates } from '../workspace/storage.ts';
+import { writeSampleTemplates } from '../workspace/storage.ts';
 import { extractTitle } from './title.ts';
 import { withoutTitleMismatch } from './titleWarning.ts';
 
@@ -43,7 +43,6 @@ export class VaultData {
   private visibleParents = new Map<string, number>();
   private reconciliation?: Promise<void>;
   private requested = false;
-  private reports = new Map<string, ReturnType<typeof setTimeout>>();
   private retries = new Map<string, ReturnType<typeof setTimeout>>();
   private savedTitles = new Map<string, string>();
   private unsavedTemplates = new Map<string, Row>();
@@ -63,11 +62,10 @@ export class VaultData {
   }
   reset(workspace?: Workspace): VaultMemory {
     this.generation++; this.requested = false;
-    for (const timer of this.reports.values()) clearTimeout(timer);
     for (const timer of this.retries.values()) clearTimeout(timer);
     this.retries.clear();
     this.savedTitles = new Map((workspace?.notes || []).map(note => [note.id, note.title]));
-    this.reports.clear(); this.queues = new WriteQueues(); this.reads.clear(); this.visibleParents.clear(); this.selfWrites.clear(); this.unsavedTemplates.clear();
+    this.queues = new WriteQueues(); this.reads.clear(); this.visibleParents.clear(); this.selfWrites.clear(); this.unsavedTemplates.clear();
     this.memory = { ...empty(), relations: relations(workspace?.notes || []) };
     return this.memory;
   }
@@ -508,32 +506,6 @@ export class VaultData {
       this.markOwn(asText(response.path)); this.emit();
     });
   }
-  saveReport(id: string, body: string, memo: string) {
-    const workspace = this.workspace(); if (!workspace) return;
-    const report = { id, body, memo }, existing = workspace.reports.some(item => item.id === id);
-    this.emit({ ...workspace, reports: existing ? workspace.reports.map(item => item.id === id ? report : item) : [...workspace.reports, report] });
-    if (workspace.sample) {
-      for (const [key, value] of [['aisurada.reportEdits.v1', body], ['aisurada.reportMemos.v1', memo]]) {
-        writeJSON(this.services.storage, key, { ...asRow(readJSON(this.services.storage, key)), [id]: value });
-      }
-      return;
-    }
-    clearTimeout(this.reports.get(id));
-    this.reports.set(id, setTimeout(() => { void this.sendReport(id); }, 400));
-  }
-  private async sendReport(id: string): Promise<WriteResult> {
-    clearTimeout(this.reports.get(id)); this.reports.delete(id);
-    const generation = this.generation;
-    return this.queues.run('report:' + id, async () => {
-      if (!this.valid(generation)) return { ok: false };
-      const report = this.workspace()?.reports.find(item => item.id === id); if (!report) return { ok: false };
-      let argv: string[];
-      try { argv = write.report(id, asText(report.body), asText(report.memo)); }
-      catch (error) { this.services.warn('리포트 저장', error); this.failure(`리포트 저장: ${id}`); return { ok: false }; }
-      return this.perform(argv, `리포트 저장: ${id}`, response => this.markOwn(asText(response.path) || `.aisurada/reports/${id}.json`));
-    });
-  }
-  async flushReports() { await Promise.allSettled([...this.reports.keys()].map(id => this.sendReport(id))); }
 
   async deleteDoc(id: string): Promise<WriteResult> {
     const workspace = this.workspace(), note = this.note({ id }), generation = this.generation;

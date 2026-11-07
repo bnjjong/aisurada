@@ -128,7 +128,6 @@ export function Rail({
           ["calendar", "캘린더"],
           ["favorites", "즐겨찾기"],
           ["connections", "연결"],
-          ["review", "데일리 리포트"],
           ["templates", "템플릿"],
           ["trash", "휴지통"],
           ["guide", "연동 가이드"],

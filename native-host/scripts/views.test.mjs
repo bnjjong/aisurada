@@ -28,7 +28,6 @@ import {
   canPlaceAt,
   movedTime,
 } from "../src/ui/CalendarAgenda.tsx";
-import { reportIds } from "../src/ui/OtherPages.tsx";
 import { readingHTML } from "../src/ui/ReadMarkdown.tsx";
 import { restoreReason } from "../src/ui/History.tsx";
 import {
@@ -358,17 +357,6 @@ test("캘린더 15분 스냅·경계·한 시간 겹침 레인", () => {
   assert.equal(l.map.get("a"), 0);
   assert.equal(l.map.get("b"), 1);
   assert.equal(l.map.get("c"), 0);
-});
-test("리포트 막대 평일·기존 리포트·월요일 주간 기록", () => {
-  assert.deepEqual(reportIds("2026-11-01", [note("a")], []), []);
-  assert.deepEqual(
-    reportIds("2026-11-02", [note("a", { date: "2026-11-03" })], []),
-    ["rv-weekly-2026-11-02"],
-  );
-  assert.deepEqual(
-    reportIds("2026-11-01", [], [{ id: "rv-evening-2026-11-01" }]),
-    ["rv-evening-2026-11-01"],
-  );
 });
 test("겹 화면 Esc 최상위와 같은 이벤트의 하위 중복 닫기 방지", () => {
   const a = Symbol(),

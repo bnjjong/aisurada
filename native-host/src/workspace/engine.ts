@@ -27,17 +27,14 @@ export async function engineCall(host: HostPort, argv: string[]): Promise<unknow
   return JSON.parse(result.stdout);
 }
 
-// 6.2: a report body is HTML only when it starts with a tag name followed by a space, > or /.
-// `<https://…>` (an autolink) is markdown.
-export const REPORT_HTML = /^\s*<\/?[a-zA-Z][a-zA-Z0-9-]*(?=[\s>/])/;
-export async function readWorkspace(host: HostPort, reindex: boolean, previous?: Workspace, sanitizeHTML: (html: string) => string = value => value,
+export async function readWorkspace(host: HostPort, reindex: boolean, previous?: Workspace, _sanitizeHTML: (html: string) => string = value => value,
   current: () => boolean = () => true): Promise<Pick<Workspace,
-  'agendas' | 'projects' | 'notes' | 'reports' | 'templates' | 'trash' | 'skipped' | 'conflicts' | 'noteReadFailed'>> {
+  'agendas' | 'projects' | 'notes' | 'templates' | 'trash' | 'skipped' | 'conflicts' | 'noteReadFailed'>> {
   const first = await Promise.allSettled([
     reindex ? engineCall(host, read.reindex()) : Promise.resolve(null),
-    engineCall(host, read.reports()), engineCall(host, read.templates()), engineCall(host, read.trash()),
+    engineCall(host, read.templates()), engineCall(host, read.trash()),
   ]);
-  if (!current()) return { agendas: [], projects: [], notes: [], reports: [], templates: [], trash: [], skipped: [], conflicts: [], noteReadFailed: true };
+  if (!current()) return { agendas: [], projects: [], notes: [], templates: [], trash: [], skipped: [], conflicts: [], noteReadFailed: true };
   const second = await Promise.allSettled([
     engineCall(host, read.agendas()), engineCall(host, read.projects()), engineCall(host, read.docs()),
   ]);
@@ -53,9 +50,8 @@ export async function readWorkspace(host: HostPort, reindex: boolean, previous?:
   const index = asRow(value(first[0]));
   return {
     agendas, projects: rows(fallback(second[1], previous?.projects)), notes,
-    reports: rows(fallback(first[1], previous?.reports), 'reports').map(row => ({ ...row, body: asText(row.body).trim() ? REPORT_HTML.test(asText(row.body)) ? sanitizeHTML(asText(row.body)) : asText(row.body) : '', memo: asText(row.memo).trim() ? asText(row.memo) : '' })),
-    templates: rows(fallback(first[2], previous?.templates), 'templates').filter(r => r.category === 'doc' || r.category === 'ritual'),
-    trash: rows(fallback(first[3], previous?.trash), 'trash'), skipped: rows(index?.skipped), conflicts: rows(index?.conflicts),
+    templates: rows(fallback(first[1], previous?.templates), 'templates').filter(r => r.category === 'doc' || r.category === 'ritual'),
+    trash: rows(fallback(first[2], previous?.trash), 'trash'), skipped: rows(index?.skipped), conflicts: rows(index?.conflicts),
     noteReadFailed: second[2].status === 'rejected',
   };
 }

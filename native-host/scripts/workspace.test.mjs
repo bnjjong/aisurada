@@ -65,7 +65,7 @@ test('boot preserves raw path and enforces allow, init, migration and two read b
   const h = harness(t); setLast(h, '/fixture/./');
   const first = h.controller.boot(); assert.equal(h.controller.boot(), first); await first;
   assert.deepEqual(h.calls.find(c => c.command === 'allow_workspace').args, { path: '/fixture/./' });
-  assert.deepEqual(argv(h), [ ['init-workspace', 'name=테스트', 'templates=[]'], ['reindex'], ['list-reports', 'bodies=true'],
+  assert.deepEqual(argv(h), [ ['init-workspace', 'name=테스트', 'templates=[]'], ['reindex'],
     ['list-templates', 'bodies=true'], ['list-trash'], ['list-agendas'], ['list-projects'], ['list-docs', 'limit=0', 'bodies=true'] ]);
   assert.ok(h.events.indexOf('allow_workspace') < h.events.indexOf('init-workspace'));
   assert.ok(h.events.indexOf('init-workspace') < h.events.indexOf('migration'));
@@ -159,25 +159,6 @@ test('C202: a failed initialization of a new vault puts the host back on the old
   assert.equal(h.watches[0].stopped, true); assert.equal(h.watches.at(-1).root, shown.path); assert.equal(h.watches.at(-1).stopped, false);
 });
 
-test('목록 25번: 샘플로 바꿀 때도 400ms 안에 모아 둔 회고 쓰기를 먼저 보낸다',async t=>{
-  for(const change of [h=>h.controller.sample(),h=>h.controller.openRecent({path:'/documents/aisurada-sample',name:'샘플',sample:true})]){
-    const h=harness(t);setLast(h);await h.controller.boot();await tick();
-    h.controller.data.saveReport('rv-morning-2026-06-04','아침 회고','');
-    await change(h);await tick();
-    assert.ok(h.calls.some(call=>call.command==='sidecar_call'&&call.args.argv[0]==='save-report'),'the collected report was dropped');
-  }
-});
-test('C174: retrospective edits waiting to be written go to the old vault before opening or creating another vault', async t => {
-  for (const change of [h => h.controller.create('new'), h => h.controller.open('/other')]) {
-    const h = harness(t); setLast(h); await h.controller.boot(); await tick(); h.controller.setHome('/parent');
-    h.controller.data.saveReport('rv-morning-2026-06-04', '아침 회고', '');
-    await change(h);
-    const save = h.calls.findIndex(c => c.command === 'sidecar_call' && c.args.argv[0] === 'save-report');
-    const leave = h.calls.findIndex(c => c.command === 'allow_workspace' && c.args.path !== h.calls.find(d => d.command === 'allow_workspace').args.path);
-    assert.ok(save >= 0 && leave >= 0 && save < leave, 'report written after the host left the vault');
-  }
-});
-
 test('recent opening does not reorder entries and removal re-reads shared storage', async t => {
   const h = harness(t); await h.controller.boot();
   addRecent(h.services.storage, { path: '/older', name: 'old' }); addRecent(h.services.storage, { path: '/newer', name: 'new' });
@@ -188,11 +169,11 @@ test('recent opening does not reorder entries and removal re-reads shared storag
   assert.deepEqual(h.controller.getSnapshot().recent.map(r => r.path), ['/elsewhere', '/newer']);
 });
 
-test('note boot performs only six reads and never writes main storage or authorizes a vault', async t => {
+test('note boot performs only five reads and never writes main storage or authorizes a vault', async t => {
   const h = harness(t, { context: { kind: 'note', docId: fixtureNote.id }, values: { [KEYS.last]: JSON.stringify({ path: '/wrong', name: 'wrong' }) } });
   await h.controller.boot();
   assert.equal(h.calls[0].command, 'vault_root');
-  assert.equal(argv(h).length, 6);
+  assert.equal(argv(h).length, 5);
   assert.ok(!argv(h).some(a => ['reindex', 'init-workspace'].includes(a[0])));
   assert.ok(!h.calls.some(c => ['allow_workspace', 'saved_note_windows', 'create_workspace_dir'].includes(c.command)));
   assert.equal(h.writes.length, 0);
@@ -286,12 +267,4 @@ test('sample transition finishes an in-flight read without launching its stale s
   const sample = h.controller.sample(); await tick(); gate.resolve(); await Promise.all([sample, read]);
   assert.equal(h.controller.getSnapshot().workspace.sample, true);
   assert.equal(h.calls.filter(call => call.command === 'sidecar_call').length, before);
-});
-
-test('sample report edits and memos survive reopening without calling the engine', async t => {
-  const h = harness(t); await h.controller.boot(); await h.controller.sample(); const before = h.calls.length;
-  h.controller.data.saveReport('rv-morning-2026-06-04', 'sample body', 'memo');
-  await h.controller.launcher(); await h.controller.sample();
-  assert.deepEqual(h.controller.getSnapshot().workspace.reports, [{id:'rv-morning-2026-06-04',body:'sample body',memo:'memo'}]);
-  assert.ok(!h.calls.slice(before).some(call=>call.command==='sidecar_call'));
 });

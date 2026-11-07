@@ -6,7 +6,7 @@ const command = (name: string, positional: string[] = [], fields: Fields = {}, t
   [name, ...positional, ...cells(fields), ...(token ? [`f1=${token}`] : [])];
 
 export const read = {
-  reindex: () => ['reindex'], reports: () => ['list-reports', 'bodies=true'],
+  reindex: () => ['reindex'],
   templates: () => ['list-templates', 'bodies=true'], trash: () => ['list-trash'],
   agendas: () => ['list-agendas'], projects: () => ['list-projects'], docs: () => ['list-docs', 'limit=0', 'bodies=true'],
   subNotes: (parent: string) => ['list-sub-notes', parent, 'bodies=true'],
@@ -46,11 +46,6 @@ export const write = {
   deleteProject: (id: string) => ['delete-project', id],
   saveTemplate: (fields: Fields) => command('save-template', [], fields), saveRitual: (id: string, fields: Fields) => command('save-ritual-template', [id], fields),
   deleteTemplate: (id: string) => ['delete-doc-template', id],
-  report: (id: string, body: string, memo: string) => {
-    const match = /^rv-(morning|evening|weekly)-(\d{4}-\d{2}-\d{2})$/.exec(id);
-    if (!match) throw new Error('리포트 id가 올바르지 않아요.');
-    return command('save-report', [], { kind: match[1], date: match[2], body: body.trim() ? body : undefined, memo: memo.trim() ? memo : undefined });
-  },
   facts: (id: string, facts: string) => command('update-agenda-facts', [id], { facts: facts.trim() }),
   appendChatTurn: (noteId: string, subId: string | undefined, fields: Fields) =>
     command('append-chat-turn', [noteId, ...(subId ? [subId] : [])], fields),

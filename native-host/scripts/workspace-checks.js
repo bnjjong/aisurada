@@ -46,9 +46,9 @@ if (location.pathname.startsWith('/note-window/')) {
     });
     await test('raw-vault-path-and-batches', async () => {
       assert(await invoke('vault_root') === cfg.raw, 'raw path changed');
-      const initial = (await calls()).slice(0, 8);
+      const initial = (await calls()).slice(0, 7);
       const names = initial.map(c => c.args.argv[0]);
-      assert(names[0] === 'init-workspace' && JSON.stringify(names.slice(1,5).sort()) === JSON.stringify(['list-reports','list-templates','list-trash','reindex']) && JSON.stringify(names.slice(5).sort()) === JSON.stringify(['list-agendas','list-docs','list-projects']), 'initial command groups: ' + names.join(', '));
+      assert(names[0] === 'init-workspace' && JSON.stringify(names.slice(1,4).sort()) === JSON.stringify(['list-templates','list-trash','reindex']) && JSON.stringify(names.slice(4).sort()) === JSON.stringify(['list-agendas','list-docs','list-projects']), 'initial command groups: ' + names.join(', '));
       assert(JSON.stringify(initial.find(c => c.args.argv[0] === 'list-docs').args.argv) === JSON.stringify(['list-docs', 'limit=0', 'bodies=true']), 'bodies or unlimited flag missing');
     });
     await test('legacy-note-readable', async () => {

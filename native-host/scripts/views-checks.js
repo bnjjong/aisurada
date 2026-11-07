@@ -670,65 +670,6 @@ if (location.pathname.startsWith("/note-window/")) {
         "dirty template resurrected",
       );
     });
-    await test("review-memo-body-save-and-ai-reset", async () => {
-      go("/review");
-      await until(() => $(".report-row textarea"), "review");
-      const box = $(".report-row textarea"),
-        id = box.getAttribute("aria-label").replace(/ 메모$/, "");
-      fill(box, "회고 메모 저장");
-      await until(
-        async () =>
-          (await engine(["list-reports", "bodies=true"])).some(
-            (r) => r.id === id && r.memo === "회고 메모 저장",
-          ),
-        "memo disk",
-      );
-      click("편집", $(".report-row"));
-      await until(() => $(".report-row .lex-content"), "report editor");
-      await pause(1500);
-      append("고친 리포트", $(".report-row .lex-content"));
-      await pause(100);
-      click("저장", $(".report-row"));
-      await until(
-        async () =>
-          (await engine(["list-reports", "bodies=true"])).some(
-            (r) => r.id === id && String(r.body || "").includes("고친 리포트"),
-          ),
-        "report body",
-      );
-      click("AI 원본", $(".report-row"));
-      await until(
-        async () =>
-          (await engine(["list-reports", "bodies=true"])).find(
-            (r) => r.id === id,
-          )?.body == null,
-        "report reset",
-      );
-    });
-    await test("calendar-report-modal-note-preview-and-return", async () => {
-      await engine([
-        "save-report",
-        "kind=morning",
-        "date=" + cfg.today,
-        "body=# 달력 리포트\n\n[노트 보기](#doc:" + cfg.id + ")",
-        "memo=",
-      ]);
-      go("/calendar?mode=day&date=" + cfg.today);
-      dispatchEvent(new Event("focus"));
-      await until(() => button("모닝", $(".calendar-page")), "calendar report");
-      click("모닝", $(".calendar-page"));
-      await until(
-        () => $(".report-dialog .read-markdown a"),
-        "report dialog links",
-      );
-      $(".report-dialog .read-markdown a").click();
-      await until(() => $(".note-preview"), "report note preview");
-      click("회고로", $(".note-preview"));
-      await until(() => !$(".note-preview"), "return from preview");
-      assert($(".report-dialog"), "report closed with preview");
-      esc();
-      await until(() => !$(".report-dialog"), "report close");
-    });
     await test("readonly-html-sanitized-no-editor-copy-history", async () => {
       go("/doc/ndfixture-00000004");
       await until(

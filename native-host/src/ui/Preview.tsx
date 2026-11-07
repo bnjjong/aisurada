@@ -193,11 +193,6 @@ export function Preview({
           }
         }}
       >
-        {document.querySelector(".report-dialog") && (
-          <div className="preview-tools">
-            <button onClick={() => controller.showPreview(null)}>회고로</button>
-          </div>
-        )}
         {moveError && <p role="status" className="read-failure">{moveError}</p>}
         <NoteReading note={captured} controller={controller} mode="preview" />
       </div>

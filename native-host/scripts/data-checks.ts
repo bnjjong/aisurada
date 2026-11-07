@@ -63,10 +63,9 @@ if (location.pathname.startsWith('/note-window/')) {
   };
   try {
     await controller.boot();
-    await test('real-boot-token-migration-and-report-sanitization', async () => {
+    await test('real-boot-token-migration', async () => {
       assert(root().body.includes('격리된 vault'), 'body absent'); assert(!!root().precondition, 'first token absent');
       assert(current().notes.some(note => note.id === cfg.legacyId && !asText(note.path).endsWith('.md')), 'migration missing');
-      const report = current().reports[0]; assert(asText(report?.body).includes('안전한 회고') && !asText(report?.body).includes('<script>'), 'HTML not sanitized');
     });
     await test('real-fs-watch-applies-external-content', async () => {
       await externalEdit('# 실제 엔진 기록\n\n감시로 받은 바깥 편집\n');
@@ -117,13 +116,11 @@ if (location.pathname.startsWith('/note-window/')) {
       const after = asRow(await controller.callEngine(read.doc(cfg.id)))!;
       assert(root().body === after.body && root().precondition === after.precondition, 'derived card removal diverged from engine bytes/token');
     });
-    await test('real-report-facts-and-template-writes', async () => {
+    await test('real-facts-and-template-writes', async () => {
       const aid = current().agendas[0].id;
       const facts = await data.loadFacts(aid); assert(!!facts, 'facts read failed');
       assert((await data.saveFacts(aid, ' 새 사실층 ', asText(facts.facts))).ok, 'facts write failed');
       const refusal = await data.saveFacts(aid, 'stale', asText(facts.facts)); assert(refusal.conflict, 'facts lost-update guard absent');
-      data.saveReport('rv-morning-' + cfg.today, '회고 본문', '마지막 메모'); await data.flushReports();
-      const reports = await controller.callEngine(read.reports()) as Row[]; assert(JSON.stringify(reports).includes('마지막 메모'), 'report not persisted');
       const template = await data.saveTemplate({ name: '검증 템플릿', type: 'free', desc: '', body: '# 본문\n' }); assert(template.ok, 'template write failed');
       assert((await data.deleteTemplate(asText(template.value?.id))).ok, 'template delete failed');
     });

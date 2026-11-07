@@ -30,7 +30,7 @@ test('6.8 L2: every trailing slash goes, a repo of nothing but slashes is not lo
 function draw(state) {
   return renderToString(React.createElement(RailProjects, { state }));
 }
-const workspace = (agendas, projects = []) => ({ path: '/vault', name: 'v', sample: false, today: '2026-11-04', agendas, projects, notes: [], templates: [], reports: [], trash: [], skipped: [], conflicts: [], noteReadFailed: false });
+const workspace = (agendas, projects = []) => ({ path: '/vault', name: 'v', sample: false, today: '2026-11-04', agendas, projects, notes: [], templates: [], trash: [], skipped: [], conflicts: [], noteReadFailed: false });
 
 test('6.10 L1: with no session and no line to write, the section is not drawn', () => {
   setSessionStoreState({ status: 'ok', sessions: [], skippedCount: 0, endedDroppedCount: 0, error: null, readAt: Date.now() });

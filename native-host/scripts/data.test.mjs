@@ -18,7 +18,7 @@ const note = (id='a', fields={}) => ({ id, title:id, body:'# '+id+'\n\nold', age
 
 function fixture(t, options={}) {
   let workspace = { ...sampleWorkspace(), sample:false, path:'/fixture', name:'fixture', agendas:[{id:'ag',slug:'demo',title:'Demo'}], notes:[note(),note('b')],
-    projects:[{id:'pr',slug:'p',title:'Project'}], templates:[{id:'tp',category:'doc',name:'T'}], reports:[{id:'rv-morning-2026-11-01',body:'before',memo:'memo'}], trash:[{trashId:'tr1',file:'gone',title:'Gone'}], ...options.workspace };
+    projects:[{id:'pr',slug:'p',title:'Project'}], templates:[{id:'tp',category:'doc',name:'T'}], trash:[{trashId:'tr1',file:'gone',title:'Gone'}], ...options.workspace };
   const disk = copy(workspace), calls=[], warnings=[], commits=[], values=new Map();
   const sub={a:[note('child',{created:'2026-11-01T10:00:00Z',path:'notes/demo/a/sub/child',precondition:'S0'})]};
   let now=1000, handler=options.handler;
@@ -32,7 +32,6 @@ function fixture(t, options={}) {
       if(cmd==='list-agendas')return ok(copy(disk.agendas));
       if(cmd==='list-projects')return ok(copy(disk.projects));
       if(cmd==='list-templates')return ok(copy(disk.templates));
-      if(cmd==='list-reports')return ok(copy(disk.reports));
       if(cmd==='list-trash')return ok(copy(disk.trash));
       if(cmd==='reindex')return ok({skipped:copy(disk.skipped),conflicts:copy(disk.conflicts)});
       if(cmd==='list-sub-notes')return ok({subNotes:copy(sub[argv[1]]||[])});
@@ -51,8 +50,6 @@ test('argv preserves whitespace, newlines, quotes, equals, empty fields and plac
   assert.deepEqual(write.createDoc({agenda:'s',type:'free',title:'',body:'',date:'d',time:'t',tags:[],tier:'other'}),['create-doc','agenda=s','type=free','title=','body=','date=d','time=t','format=markdown','tags=[]']);
   assert.deepEqual(read.docs(),['list-docs','limit=0','bodies=true']);
   assert.deepEqual(read.comments('root','child'),['list-comments','root','child']);
-  assert.deepEqual(write.report('rv-weekly-2026-11-01','  ','\n'),['save-report','kind=weekly','date=2026-11-01']);
-  assert.throws(()=>write.report('invalid','a','b'));
 });
 test('read/history and remaining write command surfaces retain exact positional and named cells',()=>{
   const cases=[
@@ -85,11 +82,10 @@ test('bridge errors retain status and trimmed stderr while refusal commands retu
   await assert.rejects(engineCall({invoke:async()=>({status:0,stdout:'not json',stderr:''})},['list-docs']));
   await assert.rejects(engineCall({invoke:async()=>{throw 'host rejected';}},['list-docs']),e=>e==='host rejected');
 });
-test('initial reads derive date, agenda and report normalization without using date/time overrides',async t=>{
-  const h=fixture(t);h.disk.notes[0]={...note(),created:'xT25:30',date:'WRONG',time:'WRONG'};h.disk.reports=[{id:'x',body:'<p>safe<script>bad</script></p>',memo:'  '}];
-  const data=await readWorkspace(h.services.host,true,undefined,html=>html.replace(/<script>.*?<\/script>/g,''));
+test('initial reads derive date and agenda normalization without using date/time overrides',async t=>{
+  const h=fixture(t);h.disk.notes[0]={...note(),created:'xT25:30',date:'WRONG',time:'WRONG'};
+  const data=await readWorkspace(h.services.host,true,undefined);
   assert.equal(data.notes[0].date,'xT25:30');assert.equal(data.notes[0].time,'00:00');assert.equal(data.notes[0].agendaId,'ag');
-  assert.equal(data.reports[0].body,'<p>safe</p>');assert.equal(data.reports[0].memo,'');
 });
 test('clean reconciliation updates content and deduplicated relations in one publication',async t=>{
   const h=fixture(t);h.disk.notes=[note('a',{body:'external',precondition:'NEW',links:[{to:'a',kind:'direct'},{to:'b',kind:'direct'},{to:'b',kind:'direct'}]})];
@@ -98,14 +94,14 @@ test('clean reconciliation updates content and deduplicated relations in one pub
   assert.equal(relations([note('a',{links:[{to:'b',kind:'attach'},{to:'b',kind:'direct'}]})]).length,2);
 });
 test('failed auxiliary reads preserve old values but a failed reindex clears diagnostic lists',async t=>{
-  const h=fixture(t,{workspace:{skipped:[{path:'old'}],conflicts:[{path:'copy'}]},handler:async argv=>['list-reports','list-projects','list-agendas','list-templates','list-trash','reindex'].includes(argv[0])?fail(4):undefined});
+  const h=fixture(t,{workspace:{skipped:[{path:'old'}],conflicts:[{path:'copy'}]},handler:async argv=>['list-projects','list-agendas','list-templates','list-trash','reindex'].includes(argv[0])?fail(4):undefined});
   h.disk.notes=[note('a',{body:'new'})];await h.data.reconcile();
-  for(const field of ['reports','projects','agendas','templates','trash'])assert.equal(h.workspace[field].length,1,field);
+  for(const field of ['projects','agendas','templates','trash'])assert.equal(h.workspace[field].length,1,field);
   assert.equal(h.workspace.notes[0].agendaId,'ag');assert.deepEqual(h.workspace.skipped,[]);assert.deepEqual(h.workspace.conflicts,[]);
 });
 test('failed note read leaves every workspace field untouched',async t=>{
   const h=fixture(t,{handler:async argv=>argv[0]==='list-docs'?fail(4):undefined}), before=h.workspace;
-  h.disk.agendas=[];h.disk.reports=[];await h.data.reconcile();assert.equal(h.workspace,before);assert.equal(h.commits.length,0);
+  h.disk.agendas=[];await h.data.reconcile();assert.equal(h.workspace,before);assert.equal(h.commits.length,0);
 });
 test('editing/unsaved notes retain memory content and token but main paths follow disk moves',async t=>{
   const h=fixture(t);h.data.edit({id:'a'},{body:'local'});h.disk.notes=[note('a',{body:'external',path:'notes/demo/moved',precondition:'NEW'})];
@@ -251,12 +247,6 @@ test('facts save reads immediately before writing and refuses changed or unreada
   h.setHandler(async argv=>argv[0]==='get-agenda-facts'?fail(4):undefined);assert.equal((await h.data.saveFacts('ag','local','facts')).ok,false);
   h.setHandler(undefined);assert.equal((await h.data.saveFacts('ag',' local ','facts')).ok,true);assert.deepEqual(h.argv().at(-1),['update-agenda-facts','ag','facts=local']);
 });
-test('report edits debounce into one latest write and flush before workspace departure',async t=>{
-  const h=fixture(t);h.data.saveReport('rv-morning-2026-11-01','one','memo');h.data.saveReport('rv-morning-2026-11-01','last','');assert.equal(h.argv().length,0);
-  await h.data.flushReports();assert.deepEqual(h.argv(),[['save-report','kind=morning','date=2026-11-01','body=last']]);
-  assert.equal(h.data.selfWrites.has('/fixture/.aisurada/reports/rv-morning-2026-11-01.json'),false); // Response path takes precedence.
-  h.data.saveReport('rv-morning-2026-11-01','abandoned','');h.setWorkspace({...h.workspace,path:'/other'});await h.data.flushReports();assert.equal(h.argv().length,1);
-});
 test('trash writes restore optimistic removals on failure and restoration waits for reconciliation',async t=>{
   const h=fixture(t,{handler:async argv=>['delete-doc','purge-doc'].includes(argv[0])?fail(4):undefined});
   await h.data.deleteDoc('a');assert.equal(h.workspace.notes[0].id,'a');await h.data.trashAction('tr1','purge');assert.equal(h.workspace.trash[0].trashId,'tr1');
@@ -325,9 +315,9 @@ test('reset discards queued writes and late results from the previous workspace'
   const first=h.data.updateNote({id:'a'},{body:'one'});await tick();const queued=h.data.updateNote({id:'a'},{body:'two'});h.setWorkspace({...h.workspace,path:'/new',notes:[note('new')]});gate.resolve();await Promise.all([first,queued]);
   assert.equal(h.argv().filter(a=>a[0]==='update-doc').length,1);assert.equal(h.workspace.notes[0].id,'new');
 });
-test('samples mutate only memory and report storage, never invoke the host',async t=>{
-  const h=fixture(t,{workspace:{sample:true,path:''}});await h.data.favorite('a',true);await h.data.updateNote({id:'a'},{body:'sample'});h.data.saveReport('rv-morning-2026-11-01','sample','memo');await h.data.reconcile();
-  assert.deepEqual(h.calls,[]);assert.equal(JSON.parse(h.values.get('aisurada.reportEdits.v1'))['rv-morning-2026-11-01'],'sample');
+test('samples mutate only memory, never invoke the host',async t=>{
+  const h=fixture(t,{workspace:{sample:true,path:''}});await h.data.favorite('a',true);await h.data.updateNote({id:'a'},{body:'sample'});await h.data.reconcile();
+  assert.deepEqual(h.calls,[]);
 });
 test('self-write paths honor expiry, segment boundaries and exact root spelling',()=>{
   let now=0;const own=new SelfWrites(()=>now);own.record('/v','');assert.equal(own.has('/v/anything'),false);own.record('/v','notes/a');

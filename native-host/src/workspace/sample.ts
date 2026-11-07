@@ -13,5 +13,5 @@ export function sampleWorkspace(): Workspace {
     { id: 'md3', title: '하루를 돌아보며', agenda: 'daily', agendaId: 'ag-sample-daily', format: 'markdown', created: '2026-06-04T17:00:00+09:00', date: '2026-06-04', time: '17:00', body: '# 하루를 돌아보며\n\n오늘 잘된 것 하나, 내일 이어갈 것 하나를 남겨 보세요.\n' },
   ];
   return { path: '', name: '샘플 워크스페이스', sample: true, today: '2026-06-04', agendas, notes,
-    projects: [], templates: [], reports: [], trash: [], skipped: [], conflicts: [], noteReadFailed: false };
+    projects: [], templates: [], trash: [], skipped: [], conflicts: [], noteReadFailed: false };
 }

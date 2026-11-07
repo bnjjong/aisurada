@@ -38,9 +38,8 @@ export interface HostPort {
   confirmLeave(message: string): Promise<boolean>;
 }
 
-// Editors and report forms register their pending work here when introduced.
+// Editors register their pending work here when introduced.
 export interface PendingWork {
-  flushReports(): Promise<void>;
   flushEditors(): Promise<void>;
   waitForWrites(timeoutMs: number): Promise<boolean>;
   unsavedNotes(): number;
@@ -97,7 +96,6 @@ export interface Workspace {
   projects: Row[];
   notes: Note[];
   templates: Row[];
-  reports: Row[];
   trash: Row[];
   skipped: Row[];
   conflicts: Row[];

@@ -18,7 +18,6 @@ import {
   Favorites,
   Connections,
   Templates,
-  Review,
   Trash,
   Guide,
 } from "../ui/OtherPages.tsx";
@@ -178,8 +177,6 @@ function RouteContent({
           controller={controller}
         />
       );
-    case "review":
-      return <Review state={state} controller={controller} />;
     case "trash":
       return <Trash state={state} controller={controller} />;
     case "guide":

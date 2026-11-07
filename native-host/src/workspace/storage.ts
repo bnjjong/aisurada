@@ -8,11 +8,8 @@ export const KEYS = {
   prefs: 'aisurada.prefs.v1',
   tabs: 'aisurada.tabs.v1',
   noteWindow: 'aisurada.noteWindow.v1',
-  sampleReport: 'aisurada.sampleReport.v1',
   connMode: 'aisurada.connMode.v3',
   connFilter: 'aisurada.connFilter.v2',
-  sampleReportEdits: 'aisurada.reportEdits.v1',
-  sampleReportMemos: 'aisurada.reportMemos.v1',
   sampleTemplates: 'aisurada.templates.v1',
   recentNotesPrefix: 'aisurada.recentNotes.v1:',
 } as const;

@@ -14,7 +14,6 @@ import { AgendaFilter } from "./Rail.tsx";
 import { NoteReading } from "../navigation/NoteReading.tsx";
 import { Confirm, Modal } from "./Modal.tsx";
 import { DiffTable } from "./History.tsx";
-import { ReportDialog, reportIds } from "./OtherPages.tsx";
 export const addDays = (date: string, n: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
@@ -82,7 +81,6 @@ export function Calendar({
     all = visibleNotes(ws.notes, state.prefs.showRecords).filter(
       (n) => !state.hiddenAgendas.includes(n.agendaId),
     ),
-    [report, setReport] = useState(""),
     [now, setNow] = useState(new Date()),
     [dragged, setDragged] = useState<{ id: string; delta: number } | null>(
       null,
@@ -104,23 +102,6 @@ export function Calendar({
       route(mode, view.date, addDays(view.week, dir * 7));
     else route(mode, addDays(view.date, dir));
   };
-  const bars = (date: string) =>
-    reportIds(date, all, ws.reports).map((id) => (
-      <button
-        className="report-bar"
-        key={id}
-        onClick={(e) => {
-          e.stopPropagation();
-          setReport(id);
-        }}
-      >
-        {id.startsWith("rv-morning")
-          ? "모닝"
-          : id.startsWith("rv-evening")
-            ? "회고"
-            : "주간"}
-      </button>
-    ));
   const dayNotes = all.filter((n) => n.date === view.date),
     layout = lanes(dayNotes),
     start = Math.max(
@@ -177,16 +158,13 @@ export function Calendar({
             }}
           />
           <AgendaFilter state={state} controller={controller} />
-          <button onClick={() => controller.navigate("/review")}>리포트</button>
           <button onClick={() => controller.form({ kind: "note" })}>
             새 문서
           </button>
         </div>
         {mode === "day" ? (
           <>
-            <div className="report-bars">{bars(view.date)}</div>
-            {!dayNotes.length &&
-            !reportIds(view.date, all, ws.reports).length ? (
+            {!dayNotes.length ? (
               <p>이 날의 기록이 없어요</p>
             ) : (
               <div
@@ -323,7 +301,6 @@ export function Calendar({
                   (date) => (
                     <section key={date}>
                       <h3>{date.slice(5)}</h3>
-                      {bars(date)}
                       {all
                         .filter((n) => n.date === date)
                         .map((n) => (
@@ -341,16 +318,6 @@ export function Calendar({
               </div>
             ) : (
               <div className="week-agendas">
-                <div className="week-report-bars">
-                  {Array.from({ length: 7 }, (_, i) =>
-                    addDays(view.week, i),
-                  ).map((date) => (
-                    <section key={date}>
-                      <time>{date.slice(5)}</time>
-                      {bars(date)}
-                    </section>
-                  ))}
-                </div>
                 {railAgendaOrder(ws.agendas, ws.notes, ws.projects)
                   .filter((a) =>
                     all.some(
@@ -402,7 +369,6 @@ export function Calendar({
                     date={date}
                     current={date.startsWith(view.date.slice(0, 7))}
                     notes={all.filter((n) => n.date === date)}
-                    bars={bars(date)}
                     open={(id) => controller.showPreview(id)}
                     day={() => route("day", date)}
                   />
@@ -410,14 +376,6 @@ export function Calendar({
               )}
             </div>
           </>
-        )}
-        {report && (
-          <ReportDialog
-            id={report}
-            state={state}
-            controller={controller}
-            close={() => setReport("")}
-          />
         )}
       </div>
     </section>
@@ -427,14 +385,12 @@ function MonthCell({
   date,
   current,
   notes,
-  bars,
   open,
   day,
 }: {
   date: string;
   current: boolean;
   notes: Note[];
-  bars: React.ReactNode;
   open(id: string): void;
   day(): void;
 }) {
@@ -471,7 +427,6 @@ function MonthCell({
       </button>
       {current && (
         <>
-          {bars}
           {notes.slice(0, shown).map((n) => (
             <button
               className="mchip"
