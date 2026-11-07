@@ -22,6 +22,22 @@ export async function openEditorLink(url: string, features: EditorFeatures, head
   }
   if (url.startsWith('#')) { if (!heading?.(url.slice(1))) await features.host?.warn('절을 찾을 수 없어요'); return; }
   if (/^(https?:|mailto:|tel:)/i.test(url)) { await features.host?.openURL(url); return; }
+  if (url.startsWith('/') || /^file:\/\//i.test(url)) {
+    let path = url;
+    if (/^file:\/\//i.test(url)) {
+      try { path = decodeURIComponent(new URL(url).pathname); }
+      catch { path = decodeURIComponent(url.replace(/^file:\/\/(localhost)?/i, '')); }
+    } else {
+      try { path = decodeURIComponent(url); } catch { path = url; }
+    }
+    try {
+      if (features.host?.openPath) await features.host.openPath(path);
+      else await features.host?.openFile(path);
+    } catch {
+      await features.host?.warn(`파일을 열 수 없어요: ${path}`);
+    }
+    return;
+  }
   const path = relativePath(url);
   if (!path || !features.noteDirectory) return;
   if (/\.(html?|svg)$/i.test(path)) {

@@ -1,5 +1,5 @@
 import { DecoratorNode, ElementNode, $applyNodeReplacement } from 'lexical';
-import type { NodeKey, SerializedLexicalNode, SerializedElementNode, LexicalUpdateJSON } from 'lexical';
+import type { NodeKey, SerializedLexicalNode, SerializedElementNode, LexicalUpdateJSON, EditorConfig } from 'lexical';
 import { LinkNode } from '@lexical/link';
 import type { SerializedLinkNode, LinkAttributes } from '@lexical/link';
 import { MarkNode } from '@lexical/mark';
@@ -14,8 +14,33 @@ export class RelativeLinkNode extends LinkNode {
   static getType() { return 'ais-link'; }
   static clone(node: RelativeLinkNode) { return new RelativeLinkNode(node.__url, { rel: node.__rel, target: node.__target, title: node.__title }, node.__key); }
   static importJSON(value: SerializedLinkNode) { return new RelativeLinkNode(value.url).updateFromJSON(value); }
-  sanitizeUrl(url: string) { return relativePath(url) || url.startsWith('#') ? url : super.sanitizeUrl(url); }
+  sanitizeUrl(url: string) {
+    return relativePath(url) || url.startsWith('#') || url.startsWith('/') || /^file:\/\//i.test(url)
+      ? url
+      : super.sanitizeUrl(url);
+  }
   constructor(url = '', attributes: LinkAttributes = {}, key?: NodeKey) { super(url, attributes, key); }
+  createDOM(config: EditorConfig) {
+    const element = super.createDOM(config);
+    this.applyLinkTooltip(element);
+    return element;
+  }
+  updateDOM(prevNode: this, element: HTMLAnchorElement, config: EditorConfig) {
+    const changed = super.updateDOM(prevNode, element, config);
+    this.applyLinkTooltip(element);
+    return changed;
+  }
+  private applyLinkTooltip(element: HTMLElement) {
+    const url = this.getURL();
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+    const mod = isMac ? '⌘' : 'Ctrl';
+    let action = '링크 열기';
+    if (url.startsWith('/') || /^file:\/\//i.test(url)) action = '기본 앱에서 파일 열기';
+    else if (url.startsWith('#doc:')) action = '노트 열기';
+    else if (url.startsWith('#sub:')) action = '하위 페이지 열기';
+    else if (url.startsWith('#')) action = '소제목으로 이동';
+    element.title = `${url}\n(${mod} + 클릭으로 ${action})`;
+  }
 }
 
 type CalloutJSON = SerializedElementNode & { kind: string };

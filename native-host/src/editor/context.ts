@@ -5,6 +5,7 @@ export interface EditorHost {
   native: boolean;
   writeImage(directory: string, name: string, bytes: Uint8Array): Promise<unknown>;
   openFile(path: string): Promise<void>;
+  openPath?(path: string): Promise<void>;
   openURL(url: string): Promise<void>;
   confirm(message: string): Promise<boolean>;
   warn(message: string): Promise<void>;

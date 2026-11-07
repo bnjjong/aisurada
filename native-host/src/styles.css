@@ -240,6 +240,8 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .lex-content h1 { font-size: 32px; line-height: 1.4; margin: 38px 0 24px; }
 .lex-content h2 { font-size: 24px; margin: 36px 0 20px; }.lex-content h3 { font-size: 19px; margin: 28px 0 14px; }.lex-content h4,.lex-content h5,.lex-content h6 { font-size: 16px; margin: 22px 0 12px; }
 .lex-bold { font-weight: 700; }.lex-italic,.sel-format-italic { font-style: normal; color: #4384d6; }.lex-strike { text-decoration: line-through; }.lex-underline { text-decoration: underline; }
+.lex-link { color: var(--accent); text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; cursor: pointer; }
+.lex-link:hover { text-decoration-color: var(--accent); }
 .lex-inline-code { font: .9em ui-monospace, monospace; background: var(--soft); padding: 2px 4px; border-radius: 4px; }.lex-highlight { background: #f5d76b66; }
 .lex-quote { border-left: 3px solid var(--line); margin: 22px 0; padding: 4px 20px; color: var(--muted); }
 .lex-hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; height: 0; cursor: pointer; }
