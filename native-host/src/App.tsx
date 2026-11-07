@@ -110,7 +110,7 @@ function WorkspaceApp() {
   </>;
 }
 
-function Brand({ state = 'idle' }: { state?: BrandState }) { return <div className="brand"><BrandMark state={state} /><span>aisurada</span></div>; }
+function Brand({ state = 'idle' }: { state?: BrandState }) { return <div className="brand" role="img" aria-label="aisurada"><BrandMark state={state} /></div>; }
 
 function Launcher({ controller, state }: { controller: WorkspaceController; state: WorkspaceState }) {
   const [mode, setMode] = useState<'create' | 'open' | null>(() => new URLSearchParams(state.route.split('?')[1]).get('mode') === 'create' ? 'create' : null);

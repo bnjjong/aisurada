@@ -36,7 +36,8 @@ button { border: 1px solid var(--line); background: var(--surface); border-radiu
 button:hover:not(:disabled) { background: var(--soft); }
 input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); color: var(--ink); }
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 650; font-size: 19px; letter-spacing: -.5px; }
-.brand-mark { display: block; flex: none; width: 36px; height: 36px; border-radius: 11px; }
+.brand-mark { --bs: 56px; display: block; flex: none; width: var(--bs); height: var(--bs); border-radius: calc(var(--bs) * .3); }
+.launcher-intro .brand-mark, .status-screen .brand-mark { --bs: 72px; }
 .eyebrow { color: var(--muted); font-size: 10px; letter-spacing: 1.8px; font-weight: 600; }
 .muted { color: var(--muted); font-size: 14px; line-height: 1.7; }
 .launcher { display: grid; grid-template-columns: 1fr 1.12fr; min-height: 100vh; }

@@ -150,7 +150,7 @@
 :root[data-skin="modern"] .tab-button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
 :root[data-skin="modern"] .workspace-rail nav button { padding: 9px 12px; }
 :root[data-skin="modern"] .workspace-rail nav button.active { background: var(--sunken); color: var(--ink); font-weight: 600; }
-:root[data-skin="modern"] .brand-mark { border-radius: 9px; }
+:root[data-skin="modern"] .brand-mark { border-radius: calc(var(--bs) * .25); }
 :root[data-skin="modern"] :is(.sample-badge, .format-badge, .record-badge, .tag-chip, .session-chip, .vb-savestate) { border-radius: 6px; }
 
 /* ───────── 카드 · 떠 있는 것 ───────── */

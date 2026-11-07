@@ -229,7 +229,7 @@
 :root[data-skin="glass"] .workspace-rail nav button { padding: 10px 14px; font-weight: 600; }
 :root[data-skin="glass"] .workspace-rail nav button.active { background: var(--tab-on); color: var(--ink); box-shadow: var(--sh-tab); }
 :root[data-skin="glass"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--tab-on); box-shadow: var(--sh-tab); }
-:root[data-skin="glass"] .brand-mark { border-radius: 12px; box-shadow: var(--sh-acc); }
+:root[data-skin="glass"] .brand-mark { border-radius: calc(var(--bs) * .33); box-shadow: var(--sh-acc); }
 
 /* ───────── 카드 · 칩 ───────── */
 :root[data-skin="glass"] .workspace-option { border: 1px solid var(--rim); border-radius: 20px; background: var(--soft); box-shadow: var(--sh-1); }

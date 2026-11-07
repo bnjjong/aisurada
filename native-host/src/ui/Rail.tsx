@@ -116,8 +116,8 @@ export function Rail({
   };
   return (
     <aside className="workspace-rail">
-      <div className="brand">
-        <LiveBrandMark />aisurada
+      <div className="brand" role="img" aria-label="aisurada">
+        <LiveBrandMark />
       </div>
       <div className="workspace-identity">
         <strong>{ws.name}</strong>
