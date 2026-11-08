@@ -10,7 +10,7 @@ import { $convertFromMarkdownString } from '@lexical/markdown';
 import { $createCodeNode } from '@lexical/code';
 import { $createTextNode } from 'lexical';
 import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs, closeBlockEmphasis } from '../src/editor/grammar.ts';
-import { frameHeight, openEditorLink, FRAME_LINK } from '../src/editor/media.tsx';
+import { frameHeight, openEditorLink, FRAME_LINK, imageFileName } from '../src/editor/media.tsx';
 import { REPORT_HTML } from '../src/workspace/engine.ts';
 import { tablesOnlyJSON } from '../src/editor/tableTools.tsx';
 const cases=JSON.parse(readFileSync(new URL('../fixtures/editor-roundtrip/cases.json',import.meta.url),'utf8'));
@@ -130,3 +130,13 @@ test('절대 경로와 file:// 링크는 openPath 또는 openFile로 전달된�
 });
 test('주석은 마지막 같은 ID 열기와 첫 닫기를 짝짓는다',()=>{const p=markerPlaceholders('<!--aisc:cm1-a-->a<!--aisc:cm1-a-->b<!--/aisc:cm1-a-->c');assert.equal(p.pairs.length,1);assert.equal(p.pairs[0].open,1);});
 test('표 전용 복사는 앱 JSON에서도 문단을 걷고 표 노드만 남긴다',()=>{const table={type:'table',children:[{type:'tablerow'}]};assert.deepEqual(JSON.parse(tablesOnlyJSON(JSON.stringify({namespace:'aisurada-editor',nodes:[{type:'paragraph',text:'제외'},table]}))),{namespace:'aisurada-editor',nodes:[table]});assert.equal(tablesOnlyJSON('broken'),undefined);});
+test('이미지 파일명 추출은 상대 경로, URL, 쿼리, 인코딩을 처리하고 data URL은 제외한다', () => {
+  assert.equal(imageFileName('attach/yofidra-kit-bag.svg'), 'yofidra-kit-bag.svg');
+  assert.equal(imageFileName('attach/assembly%20steps.svg'), 'assembly steps.svg');
+  assert.equal(imageFileName('images/sub/photo.png?v=123#anchor'), 'photo.png');
+  assert.equal(imageFileName('https://example.com/assets/logo.png'), 'logo.png');
+  assert.equal(imageFileName('file:///Users/df/vault/attach/test.png'), 'test.png');
+  assert.equal(imageFileName('attach\\sub\\test.png'), 'test.png');
+  assert.equal(imageFileName('data:image/svg+xml;utf8,...'), '');
+  assert.equal(imageFileName(''), '');
+});

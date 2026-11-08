@@ -27,6 +27,10 @@ export async function engineCall(host: HostPort, argv: string[]): Promise<unknow
   return JSON.parse(result.stdout);
 }
 
+// 6.2: a report body is HTML only when it starts with a tag name followed by a space, > or /.
+// `<https://…>` (an autolink) is markdown.
+export const REPORT_HTML = /^\s*<\/?[a-zA-Z][a-zA-Z0-9-]*(?=[\s>/])/;
+
 export async function readWorkspace(host: HostPort, reindex: boolean, previous?: Workspace, _sanitizeHTML: (html: string) => string = value => value,
   current: () => boolean = () => true): Promise<Pick<Workspace,
   'agendas' | 'projects' | 'notes' | 'templates' | 'trash' | 'skipped' | 'conflicts' | 'noteReadFailed'>> {
