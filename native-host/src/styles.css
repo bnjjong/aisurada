@@ -105,10 +105,13 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .empty-state > span { font-size: 32px; }.empty-state h2 { font-size: 17px; font-weight: 500; }.empty-state p { font-size: 13px; }
 .read-failure { background: var(--soft); border-bottom: 1px solid var(--line); color: var(--ink); padding: 16px 24px; font-size: 12px; line-height: 1.8; }
 .note-reading {
+  position: relative;
   --reading-pad-x: clamp(32px, 7vw, 96px);
   --reading-pad-top: 32px;
   padding: var(--reading-pad-top) var(--reading-pad-x) 80px;
-  max-width: 980px;
+  width: 100%;
+  max-width: var(--doc-width, 820px);
+  min-width: 0;
   margin: 0 auto;
 }
 .note-back { margin: 32px 0 0 40px; }
@@ -141,7 +144,7 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .tab-main .tab-button { min-width: 156px; }
 .tab-mark { display: block; flex: none; width: 20px; height: 20px; border-radius: 6px; }
 /* 로고 상태 몸짓(시안: 로고 22). 상태는 svg의 is-still, is-idle, is-thinking, is-ok, is-error 클래스로 정해진다. */
-@property --bm-a { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --bm-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .bm { background: radial-gradient(circle closest-side at 50% 50%, rgba(58, 98, 240, .6), rgba(58, 98, 240, 0) 86%), linear-gradient(180deg, #14246a, #070b24); }
 .bm * { transform-box: fill-box; transform-origin: center; }
 .bm .bm-neck, .bm .bm-cap, .bm .bm-pfl, .bm .bm-pfr { opacity: 0; }
@@ -1276,4 +1279,43 @@ code.is-symbol { font-weight: 700; }
 .doc-listitem.active {
   background: var(--soft);
   border-radius: 6px;
+}
+
+/* 부록 F: 노트 본문 폭 조절 손잡이 (DocWidthResizer) */
+.doc-width-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(100% + 8px);
+  width: 16px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 10;
+  outline: none;
+}
+.doc-width-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 2px;
+  background: transparent;
+  border-radius: 1px;
+  transition: background-color 0.14s ease;
+}
+.doc-width-resize:hover::after,
+.doc-width-resize:focus-visible::after,
+body.col-resizing .doc-width-resize::after {
+  background: var(--accent);
+}
+body.col-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* 부록 F.3: 코멘트 글줄 720px 상한 */
+.note-comment-thread {
+  max-width: 720px;
 }

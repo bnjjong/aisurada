@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Note } from "../workspace/types.ts";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { rememberNoteScroll } from "./scroll.ts";
 import { NoteEditor } from "../editor/NoteEditor.tsx";
 import { NoteMeta } from "../ui/NoteParts.tsx";
 import type { NoteMode } from "../ui/NoteParts.tsx";
+import { DocWidthResizer, clampDocWidth } from "../ui/DocWidthResizer.tsx";
 import { useNoteAsk, NoteAskFrame, AskComposePopover } from "@claude-plug/ask";
 import type { NoteBodyPort, AskComposeState } from "@claude-plug/ask";
 import { useNoteRail, noteRailNow } from "@claude-plug/state";
@@ -120,10 +122,33 @@ export function NoteReading({
   const context =
     mode ||
     (parent ? "sub" : controller?.context.kind === "note" ? "window" : "tab");
+
+  const isWindow = context === "window";
+  const prefDocWidth = clampDocWidth(controller?.getSnapshot().prefs.docWidth);
+  const [windowDocWidth, setWindowDocWidth] = useState<number>(prefDocWidth);
+  const docWidth = isWindow ? windowDocWidth : prefDocWidth;
+
+  const resizerController = useMemo(() => {
+    if (!controller) return undefined;
+    if (!isWindow) return controller;
+    return {
+      ...controller,
+      preference: (patch: { docWidth?: number }) => {
+        if (typeof patch.docWidth === "number") {
+          setWindowDocWidth(clampDocWidth(patch.docWidth));
+        }
+      },
+    } as WorkspaceController;
+  }, [controller, isWindow]);
+
   return (
     <article
       className={`doc-pane note-reading ${live.format === "html" ? "doc-prose" : ""}`}
+      style={context !== "preview" ? ({ "--doc-width": `${docWidth}px` } as CSSProperties) : undefined}
     >
+      {context !== "preview" && controller && (
+        <DocWidthResizer controller={resizerController} width={docWidth} />
+      )}
       {controller ? (
         <NoteMeta
           key={note.id}
