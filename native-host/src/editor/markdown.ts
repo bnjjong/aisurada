@@ -25,7 +25,7 @@ import {
   AnnotationNode, CalloutNode, ReferenceNode, ImageNode, RelativeLinkNode,
   $createAnnotation, $isAnnotation, $createCallout, $isCallout, $createReference, $isReference, $createImage, $isImage, CHIP_FORMATS,
 } from './nodes.tsx';
-import { outermostInline, TAG_FORMATS, IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN } from '../data/mdInline.ts';
+import { outermostInline, TAG_FORMATS, IMAGE_PATTERN, CHIP_PATTERN, LINK_PATTERN, parseImageAlt } from '../data/mdInline.ts';
 import type { FormatMatch, LinkMatch } from '../data/mdInline.ts';
 import { foldParagraphs, closeBlockEmphasis, doubleListIndent, fenceTracker, mapOutsideCode, tableCells, dividerWidths, widthHint, widthDashes, markerPlaceholders, stripMarkers } from './grammar.ts';
 
@@ -156,8 +156,8 @@ const IMAGE: TextMatchTransformer = {
   type: 'text-match', dependencies: [ImageNode], trigger: ')',
   importRegExp: IMAGE_PATTERN,
   regExp: /!\[([^\]\ue000]*)\]\(([^\s)]+)\)$/,
-  replace: (node, match) => { node.replace($createImage(match[2], match[1])); },
-  export: node => $isImage(node) ? `![${node.getAlt()}](${node.getSource()})` : null,
+  replace: (node, match) => { const { alt, width } = parseImageAlt(match[1]); node.replace($createImage(match[2], alt, width)); },
+  export: node => $isImage(node) ? `![${node.getAlt()}${node.getWidth() > 0 ? '|' + node.getWidth() : ''}](${node.getSource()})` : null,
 };
 const CHIP: TextMatchTransformer = {
   type: 'text-match', dependencies: [ReferenceNode], trigger: ')',

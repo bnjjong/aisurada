@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Marked, Renderer } from "marked";
 import type { Tokens } from "marked";
-import { SENTINEL, sentinelInline } from "../data/mdInline.ts";
+import { SENTINEL, sentinelInline, parseImageAlt } from "../data/mdInline.ts";
 import { closeBlockEmphasis, fenceTracker, foldParagraphs } from "../editor/grammar.ts";
 import { sanitizeHtml } from "../lib/sanitize.ts";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -134,13 +134,22 @@ export function ReadMarkdown({
       html === undefined
         ? markdownHTML(body || "", external)
         : sanitizeHtml(html));
-    if (!directory || !native) return safe;
+    // 이미지 크기 표기 `![alt|480](주소)`: alt 끝의 `|숫자`를 떼어 가로 크기로 쓴다(에디터와 같은 규칙).
+    const sized = /alt="[^"]*\|\d{2,4}"/.test(safe);
+    if ((!directory || !native) && !sized) return safe;
     // Sanitize before resolving trusted native assets. A later sanitizer
     // would discard the asset: URI; resolving in an effect would issue a
     // relative request before the final image URL is ready.
     const template = document.createElement("template");
     template.innerHTML = safe;
     template.content.querySelectorAll("img").forEach((img) => {
+      const { alt, width } = parseImageAlt(img.getAttribute("alt") || "");
+      if (width) {
+        img.setAttribute("alt", alt);
+        img.setAttribute("width", String(width));
+        img.style.height = "auto";
+      }
+      if (!directory || !native) return;
       const src = img.getAttribute("src") || "";
       if (src && !/^(?:\/|[a-z][a-z\d+.-]*:)/i.test(src)) {
         try {

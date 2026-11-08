@@ -1,5 +1,5 @@
-import { DecoratorNode, ElementNode, $applyNodeReplacement } from 'lexical';
-import type { NodeKey, SerializedLexicalNode, SerializedElementNode, LexicalUpdateJSON, EditorConfig } from 'lexical';
+import { DecoratorNode, ElementNode, $applyNodeReplacement, $getNodeByKey } from 'lexical';
+import type { NodeKey, SerializedLexicalNode, SerializedElementNode, LexicalUpdateJSON, EditorConfig, LexicalEditor } from 'lexical';
 import { LinkNode } from '@lexical/link';
 import type { SerializedLinkNode, LinkAttributes } from '@lexical/link';
 import { MarkNode } from '@lexical/mark';
@@ -130,20 +130,29 @@ export const $createReference = (target: string, label: string, card = false, fo
   $applyNodeReplacement(new ReferenceNode(target, label, card, chipFormats(formats)));
 export const $isReference = (node: unknown): node is ReferenceNode => node instanceof ReferenceNode;
 
-type ImageJSON = SerializedLexicalNode & { source: string; alt: string };
+type ImageJSON = SerializedLexicalNode & { source: string; alt: string; width?: number };
+/**
+ * 노트에 넣은 이미지입니다. 마크다운에서는 `![alt](주소)`, 크기를 정하면 `![alt|너비](주소)` 입니다.
+ * `__width`는 화면에 그리는 가로(px)이고, 0이면 크기를 정하지 않아 본문 폭을 넘지 않는 원래 크기로 보입니다.
+ */
 export class ImageNode extends DecoratorNode<ReactNode> {
-  __source: string; __alt: string;
-  constructor(source = '', alt = '', key?: NodeKey) { super(key); this.__source = source; this.__alt = alt; }
+  __source: string; __alt: string; __width: number;
+  constructor(source = '', alt = '', width = 0, key?: NodeKey) { super(key); this.__source = source; this.__alt = alt; this.__width = width; }
   static getType() { return 'ais-image'; }
-  static clone(node: ImageNode) { return new ImageNode(node.__source, node.__alt, node.__key); }
-  static importJSON(value: ImageJSON) { return new ImageNode(value.source, value.alt); }
-  exportJSON(): ImageJSON { return { ...super.exportJSON(), source: this.getSource(), alt: this.getAlt() }; }
-  getSource() { return this.getLatest().__source; } getAlt() { return this.getLatest().__alt; }
+  static clone(node: ImageNode) { return new ImageNode(node.__source, node.__alt, node.__width, node.__key); }
+  static importJSON(value: ImageJSON) { return new ImageNode(value.source, value.alt, value.width ?? 0); }
+  exportJSON(): ImageJSON { return { ...super.exportJSON(), source: this.getSource(), alt: this.getAlt(), width: this.getWidth() }; }
+  getSource() { return this.getLatest().__source; } getAlt() { return this.getLatest().__alt; } getWidth() { return this.getLatest().__width; }
+  setWidth(width: number) { this.getWritable().__width = width > 0 ? Math.round(width) : 0; return this; }
   isInline() { return true; }
   createDOM() { const element = document.createElement('span'); element.className = 'lex-image'; element.contentEditable = 'false'; return element; }
   updateDOM() { return false; }
-  exportDOM() { const element = document.createElement('img'); element.setAttribute('src', this.getSource()); element.alt = this.getAlt(); return { element }; }
-  decorate() { return <ImageView source={this.getSource()} alt={this.getAlt()} />; }
+  exportDOM() { const element = document.createElement('img'); element.setAttribute('src', this.getSource()); element.alt = this.getAlt(); if (this.getWidth() > 0) element.setAttribute('width', String(this.getWidth())); return { element }; }
+  decorate(editor: LexicalEditor) {
+    const key = this.getKey();
+    return <ImageView source={this.getSource()} alt={this.getAlt()} width={this.getWidth()} nodeKey={key}
+      onWidth={width => editor.update(() => { const node = $getNodeByKey(key); if ($isImage(node)) node.setWidth(width); })} />;
+  }
 }
-export const $createImage = (source: string, alt = '') => $applyNodeReplacement(new ImageNode(source, alt));
+export const $createImage = (source: string, alt = '', width = 0) => $applyNodeReplacement(new ImageNode(source, alt, width));
 export const $isImage = (node: unknown): node is ImageNode => node instanceof ImageNode;

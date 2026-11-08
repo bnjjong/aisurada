@@ -16,6 +16,16 @@ export const TAG_FORMATS: Record<string, InlineFormat[]> = {
 };
 // The editor's image, note chip and link import patterns, in their winning order.
 export const IMAGE_PATTERN = /!\[([^\]]*)\]\(([^\s)]+)\)/;
+/**
+ * 이미지 문법의 대괄호 안 글자에서 크기를 가른다. `alt|480`은 대체 글자 `alt`에 가로 480px,
+ * 끝에 `|숫자`가 없으면 크기 없음(0)이다. `|`가 alt 안에 있어도 맨 끝의 `|숫자`만 크기로 본다.
+ * 크기는 16~4000으로 제한하고, 이 범위를 벗어나는 숫자는 크기가 아니라 alt의 일부로 둔다.
+ */
+export function parseImageAlt(raw: string): { alt: string; width: number } {
+  const found = /^([\s\S]*)\|(\d{2,4})$/.exec(raw);
+  const width = found ? Number(found[2]) : 0;
+  return found && width >= 16 && width <= 4000 ? { alt: found[1], width } : { alt: raw, width: 0 };
+}
 export const CHIP_PATTERN = /\[([^\]]+)\]\(#doc:([^\s)]+)\)/;
 export const LINK_PATTERN = /(?:\[(.+?)\])(?:\((?:([^()\s]+)(?:\s"((?:[^"]*\\")*[^"]*)"\s*)?)\))/;
 
