@@ -431,7 +431,7 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .note-toc {
   position: absolute;
   top: 0;
-  right: -42px;
+  right: min(-42px, calc(-1 * var(--reading-pad-x, 96px) + 12px));
   left: auto;
   float: none;
   margin: 0;
