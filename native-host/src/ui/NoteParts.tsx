@@ -49,6 +49,7 @@ export function NoteMeta({
     [history, setHistory] = useState(false),
     [deleting, setDeleting] = useState(false),
     [menuOpen, setMenuOpen] = useState(false),
+    [copiedId, setCopiedId] = useState(false),
     [moveError, setMoveError] = useState(""),
     moreButton = useRef<HTMLButtonElement>(null),
     closeMenu = useCallback(() => setMenuOpen(false), []);
@@ -91,6 +92,11 @@ export function NoteMeta({
                 : "새 창을 열지 못했어요. 앱을 다시 켜고 해 보세요.",
           ),
         );
+  const copyId = () =>
+    void navigator.clipboard.writeText(chain).then(() => {
+      setCopiedId(true);
+      window.setTimeout(() => setCopiedId(false), 1500);
+    });
   // 자주 쓰지 않는 동작은 "더 보기" 메뉴로 모으고, 지우기는 구분선 아래 빨간색으로 떼어 놓는다.
   const menuItems: ActionMenuItem[] = [
     ...(note.format === "markdown"
@@ -107,14 +113,6 @@ export function NoteMeta({
           },
         ]
       : []),
-    {
-      key: "id-copy",
-      label: parent ? "경로 복사" : "ID 복사",
-      icon: "copy" as const,
-      hint: chain.length > 12 ? chain.slice(0, 8) + "…" : chain,
-      className: "act-id-copy",
-      onSelect: () => void navigator.clipboard.writeText(chain),
-    },
     ...(!parent && state.workspace?.path
       ? [
           {
@@ -169,6 +167,18 @@ export function NoteMeta({
           )}
         </div>
         <div className="doc-meta-right">
+          <button
+            type="button"
+            className="doc-meta-copy-id ico-btn has-text"
+            aria-label={parent ? "경로 복사" : "ID 복사"}
+            data-tip={
+              copiedId ? "복사했어요" : (parent ? "경로 복사 · " : "ID 복사 · ") + (chain.length > 14 ? chain.slice(0, 10) + "…" : chain)
+            }
+            onClick={copyId}
+          >
+            <Icon name={copiedId ? "check" : "copy"} />
+            <span>{parent ? "경로" : "ID"}</span>
+          </button>
           {!parent && (
             <button
               type="button"
