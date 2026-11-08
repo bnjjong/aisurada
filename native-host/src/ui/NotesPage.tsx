@@ -51,12 +51,10 @@ export function NotesPage({
       )
     : filteredByAgenda;
 
-  const newestFirst =
-    state.prefs.docSortDir === "desc" || Boolean((state.prefs as any).agendaDesc);
-  const sortMode: "structure" | "time" =
-    (state.prefs.docSortMode || (state.prefs as any).agendaSort) === "time"
-      ? "time"
-      : "structure";
+  const [sortMode, setSortMode] = useState<"time" | "structure">("time");
+  const [newestFirst, setNewestFirst] = useState<boolean>(
+    state.prefs.docSortDir !== "asc",
+  );
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortMode === "structure") {
@@ -203,7 +201,10 @@ export function NotesPage({
                 aria-pressed={sortMode === mode}
                 aria-label={name}
                 data-tip={name}
-                onClick={() => controller.preference({ docSortMode: mode })}
+                onClick={() => {
+                  setSortMode(mode);
+                  controller.preference({ docSortMode: mode });
+                }}
               >
                 <Icon name={icon} />
               </button>
@@ -214,11 +215,13 @@ export function NotesPage({
             className={`ico-btn ag-dir${newestFirst ? "" : " is-flipped"}`}
             aria-label={newestFirst ? "최신이 위" : "오래된 것이 위"}
             data-tip={newestFirst ? "최신이 위" : "오래된 것이 위"}
-            onClick={() =>
+            onClick={() => {
+              const next = !newestFirst;
+              setNewestFirst(next);
               controller.preference({
-                docSortDir: newestFirst ? "asc" : "desc",
-              })
-            }
+                docSortDir: next ? "desc" : "asc",
+              });
+            }}
           >
             <Icon name="sort" />
           </button>
