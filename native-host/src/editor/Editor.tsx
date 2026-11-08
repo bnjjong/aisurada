@@ -50,6 +50,16 @@ import { MermaidLayer } from "./mermaid.tsx";
 import { headingSlug } from "./grammar.ts";
 import { openEditorLink } from "./media.tsx";
 
+/** [element]가 든 노트의 위쪽 고정 패널(.doc-meta-bar)이 스크롤 영역 위에서 차지하는 높이(px). 패널이 없으면 0. */
+function stickyBarHeight(element: HTMLElement): number {
+  const bar = element.closest(".note-reading")?.querySelector<HTMLElement>(".doc-meta-bar");
+  if (!bar) return 0;
+  let scroller: HTMLElement | null = element.parentElement;
+  while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+  const top = scroller ? scroller.getBoundingClientRect().top : 0;
+  return Math.max(0, Math.ceil(bar.getBoundingClientRect().bottom - top));
+}
+
 export interface EditorHeading {
   key: string;
   level: number;
@@ -244,9 +254,12 @@ function EditorBridge(props: EditorProps) {
         ?.getKey();
     });
     if (!target) return false;
-    editor
-      .getElementByKey(target)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const element = editor.getElementByKey(target);
+    if (!element) return true;
+    // 노트 위쪽의 고정 패널(정보줄)이 스크롤 영역 맨 위를 덮고 있어서, 제목을 맨 위에 붙이면 패널 밑에 가려진다.
+    // 이동할 때마다 패널의 현재 높이를 재서, 제목이 패널 바로 아래에 멈추게 한다.
+    element.style.scrollMarginTop = `${stickyBarHeight(element) + 12}px`;
+    element.scrollIntoView({ block: "start", behavior: "smooth" });
     return true;
   }
   useEffect(() => {
@@ -424,15 +437,21 @@ function EditorBridge(props: EditorProps) {
         currentRoot.closest(".doc-scroll, .page-scroll, .subnote-page") ||
         document.scrollingElement;
       const top = scroller?.getBoundingClientRect().top || 0;
+      // 고정 패널 아래에 멈춘 제목도 "지금 보는 장"으로 치도록 기준선을 패널 높이만큼 내린다(최소 100px).
+      const line = top + Math.max(100, stickyBarHeight(currentRoot) + 24);
+      // 문서 끝까지 내려가면 마지막 제목은 맨 위까지 올라올 수 없으니, 끝에서는 마지막 장을 보고 있는 것으로 친다.
+      const atEnd = !!scroller && scroller.scrollHeight - scroller.clientHeight > 1 &&
+        scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 2;
       let key = "";
       editor.getEditorState().read(() => {
-        for (const node of $getRoot().getChildren().filter($isHeadingNode))
+        const headings = $getRoot().getChildren().filter($isHeadingNode);
+        for (const node of headings)
           if (
             (editor.getElementByKey(node.getKey())?.getBoundingClientRect()
-              .top || 0) <=
-            top + 100
+              .top || 0) <= line
           )
             key = node.getKey();
+        if (atEnd && headings.length) key = headings[headings.length - 1].getKey();
       });
       callbacks.current.onSection?.(key);
     };
