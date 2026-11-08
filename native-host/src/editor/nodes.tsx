@@ -1,4 +1,4 @@
-import { DecoratorNode, ElementNode, $applyNodeReplacement, $getNodeByKey } from 'lexical';
+import { DecoratorNode, ElementNode, $applyNodeReplacement, $getNodeByKey, $createTextNode } from 'lexical';
 import type { NodeKey, SerializedLexicalNode, SerializedElementNode, LexicalUpdateJSON, EditorConfig, LexicalEditor } from 'lexical';
 import { LinkNode } from '@lexical/link';
 import type { SerializedLinkNode, LinkAttributes } from '@lexical/link';
@@ -42,6 +42,11 @@ export class RelativeLinkNode extends LinkNode {
     element.title = `${url}\n(${mod} + 클릭으로 ${action})`;
   }
 }
+export const $createRelativeLink = (url: string, text: string) => {
+  const link = new RelativeLinkNode(url);
+  link.append($createTextNode(text));
+  return $applyNodeReplacement(link);
+};
 
 type CalloutJSON = SerializedElementNode & { kind: string };
 export class CalloutNode extends ElementNode {
