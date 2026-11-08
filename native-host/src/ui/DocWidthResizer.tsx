@@ -93,6 +93,7 @@ export function DocWidthResizer({
       aria-orientation="vertical"
       aria-label="본문 너비 조절"
       aria-description="드래그해서 너비 조절 · 더블클릭 시 기본값"
+      title="드래그해서 본문 너비 조절 (더블클릭: 기본값 820px)"
       aria-valuemin={DOC_WIDTH_MIN}
       aria-valuemax={DOC_WIDTH_MAX}
       aria-valuenow={width}
@@ -106,6 +107,9 @@ export function DocWidthResizer({
       }}
     >
       <span className="doc-width-resize-line" aria-hidden="true" />
+      <span className="doc-width-resize-pill" aria-hidden="true">
+        <span className="doc-width-resize-dots" />
+      </span>
     </div>
   );
 }

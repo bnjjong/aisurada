@@ -1296,6 +1296,8 @@ code.is-symbol { font-weight: 700; }
   margin: 0;
   box-sizing: border-box;
 }
+
+/* 전체 세로 가이드선: 평상시 은은하게 표시(opacity: 0.25), 호버 시 액센트 컬러로 점등 */
 .doc-width-resize .doc-width-resize-line {
   position: absolute;
   top: 0;
@@ -1303,18 +1305,76 @@ code.is-symbol { font-weight: 700; }
   left: 7px;
   width: 2px;
   box-sizing: border-box;
-  background: var(--accent);
+  background: var(--line, #cbd5e1);
   border-radius: 9999px;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.14s ease;
+  opacity: 0.25;
+  transition: opacity 0.15s ease, background 0.15s ease;
 }
+
+/* 스크롤 시 화면 뷰포트를 따라다니는 중앙 캡슐형 손잡이 (Grip Pill) */
+.doc-width-resize .doc-width-resize-pill {
+  position: sticky;
+  top: calc(50vh - 19px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  width: 6px;
+  height: 38px;
+  background: var(--line, #cbd5e1);
+  border-radius: 9999px;
+  opacity: 0.7;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: width 0.15s ease, height 0.15s ease, opacity 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 캡슐 손잡이 내부의 미세 그립 바 */
+.doc-width-resize .doc-width-resize-dots {
+  display: block;
+  width: 2px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--surface, #ffffff);
+  opacity: 0.9;
+  transition: height 0.15s ease, background 0.15s ease;
+}
+
+/* 마우스 호버 및 키보드 포커스 시: 명확한 시각 피드백 */
 .doc-width-resize:hover .doc-width-resize-line,
 .doc-width-resize:focus-visible .doc-width-resize-line {
-  opacity: 0.65;
+  opacity: 0.7;
+  background: var(--accent);
 }
+
+.doc-width-resize:hover .doc-width-resize-pill,
+.doc-width-resize:focus-visible .doc-width-resize-pill {
+  width: 8px;
+  height: 46px;
+  opacity: 1;
+  background: var(--accent);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.doc-width-resize:hover .doc-width-resize-dots,
+.doc-width-resize:focus-visible .doc-width-resize-dots {
+  height: 18px;
+  background: #ffffff;
+}
+
+/* 드래그 중인 상태 */
 body.col-resizing .doc-width-resize .doc-width-resize-line {
   opacity: 1;
+  background: var(--accent);
+}
+
+body.col-resizing .doc-width-resize .doc-width-resize-pill {
+  width: 8px;
+  height: 50px;
+  opacity: 1;
+  background: var(--accent);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
 }
 body.col-resizing {
   cursor: col-resize !important;
