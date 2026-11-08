@@ -10,7 +10,7 @@ import {
 } from 'lexical';
 import type { BaseSelection, ElementNode, TextNode } from 'lexical';
 import type { EditorProps } from './Editor.tsx';
-import { $createAnnotation, $isCallout, $createReference, $createImage } from './nodes.tsx';
+import { $createAnnotation, $isCallout, $createReference, $createImage, $createRelativeLink } from './nodes.tsx';
 import { calloutStyle } from './grammar.ts';
 import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock.ts';
 
@@ -20,6 +20,17 @@ export const OPEN_COMMENT_COMMAND = createCommand<void>('aisurada:comment-compos
 export const OPEN_ASK_COMMAND = createCommand<void>('aisurada:ask-compose');
 const formats = ['bold', 'italic', 'strikethrough', 'code'] as const;
 const imageTypes: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
+const supportedExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg', 'pdf']);
+function resolveFileExtension(file: File): string | null {
+  if (file.type === 'application/pdf') return 'pdf';
+  if (imageTypes[file.type]) return imageTypes[file.type];
+  const match = file.name.match(/\.([a-zA-Z0-9]+)$/);
+  if (match) {
+    const ext = match[1].toLowerCase();
+    if (supportedExtensions.has(ext)) return ext === 'jpeg' ? 'jpg' : ext;
+  }
+  return null;
+}
 const languages = ['plaintext', 'kotlin', 'java', 'typescript', 'javascript', 'python', 'sql', 'bash', 'yaml', 'json', 'xml', 'groovy', 'dockerfile', 'properties', 'diff', 'mermaid'];
 
 // 슬래시 메뉴의 아이콘. 글자(한자, 기호)가 아니라 선으로 그려서 한글 화면에 낯선 글자가 섞이지 않고, 글꼴과 상관없이 같게 보인다.
@@ -30,6 +41,7 @@ const slashIcons: Record<string, string> = {
   callout: 'M3.5 3.5h9a1 1 0 011 1v7a1 1 0 01-1 1h-9a1 1 0 01-1-1v-7a1 1 0 011-1zM5 6.5h6M5 9.5h4',
   code: 'M6 5L3 8l3 3M10 5l3 3-3 3',
   divider: 'M2.5 8h11',
+  pdf: 'M4 2.5h5l3 3v8H4v-11zM9 2.5v3h3M6 8.5h4M6 10.5h2.5',
 };
 function SlashIcon({ name }: { name: string }) {
   return <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={slashIcons[name]} /></svg>;
@@ -66,6 +78,7 @@ export function EditorTools(props: EditorProps) {
     { id: 'callout', icon: 'callout', label: '콜아웃', desc: '눈에 띄는 안내 상자', aliases: 'callout 정보 강조 안내' },
     { id: 'code', icon: 'code', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
     { id: 'divider', icon: 'divider', label: '구분선', desc: '내용을 나누는 가로줄', aliases: 'divider hr line 선 구분선 수평선' },
+    { id: 'pdf', icon: 'pdf', label: 'PDF 첨부', desc: 'PDF 문서를 첨부해요', aliases: 'pdf 파일 문서 첨부 document file' },
   ].filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(menu?.query.toLowerCase() || ''));
   const notes = (props.features?.notes || []).filter(note => note.id !== props.features?.currentId && note.title.trim()
     && (props.features?.showRecords || note.tier !== 'record') && note.title.toLowerCase().includes(menu?.query.toLowerCase() || ''))
@@ -80,6 +93,47 @@ export function EditorTools(props: EditorProps) {
     const range = $createRangeSelection(); range.anchor.set(trigger.key, trigger.start, 'text'); range.focus.set(trigger.key, trigger.start + trigger.size, 'text');
     $setSelection(range); range.removeText(); return range;
   }
+  async function handleAttachmentFiles(files: File[]) {
+    const features = latest.current.features;
+    if (!features?.host?.native) return;
+    if (!features.noteDirectory) {
+      void features.host.warn('이 노트에는 첨부를 둘 수 없어요. 앱에서 한 번 열면 폴더로 바뀝니다.');
+      return;
+    }
+    const failed: string[] = [];
+    for (const file of files) {
+      try {
+        const ext = resolveFileExtension(file);
+        if (!ext) throw Error(`지원하지 않는 파일 형식: ${file.name || file.type}`);
+        if (file.size > 50_000_000) throw Error('50,000,000바이트(50MB)를 넘는 파일이에요.');
+        const isImage = ext !== 'pdf';
+        const cleanName = (file.name || 'file')
+          .replace(/\.[^.]+$/, '')
+          .replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
+          .slice(0, 30);
+        const name = isImage
+          ? `img-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}.${ext}`
+          : `${cleanName || 'doc'}-${Date.now().toString(36).slice(-4)}.${ext}`;
+        await features.host!.writeImage(features.noteDirectory!, name, new Uint8Array(await file.arrayBuffer()));
+        editor.update(() => {
+          const selected = $getSelection();
+          if (isImage) {
+            const image = $createImage('attach/' + name);
+            if ($isRangeSelection(selected)) selected.insertNodes([image]);
+            else $getRoot().append($createParagraphNode().append(image));
+          } else {
+            const displayName = file.name || name;
+            const link = $createRelativeLink('attach/' + name, `📄 ${displayName}`);
+            if ($isRangeSelection(selected)) selected.insertNodes([link]);
+            else $getRoot().append($createParagraphNode().append(link));
+          }
+        });
+      } catch (error) {
+        failed.push(`${file.name || file.type}: ${String(error)}`);
+      }
+    }
+    if (failed.length) await features.host!.warn('첨부하지 못했어요.\n' + failed.join('\n'));
+  }
   async function choose(id: string) {
     const active = menuRef.current; if (!active) return;
     if (active.kind === 'note') {
@@ -89,6 +143,19 @@ export function EditorTools(props: EditorProps) {
     }
     if (id === 'note') { setMenu({ ...active, kind: 'note', query: '', selected: 0 }); return; }
     setMenu(null);
+    if (id === 'pdf') {
+      editor.update(() => { removeTrigger(active.trigger); });
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf,application/pdf';
+      input.onchange = () => {
+        if (input.files?.length) {
+          void handleAttachmentFiles([...input.files]);
+        }
+      };
+      input.click();
+      return;
+    }
     if (id !== 'page') { editor.update(() => { removeTrigger(active.trigger); block(id); }); editor.focus(); return; }
     let target = '';
     editor.update(() => {
@@ -181,26 +248,11 @@ export function EditorTools(props: EditorProps) {
     const paste = editor.registerCommand(PASTE_COMMAND, event => {
       const features = latest.current.features;
       if (!event || !('clipboardData' in event) || !features?.host?.native) return false;
-      const files = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith('image/'));
+      const files = [...(event.clipboardData?.files || [])].filter(file => resolveFileExtension(file) !== null);
       if (!files.length) return false;
       event.preventDefault();
-      if (!features.noteDirectory) { void features.host.warn('이 노트에는 첨부를 둘 수 없어요. 앱에서 한 번 열면 폴더로 바뀝니다.'); return true; }
-      void (async () => {
-        const failed: string[] = [];
-        for (const file of files) {
-          try {
-            const extension = imageTypes[file.type]; if (!extension) throw Error(`지원하지 않는 그림 형식: ${file.type}`);
-            if (file.size > 5_000_000) throw Error('5,000,000바이트를 넘는 그림이에요.');
-            const name = `img-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}.${extension}`;
-            await features.host!.writeImage(features.noteDirectory!, name, new Uint8Array(await file.arrayBuffer()));
-            editor.update(() => {
-              const image = $createImage('attach/' + name), selected = $getSelection();
-              if ($isRangeSelection(selected)) selected.insertNodes([image]); else $getRoot().append($createParagraphNode().append(image));
-            });
-          } catch (error) { failed.push(`${file.name || file.type}: ${String(error)}`); }
-        }
-        if (failed.length) await features.host!.warn('그림을 못 붙였어요.\n' + failed.join('\n'));
-      })(); return true;
+      void handleAttachmentFiles(files);
+      return true;
     }, COMMAND_PRIORITY_HIGH);
     const tab = editor.registerCommand(KEY_TAB_COMMAND, event => {
       const selected = $getSelection();
@@ -254,7 +306,16 @@ export function EditorTools(props: EditorProps) {
       const rect = [...mark.getClientRects()].at(-1);
       if (mark.classList.contains('lex-comment-end') && rect && event.clientX >= rect.right - 20 && event.clientY >= rect.top - 6) latest.current.features?.openComment?.(mark.dataset.commentId!);
     };
-    const drop = (event: DragEvent) => { if (event.dataTransfer?.files.length) event.preventDefault(); };
+    const drop = (event: DragEvent) => {
+      const files = [...(event.dataTransfer?.files || [])].filter(file => resolveFileExtension(file) !== null);
+      if (files.length) {
+        event.preventDefault();
+        event.stopPropagation();
+        void handleAttachmentFiles(files);
+      } else if (event.dataTransfer?.files.length) {
+        event.preventDefault();
+      }
+    };
     const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { closeCompose(); setMenu(null); setCard(null); } };
     const blur = () => setLine(null);
     root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop); root.addEventListener('blur', blur);

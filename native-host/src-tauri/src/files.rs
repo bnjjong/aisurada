@@ -6,8 +6,10 @@ use std::{
 };
 use tauri::{Runtime, State};
 use tauri_plugin_opener::OpenerExt;
-const IMAGE_EXTENSIONS: &[&str] = &["svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp"];
-const LIMIT: usize = 5_000_000;
+const ATTACHMENT_EXTENSIONS: &[&str] = &[
+    "svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "pdf",
+];
+const LIMIT: usize = 50_000_000;
 
 #[tauri::command]
 pub async fn write_attachment_bytes(
@@ -44,8 +46,8 @@ pub(crate) fn check_attachment_name(name: &str) -> Result<(), String> {
         .and_then(|v| v.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    if !IMAGE_EXTENSIONS.contains(&extension.as_str()) {
-        return Err(format!("그림 파일이 아니에요(쓸 수 있는 확장자: svg, png, jpg, jpeg, gif, webp, avif, bmp): {name}"));
+    if !ATTACHMENT_EXTENSIONS.contains(&extension.as_str()) {
+        return Err(format!("지원하지 않는 첨부 파일 형식이에요(쓸 수 있는 확장자: svg, png, jpg, jpeg, gif, webp, avif, bmp, pdf): {name}"));
     }
     Ok(())
 }
@@ -81,7 +83,7 @@ fn write_attachment(
     }
     if bytes.len() > LIMIT {
         return Err(format!(
-            "그림이 너무 커요: {} 바이트. 상한은 5000000 바이트예요",
+            "파일이 너무 커요: {} 바이트. 상한은 50000000 바이트예요",
             bytes.len()
         ));
     }
@@ -185,7 +187,7 @@ mod tests {
         let (temp, note) = setup();
         let vault = temp.path().to_str().unwrap();
         let note = note.to_str().unwrap();
-        for extension in IMAGE_EXTENSIONS {
+        for extension in ATTACHMENT_EXTENSIONS {
             let name = format!("한글.{}", extension.to_uppercase());
             let rel = write_attachment(vault, note, &name, &[0, 255, 7]).unwrap();
             assert_eq!(fs::read(temp.path().join(rel)).unwrap(), vec![0, 255, 7]);
@@ -214,10 +216,10 @@ mod tests {
             .contains("점으로 시작"));
         assert!(write_attachment(vault, note, "a.command", &large)
             .unwrap_err()
-            .contains("그림 파일"));
+            .contains("지원하지 않는 첨부 파일 형식"));
         assert!(write_attachment(vault, note, "a.png", &large)
             .unwrap_err()
-            .contains("5000001 바이트"));
+            .contains("50000001 바이트"));
         assert!(!Path::new(note).join("attach").exists());
         assert!(
             write_attachment(vault, "/missing-note-dir", "a.png", &large)
