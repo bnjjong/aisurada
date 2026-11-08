@@ -1409,6 +1409,9 @@ body.col-resizing {
 .lex-image-frame.is-svg.has-fixed-width img { max-width: 100%; }
 .lex-image-frame img { cursor: default; }
 .lex-image-frame.is-selected img { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lex-image-media { position: relative; display: inline-block; max-width: 100%; vertical-align: middle; line-height: 0; }
+.lex-image-frame.is-svg:not(.has-fixed-width) .lex-image-media { display: block; width: 100%; }
+.lex-image-caption { display: block; font-family: var(--font-mono); font-size: 11px; line-height: 1.4; color: var(--muted); text-align: center; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
 .lex-image-grip { position: absolute; right: -8px; bottom: -8px; z-index: 4; display: grid; place-items: center; width: 20px; height: 20px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); cursor: nwse-resize; touch-action: none; }
 .lex-image-grip:hover { color: var(--ink); }
 .lex-image-grip svg { display: block; }
