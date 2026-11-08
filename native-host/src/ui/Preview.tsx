@@ -16,14 +16,46 @@ export function Preview({
   const note = state.workspace?.notes.find((n) => n.id === state.preview),
     [full, setFull] = useState(false),
     [moveError, setMoveError] = useState(""),
-    box = useRef<HTMLDivElement>(null),
-    resizing = useRef(false);
+    box = useRef<HTMLDivElement>(null);
   if (!note) return null;
   const captured =
       state.previewOpened?.id === note.id ? state.previewOpened : note,
     agenda = state.workspace?.agendas.find((a) => a.id === captured.agendaId),
     pw = Number(state.prefs.previewWidth) || 720,
     ph = typeof state.prefs.previewHeight === "number" ? state.prefs.previewHeight : null;
+  // 팝업 오른쪽 아래 모서리의 손잡이를 끌어 노트 영역 크기를 바꾼다.
+  // 팝업은 화면 가운데에 놓여 있어서 모서리를 d만큼 끌면 크기는 2d만큼 변해야 모서리가 포인터를 따라온다.
+  const startResize = (e: React.PointerEvent<HTMLElement>) => {
+    const area = box.current;
+    if (full || !area) return;
+    e.preventDefault();
+    const grip = e.currentTarget,
+      pointer = e.pointerId,
+      x0 = e.clientX,
+      y0 = e.clientY,
+      start = area.getBoundingClientRect(),
+      clamp = (value: number, min: number, max: number) =>
+        Math.max(min, Math.min(max, Math.round(value)));
+    grip.setPointerCapture(pointer);
+    const move = (ev: PointerEvent) => {
+      area.style.width = clamp(start.width + 2 * (ev.clientX - x0), 480, 1600) + "px";
+      area.style.height = clamp(start.height + 2 * (ev.clientY - y0), 320, 2400) + "px";
+    };
+    const end = () => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", end);
+      grip.removeEventListener("pointercancel", end);
+      const r = area.getBoundingClientRect();
+      const width = clamp(r.width, 480, 1600),
+        height = clamp(r.height, 320, 2400);
+      if (width !== pw || height !== (ph || 480)) {
+        controller.preference({ previewWidth: width, previewHeight: height });
+      }
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", end);
+    grip.addEventListener("pointercancel", end);
+  };
   const title = displayTitle(note, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true);
 
   const headerActions = (
@@ -172,26 +204,6 @@ export function Preview({
         style={
           !full ? ({ width: pw, ...(ph ? { height: ph } : {}) } as React.CSSProperties) : undefined
         }
-        onPointerDown={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          resizing.current =
-            !full && e.clientX > r.right - 20 && e.clientY > r.bottom - 20;
-        }}
-        onPointerUp={() => {
-          if (!resizing.current) return;
-          resizing.current = false;
-          const r = box.current?.getBoundingClientRect();
-          if (r) {
-            const width = Math.max(480, Math.min(1600, Math.round(r.width)));
-            const height = Math.max(320, Math.min(2400, Math.round(r.height)));
-            if (width !== pw || height !== (ph || 480)) {
-              controller.preference({
-                previewWidth: width,
-                previewHeight: height,
-              });
-            }
-          }
-        }}
       >
         {moveError && <p role="status" className="read-failure">{moveError}</p>}
         <NoteReading note={captured} controller={controller} mode="preview" />
@@ -219,6 +231,18 @@ export function Preview({
         </button>
         <button onClick={() => controller.showPreview(null)}>닫기</button>
       </footer>
+      {!full && (
+        <span
+          className="preview-grip"
+          title="끌어서 크기 조절"
+          aria-hidden="true"
+          onPointerDown={startResize}
+        >
+          <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M10.5 3.5L3.5 10.5M10.5 7.5L7.5 10.5" />
+          </svg>
+        </span>
+      )}
     </Modal>
   );
 }

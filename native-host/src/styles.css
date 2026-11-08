@@ -1326,3 +1326,17 @@ body.col-resizing {
 .note-comment-thread {
   max-width: 720px;
 }
+
+/* ───────── 팝업 노트 크기 조절 손잡이: 팝업의 오른쪽 아래 모서리 ─────────
+   브라우저 기본 손잡이(resize: both)는 노트 영역의 모서리에 붙어서 푸터 위에 떠 있었다.
+   팝업의 실제 모서리에 직접 만든 손잡이를 두고, 푸터 단추가 가리지 않게 오른쪽 여백을 늘린다.
+   큰 둥근 모서리를 가진 스킨은 손잡이가 모서리 곡선 밖으로 잘리지 않게 안쪽으로 들인다(--grip-inset). */
+.ui-modal.note-preview { position: relative; --grip-inset: 6px; }
+.preview-resize { resize: none; }
+.note-preview > footer { padding-right: 44px; }
+.preview-grip { position: absolute; right: var(--grip-inset); bottom: var(--grip-inset); z-index: 3; display: grid; place-items: center; width: 20px; height: 20px; color: var(--muted); cursor: nwse-resize; touch-action: none; border-radius: 6px; }
+.preview-grip svg { display: block; }
+.preview-grip:hover { color: var(--ink); background: var(--soft); }
+.preview-full .preview-grip { display: none; }
+:root[data-skin="tactile"] .ui-modal.note-preview, :root[data-skin="glass"] .ui-modal.note-preview { --grip-inset: 12px; }
+:root[data-skin="grid"] .ui-modal.note-preview, :root[data-skin="page"] .ui-modal.note-preview { --grip-inset: 4px; }
