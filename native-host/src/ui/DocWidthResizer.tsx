@@ -92,12 +92,11 @@ export function DocWidthResizer({
       role="separator"
       aria-orientation="vertical"
       aria-label="본문 너비 조절"
+      aria-description="드래그해서 너비 조절 · 더블클릭 시 기본값"
       aria-valuemin={DOC_WIDTH_MIN}
       aria-valuemax={DOC_WIDTH_MAX}
       aria-valuenow={width}
       tabIndex={0}
-      data-tip="드래그해서 너비 조절 · 더블클릭 시 기본값"
-      title="드래그해서 너비 조절 · 더블클릭 시 기본값"
       onPointerDown={pointerDown}
       onKeyDown={keyDown}
       onDoubleClick={() => {
@@ -105,6 +104,8 @@ export function DocWidthResizer({
           controller.preference({ docWidth: DOC_WIDTH_DEFAULT });
         }
       }}
-    />
+    >
+      <span className="doc-width-resize-line" aria-hidden="true" />
+    </div>
   );
 }

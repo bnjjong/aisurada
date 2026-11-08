@@ -1292,22 +1292,29 @@ code.is-symbol { font-weight: 700; }
   touch-action: none;
   z-index: 10;
   outline: none;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
-.doc-width-resize::after {
-  content: "";
+.doc-width-resize .doc-width-resize-line {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 7px;
   width: 2px;
-  background: transparent;
-  border-radius: 1px;
-  transition: background-color 0.14s ease;
-}
-.doc-width-resize:hover::after,
-.doc-width-resize:focus-visible::after,
-body.col-resizing .doc-width-resize::after {
+  box-sizing: border-box;
   background: var(--accent);
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+.doc-width-resize:hover .doc-width-resize-line,
+.doc-width-resize:focus-visible .doc-width-resize-line {
+  opacity: 0.65;
+}
+body.col-resizing .doc-width-resize .doc-width-resize-line {
+  opacity: 1;
 }
 body.col-resizing {
   cursor: col-resize !important;
