@@ -115,6 +115,7 @@ export function TableTools(props: EditorProps) {
   useEffect(() => {
     let active = true;
     let rafId = 0;
+    let refreshCell = () => {};
     const root = editor.getRootElement();
     if (!root) return;
     const collect = () => {
@@ -150,27 +151,57 @@ export function TableTools(props: EditorProps) {
     const update = editor.registerUpdateListener(() => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        if (active && editor.getRootElement()) { collect(); scale(); }
+        if (active && editor.getRootElement()) { collect(); scale(); refreshCell(); }
       });
     });
     // The document can already be in the DOM before this listener is installed.
     rafId = requestAnimationFrame(() => { if (active && editor.getRootElement()) collect(); });
-    const over = (event: MouseEvent) => {
-      if (open) return; // 메뉴가 열려 있는 동안은 고른 줄에 고정한다. 마우스가 메뉴로 가다가 다른 줄을 지나도 따라가지 않는다.
-      const container = outer();
-      if (!root || !container) return;
-      const element = (event.target as Element).closest<HTMLTableCellElement>('td,th'); if (!element || !root.contains(element)) return;
-      const tableElem = element.closest('table');
-      if (!tableElem) return;
+    // 줄 메뉴 손잡이는 마우스가 표 칸 위에 있을 때만 보인다. 칸을 벗어나면 잠깐(250ms) 뒤에 숨긴다.
+    // 손잡이·열 경계·메뉴로 가는 길에 칸 밖을 잠깐 지나도 사라지지 않게 하려는 유예다.
+    let leaveTimer = 0;
+    const cancelLeave = () => { clearTimeout(leaveTimer); };
+    const leaveSoon = () => { clearTimeout(leaveTimer); leaveTimer = window.setTimeout(() => setCell(null), 250); };
+    const controls = '.lex-row-grip,.lex-col-grip,.lex-table-grip,.lex-table-menu,.lex-row-outline';
+    const inCell = (target: Element | null) => !!target?.closest('td,th') && root.contains(target);
+    // 칸의 줄에 붙일 손잡이 위치를 DOM에서 다시 잰다. 손잡이는 칸이 아니라 줄에 붙인다. 마우스가 같은 줄의 다른 열로 가도 제자리에 있다.
+    const place = (element: HTMLTableCellElement): Cell | null => {
+      const container = outer(), tableElem = element.closest('table');
+      if (!root || !container || !tableElem) return null;
       const base = container.getBoundingClientRect(), rect = element.getBoundingClientRect(), table = tableElem.getBoundingClientRect();
-      const row = (element.closest('tr') ?? element).getBoundingClientRect(); // 손잡이는 칸이 아니라 줄에 붙인다. 마우스가 같은 줄의 다른 열로 가도 제자리에 있다.
+      const row = (element.closest('tr') ?? element).getBoundingClientRect();
+      let found: Cell | null = null;
       editor.read(() => {
         const node = $getNearestNodeFromDOMNode(element);
-        if ($isTableCellNode(node)) setCell({ key: node.getKey(), rowLeft: row.left - base.left, rowTop: row.top - base.top, rowWidth: row.width, rowHeight: row.height, right: rect.right - base.left,
-          tableRight: table.right - base.left, tableTop: table.top - base.top, tableBottom: table.bottom - base.top });
+        if ($isTableCellNode(node)) found = { key: node.getKey(), rowLeft: row.left - base.left, rowTop: row.top - base.top, rowWidth: row.width, rowHeight: row.height, right: rect.right - base.left,
+          tableRight: table.right - base.left, tableTop: table.top - base.top, tableBottom: table.bottom - base.top };
       });
+      return found;
     };
-    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.lex-table-menu,.lex-row-grip')) setOpen(false); };
+    // 문서가 바뀌면(표 삭제, 위쪽 내용이 늘거나 줄어 위치가 밀림) 손잡이를 지우거나 줄 위치에 다시 맞춘다.
+    refreshCell = () => setCell(current => {
+      if (!current) return current;
+      const element = editor.getElementByKey(current.key);
+      if (!(element instanceof HTMLTableCellElement) || !root.contains(element)) return null;
+      const next = place(element);
+      return next && JSON.stringify(next) !== JSON.stringify(current) ? next : current;
+    });
+    const over = (event: MouseEvent) => {
+      if (open) return; // 메뉴가 열려 있는 동안은 고른 줄에 고정한다. 마우스가 메뉴로 가다가 다른 줄을 지나도 따라가지 않는다.
+      const element = (event.target as Element).closest<HTMLTableCellElement>('td,th'); if (!element || !root.contains(element)) return;
+      cancelLeave();
+      const next = place(element);
+      if (next) setCell(next);
+    };
+    const away = (event: MouseEvent) => {
+      if (open) return;
+      const target = event.target as Element | null;
+      if (target?.closest(controls)) { cancelLeave(); return; }
+      if (inCell(target)) return;
+      leaveSoon();
+    };
+    const gone = (event: MouseEvent) => { if (!open && !event.relatedTarget) leaveSoon(); };
+    document.addEventListener('mouseover', away); document.addEventListener('mouseout', gone);
+    const outside = (event: PointerEvent) => { const target = event.target as Element; if (!target.closest('.lex-table-menu,.lex-row-grip')) { setOpen(false); if (!inCell(target)) leaveSoon(); } };
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); } };
     root.addEventListener('mouseover', over); document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape, true);
     const copy = (event: ClipboardEvent | null, cut = false) => {
@@ -199,7 +230,7 @@ export function TableTools(props: EditorProps) {
       if (!event || event.altKey || !event.shiftKey || !(/Mac/.test(navigator.platform) ? event.metaKey : event.ctrlKey) || event.code !== 'KeyC' || !tablesFromSelection().length) return false;
       event.preventDefault(); copyMode.current = true; document.execCommand('copy'); return true;
     }, COMMAND_PRIORITY_HIGH);
-    return () => { active = false; cancelAnimationFrame(rafId); stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
+    return () => { active = false; cancelAnimationFrame(rafId); stopResize.current?.(); update(); copyOff(); cutOff(); keyOff(); root.removeEventListener('mouseover', over); cancelLeave(); document.removeEventListener('mouseover', away); document.removeEventListener('mouseout', gone); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
   }, [editor, open, props.askDocId]);
   // 줄 메뉴: AI와 코멘트는 이 줄에 대한 것이고, 행 작업은 이 줄에, 열 작업은 커서가 놓인 칸의 열에, 표 작업은 표 전체에 한다.
   const groups = [
