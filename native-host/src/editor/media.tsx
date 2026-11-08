@@ -53,7 +53,7 @@ export function ImageView({ source, alt, width, nodeKey, onWidth }: { source: st
   const features = useContext(EditorContext), path = relativePath(source);
   if (path && features.noteDirectory && /\.html?$/i.test(path)) return <HTMLFrame path={path} label={alt} />;
   const url = path && features.noteDirectory && features.host?.native ? convertFileSrc(`${features.noteDirectory}/${path}`) : source;
-  return <ImageBox url={url} alt={alt} width={width} nodeKey={nodeKey} onWidth={onWidth} />;
+  return <ImageBox url={url} source={source} alt={alt} width={width} nodeKey={nodeKey} onWidth={onWidth} />;
 }
 
 const IMAGE_MIN = 48;
@@ -66,7 +66,7 @@ const IMAGE_PRESETS: { label: string; width: number }[] = [
  * 크기 도구줄(작게·중간·본문 폭·원래 크기)이 나타난다. 더블클릭하면 원래 크기로 돌아간다.
  * 크기는 [onWidth]로 노트에 저장되고, 본문 폭보다 크게는 키울 수 없다.
  */
-function ImageBox({ url, alt, width, nodeKey, onWidth }: { url: string; alt: string; width: number; nodeKey: string; onWidth(width: number): void }) {
+function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; source: string; alt: string; width: number; nodeKey: string; onWidth(width: number): void }) {
   const [editor] = useLexicalComposerContext();
   const [selected, setSelected, clearSelected] = useLexicalNodeSelection(nodeKey);
   const [editable, setEditable] = useState(() => editor.isEditable());
@@ -106,9 +106,11 @@ function ImageBox({ url, alt, width, nodeKey, onWidth }: { url: string; alt: str
     };
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', release); grip.addEventListener('pointercancel', release);
   };
+  const isSvg = /\.svg(?:[?#]|$)/i.test(source) || /\.svg(?:[?#]|$)/i.test(url);
   const shown = live ?? (width > 0 ? width : 0);
-  return <span ref={frame} className={`lex-image-frame${selected && editable ? ' is-selected' : ''}`}>
-    <img ref={image} src={url} alt={alt} loading="lazy" draggable="false" style={shown ? { width: shown } : undefined}
+  const hasFixedWidth = shown > 0;
+  return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`}>
+    <img ref={image} src={url} alt={alt} loading="lazy" draggable="false" style={shown ? { width: shown } : (isSvg ? { width: '100%' } : undefined)}
       onDoubleClick={() => { if (editable && width > 0) onWidth(0); }} />
     {selected && editable && <>
       <span className="lex-image-bar" role="toolbar" aria-label="이미지 크기">
