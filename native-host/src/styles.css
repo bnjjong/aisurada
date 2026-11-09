@@ -736,6 +736,7 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ask-compose-popover { padding: 12px 16px; min-width: 280px; max-width: 380px; font-size: 12px; }
 .ask-options-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
 .ask-options-row select { font-size: 11px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); }
+.ask-options-row select:disabled, .rchat-options select:disabled { opacity: 0.55; cursor: not-allowed; background: var(--soft); }
 .ask-attach-btn { border: 1px solid var(--line); background: var(--soft); padding: 3px 6px; border-radius: 4px; cursor: pointer; }
 .ask-compose-popover textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 12px; background: var(--surface); color: var(--ink); resize: vertical; box-sizing: border-box; }
 .ask-compose-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }

@@ -50,16 +50,19 @@ test('Chapter 3: pending records and the waiting count', () => {
 });
 
 test('Chapter 3.3: model and effort lists and the way stored values come back (M5)', () => {
-  assert.deepEqual(ASK_MODELS.map((m) => m.id), ['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-fable-5']);
-  assert.deepEqual(ASK_MODELS.map((m) => m.label), ['opus 5.5', 'opus 5', 'sonnet 5.5', 'sonnet 5', 'fable 5.1', 'fable 5']);
+  assert.deepEqual(ASK_MODELS.map((m) => m.id), ['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-fable-5', 'gemini-3-8-flash']);
+  assert.deepEqual(ASK_MODELS.map((m) => m.label), ['opus 5.5', 'opus 5', 'sonnet 5.5', 'sonnet 5', 'fable 5.1', 'fable 5', 'gemini 3.8 flash']);
   assert.deepEqual(ASK_EFFORTS.map((e) => e.id), ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.equal(normalizeModel('opus'), 'claude-opus-5-5');
   assert.equal(normalizeModel('sonnet'), 'claude-sonnet-5-5');
   assert.equal(normalizeModel('fable'), 'claude-fable-5-1');
+  assert.equal(normalizeModel('gemini-3-8-flash'), 'gemini-3-8-flash');
+  assert.equal(normalizeModel('gemini-3.8-flash'), 'gemini-3-8-flash');
   assert.equal(normalizeModel('claude-haiku-5-5'), 'claude-sonnet-5-5', 'haiku is not in the list');
   assert.equal(normalizeModel('broken\u0000text'), 'claude-sonnet-5-5');
   assert.equal(normalizeEffort('xhigh'), 'xhigh');
   assert.equal(normalizeEffort('nope'), 'low');
+  assert.equal(normalizeEffort('low', 'gemini-3-8-flash'), 'high', 'gemini always uses high effort');
 });
 
 test('Chapter 2.1: the underline id tail is 8 hexadecimal digits (L1)', () => {

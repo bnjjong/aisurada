@@ -101,6 +101,52 @@ pub fn resolve_claude() -> Option<PathBuf> {
     None
 }
 
+pub fn resolve_gemini() -> Option<PathBuf> {
+    // 1. AISURADA_GEMINI_BIN
+    if let Ok(bin) = env::var("AISURADA_GEMINI_BIN") {
+        if !bin.is_empty() {
+            let p = PathBuf::from(&bin);
+            if is_regular_file(&p) {
+                return Some(p);
+            }
+        }
+    }
+
+    // 2. $HOME/.local/bin/gemini
+    if let Ok(home) = env::var("HOME") {
+        if !home.is_empty() {
+            let p = PathBuf::from(home).join(".local/bin/gemini");
+            if is_regular_file(&p) {
+                return Some(p);
+            }
+        }
+    }
+
+    // 3. /opt/homebrew/bin/gemini
+    let brew_opt = PathBuf::from("/opt/homebrew/bin/gemini");
+    if is_regular_file(&brew_opt) {
+        return Some(brew_opt);
+    }
+
+    // 4. /usr/local/bin/gemini
+    let usr_local = PathBuf::from("/usr/local/bin/gemini");
+    if is_regular_file(&usr_local) {
+        return Some(usr_local);
+    }
+
+    // 5. PATH
+    if let Ok(path_var) = env::var("PATH") {
+        for dir in env::split_paths(&path_var) {
+            let p = dir.join("gemini");
+            if is_regular_file(&p) {
+                return Some(p);
+            }
+        }
+    }
+
+    None
+}
+
 pub fn augmented_path() -> String {
     augmented_path_with(TOOLS_DIR.get().map(PathBuf::as_path))
 }
@@ -199,17 +245,17 @@ struct ExecResult {
     stderr: String,
 }
 
-/// claude 를 한 번 띄워 끝나기를 기다린다. 상한에 닿으면 2부의 `process::run` 이 SIGTERM, 3초, SIGKILL로
+/// CLI 실행 파일을 한 번 띄워 끝나기를 기다린다. 상한에 닿으면 2부의 `process::run` 이 SIGTERM, 3초, SIGKILL로
 /// 끝내고, 출력 파이프를 다른 프로세스가 쥐고 있어도 상한에서 답한다(5.6).
-fn run_claude_process(
-    claude_bin: &Path,
+fn run_cli_process(
+    binary: &Path,
     work_dir: &Path,
     vault: &str,
     args: &[String],
     input_text: &str,
     timeout_secs: u64,
 ) -> Result<ExecResult, RunError> {
-    let mut cmd = Command::new(claude_bin);
+    let mut cmd = Command::new(binary);
     cmd.current_dir(work_dir);
     cmd.args(args);
 
@@ -299,10 +345,97 @@ fn check_route(route: Option<&str>) -> Result<(), String> {
     }
 }
 
+pub fn map_gemini_model(model: &str) -> &str {
+    match model {
+        "gemini-3-8-flash" | "gemini-3.8-flash" | "gemini-flash" => "gemini-3.8-flash",
+        other => other,
+    }
+}
+
+fn execute_gemini_ask(
+    args: AskClaudeArgs,
+    work_dir: &Path,
+    missing_cwd: Option<String>,
+    start_time: Instant,
+) -> AskClaudeResponse {
+    let gemini_bin = match resolve_gemini() {
+        Some(b) => b,
+        None => {
+            return failure(
+                "gemini 실행 파일을 못 찾았다. npm i -g @google/gemini-cli 로 설치하거나 AISURADA_GEMINI_BIN 으로 자리를 알려 줄 수 있다."
+                    .to_string(),
+                0,
+                missing_cwd,
+            );
+        }
+    };
+
+    let input_text = if let Some(seed) = &args.seed {
+        seed_prompt(seed, &args.prompt)
+    } else {
+        args.prompt.clone()
+    };
+
+    let mapped_model = map_gemini_model(&args.model);
+    let cli_args = vec![
+        "-p".to_string(),
+        input_text.clone(),
+        "--model".to_string(),
+        mapped_model.to_string(),
+    ];
+
+    match run_cli_process(
+        &gemini_bin,
+        work_dir,
+        &args.vault,
+        &cli_args,
+        &input_text,
+        args.timeout_seconds,
+    ) {
+        Ok(res) => {
+            let elapsed = start_time.elapsed().as_millis() as u64;
+            if res.timed_out {
+                return AskClaudeResponse {
+                    ok: false,
+                    answer: String::new(),
+                    error: Some(format!(
+                        "{}초 안에 답이 안 왔다. gemini 응답 시간을 초과했다.",
+                        args.timeout_seconds
+                    )),
+                    elapsed_ms: elapsed,
+                    missing_cwd,
+                };
+            }
+            if res.exit_code == Some(0) {
+                return AskClaudeResponse {
+                    ok: true,
+                    answer: res.stdout.trim().to_string(),
+                    error: None,
+                    elapsed_ms: elapsed,
+                    missing_cwd,
+                };
+            }
+            let cause = format_cause(&res.stderr, &res.stdout);
+            let code_str = res.exit_code.map_or("?".to_string(), |c| c.to_string());
+            let err_msg = format!("gemini 가 종료 코드 {} 로 끝났다: {}", code_str, cause);
+            failure(err_msg, elapsed, missing_cwd)
+        }
+        Err(RunError::Spawn(e)) => {
+            let elapsed = start_time.elapsed().as_millis() as u64;
+            failure(format!("gemini 를 못 띄웠다: {}", e), elapsed, missing_cwd)
+        }
+        Err(RunError::Io(e)) => failure(format!("gemini 를 기다리던 일꾼이 끊겼다: {}", e), 0, missing_cwd),
+    }
+}
+
 pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let start_time = Instant::now();
 
     let (work_dir, missing_cwd) = determine_work_dir(&args.vault, args.cwd.as_deref());
+
+    if args.model.starts_with("gemini") {
+        return execute_gemini_ask(args, &work_dir, missing_cwd, start_time);
+    }
 
     let claude_bin = match resolve_claude() {
         Some(b) => b,
@@ -361,7 +494,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
         let cli_args = build_args(current_resume);
         let input_text = assemble_input(current_resume);
 
-        match run_claude_process(
+        match run_cli_process(
             &claude_bin,
             &work_dir,
             &args.vault,
@@ -952,5 +1085,85 @@ exit 1
         assert!(!resp.ok);
         assert!(resp.error.unwrap().contains("1초 안에 답이 안 왔다"));
         assert!(started.elapsed() < Duration::from_secs(4));
+    }
+
+    #[test]
+    fn test_resolve_gemini_with_env_var() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let temp = tempdir().unwrap();
+        let fake = temp.path().join("gemini");
+        File::create(&fake).unwrap();
+
+        env::set_var("AISURADA_GEMINI_BIN", &fake);
+        assert_eq!(resolve_gemini(), Some(fake));
+        env::remove_var("AISURADA_GEMINI_BIN");
+    }
+
+    #[test]
+    fn test_map_gemini_model() {
+        assert_eq!(map_gemini_model("gemini-3-8-flash"), "gemini-3.8-flash");
+        assert_eq!(map_gemini_model("gemini-3.8-flash"), "gemini-3.8-flash");
+        assert_eq!(map_gemini_model("gemini-flash"), "gemini-3.8-flash");
+        assert_eq!(map_gemini_model("gemini-pro"), "gemini-pro");
+    }
+
+    #[test]
+    fn test_gemini_missing_binary_message() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        env::set_var("AISURADA_GEMINI_BIN", "/nonexistent/gemini-bin");
+        let res = execute_ask(AskClaudeArgs {
+            vault: "/tmp".to_string(),
+            session_id: "test-sess".to_string(),
+            model: "gemini-3-8-flash".to_string(),
+            effort: "high".to_string(),
+            prompt: "안녕".to_string(),
+            resume: false,
+            timeout_seconds: 10,
+            keep_alive: None,
+            seed: None,
+            system: None,
+            route: None,
+            cwd: None,
+            resume_only: None,
+            persona: None,
+        });
+        env::remove_var("AISURADA_GEMINI_BIN");
+
+        assert!(!res.ok);
+        assert!(res.error.unwrap().contains("gemini 실행 파일을 못 찾았다"));
+    }
+
+    #[test]
+    fn test_gemini_success_with_fake_binary() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let temp = tempdir().unwrap();
+        let fake = temp.path().join("gemini");
+        let script = "#!/bin/sh\necho 'Gemini Flash 답변입니다'\nexit 0\n";
+        fs::write(&fake, script).unwrap();
+        let mut perms = fs::metadata(&fake).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake, perms).unwrap();
+
+        env::set_var("AISURADA_GEMINI_BIN", &fake);
+        let res = execute_ask(AskClaudeArgs {
+            vault: temp.path().to_str().unwrap().to_string(),
+            session_id: "test-sess".to_string(),
+            model: "gemini-3-8-flash".to_string(),
+            effort: "high".to_string(),
+            prompt: "테스트 질문".to_string(),
+            resume: false,
+            timeout_seconds: 10,
+            keep_alive: None,
+            seed: None,
+            system: None,
+            route: None,
+            cwd: None,
+            resume_only: None,
+            persona: None,
+        });
+        env::remove_var("AISURADA_GEMINI_BIN");
+
+        assert!(res.ok);
+        assert_eq!(res.answer, "Gemini Flash 답변입니다");
     }
 }

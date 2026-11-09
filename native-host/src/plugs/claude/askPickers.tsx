@@ -2,21 +2,48 @@
 // picture strip with its paste rules (3.2, 4.4). Adheres to Chapters 3 and 4 of aisurada Part 4 specifications.
 import { useCallback, useState } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
-import { ASK_EFFORTS, ASK_MODELS, IMAGE_MIME_EXTENSIONS, MAX_IMAGES, MAX_IMAGE_BYTES } from './askText.ts';
+import { ASK_EFFORTS, ASK_MODELS, IMAGE_MIME_EXTENSIONS, MAX_IMAGES, MAX_IMAGE_BYTES, isGeminiModel } from './askText.ts';
 import { setAskEffort, setAskModel, useAskState } from './state.ts';
 
 /** 3.3: two pickers that read and write the one model and effort of this window. */
 export function AskOptionsRow() {
   const model = useAskState((state) => state.model);
   const effort = useAskState((state) => state.effort);
+  const isGemini = isGeminiModel(model);
+
+  const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextModel = event.target.value;
+    setAskModel(nextModel);
+    if (isGeminiModel(nextModel)) {
+      setAskEffort('high');
+    }
+  };
+
+  const claudeModels = ASK_MODELS.filter((item) => item.provider === 'claude');
+  const geminiModels = ASK_MODELS.filter((item) => item.provider === 'gemini');
+
   return (
     <div className="ask-options-row">
-      <select className="ask-option" aria-label="모델" value={model} onChange={(event) => setAskModel(event.target.value)}>
-        {ASK_MODELS.map((item) => (
-          <option key={item.id} value={item.id}>{item.label}</option>
-        ))}
+      <select className="ask-option" aria-label="모델" value={model} onChange={handleModelChange}>
+        <optgroup label="Claude">
+          {claudeModels.map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </optgroup>
+        <optgroup label="Gemini">
+          {geminiModels.map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </optgroup>
       </select>
-      <select className="ask-option" aria-label="effort" value={effort} onChange={(event) => setAskEffort(event.target.value)}>
+      <select
+        className="ask-option"
+        aria-label="effort"
+        value={isGemini ? 'high' : effort}
+        disabled={isGemini}
+        title={isGemini ? 'Gemini 모델은 high effort로 고정됩니다' : undefined}
+        onChange={(event) => setAskEffort(event.target.value)}
+      >
         {ASK_EFFORTS.map((item) => (
           <option key={item.id} value={item.id}>{item.label}</option>
         ))}
