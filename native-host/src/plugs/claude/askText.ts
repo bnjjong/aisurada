@@ -2,14 +2,21 @@
 // persona. Adheres to Chapters 2, 3 of aisurada Part 4 Claude integration specifications.
 // Nothing here touches React or the host, so the node tests can run it as it is.
 
+export interface AskModelOption {
+  id: string;
+  label: string;
+  provider: 'claude' | 'gemini';
+}
+
 // 3.3: the two lists are contract, the labels are not.
-export const ASK_MODELS = [
-  { id: 'claude-opus-5-5', label: 'opus 5.5' },
-  { id: 'claude-opus-5', label: 'opus 5' },
-  { id: 'claude-sonnet-5-5', label: 'sonnet 5.5' },
-  { id: 'claude-sonnet-5', label: 'sonnet 5' },
-  { id: 'claude-fable-5-1', label: 'fable 5.1' },
-  { id: 'claude-fable-5', label: 'fable 5' },
+export const ASK_MODELS: readonly AskModelOption[] = [
+  { id: 'claude-opus-5-5', label: 'opus 5.5', provider: 'claude' },
+  { id: 'claude-opus-5', label: 'opus 5', provider: 'claude' },
+  { id: 'claude-sonnet-5-5', label: 'sonnet 5.5', provider: 'claude' },
+  { id: 'claude-sonnet-5', label: 'sonnet 5', provider: 'claude' },
+  { id: 'claude-fable-5-1', label: 'fable 5.1', provider: 'claude' },
+  { id: 'claude-fable-5', label: 'fable 5', provider: 'claude' },
+  { id: 'gemini-3-8-flash', label: 'gemini 3.8 flash', provider: 'gemini' },
 ] as const;
 export const ASK_EFFORTS = [
   { id: 'low', label: 'low' },
@@ -21,11 +28,22 @@ export const ASK_EFFORTS = [
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 export const DEFAULT_EFFORT = 'low';
 
+export function isGeminiModel(value: unknown): boolean {
+  return typeof value === 'string' && (value.startsWith('gemini') || value === 'gemini');
+}
+
+export function defaultEffortForModel(modelId: unknown): string {
+  return isGeminiModel(modelId) ? 'high' : DEFAULT_EFFORT;
+}
+
 // 3.3: old aliases move to the newest of their family; anything else outside the list is the first value.
 const MODEL_ALIASES: Record<string, string> = {
   opus: 'claude-opus-5-5',
   sonnet: 'claude-sonnet-5-5',
   fable: 'claude-fable-5-1',
+  'gemini-3.8-flash': 'gemini-3-8-flash',
+  'gemini-flash': 'gemini-3-8-flash',
+  gemini: 'gemini-3-8-flash',
 };
 
 /** Brings a stored or received model id back to a value the picker can show. */
@@ -35,8 +53,9 @@ export function normalizeModel(value: unknown): string {
   return MODEL_ALIASES[value] ?? DEFAULT_MODEL;
 }
 
-/** Brings a stored or received effort back to one of the five values. */
-export function normalizeEffort(value: unknown): string {
+/** Brings a stored or received effort back to one of the five values. Gemini models always use high. */
+export function normalizeEffort(value: unknown, model?: string): string {
+  if (isGeminiModel(model)) return 'high';
   return typeof value === 'string' && ASK_EFFORTS.some((effort) => effort.id === value) ? value : DEFAULT_EFFORT;
 }
 
