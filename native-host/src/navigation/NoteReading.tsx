@@ -144,9 +144,9 @@ export function NoteReading({
   return (
     <article
       className={`doc-pane note-reading ${live.format === "html" ? "doc-prose" : ""}`}
-      style={context !== "preview" ? ({ "--doc-width": `${docWidth}px` } as CSSProperties) : undefined}
+      style={context !== "preview" && context !== "sub" ? ({ "--doc-width": `${docWidth}px` } as CSSProperties) : undefined}
     >
-      {context !== "preview" && controller && (
+      {context !== "preview" && context !== "sub" && controller && (
         <DocWidthResizer controller={resizerController} width={docWidth} />
       )}
       {controller ? (
