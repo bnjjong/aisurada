@@ -119,9 +119,10 @@ export function Rail({
       <div className="brand" role="img" aria-label="aisurada">
         <LiveBrandMark />
       </div>
-      <div className="workspace-identity">
+      <div className="workspace-identity" title={ws.path || ws.name}>
         <strong>{ws.name}</strong>
         {ws.sample && <span className="sample-badge">샘플</span>}
+        {ws.path && <span className="workspace-path" title={ws.path}>{ws.path}</span>}
       </div>
       <nav data-rail-section="nav" aria-label="워크스페이스 메뉴">
         {[
