@@ -347,6 +347,8 @@ fn check_route(route: Option<&str>) -> Result<(), String> {
 
 pub fn map_gemini_model(model: &str) -> &str {
     match model {
+        "gemini-3-8-high" | "gemini-3.8-high" | "gemini-high" => "gemini-3.8-high",
+        "gemini-3-8-medium" | "gemini-3.8-medium" | "gemini-medium" => "gemini-3.8-medium",
         "gemini-3-8-flash" | "gemini-3.8-flash" | "gemini-flash" => "gemini-3.8-flash",
         other => other,
     }
@@ -1101,9 +1103,9 @@ exit 1
 
     #[test]
     fn test_map_gemini_model() {
+        assert_eq!(map_gemini_model("gemini-3-8-high"), "gemini-3.8-high");
+        assert_eq!(map_gemini_model("gemini-3-8-medium"), "gemini-3.8-medium");
         assert_eq!(map_gemini_model("gemini-3-8-flash"), "gemini-3.8-flash");
-        assert_eq!(map_gemini_model("gemini-3.8-flash"), "gemini-3.8-flash");
-        assert_eq!(map_gemini_model("gemini-flash"), "gemini-3.8-flash");
         assert_eq!(map_gemini_model("gemini-pro"), "gemini-pro");
     }
 

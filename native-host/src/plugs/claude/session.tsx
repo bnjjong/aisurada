@@ -11,7 +11,7 @@ import { askClaudeBridge, tauriAskHost } from './askHost.ts';
 import { AskImageStrip, useAskImages } from './askPickers.tsx';
 import type { PickedImage } from './askPickers.tsx';
 import { writePictures } from './askRun.ts';
-import { ASK_EFFORTS, ASK_MODELS, MAX_IMAGES, isGeminiModel, modelLabel, normalizeEffort, normalizeModel, randomUuid } from './askText.ts';
+import { ASK_EFFORTS, ASK_MODELS, MAX_IMAGES, defaultEffortForModel, isGeminiModel, modelLabel, normalizeEffort, normalizeModel, randomUuid } from './askText.ts';
 import { ModelProse } from './modelProse.tsx';
 import { PendingLine } from './askParts.tsx';
 import { getSessionStoreSnapshot, refreshSessions, useProjectsList, useSessionStore } from './projects.tsx';
@@ -467,7 +467,7 @@ function ModelEffortPicks(): React.JSX.Element {
     const nextModel = event.target.value;
     setAskModel(nextModel);
     if (isGeminiModel(nextModel)) {
-      setAskEffort('high');
+      setAskEffort(defaultEffortForModel(nextModel));
     }
   };
 
@@ -491,9 +491,9 @@ function ModelEffortPicks(): React.JSX.Element {
       <select
         className="ask-option"
         aria-label="effort"
-        value={isGemini ? 'high' : effort}
+        value={isGemini ? defaultEffortForModel(model) : effort}
         disabled={isGemini}
-        title={isGemini ? 'Gemini 모델은 high effort로 고정됩니다' : undefined}
+        title={isGemini ? `Gemini 모델은 ${defaultEffortForModel(model)} effort로 고정됩니다` : undefined}
         onChange={(event) => setAskEffort(event.target.value)}
       >
         {ASK_EFFORTS.map((item) => (
@@ -845,7 +845,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
                 setPicked((prev) => ({
                   ...prev,
                   model: nextModel,
-                  ...(isGeminiModel(nextModel) ? { effort: 'high' } : {}),
+                  ...(isGeminiModel(nextModel) ? { effort: defaultEffortForModel(nextModel) } : {}),
                 }));
               }}
             >
@@ -863,7 +863,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
             <select
               className="ask-option"
               aria-label="effort"
-              value={isGeminiModel(choice.model) ? 'high' : choice.effort}
+              value={isGeminiModel(choice.model) ? defaultEffortForModel(choice.model) : choice.effort}
               disabled={isGeminiModel(choice.model)}
               onChange={(event) => setPicked((prev) => ({ ...prev, effort: event.target.value }))}
             >

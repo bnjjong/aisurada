@@ -641,18 +641,18 @@ tr:last-child td { border-bottom: none; }
           <tbody>
             <tr>
               <td><b>기본 AI 모델</b></td>
-              <td><code>sonnet 3.7</code> 또는 <code>gemini 3.8 flash</code></td>
+              <td><code>sonnet 5.5</code> 또는 <code>gemini 3.8 high</code></td>
               <td>
                 <ul>
-                  <li><b>Claude 계열</b>: <code>sonnet 5.5</code>, <code>sonnet 5</code>, <code>opus</code>, <code>fable</code> (코드 분석, 문서 요약, 논리적 질의에서 최고 품질 제공)</li>
-                  <li><b>Gemini 계열</b>: <code>gemini 3.8 flash</code> (Google의 초고속 경량화 모델, 빠른 질답에 최적화)</li>
+                  <li><b>Claude 계열</b>: <code>sonnet 5.5</code>, <code>opus 5.5</code> (코드 분석, 문서 요약, 논리적 질의에서 최고 품질 제공)</li>
+                  <li><b>Gemini 계열</b>: <code>gemini 3.8 high</code>, <code>gemini 3.8 medium</code> (Google Gemini 기반 고속 질답)</li>
                 </ul>
               </td>
             </tr>
             <tr>
               <td><b>추론 강도<br>(Thinking Effort)</b></td>
               <td><code>low</code> ~ <code>high</code></td>
-              <td>모델이 답변을 작성하기 전 깊게 사고(Thinking)하는 시간입니다. Claude 모델에서는 <code>low</code>~<code>max</code>를 선택할 수 있으며, <code>gemini 3.8 flash</code>를 선택하면 기본값 <code>high</code>로 자동 고정(비활성화)됩니다.</td>
+              <td>모델이 답변을 작성하기 전 깊게 사고(Thinking)하는 시간입니다. Claude 모델에서는 <code>low</code>~<code>max</code>를 선택할 수 있으며, <code>gemini 3.8 high</code>는 <code>high</code>로, <code>gemini 3.8 medium</code>은 <code>medium</code>으로 자동 고정(비활성화)됩니다.</td>
             </tr>
             <tr>
               <td><b>문답 대기 상한<br>(Timeout)</b></td>
