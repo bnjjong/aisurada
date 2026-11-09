@@ -56,7 +56,7 @@ function tableRowCells(selection: BaseSelection): ElementNode[] {
 }
 export function EditorTools(props: EditorProps) {
   const [editor] = useLexicalComposerContext(), latest = useRef(props); latest.current = props;
-  const [selectionBar, setBar] = useState<{ x: number; y: number; quote: string; special: boolean; formats: boolean[] } | null>(null);
+  const [selectionBar, setBar] = useState<{ x: number; y: number; quote: string; special: boolean; formats: boolean[]; client?: { left: number; top: number } } | null>(null);
   const [compose, setCompose] = useState<{ quote: string; x: number; y: number } | null>(null), [comment, setComment] = useState('');
   const selection = useRef<BaseSelection | null>(null), composeRef = useRef(compose); composeRef.current = compose;
   const [menu, setMenu] = useState<Menu | null>(null), menuRef = useRef(menu); menuRef.current = menu;
@@ -190,7 +190,10 @@ export function EditorTools(props: EditorProps) {
   function beginAsk() {
     if (!selectionBar || !selection.current) return;
     const target = selection.current.clone();
-    props.onOpenAskCompose?.(selectionBar.quote, { left: selectionBar.x, top: selectionBar.y + 42 }, (turnId: string) => wrapAskSelection(turnId, target));
+    const box = outer()?.getBoundingClientRect();
+    const left = selectionBar.client?.left ?? (box ? Math.round(box.left + selectionBar.x) : selectionBar.x);
+    const top = selectionBar.client?.top ?? (box ? Math.round(box.top + selectionBar.y + 42) : selectionBar.y + 42);
+    props.onOpenAskCompose?.(selectionBar.quote, { left, top }, (turnId: string) => wrapAskSelection(turnId, target));
   }
   function submitComment() {
     if (!comment.trim() || !composeRef.current || !selection.current) return;
@@ -231,7 +234,7 @@ export function EditorTools(props: EditorProps) {
           const dom = window.getSelection(), rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : root.getBoundingClientRect();
           const quote = $isTableSelection(selected) ? tableRowCells(selected).reduce((lines, cell, index, cells) => lines + cell.getTextContent()
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '') : text;
-          setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)) });
+          setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)), client: { left: Math.round(rect.left), top: Math.round(rect.bottom + 6) } });
         } else if (!composeRef.current) setBar(null);
         if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('ais:import') || tags.has('ais:repair') || tags.has('ais:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
         if ($isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
@@ -282,9 +285,9 @@ export function EditorTools(props: EditorProps) {
         : selected.getTextContent();
       const dom = window.getSelection();
       const rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : currentRoot.getBoundingClientRect();
-      const position = coords(rect);
-      const top = rect.height > 0 ? position.y + 42 : 70;
-      latest.current.onOpenAskCompose?.(quote, { left: position.x, top }, (turnId: string) => wrapAskSelection(turnId, target));
+      const left = Math.round(rect.left);
+      const top = Math.round(rect.bottom + 6);
+      latest.current.onOpenAskCompose?.(quote, { left, top }, (turnId: string) => wrapAskSelection(turnId, target));
       return true;
     }, COMMAND_PRIORITY_HIGH);
     const over = (event: MouseEvent) => {
