@@ -11,11 +11,7 @@ export interface AskModelOption {
 // 3.3: the two lists are contract, the labels are not.
 export const ASK_MODELS: readonly AskModelOption[] = [
   { id: 'claude-opus-5-5', label: 'opus 5.5', provider: 'claude' },
-  { id: 'claude-opus-5', label: 'opus 5', provider: 'claude' },
   { id: 'claude-sonnet-5-5', label: 'sonnet 5.5', provider: 'claude' },
-  { id: 'claude-sonnet-5', label: 'sonnet 5', provider: 'claude' },
-  { id: 'claude-fable-5-1', label: 'fable 5.1', provider: 'claude' },
-  { id: 'claude-fable-5', label: 'fable 5', provider: 'claude' },
   { id: 'gemini-3-8-flash', label: 'gemini 3.8 flash', provider: 'gemini' },
 ] as const;
 export const ASK_EFFORTS = [
@@ -39,8 +35,12 @@ export function defaultEffortForModel(modelId: unknown): string {
 // 3.3: old aliases move to the newest of their family; anything else outside the list is the first value.
 const MODEL_ALIASES: Record<string, string> = {
   opus: 'claude-opus-5-5',
+  'claude-opus-5': 'claude-opus-5-5',
   sonnet: 'claude-sonnet-5-5',
-  fable: 'claude-fable-5-1',
+  'claude-sonnet-5': 'claude-sonnet-5-5',
+  fable: 'claude-sonnet-5-5',
+  'claude-fable-5-1': 'claude-sonnet-5-5',
+  'claude-fable-5': 'claude-sonnet-5-5',
   'gemini-3.8-flash': 'gemini-3-8-flash',
   'gemini-flash': 'gemini-3-8-flash',
   gemini: 'gemini-3-8-flash',
