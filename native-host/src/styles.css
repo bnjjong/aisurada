@@ -84,6 +84,7 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .workspace-rail { padding: 30px 20px; display: flex; flex-direction: column; background: var(--soft); border-right: 1px solid var(--line); }
 .workspace-rail .brand { font-size: 17px; padding: 0 8px; justify-content: center; }
 .workspace-identity { margin: 32px 8px 28px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; overflow-wrap: anywhere; }
+.workspace-path { display: block; width: 100%; font-size: 11px; line-height: 1.4; color: var(--muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; cursor: text; }
 .sample-badge { color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font-size: 9px; }
 .workspace-rail nav button { width: 100%; display: flex; justify-content: space-between; border: 0; text-align: left; font-size: 13px; }
 .workspace-rail nav button.active { background: var(--surface); color: var(--accent); }
