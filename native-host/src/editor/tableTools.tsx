@@ -11,6 +11,7 @@ import type { EditorProps } from './Editor.tsx';
 import { $exportSelection, $tableMarkdown, $tableTSV } from './markdown.ts';
 import { OPEN_COMMENT_COMMAND, OPEN_ASK_COMMAND } from './tools.tsx';
 import { AskHoverCard } from '@claude-plug/ask';
+import { useAskState } from '@claude-plug/state';
 
 // row*는 마우스가 있는 「줄」의 자리다. 줄 손잡이(점 여섯 개)가 그 줄 왼쪽 가장자리에 줄마다 한 개 뜨고, 메뉴를 열면 이 자리에 파란 테두리를 두른다.
 // right는 마우스가 있는 칸의 오른쪽 가장자리(열 너비 손잡이용)다.
@@ -31,6 +32,7 @@ export function tablesOnlyJSON(raw?: string): string | undefined {
 }
 export function TableTools(props: EditorProps) {
   const [editor] = useLexicalComposerContext();
+  const pendingByMark = useAskState(state => props.askDocId ? state.pending[props.askDocId] : undefined);
   const [cell, setCell] = useState<Cell | null>(null), [open, setOpen] = useState(false), copyMode = useRef(false);
   const [dots, setDots] = useState<{ key: string; x: number; y: number; ids: string[]; asks: string[] }[]>([]), [rowCard, setRowCard] = useState<string | null>(null);
   const rowPinned = useRef(false);
@@ -122,10 +124,14 @@ export function TableTools(props: EditorProps) {
       const container = outer();
       if (!container || !root) return;
       const base = container.getBoundingClientRect(), next: typeof dots = [];
+      const seenAsks = new Set<string>();
       root.querySelectorAll<HTMLTableRowElement>('tr').forEach(row => {
         const ids = [...new Set([...row.querySelectorAll<HTMLElement>('[data-comment-id]')].map(mark => mark.dataset.commentId!))];
         // 17.4: with askDocId the row also draws a dot for its question marks and its card carries them.
-        const asks = props.askDocId ? [...new Set([...row.querySelectorAll<HTMLElement>('[data-ask-id]')].map(mark => mark.dataset.askId!))] : [];
+        // R13: 여러 줄에 걸친 물음은 처음 나온 줄이 표식을 맡는다 (seenAsks로 중복 방지)
+        const allRowAsks = props.askDocId ? [...new Set([...row.querySelectorAll<HTMLElement>('[data-ask-id]')].map(mark => mark.dataset.askId!))] : [];
+        const asks = allRowAsks.filter(id => !seenAsks.has(id));
+        for (const id of asks) seenAsks.add(id);
         if (!ids.length && !asks.length) return;
         const rect = row.getBoundingClientRect(); let key = '';
         editor.read(() => { key = $getNearestNodeFromDOMNode(row)?.getKey() || ''; });
@@ -243,6 +249,26 @@ export function TableTools(props: EditorProps) {
   const hasCaret = open && cell ? editor.getEditorState().read(() => { const table = $getNodeByKey(cell.key)?.getParents().find($isTableNode); return !!table && !!$caretCellIn(table); }) : false;
   return <>
     {cell && <>
+      {props.onAskAi && (
+        <button
+          className="lex-row-ask lex-rownote-btn is-ask ask-add-btn"
+          title="이 줄을 AI에게 묻기"
+          aria-label="이 줄을 AI에게 묻기"
+          style={{ left: cell.rowLeft - 32, top: cell.rowTop + cell.rowHeight / 2 - 14 }}
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => editor.update(() => {
+            const target = $getNodeByKey<TableCellNode>(cell.key);
+            const table = target?.getParents().find($isTableNode);
+            const row = target?.getParent<TableRowNode>();
+            if (table && row) {
+              $setSelection($createTableSelectionFrom(table, row.getFirstChild<TableCellNode>()!, row.getLastChild<TableCellNode>()!));
+              editor.dispatchCommand(OPEN_ASK_COMMAND, undefined);
+            }
+          })}
+        >
+          AI
+        </button>
+      )}
       <button className={`lex-row-grip${open ? ' is-active' : ''}`} title="줄 메뉴" aria-label="줄 메뉴" aria-expanded={open}
         style={{ left: cell.rowLeft - 9, top: cell.rowTop + cell.rowHeight / 2 - 14 }} onMouseDown={event => event.preventDefault()} onClick={() => setOpen(!open)}>
         <svg viewBox="0 0 8 14" width="8" height="14" fill="currentColor" aria-hidden="true">{[2, 7, 12].flatMap(y => [1.8, 6.2].map(x => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.2" />))}</svg>
@@ -254,10 +280,38 @@ export function TableTools(props: EditorProps) {
       const needsCaret = id.endsWith('-col') && !hasCaret;
       return <button key={id} disabled={needsCaret} title={needsCaret ? '열 작업은 표 안의 칸을 눌러 커서를 둔 뒤에 쓸 수 있어요' : undefined} onClick={() => operation(id)}>{title}</button>;
     })}</div>)}</div>}
-    {dots.map(dot => <div className={`lex-row-dot lex-rownote-dot${dot.asks.length ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}`} key={dot.key} style={{ left: dot.x, top: dot.y }} onMouseEnter={() => { cancelRowClose(); if (!rowPinned.current) setRowCard(dot.key); }} onMouseLeave={closeRowSoon}>
-      <button aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'} onClick={() => { if (dot.ids.length) props.features?.openComment?.(dot.ids[0]); }}>●</button>
-      {rowCard === dot.key && <div className="comment-card">{dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}
-        {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => { cancelRowClose(); rowPinned.current = false; setRowCard(null); }} onPin={() => { cancelRowClose(); rowPinned.current = true; }} pinned={false} />)}</div>}
-    </div>)}
+    {dots.map(dot => {
+      const dotPending = dot.asks.map(id => pendingByMark?.[id]).filter(Boolean);
+      const isBusy = dotPending.length > 0;
+      const isQueued = isBusy && dotPending.every(p => p?.queued);
+      const isAsk = dot.asks.length > 0;
+      return (
+        <div
+          className={`lex-row-dot lex-rownote-dot${isAsk ? ' is-ask' : ''}${dot.ids.length ? ' is-comment' : ''}${isBusy ? ' is-busy' : ''}${isQueued ? ' is-queued' : ''}`}
+          key={dot.key}
+          style={{ left: dot.x, top: dot.y }}
+          onMouseEnter={() => { cancelRowClose(); if (!rowPinned.current) setRowCard(dot.key); }}
+          onMouseLeave={closeRowSoon}
+        >
+          <button
+            aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'}
+            onClick={() => {
+              cancelRowClose();
+              rowPinned.current = true;
+              setRowCard(dot.key);
+              if (dot.ids.length) props.features?.openComment?.(dot.ids[0]);
+            }}
+          >
+            ●
+          </button>
+          {rowCard === dot.key && (
+            <div className={`comment-card${rowPinned.current ? ' is-pinned' : ''}`}>
+              {dot.ids.map(id => <p key={id}>{props.features?.comments?.[id] || '이 코멘트를 못 찾았어요. 표시만 남아 있어요.'}</p>)}
+              {dot.asks.map(id => <AskHoverCard key={id} docId={props.askDocId || ''} turnId={id} onFollowUp={props.onAskFollowUp} onClose={() => { cancelRowClose(); rowPinned.current = false; setRowCard(null); }} onPin={() => { cancelRowClose(); rowPinned.current = true; }} pinned={rowPinned.current} />)}
+            </div>
+          )}
+        </div>
+      );
+    })}
   </>;
 }

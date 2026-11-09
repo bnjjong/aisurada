@@ -133,7 +133,7 @@ export function authorBundleText(sessionId: string, author: EngineAuthor | null 
   if (!author) return { text: '', lines: 0 };
   const parts = authorParts(author);
   if (parts.length === 0) return { text: '', lines: 0 };
-  const body = parts.map((part) => `<session-transcript part="${part.label}">\n${part.lines.join('\n')}\n</session-transcript>`).join('\n');
+  const body = parts.map((part) => `<session-transcript part="${part.label}">\n${part.lines.join('\n')}\n</session-transcript>`).join('\n\n');
   const lines = parts.reduce((sum, part) => sum + part.lines.length, 0);
   const text = [
     '## 이 노트를 쓴 세션의 대화',

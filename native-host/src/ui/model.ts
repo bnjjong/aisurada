@@ -47,6 +47,7 @@ export interface Preferences {
   titleDatePrefix?: boolean;
   showRecordTier?: boolean;
   mermaidShowSource?: boolean;
+  askTimeoutSeconds?: number;
   titleDate: boolean;
   showRecords: boolean;
   diagrams: boolean;
