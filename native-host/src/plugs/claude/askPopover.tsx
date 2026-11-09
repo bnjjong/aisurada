@@ -55,7 +55,12 @@ export function AskComposePopover({ state, onSubmit, onCancel }: AskComposePopov
     <div
       ref={box}
       className={MOUSE}
-      style={{ position: 'fixed', left: Math.max(10, state.left), top: Math.max(10, state.top), zIndex: 60 }}
+      style={{
+        position: 'fixed',
+        left: typeof window !== 'undefined' ? Math.max(10, Math.min(state.left, window.innerWidth - 380)) : Math.max(10, state.left),
+        top: typeof window !== 'undefined' ? Math.max(10, Math.min(state.top, window.innerHeight - 280)) : Math.max(10, state.top),
+        zIndex: 60,
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
