@@ -82,6 +82,16 @@ test('3.7 bundle text: header, parts and the 물음 header', () => {
     '',
   ].join('\n'));
   assert.equal(authorBundleText('s', null).text, '');
+
+  // R6: two transcript windows have a blank line between them (G.7, 3.7)
+  const long = Array.from({ length: 20 }, (_, i) => turn(100 + i, i % 2 ? 'assistant' : 'user', 'z'.repeat(2000)));
+  const two = authorBundleText('11111111-2222-4333-8444-555555555555', {
+    note: 'n',
+    mentions: [100, 119],
+    creation: [turn(99, 'user', '만들기'), turn(100, 'assistant', '노트')],
+    latest: long,
+  });
+  assert.ok(two.text.includes('</session-transcript>\n\n<session-transcript part="마지막으로 고치기까지">'));
 });
 
 test('8.7 rail bundle: header lines, blank lines around the transcript, and the cut note', () => {

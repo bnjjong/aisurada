@@ -332,11 +332,19 @@ export class WorkspaceController {
   removeChildCards = (parent: string, child: string) => { for (const port of this.childRemovers.values()) if (port.id === parent) port.remove(child); };
   registerBuffer = (key: string, read: () => string) => { const token = Symbol(); this.buffers.set(token, { key, read }); return () => { this.buffers.delete(token); }; };
   readBuffer = (key: string, fallback = '') => [...this.buffers.values()].reverse().find(entry => entry.key === key)?.read() ?? fallback;
-  moveNoteWindow = async (id: string): Promise<'opened' | 'unsaved' | 'failed'> => {
+  moveNoteWindow = async (id: string): Promise<'opened' | 'unsaved' | 'failed' | 'asking'> => {
     if (this.moving.has(id)) return 'opened'; this.moving.add(id);
     try {
       await this.flushEditors(); await this.data.settled();
       if (this.data.unsavedForRoot(id).length) return 'unsaved';
+      const targetKeys = new Set<string>([id]);
+      for (const [parent, notes] of Object.entries(this.data.getSnapshot().subNotes)) {
+        const root = this.data.chain(parent)?.split('/')[0] || parent;
+        if (root === id) {
+          for (const n of notes) targetKeys.add(n.id);
+        }
+      }
+      if (waitingAnswers(targetKeys) > 0) return 'asking';
       const note = this.state.workspace?.notes.find(n => n.id === id);
       await this.services.host.invoke('open_note_window', { docId: id, title: note?.title || null, geometry: this.noteGeometry() });
       // 15.14 (8), C156: from a note tab the open rule sends open_note_window once more (the agenda
@@ -633,9 +641,18 @@ export class WorkspaceController {
     } catch { /* A failed flush must still ask before discarding data. */ }
     finally { clearTimeout(timer); }
     const count = pending.unsavedNotes() + this.data.unsavedKeys().length;
-    // Part 4's outstanding questions and unpersisted answers are both zero.
-    return settled && count === 0 || await this.services.host.confirmLeave(
-      `아직 저장하지 못한 노트가 ${count}개 있어요.${settled ? '' : ' 저장을 마치지 못했어요.'} 워크스페이스를 바꿀까요?`);
+    const waiting = waitingAnswers();
+    const unsavedA = unsavedAnswers();
+
+    if (settled && count === 0 && waiting === 0 && unsavedA === 0) return true;
+
+    const reasons: string[] = [];
+    if (!settled) reasons.push('저장이 끝났는지 확인하지 못했어요.');
+    if (count > 0) reasons.push(`저장하지 못한 글이 ${count}개 있어요.`);
+    if (waiting > 0) reasons.push(`답을 기다리는 물음이 ${waiting}개 있어요.`);
+    if (unsavedA > 0) reasons.push(`저장하지 못한 AI 답이 ${unsavedA}개 있어요.`);
+    reasons.push('워크스페이스를 바꿀까요?');
+    return await this.services.host.confirmLeave(reasons.join(' '));
   }
 
   private async authorize(path: string) {

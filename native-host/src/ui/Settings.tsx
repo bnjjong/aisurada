@@ -1,6 +1,7 @@
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Skin, WorkspaceState } from "../workspace/types.ts";
 import { ClaudeConnect } from "@claude-plug/connect";
+import { CLAUDE_ENABLED } from "@claude-plug/state";
 import { Modal } from "./Modal.tsx";
 import { displayTitle } from "./model.ts";
 /** 설정에서 고를 수 있는 화면 모양. 순서가 곧 화면에 나오는 순서다. */
@@ -103,6 +104,25 @@ export function Settings({
           state.prefs.titleDatePrefix ?? state.prefs.titleDate,
         )}
       </p>
+      {CLAUDE_ENABLED && (
+        <label className="set-switch set-ask-timeout">
+          <span>
+            <strong>AI 응답 대기 시간</strong>
+            <small>노트에서 AI에게 질문하고 응답을 기다리는 최대 시간이에요.</small>
+          </span>
+          <select
+            className="set-ask-timeout-select"
+            value={state.prefs.askTimeoutSeconds ?? 3600}
+            onChange={(e) => controller.preference({ askTimeoutSeconds: Number(e.target.value) })}
+          >
+            <option value={600}>10분</option>
+            <option value={1200}>20분</option>
+            <option value={1800}>30분</option>
+            <option value={3600}>1시간 (기본값)</option>
+            <option value={7200}>2시간</option>
+          </select>
+        </label>
+      )}
       <ClaudeConnect />
     </Modal>
   );
