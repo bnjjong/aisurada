@@ -132,12 +132,17 @@ public final class TrashCommands {
     private static void save(Path vault, List<TrashReader.TrashRecord> entries) {
         List<TrashReader.TrashRecord> list = new ArrayList<>(entries);
         byte[] bytes = serializeTrash(list);
-        // [B3] 2-나: 1MB(1,000,000 바이트) 초과 시 가장 오래된 항목부터 FIFO 자동 순환 삭제(Auto Pruning)
+        // [B3] 1MB(1,000,000 바이트) 초과 시 가장 오래된 항목부터 FIFO 자동 영구 삭제하며 알림과 기록을 남김 (설계 결정 1-가)
         while (bytes.length > 1_000_000 && list.size() > 1) {
             TrashReader.TrashRecord oldest = list.remove(list.size() - 1);
             try {
                 TreeRemover.remove(archive(vault, oldest.file()));
             } catch (Exception ignored) {}
+            Diagnostics.line("알림: 휴지통이 1MB를 초과하여 가장 오래된 보관물 '" + oldest.title() + "'(" + oldest.file() + ")을 영구 삭제했습니다.");
+            System.getLogger(TrashCommands.class.getName()).log(
+                System.Logger.Level.WARNING,
+                "휴지통 용량 초과(1MB)로 가장 오래된 항목을 영구 삭제함: " + oldest.title() + " (" + oldest.docId() + ")"
+            );
             bytes = serializeTrash(list);
         }
         AtomicWriter.writeAtomic(vault.resolve(".aisurada/trash/trash.json"), bytes);

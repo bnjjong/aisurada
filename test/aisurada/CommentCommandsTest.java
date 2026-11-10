@@ -196,13 +196,15 @@ public final class CommentCommandsTest {
         System.clearProperty("aisurada.test.random"); TestApparatus.resetRandomQueue();
         Path target=v.resolve("outside.json"); Files.move(f,target); Files.createSymbolicLink(f,target);
         ok(v,"update-comment",ROOT,"comment_id="+generated,"body=링크 갱신");
-        eq(Files.isSymbolicLink(f),true,"comment symlink retained"); eq(Files.readString(target).contains("링크 갱신"),true,"symlink target rewritten");
+        // [설계 결정 5-가] 링크 너머 외부 파일을 변경하지 않고 링크 자체를 안전한 새 파일로 원자적 교체
+        eq(Files.isSymbolicLink(f),false,"comment symlink replaced by safe file");
+        eq(Files.readString(f).contains("링크 갱신"),true,"comments file rewritten");
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         try {
             ok(v,"update-comment",ROOT,"comment_id="+generated,"body=UTC 시계");
-            eq(rows(object(Files.readAllBytes(target))).getFirst().get("editedAt"),NOW,"25-char clamp also applies across wall clocks");
+            eq(rows(object(Files.readAllBytes(f))).getFirst().get("editedAt"),NOW,"25-char clamp also applies across wall clocks");
             ok(v,"create-comment",ROOT,"comment_id="+ID2,"body=UTC 생성");
-            eq(rows(object(Files.readAllBytes(target))).getFirst().get("createdAt"),"2026-10-21T05:05:07+09:00","process wall clock with fixed offset label preserved");
+            eq(rows(object(Files.readAllBytes(f))).getFirst().get("createdAt"),"2026-10-21T05:05:07+09:00","process wall clock with fixed offset label preserved");
         } finally { TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul")); }
     }
 

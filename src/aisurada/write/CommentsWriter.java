@@ -38,11 +38,10 @@ public final class CommentsWriter {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("v", 1);
         document.put("comments", ordered);
-        // [B9] 원자적 쓰기 적용: 링크일 경우 링크 대상을 찾아 원자적으로 기록하여 링크 유지 및 파일 손상 방지
+        // [B9] 설명서 19.7 원칙: 링크 너머 실제 파일을 건드리지 않고 링크 자체를 안전하게 교체 (toRealPath 제거)
         try {
-            Path targetFile = Files.isSymbolicLink(file) ? file.toRealPath() : file;
-            AtomicWriter.writeAtomic(targetFile, JsonWriter.toFileBytes(document));
-        } catch (IOException e) {
+            AtomicWriter.writeAtomic(file, JsonWriter.toFileBytes(document));
+        } catch (Exception e) {
             throw failed(file);
         }
     }

@@ -174,6 +174,19 @@ fn is_executable(path: &Path) -> bool {
             return true;
         }
     }
+    // macOS Finder 별칭(Alias) 파일은 확장자를 .md 등으로 위장해도 LaunchServices가 실행 파일을 실행하므로 차단
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(mut f) = fs::File::open(path) {
+            use std::io::Read;
+            let mut buf = [0u8; 8];
+            if let Ok(n) = f.read(&mut buf) {
+                if n >= 8 && &buf[..8] == b"book\0\0\0\0" {
+                    return true;
+                }
+            }
+        }
+    }
     const BLOCKED_EXTENSIONS: &[&str] = &[
         // macOS 실행/패키지/설정/프로파일/스크립트
         "command", "tool", "terminal", "jar", "py", "pkg", "mpkg", "mobileconfig",
@@ -182,7 +195,7 @@ fn is_executable(path: &Path) -> bool {
         // Windows/DOS 실행/스크립트
         "exe", "bat", "cmd", "vbs", "vbe", "js", "jse", "wsf", "wsh", "ps1", "psm1", "msi",
         // 웹링크 및 바로가기
-        "webloc", "url", "lnk",
+        "webloc", "url", "lnk", "alias",
     ];
     path.extension().and_then(|v| v.to_str()).is_some_and(|v| {
         BLOCKED_EXTENSIONS.contains(&v.to_ascii_lowercase().as_str())
@@ -321,6 +334,19 @@ mod tests {
                 .unwrap_err()
                 .contains("실행 파일"));
         }
+        // 별칭(.alias) 확장자 및 Finder Alias 헤더를 가진 .md 위장 파일 거부 확인
+        let alias_ext = note.join("x.alias");
+        fs::write(&alias_ext, b"data").unwrap();
+        assert!(open_target(vault, alias_ext.to_str().unwrap())
+            .unwrap_err()
+            .contains("실행 파일"));
+
+        let fake_md_alias = note.join("alias_readme.md");
+        fs::write(&fake_md_alias, b"book\0\0\0\0some bookmark payload").unwrap();
+        assert!(open_target(vault, fake_md_alias.to_str().unwrap())
+            .unwrap_err()
+            .contains("실행 파일"));
+
         let app = note.join("program.APP");
         fs::create_dir(&app).unwrap();
         assert!(open_target(vault, app.to_str().unwrap()).is_err());

@@ -16,9 +16,31 @@ public final class YamlRoundTripTest {
     public static void main(String[] args) {
         testB7UnderlineNumbers();
         testB2FoldedBlockNewlines();
+        testB2FoldedBlockWithBlankLines();
         testB2TemplateDescMultipleRoundTrips();
         testGeneralRoundTrip();
         System.out.println("YamlRoundTripTest: " + checks + " checks passed.");
+    }
+
+    /** B2: 접는 블록(>-)에서 빈 줄(\n\n)을 사이에 둔 문단들이 회차를 거듭해도 줄어들지 않고 원본 그대로 보존되는지 검증 */
+    private static void testB2FoldedBlockWithBlankLines() {
+        String longLine = "이 문장은 78글자를 훌쩍 넘어서 FrontmatterWriter의 foldLine 접는 블록 분기를 강제로 타도록 만든 아주 길고 긴 테스트 문장입니다.";
+        String original = longLine + "\n\n두 번째 문단입니다.\n\n세 번째 문단입니다.";
+        String current = original;
+
+        for (int cycle = 1; cycle <= 5; cycle++) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", "tpl-00000002");
+            map.put("desc", current);
+
+            String dumped = FrontmatterWriter.dumpGeneralMap(map);
+            Map<String, Object> loaded = Frontmatter.parse(dumped);
+            check(loaded != null, "loaded must not be null at cycle " + cycle);
+            Object loadedDesc = loaded.get("desc");
+            check(loadedDesc instanceof String, "desc must be string at cycle " + cycle);
+            current = (String) loadedDesc;
+            check(original.equals(current), "folded block with blank lines must remain identical after cycle " + cycle + ", but was: [" + current + "]");
+        }
     }
 
     /** 템플릿 설명이 여러 번 저장-파싱되어도 끝 줄바꿈이나 내용이 매 회차 늘어나지 않는지 검증 */
