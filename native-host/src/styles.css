@@ -1466,6 +1466,21 @@ body.col-resizing {
 .lex-image-grip svg { display: block; }
 .lex-image-bar { position: absolute; left: 50%; top: 10px; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 3px; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); white-space: nowrap; line-height: 1; }
 .lex-image-bar button { padding: 5px 9px; border: 0; border-radius: 7px; background: transparent; box-shadow: none; color: var(--ink); font-size: 11px; font-weight: 600; line-height: 1.2; }
+
+/* ───────── 버튼 공용 클래스: .btn-primary ───────── */
+.btn-primary {
+  background: var(--ais-primary, var(--ais-accent, #3b82f6));
+  color: #fff;
+  border: none;
+  font-weight: 500;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .lex-image-bar button:hover:not(:disabled) { background: var(--soft); box-shadow: none; }
 .lex-image-bar button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink, #fff); }
 .lex-image-size { padding: 0 8px 0 6px; color: var(--muted); font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; }

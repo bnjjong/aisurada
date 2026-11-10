@@ -60,8 +60,11 @@ public final class NoteFile {
         if (size > 1_000_000) {
             throw new IOException("File size exceeds 1,000,000 bytes: " + size);
         }
-
         byte[] rawBytes = Files.readAllBytes(filePath);
+        return parse(rawBytes);
+    }
+
+    public static ParsedNoteFile parse(byte[] rawBytes) throws IOException {
         String token = computeToken(rawBytes);
         String content = StrictUtf8.decodeStrict(rawBytes);
 

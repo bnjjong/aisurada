@@ -59,16 +59,10 @@ public final class DoctorCommand {
         String label = "co.kcd.aisurada.sidecar." + vaultKey;
 
         // 2. 소켓 경로 결정 및 길이 검사
-        String rawSocket = System.getenv("AISURADA_SIDECAR_SOCKET");
-        if (rawSocket == null || Trim.isBlank(rawSocket)) {
-            rawSocket = userHome + "/Library/Caches/aisurada/ais-" + hash16 + ".sock";
-        } else {
-            rawSocket = Trim.trim(rawSocket);
-        }
-        Path socketPath = Paths.get(VaultPath.normalize(rawSocket));
-        byte[] socketBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
-        if (socketBytes.length > 102) {
-            System.err.println("AIS-400 소켓 경로가 102 바이트를 넘는다(" + socketBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+        aisurada.serve.SidecarLocation location = aisurada.serve.SidecarLocation.resolve(normalizedVault);
+        Path socketPath = location.socketPath();
+        if (location.isSocketPathTooLong()) {
+            System.err.println("AIS-400 소켓 경로가 102 바이트를 넘는다(" + location.socketPathBytes().length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(2);
             return;
         }
