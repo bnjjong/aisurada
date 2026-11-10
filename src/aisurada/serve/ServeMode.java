@@ -56,22 +56,12 @@ public final class ServeMode {
      * serve 모드로 진입하여 소켓 서버를 엽니다.
      */
     public static void run(String vaultRoot, EngineConfig config) {
-        String userHome = System.getProperty("user.home");
-        vaultKey = VaultKey.compute(vaultRoot);
-        String hash16 = VaultKey.computeHash16(vaultRoot);
+        SidecarLocation location = SidecarLocation.resolve(vaultRoot);
+        vaultKey = location.vaultKey();
+        socketPath = location.socketPath();
 
-        // 1. 소켓 경로 결정
-        String rawSocket = System.getenv("AISURADA_SIDECAR_SOCKET");
-        if (rawSocket == null || Trim.isBlank(rawSocket)) {
-            rawSocket = userHome + "/Library/Caches/aisurada/ais-" + hash16 + ".sock";
-        } else {
-            rawSocket = Trim.trim(rawSocket);
-        }
-        socketPath = Paths.get(VaultPath.normalize(rawSocket));
-
-        byte[] socketPathBytes = socketPath.toString().getBytes(StandardCharsets.UTF_8);
-        if (socketPathBytes.length > 102) {
-            System.err.println("소켓 경로가 102 바이트를 넘는다(" + socketPathBytes.length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
+        if (location.isSocketPathTooLong()) {
+            System.err.println("소켓 경로가 102 바이트를 넘는다(" + location.socketPathBytes().length + " 바이트): " + socketPath + ". AISURADA_SIDECAR_SOCKET 로 더 짧은 자리를 지정한다.");
             System.exit(1);
         }
 
@@ -79,8 +69,8 @@ public final class ServeMode {
         Instant startedAt = Instant.now();
 
         // 3. 잠금 파일 획득
-        runDir = Paths.get(userHome, "Library", "Application Support", "aisurada", "run");
-        Path lockFile = runDir.resolve(vaultKey + ".lock");
+        runDir = location.runDir();
+        Path lockFile = location.lockFile();
         try {
             Files.createDirectories(runDir);
             lockChannel = FileChannel.open(lockFile, StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);

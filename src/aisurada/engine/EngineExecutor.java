@@ -110,14 +110,23 @@ public final class EngineExecutor {
                     return EngineResult.aisError(3, 409, err);
                 }
 
+                java.util.function.Supplier<NoteIndex> lazyIndex = new java.util.function.Supplier<>() {
+                    private NoteIndex cached;
+                    @Override
+                    public NoteIndex get() {
+                        if (cached == null) {
+                            cached = NoteIndex.fresh(vaultRoot);
+                        }
+                        return cached;
+                    }
+                };
+
                 Object response;
 
                 if ("get-ask".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = aisurada.ask.AskCommands.executeGetAsk(vaultRoot, parsed, noteIndex);
+                    response = aisurada.ask.AskCommands.executeGetAsk(vaultRoot, parsed, lazyIndex.get());
                 } else if ("append-ask-turn".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = aisurada.ask.AskCommands.executeAppendAskTurn(vaultRoot, parsed, noteIndex);
+                    response = aisurada.ask.AskCommands.executeAppendAskTurn(vaultRoot, parsed, lazyIndex.get());
                 } else if ("read-session".equals(parsed.commandName())) {
                     response = aisurada.session.SessionCommands.executeReadSession(parsed);
                 } else if ("session-titles".equals(parsed.commandName())) {
@@ -125,11 +134,9 @@ public final class EngineExecutor {
                 } else if ("recent-sessions".equals(parsed.commandName())) {
                     response = aisurada.session.SessionCommands.executeRecentSessions(parsed);
                 } else if ("list-chats".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = aisurada.chat.ChatCommands.executeListChats(vaultRoot, parsed, noteIndex);
+                    response = aisurada.chat.ChatCommands.executeListChats(vaultRoot, parsed, lazyIndex.get());
                 } else if ("append-chat-turn".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = aisurada.chat.ChatCommands.executeAppendChatTurn(vaultRoot, parsed, noteIndex);
+                    response = aisurada.chat.ChatCommands.executeAppendChatTurn(vaultRoot, parsed, lazyIndex.get());
                 } else if ("reindex".equals(parsed.commandName())) {
                     response = Reindex.execute(vaultRoot, startTime);
                 } else if ("history".equals(parsed.commandName())) {
@@ -139,30 +146,24 @@ public final class EngineExecutor {
                 } else if ("reindex-paths".equals(parsed.commandName())) {
                     response = Reindex.paths(vaultRoot, parsed.positionalArgs(), startTime);
                 } else if ("get-doc".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
+                    NoteIndex noteIndex = lazyIndex.get();
                     response = GetDoc.execute(vaultRoot, parsed, noteIndex.agendaTable(), noteIndex.noteScan());
                 } else if ("get-sub-note".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = GetSubNote.execute(vaultRoot, parsed, noteIndex.noteScan());
+                    response = GetSubNote.execute(vaultRoot, parsed, lazyIndex.get().noteScan());
                 } else if ("list-attachments".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = ListAttachments.execute(vaultRoot, parsed, noteIndex);
+                    response = ListAttachments.execute(vaultRoot, parsed, lazyIndex.get());
                 } else if ("list-comments".equals(parsed.commandName())) {
-                    response = ListComments.execute(vaultRoot, parsed, NoteIndex.fresh(vaultRoot));
+                    response = ListComments.execute(vaultRoot, parsed, lazyIndex.get());
                 } else if (Set.of("create-comment", "update-comment", "delete-comment").contains(parsed.commandName())) {
                     response = CommentCommands.execute(vaultRoot, parsed);
                 } else if ("list-sub-notes".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = ListSubNotes.execute(vaultRoot, parsed, noteIndex);
+                    response = ListSubNotes.execute(vaultRoot, parsed, lazyIndex.get());
                 } else if ("list-docs".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = ListDocs.execute(vaultRoot, parsed, noteIndex);
+                    response = ListDocs.execute(vaultRoot, parsed, lazyIndex.get());
                 } else if ("list-tags".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = ListTags.execute(parsed, noteIndex);
+                    response = ListTags.execute(parsed, lazyIndex.get());
                 } else if ("search-docs".equals(parsed.commandName())) {
-                    NoteIndex noteIndex = NoteIndex.fresh(vaultRoot);
-                    response = SearchDocs.execute(vaultRoot, parsed, noteIndex);
+                    response = SearchDocs.execute(vaultRoot, parsed, lazyIndex.get());
                 } else if ("list-templates".equals(parsed.commandName())) {
                     response = ListTemplates.execute(vaultRoot, parsed);
                 } else if ("get-template".equals(parsed.commandName())) {

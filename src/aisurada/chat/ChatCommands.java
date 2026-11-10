@@ -523,25 +523,6 @@ public final class ChatCommands {
     }
 
     private static void atomicWrite(Path targetFile, byte[] data) {
-        Path parent = targetFile.getParent();
-        if (parent != null && !Files.exists(parent)) {
-            try {
-                Files.createDirectories(parent);
-            } catch (IOException e) {
-                throw new AisException(500, "폴더를 만들지 못했다: " + parent);
-            }
-        }
-        Path tmp = parent.resolve(targetFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
-        try {
-            Files.write(tmp, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-            try {
-                Files.move(tmp, targetFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(tmp, targetFile, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (IOException e) {
-            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
-            throw new AisException(500, "레일 대화 파일 쓰기 실패: " + e.getMessage());
-        }
+        aisurada.write.AtomicWriter.writeAtomic(targetFile, data);
     }
 }

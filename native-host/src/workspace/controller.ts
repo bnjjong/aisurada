@@ -540,9 +540,7 @@ export class WorkspaceController {
           if (revision === this.linkRevision) { this.notify(`딥링크가 가리키는 폴더가 워크스페이스가 아니에요: ${link.ws}`); this.navigate('/launcher'); }
           return;
         }
-        if (!await this.canLeave()) return;
-        this.data.invalidate();
-        await this.data.idle();
+        if (!await this.leaveVault()) return;
         await this.authorize(link.ws);
         await this.openWorkspace(link.ws);
         this.patch({ recent: addRecent(this.services.storage, { path: link.ws, name: workspaceName(link.ws) }) });
@@ -639,6 +637,14 @@ export class WorkspaceController {
     } catch { this.notify('폴더 선택 창을 열 수 없어요'); return null; }
   };
 
+  private async leaveVault(): Promise<boolean> {
+    if (!await this.canLeave()) return false;
+    this.stopWatch();
+    this.data.invalidate();
+    await this.data.idle();
+    return true;
+  }
+
   private async canLeave(question = '워크스페이스를 바꿀까요?'): Promise<boolean> {
     if (!this.state.workspace || this.state.workspace.sample) return true;
     const pending = this.services.pending;
@@ -705,7 +711,7 @@ export class WorkspaceController {
 
   open = (rawPath: string, menu = false): Promise<boolean> => this.action(async () => {
     const path = rawPath.trim();
-    if (!path || !await this.canLeave()) return false;
+    if (!path || !await this.leaveVault()) return false;
     await this.openWorkspace(path);
     this.patch({ recent: addRecent(this.services.storage, { path, name: workspaceName(path) }) });
     this.navigate('/calendar');
@@ -714,13 +720,10 @@ export class WorkspaceController {
 
   create = (rawName: string): Promise<boolean> => this.action(async () => {
     const name = rawName.trim(), parent = this.state.home;
-    if (!name || !await this.canLeave()) return false;
+    if (!name || !await this.leaveVault()) return false;
     const path = await this.services.host.invoke<string>('create_workspace_dir', { parent, name });
     const before = await this.services.host.invoke<string | null>('vault_root').catch(() => null);
-    this.data.invalidate();
-    await this.data.idle();
     await this.authorize(path);
-    this.stopWatch();
     // Creation reports initialization failure instead of claiming success.
     try { await engineCall(this.services.host, write.init(name)); }
     catch (error) {
@@ -753,16 +756,15 @@ export class WorkspaceController {
     try { documents = (await this.services.host.documentDir()).replace(/\/+$/, '') || documents; } catch { /* fallback */ }
     this.patch({ recent: addRecent(this.services.storage,
       { path: `${documents}/aisurada-sample`, name: '샘플 워크스페이스', sample: true }) });
-    if (!await this.canLeave()) return false;
-    this.stopWatch(); this.data.invalidate(); await this.data.idle();
+    if (!await this.leaveVault()) return false;
     this.openSample();
     this.navigate('/calendar');
     return true;
   }, '워크스페이스를 열 수 없어요');
 
   openRecent = (item: RecentWorkspace): Promise<boolean> => this.action(async () => {
-    if (!await this.canLeave()) return false;
-    if (item.sample) { this.stopWatch(); this.data.invalidate(); await this.data.idle(); this.openSample(); }
+    if (!await this.leaveVault()) return false;
+    if (item.sample) this.openSample();
     else await this.openWorkspace(item.path, item.name);
     this.navigate('/calendar');
     return true;
@@ -773,9 +775,7 @@ export class WorkspaceController {
   };
 
   launcher = (): Promise<boolean> => this.action(async () => {
-    if (!await this.canLeave()) return false;
-    this.stopWatch();
-    this.data.invalidate(); await this.data.idle();
+    if (!await this.leaveVault()) return false;
     void this.services.host.invoke('close_note_windows').catch(() => {});
     this.patch({ workspace: null, vault: this.data.reset() });
     writeJSON(this.services.storage, KEYS.last, null);
