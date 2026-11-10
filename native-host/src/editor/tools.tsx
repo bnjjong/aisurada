@@ -58,6 +58,7 @@ export function EditorTools(props: EditorProps) {
   const [editor] = useLexicalComposerContext(), latest = useRef(props); latest.current = props;
   const [selectionBar, setBar] = useState<{ x: number; y: number; quote: string; special: boolean; formats: boolean[]; client?: { left: number; top: number } } | null>(null);
   const [compose, setCompose] = useState<{ quote: string; x: number; y: number } | null>(null), [comment, setComment] = useState('');
+  const commentRef = useRef(comment); commentRef.current = comment;
   const selection = useRef<BaseSelection | null>(null), composeRef = useRef(compose); composeRef.current = compose;
   const [menu, setMenu] = useState<Menu | null>(null), menuRef = useRef(menu); menuRef.current = menu;
   const [code, setCode] = useState<{ key: string; language: string } | null>(null), [callout, setCallout] = useState<{ key: string; kind: string } | null>(null);
@@ -328,7 +329,7 @@ export function EditorTools(props: EditorProps) {
         event.preventDefault();
       }
     };
-    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { closeCompose(); setMenu(null); setCard(null); } };
+    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { if (!commentRef.current.trim()) closeCompose(); setMenu(null); setCard(null); } };
     const blur = () => setLine(null);
     root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop); root.addEventListener('blur', blur);
     document.addEventListener('pointerdown', outside);

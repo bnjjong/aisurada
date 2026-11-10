@@ -10,6 +10,7 @@ import { InteractionOverlays } from './interaction/Overlays.tsx';
 import { VaultBanner } from './data/VaultBanner.tsx';
 import { captureEscape } from './ui/layers.ts';
 import { Preview } from './ui/Preview.tsx';
+import { Modal } from './ui/Modal.tsx';
 import { BrandMark } from './ui/BrandMark.tsx';
 import type { BrandState } from './ui/BrandMark.tsx';
 
@@ -90,18 +91,18 @@ function WorkspaceApp() {
       {preview && <Preview key={preview.id} controller={controller} state={state} />}
       <InteractionOverlays controller={controller} state={state} />
       {state.noteCloseDialog && (
-        <div className="note-window-dialog-backdrop modal-overlay" onClick={() => controller.dismissNoteCloseDialog()}>
-          <div className="note-window-dialog modal-card" onClick={e => e.stopPropagation()}>
-            <h2>창을 닫으면 사라지는 것이 있어요</h2>
-            <ul className="note-window-dialog-list">
-              {state.noteCloseDialog.reasons.map((r, i) => <li key={i}>{r}</li>)}
-            </ul>
-            <div className="note-window-dialog-actions modal-actions">
-              <button type="button" onClick={() => controller.dismissNoteCloseDialog()}>남겨 두기</button>
-              <button type="button" className="btn-danger" onClick={() => void controller.forceCloseNoteWindow()}>그래도 닫기</button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          title="창을 닫으면 사라지는 것이 있어요"
+          close={() => controller.dismissNoteCloseDialog()}
+        >
+          <ul className="note-window-dialog-list">
+            {state.noteCloseDialog.reasons.map((r, i) => <li key={i}>{r}</li>)}
+          </ul>
+          <footer>
+            <button type="button" onClick={() => controller.dismissNoteCloseDialog()}>남겨 두기</button>
+            <button type="button" className="button-primary btn-danger" style={{ color: 'var(--err, #d32f2f)' }} onClick={() => void controller.forceCloseNoteWindow()}>그래도 닫기</button>
+          </footer>
+        </Modal>
       )}
     </main>;
   }

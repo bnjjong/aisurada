@@ -68,6 +68,7 @@
   --rail-edge: #0b1220; --rail-glow: rgba(30, 79, 216, .55); --rail-base: linear-gradient(180deg, #0b1220 0%, #08101f 100%);
   --rail-star-a: #ffffff; --rail-star-b: #eef0f4; --rail-star-c: #cfd4dd; --rail-link: #9db7ff;
   --ink: #f6f7f9; --muted: #cfd4dd; --line: rgba(246, 247, 249, .14); --soft: rgba(246, 247, 249, .10);
+  --sunken: rgba(255, 255, 255, .14);
 }
 :root[data-skin="modern"][data-theme="dark"] .workspace-rail {
   --rail-edge: #1c2432; --rail-glow: rgba(108, 147, 255, .30); --rail-base: linear-gradient(180deg, #171e2b 0%, #0b0f17 100%);
@@ -102,6 +103,7 @@
   --rail-edge: #4c5873; --rail-glow: rgba(76, 88, 115, .60); --rail-base: linear-gradient(#0a1633, #0a1633); --rail-signal: #d01f1a;
   --rail-grid: rgba(205, 213, 227, .07); --rail-star-a: #ffffff; --rail-star-b: #eef2f8; --rail-star-c: #cdd5e3; --rail-link: #eef2f8;
   --ink: #eef2f8; --muted: #cdd5e3; --line: #4c5873; --soft: rgba(238, 242, 248, .12);
+  --sunken: rgba(255, 255, 255, .14);
 }
 :root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active,
 :root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled),
@@ -120,6 +122,7 @@
   --rail-star-a: #ffffff; --rail-star-b: #dce6fc; --rail-star-c: #dae1ee; --rail-link: #a9c0ff;
   --ink: #ffffff; --muted: #dae1ee; --line: rgba(255, 255, 255, .14); --soft: rgba(255, 255, 255, .10);
   --hover: rgba(255, 255, 255, .10); --surface: rgba(255, 255, 255, .14); --sh-1: inset 0 0 0 1px rgba(255, 255, 255, .16);
+  --accent-soft: rgba(255, 255, 255, .16); --accent-text: #fff;
 }
 :root[data-skin="tactile"][data-theme="dark"] .workspace-rail {
   --rail-glow: rgba(127, 163, 255, .35); --rail-base: linear-gradient(180deg, #18244a 0%, #070c1c 100%);

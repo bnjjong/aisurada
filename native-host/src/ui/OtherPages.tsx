@@ -515,6 +515,7 @@ function TemplateEditor({
       desc: asText(t.desc),
       body: asText(t.body),
     }),
+    [confirmDelete, setConfirmDelete] = useState(false),
     [value, setValue] = useState(() => fields(template)),
     [mirror, setMirror] = useState({
       revision: 0,
@@ -585,11 +586,10 @@ function TemplateEditor({
         </button>
         {!template.builtin && template.category !== "ritual" && (
           <button
-            onClick={() => {
-              clearTimeout(timer.current);
-              dirty.current = false;
-              void controller.data.deleteTemplate(asText(template.id));
-            }}
+            type="button"
+            className="tpl-delete-btn"
+            style={{ marginLeft: "auto", color: "var(--err, #d32f2f)" }}
+            onClick={() => setConfirmDelete(true)}
           >
             삭제
           </button>
@@ -634,6 +634,19 @@ function TemplateEditor({
           showRecords: state.prefs.showRecords,
         }}
       />
+      {confirmDelete && (
+        <Confirm
+          title="템플릿을 삭제할까요?"
+          description="삭제한 템플릿은 되돌릴 수 없어요."
+          label="삭제"
+          close={() => setConfirmDelete(false)}
+          accept={() => {
+            clearTimeout(timer.current);
+            dirty.current = false;
+            void controller.data.deleteTemplate(asText(template.id));
+          }}
+        />
+      )}
     </section>
   );
 }

@@ -72,7 +72,12 @@ function NewNote({
     [error, setError] = useState("");
   const bodyRef = useRef(body);
   bodyRef.current = body;
-  const close = () => controller.form(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const isDirty = Boolean(title.trim() || body.trim());
+  const handleClose = () => {
+    if (isDirty) setConfirmDiscard(true);
+    else controller.form(null);
+  };
   const choices = ws.templates.filter(
     (t) =>
       t.category !== "ritual" &&
@@ -80,7 +85,7 @@ function NewNote({
       (!t.format || t.format === "markdown"),
   );
   return (
-    <Modal title="새 문서" close={close} className="ndf">
+    <Modal title="새 문서" close={handleClose} className="ndf">
       {!ws.agendas.length ? (
         <>
           <p>먼저 아젠다를 하나 만들어 주세요</p>
@@ -221,7 +226,7 @@ function NewNote({
           </div>
           {error && <p role="alert">{error}</p>}
           <footer className="ndf-foot">
-            <button type="button" onClick={close}>
+            <button type="button" onClick={handleClose}>
               취소
             </button>
             <button type="submit" disabled={busy || !title.trim() || !agenda}>
@@ -229,6 +234,15 @@ function NewNote({
             </button>
           </footer>
         </form>
+      )}
+      {confirmDiscard && (
+        <Confirm
+          title="쓴 글을 버릴까요?"
+          description="작성 중인 내용이 모두 사라집니다."
+          label="버리기"
+          close={() => setConfirmDiscard(false)}
+          accept={() => controller.form(null)}
+        />
       )}
     </Modal>
   );
@@ -264,13 +278,25 @@ function EntityForm({
     [summary, setSummary] = useState(asText(old?.summary)),
     [error, setError] = useState(""),
     [confirm, setConfirm] = useState(false),
+    [confirmDiscard, setConfirmDiscard] = useState(false),
     [busy, setBusy] = useState(false);
-  const close = () => controller.form(null),
-    label = kind === "agenda" ? "아젠다" : "프로젝트";
+  const isDirty = Boolean(
+    id
+      ? title !== asText(old?.title) ||
+        summary !== asText(old?.summary) ||
+        repo !== asText(old?.repo) ||
+        project !== (initial || asText(old?.project))
+      : title.trim() || summary.trim() || repo.trim(),
+  );
+  const handleClose = () => {
+    if (isDirty) setConfirmDiscard(true);
+    else controller.form(null);
+  };
+  const label = kind === "agenda" ? "아젠다" : "프로젝트";
   return (
     <Modal
       title={`${label} ${id ? "편집" : "추가"}`}
-      close={close}
+      close={handleClose}
       className="ndf"
     >
       <form
@@ -364,7 +390,7 @@ function EntityForm({
               삭제
             </button>
           )}
-          <button type="button" onClick={close}>
+          <button type="button" onClick={handleClose}>
             취소
           </button>
           <button type="submit" disabled={busy || !title.trim()}>
@@ -372,6 +398,15 @@ function EntityForm({
           </button>
         </footer>
       </form>
+      {confirmDiscard && (
+        <Confirm
+          title="쓴 글을 버릴까요?"
+          description="작성 중인 내용이 사라집니다."
+          label="버리기"
+          close={() => setConfirmDiscard(false)}
+          accept={() => controller.form(null)}
+        />
+      )}
       {confirm && (
         <Confirm
           title={`${label}를 삭제할까요?`}

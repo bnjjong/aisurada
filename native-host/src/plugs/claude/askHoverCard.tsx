@@ -116,10 +116,12 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       onKeyDown={(event) => {
         // 4.5: Esc inside the card closes it and stops the native propagation, so a preview modal around it stays.
         if (event.key === 'Escape') {
-          event.preventDefault();
           event.stopPropagation();
           event.nativeEvent.stopImmediatePropagation();
-          onClose?.();
+          if (!event.defaultPrevented) {
+            event.preventDefault();
+            onClose?.();
+          }
         }
       }}
     >
@@ -136,7 +138,7 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       {turns.length > 0 && !isPinned && <div className="ask-hovercard-hint" style={{ flexShrink: 0 }}>눌러서 고정하면 이어 물을 수 있어요</div>}
       {turns.length > 0 && isPinned && !record && onFollowUp && (
         <div style={{ flexShrink: 0 }}>
-          <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} />
+          <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} onClose={onClose} />
         </div>
       )}
       <div

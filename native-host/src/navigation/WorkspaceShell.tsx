@@ -61,7 +61,20 @@ export function WorkspaceShell({ controller, state }: Props) {
   const route = parseRoute(state.route),
     ws = state.workspace!,
     rail = route.kind !== "doc" && route.kind !== "file",
-    railWidth = clampRailWidth(state.prefs.railWidth);
+    railWidth = clampRailWidth(state.prefs.railWidth),
+    boundaryKey = (() => {
+      if (route.kind === "templates") return "templates";
+      if (route.kind === "notes") return "notes";
+      if (route.kind === "agenda") return `/agenda/${route.id}`;
+      try {
+        const u = new URL(state.route, "http://aisurada.local");
+        u.searchParams.delete("open");
+        const q = u.searchParams.toString();
+        return u.pathname + (q ? `?${q}` : "");
+      } catch {
+        return state.route.replace(/[?&]open=[^&]*/, "").replace(/[?&]$/, "");
+      }
+    })();
   return (
     <div className="workspace-shell workspace-frame" aria-busy={state.busy}>
       <TabBar controller={controller} state={state} />
@@ -84,7 +97,7 @@ export function WorkspaceShell({ controller, state }: Props) {
         <main className="screen-content" id="screen-content" role="tabpanel">
           <RouteBoundary
             controller={controller}
-            key={route.kind === "templates" ? "templates" : state.route}
+            key={boundaryKey}
           >
             {route.kind !== "terminal" && (
               <RouteContent
