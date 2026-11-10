@@ -27,6 +27,11 @@ export const CARD_CLOSE_DELAY_MS = 180;
 export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned = false }: AskHoverCardProps) {
   const context = useContext(AskContext);
   const [size, setSize] = useState(() => context.cardSize ?? { width: 360, height: null });
+  useEffect(() => {
+    if (context.cardSize) {
+      setSize(context.cardSize);
+    }
+  }, [context.cardSize?.width, context.cardSize?.height]);
   const stopResize = useRef<(() => void) | null>(null);
   useEffect(() => () => stopResize.current?.(), []);
   const thread = useAskState((state) => state.threads[docId] ?? null) as AskThread | null;
@@ -94,7 +99,16 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       ref={card}
       className={`ask-hovercard${isPinned ? ' is-pinned' : ''}`}
       data-ask-card={underline}
-      style={{ position: 'relative', width: size.width, height: size.height ?? undefined, maxHeight: 1600, boxSizing: 'border-box', overflow: 'auto' }}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        width: size.width,
+        height: size.height ?? undefined,
+        maxHeight: size.height ? 1600 : 400,
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}
       onMouseEnter={cancelClose}
       // Any press inside the card pins it; a focus that lands in its box does the same.
       onPointerDown={pin}
@@ -112,19 +126,37 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       {turns.length === 0 && !record ? (
         <div className="ask-hovercard-empty">이 기기에 그 문답이 없어요. 밑줄만 남아 있어요.</div>
       ) : (
-        <div className="ask-hovercard-body">
+        <div className="ask-hovercard-body" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
           {turns.map((turn) => (
             <AskTurnView key={turn.id} turn={turn} fold={false} />
           ))}
           {record && <PendingLine record={record} />}
         </div>
       )}
-      {turns.length > 0 && !isPinned && <div className="ask-hovercard-hint">눌러서 고정하면 이어 물을 수 있어요</div>}
+      {turns.length > 0 && !isPinned && <div className="ask-hovercard-hint" style={{ flexShrink: 0 }}>눌러서 고정하면 이어 물을 수 있어요</div>}
       {turns.length > 0 && isPinned && !record && onFollowUp && (
-        <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} />
+        <div style={{ flexShrink: 0 }}>
+          <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} />
+        </div>
       )}
-      <div className="ask-card-resizer" role="separator" aria-label="문답 카드 크기 조절" onPointerDown={resize}
-        style={{ position: 'sticky', display: 'block', marginLeft: 'auto', bottom: 0, width: 16, height: 16, cursor: 'nwse-resize', borderRight: '2px solid var(--muted)', borderBottom: '2px solid var(--muted)' }} />
+      <div
+        className="ask-card-resizer"
+        role="separator"
+        aria-label="문답 카드 크기 조절"
+        onPointerDown={resize}
+        style={{
+          position: 'absolute',
+          right: 2,
+          bottom: 2,
+          width: 16,
+          height: 16,
+          cursor: 'nwse-resize',
+          borderRight: '2px solid var(--muted)',
+          borderBottom: '2px solid var(--muted)',
+          zIndex: 10,
+          pointerEvents: 'auto',
+        }}
+      />
     </div>
   );
 }
