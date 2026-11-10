@@ -268,3 +268,28 @@ test('sample transition finishes an in-flight read without launching its stale s
   assert.equal(h.controller.getSnapshot().workspace.sample, true);
   assert.equal(h.calls.filter(call => call.command === 'sidecar_call').length, before);
 });
+
+test('closeMainWindow asks confirmation when note windows are open and prevents reentrancy', async t => {
+  const confirms = [];
+  const h = harness(t, {
+    invoke: async (command) => {
+      if (command === 'note_windows') return ['note-1', 'note-2'];
+      if (command === 'exit_app') return;
+    },
+  });
+  h.services.host.confirmLeave = async (msg) => { confirms.push(msg); return false; };
+  setLast(h);
+  await h.controller.boot();
+
+  const closed = await h.controller.closeMainWindow();
+  assert.equal(closed, false);
+  assert.equal(confirms.length, 1);
+  assert.match(confirms[0], /열려 있는 독립 노트 창이 2개/);
+  assert.equal(h.calls.some(c => c.command === 'exit_app'), false);
+
+  // 허용 시 exit_app 호출 확인
+  h.services.host.confirmLeave = async () => true;
+  const closedOk = await h.controller.closeMainWindow();
+  assert.equal(closedOk, true);
+  assert.equal(h.calls.some(c => c.command === 'exit_app'), true);
+});

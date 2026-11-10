@@ -176,9 +176,10 @@ public final class SessionTranscript {
             mtime = null;
         }
 
-        TranscriptCacheKey cacheKey = mtime != null ? new TranscriptCacheKey(file, fileBytes, mtime) : null;
-        CachedFileParseEntry cachedEntry = cacheKey != null ? Optional.ofNullable(TRANSCRIPT_CACHE.get(file)).map(java.lang.ref.SoftReference::get).orElse(null) : null;
-        CachedFileParse cached = (cachedEntry != null && cachedEntry.key().equals(cacheKey)) ? cachedEntry.parsed() : null;
+        // 세션 전사 캐시는 runningAgents(서브에이전트 종료 상태), noteMentions, author, URL 등의
+        // 1/2차 파싱 불일치 및 대용량 메모리 점유(누수)를 유발하므로 비활성화하고 매번 정규 파싱을 수행한다.
+        TranscriptCacheKey cacheKey = null;
+        CachedFileParse cached = null;
 
         int lineCount = 0;
         int skippedCount = 0;

@@ -140,3 +140,13 @@ test('이미지 파일명 추출은 상대 경로, URL, 쿼리, 인코딩을 처
   assert.equal(imageFileName('data:image/svg+xml;utf8,...'), '');
   assert.equal(imageFileName(''), '');
 });
+
+test('표 칸 역슬래시는 \\n만 개행으로 처리하고 구두점 앞 역슬래시나 경로를 이중 해제하지 않는다', () => {
+  // 마크다운 파일 내용: | 경로 | 줄바꿈 |\n| --- | --- |\n| ..\\..\\foo | a\nb |
+  const tableMarkdown = '| 경로 | 줄바꿈 |\n| --- | --- |\n| ..\\\\..\\\\foo | a\\nb |';
+  const editor = createHeadlessEditor({ namespace: 'table-slash', nodes: EDITOR_NODES, onError: e => { throw e; } });
+  editor.update(() => $importDocument(tableMarkdown), { discrete: true });
+  const exported = editor.getEditorState().read($exportDocument);
+  assert.match(exported, /\.\.\\\\\.\.\\\\foo/);
+  assert.match(exported, /a\\nb/);
+});
