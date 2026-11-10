@@ -113,17 +113,19 @@ public final class DoctorCommand {
         StateFile state = null;
         if (hasStateFile) {
             state = StateFile.read(stateFilePath);
-            String pidStr = state.getPid() != null ? String.valueOf(state.getPid()) : "(모름)";
-            boolean pidAlive = false;
-            if (state.getPid() != null) {
-                pidAlive = ProcessHandle.of(state.getPid()).map(ProcessHandle::isAlive).orElse(false);
-            }
-            String pidAliveStr = pidAlive ? "그 pid 가 돈다" : "그 pid 로 도는 것이 없다";
-            String lastActiveStr = TimeFormat.formatAgo(state.getLastActiveAt());
-            String openConnsStr = state.getOpenConnections() != null ? (state.getOpenConnections() + "개") : "(모름)";
-            String startedStr = TimeFormat.formatAgo(state.getStartedAt());
+            if (state != null) {
+                String pidStr = state.getPid() != null ? String.valueOf(state.getPid()) : "(모름)";
+                boolean pidAlive = false;
+                if (state.getPid() != null) {
+                    pidAlive = ProcessHandle.of(state.getPid()).map(ProcessHandle::isAlive).orElse(false);
+                }
+                String pidAliveStr = pidAlive ? "그 pid 가 돈다" : "그 pid 로 도는 것이 없다";
+                String lastActiveStr = TimeFormat.formatAgo(state.getLastActiveAt());
+                String openConnsStr = state.getOpenConnections() != null ? (state.getOpenConnections() + "개") : "(모름)";
+                String startedStr = TimeFormat.formatAgo(state.getStartedAt());
 
-            System.out.println("           pid=" + pidStr + " (" + pidAliveStr + ")  마지막 활동 " + lastActiveStr + "  열린 연결 " + openConnsStr + "  뜬 것은 " + startedStr);
+                System.out.println("           pid=" + pidStr + " (" + pidAliveStr + ")  마지막 활동 " + lastActiveStr + "  열린 연결 " + openConnsStr + "  뜬 것은 " + startedStr);
+            }
         }
 
         System.out.println("잠금       " + lockFilePath + "  (" + (Files.exists(lockFilePath) ? "있음" : "없음") + ")");

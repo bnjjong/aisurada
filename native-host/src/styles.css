@@ -13,6 +13,12 @@
   --accent: #2f5542;
   --accent-ink: #fff;
   --font-mono: 'D2Coding', ui-monospace, Menlo, monospace;
+  /* [B13] 터미널 및 모달 호환용 공용 테마 변수 별칭 */
+  --bg-primary: var(--surface);
+  --bg-secondary: var(--soft);
+  --text-primary: var(--ink);
+  --text-secondary: var(--muted);
+  --text-muted: var(--muted);
   color: var(--ink);
   background: var(--surface);
   color-scheme: light;

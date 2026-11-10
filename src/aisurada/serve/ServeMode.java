@@ -192,12 +192,12 @@ public final class ServeMode {
                     System.err.println("경고: 정비 중 상태 파일 작성 실패: " + e.getMessage());
                 }
 
-                // 유휴 판정
+                // 유휴 판정 (곱셈 오버플로 방지를 위해 경과 시간을 분 단위로 환산하여 비교)
                 long idleMinutes = config.idleTimeoutMinutes();
                 if (idleMinutes > 0 && openConnections.get() == 0) {
                     long elapsedNanos = System.nanoTime() - lastActiveNanoRef.get();
-                    long limitNanos = idleMinutes * 60L * 1_000_000_000L;
-                    if (elapsedNanos >= limitNanos) {
+                    long elapsedMinutes = elapsedNanos / (60L * 1_000_000_000L);
+                    if (elapsedMinutes >= idleMinutes) {
                         // 유휴 종료
                         doTeardown();
                         System.exit(0);

@@ -17,8 +17,8 @@ public final class FrontmatterWriter {
     );
 
     private static final Pattern BASE60_PATTERN = Pattern.compile("^[-+]?[0-9_]+(:[0-9_]+)+(\\.[0-9_]*)?$");
-    private static final Pattern INTEGER_PATTERN = Pattern.compile("^[+-]?(?:0|0b[01]+|0x[0-9a-fA-F]+|0o[0-7]+|[0-9]+)$");
-    private static final Pattern FLOAT_PATTERN = Pattern.compile("^(?:[-+]?(?:[0-9]+)(?:\\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
+    private static final Pattern INTEGER_PATTERN = Pattern.compile("^[+-]?(?:0|0b[01_]+|0x[0-9a-fA-F_]+|0o[0-7_]+|[0-9][0-9_]*)$");
+    private static final Pattern FLOAT_PATTERN = Pattern.compile("^(?:[-+]?(?:[0-9][0-9_]*)(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?|[-+]?\\.[0-9_]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
     private static final Pattern DATE_PATTERN = Pattern.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
     private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("^[0-9]{4}-[0-9][0-9]?-[0-9][0-9]?(?:[Tt]|[ \t]+)[0-9][0-9]?:[0-9]{2}:[0-9]{2}(?:\\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9][0-9]?(?::[0-9]{2})?))?$");
 
@@ -669,7 +669,9 @@ public final class FrontmatterWriter {
                 sb.append(folded);
             }
             if (i < count - 1) {
-                sb.append("\n");
+                String nextLine = lines[i + 1];
+                boolean needsExtraBlankLine = !line.startsWith(" ") && !nextLine.isEmpty() && !nextLine.startsWith(" ");
+                sb.append(needsExtraBlankLine ? "\n\n" : "\n");
             }
         }
         return sb.toString();

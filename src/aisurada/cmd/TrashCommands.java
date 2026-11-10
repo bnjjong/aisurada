@@ -130,8 +130,22 @@ public final class TrashCommands {
         var entries = new ArrayList<>(scan.entries()); entries.sort(Comparator.comparingInt(TrashReader.TrashRecord::fileOrder)); return entries;
     }
     private static void save(Path vault, List<TrashReader.TrashRecord> entries) {
+        List<TrashReader.TrashRecord> list = new ArrayList<>(entries);
+        byte[] bytes = serializeTrash(list);
+        // [B3] 2-나: 1MB(1,000,000 바이트) 초과 시 가장 오래된 항목부터 FIFO 자동 순환 삭제(Auto Pruning)
+        while (bytes.length > 1_000_000 && list.size() > 1) {
+            TrashReader.TrashRecord oldest = list.remove(list.size() - 1);
+            try {
+                TreeRemover.remove(archive(vault, oldest.file()));
+            } catch (Exception ignored) {}
+            bytes = serializeTrash(list);
+        }
+        AtomicWriter.writeAtomic(vault.resolve(".aisurada/trash/trash.json"), bytes);
+    }
+
+    private static byte[] serializeTrash(List<TrashReader.TrashRecord> entries) {
         var maps = entries.stream().map(r -> row("trashId", r.trashId(), "file", r.file(), "originalPath", r.originalPath(), "docId", r.docId(), "agendaId", r.agendaId(), "agendaSlug", r.agendaSlug(), "title", r.title(), "type", r.type(), "format", r.format(), "created", r.created(), "trashedAt", r.trashedAt())).toList();
-        AtomicWriter.writeAtomic(vault.resolve(".aisurada/trash/trash.json"), JsonWriter.toFileBytes(maps));
+        return JsonWriter.toFileBytes(maps);
     }
     private static Map<String, Object> empty(Path vault) {
         var scan = TrashReader.scan(vault); var entries = new ArrayList<>(scan.entries()); entries.sort(Comparator.comparingInt(TrashReader.TrashRecord::fileOrder));

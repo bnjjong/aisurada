@@ -38,8 +38,13 @@ public final class CommentsWriter {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("v", 1);
         document.put("comments", ordered);
-        try { Files.write(file, JsonWriter.toFileBytes(document)); }
-        catch (IOException e) { throw failed(file); }
+        // [B9] 원자적 쓰기 적용: 링크일 경우 링크 대상을 찾아 원자적으로 기록하여 링크 유지 및 파일 손상 방지
+        try {
+            Path targetFile = Files.isSymbolicLink(file) ? file.toRealPath() : file;
+            AtomicWriter.writeAtomic(targetFile, JsonWriter.toFileBytes(document));
+        } catch (IOException e) {
+            throw failed(file);
+        }
     }
 
     private static AisException failed(Path file) {

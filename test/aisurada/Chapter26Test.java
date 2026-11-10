@@ -102,6 +102,31 @@ public final class Chapter26Test {
             Path broken = t.vault(); put(broken, TRASH, "{}");
             eq(stderr(run(broken, "list_trash", "{}")), "휴지통 항목 1건을 못 읽어 목록에서 뺐다.\n  .aisurada/trash/trash.json — 매니페스트가 배열이 아니다\n", "tool list writes trash diagnostics");
             eq(stderr(run(broken, "list-trash")), stderr(run(broken, "list_trash", "{}")), "both surfaces write the same trash diagnostics");
+
+            // [B3] 1MB 초과 시 FIFO 자동 순환 삭제(Auto Pruning) 검증
+            Path over1mbVault = t.vault();
+            List<Map<String, Object>> dummyEntries = new ArrayList<>();
+            // 약 1,100,000 바이트가 되도록 항목 생성 (각 항목 약 400바이트 x 2,800개)
+            for (int i = 0; i < 2800; i++) {
+                String tid = String.format("trfixture-%08d", i);
+                dummyEntries.add(entry(tid, "file-" + tid + ".md", "demo"));
+            }
+            manifest(over1mbVault, dummyEntries);
+            long initialSize = Files.size(over1mbVault.resolve(TRASH));
+            check(initialSize > 1_000_000L, "initial manifest must exceed 1MB: " + initialSize);
+
+            // 새 노트 생성 후 delete-doc 수행
+            note(over1mbVault, "notes/demo/prune-test.md", "ndfixture-00000099", "demo", "2026-06-16", "", "to be deleted");
+            var delRes = ok(over1mbVault, "delete-doc", "ndfixture-00000099");
+            check(delRes.containsKey("trashId"), "delete-doc must succeed");
+
+            // 결과 검증: manifest 크기는 1,000,000바이트 이하여야 하고, 이전 항목들이 통째로 날아가지 않고 수천 개 유지되어야 함
+            long prunedSize = Files.size(over1mbVault.resolve(TRASH));
+            check(prunedSize <= 1_000_000L, "pruned manifest must be <= 1,000,000 bytes: " + prunedSize);
+            var listAfterPrune = list(over1mbVault, "list-trash");
+            check(listAfterPrune.size() > 1900, "most entries must be preserved (not reset to 1), actual: " + listAfterPrune.size());
+            check(listAfterPrune.getFirst().get("trashId").equals(delRes.get("trashId")), "newly deleted item must be at the head");
+
             t.done();
         }
     }

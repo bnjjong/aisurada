@@ -6,6 +6,7 @@ JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 mkdir -p build/test-classes
 "$JAVAC" -encoding UTF-8 -cp dist/ais-engine.jar -d build/test-classes test/aisurada/*.java test/aisurada/git/*.java test/aisurada/cli/*.java
+"$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.YamlRoundTripTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.CommentCommandsTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.ReindexPathsTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.AgendaFactsTest

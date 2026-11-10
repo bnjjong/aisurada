@@ -123,9 +123,10 @@ public final class ListDocs {
             // 1~99: 쪽 크기가 limit, 1쪽만 읽으면 limit에 닿음
             rowsToRead = Math.min(total, limit);
         } else {
-            // limit >= 100: 쪽 크기가 100, limit에 닿거나 전체 건수에 닿을 때까지 쪽을 통째로 읽음
-            int pages = (limit + 99) / 100;
-            rowsToRead = Math.min(total, pages * 100);
+            // limit >= 100: 쪽 크기가 100, limit에 닿거나 전체 건수에 닿을 때까지 쪽을 통째로 읽음 (int 오버플로 방지)
+            long pages = ((long) limit + 99) / 100;
+            long calculated = pages * 100L;
+            rowsToRead = (int) Math.min((long) total, calculated);
         }
 
         // 6. 읽는 범위 내의 모든 메인 노트에 대해 HTML 첨부를 읽음 (9.5, 9.9 11번)

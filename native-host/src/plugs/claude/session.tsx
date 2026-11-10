@@ -5,6 +5,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useStat
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { Modal } from '../../ui/Modal.tsx';
 import { agendaOrder, HUE_COLORS } from '../../ui/model.ts';
 import { AskContext } from './askContext.ts';
 import { askClaudeBridge, tauriAskHost } from './askHost.ts';
@@ -1403,12 +1404,8 @@ export function PinSessionModal({
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="ndf modal-content" role="dialog" aria-label="노트로 굳히기">
-        <header className="modal-header">
-          <h3>노트로 굳히기</h3>
-          <button type="button" aria-label="닫기" onClick={onClose}>✕</button>
-        </header>
+    <Modal title="노트로 굳히기" close={onClose} wide className="session-pin-modal">
+      <div className="ndf modal-content" style={{ width: '100%', maxHeight: '75vh', overflowY: 'auto' }}>
         <div className="ndf-body">
           <div className="pin-ranges">
             {([100, 200, 500] as const).map((n) => (
@@ -1440,12 +1437,12 @@ export function PinSessionModal({
           </div>}
           {error && <div className="pin-warn">{error}</div>}
         </div>
-        <footer className="ndf-foot modal-footer">
+        <footer className="ndf-foot modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" className="btn-secondary" onClick={onClose}>취소</button>
           <button type="button" className="btn-primary" disabled={!canSave} onClick={() => void save()}>{saving ? '저장 중…' : '굳히기'}</button>
         </footer>
       </div>
-    </div>
+    </Modal>
   );
 }
 

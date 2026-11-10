@@ -99,14 +99,18 @@ public final class JsonReader {
                         if (pos + 4 > len) {
                             throw new IllegalArgumentException("Invalid unicode escape");
                         }
-                        String hex = src.substring(pos, pos + 4);
-                        pos += 4;
-                        try {
-                            int code = Integer.parseInt(hex, 16);
-                            sb.append((char) code);
-                        } catch (NumberFormatException e) {
-                            throw new IllegalArgumentException("Invalid hex in unicode escape: " + hex, e);
+                        int code = 0;
+                        for (int i = 0; i < 4; i++) {
+                            char h = src.charAt(pos + i);
+                            int d;
+                            if (h >= '0' && h <= '9') d = h - '0';
+                            else if (h >= 'a' && h <= 'f') d = h - 'a' + 10;
+                            else if (h >= 'A' && h <= 'F') d = h - 'A' + 10;
+                            else throw new IllegalArgumentException("Invalid hex in unicode escape: " + src.substring(pos, pos + 4));
+                            code = (code << 4) | d;
                         }
+                        pos += 4;
+                        sb.append((char) code);
                     }
                     default -> throw new IllegalArgumentException("Unsupported escape: \\" + esc);
                 }
