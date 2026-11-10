@@ -40,6 +40,8 @@ function WorkspaceApp() {
     let unlistenClose: (() => void) | undefined;
     if (context.kind === 'note') {
       void controller.listenCloseRequested(() => { void controller.closeNoteWindow(); })?.then(fn => { unlistenClose = fn; });
+    } else if (context.kind === 'main') {
+      void controller.listenCloseRequested(() => { void controller.closeMainWindow(); })?.then(fn => { unlistenClose = fn; });
     }
     let unlistenGeometry: (() => void) | undefined;
     if (context.kind === 'note') void controller.listenNoteGeometry()?.then(fn => { unlistenGeometry = fn; });

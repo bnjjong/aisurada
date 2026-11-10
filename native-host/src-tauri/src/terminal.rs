@@ -11,7 +11,7 @@ use std::{
     },
     time::Duration,
 };
-use tauri::{ipc::Channel, State};
+use tauri::{ipc::Channel, Runtime, State, WebviewWindow};
 const REPLAY: usize = 2_097_152;
 const FNV_START: u64 = 0xcbf29ce484222325;
 pub(crate) type Sink = Arc<dyn Fn(&[u8]) -> Result<(), String> + Send + Sync>;
@@ -276,14 +276,23 @@ fn size(cols: u16, rows: u16) -> PtySize {
 pub struct Started {
     pub fell_back: bool,
 }
+fn require_main<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("터미널은 main 창에서만 실행할 수 있어요".into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
-pub fn pty_start(
+pub fn pty_start<R: Runtime>(
+    window: WebviewWindow<R>,
     state: State<'_, HostState>,
     key: String,
     cols: u16,
     rows: u16,
     on_data: Channel<String>,
 ) -> Result<Started, String> {
+    require_main(&window)?;
     let (c, fell_back) = login_shell(None);
     let fell_back = state.terminals.start_shell(
         key,
@@ -295,16 +304,24 @@ pub fn pty_start(
     Ok(Started { fell_back })
 }
 #[tauri::command]
-pub fn pty_write(state: State<'_, HostState>, key: String, data: String) -> Result<(), String> {
+pub fn pty_write<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, HostState>,
+    key: String,
+    data: String,
+) -> Result<(), String> {
+    require_main(&window)?;
     state.terminals.write(&key, data.into_bytes())
 }
 #[tauri::command]
-pub fn pty_resize(
+pub fn pty_resize<R: Runtime>(
+    window: WebviewWindow<R>,
     state: State<'_, HostState>,
     key: String,
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
+    require_main(&window)?;
     let e = state.terminals.entry(&key)?;
     let master = e.master.lock().unwrap();
     master
@@ -314,11 +331,21 @@ pub fn pty_resize(
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
-pub fn pty_detach(state: State<'_, HostState>, key: String) {
+pub fn pty_detach<R: Runtime>(window: WebviewWindow<R>, state: State<'_, HostState>, key: String) {
+    if window.label() != "main" {
+        return;
+    }
     state.terminals.detach(&key)
 }
 #[tauri::command]
-pub fn pty_alive(state: State<'_, HostState>, key: String) -> bool {
+pub fn pty_alive<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, HostState>,
+    key: String,
+) -> bool {
+    if window.label() != "main" {
+        return false;
+    }
     state.terminals.is_alive(&key)
 }
 #[derive(Debug, Serialize)]
@@ -338,7 +365,14 @@ impl Default for Stats {
     }
 }
 #[tauri::command]
-pub fn pty_stats(state: State<'_, HostState>, key: String) -> Stats {
+pub fn pty_stats<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, HostState>,
+    key: String,
+) -> Stats {
+    if window.label() != "main" {
+        return Stats::default();
+    }
     state.terminals.stats(&key)
 }
 #[cfg(test)]

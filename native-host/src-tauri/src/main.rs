@@ -50,6 +50,7 @@ fn main() {
         .manage(lifecycle::HostState::default())
         .manage(secrets::SecretState::default())
         .invoke_handler(tauri::generate_handler![
+            lifecycle::exit_app,
             workspace::allow_workspace,
             workspace::vault_root,
             workspace::is_workspace,

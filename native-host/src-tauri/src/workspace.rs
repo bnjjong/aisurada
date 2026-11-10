@@ -27,6 +27,35 @@ fn switch_workspace(
     if caller != "main" {
         return Err("노트 창은 vault 를 바꾸지 않는다".into());
     }
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("폴더 경로가 비어있어요".into());
+    }
+    let p = Path::new(trimmed);
+    if p == Path::new("/") || trimmed == "/" {
+        return Err("루트 폴더는 워크스페이스로 열 수 없어요".into());
+    }
+    if let Ok(canon) = p.canonicalize() {
+        if canon == Path::new("/") {
+            return Err("루트 폴더는 워크스페이스로 열 수 없어요".into());
+        }
+        let s = canon.to_string_lossy();
+        if s == "/System"
+            || s.starts_with("/System/")
+            || s == "/bin"
+            || s.starts_with("/bin/")
+            || s == "/sbin"
+            || s.starts_with("/sbin/")
+            || s == "/usr"
+            || s.starts_with("/usr/")
+            || s == "/etc"
+            || s.starts_with("/etc/")
+            || s == "/private/etc"
+            || s.starts_with("/private/etc/")
+        {
+            return Err("시스템 폴더는 워크스페이스로 열 수 없어요".into());
+        }
+    }
     let mut current = current.lock().map_err(|_| "vault 잠금을 얻지 못했다")?;
     if has_notes() && current.as_ref().is_some_and(|old| !same_vault(old, &path)) {
         return Err("노트 창이 열려 있어서 vault 를 바꾸지 않았어요. 노트 창의 저장하지 못한 글을 정리하고 창을 닫은 뒤 다시 열어 주세요.".into());

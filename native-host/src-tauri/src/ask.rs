@@ -614,6 +614,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
 
 #[tauri::command]
 pub async fn ask_claude(
+    state: tauri::State<'_, crate::lifecycle::HostState>,
     vault: String,
     session_id: String,
     model: String,
@@ -631,6 +632,16 @@ pub async fn ask_claude(
 ) -> Result<AskClaudeResponse, String> {
     // route 는 일을 시작하기 전에 거른다. 모르는 값이면 커맨드째 거절한다
     check_route(route.as_deref())?;
+
+    let open_vault = state
+        .vault
+        .lock()
+        .map_err(|_| "vault 잠금을 얻지 못했다")?
+        .clone()
+        .ok_or("vault가 아직 열리지 않았어요")?;
+    if !crate::workspace::same_vault(&open_vault, &vault) {
+        return Err("현재 열린 워크스페이스에서만 Claude 세션을 실행할 수 있어요".into());
+    }
 
     let args = AskClaudeArgs {
         vault,

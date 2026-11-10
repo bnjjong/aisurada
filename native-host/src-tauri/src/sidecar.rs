@@ -35,6 +35,13 @@ pub async fn sidecar_call<R: Runtime>(
     state: State<'_, HostState>,
     argv: Vec<String>,
 ) -> Result<Reply, String> {
+    if argv.is_empty() {
+        return Err("사이드카 인자가 비어있어요".into());
+    }
+    let sub = argv[0].trim().to_ascii_lowercase();
+    if sub == "install" || sub == "sweep" || sub == "--sidecar" || argv.iter().any(|a| a == "--sidecar") {
+        return Err(format!("허용되지 않은 사이드카 명령이에요: {}", argv[0]));
+    }
     let vault = state
         .vault
         .lock()

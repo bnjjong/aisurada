@@ -5,7 +5,7 @@ use std::{
         Mutex,
     },
 };
-use tauri::{Manager, Runtime};
+use tauri::{Emitter, Manager, Runtime};
 #[derive(Default)]
 pub struct HostState {
     pub vault: Mutex<Option<String>>,
@@ -38,9 +38,13 @@ pub fn window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     let app = window.app_handle();
     let state = app.state::<HostState>();
     match event {
-        tauri::WindowEvent::CloseRequested { .. } if window.label() == "main" => {
+        tauri::WindowEvent::CloseRequested { api, .. } if window.label() == "main" => {
+            if !state.quitting.load(Ordering::SeqCst) {
+                api.prevent_close();
+                let _ = window.emit("ais_close_requested", ());
+                return;
+            }
             state.reap_terminals();
-            state.quitting.store(true, Ordering::SeqCst);
             for (label, note) in app.webview_windows() {
                 if label.starts_with("note-") {
                     let _ = note.close();
@@ -58,6 +62,18 @@ pub fn window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
         | tauri::WindowEvent::Focused(_) => crate::layout::schedule(window),
         _ => {}
     }
+}
+#[tauri::command]
+pub fn exit_app<R: Runtime>(app: tauri::AppHandle<R>) {
+    let state = app.state::<HostState>();
+    state.quitting.store(true, Ordering::SeqCst);
+    state.reap_terminals();
+    for (label, note) in app.webview_windows() {
+        if label.starts_with("note-") {
+            let _ = note.close();
+        }
+    }
+    app.exit(0);
 }
 pub fn create_main(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let config = app
@@ -79,6 +95,15 @@ pub fn create_main(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Err
             builder = builder.inner_size(g.width, g.height).position(x, y);
         }
     }
+    let builder = builder.on_navigation(|url| {
+        let s = url.as_str();
+        s.starts_with("tauri://")
+            || s.starts_with("http://localhost")
+            || s.starts_with("https://tauri.localhost")
+            || s.starts_with("asset://")
+            || s.starts_with("data:")
+            || s.starts_with("about:blank")
+    });
     builder.build()?;
     if let Some((_, l)) = remembered {
         crate::desktop::restore(app, "main", l, ms);

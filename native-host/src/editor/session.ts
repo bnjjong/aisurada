@@ -181,13 +181,25 @@ export class EditorSession {
   };
   dispose() {
     if (this.released) return;
-    clearTimeout(this.timer); this.stash(); this.unlisten(); this.unregister(); this.unrestore(); this.unbuffer();
-    if (!this.discarding && this.valid() && !this.conflicted()) {
-      const bodyNeeded = this.buffer !== this.controller.data.note(this.ref)?.body || this.ownEditing && !this.jobs;
-      if (bodyNeeded) void this.flush('dispose');
-      else if (this.work) void this.work.then(result => { if (result === 'saved' && this.valid() && !this.conflicted()) void this.title('dispose'); });
-      else void this.title('dispose');
-    }
-    this.released = true; this.listeners.clear();
+    this.released = true;
+    clearTimeout(this.timer); this.stash(); this.unlisten(); this.unrestore(); this.unbuffer();
+    this.listeners.clear();
+    const doFlush = async () => {
+      try {
+        if (!this.discarding && this.valid() && !this.conflicted()) {
+          const bodyNeeded = this.buffer !== this.controller.data.note(this.ref)?.body || (this.ownEditing && !this.jobs);
+          if (bodyNeeded) await this.flush('dispose');
+          else if (this.work) {
+            const result = await this.work;
+            if (result === 'saved' && this.valid() && !this.conflicted()) await this.title('dispose');
+          } else {
+            await this.title('dispose');
+          }
+        }
+      } finally {
+        this.unregister();
+      }
+    };
+    void doFlush();
   }
 }
