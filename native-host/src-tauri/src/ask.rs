@@ -102,8 +102,8 @@ pub fn resolve_claude() -> Option<PathBuf> {
 }
 
 pub fn resolve_gemini() -> Option<PathBuf> {
-    // 1. AISURADA_GEMINI_BIN
-    if let Ok(bin) = env::var("AISURADA_GEMINI_BIN") {
+    // 1. AISURADA_ANTIGRAVITY_BIN 또는 AISURADA_GEMINI_BIN
+    if let Ok(bin) = env::var("AISURADA_ANTIGRAVITY_BIN").or_else(|_| env::var("AISURADA_GEMINI_BIN")) {
         if !bin.is_empty() {
             let p = PathBuf::from(&bin);
             if is_regular_file(&p) {
@@ -112,34 +112,44 @@ pub fn resolve_gemini() -> Option<PathBuf> {
         }
     }
 
-    // 2. $HOME/.local/bin/gemini
+    let bin_names = ["antigravity", "agy", "gemini"];
+
+    // 2. $HOME/.local/bin
     if let Ok(home) = env::var("HOME") {
         if !home.is_empty() {
-            let p = PathBuf::from(home).join(".local/bin/gemini");
-            if is_regular_file(&p) {
-                return Some(p);
+            for name in &bin_names {
+                let p = PathBuf::from(&home).join(format!(".local/bin/{}", name));
+                if is_regular_file(&p) {
+                    return Some(p);
+                }
             }
         }
     }
 
-    // 3. /opt/homebrew/bin/gemini
-    let brew_opt = PathBuf::from("/opt/homebrew/bin/gemini");
-    if is_regular_file(&brew_opt) {
-        return Some(brew_opt);
+    // 3. /opt/homebrew/bin
+    for name in &bin_names {
+        let brew_opt = PathBuf::from(format!("/opt/homebrew/bin/{}", name));
+        if is_regular_file(&brew_opt) {
+            return Some(brew_opt);
+        }
     }
 
-    // 4. /usr/local/bin/gemini
-    let usr_local = PathBuf::from("/usr/local/bin/gemini");
-    if is_regular_file(&usr_local) {
-        return Some(usr_local);
+    // 4. /usr/local/bin
+    for name in &bin_names {
+        let usr_local = PathBuf::from(format!("/usr/local/bin/{}", name));
+        if is_regular_file(&usr_local) {
+            return Some(usr_local);
+        }
     }
 
     // 5. PATH
     if let Ok(path_var) = env::var("PATH") {
         for dir in env::split_paths(&path_var) {
-            let p = dir.join("gemini");
-            if is_regular_file(&p) {
-                return Some(p);
+            for name in &bin_names {
+                let p = dir.join(name);
+                if is_regular_file(&p) {
+                    return Some(p);
+                }
             }
         }
     }
@@ -348,9 +358,9 @@ fn check_route(route: Option<&str>) -> Result<(), String> {
 
 pub fn map_gemini_model(model: &str) -> &str {
     match model {
-        "gemini-3-8-high" | "gemini-3.8-high" | "gemini-high" => "gemini-3.8-flash",
-        "gemini-3-8-medium" | "gemini-3.8-medium" | "gemini-medium" => "gemini-3.8-flash",
-        "gemini-3-8-flash" | "gemini-3.8-flash" | "gemini-flash" => "gemini-3.8-flash",
+        "gemini-3-8-high" | "gemini-3.8-high" | "gemini-high" => "gemini-3.8-flash-high",
+        "gemini-3-8-medium" | "gemini-3.8-medium" | "gemini-medium" => "gemini-3.8-flash-medium",
+        "gemini-3-8-flash" | "gemini-3.8-flash" | "gemini-flash" => "gemini-3.8-flash-high",
         other => other,
     }
 }
@@ -365,13 +375,18 @@ fn execute_gemini_ask(
         Some(b) => b,
         None => {
             return failure(
-                "gemini 실행 파일을 못 찾았다. npm i -g @google/gemini-cli 로 설치하거나 AISURADA_GEMINI_BIN 으로 자리를 알려 줄 수 있다."
+                "antigravity 실행 파일을 못 찾았다. AISURADA_ANTIGRAVITY_BIN 으로 자리를 알려 줄 수 있다."
                     .to_string(),
                 0,
                 missing_cwd,
             );
         }
     };
+
+    let bin_name = gemini_bin
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("antigravity");
 
     let input_text = if let Some(seed) = &args.seed {
         seed_prompt(seed, &args.prompt)
@@ -380,13 +395,15 @@ fn execute_gemini_ask(
     };
 
     let mapped_model = map_gemini_model(&args.model);
-    let cli_args = vec![
+    let mut cli_args = vec![
         "-p".to_string(),
         input_text.clone(),
         "--model".to_string(),
         mapped_model.to_string(),
-        "--skip-trust".to_string(),
     ];
+    if bin_name.contains("gemini") {
+        cli_args.push("--skip-trust".to_string());
+    }
 
     match run_cli_process(
         &gemini_bin,
@@ -403,8 +420,8 @@ fn execute_gemini_ask(
                     ok: false,
                     answer: String::new(),
                     error: Some(format!(
-                        "{}초 안에 답이 안 왔다. gemini 응답 시간을 초과했다.",
-                        args.timeout_seconds
+                        "{}초 안에 답이 안 왔다. {} 응답 시간을 초과했다.",
+                        args.timeout_seconds, bin_name
                     )),
                     elapsed_ms: elapsed,
                     missing_cwd,
@@ -421,14 +438,14 @@ fn execute_gemini_ask(
             }
             let cause = format_cause(&res.stderr, &res.stdout);
             let code_str = res.exit_code.map_or("?".to_string(), |c| c.to_string());
-            let err_msg = format!("gemini 가 종료 코드 {} 로 끝났다: {}", code_str, cause);
+            let err_msg = format!("{} 가 종료 코드 {} 로 끝났다: {}", bin_name, code_str, cause);
             failure(err_msg, elapsed, missing_cwd)
         }
         Err(RunError::Spawn(e)) => {
             let elapsed = start_time.elapsed().as_millis() as u64;
-            failure(format!("gemini 를 못 띄웠다: {}", e), elapsed, missing_cwd)
+            failure(format!("{} 를 못 띄웠다: {}", bin_name, e), elapsed, missing_cwd)
         }
-        Err(RunError::Io(e)) => failure(format!("gemini 를 기다리던 일꾼이 끊겼다: {}", e), 0, missing_cwd),
+        Err(RunError::Io(e)) => failure(format!("{} 를 기다리던 일꾼이 끊겼다: {}", bin_name, e), 0, missing_cwd),
     }
 }
 
@@ -1095,19 +1112,19 @@ exit 1
     fn test_resolve_gemini_with_env_var() {
         let _lock = ENV_LOCK.lock().unwrap();
         let temp = tempdir().unwrap();
-        let fake = temp.path().join("gemini");
+        let fake = temp.path().join("antigravity");
         File::create(&fake).unwrap();
 
-        env::set_var("AISURADA_GEMINI_BIN", &fake);
+        env::set_var("AISURADA_ANTIGRAVITY_BIN", &fake);
         assert_eq!(resolve_gemini(), Some(fake));
-        env::remove_var("AISURADA_GEMINI_BIN");
+        env::remove_var("AISURADA_ANTIGRAVITY_BIN");
     }
 
     #[test]
     fn test_map_gemini_model() {
-        assert_eq!(map_gemini_model("gemini-3-8-high"), "gemini-3.8-flash");
-        assert_eq!(map_gemini_model("gemini-3-8-medium"), "gemini-3.8-flash");
-        assert_eq!(map_gemini_model("gemini-3-8-flash"), "gemini-3.8-flash");
+        assert_eq!(map_gemini_model("gemini-3-8-high"), "gemini-3.8-flash-high");
+        assert_eq!(map_gemini_model("gemini-3-8-medium"), "gemini-3.8-flash-medium");
+        assert_eq!(map_gemini_model("gemini-3-8-flash"), "gemini-3.8-flash-high");
         assert_eq!(map_gemini_model("gemini-pro"), "gemini-pro");
     }
 
@@ -1118,7 +1135,8 @@ exit 1
         let orig_path = env::var("PATH").ok();
         env::set_var("HOME", "/nonexistent_home_dir_for_test");
         env::set_var("PATH", "/nonexistent_path_dir_for_test");
-        env::set_var("AISURADA_GEMINI_BIN", "/nonexistent/gemini-bin");
+        env::set_var("AISURADA_ANTIGRAVITY_BIN", "/nonexistent/antigravity-bin");
+        env::remove_var("AISURADA_GEMINI_BIN");
 
         let res = execute_ask(AskClaudeArgs {
             vault: "/tmp".to_string(),
@@ -1147,27 +1165,27 @@ exit 1
         } else {
             env::remove_var("PATH");
         }
-        env::remove_var("AISURADA_GEMINI_BIN");
+        env::remove_var("AISURADA_ANTIGRAVITY_BIN");
 
         assert!(!res.ok);
-        assert!(res.error.unwrap().contains("gemini 실행 파일을 못 찾았다"));
+        assert!(res.error.unwrap().contains("antigravity 실행 파일을 못 찾았다"));
     }
 
     #[test]
     fn test_gemini_success_with_fake_binary() {
         let _lock = ENV_LOCK.lock().unwrap();
         let temp = tempdir().unwrap();
-        let fake = temp.path().join("gemini");
+        let fake = temp.path().join("antigravity");
         let script = r#"#!/bin/sh
-if ! echo "$@" | grep -q -- "--skip-trust"; then
-  echo "Missing --skip-trust" >&2
+if ! echo "$@" | grep -q -- "-p"; then
+  echo "Missing -p" >&2
   exit 1
 fi
-if ! echo "$@" | grep -q -- "--model gemini-3.8-flash"; then
+if ! echo "$@" | grep -q -- "--model gemini-3.8-flash-high"; then
   echo "Missing or incorrect --model" >&2
   exit 1
 fi
-echo 'Gemini Flash 답변입니다'
+echo 'Antigravity Gemini Flash 답변입니다'
 exit 0
 "#;
         fs::write(&fake, script).unwrap();
@@ -1175,7 +1193,7 @@ exit 0
         perms.set_mode(0o755);
         fs::set_permissions(&fake, perms).unwrap();
 
-        env::set_var("AISURADA_GEMINI_BIN", &fake);
+        env::set_var("AISURADA_ANTIGRAVITY_BIN", &fake);
         let res = execute_ask(AskClaudeArgs {
             vault: temp.path().to_str().unwrap().to_string(),
             session_id: "test-sess".to_string(),
@@ -1192,9 +1210,9 @@ exit 0
             resume_only: None,
             persona: None,
         });
-        env::remove_var("AISURADA_GEMINI_BIN");
+        env::remove_var("AISURADA_ANTIGRAVITY_BIN");
 
         assert!(res.ok, "Expected ok but got error: {:?}", res.error);
-        assert_eq!(res.answer, "Gemini Flash 답변입니다");
+        assert_eq!(res.answer, "Antigravity Gemini Flash 답변입니다");
     }
 }
