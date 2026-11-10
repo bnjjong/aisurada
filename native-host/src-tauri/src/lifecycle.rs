@@ -75,6 +75,18 @@ pub fn exit_app<R: Runtime>(app: tauri::AppHandle<R>) {
     }
     app.exit(0);
 }
+pub fn is_allowed_navigation(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "tauri" => true,
+        "https" => url.host_str() == Some("tauri.localhost"),
+        "http" => matches!(url.host_str(), Some("localhost") | Some("127.0.0.1")),
+        "asset" => matches!(url.host_str(), Some("localhost")),
+        "aisframe" => true,
+        "data" | "about" => true,
+        _ => false,
+    }
+}
+
 pub fn create_main(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let config = app
         .config()
@@ -95,15 +107,7 @@ pub fn create_main(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Err
             builder = builder.inner_size(g.width, g.height).position(x, y);
         }
     }
-    let builder = builder.on_navigation(|url| {
-        let s = url.as_str();
-        s.starts_with("tauri://")
-            || s.starts_with("http://localhost")
-            || s.starts_with("https://tauri.localhost")
-            || s.starts_with("asset://")
-            || s.starts_with("data:")
-            || s.starts_with("about:blank")
-    });
+    let builder = builder.on_navigation(|url| is_allowed_navigation(url));
     builder.build()?;
     if let Some((_, l)) = remembered {
         crate::desktop::restore(app, "main", l, ms);
@@ -121,5 +125,24 @@ mod tests {
         s.page_loaded("note-x");
         s.page_loaded("main");
         s.page_loaded("main");
+    }
+
+    #[test]
+    fn navigation_allows_local_and_aisframe_and_blocks_spoofing() {
+        use tauri::Url;
+        assert!(is_allowed_navigation(&Url::parse("aisframe://localhost/attachment/index.html").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("http://127.0.0.1:1420/").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("http://localhost:1420/").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("https://tauri.localhost/").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("tauri://localhost/").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("asset://localhost/path").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("about:blank").unwrap()));
+        assert!(is_allowed_navigation(&Url::parse("data:text/html,test").unwrap()));
+
+        // 스푸핑 및 외부 URL 차단
+        assert!(!is_allowed_navigation(&Url::parse("http://localhost@evil.com/").unwrap()));
+        assert!(!is_allowed_navigation(&Url::parse("http://localhost.evil.com/").unwrap()));
+        assert!(!is_allowed_navigation(&Url::parse("https://evil.com/").unwrap()));
+        assert!(!is_allowed_navigation(&Url::parse("http://192.168.1.1/").unwrap()));
     }
 }

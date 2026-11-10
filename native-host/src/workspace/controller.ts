@@ -42,6 +42,7 @@ export class WorkspaceController {
   private pendingLink: { link: AppLink; revision: number } | null = null;
   private drainingLinks = false;
   private closingNote = false;
+  private closingMain = false;
   private unlistenSelf?: () => void;
   private selfListenerStarted = false;
   private editorFlushers = new Map<symbol, { root: string; flush: () => Promise<void> }>();
@@ -459,15 +460,27 @@ export class WorkspaceController {
   };
 
   closeMainWindow = async (): Promise<boolean> => {
-    if (this.context.kind !== 'main' || this.disposed) return false;
-    const can = await this.canLeave('앱을 종료할까요?');
-    if (!can) return false;
+    if (this.context.kind !== 'main' || this.closingMain || this.disposed) return false;
+    this.closingMain = true;
     try {
-      await this.services.host.invoke('exit_app');
-    } catch {
-      await this.services.closeWindow?.();
+      const openNotes = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
+      if (openNotes && openNotes.length > 0) {
+        const ok = await this.services.host.confirmLeave(
+          `열려 있는 독립 노트 창이 ${openNotes.length}개 있어요. 저장되지 않은 내용이 있을 수 있습니다. 모든 창을 닫고 앱을 종료할까요?`
+        );
+        if (!ok) return false;
+      }
+      const can = await this.canLeave('앱을 종료할까요?');
+      if (!can) return false;
+      try {
+        await this.services.host.invoke('exit_app');
+      } catch {
+        await this.services.closeWindow?.();
+      }
+      return true;
+    } finally {
+      this.closingMain = false;
     }
-    return true;
   };
 
   dismissNoteCloseDialog = () => {

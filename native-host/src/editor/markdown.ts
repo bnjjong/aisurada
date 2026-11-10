@@ -264,15 +264,12 @@ export function $tableTSV(table: TableNode, selected?: Set<string>): string {
   return table.getChildren<TableRowNode>().map(row => row.getChildren<TableCellNode>().filter(cell => !selected || selected.has(cell.getKey()))
     .map(cell => cell.getTextContent().replace(/[\r\n\t]/g, ' ')).join('\t')).filter(Boolean).join('\n') + '\n';
 }
-// [B8] 표 칸의 역슬래시 짝을 보존하며 \n만 개행으로 치환 (C:\\new 등이 오염되지 않도록 방어)
+// [B8] 표 칸의 역슬래시 짝을 보존하며 \n만 개행으로 치환 (구두점/문자 앞 역슬래시는 손대지 않고, \n 앞의 홀수 \만 개행으로 변환)
 function unescapeTableCellNewlines(text: string): string {
-  return text.replace(/(\\+)(n)?/g, (_match, slashes: string, nLetter?: string) => {
+  return text.replace(/(\\+)n/g, (_match, slashes: string) => {
     const isOdd = slashes.length % 2 === 1;
-    const preserved = '\\'.repeat(Math.floor(slashes.length / 2));
-    if (nLetter) {
-      return isOdd ? (preserved + '\n') : (preserved + '\\n');
-    }
-    return preserved + (isOdd ? '\\' : '');
+    const remaining = '\\'.repeat(slashes.length - 1);
+    return isOdd ? (remaining + '\n') : (slashes + 'n');
   });
 }
 
