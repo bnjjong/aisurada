@@ -43,20 +43,24 @@
 :root[data-skin="classic"] .workspace-rail nav button { background: transparent; }
 :root[data-skin="classic"] .workspace-rail nav button:hover:not(:disabled) { background: var(--soft); }
 :root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active,
-:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--surface); }
+:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active:hover:not(:disabled),
+:root[data-skin="classic"][data-theme="dark"] .rail-agenda.active { background: var(--surface); }
 :root[data-skin="classic"][data-theme="light"] .workspace-rail {
   --rail-edge: #26352e; --rail-glow: rgba(183, 208, 183, .28); --rail-base: linear-gradient(180deg, #2f5542 0%, #26352e 100%);
   --rail-star-a: #fdfdfa; --rail-star-b: #f3f5ee; --rail-star-c: #e5e9df; --rail-link: #b7d0b7;
   --ink: #fdfdfa; --muted: rgba(253, 253, 250, .72); --line: rgba(253, 253, 250, .18); --soft: rgba(253, 253, 250, .10);
 }
 :root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active,
-:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled) { background: #fdfdfa; color: #26352e; }
-:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active span { color: #7a847e; }
+:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled),
+:root[data-skin="classic"][data-theme="light"] .rail-agenda.active { background: #fdfdfa; color: #26352e; }
+:root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active span,
+:root[data-skin="classic"][data-theme="light"] .rail-agenda.active small { color: #7a847e; }
 :root[data-skin="classic"][data-theme="dark"] .workspace-rail {
   --rail-edge: #344238; --rail-glow: rgba(183, 208, 183, .22); --rail-base: linear-gradient(180deg, #222d25 0%, #1b241f 100%);
   --rail-star-a: #e0e8df; --rail-star-b: #e0e8df; --rail-star-c: #a4b3a7; --rail-link: var(--accent);
 }
-:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active { box-shadow: inset 0 0 0 1px var(--line); }
+:root[data-skin="classic"][data-theme="dark"] .workspace-rail nav button.active,
+:root[data-skin="classic"][data-theme="dark"] .rail-agenda.active { box-shadow: inset 0 0 0 1px var(--line); }
 
 /* ───────── 모던 (modern) ───────── */
 :root[data-skin="modern"] .workspace-rail { border-right: 1px solid var(--rail-edge); }
@@ -70,8 +74,11 @@
   --rail-star-a: #e7ebf3; --rail-star-b: #98a2b5; --rail-star-c: #98a2b5; --rail-link: var(--accent);
 }
 :root[data-skin="modern"] .workspace-rail nav button.active,
-:root[data-skin="modern"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
-:root[data-skin="modern"] .workspace-rail nav button.active span { color: var(--accent-text); }
+:root[data-skin="modern"] .workspace-rail nav button.active:hover:not(:disabled),
+:root[data-skin="modern"] .rail-agenda.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+:root[data-skin="modern"] .workspace-rail nav button.active span,
+:root[data-skin="modern"] .rail-agenda.active small { color: var(--accent-text); }
+:root[data-skin="modern"] .rail-agenda.active .agenda-name { color: var(--accent-text); }
 
 /* ───────── 격자 (grid): 각진 별과 격자선, 붉은 신호색 점 ───────── */
 :root[data-skin="grid"] .workspace-rail { border-right: 1px solid var(--rail-edge); }
@@ -97,8 +104,10 @@
   --ink: #eef2f8; --muted: #cdd5e3; --line: #4c5873; --soft: rgba(238, 242, 248, .12);
 }
 :root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active,
-:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled) { background: #ffffff; color: #0a1633; }
-:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active span { color: #4c5873; }
+:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled),
+:root[data-skin="grid"][data-theme="light"] .rail-agenda.active { background: #ffffff; color: #0a1633; }
+:root[data-skin="grid"][data-theme="light"] .workspace-rail nav button.active span,
+:root[data-skin="grid"][data-theme="light"] .rail-agenda.active small { color: #4c5873; }
 :root[data-skin="grid"][data-theme="dark"] .workspace-rail {
   --rail-edge: #232e4d; --rail-glow: rgba(154, 166, 192, .30); --rail-base: linear-gradient(180deg, #0f1730 0%, #0a1226 100%); --rail-signal: #ff5148;
   --rail-grid: rgba(233, 238, 248, .06); --rail-star-a: #e9eef8; --rail-star-b: #9aa6c0; --rail-star-c: #9aa6c0; --rail-link: var(--accent);

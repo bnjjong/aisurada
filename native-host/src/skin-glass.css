@@ -227,8 +227,9 @@
 :root[data-skin="glass"] .tab-label small { margin-bottom: 1px; line-height: 12px; }
 :root[data-skin="glass"] .tab-close { align-self: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
 :root[data-skin="glass"] .workspace-rail nav button { padding: 10px 14px; font-weight: 600; }
-:root[data-skin="glass"] .workspace-rail nav button.active { background: var(--tab-on); color: var(--ink); box-shadow: var(--sh-tab); }
-:root[data-skin="glass"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--tab-on); box-shadow: var(--sh-tab); }
+:root[data-skin="glass"] .rail-agenda { border-radius: 12px; padding: 2px 8px; }
+:root[data-skin="glass"] :is(.workspace-rail nav button.active, .rail-agenda.active) { background: var(--tab-on); color: var(--ink); box-shadow: var(--sh-tab); }
+:root[data-skin="glass"] :is(.workspace-rail nav button.active, .rail-agenda.active):hover:not(:disabled) { background: var(--tab-on); box-shadow: var(--sh-tab); }
 :root[data-skin="glass"] .brand-mark { border-radius: calc(var(--bs) * .33); box-shadow: var(--sh-acc); }
 
 /* ───────── 카드 · 칩 ───────── */
