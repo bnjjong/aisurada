@@ -30,43 +30,6 @@ public final class FrontmatterWriter {
     private FrontmatterWriter() {}
 
     /**
-     * 설명서 1.7 키 차례 전체를 캡슐화하는 프론트매터 데이터 레코드.
-     */
-    public record FrontmatterData(
-            String id,
-            String agenda,
-            String type,
-            String title,
-            String created,
-            String sessionId,
-            String tier,
-            String editedBy,
-            String editedAt,
-            String editedSessionId,
-            List<String> tags,
-            boolean favorite,
-            String favoriteCategory,
-            String template,
-            Map<String, Object> evaluation,
-            List<Map<String, String>> links
-    ) {
-        public String build() {
-            return buildFullNoteFrontmatter(this);
-        }
-    }
-
-    /**
-     * 프론트매터 레코드를 바탕으로 YAML 문자열을 생성합니다.
-     */
-    public static String buildFullNoteFrontmatter(FrontmatterData d) {
-        return buildFullNoteFrontmatter(
-                d.id(), d.agenda(), d.type(), d.title(), d.created(), d.sessionId(),
-                d.tier(), d.editedBy(), d.editedAt(), d.editedSessionId(), d.tags(),
-                d.favorite(), d.favoriteCategory(), d.template(), d.evaluation(), d.links()
-        );
-    }
-
-    /**
      * 설명서 1.7 키 차례(17개 키) 전체를 지원하는 프론트매터 YAML 문자열을 생성합니다.
      *
      * @param id 노트 id (1)
@@ -707,7 +670,8 @@ public final class FrontmatterWriter {
             }
             if (i < count - 1) {
                 String nextLine = lines[i + 1];
-                boolean needsExtraBlankLine = !line.startsWith(" ") && !nextLine.isEmpty() && !nextLine.startsWith(" ");
+                // 빈 줄(\n\n)이 있을 때도 SnakeYAML의 folded block 언폴딩 규격(빈 줄 수 + 1)을 만족하도록 개행 유지
+                boolean needsExtraBlankLine = !line.startsWith(" ") && !nextLine.startsWith(" ");
                 sb.append(needsExtraBlankLine ? "\n\n" : "\n");
             }
         }

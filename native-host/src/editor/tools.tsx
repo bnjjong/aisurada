@@ -229,12 +229,13 @@ export function EditorTools(props: EditorProps) {
         const spot = lineRect && box ? { x: Math.round(lineRect.left - box.left), y: Math.round(lineRect.top - box.top) } : null;
         setLine(previous => previous?.x === spot?.x && previous?.y === spot?.y ? previous : spot);
         const text = selected?.getTextContent() || '';
-        if (selected && text.trim() && ($isRangeSelection(selected) && !selected.isCollapsed() || $isTableSelection(selected))) {
+        // [B4] 코드 블록 내부 선택 시에는 마커 삽입으로 인한 코드 오염 및 고아 코멘트 방지를 위해 툴바를 숨김 (설계 결정 6-가)
+        if (!inCode && selected && text.trim() && ($isRangeSelection(selected) && !selected.isCollapsed() || $isTableSelection(selected))) {
           if (!composeRef.current) selection.current = selected.clone();
           const dom = window.getSelection(), rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : root.getBoundingClientRect();
           const quote = $isTableSelection(selected) ? tableRowCells(selected).reduce((lines, cell, index, cells) => lines + cell.getTextContent()
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '') : text;
-          setBar({ ...coords(rect), quote, special: !!inCode || $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)), client: { left: Math.round(rect.left), top: Math.round(rect.bottom + 6) } });
+          setBar({ ...coords(rect), quote, special: $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)), client: { left: Math.round(rect.left), top: Math.round(rect.bottom + 6) } });
         } else if (!composeRef.current) setBar(null);
         if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('ais:import') || tags.has('ais:repair') || tags.has('ais:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
         if ($isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
@@ -269,6 +270,10 @@ export function EditorTools(props: EditorProps) {
       const currentRoot = editor.getRootElement();
       if (!currentRoot) return false;
       const selected = $getSelection(); if (!selected) return false;
+      if ($isRangeSelection(selected)) {
+        const anchorNode = selected.anchor.getNode();
+        if ([anchorNode, ...anchorNode.getParents()].some($isCodeNode)) return false;
+      }
       selection.current = selected.clone();
       const quote = $isTableSelection(selected) ? tableRowCells(selected).map(cell => cell.getTextContent()).join('\t') + '\n' : selected.getTextContent();
       const rect = currentRoot.getBoundingClientRect(); setCompose({ quote, ...coords(rect), y: 70 }); return true;
@@ -277,6 +282,10 @@ export function EditorTools(props: EditorProps) {
       const currentRoot = editor.getRootElement();
       if (!currentRoot) return false;
       const selected = $getSelection(); if (!selected) return false;
+      if ($isRangeSelection(selected)) {
+        const anchorNode = selected.anchor.getNode();
+        if ([anchorNode, ...anchorNode.getParents()].some($isCodeNode)) return false;
+      }
       selection.current = selected.clone();
       const target = selected.clone();
       const quote = $isTableSelection(selected)
