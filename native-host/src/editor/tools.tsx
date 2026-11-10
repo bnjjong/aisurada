@@ -171,6 +171,26 @@ export function EditorTools(props: EditorProps) {
       card.insertAfter(paragraph); paragraph.selectStart();
     }); editor.focus();
   }
+  function dismissMenu(queryToRestore?: string) {
+    const active = menuRef.current;
+    if (!active) return;
+    const q = queryToRestore ?? active.query;
+    if (q) {
+      editor.update(() => {
+        const node = $getNodeByKey<TextNode>(active.trigger.key);
+        if ($isTextNode(node)) {
+          const insertPos = active.trigger.start + active.trigger.size;
+          const range = $createRangeSelection();
+          range.anchor.set(active.trigger.key, insertPos, 'text');
+          range.focus.set(active.trigger.key, insertPos, 'text');
+          $setSelection(range);
+          range.insertText(q);
+        }
+      });
+    }
+    setMenu(null);
+    editor.focus();
+  }
   function beginComment() {
     if (!selectionBar) return;
     setCompose({ quote: selectionBar.quote, x: selectionBar.x, y: selectionBar.y + 42 }); setComment('');
@@ -238,8 +258,8 @@ export function EditorTools(props: EditorProps) {
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '') : text;
           setBar({ ...coords(rect), quote, special: $isTableSelection(selected), formats: formats.map(format => $isRangeSelection(selected) && $selectionHasFormat(format)), client: { left: Math.round(rect.left), top: Math.round(rect.bottom + 6) } });
         } else if (!composeRef.current) setBar(null);
-        if ((!dirtyElements.size && !dirtyLeaves.size) || tags.has('ais:import') || tags.has('ais:repair') || tags.has('ais:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
-        if ($isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
+        if (!dirtyElements.size && !dirtyLeaves.size || tags.has('ais:import') || tags.has('ais:repair') || tags.has('ais:mirror') || tags.has('aisurada-mirror') || menuRef.current) return;
+        if (!inCode && $isRangeSelection(selected) && selected.isCollapsed() && $isTextNode(node)) {
           const before = node.getTextContent().slice(0, selected.anchor.offset);
           const pair = /(?:^|[^\[])\[\[$/.test(before);
           const slash = /(?:^|\s)\/$/.test(before);
@@ -329,7 +349,7 @@ export function EditorTools(props: EditorProps) {
         event.preventDefault();
       }
     };
-    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { if (!commentRef.current.trim()) closeCompose(); setMenu(null); setCard(null); } };
+    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.comment-compose-popover,.sel-bar,.slash-menu,.note-picker,.comment-card')) { if (!commentRef.current.trim()) closeCompose(); if (menuRef.current) dismissMenu(); setCard(null); } };
     const blur = () => setLine(null);
     root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop); root.addEventListener('blur', blur);
     document.addEventListener('pointerdown', outside);
@@ -358,11 +378,28 @@ export function EditorTools(props: EditorProps) {
     }}><blockquote>{compose.quote}</blockquote><textarea className="comment-input" aria-label="코멘트 내용" autoFocus value={comment} onChange={event => setComment(event.target.value)} />
       <div><button className="link-popover-btn" onClick={closeCompose}>취소</button><button className="link-popover-btn primary" disabled={!comment.trim()} onClick={submitComment}>추가</button></div></div>}
     {menu && <div className={menu.kind === 'note' ? 'note-picker' : 'slash-menu'} style={{ left: menu.x, top: menu.y }}>
-      <input aria-label={menu.kind === 'note' ? '노트 링크 검색' : '블록 검색'} ref={input => input?.focus({ preventScroll: true })} value={menu.query} onChange={event => setMenu({ ...menu, query: event.target.value, selected: 0 })}
+      <input aria-label={menu.kind === 'note' ? '노트 링크 검색' : '블록 검색'} ref={input => input?.focus({ preventScroll: true })} value={menu.query}
+        onChange={event => {
+          const nextQuery = event.target.value;
+          const filtered = (menu.kind === 'note'
+            ? notes.filter(n => n.title.toLowerCase().includes(nextQuery.toLowerCase()))
+            : slashItems.filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(nextQuery.toLowerCase()))
+          );
+          if (nextQuery && filtered.length === 0) {
+            dismissMenu(nextQuery);
+            return;
+          }
+          setMenu({ ...menu, query: nextQuery, selected: 0 });
+        }}
         onKeyDown={event => {
-          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setMenu(null); editor.focus(); }
+          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismissMenu(); }
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); event.stopPropagation(); setMenu({ ...menu, selected: Math.max(0, Math.min(candidates.length - 1, menu.selected + (event.key === 'ArrowDown' ? 1 : -1))) }); }
-          if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (candidates[menu.selected]) void choose(candidates[menu.selected].id); }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!menu.query.trim()) { setMenu(null); editor.focus(); return; }
+            if (candidates[menu.selected]) void choose(candidates[menu.selected].id);
+          }
         }} />
       {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id} data-slash-id={item.id}
         aria-selected={menu.selected === index} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setMenu({ ...menu, selected: index })} onClick={() => void choose(item.id)}>

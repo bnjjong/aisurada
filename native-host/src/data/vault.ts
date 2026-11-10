@@ -233,13 +233,24 @@ export class VaultData {
     } catch (error) { this.services.warn('코멘트를 읽지 못했어요', error); }
     return this.memory.comments[key];
   }
+  private factsDrafts = new Map<string, { draft: string; base: string; editing: boolean }>();
+  getFactsDraft(id: string) { return this.factsDrafts.get(id); }
+  setFactsDraft(id: string, draft: string, base: string, editing: boolean) { this.factsDrafts.set(id, { draft, base, editing }); }
+  clearFactsDraft(id: string) { this.factsDrafts.delete(id); }
+
   async loadFacts(id: string): Promise<Row | undefined> {
     const generation = this.generation, ticket = this.stamp('facts:' + id);
     if (!this.workspace() || this.workspace()?.sample) return this.memory.facts[id];
     try {
       const value = asRow(await engineCall(this.services.host, read.facts(id)));
       if (value && this.valid(generation) && this.reads.get('facts:' + id) === ticket) { this.memory = { ...this.memory, facts: { ...this.memory.facts, [id]: value } }; this.emit(); return value; }
-    } catch (error) { this.services.warn('사실층을 읽지 못했어요', error); }
+    } catch (error) {
+      this.services.warn('사실층을 읽지 못했어요', error);
+      if (this.valid(generation) && this.reads.get('facts:' + id) === ticket) {
+        this.memory = { ...this.memory, facts: { ...this.memory.facts, [id]: { failed: true, error: String(error) } } };
+        this.emit();
+      }
+    }
     return undefined;
   }
   private toNote(row: Row, agendaId: string): Note {

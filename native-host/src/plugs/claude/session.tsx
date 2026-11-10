@@ -330,6 +330,11 @@ export function SessionComposer({
     const current = getSessionComposerState(sessionId);
     const text = current.text.trim();
     if (!text || !vault || current.sending) return;
+    const model = askNow().model;
+    if (model.toLowerCase().includes('gemini')) {
+      patchComposer(sessionId, { error: '세션 이어 쓰기는 Claude만 돼요' });
+      return;
+    }
     const held = current.images; // 10.3 step 2
     patchComposer(sessionId, { sending: true, error: null, notice: null });
     void (async () => {

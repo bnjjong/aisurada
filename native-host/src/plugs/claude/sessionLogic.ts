@@ -194,6 +194,9 @@ export async function sendToSession(deps: SessionSendDeps, input: SessionSendInp
         return { ok: false, error: `붙인 그림을 못 저장해서 안 보냈어요: ${error instanceof Error ? error.message : String(error)}` };
       }
     }
+    if (input.model.toLowerCase().includes('gemini')) {
+      return { ok: false, error: '세션 이어 쓰기는 Claude만 돼요' };
+    }
     const text = input.text.trim();
     const answer = await deps.askClaude({
       vault: input.vault,

@@ -1,6 +1,6 @@
 // Hover card appearing above/below ask mark in note editor.
 // Adheres to Chapter 4 (4.5, 4.7) of aisurada Part 4 Claude integration specifications.
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { AskTurnView, FollowUpRow, PendingLine } from './askParts.tsx';
 import { turnsForUnderline } from './askText.ts';
@@ -50,15 +50,47 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
-  // 4.5: a press outside a pinned card closes it.
+  const previousFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!previousFocus.current) {
+      previousFocus.current = document.activeElement as HTMLElement | null;
+    }
+  }, []);
+
+  const handleClose = useCallback(() => {
+    onClose?.();
+    if (previousFocus.current?.isConnected) {
+      previousFocus.current.focus();
+    }
+  }, [onClose]);
+
+  // 4.5: a press outside a pinned card closes it, unless writing follow-up text.
   useEffect(() => {
     if (!isPinned) return;
     const outside = (event: PointerEvent) => {
-      if (card.current && !card.current.contains(event.target as Node)) onClose?.();
+      if (card.current && !card.current.contains(event.target as Node)) {
+        const textarea = card.current.querySelector('textarea');
+        if (textarea && textarea.value.trim()) return;
+        handleClose();
+      }
     };
     document.addEventListener('pointerdown', outside, true);
     return () => document.removeEventListener('pointerdown', outside, true);
-  }, [isPinned, onClose]);
+  }, [isPinned, handleClose]);
+
+  // Document-level Escape listener when card is pinned
+  useEffect(() => {
+    if (!isPinned) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isPinned, handleClose]);
 
   const cancelClose = () => {
     if (timer.current) {
@@ -120,11 +152,23 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
           event.nativeEvent.stopImmediatePropagation();
           if (!event.defaultPrevented) {
             event.preventDefault();
-            onClose?.();
+            handleClose();
           }
         }
       }}
     >
+      {isPinned && (
+        <button
+          type="button"
+          className="ask-hovercard-close-btn"
+          aria-label="문답 카드 닫기"
+          title="닫기"
+          onClick={handleClose}
+          style={{ position: 'absolute', top: 4, right: 4, zIndex: 11, fontSize: 13, color: 'var(--muted)', background: 'transparent', border: 0, cursor: 'pointer' }}
+        >
+          ✕
+        </button>
+      )}
       {turns.length === 0 && !record ? (
         <div className="ask-hovercard-empty">이 기기에 그 문답이 없어요. 밑줄만 남아 있어요.</div>
       ) : (
@@ -138,7 +182,7 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       {turns.length > 0 && !isPinned && <div className="ask-hovercard-hint" style={{ flexShrink: 0 }}>눌러서 고정하면 이어 물을 수 있어요</div>}
       {turns.length > 0 && isPinned && !record && onFollowUp && (
         <div style={{ flexShrink: 0 }}>
-          <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} onClose={onClose} />
+          <FollowUpRow onSend={(question, images) => onFollowUp(question, underline, images)} onClose={handleClose} />
         </div>
       )}
       <div

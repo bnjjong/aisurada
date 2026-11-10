@@ -31,19 +31,32 @@ export function AskComposePopover({ state, onSubmit, onCancel }: AskComposePopov
   const pictures = useAskImages({ hasNoteFolder: Boolean(context.baseDir) && !/\.(?:md|markdown|html|json)$/i.test(context.baseDir ?? ''), http: runtime === 'http' });
   const box = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
+
+  const cancelAndRestore = () => {
+    onCancel();
+    if (previousFocus.current?.isConnected) {
+      previousFocus.current.focus();
+    }
+  };
 
   useEffect(() => {
+    if (!previousFocus.current) {
+      previousFocus.current = document.activeElement as HTMLElement | null;
+    }
     textarea.current?.focus();
   }, []);
 
-  // 3.2: a press outside the box closes it. It opens fresh each time, so the pictures go with it.
+  // 3.2: a press outside the box closes it unless writing a question or pictures are held.
   useEffect(() => {
     const outside = (event: PointerEvent) => {
-      if (box.current && !box.current.contains(event.target as Node)) onCancel();
+      if (box.current && !box.current.contains(event.target as Node)) {
+        if (!question.trim() && pictures.images.length === 0) cancelAndRestore();
+      }
     };
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
-  }, [onCancel]);
+  }, [onCancel, question, pictures.images.length]);
 
   const submit = () => {
     const trimmed = question.trim();
@@ -65,7 +78,7 @@ export function AskComposePopover({ state, onSubmit, onCancel }: AskComposePopov
         if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
-          onCancel();
+          cancelAndRestore();
         }
         // 3.2: Cmd or Ctrl with Enter asks; a plain Enter is a new line.
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {

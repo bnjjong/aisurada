@@ -64,6 +64,7 @@ export interface AskClaudeArgs {
   timeoutSeconds: number;
   keepAlive: false;
   persona: string;
+  seed?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export interface AskRequest {
@@ -316,6 +317,16 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
         htmlPath: request.htmlRel ? `${request.noteDir}/${request.htmlRel}` : undefined,
         imagePaths: picture.written.map((relative) => `${request.noteDir}/${relative}`),
       });
+      let seed: Array<{ role: 'user' | 'assistant'; content: string }> | undefined;
+      if (request.model.toLowerCase().includes('gemini') && thread.turns.length > 0) {
+        const prior = thread.turns.filter((t) => t.markId === request.markId && isAnswered(t));
+        if (prior.length > 0) {
+          seed = prior.flatMap((t) => [
+            { role: 'user' as const, content: t.question },
+            { role: 'assistant' as const, content: t.answer },
+          ]);
+        }
+      }
       result = await host.askClaude({
         vault: request.vault,
         sessionId: thread.sessionId,
@@ -326,6 +337,7 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
         timeoutSeconds: request.timeoutSeconds,
         keepAlive: false,
         persona: askPersona(request.target, request.heading),
+        ...(seed ? { seed } : {}),
       });
     }
 

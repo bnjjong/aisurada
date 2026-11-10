@@ -755,10 +755,11 @@ function Facts({
   state: WorkspaceState;
   controller: WorkspaceController;
 }) {
+  const savedDraft = controller.data.getFactsDraft(agenda.id);
   const facts = state.vault.facts[agenda.id],
-    [editing, setEditing] = useState(false),
-    [draft, setDraft] = useState(""),
-    [base, setBase] = useState(""),
+    [editing, setEditing] = useState(savedDraft?.editing ?? false),
+    [draft, setDraft] = useState(savedDraft?.draft ?? ""),
+    [base, setBase] = useState(savedDraft?.base ?? ""),
     [clash, setClash] = useState(false),
     [difference, setDifference] = useState(false),
     [busy, setBusy] = useState(false);
@@ -772,6 +773,7 @@ function Facts({
     if (r.ok) {
       setEditing(false);
       setClash(false);
+      controller.data.clearFactsDraft(agenda.id);
     } else if (r.conflict) {
       setBase(asText(r.value?.facts));
       setClash(true);
@@ -781,14 +783,16 @@ function Facts({
     <section className="agenda-facts ag-facts">
       <header className="ag-facts-head">
         <h3>사실층</h3>
-        {facts && !facts.tooLargeToEdit && !editing && (
+        {facts && !facts.tooLargeToEdit && !facts.failed && !editing && (
           <button
             className="btn"
             onClick={() => {
-              setDraft(asText(facts.facts));
-              setBase(asText(facts.facts));
+              const text = asText(facts.facts);
+              setDraft(text);
+              setBase(text);
               setEditing(true);
               setClash(false);
+              controller.data.setFactsDraft(agenda.id, text, text, true);
             }}
           >
             {facts.facts ? "고치기" : "적기"}
@@ -797,6 +801,17 @@ function Facts({
       </header>
       {!facts ? (
         <p>사실층을 읽는 중이에요.</p>
+      ) : facts.failed ? (
+        <p>
+          사실층을 못 읽었어요.{" "}
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void controller.data.loadFacts(agenda.id)}
+          >
+            다시 읽기
+          </button>
+        </p>
       ) : facts.tooLargeToEdit ? (
         <p>
           이 파일이 너무 커서 앱에서 못 고쳐요({String(facts.editLimit)}자를
@@ -819,13 +834,25 @@ function Facts({
           <textarea
             className="ag-facts-area"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setDraft(val);
+              controller.data.setFactsDraft(agenda.id, val, base, true);
+            }}
           />
           <p>
             {draft.trim().length} / {String(facts.limit)}자
           </p>
           <div className="ag-facts-foot">
-            <button onClick={() => setEditing(false)}>취소</button>
+            <button
+              onClick={() => {
+                setEditing(false);
+                setClash(false);
+                controller.data.clearFactsDraft(agenda.id);
+              }}
+            >
+              취소
+            </button>
             <button
               className="btn-primary"
               disabled={busy || draft.trim().length > Number(facts.limit)}
