@@ -5,6 +5,7 @@ import { agendaOrder, HUE_COLORS, railGroupCollapsed } from "./model.ts";
 import { LiveBrandMark } from "./BrandMark.tsx";
 import { RailProjects, useProjectsList } from "@claude-plug/projects";
 import { useSessionBadge } from "@claude-plug/session";
+import { parseRoute } from "../navigation/routes.ts";
 export function Rail({
   controller,
   state,
@@ -17,6 +18,8 @@ export function Rail({
   const LOOSE_GROUP_KEY = "(미분류)";
   const ws = state.workspace!,
     sorted = agendaOrder(ws.agendas, ws.notes);
+  const route = parseRoute(state.route);
+  const activeAgendaId = route.kind === "agenda" ? route.id : null;
   const group = (
     name: string,
     slug: string,
@@ -71,46 +74,51 @@ export function Rail({
           </header>
         )}
         {!collapsed &&
-          agendas.map((a) => (
-            <div
-              className={`rail-agenda ${state.hiddenAgendas.includes(a.id) ? "hidden-agenda" : ""}`}
-              key={a.id}
-            >
-              <button
-                className="agenda-dot"
-                title={`${a.title} 표시 전환`}
-                aria-pressed={!state.hiddenAgendas.includes(a.id)}
-                style={{ color: HUE_COLORS[asText(a.hue)] || "var(--accent)" }}
-                onClick={() =>
-                  controller.filterAgendas(
-                    state.hiddenAgendas.includes(a.id)
-                      ? state.hiddenAgendas.filter((id) => id !== a.id)
-                      : [...state.hiddenAgendas, a.id],
-                  )
-                }
+          agendas.map((a) => {
+            const isActive =
+              activeAgendaId !== null &&
+              (a.id === activeAgendaId || a.slug === activeAgendaId);
+            return (
+              <div
+                className={`rail-agenda ${isActive ? "active" : ""} ${state.hiddenAgendas.includes(a.id) ? "hidden-agenda" : ""}`}
+                key={a.id}
               >
-                ●
-              </button>
-              <button
-                className="agenda-name"
-                onClick={() =>
-                  controller.navigate("/agenda/" + encodeURIComponent(a.id))
-                }
-              >
-                {a.title}
-                <small>
-                  {ws.notes.filter((n) => n.agendaId === a.id).length}
-                </small>
-              </button>
-              <button
-                className="agenda-edit"
-                aria-label={`${a.title} 아젠다 편집`}
-                onClick={() => controller.form({ kind: "agenda", id: a.id })}
-              >
-                ⋯
-              </button>
-            </div>
-          ))}
+                <button
+                  className="agenda-dot"
+                  title={`${a.title} 표시 전환`}
+                  aria-pressed={!state.hiddenAgendas.includes(a.id)}
+                  style={{ color: HUE_COLORS[asText(a.hue)] || "var(--accent)" }}
+                  onClick={() =>
+                    controller.filterAgendas(
+                      state.hiddenAgendas.includes(a.id)
+                        ? state.hiddenAgendas.filter((id) => id !== a.id)
+                        : [...state.hiddenAgendas, a.id],
+                    )
+                  }
+                >
+                  ●
+                </button>
+                <button
+                  className="agenda-name"
+                  onClick={() =>
+                    controller.navigate("/agenda/" + encodeURIComponent(a.id))
+                  }
+                >
+                  {a.title}
+                  <small>
+                    {ws.notes.filter((n) => n.agendaId === a.id).length}
+                  </small>
+                </button>
+                <button
+                  className="agenda-edit"
+                  aria-label={`${a.title} 아젠다 편집`}
+                  onClick={() => controller.form({ kind: "agenda", id: a.id })}
+                >
+                  ⋯
+                </button>
+              </div>
+            );
+          })}
       </section>
     );
   };
@@ -135,7 +143,7 @@ export function Rail({
           ["guide", "연동 가이드"],
         ].map(([path, label]) => (
           <button
-            className={`nav-item ${state.route.startsWith("/" + path) || (path === "calendar" && state.route.startsWith("/agenda")) ? "active" : ""}`}
+            className={`nav-item ${state.route.startsWith("/" + path) ? "active" : ""}`}
             key={path}
             onClick={() => controller.navigate("/" + path)}
           >

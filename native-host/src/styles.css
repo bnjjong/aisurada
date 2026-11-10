@@ -382,7 +382,9 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .agenda-summary header button { width: auto; padding: 6px; font-size: 10px; }
 .rail-group { margin: 16px 0; }
 .rail-group header > button:first-child { flex: 1; font-weight: 600; }
-.rail-agenda { display: flex; align-items: center; min-width: 0; }
+.rail-agenda { display: flex; align-items: center; min-width: 0; border-radius: 8px; padding: 0 4px; }
+.rail-agenda.active { background: var(--surface); color: var(--accent); }
+.rail-agenda.active .agenda-name { font-weight: 600; }
 .rail-agenda button { padding: 9px 5px; }
 .rail-agenda .agenda-dot { flex: none; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 12px; padding: 0; background: transparent !important; color: var(--accent); }
 .rail-agenda .agenda-name { min-width: 0; flex: 1; align-items: center; }

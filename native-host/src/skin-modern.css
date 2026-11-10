@@ -149,7 +149,8 @@
 :root[data-skin="modern"] .tab-item.tab-selected { background: var(--surface); border-bottom-color: var(--accent); }
 :root[data-skin="modern"] .tab-button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
 :root[data-skin="modern"] .workspace-rail nav button { padding: 9px 12px; }
-:root[data-skin="modern"] .workspace-rail nav button.active { background: var(--sunken); color: var(--ink); font-weight: 600; }
+:root[data-skin="modern"] .rail-agenda { border-radius: 8px; padding: 2px 6px; }
+:root[data-skin="modern"] :is(.workspace-rail nav button.active, .rail-agenda.active) { background: var(--sunken); color: var(--ink); font-weight: 600; }
 :root[data-skin="modern"] .brand-mark { border-radius: calc(var(--bs) * .25); }
 :root[data-skin="modern"] :is(.sample-badge, .format-badge, .record-badge, .tag-chip, .session-chip, .vb-savestate) { border-radius: 6px; }
 

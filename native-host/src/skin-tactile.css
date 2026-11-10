@@ -202,8 +202,9 @@
 :root[data-skin="tactile"] .workspace-screen { --screen-pad: 8px; padding: 8px; gap: 0; }
 :root[data-skin="tactile"] .workspace-rail { background: transparent; border-right: 0; padding: 20px 12px 12px; }
 :root[data-skin="tactile"] .workspace-rail nav button { padding: 10px 16px; border-radius: 999px; font-weight: 600; }
-:root[data-skin="tactile"] .workspace-rail nav button.active { background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); }
-:root[data-skin="tactile"] .workspace-rail nav button.active:hover:not(:disabled) { background: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .rail-agenda { border-radius: 999px; padding: 2px 10px; }
+:root[data-skin="tactile"] :is(.workspace-rail nav button.active, .rail-agenda.active) { background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] :is(.workspace-rail nav button.active, .rail-agenda.active):hover:not(:disabled) { background: var(--surface); box-shadow: var(--sh-1); }
 :root[data-skin="tactile"] .screen-content { border-radius: 24px; background: var(--surface); box-shadow: var(--sh-1); }
 :root[data-skin="tactile"] .note-window { background: var(--surface); }
 :root[data-skin="tactile"] .read-failure, :root[data-skin="tactile"] .vault-warning, :root[data-skin="tactile"] .vault-write-failures { margin: 8px 8px 0; border: 0; border-radius: 16px; background: var(--soft); }
