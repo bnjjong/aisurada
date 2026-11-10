@@ -3,6 +3,7 @@ package aisurada.git;
 import aisurada.config.EngineConfig;
 import aisurada.engine.EngineExecutor;
 import aisurada.engine.EngineResult;
+import aisurada.engine.WritePipeline;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 /** 실제 git 커밋과 시계 주입으로 작성자 전환·복구·공통 쓰기 차례를 검증한다. */
 public final class VaultGitTest {
@@ -24,7 +26,7 @@ public final class VaultGitTest {
         // test.sh가 실제 4부 없는 jar를 classpath에 둔다.
         System.setProperty("aisurada.enable.part4","true");
         try {
-            commits(); blocking(); retries(); pendingValues(); ids(); pipeline(); factsPipeline(); templatesPipeline(); process();
+            commits(); blocking(); retries(); pendingValues(); ids(); pipeline(); factsPipeline(); templatesPipeline(); process(); maintenanceLocking();
             System.out.println("vault git: "+checks+" checks passed");
         } finally {
             System.clearProperty("aisurada.enable.part4");
@@ -267,6 +269,48 @@ public final class VaultGitTest {
         run(v,404,"get-template","absent");write(v,"outside","read request");VaultGit.serving(v).commit("shutdown");
         check(message(v).contains("Aisurada-Writer: outside\n"),"template get does not record writer");
         EngineConfig.activate(null);
+    }
+    private static void maintenanceLocking() throws Exception {
+        Path v = repo(); TestClock clock = new TestClock(); VaultGit g = new VaultGit(v, true, 300, clock, null);
+        write(v, "notes/demo/root/note.md", note(ID, "정비 잠금 검사"));
+        g.afterWrite(false, null);
+        clock.advance(301);
+
+        java.util.concurrent.CountDownLatch locked = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        Thread writer = new Thread(() -> {
+            ReentrantLock writeLock = WritePipeline.tryAcquireWriteLock(v);
+            check(writeLock != null, "writer thread acquired write lock");
+            locked.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                writeLock.unlock();
+            }
+        });
+        writer.start();
+        locked.await();
+
+        int before = count(v);
+        g.tick();
+        eq(count(v), before, "maintenance commit skipped while write lock is busy");
+        check(g.hasPending(), "pending changes preserved during skip");
+
+        clock.advance(4);
+        g.tick();
+        eq(count(v), before, "still waiting within 5-second backoff while lock is busy");
+
+        release.countDown();
+        writer.join();
+
+        g.tick();
+        eq(count(v), before, "still waiting within 5-second backoff after lock released");
+        clock.advance(2);
+        g.tick();
+        eq(count(v), before + 1, "maintenance committed after 5-second delay");
+        check(!g.hasPending(), "pending cleared after maintenance commit");
     }
     private static EngineResult run(Path v,int code,String... argv){EngineResult r=EngineExecutor.execute(v,argv,true,System.currentTimeMillis());eq(r.errorCode(),code,"pipeline result "+Arrays.toString(argv)+": "+new String(r.stderrBytes(),StandardCharsets.UTF_8));return r;}
     private static VaultGit.CommandResult result(int code,String text){return new VaultGit.CommandResult(code,text.getBytes(StandardCharsets.UTF_8));}

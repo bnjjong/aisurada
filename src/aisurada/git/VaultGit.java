@@ -1,6 +1,7 @@
 package aisurada.git;
 
 import aisurada.config.EngineConfig;
+import aisurada.engine.WritePipeline;
 import aisurada.text.Trim;
 
 import java.io.IOException;
@@ -82,9 +83,29 @@ public final class VaultGit {
         try {
             Instant now = clock.instant();
             if (pairs.isEmpty() || now.isBefore(retryAfter)) return;
-            if (Duration.between(lastWrite, now).getSeconds() >= idleSeconds) attemptLocked("idle");
-            else if (Duration.between(firstWrite, now).compareTo(Duration.ofMinutes(15)) >= 0) attemptLocked("overdue");
+            if (Duration.between(lastWrite, now).getSeconds() >= idleSeconds) attemptMaintenance("idle", now);
+            else if (Duration.between(firstWrite, now).compareTo(Duration.ofMinutes(15)) >= 0) attemptMaintenance("overdue", now);
         } finally { lock.unlock(); }
+    }
+
+    private void attemptMaintenance(String reason, Instant now) {
+        ReentrantLock writeLock = WritePipeline.tryAcquireWriteLock(vault);
+        if (writeLock == null) {
+            // [결정 2-나] 쓰기 작업 중이면 정비 커밋은 건너뛰고 5초 뒤 다시 시도한다 (교착 방지 및 불완전 커밋 차단)
+            retryAfter = now.plusSeconds(5);
+            return;
+        }
+        try {
+            attemptLocked(reason);
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    boolean hasPending() {
+        lock.lock();
+        try { return !pairs.isEmpty(); }
+        finally { lock.unlock(); }
     }
 
     /** startup/shutdown은 재시도 시각을 기다리지 않는다. 커밋 실패는 쓰기의 실패가 아니다. */

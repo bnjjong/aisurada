@@ -269,27 +269,24 @@ test('sample transition finishes an in-flight read without launching its stale s
   assert.equal(h.calls.filter(call => call.command === 'sidecar_call').length, before);
 });
 
-test('closeMainWindow asks confirmation when note windows are open and prevents reentrancy', async t => {
-  const confirms = [];
+test('closeMainWindow requests note window closure and waits before exiting', async t => {
+  let noteWindows = ['note-1', 'note-2'];
   const h = harness(t, {
     invoke: async (command) => {
-      if (command === 'note_windows') return ['note-1', 'note-2'];
+      if (command === 'note_windows') return noteWindows;
+      if (command === 'close_note_windows') {
+        // 노트 창들이 각자의 닫기 절차를 마치고 비워짐
+        noteWindows = [];
+        return;
+      }
       if (command === 'exit_app') return;
     },
   });
-  h.services.host.confirmLeave = async (msg) => { confirms.push(msg); return false; };
   setLast(h);
   await h.controller.boot();
 
   const closed = await h.controller.closeMainWindow();
-  assert.equal(closed, false);
-  assert.equal(confirms.length, 1);
-  assert.match(confirms[0], /열려 있는 독립 노트 창이 2개/);
-  assert.equal(h.calls.some(c => c.command === 'exit_app'), false);
-
-  // 허용 시 exit_app 호출 확인
-  h.services.host.confirmLeave = async () => true;
-  const closedOk = await h.controller.closeMainWindow();
-  assert.equal(closedOk, true);
+  assert.equal(closed, true);
+  assert.equal(h.calls.some(c => c.command === 'close_note_windows'), true);
   assert.equal(h.calls.some(c => c.command === 'exit_app'), true);
 });

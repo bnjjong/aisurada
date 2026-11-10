@@ -190,7 +190,7 @@ if (location.pathname.startsWith("/note-window/")) {
       },
     });
     try {
-      await invoke("write_attachment_bytes", new Uint8Array(5000001), {
+      await invoke("write_attachment_bytes", new Uint8Array(50000001), {
         headers: {
           "x-ais-note-dir": encodeURIComponent(cfg.noteDir),
           "x-ais-name": "x.png",

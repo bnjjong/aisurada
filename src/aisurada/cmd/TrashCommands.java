@@ -64,8 +64,10 @@ public final class TrashCommands {
         if (!Files.exists(source)) throw new AisException(400, "옮길 노트 파일이 없다: " + path);
         NoteMover.move(source, archive(vault, file));
         List<TrashReader.TrashRecord> updated = new ArrayList<>(); updated.add(entry);
-        entries.stream().filter(r -> !r.trashId().equals(trashId)).forEach(updated::add); save(vault, updated);
+        entries.stream().filter(r -> !r.trashId().equals(trashId)).forEach(updated::add);
+        List<Map<String, Object>> autoPurged = save(vault, updated);
         Map<String, Object> result = row("trashId", trashId, "id", id, "title", note.meta().title(), "originalPath", path, "file", file);
+        if (!autoPurged.isEmpty()) result.put("autoPurged", autoPurged);
         String category = note.meta().favoriteCategory();
         if (note.meta().favorite()) result.put("wasFavorite", true);
         if (category != null) result.put("favoriteCategory", category);
@@ -129,8 +131,9 @@ public final class TrashCommands {
         if (!scan.skipped().isEmpty()) System.getLogger(TrashCommands.class.getName()).log(System.Logger.Level.WARNING, "못 읽은 휴지통 항목 " + scan.skipped().size() + "개는 다음 쓰기에서 빠진다.");
         var entries = new ArrayList<>(scan.entries()); entries.sort(Comparator.comparingInt(TrashReader.TrashRecord::fileOrder)); return entries;
     }
-    private static void save(Path vault, List<TrashReader.TrashRecord> entries) {
+    private static List<Map<String, Object>> save(Path vault, List<TrashReader.TrashRecord> entries) {
         List<TrashReader.TrashRecord> list = new ArrayList<>(entries);
+        List<Map<String, Object>> autoPurged = new ArrayList<>();
         byte[] bytes = serializeTrash(list);
         // [B3] 1MB(1,000,000 바이트) 초과 시 가장 오래된 항목부터 FIFO 자동 영구 삭제하며 알림과 기록을 남김 (설계 결정 1-가)
         while (bytes.length > 1_000_000 && list.size() > 1) {
@@ -143,9 +146,11 @@ public final class TrashCommands {
                 System.Logger.Level.WARNING,
                 "휴지통 용량 초과(1MB)로 가장 오래된 항목을 영구 삭제함: " + oldest.title() + " (" + oldest.docId() + ")"
             );
+            autoPurged.add(row("trashId", oldest.trashId(), "docId", oldest.docId(), "title", oldest.title(), "file", oldest.file()));
             bytes = serializeTrash(list);
         }
         AtomicWriter.writeAtomic(vault.resolve(".aisurada/trash/trash.json"), bytes);
+        return autoPurged;
     }
 
     private static byte[] serializeTrash(List<TrashReader.TrashRecord> entries) {

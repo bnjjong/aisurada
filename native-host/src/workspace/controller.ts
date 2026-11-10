@@ -60,7 +60,12 @@ export class WorkspaceController {
     this.recentNotes = new RecentNotes(services.storage);
     this.context = context;
     this.tabs = new TabModel(services.storage, context.kind === 'main');
-    this.data = new VaultData(services, () => this.state.workspace, (vault, workspace) => this.patch({ vault, ...(workspace ? { workspace } : {}) }));
+    this.data = new VaultData(
+      services,
+      () => this.state.workspace,
+      (vault, workspace) => this.patch({ vault, ...(workspace ? { workspace } : {}) }),
+      notice => this.notify(notice)
+    );
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
       prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
@@ -463,15 +468,31 @@ export class WorkspaceController {
     if (this.context.kind !== 'main' || this.closingMain || this.disposed) return false;
     this.closingMain = true;
     try {
-      const openNotes = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
-      if (openNotes && openNotes.length > 0) {
-        const ok = await this.services.host.confirmLeave(
-          `열려 있는 독립 노트 창이 ${openNotes.length}개 있어요. 저장되지 않은 내용이 있을 수 있습니다. 모든 창을 닫고 앱을 종료할까요?`
-        );
-        if (!ok) return false;
-      }
       const can = await this.canLeave('앱을 종료할까요?');
       if (!can) return false;
+
+      // 열려 있는 독립 노트 창들을 각자의 안전한 닫기 절차(flush 및 미저장 확인)로 닫는다.
+      const initialNotes = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
+      if (initialNotes && initialNotes.length > 0) {
+        await this.services.host.invoke('close_note_windows').catch(() => {});
+
+        // 모든 노트 창이 닫힐 때까지 최대 10초 대기한다.
+        const start = Date.now();
+        while (Date.now() - start < 10_000) {
+          const remaining = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
+          if (!remaining || remaining.length === 0) {
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // 여전히 닫히지 않은 노트 창이 남아있다면(사용자가 취소했거나 저장이 걸린 경우), 앱 종료를 중단한다.
+        const finalCheck = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
+        if (finalCheck && finalCheck.length > 0) {
+          return false;
+        }
+      }
+
       try {
         await this.services.host.invoke('exit_app');
       } catch {

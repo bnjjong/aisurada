@@ -651,28 +651,56 @@ public final class FrontmatterWriter {
         int indent = 2 * depth;
         String indentStr = " ".repeat(indent);
 
-        int count = lines.length;
-        if (s.endsWith("\n") && count > 0 && lines[count - 1].isEmpty()) {
-            count--;
+        int lastContentIdx = -1;
+        for (int i = lines.length - 1; i >= 0; i--) {
+            if (!lines[i].isEmpty()) {
+                lastContentIdx = i;
+                break;
+            }
         }
 
-        for (int i = 0; i < count; i++) {
-            String line = lines[i];
-            if (line.isEmpty()) {
+        if (lastContentIdx == -1) {
+            for (int i = 0; i < lines.length - 1; i++) {
                 sb.append("\n");
-                continue;
             }
+            return sb.toString();
+        }
+
+        int i = 0;
+        while (i < lines.length && lines[i].isEmpty()) {
+            sb.append("\n");
+            i++;
+        }
+
+        while (i <= lastContentIdx) {
+            String line = lines[i];
             if (line.startsWith(" ")) {
                 sb.append(indentStr).append(line);
             } else {
-                String folded = foldLine(line, w, indentStr);
-                sb.append(folded);
+                sb.append(foldLine(line, w, indentStr));
             }
-            if (i < count - 1) {
-                String nextLine = lines[i + 1];
-                // 빈 줄(\n\n)이 있을 때도 SnakeYAML의 folded block 언폴딩 규격(빈 줄 수 + 1)을 만족하도록 개행 유지
-                boolean needsExtraBlankLine = !line.startsWith(" ") && !nextLine.startsWith(" ");
-                sb.append(needsExtraBlankLine ? "\n\n" : "\n");
+
+            if (i < lastContentIdx) {
+                int next = i + 1;
+                while (next <= lastContentIdx && lines[next].isEmpty()) {
+                    next++;
+                }
+                int k = next - i; // 원본 개행 개수
+                // 둘 다 일반 줄인 경우에만 SnakeYAML의 folded scalar 파싱 시 개행이 접히므로 k+1개의 개행을 출력
+                boolean bothPlain = !line.startsWith(" ") && !lines[next].startsWith(" ");
+                int newlines = bothPlain ? k + 1 : k;
+                for (int n = 0; n < newlines; n++) {
+                    sb.append("\n");
+                }
+                i = next;
+            } else {
+                if (chomping == '+') {
+                    int trailingBlanks = lines.length - 1 - lastContentIdx;
+                    for (int j = 0; j < trailingBlanks - 1; j++) {
+                        sb.append("\n");
+                    }
+                }
+                i++;
             }
         }
         return sb.toString();
