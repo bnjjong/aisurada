@@ -262,6 +262,7 @@ fn run_cli_process(
     // 환경 변수 설정
     cmd.env("PATH", augmented_path());
     cmd.env("AISURADA_VAULT", vault);
+    cmd.env("GEMINI_CLI_TRUST_WORKSPACE", "true");
 
     match process::run_typed(
         &mut cmd,
@@ -347,8 +348,8 @@ fn check_route(route: Option<&str>) -> Result<(), String> {
 
 pub fn map_gemini_model(model: &str) -> &str {
     match model {
-        "gemini-3-8-high" | "gemini-3.8-high" | "gemini-high" => "gemini-3.8-high",
-        "gemini-3-8-medium" | "gemini-3.8-medium" | "gemini-medium" => "gemini-3.8-medium",
+        "gemini-3-8-high" | "gemini-3.8-high" | "gemini-high" => "gemini-3.8-flash",
+        "gemini-3-8-medium" | "gemini-3.8-medium" | "gemini-medium" => "gemini-3.8-flash",
         "gemini-3-8-flash" | "gemini-3.8-flash" | "gemini-flash" => "gemini-3.8-flash",
         other => other,
     }
@@ -384,6 +385,7 @@ fn execute_gemini_ask(
         input_text.clone(),
         "--model".to_string(),
         mapped_model.to_string(),
+        "--skip-trust".to_string(),
     ];
 
     match run_cli_process(
@@ -1103,8 +1105,8 @@ exit 1
 
     #[test]
     fn test_map_gemini_model() {
-        assert_eq!(map_gemini_model("gemini-3-8-high"), "gemini-3.8-high");
-        assert_eq!(map_gemini_model("gemini-3-8-medium"), "gemini-3.8-medium");
+        assert_eq!(map_gemini_model("gemini-3-8-high"), "gemini-3.8-flash");
+        assert_eq!(map_gemini_model("gemini-3-8-medium"), "gemini-3.8-flash");
         assert_eq!(map_gemini_model("gemini-3-8-flash"), "gemini-3.8-flash");
         assert_eq!(map_gemini_model("gemini-pro"), "gemini-pro");
     }
@@ -1112,11 +1114,16 @@ exit 1
     #[test]
     fn test_gemini_missing_binary_message() {
         let _lock = ENV_LOCK.lock().unwrap();
+        let orig_home = env::var("HOME").ok();
+        let orig_path = env::var("PATH").ok();
+        env::set_var("HOME", "/nonexistent_home_dir_for_test");
+        env::set_var("PATH", "/nonexistent_path_dir_for_test");
         env::set_var("AISURADA_GEMINI_BIN", "/nonexistent/gemini-bin");
+
         let res = execute_ask(AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: "test-sess".to_string(),
-            model: "gemini-3-8-flash".to_string(),
+            model: "gemini-3-8-high".to_string(),
             effort: "high".to_string(),
             prompt: "안녕".to_string(),
             resume: false,
@@ -1129,6 +1136,17 @@ exit 1
             resume_only: None,
             persona: None,
         });
+
+        if let Some(h) = orig_home {
+            env::set_var("HOME", h);
+        } else {
+            env::remove_var("HOME");
+        }
+        if let Some(p) = orig_path {
+            env::set_var("PATH", p);
+        } else {
+            env::remove_var("PATH");
+        }
         env::remove_var("AISURADA_GEMINI_BIN");
 
         assert!(!res.ok);
@@ -1140,7 +1158,18 @@ exit 1
         let _lock = ENV_LOCK.lock().unwrap();
         let temp = tempdir().unwrap();
         let fake = temp.path().join("gemini");
-        let script = "#!/bin/sh\necho 'Gemini Flash 답변입니다'\nexit 0\n";
+        let script = r#"#!/bin/sh
+if ! echo "$@" | grep -q -- "--skip-trust"; then
+  echo "Missing --skip-trust" >&2
+  exit 1
+fi
+if ! echo "$@" | grep -q -- "--model gemini-3.8-flash"; then
+  echo "Missing or incorrect --model" >&2
+  exit 1
+fi
+echo 'Gemini Flash 답변입니다'
+exit 0
+"#;
         fs::write(&fake, script).unwrap();
         let mut perms = fs::metadata(&fake).unwrap().permissions();
         perms.set_mode(0o755);
@@ -1150,7 +1179,7 @@ exit 1
         let res = execute_ask(AskClaudeArgs {
             vault: temp.path().to_str().unwrap().to_string(),
             session_id: "test-sess".to_string(),
-            model: "gemini-3-8-flash".to_string(),
+            model: "gemini-3-8-high".to_string(),
             effort: "high".to_string(),
             prompt: "테스트 질문".to_string(),
             resume: false,
@@ -1165,7 +1194,7 @@ exit 1
         });
         env::remove_var("AISURADA_GEMINI_BIN");
 
-        assert!(res.ok);
+        assert!(res.ok, "Expected ok but got error: {:?}", res.error);
         assert_eq!(res.answer, "Gemini Flash 답변입니다");
     }
 }
