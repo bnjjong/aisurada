@@ -156,7 +156,13 @@ fn is_executable(path: &Path) -> bool {
         return path
             .file_name()
             .and_then(|v| v.to_str())
-            .is_some_and(|v| v.to_ascii_lowercase().ends_with(".app"));
+            .is_some_and(|v| {
+                let lower = v.to_ascii_lowercase();
+                lower.ends_with(".app")
+                    || lower.ends_with(".prefpane")
+                    || lower.ends_with(".workflow")
+                    || lower.ends_with(".scptd")
+            });
     }
     if !path.is_file() {
         return false;
@@ -168,8 +174,18 @@ fn is_executable(path: &Path) -> bool {
             return true;
         }
     }
+    const BLOCKED_EXTENSIONS: &[&str] = &[
+        // macOS 실행/패키지/설정/프로파일/스크립트
+        "command", "tool", "terminal", "jar", "py", "pkg", "mpkg", "mobileconfig",
+        "prefpane", "workflow", "action", "scpt", "applescript", "sh", "bash", "zsh",
+        "csh", "ksh", "fish", "rb", "pl", "php",
+        // Windows/DOS 실행/스크립트
+        "exe", "bat", "cmd", "vbs", "vbe", "js", "jse", "wsf", "wsh", "ps1", "psm1", "msi",
+        // 웹링크 및 바로가기
+        "webloc", "url", "lnk",
+    ];
     path.extension().and_then(|v| v.to_str()).is_some_and(|v| {
-        ["command", "tool", "terminal", "jar", "py"].contains(&v.to_ascii_lowercase().as_str())
+        BLOCKED_EXTENSIONS.contains(&v.to_ascii_lowercase().as_str())
     })
 }
 
@@ -280,7 +296,7 @@ mod tests {
         let (temp, note) = setup();
         let vault = temp.path().to_str().unwrap();
         let outside = tempfile::tempdir().unwrap();
-        for name in ["x.pdf", "x.sh", "x.pkg", "x.html", "x.svg"] {
+        for name in ["x.pdf", "x.txt", "x.html", "x.svg", "x.png"] {
             let path = note.join(name);
             fs::write(&path, b"data").unwrap();
             assert_eq!(
@@ -288,7 +304,17 @@ mod tests {
                 path.canonicalize().unwrap()
             );
         }
-        for name in ["x.COMMAND", "x.ToOl", "x.terminal", "x.jar", "x.PY"] {
+        for name in [
+            "x.COMMAND",
+            "x.ToOl",
+            "x.terminal",
+            "x.jar",
+            "x.PY",
+            "x.pkg",
+            "x.mobileconfig",
+            "x.sh",
+            "x.exe",
+        ] {
             let path = note.join(name);
             fs::write(&path, b"data").unwrap();
             assert!(open_target(vault, path.to_str().unwrap())

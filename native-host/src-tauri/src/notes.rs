@@ -133,6 +133,15 @@ fn create<R: Runtime>(
     } else {
         b = b.center()
     };
+    let b = b.on_navigation(|url| {
+        let s = url.as_str();
+        s.starts_with("tauri://")
+            || s.starts_with("http://localhost")
+            || s.starts_with("https://tauri.localhost")
+            || s.starts_with("asset://")
+            || s.starts_with("data:")
+            || s.starts_with("about:blank")
+    });
     b.build().map_err(|e| e.to_string())
 }
 #[tauri::command]

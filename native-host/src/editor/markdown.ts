@@ -70,8 +70,8 @@ const CODE_BLOCK: MultilineElementTransformer = {
   },
   export: node => {
     if (!$isCodeNode(node)) return null;
-    const raw = (item: LexicalNode): string => $isAnnotation(item) ? `<!--ais${item.getKind()}:${item.getIDs()[0]}-->${item.getChildren().map(raw).join('')}<!--/ais${item.getKind()}:${item.getIDs()[0]}-->`
-      : $isElementNode(item) ? item.getChildren().map(raw).join('') : item.getTextContent();
+    // [B4] 코드 블록 내부에는 HTML 주석 표식(<!--aisc:-->)을 남기지 않고 순수 텍스트만 추출하여 코드 오염 방지
+    const raw = (item: LexicalNode): string => $isElementNode(item) ? item.getChildren().map(raw).join('') : item.getTextContent();
     const body = node.getChildren().map(raw).join(''), runs = body.match(/`{3,}/g);
     let fence = $getState(node, fenceState);
     if (body.includes(fence) && runs) fence = '`'.repeat(Math.max(...runs.map(run => run.length)) + 1);
@@ -264,6 +264,18 @@ export function $tableTSV(table: TableNode, selected?: Set<string>): string {
   return table.getChildren<TableRowNode>().map(row => row.getChildren<TableCellNode>().filter(cell => !selected || selected.has(cell.getKey()))
     .map(cell => cell.getTextContent().replace(/[\r\n\t]/g, ' ')).join('\t')).filter(Boolean).join('\n') + '\n';
 }
+// [B8] 표 칸의 역슬래시 짝을 보존하며 \n만 개행으로 치환 (C:\\new 등이 오염되지 않도록 방어)
+function unescapeTableCellNewlines(text: string): string {
+  return text.replace(/(\\+)(n)?/g, (_match, slashes: string, nLetter?: string) => {
+    const isOdd = slashes.length % 2 === 1;
+    const preserved = '\\'.repeat(Math.floor(slashes.length / 2));
+    if (nLetter) {
+      return isOdd ? (preserved + '\n') : (preserved + '\\n');
+    }
+    return preserved + (isOdd ? '\\' : '');
+  });
+}
+
 const TABLE: ElementTransformer = {
   type: 'element', dependencies: [TableNode, TableRowNode, TableCellNode], regExp: /^\|.*\|\s?$/,
   replace: (parent, children, match, importing) => {
@@ -279,7 +291,7 @@ const TABLE: ElementTransformer = {
     const table = $isTableNode(previous) ? previous : $createTableNode(), row = $createTableRowNode();
     for (const text of tableCells(match[0])) {
       const cell = $createTableCellNode(TableCellHeaderStates.NO_STATUS);
-      table.append(row); row.append(cell); importInto(mapOutsideCode(text, part => part.replace(/\\n/g, '\n')), cell, true, false);
+      table.append(row); row.append(cell); importInto(mapOutsideCode(text, part => unescapeTableCellNewlines(part)), cell, true, false);
     }
     if ($isTableNode(previous)) parent.remove(); else parent.replace(table);
     if (!importing) table.getLastDescendant()?.selectEnd();

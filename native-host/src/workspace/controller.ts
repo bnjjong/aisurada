@@ -458,6 +458,18 @@ export class WorkspaceController {
     }
   };
 
+  closeMainWindow = async (): Promise<boolean> => {
+    if (this.context.kind !== 'main' || this.disposed) return false;
+    const can = await this.canLeave('앱을 종료할까요?');
+    if (!can) return false;
+    try {
+      await this.services.host.invoke('exit_app');
+    } catch {
+      await this.services.closeWindow?.();
+    }
+    return true;
+  };
+
   dismissNoteCloseDialog = () => {
     this.patch({ noteCloseDialog: null });
   };
@@ -627,7 +639,7 @@ export class WorkspaceController {
     } catch { this.notify('폴더 선택 창을 열 수 없어요'); return null; }
   };
 
-  private async canLeave(): Promise<boolean> {
+  private async canLeave(question = '워크스페이스를 바꿀까요?'): Promise<boolean> {
     if (!this.state.workspace || this.state.workspace.sample) return true;
     const pending = this.services.pending;
     let settled = false;
@@ -651,7 +663,7 @@ export class WorkspaceController {
     if (count > 0) reasons.push(`저장하지 못한 글이 ${count}개 있어요.`);
     if (waiting > 0) reasons.push(`답을 기다리는 물음이 ${waiting}개 있어요.`);
     if (unsavedA > 0) reasons.push(`저장하지 못한 AI 답이 ${unsavedA}개 있어요.`);
-    reasons.push('워크스페이스를 바꿀까요?');
+    reasons.push(question);
     return await this.services.host.confirmLeave(reasons.join(' '));
   }
 

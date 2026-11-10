@@ -22,9 +22,13 @@ export function fenceTracker() {
 export const fenceLine = (line: string) => /^[ \t]*`{3,}/.test(line);
 
 // 9.4: the lines that open a block and so never join the line before them.
-const blockLine = (line: string) => /^(?:#{1,6}\s|>|\s*(?:[-*+]|\d+\.)\s|\s*\|.*\|\s*$)/.test(line) || fenceLine(line)
+const blockLine = (line: string) => /^(?:#{1,6}\s|>|\s*(?:[-*+]|\d+[.)])\s|\s*\|.*\|\s*$)/.test(line) || fenceLine(line)
   || /^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
-const hardBreak = (line: string) => /(?: {2,}|\\)$/.test(line);
+const hardBreak = (line: string) => {
+  if (/ {2,}$/.test(line)) return true;
+  const slashes = line.match(/\\+$/)?.[0].length || 0;
+  return slashes % 2 === 1;
+};
 
 export function foldParagraphs(input: string): string {
   const lines = input.replace(/\r\n?/g, '\n').split('\n'), output: string[] = [], fenced = fenceTracker();
@@ -104,12 +108,13 @@ export function closeBlockEmphasis(markdown: string, paragraphs = false): string
 }
 
 // C186: code lines that look like list items keep their spaces.
+const isHrLine = (line: string) => /^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
 export function doubleListIndent(text: string): string {
   const fenced = fenceTracker();
-  return text.split('\n').map(line => fenced(line) ? line : line.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/, indent => indent + indent)).join('\n');
+  return text.split('\n').map(line => (fenced(line) || isHrLine(line)) ? line : line.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/, indent => indent + indent)).join('\n');
 }
 export function halveListIndent(text: string): string {
-  return text.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/gm, indent => ' '.repeat(Math.round(indent.length / 2)));
+  return text.split('\n').map(line => isHrLine(line) ? line : line.replace(/^( +)(?=(?:[-*+]|\d+[.)])\s)/, indent => ' '.repeat(Math.round(indent.length / 2)))).join('\n');
 }
 export function tableCells(line: string): string[] {
   let text = line.trim().slice(1);
