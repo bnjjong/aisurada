@@ -34,19 +34,41 @@ export const movedTime = (time: string, delta: number, snap: boolean): string | 
   const next = Math.max(0, Math.min(top, from + (snap ? Math.round(delta / 15) * 15 : delta)));
   return (delta > 0 && next < from) || (delta < 0 && next > from) ? null : clockAt(next);
 };
-// 일정 하나가 일 보기에서 자리를 잡는 분. 서로 겹치는지 줄을 나눌 때 쓴다.
+// 1분당 px 배율(1.2px)과 일정 하나가 일 보기에서 자리를 잡는 분(60분 = 72px)
+const SCALE = 1.2;
 const SLOT = 60;
+const CARD_HEIGHT = SLOT * SCALE; // 72px
 export function lanes(notes: Note[]) {
   const ends: number[] = [],
-    map = new Map<string, number>();
-  for (const n of [...notes].sort((a, b) => a.time.localeCompare(b.time))) {
+    map = new Map<string, number>(),
+    counts = new Map<string, number>();
+  const sorted = [...notes].sort((a, b) => a.time.localeCompare(b.time));
+  for (const n of sorted) {
     const start = minute(n.time),
       i = ends.findIndex((end) => end <= start);
     const lane = i < 0 ? ends.length : i;
     ends[lane] = start + SLOT;
     map.set(n.id, lane);
   }
-  return { map, count: ends.length };
+  let cluster: Note[] = [],
+    clusterEnd = -1;
+  for (const n of sorted) {
+    const start = minute(n.time);
+    if (cluster.length > 0 && start >= clusterEnd) {
+      const groupCount =
+        Math.max(...cluster.map((x) => map.get(x.id) ?? 0)) + 1;
+      for (const x of cluster) counts.set(x.id, groupCount);
+      cluster = [];
+    }
+    cluster.push(n);
+    clusterEnd = Math.max(clusterEnd, start + SLOT);
+  }
+  if (cluster.length > 0) {
+    const groupCount =
+      Math.max(...cluster.map((x) => map.get(x.id) ?? 0)) + 1;
+    for (const x of cluster) counts.set(x.id, groupCount);
+  }
+  return { map, count: ends.length, counts };
 }
 export function canPlaceAt(
   note: Note,
@@ -170,10 +192,10 @@ export function Calendar({
             ) : (
               <div
                 className="day-timeline"
-                style={{ height: (end - start) * 48 }}
+                style={{ height: (end - start) * CARD_HEIGHT }}
               >
                 {Array.from({ length: end - start }, (_, i) => (
-                  <div className="hour-line" style={{ top: i * 48 }} key={i}>
+                  <div className="hour-line" style={{ top: i * CARD_HEIGHT }} key={i}>
                     <time>{String(start + i).padStart(2, "0")}:00</time>
                   </div>
                 ))}
@@ -183,100 +205,107 @@ export function Calendar({
                     style={{
                       top:
                         (now.getHours() * 60 + now.getMinutes() - start * 60) *
-                        0.8,
+                        SCALE,
                     }}
                   >
                     지금
                   </div>
                 )}
-                {dayNotes.map((n) => (
-                  <button
-                    className="tl-block note-row"
-                    data-calendar-note={n.id}
-                    key={n.id}
-                    style={{
-                      top: (minute(n.time) - start * 60) * 0.8,
-                      left: `calc(55px + ${((layout.map.get(n.id) || 0) * 90) / Math.max(1, layout.count)}%)`,
-                      width: `calc(${90 / Math.max(1, layout.count)}% - 14px)`,
-                      minHeight: 35,
-                      transform:
-                        dragged?.id === n.id
-                          ? `translateY(${dragged.delta}px)`
-                          : undefined,
-                    }}
-                    onClick={(e) => {
-                      if (e.detail === 0) controller.showPreview(n.id);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        controller.showPreview(n.id);
-                      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                        e.preventDefault();
-                        const next = movedTime(
-                          n.time,
-                          e.key === "ArrowUp" ? -15 : 15,
-                          false,
-                        );
-                        if (next) saveTime(n, next);
-                      }
-                    }}
-                    onPointerDown={(e) => {
-                      if (e.button === 0) {
-                        drag.current = { id: n.id, y: e.clientY, moved: false };
-                        if (e.nativeEvent.isTrusted)
-                          e.currentTarget.setPointerCapture(e.pointerId);
-                      }
-                    }}
-                    onPointerMove={(e) => {
-                      const d = drag.current;
-                      if (d?.id === n.id && Math.abs(e.clientY - d.y) > 4) {
-                        d.moved = true;
-                        setDragged({ id: n.id, delta: e.clientY - d.y });
-                      }
-                    }}
-                    onPointerCancel={() => {
-                      drag.current = null;
-                      setDragged(null);
-                    }}
-                    onPointerUp={(e) => {
-                      const d = drag.current;
-                      if (!d || d.id !== n.id) return;
-                      drag.current = null;
-                      setDragged(null);
-                      if (e.currentTarget.hasPointerCapture(e.pointerId))
-                        e.currentTarget.releasePointerCapture(e.pointerId);
-                      if (!d.moved) {
-                        controller.showPreview(n.id);
-                        return;
-                      }
-                      e.currentTarget.style.pointerEvents = "none";
-                      const hit = document
-                          .elementFromPoint(e.clientX, e.clientY)
-                          ?.closest<HTMLElement>("[data-calendar-note]"),
-                        other = dayNotes.find(
-                          (x) =>
-                            x.id === hit?.dataset.calendarNote && x.id !== n.id,
-                        );
-                      e.currentTarget.style.pointerEvents = "";
-                      if (other) {
-                        saveTime(n, other.time);
-                        saveTime(other, n.time);
-                      } else {
-                        const next = movedTime(
-                          n.time,
-                          (e.clientY - d.y) / 0.8,
-                          true,
-                        );
-                        if (next && canPlaceAt(n, dayNotes, layout, next))
-                          saveTime(n, next);
-                      }
-                    }}
-                  >
-                    <time>{n.time}</time>
-                    <strong>{n.title || "제목 없는 노트"}</strong>
-                  </button>
-                ))}
+                {dayNotes.map((n) => {
+                  const lane = layout.map.get(n.id) || 0;
+                  const laneCount = Math.max(
+                    1,
+                    layout.counts?.get(n.id) || layout.count,
+                  );
+                  return (
+                    <button
+                      className="tl-block"
+                      data-calendar-note={n.id}
+                      key={n.id}
+                      style={{
+                        top: (minute(n.time) - start * 60) * SCALE,
+                        left: `calc(55px + ${(lane * 90) / laneCount}%)`,
+                        width: `calc(${90 / laneCount}% - 14px)`,
+                        height: CARD_HEIGHT,
+                        transform:
+                          dragged?.id === n.id
+                            ? `translateY(${dragged.delta}px)`
+                            : undefined,
+                      }}
+                      onClick={(e) => {
+                        if (e.detail === 0) controller.showPreview(n.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          controller.showPreview(n.id);
+                        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                          e.preventDefault();
+                          const next = movedTime(
+                            n.time,
+                            e.key === "ArrowUp" ? -15 : 15,
+                            false,
+                          );
+                          if (next) saveTime(n, next);
+                        }
+                      }}
+                      onPointerDown={(e) => {
+                        if (e.button === 0) {
+                          drag.current = { id: n.id, y: e.clientY, moved: false };
+                          if (e.nativeEvent.isTrusted)
+                            e.currentTarget.setPointerCapture(e.pointerId);
+                        }
+                      }}
+                      onPointerMove={(e) => {
+                        const d = drag.current;
+                        if (d?.id === n.id && Math.abs(e.clientY - d.y) > 4) {
+                          d.moved = true;
+                          setDragged({ id: n.id, delta: e.clientY - d.y });
+                        }
+                      }}
+                      onPointerCancel={() => {
+                        drag.current = null;
+                        setDragged(null);
+                      }}
+                      onPointerUp={(e) => {
+                        const d = drag.current;
+                        if (!d || d.id !== n.id) return;
+                        drag.current = null;
+                        setDragged(null);
+                        if (e.currentTarget.hasPointerCapture(e.pointerId))
+                          e.currentTarget.releasePointerCapture(e.pointerId);
+                        if (!d.moved) {
+                          controller.showPreview(n.id);
+                          return;
+                        }
+                        e.currentTarget.style.pointerEvents = "none";
+                        const hit = document
+                            .elementFromPoint(e.clientX, e.clientY)
+                            ?.closest<HTMLElement>("[data-calendar-note]"),
+                          other = dayNotes.find(
+                            (x) =>
+                              x.id === hit?.dataset.calendarNote && x.id !== n.id,
+                          );
+                        e.currentTarget.style.pointerEvents = "";
+                        if (other) {
+                          saveTime(n, other.time);
+                          saveTime(other, n.time);
+                        } else {
+                          const next = movedTime(
+                            n.time,
+                            (e.clientY - d.y) / SCALE,
+                            true,
+                          );
+                          if (next && canPlaceAt(n, dayNotes, layout, next))
+                            saveTime(n, next);
+                        }
+                      }}
+                    >
+                      <time>{n.time}</time>
+                      <strong>{n.title || "제목 없는 노트"}</strong>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </>

@@ -357,6 +357,16 @@ test("캘린더 15분 스냅·경계·한 시간 겹침 레인", () => {
   assert.equal(l.map.get("a"), 0);
   assert.equal(l.map.get("b"), 1);
   assert.equal(l.map.get("c"), 0);
+  assert.equal(l.counts.get("a"), 2);
+  assert.equal(l.counts.get("b"), 2);
+  assert.equal(l.counts.get("c"), 2);
+  const separated = lanes([
+    note("x", { time: "09:00" }),
+    note("y", { time: "11:00" }),
+  ]);
+  assert.equal(separated.count, 1);
+  assert.equal(separated.counts.get("x"), 1);
+  assert.equal(separated.counts.get("y"), 1);
 });
 test("겹 화면 Esc 최상위와 같은 이벤트의 하위 중복 닫기 방지", () => {
   const a = Symbol(),

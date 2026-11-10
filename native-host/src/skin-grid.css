@@ -149,3 +149,4 @@
 :root[data-skin="grid"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) { border-bottom-color: var(--strong); }
 :root[data-skin="grid"] .notice { border: 1px solid var(--strong); }
 :root[data-skin="grid"] .vault-write-failures, :root[data-skin="grid"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }
+:root[data-skin="grid"] .tl-block { background: var(--soft); border: 1px solid var(--line); border-left: 3px solid var(--accent); }
