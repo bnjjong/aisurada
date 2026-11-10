@@ -448,6 +448,12 @@ public final class CreateDoc {
         return link;
     }
 
+    private static String formatInvalidVal(Object obj) {
+        if (obj == null) return "null";
+        if (obj instanceof JsonValue jv) return JsonCompact.compact(jv);
+        return String.valueOf(obj);
+    }
+
     private static Map<String, String> validateLinkEntry(Map<?, ?> map) {
         List<String> unknownKeys = new ArrayList<>();
         for (Object k : map.keySet()) {
@@ -463,7 +469,7 @@ public final class CreateDoc {
 
         Object toObj = map.get("to");
         if (!(toObj instanceof String to)) {
-            throw new AisException(400, "links 항목의 to 가 문자열이 아니다: " + (toObj != null ? "\"" + toObj + "\"" : "null"));
+            throw new AisException(400, "links 항목의 to 가 문자열이 아니다: " + formatInvalidVal(toObj));
         }
         if (to.length() > 200) {
             throw new AisException(400, "links 항목의 to 가 너무 길다(최대 200자): " + to.length() + "자");
@@ -471,7 +477,7 @@ public final class CreateDoc {
 
         Object kindObj = map.get("kind");
         if (!(kindObj instanceof String kind)) {
-            throw new AisException(400, "links 항목의 kind 가 문자열이 아니다: " + (kindObj != null ? "\"" + kindObj + "\"" : "null"));
+            throw new AisException(400, "links 항목의 kind 가 문자열이 아니다: " + formatInvalidVal(kindObj));
         }
         if (kind.length() > 200) {
             throw new AisException(400, "links 항목의 kind 가 너무 길다(최대 200자): " + kind.length() + "자");

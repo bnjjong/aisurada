@@ -84,7 +84,8 @@ public final class ResponseFrame {
         int magic = ByteBuffer.wrap(magicBuf).getInt();
         if (magic != MAGIC) {
             String hex = (magic < 0 ? "-" : "") + Long.toHexString(Math.abs((long) magic));
-            throw new FrameException("응답 프레임의 매직이 다르다. 기대=0x574c4731 실제=0x" + hex + ". 소켓 자리에 다른 프로그램이 붙어 있을 수 있다.");
+            String expectedHex = String.format("0x%08x", MAGIC);
+            throw new FrameException("응답 프레임의 매직이 다르다. 기대=" + expectedHex + " 실제=0x" + hex + ". 소켓 자리에 다른 프로그램이 붙어 있을 수 있다.");
         }
 
         // 2. 버전 2바이트 수신 및 즉시 검증 (4.2 2번)

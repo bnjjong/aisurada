@@ -58,7 +58,8 @@ public final class TrashReader {
     private static final LoaderOptions LOADER_OPTIONS;
     static {
         LOADER_OPTIONS = new LoaderOptions();
-        LOADER_OPTIONS.setCodePointLimit(1_000_000);
+        // [B3] 1MB 초과 시에도 정상 복구 및 FIFO 순환 삭제가 가능하도록 파싱 한도를 10MB로 확장
+        LOADER_OPTIONS.setCodePointLimit(10_000_000);
         LOADER_OPTIONS.setMaxAliasesForCollections(50);
         LOADER_OPTIONS.setNestingDepthLimit(50); // 1.8과 같다(Frontmatter 참고)
     }
@@ -74,12 +75,12 @@ public final class TrashReader {
         List<TrashRecord> entries = new ArrayList<>();
         List<SkippedTrash> skipped = new ArrayList<>();
 
-        // 1. 크기 및 UTF-8 검증 (1,000,000 바이트)
+        // 1. 크기 및 UTF-8 검증 (비정상적으로 거대한 파일은 10MB 상한으로 차단, 1MB 초과라도 복구 읽기 허용)
         byte[] rawBytes;
         try {
             long size = Files.size(trashJson);
-            if (size > 1_000_000L) {
-                skipped.add(new SkippedTrash(".aisurada/trash/trash.json", "매니페스트를 못 읽었다"));
+            if (size > 10_000_000L) {
+                skipped.add(new SkippedTrash(".aisurada/trash/trash.json", "매니페스트가 10MB를 초과하여 못 읽었다"));
                 return new ScanResult(entries, skipped);
             }
             rawBytes = Files.readAllBytes(trashJson);
