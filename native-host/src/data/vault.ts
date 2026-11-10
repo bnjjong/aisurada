@@ -50,9 +50,12 @@ export class VaultData {
   private services: WorkspaceServices;
   private workspace: () => Workspace | null;
   private changed: (memory: VaultMemory, workspace?: Workspace) => void;
+  private onNotify?: (notice: string) => void;
   constructor(services: WorkspaceServices, workspace: () => Workspace | null,
-    changed: (memory: VaultMemory, workspace?: Workspace) => void) {
+    changed: (memory: VaultMemory, workspace?: Workspace) => void,
+    onNotify?: (notice: string) => void) {
     this.services = services; this.workspace = workspace; this.changed = changed;
+    this.onNotify = onNotify;
     this.selfWrites = new SelfWrites(() => services.now().getTime());
   }
   getSnapshot = () => this.memory;
@@ -517,6 +520,10 @@ export class VaultData {
       this.setFlag('editing', id, false); this.setFlag('unsaved', id, false); this.clearConflict({ id });
       const current = this.workspace()!;
       this.emit({ ...current, trash: [...current.trash, { ...note, ...response, docId: id }] });
+      if (Array.isArray(response.autoPurged) && response.autoPurged.length > 0) {
+        const titles = response.autoPurged.map((p: any) => p.title || p.docId).join(', ');
+        this.onNotify?.(`휴지통이 1MB를 초과하여 가장 오래된 보관물 '${titles}'을 영구 삭제했어요.`);
+      }
     }));
     if (!result.ok && this.valid(generation)) {
       const current = this.workspace()!;

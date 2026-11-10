@@ -1471,19 +1471,19 @@ body.col-resizing {
 
 /* ───────── 버튼 공용 클래스: .btn-primary ───────── */
 .btn-primary {
-  background: var(--ais-primary, var(--ais-accent, #3b82f6));
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink, #fff);
   border: none;
   font-weight: 500;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--ais-primary, var(--ais-accent, #3b82f6));
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink, #fff);
   filter: brightness(1.1);
 }
 .btn-primary:active:not(:disabled) {
-  background: var(--ais-primary, var(--ais-accent, #3b82f6));
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink, #fff);
   filter: brightness(0.95);
 }
 .btn-primary:disabled {

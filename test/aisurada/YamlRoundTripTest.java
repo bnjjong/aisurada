@@ -17,9 +17,53 @@ public final class YamlRoundTripTest {
         testB7UnderlineNumbers();
         testB2FoldedBlockNewlines();
         testB2FoldedBlockWithBlankLines();
+        testB2FoldedBlockWithIndentedLines();
+        testB2FoldedBlockWithTrailingBlankLines();
         testB2TemplateDescMultipleRoundTrips();
         testGeneralRoundTrip();
         System.out.println("YamlRoundTripTest: " + checks + " checks passed.");
+    }
+
+    /** 접는 블록(>-)에서 빈 줄 다음 들여쓴 줄이 올 때 줄바꿈이 매 저장마다 증식하지 않는지 5회 왕복 검증 */
+    private static void testB2FoldedBlockWithIndentedLines() {
+        String longLine = "이 문장은 78글자를 훌쩍 넘어서 FrontmatterWriter의 foldLine 접는 블록 분기를 강제로 타도록 만든 아주 길고 긴 테스트 문장입니다.";
+        String original = longLine + "\n\n  들여쓴 줄 내용입니다.\n  두 번째 들여쓴 줄입니다.";
+        String current = original;
+
+        for (int cycle = 1; cycle <= 5; cycle++) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", "tpl-00000003");
+            map.put("desc", current);
+
+            String dumped = FrontmatterWriter.dumpGeneralMap(map);
+            Map<String, Object> loaded = Frontmatter.parse(dumped);
+            check(loaded != null, "loaded must not be null at cycle " + cycle);
+            Object loadedDesc = loaded.get("desc");
+            check(loadedDesc instanceof String, "desc must be string at cycle " + cycle);
+            current = (String) loadedDesc;
+            check(original.equals(current), "folded block with indented lines must remain identical after cycle " + cycle + ", but was: [" + current + "]");
+        }
+    }
+
+    /** 접는 블록(>+)에서 끝 빈 줄이 매 저장마다 2배로 늘어나지 않고 원본 개수가 보존되는지 5회 왕복 검증 */
+    private static void testB2FoldedBlockWithTrailingBlankLines() {
+        String longLine = "이 문장은 78글자를 훌쩍 넘어서 FrontmatterWriter의 foldLine 접는 블록 분기를 강제로 타도록 만든 아주 길고 긴 테스트 문장입니다.";
+        String original = longLine + "\n\n";
+        String current = original;
+
+        for (int cycle = 1; cycle <= 5; cycle++) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", "tpl-00000004");
+            map.put("desc", current);
+
+            String dumped = FrontmatterWriter.dumpGeneralMap(map);
+            Map<String, Object> loaded = Frontmatter.parse(dumped);
+            check(loaded != null, "loaded must not be null at cycle " + cycle);
+            Object loadedDesc = loaded.get("desc");
+            check(loadedDesc instanceof String, "desc must be string at cycle " + cycle);
+            current = (String) loadedDesc;
+            check(original.equals(current), "folded block with trailing blank lines must remain identical after cycle " + cycle + ", but was: [" + current + "]");
+        }
     }
 
     /** B2: 접는 블록(>-)에서 빈 줄(\n\n)을 사이에 둔 문단들이 회차를 거듭해도 줄어들지 않고 원본 그대로 보존되는지 검증 */

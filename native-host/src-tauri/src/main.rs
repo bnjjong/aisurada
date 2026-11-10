@@ -120,8 +120,9 @@ fn main() {
                 .page_loaded(webview.label());
         })
         .on_window_event(lifecycle::window_event)
-        .run(tauri::generate_context!())
-        .expect("aisurada native host failed to start");
+        .build(tauri::generate_context!())
+        .expect("aisurada native host failed to build")
+        .run(lifecycle::run_event);
 }
 
 #[cfg(test)]

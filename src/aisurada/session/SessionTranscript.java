@@ -41,22 +41,6 @@ public final class SessionTranscript {
             "localhost", "ipc.localhost", "asset.localhost", "127.0.0.1"
     );
 
-    private record TranscriptCacheKey(Path path, long size, java.nio.file.attribute.FileTime mtime) {}
-    private record CachedFileParse(
-            int lineCount,
-            int skippedCount,
-            List<RawTurn> allTurns,
-            Map<Integer, Map<String, Object>> todosMap,
-            String model,
-            String effort,
-            Long contextTokens,
-            boolean quotaBlocked,
-            Long quotaResetsAt,
-            List<String> rawLines
-    ) {}
-    private static final Map<Path, java.lang.ref.SoftReference<CachedFileParseEntry>> TRANSCRIPT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
-    private record CachedFileParseEntry(TranscriptCacheKey key, CachedFileParse parsed) {}
-
     private SessionTranscript() {}
 
     /**
@@ -169,18 +153,6 @@ public final class SessionTranscript {
             fileBytes = 0;
         }
 
-        java.nio.file.attribute.FileTime mtime;
-        try {
-            mtime = Files.getLastModifiedTime(file);
-        } catch (IOException e) {
-            mtime = null;
-        }
-
-        // 세션 전사 캐시는 runningAgents(서브에이전트 종료 상태), noteMentions, author, URL 등의
-        // 1/2차 파싱 불일치 및 대용량 메모리 점유(누수)를 유발하므로 비활성화하고 매번 정규 파싱을 수행한다.
-        TranscriptCacheKey cacheKey = null;
-        CachedFileParse cached = null;
-
         int lineCount = 0;
         int skippedCount = 0;
         List<RawTurn> allTurns = new ArrayList<>();
@@ -205,44 +177,13 @@ public final class SessionTranscript {
         boolean quotaBlocked = false;
         Long quotaResetsAt = null;
 
-        if (cached != null) {
-            lineCount = cached.lineCount();
-            skippedCount = cached.skippedCount();
-            for (RawTurn t : cached.allTurns()) {
-                allTurns.add(t);
-                if (t.toolUseId != null) toolUseMap.put(t.toolUseId, t);
-                if (includeUrls && t.text != null) extractUrls(t.text, urlCountMap);
-            }
-            todosMap.putAll(cached.todosMap());
-            currentModel = cached.model();
-            currentEffort = cached.effort();
-            currentContextTokens = cached.contextTokens();
-            quotaBlocked = cached.quotaBlocked();
-            quotaResetsAt = cached.quotaResetsAt();
-
-            if (!notesToTrack.isEmpty() && !allTurns.isEmpty()) {
-                int lastTurnIdx = allTurns.size() - 1;
-                for (String raw : cached.rawLines()) {
-                    for (String nid : notesToTrack) {
-                        if (raw.contains(nid)) {
-                            List<Integer> list = noteMentionsMap.get(nid);
-                            if (list.isEmpty() || list.get(list.size() - 1) != lastTurnIdx) {
-                                list.add(lastTurnIdx);
-                            }
-                        }
-                    }
+        try (BufferedReader reader = newFlexibleReader(file)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lineCount++;
+                if (Trim.isBlank(line)) {
+                    continue; // 빈 줄은 안 센다 (7.4)
                 }
-            }
-        } else {
-            List<String> collectedLines = new ArrayList<>();
-            try (BufferedReader reader = newFlexibleReader(file)) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    lineCount++;
-                    if (Trim.isBlank(line)) {
-                        continue; // 빈 줄은 안 센다 (7.4)
-                    }
-                    collectedLines.add(line);
 
                 JsonValue jsonValue;
                 try {
@@ -466,24 +407,7 @@ public final class SessionTranscript {
                 }
             }
         } catch (IOException e) {
-                throw new RuntimeException("사이드카 안에서 실패했다: " + e.getMessage() + ". 자세한 것은 사이드카 로그에 있다.", e);
-            }
-
-            if (cacheKey != null) {
-                CachedFileParse toCache = new CachedFileParse(
-                        lineCount,
-                        skippedCount,
-                        new ArrayList<>(allTurns),
-                        new TreeMap<>(todosMap),
-                        currentModel,
-                        currentEffort,
-                        currentContextTokens,
-                        quotaBlocked,
-                        quotaResetsAt,
-                        collectedLines
-                );
-                TRANSCRIPT_CACHE.put(file, new java.lang.ref.SoftReference<>(new CachedFileParseEntry(cacheKey, toCache)));
-            }
+            throw new RuntimeException("사이드카 안에서 실패했다: " + e.getMessage() + ". 자세한 것은 사이드카 로그에 있다.", e);
         }
 
         // 전체 회차 수

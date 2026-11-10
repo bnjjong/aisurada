@@ -63,6 +63,22 @@ pub fn window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
         _ => {}
     }
 }
+pub fn run_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::RunEvent) {
+    match event {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            let state = app.state::<HostState>();
+            if !state.quitting.load(Ordering::SeqCst) {
+                api.prevent_exit();
+                if let Some(main) = app.get_webview_window("main") {
+                    let _ = main.emit("ais_close_requested", ());
+                } else {
+                    exit_app(app.clone());
+                }
+            }
+        }
+        _ => {}
+    }
+}
 #[tauri::command]
 pub fn exit_app<R: Runtime>(app: tauri::AppHandle<R>) {
     let state = app.state::<HostState>();
