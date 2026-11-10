@@ -4,6 +4,7 @@ import type { MaskedResult, SecretTableStatus } from './ptyBridge.ts';
 import { secretTableProbe, secretTableStatus, maskScrollback } from './ptyBridge.ts';
 import { sliceLogicalLines, formatPinnedNoteBody } from './logicalLines.ts';
 import type { Agenda } from '../../workspace/types.ts';
+import { Modal } from '../Modal.tsx';
 
 interface PinScrollbackModalProps {
   logicalLines: string[];
@@ -155,16 +156,12 @@ export function PinScrollbackModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center'
-    }}>
-      <div className="modal-box pin-modal" onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg-primary, #fff)', borderRadius: 8, padding: 24, width: 560, maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto'
+    <Modal title="터미널 스크롤백 굳히기" close={onClose} wide className="pin-scrollback-modal">
+      <div className="modal-box pin-modal" style={{
+        background: 'var(--surface)', color: 'var(--ink)', width: '100%', maxWidth: '100%', maxHeight: '75vh', overflowY: 'auto'
       }}>
         <div className="modal-head" style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 18 }}>터미널 스크롤백 굳히기</h3>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted, #888)', fontSize: 13 }}>
+          <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 13 }}>
             스크롤백을 값 일치 마스킹을 거쳐 기록 노트로 저장합니다.
           </p>
         </div>
@@ -315,6 +312,6 @@ export function PinScrollbackModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
