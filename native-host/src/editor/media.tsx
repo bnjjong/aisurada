@@ -158,7 +158,9 @@ function HTMLFrame({ path, label }: { path: string; label: string }) {
     return () => { removeEventListener('pointerdown', input, true); removeEventListener('keydown', input, true); removeEventListener('message', message); };
   }, [url, features]);
   return <span className="ais-html-frame"><span className="ais-html-frame-header"><strong>{label || path}</strong>
-    <button className="ais-html-frame-ask" data-rel={path} data-label={label} hidden>AI에게 묻기</button>
-    <button className="ais-html-frame-open" onClick={() => void openEditorLink(path, features)}>브라우저로 열기</button></span>
+    <span className="ais-html-frame-actions">
+      <button className="ais-html-frame-ask" data-rel={path} data-label={label} hidden>AI에게 묻기</button>
+      <button className="ais-html-frame-open" onClick={() => void openEditorLink(path, features)}>브라우저로 열기</button>
+    </span></span>
     <iframe ref={frame} src={url} title={label || path} sandbox="allow-scripts" referrerPolicy="no-referrer" loading="lazy" className="ais-html-frame-view" style={{ height }} /></span>;
 }
