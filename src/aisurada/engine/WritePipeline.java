@@ -26,6 +26,12 @@ public final class WritePipeline implements AutoCloseable {
         this.acquiredLock = acquiredLock;
     }
 
+    public static ReentrantLock tryAcquireWriteLock(Path vault) {
+        String vaultKey = vault.toAbsolutePath().normalize().toString();
+        ReentrantLock lock = VAULT_WRITE_LOCKS.computeIfAbsent(vaultKey, k -> new ReentrantLock(true));
+        return lock.tryLock() ? lock : null;
+    }
+
     public static WritePipeline begin(Path vault, String command, boolean tool, boolean serve, String session) {
         if (!CommandRegistry.WRITE_COMMANDS.contains(command)) {
             return new WritePipeline(null, null, tool, session, null);
