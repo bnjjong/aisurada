@@ -102,6 +102,12 @@ export interface AskRequest {
 // --------------------------------------------------------------------------
 
 const lines = new Map<string, Promise<void>>();
+const canceledMarks = new Set<string>();
+
+export function cancelQueuedAsk(key: string, markId: string): void {
+  canceledMarks.add(markId);
+  setPendingAsk(key, markId, null);
+}
 
 /** A later question waits for the end of the last one of the same key. A throw does not stop the line. */
 function enqueue(key: string, task: () => Promise<void>): Promise<void> {
@@ -277,6 +283,14 @@ export function startAsk(host: AskHost, request: AskRequest): Promise<void> {
 
 async function depart(host: AskHost, request: AskRequest, picturesPromise: Promise<PictureWrite>): Promise<void> {
   const key = request.target.id;
+  if (canceledMarks.has(request.markId)) {
+    canceledMarks.delete(request.markId);
+    setPendingAsk(key, request.markId, null);
+    return;
+  }
+  if (!askNow().pending[key]?.[request.markId]) {
+    return;
+  }
   try {
     // 3.5: when its turn comes the queued mark is removed and the start time becomes the departure.
     const at = Date.now();

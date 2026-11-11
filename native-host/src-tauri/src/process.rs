@@ -216,7 +216,8 @@ mod tests {
                 &mut c,
                 None,
                 Duration::from_millis(150),
-                Duration::from_secs(1)
+                Duration::from_secs(1),
+                None
             )
             .unwrap(),
             Outcome::TimedOut
@@ -228,7 +229,8 @@ mod tests {
                 &mut command("trap '' TERM; while :; do :; done"),
                 None,
                 Duration::from_millis(100),
-                Duration::from_millis(150)
+                Duration::from_millis(150),
+                None
             )
             .unwrap(),
             Outcome::TimedOut
@@ -242,7 +244,8 @@ mod tests {
                 &mut command("exec 1>&- 2>&-; while :; do :; done"),
                 None,
                 Duration::from_millis(100),
-                Duration::from_millis(150)
+                Duration::from_millis(150),
+                None
             )
             .unwrap(),
             Outcome::TimedOut
@@ -259,7 +262,8 @@ mod tests {
                 &mut c,
                 None,
                 Duration::from_millis(100),
-                Duration::from_millis(100)
+                Duration::from_millis(100),
+                None
             )
             .unwrap(),
             Outcome::TimedOut
