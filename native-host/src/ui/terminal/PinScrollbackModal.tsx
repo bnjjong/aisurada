@@ -43,9 +43,16 @@ export function PinScrollbackModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    previousFocus.current = document.activeElement as HTMLElement | null;
     titleInputRef.current?.focus();
+    return () => {
+      if (previousFocus.current && typeof previousFocus.current.focus === 'function') {
+        previousFocus.current.focus();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -191,14 +198,14 @@ export function PinScrollbackModal({
         </div>
 
         {selectionNotice && (
-          <div className="pin-selection-note" style={{ fontSize: 12, color: '#d97706', marginBottom: 8 }}>{selectionNotice}</div>
+          <div className="pin-selection-note" style={{ fontSize: 12, color: 'var(--warn)', marginBottom: 8 }}>{selectionNotice}</div>
         )}
-        <div className="pin-hint" style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginBottom: 12 }}>
+        <div className="pin-hint" style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
           실제로 굳힐 줄은 {currentLines.length}줄이에요. 빈 꼬리는 빼고 세요.
         </div>
 
         {/* Secret Table Status */}
-        <div className="pin-status" style={{ fontSize: 13, background: 'var(--bg-secondary, #f5f5f5)', padding: 10, borderRadius: 6, marginBottom: 12 }}>
+        <div className="pin-status" style={{ fontSize: 13, background: 'var(--soft)', padding: 10, borderRadius: 6, marginBottom: 12 }}>
           {tableStatus?.ready ? (
             <div>가릴 수 있는 값 {tableStatus.maskable}종. 물어본 이름 {tableStatus.asked}중 {tableStatus.read}개를 읽었어요.</div>
           ) : (
@@ -229,29 +236,29 @@ export function PinScrollbackModal({
         {masked && (
           <div className="pin-warn" style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
             {masked.short.length > 0 && (
-              <div style={{ color: '#d97706' }}>
+              <div style={{ color: 'var(--warn)' }}>
                 짧아서 못 지킨 이름 {masked.short.length}: {masked.short.join(', ')}
               </div>
             )}
             {masked.unreadable.length > 0 && (
-              <div style={{ color: '#dc2626' }}>
+              <div style={{ color: 'var(--err)' }}>
                 값을 못 읽은 이름 {masked.unreadable.length}: {masked.unreadable.join(', ')}
               </div>
             )}
             {shapesSum > 0 ? (
-              <div style={{ color: '#dc2626' }}>
+              <div style={{ color: 'var(--err)' }}>
                 표에 없는데 비밀처럼 생긴 것이 {shapesSum} 건이에요. 안 가려졌어요.
                 {masked.shapes.filter(shape => shape.count > 0).map(shape => (
                   <div className="pin-shape" key={shape.kind || shape.label}>{shape.label} {shape.count} 건</div>
                 ))}
               </div>
             ) : (
-              <div style={{ color: '#059669' }}>
+              <div style={{ color: 'var(--ok)' }}>
                 모양 검사를 지났고 걸린 것이 0 건이에요. 채택한 패턴 밖의 모양은 못 봐요.
               </div>
             )}
             {hadTui && (
-              <div style={{ color: '#d97706' }}>
+              <div style={{ color: 'var(--warn)' }}>
                 굳힐 때 TUI 가 떠 있었어요. 여기 담기는 것은 그 아래 쌓인 기록이라 보던 화면과 달라요.
               </div>
             )}
@@ -259,7 +266,7 @@ export function PinScrollbackModal({
         )}
 
         {errorMsg && (
-          <div className="pin-error" style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>
+          <div className="pin-error" style={{ color: 'var(--err)', fontSize: 13, marginBottom: 12 }}>
             {errorMsg}
           </div>
         )}
@@ -292,7 +299,7 @@ export function PinScrollbackModal({
 
         {/* 14.9 저장: the final body's size in UTF-8 bytes against the 300,000 limit */}
         {masked && (
-          <div className="pin-bytes" style={{ fontSize: 12, marginBottom: 10, color: bodyBytes > 300000 ? '#dc2626' : 'var(--text-secondary, #666)' }}>
+          <div className="pin-bytes" style={{ fontSize: 12, marginBottom: 10, color: bodyBytes > 300000 ? 'var(--err)' : 'var(--muted)' }}>
             본문 {bodyBytes.toLocaleString('en-US')} 바이트 / 상한 300,000 바이트{bodyBytes > 300000 ? ' — 범위를 줄여 주세요.' : ''}
           </div>
         )}

@@ -10,10 +10,10 @@ export interface AskModelOption {
 
 // 3.3: the two lists are contract, the labels are not.
 export const ASK_MODELS: readonly AskModelOption[] = [
-  { id: 'claude-opus-5-5', label: 'opus 5.5', provider: 'claude' },
-  { id: 'claude-sonnet-5-5', label: 'sonnet 5.5', provider: 'claude' },
-  { id: 'gemini-3-8-high', label: 'gemini 3.8 high', provider: 'gemini' },
-  { id: 'gemini-3-8-medium', label: 'gemini 3.8 medium', provider: 'gemini' },
+  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', provider: 'claude' },
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', provider: 'claude' },
+  { id: 'gemini-3-8-high', label: 'Gemini 3.8 Flash High', provider: 'gemini' },
+  { id: 'gemini-3-8-medium', label: 'Gemini 3.8 Flash Medium', provider: 'gemini' },
 ] as const;
 export const ASK_EFFORTS = [
   { id: 'low', label: 'low' },
@@ -355,4 +355,48 @@ export function mergeUnsaved(saved: AskThread, memory: AskThread | null): AskThr
   const known = new Set(saved.turns.map((turn) => turn.id));
   const kept = (memory?.turns ?? []).filter((turn) => turn.unsaved && !known.has(turn.id));
   return kept.length === 0 ? saved : { ...saved, turns: [...saved.turns, ...kept] };
+}
+
+/** C4: 실패 에러 문자열을 사용자가 이해하기 쉬운 한국어로 변환 */
+export function humanizeAskError(raw: unknown): { message: string; raw: string } {
+  const text = typeof raw === 'string' ? raw : String(raw ?? '');
+  if (!text) return { message: '답변을 받아오지 못했어요.', raw: '' };
+
+  if (
+    text.includes('AISURADA_CLAUDE_BIN') ||
+    text.includes('claude 실행 파일') ||
+    text.includes('ENOENT') ||
+    text.includes('not found')
+  ) {
+    return {
+      message: 'Claude CLI(claude)를 찾지 못했어요. 설치되어 있는지 확인해 주세요.',
+      raw: text,
+    };
+  }
+  if (
+    text.includes('로그인') ||
+    text.includes('login') ||
+    text.includes('authenticated') ||
+    text.includes('종료 코드 1')
+  ) {
+    return {
+      message: 'Claude 로그인이 필요해요. 터미널에서 claude login을 실행해 주세요.',
+      raw: text,
+    };
+  }
+  if (
+    text.includes('시간 초과') ||
+    text.includes('timeout') ||
+    text.includes('timed out') ||
+    text.includes('기한')
+  ) {
+    return {
+      message: '응답 시간이 너무 오래 걸려 중단되었어요.',
+      raw: text,
+    };
+  }
+  return {
+    message: '답변을 받아오지 못했어요.',
+    raw: text,
+  };
 }

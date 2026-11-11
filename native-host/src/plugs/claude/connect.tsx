@@ -50,6 +50,7 @@ export function ConnectView({
   onWrite,
   onConnect,
   onDisconnect,
+  onRefresh,
 }: {
   status: ConnectStatus | null;
   busy: boolean;
@@ -59,9 +60,11 @@ export function ConnectView({
   onWrite: (write: boolean) => void;
   onConnect: () => void;
   onDisconnect: () => void;
+  onRefresh?: () => void;
 }) {
   let line: string;
-  if (!status) line = "확인하는 중이에요…";
+  if (!status && error) line = "연결 상태를 확인하지 못했어요.";
+  else if (!status) line = "확인하는 중이에요…";
   else if (!status.claudeFound) line = "Claude Code를 찾지 못했어요. 설치한 뒤 설정을 다시 열어 주세요.";
   else if (!status.registered) line = "연결되어 있지 않아요.";
   else line = status.write ? "연결되어 있어요 · 노트를 읽고 쓸 수 있어요" : "연결되어 있어요 · 노트를 읽기만 해요";
@@ -75,6 +78,13 @@ export function ConnectView({
       <p className="set-connect-status" role="status">
         {line}
       </p>
+      {!status && error && onRefresh && (
+        <div className="set-connect-actions">
+          <button type="button" disabled={busy} onClick={onRefresh}>
+            다시 확인
+          </button>
+        </div>
+      )}
       {status?.claudeFound && (
         <>
           <label className="set-switch set-connect-write">
@@ -200,6 +210,7 @@ export function ClaudeConnect({ call = callHost }: { call?: ConnectCall }) {
       onWrite={setWrite}
       onConnect={() => void run(["claude-mcp", "add", ...(write ? ["--write"] : [])])}
       onDisconnect={() => void run(["claude-mcp", "remove"])}
+      onRefresh={() => void refresh()}
     />
   );
 }

@@ -4,7 +4,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { AskContext } from './askContext.ts';
 import { AskImageStrip, AskOptionsRow, useAskImages } from './askPickers.tsx';
-import { modelLabel } from './askText.ts';
+import { humanizeAskError, isGeminiModel, modelLabel } from './askText.ts';
 import type { AskTurn } from './askText.ts';
 import { ModelProse } from './modelProse.tsx';
 import type { PendingAsk } from './state.ts';
@@ -17,7 +17,11 @@ export function elapsedSeconds(elapsedMs: number): string {
 
 /** 4.2: the meta line of a turn. */
 export function metaLine(turn: AskTurn): string {
-  const base = `${modelLabel(turn.model)} · ${turn.effort} · ${elapsedSeconds(turn.elapsedMs)}초`;
+  const elapsed = turn.elapsedMs >= 60_000
+    ? `${(turn.elapsedMs / 60_000).toFixed(1)}분`
+    : `${elapsedSeconds(turn.elapsedMs)}초`;
+  const effortPart = isGeminiModel(turn.model) ? '' : ` · ${turn.effort}`;
+  const base = `${modelLabel(turn.model)}${effortPart} · ${elapsed}`;
   return turn.sessionLines ? `${base} · 작성 세션 대화 ${turn.sessionLines}줄 함께 보냄` : base;
 }
 
@@ -29,6 +33,7 @@ function pictureSource(baseDir: string, relative: string): string {
 export function AskTurnView({ turn, fold }: { turn: AskTurn; fold: boolean }) {
   const { baseDir } = useContext(AskContext);
   const pictures = turn.images ?? [];
+  const errorInfo = turn.error ? humanizeAskError(turn.error) : null;
   return (
     <div className={`ask-turn${turn.error ? ' is-error' : ''}`} data-turn-id={turn.id}>
       {turn.quote && <div className="ask-quote" title={turn.quote}>{turn.quote}</div>}
@@ -51,7 +56,15 @@ export function AskTurnView({ turn, fold }: { turn: AskTurn; fold: boolean }) {
         ) : (
           <div className="ask-images">그림 {pictures.length}장 붙임</div>
         ))}
-      {turn.error ? <div className="ask-error">{turn.error}</div> : <div className="ask-answer"><ModelProse content={turn.answer} foldable={fold} /></div>}
+      {errorInfo ? (
+        <div className="ask-error" title={errorInfo.raw}>
+          {errorInfo.message}
+        </div>
+      ) : (
+        <div className="ask-answer">
+          <ModelProse content={turn.answer} foldable={fold} />
+        </div>
+      )}
       <div className="ask-meta">{metaLine(turn)}</div>
       {turn.unsaved && <div className="ask-unsaved">이 답은 vault 에 저장되지 않았어요. 앱을 닫으면 사라져요.</div>}
     </div>
@@ -61,9 +74,11 @@ export function AskTurnView({ turn, fold }: { turn: AskTurn; fold: boolean }) {
 /** 4.9: the text of the "요청 중" line from the record and the clock. */
 export function pendingText(record: Pick<PendingAsk, 'at' | 'queued' | 'timeoutSeconds'>, now: number): string {
   const seconds = Math.max(0, Math.floor((now - record.at) / 1000));
-  if (record.queued) return `앞 물음을 기다리는 중이에요… ${seconds}초`;
+  const elapsed = seconds >= 60 ? `${Math.floor(seconds / 60)}분 ${seconds % 60}초` : `${seconds}초`;
+  if (record.queued) return `앞 물음을 기다리는 중이에요… ${elapsed}`;
   const limit = record.timeoutSeconds ?? 3600;
-  return seconds >= limit / 2 ? `요청 중이에요… ${seconds}초 · ${limit}초까지 기다려요` : `요청 중이에요… ${seconds}초`;
+  const limitText = limit >= 60 ? `${Math.floor(limit / 60)}분` : `${limit}초`;
+  return seconds >= limit / 2 ? `답을 기다리는 중이에요… ${elapsed} · 최대 ${limitText}까지 기다려요` : `답을 기다리는 중이에요… ${elapsed}`;
 }
 
 /** 4.9: the line of a question in flight. The second count is made from the clock every second, not counted. */

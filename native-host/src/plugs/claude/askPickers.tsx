@@ -2,7 +2,7 @@
 // picture strip with its paste rules (3.2, 4.4). Adheres to Chapters 3 and 4 of aisurada Part 4 specifications.
 import { useCallback, useState } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
-import { ASK_EFFORTS, ASK_MODELS, IMAGE_MIME_EXTENSIONS, MAX_IMAGES, MAX_IMAGE_BYTES, defaultEffortForModel, isGeminiModel } from './askText.ts';
+import { ASK_EFFORTS, ASK_MODELS, DEFAULT_EFFORT, IMAGE_MIME_EXTENSIONS, MAX_IMAGES, MAX_IMAGE_BYTES, defaultEffortForModel, isGeminiModel } from './askText.ts';
 import { setAskEffort, setAskModel, useAskState } from './state.ts';
 
 /** 3.3: two pickers that read and write the one model and effort of this window. */
@@ -16,6 +16,8 @@ export function AskOptionsRow() {
     setAskModel(nextModel);
     if (isGeminiModel(nextModel)) {
       setAskEffort(defaultEffortForModel(nextModel));
+    } else {
+      setAskEffort(DEFAULT_EFFORT);
     }
   };
 
@@ -36,18 +38,19 @@ export function AskOptionsRow() {
           ))}
         </optgroup>
       </select>
-      <select
-        className="ask-option"
-        aria-label="effort"
-        value={isGemini ? defaultEffortForModel(model) : effort}
-        disabled={isGemini}
-        title={isGemini ? `Gemini 모델은 ${defaultEffortForModel(model)} effort로 고정됩니다` : undefined}
-        onChange={(event) => setAskEffort(event.target.value)}
-      >
-        {ASK_EFFORTS.map((item) => (
-          <option key={item.id} value={item.id}>{item.label}</option>
-        ))}
-      </select>
+      {!isGemini && (
+        <select
+          className="ask-option"
+          aria-label="추론 강도"
+          title="추론 강도"
+          value={effort}
+          onChange={(event) => setAskEffort(event.target.value)}
+        >
+          {ASK_EFFORTS.map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

@@ -117,7 +117,7 @@ export function agentBarText(count: number, alive: boolean): string {
 }
 
 export function todoBarText(todos: Array<{ status: string }>): string {
-  return `할 일 ${todos.length}개 가운데 ${todos.filter((todo) => todo.status === 'completed').length}개가 끝났습니다`;
+  return `할 일 ${todos.length}개 가운데 ${todos.filter((todo) => todo.status === 'completed').length}개가 끝났어요`;
 }
 
 // --------------------------------------------------------------------------
@@ -270,7 +270,7 @@ export function railTurnFrom(input: { id: string; askedAt: string; question: str
     askedAt: input.askedAt,
     question: cutText(input.question, TEXT_LIMIT),
     answer: failed ? '' : cutText(input.answer.answer ?? '', TEXT_LIMIT),
-    ...(failed ? { error: input.answer.error || '까닭을 못 받았다' } : {}),
+    ...(failed ? { error: input.answer.error || '답변을 받지 못했어요' } : {}),
     model: input.model,
     effort: input.effort,
     elapsedMs: Math.max(0, Math.trunc(input.answer.elapsed_ms ?? 0) || 0),

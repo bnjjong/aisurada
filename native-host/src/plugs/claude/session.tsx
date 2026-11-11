@@ -12,7 +12,7 @@ import { askClaudeBridge, tauriAskHost } from './askHost.ts';
 import { AskImageStrip, useAskImages } from './askPickers.tsx';
 import type { PickedImage } from './askPickers.tsx';
 import { writePictures } from './askRun.ts';
-import { ASK_EFFORTS, ASK_MODELS, MAX_IMAGES, defaultEffortForModel, isGeminiModel, modelLabel, normalizeEffort, normalizeModel, randomUuid } from './askText.ts';
+import { ASK_EFFORTS, ASK_MODELS, MAX_IMAGES, defaultEffortForModel, humanizeAskError, isGeminiModel, modelLabel, normalizeEffort, normalizeModel, randomUuid } from './askText.ts';
 import { ModelProse } from './modelProse.tsx';
 import { PendingLine } from './askParts.tsx';
 import { getSessionStoreSnapshot, refreshSessions, useProjectsList, useSessionStore } from './projects.tsx';
@@ -122,7 +122,7 @@ export function useReadSession(sessionId: string, limit: number, signal: number)
 // 9.4: a transcript turn
 // --------------------------------------------------------------------------
 
-export function TranscriptTurn({ turn }: { turn: EngineTurn }): React.JSX.Element | null {
+export function TranscriptTurn({ turn, model }: { turn: EngineTurn; model?: string }): React.JSX.Element | null {
   if (turn.who === 'tool') {
     if (!turn.tool) return null;
     const failed = turn.tool.failed === true;
@@ -137,10 +137,11 @@ export function TranscriptTurn({ turn }: { turn: EngineTurn }): React.JSX.Elemen
     );
   }
   const user = turn.who === 'user';
+  const authorName = user ? '나' : isGeminiModel(model) ? 'Gemini' : 'Claude';
   return (
     <div className={`sess-turn ${user ? 'sess-turn-user' : 'sess-turn-assistant'}`}>
       <div className="sess-turn-head">
-        <span className="sess-turn-author">{user ? '나' : '클로드'}</span>
+        <span className="sess-turn-author">{authorName}</span>
         <span className="sess-turn-at">{formatTurnTime(turn.at)}</span>
         {turn.truncated && <span className="sess-turn-cut">{turn.chars ?? 2000}자 중 앞부분</span>}
       </div>
@@ -152,7 +153,7 @@ export function TranscriptTurn({ turn }: { turn: EngineTurn }): React.JSX.Elemen
 /** The four states of the conversation column (9.4). */
 export function TranscriptBody({ read }: { read: { view: ReadSessionView | null; loading: boolean; error: string | null } }): React.JSX.Element {
   const { view, loading, error } = read;
-  if (error && !view) return <div className="sess-page-empty" title={error}>대화 기록을 못 읽었어요. 사이드카가 안 떠 있을 수 있어요.</div>;
+  if (error && !view) return <div className="sess-page-empty" title={error}>대화 기록을 못 읽었어요. 동기화 엔진이 안 떠 있을 수 있어요.</div>;
   if (loading || !view) return <div className="sess-page-empty">대화 기록을 읽는 중이에요.</div>;
   if (view.file === null) return <div className="sess-page-empty">이 기계에 그 세션의 기록이 없어요. 다른 기기에서 돌던 세션일 수 있어요.</div>;
   if (view.turns.length === 0) return <div className="sess-page-empty">기록은 있는데 주고받은 말이 없어요.</div>;
@@ -165,7 +166,7 @@ export function TranscriptBody({ read }: { read: { view: ReadSessionView | null;
       {view.hasMore && <div className="sess-page-hasmore">앞의 대화가 더 있어요. 지금은 최근 {view.turns.length.toLocaleString('en-US')}건만 보여요.</div>}
       <div className="sess-page-turns">
         {view.turns.map((turn) => (
-          <TranscriptTurn key={turn.index} turn={turn} />
+          <TranscriptTurn key={turn.index} turn={turn} model={view.runState?.model} />
         ))}
       </div>
     </>
@@ -189,10 +190,12 @@ function StatusCell({ row }: { row: ClaudeSession }): React.JSX.Element {
 /** The last-turn line (9.3): drawn from `runState` whether or not the session is in the list. */
 function RunStateLine({ runState }: { runState: ReadSessionView['runState'] }): React.JSX.Element | null {
   if (!runState) return null;
+  const cleanModel = runState.model ? runState.model.replace(/\s*\[.*\]$/, '') : '';
+  const displayModel = cleanModel ? modelLabel(cleanModel) : '';
   return (
     <div className="sess-page-runstate">
       <span>마지막 회차</span>
-      {runState.model && <span>{runState.model}</span>}
+      {displayModel && <span>{displayModel}</span>}
       {runState.effort && <span>{runState.effort}</span>}
       {runState.contextTokens !== undefined && <span>컨텍스트 {runState.contextTokens.toLocaleString()}토큰</span>}
       {runState.quotaBlocked && (
@@ -336,7 +339,7 @@ export function SessionComposer({
       return;
     }
     const held = current.images; // 10.3 step 2
-    patchComposer(sessionId, { sending: true, error: null, notice: null });
+    patchComposer(sessionId, { text: '', images: [], sending: true, error: null, notice: null });
     void (async () => {
       const bytes = await Promise.all(held.map(async (image) => ({ name: pictureFileName(image.file), bytes: new Uint8Array(await image.file.arrayBuffer()) })));
       const result = await sendToSession(
@@ -357,7 +360,8 @@ export function SessionComposer({
         replySignals.set(sessionId, (replySignals.get(sessionId) ?? 0) + 1);
         patchComposer(sessionId, { text: '', sending: false, error: null, notice: result.notice, images: [], imageNotice: null });
       } else {
-        patchComposer(sessionId, { sending: false, error: result.error });
+        const err = humanizeAskError(result.error);
+        patchComposer(sessionId, { text, images: held, sending: false, error: err.message });
       }
     })();
   };
@@ -628,7 +632,8 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
     if (store.status === 'idle') void refreshSessions(vault || undefined);
   }, [store.status, vault]);
 
-  const read = useReadSession(sessionId, 100, 0);
+  const signal = useReplySignal(sessionId);
+  const read = useReadSession(sessionId, 100, signal);
   const noteId = chat?.target.noteId ?? '';
   const subId = chat?.target.subId;
 
@@ -879,15 +884,17 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
                 ))}
               </optgroup>
             </select>
-            <select
-              className="ask-option"
-              aria-label="effort"
-              value={isGeminiModel(choice.model) ? defaultEffortForModel(choice.model) : choice.effort}
-              disabled={isGeminiModel(choice.model)}
-              onChange={(event) => setPicked((prev) => ({ ...prev, effort: event.target.value }))}
-            >
-              {ASK_EFFORTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </select>
+            {!isGeminiModel(choice.model) && (
+              <select
+                className="ask-option"
+                aria-label="추론 강도"
+                title="추론 강도"
+                value={choice.effort}
+                onChange={(event) => setPicked((prev) => ({ ...prev, effort: event.target.value }))}
+              >
+                {ASK_EFFORTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            )}
             {choice.hint && <span className="rchat-options-hint">{choice.hint}</span>}
           </div>
           {notice && <div className="sess-composer-notice">{notice}</div>}
@@ -945,9 +952,9 @@ function RailTurnPair({ turn, baseDir }: { turn: RailTurn; baseDir?: string }): 
       </div>
       <div className={`sess-turn sess-turn-assistant${turn.error ? ' rchat-failed' : ''}`}>
         <div className="sess-turn-head">
-          <span className="sess-turn-author">클로드</span>
+          <span className="sess-turn-author">{isGeminiModel(turn.model) ? 'Gemini' : 'Claude'}</span>
           <span className="sess-turn-model">{modelLabel(turn.model)}</span>
-          <span className="sess-turn-effort">{turn.effort}</span>
+          {!isGeminiModel(turn.model) && <span className="sess-turn-effort">{turn.effort}</span>}
           <span className="sess-turn-time">{(turn.elapsedMs / 1000).toFixed(1)}초</span>
         </div>
         <div className="sess-turn-body">{turn.error ? <div className="rchat-error">못 받았어요: {turn.error}</div> : <ModelProse content={turn.answer} />}</div>
@@ -1028,7 +1035,9 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
   }, [store.status, vault]);
 
   // 9.2: the conversation is read again only when the answer signal of this session changes.
-  const signal = useReplySignal(sessionId);
+  const [manualSignal, setManualSignal] = useState(0);
+  const autoSignal = useReplySignal(sessionId);
+  const signal = autoSignal + manualSignal;
   const read = useReadSession(sessionId, 100, signal);
   const view = read.view;
 
@@ -1040,13 +1049,28 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
 
   const previewOpen = state?.prefs?.sessionPreviewOpen !== false;
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 1100);
+  const [railOverlayOpen, setRailOverlayOpen] = useState(false);
   useEffect(() => {
     const check = () => setNarrow(window.innerWidth <= 1100);
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
-  const railVisible = previewOpen && !narrow;
+  const railVisible = narrow ? railOverlayOpen : previewOpen;
   const setPreviewOpen = (open: boolean) => controller?.preference?.({ sessionPreviewOpen: open });
+  const toggleRail = () => {
+    if (narrow) {
+      setRailOverlayOpen(!railOverlayOpen);
+    } else {
+      setPreviewOpen(!previewOpen);
+    }
+  };
+
+  const talkRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (talkRef.current) {
+      talkRef.current.scrollTop = talkRef.current.scrollHeight;
+    }
+  }, [view?.turns.length, signal]);
 
   const alive = sessionItem?.processAlive === true;
   const [copied, setCopied] = useState(false);
@@ -1103,15 +1127,17 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
   }, [sessionId]);
 
   const openTerminal = () => {
-    setPreviewOpen(true);
+    if (narrow) setRailOverlayOpen(true);
+    else setPreviewOpen(true);
     chooseTab('cli');
   };
 
+  const startedText = sessionItem ? sinceText(sessionItem.startedAt) : '';
   const meta = sessionItem ? (
     <>
       <span className="sess-page-kind">{kindLabel(sessionItem.kind)}</span>
       <StatusCell row={sessionItem} />
-      <span className="sess-page-started">{sinceText(sessionItem.startedAt)}에 시작</span>
+      <span className="sess-page-started">{startedText === '방금' ? '방금 시작' : `${startedText}에 시작`}</span>
       {sessionItem.pid !== undefined && <span className="sess-page-pid">pid {sessionItem.pid}</span>}
       {sessionItem.branch && <span className="sess-page-branch">{sessionItem.branch}</span>}
     </>
@@ -1129,7 +1155,8 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
               {sessionTitle(sessionItem)}
             </h1>
             <div className="sess-page-actions">
-              {!narrow && <button type="button" className="open-cli" onClick={openTerminal}>터미널 열기</button>}
+              <button type="button" className="sess-page-refresh" title="대화 새로 읽기" onClick={() => setManualSignal((s) => s + 1)}>새로 읽기</button>
+              <button type="button" className="open-cli" onClick={openTerminal}>터미널 열기</button>
               <button
                 type="button"
                 className="sess-page-resume"
@@ -1151,7 +1178,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
               >
                 노트로 굳히기
               </button>
-              {!narrow && <button type="button" className="prev-toggle" onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? '레일 접기' : '레일 펴기'}</button>}
+              <button type="button" className="prev-toggle" onClick={toggleRail}>{railVisible ? '레일 접기' : '레일 펴기'}</button>
             </div>
           </div>
           <div className="sess-page-meta">{meta}</div>
@@ -1159,62 +1186,67 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
           <RunStateLine runState={view?.runState ?? null} />
         </header>
 
-        <section className="sess-page-talk">
+        <section className="sess-page-talk" ref={talkRef}>
           <div className="sess-page-talk-head">
             <h2>대화</h2>
             {view && <span className="sess-count">{view.source.messages}</span>}
           </div>
           <TranscriptBody read={read} />
-
-          <footer className="sess-dock">
-            {view && view.runningAgents.length > 0 && (
-              <div className="subagent-bar sess-dock-row">
-                <button type="button" className="sess-dock-head" aria-expanded={agentsOpen} onClick={() => setAgentsOpen(!agentsOpen)}>
-                  {alive && <span className="sess-run" />}
-                  <span>{agentBarText(view.runningAgents.length, alive)}</span>
-                </button>
-                {!narrow && <button type="button" className="open-cli" onClick={openTerminal}>터미널 열기</button>}
-                {agentsOpen && (
-                  <div className="sess-dock-list">
-                    {view.runningAgents.map((agent, index) => (
-                      <div key={index} className="sess-dock-item">
-                        <span className="sess-dock-what">{agent.what ?? '(무엇을 하는지 안 적힌 호출)'}</span>
-                        {agent.at && !Number.isNaN(new Date(agent.at).getTime()) && <span className="sess-dock-at">{sinceText(new Date(agent.at).getTime())}</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {view && view.todos.length > 0 && (
-              <div className="todo-bar sess-dock-row">
-                <button type="button" className="sess-dock-head" aria-expanded={todosOpen} onClick={() => setTodosOpen(!todosOpen)}>{todoBarText(view.todos)}</button>
-                {todosOpen && (
-                  <div className="sess-dock-list">
-                    {view.todos.map((todo) => (
-                      <div key={todo.number} className="sess-dock-item">
-                        <span className="todo-status" data-status={todo.status}>{todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '●' : '○'}</span>
-                        <span className="sess-dock-what">{todo.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <SessionComposer
-              key={sessionId}
-              sessionId={sessionId}
-              sessionItem={sessionItem}
-              sessionLoaded={!read.loading && !read.error}
-              transcriptFile={view?.file}
-              vault={vault}
-              timeoutSeconds={() => Number(state?.prefs?.askTimeoutSeconds) || 3600}
-            />
-          </footer>
         </section>
+
+        <footer className="sess-dock">
+          {view && view.runningAgents.length > 0 && (
+            <div className="subagent-bar sess-dock-row">
+              <button type="button" className="sess-dock-head" aria-expanded={agentsOpen} onClick={() => setAgentsOpen(!agentsOpen)}>
+                {alive && <span className="sess-run" />}
+                <span>{agentBarText(view.runningAgents.length, alive)}</span>
+              </button>
+              <button type="button" className="open-cli" onClick={openTerminal}>터미널 열기</button>
+              {agentsOpen && (
+                <div className="sess-dock-list">
+                  {view.runningAgents.map((agent, index) => (
+                    <div key={index} className="sess-dock-item">
+                      <span className="sess-dock-what">{agent.what ?? '(무엇을 하는지 안 적힌 호출)'}</span>
+                      {agent.at && !Number.isNaN(new Date(agent.at).getTime()) && <span className="sess-dock-at">{sinceText(new Date(agent.at).getTime())}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {view && view.todos.length > 0 && (
+            <div className="todo-bar sess-dock-row">
+              <button type="button" className="sess-dock-head" aria-expanded={todosOpen} onClick={() => setTodosOpen(!todosOpen)}>{todoBarText(view.todos)}</button>
+              {todosOpen && (
+                <div className="sess-dock-list">
+                  {view.todos.map((todo) => (
+                    <div key={todo.number} className="sess-dock-item">
+                      <span className="todo-status" data-status={todo.status}>{todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '●' : '○'}</span>
+                      <span className="sess-dock-what">{todo.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <SessionComposer
+            key={sessionId}
+            sessionId={sessionId}
+            sessionItem={sessionItem}
+            sessionLoaded={!read.loading && !read.error}
+            transcriptFile={view?.file}
+            vault={vault}
+            timeoutSeconds={() => Number(state?.prefs?.askTimeoutSeconds) || 3600}
+          />
+        </footer>
       </div>
 
-      <aside className="prevcol" hidden={!railVisible} style={{ display: railVisible ? undefined : 'none' }}>
+      <aside className={`prevcol${narrow && railOverlayOpen ? ' is-overlay' : ''}`} hidden={!railVisible} style={{ display: railVisible ? undefined : 'none' }}>
+          {narrow && (
+            <div className="prev-overlay-head" style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 12px', borderBottom: '1px solid var(--line)' }}>
+              <button type="button" aria-label="레일 닫기" onClick={() => setRailOverlayOpen(false)} style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 14, color: 'var(--ink)' }}>✕</button>
+            </div>
+          )}
           <div className="prev-tabs">
             <button type="button" className={`prev-tab${tab === 'notes' ? ' on' : ''}`} onClick={() => chooseTab('notes')}>관련 노트 <span className="prev-tab-n">{related.length}</span></button>
             <button type="button" className={`prev-tab${tab === 'links' ? ' on' : ''}`} onClick={() => chooseTab('links')}>링크 <span className="prev-tab-n">{view?.urls.length ?? 0}</span></button>
