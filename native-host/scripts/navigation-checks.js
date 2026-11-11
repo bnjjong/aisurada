@@ -54,7 +54,7 @@ if (location.pathname.startsWith('/note-window/')) {
         assert(saved().state.workspaceRoot === cfg.raw, 'saved root spelling changed');
       });
       await test('screen-routes-and-rail', async () => {
-        for (const [path, title] of [['/favorites','즐겨찾기'],['/agenda/demo','검증 아젠다'],['/connections','연결'],['/review','데일리 리포트'],
+        for (const [path, title] of [['/favorites','즐겨찾기'],['/agenda/demo','검증 아젠다'],['/connections','연결'],
           ['/templates','템플릿'],['/trash','휴지통'],['/guide','연동 가이드'],['/session/demo','이 판에는 Claude 연동이 없어요']]) {
           go(path); await until(() => h1() === title); assert(document.querySelector('[data-rail-section="nav"]'), 'missing rail at ' + path);
         }

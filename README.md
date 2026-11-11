@@ -200,7 +200,7 @@ node fixtures/runner-test.mjs
 ```
 
 - 실행기는 34.1의 옵션 문법, 묶음 무결성(sha256), `--out` 겹침(장치와 inode), 거르개, 판정 9가지, `report.json`, 자가 점검과 변형 8가지를 따릅니다. 어댑터 계약은 34.5이고, 이 엔진의 어댑터 `fixtures/aisurada.adapter.json`은 묶음 밖에 둡니다.
-- 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 29건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
+- 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 27건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
 
 자세한 것은 [34장 완료 노트](docs/rebuild-p1-chapter34-complete.md)에 있습니다.
 

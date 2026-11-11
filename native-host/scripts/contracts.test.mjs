@@ -6,7 +6,7 @@ const config = read('tauri.conf.json');
 test('bundle identity, deferred main creation and flat resource map', () => {
   assert.equal(config.identifier, 'co.kcd.aisurada');
   assert.equal(config.productName, 'aisurada');
-  assert.deepEqual(config.app.windows, [{title:'aisurada',width:800,height:600,create:false}]);
+  assert.deepEqual(config.app.windows, [{title:'aisurada',width:1040,height:720,minWidth:900,minHeight:540,create:false}]);
   assert.equal(config.bundle.resources['../../dist/ais-cli.jar'], 'ais-cli.jar');
   assert.equal(config.bundle.resources['../../dist/ais-sidecar.jar'], 'ais-sidecar.jar');
   for (const source of Object.keys(config.bundle.resources)) assert.ok(existsSync(new URL('../src-tauri/' + source, import.meta.url)));

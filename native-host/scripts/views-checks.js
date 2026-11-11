@@ -42,8 +42,10 @@ const click = (text, root = document) => {
   b.click();
 };
 // 노트 삭제는 정보줄의 "더 보기" 메뉴 맨 아래 항목이다. 메뉴는 body 바깥에 그려진다.
-const trashNote = (scope = document) => {
+// 메뉴는 누른 다음 그리기에서 나타나므로, 뜰 때까지 기다린 뒤 항목을 누른다.
+const trashNote = async (scope = document) => {
   click("더 보기", $(".doc-meta", scope));
+  await until(() => $(".act-menu"), "more menu");
   click("삭제", $(".act-menu"));
 };
 const fill = (node, text) => {
@@ -135,7 +137,7 @@ if (location.pathname.startsWith("/note-window/")) {
         $$(".workspace-rail .nav-item")
           .map((b) => b.textContent.trim())
           .join("|") ===
-          "캘린더|즐겨찾기|연결|데일리 리포트|템플릿|휴지통|연동 가이드",
+          "전체 노트|캘린더|즐겨찾기|연결|템플릿|휴지통|연동 가이드",
         "rail order",
       );
       const before = (await fetch("/calls").then((r) => r.json())).length;
@@ -358,7 +360,7 @@ if (location.pathname.startsWith("/note-window/")) {
       esc();
       await until(() => !$(".nhist"), "history escape");
       assert($(".subnote-page"), "history Esc also closed sub");
-      trashNote($(".subnote-page"));
+      await trashNote($(".subnote-page"));
       await until(
         () => $('[aria-label="하위 페이지를 삭제할까요?"]'),
         "sub delete confirm",
@@ -528,16 +530,16 @@ if (location.pathname.startsWith("/note-window/")) {
       ).id;
     });
     await test("new-note-template-title-replacement-and-auto-pane", async () => {
-      click("문서 추가", $(".detail-head"));
-      await until(() => $('[aria-label="새 문서 제목"]'), "new note form");
-      fill($('[aria-label="새 문서 제목"]'), "양식으로 만든 노트");
+      click("새 노트", $(".detail-head"));
+      await until(() => $('[aria-label="새 노트 제목"]'), "new note form");
+      fill($('[aria-label="새 노트 제목"]'), "양식으로 만든 노트");
       const selects = $$(".ndf select");
       fill(selects[2], "tplfixture-00000001");
       await until(
         () => $(".ndf .lex-content")?.textContent.includes("템플릿 본문"),
         "template body",
       );
-      click("문서 만들기", $(".ndf"));
+      click("노트 만들기", $(".ndf"));
       await until(
         () =>
           $(".agenda-note .lex-content h1")?.textContent ===
@@ -664,6 +666,12 @@ if (location.pathname.startsWith("/note-window/")) {
       );
       fill($(".tpl-name-input"), "삭제할 미저장 이름");
       click("삭제", $(".template-editor header"));
+      // 템플릿 삭제는 앱 안의 확인 창을 거친다. 확인하기 전에는 지워지지 않는다.
+      await until(
+        () => $('[aria-label="템플릿을 삭제할까요?"]'),
+        "template delete confirm",
+      );
+      click("삭제", $('[aria-label="템플릿을 삭제할까요?"]'));
       await until(
         async () =>
           !(await engine(["list-templates"])).some(
@@ -691,8 +699,10 @@ if (location.pathname.startsWith("/note-window/")) {
       );
       // 본문 복사는 "더 보기" 메뉴 안에 있다. 메뉴를 열어 HTML 노트에는 그 항목이 없음을 본다.
       click("더 보기", $(".doc-meta"));
+      await until(() => $(".act-menu"), "more menu");
+      // 메뉴가 비어서 통과하는 일이 없도록, 다른 항목(삭제)이 있음도 함께 본다.
       assert(
-        $(".act-menu") && !button("본문 복사", $(".act-menu")),
+        button("삭제", $(".act-menu")) && !button("본문 복사", $(".act-menu")),
         "HTML note must not offer body copy",
       );
       click("더 보기", $(".doc-meta"));
@@ -736,7 +746,7 @@ if (location.pathname.startsWith("/note-window/")) {
     });
     await test("trash-note-restore-purge-and-empty", async () => {
       await open(created.id);
-      trashNote();
+      await trashNote();
       await until(
         () => $('[aria-label="휴지통으로 옮길까요?"]'),
         "trash confirm",
@@ -754,7 +764,7 @@ if (location.pathname.startsWith("/note-window/")) {
         "restored note",
       );
       await open(created.id);
-      trashNote();
+      await trashNote();
       await until(
         () => $('[aria-label="휴지통으로 옮길까요?"]'),
         "delete again",
@@ -770,7 +780,7 @@ if (location.pathname.startsWith("/note-window/")) {
       click("삭제", $('[aria-label="완전히 삭제할까요?"]'));
       await until(() => !$(".trash-row"), "purged");
       await open(cfg.legacyId);
-      trashNote();
+      await trashNote();
       await until(
         () => $('[aria-label="휴지통으로 옮길까요?"]'),
         "legacy trash confirm",

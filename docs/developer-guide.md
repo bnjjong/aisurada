@@ -346,8 +346,8 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
 | 엔진 전체 | `bash test.sh` | 수 분 | 실제 임시 vault, 실제 serve와 `ais-cli` 왕복 |
-| 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 449건, `cargo test` 90건(무시 1건) |
-| 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 29건과 실행기 자체 |
+| 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 450건, `cargo test` 102건(무시 1건) |
+| 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체 |
 | 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 실제 Java 엔진, 격리 HOME |
 
 두 전체 시험 모두 맨 앞에서 `build.sh`를 돌려 `build/`와 `dist/`를 **지우고 다시 만든다.**
@@ -393,7 +393,7 @@ node fixtures/runner-test.mjs
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
 | 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다 |
-| 실제 창(4부) | `test:part4:acceptance`(켠 판 7건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
+| 실제 창(4부) | `test:part4:acceptance`(켠 판 7건), `test:ask-marks:acceptance`(끈 판 4건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 
 실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·소켓·빈 `ZDOTDIR`를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 `Diagnostics retained: <경로>`를 찍는다. `AISURADA_WORKSPACE_REPORT=<절대 경로>.json`이나 `AISURADA_CHECK_REPORT=<절대 경로>.json`으로 결과를 JSON으로 남길 수 있다. `--only=<사례 id>`로 일부만 돌릴 수 있다(편집기 왕복).
 
@@ -489,5 +489,5 @@ node fixtures/runner-test.mjs
 - 앱에 든 Java로 도는 `ais-cli`는 릴리스 설정의 디버그 번들에서 실제로 확인했다(`verify-release.mjs` 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.
 - 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
 - 물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.
-- 외부 설명서와 달라진 곳: `mins` 필드를 지웠다(위 「vault의 모양」). 이 저장소의 받아들임 묶음 29건은 `mins`를 뺀 기대값으로 고쳐 두었다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 `mins`가 없는 만큼 어긋난다.
+- 외부 설명서와 달라진 곳: `mins` 필드를 지웠다(위 「vault의 모양」). 데일리 리포트 명령(`list-reports`, `get-report`, `save-report`)도 엔진에서 뺐다. 이 저장소의 받아들임 묶음은 `mins`를 뺀 기대값으로 고쳐 두었고, 리포트 사례 2건(`list_reports/all`, `get_report/missing`)을 덜어 27건이다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 `mins`가 없는 만큼, 그리고 리포트 사례만큼 어긋난다.
 - 설명서 원문이 제공되지 않은 부분(3부 18장, 4부 `ais-agent` 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.

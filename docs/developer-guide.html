@@ -385,8 +385,8 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
 <tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>수 분</td><td>실제 임시 vault, 실제 serve와 <code>ais-cli</code> 왕복</td></tr>
-<tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>수 분</td><td>타입 검사, 화면 빌드 2종, Node 시험 449건, <code>cargo test</code> 90건(무시 1건)</td></tr>
-<tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 29건과 실행기 자체</td></tr>
+<tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>수 분</td><td>타입 검사, 화면 빌드 2종, Node 시험 450건, <code>cargo test</code> 102건(무시 1건)</td></tr>
+<tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체</td></tr>
 <tr><td>실제 창 점검</td><td><code>pnpm test:*:acceptance</code></td><td>종류당 수 분</td><td>실제 WKWebView, 실제 Java 엔진, 격리 HOME</td></tr>
 </tbody></table></div>
 <p>두 전체 시험 모두 맨 앞에서 <code>build.sh</code>를 돌려 <code>build/</code>와 <code>dist/</code>를 <strong>지우고 다시 만든다.</strong></p>
@@ -419,7 +419,7 @@ node fixtures/runner-test.mjs</code></pre></div>
 <tr><td>계약</td><td><code>node --test scripts/contracts.test.mjs</code></td><td>번들 식별자, 권한, CSP</td></tr>
 <tr><td>호스트</td><td><code>cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked</code></td><td></td></tr>
 <tr><td>실제 창</td><td><code>test:acceptance</code>, <code>test:workspace:acceptance</code>, <code>test:navigation:acceptance</code>, <code>test:interaction:acceptance</code>, <code>test:data:acceptance</code>, <code>test:editor:acceptance</code>, <code>test:autosave:acceptance</code>, <code>test:views:acceptance</code></td><td>종류별 한 번에 하나씩. 4부를 뺀 판을 잰다</td></tr>
-<tr><td>실제 창(4부)</td><td><code>test:part4:acceptance</code>(켠 판 7건), <code>test:ask-marks:acceptance</code>(끈 판 5건)</td><td><code>test-native.sh</code>에 들어 있지 않으니 따로 돌린다</td></tr>
+<tr><td>실제 창(4부)</td><td><code>test:part4:acceptance</code>(켠 판 7건), <code>test:ask-marks:acceptance</code>(끈 판 4건)</td><td><code>test-native.sh</code>에 들어 있지 않으니 따로 돌린다</td></tr>
 </tbody></table></div>
 <p>실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·소켓·빈 <code>ZDOTDIR</code>를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 <code>Diagnostics retained: &lt;경로&gt;</code>를 찍는다. <code>AISURADA_WORKSPACE_REPORT=&lt;절대 경로&gt;.json</code>이나 <code>AISURADA_CHECK_REPORT=&lt;절대 경로&gt;.json</code>으로 결과를 JSON으로 남길 수 있다. <code>--only=&lt;사례 id&gt;</code>로 일부만 돌릴 수 있다(편집기 왕복).</p>
 <p><strong>4부 점검.</strong> 위 8종은 4부를 뺀 판(<code>build:noclaude</code>, <code>--no-default-features</code>)을 잰다. 4부를 켠 판은 <code>pnpm test:part4:acceptance</code>가 잰다(<code>pnpm build</code>로 4부 화면을 짓고 호스트를 기본 기능으로 띄운다). 가짜 <code>claude</code>(<code>AISURADA_CLAUDE_BIN</code>)와 격리 HOME의 가짜 전사(<code>~/.claude/projects/…/&lt;세션 id&gt;.jsonl</code>)를 쓰므로 토큰을 쓰지 않는다. 점검 코드는 <code>native-host/scripts/part4-checks.js</code>다.</p>
@@ -497,7 +497,7 @@ node fixtures/runner-test.mjs</code></pre></div>
 <li>앱에 든 Java로 도는 <code>ais-cli</code>는 릴리스 설정의 디버그 번들에서 실제로 확인했다(<code>verify-release.mjs</code> 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.</li>
 <li>4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 <code>launchctl</code>로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.</li>
 <li>물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.</li>
-<li>외부 설명서와 달라진 곳: <code>mins</code> 필드를 지웠다(위 「vault의 모양」). 이 저장소의 받아들임 묶음 29건은 <code>mins</code>를 뺀 기대값으로 고쳐 두었다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 <code>mins</code>가 없는 만큼 어긋난다.</li>
+<li>외부 설명서와 달라진 곳: <code>mins</code> 필드를 지웠다(위 「vault의 모양」). 데일리 리포트 명령(<code>list-reports</code>, <code>get-report</code>, <code>save-report</code>)도 엔진에서 뺐다. 이 저장소의 받아들임 묶음은 <code>mins</code>를 뺀 기대값으로 고쳐 두었고, 리포트 사례 2건(<code>list_reports/all</code>, <code>get_report/missing</code>)을 덜어 27건이다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 <code>mins</code>가 없는 만큼, 그리고 리포트 사례만큼 어긋난다.</li>
 <li>설명서 원문이 제공되지 않은 부분(3부 18장, 4부 <code>ais-agent</code> 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.</li>
 </ul>
 

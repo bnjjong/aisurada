@@ -70,7 +70,7 @@ test('9.3 M3: an ended row says how long ago it ended; a list row says its run s
 test('9.5 D26: the agent bar says "도는 중" only for a session whose pid is alive', () => {
   assert.equal(agentBarText(2, true), '서브에이전트 2개가 도는 중');
   assert.equal(agentBarText(2, false), '결과가 안 온 서브에이전트 2개, 지금 도는지는 몰라요');
-  assert.equal(todoBarText([{ status: 'completed' }, { status: 'in_progress' }]), '할 일 2개 가운데 1개가 끝났습니다');
+  assert.equal(todoBarText([{ status: 'completed' }, { status: 'in_progress' }]), '할 일 2개 가운데 1개가 끝났어요');
 });
 
 test('9.8 D29: inline code uses a fence one longer than the longest run and pads where the manual says', () => {
@@ -112,7 +112,7 @@ test('9.8 H5 M12: the pinned note body', () => {
 test('9.4: the four states of the conversation column', () => {
   const html = (read) => renderToString(React.createElement(TranscriptBody, { read })).replace(/<!-- -->/g, '');
   assert.match(html({ view: null, loading: true, error: null }), /대화 기록을 읽는 중이에요/);
-  assert.match(html({ view: null, loading: false, error: 'boom' }), /사이드카가 안 떠 있을 수 있어요/);
+  assert.match(html({ view: null, loading: false, error: 'boom' }), /동기화 엔진이 안 떠 있을 수 있어요/);
   assert.equal(html({ view: null, loading: false, error: 'boom' }).includes('boom'), true, 'the failure text is in the tooltip only');
   assert.match(html({ view: normalizeReadSession({ file: null }), loading: false, error: null }), /이 기계에 그 세션의 기록이 없어요/);
   assert.match(html({ view: normalizeReadSession({ file: '/x', turns: [] }), loading: false, error: null }), /기록은 있는데 주고받은 말이 없어요/);

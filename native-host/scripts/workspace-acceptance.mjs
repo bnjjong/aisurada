@@ -24,7 +24,9 @@ let dataDriver;
 const probeAssets = new Map();
 if (dataCheck || autosaveCheck) {
   const { build } = await import('vite');
-  const compiled = await build({ configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': JSON.stringify('production') }, build: { write: false, minify: false, target: 'safari15',
+  // 자동 저장 점검만 확인 창(네이티브 대화 창)에 답해야 해서, 이 번들에서만 대화상자 플러그인을 대역으로 바꾼다.
+  const alias = autosaveCheck ? { '@tauri-apps/plugin-dialog': join(host, 'scripts/acceptance/dialog-stub.ts') } : {};
+  const compiled = await build({ configFile: false, logLevel: 'silent', resolve: { alias }, define: { 'process.env.NODE_ENV': JSON.stringify('production') }, build: { write: false, minify: false, target: 'safari15',
     lib: { entry: join(host, autosaveCheck ? 'scripts/autosave-checks.ts' : 'scripts/data-checks.ts'), formats: ['es'], fileName: 'probe' } } });
   const output = (Array.isArray(compiled) ? compiled[0] : compiled).output;
   dataDriver = output.find(output => output.type === 'chunk' && output.isEntry).code;

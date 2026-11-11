@@ -69,7 +69,7 @@ test('8.10: the turn id, the cut of 20,000 characters, the failure text and the 
   assert.equal(ok.elapsedMs, 7400);
   assert.equal(ok.images, undefined);
   const failed = railTurnFrom({ id: 'rt2', askedAt: 't', question: 'q', model: 'm', effort: 'e', images: ['attach/a.png'], answer: { ok: false, error: null, elapsed_ms: 0 } });
-  assert.equal(failed.error, '까닭을 못 받았다');
+  assert.equal(failed.error, '답변을 받지 못했어요');
   assert.equal(failed.answer, '');
   assert.deepEqual(failed.images, ['attach/a.png']);
 });

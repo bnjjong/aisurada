@@ -5,12 +5,10 @@
   "note": "설명서 34장의 받아들임 묶음을 설명서만 보고 다시 지은 판. 실행기와 라이브러리는 34.1의 규칙을 따른다. 진짜 묶음(읽기 레인 460건, 나무 fixture.v1과 claude-home.v1)이 이 저장소에 없어서, 레인은 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았다. 진짜 묶음을 받으면 lanes와 trees를 그것으로 바꾸고 build-bundle.mjs로 목록을 다시 적는다.",
   "counts": {
     "lanes/read/get_doc.json": 3,
-    "lanes/read/get_report.json": 1,
     "lanes/read/get_sub_note.json": 2,
     "lanes/read/get_template.json": 4,
     "lanes/read/list_attachments.json": 3,
     "lanes/read/list_docs.json": 3,
-    "lanes/read/list_reports.json": 1,
     "lanes/read/list_sub_notes.json": 3,
     "lanes/read/list_templates.json": 9
   },
@@ -18,7 +16,6 @@
     "get_doc/ndfixture-00000004": "설명서 13145줄(34.1이 묶음에서 그대로 옮긴 케이스)",
     "get_doc/ndfixture-00000003": "설명서 5249줄의 예시",
     "get_doc/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
-    "get_report/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "get_sub_note/ndfixture-00000001/snfixture-00000001/snfixture-00000006": "설명서 5353줄의 예시",
     "get_sub_note/missing-child": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "get_template/tpl-halfmoved": "설명서 1542줄(2.4: 같은 id 2벌의 1건 읽기는 html 쪽)과 10049줄의 목록 값",
@@ -31,7 +28,6 @@
     "list_docs/type-research": "설명서 4381줄의 예시",
     "list_docs/empty-range": "설명서 3474줄의 실패 9건 표(ais 포함)",
     "list_docs/unknown-agenda": "설명서 3474줄의 실패 9건 표(ais 포함)",
-    "list_reports/all": "설명서 10550줄의 예시",
     "list_sub_notes/ndfixture-00000001": "설명서 6873줄의 예시",
     "list_sub_notes/ndfixture-00000002": "설명서 6931줄의 예시",
     "list_sub_notes/missing": "설명서 3474줄의 실패 9건 표(ais 포함)",
@@ -57,19 +53,21 @@
     {
       "date": "2026-10-31",
       "change": "34장 판 확인 후속: get_doc.json의 케이스 차례를 바꿔 ndfixture-00000003을 앞에 둠. 토큰 1개인 첫 JSON 객체에 짝(list_docs/type-research)이 있어야 지금 실행기의 --mutants도 대상을 고른다. 실행기는 옵션 값 재는 자리, 겹친 목록 항목, AIS 번호 끝 경계, detail 1줄, 아직 없는 AISURADA_VAULT, stdout 자리표, 나무 dirs, 자가 점검 engine 칸, 변형 대상 고르기를 지금 실행기에 맞춤"
+    },
+    {
+      "date": "2026-11-11",
+      "change": "데일리 리포트 명령(list-reports, get-report, save-report)을 엔진에서 뺀 것(a590a66)을 따라, 레인 get_report.json(1건)과 list_reports.json(1건)을 덜어 냄. 이 두 건은 지금 엔진이 모르는 명령이라 종료 코드 2(쓰는 법)로 끝나 어긋났다. 케이스는 29건에서 27건이 됨"
     }
   ],
   "files": {
     ".gitattributes": "4a669ece67c496f5d07207f2daaf830c1e5b962e389baebd0ac068fd88be22ff",
-    "README.md": "031951e38bed86a62445fa274776cb087165a451e341fead459825366a4aee74",
+    "README.md": "55f7d0fc4433893055b74d1c54974032ba003a4ad7e8413a77a2174d0bace92b",
     "adapters/aisurada-jar.json": "f0819304fc1c948f0d2fc611aca17f35ac63abed6a2e1a3e8a7f1c70e4a60504",
     "lanes/read/get_doc.json": "0931c0553da6b2a1b4a02f507d19acfaa8621cb97d2a7cd0e62c29cfc39a7fb0",
-    "lanes/read/get_report.json": "6377793174d1e9e9befacb495e5193ef87ae4fb54a1ccf2a377bf790c467abd7",
     "lanes/read/get_sub_note.json": "282dd825db36f936a1c6b4919e67fc710248f493b40694830bde604e5fa53c35",
     "lanes/read/get_template.json": "922fd8cf32b7536cf36871a39d8177079f455725df60942ac8f3449c10a364b8",
     "lanes/read/list_attachments.json": "eff4cec0a90a7087aae012aa619c052ba4cc0d5f2a40d851b7f54219d1a64d50",
     "lanes/read/list_docs.json": "65c815e485e69b40b058dea28322032be64bac8ff6e421c53f6be37d24bb5777",
-    "lanes/read/list_reports.json": "0581cca4369a5ae7884eb711b1e3791e63c704440866718039fb5fdf5a018ee6",
     "lanes/read/list_sub_notes.json": "ffa50358f76814aae4db2567c0a3bca26e23659994f55ebeb18f6f64bfcdd0fd",
     "lanes/read/list_templates.json": "8460f10bc6c8124152c2f6499508dfda75aab5a3f38ef799b6683046485f76cd",
     "lib/bundle.mjs": "9ee66830c1bfbf0e1c43b9b29a0598c82cf4c8c057e3dc8f5b8aeee62922565e",

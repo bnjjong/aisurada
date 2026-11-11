@@ -51,7 +51,7 @@ test('Chapter 3: pending records and the waiting count', () => {
 
 test('Chapter 3.3: model and effort lists and the way stored values come back (M5)', () => {
   assert.deepEqual(ASK_MODELS.map((m) => m.id), ['claude-opus-5-5', 'claude-sonnet-5-5', 'gemini-3-8-high', 'gemini-3-8-medium']);
-  assert.deepEqual(ASK_MODELS.map((m) => m.label), ['opus 5.5', 'sonnet 5.5', 'gemini 3.8 high', 'gemini 3.8 medium']);
+  assert.deepEqual(ASK_MODELS.map((m) => m.label), ['Claude Opus 5.5', 'Claude Sonnet 5.5', 'Gemini 3.8 Flash High', 'Gemini 3.8 Flash Medium']);
   assert.deepEqual(ASK_EFFORTS.map((e) => e.id), ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.equal(normalizeModel('opus'), 'claude-opus-5-5');
   assert.equal(normalizeModel('claude-opus-5'), 'claude-opus-5-5');

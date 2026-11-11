@@ -66,8 +66,10 @@ if (location.pathname.startsWith('/note-window/')) {
     });
     await test('sample-preserves-real-vault', async () => {
       const last = localStorage.getItem('aisurada.lastWorkspace.v1');
-      navigate('/launcher'); await until(() => document.querySelector('.sample-button'));
-      click('.sample-button'); await until(() => document.querySelector('.sample-badge'));
+      // 열린 워크스페이스가 있으면 「열려 있는 워크스페이스로 돌아가기」도 같은 sample-button 클래스를 쓴다. 글자로 샘플 단추를 고른다.
+      const sampleButton = () => [...document.querySelectorAll('.sample-button')].find(button => button.textContent.includes('샘플로 둘러보기'));
+      navigate('/launcher'); await until(() => sampleButton());
+      sampleButton().click(); await until(() => document.querySelector('.sample-badge'));
       assert(localStorage.getItem('aisurada.lastWorkspace.v1') === last, 'sample replaced last real vault');
       // An earlier focus refresh may finish while the transition waits in the
       // queue. From the moment the sample opens, no engine read may follow.
