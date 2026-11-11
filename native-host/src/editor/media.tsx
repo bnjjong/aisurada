@@ -45,7 +45,7 @@ export async function openEditorLink(url: string, features: EditorFeatures, head
   const path = relativePath(url);
   if (!path || !features.noteDirectory) return;
   if (/\.(html?|svg)$/i.test(path)) {
-    try { if (!await features.host?.confirm('첨부를 기본 앱에서 열까요? 파일 안의 스크립트가 실행될 수 있어요.')) return; } catch { return; }
+    try { if (!await features.host?.confirm('첨부를 기본 앱에서 열까요? 파일 안의 스크립트가 실행될 수 있어요.', { title: '첨부 열기', okLabel: '열기', cancelLabel: '취소' })) return; } catch { return; }
   }
   await features.host?.openFile(`${features.noteDirectory}/${path}`);
 }

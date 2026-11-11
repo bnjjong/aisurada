@@ -179,7 +179,7 @@ export function NoteEditor({
             <button
               data-conflict-action="load"
               onClick={async () => {
-                const ok = await editorHost().confirm("지금까지 작성한 편집 내용을 버리고 외부 파일을 불러올까요?");
+                const ok = await editorHost().confirm("지금까지 작성한 편집 내용을 버리고 외부 파일을 불러올까요?", { title: "편집 버리기", okLabel: "버리기", cancelLabel: "취소" });
                 if (ok) {
                   void session.discard();
                 }

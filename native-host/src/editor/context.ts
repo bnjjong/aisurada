@@ -7,9 +7,11 @@ export interface EditorHost {
   openFile(path: string): Promise<void>;
   openPath?(path: string): Promise<void>;
   openURL(url: string): Promise<void>;
-  confirm(message: string): Promise<boolean>;
+  /** 확인 창에 묻는다. 창 제목과 단추 글자는 묻는 쪽이 정한다(정하지 않으면 「확인」「취소」). */
+  confirm(message: string, options?: ConfirmOptions): Promise<boolean>;
   warn(message: string): Promise<void>;
 }
+export interface ConfirmOptions { title?: string; okLabel?: string; cancelLabel?: string; }
 export interface EditorFeatures {
   notes?: EditorNote[]; currentId?: string; showRecords?: boolean; noteDirectory?: string;
   children?: { id: string; title: string }[];
