@@ -178,22 +178,26 @@ export function NoteEditor({
             )}
             <button
               data-conflict-action="load"
-              onClick={() => void session.discard()}
+              onClick={() => {
+                if (window.confirm("지금까지 작성한 편집 내용을 버리고 외부 파일을 불러올까요?")) {
+                  void session.discard();
+                }
+              }}
               disabled={snapshot.discarding}
             >
-              디스크 버전 불러오기
+              내 편집 버리고 외부 파일 불러오기
             </button>
             <button
               data-conflict-action="keep"
               onClick={() => void session.keep()}
               disabled={snapshot.discarding}
             >
-              내 편집 유지
+              외부 변경 덮어쓰고 내 편집 유지
             </button>
           </div>
         </div>
       )}
-      {snapshot.discarding && <p role="status">디스크 버전을 불러오는 중…</p>}
+      {snapshot.discarding && <p role="status">외부 파일을 불러오는 중…</p>}
       {headings.length >= 2 && (
         <div className="note-toc-wrapper">
           <nav
@@ -202,6 +206,11 @@ export function NoteEditor({
             onMouseEnter={() => setToc(true)}
             onMouseLeave={() => setToc(false)}
             onFocus={() => setToc(true)}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setToc(false);
+              }
+            }}
           >
             {headings.slice(1).map((h) => (
               <button

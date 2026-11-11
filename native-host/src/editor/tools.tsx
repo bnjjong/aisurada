@@ -74,6 +74,16 @@ export function EditorTools(props: EditorProps) {
     if (!box) return { x: 0, y: 0 };
     return { x: Math.max(8, Math.min(rect.left - box.left, box.width - 260)), y: Math.max(0, rect.top - box.top - 42) };
   };
+  const menuCoords = (rect: DOMRect, menuHeight = 240) => {
+    const box = outer()?.getBoundingClientRect();
+    if (!box) return { x: 0, y: 0 };
+    const x = Math.max(8, Math.min(rect.left - box.left, box.width - 280));
+    const spaceBelow = box.height - (rect.bottom - box.top);
+    const y = spaceBelow < menuHeight && (rect.top - box.top) > menuHeight
+      ? Math.max(0, Math.round(rect.top - box.top - menuHeight))
+      : Math.round(rect.top - box.top + 28);
+    return { x, y };
+  };
   const slashItems = [
     ...(props.features?.createChild ? [{ id: 'page', icon: 'page', label: '페이지', desc: '하위 노트를 만들어 카드로 넣어요', aliases: 'page 후속 하위 노트 새 페이지' }] : []),
     ...(props.features?.notes ? [{ id: 'note', icon: 'link', label: '노트 링크', desc: '다른 노트로 가는 링크', aliases: 'note link 링크 기록' }] : []),
@@ -298,8 +308,8 @@ export function EditorTools(props: EditorProps) {
           const pair = /(?:^|[^\[])\[\[$/.test(before);
           const slash = /(?:^|\s)\/$/.test(before);
           if (pair && latest.current.features?.notes || slash) {
-            const dom = window.getSelection(), rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : root.getBoundingClientRect(), position = coords(rect);
-            setMenu({ kind: pair ? 'note' : 'slash', trigger: { key: node.getKey(), start: selected.anchor.offset - (pair ? 2 : 1), size: pair ? 2 : 1 }, query: '', selected: 0, x: position.x, y: position.y + 68 });
+            const dom = window.getSelection(), rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : root.getBoundingClientRect(), position = menuCoords(rect);
+            setMenu({ kind: pair ? 'note' : 'slash', trigger: { key: node.getKey(), start: selected.anchor.offset - (pair ? 2 : 1), size: pair ? 2 : 1 }, query: '', selected: 0, x: position.x, y: position.y });
           }
         }
       });
@@ -316,9 +326,15 @@ export function EditorTools(props: EditorProps) {
     const tab = editor.registerCommand(KEY_TAB_COMMAND, event => {
       const selected = $getSelection();
       if (!$isRangeSelection(selected)) return false;
-      const parents = selected.anchor.getNode().getParents();
-      if (!parents.some($isCodeNode) || parents.some($isTableCellNode)) return false;
-      event.preventDefault(); selected.insertText('\t'); return true;
+      const node = selected.anchor.getNode();
+      const parents = [node, ...node.getParents()];
+      if (parents.some($isCodeNode) && !parents.some($isTableCellNode)) {
+        event.preventDefault(); selected.insertText('\t'); return true;
+      }
+      if (parents.some($isTableCellNode) || parents.some(n => n.getType() === 'list' || n.getType() === 'listitem')) {
+        return false;
+      }
+      event.preventDefault(); return true;
     }, COMMAND_PRIORITY_HIGH);
     const formatCommand = editor.registerCommand(FORMAT_TEXT_COMMAND, $formatSelection, COMMAND_PRIORITY_LOW);
     const commentCommand = editor.registerCommand(OPEN_COMMENT_COMMAND, () => {
@@ -370,8 +386,7 @@ export function EditorTools(props: EditorProps) {
     const click = (event: MouseEvent) => {
       const mark = (event.target as Element).closest<HTMLElement>('[data-comment-id]'); if (!mark || mark.closest('td,th')) return;
       setCard(previous => previous ? { ...previous, pinned: true } : previous);
-      const rect = [...mark.getClientRects()].at(-1);
-      if (mark.classList.contains('lex-comment-end') && rect && event.clientX >= rect.right - 20 && event.clientY >= rect.top - 6) latest.current.features?.openComment?.(mark.dataset.commentId!);
+      if (mark.dataset.commentId) latest.current.features?.openComment?.(mark.dataset.commentId);
     };
     const drop = (event: DragEvent) => {
       const files = [...(event.dataTransfer?.files || [])].filter(file => resolveFileExtension(file) !== null);
@@ -410,7 +425,10 @@ export function EditorTools(props: EditorProps) {
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>
     {(code || callout) && anchor && <div className="lex-toolbar lex-block-bar" style={{ top: anchor.top, right: anchor.right }}>
-      {code && <select aria-label="코드 언어" value={code.language} onChange={event => editor.update(() => { const node = $getNodeByKey(code.key); if ($isCodeNode(node)) node.setLanguage(event.target.value); })}>
+      {code && <select aria-label="코드 언어" value={code.language} onChange={event => {
+        editor.update(() => { const node = $getNodeByKey(code.key); if ($isCodeNode(node)) node.setLanguage(event.target.value); });
+        editor.focus();
+      }}>
         {!languages.includes(code.language) && <option value={code.language}>{code.language || '언어 없음'}</option>}{languages.map(language => <option key={language}>{language}</option>)}</select>}
       {callout && ['info', 'success', 'warn', 'danger'].map((kind, index) => <button key={kind} aria-pressed={calloutStyle(callout.kind) === kind}
         onMouseDown={event => event.preventDefault()} onClick={() => editor.update(() => { const node = $getNodeByKey(callout.key); if ($isCallout(node)) node.setKind(kind); })}>{['정보', '성공', '주의', '위험'][index]}</button>)}
@@ -420,7 +438,16 @@ export function EditorTools(props: EditorProps) {
       <span aria-hidden="true">/ 를 눌러 표, 콜아웃, 코드 블록을 넣어요</span>
     </div>}
     {selectionBar && !compose && !menu && <div className="sel-bar" style={{ left: selectionBar.x, top: selectionBar.y }} onMouseDown={event => event.preventDefault()}>
-      {!selectionBar.special && formats.map((value, index) => <button className={`sel-format-btn sel-format-${value}`} aria-pressed={selectionBar.formats[index]} key={value} onClick={() => format(value)}>{['B', 'I', 'S', '</>'][index]}</button>)}
+      {!selectionBar.special && formats.map((value, index) => {
+        const labels: Record<string, string> = {
+          bold: '굵게 (⌘B)',
+          italic: '기울임 (⌘I)',
+          strikethrough: '취소선',
+          code: '인라인 코드 (⌘E)',
+        };
+        const title = labels[value] || value;
+        return <button className={`sel-format-btn sel-format-${value}`} aria-pressed={selectionBar.formats[index]} key={value} title={title} aria-label={title} onClick={() => format(value)}>{['B', 'I', 'S', '</>'][index]}</button>;
+      })}
       {props.features?.comment && <button className="comment-add-btn" onClick={beginComment}>코멘트</button>}
       {props.onAskAi && <button className="ask-add-btn comment-add-btn" onClick={beginAsk}>AI에게 묻기</button>}
     </div>}

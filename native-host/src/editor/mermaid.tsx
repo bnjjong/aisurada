@@ -164,13 +164,16 @@ function Preview({
       <button onClick={() => setExpanded(!expanded)}>
         {expanded ? "코드 숨기기" : "코드"}
       </button>
-      {error ? (
-        <p role="status">{error}</p>
+      {error && !svg ? (
+        <p role="status" className="mermaid-error">{error}</p>
       ) : (
-        <div
-          className="mermaid-svg"
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
+        <>
+          {error && <div className="mermaid-error-bar" role="status" title={error}>{error.split('\n')[0]}</div>}
+          <div
+            className="mermaid-svg"
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        </>
       )}
     </div>
   );

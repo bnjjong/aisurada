@@ -78,6 +78,7 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; 
   const [selected, setSelected, clearSelected] = useLexicalNodeSelection(nodeKey);
   const [editable, setEditable] = useState(() => editor.isEditable());
   const [live, setLive] = useState<number | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const frame = useRef<HTMLSpanElement>(null), image = useRef<HTMLImageElement>(null);
   useEffect(() => editor.registerEditableListener(setEditable), [editor]);
   // 에디터의 기본 클릭 처리(리치텍스트)는 클릭 때 노드 선택을 지운다. 그보다 먼저 이 이미지를 눌렀는지 보고 선택한다.
@@ -117,10 +118,18 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; 
   const shown = live ?? (width > 0 ? width : 0);
   const hasFixedWidth = shown > 0;
   const fileName = imageFileName(source);
+  const isGeneratedName = /^img-[a-z0-9]+-[a-z0-9]+\.[a-z0-9]+$/i.test(fileName);
   return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`} style={shown ? { width: shown } : undefined}>
     <span className="lex-image-media">
-      <img ref={image} src={url} alt={alt} loading="lazy" draggable="false" style={shown ? { width: shown } : (isSvg ? { width: '100%' } : undefined)}
-        onDoubleClick={() => { if (editable && width > 0) onWidth(0); }} />
+      {loadFailed ? (
+        <span className="lex-image-missing" title={source}>
+          ⚠️ 그림 파일을 찾을 수 없어요 {fileName ? `(${fileName})` : ''}
+        </span>
+      ) : (
+        <img ref={image} src={url} alt={alt} loading="lazy" draggable="false" style={shown ? { width: shown } : (isSvg ? { width: '100%' } : undefined)}
+          onError={() => setLoadFailed(true)}
+          onDoubleClick={() => { if (editable && width > 0) onWidth(0); }} />
+      )}
       {selected && editable && <>
         <span className="lex-image-bar" role="toolbar" aria-label="이미지 크기">
           {IMAGE_PRESETS.map(preset => <button key={preset.label} type="button" onMouseDown={event => event.preventDefault()}
@@ -133,7 +142,7 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; 
         </span>
       </>}
     </span>
-    {fileName && <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{fileName}</span>}
+    {fileName && !isGeneratedName && <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{fileName}</span>}
   </span>;
 }
 export const FRAME_LINK = /^(?:https?|mailto|tel):/i;

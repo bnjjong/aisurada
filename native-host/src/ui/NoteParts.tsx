@@ -50,6 +50,7 @@ export function NoteMeta({
     [deleting, setDeleting] = useState(false),
     [menuOpen, setMenuOpen] = useState(false),
     [copiedId, setCopiedId] = useState(false),
+    [copiedItem, setCopiedItem] = useState<string | null>(null),
     [moveError, setMoveError] = useState(""),
     moreButton = useRef<HTMLButtonElement>(null),
     closeMenu = useCallback(() => setMenuOpen(false), []);
@@ -105,13 +106,16 @@ export function NoteMeta({
       ? [
           {
             key: "body-copy",
-            label: "본문 복사",
+            label: copiedItem === "body" ? "✓ 복사했어요" : "본문 복사",
             icon: "copy" as const,
             className: "act-body-copy",
-            onSelect: () =>
+            onSelect: () => {
               void navigator.clipboard.writeText(
                 stripMarkers(controller.readBuffer(key, live.body)),
-              ),
+              );
+              setCopiedItem("body");
+              window.setTimeout(() => setCopiedItem(null), 1500);
+            },
           },
         ]
       : []),
@@ -119,13 +123,16 @@ export function NoteMeta({
       ? [
           {
             key: "window-link",
-            label: "새 창 링크 복사",
+            label: copiedItem === "link" ? "✓ 복사했어요" : "새 창 링크 복사",
             icon: "link" as const,
             className: "act-window-link",
-            onSelect: () =>
+            onSelect: () => {
               void navigator.clipboard.writeText(
                 `aisurada://doc/${encodeURIComponent(note.id)}?ws=${encodeURIComponent(state.workspace!.path)}&window=1`,
-              ),
+              );
+              setCopiedItem("link");
+              window.setTimeout(() => setCopiedItem(null), 1500);
+            },
           },
         ]
       : []),
@@ -508,7 +515,7 @@ export function Tags({
             e.preventDefault();
             add(value);
           }
-          if (e.key === "Backspace" && !value && own.length) {
+          if (e.key === "Backspace" && !value && own.length && !e.repeat) {
             e.preventDefault();
             void controller.data.updateNote(
               { id: note.id, parent },
@@ -810,6 +817,7 @@ function Comments({
     if (e.key === "Escape") {
       e.stopPropagation();
       e.preventDefault();
+      setEdit("");
     }
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();

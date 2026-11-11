@@ -229,6 +229,23 @@ const ANNOTATION: TextMatchTransformer = {
   export: (node, children) => $isAnnotation(node) && node.getIDs()[0]
     ? `<!--ais${node.getKind()}:${node.getIDs()[0]}-->${children(node)}<!--/ais${node.getKind()}:${node.getIDs()[0]}-->` : null,
 };
+const UNDERLINE_TAG: TextMatchTransformer = {
+  type: 'text-match', dependencies: [], regExp: /<u>([\s\S]+?)<\/u>/,
+  replace: (node, match) => {
+    node.setTextContent(match[1]);
+    if (!node.hasFormat('underline')) node.toggleFormat('underline');
+    return node;
+  },
+  export: (node, _children, exportFormat) => {
+    if (!$isTextNode(node) || !node.hasFormat('underline')) return null;
+    const text = node.getTextContent();
+    const cloned = $createTextNode(text);
+    for (const f of ['bold', 'italic', 'strikethrough', 'code', 'highlight'] as const) {
+      if (node.hasFormat(f)) cloned.toggleFormat(f);
+    }
+    return `<u>${exportFormat ? exportFormat(cloned, text) : text}</u>`;
+  },
+};
 const CARD: ElementTransformer = {
   type: 'element', dependencies: [ReferenceNode], regExp: /^\[([^\]\ue000]+)\]\(#sub:([^\s)]+)\)$/,
   replace: (parent, _children, match) => { if (isInCell(parent)) return false; parent.replace($createReference(match[2], match[1], true)); },
@@ -332,7 +349,7 @@ const HORIZONTAL_RULE: ElementTransformer = {
 export function transformers(cell = false, copy = false): Transformer[] {
   return [CODE_BLOCK, ...(cell ? [] : [PARAGRAPH, HORIZONTAL_RULE, { ...TABLE, export: (node: LexicalNode, _children: (node: ElementNode) => string, selected?: BaseSelection | null) => $isTableNode(node) ? $tableMarkdown(node, copy, selected) : null }]), CALLOUT, checklist(cell), ...(cell ? [] : [CARD]), HEADING,
     cell ? QUOTE : GUARDED_QUOTE, cell ? UNORDERED_LIST : listRule(UNORDERED_LIST, 'bullet'), cell ? ORDERED_LIST : listRule(ORDERED_LIST, 'number'),
-    HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, ...(copy ? [] : [CHIP_RUN]), IMAGE, CHIP, LINK, ANNOTATION];
+    HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, ...(copy ? [] : [CHIP_RUN]), IMAGE, CHIP, LINK, ANNOTATION, UNDERLINE_TAG];
 }
 const INLINE_RULES: Transformer[] = [HIGHLIGHT, ...TEXT_FORMAT_TRANSFORMERS, IMAGE, CHIP, LINK];
 // Opening a note uses INLINE in place of the library's inline rules; saving keeps them.

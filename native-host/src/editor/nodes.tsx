@@ -100,6 +100,7 @@ function ReferenceView({ target, label, card, formats = [] }: { target: string; 
   const features = useContext(EditorContext);
   const title = (card ? features.children : features.notes)?.find(note => note.id === target)?.title || label || '제목 없음';
   return <a className={card ? 'child-page-card' : 'doc-link-chip'} href={`#${card ? 'sub' : 'doc'}:${target}`}
+    title={card ? undefined : '⌘+클릭으로 노트 열기'}
     {...(card ? { 'data-child-page': target } : { 'data-doc-link': target })} onClick={event => {
       event.preventDefault(); event.stopPropagation();
       if (card) features.openChild?.(target); else if (event.metaKey || event.ctrlKey) {

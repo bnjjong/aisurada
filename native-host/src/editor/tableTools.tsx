@@ -34,6 +34,7 @@ export function TableTools(props: EditorProps) {
   const [editor] = useLexicalComposerContext();
   const pendingByMark = useAskState(state => props.askDocId ? state.pending[props.askDocId] : undefined);
   const [cell, setCell] = useState<Cell | null>(null), [open, setOpen] = useState(false), copyMode = useRef(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [dots, setDots] = useState<{ key: string; x: number; y: number; ids: string[]; asks: string[] }[]>([]), [rowCard, setRowCard] = useState<string | null>(null);
   const rowPinned = useRef(false);
   const rowCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,13 +53,15 @@ export function TableTools(props: EditorProps) {
     }
     return [...found.values()];
   }
-  const copyTable = (tsv: boolean) => {
+  const copyTable = (tsv: boolean, id: string) => {
     if (!cell) return;
     editor.update(() => { const target = $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode); table?.select(0, table.getChildrenSize()); }, { discrete: true });
     copyMode.current = tsv; editor.focus(() => document.execCommand('copy'));
+    setCopied(id);
+    setTimeout(() => setCopied(null), 1500);
   };
   function operation(name: string) {
-    if (name === 'markdown' || name === 'tsv') { copyTable(name === 'tsv'); setOpen(false); return; }
+    if (name === 'markdown' || name === 'tsv') { copyTable(name === 'tsv', name); setOpen(false); return; }
     if (name === 'ask' || name === 'comment') {
       editor.update(() => {
         const target = cell && $getNodeByKey<TableCellNode>(cell.key), table = target?.getParents().find($isTableNode), row = target?.getParent<TableRowNode>();
@@ -213,6 +216,15 @@ export function TableTools(props: EditorProps) {
     const copy = (event: ClipboardEvent | null, cut = false) => {
       const selected = $getSelection(), tables = tablesFromSelection();
       if (!selected || !tables.length || !event?.clipboardData) return false;
+      if (!copyMode.current && $isRangeSelection(selected)) {
+        const anchorNode = selected.anchor.getNode();
+        const focusNode = selected.focus.getNode();
+        const anchorCell = $isTableCellNode(anchorNode) ? anchorNode : anchorNode.getParents().find($isTableCellNode);
+        const focusCell = $isTableCellNode(focusNode) ? focusNode : focusNode.getParents().find($isTableCellNode);
+        if (anchorCell && focusCell && anchorCell.is(focusCell)) {
+          return false;
+        }
+      }
       event.preventDefault(); const selectedCells = $isTableSelection(selected) ? new Set(selected.getNodes().filter($isTableCellNode).map(node => node.getKey())) : undefined;
       const data = $getClipboardDataFromSelection(selected);
       data['text/plain'] = copyMode.current ? tables.map(table => $tableTSV(table, selectedCells)).join('\n')
@@ -243,7 +255,7 @@ export function TableTools(props: EditorProps) {
     [...(props.onAskAi ? [['ask', '이 줄을 AI에게 묻기']] : []), ...(props.features?.comment ? [['comment', '이 줄에 코멘트 달기']] : [])],
     [['before-row', '위에 행 추가'], ['after-row', '아래에 행 추가'], ['remove-row', '행 삭제']],
     [['before-col', '커서 열 왼쪽에 추가'], ['after-col', '커서 열 오른쪽에 추가'], ['remove-col', '커서 열 삭제']],
-    [['fit', '표 너비 화면에 맞춤'], ['markdown', '표 복사 — 마크다운'], ['tsv', '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']],
+    [['fit', '표 너비 화면에 맞춤'], ['markdown', copied === 'markdown' ? '✓ 복사했어요' : '표 복사 — 마크다운'], ['tsv', copied === 'tsv' ? '✓ 복사했어요' : '표 복사 — Slack과 시트'], ['remove-table', '표 삭제']],
   ].filter(group => group.length);
   // 메뉴가 열려 있을 때만 읽는다. 커서가 이 표 안에 없으면 열 작업 항목은 눌러도 할 일이 없으므로 꺼 둔다.
   const hasCaret = open && cell ? editor.getEditorState().read(() => { const table = $getNodeByKey(cell.key)?.getParents().find($isTableNode); return !!table && !!$caretCellIn(table); }) : false;
