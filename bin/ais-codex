@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# codex를 띄우되, 부모 에이전트에서 물려받은 세션 변수를 치워 주는 래퍼입니다.
+#
+# Codex는 셸 도구에는 CODEX_SESSION_ID와 CODEX_THREAD_ID를 주고, MCP 서버에는 도구 호출마다 요청에
+# 세션 id를 실어 보냅니다. 그래서 Codex만 쓸 때는 이 래퍼가 필요 없습니다.
+#
+# 필요한 때는 Claude Code 셸 안에서 codex를 띄울 때입니다. 그러면 Codex 프로세스에
+# CLAUDE_CODE_SESSION_ID가 남아 있어서 엔진이 어느 쪽 세션인지 가리지 못하고 아무것도 기록하지
+# 않습니다. 이 래퍼는 Claude와 다른 래퍼가 넣은 세션 변수를 지우고 codex를 띄웁니다.
+#
+#   ais-codex [codex 인자...]
+#
+# 쓰는 codex 실행 파일을 바꾸려면 AISURADA_CODEX_BIN에 경로를 줍니다.
+set -euo pipefail
+
+CODEX_BIN="${AISURADA_CODEX_BIN:-codex}"
+
+exec env -u CLAUDE_CODE_SESSION_ID -u AISURADA_SESSION_ID -u AISURADA_SESSION_AGENT "$CODEX_BIN" "$@"
