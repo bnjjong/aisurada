@@ -87,7 +87,11 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
     drag.current = null; setDragging(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
-  return <div className="tab-bar" role="tablist" aria-label="열린 화면" ref={list}>
+  return <div className="tab-bar" role="tablist" aria-label="열린 화면" ref={list} onWheel={(e) => {
+    if (e.deltaY) {
+      e.currentTarget.scrollLeft += e.deltaY;
+    }
+  }}>
     {ids.map(id => {
       const title = id === null ? '내 기록' : tabTitle(id, state);
       const note = state.workspace?.notes.find(n => n.id === id);

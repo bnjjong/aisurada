@@ -10,6 +10,7 @@
   position: relative;
   color: var(--ink);
   contain: paint;
+  --ok: #81c784;
   background:
     radial-gradient(1.6px 1.6px at 14% 6%, var(--rail-star-a) 55%, transparent 60%),
     radial-gradient(1.2px 1.2px at 82% 9%, var(--rail-star-a) 55%, transparent 60%),
@@ -49,6 +50,7 @@
   --rail-edge: #26352e; --rail-glow: rgba(183, 208, 183, .28); --rail-base: linear-gradient(180deg, #2f5542 0%, #26352e 100%);
   --rail-star-a: #fdfdfa; --rail-star-b: #f3f5ee; --rail-star-c: #e5e9df; --rail-link: #b7d0b7;
   --ink: #fdfdfa; --muted: rgba(253, 253, 250, .72); --line: rgba(253, 253, 250, .18); --soft: rgba(253, 253, 250, .10);
+  --accent: #b7d0b7;
 }
 :root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active,
 :root[data-skin="classic"][data-theme="light"] .workspace-rail nav button.active:hover:not(:disabled),
@@ -123,6 +125,7 @@
   --ink: #ffffff; --muted: #dae1ee; --line: rgba(255, 255, 255, .14); --soft: rgba(255, 255, 255, .10);
   --hover: rgba(255, 255, 255, .10); --surface: rgba(255, 255, 255, .14); --sh-1: inset 0 0 0 1px rgba(255, 255, 255, .16);
   --accent-soft: rgba(255, 255, 255, .16); --accent-text: #fff;
+  --bg: rgba(255, 255, 255, .16);
 }
 :root[data-skin="tactile"][data-theme="dark"] .workspace-rail {
   --rail-glow: rgba(127, 163, 255, .35); --rail-base: linear-gradient(180deg, #18244a 0%, #070c1c 100%);
