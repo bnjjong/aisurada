@@ -181,8 +181,12 @@ export function Calendar({
             }}
           />
           <AgendaFilter state={state} controller={controller} />
-          <button onClick={() => controller.form({ kind: "note" })}>
-            새 문서
+          <button
+            onClick={() =>
+              controller.form({ kind: "note", date: view.date } as any)
+            }
+          >
+            새 노트
           </button>
         </div>
         {mode === "day" ? (
@@ -328,22 +332,29 @@ export function Calendar({
             {state.prefs.weekLayout === "dates" || state.prefs.weekLayout === "stack" ? (
               <div className="week-columns">
                 {Array.from({ length: 7 }, (_, i) => addDays(view.week, i)).map(
-                  (date) => (
-                    <section key={date}>
-                      <h3>{date.slice(5)}</h3>
-                      {all
-                        .filter((n) => n.date === date)
-                        .map((n) => (
-                          <button
-                            className="mchip"
-                            key={n.id}
-                            onClick={() => controller.showPreview(n.id)}
-                          >
-                            {n.time} {n.title}
-                          </button>
-                        ))}
-                    </section>
-                  ),
+                  (date) => {
+                    const isToday = date === ws.today;
+                    return (
+                      <section
+                        key={date}
+                        className={isToday ? "is-today" : undefined}
+                        aria-current={isToday ? "date" : undefined}
+                      >
+                        <h3>{date.slice(5)}</h3>
+                        {all
+                          .filter((n) => n.date === date)
+                          .map((n) => (
+                            <button
+                              className="mchip"
+                              key={n.id}
+                              onClick={() => controller.showPreview(n.id)}
+                            >
+                              {n.time} {n.title || "제목 없는 노트"}
+                            </button>
+                          ))}
+                      </section>
+                    );
+                  },
                 )}
               </div>
             ) : (
@@ -373,14 +384,14 @@ export function Calendar({
                             key={n.id}
                             onClick={() => controller.showPreview(n.id)}
                           >
-                            {n.date.slice(5)} {n.time} {n.title}
+                            {n.date.slice(5)} {n.time} {n.title || "제목 없는 노트"}
                           </button>
                         ))}
                     </section>
                   ))}
                 {!all.some(
                   (n) => n.date >= view.week && n.date <= addDays(view.week, 6),
-                ) && <p>이번 주엔 기록된 아젠다가 없어요.</p>}
+                ) && <p>이 주엔 기록된 아젠다가 없어요.</p>}
               </div>
             )}
           </>
@@ -398,6 +409,7 @@ export function Calendar({
                     key={date}
                     date={date}
                     current={date.startsWith(view.date.slice(0, 7))}
+                    isToday={date === ws.today}
                     notes={all.filter((n) => n.date === date)}
                     open={(id) => controller.showPreview(id)}
                     day={() => route("day", date)}
@@ -414,12 +426,14 @@ export function Calendar({
 function MonthCell({
   date,
   current,
+  isToday,
   notes,
   open,
   day,
 }: {
   date: string;
   current: boolean;
+  isToday?: boolean;
   notes: Note[];
   open(id: string): void;
   day(): void;
@@ -440,7 +454,8 @@ function MonthCell({
   return (
     <div
       ref={box}
-      className={`month-cell ${current ? "" : "outside-month"}`}
+      className={`month-cell ${current ? "" : "outside-month"} ${isToday ? "is-today" : ""}`}
+      aria-current={isToday ? "date" : undefined}
       onClick={() => {
         if (current) day();
       }}
@@ -466,7 +481,7 @@ function MonthCell({
                 open(n.id);
               }}
             >
-              {n.title}
+              {n.title || "제목 없는 노트"}
             </button>
           ))}
           {notes.length > shown && (
@@ -520,8 +535,16 @@ export function AgendaPage({
     );
   if (!agenda)
     return (
-      <section className="page-scroll">
+      <section className="page-scroll empty-state">
         <h1>이 아젠다를 못 찾았어요</h1>
+        <p>삭제되었거나 잘못된 아젠다 경로예요.</p>
+        <button
+          type="button"
+          className="button-primary"
+          onClick={() => controller.navigate("/calendar")}
+        >
+          캘린더로
+        </button>
       </section>
     );
   const notes = visibleNotes(
@@ -542,27 +565,44 @@ export function AgendaPage({
     setOpen(
       open.includes(nid) ? open.filter((id) => id !== nid) : [...open, nid],
     );
-  const row = (n: Note) => (
-    <div className="doc-listitem" key={n.id}>
-      <button onClick={() => toggle(n.id)}>
-        <strong className="dli-title">
-          {displayTitle(n, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true)}
-        </strong>
-        <small>
-          {n.date} · {n.time}{" "}
-          {Boolean(n.format && n.format !== "markdown") && String(n.format).toUpperCase()}
-        </small>
-      </button>
-      <button
-        className="fav-toggle"
-        aria-pressed={n.favorite === true}
-        aria-label={`${n.title} 즐겨찾기`}
-        onClick={() => void controller.data.favorite(n.id, n.favorite !== true)}
-      >
-        {n.favorite ? "★" : "☆"}
-      </button>
-    </div>
-  );
+  const handleSelectNote = (nid: string, e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
+      toggle(nid);
+    } else {
+      if (open.length === 1 && open[0] === nid) {
+        setOpen([]);
+      } else {
+        setOpen([nid]);
+      }
+    }
+  };
+  const row = (n: Note) => {
+    const isSelected = open.includes(n.id);
+    return (
+      <div className={`doc-listitem ${isSelected ? "active" : ""}`} key={n.id}>
+        <button
+          onClick={(e) => handleSelectNote(n.id, e)}
+          aria-current={isSelected ? "true" : undefined}
+        >
+          <strong className="dli-title">
+            {displayTitle(n, state.prefs.titleDatePrefix ?? (state.prefs as any).titleDate ?? true)}
+          </strong>
+          <small>
+            {n.date} · {n.time}{" "}
+            {Boolean(n.format && n.format !== "markdown") && String(n.format).toUpperCase()}
+          </small>
+        </button>
+        <button
+          className="fav-toggle"
+          aria-pressed={n.favorite === true}
+          aria-label={`${n.title} 즐겨찾기`}
+          onClick={() => void controller.data.favorite(n.id, n.favorite !== true)}
+        >
+          {n.favorite ? "★" : "☆"}
+        </button>
+      </div>
+    );
+  };
   return (
     <div className="agenda-route">
       <section className="agenda-list page-scroll">
@@ -570,8 +610,8 @@ export function AgendaPage({
           <button
             type="button"
             className="ico-btn"
-            aria-label="아젠다 목록으로"
-            data-tip="아젠다 목록으로"
+            aria-label="캘린더로"
+            data-tip="캘린더로"
             data-tip-align="start"
             onClick={() => controller.navigate("/calendar")}
           >
@@ -591,8 +631,8 @@ export function AgendaPage({
           <button
             type="button"
             className="ico-btn ag-add button-primary"
-            aria-label="문서 추가"
-            data-tip="문서 추가"
+            aria-label="새 노트"
+            data-tip="새 노트"
             onClick={() => controller.form({ kind: "note", agenda: agenda.id })}
           >
             <Icon name="plus" />
@@ -604,7 +644,7 @@ export function AgendaPage({
           <div className="ag-seg" role="group" aria-label="아젠다 정렬">
             {(
               [
-                ["structure", "구조", "tree"],
+                ["structure", "구조순", "tree"],
                 ["time", "시간순", "clock"],
               ] as const
             ).map(([mode, name, icon]) => (
@@ -684,6 +724,20 @@ export function AgendaPage({
             />
             <div
               className="pane-resize"
+              role="separator"
+              tabIndex={0}
+              aria-orientation="vertical"
+              aria-label={`${n.title} 패널 너비 조절`}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                  e.preventDefault();
+                  const delta = e.key === "ArrowLeft" ? -24 : 24;
+                  setWidths((old) => ({
+                    ...old,
+                    [n.id]: Math.max(320, (old[n.id] || 620) + delta),
+                  }));
+                }
+              }}
               onDoubleClick={() =>
                 setWidths(
                   Object.fromEntries(
@@ -731,9 +785,9 @@ export function AgendaPage({
           {!!notes.length && (
             <div className="note-composition">
               {TYPES.map((t) => (
-                <span key={t}>
+                <button type="button" key={t} className="note-composition-chip">
                   {TYPE_NAMES[t]} {notes.filter((n) => n.type === t).length}
-                </span>
+                </button>
               ))}
             </div>
           )}

@@ -127,8 +127,8 @@ export function NotesPage({
           <button
             type="button"
             className="ico-btn ag-add button-primary"
-            aria-label="새 노트 추가"
-            data-tip="새 노트 추가"
+            aria-label="새 노트"
+            data-tip="새 노트"
             onClick={() =>
               controller.form({
                 kind: "note",
@@ -192,7 +192,7 @@ export function NotesPage({
             {(
               [
                 ["time", "시간순", "clock"],
-                ["structure", "아젠다순", "tree"],
+                ["structure", "구조순", "tree"],
               ] as const
             ).map(([mode, name, icon]) => (
               <button
@@ -265,6 +265,20 @@ export function NotesPage({
             />
             <div
               className="pane-resize"
+              role="separator"
+              tabIndex={0}
+              aria-orientation="vertical"
+              aria-label={`${n.title} 패널 너비 조절`}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                  e.preventDefault();
+                  const delta = e.key === "ArrowLeft" ? -24 : 24;
+                  setWidths((old) => ({
+                    ...old,
+                    [n.id]: Math.max(320, (old[n.id] || 620) + delta),
+                  }));
+                }
+              }}
               onDoubleClick={() =>
                 setWidths(
                   Object.fromEntries(
@@ -309,14 +323,15 @@ export function NotesPage({
             {ws.agendas.map((a) => {
               const count = allVisible.filter((n) => n.agendaId === a.id).length;
               return count > 0 ? (
-                <span
+                <button
+                  type="button"
                   key={a.id}
-                  style={{ cursor: "pointer" }}
+                  className="note-composition-chip"
                   onClick={() => setAgendaFilter(a.id)}
                   title={`${a.title} 아젠다 노트만 보기`}
                 >
                   {a.title} <strong>{count}</strong>
-                </span>
+                </button>
               ) : null;
             })}
           </div>

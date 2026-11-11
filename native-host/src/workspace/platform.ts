@@ -21,8 +21,12 @@ export function workspaceServices(): WorkspaceServices {
       },
       documentDir,
       chooseDirectory: () => open({ directory: true, multiple: false }),
-      confirmLeave: message => confirm(message, { title: '지금 vault에 남은 글이 있어요', kind: 'warning',
-        okLabel: '그래도 바꾸기', cancelLabel: '남겨 두기' }),
+      confirmLeave: (message, options) => confirm(message, {
+        title: options?.title || '지금 워크스페이스에 남은 글이 있어요',
+        kind: 'warning',
+        okLabel: options?.okLabel || '그래도 바꾸기',
+        cancelLabel: options?.cancelLabel || '남겨 두기',
+      }),
     },
     files: fs,
     storage: {

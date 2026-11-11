@@ -271,7 +271,7 @@ export function recentWorkspaces(storage: StoragePort): RecentWorkspace[] {
 
 export function addRecent(storage: StoragePort, item: Omit<RecentWorkspace, 'opened'>): RecentWorkspace[] {
   // Read on every mutation so another entry point's update is not overwritten.
-  const next = [{ ...item, opened: '방금 전' }, ...recentWorkspaces(storage).filter(r => r.path !== item.path)].slice(0, 6);
+  const next = [{ ...item, opened: new Date().toISOString() }, ...recentWorkspaces(storage).filter(r => r.path !== item.path)].slice(0, 6);
   writeJSON(storage, KEYS.recent, next);
   return next;
 }

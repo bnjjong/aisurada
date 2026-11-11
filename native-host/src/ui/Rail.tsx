@@ -86,6 +86,7 @@ export function Rail({
                 <button
                   className="agenda-dot"
                   title={`${a.title} 표시 전환`}
+                  aria-label={`${a.title} 표시 전환`}
                   aria-pressed={!state.hiddenAgendas.includes(a.id)}
                   style={{ color: HUE_COLORS[asText(a.hue)] || "var(--accent)" }}
                   onClick={() =>
@@ -187,6 +188,7 @@ export function Rail({
         <button
           className="iconbtn icon-btn"
           title="테마 전환"
+          aria-label="테마 전환"
           onClick={() =>
             controller.preference({
               theme: state.theme === "dark" ? "light" : "dark",
@@ -198,6 +200,7 @@ export function Rail({
         <button
           className="iconbtn icon-btn"
           title="설정"
+          aria-label="설정"
           onClick={() => controller.settings(true)}
         >
           ⚙

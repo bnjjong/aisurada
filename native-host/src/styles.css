@@ -1059,11 +1059,6 @@ code.is-symbol { font-weight: 700; }
   font-size: 12px;
   border-radius: 4px;
 }
-  background: #ffebee;
-  color: #c62828;
-  font-size: 12px;
-  border-radius: 4px;
-}
 
 .sess-composer-images {
   display: flex;
@@ -1551,3 +1546,100 @@ body.col-resizing {
 :root[data-skin="tactile"] .lex-image-grip { border: 0; box-shadow: var(--sh-1); }
 :root[data-skin="grid"] .lex-image-bar, :root[data-skin="grid"] .lex-image-bar button, :root[data-skin="grid"] .lex-image-grip, :root[data-skin="page"] .lex-image-bar, :root[data-skin="page"] .lex-image-bar button, :root[data-skin="page"] .lex-image-grip { border-radius: 0; }
 :root[data-skin="glass"] .lex-image-bar { border-radius: 14px; box-shadow: var(--sh-float); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+
+/* ───────── N6: 상단 공지/알림 박스 (닫기 및 상세 보기) ───────── */
+.notice-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.notice-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.notice-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+.notice-details {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.notice-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.notice-details pre {
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  font-size: 11px;
+  overflow-x: auto;
+}
+
+/* ───────── N14: 캘린더 오늘 날짜 강조 (.is-today) ───────── */
+.month-cell.is-today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.month-cell.is-today .mcell-date {
+  font-weight: 700;
+  color: var(--accent);
+}
+.week-columns section.is-today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 3%, transparent);
+  border-radius: 6px;
+}
+.week-columns section.is-today h3 {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ───────── N15: 패널 리사이저 포커스 및 칩 버튼 스타일 ───────── */
+.pane-resize:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.note-composition-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.note-composition-chip:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+/* ───────── N12: 폼 색상 선택 점 뱃지 ───────── */
+.hue-field .hue-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hue-field .hue-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: none;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}

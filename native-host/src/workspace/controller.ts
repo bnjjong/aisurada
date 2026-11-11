@@ -170,12 +170,21 @@ export class WorkspaceController {
   form = (form: WorkspaceState['form']) => { if (this.context.kind === 'main') this.patch({ form }); };
   filterAgendas = (hidden: string[]) => this.patch({ hiddenAgendas: [...new Set(hidden)] });
   isNative = () => !!this.services.native;
-  confirm = (text: string) => this.services.host.confirmLeave(text);
+  confirm = (text: string, options?: { title?: string; okLabel?: string; cancelLabel?: string }) =>
+    this.services.host.confirmLeave(text, options);
 
   notify = (notice: string) => {
     clearTimeout(this.noticeTimer);
     this.patch({ notice });
-    this.noticeTimer = setTimeout(() => this.patch({ notice: null }), 2600);
+    const isError = notice.includes('실패') || notice.includes('오류') || notice.includes('Error');
+    if (!isError) {
+      this.noticeTimer = setTimeout(() => this.patch({ notice: null }), 3000);
+    }
+  };
+
+  clearNotice = () => {
+    clearTimeout(this.noticeTimer);
+    this.patch({ notice: null });
   };
 
   private enqueue<T>(action: () => Promise<T>): Promise<T> {
@@ -189,7 +198,12 @@ export class WorkspaceController {
     return this.enqueue(async () => {
       this.patch({ busy: true });
       try { return await work(); }
-      catch (error) { this.notify(`${failure}: ${String(error)}`); onFailure?.(); return false; }
+      catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.notify(`${failure}: ${msg}`);
+        onFailure?.();
+        return false;
+      }
       finally { this.patch({ busy: false }); }
     });
   }
@@ -441,7 +455,7 @@ export class WorkspaceController {
 
       const reasons: string[] = [];
       if (!settled) {
-        reasons.push('저장이 끝났는지 확인하지 못했어요. 사이드카가 답하지 않아요.');
+        reasons.push('저장이 끝났는지 확인하지 못했어요. 동기화 엔진이 답하지 않아요.');
       }
       if (count > 0) {
         reasons.push(`디스크에 아직 못 쓴 노트가 ${count}개 있어요. 충돌 배너가 떠 있거나 저장이 실패한 노트예요.`);
@@ -468,7 +482,11 @@ export class WorkspaceController {
     if (this.context.kind !== 'main' || this.closingMain || this.disposed) return false;
     this.closingMain = true;
     try {
-      const can = await this.canLeave('앱을 종료할까요?');
+      const can = await this.canLeave('앱을 종료할까요?', {
+        title: '앱을 종료할까요?',
+        okLabel: '종료',
+        cancelLabel: '취소',
+      });
       if (!can) return false;
 
       // 열려 있는 독립 노트 창들을 각자의 안전한 닫기 절차(flush 및 미저장 확인)로 닫는다.
@@ -662,7 +680,7 @@ export class WorkspaceController {
     if (this.context.kind === 'note') return null;
     try {
       const path = await this.services.host.chooseDirectory();
-      if (!path) throw new Error('취소');
+      if (!path) return null;
       if (forCreation) {
         this.patch({ home: path });
         writeJSON(this.services.storage, KEYS.home, homePath(path));
@@ -671,15 +689,21 @@ export class WorkspaceController {
     } catch { this.notify('폴더 선택 창을 열 수 없어요'); return null; }
   };
 
-  private async leaveVault(): Promise<boolean> {
-    if (!await this.canLeave()) return false;
+  private async leaveVault(
+    question = '다른 워크스페이스를 열까요?',
+    options?: { title?: string; okLabel?: string; cancelLabel?: string }
+  ): Promise<boolean> {
+    if (!await this.canLeave(question, options)) return false;
     this.stopWatch();
     this.data.invalidate();
     await this.data.idle();
     return true;
   }
 
-  private async canLeave(question = '워크스페이스를 바꿀까요?'): Promise<boolean> {
+  private async canLeave(
+    question = '다른 워크스페이스를 열까요?',
+    options?: { title?: string; okLabel?: string; cancelLabel?: string }
+  ): Promise<boolean> {
     if (!this.state.workspace || this.state.workspace.sample) return true;
     const pending = this.services.pending;
     let settled = false;
@@ -704,7 +728,7 @@ export class WorkspaceController {
     if (waiting > 0) reasons.push(`답을 기다리는 물음이 ${waiting}개 있어요.`);
     if (unsavedA > 0) reasons.push(`저장하지 못한 AI 답이 ${unsavedA}개 있어요.`);
     reasons.push(question);
-    return await this.services.host.confirmLeave(reasons.join(' '));
+    return await this.services.host.confirmLeave(reasons.join(' '), options);
   }
 
   private async authorize(path: string) {
@@ -809,7 +833,11 @@ export class WorkspaceController {
   };
 
   launcher = (): Promise<boolean> => this.action(async () => {
-    if (!await this.leaveVault()) return false;
+    if (!await this.leaveVault('시작 화면으로 이동할까요?', {
+      title: '시작 화면으로 이동할까요?',
+      okLabel: '이동',
+      cancelLabel: '머무르기',
+    })) return false;
     void this.services.host.invoke('close_note_windows').catch(() => {});
     this.patch({ workspace: null, vault: this.data.reset() });
     writeJSON(this.services.storage, KEYS.last, null);

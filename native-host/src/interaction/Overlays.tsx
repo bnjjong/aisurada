@@ -54,6 +54,12 @@ function QuickSearch({
       : emptySearch(notes, initial.recent, initial.live);
   }, [query, state.workspace, state.prefs.showRecords]);
   const matches = results.slice(0, 20);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
   const open = (note: Note) => {
     controller.closeSearch();
     controller.navigate(docAddress(note.id));
@@ -196,7 +202,8 @@ function SubNotePages({
         parent = id;
       }
     })().catch((error) => {
-      if (current) setFailure(String(error));
+      if (current)
+        setFailure(error instanceof Error ? error.message : String(error));
     });
     return () => {
       current = false;

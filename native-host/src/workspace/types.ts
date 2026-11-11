@@ -35,7 +35,7 @@ export interface HostPort {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
   documentDir(): Promise<string>;
   chooseDirectory(): Promise<string | null>;
-  confirmLeave(message: string): Promise<boolean>;
+  confirmLeave(message: string, options?: { title?: string; okLabel?: string; cancelLabel?: string }): Promise<boolean>;
 }
 
 // Editors register their pending work here when introduced.
