@@ -1,5 +1,6 @@
 package aisurada.cli;
 
+import aisurada.session.SessionAgents;
 import aisurada.args.JsonCompact;
 import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
@@ -142,7 +143,14 @@ final class McpServer {
         }
     }
 
+    /** initialize 요청의 clientInfo.name입니다. 어느 에이전트가 붙었는지 가릴 때 씁니다. */
+    private volatile String clientName;
+
     private String initializeResult(JsonValue params) {
+        if (params instanceof JsonValue.JsonObject p0 && p0.properties().get("clientInfo") instanceof JsonValue.JsonObject info
+                && info.properties().get("name") instanceof JsonValue.JsonString nameValue) {
+            clientName = nameValue.value();
+        }
         String requested = null;
         if (params instanceof JsonValue.JsonObject p && p.properties().get("protocolVersion") instanceof JsonValue.JsonString v) {
             requested = v.value();
@@ -204,7 +212,14 @@ final class McpServer {
             return result(id, toolResult("이 서버는 읽기 전용으로 떠 있어 " + name + " 을 쓸 수 없다. "
                     + "쓰려면 서버를 `ais-cli mcp --write`로 다시 띄워야 한다.", true));
         }
-        AisCliMain.Call call = caller.apply(new String[] {name, JsonCompact.compact(arguments)});
+        // Codex는 도구 호출마다 _meta에 세션 id를 싣는다. 환경변수로는 MCP 서버에 세션이 전해지지 않는다
+        AisCliMain.Call call;
+        SessionAgents.setCallOverride(SessionAgents.fromMcpRequest(clientName, metaSessionId(p.properties().get("_meta"))));
+        try {
+            call = caller.apply(new String[] {name, JsonCompact.compact(arguments)});
+        } finally {
+            SessionAgents.setCallOverride(null);
+        }
         if (call.status() == 0) {
             String text = call.stdout().isEmpty() ? "(출력 없음)" : call.stdout();
             return result(id, toolResult(text, false));
@@ -216,6 +231,19 @@ final class McpServer {
         }
         text.append("\n(종료 코드 ").append(call.status()).append(')');
         return result(id, toolResult(text.toString(), true));
+    }
+
+    /** 호출 요청의 _meta에서 세션 id를 꺼냅니다. sessionId를 먼저 보고 없으면 threadId를 봅니다. 없으면 null입니다. */
+    private static String metaSessionId(JsonValue meta) {
+        if (!(meta instanceof JsonValue.JsonObject m)) {
+            return null;
+        }
+        for (String key : new String[] {"sessionId", "threadId"}) {
+            if (m.properties().get(key) instanceof JsonValue.JsonString v && !v.value().isBlank()) {
+                return v.value();
+            }
+        }
+        return null;
     }
 
     private static String toolResult(String text, boolean isError) {

@@ -340,6 +340,37 @@ public final class McpServerTest {
         }
     }
 
+    /**
+     * Codex는 도구 호출마다 params._meta에 세션 id를 싣고, 환경변수로는 MCP 서버에 세션을 알려 주지 않는다.
+     * 그 값은 initialize에서 codex 클라이언트라고 밝힌 연결의 호출에만 세션 출처가 된다.
+     */
+    private static void sessionFromMeta() {
+        List<aisurada.session.SessionAgents.Source> seen = new ArrayList<>();
+        McpServer codex = new McpServer(true, args -> {
+            seen.add(aisurada.session.SessionAgents.callOverride());
+            return new AisCliMain.Call(0, "{}", "");
+        });
+        String withMeta = "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"list_docs\",\"arguments\":{},\"_meta\":{\"sessionId\":\"t-1\",\"threadId\":\"t-2\"}}}";
+        String withoutMeta = "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"list_docs\",\"arguments\":{}}}";
+        send(codex, withMeta);
+        eq(seen.get(0), null, "initialize 전에는 누구인지 몰라 _meta를 믿지 않는다");
+        send(codex, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"clientInfo\":{\"name\":\"codex-mcp-client\"}}}");
+        send(codex, withMeta);
+        eq(seen.get(1), new aisurada.session.SessionAgents.Source("codex", "t-1"), "codex 클라이언트의 _meta.sessionId가 출처가 된다");
+        eq(aisurada.session.SessionAgents.callOverride(), null, "호출이 끝나면 걸린 출처를 지운다");
+        send(codex, withoutMeta);
+        eq(seen.get(2), null, "_meta가 없으면 출처를 정하지 않는다");
+
+        List<aisurada.session.SessionAgents.Source> otherSeen = new ArrayList<>();
+        McpServer other = new McpServer(true, args -> {
+            otherSeen.add(aisurada.session.SessionAgents.callOverride());
+            return new AisCliMain.Call(0, "{}", "");
+        });
+        send(other, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"clientInfo\":{\"name\":\"claude-code\"}}}");
+        send(other, withMeta);
+        eq(otherSeen.get(0), null, "다른 클라이언트의 _meta는 믿지 않는다");
+    }
+
     private static void realEngineRoundTrip() throws Exception {
         Path temp = Files.createTempDirectory("aisurada-mcp-");
         Path home = Files.createDirectory(temp.resolve("home"));
@@ -454,6 +485,7 @@ public final class McpServerTest {
         schemasMatchEngine();
         exposureRules();
         protocolWithFakeCaller();
+        sessionFromMeta();
         realEngineRoundTrip();
         System.out.println("McpServerTest: " + checks + "건 통과");
     }

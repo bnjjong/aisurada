@@ -5,6 +5,7 @@ import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
 import aisurada.args.ParsedArgs;
 import aisurada.cli.AisException;
+import aisurada.session.SessionAgents;
 import aisurada.text.Trim;
 import aisurada.text.Uri;
 import aisurada.text.Utf16;
@@ -241,6 +242,7 @@ public final class CreateDoc {
                 rawTitle,
                 createdStr,
                 isTool ? sessionId : null,
+                isTool && sessionId != null ? SessionAgents.forFile(WritePipeline.currentSessionAgent()) : null,
                 tier,
                 validatedTags,
                 validatedTemplate,

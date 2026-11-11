@@ -45,6 +45,10 @@ public final class NoteRow {
 
         if (!suppressBodyAndTokens && note.meta().sessionId() != null) {
             resp.put("sessionId", note.meta().sessionId());
+            // 확장: claude가 아닌 에이전트의 세션일 때만 낸다. 없으면 claude다
+            if (note.meta().sessionAgent() != null) {
+                resp.put("sessionAgent", note.meta().sessionAgent());
+            }
         }
 
         resp.put("date", note.meta().date());
@@ -59,6 +63,9 @@ public final class NoteRow {
             resp.put("editedAt", note.meta().editedAt());
             if (note.meta().editedSessionId() != null && !"app".equals(note.meta().editedBy())) {
                 resp.put("editedSessionId", note.meta().editedSessionId());
+                if (note.meta().editedSessionAgent() != null) {
+                    resp.put("editedSessionAgent", note.meta().editedSessionAgent());
+                }
             }
         }
 
@@ -118,6 +125,10 @@ public final class NoteRow {
 
         if (!suppressBodyAndTokens && note.meta().sessionId() != null) {
             resp.put("sessionId", note.meta().sessionId());
+            // 확장: claude가 아닌 에이전트의 세션일 때만 낸다. 없으면 claude다
+            if (note.meta().sessionAgent() != null) {
+                resp.put("sessionAgent", note.meta().sessionAgent());
+            }
         }
 
         resp.put("date", note.meta().date());
@@ -132,6 +143,9 @@ public final class NoteRow {
             resp.put("editedAt", note.meta().editedAt());
             if (note.meta().editedSessionId() != null && !"app".equals(note.meta().editedBy())) {
                 resp.put("editedSessionId", note.meta().editedSessionId());
+                if (note.meta().editedSessionAgent() != null) {
+                    resp.put("editedSessionAgent", note.meta().editedSessionAgent());
+                }
             }
         }
 
@@ -215,6 +229,9 @@ public final class NoteRow {
             resp.put("editedAt", sub.meta().editedAt());
             if (sub.meta().editedSessionId() != null && !"app".equals(sub.meta().editedBy())) {
                 resp.put("editedSessionId", sub.meta().editedSessionId());
+                if (sub.meta().editedSessionAgent() != null) {
+                    resp.put("editedSessionAgent", sub.meta().editedSessionAgent());
+                }
             }
         }
 
@@ -260,6 +277,9 @@ public final class NoteRow {
             resp.put("editedAt", sub.meta().editedAt());
             if (sub.meta().editedSessionId() != null && !"app".equals(sub.meta().editedBy())) {
                 resp.put("editedSessionId", sub.meta().editedSessionId());
+                if (sub.meta().editedSessionAgent() != null) {
+                    resp.put("editedSessionAgent", sub.meta().editedSessionAgent());
+                }
             }
         }
 

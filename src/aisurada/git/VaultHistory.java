@@ -193,7 +193,12 @@ public final class VaultHistory {
         if (fm != null && fm.get("editedBy") instanceof String by && fm.get("editedAt") instanceof String at
                 && !Trim.isBlank(by) && !Trim.isBlank(at)) {
             row.put("editedBy", Trim.trim(by));
-            if (fm.get("editedSessionId") instanceof String session && !Trim.isBlank(session)) row.put("editedSessionId", Trim.trim(session));
+            if (fm.get("editedSessionId") instanceof String session && !Trim.isBlank(session)) {
+                row.put("editedSessionId", Trim.trim(session));
+                // 확장: claude가 아닌 에이전트의 편집 세션이면 이름을 함께 낸다
+                String agent = aisurada.session.SessionAgents.readFromFile(fm.get("editedSessionAgent"));
+                if (agent != null) row.put("editedSessionAgent", agent);
+            }
         }
         return row;
     }

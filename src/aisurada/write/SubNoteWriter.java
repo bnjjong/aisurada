@@ -66,8 +66,8 @@ public final class SubNoteWriter {
      */
     public static String fileText(NoteScanner.NoteRecord sub, String agenda, String title, List<String> tags, String body) {
         String frontmatter = FrontmatterWriter.buildFullNoteFrontmatter(
-                sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, null,
-                sub.meta().editedBy(), sub.meta().editedAt(), sub.meta().editedSessionId(),
+                sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, null, null,
+                sub.meta().editedBy(), sub.meta().editedAt(), sub.meta().editedSessionId(), sub.meta().editedSessionAgent(),
                 tags, false, null, null, null, sub.meta().links());
         return "---\n" + frontmatter + "---\n" + body;
     }

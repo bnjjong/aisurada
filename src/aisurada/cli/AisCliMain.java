@@ -5,6 +5,7 @@ import aisurada.frame.FrameException;
 import aisurada.frame.RequestFrame;
 import aisurada.frame.ResponseFrame;
 import aisurada.serve.StateFile;
+import aisurada.session.SessionAgents;
 import aisurada.text.Trim;
 import aisurada.vault.VaultKey;
 import aisurada.vault.VaultPath;
@@ -321,12 +322,16 @@ public final class AisCliMain {
 
         // 요청 프레임 구성
         List<String> reqArgs = new ArrayList<>(Arrays.asList(args));
-        String rawSid = System.getenv("CLAUDE_CODE_SESSION_ID");
-        if (rawSid != null) {
-            String sid = Trim.trim(rawSid);
-            if (!sid.isEmpty()) {
-                reqArgs.add("\u0000ais-session-id");
-                reqArgs.add(sid);
+        // 세션 출처: MCP 요청이 실어 온 값, 래퍼가 넣은 AISURADA_SESSION_*, 에이전트 고유 변수 차례로 정한다.
+        // claude가 아닌 에이전트일 때만 에이전트 표식 2칸을 더해서, Claude 호출의 요청은 전과 같다
+        SessionAgents.Source sessionSource = SessionAgents.callOverride();
+        if (sessionSource == null) sessionSource = SessionAgents.fromEnvironment(System.getenv());
+        if (sessionSource != null) {
+            reqArgs.add("\u0000ais-session-id");
+            reqArgs.add(sessionSource.sessionId());
+            if (SessionAgents.forFile(sessionSource.agent()) != null) {
+                reqArgs.add("\u0000ais-session-agent");
+                reqArgs.add(sessionSource.agent());
             }
         }
 

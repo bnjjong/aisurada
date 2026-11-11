@@ -58,7 +58,16 @@ public final class EngineExecutor {
     public static EngineResult execute(Path vaultRoot, String[] rawArgv, boolean isServeMode, long startTime) {
         List<String> argv = new ArrayList<>(Arrays.asList(rawArgv));
 
-        // 1. 세션 표식 분리 (4.4)
+        // 1. 세션 표식 분리 (4.4). 확장: claude가 아닌 에이전트의 요청은 세션 표식 뒤에 에이전트 표식 2칸이 더 온다
+        String sessionAgent = null;
+        if (argv.size() >= 2) {
+            int secondFromLast = argv.size() - 2;
+            if ("\u0000ais-session-agent".equals(argv.get(secondFromLast))) {
+                sessionAgent = argv.get(secondFromLast + 1);
+                argv.remove(secondFromLast + 1);
+                argv.remove(secondFromLast);
+            }
+        }
         String sessionId = null;
         if (argv.size() >= 2) {
             int secondFromLast = argv.size() - 2;
@@ -68,6 +77,8 @@ public final class EngineExecutor {
                 argv.remove(secondFromLast);
             }
         }
+        // 세션 표식이 없으면 에이전트 표식도 뜻이 없다
+        if (sessionId == null) sessionAgent = null;
 
         // 2. 명령 존재 확인
         if (argv.isEmpty()) {
@@ -103,7 +114,7 @@ public final class EngineExecutor {
         try (diagnostics) {
             ParsedArgs parsed = ArgsParser.parse(firstArg, commandArgs);
 
-            try (WritePipeline scope = WritePipeline.begin(vaultRoot, parsed.commandName(), isTool, isServeMode, sessionId)) {
+            try (WritePipeline scope = WritePipeline.begin(vaultRoot, parsed.commandName(), isTool, isServeMode, sessionId, sessionAgent)) {
                 if (isPart4 && !isPart4Enabled()) {
                     // 5. 4부가 없음 (32.2)
                     byte[] err = NO_PART4_MESSAGE.getBytes(StandardCharsets.UTF_8);

@@ -95,8 +95,8 @@ public final class UpdateSubNote {
         // 5번: 하위 노트 키 11개로 짓고 도장은 1.10으로 정한다. B를 못 찍으면 여기서 AIS-400이다
         StampJudgment.JudgmentResult judgment = StampJudgment.judge(
                 sub.format(), body, oldBody, rawYamlMap,
-                sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, null,
-                sub.meta().editedBy(), sub.meta().editedAt(), sub.meta().editedSessionId(),
+                sub.id(), agenda, sub.meta().type(), title, sub.meta().created(), null, null, null,
+                sub.meta().editedBy(), sub.meta().editedAt(), sub.meta().editedSessionId(), sub.meta().editedSessionAgent(),
                 tags, false, null, null, null, sub.meta().links(),
                 parsed.isToolSurface(), sessionId);
 

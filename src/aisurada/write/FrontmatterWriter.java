@@ -38,10 +38,12 @@ public final class FrontmatterWriter {
      * @param title 노트 제목 (4)
      * @param created 시각 문자열 (5)
      * @param sessionId 세션 식별자 (6, 있을 때만)
+     * @param sessionAgent 세션을 연 에이전트 (6 바로 뒤, 세션 식별자가 있고 claude가 아닐 때만)
      * @param tier 층 (8, record일 때만)
      * @param editedBy 마지막 편집자 (9, 도장 있을 때만)
      * @param editedAt 마지막 편집 시각 (10, 도장 있을 때만)
      * @param editedSessionId 마지막 편집 세션 (11, 도장 및 세션 있을 때만)
+     * @param editedSessionAgent 마지막 편집 세션의 에이전트 (11 바로 뒤, 편집 세션이 있고 claude가 아닐 때만)
      * @param tags 태그 목록 (12, 비어있지 않을 때만)
      * @param favorite 즐겨찾기 여부 (13, 참일 때만)
      * @param favoriteCategory 즐겨찾기 라벨 (14, 있을 때만)
@@ -57,10 +59,12 @@ public final class FrontmatterWriter {
             String title,
             String created,
             String sessionId,
+            String sessionAgent,
             String tier,
             String editedBy,
             String editedAt,
             String editedSessionId,
+            String editedSessionAgent,
             List<String> tags,
             boolean favorite,
             String favoriteCategory,
@@ -88,6 +92,10 @@ public final class FrontmatterWriter {
         // 6. sessionId. 13.9의 6번: 새 노트는 빈 표식도 '' 로 적는다. 메타 쓰기는 다듬어 빈 값을 이미 null로 넘긴다
         if (sessionId != null) {
             appendKeyVal(sb, "sessionId", sessionId, 1);
+            // 확장: claude가 아닌 에이전트의 세션이면 어느 CLI의 세션인지 적는다. 줄이 없으면 claude다
+            if (sessionAgent != null) {
+                appendKeyVal(sb, "sessionAgent", sessionAgent, 1);
+            }
         }
 
         // 8. tier
@@ -102,6 +110,9 @@ public final class FrontmatterWriter {
             // 14.9의 17번: 새 도장은 빈 표식도 '' 로 적는다. 읽은 옛 값은 1.8에서 이미 빈 글이 없음이 됐다
             if (editedSessionId != null) {
                 appendKeyVal(sb, "editedSessionId", editedSessionId, 1);
+                if (editedSessionAgent != null) {
+                    appendKeyVal(sb, "editedSessionAgent", editedSessionAgent, 1);
+                }
             }
         }
 
@@ -181,14 +192,15 @@ public final class FrontmatterWriter {
             String title,
             String created,
             String sessionId,
+            String sessionAgent,
             String tier,
             List<String> tags,
             String template,
             List<Map<String, String>> links
     ) {
         return buildFullNoteFrontmatter(
-                id, agenda, type, title, created, sessionId, tier,
-                null, null, null, tags, false, null, template, null, links
+                id, agenda, type, title, created, sessionId, sessionAgent, tier,
+                null, null, null, null, tags, false, null, template, null, links
         );
     }
 

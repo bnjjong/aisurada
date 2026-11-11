@@ -86,7 +86,7 @@ public final class CreateSubNote {
                 + String.format("%02d%02d", now.getHour(), now.getMinute()) + "-"
                 + SlugBuilder.build(title, 50) + "-" + CreateDoc.extractIdTail(subId);
         String frontmatter = FrontmatterWriter.buildFullNoteFrontmatter(
-                subId, agenda, type, title, created, null, null, null, null, null,
+                subId, agenda, type, title, created, null, null, null, null, null, null, null,
                 null, false, null, null, null, null);
         String fileText = "---\n" + frontmatter + "---\n" + body;
         if (fileText.length() > 1_000_000) {

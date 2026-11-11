@@ -178,8 +178,9 @@ public final class UpdateDoc {
         Map<String, Object> evaluation = MetaWriter.asIndexed(note.meta().evaluation());
         StampJudgment.JudgmentResult judgment = StampJudgment.judge(
                 format, body, oldBody, rawYamlMap,
-                noteId, agendaSlug, note.meta().type(), title, created, fileSessionId, note.meta().tier(),
-                note.meta().editedBy(), note.meta().editedAt(), note.meta().editedSessionId(),
+                noteId, agendaSlug, note.meta().type(), title, created, fileSessionId,
+                fileSessionId == null ? null : note.meta().sessionAgent(), note.meta().tier(),
+                note.meta().editedBy(), note.meta().editedAt(), note.meta().editedSessionId(), note.meta().editedSessionAgent(),
                 tags, note.meta().favorite(), indexedCategory, template, evaluation, note.meta().links(),
                 isTool, sessionId);
         String fileText = judgment.fileText();

@@ -319,8 +319,8 @@ public final class NoteScanner {
             effectiveMeta = new NoteMeta.MetaData(
                     meta.id(), meta.agendaSlug(), meta.type(), meta.title(),
                     meta.created(), meta.date(), meta.time(),
-                    null, meta.tier(),
-                    null, null, null,
+                    null, null, meta.tier(),
+                    null, null, null, null,
                     meta.tags(), meta.links(), meta.favorite(), meta.favoriteCategory(),
                     meta.template(), meta.evaluation()
             );

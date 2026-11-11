@@ -1,5 +1,8 @@
 package aisurada.write;
 
+import aisurada.engine.WritePipeline;
+import aisurada.session.SessionAgents;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -21,7 +24,8 @@ public final class StampJudgment {
             boolean stampChanged,
             String finalEditedBy,
             String finalEditedAt,
-            String finalEditedSessionId
+            String finalEditedSessionId,
+            String finalEditedSessionAgent
     ) {}
 
     /**
@@ -37,10 +41,12 @@ public final class StampJudgment {
             String title,
             String created,
             String sessionId,
+            String sessionAgent,
             String tier,
             String oldEditedBy,
             String oldEditedAt,
             String oldEditedSessionId,
+            String oldEditedSessionAgent,
             List<String> tags,
             boolean favorite,
             String favoriteCategory,
@@ -50,8 +56,8 @@ public final class StampJudgment {
             boolean isToolSurface,
             String currentSessionId
     ) {
-        return judge(format, body, body, rawYamlMapFromFile, id, agenda, type, title, created, sessionId, tier,
-                oldEditedBy, oldEditedAt, oldEditedSessionId, tags, favorite, favoriteCategory, template,
+        return judge(format, body, body, rawYamlMapFromFile, id, agenda, type, title, created, sessionId, sessionAgent, tier,
+                oldEditedBy, oldEditedAt, oldEditedSessionId, oldEditedSessionAgent, tags, favorite, favoriteCategory, template,
                 evaluation, links, isToolSurface, currentSessionId);
     }
 
@@ -70,10 +76,12 @@ public final class StampJudgment {
             String title,
             String created,
             String sessionId,
+            String sessionAgent,
             String tier,
             String oldEditedBy,
             String oldEditedAt,
             String oldEditedSessionId,
+            String oldEditedSessionAgent,
             List<String> tags,
             boolean favorite,
             String favoriteCategory,
@@ -95,8 +103,8 @@ public final class StampJudgment {
 
         // 1. Form A: 옛 도장을 넣은 새 파일 글
         String frontmatterA = FrontmatterWriter.buildFullNoteFrontmatter(
-                id, agenda, type, title, created, sessionId, tier,
-                oldEditedBy, oldEditedAt, oldEditedSessionId,
+                id, agenda, type, title, created, sessionId, sessionAgent, tier,
+                oldEditedBy, oldEditedAt, oldEditedSessionId, oldEditedSessionAgent,
                 tags, favorite, favoriteCategory, template, evaluation, links
         );
         String formA = openFence + frontmatterA + closeFence + body;
@@ -108,7 +116,7 @@ public final class StampJudgment {
         // 3. A와 B 맞대기
         if (formA.equals(formB)) {
             // 같으면 A를 쓰고 옛 도장이 남음
-            return new JudgmentResult(formA, false, oldEditedBy, oldEditedAt, oldEditedSessionId);
+            return new JudgmentResult(formA, false, oldEditedBy, oldEditedAt, oldEditedSessionId, oldEditedSessionAgent);
         }
 
         // 4. 다르면 새 도장으로 다시 지어 씀
@@ -119,14 +127,17 @@ public final class StampJudgment {
                 kst.getYear(), kst.getMonthValue(), kst.getDayOfMonth(), kst.getHour(), kst.getMinute());
         // 14.9의 17번: 표식 값은 안 다듬고 안 자른다. 빈 글이어도 그대로 적는다
         String newEditedSessionId = (isToolSurface && currentSessionId != null) ? currentSessionId : null;
+        // 확장: 편집 세션이 claude가 아니면 에이전트를 함께 적는다. 요청 범위(WritePipeline)에서 읽는다
+        String newEditedSessionAgent = newEditedSessionId != null
+                ? SessionAgents.forFile(WritePipeline.currentSessionAgent()) : null;
 
         String frontmatterC = FrontmatterWriter.buildFullNoteFrontmatter(
-                id, agenda, type, title, created, sessionId, tier,
-                newEditedBy, newEditedAt, newEditedSessionId,
+                id, agenda, type, title, created, sessionId, sessionAgent, tier,
+                newEditedBy, newEditedAt, newEditedSessionId, newEditedSessionAgent,
                 tags, favorite, favoriteCategory, template, evaluation, links
         );
         String formC = openFence + frontmatterC + closeFence + body;
 
-        return new JudgmentResult(formC, true, newEditedBy, newEditedAt, newEditedSessionId);
+        return new JudgmentResult(formC, true, newEditedBy, newEditedAt, newEditedSessionId, newEditedSessionAgent);
     }
 }

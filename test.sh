@@ -18,6 +18,7 @@ done
 "$JAVA" -Daisurada.enable.part4=true -cp dist/ais-sidecar-noclaude.jar:build/test-classes aisurada.Chapter32Test
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.AskCommandsTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.SessionCommandsTest
+"$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.AgentSessionTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.ChatCommandsTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.Part4ReviewTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.Chapter25To30IntegrationTest

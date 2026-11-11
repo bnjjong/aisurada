@@ -1,5 +1,6 @@
 package aisurada.vault;
 
+import aisurada.session.SessionAgents;
 import aisurada.text.Trim;
 import aisurada.text.Utf16;
 
@@ -37,10 +38,14 @@ public final class NoteMeta {
             String date,
             String time,
             String sessionId,
+            /** 세션을 연 에이전트. 줄이 없으면(claude) null이다. */
+            String sessionAgent,
             String tier,
             String editedBy,
             String editedAt,
             String editedSessionId,
+            /** 마지막 편집 세션의 에이전트. 줄이 없으면(claude) null이다. */
+            String editedSessionAgent,
             List<String> tags,
             List<Map<String, String>> links,
             boolean favorite,
@@ -139,12 +144,15 @@ public final class NoteMeta {
 
         // 6. sessionId
         String sessionId = null;
+        String sessionAgent = null;
         if (!isSubNote) {
             Object rawSid = map.get("sessionId");
             if (rawSid instanceof String strSid) {
                 String trimmed = Trim.trim(strSid);
                 if (!trimmed.isEmpty()) {
                     sessionId = Utf16.cut(trimmed, 128);
+                    // 세션 id가 있을 때만 에이전트를 읽는다. 줄이 없으면 claude다
+                    sessionAgent = SessionAgents.readFromFile(map.get("sessionAgent"));
                 }
             }
         }
@@ -167,6 +175,7 @@ public final class NoteMeta {
         String editedBy = null;
         String editedAt = null;
         String editedSessionId = null;
+        String editedSessionAgent = null;
 
         Object rawEb = map.get("editedBy");
         Object rawEa = map.get("editedAt");
@@ -181,6 +190,7 @@ public final class NoteMeta {
                     String tesid = Trim.trim(strEsid);
                     if (!tesid.isEmpty()) {
                         editedSessionId = tesid;
+                        editedSessionAgent = SessionAgents.readFromFile(map.get("editedSessionAgent"));
                     }
                 }
             }
@@ -306,8 +316,8 @@ public final class NoteMeta {
         return new MetaData(
                 id, agendaSlug, type, title,
                 createdResult.formattedCreated, createdResult.date, createdResult.time,
-                sessionId, tier,
-                editedBy, editedAt, editedSessionId,
+                sessionId, sessionAgent, tier,
+                editedBy, editedAt, editedSessionId, editedSessionAgent,
                 tags, links, favorite, favoriteCategory, template, evaluation
         );
     }

@@ -85,8 +85,8 @@ public final class DerivedBodyWriter {
         }
         String frontmatter = FrontmatterWriter.buildFullNoteFrontmatter(
                 root.id(), agenda, root.meta().type(), MetaWriter.asIndexed(root.meta().title()), root.meta().created(),
-                fileSessionId, root.meta().tier(),
-                root.meta().editedBy(), root.meta().editedAt(), root.meta().editedSessionId(),
+                fileSessionId, fileSessionId == null ? null : root.meta().sessionAgent(), root.meta().tier(),
+                root.meta().editedBy(), root.meta().editedAt(), root.meta().editedSessionId(), root.meta().editedSessionAgent(),
                 SubNoteWriter.indexedTags(root), root.meta().favorite(), MetaWriter.asIndexed(root.meta().favoriteCategory()),
                 root.meta().template(), evaluation, root.meta().links());
         String fileText = "---\n" + frontmatter + "---\n" + body;
