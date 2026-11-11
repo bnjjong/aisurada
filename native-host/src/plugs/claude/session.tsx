@@ -356,9 +356,14 @@ export function SessionComposer({
         { sessionId, text, images: bytes, vault, model: askNow().model, effort: askNow().effort, timeoutSeconds: timeoutSeconds() }
       );
       if (result.ok) {
-        // 10.5: the box, its pictures and the picture notice are emptied; the answer signal rises so the screen reads again.
-        replySignals.set(sessionId, (replySignals.get(sessionId) ?? 0) + 1);
-        patchComposer(sessionId, { text: '', sending: false, error: null, notice: result.notice, images: [], imageNotice: null });
+        if (result.cancelled) {
+          replySignals.set(sessionId, (replySignals.get(sessionId) ?? 0) + 1);
+          patchComposer(sessionId, { text, images: held, sending: false, error: null, notice: result.notice });
+        } else {
+          // 10.5: the box, its pictures and the picture notice are emptied; the answer signal rises so the screen reads again.
+          replySignals.set(sessionId, (replySignals.get(sessionId) ?? 0) + 1);
+          patchComposer(sessionId, { text: '', sending: false, error: null, notice: result.notice, images: [], imageNotice: null });
+        }
       } else {
         const err = humanizeAskError(result.error);
         patchComposer(sessionId, { text, images: held, sending: false, error: err.message });

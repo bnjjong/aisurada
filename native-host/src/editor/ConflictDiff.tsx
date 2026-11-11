@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import { compareBodies } from './diff.ts';
+
+async function askConfirm(msg: string): Promise<boolean> {
+  if (isTauri()) {
+    return await confirm(msg, { title: '편집 버리기', kind: 'warning', okLabel: '버리기', cancelLabel: '취소' });
+  }
+  return window.confirm(msg);
+}
 
 export function ConflictDiff({ left, readRight, close, discard, keep }: {
   left: string; readRight(): Promise<string>; close(): void; discard(): void; keep(): void;
@@ -24,8 +33,9 @@ export function ConflictDiff({ left, readRight, close, discard, keep }: {
       </>}
     <footer>
       <button onClick={close}>닫기</button>
-      <button data-conflict-action="load" onClick={() => {
-        if (window.confirm("지금까지 작성한 편집 내용을 버리고 외부 파일을 불러올까요?")) {
+      <button data-conflict-action="load" onClick={async () => {
+        const ok = await askConfirm("지금까지 작성한 편집 내용을 버리고 외부 파일을 불러올까요?");
+        if (ok) {
           close();
           discard();
         }

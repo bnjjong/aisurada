@@ -14,7 +14,7 @@
   --accent-ink: #fff;
   --ok: #2e7d32;
   --ok-bg: #e8f5e9;
-  --warn: #c49b43;
+  --warn: #b45309;
   --warn-bg: #fff8e1;
   --err: #d32f2f;
   --err-bg: #ffebee;
@@ -93,6 +93,8 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .path-input button { flex-shrink: 0; font-size: 12px; padding: 8px 10px; }
 .button-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-size: 13px; padding: 13px; }
 .button-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(.95); }
+.btn-danger, button.btn-danger { background: var(--err); color: var(--err-ink, #ffffff) !important; border-color: var(--err); }
+.btn-danger:hover:not(:disabled), button.btn-danger:hover:not(:disabled) { background: var(--err); filter: brightness(.9); }
 .recent-workspaces { border-top: 1px solid var(--line); padding-top: 22px; }
 .recent-workspaces h3 { font-size: 11px; color: var(--muted); font-weight: 500; margin: 0 0 14px; }
 .recent-workspaces ul { padding: 0; margin: 0; list-style: none; }
@@ -397,7 +399,7 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .doc-conflict-banner { position: sticky; top: 28px; z-index: 9; border: 1px solid #cb9f5680; border-radius: 8px; background: var(--surface); box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 14px 18px; margin: 8px 0 16px; font-size: 12px; line-height: 1.7; }.doc-conflict-banner p { margin: 0 0 10px; }.doc-conflict-banner > div { display: flex; flex-wrap: wrap; gap: 7px; }.doc-conflict-banner button { font-size: 11px; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 .doc-conflict-banner button[data-conflict-action="load"], .cdiff button[data-conflict-action="load"] { border: 1px solid rgba(201, 42, 42, 0.4); color: #c92a2a; background: rgba(201, 42, 42, 0.06); }
 .doc-conflict-banner button[data-conflict-action="load"]:hover, .cdiff button[data-conflict-action="load"]:hover { background: #c92a2a; color: #fff; }
-.doc-conflict-banner button[data-conflict-action="keep"], .cdiff button[data-conflict-action="keep"] { border: 1px solid var(--accent); color: #fff; background: var(--accent); font-weight: 500; }
+.doc-conflict-banner button[data-conflict-action="keep"], .cdiff button[data-conflict-action="keep"] { border: 1px solid var(--accent); color: var(--accent-ink); background: var(--accent); font-weight: 500; }
 .sync-banner > button { float: right; padding: 3px 10px; font-size: 11px; }
 .cdiff { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: var(--surface); color: var(--ink); font-size: 13px; outline: none; white-space: normal; }.cdiff > header { padding: 22px 30px; border-bottom: 1px solid var(--line); }.cdiff h2 { margin: 0 0 5px; font-size: 21px; }.cdiff header span { color: var(--muted); font-size: 11px; }.cdiff-count,.cdiff-msg { margin: 0; padding: 16px 30px; border-bottom: 1px solid var(--line); }.cdiff-scroll { flex: 1; overflow: auto; min-height: 0; }.cdiff-table { width: 100%; border-collapse: collapse; font: 12px/1.7 ui-monospace, monospace; table-layout: fixed; }.cdiff-table th { text-align: left; background: var(--soft); position: sticky; top: 0; font-size: 11px; }.cdiff-table td,.cdiff-table th { padding: 4px 10px; border-bottom: 1px solid var(--line); }.cdiff-table th:nth-child(1),.cdiff-table th:nth-child(2) { width: 70px; }.cdiff-table th:nth-child(3) { width: 90px; text-align: center; }.cdiff-table td:nth-child(-n+2) { color: var(--muted); vertical-align: top; text-align: right; }.cdiff-table td:last-child { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cdiff-status-cell { font-size: 11px; white-space: nowrap; font-family: sans-serif; text-align: center !important; }
@@ -951,6 +953,10 @@ code.is-symbol { font-weight: 700; }
 
 .sess-page-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
 .sess-page-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+@media (max-width: 1100px) {
+  .sess-page-head-row { flex-wrap: wrap; gap: 8px; }
+  .sess-page-title { flex-basis: 100%; margin-bottom: 4px; }
+}
 .sess-page-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
 
 .sess-page-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
