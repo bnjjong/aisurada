@@ -11,6 +11,7 @@ import {
 } from "./model.ts";
 import { Editor } from "../editor/Editor.tsx";
 import { EMPTY_TEMPLATE } from "./Forms.tsx";
+import { formatDateTime, withJosa } from "./dates.ts";
 export function Page({
   title,
   children,
@@ -105,7 +106,7 @@ export function Favorites({
               <option value="tags">태그</option>
             </select>
           </div>
-          {!filtered.length && <p>“{query}”와 맞는 즐겨찾기가 없어요.</p>}
+          {!filtered.length && <p>“{withJosa(query, "와/과")} 맞는 즐겨찾기가 없어요.</p>}
           {names.map((name) => (
             <section key={name}>
               <h2>{name}</h2>
@@ -318,7 +319,7 @@ export function Connections({
                 className="cx-detail-open"
                 onClick={() => controller.showPreview(n.id)}
               >
-                문서 열기
+                노트 열기
               </button>
             </div>
           ))}
@@ -406,7 +407,7 @@ export function Connections({
                 className="cx-detail-open"
                 onClick={() => controller.showPreview(detail.id)}
               >
-                문서 열기
+                노트 열기
               </button>
             </aside>
           )}
@@ -684,7 +685,7 @@ export function Trash({
               <small>
                 {agenda?.title || asText(r.agenda)} ·{" "}
                 {TYPE_NAMES[asText(r.type)]} ·{" "}
-                {asText(r.deletedAt || r.trashedAt)}
+                {formatDateTime(asText(r.deletedAt || r.trashedAt))}
               </small>
               <button
                 className="btn-neutral"

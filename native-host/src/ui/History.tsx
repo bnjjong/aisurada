@@ -6,15 +6,16 @@ import { Modal } from "./Modal.tsx";
 import { compareBodies } from "../editor/diff.ts";
 import type { DiffRow } from "../editor/diff.ts";
 import { stripMarkers } from "../editor/grammar.ts";
+import { formatDateTime } from "./dates.ts";
 // 13.4: why the note's present text could not be recorded first, from the first
 // commit-vault answer. The table is read top to bottom.
 export function restoreReason(commit: { outcome?: unknown; blocked?: unknown } | null | undefined): string {
   if (!commit || commit.outcome === "failed") return "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.";
-  if (commit.outcome === "disabled") return "자동 커밋이 꺼져 있거나 vault가 git 저장소가 아니에요.";
-  if (commit.blocked === "index-lock") return "vault의 git이 잠겨 있어요(.git/index.lock).";
-  if (commit.blocked === "in-progress") return "vault에서 git 병합이나 리베이스가 진행 중이에요.";
-  if (commit.blocked === "not-main") return "vault의 git이 main 브랜치에 있지 않아요.";
-  return "vault에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.";
+  if (commit.outcome === "disabled") return "자동 커밋이 꺼져 있거나 워크스페이스가 git 저장소가 아니에요.";
+  if (commit.blocked === "index-lock") return "워크스페이스의 git이 잠겨 있어요(.git/index.lock).";
+  if (commit.blocked === "in-progress") return "워크스페이스에서 git 병합이나 리베이스가 진행 중이에요.";
+  if (commit.blocked === "not-main") return "워크스페이스의 git이 main 브랜치에 있지 않아요.";
+  return "워크스페이스에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.";
 }
 export function DiffTable({
   left,
@@ -122,11 +123,7 @@ export function DiffTable({
   );
 }
 const versionTime = (value: unknown) => {
-  const text = asText(value),
-    d = new Date(text);
-  if (!Number.isFinite(d.getTime())) return text;
-  const n = (v: number) => String(v).padStart(2, "0");
-  return `${d.getFullYear() === new Date().getFullYear() ? "" : d.getFullYear() + "-"}${n(d.getMonth() + 1)}-${n(d.getDate())} ${n(d.getHours())}:${n(d.getMinutes())}`;
+  return formatDateTime(asText(value));
 };
 export function History({
   id,
@@ -223,7 +220,7 @@ export function History({
         },
         () => {
           if (active)
-            setSearchNote("찾기에 실패했어요. 사이드카가 떠 있는지 봐 주세요");
+            setSearchNote("찾기에 실패했어요. 동기화 엔진이 떠 있는지 확인해 주세요");
         },
       );
     }, 250);
@@ -322,7 +319,7 @@ export function History({
             <p>판 목록을 읽고 있어요.</p>
           ) : !versions.length ? (
             <p>
-              이 노트의 판이 아직 없어요. 쓰기가 5분 멈추면 사이드카가 vault를
+              이 노트의 판이 아직 없어요. 쓰기가 5분 멈추면 동기화 엔진이 워크스페이스를
               커밋하고, 그때부터 판이 쌓여요.
             </p>
           ) : (

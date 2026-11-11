@@ -9,7 +9,7 @@ export class SidecarCommandError extends Error {
   readonly command: string;
   readonly stderr: string;
   constructor(command: string, result: SidecarResult) {
-    super(`사이드카 명령이 실패했어요(${command}, 종료 코드 ${result.status}): ${result.stderr.trim()}`);
+    super(`동기화 엔진 명령이 실패했어요(${command}, 종료 코드 ${result.status}): ${result.stderr.trim()}`);
     this.name = 'SidecarCommandError'; this.command = command; this.status = result.status; this.stderr = result.stderr.trim();
   }
 }

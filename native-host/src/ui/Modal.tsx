@@ -24,20 +24,62 @@ export function Modal({
   useEffect(() => {
     const remove = addLayer(token.current),
       previous = document.activeElement as HTMLElement | null;
-    box.current?.focus({ preventScroll: true });
+    const focusFirst = () => {
+      if (!box.current) return;
+      const focusables = box.current.querySelectorAll<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length > 0) {
+        focusables[0].focus({ preventScroll: true });
+      } else {
+        box.current.focus({ preventScroll: true });
+      }
+    };
+    const rId = requestAnimationFrame(focusFirst);
     const key = (e: KeyboardEvent) => {
-      if (
-        e.key === "Escape" &&
-        !e.defaultPrevented &&
-        topLayer() === token.current
-      ) {
+      if (topLayer() !== token.current) return;
+      if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
         e.stopPropagation();
         callbacks.current();
+        return;
+      }
+      if (e.key === "Tab" && box.current) {
+        const focusables = Array.from(
+          box.current.querySelectorAll<HTMLElement>(
+            'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter(
+          (el) => el.offsetParent !== null || el === document.activeElement,
+        );
+        if (!focusables.length) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (
+            document.activeElement === first ||
+            !box.current.contains(document.activeElement)
+          ) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (
+            document.activeElement === last ||
+            !box.current.contains(document.activeElement)
+          ) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
     window.addEventListener("keydown", key);
     return () => {
+      cancelAnimationFrame(rId);
       remove();
       window.removeEventListener("keydown", key);
       if (previous?.isConnected) previous.focus({ preventScroll: true });

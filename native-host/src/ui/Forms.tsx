@@ -21,6 +21,20 @@ const HUES = [
   "fuchsia",
   "brown",
 ];
+const HUE_NAMES: Record<string, string> = {
+  blue: "파랑",
+  violet: "보라",
+  teal: "청록",
+  orange: "주황",
+  pink: "분홍",
+  green: "초록",
+  red: "빨강",
+  amber: "호박",
+  lime: "연두",
+  cyan: "하늘",
+  fuchsia: "자홍",
+  brown: "갈색",
+};
 export function Forms({
   state,
   controller,
@@ -63,7 +77,7 @@ function NewNote({
     [type, setType] = useState("plan"),
     [template, setTemplate] = useState(""),
     [title, setTitle] = useState(""),
-    [date, setDate] = useState(ws.today),
+    [date, setDate] = useState((state.form as any)?.date || ws.today),
     [time, setTime] = useState(now.toTimeString().slice(0, 5)),
     [tags, setTags] = useState(""),
     [body, setBody] = useState(""),
@@ -85,7 +99,7 @@ function NewNote({
       (!t.format || t.format === "markdown"),
   );
   return (
-    <Modal title="새 문서" close={handleClose} className="ndf">
+    <Modal title="새 노트" close={handleClose} className="ndf">
       {!ws.agendas.length ? (
         <>
           <p>먼저 아젠다를 하나 만들어 주세요</p>
@@ -114,14 +128,14 @@ function NewNote({
             });
             setBusy(false);
             if (r.ok) {
-              close();
+              controller.form(null);
               controller.navigate(
                 "/agenda/" +
                   encodeURIComponent(agenda) +
                   "?open=" +
                   encodeURIComponent(asText(r.value?.id)),
               );
-            } else setError("문서를 만들지 못했어요.");
+            } else setError("노트를 만들지 못했어요.");
           }}
         >
           <div className="form-grid">
@@ -178,7 +192,7 @@ function NewNote({
             <label>
               제목
               <input
-                aria-label="새 문서 제목"
+                aria-label="새 노트 제목"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -230,7 +244,7 @@ function NewNote({
               취소
             </button>
             <button type="submit" disabled={busy || !title.trim() || !agenda}>
-              문서 만들기
+              노트 만들기
             </button>
           </footer>
         </form>
@@ -322,7 +336,7 @@ function EntityForm({
           );
           setBusy(false);
           if (r.ok) {
-            close();
+            controller.form(null);
             if (kind === "agenda" && !id)
               controller.navigate(
                 "/agenda/" + encodeURIComponent(asText(r.value?.id)),
@@ -339,15 +353,22 @@ function EntityForm({
             onChange={(e) => setTitle(e.target.value)}
           />
         </label>
-        <label>
+        <label className="hue-field">
           색
-          <select value={hue} onChange={(e) => setHue(e.target.value)}>
-            {HUES.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
+          <div className="hue-selector">
+            <span
+              className="hue-dot"
+              style={{ backgroundColor: hue }}
+              aria-hidden="true"
+            />
+            <select value={hue} onChange={(e) => setHue(e.target.value)}>
+              {HUES.map((h) => (
+                <option key={h} value={h}>
+                  {HUE_NAMES[h] || h}
+                </option>
+              ))}
+            </select>
+          </div>
         </label>
         {kind === "agenda" && (
           <>
@@ -418,8 +439,12 @@ function EntityForm({
           close={() => setConfirm(false)}
           accept={async () => {
             const r = await controller.data.deleteEntity(kind, id!);
-            if (r.ok) close();
-            else setError(r.reason || `${label}를 지우지 못했어요.`);
+            if (r.ok) {
+              controller.form(null);
+              if (kind === "agenda") {
+                controller.navigate("/calendar", true);
+              }
+            } else setError(r.reason || `${label}를 지우지 못했어요.`);
           }}
         />
       )}

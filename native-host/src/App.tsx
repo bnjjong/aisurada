@@ -13,6 +13,7 @@ import { Preview } from './ui/Preview.tsx';
 import { Modal } from './ui/Modal.tsx';
 import { BrandMark } from './ui/BrandMark.tsx';
 import type { BrandState } from './ui/BrandMark.tsx';
+import { formatRelativeTime } from './ui/dates.ts';
 
 // Window identity is decided once, before any internal navigation.
 const context = windowContext(window.location.pathname);
@@ -85,7 +86,7 @@ function WorkspaceApp() {
       {note ? <NoteScreen note={note} controller={controller} /> : (
         <div className="doc-route-empty-card">
           <h2>이 노트를 찾을 수 없어요</h2>
-          <p>삭제됐거나 옮겨졌을 수 있어요. 이 창을 닫고 main 창에서 다시 찾아보세요.</p>
+          <p>삭제됐거나 옮겨졌을 수 있어요. 이 창을 닫고 메인 창에서 다시 찾아보세요.</p>
         </div>
       )}
       {preview && <Preview key={preview.id} controller={controller} state={state} />}
@@ -109,8 +110,34 @@ function WorkspaceApp() {
   return <>
     {!state.workspace || state.route.split('?')[0] === '/launcher'
       ? <Launcher controller={controller} state={state} /> : <WorkspaceShell controller={controller} state={state} />}
-    {state.notice && <div className="notice" role="status">{state.notice}</div>}
+    {state.notice && <NoticeBox notice={state.notice} onClose={controller.clearNotice} />}
   </>;
+}
+
+function NoticeBox({ notice, onClose }: { notice: string; onClose: () => void }) {
+  const colonIndex = notice.indexOf(': ');
+  const hasDetails = colonIndex !== -1 && notice.length > colonIndex + 2;
+  const summaryText = hasDetails ? notice.slice(0, colonIndex) : notice;
+  const detailText = hasDetails ? notice.slice(colonIndex + 2) : null;
+
+  return (
+    <div className="notice" role="status">
+      <div className="notice-inner">
+        <div className="notice-body">
+          <span>{summaryText}</span>
+          {detailText && (
+            <details className="notice-details">
+              <summary>자세히</summary>
+              <pre>{detailText}</pre>
+            </details>
+          )}
+        </div>
+        <button type="button" className="notice-close" onClick={onClose} aria-label="알림 닫기">
+          ×
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Brand({ state = 'idle' }: { state?: BrandState }) { return <div className="brand" role="img" aria-label="aisurada"><BrandMark state={state} /></div>; }
@@ -155,15 +182,25 @@ function Launcher({ controller, state }: { controller: WorkspaceController; stat
         <button className="button-primary" type="submit" disabled={state.busy || !(mode === 'create' ? name.trim() && state.home : path.trim())}>
           {state.busy ? '워크스페이스를 여는 중…' : mode === 'create' ? '만들기' : '열기'}</button>
       </form>}
+      {state.workspace && (
+        <button
+          type="button"
+          className="sample-button"
+          style={{ marginBottom: 8 }}
+          onClick={() => controller.navigate('/calendar')}
+          disabled={state.busy}
+        >
+          열려 있는 워크스페이스로 돌아가기 <span aria-hidden="true">→</span>
+        </button>
+      )}
       <button className="sample-button" onClick={() => void controller.sample()} disabled={state.busy}>샘플로 둘러보기 <span aria-hidden="true">→</span></button>
       {state.recent.length > 0 && <section className="recent-workspaces" aria-label="최근 워크스페이스"><h3>최근 워크스페이스</h3>
         <ul>{state.recent.map(item => <li key={item.path}>
           <button className="recent-open" onClick={() => void controller.openRecent(item)} disabled={state.busy}>
-            <span className="recent-icon" aria-hidden="true">▱</span><span><strong>{item.name}</strong><small>{item.path}</small></span><span className="recent-time">{item.opened}</span>
+            <span className="recent-icon" aria-hidden="true">▱</span><span><strong>{item.name}</strong><small>{item.path}</small></span><span className="recent-time">{formatRelativeTime(item.opened)}</span>
           </button><button className="recent-remove" aria-label={`${item.name} 최근 목록에서 제거`} onClick={() => controller.forgetRecent(item.path)} disabled={state.busy}>×</button>
         </li>)}</ul>
       </section>}
-      <footer className="launcher-footer"><span>GitHub와 함께 기록하기</span><button className="text-button" onClick={() => controller.notify('GitHub 연결은 워크스페이스를 연 뒤 설정에서')} disabled={state.busy}>GitHub 연동 ↗</button></footer>
     </section>
   </main>;
 }
