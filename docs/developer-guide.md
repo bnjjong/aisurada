@@ -116,6 +116,23 @@ test-native.sh         화면·호스트 시험 전체
 
 ## 5. 엔진 쓰는 법
 
+### 세션 에이전트(Codex·Gemini) 확장
+
+노트에 적는 세션 id는 원래 Claude Code 것만 있었다. 이 확장은 Codex와 Gemini CLI의 세션도 같은 자리에 적고, 노트 칩에서 터미널로 이어 열고, 두 CLI의 대화 기록을 세션 화면에서 읽게 한다. **외부 설명서에 없는 확장이다.** 설명서의 4.4(세션 표식), 1.7·1.10(머리말 키와 도장), 7장(`read-session`, `session-titles`)과 어긋나는 곳은 아래 표가 전부다. 이 표 밖에서는 설명서대로 동작해야 한다.
+
+| 곳 | 설명서 | 확장 |
+|---|---|---|
+| 노트 머리말 | `sessionId`, `editedSessionId` | claude가 아닌 세션이면 바로 뒤에 `sessionAgent`, `editedSessionAgent`를 적는다. 줄이 없으면 claude라서 기존 노트와 Claude 호출의 파일은 바이트가 같다. |
+| 소켓 표식(4.4) | 끝 2칸 `\0ais-session-id <id>` | claude가 아니면 그 뒤에 `\0ais-session-agent <이름>` 2칸이 더 온다. 인자 한도 64칸에는 이 2칸도 센다. |
+| 세션 출처 | `CLAUDE_CODE_SESSION_ID`만 읽는다 | `SessionAgents`가 정한다. MCP 요청의 Codex `_meta.sessionId`(클라이언트 이름이 codex일 때만), `AISURADA_SESSION_ID`+`AISURADA_SESSION_AGENT`, 에이전트 고유 변수 차례다. 고유 변수가 둘 이상 보이면 기록하지 않는다. |
+| `read-session`, `session-titles` | Claude 기록(`~/.claude/projects`)만 | Claude 기록이 없으면 Codex(`~/.codex/sessions`)와 Gemini(`~/.gemini/tmp`) 기록을 세션 id로 찾는다. 찾았을 때만 응답에 `agent`가 붙는다. |
+
+- **기록 형식.** Codex는 `event_msg`의 `item_completed`(새 형식)가 있으면 그것만, 없으면 `user_message`/`agent_message`(예전 형식)를 읽는다(`CodexTranscript`). Gemini는 `chats/session-*.jsonl`의 `user`/`gemini` 줄에서 환경 설명 줄을 빼고 `toolCalls`를 풀며 `$rewindTo`를 지킨다. 작업 폴더는 `~/.gemini/projects.json`을 거꾸로 찾는다(`GeminiTranscript`). 홈 폴더는 시험용으로 `aisurada.codex.home`, `aisurada.gemini.home`로 바꿀 수 있다.
+- **래퍼.** Gemini CLI는 셸 도구와 MCP 서버에 세션 id를 주지 않는다. `bin/ais-gemini`가 실행 전에 UUID를 만들어 `--session-id`로 넘기고 같은 값을 변수로 내보낸다. Codex는 셸 도구에 `CODEX_SESSION_ID`/`CODEX_THREAD_ID`를 주고 MCP 호출 요청에 `_meta`를 실어서 래퍼가 필요 없지만, Claude 셸에서 띄우면 `CLAUDE_CODE_SESSION_ID`가 남아 어느 쪽인지 가릴 수 없다. `bin/ais-codex`가 그것을 지운다.
+- **화면.** 칩은 CLI 이름을 붙이고 네이티브 앱에서는 "터미널" 단추로 `/terminal/<세션 id>`를 연다. 터미널 계획(`terminal.ts`)은 `session-titles`가 알려 준 `agent`로 호스트에 `agent`를 넘기고, 호스트(`session_shell.rs`)는 `claude --resume`, `codex resume`, `gemini --resume` 가운데 고른다. 모르는 이름은 셸 앞에서 거절한다.
+- **한계.** 세션 목록(프로젝트별 화면, `recent-sessions`)에는 Codex·Gemini 세션이 나오지 않는다. 노트 칩으로 들어간 세션 화면은 읽기 전용이고 입력창을 닫는다. Codex·Gemini 기록에서는 `author=`(작성 세션 대화를 묻기에 첨부)와 하위 에이전트·할 일 표시가 없다. `FrontmatterWriter`가 정해진 필드만 쓰는 구조라서, `sessionAgent`를 모르는 옛 빌드가 노트를 다시 쓰면 그 줄이 지워질 수 있다(옛 빌드로 직접 확인하지는 않았다).
+- **시험.** 엔진은 `AgentSessionTest`(파일 형식, 도장, 환경변수 해석, 두 CLI의 가짜 기록)와 `McpServerTest`의 `sessionFromMeta`, 화면은 `chapter10.test.mjs`와 `agent-session-chip.test.mjs`다. 실제 Codex·Gemini 기록은 읽기 전용으로 엔진 명령에 먹여 확인했다. 실제 앱 창에서 칩을 눌러 본 확인은 없다.
+
 ### 두 가지 모양
 
 - **단발 모드**: `java -jar dist/ais-engine.jar <명령> [인자...]` 명령 1개를 처리하고 끝난다.
@@ -489,5 +506,5 @@ node fixtures/runner-test.mjs
 - 앱에 든 Java로 도는 `ais-cli`는 릴리스 설정의 디버그 번들에서 실제로 확인했다(`verify-release.mjs` 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.
 - 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
 - 물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.
-- 외부 설명서와 달라진 곳: `mins` 필드를 지웠다(위 「vault의 모양」). 데일리 리포트 명령(`list-reports`, `get-report`, `save-report`)도 엔진에서 뺐다. 이 저장소의 받아들임 묶음은 `mins`를 뺀 기대값으로 고쳐 두었고, 리포트 사례 2건(`list_reports/all`, `get_report/missing`)을 덜어 27건이다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 `mins`가 없는 만큼, 그리고 리포트 사례만큼 어긋난다.
+- 외부 설명서와 달라진 곳: Codex·Gemini 세션을 노트에 적고 읽는 확장이 있다(§5 「세션 에이전트 확장」). `mins` 필드를 지웠다(위 「vault의 모양」). 데일리 리포트 명령(`list-reports`, `get-report`, `save-report`)도 엔진에서 뺐다. 이 저장소의 받아들임 묶음은 `mins`를 뺀 기대값으로 고쳐 두었고, 리포트 사례 2건(`list_reports/all`, `get_report/missing`)을 덜어 27건이다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 `mins`가 없는 만큼, 그리고 리포트 사례만큼 어긋난다.
 - 설명서 원문이 제공되지 않은 부분(3부 18장, 4부 `ais-agent` 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.

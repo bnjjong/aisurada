@@ -339,6 +339,10 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | `AISURADA_VAULT_AUTOCOMMIT_ENABLED` | vault 자동 커밋과 commit-vault 사용 | true |
 | `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS` | 마지막 쓰기부터 커밋까지의 유휴 초 | 300 |
 | `AISURADA_VAULT_SNAPSHOT_ENABLED` | 본문 덮기 전 옛 스냅숏 저장 | false |
+| `AISURADA_SESSION_ID` | 이 호출을 보낸 에이전트 세션의 id. `AISURADA_SESSION_AGENT`와 함께 줄 때만 쓴다. `bin/ais-gemini`가 넣는다 | 없음 |
+| `AISURADA_SESSION_AGENT` | 그 세션을 연 CLI 이름(`claude`, `codex`, `gemini` …). 소문자 영문으로 시작하고 32자까지 | 없음 |
+
+`ais-cli`는 세션 id를 이 차례로 정합니다. MCP 요청에 Codex가 실은 `_meta.sessionId`, 위의 두 변수, 에이전트 고유 변수(`CLAUDE_CODE_SESSION_ID`, `CODEX_SESSION_ID`, `CODEX_THREAD_ID`). 고유 변수가 둘 이상의 에이전트에서 동시에 보이면 어느 쪽 세션인지 알 수 없어 기록하지 않습니다. claude가 아닌 세션의 노트에는 `sessionAgent` 줄이 `sessionId` 바로 뒤에 붙고, 줄이 없으면 claude입니다. `bin/ais-gemini`는 Gemini CLI를 `--session-id <새 UUID>`로 띄우고 같은 값을 위의 두 변수로 내보내는 래퍼이고, `bin/ais-codex`는 Claude 셸에서 물려받은 세션 변수를 지우고 codex를 띄웁니다.
 
 ## 종료 코드
 
