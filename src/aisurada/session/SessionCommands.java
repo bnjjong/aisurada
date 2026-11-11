@@ -111,13 +111,19 @@ public final class SessionCommands {
         }
 
         Path projectsDir = SessionTranscript.getClaudeProjectsDir();
-        SessionTranscript.ReadSessionResult res = SessionTranscript.readSession(
-                projectsDir, sessionId, limit, before, includeUrls, noteId, authorNotes
-        );
+        // Claude 기록이 없으면 Codex와 Gemini 기록을 찾는다. 찾으면 응답에 agent를 더한다(claude는 키가 없다)
+        AgentTranscripts.Located other = SessionTranscript.findTranscriptFile(projectsDir, sessionId) == null
+                ? AgentTranscripts.locate(sessionId) : null;
+        SessionTranscript.ReadSessionResult res = other != null
+                ? AgentTranscripts.read(other, sessionId, limit, before, includeUrls, noteId)
+                : SessionTranscript.readSession(projectsDir, sessionId, limit, before, includeUrls, noteId, authorNotes);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("sessionId", res.sessionId());
         resp.put("file", res.filePath());
+        if (other != null) {
+            resp.put("agent", other.agent());
+        }
 
         Map<String, Object> src = new LinkedHashMap<>();
         src.put("bytes", res.bytes());
@@ -169,6 +175,20 @@ public final class SessionCommands {
             String sId = id;
             SessionTranscript.SessionTitleInfo info = SessionTranscript.readTitleInfo(projectsDir, sId);
             Map<String, Object> item = new LinkedHashMap<>();
+            if (!info.found()) {
+                AgentTranscripts.Located other = AgentTranscripts.locate(sId);
+                if (other != null) {
+                    AgentTranscripts.Info found = AgentTranscripts.info(other, sId);
+                    item.put("sessionId", found.sessionId());
+                    item.put("found", found.found());
+                    item.put("title", found.title());
+                    item.put("branch", null);
+                    item.put("cwd", found.cwd());
+                    item.put("agent", found.agent());
+                    sessions.add(item);
+                    continue;
+                }
+            }
             item.put("sessionId", info.sessionId());
             item.put("found", info.found());
             item.put("title", info.title());

@@ -629,7 +629,7 @@ public final class SessionTranscript {
         }
     }
 
-    private static void extractUrls(String text, Map<String, Integer> map) {
+    static void extractUrls(String text, Map<String, Integer> map) {
         if (text == null || text.isEmpty()) return;
         Matcher m = URL_PATTERN.matcher(text);
         while (m.find()) {
