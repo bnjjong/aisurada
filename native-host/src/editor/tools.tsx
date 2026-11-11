@@ -157,18 +157,28 @@ export function EditorTools(props: EditorProps) {
     const failed: string[] = [];
     for (const filePath of paths) {
       try {
-        const attachment = await invoke<{ name: string; display_name: string; is_image: boolean; rel_path: string }>(
+        const attachment = await invoke<{
+          name: string;
+          displayName?: string;
+          display_name?: string;
+          isImage?: boolean;
+          is_image?: boolean;
+          relPath?: string;
+          rel_path?: string;
+        }>(
           'copy_dropped_attachment',
           { noteDir: features.noteDirectory, path: filePath }
         );
+        const isImage = Boolean(attachment.isImage ?? attachment.is_image);
+        const displayName = attachment.displayName ?? attachment.display_name ?? attachment.name;
         editor.update(() => {
           const selected = $getSelection();
-          if (attachment.is_image) {
+          if (isImage) {
             const image = $createImage('attach/' + attachment.name);
             if ($isRangeSelection(selected)) selected.insertNodes([image]);
             else $getRoot().append($createParagraphNode().append(image));
           } else {
-            const link = $createRelativeLink('attach/' + attachment.name, `📄 ${attachment.display_name}`);
+            const link = $createRelativeLink('attach/' + attachment.name, `📄 ${displayName}`);
             if ($isRangeSelection(selected)) selected.insertNodes([link]);
             else $getRoot().append($createParagraphNode().append(link));
           }
@@ -458,13 +468,17 @@ export function EditorTools(props: EditorProps) {
       <div><button className="link-popover-btn" onClick={closeCompose}>취소</button><button className="link-popover-btn primary" disabled={!comment.trim()} onClick={submitComment}>추가</button></div></div>}
     {menu && <div className={menu.kind === 'note' ? 'note-picker' : 'slash-menu'} style={{ left: menu.x, top: menu.y }}>
       <input aria-label={menu.kind === 'note' ? '노트 링크 검색' : '블록 검색'} ref={input => input?.focus({ preventScroll: true })} value={menu.query}
+        onCompositionStart={() => { (window as any).__slashComposing = true; }}
+        onCompositionEnd={() => { (window as any).__slashComposing = false; }}
         onChange={event => {
           const nextQuery = event.target.value;
+          const isComposing = Boolean((window as any).__slashComposing || (event.nativeEvent as any)?.isComposing);
+          const isJamo = /^[\u3131-\u318E]+$/.test(nextQuery);
           const filtered = (menu.kind === 'note'
             ? notes.filter(n => n.title.toLowerCase().includes(nextQuery.toLowerCase()))
             : slashItems.filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(nextQuery.toLowerCase()))
           );
-          if (nextQuery && filtered.length === 0) {
+          if (nextQuery && filtered.length === 0 && !isComposing && !isJamo) {
             dismissMenu(nextQuery);
             return;
           }
@@ -476,8 +490,12 @@ export function EditorTools(props: EditorProps) {
           if (event.key === 'Enter') {
             event.preventDefault();
             event.stopPropagation();
-            if (!menu.query.trim()) { setMenu(null); editor.focus(); return; }
-            if (candidates[menu.selected]) void choose(candidates[menu.selected].id);
+            if (candidates[menu.selected]) {
+              void choose(candidates[menu.selected].id);
+            } else {
+              setMenu(null);
+              editor.focus();
+            }
           }
         }} />
       {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id} data-slash-id={item.id}

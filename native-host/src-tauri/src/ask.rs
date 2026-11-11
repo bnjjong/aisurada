@@ -1,7 +1,7 @@
 use crate::process::{self, Outcome, RunError};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     path::{Path, PathBuf},
     process::Command,
@@ -254,24 +254,31 @@ fn format_cause(stderr: &str, stdout: &str) -> String {
 
 static CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+static CANCEL_REQUESTED: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 
 pub fn register_cancel(session_id: &str) -> Arc<AtomicBool> {
-    let flag = Arc::new(AtomicBool::new(false));
-    CANCEL_FLAGS.lock().unwrap().insert(session_id.to_string(), flag.clone());
+    let mut flags = CANCEL_FLAGS.lock().unwrap();
+    let requested = CANCEL_REQUESTED.lock().unwrap();
+    let already_cancelled = requested.contains(session_id);
+    let flag = Arc::new(AtomicBool::new(already_cancelled));
+    flags.insert(session_id.to_string(), flag.clone());
     flag
 }
 
 pub fn unregister_cancel(session_id: &str) {
     CANCEL_FLAGS.lock().unwrap().remove(session_id);
+    CANCEL_REQUESTED.lock().unwrap().remove(session_id);
 }
 
 #[tauri::command]
 pub fn cancel_ask(session_id: String) -> Result<bool, String> {
+    CANCEL_REQUESTED.lock().unwrap().insert(session_id.clone());
     if let Some(flag) = CANCEL_FLAGS.lock().unwrap().get(&session_id) {
         flag.store(true, Ordering::Relaxed);
         Ok(true)
     } else {
-        Ok(false)
+        Ok(true)
     }
 }
 

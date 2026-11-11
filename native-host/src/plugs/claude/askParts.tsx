@@ -6,6 +6,7 @@ import { AskContext } from './askContext.ts';
 import { AskImageStrip, AskOptionsRow, useAskImages } from './askPickers.tsx';
 import { humanizeAskError, isGeminiModel, modelLabel } from './askText.ts';
 import type { AskTurn } from './askText.ts';
+import { cancelQueuedAsk } from './askRun.ts';
 import { ModelProse } from './modelProse.tsx';
 import type { PendingAsk } from './state.ts';
 import { useAskState } from './state.ts';
@@ -82,7 +83,7 @@ export function pendingText(record: Pick<PendingAsk, 'at' | 'queued' | 'timeoutS
 }
 
 /** 4.9: the line of a question in flight. The second count is made from the clock every second, not counted. */
-export function PendingLine({ record }: { record: PendingAsk }) {
+export function PendingLine({ record, markId, noteKey }: { record: PendingAsk; markId?: string; noteKey?: string }) {
   const [now, setNow] = useState(() => Date.now());
   const [stopping, setStopping] = useState(false);
   useEffect(() => {
@@ -94,6 +95,10 @@ export function PendingLine({ record }: { record: PendingAsk }) {
     if (stopping) return;
     setStopping(true);
     try {
+      if (record.queued && markId && noteKey) {
+        cancelQueuedAsk(noteKey, markId);
+        return;
+      }
       if (record.sessionId && isTauri()) {
         await invoke('cancel_ask', { sessionId: record.sessionId });
       }

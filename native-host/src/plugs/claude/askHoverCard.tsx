@@ -188,7 +188,7 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
           {turns.map((turn) => (
             <AskTurnView key={turn.id} turn={turn} fold={false} />
           ))}
-          {record && <PendingLine record={record} />}
+          {record && <PendingLine record={record} markId={underline} noteKey={docId} />}
         </div>
       )}
       {turns.length > 0 && !isPinned && <div className="ask-hovercard-hint" style={{ flexShrink: 0 }}>눌러서 고정하면 이어 물을 수 있어요</div>}

@@ -230,20 +230,25 @@ const ANNOTATION: TextMatchTransformer = {
     ? `<!--ais${node.getKind()}:${node.getIDs()[0]}-->${children(node)}<!--/ais${node.getKind()}:${node.getIDs()[0]}-->` : null,
 };
 const UNDERLINE_TAG: TextMatchTransformer = {
-  type: 'text-match', dependencies: [], regExp: /<u>([\s\S]+?)<\/u>/,
+  type: 'text-match',
+  dependencies: [],
+  importRegExp: /<u>([\s\S]+?)<\/u>/,
+  regExp: /<u>([\s\S]+?)<\/u>/,
   replace: (node, match) => {
     node.setTextContent(match[1]);
     if (!node.hasFormat('underline')) node.toggleFormat('underline');
-    return node;
   },
   export: (node, _children, exportFormat) => {
     if (!$isTextNode(node) || !node.hasFormat('underline')) return null;
     const text = node.getTextContent();
-    const cloned = $createTextNode(text);
-    for (const f of ['bold', 'italic', 'strikethrough', 'code', 'highlight'] as const) {
-      if (node.hasFormat(f)) cloned.toggleFormat(f);
-    }
-    return `<u>${exportFormat ? exportFormat(cloned, text) : text}</u>`;
+    const standIn = Object.assign(Object.create(TextNode.prototype) as TextNode, {
+      hasFormat: (format: string) => format !== 'underline' && node.hasFormat(format as any),
+      getTextContent: () => text,
+      getPreviousSibling: () => null,
+      getNextSibling: () => null,
+    });
+    const inner = exportFormat ? exportFormat(standIn, text) : text;
+    return `<u>${inner}</u>`;
   },
 };
 const CARD: ElementTransformer = {

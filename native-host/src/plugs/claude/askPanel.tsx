@@ -78,7 +78,7 @@ export function AskPanel({ noteKey, onFollowUp }: AskPanelProps) {
               <AskTurnView key={turn.id} turn={turn} fold />
             ))}
             {record ? (
-              <PendingLine record={record} />
+              <PendingLine record={record} markId={group.markId} noteKey={noteKey} />
             ) : onFollowUp && open.has(group.markId) ? (
               <FollowUpRow
                 autoFocus
@@ -96,7 +96,7 @@ export function AskPanel({ noteKey, onFollowUp }: AskPanelProps) {
       })}
 
       {waitingOnly.map(([markId, record]) => (
-        <PendingLine key={markId} record={record} />
+        <PendingLine key={markId} record={record} markId={markId} noteKey={noteKey} />
       ))}
 
       {abandonedList.map((item) => {
