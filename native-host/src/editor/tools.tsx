@@ -17,7 +17,8 @@ import { calloutStyle } from './grammar.ts';
 import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock.ts';
 
 type Trigger = { key: string; start: number; size: number };
-type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; x: number; y: number };
+// picked: 사용자가 ↑↓나 마우스로 항목을 직접 골랐는지. selected는 열 때부터 0이라, 이것만으로는 「고른 것」과 「맨 위에 놓인 것」을 가릴 수 없다.
+type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; picked?: boolean; x: number; y: number };
 export const OPEN_COMMENT_COMMAND = createCommand<void>('aisurada:comment-compose');
 export const OPEN_ASK_COMMAND = createCommand<void>('aisurada:ask-compose');
 const formats = ['bold', 'italic', 'strikethrough', 'code'] as const;
@@ -196,7 +197,7 @@ export function EditorTools(props: EditorProps) {
       editor.update(() => { const range = removeTrigger(active.trigger); range?.insertNodes([$createReference(id, note.title.replace(/\[/g, '［').replace(/\]/g, '］'))]); });
       setMenu(null); editor.focus(); return;
     }
-    if (id === 'note') { setMenu({ ...active, kind: 'note', query: '', selected: 0 }); return; }
+    if (id === 'note') { setMenu({ ...active, kind: 'note', query: '', selected: 0, picked: false }); return; }
     setMenu(null);
     if (id === 'pdf') {
       editor.update(() => { removeTrigger(active.trigger); });
@@ -483,24 +484,22 @@ export function EditorTools(props: EditorProps) {
             dismissMenu(nextQuery);
             return;
           }
-          setMenu({ ...menu, query: nextQuery, selected: 0 });
+          setMenu({ ...menu, query: nextQuery, selected: 0, picked: false });
         }}
         onKeyDown={event => {
           if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismissMenu(); }
-          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); event.stopPropagation(); setMenu({ ...menu, selected: Math.max(0, Math.min(candidates.length - 1, menu.selected + (event.key === 'ArrowDown' ? 1 : -1))) }); }
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); event.stopPropagation(); setMenu({ ...menu, selected: Math.max(0, Math.min(candidates.length - 1, menu.selected + (event.key === 'ArrowDown' ? 1 : -1))), picked: true }); }
           if (event.key === 'Enter') {
             event.preventDefault();
             event.stopPropagation();
-            if (candidates[menu.selected]) {
-              void choose(candidates[menu.selected].id);
-            } else {
-              setMenu(null);
-              editor.focus();
-            }
+            // 검색어를 쳤거나 항목을 직접 골랐을 때만 실행한다. 「/」만 치고 Enter면 메뉴만 닫고 「/」는 글에 남긴다.
+            const item = candidates[menu.selected];
+            if (item && (menu.query || menu.picked)) void choose(item.id);
+            else dismissMenu();
           }
         }} />
       {candidates.length ? candidates.map((item, index) => <button className={menu.kind === 'note' ? 'note-picker-item' : 'slash-item'} key={item.id} data-slash-id={item.id}
-        aria-selected={menu.selected === index} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setMenu({ ...menu, selected: index })} onClick={() => void choose(item.id)}>
+        aria-selected={menu.selected === index} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setMenu({ ...menu, selected: index, picked: true })} onClick={() => void choose(item.id)}>
         {'icon' in item && <span className="slash-item-icon" aria-hidden="true"><SlashIcon name={item.icon} /></span>}
         <span className="slash-item-label">{item.label}{'desc' in item && <small>{item.desc}</small>}</span>{'hint' in item && <small>{item.hint}</small>}</button>) : <p>일치하는 {menu.kind === 'note' ? '노트가' : '블록이'} 없어요.</p>}
     </div>}
