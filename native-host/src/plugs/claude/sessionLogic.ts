@@ -172,7 +172,7 @@ export interface SessionSendInput {
   timeoutSeconds: number;
 }
 
-export type SessionSendResult = { ok: true; notice: string | null } | { ok: false; error: string };
+export type SessionSendResult = { ok: true; notice: string | null; cancelled?: boolean } | { ok: false; error: string; cancelled?: boolean };
 
 /**
  * 10.3 steps 4 to 9. The list and the first folder are read together; a session another terminal holds is refused
@@ -211,6 +211,9 @@ export async function sendToSession(deps: SessionSendDeps, input: SessionSendInp
       keepAlive: true,
     });
     if (!answer.ok) return { ok: false, error: answer.error || '까닭을 못 받았다' };
+    if (answer.answer?.includes('[사용자에 의해 중단됨]')) {
+      return { ok: true, notice: '질문이 중단되었어요. 작성하던 글을 복원했어요.', cancelled: true };
+    }
     return { ok: true, notice: answer.missing_cwd ? `이 세션이 처음 돌던 폴더(${answer.missing_cwd})가 없어서 vault 에서 이어 갔어요.` : null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };

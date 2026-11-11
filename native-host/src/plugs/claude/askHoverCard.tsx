@@ -94,6 +94,8 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
     if (!isPinned) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) {
+        const textarea = card.current?.querySelector('textarea');
+        if (textarea && textarea.value.trim()) return;
         event.preventDefault();
         event.stopPropagation();
         handleClose();
@@ -162,6 +164,8 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
         if (event.key === 'Escape') {
           event.stopPropagation();
           event.nativeEvent.stopImmediatePropagation();
+          const textarea = card.current?.querySelector('textarea');
+          if (textarea && textarea.value.trim()) return;
           if (!event.defaultPrevented) {
             event.preventDefault();
             handleClose();

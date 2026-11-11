@@ -395,8 +395,9 @@ export function EditorTools(props: EditorProps) {
     const leave = () => { closeCard.current = setTimeout(() => setCard(previous => previous?.pinned ? previous : null), 180); };
     const click = (event: MouseEvent) => {
       const mark = (event.target as Element).closest<HTMLElement>('[data-comment-id]'); if (!mark || mark.closest('td,th')) return;
+      // 본문 클릭 시 화면이 아래 코멘트 목록으로 튀지 않도록 카드를 고정만 하고,
+      // 스레드 이동은 카드의 [스레드에서 보기] 버튼을 통해 하도록 분리한다 (E9).
       setCard(previous => previous ? { ...previous, pinned: true } : previous);
-      if (mark.dataset.commentId) latest.current.features?.openComment?.(mark.dataset.commentId);
     };
     const drop = (event: DragEvent) => {
       const files = [...(event.dataTransfer?.files || [])].filter(file => resolveFileExtension(file) !== null);

@@ -67,6 +67,7 @@ fn main() {
             notes::open_note_window,
             notes::note_windows,
             notes::close_note_windows,
+            notes::cancel_quit,
             notes::destroy_current_window,
             notes::show_in_main,
             notes::saved_note_windows,

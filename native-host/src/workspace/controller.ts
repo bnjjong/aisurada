@@ -507,6 +507,7 @@ export class WorkspaceController {
         // 여전히 닫히지 않은 노트 창이 남아있다면(사용자가 취소했거나 저장이 걸린 경우), 앱 종료를 중단한다.
         const finalCheck = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
         if (finalCheck && finalCheck.length > 0) {
+          await this.services.host.invoke('cancel_quit').catch(() => {});
           return false;
         }
       }

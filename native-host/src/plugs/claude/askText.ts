@@ -362,11 +362,12 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string }
   const text = typeof raw === 'string' ? raw : String(raw ?? '');
   if (!text) return { message: '답변을 받아오지 못했어요.', raw: '' };
 
+  const lower = text.toLowerCase();
   if (
     text.includes('AISURADA_CLAUDE_BIN') ||
     text.includes('claude 실행 파일') ||
     text.includes('ENOENT') ||
-    text.includes('not found')
+    lower.includes('not found')
   ) {
     return {
       message: 'Claude CLI(claude)를 찾지 못했어요. 설치되어 있는지 확인해 주세요.',
@@ -374,10 +375,11 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string }
     };
   }
   if (
+    lower.includes('login') ||
     text.includes('로그인') ||
-    text.includes('login') ||
-    text.includes('authenticated') ||
-    text.includes('종료 코드 1')
+    lower.includes('authenticated') ||
+    lower.includes('credential') ||
+    lower.includes('unauthorized')
   ) {
     return {
       message: 'Claude 로그인이 필요해요. 터미널에서 claude login을 실행해 주세요.',
@@ -385,13 +387,20 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string }
     };
   }
   if (
-    text.includes('시간 초과') ||
-    text.includes('timeout') ||
-    text.includes('timed out') ||
+    text.includes('초과') ||
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    text.includes('답이 안 왔다') ||
     text.includes('기한')
   ) {
     return {
       message: '응답 시간이 너무 오래 걸려 중단되었어요.',
+      raw: text,
+    };
+  }
+  if (text.includes('중단') || lower.includes('cancel')) {
+    return {
+      message: '사용자에 의해 질문이 중단되었어요.',
       raw: text,
     };
   }
