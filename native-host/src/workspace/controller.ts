@@ -492,6 +492,9 @@ export class WorkspaceController {
       // 열려 있는 독립 노트 창들을 각자의 안전한 닫기 절차(flush 및 미저장 확인)로 닫는다.
       const initialNotes = await this.services.host.invoke<string[]>('note_windows').catch(() => []);
       if (initialNotes && initialNotes.length > 0) {
+        // 이 뒤에 닫히는 노트 창이 다음 실행에 되살아나도록 「종료 중」 표시를 먼저 켠다.
+        // close_note_windows는 시작 화면 이동 같은 종료 아닌 길에서도 불려서, 표시를 거기서 켜면 안 된다.
+        await this.services.host.invoke('begin_quit').catch(() => {});
         await this.services.host.invoke('close_note_windows').catch(() => {});
 
         // 모든 노트 창이 닫힐 때까지 최대 10초 대기한다.

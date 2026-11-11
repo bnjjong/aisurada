@@ -289,4 +289,7 @@ test('closeMainWindow requests note window closure and waits before exiting', as
   assert.equal(closed, true);
   assert.equal(h.calls.some(c => c.command === 'close_note_windows'), true);
   assert.equal(h.calls.some(c => c.command === 'exit_app'), true);
+  // 「종료 중」 표시는 노트 창을 닫기 전에 켠다. 그래야 끄기 직전의 노트 창이 다음 실행에 되살아난다.
+  const order = h.calls.map(c => c.command);
+  assert.ok(order.indexOf('begin_quit') >= 0 && order.indexOf('begin_quit') < order.indexOf('close_note_windows'));
 });

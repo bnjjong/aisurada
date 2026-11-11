@@ -175,10 +175,17 @@ pub async fn open_note_window<R: Runtime>(
 pub fn note_windows<R: Runtime>(app: tauri::AppHandle<R>) -> Vec<String> {
     ids(&app, None)
 }
+/// 앱을 끄는 길의 첫걸음에서만 부른다. 이 뒤에 닫히는 노트 창은 사용자가 닫은 것이
+/// 아니라 앱이 꺼지며 닫힌 것이라서, 다음 실행에 되살릴 목록에서 지우지 않는다.
+/// 노트 창을 닫는 `close_note_windows`는 시작 화면 이동이나 워크스페이스 전환에서도
+/// 불리므로, 이 표시를 거기서 켜면 앱이 꺼질 때까지 남아 종료 확인을 건너뛰게 된다.
 #[tauri::command]
-pub fn close_note_windows<R: Runtime>(app: tauri::AppHandle<R>) {
+pub fn begin_quit<R: Runtime>(app: tauri::AppHandle<R>) {
     let state = app.state::<HostState>();
     state.quitting.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+#[tauri::command]
+pub fn close_note_windows<R: Runtime>(app: tauri::AppHandle<R>) {
     for w in app
         .webview_windows()
         .values()

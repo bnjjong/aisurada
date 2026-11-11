@@ -115,6 +115,8 @@ test('menu open failure returns to launcher but unsaved-data cancellation retain
 test('welcome closes note windows, clears last workspace and leaves the host root untouched', async t => {
   const h=await fixture(t); await h.controller.handleMenu('ais_welcome');
   assert.equal(h.controller.getSnapshot().workspace,null); assert.equal(h.values.get(KEYS.last),'null'); assert.equal(commands(h,'close_note_windows').length,1);
+  // 시작 화면으로 가는 길은 앱을 끄는 길이 아니다. 「종료 중」 표시를 켜면 이후 종료 확인이 건너뛰어진다.
+  assert.equal(commands(h,'begin_quit').length,0);
   assert.equal(await h.services.host.invoke('vault_root'),'/fixture');
 });
 
