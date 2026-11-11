@@ -185,6 +185,8 @@
 :root[data-skin="tactile"] .tab-bar {
   align-items: stretch; margin: 8px 8px 0; padding: 4px; gap: 3px; min-height: 0; border: 0; border-radius: 999px;
   background: var(--sunken); box-shadow: var(--in); scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
 }
 :root[data-skin="tactile"] .tab-bar::-webkit-scrollbar { display: none; }
 :root[data-skin="tactile"] .tab-item { align-items: stretch; border: 0; border-top: 0; border-radius: 999px; background: var(--tab-idle); transition: background-color .12s, box-shadow .12s; }
@@ -197,7 +199,7 @@
 :root[data-skin="tactile"] .tab-button:hover:not(:disabled) { background: transparent; }
 :root[data-skin="tactile"] .tab-button:focus-visible { outline-offset: -2px; }
 :root[data-skin="tactile"] .tab-label small { margin-bottom: 1px; line-height: 12px; font-weight: 500; }
-:root[data-skin="tactile"] .tab-close { align-self: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
+:root[data-skin="tactile"] .tab-close { align-self: center; flex: none; width: 24px; height: 24px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
 :root[data-skin="tactile"] .tab-close:hover:not(:disabled) { background: var(--line); }
 :root[data-skin="tactile"] .workspace-screen { --screen-pad: 8px; padding: 8px; gap: 0; }
 :root[data-skin="tactile"] .workspace-rail { background: transparent; border-right: 0; padding: 20px 12px 12px; }

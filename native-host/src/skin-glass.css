@@ -127,6 +127,11 @@
   -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
 }
 :root[data-skin="glass"] .cdiff { background: var(--glass-solid); -webkit-backdrop-filter: blur(36px); backdrop-filter: blur(36px); }
+:root[data-skin="glass"] :is(.subnote-page > header, .cdiff-table th, .lex-block-bar) {
+  background: var(--glass-solid);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
 
 /* ───────── 버튼 · 입력: 반투명 유리 조각 ───────── */
 :where(:root[data-skin="glass"]) button { border: 1px solid var(--rim); border-radius: 12px; background: var(--hover); box-shadow: var(--sh-1); padding: 8px 14px; font-weight: 500; transition: background-color .12s, box-shadow .12s; }
@@ -213,6 +218,8 @@
 :root[data-skin="glass"] .tab-bar {
   align-items: stretch; margin: 12px 12px 0; padding: 4px; gap: 4px; min-height: 0; border: 1px solid var(--rim); border-radius: 16px;
   background: var(--soft); box-shadow: var(--sh-1); scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
   -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
 }
 :root[data-skin="glass"] .tab-bar::-webkit-scrollbar { display: none; }
@@ -225,7 +232,7 @@
 :root[data-skin="glass"] .tab-button:hover:not(:disabled) { background: transparent; }
 :root[data-skin="glass"] .tab-button:focus-visible { outline-offset: -2px; }
 :root[data-skin="glass"] .tab-label small { margin-bottom: 1px; line-height: 12px; }
-:root[data-skin="glass"] .tab-close { align-self: center; flex: none; width: 20px; height: 20px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
+:root[data-skin="glass"] .tab-close { align-self: center; flex: none; width: 24px; height: 24px; margin: 0 8px 0 0; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
 :root[data-skin="glass"] .workspace-rail nav button { padding: 10px 14px; font-weight: 600; }
 :root[data-skin="glass"] .rail-agenda { border-radius: 12px; padding: 2px 8px; }
 :root[data-skin="glass"] :is(.workspace-rail nav button.active, .rail-agenda.active) { background: var(--tab-on); color: var(--ink); box-shadow: var(--sh-tab); }

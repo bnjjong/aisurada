@@ -117,10 +117,13 @@ pub fn create_main(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Err
         .and_then(|p| std::fs::read(p).ok())
         .and_then(|b| serde_json::from_slice::<crate::layout::Geometry>(&b).ok());
     let mut builder = tauri::WebviewWindowBuilder::from_config(app, config)?.center();
+    builder = builder.min_inner_size(900.0, 540.0);
     if let Some(g) = remembered.as_ref().map(|p| p.0.clone()).or(fallback) {
         let g = crate::layout::place(Some(g), &ms, 0);
         if let (Some(x), Some(y)) = (g.x, g.y) {
-            builder = builder.inner_size(g.width, g.height).position(x, y);
+            let width = g.width.max(900.0);
+            let height = g.height.max(540.0);
+            builder = builder.inner_size(width, height).position(x, y);
         }
     }
     let builder = builder.on_navigation(|url| is_allowed_navigation(url));
