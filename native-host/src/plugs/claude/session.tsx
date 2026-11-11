@@ -436,9 +436,20 @@ export function SessionComposer({
           >
             🎤
           </button>
-          <button type="button" className="sess-composer-send" aria-label="보내기" disabled={composer.sending || !composer.text.trim()} onClick={send}>
-            {composer.sending ? '보내는 중...' : '보내기'}
-          </button>
+          {composer.sending ? (
+            <button
+              type="button"
+              className="sess-composer-stop"
+              aria-label="멈추기"
+              onClick={() => void invoke('cancel_ask', { sessionId })}
+            >
+              멈추기
+            </button>
+          ) : (
+            <button type="button" className="sess-composer-send" aria-label="보내기" disabled={!composer.text.trim()} onClick={send}>
+              보내기
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -536,6 +547,7 @@ export interface NoteSessionRailProps {
 
 interface Running {
   chatId: string;
+  sessionId?: string;
   startedAt: number;
   images: number;
   previews: string[];
@@ -725,7 +737,8 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
     const timeoutSeconds = chat?.timeoutSeconds?.() ?? 3600; // 6
     const askedAt = new Date().toISOString(); // the time of 8.6 step 9
     const turnId = railTurnId(Date.now(), randomUuid());
-    setRunning({ chatId, startedAt: Date.now(), images: files.length, previews, question, timeoutSeconds }); // 7
+    const askSessionId = await railChatSessionId(chatId);
+    setRunning({ chatId, sessionId: askSessionId, startedAt: Date.now(), images: files.length, previews, question, timeoutSeconds }); // 7
     setLastSent(chatId);
     setNewChat(false);
     setNotice(null);
@@ -832,7 +845,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
                     {running.images > 0 && <div className="sess-turn-images">{running.previews.map((src, index) => <img key={index} src={src} alt="붙인 그림" style={{ maxWidth: 120, maxHeight: 90 }} />)}</div>}
                   </div>
                   <div className="sess-turn sess-turn-assistant">
-                    <div className="sess-turn-body"><PendingLine record={{ at: running.startedAt, sessionId: '', timeoutSeconds: running.timeoutSeconds }} /></div>
+                    <div className="sess-turn-body"><PendingLine record={{ at: running.startedAt, sessionId: running.sessionId ?? '', timeoutSeconds: running.timeoutSeconds }} /></div>
                   </div>
                 </div>
               )}
@@ -896,9 +909,22 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
             }}
           />
           <div className="sess-composer-footer">
-            <button type="button" className="sess-composer-send" disabled={querying || !text.trim() || (first && read.loading)} onClick={() => void send()}>
-              {querying ? '요청 중…' : first && read.loading ? '세션 대화를 읽는 중…' : '묻기'}
-            </button>
+            {querying ? (
+              <button
+                type="button"
+                className="sess-composer-stop"
+                aria-label="멈추기"
+                onClick={() => {
+                  if (running?.sessionId) void invoke('cancel_ask', { sessionId: running.sessionId });
+                }}
+              >
+                멈추기
+              </button>
+            ) : (
+              <button type="button" className="sess-composer-send" disabled={!text.trim() || (first && read.loading)} onClick={() => void send()}>
+                {first && read.loading ? '세션 대화를 읽는 중…' : '묻기'}
+              </button>
+            )}
           </div>
         </footer>
       </aside>

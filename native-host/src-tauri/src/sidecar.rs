@@ -215,6 +215,11 @@ fn execute(
             stdout: String::new(),
             stderr: TIMEOUT_MESSAGE.into(),
         }),
+        Outcome::Cancelled => Ok(Reply {
+            status: -1,
+            stdout: String::new(),
+            stderr: "취소되었습니다.".into(),
+        }),
     }
 }
 

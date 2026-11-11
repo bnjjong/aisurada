@@ -69,14 +69,38 @@ export function pendingText(record: Pick<PendingAsk, 'at' | 'queued' | 'timeoutS
 /** 4.9: the line of a question in flight. The second count is made from the clock every second, not counted. */
 export function PendingLine({ record }: { record: PendingAsk }) {
   const [now, setNow] = useState(() => Date.now());
+  const [stopping, setStopping] = useState(false);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleStop = async () => {
+    if (stopping) return;
+    setStopping(true);
+    try {
+      if (record.sessionId && isTauri()) {
+        await invoke('cancel_ask', { sessionId: record.sessionId });
+      }
+    } catch (e) {
+      console.error('질문 중단 실패:', e);
+      setStopping(false);
+    }
+  };
+
   return (
     <div className={`ask-pending${record.queued ? ' is-queued' : ''}`}>
       <span className="ask-pending-label">{pendingText(record, now)}</span>
       <span className="ask-pending-bar" aria-hidden="true" />
+      <button
+        type="button"
+        className="ask-pending-stop"
+        onClick={handleStop}
+        disabled={stopping}
+        title="AI 질문 멈추기"
+      >
+        {stopping ? '멈추는 중…' : '멈추기'}
+      </button>
     </div>
   );
 }

@@ -15,6 +15,7 @@ pub struct Output {
 pub enum Outcome {
     Finished(Output),
     TimedOut,
+    Cancelled,
 }
 
 /// 띄우지 못한 실패와, 띄운 뒤 기다리다 난 입출력 실패를 가른다. 4부 묻기가 두 실패에 다른 글과
@@ -50,7 +51,16 @@ pub fn run_typed(
     input: Option<Vec<u8>>,
     timeout: Duration,
 ) -> Result<Outcome, RunError> {
-    run_with_grace(command, input, timeout, Duration::from_secs(3))
+    run_with_grace(command, input, timeout, Duration::from_secs(3), None)
+}
+
+pub fn run_typed_cancellable(
+    command: &mut Command,
+    input: Option<Vec<u8>>,
+    timeout: Duration,
+    cancel_flag: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+) -> Result<Outcome, RunError> {
+    run_with_grace(command, input, timeout, Duration::from_secs(3), cancel_flag)
 }
 
 fn run_with_grace(
@@ -58,6 +68,7 @@ fn run_with_grace(
     input: Option<Vec<u8>>,
     timeout: Duration,
     grace: Duration,
+    cancel_flag: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<Outcome, RunError> {
     let has_input = input.as_ref().is_some_and(|bytes| !bytes.is_empty());
     command
@@ -87,6 +98,10 @@ fn run_with_grace(
     });
     let mut streams: [Option<std::io::Result<Vec<u8>>>; 2] = [None, None];
     loop {
+        if cancel_flag.as_ref().map_or(false, |f| f.load(std::sync::atomic::Ordering::Relaxed)) {
+            terminate(&mut child, grace);
+            return Ok(Outcome::Cancelled);
+        }
         // Prefer completion when EOF and the deadline become ready together.
         while let Ok((index, bytes)) = rx.try_recv() {
             streams[index] = Some(bytes);

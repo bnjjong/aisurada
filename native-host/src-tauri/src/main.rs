@@ -57,6 +57,7 @@ fn main() {
             workspace::create_workspace_dir,
             sidecar::sidecar_call,
             files::write_attachment_bytes,
+            files::copy_dropped_attachment,
             files::open_in_default_app,
             files::open_external_path,
             self_write::announce_self_write,
@@ -85,6 +86,8 @@ fn main() {
             ask::ask_claude,
             #[cfg(feature = "claude")]
             ask::ask_runtime,
+            #[cfg(feature = "claude")]
+            ask::cancel_ask,
             #[cfg(feature = "claude")]
             agents::list_claude_agents,
             #[cfg(feature = "claude")]

@@ -88,6 +88,7 @@ fn run_list_agents() -> AgentsResponse {
             }
         }
         Ok(Outcome::TimedOut) => failure("10초 안에 세션 목록이 안 왔다.".into()),
+        Ok(Outcome::Cancelled) => failure("세션 목록 조회가 취소되었습니다.".into()),
         Err(RunError::Spawn(e)) => failure(format!("claude 를 못 띄웠다: {}", e)),
         Err(RunError::Io(e)) => failure(format!("claude 를 기다리던 일꾼이 끊겼다: {}", e)),
     }
@@ -130,6 +131,7 @@ fn run_alive_pids(pids: Vec<u32>) -> Result<Vec<u32>, String> {
             Ok(alive)
         }
         Ok(Outcome::TimedOut) => Err("ps 가 5초 안에 안 끝났다.".into()),
+        Ok(Outcome::Cancelled) => Err("ps 가 취소되었습니다.".into()),
         Err(error) => Err(format!("ps 를 못 띄웠다: {}", error.into_io())),
     }
 }

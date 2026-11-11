@@ -728,6 +728,9 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ask-followup-open { font-size: 11px; padding: 4px 8px; background: transparent; border: 1px dashed var(--line); border-radius: 4px; color: var(--muted); cursor: pointer; }
 .ask-pending { display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: rgba(200, 150, 40, 0.1); border-radius: 6px; margin: 8px 0; font-size: 12px; }
 .ask-pending-label { font-weight: 600; color: #c49b43; font-size: 11px; }
+.ask-pending-stop { border: 1px solid rgba(196, 155, 67, 0.4); background: transparent; color: #c49b43; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; cursor: pointer; margin-left: auto; transition: all 0.15s ease; }
+.ask-pending-stop:hover { background: rgba(196, 155, 67, 0.15); }
+.ask-pending-stop:disabled { opacity: 0.5; cursor: not-allowed; }
 .ask-abandoned { display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: var(--soft); border-radius: 6px; margin: 8px 0; font-size: 12px; }
 .ask-abandoned-cmd { font-family: var(--font-mono); font-size: 11px; background: var(--surface); padding: 2px 6px; border-radius: 4px; }
 .ask-abandoned-x { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: var(--muted); margin-left: auto; }
@@ -886,6 +889,9 @@ code.is-symbol { font-weight: 700; }
 .sess-composer-footer { display: flex; justify-content: flex-end; }
 .sess-composer-send { border: 0; background: var(--accent); color: #fff; font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 4px; cursor: pointer; }
 .sess-composer-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.sess-composer-stop { border: 1px solid #d9534f; background: rgba(217, 83, 79, 0.1); color: #d9534f; font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 4px; cursor: pointer; transition: all 0.15s ease; }
+.sess-composer-stop:hover { background: #d9534f; color: #fff; }
+.sess-composer-stop:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* --------------------------------------------------------------------------
  * Chapter 9: Session Screen (/session/:id)

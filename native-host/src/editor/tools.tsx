@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $wrapSelectionInMarkNode } from '@lexical/mark';
 import { $isCodeNode } from '@lexical/code';
@@ -131,6 +133,38 @@ export function EditorTools(props: EditorProps) {
         });
       } catch (error) {
         failed.push(`${file.name || file.type}: ${String(error)}`);
+      }
+    }
+    if (failed.length) await features.host!.warn('첨부하지 못했어요.\n' + failed.join('\n'));
+  }
+  async function handleDroppedPaths(paths: string[]) {
+    const features = latest.current.features;
+    if (!features?.host?.native) return;
+    if (!features.noteDirectory) {
+      void features.host.warn('이 노트에는 첨부를 둘 수 없어요. 앱에서 한 번 열면 폴더로 바뀝니다.');
+      return;
+    }
+    const failed: string[] = [];
+    for (const filePath of paths) {
+      try {
+        const attachment = await invoke<{ name: string; display_name: string; is_image: boolean; rel_path: string }>(
+          'copy_dropped_attachment',
+          { noteDir: features.noteDirectory, path: filePath }
+        );
+        editor.update(() => {
+          const selected = $getSelection();
+          if (attachment.is_image) {
+            const image = $createImage('attach/' + attachment.name);
+            if ($isRangeSelection(selected)) selected.insertNodes([image]);
+            else $getRoot().append($createParagraphNode().append(image));
+          } else {
+            const link = $createRelativeLink('attach/' + attachment.name, `📄 ${attachment.display_name}`);
+            if ($isRangeSelection(selected)) selected.insertNodes([link]);
+            else $getRoot().append($createParagraphNode().append(link));
+          }
+        });
+      } catch (error) {
+        failed.push(`${filePath}: ${String(error)}`);
       }
     }
     if (failed.length) await features.host!.warn('첨부하지 못했어요.\n' + failed.join('\n'));
@@ -353,7 +387,25 @@ export function EditorTools(props: EditorProps) {
     const blur = () => setLine(null);
     root.addEventListener('mouseover', over); root.addEventListener('mouseleave', leave); root.addEventListener('click', click); root.addEventListener('drop', drop); root.addEventListener('blur', blur);
     document.addEventListener('pointerdown', outside);
-    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); askCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); root.removeEventListener('blur', blur); document.removeEventListener('pointerdown', outside); };
+    let unlistenDragDrop: (() => void) | undefined;
+    if (isTauri()) {
+      let live = true;
+      void getCurrentWebview().onDragDropEvent((event) => {
+        const payload: any = event.payload;
+        if (payload.type !== 'drop' || !Array.isArray(payload.paths) || payload.paths.length === 0) return;
+        const currentRoot = editor.getRootElement();
+        if (!currentRoot) return;
+        const rect = currentRoot.getBoundingClientRect();
+        const pos = payload.position;
+        if (pos && pos.x >= rect.left && pos.x <= rect.right && pos.y >= rect.top && pos.y <= rect.bottom) {
+          void handleDroppedPaths(payload.paths);
+        }
+      }).then((fn) => {
+        if (live) unlistenDragDrop = fn;
+        else fn();
+      });
+    }
+    return () => { update(); paste(); tab(); formatCommand(); commentCommand(); askCommand(); clearTimeout(closeCard.current); root.removeEventListener('mouseover', over); root.removeEventListener('mouseleave', leave); root.removeEventListener('click', click); root.removeEventListener('drop', drop); root.removeEventListener('blur', blur); document.removeEventListener('pointerdown', outside); unlistenDragDrop?.(); };
   }, [editor]);
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>

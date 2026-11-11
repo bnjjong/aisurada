@@ -1,10 +1,14 @@
 use crate::process::{self, Outcome, RunError};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     env, fs,
     path::{Path, PathBuf},
     process::Command,
-    sync::OnceLock,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, LazyLock, Mutex, OnceLock,
+    },
     time::{Duration, Instant},
 };
 
@@ -248,9 +252,33 @@ fn format_cause(stderr: &str, stdout: &str) -> String {
     }
 }
 
+static CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub fn register_cancel(session_id: &str) -> Arc<AtomicBool> {
+    let flag = Arc::new(AtomicBool::new(false));
+    CANCEL_FLAGS.lock().unwrap().insert(session_id.to_string(), flag.clone());
+    flag
+}
+
+pub fn unregister_cancel(session_id: &str) {
+    CANCEL_FLAGS.lock().unwrap().remove(session_id);
+}
+
+#[tauri::command]
+pub fn cancel_ask(session_id: String) -> Result<bool, String> {
+    if let Some(flag) = CANCEL_FLAGS.lock().unwrap().get(&session_id) {
+        flag.store(true, Ordering::Relaxed);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 struct ExecResult {
     exit_code: Option<i32>,
     timed_out: bool,
+    cancelled: bool,
     stdout: String,
     stderr: String,
 }
@@ -264,6 +292,7 @@ fn run_cli_process(
     args: &[String],
     input_text: &str,
     timeout_secs: u64,
+    cancel_flag: Option<Arc<AtomicBool>>,
 ) -> Result<ExecResult, RunError> {
     let mut cmd = Command::new(binary);
     cmd.current_dir(work_dir);
@@ -274,20 +303,30 @@ fn run_cli_process(
     cmd.env("AISURADA_VAULT", vault);
     cmd.env("GEMINI_CLI_TRUST_WORKSPACE", "true");
 
-    match process::run_typed(
+    match process::run_typed_cancellable(
         &mut cmd,
         Some(input_text.as_bytes().to_vec()),
         Duration::from_secs(timeout_secs),
+        cancel_flag,
     )? {
         Outcome::Finished(output) => Ok(ExecResult {
             exit_code: output.status.code(),
             timed_out: false,
+            cancelled: false,
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         }),
         Outcome::TimedOut => Ok(ExecResult {
             exit_code: None,
             timed_out: true,
+            cancelled: false,
+            stdout: String::new(),
+            stderr: String::new(),
+        }),
+        Outcome::Cancelled => Ok(ExecResult {
+            exit_code: None,
+            timed_out: false,
+            cancelled: true,
             stdout: String::new(),
             stderr: String::new(),
         }),
@@ -405,16 +444,30 @@ fn execute_gemini_ask(
         cli_args.push("--skip-trust".to_string());
     }
 
-    match run_cli_process(
+    let cancel_flag = register_cancel(&args.session_id);
+    let run_res = run_cli_process(
         &gemini_bin,
         work_dir,
         &args.vault,
         &cli_args,
         &input_text,
         args.timeout_seconds,
-    ) {
+        Some(cancel_flag),
+    );
+    unregister_cancel(&args.session_id);
+
+    match run_res {
         Ok(res) => {
             let elapsed = start_time.elapsed().as_millis() as u64;
+            if res.cancelled {
+                return AskClaudeResponse {
+                    ok: true,
+                    answer: "[사용자에 의해 중단됨]".to_string(),
+                    error: None,
+                    elapsed_ms: elapsed,
+                    missing_cwd,
+                };
+            }
             if res.timed_out {
                 return AskClaudeResponse {
                     ok: false,
@@ -509,6 +562,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let mut current_resume = args.resume;
     let mut attempt = 0;
     let mut last_result: Option<ExecResult> = None;
+    let cancel_flag = register_cancel(&args.session_id);
 
     while attempt < 2 {
         attempt += 1;
@@ -522,9 +576,10 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
             &cli_args,
             &input_text,
             args.timeout_seconds,
+            Some(cancel_flag.clone()),
         ) {
             Ok(res) => {
-                if res.timed_out || res.exit_code == Some(0) {
+                if res.cancelled || res.timed_out || res.exit_code == Some(0) {
                     last_result = Some(res);
                     break;
                 }
@@ -547,10 +602,12 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
                 break;
             }
             Err(RunError::Spawn(e)) => {
+                unregister_cancel(&args.session_id);
                 let elapsed = start_time.elapsed().as_millis() as u64;
                 return failure(format!("claude 를 못 띄웠다: {}", e), elapsed, missing_cwd);
             }
             Err(RunError::Io(e)) => {
+                unregister_cancel(&args.session_id);
                 // 기다리던 일꾼이 끊겼다. 5.8 표에서 이 실패의 elapsed_ms 는 0이다
                 return failure(
                     format!("claude 를 기다리던 일꾼이 끊겼다: {}", e),
@@ -560,6 +617,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
             }
         }
     }
+    unregister_cancel(&args.session_id);
 
     let elapsed = start_time.elapsed().as_millis() as u64;
     let res = match last_result {
@@ -568,6 +626,22 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
             return failure("실행 결과를 얻지 못했다.".to_string(), elapsed, missing_cwd);
         }
     };
+
+    if res.cancelled {
+        let partial = res.stdout.trim();
+        let answer = if !partial.is_empty() {
+            format!("{partial}\n\n[사용자에 의해 중단됨]")
+        } else {
+            "[사용자에 의해 중단됨]".to_string()
+        };
+        return AskClaudeResponse {
+            ok: true,
+            answer,
+            error: None,
+            elapsed_ms: elapsed,
+            missing_cwd,
+        };
+    }
 
     if res.timed_out {
         let msg = format!(

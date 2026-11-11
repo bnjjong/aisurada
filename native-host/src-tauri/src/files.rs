@@ -29,6 +29,82 @@ pub async fn write_attachment_bytes(
         .await
         .map_err(|e| format!("첨부 쓰기가 끊겼어요: {e}"))?
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DroppedAttachment {
+    pub name: String,
+    pub display_name: String,
+    pub is_image: bool,
+    pub rel_path: String,
+}
+
+#[tauri::command]
+pub async fn copy_dropped_attachment(
+    state: State<'_, HostState>,
+    note_dir: String,
+    path: String,
+) -> Result<DroppedAttachment, String> {
+    let vault = state
+        .vault
+        .lock()
+        .map_err(|_| "vault 잠금을 얻지 못했다")?
+        .clone()
+        .ok_or("vault가 아직 열리지 않았어요")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let src_path = Path::new(&path)
+            .canonicalize()
+            .map_err(|e| format!("파일을 찾을 수 없어요: {path} ({e})"))?;
+        let bytes = fs::read(&src_path).map_err(|e| format!("파일을 읽지 못했어요: {e}"))?;
+        if bytes.len() > LIMIT {
+            return Err(format!("파일이 너무 커요: {} 바이트. 상한은 50000000 바이트예요", bytes.len()));
+        }
+        let ext = src_path
+            .extension()
+            .and_then(|v| v.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if !ATTACHMENT_EXTENSIONS.contains(&ext.as_str()) {
+            return Err(format!("지원하지 않는 첨부 파일 형식이에요: {ext}"));
+        }
+        let is_image = ext != "pdf";
+        let orig_stem = src_path
+            .file_stem()
+            .and_then(|v| v.to_str())
+            .unwrap_or("file");
+        let clean_stem: String = orig_stem
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+            .take(30)
+            .collect();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        let now_b36 = format!("{:x}", now.as_millis());
+        let rand_8 = format!("{:08x}", now.subsec_nanos());
+        let name = if is_image {
+            format!("img-{now_b36}-{rand_8}.{ext}")
+        } else {
+            let s = if clean_stem.is_empty() { "doc" } else { &clean_stem };
+            let tail = if now_b36.len() >= 4 { &now_b36[now_b36.len() - 4..] } else { &now_b36 };
+            format!("{s}-{tail}.{ext}")
+        };
+        let rel_path = write_attachment(&vault, &note_dir, &name, &bytes)?;
+        let display_name = src_path
+            .file_name()
+            .and_then(|v| v.to_str())
+            .unwrap_or(&name)
+            .to_string();
+        Ok(DroppedAttachment {
+            name,
+            display_name,
+            is_image,
+            rel_path,
+        })
+    })
+    .await
+    .map_err(|e| format!("첨부 복사가 끊겼어요: {e}"))?
+}
 /// 그림 첨부 이름 검사(2부 설명서 7.1). 파일 이름 하나여야 하고, 점으로 시작하면 안 되고, 확장자가 그림 8가지
 /// 가운데 하나여야 한다. 4부의 세션 입력창 그림(`write_session_image`)도 같은 검사를 쓴다(10장 10.6).
 pub(crate) fn check_attachment_name(name: &str) -> Result<(), String> {
