@@ -208,6 +208,7 @@ interface CardAt {
   id: string;
   left: number;
   top: number;
+  flipped?: boolean;
   pinned: boolean;
 }
 
@@ -264,10 +265,17 @@ export function EditorAskPlugins(props?: {
       const mark = (event.target as Element | null)?.closest<HTMLElement>('.lex-ask[data-ask-id]') ?? null;
       return mark && !mark.closest('td,th') ? mark : null;
     };
-    const place = (id: string): { left: number; top: number } | null => {
+    const place = (id: string): { left: number; top: number; flipped: boolean } | null => {
       const marks = [...root.querySelectorAll<HTMLElement>('[data-ask-id]')].filter((el) => el.dataset.askId === id && !el.closest('td,th'));
       const rect = unionRect(marks);
-      return rect ? { left: rect.left, top: rect.bottom + 6 } : null;
+      if (!rect) return null;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+      const cardWidth = 360;
+      const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
+      const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
+      const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
+      return { left, top, flipped: shouldFlip };
     };
     const over = (event: Event) => {
       const mark = markOf(event);
@@ -364,12 +372,18 @@ export function EditorAskPlugins(props?: {
       const id = htmlAskId(rel);
       const header = button.closest('.ais-html-frame-header') ?? button;
       const rect = header.getBoundingClientRect();
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+      const cardWidth = 360;
+      const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
+      const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
+      const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
       const { thread: current, pending: records, props: latest } = live.current;
       if (turnsForUnderline(current?.turns ?? [], id).length === 0 && !records?.[id]) {
         askedHtml.current.add(id);
-        latest?.onOpenCompose?.(htmlQuote(button.dataset.label ?? '', rel), { left: rect.left, top: rect.bottom + 6 }, id);
+        latest?.onOpenCompose?.(htmlQuote(button.dataset.label ?? '', rel), { left, top }, id);
       } else {
-        setCard({ id, left: rect.left, top: rect.bottom + 6, pinned: true });
+        setCard({ id, left, top, flipped: shouldFlip, pinned: true });
       }
     };
     root.addEventListener('click', clickButton, true);
@@ -388,15 +402,69 @@ export function EditorAskPlugins(props?: {
       const root = anchor.current?.closest('.lex-editor');
       const button = [...(root?.querySelectorAll<HTMLButtonElement>('.ais-html-frame-ask') ?? [])].find((el) => htmlAskId(el.dataset.rel ?? '') === id);
       const rect = (button?.closest('.ais-html-frame-header') ?? button)?.getBoundingClientRect();
-      if (rect) setCard({ id, left: rect.left, top: rect.bottom + 6, pinned: true });
+      if (rect) {
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        const cardWidth = 360;
+        const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
+        const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
+        const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
+        setCard({ id, left, top, flipped: shouldFlip, pinned: true });
+      }
     }
   }, [pending]);
+
+  // Update card position on scroll or resize so it tracks the mark accurately (C5)
+  useEffect(() => {
+    if (!card) return;
+    const updateCardPos = () => {
+      const root = anchor.current?.closest('.lex-editor');
+      if (!root) return;
+      const marks = [...root.querySelectorAll<HTMLElement>('[data-ask-id]')].filter((el) => el.dataset.askId === card.id && !el.closest('td,th'));
+      let rect = unionRect(marks);
+      if (!rect) {
+        const button = [...root.querySelectorAll<HTMLButtonElement>('.ais-html-frame-ask')].find((el) => htmlAskId(el.dataset.rel ?? '') === card.id);
+        const header = button?.closest('.ais-html-frame-header') ?? button;
+        rect = header?.getBoundingClientRect() ?? null;
+      }
+      if (!rect) return;
+      if (!card.pinned && (rect.bottom < 0 || rect.top > window.innerHeight)) {
+        setCard(null);
+        return;
+      }
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const cardWidth = 360;
+      const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
+      const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
+      const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
+      setCard((curr) => (curr && (curr.left !== left || curr.top !== top || curr.flipped !== shouldFlip) ? { ...curr, left, top, flipped: shouldFlip } : curr));
+    };
+
+    window.addEventListener('scroll', updateCardPos, true);
+    window.addEventListener('resize', updateCardPos);
+    return () => {
+      window.removeEventListener('scroll', updateCardPos, true);
+      window.removeEventListener('resize', updateCardPos);
+    };
+  }, [card?.id, card?.pinned]);
 
   return (
     <>
       <span ref={anchor} hidden />
       {card && docId && (
-        <div className="ask-card-anchor" style={{ position: 'fixed', left: card.left, top: card.top, zIndex: 50 }} onMouseEnter={cancel} onMouseLeave={() => !card.pinned && closeSoon()}>
+        <div
+          className="ask-card-anchor"
+          style={{
+            position: 'fixed',
+            left: card.left,
+            top: card.top,
+            transform: card.flipped ? 'translateY(-100%)' : undefined,
+            zIndex: 50,
+          }}
+          onMouseEnter={cancel}
+          onMouseLeave={() => !card.pinned && closeSoon()}
+        >
           <AskHoverCard key={card.id} docId={docId} turnId={card.id} pinned={card.pinned} onPin={() => { cancel(); setCard((current) => current ? { ...current, pinned: true } : null); }} onFollowUp={props?.onFollowUp} onClose={() => setCard(null)} />
         </div>
       )}

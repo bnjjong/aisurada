@@ -26,10 +26,21 @@ export const CARD_CLOSE_DELAY_MS = 180;
 
 export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned = false }: AskHoverCardProps) {
   const context = useContext(AskContext);
-  const [size, setSize] = useState(() => context.cardSize ?? { width: 360, height: null });
+  const [size, setSize] = useState(() => {
+    const initial = context.cardSize ?? { width: 360, height: null };
+    const maxH = typeof window !== 'undefined' ? window.innerHeight - 100 : 800;
+    return {
+      width: initial.width,
+      height: initial.height ? Math.min(initial.height, maxH) : null,
+    };
+  });
   useEffect(() => {
     if (context.cardSize) {
-      setSize(context.cardSize);
+      const maxH = typeof window !== 'undefined' ? window.innerHeight - 100 : 800;
+      setSize({
+        width: context.cardSize.width,
+        height: context.cardSize.height ? Math.min(context.cardSize.height, maxH) : null,
+      });
     }
   }, [context.cardSize?.width, context.cardSize?.height]);
   const stopResize = useRef<(() => void) | null>(null);
@@ -109,8 +120,9 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
     const x = event.clientX, y = event.clientY;
     let width = rect.width, height = rect.height;
     const move = (next: PointerEvent) => {
+      const maxH = typeof window !== 'undefined' ? window.innerHeight - 100 : 800;
       width = Math.max(280, Math.min(720, rect.width + next.clientX - x));
-      height = Math.max(160, Math.min(1600, rect.height + next.clientY - y));
+      height = Math.max(160, Math.min(maxH, rect.height + next.clientY - y));
       setSize({ width, height });
     };
     const stop = () => {
@@ -137,7 +149,7 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
         flexDirection: 'column',
         width: size.width,
         height: size.height ?? undefined,
-        maxHeight: size.height ? 1600 : 400,
+        maxHeight: Math.min(size.height ? 1600 : 400, typeof window !== 'undefined' ? window.innerHeight - 100 : 400),
         boxSizing: 'border-box',
         overflow: 'hidden',
       }}

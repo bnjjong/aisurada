@@ -16,7 +16,12 @@ interface Drag {
 
 export function tabTitle(id: string, state: WorkspaceState): string {
   if (id === 'term:main') return '터미널';
-  if (id.startsWith('term:')) return `터미널 · ${id.slice(5)}`;
+  if (id.startsWith('term:')) {
+    const termId = id.slice(5);
+    const session = (state as any).sessions?.find?.((s: any) => s.id === termId);
+    const label = session?.title || (termId.length > 8 ? termId.slice(0, 8) : termId);
+    return `터미널 · ${label}`;
+  }
   if (id.startsWith('ext:')) return id.slice(4).split('/').pop() || id.slice(4);
   return state.workspace?.notes.find(note => note.id === id)?.title || id;
 }
