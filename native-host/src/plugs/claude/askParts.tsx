@@ -100,7 +100,7 @@ export function PendingLine({ record, markId, noteKey }: { record: PendingAsk; m
         return;
       }
       if (record.sessionId && isTauri()) {
-        await invoke('cancel_ask', { sessionId: record.sessionId });
+        await invoke('cancel_ask', { sessionId: record.sessionId, ...(record.askId ? { askId: record.askId } : {}) });
       }
     } catch (e) {
       console.error('질문 중단 실패:', e);

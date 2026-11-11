@@ -1,7 +1,7 @@
 use crate::process::{self, Outcome, RunError};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env, fs,
     path::{Path, PathBuf},
     process::Command,
@@ -40,6 +40,20 @@ pub struct AskClaudeArgs {
     pub cwd: Option<String>,
     pub resume_only: Option<bool>,
     pub persona: Option<String>,
+    /// 이 물음 하나만 가리키는 id. 화면이 물음마다 새로 만들어 보내고, 멈추기도 같은 id로 한다.
+    /// 한 노트의 물음은 모두 같은 세션 id를 쓰므로, 세션 id로 멈추면 끝난 물음에 늦게 닿은 멈춤이
+    /// 다음 물음을 끊는다. 비어 있으면(옛 화면) 세션 id로 멈춘다.
+    pub ask_id: Option<String>,
+}
+
+impl AskClaudeArgs {
+    /// 멈춤 표시(`register_cancel`/`cancel_ask`)를 찾는 열쇠. 물음 id가 있으면 그것이고, 없으면 세션 id다.
+    pub fn cancel_key(&self) -> &str {
+        self.ask_id
+            .as_deref()
+            .filter(|id| !id.is_empty())
+            .unwrap_or(&self.session_id)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -254,32 +268,44 @@ fn format_cause(stderr: &str, stdout: &str) -> String {
 
 static CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
-static CANCEL_REQUESTED: LazyLock<Mutex<HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+/// 물음이 등록되기 전에 온 멈춤. 「묻자마자 멈추기」를 받으려고 둔다. 키는 물음 id(없으면 세션 id)이고,
+/// 값은 멈춤이 온 시각이다. 이미 끝난 물음에 늦게 온 멈춤이 영영 남지 않도록 오래된 것은 지운다.
+static CANCEL_REQUESTED: LazyLock<Mutex<HashMap<String, Instant>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+const CANCEL_REQUEST_TTL: Duration = Duration::from_secs(60);
 
-pub fn register_cancel(session_id: &str) -> Arc<AtomicBool> {
+fn forget_old_requests(requested: &mut HashMap<String, Instant>) {
+    requested.retain(|_, at| at.elapsed() < CANCEL_REQUEST_TTL);
+}
+
+pub fn register_cancel(key: &str) -> Arc<AtomicBool> {
     let mut flags = CANCEL_FLAGS.lock().unwrap();
-    let requested = CANCEL_REQUESTED.lock().unwrap();
-    let already_cancelled = requested.contains(session_id);
+    let mut requested = CANCEL_REQUESTED.lock().unwrap();
+    forget_old_requests(&mut requested);
+    let already_cancelled = requested.contains_key(key);
     let flag = Arc::new(AtomicBool::new(already_cancelled));
-    flags.insert(session_id.to_string(), flag.clone());
+    flags.insert(key.to_string(), flag.clone());
     flag
 }
 
-pub fn unregister_cancel(session_id: &str) {
-    CANCEL_FLAGS.lock().unwrap().remove(session_id);
-    CANCEL_REQUESTED.lock().unwrap().remove(session_id);
+pub fn unregister_cancel(key: &str) {
+    CANCEL_FLAGS.lock().unwrap().remove(key);
+    CANCEL_REQUESTED.lock().unwrap().remove(key);
 }
 
+/// 물음 하나를 멈춘다. `ask_id`가 있으면 그 물음만, 없으면 옛 방식대로 세션 id로 멈춘다.
 #[tauri::command]
-pub fn cancel_ask(session_id: String) -> Result<bool, String> {
-    CANCEL_REQUESTED.lock().unwrap().insert(session_id.clone());
-    if let Some(flag) = CANCEL_FLAGS.lock().unwrap().get(&session_id) {
-        flag.store(true, Ordering::Relaxed);
-        Ok(true)
-    } else {
-        Ok(true)
+pub fn cancel_ask(session_id: String, ask_id: Option<String>) -> Result<bool, String> {
+    let key = ask_id.filter(|id| !id.is_empty()).unwrap_or(session_id);
+    {
+        let mut requested = CANCEL_REQUESTED.lock().unwrap();
+        forget_old_requests(&mut requested);
+        requested.insert(key.clone(), Instant::now());
     }
+    if let Some(flag) = CANCEL_FLAGS.lock().unwrap().get(&key) {
+        flag.store(true, Ordering::Relaxed);
+    }
+    Ok(true)
 }
 
 struct ExecResult {
@@ -451,7 +477,7 @@ fn execute_gemini_ask(
         cli_args.push("--skip-trust".to_string());
     }
 
-    let cancel_flag = register_cancel(&args.session_id);
+    let cancel_flag = register_cancel(args.cancel_key());
     let run_res = run_cli_process(
         &gemini_bin,
         work_dir,
@@ -461,7 +487,7 @@ fn execute_gemini_ask(
         args.timeout_seconds,
         Some(cancel_flag),
     );
-    unregister_cancel(&args.session_id);
+    unregister_cancel(args.cancel_key());
 
     match run_res {
         Ok(res) => {
@@ -569,7 +595,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     let mut current_resume = args.resume;
     let mut attempt = 0;
     let mut last_result: Option<ExecResult> = None;
-    let cancel_flag = register_cancel(&args.session_id);
+    let cancel_flag = register_cancel(args.cancel_key());
 
     while attempt < 2 {
         attempt += 1;
@@ -609,12 +635,12 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
                 break;
             }
             Err(RunError::Spawn(e)) => {
-                unregister_cancel(&args.session_id);
+                unregister_cancel(args.cancel_key());
                 let elapsed = start_time.elapsed().as_millis() as u64;
                 return failure(format!("claude 를 못 띄웠다: {}", e), elapsed, missing_cwd);
             }
             Err(RunError::Io(e)) => {
-                unregister_cancel(&args.session_id);
+                unregister_cancel(args.cancel_key());
                 // 기다리던 일꾼이 끊겼다. 5.8 표에서 이 실패의 elapsed_ms 는 0이다
                 return failure(
                     format!("claude 를 기다리던 일꾼이 끊겼다: {}", e),
@@ -624,7 +650,7 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
             }
         }
     }
-    unregister_cancel(&args.session_id);
+    unregister_cancel(args.cancel_key());
 
     let elapsed = start_time.elapsed().as_millis() as u64;
     let res = match last_result {
@@ -710,6 +736,7 @@ pub async fn ask_claude(
     cwd: Option<String>,
     resume_only: Option<bool>,
     persona: Option<String>,
+    ask_id: Option<String>,
 ) -> Result<AskClaudeResponse, String> {
     // route 는 일을 시작하기 전에 거른다. 모르는 값이면 커맨드째 거절한다
     check_route(route.as_deref())?;
@@ -739,6 +766,7 @@ pub async fn ask_claude(
         cwd,
         resume_only,
         persona,
+        ask_id,
     };
 
     // async 일꾼 밖의 blocking 일꾼에서 실행하고 await 로 기다린다. recv() 로 막으면 상한(1~2시간) 동안
@@ -915,6 +943,7 @@ echo "STDIN: $(cat)"
         let args = AskClaudeArgs {
             vault: vault_str.clone(),
             session_id: "test-sess-uuid".to_string(),
+            ask_id: None,
             model: "claude-sonnet-5-5".to_string(),
             effort: "low".to_string(),
             prompt: "캐시는 언제 비우나?".to_string(),
@@ -967,6 +996,7 @@ fi
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: "sess-already-in-use".to_string(),
+            ask_id: None,
             model: "claude-sonnet-5-5".to_string(),
             effort: "low".to_string(),
             prompt: "질문".to_string(),
@@ -1002,6 +1032,7 @@ exit 1
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: "sess-not-found".to_string(),
+            ask_id: None,
             model: "claude-sonnet-5-5".to_string(),
             effort: "low".to_string(),
             prompt: "질문".to_string(),
@@ -1040,6 +1071,7 @@ exit 1
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: "sess-timeout".to_string(),
+            ask_id: None,
             model: "claude-sonnet-5-5".to_string(),
             effort: "low".to_string(),
             prompt: "질문".to_string(),
@@ -1086,6 +1118,7 @@ exit 1
         let args = AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: "sess-d12".to_string(),
+            ask_id: None,
             model: "claude-sonnet-5-5".to_string(),
             effort: "low".to_string(),
             prompt: "질문".to_string(),
@@ -1113,6 +1146,7 @@ exit 1
         AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: session.to_string(),
+            ask_id: None,
             model: "claude-sonnet-5-5".to_string(),
             effort: "low".to_string(),
             prompt: "질문".to_string(),
@@ -1233,6 +1267,7 @@ exit 1
         let res = execute_ask(AskClaudeArgs {
             vault: "/tmp".to_string(),
             session_id: "test-sess".to_string(),
+            ask_id: None,
             model: "gemini-3-8-high".to_string(),
             effort: "high".to_string(),
             prompt: "안녕".to_string(),
@@ -1289,6 +1324,7 @@ exit 0
         let res = execute_ask(AskClaudeArgs {
             vault: temp.path().to_str().unwrap().to_string(),
             session_id: "test-sess".to_string(),
+            ask_id: None,
             model: "gemini-3-8-high".to_string(),
             effort: "high".to_string(),
             prompt: "테스트 질문".to_string(),
@@ -1306,5 +1342,57 @@ exit 0
 
         assert!(res.ok, "Expected ok but got error: {:?}", res.error);
         assert_eq!(res.answer, "Antigravity Gemini Flash 답변입니다");
+    }
+
+    // 멈춤 표시는 프로그램 전체에서 하나를 같이 쓰므로, 시험마다 서로 다른 열쇠를 쓴다.
+
+    #[test]
+    fn stale_cancel_does_not_hit_next_ask() {
+        // 물음 1이 끝난 뒤에야 물음 1의 멈춤이 닿는다. 같은 노트라 세션 id는 같지만 물음 id는 다르다.
+        let _ = cancel_ask("sess-stale".into(), Some("ask-stale-1".into()));
+        let flag = register_cancel("ask-stale-2");
+        assert!(!flag.load(Ordering::Relaxed), "끝난 물음의 멈춤이 다음 물음을 끊으면 안 된다");
+        unregister_cancel("ask-stale-2");
+        unregister_cancel("ask-stale-1");
+    }
+
+    #[test]
+    fn cancel_before_register_still_stops_that_ask() {
+        // 묻자마자 멈추기: 멈춤이 등록보다 먼저 와도 그 물음은 멈춘다.
+        let _ = cancel_ask("sess-early".into(), Some("ask-early".into()));
+        let flag = register_cancel("ask-early");
+        assert!(flag.load(Ordering::Relaxed));
+        unregister_cancel("ask-early");
+    }
+
+    #[test]
+    fn cancel_reaches_a_running_ask_by_its_own_id_only() {
+        let flag = register_cancel("ask-run-1");
+        let _ = cancel_ask("sess-run".into(), Some("ask-run-other".into()));
+        assert!(!flag.load(Ordering::Relaxed), "다른 물음 id의 멈춤은 닿지 않는다");
+        let _ = cancel_ask("sess-run".into(), Some("ask-run-1".into()));
+        assert!(flag.load(Ordering::Relaxed));
+        unregister_cancel("ask-run-1");
+        unregister_cancel("ask-run-other");
+    }
+
+    #[test]
+    fn cancel_without_ask_id_falls_back_to_the_session_id() {
+        let flag = register_cancel("sess-fallback");
+        let _ = cancel_ask("sess-fallback".into(), None);
+        assert!(flag.load(Ordering::Relaxed));
+        unregister_cancel("sess-fallback");
+    }
+
+    #[test]
+    fn old_cancel_requests_are_forgotten() {
+        let old = Instant::now()
+            .checked_sub(CANCEL_REQUEST_TTL + Duration::from_secs(1))
+            .expect("시계가 시험에 필요한 만큼 지나 있다");
+        CANCEL_REQUESTED.lock().unwrap().insert("ask-old".into(), old);
+        let flag = register_cancel("ask-old");
+        assert!(!flag.load(Ordering::Relaxed), "1분 넘은 멈춤은 쓰지 않는다");
+        assert!(!CANCEL_REQUESTED.lock().unwrap().contains_key("ask-old"));
+        unregister_cancel("ask-old");
     }
 }

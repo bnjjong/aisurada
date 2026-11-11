@@ -166,7 +166,8 @@ test('3.8 first question: nine keys, the text, the persona, the author bundle, a
   await startAsk(host, baseRequest());
   assert.equal(host.calls.ask.length, 1);
   const args = host.calls.ask[0];
-  assert.deepEqual(Object.keys(args).sort(), ['effort', 'keepAlive', 'model', 'persona', 'prompt', 'resume', 'sessionId', 'timeoutSeconds', 'vault']);
+  assert.deepEqual(Object.keys(args).sort(), ['askId', 'effort', 'keepAlive', 'model', 'persona', 'prompt', 'resume', 'sessionId', 'timeoutSeconds', 'vault']);
+  assert.ok(args.askId && args.askId !== args.sessionId, 'the question has its own id, apart from the conversation id');
   assert.equal(args.vault, '/v', 'the vault, not the note folder');
   assert.equal(args.resume, false);
   assert.equal(args.keepAlive, false);
@@ -199,9 +200,15 @@ test('3.5 line: the second question waits, sees the first turn, resumes and carr
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(host.calls.ask.length, 1, 'the second question has not left yet');
   assert.equal(askNow().pending['ndq-00000002']['akq2-bbbbbbbb'].queued, true);
+  // The stop button reads the id off the in-flight record, so it must be the id the question was sent with.
+  assert.equal(askNow().pending['ndq-00000002']['akq2-aaaaaaaa'].askId, host.calls.ask[0].askId);
+  const secondAskId = askNow().pending['ndq-00000002']['akq2-bbbbbbbb'].askId;
+  assert.ok(secondAskId && secondAskId !== host.calls.ask[0].askId, 'a question waiting behind another already has its own id');
   release();
   await Promise.all([first, second]);
   assert.equal(host.calls.ask.length, 2);
+  assert.equal(host.calls.ask[1].askId, secondAskId, 'the id made at the press is the one sent');
+  assert.notEqual(host.calls.ask[1].askId, host.calls.ask[0].askId, 'one session id, two questions, two ids: a stop for the first cannot cut the second');
   assert.equal(host.calls.ask[1].resume, true, 'it sees the first turn');
   assert.equal(host.calls.ask[1].sessionId, host.calls.ask[0].sessionId);
   assert.ok(!host.calls.ask[1].prompt.includes('## 이 노트를 쓴 세션의 대화'), 'an answered thread carries no bundle again');

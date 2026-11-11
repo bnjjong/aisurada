@@ -53,10 +53,14 @@ export interface AskHost {
   announceSelfWrite(vault: string, relPath: string): void;
 }
 
-/** 3.8: the nine keys a drag question sends. Nothing more, or the way back to the flags is lost. */
+/**
+ * 3.8: the keys a drag question sends: the nine of the chapter and `askId`. Nothing more, or the way back to the flags
+ * is lost. `askId` names this one question, so a stop meant for it cannot cut the next question of the same note.
+ */
 export interface AskClaudeArgs {
   vault: string;
   sessionId: string;
+  askId?: string;
   model: string;
   effort: string;
   prompt: string;
@@ -272,6 +276,9 @@ export function startAsk(host: AskHost, request: AskRequest): Promise<void> {
   const record: PendingAsk = {
     at: Date.now(),
     sessionId: thread.sessionId,
+    // This question's own id: made at the press so a stop pressed at once still finds it, and so a stop that
+    // arrives after the answer ended cannot cut the next question of the same note (they share `sessionId`).
+    askId: randomUuid(),
     timeoutSeconds: request.timeoutSeconds,
     ...(askNow().runtime ? { runtime: askNow().runtime as string } : {}),
     ...(isLineBusy(key) ? { queued: true } : {}),
@@ -344,6 +351,7 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
       result = await host.askClaude({
         vault: request.vault,
         sessionId: thread.sessionId,
+        ...(departed.askId ? { askId: departed.askId } : {}),
         model: request.model,
         effort: request.effort,
         prompt,

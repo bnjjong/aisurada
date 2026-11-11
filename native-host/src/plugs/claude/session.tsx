@@ -215,6 +215,8 @@ export interface ComposerState {
   text: string;
   /** Sending: set at the press, cleared with the result. */
   sending: boolean;
+  /** The id of the send in flight. The stop button names it so a stop that arrives late cannot cut the next send. */
+  askId?: string;
   error: string | null;
   notice: string | null;
   images: PickedImage[];
@@ -339,7 +341,8 @@ export function SessionComposer({
       return;
     }
     const held = current.images; // 10.3 step 2
-    patchComposer(sessionId, { text: '', images: [], sending: true, error: null, notice: null });
+    const askId = randomUuid(); // this one send's own id, for the stop button
+    patchComposer(sessionId, { text: '', images: [], sending: true, askId, error: null, notice: null });
     void (async () => {
       const bytes = await Promise.all(held.map(async (image) => ({ name: pictureFileName(image.file), bytes: new Uint8Array(await image.file.arrayBuffer()) })));
       const result = await sendToSession(
@@ -353,7 +356,7 @@ export function SessionComposer({
           writeImage: (id, name, data) => invoke<string>('write_session_image', data, { headers: { 'x-ais-session-id': encodeURIComponent(id), 'x-ais-name': encodeURIComponent(name) } }),
           askClaude: (args) => askClaudeBridge(args),
         },
-        { sessionId, text, images: bytes, vault, model: askNow().model, effort: askNow().effort, timeoutSeconds: timeoutSeconds() }
+        { sessionId, text, images: bytes, vault, model: askNow().model, effort: askNow().effort, timeoutSeconds: timeoutSeconds(), askId }
       );
       if (result.ok) {
         if (result.cancelled) {
@@ -450,7 +453,7 @@ export function SessionComposer({
               type="button"
               className="sess-composer-stop"
               aria-label="멈추기"
-              onClick={() => void invoke('cancel_ask', { sessionId })}
+              onClick={() => void invoke('cancel_ask', { sessionId, ...(composer.askId ? { askId: composer.askId } : {}) })}
             >
               멈추기
             </button>
@@ -557,6 +560,8 @@ export interface NoteSessionRailProps {
 interface Running {
   chatId: string;
   sessionId?: string;
+  /** This one question's own id. See `PendingAsk.askId`: the stop button names it. */
+  askId?: string;
   startedAt: number;
   images: number;
   previews: string[];
@@ -748,7 +753,8 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
     const askedAt = new Date().toISOString(); // the time of 8.6 step 9
     const turnId = railTurnId(Date.now(), randomUuid());
     const askSessionId = await railChatSessionId(chatId);
-    setRunning({ chatId, sessionId: askSessionId, startedAt: Date.now(), images: files.length, previews, question, timeoutSeconds }); // 7
+    const askId = randomUuid(); // this one question's own id, for the stop button
+    setRunning({ chatId, sessionId: askSessionId, askId, startedAt: Date.now(), images: files.length, previews, question, timeoutSeconds }); // 7
     setLastSent(chatId);
     setNewChat(false);
     setNotice(null);
@@ -775,6 +781,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
         result = await askClaudeBridge({
           vault,
           sessionId: await railChatSessionId(chatId),
+          askId,
           model,
           effort,
           prompt,
@@ -855,7 +862,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
                     {running.images > 0 && <div className="sess-turn-images">{running.previews.map((src, index) => <img key={index} src={src} alt="붙인 그림" style={{ maxWidth: 120, maxHeight: 90 }} />)}</div>}
                   </div>
                   <div className="sess-turn sess-turn-assistant">
-                    <div className="sess-turn-body"><PendingLine record={{ at: running.startedAt, sessionId: running.sessionId ?? '', timeoutSeconds: running.timeoutSeconds }} /></div>
+                    <div className="sess-turn-body"><PendingLine record={{ at: running.startedAt, sessionId: running.sessionId ?? '', ...(running.askId ? { askId: running.askId } : {}), timeoutSeconds: running.timeoutSeconds }} /></div>
                   </div>
                 </div>
               )}
@@ -927,7 +934,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
                 className="sess-composer-stop"
                 aria-label="멈추기"
                 onClick={() => {
-                  if (running?.sessionId) void invoke('cancel_ask', { sessionId: running.sessionId });
+                  if (running?.sessionId) void invoke('cancel_ask', { sessionId: running.sessionId, ...(running.askId ? { askId: running.askId } : {}) });
                 }}
               >
                 멈추기

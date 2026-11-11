@@ -170,6 +170,8 @@ export interface SessionSendInput {
   model: string;
   effort: string;
   timeoutSeconds: number;
+  /** This one send's id. The stop button names it, so a stop that arrives late cannot cut the next send. */
+  askId?: string;
 }
 
 export type SessionSendResult = { ok: true; notice: string | null; cancelled?: boolean } | { ok: false; error: string; cancelled?: boolean };
@@ -205,6 +207,7 @@ export async function sendToSession(deps: SessionSendDeps, input: SessionSendInp
       resume: true,
       resumeOnly: true,
       ...(cwd ? { cwd } : {}),
+      ...(input.askId ? { askId: input.askId } : {}),
       model: input.model,
       effort: input.effort,
       timeoutSeconds: input.timeoutSeconds,

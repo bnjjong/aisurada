@@ -60,6 +60,14 @@ test('10.4 H1: the send calls ask_claude with the eight keys, the first folder o
   const noCwd = fakeDeps();
   await sendToSession(noCwd, base);
   assert.equal('cwd' in noCwd.calls.ask[0], false, 'no first folder: the key is not sent');
+  assert.equal('askId' in noCwd.calls.ask[0], false, 'no send id given: the key is not sent');
+});
+
+test('10.4: a send id given by the screen goes to ask_claude, so a stop can name this one send', async () => {
+  const deps = fakeDeps();
+  await sendToSession(deps, { ...base, askId: 'ask-send-1' });
+  assert.equal(deps.calls.ask[0].askId, 'ask-send-1');
+  assert.equal(deps.calls.ask[0].sessionId, ID, 'the conversation id is still the session id');
 });
 
 test('10.3 / 10.5: the list is read again before sending; a live row refuses before any picture is written; failures keep the box', async () => {

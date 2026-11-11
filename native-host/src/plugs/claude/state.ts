@@ -36,6 +36,12 @@ export interface PendingAsk {
   at: number;
   /** The conversation id of the question. */
   sessionId: string;
+  /**
+   * The id of this one question, made when the question is pressed. Every question of a note shares one `sessionId`,
+   * so stopping by `sessionId` lets a stop that arrives late (the answer has just ended) cut the next question.
+   * Absent in old records; a stop then goes by `sessionId`.
+   */
+  askId?: string;
   /** The wait limit in seconds this question was sent with. Absent in old records; read as 3,600. */
   timeoutSeconds?: number;
   /** The way it went. Absent when unknown or old; read as `cli`. */
