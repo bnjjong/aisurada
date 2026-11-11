@@ -3,7 +3,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import { asText } from "../workspace/types.ts";
 import type { Note, WorkspaceState } from "../workspace/types.ts";
 import { docAddress } from "../navigation/routes.ts";
-import { NoteReading } from "../navigation/NoteReading.tsx";
+import { NoteReading, NoteRail, noteDirOf } from "../navigation/NoteReading.tsx";
 import { Settings } from "../ui/Settings.tsx";
 import { Forms } from "../ui/Forms.tsx";
 import { visibleNotes, displayTitle, TYPE_NAMES } from "../ui/model.ts";
@@ -269,7 +269,13 @@ function SubNotePages({
             <button onClick={controller.popSubNote}>한 단계 뒤로</button>
           </div>
         ) : top ? (
-          <NoteReading note={top} controller={controller} parent={parent} root={trail.root} />
+          // 세션 레일은 스크롤하는 본문 밖, 오른쪽 칸에 둔다(노트 화면과 같은 모양).
+          <div className="subnote-body">
+            <div className="subnote-scroll">
+              <NoteReading note={top} controller={controller} parent={parent} root={trail.root} />
+            </div>
+            <NoteRail note={top} controller={controller} noteDir={noteDirOf(controller, top)} root={trail.root} />
+          </div>
         ) : (
           <p role="status">하위 노트를 여는 중…</p>
         )}

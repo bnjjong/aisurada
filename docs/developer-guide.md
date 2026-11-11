@@ -393,7 +393,7 @@ node fixtures/runner-test.mjs
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
 | 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다 |
-| 실제 창(4부) | `test:part4:acceptance`(켠 판 7건), `test:ask-marks:acceptance`(끈 판 4건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
+| 실제 창(4부) | `test:part4:acceptance`(켠 판 9건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 
 실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·소켓·빈 `ZDOTDIR`를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 `Diagnostics retained: <경로>`를 찍는다. `AISURADA_WORKSPACE_REPORT=<절대 경로>.json`이나 `AISURADA_CHECK_REPORT=<절대 경로>.json`으로 결과를 JSON으로 남길 수 있다. `--only=<사례 id>`로 일부만 돌릴 수 있다(편집기 왕복).
 

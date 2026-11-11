@@ -124,5 +124,38 @@ try {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await until(() => !document.querySelector('.settings-modal'));
   });
+  // 세션 칩의 「열기」: 레일은 본문 아래가 아니라 오른쪽에, 본문과 따로 스크롤되는 칸으로 떠야 한다.
+  if (cfg.part4Check) await test('enabled-note-rail-beside-body-not-below', async () => {
+    go(`/doc/${cfg.id}`);
+    await until(() => document.querySelector('.doc-scroll .note-reading .lex-editor'));
+    await until(() => document.querySelector('.doc-meta-id-open'));
+    document.querySelector('.doc-meta-id-open').click();
+    await until(() => document.querySelector('.nsrail'));
+    await wait(200);
+    const rail = document.querySelector('.nsrail'), body = document.querySelector('.doc-scroll');
+    assert(!body.contains(rail), '레일이 본문 스크롤 상자 안에 들어 있다');
+    const r = rail.getBoundingClientRect(), b = body.getBoundingClientRect();
+    assert(r.left >= b.right - 1, `레일이 본문 오른쪽이 아니다: 레일 left=${r.left} 본문 right=${b.right}`);
+    assert(Math.abs(r.top - b.top) < 2 && Math.abs(r.height - b.height) < 2, `레일이 본문과 같은 높이가 아니다: ${r.top}/${r.height} vs ${b.top}/${b.height}`);
+    assert(b.width > 300, `본문 칸이 너무 좁다: ${b.width}`);
+    document.querySelector('.nsrail-close').click();
+    await until(() => !document.querySelector('.nsrail'));
+    assert(document.querySelector('.doc-scroll').getBoundingClientRect().width >= b.width + r.width - 2, '레일을 닫아도 본문 칸이 넓어지지 않는다');
+  });
+  // 하위 페이지: 머리글은 고정, 본문 칸(.subnote-scroll)만 스크롤한다. 레일이 열리면 이 본문 칸 오른쪽에 붙는다.
+  // (하위 노트는 list-sub-notes가 sessionId를 주지 않아 칩의 「열기」가 없다. 그래서 레일 대신 이 구조만 잰다.)
+  await test('subnote-page-header-fixed-body-scrolls-inside', async () => {
+    go(`/doc/${cfg.id}`);
+    await until(() => document.querySelector('.doc-scroll .child-page-card'));
+    document.querySelector('.doc-scroll .child-page-card').click();
+    await until(() => document.querySelector('.subnote-page .subnote-body > .subnote-scroll .note-reading'));
+    const page = document.querySelector('.subnote-page'), head = page.querySelector(':scope > header'), body = page.querySelector('.subnote-scroll');
+    assert(getComputedStyle(page).overflowY === 'hidden', `하위 페이지 상자가 스크롤한다: ${getComputedStyle(page).overflowY}`);
+    assert(getComputedStyle(body).overflowY === 'auto', `하위 본문 칸이 스크롤 상자가 아니다: ${getComputedStyle(body).overflowY}`);
+    const h = head.getBoundingClientRect(), b = body.getBoundingClientRect(), p = page.getBoundingClientRect();
+    assert(b.top >= h.bottom - 1, `머리글이 본문을 가린다: 머리글 bottom=${h.bottom} 본문 top=${b.top}`);
+    assert(b.left >= p.left - 1 && b.right <= p.right + 1 && b.bottom <= p.bottom + 1, '하위 본문 칸이 하위 페이지 밖으로 나갔다');
+    assert(!page.querySelector('.nsrail'), '레일을 열지 않았는데 레일이 있다');
+  });
 } catch { /* failing check is already in results */ }
 await post('/result', results);

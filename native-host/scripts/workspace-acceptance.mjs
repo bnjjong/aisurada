@@ -89,6 +89,10 @@ if (askMarksCheck) {
 // 4부를 켠 판만 전사를 쓴다. 엔진은 격리 HOME의 ~/.claude/projects를 읽는다(래퍼가 -Duser.home을 준다).
 const sessionId = 'f1a50000-0000-4000-8000-000000000001';
 if (part4Check) {
+  // 노트와 하위 노트에 세션 칩을 달아, 칩의 「열기」로 세션 레일이 본문 옆에 뜨는지 잰다.
+  for (const file of [rootNote, childNote]) {
+    write(file, readFileSync(file, 'utf8').replace('type: free', `type: free\nsessionId: ${sessionId}`));
+  }
   const stamp = new Date().toISOString();
   write(join(home, '.claude/projects/-Users-test-vault', `${sessionId}.jsonl`), [
     { type: 'user', entrypoint: 'cli', cwd: '/Users/test/vault', timestamp: stamp, message: { content: '세션 점검용 첫 물음' } },

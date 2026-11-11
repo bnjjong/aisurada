@@ -210,9 +210,14 @@ export function NoteReading({
           <pre className="note-body">{note.body}</pre>
         </>
       )}
-      {parent && controller && <NoteRail note={note} controller={controller} noteDir={noteDir} root={root ?? parent} />}
     </article>
   );
+}
+
+/** 노트 폴더의 절대 경로. 세션 레일이 Claude를 띄울 작업 폴더로 쓴다. 워크스페이스나 노트 경로를 모르면 없다. */
+export function noteDirOf(controller: WorkspaceController | undefined, note: Note): string | undefined {
+  const base = controller?.getSnapshot().workspace?.path;
+  return base && note.path ? `${base}/${note.path}` : undefined;
 }
 
 export function NoteScreen({
@@ -222,9 +227,7 @@ export function NoteScreen({
   note: Note;
   controller: WorkspaceController;
 }) {
-  const noteDir = controller?.getSnapshot().workspace?.path && note.path
-    ? `${controller.getSnapshot().workspace!.path}/${note.path}`
-    : undefined;
+  const noteDir = noteDirOf(controller, note);
   // Ensure noteRailNow is referenced for deep-link / navigation contracts
   void noteRailNow;
   const surface = useRef<HTMLDivElement>(null);
@@ -242,14 +245,17 @@ export function NoteScreen({
       },
     );
   }, [note.id, controller]);
+  // 레일은 스크롤 상자 밖, 본문 오른쪽 칸에 둔다. 같은 상자에 넣으면 본문 아래에 쌓이고 본문과 같이 스크롤된다.
   return (
-    <div
-      className="doc-scroll"
-      ref={surface}
-      tabIndex={0}
-      aria-label={`${note.title} 본문`}
-    >
-      <NoteReading note={note} controller={controller} />
+    <div className="doc-route">
+      <div
+        className="doc-scroll"
+        ref={surface}
+        tabIndex={0}
+        aria-label={`${note.title} 본문`}
+      >
+        <NoteReading note={note} controller={controller} />
+      </div>
       <NoteRail note={note} controller={controller} noteDir={noteDir} />
     </div>
   );
@@ -259,7 +265,7 @@ export function NoteScreen({
  * 8.1, 8.2: the session rail of a note or of a sub page. A note's rail is asked for by `openNoteRail(<note id>, <session id>)`; a sub note
  * opens it with its own id, and its chats are those of the pair (root id, sub id).
  */
-function NoteRail({
+export function NoteRail({
   note,
   controller,
   noteDir,

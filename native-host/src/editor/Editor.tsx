@@ -434,7 +434,7 @@ function EditorBridge(props: EditorProps) {
       const currentRoot = editor.getRootElement();
       if (!currentRoot) return;
       const scroller =
-        currentRoot.closest(".doc-scroll, .page-scroll, .subnote-page") ||
+        currentRoot.closest(".doc-scroll, .page-scroll, .subnote-scroll") ||
         document.scrollingElement;
       const top = scroller?.getBoundingClientRect().top || 0;
       // 고정 패널 아래에 멈춘 제목도 "지금 보는 장"으로 치도록 기준선을 패널 높이만큼 내린다(최소 100px).
