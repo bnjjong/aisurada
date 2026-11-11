@@ -326,12 +326,12 @@ test("C198: 읽기 화면도 블록 안에서 줄을 넘는 서식을 편집기�
 test("목록 27번(13.4): 되돌리기를 막은 까닭은 첫 commit-vault의 답으로 표의 차례대로 가른다", () => {
   assert.equal(restoreReason(null), "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.");
   assert.equal(restoreReason({ outcome: "failed" }), "커밋이 실패했어요. 잠시 뒤 다시 해 주세요.");
-  assert.equal(restoreReason({ outcome: "disabled", blocked: "off" }), "자동 커밋이 꺼져 있거나 vault가 git 저장소가 아니에요.");
-  assert.equal(restoreReason({ outcome: "skipped", blocked: "index-lock" }), "vault의 git이 잠겨 있어요(.git/index.lock).");
-  assert.equal(restoreReason({ outcome: "skipped", blocked: "in-progress" }), "vault에서 git 병합이나 리베이스가 진행 중이에요.");
-  assert.equal(restoreReason({ outcome: "skipped", blocked: "not-main" }), "vault의 git이 main 브랜치에 있지 않아요.");
-  assert.equal(restoreReason({ outcome: "skipped" }), "vault에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.");
-  assert.equal(restoreReason({ outcome: "skipped", blocked: "off" }), "vault에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.");
+  assert.equal(restoreReason({ outcome: "disabled", blocked: "off" }), "자동 커밋이 꺼져 있거나 워크스페이스가 git 저장소가 아니에요.");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "index-lock" }), "워크스페이스의 git이 잠겨 있어요(.git/index.lock).");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "in-progress" }), "워크스페이스에서 git 병합이나 리베이스가 진행 중이에요.");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "not-main" }), "워크스페이스의 git이 main 브랜치에 있지 않아요.");
+  assert.equal(restoreReason({ outcome: "skipped" }), "워크스페이스에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.");
+  assert.equal(restoreReason({ outcome: "skipped", blocked: "off" }), "워크스페이스에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.");
 });
 test("목록 29번(12.1): 프로젝트가 0개면 접어 둔 「미분류」도 아젠다를 숨기지 않는다", () => {
   assert.equal(railGroupCollapsed(["(미분류)"], 0, "(미분류)"), false);

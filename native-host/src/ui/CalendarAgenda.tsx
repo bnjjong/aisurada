@@ -230,7 +230,7 @@ export function Calendar({
                         top: (minute(n.time) - start * 60) * SCALE,
                         left: `calc(55px + ${(lane * 90) / laneCount}%)`,
                         width: `calc(${90 / laneCount}% - 14px)`,
-                        height: CARD_HEIGHT,
+                        height: CARD_HEIGHT - 2,
                         transform:
                           dragged?.id === n.id
                             ? `translateY(${dragged.delta}px)`
