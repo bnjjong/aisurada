@@ -344,7 +344,7 @@ export function History({
                       {v.editedBy === "app"
                         ? "앱"
                         : v.editedBy === "tool"
-                          ? `Claude 세션${titles[asText(v.editedSessionId)] ? " 「" + titles[asText(v.editedSessionId)] + "」" : ""}`
+                          ? `${v.editedSessionAgent === "codex" ? "Codex" : v.editedSessionAgent === "gemini" ? "Gemini" : "Claude"} 세션${titles[asText(v.editedSessionId)] ? " 「" + titles[asText(v.editedSessionId)] + "」" : ""}`
                           : "쓴 쪽 모름"}{" "}
                       ·{" "}
                       {v.source === "auto"

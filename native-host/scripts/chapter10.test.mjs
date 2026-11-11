@@ -4,9 +4,28 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { SessionComposer, formatDroppedPaths, insertDropped, patchComposer, getSessionComposerState } from '../src/plugs/claude/session.tsx';
 import { AGENT_BUSY_NOTICE, LIVE_ELSEWHERE_NOTICE, planSessionShellWith } from '../src/plugs/claude/terminal.ts';
-import { COMPOSER_BLOCK_TEXT, composerBlock, pictureLines, sendToSession } from '../src/plugs/claude/sessionLogic.ts';
+import { COMPOSER_BLOCK_TEXT, agentLabel, composerBlock, normalizeReadSession, pictureLines, railPersona, resumeCommand, sendToSession } from '../src/plugs/claude/sessionLogic.ts';
 
 const ID = '3f2a9c4e-1b2d-4c3e-8f40-00000000a001';
+
+test('a session another CLI opened is read here, resumed there, and never sent to from this box', () => {
+  assert.equal(normalizeReadSession({ sessionId: ID, agent: 'codex', turns: [] }).agent, 'codex');
+  assert.equal(normalizeReadSession({ sessionId: ID, turns: [] }).agent, 'claude', 'the engine names no agent for Claude');
+  assert.equal(composerBlock(undefined, { done: true, file: '/x', agent: 'codex' }), 'other-agent');
+  assert.equal(composerBlock(undefined, { done: true, file: '/x', agent: 'claude' }), null, 'a claude session keeps its box');
+  assert.equal(composerBlock({ processAlive: true, kind: 'interactive' }, { done: true, file: '/x', agent: 'gemini' }), 'other-agent', 'the agent decides before the live row');
+  assert.match(COMPOSER_BLOCK_TEXT['other-agent'], /읽기만/);
+  assert.equal(resumeCommand('codex', ID), `codex resume ${ID}`);
+  assert.equal(resumeCommand('gemini', ID), `gemini --resume ${ID}`);
+  assert.equal(resumeCommand('claude', ID), `claude --resume ${ID}`);
+  assert.equal(resumeCommand(undefined, ID), `claude --resume ${ID}`);
+  assert.equal(agentLabel('codex'), 'Codex');
+  assert.equal(agentLabel(undefined), 'Claude Code');
+  const base = { heading: null, noteId: 'n1', sessionId: ID, hasBundle: true };
+  assert.match(railPersona({ ...base, agent: 'gemini' }), /Gemini CLI 세션/);
+  assert.equal(railPersona(base), railPersona({ ...base, agent: 'claude' }), 'the Claude text did not change');
+  assert.match(railPersona(base), /Claude Code 세션/);
+});
 
 test('10.1: the composer decision table', () => {
   assert.equal(composerBlock({ processAlive: true, kind: 'interactive' }, { done: false, file: undefined }), 'live-terminal');
@@ -114,6 +133,7 @@ function planHost(options = {}) {
     refresh: async () => {},
     rows: () => options.rows ?? [],
     firstCwd: async () => options.firstCwd ?? null,
+    ...(options.agent !== undefined ? { agentOf: async () => options.agent } : {}),
     release: async (v, id) => { calls.release.push([v, id]); return options.release ?? 'not_live'; },
     start: async (key, cols, rows, action) => { calls.start.push(action); return { fellBack: false }; },
   };
@@ -140,6 +160,17 @@ test('10.9: the shell plan for term:<session id>', async () => {
   await (await planSessionShellWith(held, `term:${ID}`, ID)).start(80, 24, () => {});
   assert.equal('cwd' in held.calls.start[0], false, 'an agent-held row gives no folder');
   assert.deepEqual(await planSessionShellWith(planHost({ release: 'busy' }), `term:${ID}`, ID), { kind: 'refuse', notice: AGENT_BUSY_NOTICE });
+  // Codex and Gemini sessions resume with their own CLI in their own first folder; Claude's live list and release do not apply.
+  const codex = planHost({ agent: 'codex', firstCwd: '/work/proj', rows: [{ sessionId: ID, processAlive: true, cwd: '/x' }] });
+  await (await planSessionShellWith(codex, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.deepEqual(codex.calls.start[0], { mode: 'resume', sessionId: ID, agent: 'codex', cwd: '/work/proj' });
+  assert.equal(codex.calls.release.length, 0, 'nothing of Claude is released for a codex session');
+  const gemini = planHost({ agent: 'gemini' });
+  await (await planSessionShellWith(gemini, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.deepEqual(gemini.calls.start[0], { mode: 'resume', sessionId: ID, agent: 'gemini' }, 'no folder key when none was read');
+  const claudeNamed = planHost({ agent: 'claude', firstCwd: '/first' });
+  await (await planSessionShellWith(claudeNamed, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.deepEqual(claudeNamed.calls.start[0], { mode: 'resume', sessionId: ID, cwd: '/first' }, 'a claude session keeps the old action, without an agent key');
   const noVault = planHost({ vault: null, rows: [{ sessionId: ID, cwd: '/row' }] });
   await (await planSessionShellWith(noVault, `term:${ID}`, ID)).start(80, 24, () => {});
   assert.equal(noVault.calls.release.length, 0, 'without a vault nothing is released');

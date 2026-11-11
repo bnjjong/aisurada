@@ -25,6 +25,11 @@ export interface PlanHost {
   refresh(vault: string | null): Promise<void>;
   rows(): Array<{ sessionId: string; processAlive?: boolean; heldByAgent?: boolean; id?: string; cwd: string }>;
   firstCwd(sessionId: string): Promise<string | null>;
+  /**
+   * The CLI that opened the session: `codex` or `gemini` when the engine found the transcript in that CLI's store,
+   * `null` for Claude and for a session that cannot be read. Optional so a host without it plans every session as Claude.
+   */
+  agentOf?(sessionId: string): Promise<string | null>;
   release(vault: string, sessionId: string): Promise<string | null>;
   start(key: string, cols: number, rows: number, action: Record<string, unknown>, onData: (bytes: Uint8Array) => void): Promise<{ fellBack: boolean }>;
 }
@@ -38,15 +43,28 @@ export interface PlanHost {
  * 5. Otherwise resume, with the first folder or the row's folder (none for an agent-held row).
  * 6. For a resume with a vault, `release_agent_session` is asked; `busy` refuses, anything else passes.
  * 7. The session shell.
+ *
+ * A session that Codex or Gemini opened has no row in Claude's live list and nothing of Claude's to release, so with a vault
+ * the engine names its agent, and the plan resumes it with that CLI in its own first folder.
  */
 export async function planSessionShellWith(host: PlanHost, tabId: string, sessionId?: string): Promise<SessionShellPlan> {
   if (!sessionId) return { kind: 'plain' };
   if (await host.alive(tabId).catch(() => false)) return { kind: 'plain' };
   const vault = await host.vault().catch(() => null);
   let firstCwd: string | null = null;
+  let agent: string | null = null;
   if (vault) {
-    const [, cwd] = await Promise.all([host.refresh(vault).catch(() => {}), host.firstCwd(sessionId).catch(() => null)]);
+    const [, cwd, found] = await Promise.all([
+      host.refresh(vault).catch(() => {}),
+      host.firstCwd(sessionId).catch(() => null),
+      host.agentOf ? host.agentOf(sessionId).catch(() => null) : Promise.resolve(null),
+    ]);
     firstCwd = cwd;
+    agent = found;
+  }
+  if (agent && agent !== 'claude') {
+    const other: Record<string, unknown> = { mode: 'resume', sessionId, agent, ...(firstCwd ? { cwd: firstCwd } : {}) };
+    return { kind: 'session', start: (cols, rows, onData) => host.start(tabId, cols, rows, other, onData) };
   }
   const row = host.rows().find((item) => item.sessionId === sessionId);
   let action: Record<string, unknown>;
@@ -74,6 +92,12 @@ const tauriPlanHost: PlanHost = {
     if (reply.status !== 0) return null;
     const cwd = JSON.parse(reply.stdout)?.sessions?.[0]?.cwd;
     return typeof cwd === 'string' && cwd ? cwd : null;
+  },
+  agentOf: async (sessionId) => {
+    const reply = await invoke<{ status: number; stdout: string }>('sidecar_call', { argv: ['session-titles', sessionId] });
+    if (reply.status !== 0) return null;
+    const agent = JSON.parse(reply.stdout)?.sessions?.[0]?.agent;
+    return typeof agent === 'string' && agent ? agent : null;
   },
   release: (vault, sessionId) => invoke<string>('release_agent_session', { vault, sessionId }).catch(() => null),
   start: (key, cols, rows, action, onData) => {

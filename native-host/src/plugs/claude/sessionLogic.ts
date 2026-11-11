@@ -12,6 +12,8 @@ import type { ClaudeSession } from './sessionTypes.ts';
 
 export interface ReadSessionView {
   sessionId: string;
+  /** The CLI that opened the session. The engine names it only for Codex and Gemini; no name is Claude. */
+  agent: string;
   /** `null` when this machine has no record of the session (7.9). */
   file: string | null;
   source: { bytes: number; lines: number; skipped: number; messages: number };
@@ -33,6 +35,7 @@ export function normalizeReadSession(raw: any): ReadSessionView {
   const state = raw?.runState && typeof raw.runState === 'object' ? raw.runState : null;
   return {
     sessionId: String(raw?.sessionId ?? ''),
+    agent: typeof raw?.agent === 'string' && raw.agent ? raw.agent : 'claude',
     file: typeof raw?.file === 'string' ? raw.file : null,
     source: { bytes: asCount(raw?.source?.bytes), lines: asCount(raw?.source?.lines), skipped: asCount(raw?.source?.skipped), messages: asCount(raw?.source?.messages) },
     hasMore: raw?.hasMore === true,
@@ -124,14 +127,16 @@ export function todoBarText(todos: Array<{ status: string }>): string {
 // 10.1: is the composer open
 // --------------------------------------------------------------------------
 
-export type ComposerBlock = 'live-terminal' | 'live-background' | 'no-record';
+export type ComposerBlock = 'live-terminal' | 'live-background' | 'no-record' | 'other-agent';
 
 /**
  * 10.1: a row that is alive and not held by an agent closes it (a background row by `live-background`, any other by
  * `live-terminal`); otherwise a read that finished with `file` null closes it as `no-record`; otherwise it is open.
  * Not knowing a thing opens it: no row, no pid, a list that could not be read, a conversation still being read.
  */
-export function composerBlock(row: Pick<ClaudeSession, 'processAlive' | 'heldByAgent' | 'kind'> | undefined, read: { done: boolean; file: string | null | undefined }): ComposerBlock | null {
+export function composerBlock(row: Pick<ClaudeSession, 'processAlive' | 'heldByAgent' | 'kind'> | undefined, read: { done: boolean; file: string | null | undefined; agent?: string }): ComposerBlock | null {
+  // A session another CLI opened is only read here; sending resumes it with Claude's command, which would start a different conversation.
+  if (read.agent && read.agent !== 'claude') return 'other-agent';
   if (row && row.processAlive === true && row.heldByAgent !== true) return row.kind === 'background' ? 'live-background' : 'live-terminal';
   if (read.done && read.file === null) return 'no-record';
   return null;
@@ -141,7 +146,22 @@ export const COMPOSER_BLOCK_TEXT: Record<ComposerBlock, string> = {
   'live-terminal': '이 세션은 다른 터미널에서 열려 있어요. 여기서도 보내면 대화가 둘로 갈라져서 입력창을 닫아 뒀어요. 그 터미널에서 claude 를 끝내고 돌아오면 여기서 이어 쓸 수 있어요.',
   'live-background': '이 세션은 백그라운드에서 돌고 있어요. 도는 동안에는 claude 가 이어 쓰기를 거절해서 입력창을 닫아 뒀어요. 끝나면 여기서 이어 쓸 수 있어요.',
   'no-record': '이 기계에 이 세션의 대화 기록이 없어서 이어 쓸 수 없어요.',
+  'other-agent': '이 세션은 Claude가 아닌 다른 CLI(Codex, Gemini)가 연 것이라 여기서는 읽기만 돼요. 이어 쓰려면 터미널에서 이어 가기 명령을 쓰세요.',
 };
+
+/** The names the screen shows for the CLI that opened a session. A missing or unknown name is Claude Code. */
+export function agentLabel(agent: string | null | undefined): string {
+  if (agent === 'codex') return 'Codex';
+  if (agent === 'gemini') return 'Gemini CLI';
+  return 'Claude Code';
+}
+
+/** The command that resumes a session in a terminal, by the CLI that opened it. */
+export function resumeCommand(agent: string | null | undefined, sessionId: string): string {
+  if (agent === 'codex') return `codex resume ${sessionId}`;
+  if (agent === 'gemini') return `gemini --resume ${sessionId}`;
+  return `claude --resume ${sessionId}`;
+}
 
 /** 10.6: the picture lines at the end of a sent text. */
 export function pictureLines(paths: string[]): string {
@@ -290,14 +310,14 @@ export function railHeading(markdown: string | undefined, format?: string): stri
 }
 
 /** 8.7: the rail chat's persona. The second line's end depends on whether the bundle has anything in it. */
-export function railPersona(input: { heading: string | null; noteId: string; subId?: string; sessionId: string; hasBundle: boolean }): string {
+export function railPersona(input: { heading: string | null; noteId: string; subId?: string; sessionId: string; hasBundle: boolean; agent?: string }): string {
   const place = input.subId ? `노트 ${input.noteId}의 하위 노트 ${input.subId}` : input.noteId;
   const name = input.heading ? `「${input.heading}」(${place})` : place;
   const read = input.subId ? `ais-cli get_sub_note '{"parent":"${input.noteId}","id":"${input.subId}"}'` : `ais-cli get_doc '{"id":"${input.noteId}"}'`;
   const update = input.subId ? 'ais-cli update_sub_note' : 'ais-cli update_doc';
   return [
     `너는 사용자의 aisurada 앱에서, 노트 옆 세션 레일로 질문을 받는다. 노트는 ${name}이다.`,
-    `이 대화는 Claude Code 세션 ${input.sessionId} 와 그 세션이 쓴 이 노트를 두고 묻는다. ${input.hasBundle ? '첫 물음 앞에 그 세션의 최근 대화가 실려 있다.' : '그 세션의 대화는 실리지 않았다.'}`,
+    `이 대화는 ${agentLabel(input.agent)} 세션 ${input.sessionId} 와 그 세션이 쓴 이 노트를 두고 묻는다. ${input.hasBundle ? '첫 물음 앞에 그 세션의 최근 대화가 실려 있다.' : '그 세션의 대화는 실리지 않았다.'}`,
     `노트 내용이 필요하면 \`${read}\` 로 읽는다. 노트를 고쳐 달라고 하면 그 응답의 precondition 값을 f1 으로 실어 \`${update}\` 로 고친다.`,
     '작업 폴더는 그 세션이 돌던 폴더다. 코드나 다른 파일을 고쳐 달라는 말이 없으면 노트 밖 파일은 고치지 않는다.',
   ].join('\n');

@@ -21,6 +21,7 @@ import {
   COMPOSER_BLOCK_TEXT,
   agentBarText,
   composerBlock,
+  resumeCommand,
   formatBytes,
   formatDuration,
   formatTurnTime,
@@ -295,6 +296,7 @@ export function SessionComposer({
   sessionItem,
   sessionLoaded,
   transcriptFile,
+  agent,
   vault,
   timeoutSeconds,
 }: {
@@ -302,6 +304,8 @@ export function SessionComposer({
   sessionItem: ClaudeSession | undefined;
   sessionLoaded: boolean;
   transcriptFile: string | null | undefined;
+  /** The CLI that opened the session (`claude` when the engine named none). */
+  agent?: string;
   vault: string;
   timeoutSeconds: () => number;
   /** Kept for the callers that still pass them. */
@@ -312,7 +316,7 @@ export function SessionComposer({
   const composer = useComposer(sessionId);
   const pictures = useAskImages({ hasNoteFolder: true, http: false });
   const input = useRef<HTMLTextAreaElement>(null);
-  const block: ComposerBlock | null = composerBlock(sessionItem, { done: sessionLoaded, file: transcriptFile });
+  const block: ComposerBlock | null = composerBlock(sessionItem, { done: sessionLoaded, file: transcriptFile, agent });
 
   // The picture strip lives in the store so it follows the session, not the box (10.2).
   useEffect(() => {
@@ -788,7 +792,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
           resume: prior.length > 0,
           timeoutSeconds,
           keepAlive: false,
-          persona: railPersona({ heading: railHeading(chat?.noteMarkdown, chat?.noteFormat), noteId, subId, sessionId, hasBundle: bundle !== '' }),
+          persona: railPersona({ heading: railHeading(chat?.noteMarkdown, chat?.noteFormat), noteId, subId, sessionId, hasBundle: bundle !== '', agent: read.view?.agent }),
           ...(cwd ? { cwd } : {}),
           ...(seed ? { seed } : {}),
         });
@@ -1172,9 +1176,9 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
               <button
                 type="button"
                 className="sess-page-resume"
-                title={`claude --resume ${sessionId}`}
+                title={resumeCommand(view?.agent, sessionId)}
                 onClick={() => {
-                  void navigator.clipboard?.writeText(`claude --resume ${sessionId}`);
+                  void navigator.clipboard?.writeText(resumeCommand(view?.agent, sessionId));
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1600);
                 }}
@@ -1247,6 +1251,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
             sessionItem={sessionItem}
             sessionLoaded={!read.loading && !read.error}
             transcriptFile={view?.file}
+            agent={view?.agent}
             vault={vault}
             timeoutSeconds={() => Number(state?.prefs?.askTimeoutSeconds) || 3600}
           />

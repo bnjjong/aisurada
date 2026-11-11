@@ -872,8 +872,9 @@ code.is-symbol { font-weight: 700; }
 .doc-meta-id-label { color: var(--muted); font-size: 10px; font-weight: 500; }
 .doc-meta-id-val { font-family: var(--font-mono); font-size: 10px; color: var(--ink); }
 .doc-meta-id button { border: 0 !important; background: transparent !important; padding: 3px 6px !important; font-size: 11px !important; border-radius: 3px !important; }
-.doc-meta-id-open { color: var(--accent) !important; cursor: pointer; }
-.doc-meta-id-open:hover { text-decoration: underline; }
+.doc-meta-id-open, .doc-meta-id-term { color: var(--accent) !important; cursor: pointer; }
+.doc-meta-id-open:hover, .doc-meta-id-term:hover { text-decoration: underline; }
+.doc-meta-id-agent { color: var(--accent); font-size: 10px; font-weight: 700; }
 .doc-meta-id-copy { color: var(--muted) !important; cursor: pointer; }
 .doc-meta-id-copy:hover { color: var(--ink) !important; }
 

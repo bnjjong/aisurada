@@ -302,6 +302,11 @@ export function NoteMeta({
                 go(controller, docAddress(note.id));
               }
             } : undefined}
+            onOpenTerminal={CLAUDE_ENABLED && controller.isNative() ? (sessId) => {
+              // 칩의 세션을 앱 터미널 탭에서 이어 연다. 이어 열기 명령은 세션을 연 CLI에 맞게 호스트가 고른다
+              if (mode === "preview") controller.showPreview(null);
+              go(controller, "/terminal/" + encodeURIComponent(sessId));
+            } : undefined}
           />
         </div>
       )}
@@ -949,12 +954,28 @@ function Comments({
   );
 }
 
-function NoteSessionChips({
+/** 노트의 sessionAgent 줄에서 읽은 CLI 이름. 줄이 없거나 claude면 null이다(Claude는 화면에 따로 밝히지 않는다). */
+function sessionAgentId(value: unknown): string | null {
+  const agent = asText(value)?.trim();
+  return agent && agent !== "claude" ? agent : null;
+}
+
+/** 칩에 보여 주는 CLI 이름. 모르는 CLI는 줄에 적힌 이름 그대로 보인다. */
+function sessionAgentLabel(agent: string): string {
+  if (agent === "codex") return "Codex";
+  if (agent === "gemini") return "Gemini CLI";
+  return agent;
+}
+
+/** 노트 상단 정보줄 아래의 세션 칩. 시험에서도 그려 보려고 내보낸다. */
+export function NoteSessionChips({
   note,
   onOpenRail,
+  onOpenTerminal,
 }: {
   note: Note;
   onOpenRail?: (sessionId: string) => void;
+  onOpenTerminal?: (sessionId: string) => void;
 }) {
   const createdSess = asText(note.sessionId)?.trim() || "";
   const editedSess = asText(note.editedSessionId)?.trim() || "";
@@ -965,21 +986,26 @@ function NoteSessionChips({
     role: "one" | "created" | "edited";
     label: string;
     id: string;
+    /** Claude가 아닌 CLI의 세션이면 그 id(codex, gemini …). Claude는 null. */
+    agent: string | null;
   };
 
+  const createdAgent = sessionAgentId(note.sessionAgent);
+  const editedAgent = sessionAgentId(note.editedSessionAgent);
   const chips: ChipInfo[] = [];
   if (createdSess && editedSess && createdSess !== editedSess) {
-    chips.push({ role: "created", label: "작성 세션", id: createdSess });
-    chips.push({ role: "edited", label: "편집 세션", id: editedSess });
+    chips.push({ role: "created", label: "작성 세션", id: createdSess, agent: createdAgent });
+    chips.push({ role: "edited", label: "편집 세션", id: editedSess, agent: editedAgent });
   } else {
+    // 같은 세션이면 만든 쪽 기록을 우선한다. 만든 세션 줄이 없을 때만 편집 쪽을 본다
     const singleId = editedSess || createdSess;
-    chips.push({ role: "one", label: "세션", id: singleId });
+    chips.push({ role: "one", label: "세션", id: singleId, agent: createdSess ? createdAgent : editedAgent });
   }
 
   return (
     <span className="doc-meta-sessions">
       {chips.map((chip) => (
-        <SessionChipItem key={chip.role + chip.id} chip={chip} onOpenRail={onOpenRail} />
+        <SessionChipItem key={chip.role + chip.id} chip={chip} onOpenRail={onOpenRail} onOpenTerminal={onOpenTerminal} />
       ))}
     </span>
   );
@@ -988,9 +1014,11 @@ function NoteSessionChips({
 function SessionChipItem({
   chip,
   onOpenRail,
+  onOpenTerminal,
 }: {
-  chip: { role: string; label: string; id: string };
+  chip: { role: string; label: string; id: string; agent: string | null };
   onOpenRail?: (sessionId: string) => void;
+  onOpenTerminal?: (sessionId: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -1001,9 +1029,20 @@ function SessionChipItem({
   };
 
   return (
-    <span className="doc-meta-id" data-session-role={chip.role}>
+    <span className="doc-meta-id" data-session-role={chip.role} data-session-agent={chip.agent ?? "claude"}>
+      {chip.agent && <span className="doc-meta-id-agent">{sessionAgentLabel(chip.agent)}</span>}
       <span className="doc-meta-id-label">{chip.label}</span>
       <span className="doc-meta-id-val">{chip.id}</span>
+      {onOpenTerminal && (
+        <button
+          type="button"
+          className="doc-meta-id-term"
+          title="앱 터미널 탭에서 이 세션을 이어 연다"
+          onClick={() => onOpenTerminal(chip.id)}
+        >
+          터미널
+        </button>
+      )}
       {onOpenRail && (
         <button
           type="button"
