@@ -93,8 +93,12 @@ input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius:
 .path-input button { flex-shrink: 0; font-size: 12px; padding: 8px 10px; }
 .button-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-size: 13px; padding: 13px; }
 .button-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(.95); }
-.btn-danger, button.btn-danger { background: var(--err); color: var(--err-ink, #ffffff) !important; border-color: var(--err); }
-.btn-danger:hover:not(:disabled), button.btn-danger:hover:not(:disabled) { background: var(--err); filter: brightness(.9); }
+/* 위험 단추: 빨간 바탕에 흰 글자(대비 5.5:1 이상). 스킨의 강조 단추 규칙(.button-primary)은 바탕을 강조색으로 칠해서,
+   어두운 테마에서는 흰 글자가 밝은 바탕에 묻힌다. 그래서 위험 단추는 .button-primary 와 함께 쓰지 않고 이 규칙만 쓴다. */
+.btn-danger, button.btn-danger { background: #c92a2a; color: #ffffff; border-color: #c92a2a; }
+.btn-danger:hover:not(:disabled), button.btn-danger:hover:not(:disabled) { background: #b02525; border-color: #b02525; color: #ffffff; }
+.btn-danger:active:not(:disabled), button.btn-danger:active:not(:disabled) { background: #a02020; border-color: #a02020; color: #ffffff; }
+.btn-danger:focus-visible { outline: 2px solid #c92a2a; outline-offset: 2px; }
 .recent-workspaces { border-top: 1px solid var(--line); padding-top: 22px; }
 .recent-workspaces h3 { font-size: 11px; color: var(--muted); font-weight: 500; margin: 0 0 14px; }
 .recent-workspaces ul { padding: 0; margin: 0; list-style: none; }

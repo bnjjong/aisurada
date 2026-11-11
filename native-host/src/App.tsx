@@ -101,7 +101,7 @@ function WorkspaceApp() {
           </ul>
           <footer>
             <button type="button" onClick={() => controller.dismissNoteCloseDialog()}>남겨 두기</button>
-            <button type="button" className="button-primary btn-danger" onClick={() => void controller.forceCloseNoteWindow()}>그래도 닫기</button>
+            <button type="button" className="btn-danger" onClick={() => void controller.forceCloseNoteWindow()}>그래도 닫기</button>
           </footer>
         </Modal>
       )}
