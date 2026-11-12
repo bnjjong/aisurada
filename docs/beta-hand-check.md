@@ -47,7 +47,7 @@ AISURADA_CLAUDE_BIN="$HC_DIR/fake-claude" \
 native-host/src-tauri/target/debug/bundle/macos/aisurada.app/Contents/MacOS/aisurada-host
 ```
 
-앱이 뜨면 「열기」로 `$HOME/ais-hand-check/vault`를 고르고, 아젠다 하나와 노트 하나를 만든다. 끝나면 `Ctrl-C`로 엔진과 앱을 내리고 `/bin/rm -rf "$HOME/ais-hand-check"`로 지운다. 확인은 `ls ~/Library/LaunchAgents | grep -i aisurada`가 비어 있는지로 한다.
+앱이 뜨면 위처럼 `HOME`을 가짜로 준 덕분에, 앱이 연 vault를 적는 `current-vault.json`도 `$HC_DIR/home` 아래에 생기고 진짜 파일은 그대로다. 같은 까닭으로 손 확인 중에 `claude-mcp`, `codex-mcp`, `gemini-mcp`의 `add`를 돌릴 때도 `HOME`을 가짜로 준다. 안 그러면 진짜 에이전트의 MCP 등록이 손 확인 환경으로 바뀐다(진짜 CLI는 `HOME` 아래 설정을 고친다). 앱이 뜨면 「열기」로 `$HOME/ais-hand-check/vault`를 고르고, 아젠다 하나와 노트 하나를 만든다. 끝나면 `Ctrl-C`로 엔진과 앱을 내리고 `/bin/rm -rf "$HOME/ais-hand-check"`로 지운다. 확인은 `ls ~/Library/LaunchAgents | grep -i aisurada`가 비어 있는지로 한다.
 
 > 이 방법의 엔진 기동과 앱 기동은 이 문서를 쓰면서 한 번 돌려 확인했다. 앱이 8초 뒤에도 떠 있었고 `ais-cli list-docs`가 소켓으로 답했으며 LaunchAgent는 생기지 않았다. 아래 점검 자체는 아직 아무도 하지 않았다.
 

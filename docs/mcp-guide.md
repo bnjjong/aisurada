@@ -13,11 +13,11 @@ MCP 서버는 앱에 든 `ais-cli`의 한 모드(`ais-cli mcp`)입니다. 별도
 | 내놓는 도구 | 읽기 전용 모드 13개, 쓰기 모드 28개 |
 | 기본값 | **읽기 전용.** 노트를 만들고 고치려면 연결할 때 쓰기를 따로 허용해야 합니다 |
 | 영구 삭제 | 어느 모드에서도 열지 않습니다(`purge_doc`). 휴지통 비우기는 앱에서 사람이 합니다 |
-| 다루는 범위 | 서버 하나가 vault 하나(`AISURADA_VAULT`)를 다룹니다 |
+| 다루는 범위 | 서버 하나가 한 번에 vault 하나를 다룹니다. vault는 **도구를 부를 때마다** 정합니다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 열어 둔 vault입니다(§2-4) |
 
 ## 2. 연결하기
 
-연결은 세 가지 길이 있고, 모두 같은 서버를 Claude에 등록합니다. 읽기만 허용하는 것이 기본이고, 쓰기를 허용하면 §3의 쓰기 도구까지 열립니다.
+연결은 세 가지 길이 있고, 모두 같은 서버를 Claude에 등록합니다. Codex와 Antigravity·Gemini CLI에는 같은 방식의 명령이 따로 있습니다(§2-5). 읽기만 허용하는 것이 기본이고, 쓰기를 허용하면 §3의 쓰기 도구까지 열립니다. 등록에는 vault 경로를 박지 않습니다.
 
 ### 2-1. 앱의 설정 화면
 
@@ -31,14 +31,13 @@ MCP 서버는 앱에 든 `ais-cli`의 한 모드(`ais-cli mcp`)입니다. 별도
 
 - **노트를 만들고 고치는 것도 허용**을 켜고 연결하면 쓰기 모드로 등록됩니다. 이미 연결돼 있으면 버튼이 **이 설정으로 다시 연결**로 바뀌고, 누르면 모드를 바꿔 끼웁니다.
 - **연결 끊기**를 누르면 등록을 지웁니다.
-- 연결은 지금 연 워크스페이스 하나에 묶입니다. 다른 워크스페이스에서 다시 연결하면 그쪽으로 바뀝니다.
+- 연결에는 워크스페이스가 박히지 않습니다. 서버가 도구를 부를 때마다 앱이 지금 연 워크스페이스를 읽으므로, 앱에서 워크스페이스를 바꾸면 에이전트가 따라갑니다. 다시 연결할 필요가 없습니다.
 - 4부(Claude 연동)를 끈 판에는 이 화면이 없습니다.
 - 같은 영역의 **Claude Desktop에 연결하려면**을 펴면 Claude Desktop용 설정 조각이 나옵니다(§2-3).
 
 ### 2-2. 터미널의 `ais-cli claude-mcp`
 
 ```bash
-export AISURADA_VAULT="/absolute/path/to/vault"
 ais-cli claude-mcp status          # 연결 여부와 모드
 ais-cli claude-mcp add             # 읽기 전용으로 연결
 ais-cli claude-mcp add --write     # 읽기+쓰기로 연결(이미 있으면 바꿔 끼움)
@@ -48,7 +47,9 @@ ais-cli claude-mcp remove          # 연결 끊기
 - Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부릅니다. 그래서 `claude` 명령(Claude Code)이 있어야 합니다. 못 찾으면 `AISURADA_CLAUDE_BIN`으로 자리를 알려 줍니다.
 - 등록되는 Java와 `ais-cli.jar`는 이 명령을 돌린 바로 그것입니다. 앱의 `bin/ais-cli`로 돌리면 앱에 든 것이 등록됩니다.
 - `status`의 출력 예: `{"claudeFound":true,"registered":false,"write":false,"detail":""}`
-- 종료 코드: 0은 성공, 1은 `claude`를 못 돌렸거나 실패, 2는 쓰는 법이나 환경이 틀린 것입니다. `--write`는 `add`와 `config`에서만 받습니다.
+- 종료 코드: 0은 성공, 1은 `claude`를 못 돌렸거나 실패, 2는 쓰는 법이 틀린 것입니다. `--write`는 `add`와 `config`에서만 받습니다.
+- 예전 판은 `AISURADA_VAULT`를 등록에 박았습니다. 그때 만든 등록은 `add`를 다시 하면 바뀝니다(앞의 등록을 지우고 새로 더합니다).
+- 앱이 vault를 연 적이 없고 `AISURADA_VAULT`도 없으면 `add`가 끝에 알림을 냅니다. 오류는 아니고, 앱을 열어 vault를 열면 도구가 그 vault를 씁니다.
 
 앱 안의 `ais-cli`를 터미널에서 쓰는 법은 앱의 **연동 가이드**나 [개발자 가이드](developer-guide.md)의 「앱에 든 `ais-cli`」를 봅니다.
 
@@ -60,7 +61,7 @@ ais-cli claude-mcp remove          # 연결 끊기
 {"mcpServers":{"aisurada":{"type":"stdio",
   "command":"<앱의 Java 경로>/bin/java",
   "args":["-jar","<앱 또는 dist>/ais-cli.jar","mcp"],
-  "env":{"AISURADA_VAULT":"/absolute/path/to/vault"}}}}
+  "env":{"AISURADA_SIDECAR_JAR":"<앱 또는 dist>/ais-sidecar.jar"}}}}
 ```
 
 쓰기를 허용하려면 `args` 끝에 `"--write"`를 더합니다. 다른 MCP 클라이언트도 같은 형태(`command`, `args`, `env`)를 받으면 붙일 수 있습니다.
@@ -68,13 +69,31 @@ ais-cli claude-mcp remove          # 연결 끊기
 - 등록에는 Java와 jar의 **절대 경로**가 들어갑니다. 앱을 옮기거나 지우면 연결이 끊기니 그때는 다시 연결합니다.
 - `AISURADA_SIDECAR_JAR`가 `env`에 같이 들어갈 수 있습니다. 엔진을 띄울 jar의 자리입니다.
 
-### 2-4. 어느 vault에 연결할까
+### 2-4. 어느 vault를 쓰나
 
-- **한 번에 vault 하나입니다.** 서버 이름이 `aisurada`로 고정이라 Claude에는 vault 하나만 연결됩니다. 다른 vault로 `add`하면 앞의 연결을 바꿔 끼웁니다.
-- **지금 노트를 쓰는 vault에 연결합니다.** 앱 설정의 연결 버튼은 지금 연 워크스페이스에, 터미널의 `ais-cli claude-mcp add`는 `AISURADA_VAULT`가 가리키는 폴더에 묶습니다. 앱과 같은 vault인지 확인하고 등록합니다. 여러 vault가 있으면 노트를 모으는 주 vault 하나만 연결하고, 쓰기를 허용할지는 §4를 보고 정합니다.
-- **어디에 묶였는지는 `claude mcp get aisurada`로 봅니다.** 출력의 `Environment`에 `AISURADA_VAULT=…`가 나옵니다(`ais-cli claude-mcp status`의 `detail`에도 같은 글이 들어 있습니다). 등록하지 않았으면 「No MCP server named "aisurada"」라고 나옵니다.
-- **연결한 뒤에는 새 Claude 세션을 엽니다.** 이미 떠 있던 세션은 새로 등록한 서버를 보지 못하고 「aisurada MCP가 연결돼 있지 않다」고 답할 수 있습니다.
+- **앱이 지금 연 vault를 씁니다.** 앱은 워크스페이스를 열 때마다 그 경로를 `~/Library/Application Support/aisurada/current-vault.json`에 적고, 서버와 `ais-cli`는 도구를 부를 때마다 그 파일을 읽습니다. 서버를 다시 띄우거나 다시 연결하지 않아도, 앱에서 워크스페이스를 바꾸면 다음 호출부터 새 vault를 씁니다.
+- **`AISURADA_VAULT`가 있으면 그것이 이깁니다.** 개발이나 손 확인처럼 특정 vault를 고정하고 싶을 때만 씁니다. 이 값은 등록에 자동으로 들어가지 않습니다. 필요하면 서버를 띄우는 환경에 직접 줍니다.
+- **vault를 못 정하면 도구가 실패합니다.** 환경변수도 없고 앱이 vault를 연 적도 없으면 `AIS-400 vault를 정하지 못했다…`가 나옵니다. 서버는 죽지 않습니다. 앱을 열어 vault를 열면 다음 호출부터 됩니다.
+- **격리된 앱은 진짜 포인터를 건드리지 않습니다.** 손 확인이나 시험이 가짜 HOME으로 앱을 띄우면 그 HOME 아래에 파일을 적습니다. 진짜 HOME의 파일은 진짜 앱만 고칩니다.
+- **어떻게 등록됐는지는 `claude mcp get aisurada`로 봅니다.** 출력의 `Environment`에 `AISURADA_VAULT=…`가 있으면 예전 판이 vault를 박은 등록입니다. 그 경로의 vault만 쓰니 `ais-cli claude-mcp add --write`로 다시 등록합니다(`ais-cli claude-mcp status`의 `detail`에도 같은 글이 들어 있습니다).
+- **연결한 뒤에는 새 Claude 세션을 엽니다.** 이미 떠 있던 세션은 새로 등록한 서버를 보지 못하고 「aisurada MCP가 연결돼 있지 않다」고 답할 수 있습니다. 같은 까닭으로, 등록을 바꾸기 전부터 떠 있던 서버는 옛 등록(박힌 vault)으로 계속 돕니다.
 - **시험용으로 직접 띄운 엔진에는 연결하지 않는 것을 권합니다.** 개발 중에 `AISURADA_SIDECAR_SOCKET`으로 엔진을 직접 띄워 쓰는 경우, 이 값은 등록에 자동으로 들어가지 않습니다. 그 엔진이 꺼진 채 도구를 부르면 서버가 엔진을 띄우려다 진짜 launchd에 등록을 시도할 수 있습니다(§7). 꼭 붙여야 하면 직접 등록(§2-3)의 `env`에 그 값을 넣습니다.
+
+### 2-5. Codex와 Antigravity·Gemini CLI
+
+```bash
+ais-cli codex-mcp status           # 연결 여부와 모드
+ais-cli codex-mcp add --write      # 읽기+쓰기로 연결(이미 있으면 바꿔 끼움)
+ais-cli codex-mcp remove
+ais-cli gemini-mcp status          # Antigravity(agy)나 Gemini CLI 가운데 먼저 찾은 것
+ais-cli gemini-mcp add --write
+ais-cli gemini-mcp remove
+```
+
+- `claude-mcp`와 같은 방식입니다. 설정 파일을 직접 고치지 않고 각 CLI의 등록 명령(`codex mcp add`, `agy mcp add`, `gemini mcp add -s user`)만 부릅니다. 등록에는 vault를 박지 않고, 등록되는 Java와 `ais-cli.jar`는 이 명령을 돌린 것(앱의 `bin/ais-cli`로 돌리면 앱에 든 것)입니다.
+- 실행 파일을 못 찾으면 `AISURADA_CODEX_BIN`, `AISURADA_GEMINI_BIN`(또는 `AISURADA_ANTIGRAVITY_BIN`)으로 자리를 알려 줍니다. Gemini 쪽은 `antigravity`, `agy`, `gemini` 차례로 찾고, `status`와 `add`의 응답에 어느 CLI를 썼는지(`cli`)가 들어 있습니다.
+- 두 CLI에서 이 서버로 만든 노트에 세션 ID를 남기는 법은 [개발자 가이드](developer-guide.md)의 「세션 에이전트 확장」을 봅니다.
+- 설정 화면의 연결 버튼은 Claude 것뿐입니다. Codex와 Gemini는 이 명령으로만 등록합니다.
 
 ## 3. 쓸 수 있는 기능
 
@@ -251,7 +270,8 @@ printf '%s\n' \
 | 연결했는데 도구가 안 보임 | `claude mcp get aisurada`(또는 `ais-cli claude-mcp status`)로 등록과 `✔ Connected`를 봅니다. 서버는 목록 변경 알림을 보내지 않으므로, 연결을 바꾼 뒤에는 Claude Code를 새 세션으로 엽니다(새 세션이 필요한지는 확인하지 못했습니다) |
 | 쓰기 도구가 없음 | 읽기 전용으로 연결된 것입니다. 설정의 **노트를 만들고 고치는 것도 허용**을 켜고 **이 설정으로 다시 연결**을 누르거나 `ais-cli claude-mcp add --write`를 합니다 |
 | 앱을 옮기거나 지운 뒤 끊김 | 등록에 든 Java와 jar의 절대 경로가 없어진 것입니다. 다시 연결합니다 |
-| 도구가 모두 실패함 | 서버를 `AISURADA_VAULT` 없이 띄운 것일 수 있습니다. 서버가 뜰 때 표준 오류에 「AISURADA_VAULT가 없어 도구 호출은 실패한다」를 냅니다. 서버는 죽지 않고, vault를 준 채 다시 연결하면 됩니다 |
+| 도구가 모두 실패함 | `AIS-400 vault를 정하지 못했다…`이면 `AISURADA_VAULT`도 없고 앱이 vault를 연 적도 없는 것입니다. 앱을 열어 vault를 열면 다음 호출부터 됩니다(서버는 죽지 않습니다). 서버가 뜰 때 표준 오류에도 같은 안내를 냅니다 |
+| 노트가 엉뚱한 vault에 생김 | 예전 판이 `AISURADA_VAULT`를 박은 등록일 수 있습니다. `claude mcp get aisurada`(Codex는 `codex mcp get aisurada`)의 `Environment`에 `AISURADA_VAULT`가 있으면 `ais-cli claude-mcp add --write`(`codex-mcp`, `gemini-mcp`도 같습니다)로 다시 등록합니다. 앱이 지금 연 vault는 `~/Library/Application Support/aisurada/current-vault.json`에 있습니다 |
 | 클라이언트가 곧 끊김 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊습니다. 새 출력은 `System.err`로 씁니다([개발자 가이드](developer-guide.md)의 자주 막히는 곳) |
 | `claude` 명령을 못 찾음 | Claude Code가 없거나 PATH 밖에 있습니다. `AISURADA_CLAUDE_BIN`에 실행 파일 자리를 줍니다 |
 

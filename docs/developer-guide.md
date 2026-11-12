@@ -133,6 +133,16 @@ test-native.sh         화면·호스트 시험 전체
 - **한계.** 세션 목록(프로젝트별 화면, `recent-sessions`)에는 Codex·Gemini 세션이 나오지 않는다. 노트 칩으로 들어간 세션 화면은 읽기 전용이고 입력창을 닫는다. Codex·Gemini 기록에서는 `author=`(작성 세션 대화를 묻기에 첨부)와 하위 에이전트·할 일 표시가 없다. `FrontmatterWriter`가 정해진 필드만 쓰는 구조라서, `sessionAgent`를 모르는 옛 빌드가 노트를 다시 쓰면 그 줄이 지워질 수 있다(옛 빌드로 직접 확인하지는 않았다).
 - **시험.** 엔진은 `AgentSessionTest`(파일 형식, 도장, 환경변수 해석, 두 CLI의 가짜 기록)와 `McpServerTest`의 `sessionFromMeta`, 화면은 `chapter10.test.mjs`와 `agent-session-chip.test.mjs`다. 실제 Codex·Gemini 기록은 읽기 전용으로 엔진 명령에 먹여 확인했다. 실제 앱 창에서 칩을 눌러 본 확인은 없다.
 
+### 앱이 연 vault (`current-vault.json`)
+
+에이전트의 MCP 서버를 등록할 때 `AISURADA_VAULT` 경로를 박아 넣으면, 손 확인이나 옛 설정의 vault가 그대로 남아 노트가 앱과 다른 vault에 쓰인다. 그래서 등록에는 vault를 박지 않고, 앱이 연 vault를 파일에 적어 둔다.
+
+- **쓰는 쪽.** 호스트(`workspace.rs`의 `allow_workspace`)가 워크스페이스를 열 때마다 `~/Library/Application Support/aisurada/current-vault.json`에 `{"vault":"<경로>","updatedAt":<ms>}`를 적는다(임시 파일에 쓰고 이름을 바꾼다). 못 적어도 vault 열기는 막지 않는다. 호스트 시험은 진짜 HOME의 파일을 덮어쓰지 않게 이 쓰기를 건너뛴다(`cfg!(test)`).
+- **읽는 쪽.** `VaultPointer.resolve`가 `ais-cli`(`AisCliMain`, `DoctorCommand`, `SweepCommand`)와 MCP 서버에서 호출마다 읽는다. 환경변수가 비지 않았으면 그것이 이기고, 없으면 파일이다. 둘 다 없으면 `AIS-400 vault를 정하지 못했다…`다. 파일이 망가졌거나 절대 경로가 아니면 없는 것으로 본다.
+- **엔진은 그대로다.** 엔진(`serve`)은 여전히 `AISURADA_VAULT`가 필수이고 launchd 항목의 환경에 vault를 싣는다. 바뀐 것은 클라이언트가 vault를 정하는 길뿐이다.
+- **격리.** 파일은 HOME 아래라서 가짜 HOME으로 띄운 앱(손 확인, 받아들임 점검, 번들 검증)은 자기 HOME에 적고 진짜 파일을 안 건드린다.
+- **한계.** 앱을 한 번도 안 열었으면 파일이 없다. 앱을 끄고 다른 vault로 `AISURADA_VAULT`를 준 `ais-cli`를 돌려도 파일은 그대로다(앱이 마지막으로 연 vault).
+
 ### 두 가지 모양
 
 - **단발 모드**: `java -jar dist/ais-engine.jar <명령> [인자...]` 명령 1개를 처리하고 끝난다.
@@ -235,9 +245,9 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 - **도구.** 이름은 엔진 도구 29개와 같다. 기본은 읽기 13개만 내놓고 `--write`를 주면 28개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`runEnginePipeline`: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 `System.exit`을 부르는데, `AisCliMain`의 종료 호출은 모두 `exit()` 하나를 거친다. mcp 모드에서만 `exit()`이 프로세스를 끝내는 대신 `CliExit`을 던지고, 그 호출만 `isError`로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.
-- **vault.** `AISURADA_VAULT` 하나다. 서버 하나가 vault 하나를 맡는다.
+- **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(아래 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
 - **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 29개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
-- **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`ClaudeMcpCommand`)가 Claude Code에 서버를 등록한다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.
+- **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`ClaudeMcpCommand`)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 `codex-mcp`, `gemini-mcp`(`AgentMcpCommand`)가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다(`McpRegistration`). CLI마다 `--` 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 java 경로 뒤) 인자 모양은 `AgentMcpCommandTest`가 가짜 CLI로 못 박고, 진짜 CLI로는 임시 HOME에서 확인했다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.
 
 시험은 `bash test.sh`에 들어 있다. `McpServerTest`는 스키마 대조, 노출 규칙, 가짜 호출기로 프로토콜, 진짜 엔진과 진짜 `mcp` 프로세스의 왕복(읽기·쓰기·낡은 `f1` 거절·휴지통·영구 삭제 거절·vault 없는 환경에서도 서버가 사는지)을 잰다. `ClaudeMcpCommandTest`는 등록 상태를 파일에 두는 가짜 `claude`로 `status`·`add`·`remove`·`config`를 잰다.
 
