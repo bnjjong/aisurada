@@ -105,6 +105,22 @@ java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=
 
 자세한 것은 [21장 완료 노트](docs/rebuild-p1-chapter21-complete.md)에 있습니다.
 
+## 프로젝트 자원: 스킬과 에이전트 정의 (확장)
+
+외부 설명서에 없는 확장입니다. 프로젝트에서 AI에게 작업을 시키기 위한 바탕으로, 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의(마크다운 파일 하나)를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 **ID(`sk…`, `ap…`)로 참조**해야 쓸 수 있고, 참조하지 않은 것은 쓰지 않습니다. 명령은 명령 표면에만 있습니다.
+
+```bash
+java -jar dist/ais-engine.jar save-resource kind=skill scope=global 'name=번역 검수' 'description=번역을 검수한다' 'body=# 지침' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar save-resource kind=agent scope=global 'name=코드 리뷰어' 'description=코드를 리뷰한다' permission=edit 'skills=["<스킬 id>"]' --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar set-resource-ref <프로젝트 slug> <글로벌 자원 id> with-skills=true --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar usable-resources <프로젝트 slug> --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list-resources scope=global --aisurada.vault=/path/to/vault
+```
+
+- 명령 8개: `list-resources`, `get-resource`, `save-resource`, `delete-resource`, `restore-resource`, `set-resource-ref`, `usable-resources`, `list-resource-versions`.
+- 파일은 `.aisurada/resources/` 아래에만 있어서 노트와 기존 명령을 건드리지 않습니다. 고칠 때는 노트처럼 직전에 읽은 `f1` 토큰이 필요하고, 고치기 전의 판은 30판까지 남습니다.
+- 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「프로젝트 자원: 스킬과 에이전트 정의」에 있습니다.
+
 ## 22장 사실층
 
 명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.aisurada/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
