@@ -11,7 +11,7 @@ import {
 } from '../src/ui/githubStore.ts';
 import { GithubConnectView } from '../src/ui/GithubConnect.tsx';
 import { RepoListEditor, cloneLine } from '../src/ui/RepoListEditor.tsx';
-import { RepoGuideFlow, cloneFolderText } from '../src/ui/RepoGuide.tsx';
+import { GUIDE_STEPS, RepoGuideScene, cloneFolderText } from '../src/ui/RepoGuide.tsx';
 import { AgendaRepoLabel } from '../src/ui/AgendaRepoLabel.tsx';
 import { matchAgenda } from '../src/plugs/claude/projects.tsx';
 
@@ -300,9 +300,26 @@ test('the guide link sits in the repo editor (the popup itself is a portal, so i
   assert.doesNotMatch(html, /프로젝트 저장소 안내/, 'closed until it is clicked');
 });
 
-test('the guide figure draws the three steps with an accessible description', () => {
-  const html = renderToStaticMarkup(React.createElement(RepoGuideFlow));
-  assert.match(html, /role="img"/);
-  for (const word of ['프로젝트', '저장소 목록', '아젠다', '그중 하나를 고름', '세션 묶기 · 화면 표시']) assert.ok(html.includes(word), word);
-  assert.doesNotMatch(html, /<script|<style|foreignObject/);
+const GUIDE_WORDS = [
+  ['프로젝트', '저장소 목록', '아젠다', '고름', '자동 묶임', 'Claude Code', '앞으로: 앱 안 개발'],
+  ['내 컴퓨터 폴더', '그대로 사용', '복사 안 함', 'GitHub 저장소', '앱이 받아 둠', 'GitHub 연결 필요', '앱 전용 폴더'],
+  ['개인 키는 키체인에만', '읽기와 받기만 해요', '올리기·수정은 아직 없어요', '빼도 폴더는 그대로', '목록은 노트 폴더에'],
+];
+
+test('the guide is three pictures, each with a one-line title and caption (text stays short on purpose)', () => {
+  assert.deepEqual(GUIDE_STEPS.map((s) => s.id), ['why', 'how', 'safe']);
+  for (const step of GUIDE_STEPS) {
+    assert.ok(step.title.length <= 20, `title too long: ${step.title}`);
+    assert.ok(step.caption.length <= 40, `caption too long: ${step.caption}`);
+  }
+});
+
+test('each guide picture carries its labels and an accessible description, and nothing active', () => {
+  GUIDE_WORDS.forEach((words, step) => {
+    const html = renderToStaticMarkup(React.createElement(RepoGuideScene, { step }));
+    assert.match(html, /role="img" aria-label="[^"]{30,}"/, `step ${step} needs a spoken description`);
+    for (const word of words) assert.ok(html.includes(word), `step ${step}: ${word}`);
+    assert.doesNotMatch(html, /<script|<style|foreignObject/);
+  });
+  assert.equal(renderToStaticMarkup(React.createElement(RepoGuideScene, { step: 99 })), renderToStaticMarkup(React.createElement(RepoGuideScene, { step: 0 })), 'out of range falls back to the first picture');
 });

@@ -1284,16 +1284,39 @@ code.is-symbol { font-weight: 700; }
 .repo-picker { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; }
 .repo-picker-head { display: flex; align-items: center; gap: 8px; }
 .repo-picker-head input { flex: 1; min-width: 0; }
-.repo-guide { width: 560px; max-width: calc(100vw - 24px); }
-.repo-guide-body { display: grid; gap: 18px; padding: 8px 24px 24px; font-size: 13px; line-height: 1.75; }
-.repo-guide-body p, .repo-guide-body ul, .repo-guide-body h3 { margin: 0; }
-.repo-guide-body h3 { margin-bottom: 6px; font-size: 14px; }
-.repo-guide-body ul { display: grid; gap: 6px; padding-left: 18px; }
-.repo-guide-body code { font-size: 12px; word-break: break-all; }
-.repo-guide-figure { margin: 0; padding: 14px 12px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
-.repo-guide-figure svg { display: block; width: 100%; height: auto; }
-.repo-guide-figure figcaption { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--muted); }
-.repo-guide-actions { display: flex; justify-content: flex-end; }
+.repo-guide { width: 600px; max-width: calc(100vw - 24px); }
+.repo-guide-body { display: grid; gap: 14px; padding: 4px 24px 22px; }
+.repo-guide-title { margin: 0; font-size: 17px; font-weight: 650; text-align: center; }
+.repo-guide-scene { padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--soft); }
+.repo-guide-scene svg { display: block; width: 100%; height: auto; }
+.repo-guide-caption { margin: 0; font-size: 13px; line-height: 1.7; text-align: center; color: var(--muted); }
+.repo-guide-status { align-self: center; justify-self: center; margin: 0; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--warn-bg); color: var(--warn); }
+.repo-guide-status-ok { background: var(--ok-bg); color: var(--ok); }
+.repo-guide-note { margin: 0; font-size: 11px; line-height: 1.6; text-align: center; color: var(--muted); word-break: break-all; }
+.repo-guide-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.repo-guide-dots { display: flex; align-items: center; gap: 8px; }
+.repo-guide .repo-guide-dot { width: 8px; min-width: 0; height: 8px; padding: 0; border: 0; border-radius: 999px; background: var(--line); box-shadow: none; transition: width .15s; }
+.repo-guide .repo-guide-dot[aria-current="step"] { width: 22px; background: var(--accent); }
+/* 안내 그림(.rg): 색은 모두 앱의 색 변수에서 와서 화면 모양(스킨)과 어두운 모드를 따른다. */
+.rg .rg-card { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.rg .rg-chip { fill: var(--soft); stroke: var(--line); stroke-width: 1.2; }
+.rg .rg-chip-on { fill: color-mix(in srgb, var(--accent) 14%, var(--surface)); stroke: var(--accent); stroke-width: 1.6; }
+.rg .rg-dash { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3; opacity: .7; }
+.rg .rg-line { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rg .rg-line * { vector-effect: non-scaling-stroke; }
+.rg .rg-line-accent { stroke: var(--accent); }
+.rg .rg-line-soft { stroke: var(--muted); stroke-width: 1.2; opacity: .7; }
+.rg .rg-fill { fill: var(--ink); }
+.rg .rg-t { fill: var(--ink); font-size: 14px; font-weight: 600; }
+.rg .rg-s { fill: var(--muted); font-size: 11px; }
+.rg .rg-app { fill: var(--accent); }
+.rg .rg-app-t { fill: var(--accent-ink); }
+.rg .rg-pill { fill: var(--warn-bg); stroke: var(--warn); stroke-width: 1; }
+.rg .rg-pill-ok { fill: var(--ok-bg); stroke: var(--ok); }
+.rg .rg-pill-t { fill: var(--warn); font-size: 11px; font-weight: 600; }
+.rg .rg-pill-ok-t { fill: var(--ok); }
+.rg .rg-ok-fill { fill: var(--ok); }
+.rg .rg-check { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .repo-picker p { margin: 0; font-size: 12px; color: var(--muted); }
 .repo-picker ul { display: grid; gap: 2px; max-height: 160px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
 .repo-picker li button { width: 100%; text-align: left; background: transparent; box-shadow: none; border-color: transparent; border-radius: 8px; }
