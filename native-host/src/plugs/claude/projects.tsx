@@ -4,6 +4,8 @@ import type { WorkspaceController } from "../../workspace/controller.ts";
 import type { WorkspaceState, Agenda, Row } from "../../workspace/types.ts";
 import { asText } from "../../workspace/types.ts";
 import { HUE_COLORS, railAgendaOrder } from "../../ui/model.ts";
+import { agendaRepoView } from "../../ui/repoLinks.ts";
+import { useGithub } from "../../ui/githubStore.ts";
 
 import type { ClaudeSession } from './sessionTypes.ts';
 export type { ClaudeSession };
@@ -332,13 +334,17 @@ function stripTrailingSlashes(path: string): string {
  * cwd starts with `<repo>/`. An agenda with no repo, or a repo that is nothing but slashes, is not looked at. The longest repo
  * wins; on equal length the agenda earlier in the rail's order wins. Case is not folded and spaces are not trimmed.
  */
-export function matchAgenda(sessionCwd: string, orderedAgendas: Agenda[]): Agenda | null {
+export function matchAgenda(
+  sessionCwd: string,
+  orderedAgendas: Agenda[],
+  repoOf: (agenda: Agenda) => string | undefined = (a) => asText(a.repo),
+): Agenda | null {
   const cwd = stripTrailingSlashes(sessionCwd);
   let bestMatch: Agenda | null = null;
   let bestLen = -1;
 
   for (const a of orderedAgendas) {
-    const rawRepo = asText(a.repo);
+    const rawRepo = repoOf(a) ?? "";
     if (!rawRepo) continue;
     const repo = stripTrailingSlashes(rawRepo);
     if (!repo) continue;
@@ -378,6 +384,7 @@ export function RailProjects({
   state?: WorkspaceState;
 }): React.JSX.Element {
   const store = useSessionStore();
+  const github = useGithub();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedOlder, setExpandedOlder] = useState<Record<string, boolean>>({});
 
@@ -415,8 +422,11 @@ export function RailProjects({
   const agendaSessionsMap = new Map<string, ClaudeSession[]>();
   const unmatchedSessions: ClaudeSession[] = [];
 
+  // 아젠다가 프로젝트의 저장소(projectRepo)를 가리키면 그 폴더로, 아니면 옛 repo 글로 붙인다.
+  const cloneRoot = github.status?.cloneRoot;
+  const repoOf = (a: Agenda) => agendaRepoView(a, projects, cloneRoot).path;
   for (const s of store.sessions) {
-    const matched = matchAgenda(s.cwd, agendas);
+    const matched = matchAgenda(s.cwd, agendas, repoOf);
     if (matched) {
       const list = agendaSessionsMap.get(matched.id) || [];
       list.push(s);

@@ -15,6 +15,7 @@ import { NoteReading } from "../navigation/NoteReading.tsx";
 import { Confirm, Modal } from "./Modal.tsx";
 import { Icon } from "./Icon.tsx";
 import { DiffTable } from "./History.tsx";
+import { AgendaRepoLabel } from "./AgendaRepoLabel.tsx";
 export const addDays = (date: string, n: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
@@ -638,7 +639,9 @@ export function AgendaPage({
             <Icon name="plus" />
           </button>
         </div>
-        <p>{asText(agenda.repo)}</p>
+        <p>
+          <AgendaRepoLabel agenda={agenda} projects={ws.projects} />
+        </p>
         <p>{asText(agenda.summary)}</p>
         <div className="agenda-sort">
           <div className="ag-seg" role="group" aria-label="아젠다 정렬">
@@ -776,7 +779,8 @@ export function AgendaPage({
         <section className="agenda-overview page-scroll">
           <h2>{agenda.title}</h2>
           <p>
-            {asText(agenda.repo)} · 노트 {notes.length}개
+            <AgendaRepoLabel agenda={agenda} projects={ws.projects} /> · 노트{" "}
+            {notes.length}개
           </p>
           <p>{asText(agenda.summary)}</p>
           {!ws.sample && (

@@ -14,6 +14,7 @@ import { Modal } from './ui/Modal.tsx';
 import { BrandMark } from './ui/BrandMark.tsx';
 import type { BrandState } from './ui/BrandMark.tsx';
 import { formatRelativeTime } from './ui/dates.ts';
+import { refreshGithub } from './ui/githubStore.ts';
 
 // Window identity is decided once, before any internal navigation.
 const context = windowContext(window.location.pathname);
@@ -63,6 +64,8 @@ function WorkspaceApp() {
   }, [controller]);
   useEffect(() => { document.documentElement.dataset.theme = state.theme; }, [state.theme]);
   useEffect(() => { document.documentElement.dataset.skin = state.skin; }, [state.skin]);
+  // 아젠다의 저장소 폴더(GitHub 전용 항목은 앱이 받는 자리)를 풀려면 연결 상태가 필요하다. 호스트가 있을 때만 묻는다.
+  useEffect(() => { if (controller.isNative()) void refreshGithub(controller.callHost); }, [controller]);
   if (state.booting) return <main className="status-screen" role="status"><Brand state="thinking" />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
   if (state.fatal) {

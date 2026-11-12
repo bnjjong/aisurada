@@ -5,6 +5,18 @@ import { asText } from "../workspace/types.ts";
 import { Modal, Confirm } from "./Modal.tsx";
 import { Editor } from "../editor/Editor.tsx";
 import { TYPES, TYPE_NAMES, agendaRepoField } from "./model.ts";
+import { RepoListEditor } from "./RepoListEditor.tsx";
+import { cloneRepo, cloneSummary } from "./githubStore.ts";
+import {
+  cleanRepos,
+  entriesToClone,
+  parseRepos,
+  projectRepoField,
+  repoLabel,
+  reposField,
+  sameRepos,
+  validateRepos,
+} from "./repoLinks.ts";
 export const EMPTY_TEMPLATE =
   "# [제목]\n\n한 줄 요약을 적어요.\n\n## 핵심 내용\n- 첫 번째 항목\n";
 const HUES = [
@@ -289,18 +301,24 @@ function EntityForm({
     ),
     [project, setProject] = useState(initial || asText(old?.project)),
     [repo, setRepo] = useState(asText(old?.repo)),
+    [projectRepo, setProjectRepo] = useState(asText(old?.projectRepo)),
+    [repos, setRepos] = useState(() => parseRepos(old?.repos)),
     [summary, setSummary] = useState(asText(old?.summary)),
     [error, setError] = useState(""),
     [confirm, setConfirm] = useState(false),
     [confirmDiscard, setConfirmDiscard] = useState(false),
     [busy, setBusy] = useState(false);
+  // 아젠다가 고를 수 있는 저장소: 고른 프로젝트가 가진 항목들
+  const projectRepos = parseRepos(ws.projects.find((p) => p.slug === project)?.repos);
   const isDirty = Boolean(
     id
       ? title !== asText(old?.title) ||
         summary !== asText(old?.summary) ||
         repo !== asText(old?.repo) ||
+        projectRepo !== asText(old?.projectRepo) ||
+        (kind === "project" && !sameRepos(parseRepos(old?.repos), repos)) ||
         project !== (initial || asText(old?.project))
-      : title.trim() || summary.trim() || repo.trim(),
+      : title.trim() || summary.trim() || repo.trim() || cleanRepos(repos).length > 0,
   );
   const handleClose = () => {
     if (isDirty) setConfirmDiscard(true);
@@ -316,6 +334,10 @@ function EntityForm({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          // 엔진이 거절할 저장소 값은 보내기 전에 알려 준다.
+          const problem = kind === "project" ? validateRepos(repos) : null;
+          if (problem) return setError(problem);
+          setError("");
           setBusy(true);
           const r = await controller.data.saveEntity(
             kind,
@@ -329,14 +351,27 @@ function EntityForm({
                     ...(!id || project !== asText(old?.project)
                       ? { project }
                       : {}),
+                    ...projectRepoField(
+                      asText(old?.projectRepo),
+                      projectRepo,
+                      !id,
+                    ),
                   }
-                : {}),
+                : reposField(old?.repos, repos, !id)),
             },
             id,
           );
           setBusy(false);
           if (r.ok) {
             controller.form(null);
+            if (kind === "project") {
+              // 폴더 없이 GitHub만 적은 새 항목은 앱이 받아 둔다. 끝나면 결과를 알린다(실패 이유 포함).
+              for (const entry of entriesToClone(repos, parseRepos(old?.repos))) {
+                void cloneRepo(controller.callHost, entry.github!).then((result) =>
+                  controller.notify(cloneSummary(entry.github!, result)),
+                );
+              }
+            }
             if (kind === "agenda" && !id)
               controller.navigate(
                 "/agenda/" + encodeURIComponent(asText(r.value?.id)),
@@ -377,7 +412,15 @@ function EntityForm({
                 프로젝트
                 <select
                   value={project}
-                  onChange={(e) => setProject(e.target.value)}
+                  onChange={(e) => {
+                    setProject(e.target.value);
+                    // 다른 프로젝트의 저장소 이름은 뜻이 없다. 처음 프로젝트로 돌아오면 원래 고른 것을 되살린다.
+                    setProjectRepo(
+                      e.target.value === asText(old?.project)
+                        ? asText(old?.projectRepo)
+                        : "",
+                    );
+                  }}
                 >
                   <option value="">미분류</option>
                   {project && !ws.projects.some((p) => p.slug === project) && (
@@ -391,11 +434,39 @@ function EntityForm({
                 </select>
               </label>
             )}
-            <label>
-              저장소
-              <input value={repo} onChange={(e) => setRepo(e.target.value)} />
-            </label>
+            {!!projectRepos.length && (
+              <label>
+                프로젝트 저장소
+                <select
+                  aria-label="프로젝트 저장소"
+                  value={projectRepo}
+                  onChange={(e) => setProjectRepo(e.target.value)}
+                >
+                  <option value="">정하지 않음</option>
+                  {projectRepo &&
+                    !projectRepos.some((r) => r.name === projectRepo) && (
+                      <option value={projectRepo}>
+                        {projectRepo} (프로젝트에 없음)
+                      </option>
+                    )}
+                  {projectRepos.map((r) => (
+                    <option key={r.name} value={r.name}>
+                      {repoLabel(r)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {!projectRepo && (
+              <label>
+                저장소
+                <input value={repo} onChange={(e) => setRepo(e.target.value)} />
+              </label>
+            )}
           </>
+        )}
+        {kind === "project" && (
+          <RepoListEditor entries={repos} onChange={setRepos} host={controller} />
         )}
         <label>
           설명
