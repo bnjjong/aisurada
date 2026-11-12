@@ -8,7 +8,6 @@ import { CLAUDE_ENABLED, waitingAnswers, unsavedAnswers } from '@claude-plug/sta
 import { planSessionShell } from '@claude-plug/terminal';
 import { NoteAskFrame, EditorAskPlugins, AskComposePopover, AskHoverCard } from '@claude-plug/ask';
 import { NoteSessionRail, SessionRoute } from '@claude-plug/session';
-import { RailProjects } from '@claude-plug/projects';
 import { createHeadlessEditor } from '@lexical/headless';
 import { EDITOR_NODES, $importDocument, $exportDocument } from '../src/editor/markdown.ts';
 import { OPEN_ASK_COMMAND } from '../src/editor/tools.tsx';
@@ -221,8 +220,6 @@ test('Chapter 17: Plugs stub exports in Part 4-free build', async () => {
   assert.equal(NoteSessionRail(), null);
   assert.ok(SessionRoute());
 
-  // 5. projects
-  assert.equal(RailProjects(), null);
 });
 
 test('Chapter 17: Q&A marker wrap with turnId and OPEN_ASK_COMMAND', () => {

@@ -9,7 +9,7 @@ import { AskContext } from '../src/plugs/claude/askContext.ts';
 import { EditorAskPlugins } from '../src/plugs/claude/ask.tsx';
 import { AskHoverCard } from '../src/plugs/claude/askHoverCard.tsx';
 import { tauriAskHost } from '../src/plugs/claude/askHost.ts';
-import { refreshSessions } from '../src/plugs/claude/projects.tsx';
+import { refreshSessions } from '../src/plugs/claude/sessionStore.ts';
 
 const assert = (value: unknown, why: string) => { if (!value) throw Error(why); };
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));

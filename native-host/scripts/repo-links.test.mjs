@@ -13,7 +13,6 @@ import { GithubConnectView } from '../src/ui/GithubConnect.tsx';
 import { RepoListEditor, cloneLine } from '../src/ui/RepoListEditor.tsx';
 import { GUIDE_STEPS, RepoGuideScene, cloneFolderText } from '../src/ui/RepoGuide.tsx';
 import { AgendaRepoLabel } from '../src/ui/AgendaRepoLabel.tsx';
-import { matchAgenda } from '../src/plugs/claude/projects.tsx';
 
 const CLONE_ROOT = '/Users/me/Library/Application Support/aisurada/repos';
 
@@ -109,20 +108,6 @@ test('agendaRepoView follows projectRepo into the project, falls back to the old
   const none = agendaRepoView({ project: '' }, projects);
   assert.deepEqual([none.path, none.label], [undefined, '']);
   assert.equal(repoLabel({ name: 'x', github: 'a/b' }), 'x · a/b');
-});
-
-// ---------------------------------------------------------------------------
-// 세션 붙이기: matchAgenda가 저장소 폴더를 풀어 쓴다
-// ---------------------------------------------------------------------------
-
-test('matchAgenda keeps its two-argument behaviour and takes a resolver for project repos', () => {
-  const a = { id: 'a', slug: 'a', title: 'a', project: 'platform', projectRepo: 'app' };
-  const b = { id: 'b', slug: 'b', title: 'b', repo: '/old/b' };
-  assert.equal(matchAgenda('/old/b/src', [a, b]).id, 'b', 'default resolver reads the old repo text');
-  assert.equal(matchAgenda('/work/app/src', [a, b]), null, 'without a resolver a projectRepo agenda has no folder');
-  const repoOf = (agenda) => agendaRepoView(agenda, projects, CLONE_ROOT).path;
-  assert.equal(matchAgenda('/work/app/src', [a, b], repoOf).id, 'a');
-  assert.equal(matchAgenda('/old/b', [a, b], repoOf).id, 'b');
 });
 
 // ---------------------------------------------------------------------------
@@ -301,7 +286,7 @@ test('the guide link sits in the repo editor (the popup itself is a portal, so i
 });
 
 const GUIDE_WORDS = [
-  ['프로젝트', '저장소 목록', '아젠다', '고름', '자동 묶임', 'Claude Code', '앞으로: 앱 안 개발'],
+  ['프로젝트', '저장소 목록', '아젠다', '고름', '아젠다 화면', 'app · ~/app', '앞으로', '앱 안에서 개발'],
   ['내 컴퓨터 폴더', '그대로 사용', '복사 안 함', 'GitHub 저장소', '앱이 받아 둠', 'GitHub 연결 필요', '앱 전용 폴더'],
   ['개인 키는 키체인에만', '읽기와 받기만 해요', '올리기·수정은 아직 없어요', '빼도 폴더는 그대로', '목록은 노트 폴더에'],
 ];

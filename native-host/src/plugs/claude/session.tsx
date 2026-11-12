@@ -16,7 +16,7 @@ import { writePictures } from './askRun.ts';
 import { ASK_EFFORTS, ASK_MODELS, MAX_IMAGES, defaultEffortForModel, humanizeAskError, isGeminiModel, modelLabel, normalizeEffort, normalizeModel, randomUuid } from './askText.ts';
 import { ModelProse } from './modelProse.tsx';
 import { PendingLine } from './askParts.tsx';
-import { getSessionStoreSnapshot, refreshSessions, useProjectsList, useSessionStore } from './projects.tsx';
+import { getSessionStoreSnapshot, refreshSessions, useSessionList, useSessionListSync, useSessionStore } from './sessionStore.ts';
 import { askNow, setAskEffort, setAskModel, useAskState } from './state.ts';
 import {
   COMPOSER_BLOCK_TEXT,
@@ -659,14 +659,11 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
   const widthRef = useRef(width);
   const dragging = useRef(false);
 
-  const rows = useProjectsList();
-  const store = useSessionStore();
+  const rows = useSessionList();
   const vault = chat?.vault ?? '';
   const sessionItem = useMemo(() => rows.find((row) => row.sessionId === sessionId), [rows, sessionId]);
   // 8.4: the list is read once when the rail opens if it has never been read (a note window has no left rail).
-  useEffect(() => {
-    if (store.status === 'idle') void refreshSessions(vault || undefined);
-  }, [store.status, vault]);
+  useSessionListSync(vault || undefined);
 
   const signal = useReplySignal(sessionId);
   const read = useReadSession(sessionId, 100, signal);
@@ -1068,13 +1065,11 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
   }, [rawSessionId]);
   const vault = vaultPathOf(state);
 
-  const rows = useProjectsList();
+  const rows = useSessionList();
   const store = useSessionStore();
   const sessionItem = useMemo(() => rows.find((row) => row.sessionId === sessionId), [rows, sessionId]);
   // 9.2: the list is read once when it has never been read.
-  useEffect(() => {
-    if (store.status === 'idle') void refreshSessions(vault || undefined);
-  }, [store.status, vault]);
+  useSessionListSync(vault || undefined);
 
   // 9.2: the conversation is read again only when the answer signal of this session changes.
   const [manualSignal, setManualSignal] = useState(0);

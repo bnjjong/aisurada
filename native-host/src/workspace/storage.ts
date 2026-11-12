@@ -35,6 +35,7 @@ export interface AppPreferences {
   askTimeoutSeconds: number;
   sessionPreviewOpen: boolean;
   collapsedProjects: string[];
+  /** 예전 PROJECTS 패널의 펼침 기억. 패널은 없어졌지만 16장의 설정 21개 형식이라 필드는 그대로 두고, 쓰는 곳은 없다. */
   expandedSessionProjects: string[];
   [key: string]: unknown;
 }

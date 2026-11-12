@@ -822,46 +822,8 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ask-fold-toggle { font-size: 11px; color: var(--accent); background: transparent; border: 0; padding: 4px 0; cursor: pointer; display: block; }
 code.is-symbol { font-weight: 700; }
 
-/* Chapter 6: PROJECTS Rail & Session Row */
-.rail-projects-section { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
-.sess-rail-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.sess-rail-head h2 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
-.sess-rail-head .nav-add { border: 0; background: transparent; cursor: pointer; color: var(--muted); padding: 2px 4px; font-size: 13px; }
-.sess-rail-head .nav-add:hover { color: var(--ink); }
-
-.sess-note { font-size: 11px; color: var(--muted); padding: 6px 8px; line-height: 1.4; }
-.sess-note.sess-note-bad { color: var(--err); background: var(--err-bg); border-radius: 4px; margin-bottom: 6px; }
-
-.sess-project { margin-bottom: 8px; }
-.sess-toggle { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: transparent; padding: 4px 6px; cursor: pointer; text-align: left; font-size: 12px; font-weight: 600; border-radius: 4px; }
-.sess-toggle:hover { background: var(--soft); }
-.sess-caret { font-size: 10px; color: var(--muted); width: 12px; }
-.sess-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.sess-proj-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-count { font-size: 11px; color: var(--muted); font-weight: 400; }
-
-.sess-project-content { padding-left: 12px; }
-.sess-agenda-group { margin-top: 4px; margin-bottom: 8px; }
-.sess-agenda-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); padding: 2px 6px; }
-.sess-agenda-name { font-weight: 500; }
-
-.sess-row { display: flex; align-items: center; gap: 4px; width: 100%; border-radius: 4px; padding: 2px 0; }
-.sess-row:hover { background: var(--soft); }
-.sess-item { flex: 1; border: 0; background: transparent; text-align: left; padding: 4px 6px; cursor: pointer; border-radius: 4px; display: block; overflow: hidden; }
-:root:root .sess-item.is-active { background: rgba(50, 100, 220, 0.12); font-weight: 600; }
-.sess-title { font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 세션 화면의 실행 중 점. 예전 PROJECTS 패널의 규칙은 패널과 함께 없앴다. */
 .sess-run { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; animation: askPulse 1s infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
-
-.sess-meta { font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-kind.sess-ended { color: var(--ok); font-weight: 600; }
-.sess-blocked { color: var(--warn); font-weight: 600; }
-.sess-branch { font-family: var(--font-mono); font-size: 10px; }
-
-.sess-copy { border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10px; padding: 3px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; margin-right: 4px; flex-shrink: 0; }
-.sess-copy:hover { color: var(--ink); border-color: var(--muted); }
-
-.sess-more { border: 0; background: transparent; font-size: 11px; color: var(--accent); cursor: pointer; padding: 4px 6px; text-align: left; }
-.sess-more:hover { text-decoration: underline; }
 
 /* --------------------------------------------------------------------------
  * Chapter 8: Note Session Rail & Rail Chat

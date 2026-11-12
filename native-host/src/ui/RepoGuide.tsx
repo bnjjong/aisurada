@@ -15,7 +15,7 @@ export function cloneFolderText(cloneRoot?: string): string {
 // 그림 부품: 24x24 칸에 그린 선 아이콘. 색은 CSS 클래스(.rg-*)가 앱의 색 변수에서 가져와 화면 모양(스킨)을 따른다.
 // ---------------------------------------------------------------------------
 
-type IconName = "folder" | "branch" | "terminal" | "lock" | "eye" | "file" | "cloud" | "key";
+type IconName = "folder" | "branch" | "lock" | "eye" | "file" | "cloud" | "key";
 
 const ICONS: Record<IconName, ReactNode> = {
   folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
@@ -25,12 +25,6 @@ const ICONS: Record<IconName, ReactNode> = {
       <circle cx="18" cy="6" r="3" />
       <circle cx="6" cy="18" r="3" />
       <path d="M18 9a9 9 0 0 1-9 9" />
-    </>
-  ),
-  terminal: (
-    <>
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
     </>
   ),
   lock: (
@@ -110,19 +104,14 @@ function Defs() {
 // 그림 3장
 // ---------------------------------------------------------------------------
 
-/** 1장. 프로젝트의 저장소 목록에서 아젠다가 하나를 고르면, 그 폴더에서 연 세션이 그 아젠다에 자동으로 묶인다. */
+/** 1장. 프로젝트가 저장소 목록을 가지고, 아젠다가 그중 하나를 고르면 아젠다 화면에 그 저장소가 보인다. 앞으로는 앱 안 개발의 기준이 된다. */
 function SceneWhy() {
-  const sessions = [
-    { y: 48, label: "Claude Code" },
-    { y: 100, label: "터미널" },
-    { y: 152, label: "Codex" },
-  ];
   return (
     <svg
       className="rg"
       viewBox="0 0 520 240"
       role="img"
-      aria-label="프로젝트가 저장소 목록을 가지고, 아젠다가 그중 하나를 고르면, 그 저장소 폴더에서 연 세션이 그 아젠다에 자동으로 묶인다. 앞으로는 앱 안에서 개발도 할 수 있게 된다"
+      aria-label="프로젝트가 저장소 목록을 가지고, 아젠다가 그중 하나를 고르면 아젠다 화면에 그 저장소가 표시된다. 앞으로는 앱 안에서 개발도 할 수 있게 되고 이 저장소가 기준이 된다"
     >
       <Defs />
       <rect className="rg-card" x="8" y="16" width="150" height="208" rx="14" />
@@ -152,27 +141,30 @@ function SceneWhy() {
       <rect className="rg-chip" x="212" y="146" width="92" height="8" rx="4" />
       <rect className="rg-chip" x="212" y="162" width="70" height="8" rx="4" />
       <rect className="rg-chip" x="212" y="178" width="80" height="8" rx="4" />
-      <text className="rg-s" x="258" y="198" textAnchor="middle">
-        노트 · 세션
-      </text>
 
-      <path className="rg-line" d="M320 120 H366" markerEnd="url(#rg-arrow)" />
-      <text className="rg-s" x="345" y="108" textAnchor="middle">
-        자동 묶임
+      <path className="rg-line" d="M320 70 H366" markerEnd="url(#rg-arrow)" />
+      <text className="rg-s" x="343" y="60" textAnchor="middle">
+        표시
       </text>
-      <path className="rg-line rg-line-soft" d="M372 68 V172 M372 68 H382 M372 120 H382 M372 172 H382" />
-      {sessions.map((s) => (
-        <g key={s.label}>
-          <rect className="rg-card" x="384" y={s.y} width="128" height="40" rx="12" />
-          <Icon name="terminal" x={394} y={s.y + 10} size={20} />
-          <text className="rg-t" x="422" y={s.y + 25} fontSize="12">
-            {s.label}
-          </text>
-        </g>
-      ))}
-      <rect className="rg-dash" x="384" y="204" width="128" height="26" rx="13" />
-      <text className="rg-s" x="448" y="221" textAnchor="middle">
-        앞으로: 앱 안 개발
+      <rect className="rg-card" x="372" y="24" width="140" height="104" rx="14" />
+      <text className="rg-s" x="442" y="46" textAnchor="middle">
+        아젠다 화면
+      </text>
+      <rect className="rg-chip-on" x="382" y="58" width="120" height="26" rx="8" />
+      <Icon name="folder" x={388} y={63} size={16} accent />
+      <text className="rg-s" x="410" y="75" fontSize="10.5">
+        app · ~/app
+      </text>
+      <rect className="rg-chip" x="382" y="96" width="96" height="7" rx="3.5" />
+      <rect className="rg-chip" x="382" y="109" width="70" height="7" rx="3.5" />
+
+      <path className="rg-dash" d="M320 180 H366" markerEnd="url(#rg-arrow)" />
+      <rect className="rg-dash" x="372" y="152" width="140" height="72" rx="14" />
+      <text className="rg-s" x="442" y="178" textAnchor="middle">
+        앞으로
+      </text>
+      <text className="rg-t" x="442" y="200" textAnchor="middle">
+        앱 안에서 개발
       </text>
     </svg>
   );
@@ -210,7 +202,7 @@ function SceneHow() {
         aisurada 앱
       </text>
       <text className="rg-s" x="392" y="76">
-        세션·화면에 연결
+        아젠다 화면에 표시
       </text>
 
       <text className="rg-s" x="260" y="124" textAnchor="middle">
@@ -288,7 +280,7 @@ const SCENES = [SceneWhy, SceneHow, SceneSafe];
 
 /** 장마다 제목 한 줄과 설명 한 줄. 그림이 말하고, 글은 거드는 정도로만 둔다. */
 export const GUIDE_STEPS = [
-  { id: "why", title: "코드가 어디 있는지 알려 줘요", caption: "저장소를 적어 두면 아젠다와 세션이 저절로 이어져요." },
+  { id: "why", title: "코드가 어디 있는지 알려 줘요", caption: "저장소를 적어 두면 아젠다가 그중 하나를 골라 써요." },
   { id: "how", title: "두 가지 중 편한 방법으로", caption: "둘 다 적으면 폴더를 먼저 써요." },
   { id: "safe", title: "안전하게 다뤄요", caption: "저장소는 선택이에요. 적지 않아도 노트는 그대로 써요." },
 ] as const;

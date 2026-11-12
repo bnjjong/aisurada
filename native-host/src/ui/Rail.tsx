@@ -3,7 +3,6 @@ import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { agendaOrder, HUE_COLORS, railGroupCollapsed } from "./model.ts";
 import { LiveBrandMark } from "./BrandMark.tsx";
-import { RailProjects, useProjectsList } from "@claude-plug/projects";
 import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute } from "../navigation/routes.ts";
 export function Rail({
@@ -13,7 +12,6 @@ export function Rail({
   controller: WorkspaceController;
   state: WorkspaceState;
 }) {
-  useProjectsList();
   useSessionBadge();
   const LOOSE_GROUP_KEY = "(미분류)";
   const ws = state.workspace!,
@@ -182,7 +180,6 @@ export function Rail({
           LOOSE_GROUP_KEY,
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
-        <RailProjects controller={controller} state={state} />
       </section>
       <footer className="rail-footer">
         <button

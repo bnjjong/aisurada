@@ -1,7 +1,7 @@
 // Implementation of @claude-plug/terminal for Part 4 Claude-enabled builds.
 // Adheres to Chapter 10 (10.9, 10.10, 10.11) of aisurada Part 4 Claude integration specifications.
 import { Channel, invoke } from '@tauri-apps/api/core';
-import { refreshSessions, getSessionStoreSnapshot } from './projects.tsx';
+import { refreshSessions, getSessionStoreSnapshot } from './sessionStore.ts';
 
 export type SessionShellPlan =
   | { kind: 'plain' }

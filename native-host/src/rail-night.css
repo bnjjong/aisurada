@@ -30,8 +30,6 @@
 .workspace-rail .bm .bm-stars { display: none; }
 
 /* 밝은 배경 가정으로 박힌 색 두 곳 */
-.workspace-rail .sess-note.sess-note-bad { color: #ff9a92; background: rgba(255, 128, 120, .16); }
-.workspace-rail .sess-more { color: var(--rail-link); }
 
 /* 마우스 오버 시 무거운 복합 그라디언트 리페인트 병목 방지 (즉시 반응) */
 .workspace-rail nav button,
