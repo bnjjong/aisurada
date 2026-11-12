@@ -3,6 +3,7 @@
 // GitHub만 적으면 저장할 때 앱 전용 폴더에 받아 둔다(받기 결과는 githubStore가 기억해 이 목록에 보인다).
 import { useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
+import { RepoGuide } from "./RepoGuide.tsx";
 import { cloneRepo, listGithubRepos, useGithub } from "./githubStore.ts";
 import type { CloneState, GithubRepo } from "./githubStore.ts";
 import { MAX_REPOS, defaultRepoName, localPathOf } from "./repoLinks.ts";
@@ -34,6 +35,7 @@ export function RepoListEditor({
   const [repos, setRepos] = useState<GithubRepo[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
+  const [guide, setGuide] = useState(false);
 
   const patch = (index: number, change: Partial<RepoEntry>) =>
     onChange(entries.map((entry, i) => (i === index ? { ...entry, ...change } : entry)));
@@ -68,8 +70,12 @@ export function RepoListEditor({
     <fieldset className="repo-editor">
       <legend>저장소</legend>
       <p className="repo-editor-hint">
-        아젠다가 고를 수 있는 저장소예요. 폴더를 적으면 그 폴더를 쓰고, GitHub만 적으면 앱이 받아 둬요.
+        아젠다가 고를 수 있는 저장소예요. 폴더를 적으면 그 폴더를 쓰고, GitHub만 적으면 앱이 받아 둬요.{" "}
+        <button type="button" className="repo-guide-open" aria-haspopup="dialog" onClick={() => setGuide(true)}>
+          왜 필요해요?
+        </button>
       </p>
+      {guide && <RepoGuide close={() => setGuide(false)} cloneRoot={github.status?.cloneRoot} connected={connected} />}
       {entries.map((entry, index) => {
         const clone = entry.github ? github.clones[entry.github] : undefined;
         const line = cloneLine(entry, clone, connected);

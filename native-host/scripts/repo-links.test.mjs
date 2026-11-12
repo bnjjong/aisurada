@@ -11,6 +11,7 @@ import {
 } from '../src/ui/githubStore.ts';
 import { GithubConnectView } from '../src/ui/GithubConnect.tsx';
 import { RepoListEditor, cloneLine } from '../src/ui/RepoListEditor.tsx';
+import { RepoGuideFlow, cloneFolderText } from '../src/ui/RepoGuide.tsx';
 import { AgendaRepoLabel } from '../src/ui/AgendaRepoLabel.tsx';
 import { matchAgenda } from '../src/plugs/claude/projects.tsx';
 
@@ -284,4 +285,24 @@ test('AgendaRepoLabel draws the resolved repo, and names a project repo that wen
   assert.equal(draw({ project: 'platform', projectRepo: 'app' }), 'app · /work/app');
   assert.equal(draw({ project: 'empty', repo: '/legacy' }), '/legacy');
   assert.match(draw({ project: 'platform', projectRepo: 'gone', repo: '/old' }), /\/old.*gone는 프로젝트에서 빠졌어요/);
+});
+
+test('cloneFolderText names the real clone folder once the status is known, and the default place before that', () => {
+  assert.equal(cloneFolderText(CLONE_ROOT + '/'), `${CLONE_ROOT}/<소유자>/<이름>`);
+  assert.match(cloneFolderText(), /앱 전용 폴더.*aisurada\/repos\/<소유자>\/<이름>/);
+});
+
+test('the guide link sits in the repo editor (the popup itself is a portal, so it stays closed in a server render)', () => {
+  resetGithubStore();
+  const host = { callHost: async () => { throw new Error('no host'); }, pickDirectory: async () => null };
+  const html = renderToStaticMarkup(React.createElement(RepoListEditor, { entries: [], onChange: noop, host }));
+  assert.match(html, /<button[^>]*class="repo-guide-open"[^>]*aria-haspopup="dialog"[^>]*>왜 필요해요\?<\/button>/);
+  assert.doesNotMatch(html, /프로젝트 저장소 안내/, 'closed until it is clicked');
+});
+
+test('the guide figure draws the three steps with an accessible description', () => {
+  const html = renderToStaticMarkup(React.createElement(RepoGuideFlow));
+  assert.match(html, /role="img"/);
+  for (const word of ['프로젝트', '저장소 목록', '아젠다', '그중 하나를 고름', '세션 묶기 · 화면 표시']) assert.ok(html.includes(word), word);
+  assert.doesNotMatch(html, /<script|<style|foreignObject/);
 });

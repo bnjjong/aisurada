@@ -1284,6 +1284,16 @@ code.is-symbol { font-weight: 700; }
 .repo-picker { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; }
 .repo-picker-head { display: flex; align-items: center; gap: 8px; }
 .repo-picker-head input { flex: 1; min-width: 0; }
+.repo-guide { width: 560px; max-width: calc(100vw - 24px); }
+.repo-guide-body { display: grid; gap: 18px; padding: 8px 24px 24px; font-size: 13px; line-height: 1.75; }
+.repo-guide-body p, .repo-guide-body ul, .repo-guide-body h3 { margin: 0; }
+.repo-guide-body h3 { margin-bottom: 6px; font-size: 14px; }
+.repo-guide-body ul { display: grid; gap: 6px; padding-left: 18px; }
+.repo-guide-body code { font-size: 12px; word-break: break-all; }
+.repo-guide-figure { margin: 0; padding: 14px 12px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+.repo-guide-figure svg { display: block; width: 100%; height: auto; }
+.repo-guide-figure figcaption { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.repo-guide-actions { display: flex; justify-content: flex-end; }
 .repo-picker p { margin: 0; font-size: 12px; color: var(--muted); }
 .repo-picker ul { display: grid; gap: 2px; max-height: 160px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
 .repo-picker li button { width: 100%; text-align: left; background: transparent; box-shadow: none; border-color: transparent; border-radius: 8px; }
