@@ -7,6 +7,7 @@ pub mod agents;
 mod environment;
 mod files;
 mod frame;
+mod github;
 mod ipc;
 mod layout;
 mod lifecycle;
@@ -49,6 +50,7 @@ fn main() {
         })
         .manage(lifecycle::HostState::default())
         .manage(secrets::SecretState::default())
+        .manage(github::GithubState::default())
         .invoke_handler(tauri::generate_handler![
             lifecycle::exit_app,
             workspace::allow_workspace,
@@ -80,6 +82,11 @@ fn main() {
             terminal::pty_detach,
             terminal::pty_alive,
             terminal::pty_stats,
+            github::github_status,
+            github::github_connect,
+            github::github_disconnect,
+            github::github_repositories,
+            github::github_clone,
             secrets::secret_table_probe,
             secrets::secret_table_status,
             secrets::mask_scrollback,
