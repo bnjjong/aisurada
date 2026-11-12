@@ -445,24 +445,33 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .hidden-agenda .agenda-dot { opacity: .25; }.hidden-agenda .agenda-name { color: var(--muted); }
 /* 사이드바 계층: 프로젝트가 맨 위, 아젠다는 그 안쪽(세로선으로 묶는다). */
 .agenda-summary > header h2 { font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--ink); }
-.agenda-summary > header button.rail-add { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); }
+/* 아이콘만 든 둥근 단추는 flex로 가운데에 둔다. 위의 `.agenda-summary … button`이 justify-content를 space-between으로 주기 때문에 grid로는 쏠린다. */
+.agenda-summary > header button.rail-add { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); }
 .agenda-summary > header button.rail-add[aria-expanded="true"] { background: var(--soft); color: var(--ink); }
 .rail-group { margin: 6px 0; }
-.rail-group header > button.rail-group-toggle { gap: 8px; min-height: 34px; padding: 0 6px; font-size: 14px; font-weight: 600; }
+.rail-group header > button.rail-group-toggle { gap: 8px; min-height: 34px; padding: 0 10px 0 6px; font-size: 14px; font-weight: 600; }
 .rail-group-toggle > svg:first-child { flex: none; color: var(--muted); transition: transform 0.12s; }
 .rail-group-toggle[aria-expanded="true"] > svg:first-child { transform: rotate(90deg); }
 .rail-group-toggle > svg:nth-child(2) { flex: none; color: var(--muted); }
 .rail-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .rail-group-none .rail-group-name { color: var(--muted); }
 .rail-group-count { flex: none; font-size: 11px; font-weight: 500; color: var(--muted); }
-/* 프로젝트 줄에 마우스를 올리거나 키보드로 들어가면 편집·아젠다 추가가 나타난다. */
-.rail-group header { position: relative; }
+/* 편집·추가 단추는 평소엔 숨어 있다가 줄에 마우스를 올리거나 키보드로 들어가면 개수 자리에 나타난다.
+   프로젝트 줄과 아젠다 줄이 같은 모양(연필, ＋)이고, 개수는 두 줄이 같은 오른쪽 열에 선다. */
+.rail-group header, .rail-kids .rail-agenda { position: relative; }
 .rail-group header .rail-acts { position: absolute; top: 50%; right: 2px; display: flex; gap: 2px; transform: translateY(-50%); opacity: 0; transition: opacity 0.12s; }
-.rail-group header:hover .rail-acts, .rail-group header:focus-within .rail-acts { opacity: 1; }
-.rail-group header:hover .rail-group-count, .rail-group header:focus-within .rail-group-count { opacity: 0; }
-.rail-group header > button.rail-group-toggle { padding-right: 10px; }
-.rail-group header .rail-acts button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }
-.rail-kids { margin: 0 0 4px 17px; padding-left: 8px; border-left: 1.5px solid color-mix(in srgb, var(--muted) 35%, transparent); }
+.rail-group header .rail-acts button,
+.rail-agenda button.agenda-edit { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }
+.rail-agenda button.agenda-edit { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); opacity: 0; transition: opacity 0.12s; }
+.rail-group header:hover .rail-acts, .rail-group header:focus-within .rail-acts,
+.rail-agenda:hover button.agenda-edit, .rail-agenda:focus-within button.agenda-edit { opacity: 1; }
+.rail-group header:hover .rail-group-count, .rail-group header:focus-within .rail-group-count,
+.rail-agenda:hover small, .rail-agenda:focus-within small { opacity: 0; }
+/* 아젠다 줄의 오른쪽 끝을 프로젝트 줄(오른쪽 여백 10px)과 맞춰야 두 줄의 개수가 한 열에 선다. 스킨마다 줄 안쪽 여백이 달라 :root를 겹쳐 맞춘다. */
+:root:root .rail-kids .rail-agenda { padding-right: 10px; }
+.rail-kids .rail-agenda button.agenda-name { padding-right: 0; }
+/* 세로선은 프로젝트 줄의 폴더 아이콘 가운데(왼쪽 여백 6 + 화살표 12 + 간격 8 + 폴더 반폭 8 = 34px) 아래로 내린다. */
+.rail-kids { margin: 0 0 4px 33px; padding-left: 8px; border-left: 1.5px solid color-mix(in srgb, var(--muted) 35%, transparent); }
 .agenda-filter { position: relative; font-size: 12px; }.agenda-filter summary { cursor: pointer; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
 .agenda-filter[open] { background: var(--surface); z-index: 3; }.agenda-filter[open] > section { padding: 12px; border-bottom: 1px solid var(--line); }.agenda-filter label { display: inline-flex; align-items: center; gap: 8px; }.agenda-filter button { padding: 6px; }
 .doc-meta-bar {

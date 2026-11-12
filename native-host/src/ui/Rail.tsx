@@ -124,10 +124,11 @@ export function Rail({
                 </button>
                 <button
                   className="agenda-edit"
+                  title="아젠다 편집"
                   aria-label={`${a.title} 아젠다 편집`}
                   onClick={() => controller.form({ kind: "agenda", id: a.id })}
                 >
-                  ⋯
+                  <Icon name="edit" />
                 </button>
               </div>
             );
