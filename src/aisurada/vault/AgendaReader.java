@@ -190,6 +190,15 @@ public final class AgendaReader {
                 }
             }
 
+            // 확장: 프로젝트 안에서 쓰는 저장소 이름. 프로젝트가 없거나 안전한 이름이 아니면 없는 것으로 본다
+            String projectRepo = kv.get("projectRepo");
+            if (projectRepo != null) {
+                projectRepo = Trim.trim(projectRepo);
+                if (project == null || !isValidSlugSegment(projectRepo)) {
+                    projectRepo = null;
+                }
+            }
+
             String summary = Trim.trim(bodyPart);
 
             // 동일 slug 중복 검사: 2.9 (2번)에 따라 같은 slug에 다른 id가 있으면 예상 밖 실패(종료 코드 1)
@@ -205,7 +214,7 @@ public final class AgendaReader {
                 }
             }
 
-            AgendaTable.AgendaInfo info = new AgendaTable.AgendaInfo(id, slug, title, hue, repo, project, summary);
+            AgendaTable.AgendaInfo info = new AgendaTable.AgendaInfo(id, slug, title, hue, repo, project, projectRepo, summary);
             slugToId.put(slug, id);
             slugToTitle.put(slug, title);
             idToAgenda.put(id, info);

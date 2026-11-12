@@ -911,12 +911,12 @@ public final class ArgsParser {
                 usage = aisurada.cmd.ListProjects.USAGE;
             }
             case "create-project" -> {
-                allowedOptions = List.of("hue", "summary", "title");
+                allowedOptions = List.of("hue", "repos", "summary", "title");
                 maxPositional = 0;
                 usage = aisurada.cmd.CreateProject.USAGE;
             }
             case "update-project" -> {
-                allowedOptions = List.of("hue", "summary", "title");
+                allowedOptions = List.of("hue", "repos", "summary", "title");
                 maxPositional = 1;
                 usage = aisurada.cmd.UpdateProject.USAGE;
             }
@@ -929,12 +929,12 @@ public final class ArgsParser {
                 usage = aisurada.cmd.ListAgendas.USAGE;
             }
             case "create-agenda" -> {
-                allowedOptions = List.of("hue", "project", "repo", "summary", "title");
+                allowedOptions = List.of("hue", "project", "projectRepo", "repo", "summary", "title");
                 maxPositional = 0;
                 usage = aisurada.cmd.CreateAgenda.USAGE;
             }
             case "update-agenda" -> {
-                allowedOptions = List.of("hue", "project", "repo", "summary", "title");
+                allowedOptions = List.of("hue", "project", "projectRepo", "repo", "summary", "title");
                 maxPositional = 1;
                 usage = aisurada.cmd.UpdateAgenda.USAGE;
             }

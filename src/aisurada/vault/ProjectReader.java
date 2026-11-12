@@ -29,8 +29,9 @@ public final class ProjectReader {
      * 프로젝트 1개. 색인의 프로젝트 표 행 1개와 같은 칸이다(8.1).
      *
      * @param summary 본문. 닫는 울타리 줄의 줄바꿈 1개 뒤부터 받은 그대로다
+     * @param repos   프로젝트가 가진 저장소 목록(확장, {@code repos:} 줄). 줄이 없거나 못 읽으면 빈 목록이다
      */
-    public record ProjectInfo(String id, String slug, String title, String hue, String summary) {}
+    public record ProjectInfo(String id, String slug, String title, String hue, String summary, List<ProjectRepo> repos) {}
 
     private ProjectReader() {}
 
@@ -127,7 +128,7 @@ public final class ProjectReader {
         if (!AgendaReader.HUES.contains(hue)) {
             hue = "blue";
         }
-        return new ProjectInfo(id, slug, title, hue, summaryOf(fenced.body()));
+        return new ProjectInfo(id, slug, title, hue, summaryOf(fenced.body()), ProjectRepo.parseLenient(kv.get("repos")));
     }
 
     /**

@@ -1,6 +1,9 @@
 package aisurada.write;
 
 import aisurada.text.Utf16;
+import aisurada.vault.ProjectRepo;
+
+import java.util.List;
 
 /**
  * 설명서 21장 프로젝트 파일의 쓰기 규칙. 바이트는 아젠다(20.5)와 같은 꼴이고 키가 4개뿐이다(2.2).
@@ -31,7 +34,12 @@ public final class ProjectFile {
      * 닫는 {@code ---\n} 바로 뒤에 {@code summary}를 받은 그대로 붙이고 끝에 줄바꿈을 더하지 않는다.
      */
     public static byte[] render(String id, String slug, String title, String hue, String summary) {
-        String frontmatter = FrontmatterWriter.buildAgendaFrontmatter(id, slug, title, hue);
+        return render(id, slug, title, hue, List.of(), summary);
+    }
+
+    /** 확장: 저장소가 있으면 {@code repos:} 한 줄이 hue 뒤에 붙는다. 없으면 위의 4줄 그대로라 기존 파일과 바이트가 같다. */
+    public static byte[] render(String id, String slug, String title, String hue, List<ProjectRepo> repos, String summary) {
+        String frontmatter = FrontmatterWriter.buildProjectFrontmatter(id, slug, title, hue, ProjectRepo.toJson(repos));
         String content = "---\n" + frontmatter + "---\n" + (summary == null ? "" : summary);
         return Utf16.toUtf8BytesWithQuestionForUnpaired(content);
     }

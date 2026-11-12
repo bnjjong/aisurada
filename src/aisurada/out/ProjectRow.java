@@ -1,8 +1,11 @@
 package aisurada.out;
 
 import aisurada.vault.ProjectReader;
+import aisurada.vault.ProjectRepo;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -27,6 +30,14 @@ public final class ProjectRow {
         row.put("title", info.title());
         row.put("hue", info.hue());
         row.put("summary", info.summary() == null ? "" : info.summary());
+        // 확장: 저장소가 있을 때만 싣는다. 없으면 설명서 21.6의 모양 그대로다
+        if (info.repos() != null && !info.repos().isEmpty()) {
+            List<Map<String, Object>> repos = new ArrayList<>();
+            for (ProjectRepo repo : info.repos()) {
+                repos.add(repo.toMap());
+            }
+            row.put("repos", repos);
+        }
         return row;
     }
 }

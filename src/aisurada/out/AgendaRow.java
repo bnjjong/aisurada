@@ -36,6 +36,10 @@ public final class AgendaRow {
         if (info.project() != null) {
             row.put("project", info.project());
         }
+        // 확장: 프로젝트의 저장소 가운데 이 아젠다가 쓰는 것. 없으면 키째 뺀다
+        if (info.projectRepo() != null) {
+            row.put("projectRepo", info.projectRepo());
+        }
         row.put("summary", info.summary() == null ? "" : info.summary());
         // 노트 링크와 달리 id가 아니라 slug를 싣는다. 링크를 만드는 쪽이 아는 값이 slug이기 때문이다
         row.put("deepLink", "aisurada://agenda/" + Uri.encodeURIComponent(info.slug()) +

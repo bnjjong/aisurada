@@ -92,7 +92,12 @@ public final class AgendaFile {
      * 줄바꿈을 1개 더하면 되돌리기 1번마다 파일이 1바이트씩 달라 보이기 때문이다.
      */
     public static byte[] render(String id, String slug, String title, String hue, String repo, String project, String summary) {
-        String frontmatter = FrontmatterWriter.buildAgendaFrontmatter(id, slug, title, hue, repo, project);
+        return render(id, slug, title, hue, repo, project, null, summary);
+    }
+
+    /** 확장: {@code projectRepo}가 null이 아니면 {@code project} 바로 뒤에 적는다. */
+    public static byte[] render(String id, String slug, String title, String hue, String repo, String project, String projectRepo, String summary) {
+        String frontmatter = FrontmatterWriter.buildAgendaFrontmatter(id, slug, title, hue, repo, project, projectRepo);
         String content = "---\n" + frontmatter + "---\n" + (summary == null ? "" : summary);
         return Utf16.toUtf8BytesWithQuestionForUnpaired(content);
     }

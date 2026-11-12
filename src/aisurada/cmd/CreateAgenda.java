@@ -27,7 +27,7 @@ import java.util.Set;
  */
 public final class CreateAgenda {
 
-    public static final String USAGE = "create-agenda title=<이름> [hue=<색>] [repo=<저장소>] " +
+    public static final String USAGE = "create-agenda title=<이름> [hue=<색>] [repo=<저장소>] [projectRepo=<프로젝트의 저장소 이름>] " +
             "[summary=<한 문단 설명>] [project=<프로젝트 slug>]";
 
     private CreateAgenda() {}
@@ -62,6 +62,8 @@ public final class CreateAgenda {
         if (repo.isEmpty()) {
             repo = null;
         }
+        // 확장: projectRepo는 project의 repos 가운데 하나의 이름이다. project가 없거나 그 이름이 없으면 AIS-400이다
+        String projectRepo = AgendaArgs.projectRepo(vaultRoot, project, opts.get("projectRepo"));
         String summary = opts.getOrDefault("summary", "");
 
         // 20.5의 1번: slug 비켜서기와 색 고르기가 같은 행 목록을 본다
@@ -90,10 +92,10 @@ public final class CreateAgenda {
             throw new AisException(400, "경로로 쓸 수 없는 값이다: " + fileName);
         }
         AtomicWriter.writeAtomic(vaultRoot.resolve(AgendaFile.relPath(slug)),
-                AgendaFile.render(id, slug, title, hue, repo, project, summary));
+                AgendaFile.render(id, slug, title, hue, repo, project, projectRepo, summary));
 
         // 색인 행 넣기는 색인이 없는 판이라 할 일이 없다. 다음 호출이 이 파일을 읽는다(8.6)
         // 응답은 디스크를 다시 읽지 않고 방금 쓴 값에서 짓는다. 그래서 summary는 받은 글 그대로다(20.6)
-        return AgendaRow.toMap(new AgendaTable.AgendaInfo(id, slug, title, hue, repo, project, summary), vaultRoot);
+        return AgendaRow.toMap(new AgendaTable.AgendaInfo(id, slug, title, hue, repo, project, projectRepo, summary), vaultRoot);
     }
 }

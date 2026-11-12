@@ -22,7 +22,8 @@ import java.util.Map;
 public final class UpdateAgenda {
 
     public static final String USAGE = "update-agenda <아젠다 id> [title=<이름>] [hue=<색>] " +
-            "[repo=<저장소. 빈 값이면 지운다>] [summary=<한 문단 설명>] [project=<프로젝트 slug. 빈 값이면 미분류로>]";
+            "[repo=<저장소. 빈 값이면 지운다>] [summary=<한 문단 설명>] [project=<프로젝트 slug. 빈 값이면 미분류로>] " +
+            "[projectRepo=<프로젝트의 저장소 이름. 빈 값이면 지운다>]";
 
     private UpdateAgenda() {}
 
@@ -76,14 +77,24 @@ public final class UpdateAgenda {
         if (!projectGiven) {
             project = current.project();
         }
+        // 확장: projectRepo도 3갈래다. 안 줌은 지금 값을 두되 프로젝트가 바뀌었거나 미분류가 되면 낡은 가리킴이라 지운다.
+        // 빈 값은 지우고, 이름을 주면 (바뀐) 프로젝트의 repos에 그 이름이 있어야 한다
+        String projectRepo;
+        if (opts.containsKey("projectRepo")) {
+            projectRepo = AgendaArgs.projectRepo(vaultRoot, project, opts.get("projectRepo"));
+        } else if (project != null && project.equals(current.project())) {
+            projectRepo = current.projectRepo();
+        } else {
+            projectRepo = null;
+        }
         // summary는 다듬지 않는다. 아젠다 파일의 본문이라 사용자가 넣은 끝 줄바꿈까지 그 사람의 글이다
         String summary = opts.containsKey("summary") ? opts.get("summary") : current.summary();
 
         // 8. 파일을 통째로 다시 쓴다. 칸을 1개도 안 줘도 쓴다. 모르는 키(옛 status: 같은 것)는 여기서 사라진다
         String slug = current.slug();
         AtomicWriter.writeAtomic(vaultRoot.resolve(AgendaFile.relPath(slug)),
-                AgendaFile.render(id, slug, title, hue, repo, project, summary));
+                AgendaFile.render(id, slug, title, hue, repo, project, projectRepo, summary));
 
-        return AgendaRow.toMap(new AgendaTable.AgendaInfo(id, slug, title, hue, repo, project, summary), vaultRoot);
+        return AgendaRow.toMap(new AgendaTable.AgendaInfo(id, slug, title, hue, repo, project, projectRepo, summary), vaultRoot);
     }
 }

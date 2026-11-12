@@ -25,6 +25,8 @@ public record AgendaTable(
             String hue,
             String repo,
             String project,
+            /** 확장: 프로젝트의 repos 가운데 이 아젠다가 쓰는 저장소 이름. 프로젝트가 없으면 늘 null이다. */
+            String projectRepo,
             String summary
     ) {}
 }

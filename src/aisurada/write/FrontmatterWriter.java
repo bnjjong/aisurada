@@ -205,6 +205,18 @@ public final class FrontmatterWriter {
     }
 
     /**
+     * 프로젝트 파일의 프론트매터. 키는 id, slug, title, hue를 늘 이 차례로 적고, 확장 키 {@code repos}는 저장소가 있을 때만
+     * 그 뒤에 한 줄 JSON으로 적는다(줄 읽개가 들여쓴 줄을 못 읽어서 한 줄이어야 한다). 저장소가 없으면 설명서 21.5의 4줄 그대로다.
+     */
+    public static String buildProjectFrontmatter(String id, String slug, String title, String hue, String reposJson) {
+        StringBuilder sb = new StringBuilder(buildAgendaFrontmatter(id, slug, title, hue, null, null, null));
+        if (reposJson != null && !reposJson.isEmpty()) {
+            sb.append("repos: ").append(reposJson).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
      * 아젠다 파일 생성을 위한 프론트매터 YAML을 생성합니다.
      */
     public static String buildAgendaFrontmatter(String id, String slug, String title, String hue) {
@@ -217,6 +229,13 @@ public final class FrontmatterWriter {
      * 프로젝트에 안 속한 아젠다의 파일은 이 칸이 생기기 전과 바이트가 같다.
      */
     public static String buildAgendaFrontmatter(String id, String slug, String title, String hue, String repo, String project) {
+        return buildAgendaFrontmatter(id, slug, title, hue, repo, project, null);
+    }
+
+    /**
+     * 확장: {@code projectRepo}는 프로젝트의 {@code repos:} 가운데 이 아젠다가 쓰는 저장소의 이름이다. 값이 있을 때만 {@code project} 바로 뒤에 적는다.
+     */
+    public static String buildAgendaFrontmatter(String id, String slug, String title, String hue, String repo, String project, String projectRepo) {
         StringBuilder sb = new StringBuilder();
         appendKeyVal(sb, "id", id, 1);
         appendKeyVal(sb, "slug", slug, 1);
@@ -227,6 +246,9 @@ public final class FrontmatterWriter {
         }
         if (project != null) {
             appendKeyVal(sb, "project", project, 1);
+        }
+        if (projectRepo != null) {
+            appendKeyVal(sb, "projectRepo", projectRepo, 1);
         }
         return sb.toString();
     }

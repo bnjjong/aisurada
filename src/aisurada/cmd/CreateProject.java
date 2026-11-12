@@ -6,6 +6,7 @@ import aisurada.engine.WritePipeline;
 import aisurada.out.ProjectRow;
 import aisurada.text.Trim;
 import aisurada.vault.ProjectReader;
+import aisurada.vault.ProjectRepo;
 import aisurada.write.AgendaFile;
 import aisurada.write.AtomicWriter;
 import aisurada.write.IdGenerator;
@@ -27,7 +28,8 @@ import java.util.Set;
  */
 public final class CreateProject {
 
-    public static final String USAGE = "create-project title=<이름> [hue=<색>] [summary=<한 문단 설명>]";
+    public static final String USAGE = "create-project title=<이름> [hue=<색>] [summary=<한 문단 설명>] "
+            + "[repos=<저장소 목록 JSON. 예: [{\"name\":\"app\",\"path\":\"/abs\",\"github\":\"owner/name\",\"githubId\":1}]>]";
 
     private CreateProject() {}
 
@@ -50,6 +52,8 @@ public final class CreateProject {
         }
         String hue = AgendaArgs.hue(opts.get("hue"));
         String summary = opts.getOrDefault("summary", "");
+        // 확장: 저장소 목록. 틀리면 파일을 쓰기 전에 AIS-400으로 멈춘다
+        List<ProjectRepo> repos = ProjectRepo.parseStrict(opts.get("repos"));
 
         // 21.5: 프로젝트 행 전부를 1번 읽어 slug 비켜서기와 색 고르기에 쓴다
         Map<String, ProjectReader.ProjectInfo> projects = ProjectReader.scanProjects(vaultRoot);
@@ -79,10 +83,10 @@ public final class CreateProject {
             throw new AisException(400, "경로로 쓸 수 없는 값이다: " + fileName);
         }
         AtomicWriter.writeAtomic(vaultRoot.resolve(ProjectFile.relPath(slug)),
-                ProjectFile.render(id, slug, title, hue, summary));
+                ProjectFile.render(id, slug, title, hue, repos, summary));
 
         // 색인 행 넣기는 색인이 없는 판이라 할 일이 없다. 다음 호출이 이 파일을 읽는다(8.6)
         // 응답은 방금 쓴 값에서 짓는다. 그래서 summary는 받은 글 그대로다(21.6)
-        return ProjectRow.toMap(new ProjectReader.ProjectInfo(id, slug, title, hue, summary));
+        return ProjectRow.toMap(new ProjectReader.ProjectInfo(id, slug, title, hue, summary, repos));
     }
 }

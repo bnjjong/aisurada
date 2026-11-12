@@ -5,10 +5,12 @@ import aisurada.engine.WritePipeline;
 import aisurada.out.ProjectRow;
 import aisurada.text.Trim;
 import aisurada.vault.ProjectReader;
+import aisurada.vault.ProjectRepo;
 import aisurada.write.AtomicWriter;
 import aisurada.write.ProjectFile;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,7 +20,8 @@ import java.util.Map;
  */
 public final class UpdateProject {
 
-    public static final String USAGE = "update-project <프로젝트 id> [title=<이름>] [hue=<색>] [summary=<한 문단 설명>]";
+    public static final String USAGE = "update-project <프로젝트 id> [title=<이름>] [hue=<색>] [summary=<한 문단 설명>] "
+            + "[repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>]";
 
     private UpdateProject() {}
 
@@ -51,12 +54,14 @@ public final class UpdateProject {
         }
         // summary는 다듬지 않는다. 빈 글을 주면 본문을 비운다
         String summary = opts.containsKey("summary") ? opts.get("summary") : current.summary();
+        // 확장: repos는 3갈래다. 안 줌은 지금 목록을 두고, 빈 값은 지우고, JSON 배열은 통째로 바꾼다
+        List<ProjectRepo> repos = opts.containsKey("repos") ? ProjectRepo.parseStrict(opts.get("repos")) : current.repos();
 
         // 8. 파일을 통째로 다시 쓴다. 칸을 1개도 안 줘도 쓴다. 모르는 키는 여기서 사라진다
         String slug = current.slug();
         AtomicWriter.writeAtomic(vaultRoot.resolve(ProjectFile.relPath(slug)),
-                ProjectFile.render(id, slug, title, hue, summary));
+                ProjectFile.render(id, slug, title, hue, repos, summary));
 
-        return ProjectRow.toMap(new ProjectReader.ProjectInfo(id, slug, title, hue, summary));
+        return ProjectRow.toMap(new ProjectReader.ProjectInfo(id, slug, title, hue, summary, repos));
     }
 }

@@ -6,8 +6,11 @@ import aisurada.text.Trim;
 import aisurada.vault.AgendaReader;
 import aisurada.vault.AgendaTable;
 import aisurada.vault.NoteIndex;
+import aisurada.vault.ProjectReader;
+import aisurada.vault.ProjectRepo;
 import aisurada.write.IdGenerator;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -17,6 +20,40 @@ import java.util.List;
 final class AgendaArgs {
 
     private AgendaArgs() {}
+
+    /**
+     * 확장: projectRepo 칸. 안 줬거나 공백뿐이면 null(가리키는 저장소 없음)이다. 이름을 주면 project가 있어야 하고, 그 프로젝트의
+     * {@code repos}에 그 이름이 있어야 한다. 프로젝트 파일은 색인에 없어서 부를 때마다 파일에서 읽는다.
+     *
+     * @param project 이 아젠다가 속할(속한) 프로젝트 slug. 미분류면 null
+     */
+    static String projectRepo(Path vaultRoot, String project, String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String name = Trim.trim(raw);
+        if (name.isEmpty()) {
+            return null;
+        }
+        if (project == null) {
+            throw new AisException(400, "projectRepo 는 project 와 함께 줘야 한다: " + name);
+        }
+        ProjectReader.ProjectInfo found = null;
+        for (ProjectReader.ProjectInfo info : ProjectReader.scanProjects(vaultRoot).values()) {
+            if (info.slug().equals(project)) {
+                found = info;
+                break;
+            }
+        }
+        if (found == null) {
+            throw new AisException(400, "프로젝트를 찾지 못했다: " + project);
+        }
+        if (ProjectRepo.find(found.repos(), name) == null) {
+            List<String> names = found.repos().stream().map(ProjectRepo::name).toList();
+            throw new AisException(400, "프로젝트 " + project + " 에 저장소 " + name + " 이 없다. 있는 이름: " + names);
+        }
+        return name;
+    }
 
     /**
      * 첫 자리 인자에서 아젠다 id를 꺼냅니다. id는 다듬지 않는다.

@@ -610,7 +610,7 @@ public final class CreateDoc {
         AtomicWriter.writeAtomic(agendaFile, AgendaFile.render(newId, slugKey, key, chosenHue, null, null, ""));
 
         // 색인에 추가
-        AgendaTable.AgendaInfo createdInfo = new AgendaTable.AgendaInfo(newId, slugKey, key, chosenHue, null, null, null);
+        AgendaTable.AgendaInfo createdInfo = new AgendaTable.AgendaInfo(newId, slugKey, key, chosenHue, null, null, null, null);
         table.slugToId().put(slugKey, newId);
         table.slugToTitle().put(slugKey, key);
         table.idToAgenda().put(newId, createdInfo);
