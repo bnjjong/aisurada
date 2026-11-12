@@ -5,6 +5,7 @@ import { asText } from "../workspace/types.ts";
 import { Modal, Confirm } from "./Modal.tsx";
 import { Editor } from "../editor/Editor.tsx";
 import { TYPES, TYPE_NAMES, agendaRepoField } from "./model.ts";
+import { Icon } from "./Icon.tsx";
 import { RepoListEditor } from "./RepoListEditor.tsx";
 import { cloneRepo, cloneSummary } from "./githubStore.ts";
 import {
@@ -325,11 +326,24 @@ function EntityForm({
     else controller.form(null);
   };
   const label = kind === "agenda" ? "아젠다" : "프로젝트";
+  const modalTitle = `${label} ${id ? "편집" : "추가"}`;
   return (
     <Modal
-      title={`${label} ${id ? "편집" : "추가"}`}
+      title={modalTitle}
       close={handleClose}
       className="ndf"
+      // 노트 창과 같은 아이콘 닫기 단추. 접근성 이름은 기본 닫기 단추와 같게 둔다.
+      headerActions={
+        <button
+          type="button"
+          className="modal-ctrl-btn modal-ctrl-close"
+          title="닫기"
+          aria-label={`${modalTitle} 닫기`}
+          onClick={handleClose}
+        >
+          <Icon name="close" />
+        </button>
+      }
     >
       <form
         onSubmit={async (e) => {
