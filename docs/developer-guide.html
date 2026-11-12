@@ -113,7 +113,7 @@ footer.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);co
 <li><a href="#4-저장소-구조">4. 저장소 구조</a><ul><li><a href="#엔진-패키지-srcaisurada">엔진 패키지 (src/aisurada/)</a></li><li><a href="#호스트-모듈-native-hostsrc-taurisrc">호스트 모듈 (native-host/src-tauri/src/)</a></li><li><a href="#화면-모듈-native-hostsrc">화면 모듈 (native-host/src/)</a></li></ul></li>
 <li><a href="#5-엔진-쓰는-법">5. 엔진 쓰는 법</a><ul><li><a href="#세션-에이전트codexgemini-확장">세션 에이전트(Codex·Gemini) 확장</a></li><li><a href="#세션-목록-저장소-projects-패널은-없앴다">세션 목록 저장소 (PROJECTS 패널은 없앴다)</a></li><li><a href="#프로젝트의-저장소와-아젠다의-projectrepo">프로젝트의 저장소와 아젠다의 projectRepo</a></li><li><a href="#github-app-연결-githubrs">GitHub App 연결 (github.rs)</a></li><li><a href="#앱이-연-vault-current-vaultjson">앱이 연 vault (current-vault.json)</a></li><li><a href="#두-가지-모양">두 가지 모양</a></li><li><a href="#두-가지-표면">두 가지 표면</a></li><li><a href="#설정">설정</a></li><li><a href="#종료-코드">종료 코드</a></li><li><a href="#vault의-모양">vault의 모양</a></li><li><a href="#쓰기-규칙-고칠-때-지킬-것">쓰기 규칙 (고칠 때 지킬 것)</a></li><li><a href="#명령을-새로-넣는-길">명령을 새로 넣는 길</a></li><li><a href="#mcp-서버-ais-cli-mcp">MCP 서버 (ais-cli mcp)</a></li></ul></li>
 <li><a href="#6-ais-cli와-launchd-건드리기-전에">6. ais-cli와 launchd — 건드리기 전에</a></li>
-<li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#앱에-든-ais-cli">앱에 든 ais-cli</a></li><li><a href="#4부-스위치-3개">4부 스위치 3개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#좌측-메뉴레일-폭">좌측 메뉴(레일) 폭</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
+<li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#앱에-든-ais-cli">앱에 든 ais-cli</a></li><li><a href="#4부-스위치-3개">4부 스위치 3개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#좌측-메뉴레일의-프로젝트아젠다-목록">좌측 메뉴(레일)의 프로젝트·아젠다 목록</a></li><li><a href="#좌측-메뉴레일-폭">좌측 메뉴(레일) 폭</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
 <li><a href="#8-시험">8. 시험</a><ul><li><a href="#한눈에">한눈에</a></li><li><a href="#엔진-시험-쓰기">엔진 시험 쓰기</a></li><li><a href="#받아들임-묶음-34장">받아들임 묶음 (34장)</a></li><li><a href="#화면호스트-시험">화면·호스트 시험</a></li><li><a href="#동시에-돌리면-안-되는-것">동시에 돌리면 안 되는 것</a></li></ul></li>
 <li><a href="#9-앱-손-확인">9. 앱 손 확인</a></li>
 <li><a href="#10-docs-읽는-법">10. docs/ 읽는 법</a><ul><li><a href="#옛-이름-대응표">옛 이름 대응표</a></li></ul></li>
@@ -429,6 +429,15 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 <li>유리는 <code>backdrop-filter</code>를 큰 패널에만 건다. 버튼마다 걸면 느려진다. 맨살 버튼과 일반 버튼은 반투명 배경만 쓴다.</li>
 </ul>
 <p>새 모양을 더하려면 <code>types.ts</code>의 <code>Skin</code>, <code>storage.ts</code>의 <code>SKINS</code>, <code>Settings.tsx</code>의 <code>SKIN_OPTIONS</code>, <code>src/skin-&lt;이름&gt;.css</code>와 <code>main.tsx</code>의 import, 미리보기 그림 규칙(<code>styles.css</code>)을 함께 고친다. 시험은 <code>scripts/chapters14-17.test.mjs</code>의 「화면 모양」과 <code>scripts/views-checks.js</code>의 설정 점검(다섯 모양을 차례로 눌러 <code>data-skin</code>과 저장 값을 잰다)이다.</p>
+<h3 id="좌측-메뉴레일의-프로젝트아젠다-목록"><a class="anchor" href="#좌측-메뉴레일의-프로젝트아젠다-목록" aria-label="이 절의 링크">#</a>좌측 메뉴(레일)의 프로젝트·아젠다 목록</h3>
+<p>레일의 목록(<code>Rail.tsx</code>)은 <strong>프로젝트가 맨 위, 아젠다는 그 안쪽</strong>으로 그린다. 아젠다는 프로젝트 없이도 만들 수 있어서, 프로젝트에 속하지 않은 것은 맨 아래 「미분류」 묶음(점선 폴더 아이콘)에 같은 모양으로 둔다.</p>
+<ul>
+<li>제목은 프로젝트가 하나라도 있으면 「프로젝트」, 하나도 없으면 「아젠다」다. 프로젝트가 없으면 묶음 머리글도 없이 아젠다만 평평하게 나온다.</li>
+<li>제목 오른쪽의 「＋」 하나가 <code>ActionMenu</code>를 열어 「새 프로젝트」와 「새 아젠다」 중에 고르게 한다(예전의 「프로젝트 ＋」, 「＋」 단추 둘을 합쳤다).</li>
+<li>묶음 머리글은 접기 화살표, 폴더 아이콘, 이름, 아젠다 개수다. 마우스를 올리거나 키보드로 들어가면 개수 자리에 「프로젝트 편집」과 「이 프로젝트에 아젠다 추가」 아이콘이 나타난다. 접근성 이름(<code>… 프로젝트 편집</code>, <code>…에 아젠다 추가</code>)은 그대로다.</li>
+<li>아젠다 줄은 <code>.rail-kids</code> 안에 들여 쓰고 왼쪽 세로선으로 묶는다. 접기 상태 저장(<code>collapsedProjects</code>)은 그대로다.</li>
+<li>시안은 디자인 캔버스의 「02 물성 · 사이드바 계층」 보드다. 실제 앱 창에서 「＋」 메뉴를 눌러 본 확인은 없고, 실제 컴포넌트를 렌더링해 모양만 확인했다.</li>
+</ul>
 <h3 id="좌측-메뉴레일-폭"><a class="anchor" href="#좌측-메뉴레일-폭" aria-label="이 절의 링크">#</a>좌측 메뉴(레일) 폭</h3>
 <p>레일 오른쪽 가장자리의 손잡이(<code>RailResizer</code>, <code>role=&quot;separator&quot;</code>)를 끌어서 폭을 바꾼다. 범위는 200~420px, 기본은 264px이고 설정 <code>railWidth</code>(16장 21개 중 하나)에 저장한다.</p>
 <div class="table-wrap"><table><thead><tr><th>동작</th><th>결과</th></tr></thead><tbody>
