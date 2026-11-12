@@ -107,7 +107,7 @@ java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=
 
 ## 프로젝트 자원: 스킬과 에이전트 정의 (확장)
 
-외부 설명서에 없는 확장입니다. 프로젝트에서 AI에게 작업을 시키기 위한 바탕으로, 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의(마크다운 파일 하나)를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 **ID(`sk…`, `ap…`)로 참조**해야 쓸 수 있고, 참조하지 않은 것은 쓰지 않습니다. 명령은 명령 표면에만 있습니다.
+외부 설명서에 없는 확장입니다. 프로젝트에서 AI에게 작업을 시키기 위한 바탕으로, 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의(마크다운 파일 하나)를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 **ID(`sk…`, `ap…`)로 참조**해야 쓸 수 있고, 참조하지 않은 것은 쓰지 않습니다. 명령줄로도, MCP 도구(`list_resources`, `save_resource` 등 8개)로도 쓸 수 있습니다. 쓰기 도구는 노트와 같이 `mcp --write`일 때만 보입니다.
 
 ```bash
 java -jar dist/ais-engine.jar save-resource kind=skill scope=global 'name=번역 검수' 'description=번역을 검수한다' 'body=# 지침' --aisurada.vault=/path/to/vault
@@ -337,7 +337,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | `doctor` | 키, 레이블, 소켓, plist, 실행 상태, 동시 상한, 하루 청소를 진단한다. `--plist`는 쓸 plist를 보여 주고, `--prune`은 vault 폴더가 사라진 LaunchAgent를 지운다 |
 | `sweep` | 24시간 넘게 조용한 엔진을 내리고 죽은 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
 | `install` | `ais-cli.jar`와 `ais-sidecar.jar`를 `~/Library/Application Support/aisurada/bin/`에 깐다. `--cli`, `--sidecar`로 원본을 고른다 |
-| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 13개만 내놓고, `--write`를 주면 쓰기 도구까지 28개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
+| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 15개만 내놓고, `--write`를 주면 쓰기 도구까지 33개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
 | `claude-mcp` | Claude Code에 위 서버를 등록한다. `status`, `add [--write]`, `remove`는 `claude mcp`를 부르고, `config [--write]`는 Claude Desktop 설정에 붙여 넣을 조각만 출력한다. 등록에는 vault를 박지 않는다 |
 | `codex-mcp`, `gemini-mcp` | Codex, Antigravity(`agy`)·Gemini CLI에 같은 서버를 같은 방식으로 등록한다(`status`, `add [--write]`, `remove`) |
 | `--help`, `--list` | 사용법과 이름 목록 |

@@ -97,7 +97,7 @@ ais-cli gemini-mcp remove
 
 ## 3. 쓸 수 있는 기능
 
-도구는 28개이고, 이름은 엔진의 도구 이름과 같습니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
+도구는 33개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 15개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
 
 ### 노트 찾고 읽기
 
@@ -145,14 +145,11 @@ ais-cli gemini-mcp remove
 
 `parent`는 노트 id이고, 하위 노트의 첨부와 코멘트는 `노트id/하위노트id` 형태로 줍니다.
 
-### 하루 계획과 회고
+### 하루 계획
 
 | 도구 | 모드 | 하는 일 | 인자 |
 |------|:----:|---------|------|
 | `plan_day` | W | 하루 계획 초안을 짓습니다. `dryRun`을 true로 주면 노트로 저장하지 않고 초안만 냅니다 | `date`, `agenda`, `dryRun` |
-| `list_reports` | R | 회고(`morning`, `evening`, `weekly`)의 목록을 냅니다 | `kind`, `dateFrom`, `dateTo` |
-| `get_report` | R | 회고 1건을 읽습니다. id 예: `rv-evening-2026-06-04` | `id*` |
-| `save_report` | W! | 회고를 저장합니다. 같은 종류와 날짜가 있으면 **덮어씁니다** | `kind*`, `date*`, `body`, `memo` |
 
 ### 템플릿
 
@@ -161,6 +158,25 @@ ais-cli gemini-mcp remove
 | `list_templates` | R | 문서 템플릿과 리추얼 템플릿의 목록을 냅니다 | `category`(`doc`·`ritual`), `type` |
 | `get_template` | R | 템플릿 1건을 읽습니다 | `id*` |
 | `save_template` | W! | 문서 템플릿을 저장합니다. `id`를 주면 그 템플릿을 고칩니다 | `id`, `name`, `type`, `desc`, `body` |
+
+### 스킬과 에이전트 정의(자원)
+
+외부 설명서에 없는 확장입니다. 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 ID(`sk…`, `ap…`)로 **참조**해야 쓸 수 있고, **참조하지 않은 것은 쓰지 않습니다**. 쓰기 도구는 노트와 같은 관문(`--write`)을 지납니다. 정의는 특정 AI 도구에 묶이지 않고, 도구별 차이는 `tools` 칸에만 둡니다.
+
+| 도구 | 모드 | 하는 일 | 인자 |
+|------|:----:|---------|------|
+| `list_resources` | R | 스킬과 에이전트 정의의 관리 목록을 냅니다. 참조하지 않은 글로벌 자원도 나옵니다. `trash`를 true로 주면 휴지통 목록입니다 | `kind`, `scope`, `project`, `bodies`, `trash` |
+| `get_resource` | R | 1건을 지침과 `precondition`(`f1:…`)과 함께 읽습니다. `version`을 주면 옛 판을 읽습니다 | `id*`, `version` |
+| `usable_resources` | R | 프로젝트가 쓸 수 있는 자원(프로젝트 자원 + 참조한 글로벌 자원)을 냅니다. 깨진 참조(`broken`)와 필요하지만 못 쓰는 스킬(`missingSkills`)도 냅니다 | `project*`, `bodies` |
+| `list_resource_versions` | R | 고치기 전의 판 목록(새것이 앞)을 냅니다 | `id*` |
+| `save_resource` | W! | 만들거나 고칩니다. `id`가 없으면 새로 만들고(`kind*`, `scope`나 `project`, `name*`, `description*`), 있으면 준 칸만 고칩니다(`f1` 필수, 종류·범위·id는 못 바꿈) | `id`, `kind`, `scope`, `project`, `name`, `description`, `body`, `permission`, `skills`, `repo`, `tools`, `f1` |
+| `delete_resource` | W! | 휴지통으로 보냅니다(스킬은 폴더째). 응답의 `referencedBy`는 참조하던 프로젝트들입니다 | `id*` |
+| `restore_resource` | W | 휴지통의 자원을 되살립니다. 제자리에 같은 이름이 있으면 거절됩니다 | `id*` |
+| `set_resource_ref` | W | 프로젝트가 글로벌 자원을 참조하는 것을 켭니다(`remove`가 true면 끕니다). `withSkills`가 true면 에이전트를 켤 때 그 글로벌 스킬도 함께 켭니다 | `project*`, `id*`, `remove`, `withSkills` |
+
+- 에이전트의 `permission`은 `read`, `edit`, `publish` 가운데 하나이고, `skills`는 스킬 id 목록입니다.
+- AI가 고치면 `editedSession`(과 Claude가 아닐 때 `editedAgent`)이 남고, 고치기 전의 판은 30판까지 이력에 남습니다. 되돌리려면 `get_resource`의 `version`으로 옛 판을 읽고 그 내용으로 `save_resource`를 부릅니다.
+- **지금은 승인 흐름이 없어서** AI가 쓴 변경(참조 켜고 끄기와 권한 포함)이 바로 적용됩니다. 승인 워크플로우는 이슈 [#53](https://github.com/bnjjong/aisurada/issues/53)입니다. 권한 값은 작업 실행기가 없어 아직 어디에도 쓰이지 않습니다.
 
 ### 내보내기
 
@@ -181,7 +197,7 @@ ais-cli gemini-mcp remove
 
 `f1`은 모델이 그 노트를 방금 읽었다는 증거입니다. 값을 계산해서 만들 수 없고, 읽은 응답의 `precondition`을 그대로 되돌려야 합니다. 서버는 이 규칙을 접속할 때 클라이언트에 `instructions`로 알리고, 각 도구의 `f1` 설명에도 적어 둡니다. json 형식 노트만 이 검사를 면제받습니다.
 
-**쓰기를 허용하기 전에 알아 둘 것.** 쓰기 모드는 모델이 vault의 노트를 만들고, 고치고, 휴지통으로 보낼 수 있다는 뜻입니다. `update_doc`은 본문을 통째로 바꾸고, `save_report`는 같은 종류와 날짜의 회고를 덮어씁니다. 중요한 vault는 git 같은 곳에 이력이 남게 해 두고 켜는 것을 권합니다.
+**쓰기를 허용하기 전에 알아 둘 것.** 쓰기 모드는 모델이 vault의 노트를 만들고, 고치고, 휴지통으로 보낼 수 있다는 뜻입니다. `update_doc`은 본문을 통째로 바꾸고, `save_resource`는 스킬과 에이전트 정의의 지침은 물론 참조와 권한까지 바꿀 수 있습니다(지금은 승인 흐름이 없습니다). 중요한 vault는 git 같은 곳에 이력이 남게 해 두고 켜는 것을 권합니다.
 
 ## 5. 모델에게 시키는 법
 
@@ -244,7 +260,7 @@ ais-cli gemini-mcp remove
 | 능력 | `tools`만 있고 `listChanged`는 false입니다. 리소스와 프롬프트는 없습니다 |
 | `instructions` | 노트를 고치는 도구에는 `f1`이 꼭 필요하고, 고치기 전에 `get_doc`으로 읽어 `precondition`을 넘기라는 안내를 접속할 때 줍니다 |
 | 도구 주석 | 모든 도구에 `annotations.readOnlyHint`, 쓰기 도구에는 `destructiveHint`도 있습니다 |
-| 입력 스키마 | `additionalProperties: false`. 키는 엔진이 받는 키와 같고, 시험이 도구 29개를 모두 엔진의 「모르는 키다」 문구와 대조합니다 |
+| 입력 스키마 | `additionalProperties: false`. 키는 엔진이 받는 키와 같고, 시험이 도구 34개를 모두 엔진의 「모르는 키다」 문구와 대조합니다 |
 | 오류 | 요청 형식이 틀리면 JSON-RPC 오류(-32700, -32600, -32601, -32602, -32603)이고, 도구가 실패하면 정상 응답에 `isError: true`입니다 |
 | 로그 | 서버의 표준 출력에는 프로토콜 메시지만 나옵니다. 시작 메시지(`aisurada MCP 서버 0.1.0: 읽기 전용`)와 진단은 표준 오류로 갑니다 |
 
