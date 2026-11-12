@@ -185,6 +185,9 @@ public final class AgentSessionTest {
             eq(((Map<?, ?>) ((Map<?, ?>) gturns.get(2)).get("tool")).get("failed"), true, "상태가 success가 아니면 실패");
             eq(((Map<?, ?>) gread.get("runState")).get("model"), "gemini-x", "gemini 모델");
 
+            // Antigravity(agy): SQLite 안의 protobuf. sqlite3가 없으면 건너뛴다
+            antigravity(v, home);
+
             // session-titles: 모르는 id는 found=false에 agent 키가 없다
             var titles = (List<?>) ok(v, "session-titles", cid, gid, "00000000-0000-0000-0000-000000000000").get("sessions");
             eq(((Map<?, ?>) titles.get(0)).get("agent"), "codex", "titles codex"); eq(((Map<?, ?>) titles.get(1)).get("agent"), "gemini", "titles gemini");
@@ -194,6 +197,130 @@ public final class AgentSessionTest {
             System.clearProperty("aisurada.gemini.home");
             System.clearProperty("aisurada.enable.part4");
         }
+    }
+
+    /** Antigravity 대화 기록을 진짜 모양으로 짓고(SQLite + protobuf) 읽는다. 가짜 기록은 sqlite3 명령으로 만든다. */
+    private static void antigravity(Path v, Path home) throws Exception {
+        String sqlite = Files.isExecutable(Path.of("/usr/bin/sqlite3")) ? "/usr/bin/sqlite3" : null;
+        if (sqlite == null) {
+            System.out.println("  (sqlite3가 없어 Antigravity 기록 시험은 건너뜀)");
+            return;
+        }
+        String aid = "b6e7c390-5781-4dae-b98e-e17dc5202d70";
+        Path conversations = home.resolve(".gemini/antigravity-cli/conversations");
+        Files.createDirectories(conversations);
+        Path db = conversations.resolve(aid + ".db");
+        String longBody = "긴 본문 ".repeat(600); // 인자 앞부분(1200바이트)을 넘겨도 도구 이름과 id는 읽혀야 한다
+        String mcpArgs = "{\"Arguments\":{\"body\":\"" + longBody + "\",\"id\":\"ndnote0001-abcdef12\"},\"ServerName\":\"aisurada\",\"ToolName\":\"update_doc\"}";
+        List<String> sql = new ArrayList<>(List.of(
+                "create table steps (idx integer, step_type integer not null default 0, status integer not null default 0, has_subtrajectory numeric not null default false, metadata blob, error_details blob, permissions blob, task_details blob, render_info blob, step_payload blob, step_format integer not null default 0, primary key (idx));",
+                "create table trajectory_metadata_blob (id text default 'main', data blob, primary key (id));",
+                "create table executor_metadata (idx integer, data blob, primary key (idx));",
+                "create table gen_metadata (idx integer, data blob, size integer not null default 0, primary key (idx));",
+                // 작업 폴더는 file: 주소이고 공백이 %20으로 온다
+                "insert into trajectory_metadata_blob values ('main', " + hex(pbString(7, "file:///work/ag%20dir")) + ");",
+                "insert into executor_metadata values (0, " + hex(pbMessage(10, pbMessage(1, pbString(28, "gemini-test-high")))) + ");",
+                // 0: 사용자 질문(노트 id가 들어 있다)
+                step(0, 14, 3, null, pbMessage(19, cat(pbString(2, "안녕 ndnote0001-abcdef12"), pbMessage(3, pbString(1, "안녕"))))),
+                // 1: 생각만 있고 답 글이 없는 모델 단계(오래된 단계는 내용이 비워진다) → 회차가 아니다
+                step(1, 15, 5, null, pbMessage(20, pbString(3, "생각만"))),
+                // 2: 기본 도구
+                stepTool(2, 3, null, "call_1", "read_file", "{\"EndLine\":100,\"Path\":\"/a/b.md\"}"),
+                // 3: MCP 도구. 서버와 도구 이름은 인자 맨 끝에 있고 id는 긴 본문 뒤에 있다
+                stepTool(3, 3, null, "call_2", "call_mcp_tool", mcpArgs),
+                // 4: 실패한 도구(status 7)
+                stepTool(4, 7, "file does not exist", "call_3", "run_command", "{\"CommandLine\":\"false\"}"),
+                // 5: 모델 답. 3번(생각)은 뺀다
+                step(5, 15, 3, null, pbMessage(20, cat(pbString(1, "답변입니다"), pbString(3, "생각")))),
+                // 6, 7: 시스템 알림(101)과 이어쓰기 요약(23)은 대화가 아니다
+                step(6, 101, 3, null, pbMessage(114, pbString(1, "[Message] system"))),
+                step(7, 23, 3, null, pbMessage(30, pbString(5, "<summary>요약</summary>"))),
+                // 8: 글이 빈 사용자 단계
+                step(8, 14, 5, null, pbMessage(19, pbString(2, "")))));
+        Process builder = new ProcessBuilder(sqlite, db.toString()).redirectErrorStream(true).start();
+        builder.getOutputStream().write(String.join("\n", sql).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        builder.getOutputStream().close();
+        String builderOut = new String(builder.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        check(builder.waitFor() == 0, "가짜 Antigravity 기록을 sqlite3로 짓는다: " + builderOut);
+
+        var located = aisurada.session.AgentTranscripts.locate(aid);
+        eq(located == null ? null : located.agent(), "gemini", "Antigravity 기록도 gemini로 찾는다");
+        var info = aisurada.session.AgentTranscripts.info(located, aid);
+        eq(info.found(), true, "Antigravity 읽기"); eq(info.title(), "안녕 ndnote0001-abcdef12", "제목은 첫 사용자 글");
+        eq(info.cwd(), "/work/ag dir", "작업 폴더는 file: 주소를 풀어 쓴다");
+        var read = ok(v, "read-session", aid, "note=ndnote0001-abcdef12");
+        eq(read.get("agent"), "gemini", "응답에 agent");
+        var turns = (List<?>) read.get("turns");
+        eq(turns.size(), 5, "사용자 1, 도구 3, 모델 답 1 (생각만 있는 단계, 시스템 알림, 요약, 빈 입력은 뺀다)");
+        eq(((Map<?, ?>) turns.get(0)).get("who"), "user", "첫 회차는 사용자");
+        eq(((Map<?, ?>) turns.get(0)).get("at"), "2026-11-08T10:30:01.500Z", "시각은 UTC 초와 나노초");
+        var readFile = (Map<?, ?>) ((Map<?, ?>) turns.get(1)).get("tool");
+        eq(readFile.get("name"), "read_file", "기본 도구 이름"); eq(readFile.get("arg"), "/a/b.md", "Path 인자 요약(대문자 키)");
+        var mcp = (Map<?, ?>) ((Map<?, ?>) turns.get(2)).get("tool");
+        eq(mcp.get("name"), "aisurada/update_doc", "MCP 도구는 서버/도구"); eq(mcp.get("arg"), "ndnote0001-abcdef12", "긴 본문 뒤의 id를 요약에 쓴다");
+        var failed = (Map<?, ?>) ((Map<?, ?>) turns.get(3)).get("tool");
+        eq(failed.get("name"), "run_command", "명령 실행"); eq(failed.get("arg"), "false", "CommandLine 인자 요약"); eq(failed.get("failed"), true, "status 7은 실패");
+        eq(((Map<?, ?>) turns.get(4)).get("text"), "답변입니다", "모델 답은 1번 필드만");
+        eq(((Map<?, ?>) read.get("runState")).get("model"), "gemini-test-high", "모델 id");
+        eq(read.get("noteMentions"), List.of(0L), "노트 id가 나온 회차");
+
+        // id 모양이 UUID가 아니면 파일 이름으로 쓰지 않는다
+        eq(aisurada.session.AgentTranscripts.locate("../" + aid), null, "경로를 흉내 낸 id는 찾지 않는다");
+        var titles = (List<?>) ok(v, "session-titles", aid).get("sessions");
+        eq(((Map<?, ?>) titles.get(0)).get("agent"), "gemini", "titles에도 gemini"); eq(((Map<?, ?>) titles.get(0)).get("found"), true, "titles found");
+
+        // sqlite3를 못 찾으면 못 읽은 것으로 보고하고 죽지 않는다
+        System.setProperty("aisurada.sqlite.bin", home.resolve("no-such-sqlite3").toString());
+        try {
+            eq(aisurada.session.AgentTranscripts.info(located, aid).found(), false, "sqlite3가 없으면 found=false");
+        } finally {
+            System.clearProperty("aisurada.sqlite.bin");
+        }
+    }
+
+    // ---- 가짜 Antigravity 기록을 짓는 도우미: 최소 protobuf 인코더 ----
+
+    private static byte[] cat(byte[]... parts) {
+        var out = new java.io.ByteArrayOutputStream();
+        for (byte[] part : parts) out.writeBytes(part);
+        return out.toByteArray();
+    }
+
+    private static byte[] varint(long value) {
+        var out = new java.io.ByteArrayOutputStream();
+        while ((value & ~0x7fL) != 0) { out.write((int) ((value & 0x7f) | 0x80)); value >>>= 7; }
+        out.write((int) value);
+        return out.toByteArray();
+    }
+
+    private static byte[] pbNumber(int field, long value) { return cat(varint((long) field << 3), varint(value)); }
+
+    private static byte[] pbBytes(int field, byte[] value) { return cat(varint(((long) field << 3) | 2), varint(value.length), value); }
+
+    private static byte[] pbString(int field, String value) { return pbBytes(field, value.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+
+    private static byte[] pbMessage(int field, byte[] message) { return pbBytes(field, message); }
+
+    /** 단계 시각 메시지: 1번 초, 2번 나노초. */
+    private static byte[] time() { return cat(pbNumber(1, 1794133801L), pbNumber(2, 500_000_000L)); }
+
+    private static String hex(byte[] bytes) {
+        var sb = new StringBuilder("X'");
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        return sb.append("'").toString();
+    }
+
+    private static String step(int idx, int type, int status, byte[] errors, byte[] payload) {
+        byte[] metadata = pbMessage(1, time());
+        byte[] full = cat(pbNumber(1, type), pbNumber(4, status), pbMessage(5, metadata), payload);
+        return "insert into steps (idx, step_type, status, metadata, error_details, step_payload) values (" + idx + "," + type + "," + status + ","
+                + hex(metadata) + "," + (errors == null ? "null" : hex(errors)) + "," + hex(full) + ");";
+    }
+
+    private static String stepTool(int idx, int status, String error, String callId, String name, String args) {
+        byte[] metadata = cat(pbMessage(1, time()), pbMessage(4, cat(pbString(1, callId), pbString(2, name), pbString(3, args))));
+        return "insert into steps (idx, step_type, status, metadata, error_details, step_payload) values (" + idx + ",132," + status + ","
+                + hex(metadata) + "," + (error == null ? "null" : hex(pbString(2, error))) + "," + hex(cat(pbNumber(1, 132), pbMessage(5, metadata))) + ");";
     }
 
     private static String doc(String title) {

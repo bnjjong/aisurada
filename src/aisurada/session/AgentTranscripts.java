@@ -18,11 +18,12 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Claude가 아닌 에이전트(Codex, Gemini)의 세션 기록을 찾고 {@code read-session}이 내는 모양으로 바꿉니다.
+ * Claude가 아닌 에이전트(Codex, Gemini 계열)의 세션 기록을 찾고 {@code read-session}이 내는 모양으로 바꿉니다.
  *
  * <p>Claude의 기록은 {@link SessionTranscript}가 읽습니다. 이 클래스는 세션 id로 Claude 기록을 못 찾았을 때만
- * 불립니다. 두 CLI의 기록 형식은 {@link CodexTranscript}와 {@link GeminiTranscript}가 읽어서 같은 {@link Turn} 목록으로
- * 만들고, 쪽 나누기와 주소 모으기는 여기서 한 번에 합니다.
+ * 불립니다. 기록 형식은 {@link CodexTranscript}, {@link GeminiTranscript}(Gemini CLI), {@link AntigravityTranscript}
+ * (Antigravity {@code agy})가 읽어서 같은 {@link Turn} 목록으로 만들고, 쪽 나누기와 주소 모으기는 여기서 한 번에 합니다.
+ * Gemini CLI와 Antigravity는 노트에 같은 에이전트 이름({@code gemini})으로 적히므로, 둘 다 {@link SessionAgents#GEMINI}로 돌려줍니다.
  */
 public final class AgentTranscripts {
 
@@ -66,6 +67,14 @@ public final class AgentTranscripts {
         return home == null ? null : home.resolve(".gemini").resolve("tmp");
     }
 
+    /** Antigravity 대화 기록 폴더. 지금 쓰는 antigravity-cli를 먼저, 예전 antigravity를 그다음에 본다. 시스템 속성 aisurada.gemini.home으로 홈을 바꿀 수 있습니다. */
+    public static List<Path> antigravityDirs() {
+        Path home = homeFor("aisurada.gemini.home");
+        if (home == null) return List.of();
+        Path gemini = home.resolve(".gemini");
+        return List.of(gemini.resolve("antigravity-cli").resolve("conversations"), gemini.resolve("antigravity").resolve("conversations"));
+    }
+
     private static Path homeFor(String property) {
         String custom = System.getProperty(property);
         if (custom != null && !custom.trim().isEmpty()) return Path.of(custom.trim());
@@ -79,6 +88,8 @@ public final class AgentTranscripts {
         if (codex != null) return new Located(SessionAgents.CODEX, codex);
         Path gemini = findGemini(geminiTmpDir(), sessionId);
         if (gemini != null) return new Located(SessionAgents.GEMINI, gemini);
+        Path antigravity = AntigravityTranscript.find(antigravityDirs(), sessionId);
+        if (antigravity != null) return new Located(SessionAgents.GEMINI, antigravity);
         return null;
     }
 
@@ -120,9 +131,9 @@ public final class AgentTranscripts {
     // ---- 읽기 ----
 
     private static Parsed parse(Located located) throws IOException {
-        return SessionAgents.CODEX.equals(located.agent())
-                ? CodexTranscript.parse(located.file())
-                : GeminiTranscript.parse(located.file(), geminiTmpDir());
+        if (SessionAgents.CODEX.equals(located.agent())) return CodexTranscript.parse(located.file());
+        if (AntigravityTranscript.isAntigravityFile(located.file())) return AntigravityTranscript.parse(located.file());
+        return GeminiTranscript.parse(located.file(), geminiTmpDir());
     }
 
     /** session-titles 한 건. 읽을 수 없으면 found=false입니다. */
