@@ -21,6 +21,7 @@ done
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.AgentSessionTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.VaultPointerTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.ProjectReposTest
+"$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.ResourcesTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.ChatCommandsTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.Part4ReviewTest
 "$JAVA" -cp dist/ais-engine.jar:build/test-classes aisurada.Chapter25To30IntegrationTest

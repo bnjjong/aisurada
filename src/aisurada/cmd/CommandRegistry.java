@@ -68,6 +68,14 @@ public final class CommandRegistry {
             new CommandSpec("facts-brief", null, true, false, FactsBrief.USAGE),
             new CommandSpec("read-session", null, false, true, "read-session <세션 id> [limit=<개수>] [before=<순번>] [urls=true] [note=<노트 id>] [author=<노트 id>,...]"),
             new CommandSpec("session-titles", null, false, true, "session-titles <세션 id> [세션 id...]"),
+            new CommandSpec("list-resources", null, false, false, ResourceCommands.LIST_USAGE),
+            new CommandSpec("get-resource", null, false, false, ResourceCommands.GET_USAGE),
+            new CommandSpec("save-resource", null, true, false, ResourceCommands.SAVE_USAGE),
+            new CommandSpec("delete-resource", null, true, false, ResourceCommands.DELETE_USAGE),
+            new CommandSpec("restore-resource", null, true, false, ResourceCommands.RESTORE_USAGE),
+            new CommandSpec("set-resource-ref", null, true, false, ResourceCommands.REF_USAGE),
+            new CommandSpec("usable-resources", null, false, false, ResourceCommands.USABLE_USAGE),
+            new CommandSpec("list-resource-versions", null, false, false, ResourceCommands.VERSIONS_USAGE),
             new CommandSpec("recent-sessions", null, false, true, "recent-sessions [days=<일 수>]")
     );
 

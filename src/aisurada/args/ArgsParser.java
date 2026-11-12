@@ -924,6 +924,43 @@ public final class ArgsParser {
                 maxPositional = 1;
                 usage = aisurada.cmd.DeleteProject.USAGE;
             }
+            case "list-resources" -> {
+                allowedOptions = List.of("bodies", "kind", "project", "scope", "trash");
+                maxPositional = 0;
+                usage = aisurada.cmd.ResourceCommands.LIST_USAGE;
+            }
+            case "get-resource" -> {
+                allowedOptions = List.of("version");
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.GET_USAGE;
+            }
+            case "save-resource" -> {
+                allowedOptions = List.of("body", "description", "f1", "id", "kind", "name", "permission", "project", "repo", "scope", "skills", "tools");
+                maxPositional = 0;
+                usage = aisurada.cmd.ResourceCommands.SAVE_USAGE;
+            }
+            case "delete-resource" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.DELETE_USAGE;
+            }
+            case "restore-resource" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.RESTORE_USAGE;
+            }
+            case "set-resource-ref" -> {
+                allowedOptions = List.of("remove", "with-skills");
+                maxPositional = 2;
+                usage = aisurada.cmd.ResourceCommands.REF_USAGE;
+            }
+            case "usable-resources" -> {
+                allowedOptions = List.of("bodies");
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.USABLE_USAGE;
+            }
+            case "list-resource-versions" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.VERSIONS_USAGE;
+            }
             case "list-agendas" -> {
                 maxPositional = 0;
                 usage = aisurada.cmd.ListAgendas.USAGE;

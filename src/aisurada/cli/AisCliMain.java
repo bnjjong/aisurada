@@ -140,6 +140,8 @@ public final class AisCliMain {
             "list-sub-notes", "get-sub-note", "list-attachments", "list-comments", "list-tags",
             "list-trash", "list-templates", "get-template",
             "list-agendas", "list-projects", "create-project", "update-project", "delete-project",
+            "list-resources", "get-resource", "save-resource", "delete-resource", "restore-resource",
+            "set-resource-ref", "usable-resources", "list-resource-versions",
             "save-template", "set-favorite", "evaluate-doc", "link-docs",
             "write-attachment", "delete-doc", "restore-doc", "purge-doc", "create-sub-note",
             "update-sub-note", "delete-sub-note", "export-markdown", "create-doc", "update-doc",
