@@ -313,3 +313,6 @@
   }
 }
 
+
+/* 세션 입력창 카드 */
+:root[data-skin="glass"] .sess-composer-box { border-color: var(--field-line); border-radius: 20px; }

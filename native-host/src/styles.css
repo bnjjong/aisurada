@@ -1136,51 +1136,162 @@ code.is-symbol { font-weight: 700; }
   justify-content: center;
 }
 
+/* 입력창: 카드 한 장 안에 글상자와 도구줄(셀렉트 · 단축키 · 마이크 · 보내기)을 둔다. */
 .sess-composer-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 14px 14px 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.sess-composer-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .sess-composer-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  min-height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   font-family: inherit;
   font-size: 14px;
-  line-height: 1.4;
-  resize: vertical;
-  background: var(--surface);
+  line-height: 1.55;
+  resize: none;
   color: var(--ink);
+}
+
+.sess-composer-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* 강조 링은 카드가 대신 그린다. 스킨의 입력 규칙보다 앞서도록 :root를 겹쳐 쓴다. */
+:root:root .sess-composer-input:focus,
+:root:root .sess-composer-input:focus-visible {
+  outline: none;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root:root .sess-composer-input:disabled {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.6;
 }
 
 .sess-composer-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
+.sess-composer .rchat-options {
+  gap: 8px;
+}
+
+.sess-composer .ask-option {
+  min-height: 32px;
+  padding-left: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.sess-composer-footer {
+  align-items: center;
+  gap: 8px;
+}
+
+/* 그림 붙이기(⌘V)와 보내기(⌘/Ctrl+Enter) 안내. 글자(placeholder)로 두면 흐려서 비활성처럼 보였다. */
+.sess-composer-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sess-composer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sess-composer-keys kbd {
+  display: inline-grid;
+  place-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+}
+
 .sess-composer-mic {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
   cursor: pointer;
-  padding: 4px 8px;
-  font-size: 14px;
+}
+
+.sess-composer-mic:hover:not(:disabled) {
+  background: var(--soft);
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.sess-composer-mic:active:not(:disabled) {
+  background: var(--sunken);
+  box-shadow: none;
 }
 
 .sess-composer-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
   background: var(--accent);
   color: var(--accent-ink);
   border: none;
-  padding: 6px 14px;
+  padding: 0 16px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .sess-composer-send:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.sess-composer-stop {
+  min-height: 32px;
 }
 
 /* 10장 CLI 탭 */

@@ -169,3 +169,6 @@
 :root[data-skin="modern"] .notice { border: 0; border-radius: 10px; box-shadow: var(--sh-2); }
 :root[data-skin="modern"] .lex-code { border-radius: 10px; }
 :root[data-skin="modern"] .vault-write-failures, :root[data-skin="modern"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }
+
+/* 세션 입력창 카드 */
+:root[data-skin="modern"] .sess-composer-box { border-color: var(--strong); border-radius: 12px; box-shadow: var(--sh-1); }

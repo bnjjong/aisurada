@@ -88,6 +88,20 @@ const PATHS: Record<string, ReactNode> = {
   link: (
     <path d="M7 3.5H4a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 4 13.5h7a1.5 1.5 0 0 0 1.5-1.5v-3M9.5 2.5h4v4M6.5 9.5l7-7" />
   ),
+  mic: (
+    <>
+      <rect x="6" y="1.5" width="4" height="8" rx="2" />
+      <path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5" />
+    </>
+  ),
+  arrowUp: <path d="M8 13V3M4 7l4-4 4 4" />,
+  image: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="2" />
+      <circle cx="6" cy="7" r="1" />
+      <path d="M3 12l3.5-3.5 2.5 2.5 2-2 2.5 2.5" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

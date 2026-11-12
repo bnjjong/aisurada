@@ -5,6 +5,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useStat
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { Icon } from '../../ui/Icon.tsx';
 import { Modal } from '../../ui/Modal.tsx';
 import { agendaOrder, HUE_COLORS } from '../../ui/model.ts';
 import { AskContext } from './askContext.ts';
@@ -401,7 +402,7 @@ export function SessionComposer({
           ref={input}
           className="sess-composer-input"
           aria-label="세션으로 보내기"
-          placeholder="Claude에게 이어 물어보기… (⌘V로 그림 붙이기, ⌘/Ctrl+Enter로 보내기)"
+          placeholder="Claude에게 이어 물어보기…"
           value={composer.text}
           disabled={composer.sending}
           rows={3}
@@ -441,6 +442,7 @@ export function SessionComposer({
         />
         <div className="sess-composer-actions">
           <ModelEffortPicks />
+          <ComposerKeys />
           <button
             type="button"
             className="sess-composer-mic"
@@ -450,7 +452,7 @@ export function SessionComposer({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => void startDictation()}
           >
-            🎤
+            <Icon name="mic" size={16} />
           </button>
           {composer.sending ? (
             <button
@@ -464,11 +466,31 @@ export function SessionComposer({
           ) : (
             <button type="button" className="sess-composer-send" aria-label="보내기" disabled={!composer.text.trim()} onClick={send}>
               보내기
+              <Icon name="arrowUp" />
             </button>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 입력창 도구줄에 놓는 단축키 안내 칩입니다. 긴 안내를 안내 글자(placeholder)에 넣으면 글자가 흐려 보여
+ * 비활성처럼 읽혀서, 그림 붙이기(⌘V)와 보내기(⌘/Ctrl+Enter)를 칩으로 옮겼습니다.
+ */
+function ComposerKeys({ enter = '보내기' }: { enter?: string }): React.JSX.Element {
+  return (
+    <span className="sess-composer-keys" title={`⌘V로 그림 붙이기, ⌘/Ctrl+Enter로 ${enter}`}>
+      <span className="sess-composer-hint">
+        <kbd>⌘V</kbd>
+        <Icon name="image" />
+      </span>
+      <span className="sess-composer-hint">
+        <kbd>⌘↵</kbd>
+        {enter}
+      </span>
+    </span>
   );
 }
 
@@ -915,39 +937,43 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
           </div>
           {notice && <div className="sess-composer-notice">{notice}</div>}
           <AskImageStrip images={pictures.images} refusal={pictures.refusal} onRemove={pictures.remove} />
-          <textarea
-            className="sess-composer-input"
-            aria-label="새 대화로 묻기"
-            placeholder="이 세션과 노트에 대해 물어요… (⌘V로 그림 붙이기, ⌘/Ctrl+Enter로 보내기)"
-            value={text}
-            rows={3}
-            disabled={querying}
-            onChange={(event) => setText(event.target.value)}
-            onPaste={pictures.paste}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                event.preventDefault();
-                void send();
-              }
-            }}
-          />
-          <div className="sess-composer-footer">
-            {querying ? (
-              <button
-                type="button"
-                className="sess-composer-stop"
-                aria-label="멈추기"
-                onClick={() => {
-                  if (running?.sessionId) void invoke('cancel_ask', { sessionId: running.sessionId, ...(running.askId ? { askId: running.askId } : {}) });
-                }}
-              >
-                멈추기
-              </button>
-            ) : (
-              <button type="button" className="sess-composer-send" disabled={!text.trim() || (first && read.loading)} onClick={() => void send()}>
-                {first && read.loading ? '세션 대화를 읽는 중…' : '묻기'}
-              </button>
-            )}
+          <div className="sess-composer-box">
+            <textarea
+              className="sess-composer-input"
+              aria-label="새 대화로 묻기"
+              placeholder="이 세션과 노트에 대해 물어요…"
+              value={text}
+              rows={3}
+              disabled={querying}
+              onChange={(event) => setText(event.target.value)}
+              onPaste={pictures.paste}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            <div className="sess-composer-footer">
+              <ComposerKeys enter="묻기" />
+              {querying ? (
+                <button
+                  type="button"
+                  className="sess-composer-stop"
+                  aria-label="멈추기"
+                  onClick={() => {
+                    if (running?.sessionId) void invoke('cancel_ask', { sessionId: running.sessionId, ...(running.askId ? { askId: running.askId } : {}) });
+                  }}
+                >
+                  멈추기
+                </button>
+              ) : (
+                <button type="button" className="sess-composer-send" disabled={!text.trim() || (first && read.loading)} onClick={() => void send()}>
+                  {first && read.loading ? '세션 대화를 읽는 중…' : '묻기'}
+                  <Icon name="arrowUp" />
+                </button>
+              )}
+            </div>
           </div>
         </footer>
       </aside>
