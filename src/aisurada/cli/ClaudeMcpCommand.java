@@ -1,22 +1,17 @@
 package aisurada.cli;
 
 import aisurada.args.JsonCompact;
-import aisurada.text.Trim;
-import aisurada.vault.VaultPath;
+import aisurada.vault.VaultPointer;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -26,14 +21,14 @@ import java.util.concurrent.TimeoutException;
  *
  * <p>Claude의 설정 파일을 직접 고치지 않고 {@code claude mcp add-json --scope user}만 부릅니다. 등록하는 명령은
  * 이 명령을 돌린 바로 그 Java와 그 {@code ais-cli.jar}라서, 앱에서 부르면 앱에 든 Java와 jar가 등록됩니다.
- * 등록은 지금 {@code AISURADA_VAULT}가 가리키는 vault 하나에 묶입니다. 다시 {@code add}하면 바꿔 끼웁니다.
+ * 등록에는 vault 경로를 박지 않습니다. 서버가 호출마다 앱이 열어 둔 vault를 읽기 때문에({@link aisurada.vault.VaultPointer}),
+ * 앱에서 vault를 바꾸면 에이전트가 따라갑니다. 다시 {@code add}하면 바꿔 끼웁니다(예전에 vault를 박은 등록도 이때 사라집니다).
  */
 final class ClaudeMcpCommand {
 
     static final String SERVER_NAME = "aisurada";
     /** 홈 아래 {@code .local/bin} 다음으로 보는 고정 자리. 호스트(ask.rs)와 같다. */
     private static final List<Path> FIXED_CLAUDE_PATHS = List.of(Paths.get("/opt/homebrew/bin/claude"), Paths.get("/usr/local/bin/claude"));
-    private static final long CLAUDE_TIMEOUT_SECONDS = 40;
     private static final String USAGE = "사용법: ais-cli claude-mcp <status|add|remove|config> [--write]";
 
     private ClaudeMcpCommand() {}
@@ -116,7 +111,6 @@ final class ClaudeMcpCommand {
             err.println(f.getMessage());
             return f.code;
         }
-        String normalizedVault = registration.vault;
         String java = registration.java;
         String cliJar = registration.jar;
         String payload = registration.payload;
@@ -128,8 +122,12 @@ final class ClaudeMcpCommand {
             err.println("연결을 못 했다: " + added.text.strip());
             return 1;
         }
-        out.println("{\"ok\":true,\"registered\":true,\"write\":" + write + ",\"vault\":" + quote(normalizedVault)
+        out.println("{\"ok\":true,\"registered\":true,\"write\":" + write + ",\"followsAppVault\":true"
                 + ",\"command\":" + quote(java) + ",\"jar\":" + quote(cliJar) + "}");
+        // vault를 박지 않으니, 앱이 vault를 연 적이 없고 환경변수도 없으면 도구가 실패한다. 오류는 아니라서 알리기만 한다
+        if (VaultPointer.resolve(env.get("AISURADA_VAULT"), System.getProperty("user.home")) == null) {
+            err.println("알림: 아직 vault를 정할 수 없다. 앱을 열어 vault를 열면 도구가 그 vault를 쓴다.");
+        }
         return 0;
     }
 
@@ -145,8 +143,8 @@ final class ClaudeMcpCommand {
         }
     }
 
-    /** 등록할 값 하나치. 이 명령을 돌린 Java와 ais-cli.jar, 지금 vault와 엔진 jar를 모은 것이다. */
-    private record Registration(String vault, String java, String jar, String payload) {}
+    /** 등록할 값 하나치. 이 명령을 돌린 Java와 ais-cli.jar와 엔진 jar를 모은 것이다. vault는 일부러 안 담는다. */
+    private record Registration(String java, String jar, String payload) {}
 
     /** 쓰는 법이나 환경이 틀려서 멈춘다. 종료 코드를 같이 실어 나른다. */
     private static final class Failure extends RuntimeException {
@@ -159,35 +157,35 @@ final class ClaudeMcpCommand {
     }
 
     private static Registration registration(Map<String, String> env, boolean write) {
-        String vault = env.get("AISURADA_VAULT");
-        if (vault == null || Trim.isBlank(vault)) {
-            throw new Failure(2, "AIS-400 AISURADA_VAULT 환경변수가 없다. 연결할 vault 폴더의 절대 경로를 넣고 다시 실행한다.");
-        }
-        String normalizedVault;
+        McpRegistration values;
         try {
-            normalizedVault = VaultPath.normalize(Trim.trim(vault));
-        } catch (RuntimeException e) {
-            normalizedVault = Trim.trim(vault);
+            values = McpRegistration.current();
+        } catch (IllegalStateException e) {
+            throw new Failure(1, e.getMessage());
         }
-        String java = PlistGenerator.resolveSidecarJava();
-        String cliJar = runningJar();
-        if (cliJar == null) {
-            throw new Failure(1, "ais-cli.jar의 자리를 알 수 없다. jar로 돌린 ais-cli에서만 연결할 수 있다.");
-        }
-        String sidecarJar = PlistGenerator.resolveSidecarJar(System.getProperty("user.home"));
-
         StringBuilder payload = new StringBuilder("{\"type\":\"stdio\",\"command\":");
-        JsonCompact.appendString(payload, java);
-        payload.append(",\"args\":[\"-jar\",");
-        JsonCompact.appendString(payload, cliJar);
-        payload.append(",\"mcp\"").append(write ? ",\"--write\"" : "").append("],\"env\":{\"AISURADA_VAULT\":");
-        JsonCompact.appendString(payload, normalizedVault);
-        if (sidecarJar != null) {
-            payload.append(",\"AISURADA_SIDECAR_JAR\":");
-            JsonCompact.appendString(payload, sidecarJar);
+        JsonCompact.appendString(payload, values.java());
+        payload.append(",\"args\":[");
+        List<String> serverArgs = values.serverArgs(write);
+        for (int i = 0; i < serverArgs.size(); i++) {
+            if (i > 0) {
+                payload.append(',');
+            }
+            JsonCompact.appendString(payload, serverArgs.get(i));
+        }
+        payload.append("],\"env\":{");
+        boolean first = true;
+        for (Map.Entry<String, String> entry : values.env().entrySet()) {
+            if (!first) {
+                payload.append(',');
+            }
+            first = false;
+            JsonCompact.appendString(payload, entry.getKey());
+            payload.append(':');
+            JsonCompact.appendString(payload, entry.getValue());
         }
         payload.append("}}");
-        return new Registration(normalizedVault, java, cliJar, payload.toString());
+        return new Registration(values.java(), values.cliJar(), payload.toString());
     }
 
     /** claude 실행 파일을 찾는 차례는 호스트(ask.rs의 resolve_claude)와 같다. */
@@ -218,45 +216,13 @@ final class ClaudeMcpCommand {
         return null;
     }
 
-    /** 지금 돌고 있는 ais-cli.jar의 절대 경로. jar로 돌지 않았으면 null이다. */
-    private static String runningJar() {
-        try {
-            Path location = Paths.get(ClaudeMcpCommand.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-            return Files.isRegularFile(location) && location.toString().endsWith(".jar") ? location.toAbsolutePath().normalize().toString() : null;
-        } catch (URISyntaxException | RuntimeException e) {
-            return null;
-        }
-    }
-
     private record Result(int status, String text) {}
 
     /** claude를 홈 폴더에서 돌려 종료 코드와 출력을 모은다. 프로젝트 설정(.mcp.json)이 끼어들지 않게 하려는 것이다. */
     private static Result claude(Path claude, Map<String, String> env, List<String> args)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        List<String> command = new ArrayList<>();
-        command.add(claude.toString());
-        command.addAll(args);
-        ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
-        String home = env.get("HOME");
-        if (home != null && Files.isDirectory(Paths.get(home))) {
-            builder.directory(Paths.get(home).toFile());
-        }
-        builder.environment().clear();
-        builder.environment().putAll(env);
-        Process process = builder.start();
-        process.getOutputStream().close();
-        CompletableFuture<String> output = CompletableFuture.supplyAsync(() -> {
-            try {
-                return new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                return "";
-            }
-        });
-        if (!process.waitFor(CLAUDE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            process.destroyForcibly();
-            throw new TimeoutException("claude " + String.join(" ", args.subList(0, Math.min(2, args.size()))) + " 가 " + CLAUDE_TIMEOUT_SECONDS + "초 안에 안 끝났다");
-        }
-        return new Result(process.exitValue(), output.get(5, TimeUnit.SECONDS));
+        AgentCli.Result result = AgentCli.run("claude", claude, env, args);
+        return new Result(result.status(), result.text());
     }
 
     private static String quote(String s) {

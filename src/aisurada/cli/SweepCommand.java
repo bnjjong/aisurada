@@ -4,6 +4,7 @@ import aisurada.serve.StateFile;
 import aisurada.text.Trim;
 import aisurada.vault.VaultKey;
 import aisurada.vault.VaultPath;
+import aisurada.vault.VaultPointer;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +30,7 @@ public final class SweepCommand {
             }
         }
 
-        String envVault = System.getenv("AISURADA_VAULT");
+        String envVault = VaultPointer.resolve(System.getenv("AISURADA_VAULT"), System.getProperty("user.home"));
         String currentVaultKey = null;
         if (envVault != null && !Trim.isBlank(envVault)) {
             // 엔진 갈래(3.3의 2번)처럼 3.1의 경로 정리를 지난 글로 키를 짓는다. 안 그러면 끝 / 나 상대 경로로 준 지금 vault를 남으로 본다

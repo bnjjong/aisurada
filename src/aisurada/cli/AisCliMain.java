@@ -9,6 +9,7 @@ import aisurada.session.SessionAgents;
 import aisurada.text.Trim;
 import aisurada.vault.VaultKey;
 import aisurada.vault.VaultPath;
+import aisurada.vault.VaultPointer;
 
 import java.io.File;
 import java.io.IOException;
@@ -131,7 +132,7 @@ public final class AisCliMain {
     );
 
     public static final List<String> DIRECT_COMMANDS = List.of(
-            "doctor", "sweep", "schedule", "install", "mcp", "claude-mcp"
+            "doctor", "sweep", "schedule", "install", "mcp", "claude-mcp", "codex-mcp", "gemini-mcp"
     );
 
     public static final List<String> ENGINE_COMMANDS_61 = List.of(
@@ -181,6 +182,12 @@ public final class AisCliMain {
         } else if ("claude-mcp".equals(firstArg)) {
             ClaudeMcpCommand.run(Arrays.copyOfRange(args, 1, args.length));
             return;
+        } else if ("codex-mcp".equals(firstArg)) {
+            AgentMcpCommand.run(AgentMcpCommand.Kind.CODEX, Arrays.copyOfRange(args, 1, args.length));
+            return;
+        } else if ("gemini-mcp".equals(firstArg)) {
+            AgentMcpCommand.run(AgentMcpCommand.Kind.GEMINI, Arrays.copyOfRange(args, 1, args.length));
+            return;
         } else if ("schedule".equals(firstArg)) {
             // 결정 3: 모르는 이름으로 간주하여 종료 코드 2
             printUnknownName(firstArg);
@@ -221,6 +228,8 @@ public final class AisCliMain {
         System.out.println("install — 실행에 필요한 jar 파일을 설치합니다");
         System.out.println("mcp — Claude 같은 MCP 클라이언트가 노트를 읽도록 MCP 서버로 선다(표준 입출력). 쓰기 도구는 --write를 줄 때만 연다");
         System.out.println("claude-mcp — Claude Code에 이 MCP 서버를 등록한다(status, add [--write], remove)");
+        System.out.println("codex-mcp — Codex에 이 MCP 서버를 등록한다(status, add [--write], remove)");
+        System.out.println("gemini-mcp — Antigravity(agy)나 Gemini CLI에 이 MCP 서버를 등록한다(status, add [--write], remove)");
         System.out.println();
         System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61));
         System.out.println("  앱이 쓰는 배선입니다. 이름이 하이픈인 것이 표시이고, 도구 이름(밑줄)과 다른 표면입니다.");
@@ -256,15 +265,15 @@ public final class AisCliMain {
     }
 
     private static void runEnginePipeline(String[] args) {
-        // 1. AISURADA_VAULT 확인
-        String envVault = System.getenv("AISURADA_VAULT");
+        // 1. vault 정하기: AISURADA_VAULT가 있으면 그것, 없으면 앱이 열어 둔 vault. 호출마다 다시 읽어서 앱을 따라간다
+        String userHome = System.getProperty("user.home");
+        String envVault = VaultPointer.resolve(System.getenv("AISURADA_VAULT"), userHome);
         if (envVault == null || Trim.isBlank(envVault)) {
-            System.err.println("AIS-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
+            System.err.println("AIS-400 " + VaultPointer.MISSING_MESSAGE);
             exit(2);
             return;
         }
 
-        String userHome = System.getProperty("user.home");
         String userDir = System.getProperty("user.dir", ".");
         String trimmedVault = Trim.trim(envVault);
         String normalizedVault;

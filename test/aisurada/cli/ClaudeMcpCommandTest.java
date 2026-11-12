@@ -114,7 +114,10 @@ public final class ClaudeMcpCommandTest {
         List<String> argv = new ArrayList<>();
         ((JsonValue.JsonArray) field(payload, "args")).elements().forEach(e -> argv.add(text(e)));
         eq(argv, List.of("-jar", Path.of("dist/ais-cli.jar").toAbsolutePath().normalize().toString(), "mcp"), "등록하는 인자는 이 ais-cli.jar의 mcp 모드(쓰기 없음)");
-        check(text(field(field(payload, "env"), "AISURADA_VAULT")).endsWith("vault dir"), "공백이 든 vault 경로도 그대로 간다");
+        // 환경에 AISURADA_VAULT가 있어도 등록에는 vault를 박지 않는다. 서버가 호출마다 앱이 연 vault를 읽는다
+        check(field(field(payload, "env"), "AISURADA_VAULT") == null, "vault 경로를 등록에 박지 않는다: " + payload);
+        eq(text(field(JsonReader.parse(added.out), "followsAppVault")), "true", "add 응답: 앱이 연 vault를 따른다");
+        check(JsonReader.parse(added.out) instanceof JsonValue.JsonObject o && !o.properties().containsKey("vault"), "add 응답에는 vault가 없다");
         eq(text(field(field(payload, "env"), "AISURADA_SIDECAR_JAR")), "/opt/app/ais-sidecar.jar", "엔진 jar 환경 변수도 함께 등록");
         eq(text(field(JsonReader.parse(added.out), "write")), "false", "add 응답: 쓰기 없음");
         check(Files.readString(log).contains("--scope user"), "사용자 범위로 등록한다");
@@ -146,11 +149,19 @@ public final class ClaudeMcpCommandTest {
         Run failed = cli(home, failing, "add");
         eq(failed.status, 1, "claude가 실패하면 종료 코드 1");
         check(failed.err.contains("denied"), "claude의 오류 글을 알려 준다: " + failed.err);
+        // vault를 박지 않으니 vault가 없어도 등록은 된다. 앱이 vault를 연 적이 없으면 알리기만 한다
         Map<String, String> noVault = new HashMap<>(env);
         noVault.remove("AISURADA_VAULT");
         Run missingVault = cli(home, noVault, "add");
-        eq(missingVault.status, 2, "vault가 없으면 종료 코드 2");
-        check(missingVault.err.contains("AISURADA_VAULT"), "vault 환경 변수를 알려 준다");
+        eq(missingVault.status, 0, "vault가 없어도 등록은 된다: " + missingVault.err);
+        check(missingVault.err.contains("앱을 열어"), "앱을 열라고 알려 준다: " + missingVault.err);
+        Path pointerDir = Files.createDirectories(home.resolve("Library/Application Support/aisurada"));
+        Files.writeString(pointerDir.resolve("current-vault.json"), "{\"vault\":\"" + vault + "\"}");
+        Run pointed = cli(home, noVault, "add");
+        eq(pointed.status, 0, "앱이 vault를 적어 둔 뒤 add: " + pointed.err);
+        check(!pointed.err.contains("앱을 열어"), "앱이 연 vault가 있으면 알림이 없다: " + pointed.err);
+        Files.delete(pointerDir.resolve("current-vault.json"));
+        Files.deleteIfExists(state); // 이 블록의 add 두 번이 남긴 등록. 뒤의 config 시험은 아무것도 등록 안 된 상태에서 시작한다
         eq(cli(home, env, "bogus").status, 2, "모르는 동작은 사용법");
         eq(cli(home, env).status, 2, "동작이 없으면 사용법");
         eq(cli(home, env, "status", "--write").status, 2, "--write는 add에서만");
@@ -168,7 +179,7 @@ public final class ClaudeMcpCommandTest {
         check(((JsonValue.JsonArray) field(server, "args")).elements().stream().map(ClaudeMcpCommandTest::text).toList().contains("--write"), "config --write는 쓰기 인자를 싣는다");
         eq(Files.readString(log), "", "config는 claude를 부르지 않는다");
         check(!Files.exists(state), "config는 아무것도 등록하지 않는다");
-        eq(cli(home, noVault(env), "config").status, 2, "config도 vault가 없으면 종료 코드 2");
+        eq(cli(home, noVault(env), "config").status, 0, "config도 vault 없이 된다");
 
         // claude가 없을 때: status는 알려 주고, add는 실패한다
         Map<String, String> noClaude = new HashMap<>(env);

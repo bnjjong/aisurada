@@ -4,6 +4,7 @@ import aisurada.serve.StateFile;
 import aisurada.text.Trim;
 import aisurada.vault.VaultKey;
 import aisurada.vault.VaultPath;
+import aisurada.vault.VaultPointer;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,15 +34,15 @@ public final class DoctorCommand {
             else if ("--dry-run".equals(a)) dryRun = true;
         }
 
-        // 1. AISURADA_VAULT 확인
-        String envVault = System.getenv("AISURADA_VAULT");
+        // 1. vault 정하기: AISURADA_VAULT가 있으면 그것, 없으면 앱이 열어 둔 vault
+        String userHome = System.getProperty("user.home");
+        String envVault = VaultPointer.resolve(System.getenv("AISURADA_VAULT"), userHome);
         if (envVault == null || Trim.isBlank(envVault)) {
-            System.err.println("AIS-400 AISURADA_VAULT 환경변수가 없다. vault 폴더의 절대 경로를 넣고 다시 실행한다.");
+            System.err.println("AIS-400 " + VaultPointer.MISSING_MESSAGE);
             System.exit(2);
             return;
         }
 
-        String userHome = System.getProperty("user.home");
         String userDir = System.getProperty("user.dir", ".");
 
         // vault 글자 정리 (//와 끝 / 정리, 절대 경로로는 안 바꾼다)

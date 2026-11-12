@@ -1,6 +1,7 @@
 package aisurada.cli;
 
 import aisurada.session.SessionAgents;
+import aisurada.vault.VaultPointer;
 import aisurada.args.JsonCompact;
 import aisurada.args.JsonReader;
 import aisurada.args.JsonValue;
@@ -23,7 +24,8 @@ import java.util.function.Function;
  * {@code ais-cli}와 같은 길(소켓, 엔진 띄우기, 요청 왕복)로 엔진에 보냅니다. JVM을 한 번만 띄우고 호출마다
  * 재사용하므로 호출마다 JVM을 띄우는 비용이 없습니다.
  *
- * <p>vault는 {@code AISURADA_VAULT} 환경 변수로 정합니다. 서버 하나가 vault 하나를 다룹니다.
+ * <p>vault는 {@code AISURADA_VAULT} 환경 변수가 있으면 그것으로, 없으면 앱이 열어 둔 vault({@link VaultPointer})로 정하고,
+ * 도구를 부를 때마다 다시 정합니다. 그래서 등록에는 vault 경로를 박지 않아도 앱에서 vault를 바꾸면 따라갑니다.
  * 기본은 읽기 도구만 내놓고, {@code --write}를 주면 쓰기 도구도 내놓습니다({@link McpTools}).
  */
 final class McpServer {
@@ -62,7 +64,7 @@ final class McpServer {
                 write = true;
             } else if ("--help".equals(arg) || "-h".equals(arg)) {
                 System.out.println("사용법: ais-cli mcp [--write]");
-                System.out.println("  MCP 서버로 선다(표준 입출력). vault는 AISURADA_VAULT로 정한다.");
+                System.out.println("  MCP 서버로 선다(표준 입출력). vault는 AISURADA_VAULT로 정하고, 없으면 앱이 열어 둔 vault를 호출마다 따른다.");
                 System.out.println("  기본은 읽기 도구만 내놓는다. --write를 주면 노트를 만들고 고치는 도구도 내놓는다.");
                 System.out.println("  영구 삭제(purge_doc)는 어느 쪽으로도 내놓지 않는다.");
                 System.exit(0);
@@ -77,9 +79,10 @@ final class McpServer {
         PrintStream protocol = new PrintStream(new FileOutputStream(FileDescriptor.out), false, StandardCharsets.UTF_8);
         System.setOut(System.err);
         AisCliMain.enableEmbedded();
-        String vault = System.getenv("AISURADA_VAULT");
+        // 환경변수가 없으면 호출마다 앱이 열어 둔 vault를 읽는다. 시작할 때는 안내 글을 위해 한 번만 본다
+        String vault = VaultPointer.resolve(System.getenv("AISURADA_VAULT"), System.getProperty("user.home"));
         System.err.println("aisurada MCP 서버 " + SERVER_VERSION + ": " + (write ? "읽기+쓰기" : "읽기 전용")
-                + (vault == null || vault.isBlank() ? " (AISURADA_VAULT가 없어 도구 호출은 실패한다)" : ""));
+                + (vault == null || vault.isBlank() ? " (vault를 아직 못 정했다. 앱을 열어 vault를 열면 도구 호출이 그 vault를 쓴다)" : ""));
         try {
             new McpServer(write, AisCliMain::callEmbedded).serve(
                     new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8)), protocol);
