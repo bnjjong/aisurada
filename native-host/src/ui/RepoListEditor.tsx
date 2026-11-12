@@ -68,7 +68,7 @@ export function RepoListEditor({
     <fieldset className="repo-editor">
       <legend>저장소</legend>
       <p className="repo-editor-hint">
-        아젠다가 고를 수 있는 저장소예요. 이 컴퓨터의 폴더를 적으면 그 폴더를 쓰고, GitHub 저장소만 적으면 앱이 받아 둬요.
+        아젠다가 고를 수 있는 저장소예요. 폴더를 적으면 그 폴더를 쓰고, GitHub만 적으면 앱이 받아 둬요.
       </p>
       {entries.map((entry, index) => {
         const clone = entry.github ? github.clones[entry.github] : undefined;
@@ -76,52 +76,59 @@ export function RepoListEditor({
         const where = localPathOf(entry, github.status?.cloneRoot);
         return (
           <div className="repo-row" key={index} data-testid="repo-row">
-            <div className="repo-row-head">
-              <input
-                aria-label={`${index + 1}번째 저장소 이름`}
-                placeholder="이름 (예: app)"
-                value={entry.name}
-                onChange={(e) => patch(index, { name: e.target.value })}
-              />
-              <button type="button" aria-label={`${index + 1}번째 저장소 빼기`} onClick={() => onChange(entries.filter((_, i) => i !== index))}>
-                빼기
-              </button>
-            </div>
-            <div className="repo-row-field">
-              <input
-                aria-label={`${index + 1}번째 저장소 폴더`}
-                placeholder="이 컴퓨터의 폴더 (선택) 예: /Users/me/app"
-                value={entry.path ?? ""}
-                onChange={(e) => patch(index, { path: e.target.value })}
-              />
-              <button
-                type="button"
-                onClick={() => void host.pickDirectory().then((dir) => dir && patch(index, { path: dir }))}
-              >
-                폴더 고르기
-              </button>
-            </div>
-            <div className="repo-row-field">
-              <input
-                aria-label={`${index + 1}번째 저장소 GitHub`}
-                placeholder="GitHub 저장소 (선택) 예: owner/name"
-                value={entry.github ?? ""}
-                // 손으로 고치면 숫자 ID는 더는 믿을 수 없어 버린다. 목록에서 고를 때만 ID가 붙는다.
-                onChange={(e) => patch(index, { github: e.target.value, githubId: undefined })}
-              />
-              <button type="button" disabled={!connected} title={connected ? "" : "설정에서 GitHub를 먼저 연결해 주세요."} onClick={() => void openPicker(index)}>
-                내 저장소에서 고르기
-              </button>
-            </div>
+            <span className="repo-row-label" aria-hidden="true">이름</span>
+            <input
+              aria-label={`${index + 1}번째 저장소 이름`}
+              placeholder="예: app"
+              value={entry.name}
+              onChange={(e) => patch(index, { name: e.target.value })}
+            />
+            <button
+              type="button"
+              className="repo-remove"
+              aria-label={`${index + 1}번째 저장소 빼기`}
+              onClick={() => onChange(entries.filter((_, i) => i !== index))}
+            >
+              빼기
+            </button>
+            <span className="repo-row-label" aria-hidden="true">폴더</span>
+            <input
+              aria-label={`${index + 1}번째 저장소 폴더`}
+              placeholder="선택 · 예: /Users/me/app"
+              value={entry.path ?? ""}
+              onChange={(e) => patch(index, { path: e.target.value })}
+            />
+            <button
+              type="button"
+              onClick={() => void host.pickDirectory().then((dir) => dir && patch(index, { path: dir }))}
+            >
+              폴더 고르기
+            </button>
+            <span className="repo-row-label" aria-hidden="true">GitHub</span>
+            <input
+              aria-label={`${index + 1}번째 저장소 GitHub`}
+              placeholder="선택 · 예: owner/name"
+              value={entry.github ?? ""}
+              // 손으로 고치면 숫자 ID는 더는 믿을 수 없어 버린다. 목록에서 고를 때만 ID가 붙는다.
+              onChange={(e) => patch(index, { github: e.target.value, githubId: undefined })}
+            />
+            <button type="button" disabled={!connected} title={connected ? "" : "설정에서 GitHub를 먼저 연결해 주세요."} onClick={() => void openPicker(index)}>
+              내 저장소에서 고르기
+            </button>
             {picking === index && (
               <div className="repo-picker">
-                <input
-                  aria-label="저장소 찾기"
-                  placeholder="이름으로 찾기"
-                  value={query}
-                  autoFocus
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+                <div className="repo-picker-head">
+                  <input
+                    aria-label="저장소 찾기"
+                    placeholder="이름으로 찾기"
+                    value={query}
+                    autoFocus
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <button type="button" onClick={() => setPicking(null)}>
+                    닫기
+                  </button>
+                </div>
                 {!repos && !loadError && <p>불러오는 중이에요…</p>}
                 {loadError && <p role="alert">{loadError}</p>}
                 {repos && !shown.length && <p>앱을 설치한 저장소 중에 맞는 것이 없어요.</p>}
@@ -135,21 +142,15 @@ export function RepoListEditor({
                     </li>
                   ))}
                 </ul>
-                <button type="button" onClick={() => setPicking(null)}>
-                  닫기
-                </button>
               </div>
             )}
             {(line || where) && (
               <p className="repo-row-note" role={clone?.phase === "error" ? "alert" : "status"}>
-                {line || `쓰는 폴더 · ${where}`}
+                <span>{line || `쓰는 폴더 · ${where}`}</span>
                 {entry.github && !entry.path && connected && clone?.phase !== "cloning" && (
-                  <>
-                    {" "}
-                    <button type="button" onClick={() => void cloneRepo(host.callHost, entry.github!)}>
-                      지금 받기
-                    </button>
-                  </>
+                  <button type="button" onClick={() => void cloneRepo(host.callHost, entry.github!)}>
+                    지금 받기
+                  </button>
                 )}
               </p>
             )}
@@ -158,6 +159,7 @@ export function RepoListEditor({
       })}
       <button
         type="button"
+        className="repo-add"
         disabled={entries.length >= MAX_REPOS}
         onClick={() => onChange([...entries, { name: "" }])}
       >

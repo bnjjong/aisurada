@@ -476,16 +476,16 @@ function EntityForm({
           />
         </label>
         {error && <p role="alert">{error}</p>}
-        <footer>
+        <footer className="entity-foot">
           {id && (
-            <button type="button" onClick={() => setConfirm(true)}>
+            <button type="button" className="entity-delete" onClick={() => setConfirm(true)}>
               삭제
             </button>
           )}
           <button type="button" onClick={handleClose}>
             취소
           </button>
-          <button type="submit" disabled={busy || !title.trim()}>
+          <button type="submit" className="button-primary" disabled={busy || !title.trim()}>
             {id ? "저장" : "만들기"}
           </button>
         </footer>

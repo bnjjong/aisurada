@@ -1265,15 +1265,33 @@ code.is-symbol { font-weight: 700; }
 .set-github-key { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .set-github-key small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .repo-editor { margin: 0 0 18px; padding: 0; border: 0; min-width: 0; }
-.repo-editor legend { padding: 0; margin-bottom: 8px; font-size: 12px; }
-.repo-editor-hint { margin: 0 0 10px; font-size: 12px; line-height: 1.6; color: var(--muted); }
-.repo-row { display: grid; gap: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 8px; }
-.repo-row-head, .repo-row-field { display: flex; gap: 8px; min-width: 0; }
-.repo-row-head input, .repo-row-field input { flex: 1; min-width: 0; }
-.repo-row-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); word-break: break-all; }
-.repo-picker { display: grid; gap: 8px; padding: 10px; background: var(--soft); border: 1px solid var(--line); }
+.repo-editor legend { padding: 0; margin-bottom: 6px; font-size: 12px; }
+.repo-editor-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+/* 한 행은 「라벨 | 입력 | 버튼」 3열 격자다. 라벨 열과 버튼 열은 가장 넓은 칸에 맞아 행마다 줄이 맞는다. */
+.repo-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 14px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.repo-row-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.repo-row > input { min-width: 0; }
+.repo-row-note { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.repo-row-note > span { min-width: 0; word-break: break-all; }
+.repo-editor button { padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+/* 빼기: 평소엔 글자만 보이고, 올리면 위험 색으로 바뀐다. */
+.repo-editor .repo-remove { background: transparent; box-shadow: none; border-color: transparent; color: var(--muted); }
+.repo-editor .repo-remove:hover:not(:disabled) { background: var(--soft); box-shadow: none; color: var(--err, #c92a2a); }
+/* 저장소 추가: 점선 상자로 「여기에 더한다」를 알린다. */
+.repo-editor .repo-add { display: block; width: 100%; padding: 10px 12px; background: transparent; box-shadow: none; border: 1px dashed var(--line); border-color: color-mix(in srgb, var(--muted) 40%, transparent); color: var(--muted); }
+.repo-editor .repo-add::before { content: "+"; margin-right: 6px; }
+.repo-editor .repo-add:hover:not(:disabled) { background: var(--soft); box-shadow: none; border-color: var(--muted); color: var(--ink); }
+.repo-picker { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; }
+.repo-picker-head { display: flex; align-items: center; gap: 8px; }
+.repo-picker-head input { flex: 1; min-width: 0; }
 .repo-picker p { margin: 0; font-size: 12px; color: var(--muted); }
-.repo-picker ul { display: grid; gap: 4px; max-height: 160px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.repo-picker ul { display: grid; gap: 2px; max-height: 160px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.repo-picker li button { width: 100%; text-align: left; background: transparent; box-shadow: none; border-color: transparent; border-radius: 8px; }
+.repo-picker li button:hover:not(:disabled) { background: var(--surface); box-shadow: none; }
+/* 프로젝트·아젠다 폼 하단: 지우기는 왼쪽에 따로 두고, 저장은 강조 단추로 둔다. */
+.entity-foot .entity-delete { margin: 0 auto 0 -12px; padding: 9px 12px; background: transparent; box-shadow: none; border-color: transparent; color: var(--err, #c92a2a); }
+.entity-foot .entity-delete:hover:not(:disabled) { background: var(--soft); box-shadow: none; }
+.entity-foot .button-primary { padding: 9px 22px; font-size: 12px; font-weight: 600; }
 .set-connect-desktop { margin-top: 16px; font-size: 12px; }
 .set-connect-desktop summary { cursor: pointer; color: var(--muted); }
 .set-connect-desktop pre { margin: 10px 0; padding: 12px; overflow-x: auto; background: var(--soft); border: 1px solid var(--line); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
