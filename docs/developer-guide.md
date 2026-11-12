@@ -108,7 +108,7 @@ test-native.sh         화면·호스트 시험 전체
 
 ### 호스트 모듈 (`native-host/src-tauri/src/`)
 
-`workspace.rs`(vault 허용·만들기), `sidecar.rs`(`sidecar_call`), `files.rs`(그림 첨부 쓰기, 기본 앱 열기), `markdown.rs`(외부 마크다운), `notes.rs`(노트 창), `terminal.rs`(PTY), `secrets.rs`(비밀 가림), `menu.rs`, `layout.rs`(창 자리), `frame.rs`(`aisframe://`), `self_write.rs`, `process.rs`(자식 실행과 시간 상한), `ipc.rs`(이벤트 이름). 4부는 `ask.rs`, `agents.rs`, `session_image.rs`, `dictation.rs`, `session_shell.rs`이고 cargo 기능 `claude` 아래에 있다.
+`workspace.rs`(vault 허용·만들기), `github.rs`(GitHub App 연결, 아래 「GitHub App 연결」), `sidecar.rs`(`sidecar_call`), `files.rs`(그림 첨부 쓰기, 기본 앱 열기), `markdown.rs`(외부 마크다운), `notes.rs`(노트 창), `terminal.rs`(PTY), `secrets.rs`(비밀 가림), `menu.rs`, `layout.rs`(창 자리), `frame.rs`(`aisframe://`), `self_write.rs`, `process.rs`(자식 실행과 시간 상한), `ipc.rs`(이벤트 이름). 4부는 `ask.rs`, `agents.rs`, `session_image.rs`, `dictation.rs`, `session_shell.rs`이고 cargo 기능 `claude` 아래에 있다.
 
 ### 화면 모듈 (`native-host/src/`)
 
@@ -146,6 +146,17 @@ test-native.sh         화면·호스트 시험 전체
 - **로컬 폴더가 없는 GitHub 항목.** `path`가 없으면 앱이 정한 폴더(`~/Library/Application Support/aisurada/repos/<소유자>/<이름>`)에 받아 쓰는 것으로 계획했다. 이 단계에서는 엔진이 이 폴더를 알지 못한다. 받는 일과 GitHub 연결은 호스트 몫이고 아직 없다.
 - **한계.** `repos`와 `projectRepo`를 모르는 옛 빌드가 프로젝트나 아젠다를 다시 쓰면 그 줄이 지워진다(두 파일을 통째로 다시 쓰고 모르는 키는 버리는 지금 규칙).
 - **시험.** `ProjectReposTest`(파일 형식, 응답, 틀린 값 거절, 손으로 고친 파일, 아젠다의 가리킴 규칙).
+
+### GitHub App 연결 (`github.rs`)
+
+프로젝트의 GitHub 저장소(앞의 「프로젝트의 저장소와 아젠다의 `projectRepo`」)를 앱이 읽고 받아 오는 호스트 쪽 바탕이다. 사용자가 GitHub에서 직접 만든 GitHub App의 **App ID와 개인 키(PEM)** 로 **설치 토큰**을 받는 방식이고, 사용자 로그인(디바이스 플로우)은 쓰지 않는다. 활동은 앱(봇) 이름으로 남는다. 화면(설정, 폼)은 아직 없다.
+
+- **GitHub와 말하는 곳은 이 모듈뿐이다.** 화면의 CSP(`connect-src 'self' ipc:`)는 그대로고, 엔진과 에이전트(MCP)는 토큰을 볼 수 없다. HTTP는 `ureq`(rustls), RS256 서명은 `ring`, 키체인은 `security-framework`다. JWT는 base64url 세 조각이라 직접 만든다(`iat`는 60초 앞당기고 10분 안에 만료).
+- **보관.** 개인 키(PEM)는 키체인(서비스 `co.kcd.aisurada.github-app`, 계정 `private-key`)에만 둔다. App ID, 앱 이름과 slug는 `~/Library/Application Support/aisurada/github-app.json`에 둔다. 설치 토큰은 설치 id별로 메모리에만 두고 만료 5분 전부터는 새로 받는다.
+- **명령(`invoke`).** `github_status`(네트워크 없이 연결 여부), `github_connect(appId, pemPath)`(키는 파일 경로로만 받아 호스트 안에서 읽고 화면으로 돌려보내지 않는다. 키로 `GET /app`을 불러 App ID가 맞을 때만 저장한다), `github_disconnect`, `github_repositories`(설치된 모든 계정의 저장소. 설치 하나가 실패해도 나머지는 주고 실패는 `errors`에 적는다), `github_clone(fullName)`.
+- **clone.** `~/Library/Application Support/aisurada/repos/<소유자>/<이름>`에 받는다. 폴더에 `.git`이 있으면 GitHub를 부르지 않고 그대로 쓴다. 이름은 폴더로 쓰기 전에 `owner/name` 모양(`..`, 빗금, 앞의 `-` 거절)을 검사한다. 토큰은 명령줄(`ps`에 보임)이 아니라 환경변수(`GIT_CONFIG_*`로 `http.extraheader`)로만 싣고, 키체인 자격 증명 도우미가 토큰을 저장하지 못하게 `credential.helper`를 비운다. 실패하거나 시간(10분)이 넘으면 반쯤 받은 폴더를 지운다. 이미 있는 로컬 폴더를 쓰려면 프로젝트 저장소 항목의 `path`를 쓴다(`path`가 있으면 받지 않는 것은 화면 쪽 규칙으로 아직 없다).
+- **시험.** 기본 시험 9개는 가짜 GitHub 서버(로컬 TCP)와 로컬 git 저장소로 JWT 서명 검증, App ID 검사, 설치별 토큰 재사용과 만료 교체, 쪽 나누기 없는 목록, clone과 토큰 흔적 없음을 잰다. 개인 키는 시험 전용 일회용 키다. `#[ignore]` 시험 두 개는 실제 키체인(`keychain_round_trip`)과 실제 GitHub(`real_github_smoke`, 환경변수 `AISURADA_REAL_APP_ID`, `AISURADA_REAL_PEM_FILE`, `AISURADA_REAL_REPO`)를 쓰고 `cargo test -- --ignored`로만 돈다.
+- **확인한 것과 못 한 것.** 실제 키체인의 저장·읽기·덮어쓰기·삭제와, 실제 GitHub의 연결·목록·clone을 확인했다. 확인한 저장소(`bnjjong/aisurada`)가 공개 저장소라서 **비공개 저장소를 토큰으로 받는 길은 실제로 증명하지 못했다.** 쓰기(push, PR)는 이 모듈에 없다. 설치 하나에 저장소가 100개를 넘는 쪽 나누기와 20쪽 상한, 호출 한도는 실제로 겪어 보지 못했다.
 
 ### 앱이 연 vault (`current-vault.json`)
 
