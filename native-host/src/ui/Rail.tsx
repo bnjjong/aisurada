@@ -1,8 +1,11 @@
+import { useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { agendaOrder, HUE_COLORS, railGroupCollapsed } from "./model.ts";
+import { ActionMenu } from "./ActionMenu.tsx";
 import { LiveBrandMark } from "./BrandMark.tsx";
+import { Icon } from "./Icon.tsx";
 import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute } from "../navigation/routes.ts";
 export function Rail({
@@ -13,6 +16,9 @@ export function Rail({
   state: WorkspaceState;
 }) {
   useSessionBadge();
+  // 「＋」 하나로 새 프로젝트와 새 아젠다 중 고르게 하는 메뉴.
+  const addButton = useRef<HTMLButtonElement>(null);
+  const [adding, setAdding] = useState(false);
   const LOOSE_GROUP_KEY = "(미분류)";
   const ws = state.workspace!,
     sorted = agendaOrder(ws.agendas, ws.notes);
@@ -29,8 +35,10 @@ export function Rail({
     return (
       <section key={slug || LOOSE_GROUP_KEY} className="rail-group">
         {ws.projects.length > 0 && (
-          <header>
+          <header className={isNone ? "rail-group-none" : undefined}>
             <button
+              className="rail-group-toggle"
+              aria-expanded={!collapsed}
               onClick={() =>
                 controller.preference({
                   collapsedProjects: collapsed
@@ -49,30 +57,36 @@ export function Rail({
                 })
               }
             >
-              {collapsed ? "▸" : "▾"} {name}
+              <Icon name="chevron" size={12} />
+              <Icon name={isNone ? "folderDashed" : "folder"} size={16} />
+              <span className="rail-group-name">{name}</span>
+              <small className="rail-group-count">{agendas.length}</small>
             </button>
             {id && (
-              <>
+              <span className="rail-acts">
                 <button
+                  title="프로젝트 편집"
                   aria-label={`${name} 프로젝트 편집`}
                   onClick={() => controller.form({ kind: "project", id })}
                 >
-                  편집
+                  <Icon name="edit" />
                 </button>
                 <button
+                  title="이 프로젝트에 아젠다 추가"
                   aria-label={`${name}에 아젠다 추가`}
                   onClick={() =>
                     controller.form({ kind: "agenda", project: slug })
                   }
                 >
-                  ＋
+                  <Icon name="plus" />
                 </button>
-              </>
+              </span>
             )}
           </header>
         )}
-        {!collapsed &&
-          agendas.map((a) => {
+        {!collapsed && (
+          <div className={ws.projects.length > 0 ? "rail-kids" : undefined}>
+            {agendas.map((a) => {
             const isActive =
               activeAgendaId !== null &&
               (a.id === activeAgendaId || a.slug === activeAgendaId);
@@ -118,6 +132,8 @@ export function Rail({
               </div>
             );
           })}
+          </div>
+        )}
       </section>
     );
   };
@@ -153,20 +169,40 @@ export function Rail({
       </nav>
       <section data-rail-section="agendas" className="agenda-summary">
         <header>
-          <h2>아젠다</h2>
+          <h2>{ws.projects.length > 0 ? "프로젝트" : "아젠다"}</h2>
           <button
-            aria-label="프로젝트 추가"
-            onClick={() => controller.form({ kind: "project" })}
+            ref={addButton}
+            className="rail-add"
+            title="새로 만들기"
+            aria-label="새로 만들기"
+            aria-haspopup="menu"
+            aria-expanded={adding}
+            onClick={() => setAdding((open) => !open)}
           >
-            프로젝트 ＋
-          </button>
-          <button
-            aria-label="아젠다 추가"
-            onClick={() => controller.form({ kind: "agenda" })}
-          >
-            ＋
+            <Icon name="plus" />
           </button>
         </header>
+        {adding && (
+          <ActionMenu
+            label="새로 만들기"
+            anchor={addButton}
+            onClose={() => setAdding(false)}
+            items={[
+              {
+                key: "project",
+                label: "새 프로젝트",
+                icon: "folder",
+                onSelect: () => controller.form({ kind: "project" }),
+              },
+              {
+                key: "agenda",
+                label: "새 아젠다",
+                icon: "dotPlus",
+                onSelect: () => controller.form({ kind: "agenda" }),
+              },
+            ]}
+          />
+        )}
         {ws.projects.map((p) =>
           group(
             asText(p.title),

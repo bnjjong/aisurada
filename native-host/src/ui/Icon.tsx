@@ -95,6 +95,23 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   arrowUp: <path d="M8 13V3M4 7l4-4 4 4" />,
+  chevron: <path d="M6 4l4 4-4 4" />,
+  folder: (
+    <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" />
+  ),
+  folderDashed: (
+    <path
+      strokeDasharray="2.4 2.2"
+      d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"
+    />
+  ),
+  edit: <path d="M3 13l.7-3L10.5 3.2a1.4 1.4 0 0 1 2 2L5.7 12 3 13zM9.5 4.2l2.3 2.3" />,
+  dotPlus: (
+    <>
+      <circle cx="8" cy="8" r="4" />
+      <path d="M8 6.5v3M6.5 8h3" />
+    </>
+  ),
   image: (
     <>
       <rect x="2" y="3" width="12" height="10" rx="2" />

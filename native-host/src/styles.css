@@ -443,6 +443,26 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .rail-agenda .agenda-name { min-width: 0; flex: 1; align-items: center; }
 .rail-agenda .agenda-edit { width: 20px; justify-content: center; opacity: .6; }
 .hidden-agenda .agenda-dot { opacity: .25; }.hidden-agenda .agenda-name { color: var(--muted); }
+/* 사이드바 계층: 프로젝트가 맨 위, 아젠다는 그 안쪽(세로선으로 묶는다). */
+.agenda-summary > header h2 { font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.agenda-summary > header button.rail-add { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); }
+.agenda-summary > header button.rail-add[aria-expanded="true"] { background: var(--soft); color: var(--ink); }
+.rail-group { margin: 6px 0; }
+.rail-group header > button.rail-group-toggle { gap: 8px; min-height: 34px; padding: 0 6px; font-size: 14px; font-weight: 600; }
+.rail-group-toggle > svg:first-child { flex: none; color: var(--muted); transition: transform 0.12s; }
+.rail-group-toggle[aria-expanded="true"] > svg:first-child { transform: rotate(90deg); }
+.rail-group-toggle > svg:nth-child(2) { flex: none; color: var(--muted); }
+.rail-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.rail-group-none .rail-group-name { color: var(--muted); }
+.rail-group-count { flex: none; font-size: 11px; font-weight: 500; color: var(--muted); }
+/* 프로젝트 줄에 마우스를 올리거나 키보드로 들어가면 편집·아젠다 추가가 나타난다. */
+.rail-group header { position: relative; }
+.rail-group header .rail-acts { position: absolute; top: 50%; right: 2px; display: flex; gap: 2px; transform: translateY(-50%); opacity: 0; transition: opacity 0.12s; }
+.rail-group header:hover .rail-acts, .rail-group header:focus-within .rail-acts { opacity: 1; }
+.rail-group header:hover .rail-group-count, .rail-group header:focus-within .rail-group-count { opacity: 0; }
+.rail-group header > button.rail-group-toggle { padding-right: 10px; }
+.rail-group header .rail-acts button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }
+.rail-kids { margin: 0 0 4px 17px; padding-left: 8px; border-left: 1.5px solid color-mix(in srgb, var(--muted) 35%, transparent); }
 .agenda-filter { position: relative; font-size: 12px; }.agenda-filter summary { cursor: pointer; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
 .agenda-filter[open] { background: var(--surface); z-index: 3; }.agenda-filter[open] > section { padding: 12px; border-bottom: 1px solid var(--line); }.agenda-filter label { display: inline-flex; align-items: center; gap: 8px; }.agenda-filter button { padding: 6px; }
 .doc-meta-bar {
