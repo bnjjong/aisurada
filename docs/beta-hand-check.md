@@ -9,7 +9,7 @@
 | 엔진 `bash test.sh` | 전부 통과 |
 | 화면·호스트 `bash test-native.sh` | Node 422건, cargo 88건 통과 |
 | 실제 WKWebView acceptance (4부를 뺀 판) | host 26, workspace 9, navigation 11, interaction 12, data 12, editor 114, autosave 16 통과. views는 첫 실행에서 `favorites-category-and-graph-accessible-node`가 `timeout: graph`로 실패했고 재실행에서 29/29 통과(간헐 실패, 원인 미상) |
-| 4부를 켠 판의 실제 창 acceptance | `test:part4:acceptance` 8/8 통과(묻기 왕복, 전사가 있는 세션 화면, 설정의 Claude 연결 포함. 연결은 등록 상태를 파일에 두는 가짜 claude로 잰다). 레일 대화, 세션 입력창, PROJECTS 레일, 굳히기는 안 잰다 |
+| 4부를 켠 판의 실제 창 acceptance | `test:part4:acceptance` 8/8 통과(묻기 왕복, 전사가 있는 세션 화면, 설정의 Claude 연결 포함. 연결은 등록 상태를 파일에 두는 가짜 claude로 잰다). 레일 대화, 세션 입력창, 굳히기는 안 잰다 |
 | 사람이 앱을 직접 조작한 확인 | **0건** |
 
 아래 점검은 위 마지막 두 줄을 메우는 일이다.
@@ -99,8 +99,8 @@ printf '%s\n' \
   > "$HC_DIR/home/.claude/projects/-Users-test-vault/$SID.jsonl"
 ```
 
-1. 레일의 PROJECTS에 「손확인 세션」이 보이는지 본다(앱을 다시 열거나 목록을 새로 읽는다).
-2. 눌러 `/session/<id>` 화면으로 간다. 머리 줄, 사용자·어시스턴트 대화, 「이어 가기 명령 복사」 단추를 본다.
+1. **레일의 PROJECTS 패널은 없어졌다.** 세션 화면은 `sessionId` 칩이 달린 노트의 「열기」로 노트 옆 세션 레일을 열고 거기서 들어가는 길뿐이다. 이 격리 환경에서 칩이 달린 노트를 만드는 방법은 아직 확인하지 못했다(`ais-cli create-doc`에 `AISURADA_SESSION_ID`와 `AISURADA_SESSION_AGENT`를 줘 보았지만 `sessionId` 줄이 생기지 않았다). 그래서 2~6번은 손으로 볼 수 없으면 건너뛰고 건너뛰었다고 알려 달라. 세션 화면의 그리기는 `test:part4:acceptance`가 `/session/<id>`로 직접 열어 잰다.
+2. 세션 화면에 들어갔다면 머리 줄, 사용자·어시스턴트 대화, 「이어 가기 명령 복사」 단추를 본다.
 3. 하단 입력창에 글을 쓰고 보낸다. 기대: 가짜 `claude`의 답이 붙는다. 세션 입력은 `resume` 인자로 가므로 이 단계에서 `claude -p`가 불린다.
 4. 오른쪽 레일의 「관련 노트」 탭이 기본으로 서 있고, CLI 탭을 누르기 전에는 셸이 자동으로 안 뜨는지 본다.
 5. CLI 탭을 눌러 터미널이 뜨고 세션을 이어 가는 명령이 실행되는지 본다. 이 PATH의 진짜 `claude`는 격리 HOME에 로그인이 없어서 안내가 나올 수 있다. 이 단계는 명령이 실행되는 데까지만 본다.
