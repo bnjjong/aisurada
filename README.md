@@ -79,6 +79,7 @@ java -jar dist/ais-engine.jar delete-agenda <아젠다 id> --aisurada.vault=/pat
 - `list-agendas`는 읽기라 워크스페이스 표식이 없어도 답하고, slug 차례로 냅니다. `repo`와 `project`는 값이 없으면 키째 뺍니다.
 - `create-agenda`는 같은 이름이 있어도 늘 새로 만들고 slug만 `-2`부터 `-100`까지 비켜섭니다. 색을 안 주면 12색 가운데 가장 덜 쓰인 색을 고릅니다. `create_doc`이 아젠다를 만들 때도 같은 색 규칙과 바이트를 씁니다.
 - `update-agenda`는 준 칸만 바꾸고 파일을 통째로 다시 씁니다. `repo=`는 저장소를 지우고 `project=`는 미분류로 옮깁니다. slug와 파일 이름은 안 바뀝니다.
+- `projectRepo=<이름>`은 아젠다가 속한 프로젝트의 저장소 목록(`repos`) 가운데 하나를 가리킵니다. `project`가 있어야 하고 그 프로젝트에 그 이름이 있어야 합니다. 빈 값은 가리킴을 지우고, 아젠다를 다른 프로젝트로 옮기거나 미분류로 보내면 낡은 가리킴도 같이 지웁니다.
 - `delete-agenda`는 그 아젠다의 노트가 0건일 때만 파일을 `.aisurada/trash/agendas/<slug>-<아젠다 id>.md`로 옮깁니다. `notes/<slug>/` 폴더는 비어 있어도 안 지웁니다.
 - 색인이 없는 판이라 부를 때마다 아젠다 파일을 읽습니다(8.6). 그래서 손으로 지운 아젠다는 목록에서 바로 빠지고, 지금 엔진이 색인에 남기는 행(20.9의 1번)은 재현하지 않습니다.
 
@@ -98,6 +99,7 @@ java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=
 - 프로젝트는 `.aisurada/projects/<slug>.md` 파일 1개가 1개입니다. 키는 `id`, `slug`, `title`, `hue` 4개이고 본문이 `summary`입니다. 응답은 `id`, `slug`, `title`, `hue`, `summary` 차례이고 `deepLink`가 없습니다.
 - `create-project`는 이름을 `title=`로 받습니다(자리 인자 없음). 같은 이름이 있으면 slug만 `-2`부터 `-100`까지 비켜서고, 색을 안 주면 프로젝트 색만 세어 가장 덜 쓰인 색을 고릅니다.
 - `update-project`는 준 칸만 바꾸고 파일을 통째로 다시 씁니다. slug와 파일 이름은 안 바뀝니다.
+- `repos=<JSON 배열>`로 프로젝트가 가진 저장소 목록을 통째로 바꿉니다(`create-project`도 받습니다). 항목은 `name`(필수), `path`(이 컴퓨터의 절대 경로), `github`(`owner/name`), `githubId`(양의 정수, `github`와 함께)이고, `path`나 `github` 가운데 하나는 있어야 합니다. 빈 값이나 `[]`는 목록을 지웁니다.
 - `delete-project`는 그 slug를 `project`로 가리키는 아젠다가 0개일 때만 파일을 `.aisurada/trash/projects/<slug>-<프로젝트 id>.md`로 옮깁니다. 아젠다를 떼려면 `update-agenda <아젠다 id> project=`를 부릅니다.
 - 지금 엔진은 프로젝트를 색인에만 두고 파일을 안 읽지만, 이 판은 색인이 없어 부를 때마다 프로젝트 파일을 설명서 2.2의 규칙으로 읽습니다(8.6). 그래서 손으로 둔 파일도 목록에 나오고, 목록은 id 차례(엔진이 발급한 id끼리는 만든 차례)입니다.
 

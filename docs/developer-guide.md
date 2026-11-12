@@ -133,6 +133,20 @@ test-native.sh         화면·호스트 시험 전체
 - **한계.** 세션 목록(프로젝트별 화면, `recent-sessions`)에는 Codex·Gemini 세션이 나오지 않는다. 노트 칩으로 들어간 세션 화면은 읽기 전용이고 입력창을 닫는다. Codex·Gemini 기록에서는 `author=`(작성 세션 대화를 묻기에 첨부)와 하위 에이전트·할 일 표시가 없다. `FrontmatterWriter`가 정해진 필드만 쓰는 구조라서, `sessionAgent`를 모르는 옛 빌드가 노트를 다시 쓰면 그 줄이 지워질 수 있다(옛 빌드로 직접 확인하지는 않았다).
 - **시험.** 엔진은 `AgentSessionTest`(파일 형식, 도장, 환경변수 해석, 두 CLI의 가짜 기록)와 `McpServerTest`의 `sessionFromMeta`, 화면은 `chapter10.test.mjs`와 `agent-session-chip.test.mjs`다. 실제 Codex·Gemini 기록은 읽기 전용으로 엔진 명령에 먹여 확인했다. 실제 앱 창에서 칩을 눌러 본 확인은 없다.
 
+### 프로젝트의 저장소와 아젠다의 `projectRepo`
+
+프로젝트가 저장소(로컬 폴더, GitHub 저장소, 또는 둘 다)를 여러 개 가지고, 아젠다가 그중 하나를 이름으로 가리킨다. 나중에 GitHub App 연동과 앱 안의 개발 기능이 이 위에 올라간다. **외부 설명서에 없는 확장이다.** 설명서 21.5는 프로젝트 파일의 키를 4개로 못 박아 두었고(조건부 키 없음), 20.5는 아젠다의 키를 6개로 정했다.
+
+- **프로젝트 파일.** 저장소가 있으면 `hue` 다음에 `repos:` 한 줄이 붙는다. 값은 한 줄짜리 JSON 배열이다: `repos: [{"name":"app","path":"/Users/me/app","github":"me/app","githubId":123}]`. 항목은 `name`(필수, 프로젝트 안에서 유일, 50자까지, 빗금 없음), `path`(절대 경로), `github`(`owner/name`), `githubId`(양의 정수, `github`와 함께)이고 `path`나 `github` 가운데 하나는 있어야 한다. 최대 20개. **저장소가 없으면 파일은 설명서의 4줄 그대로다.**
+- **왜 한 줄인가.** 프로젝트와 아젠다 파일은 설명서 2.1의 줄 읽개로 읽는다. 이 읽개는 줄 맨 앞의 `키: 값`만 보고 들여쓴 줄은 건너뛰므로, 들여쓴 YAML 목록은 읽개에 안 보인다(`repos:`가 빈 값으로 읽힌다). JSON은 YAML이기도 해서 일반 YAML 도구도 읽는다.
+- **아젠다 파일.** `project` 바로 뒤에 `projectRepo: <저장소 이름>`이 붙는다. 프로젝트가 없는 아젠다는 늘 없는 것으로 읽는다. 기존 `repo`(로컬 경로, 자유 텍스트)는 그대로이고 프로젝트가 없는 아젠다는 지금처럼 이것만 쓴다.
+- **명령.** `create-project`와 `update-project`의 `repos=<JSON 배열>`(update는 통째로 바꾸고 빈 값이나 `[]`는 지움, 안 주면 그대로), `create-agenda`와 `update-agenda`의 `projectRepo=<이름>`. 틀린 값은 파일을 쓰기 전에 AIS-400으로 거절한다. `projectRepo`는 `project`가 있고 그 프로젝트의 `repos`에 그 이름이 있어야 한다. `update-agenda`로 프로젝트를 바꾸거나 미분류로 보내면 낡은 가리킴을 같이 지우고, 안 건드리면 그대로 둔다.
+- **읽을 때는 너그럽다.** 손으로 고친 `repos:`에서 못 읽는 항목과 겹친 이름은 건너뛰고, 줄 전체가 JSON 배열이 아니면 없는 것이다. 프로젝트가 저장소를 지워도 아젠다 파일은 건드리지 않아 낡은 이름이 남을 수 있고, 그 판단은 쓰는 쪽(화면)이 한다.
+- **응답.** `list-projects`와 `create/update-project`는 저장소가 있을 때만 `repos` 배열을, `list-agendas`와 `create/update-agenda`는 가리킬 때만 `projectRepo`를 싣는다. 없으면 설명서의 모양 그대로다.
+- **로컬 폴더가 없는 GitHub 항목.** `path`가 없으면 앱이 정한 폴더(`~/Library/Application Support/aisurada/repos/<소유자>/<이름>`)에 받아 쓰는 것으로 계획했다. 이 단계에서는 엔진이 이 폴더를 알지 못한다. 받는 일과 GitHub 연결은 호스트 몫이고 아직 없다.
+- **한계.** `repos`와 `projectRepo`를 모르는 옛 빌드가 프로젝트나 아젠다를 다시 쓰면 그 줄이 지워진다(두 파일을 통째로 다시 쓰고 모르는 키는 버리는 지금 규칙).
+- **시험.** `ProjectReposTest`(파일 형식, 응답, 틀린 값 거절, 손으로 고친 파일, 아젠다의 가리킴 규칙).
+
 ### 앱이 연 vault (`current-vault.json`)
 
 에이전트의 MCP 서버를 등록할 때 `AISURADA_VAULT` 경로를 박아 넣으면, 손 확인이나 옛 설정의 vault가 그대로 남아 노트가 앱과 다른 vault에 쓰인다. 그래서 등록에는 vault를 박지 않고, 앱이 연 vault를 파일에 적어 둔다.
