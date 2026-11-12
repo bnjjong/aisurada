@@ -84,7 +84,7 @@ public final class McpServerTest {
     private static final Pattern REQUIRED = Pattern.compile("\\): (\\S+) 가 필요하다");
 
     private static void schemasMatchEngine() {
-        eq(McpTools.all().stream().map(McpTools.Tool::name).toList(), AisCliMain.CLI_TOOL_NAMES, "도구 이름과 차례가 엔진 도구 29개와 같다");
+        eq(McpTools.all().stream().map(McpTools.Tool::name).toList(), AisCliMain.CLI_TOOL_NAMES, "도구 이름과 차례가 엔진 도구 34개와 같다");
         for (McpTools.Tool tool : McpTools.all()) {
             JsonValue schema = parse(tool.inputSchema());
             eq(text(schema, "type"), "object", tool.name() + " 스키마는 객체");
@@ -151,10 +151,11 @@ public final class McpServerTest {
     private static void exposureRules() {
         List<String> reads = McpTools.exposed(false).stream().map(McpTools.Tool::name).toList();
         eq(reads, List.of("list_docs", "search_docs", "list_tags", "get_doc", "list_trash",
-                "list_templates", "get_template", "list_sub_notes", "get_sub_note", "list_attachments", "list_comments"),
-                "기본은 읽기 도구 11개만");
+                "list_templates", "get_template", "list_sub_notes", "get_sub_note", "list_attachments", "list_comments",
+                "list_resources", "get_resource", "usable_resources", "list_resource_versions"),
+                "기본은 읽기 도구 15개만");
         List<String> all = McpTools.exposed(true).stream().map(McpTools.Tool::name).toList();
-        eq(all.size(), 25, "쓰기를 켜면 영구 삭제만 빼고 25개");
+        eq(all.size(), 33, "쓰기를 켜면 영구 삭제만 빼고 33개");
         check(!all.contains("purge_doc") && !reads.contains("purge_doc"), "purge_doc은 어느 모드에서도 안 내놓는다");
         for (McpTools.Tool tool : McpTools.all()) {
             eq(tool.write(), aisurada.cmd.CommandRegistry.WRITE_COMMANDS.contains(tool.name().replace('_', '-')),
@@ -217,13 +218,13 @@ public final class McpServerTest {
 
         // 목록
         JsonValue readTools = send(readOnly, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
-        eq(((JsonValue.JsonArray) at(readTools, "result", "tools")).elements().size(), 11, "읽기 모드 목록은 11개");
+        eq(((JsonValue.JsonArray) at(readTools, "result", "tools")).elements().size(), 15, "읽기 모드 목록은 15개");
         for (JsonValue t : ((JsonValue.JsonArray) at(readTools, "result", "tools")).elements()) {
             eq(text(t, "annotations", "readOnlyHint"), "true", text(t, "name") + " 은 읽기 힌트");
             check(at(t, "inputSchema", "properties") != null, text(t, "name") + " 에 inputSchema");
         }
         JsonValue writeTools = send(writable, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
-        eq(((JsonValue.JsonArray) at(writeTools, "result", "tools")).elements().size(), 25, "쓰기 모드 목록은 25개");
+        eq(((JsonValue.JsonArray) at(writeTools, "result", "tools")).elements().size(), 33, "쓰기 모드 목록은 33개");
         for (JsonValue t : ((JsonValue.JsonArray) at(writeTools, "result", "tools")).elements()) {
             String name = text(t, "name");
             if ("delete_doc".equals(name) || "update_doc".equals(name)) {
@@ -403,7 +404,7 @@ public final class McpServerTest {
                 JsonValue init = mcp.request("initialize", "{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}");
                 eq(text(init, "result", "serverInfo", "name"), "aisurada", "initialize");
                 in(mcp, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
-                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 25, "쓰기 모드 목록");
+                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 33, "쓰기 모드 목록");
 
                 JsonValue created = mcp.call("create_doc", "{\"agenda\":\"demo\",\"type\":\"free\",\"title\":\"한글 제목\",\"body\":\"첫 본문\\n두 번째 줄\",\"tags\":[\"mcp\"]}");
                 check(!mcp.isError(created), "create_doc 성공: " + mcp.resultText(created));
@@ -448,13 +449,83 @@ public final class McpServerTest {
                 check(mcp.resultText(mcp.call("list_docs", "{}")).contains(id), "되살아났다");
                 check(at(mcp.request("ping", null), "result") instanceof JsonValue.JsonObject, "마지막까지 서버가 살아 있다");
             }
+            // 스킬·에이전트 자원 도구(확장): 만들고, f1 로 지키며 고치고, 참조하고, 규칙 4를 지키고, 지우고 되살린다
+            Files.createDirectories(vault.resolve(".aisurada/projects"));
+            Files.writeString(vault.resolve(".aisurada/projects/앱.md"), "---\nid: pjmwmcpres1-0000abcd\nslug: 앱\ntitle: 앱\nhue: blue\n---\n");
+            String initParams = "{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}";
+            try (Mcp mcp = new Mcp(List.of(java, "-Duser.home=" + home, "-jar", cliJar, "mcp", "--write"), env, home.resolve("mcp-res.err"))) {
+                mcp.request("initialize", initParams);
+                in(mcp, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
+                JsonValue skill = mcp.call("save_resource", "{\"kind\":\"skill\",\"scope\":\"global\",\"name\":\"번역 검수\",\"description\":\"번역을 검수한다\",\"body\":\"# 지침\","
+                        + "\"tools\":{\"claude\":{\"allowed-tools\":[\"Read\"]}}}");
+                check(!mcp.isError(skill), "save_resource(스킬): " + mcp.resultText(skill));
+                String sid = text(parse(mcp.resultText(skill)), "id");
+                check(sid != null && sid.startsWith("sk"), "스킬 id 는 sk 머리: " + sid);
+                check(mcp.resultText(skill).contains("allowed-tools"), "도구 칸이 응답에 있다");
+                JsonValue agent = mcp.call("save_resource", "{\"kind\":\"agent\",\"scope\":\"global\",\"name\":\"코드 리뷰어\",\"description\":\"리뷰한다\",\"permission\":\"edit\",\"skills\":[\"" + sid + "\"]}");
+                check(!mcp.isError(agent), "save_resource(에이전트): " + mcp.resultText(agent));
+                String aid = text(parse(mcp.resultText(agent)), "id");
+                check(aid != null && aid.startsWith("ap") && mcp.resultText(agent).contains(sid), "에이전트 id 와 연결된 스킬");
+                JsonValue asString = mcp.call("save_resource", "{\"kind\":\"agent\",\"scope\":\"global\",\"name\":\"문자열로 준 스킬\",\"description\":\"d\",\"skills\":\"[\\\"" + sid + "\\\"]\"}");
+                check(!mcp.isError(asString), "skills 를 JSON 글로 줘도 받는다: " + mcp.resultText(asString));
+
+                // f1 보호: 읽고 고치면 되고, 낡은 토큰과 토큰 없음은 AIS-412 로 거절된다
+                String tok = text(parse(mcp.resultText(mcp.call("get_resource", "{\"id\":\"" + sid + "\"}"))), "precondition");
+                check(tok != null && tok.startsWith("f1:"), "get_resource 가 쓰기 전 토큰을 준다");
+                JsonValue edited = mcp.call("save_resource", "{\"id\":\"" + sid + "\",\"f1\":\"" + tok + "\",\"description\":\"고친 설명\"}");
+                check(!mcp.isError(edited) && mcp.resultText(edited).contains("고친 설명"), "f1 로 고친다: " + mcp.resultText(edited));
+                JsonValue stale = mcp.call("save_resource", "{\"id\":\"" + sid + "\",\"f1\":\"" + tok + "\",\"description\":\"낡은 토큰으로 덮기\"}");
+                check(mcp.isError(stale) && mcp.resultText(stale).contains("AIS-412"), "낡은 토큰은 거절: " + mcp.resultText(stale));
+                JsonValue noTok = mcp.call("save_resource", "{\"id\":\"" + sid + "\",\"description\":\"토큰 없이 덮기\"}");
+                check(mcp.isError(noTok) && mcp.resultText(noTok).contains("AIS-412"), "토큰 없이는 거절: " + mcp.resultText(noTok));
+                String newTok = text(parse(mcp.resultText(edited)), "precondition");
+                JsonValue kindSwap = mcp.call("save_resource", "{\"id\":\"" + sid + "\",\"f1\":\"" + newTok + "\",\"kind\":\"agent\"}");
+                check(mcp.isError(kindSwap) && mcp.resultText(kindSwap).contains("종류는 바꿀 수 없다"), "종류는 못 바꾼다");
+                check(mcp.resultText(mcp.call("list_resource_versions", "{\"id\":\"" + sid + "\"}")).contains("version"), "고치기 전 판이 이력에 남는다");
+
+                // 규칙 4: 참조하기 전에는 쓸 수 있는 자원에 안 나오고, 참조(withSkills)하면 에이전트와 스킬이 함께 나온다
+                JsonValue before = mcp.call("usable_resources", "{\"project\":\"앱\"}");
+                check(!mcp.isError(before) && ((JsonValue.JsonArray) at(parse(mcp.resultText(before)), "skills")).elements().isEmpty(), "참조 전에는 비었다: " + mcp.resultText(before));
+                check(mcp.resultText(mcp.call("list_resources", "{\"scope\":\"global\"}")).contains(sid), "관리 목록에는 참조하지 않은 글로벌도 나온다");
+                JsonValue ref = mcp.call("set_resource_ref", "{\"project\":\"앱\",\"id\":\"" + aid + "\",\"withSkills\":true}");
+                check(!mcp.isError(ref) && mcp.resultText(ref).contains(aid) && mcp.resultText(ref).contains(sid), "set_resource_ref withSkills: " + mcp.resultText(ref));
+                JsonValue after = parse(mcp.resultText(mcp.call("usable_resources", "{\"project\":\"앱\"}")));
+                eq(((JsonValue.JsonArray) at(after, "skills")).elements().size(), 1, "참조한 스킬이 쓸 수 있게 됐다");
+                eq(((JsonValue.JsonArray) at(after, "agents")).elements().size(), 1, "참조한 에이전트가 쓸 수 있게 됐다");
+                check(mcp.isError(mcp.call("set_resource_ref", "{\"project\":\"앱\",\"id\":\"" + aid + "\",\"withSkills\":\"yes\"}")), "withSkills 는 true/false 만");
+                check(mcp.isError(mcp.call("get_resource", "{\"id\":\"" + sid + "\",\"zzz\":1}")), "스키마 밖의 키는 거절");
+
+                // 지우기와 되살리기: 지우면 깨진 참조, 되살리면 이어진다
+                JsonValue del = mcp.call("delete_resource", "{\"id\":\"" + sid + "\"}");
+                check(!mcp.isError(del) && mcp.resultText(del).contains("referencedBy"), "delete_resource: " + mcp.resultText(del));
+                check(mcp.resultText(mcp.call("usable_resources", "{\"project\":\"앱\"}")).contains("broken"), "지우면 깨진 참조가 보인다");
+                check(mcp.resultText(mcp.call("list_resources", "{\"trash\":true}")).contains(sid), "휴지통 목록");
+                check(!mcp.isError(mcp.call("restore_resource", "{\"id\":\"" + sid + "\"}")), "restore_resource");
+                check(((JsonValue.JsonArray) at(parse(mcp.resultText(mcp.call("usable_resources", "{\"project\":\"앱\"}"))), "broken")).elements().isEmpty(), "되살리면 이어진다");
+                check(at(mcp.request("ping", null), "result") instanceof JsonValue.JsonObject, "자원 도구를 쓴 뒤에도 서버가 살아 있다");
+            }
+            // AI 세션이 쓰면 누가 고쳤는지 남는다
+            Map<String, String> sessionEnv = new java.util.HashMap<>(env);
+            sessionEnv.put("AISURADA_SESSION_ID", "res-session-7");
+            sessionEnv.put("AISURADA_SESSION_AGENT", "codex");
+            try (Mcp mcp = new Mcp(List.of(java, "-Duser.home=" + home, "-jar", cliJar, "mcp", "--write"), sessionEnv, home.resolve("mcp-res2.err"))) {
+                mcp.request("initialize", initParams);
+                in(mcp, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
+                JsonValue stamped = mcp.call("save_resource", "{\"kind\":\"skill\",\"scope\":\"global\",\"name\":\"세션 기록\",\"description\":\"d\"}");
+                check(!mcp.isError(stamped), "세션이 있어도 저장된다: " + mcp.resultText(stamped));
+                eq(text(parse(mcp.resultText(stamped)), "editedSession"), "res-session-7", "AI 세션 ID 가 남는다");
+                eq(text(parse(mcp.resultText(stamped)), "editedAgent"), "codex", "CLI 이름이 남는다");
+            }
             check(Files.readString(home.resolve("mcp-write.err")).contains("읽기+쓰기"), "시작할 때 모드를 표준 오류로 알린다");
 
             // 읽기 전용 모드: 쓰기 도구는 엔진에 닿지 않는다
             try (Mcp mcp = new Mcp(List.of(java, "-Duser.home=" + home, "-jar", cliJar, "mcp"), env, home.resolve("mcp-read.err"))) {
-                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 11, "읽기 모드 목록");
+                eq(((JsonValue.JsonArray) at(mcp.request("tools/list", null), "result", "tools")).elements().size(), 15, "읽기 모드 목록");
                 JsonValue refused = mcp.call("create_doc", "{\"agenda\":\"demo\",\"type\":\"free\",\"title\":\"막혀야 함\",\"body\":\"x\"}");
                 check(mcp.isError(refused), "읽기 전용은 create_doc을 거절");
+                check(!mcp.isError(mcp.call("list_resources", "{}")), "읽기 전용에서도 list_resources는 된다");
+                check(mcp.isError(mcp.call("save_resource", "{\"kind\":\"skill\",\"scope\":\"global\",\"name\":\"막혀야 함\",\"description\":\"d\"}")), "읽기 전용은 save_resource를 거절");
+                check(mcp.isError(mcp.call("delete_resource", "{\"id\":\"skmwzzzzzz-00000000\"}")), "읽기 전용은 delete_resource를 거절");
                 check(!mcp.resultText(mcp.call("list_docs", "{}")).contains("막혀야 함"), "거절된 노트는 안 생겼다");
             }
 

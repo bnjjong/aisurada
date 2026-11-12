@@ -98,7 +98,9 @@ public final class AisCliMain {
             "list_trash", "restore_doc", "purge_doc", "plan_day",
             "list_templates", "get_template", "save_template",
             "create_sub_note", "list_sub_notes", "get_sub_note", "update_sub_note", "delete_sub_note",
-            "write_attachment", "list_attachments", "list_comments", "export_markdown"
+            "write_attachment", "list_attachments", "list_comments", "export_markdown",
+            "list_resources", "get_resource", "save_resource", "delete_resource", "restore_resource",
+            "set_resource_ref", "usable_resources", "list_resource_versions"
     );
 
     /** --list의 도구 설명. 장마다 첫머리 요약에서 지은 1줄이고 계약이 아니다(3.3). */
@@ -128,7 +130,15 @@ public final class AisCliMain {
             Map.entry("write_attachment", "노트나 하위 노트에 글 첨부 1개를 쓴다"),
             Map.entry("list_attachments", "첨부 목록과 본문에 붙일 참조 조각을 낸다"),
             Map.entry("list_comments", "코멘트 목록을 낸다"),
-            Map.entry("export_markdown", "노트를 마크다운 사본으로 내보낸다")
+            Map.entry("export_markdown", "노트를 마크다운 사본으로 내보낸다"),
+            Map.entry("list_resources", "스킬과 에이전트 정의의 관리 목록을 낸다"),
+            Map.entry("get_resource", "스킬이나 에이전트 정의 1건을 지침과 함께 낸다"),
+            Map.entry("save_resource", "스킬이나 에이전트 정의를 만들거나 고친다"),
+            Map.entry("delete_resource", "스킬이나 에이전트 정의를 휴지통으로 보낸다"),
+            Map.entry("restore_resource", "휴지통의 스킬이나 에이전트 정의를 되살린다"),
+            Map.entry("set_resource_ref", "프로젝트가 글로벌 자원을 참조하는 것을 켜거나 끈다"),
+            Map.entry("usable_resources", "프로젝트가 쓸 수 있는 스킬과 에이전트 정의를 낸다"),
+            Map.entry("list_resource_versions", "스킬이나 에이전트 정의의 고치기 전 판 목록을 낸다")
     );
 
     public static final List<String> DIRECT_COMMANDS = List.of(

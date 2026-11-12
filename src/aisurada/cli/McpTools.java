@@ -12,7 +12,7 @@ import java.util.Set;
 
 /**
  * MCP 클라이언트(Claude 등)에 내놓는 도구의 이름, 설명, 입력 스키마입니다.
- * 이름은 엔진 도구 29개와 같고, 입력 스키마의 키는 {@code ArgsParser}가 받는 키와 같아야 합니다(시험이 잰다).
+ * 이름은 엔진 도구 34개와 같고, 입력 스키마의 키는 {@code ArgsParser}가 받는 키와 같아야 합니다(시험이 잰다).
  *
  * <p>읽기와 쓰기는 엔진의 {@link CommandRegistry#WRITE_COMMANDS}에서 갈라 냅니다. 기본은 읽기 도구만 내놓고,
  * 쓰기 도구는 {@code mcp --write}로 뜰 때만 내놓습니다. 영구 삭제({@code purge_doc})는 어느 쪽으로도 내놓지 않습니다.
@@ -37,7 +37,7 @@ final class McpTools {
 
     private McpTools() {}
 
-    /** 정의된 도구 29개 전부(내놓지 않는 것 포함)를 엔진 도구 차례로 돌려줍니다. */
+    /** 정의된 도구 34개 전부(내놓지 않는 것 포함)를 엔진 도구 차례로 돌려줍니다. */
     static List<Tool> all() {
         return ALL;
     }
@@ -108,6 +108,10 @@ final class McpTools {
 
         Schema strings(String name, String description) {
             return add(name, "array", description, false, "\"items\":{\"type\":\"string\"}");
+        }
+
+        Schema object(String name, String description) {
+            return add(name, "object", description, false, null);
         }
 
         Schema links(String name, String description) {
@@ -283,6 +287,57 @@ final class McpTools {
         t.add(tool("export_markdown",
                 "노트를 마크다운 사본으로 내보낸다.",
                 schema()));
+
+        // ---- 스킬과 에이전트 정의(자원). 외부 설명서에 없는 확장이다 ----
+        t.add(tool("list_resources",
+                "스킬과 에이전트 정의의 관리 목록을 낸다. scope=global 이나 project=<프로젝트 slug>로 범위를 거른다. 참조하지 않은 글로벌 자원도 나오는 관리용 목록이다. "
+                        + "프로젝트가 쓸 수 있는 것만 보려면 usable_resources를 쓴다. trash=true면 휴지통 목록이다.",
+                schema().str("kind", "skill이나 agent", false)
+                        .str("scope", "global. 프로젝트 자원은 project로 준다", false)
+                        .str("project", "프로젝트 slug", false)
+                        .bool("bodies", "true면 지침까지 싣는다. 기본은 메타만")
+                        .bool("trash", "true면 휴지통 목록")));
+        t.add(tool("get_resource",
+                "자원 1건을 지침과 쓰기 전 토큰(precondition)과 함께 읽는다. 고치기 전에 먼저 읽는다. version을 주면 고치기 전의 옛 판을 읽는다(그래도 precondition은 지금 파일의 것이다).",
+                schema().str("id", "자원 id(sk… 또는 ap…)", true)
+                        .str("version", "list_resource_versions가 준 판 이름", false)));
+        t.add(tool("save_resource",
+                "스킬이나 에이전트 정의를 만들거나 고친다. id를 안 주면 새로 만든다(kind, scope나 project, name, description이 필요하다). id를 주면 준 칸만 고친다(f1이 꼭 필요하고 종류·범위·id는 못 바꾼다). "
+                        + "스킬과 에이전트 정의는 특정 AI 도구에 종속되지 않는다. 도구별 차이는 tools 칸에만 두고, 모르는 도구 칸도 지우지 않고 보존한다. "
+                        + "에이전트의 permission은 read, edit, publish 가운데 하나이고, skills는 그 에이전트가 쓸 스킬의 id 목록이다.",
+                schema().str("id", "고칠 자원 id. 안 주면 새로 만든다", false)
+                        .str("kind", "skill이나 agent(새로 만들 때)", false)
+                        .str("scope", "global(새로 만들 때). 프로젝트 자원은 project로 준다", false)
+                        .str("project", "프로젝트 slug(새로 만들 때)", false)
+                        .str("name", "이름. 한 범위·한 종류 안에서 하나뿐이다", false)
+                        .str("description", "한 문단 설명", false)
+                        .str("body", "지침(마크다운) 전체. 주면 통째로 바뀐다", false)
+                        .str("permission", "에이전트의 권한: read, edit, publish", false)
+                        .strings("skills", "에이전트가 쓸 스킬 id 목록(통째로 바뀐다). 글로벌 에이전트는 글로벌 스킬만 쓴다")
+                        .str("repo", "프로젝트 에이전트가 쓸 저장소 이름. 빈 값이면 지운다", false)
+                        .object("tools", "도구별 선택 칸. 예: {\"claude\":{...},\"codex\":{...}}. 빈 객체면 비운다")
+                        .str("f1", "기존 자원을 고칠 때 꼭 필요한 쓰기 전 토큰. 직전에 get_resource나 save_resource가 준 precondition 값(f1:…)을 그대로 넣는다. 안 주면 AIS-412로 거절된다.", false)));
+        t.add(tool("delete_resource",
+                "자원을 휴지통으로 보낸다(스킬은 폴더째). restore_resource로 되살릴 수 있다. 응답의 referencedBy는 이 글로벌 자원을 참조하던 프로젝트들이다.",
+                schema().str("id", "자원 id", true)));
+        t.add(tool("restore_resource",
+                "휴지통의 자원을 되살린다. 제자리에 같은 이름이 이미 있으면 거절된다. list_resources trash=true가 준 id를 쓴다.",
+                schema().str("id", "휴지통의 자원 id", true)));
+        t.add(tool("set_resource_ref",
+                "프로젝트가 글로벌 자원을 참조하는 것을 켠다(remove=true면 끈다). 프로젝트는 참조한 글로벌 자원만 쓸 수 있고, 참조하지 않은 것은 쓰지 않는다. "
+                        + "withSkills=true면 에이전트를 켤 때 그 에이전트의 글로벌 스킬도 함께 켠다. 프로젝트 자원은 참조하지 않아도 쓸 수 있어 참조할 수 없다.",
+                schema().str("project", "프로젝트 slug", true)
+                        .str("id", "글로벌 자원 id", true)
+                        .bool("remove", "true면 참조를 끈다")
+                        .bool("withSkills", "true면 에이전트의 글로벌 스킬도 함께 켠다")));
+        t.add(tool("usable_resources",
+                "프로젝트가 쓸 수 있는 스킬과 에이전트 정의를 낸다: 프로젝트 자원과 참조한 글로벌 자원이다(출처 own/ref). "
+                        + "깨진 참조(broken)와, 쓸 수 있는 에이전트가 필요로 하지만 쓸 수 없는 스킬(missingSkills)도 같이 낸다. 참조하지 않은 것은 여기에 안 나오고 쓰지 않는다.",
+                schema().str("project", "프로젝트 slug", true)
+                        .bool("bodies", "true면 지침까지 싣는다")));
+        t.add(tool("list_resource_versions",
+                "자원의 고치기 전 판 목록을 낸다(새것이 앞). 되돌리려면 get_resource로 옛 판을 읽고 그 내용으로 save_resource를 부른다.",
+                schema().str("id", "자원 id", true)));
 
         Map<String, Tool> byName = new LinkedHashMap<>();
         for (Tool tool : t) {

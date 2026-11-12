@@ -3,7 +3,7 @@ package aisurada.cmd;
 import java.util.*;
 
 /**
- * 도구 26개와 명령 58개 및 사용법 목록을 관리하는 통합 레지스트리.
+ * 도구 34개와 명령 66개 및 사용법 목록을 관리하는 통합 레지스트리.
  * 단일 CommandSpec 테이블을 기반으로 목록과 메타데이터를 자동 생성합니다.
  */
 public final class CommandRegistry {
@@ -68,14 +68,14 @@ public final class CommandRegistry {
             new CommandSpec("facts-brief", null, true, false, FactsBrief.USAGE),
             new CommandSpec("read-session", null, false, true, "read-session <세션 id> [limit=<개수>] [before=<순번>] [urls=true] [note=<노트 id>] [author=<노트 id>,...]"),
             new CommandSpec("session-titles", null, false, true, "session-titles <세션 id> [세션 id...]"),
-            new CommandSpec("list-resources", null, false, false, ResourceCommands.LIST_USAGE),
-            new CommandSpec("get-resource", null, false, false, ResourceCommands.GET_USAGE),
-            new CommandSpec("save-resource", null, true, false, ResourceCommands.SAVE_USAGE),
-            new CommandSpec("delete-resource", null, true, false, ResourceCommands.DELETE_USAGE),
-            new CommandSpec("restore-resource", null, true, false, ResourceCommands.RESTORE_USAGE),
-            new CommandSpec("set-resource-ref", null, true, false, ResourceCommands.REF_USAGE),
-            new CommandSpec("usable-resources", null, false, false, ResourceCommands.USABLE_USAGE),
-            new CommandSpec("list-resource-versions", null, false, false, ResourceCommands.VERSIONS_USAGE),
+            new CommandSpec("list-resources", "list_resources", false, false, ResourceCommands.LIST_USAGE),
+            new CommandSpec("get-resource", "get_resource", false, false, ResourceCommands.GET_USAGE),
+            new CommandSpec("save-resource", "save_resource", true, false, ResourceCommands.SAVE_USAGE),
+            new CommandSpec("delete-resource", "delete_resource", true, false, ResourceCommands.DELETE_USAGE),
+            new CommandSpec("restore-resource", "restore_resource", true, false, ResourceCommands.RESTORE_USAGE),
+            new CommandSpec("set-resource-ref", "set_resource_ref", true, false, ResourceCommands.REF_USAGE),
+            new CommandSpec("usable-resources", "usable_resources", false, false, ResourceCommands.USABLE_USAGE),
+            new CommandSpec("list-resource-versions", "list_resource_versions", false, false, ResourceCommands.VERSIONS_USAGE),
             new CommandSpec("recent-sessions", null, false, true, "recent-sessions [days=<일 수>]")
     );
 

@@ -700,9 +700,69 @@ public final class ArgsParser {
             String parent = requiredString(toolName, props, "parent");
             String id = requiredString(toolName, props, "id");
             return new ParsedArgs(true, "delete-sub-note", List.of(parent, id), Collections.emptyMap(), parent);
+        } else if (RESOURCE_TOOLS.containsKey(toolName)) {
+            return parseResourceTool(toolName, props);
         } else {
             throw new AisException(400, "미지원 도구: " + toolName);
         }
+    }
+
+    /** 스킬·에이전트 자원 도구 8개. 키는 도구 스키마(McpTools)와 같아야 하고, 값이 있는 칸만 명령줄과 같은 옵션 맵으로 옮긴다. */
+    private static final Map<String, List<String>> RESOURCE_TOOLS = new LinkedHashMap<>();
+    static {
+        RESOURCE_TOOLS.put("list_resources", List.of("kind", "scope", "project", "bodies", "trash"));
+        RESOURCE_TOOLS.put("get_resource", List.of("id", "version"));
+        RESOURCE_TOOLS.put("save_resource", List.of("id", "kind", "scope", "project", "name", "description", "body", "permission", "skills", "repo", "tools", "f1"));
+        RESOURCE_TOOLS.put("delete_resource", List.of("id"));
+        RESOURCE_TOOLS.put("restore_resource", List.of("id"));
+        RESOURCE_TOOLS.put("set_resource_ref", List.of("project", "id", "remove", "withSkills"));
+        RESOURCE_TOOLS.put("usable_resources", List.of("project", "bodies"));
+        RESOURCE_TOOLS.put("list_resource_versions", List.of("id"));
+    }
+    private static final Set<String> RESOURCE_BOOLEAN_KEYS = Set.of("bodies", "trash", "remove", "withSkills");
+
+    private static ParsedArgs parseResourceTool(String toolName, Map<String, JsonValue> props) {
+        List<String> keys = RESOURCE_TOOLS.get(toolName);
+        validateKeys(toolName, props.keySet(), keys);
+        Map<String, String> named = new LinkedHashMap<>();
+        for (String key : keys) {
+            if (!props.containsKey(key)) continue;
+            JsonValue v = props.get(key);
+            String value;
+            if (RESOURCE_BOOLEAN_KEYS.contains(key)) {
+                if (!(v instanceof JsonValue.JsonLiteral l) || !(l.raw().equals("true") || l.raw().equals("false"))) {
+                    throw new AisException(400, "인자 검증 실패(" + toolName + "): " + key + " 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
+                }
+                value = l.raw();
+            } else if (key.equals("skills") && v instanceof JsonValue.JsonArray) {
+                value = JsonCompact.compact(v);
+            } else if (key.equals("tools") && v instanceof JsonValue.JsonObject) {
+                value = JsonCompact.compact(v);
+            } else {
+                value = optionalString(toolName, props, key);
+            }
+            named.put(key.equals("withSkills") ? "with-skills" : key, value);
+        }
+        // 자리 인자: 프로젝트 slug 와 자원 id 는 명령줄에서 자리 인자로 받는다
+        List<String> positional = new ArrayList<>();
+        switch (toolName) {
+            case "get_resource", "delete_resource", "restore_resource", "list_resource_versions" -> {
+                positional.add(requiredString(toolName, props, "id"));
+                named.remove("id");
+            }
+            case "usable_resources" -> {
+                positional.add(requiredString(toolName, props, "project"));
+                named.remove("project");
+            }
+            case "set_resource_ref" -> {
+                positional.add(requiredString(toolName, props, "project"));
+                positional.add(requiredString(toolName, props, "id"));
+                named.remove("project");
+                named.remove("id");
+            }
+            default -> { }
+        }
+        return new ParsedArgs(true, toolName.replace('_', '-'), positional, named, null);
     }
 
     private static void validateKeys(String toolName, Set<String> givenKeys, List<String> allowedSchemaKeys) {
