@@ -1419,6 +1419,49 @@ code.is-symbol { font-weight: 700; }
 .rg .rg-pill-ok-t { fill: var(--ok); }
 .rg .rg-ok-fill { fill: var(--ok); }
 .rg .rg-check { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* 스킬·에이전트 페이지(글로벌 페이지와 프로젝트 페이지) */
+.res-page .res-intro { margin: 0 0 16px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.res-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.res-error { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--err-bg); color: var(--err); font-size: 13px; }
+.res-rule { margin: 24px 0 4px; padding: 10px 14px; border-radius: 10px; background: var(--soft); font-size: 13px; line-height: 1.6; }
+.res-section { margin: 24px 0; }
+.res-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.res-section-head h2 { margin: 0; font-size: 15px; }
+.res-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.res-plain { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.res-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.res-main { min-width: 0; flex: 1; }
+.res-title { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.res-name { font-size: 14px; word-break: break-all; }
+.res-kind { padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; color: var(--muted); }
+.res-badge { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--soft); color: var(--ink); }
+.res-badge-ref { background: var(--ok-bg); color: var(--ok); }
+.res-badge-off { border: 1px dashed var(--muted); background: transparent; font-weight: 500; color: var(--muted); }
+.res-desc { margin: 4px 0 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.res-meta { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.res-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: none; }
+.res-actions button, .res-toolbar button, .res-section-head button, .res-warn button { padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.res-warns { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.res-warn { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 12px; line-height: 1.5; }
+.res-empty { margin: 0; font-size: 13px; color: var(--muted); }
+.res-trashed { opacity: .75; }
+.res-link { padding: 0; border: 0; background: none; box-shadow: none; font-size: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+.res-skipped { margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+.ndf.res-form { width: 560px; max-width: calc(100vw - 24px); }
+.res-form .res-hint { font-size: 11px; font-weight: 400; line-height: 1.5; color: var(--muted); }
+.res-form .res-body, .res-form .res-tools { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.6; }
+.res-form fieldset { margin: 0 0 18px; padding: 0; border: 0; display: grid; gap: 8px; }
+.res-form legend { margin-bottom: 6px; padding: 0; font-size: 12px; }
+.res-perm-option, .res-check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+.res-perm-option span { display: grid; gap: 2px; }
+.res-perm-option small { font-size: 11px; color: var(--muted); }
+.res-check-missing { color: var(--warn); }
+.res-advanced { margin: 0 0 18px; }
+.res-advanced summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.res-note { font-size: 12px; color: var(--warn); }
+.res-ref-body { display: grid; gap: 12px; padding: 4px 24px 22px; font-size: 13px; line-height: 1.7; }
+.res-ref-body footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+@media (max-width: 640px) { .res-item { flex-direction: column; } .res-actions { justify-content: flex-start; } }
 .repo-picker p { margin: 0; font-size: 12px; color: var(--muted); }
 .repo-picker ul { display: grid; gap: 2px; max-height: 160px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
 .repo-picker li button { width: 100%; text-align: left; background: transparent; box-shadow: none; border-color: transparent; border-radius: 8px; }

@@ -7,7 +7,7 @@ import { ActionMenu } from "./ActionMenu.tsx";
 import { LiveBrandMark } from "./BrandMark.tsx";
 import { Icon } from "./Icon.tsx";
 import { useSessionBadge } from "@claude-plug/session";
-import { parseRoute } from "../navigation/routes.ts";
+import { parseRoute, projectAddress } from "../navigation/routes.ts";
 export function Rail({
   controller,
   state,
@@ -64,6 +64,13 @@ export function Rail({
             </button>
             {id && (
               <span className="rail-acts">
+                <button
+                  title="프로젝트 페이지(스킬·에이전트)"
+                  aria-label={`${name} 프로젝트 페이지 열기`}
+                  onClick={() => controller.navigate(projectAddress(slug))}
+                >
+                  <Icon name="popout" />
+                </button>
                 <button
                   title="프로젝트 편집"
                   aria-label={`${name} 프로젝트 편집`}
@@ -155,6 +162,7 @@ export function Rail({
           ["favorites", "즐겨찾기"],
           ["connections", "연결"],
           ["templates", "템플릿"],
+          ["resources", "스킬·에이전트"],
           ["trash", "휴지통"],
           ["guide", "연동 가이드"],
         ].map(([path, label]) => (

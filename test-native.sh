@@ -22,5 +22,6 @@ pnpm --dir native-host exec node --import tsx --test scripts/chapter09.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/chapter10.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/agent-session-chip.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/repo-links.test.mjs
+pnpm --dir native-host exec node --import tsx --test scripts/resources-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/part4-ask-run.test.mjs
 cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked

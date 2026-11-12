@@ -2,7 +2,7 @@ import type { Agenda, Workspace } from '../workspace/types.ts';
 
 export type CalendarMode = 'day' | 'week' | 'month';
 export interface CalendarView { mode: CalendarMode; date: string; week: string; }
-type PlainPage = 'favorites' | 'connections' | 'review' | 'trash' | 'guide';
+type PlainPage = 'favorites' | 'connections' | 'review' | 'trash' | 'guide' | 'resources';
 export type ScreenRoute =
   | { kind: 'root' | 'unknown' }
   | { kind: 'launcher'; create: boolean }
@@ -13,6 +13,7 @@ export type ScreenRoute =
   | { kind: 'notes'; open: string[] }
   | { kind: 'templates'; open: string }
   | { kind: 'session'; id: string }
+  | { kind: 'project'; slug: string }
   | { kind: 'terminal'; id: string | null }
   | { kind: PlainPage };
 
@@ -31,16 +32,17 @@ export function parseRoute(address: string): ScreenRoute {
     }
     if (path === '/templates') return { kind: 'templates', open: query.get('open') || '' };
     if (path === '/terminal') return { kind: 'terminal', id: null };
-    const plain = ['favorites', 'connections', 'review', 'trash', 'guide'] as const;
+    const plain = ['favorites', 'connections', 'review', 'trash', 'guide', 'resources'] as const;
     const page = plain.find(kind => path === `/${kind}`);
     if (page) return { kind: page };
-    const segment = /^\/(doc|agenda|session|terminal)\/([^/]+)$/.exec(path);
+    const segment = /^\/(doc|agenda|session|terminal|project)\/([^/]+)$/.exec(path);
     if (!segment) return { kind: 'unknown' };
     const id = decodeURIComponent(segment[2]);
     switch (segment[1]) {
       case 'doc': return { kind: 'doc', id };
       case 'agenda': return { kind: 'agenda', id, open: (query.get('open') || '').split(',').filter(Boolean) };
       case 'session': return { kind: 'session', id };
+      case 'project': return { kind: 'project', slug: id };
       default: return { kind: 'terminal', id };
     }
   } catch { return { kind: 'unknown' }; }
@@ -49,6 +51,7 @@ export function parseRoute(address: string): ScreenRoute {
 export const docAddress = (id: string) => `/doc/${encodeURIComponent(id)}`;
 export const fileAddress = (path: string) => `/file?path=${encodeURIComponent(path)}`;
 export const agendaAddress = (id: string) => `/agenda/${encodeURIComponent(id)}`;
+export const projectAddress = (slug: string) => `/project/${encodeURIComponent(slug)}`;
 export const notesAddress = (open: string[] = []) =>
   '/notes' + (open.length ? '?open=' + open.map(encodeURIComponent).join(',') : '');
 export const isNoteTab = (id: string) => !/^(term:|ext:|sess:)/.test(id);
