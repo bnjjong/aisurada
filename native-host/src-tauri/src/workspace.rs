@@ -65,13 +65,30 @@ fn switch_workspace(
     Ok(())
 }
 
+/// 앱이 지금 연 vault를 파일로 적어 둔다(`~/Library/Application Support/aisurada/current-vault.json`).
+/// 에이전트의 MCP 서버와 `ais-cli`는 `AISURADA_VAULT`가 없으면 이 파일을 호출마다 읽어서 앱이 연 vault를 따라간다.
+/// 엔진의 `VaultPointer`가 읽는 모양과 같다. 임시 파일에 쓰고 이름을 바꿔서 읽는 쪽이 반쯤 쓴 파일을 못 보게 한다.
+pub(crate) fn write_vault_pointer(home: &Path, vault: &str) -> std::io::Result<()> {
+    let dir = home.join("Library/Application Support/aisurada");
+    std::fs::create_dir_all(&dir)?;
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let json = format!("{}\n", serde_json::json!({ "vault": vault, "updatedAt": millis }));
+    let temp = dir.join("current-vault.json.tmp");
+    std::fs::write(&temp, json)?;
+    std::fs::rename(&temp, dir.join("current-vault.json"))
+}
+
 #[tauri::command]
 pub fn allow_workspace<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, HostState>,
     path: String,
 ) -> Result<(), String> {
-    switch_workspace(
+    let opened = path.clone();
+    let result = switch_workspace(
         window.label(),
         &state.vault,
         path,
@@ -95,7 +112,16 @@ pub fn allow_workspace<R: Runtime>(
                 .map_err(|e| e.to_string())?;
             Ok(())
         },
-    )
+    );
+    // vault를 열었으면 파일에 적는다. 못 적어도 vault 열기는 막지 않는다. 시험은 사용자의 진짜 포인터를 덮어쓰지 않게 건너뛴다
+    if result.is_ok() && !cfg!(test) {
+        if let Some(home) = std::env::var_os("HOME") {
+            if let Err(e) = write_vault_pointer(Path::new(&home), &opened) {
+                eprintln!("앱이 연 vault를 파일에 적지 못했다: {e}");
+            }
+        }
+    }
+    result
 }
 
 #[tauri::command]
@@ -151,6 +177,40 @@ pub fn create_workspace_dir(parent: String, name: String) -> Result<String, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pointer_file(home: &Path) -> std::path::PathBuf {
+        home.join("Library/Application Support/aisurada/current-vault.json")
+    }
+
+    #[test]
+    fn the_opened_vault_is_written_where_the_engine_reads_it() {
+        let home = tempfile::tempdir().unwrap();
+        write_vault_pointer(home.path(), "/Users/me/df-ai/df-ai").unwrap();
+        let first: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(pointer_file(home.path())).unwrap()).unwrap();
+        assert_eq!(first["vault"], "/Users/me/df-ai/df-ai");
+        assert!(first["updatedAt"].as_u64().unwrap() > 0);
+
+        // 다른 vault를 열면 같은 파일이 새 값으로 바뀌고, 임시 파일은 남지 않는다
+        write_vault_pointer(home.path(), "/Users/me/other vault").unwrap();
+        let second: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(pointer_file(home.path())).unwrap()).unwrap();
+        assert_eq!(second["vault"], "/Users/me/other vault", "경로의 공백도 그대로 간다");
+        let leftovers: Vec<_> = std::fs::read_dir(pointer_file(home.path()).parent().unwrap())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(leftovers, vec!["current-vault.json".to_string()]);
+    }
+
+    #[test]
+    fn a_home_that_cannot_be_written_reports_an_error_instead_of_panicking() {
+        let home = tempfile::tempdir().unwrap();
+        let blocker = home.path().join("Library");
+        std::fs::write(&blocker, "파일이 폴더 자리를 막고 있다").unwrap();
+        assert!(write_vault_pointer(home.path(), "/v").is_err());
+    }
+
     #[test]
     fn switching_is_guarded_transactional_and_keeps_raw_spelling() {
         let current = Mutex::new(None);
