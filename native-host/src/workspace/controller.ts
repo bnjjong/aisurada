@@ -670,6 +670,11 @@ export class WorkspaceController {
   }
 
   callHost = <T,>(command: string, args?: Record<string, unknown>): Promise<T> => this.services.host.invoke<T>(command, args);
+  /** 폼에서 폴더 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */
+  pickDirectory = (): Promise<string | null> => this.services.host.chooseDirectory().catch(() => null);
+  /** 폼에서 확장자가 맞는 파일 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */
+  chooseFile = (extensions: string[]): Promise<string | null> =>
+    this.services.host.chooseFile ? this.services.host.chooseFile(extensions).catch(() => null) : Promise.resolve(null);
   callEngine = (argv: string[]): Promise<unknown> => engineCall(this.services.host, argv);
 
   private async discoverHome() {

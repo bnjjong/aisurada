@@ -35,6 +35,8 @@ export interface HostPort {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
   documentDir(): Promise<string>;
   chooseDirectory(): Promise<string | null>;
+  /** 확장자가 맞는 파일 하나를 고르는 대화상자. 없는 환경(시험, 브라우저)에서는 정의하지 않는다. */
+  chooseFile?(extensions: string[]): Promise<string | null>;
   confirmLeave(message: string, options?: { title?: string; okLabel?: string; cancelLabel?: string }): Promise<boolean>;
 }
 

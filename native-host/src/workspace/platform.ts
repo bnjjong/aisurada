@@ -21,6 +21,7 @@ export function workspaceServices(): WorkspaceServices {
       },
       documentDir,
       chooseDirectory: () => open({ directory: true, multiple: false }),
+      chooseFile: (extensions) => open({ directory: false, multiple: false, filters: [{ name: '파일', extensions }] }),
       confirmLeave: (message, options) => confirm(message, {
         title: options?.title || '지금 워크스페이스에 남은 글이 있어요',
         kind: 'warning',

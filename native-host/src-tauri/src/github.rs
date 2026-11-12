@@ -314,6 +314,8 @@ pub struct GithubStatus {
     pub app_id: Option<String>,
     pub app_name: Option<String>,
     pub app_slug: Option<String>,
+    /// GitHub 전용 저장소를 받는 폴더. 화면이 "받으면 여기에 생긴다"는 경로를 미리 알아 세션 붙이기에 쓴다.
+    pub clone_root: String,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -347,6 +349,11 @@ impl GithubService {
         GithubService { dir, store, api: api.to_string(), git_base: git_base.trim_end_matches('/').to_string(), tokens: Mutex::new(HashMap::new()) }
     }
 
+    /// 저장소를 받는 폴더(`<앱 지원 폴더>/repos`)
+    pub fn clone_root(&self) -> PathBuf {
+        self.dir.join("repos")
+    }
+
     fn settings_path(&self) -> PathBuf {
         self.dir.join(SETTINGS_FILE)
     }
@@ -360,7 +367,13 @@ impl GithubService {
         let text = |key: &str| settings.as_ref().and_then(|s| s.get(key)).and_then(Value::as_str).map(str::to_string);
         let has_key = matches!(self.store.get(), Ok(Some(_)));
         let app_id = text("appId");
-        GithubStatus { connected: has_key && app_id.is_some(), app_id, app_name: text("appName"), app_slug: text("appSlug") }
+        GithubStatus {
+            connected: has_key && app_id.is_some(),
+            app_id,
+            app_name: text("appName"),
+            app_slug: text("appSlug"),
+            clone_root: self.clone_root().to_string_lossy().into_owned(),
+        }
     }
 
     /// 앱을 연결한다. 키로 JWT를 서명해 `GET /app`을 불러 App ID가 맞는지 보고, 맞을 때만 키체인과 설정 파일에 저장한다.
@@ -567,7 +580,7 @@ impl GithubState {
     }
 
     fn clone_root(&self) -> PathBuf {
-        self.0.dir.join("repos")
+        self.0.clone_root()
     }
 }
 
@@ -776,7 +789,16 @@ mod tests {
         assert!(wrong.contains("맞지 않는다") && wrong.contains("5722327"), "{wrong}");
         assert!(!svc.status().connected, "틀린 ID로는 아무것도 저장하지 않는다");
         let status = svc.connect(" 5722327 ", TEST_KEY).unwrap();
-        assert_eq!(status, GithubStatus { connected: true, app_id: Some("5722327".into()), app_name: Some("My App".into()), app_slug: Some("my-app".into()) });
+        assert_eq!(
+            status,
+            GithubStatus {
+                connected: true,
+                app_id: Some("5722327".into()),
+                app_name: Some("My App".into()),
+                app_slug: Some("my-app".into()),
+                clone_root: dir.path().join("repos").to_string_lossy().into_owned(),
+            }
+        );
         let saved = std::fs::read_to_string(dir.path().join("github-app.json")).unwrap();
         assert!(!saved.contains("PRIVATE KEY") && !saved.contains("MIIE"), "개인 키는 설정 파일에 안 쓴다: {saved}");
         let seen = fake.requests.lock().unwrap().clone();
