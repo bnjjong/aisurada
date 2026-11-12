@@ -954,7 +954,7 @@ function Comments({
   );
 }
 
-/** 노트의 sessionAgent 줄에서 읽은 CLI 이름. 줄이 없거나 claude면 null이다(Claude는 화면에 따로 밝히지 않는다). */
+/** 노트의 sessionAgent 줄에서 읽은 CLI 이름. 줄이 없거나 claude면 null이다(Claude는 줄을 적지 않는 약속이다. 칩에는 그래도 이름을 보인다). */
 function sessionAgentId(value: unknown): string | null {
   const agent = asText(value)?.trim();
   return agent && agent !== "claude" ? agent : null;
@@ -962,6 +962,7 @@ function sessionAgentId(value: unknown): string | null {
 
 /** 칩에 보여 주는 CLI 이름. 모르는 CLI는 줄에 적힌 이름 그대로 보인다. */
 function sessionAgentLabel(agent: string): string {
+  if (agent === "claude") return "Claude Code";
   if (agent === "codex") return "Codex";
   if (agent === "gemini") return "Gemini CLI";
   return agent;
@@ -986,7 +987,7 @@ export function NoteSessionChips({
     role: "one" | "created" | "edited";
     label: string;
     id: string;
-    /** Claude가 아닌 CLI의 세션이면 그 id(codex, gemini …). Claude는 null. */
+    /** Claude가 아닌 CLI의 세션이면 그 id(codex, gemini …). Claude는 줄이 없어 null이고, 칩에는 「Claude Code」로 보인다. */
     agent: string | null;
   };
 
@@ -1030,7 +1031,7 @@ function SessionChipItem({
 
   return (
     <span className="doc-meta-id" data-session-role={chip.role} data-session-agent={chip.agent ?? "claude"}>
-      {chip.agent && <span className="doc-meta-id-agent">{sessionAgentLabel(chip.agent)}</span>}
+      <span className="doc-meta-id-agent">{sessionAgentLabel(chip.agent ?? "claude")}</span>
       <span className="doc-meta-id-label">{chip.label}</span>
       <span className="doc-meta-id-val">{chip.id}</span>
       {onOpenTerminal && (

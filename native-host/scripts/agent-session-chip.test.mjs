@@ -7,10 +7,10 @@ import { NoteSessionChips } from '../src/ui/NoteParts.tsx';
 const draw = (note, props = {}) => renderToStaticMarkup(React.createElement(NoteSessionChips, { note, ...props }));
 const base = { id: 'n1', title: 't', body: '', agenda: 'a', agendaId: 'a', format: 'markdown', created: '', date: '', time: '' };
 
-test('a claude note keeps its chip as it was: no agent name', () => {
+test('a claude note names Claude Code on its chip even though its file has no sessionAgent line', () => {
   const html = draw({ ...base, sessionId: 'claude-1' });
   assert.match(html, /data-session-agent="claude"/);
-  assert.doesNotMatch(html, /doc-meta-id-agent/);
+  assert.match(html, /<span class="doc-meta-id-agent">Claude Code<\/span>/);
   assert.match(html, /claude-1/);
 });
 
@@ -30,6 +30,8 @@ test('the created and the edited session each carry their own CLI', () => {
 test('an edit session with no agent line is claude even when the note was made by codex', () => {
   const html = draw({ ...base, sessionId: 'codex-1', sessionAgent: 'codex', editedSessionId: 'claude-3' });
   assert.match(html, /data-session-role="edited" data-session-agent="claude"/);
+  assert.match(html, /Claude Code/);
+  assert.match(html, /Codex/);
 });
 
 test('the terminal button is drawn only when the screen can open one', () => {
