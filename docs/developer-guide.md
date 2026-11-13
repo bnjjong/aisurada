@@ -110,7 +110,7 @@ test-native.sh         화면·호스트 시험 전체
 
 ### 호스트 모듈 (`native-host/src-tauri/src/`)
 
-`workspace.rs`(vault 허용·만들기), `github.rs`(GitHub App 연결, 아래 「GitHub App 연결」), `sidecar.rs`(`sidecar_call`), `files.rs`(그림 첨부 쓰기, 기본 앱 열기), `markdown.rs`(외부 마크다운), `notes.rs`(노트 창), `terminal.rs`(PTY), `secrets.rs`(비밀 가림), `menu.rs`, `layout.rs`(창 자리), `frame.rs`(`aisframe://`), `self_write.rs`, `process.rs`(자식 실행과 시간 상한), `ipc.rs`(이벤트 이름). 4부는 `ask.rs`, `agents.rs`, `session_image.rs`, `dictation.rs`, `session_shell.rs`이고 cargo 기능 `claude` 아래에 있다.
+`workspace.rs`(vault 허용·만들기), `github.rs`(GitHub App 연결, 아래 「GitHub App 연결」), `sidecar.rs`(`sidecar_call`), `files.rs`(그림 첨부 쓰기, 기본 앱 열기), `markdown.rs`(외부 마크다운), `notes.rs`(노트 창), `terminal.rs`(PTY), `secrets.rs`(비밀 가림), `menu.rs`, `layout.rs`(창 자리), `frame.rs`(`aisframe://`), `self_write.rs`, `process.rs`(자식 실행과 시간 상한), `ipc.rs`(이벤트 이름). `notifications.rs`(알림, 아래 「알림」). 4부는 `ask.rs`, `agents.rs`, `session_image.rs`, `dictation.rs`, `session_shell.rs`이고, 읽기 전용 러너 `runner/`(아래 「러너」)도 같이 cargo 기능 `claude` 아래에 있다.
 
 ### 화면 모듈 (`native-host/src/`)
 
@@ -242,21 +242,103 @@ test-native.sh         화면·호스트 시험 전체
   - **새로 불러오기.** 창이 다시 눈에 띄면 다시 읽는다(러너나 다른 창이 바꾼 것을 따라간다).
   - **시험용 `preset`.** 두 페이지는 엔진 없이 처음 모양을 정하는 `preset` 속성을 받는다(앱은 주지 않는다). 서버 렌더 시험이 데이터가 든 보드와 상세를 그려 보는 데 쓴다.
 - **시험.** `TasksTest`(만들기와 필수 값, 거절 문구, 고치기 보호와 모르는 칸 보존, 완료 기준 확인 기록, 번호, 휴지통, 상태 전이 전부, 연결과 막힘, 활동, 목록 거르기, 손으로 망가뜨린 파일, MCP 읽기 도구와 쓰기 도구 없음, 기존 명령과의 공존)와 `McpServerTest`의 도구 개수, 화면은 `tasks-ui.test.mjs`(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 보드·목록·상세·상태 메뉴와 레일)다. 서버 렌더에는 `document`가 없어서 설명(마크다운) 영역은 그리지 않는다. 데이터가 든 보드와 상세는 진짜 엔진으로 만든 임시 vault의 응답을 서버 렌더하고 Edge headless로 그려서 모양을 눈으로 확인했다(밝은 모양과 어두운 모양). 실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.
-- **아직 없는 것.** 러너, 태스크 안 채팅(정의 에이전트), 실행 기록, 앱 폴더의 작업 폴더(worktree). 승인 워크플로우(이슈 #53)는 러너가 권한 값을 쓰기 전에 필요하다.
+- **`ais-cli`가 넘겨 주는 이름.** 앱은 엔진을 `ais-cli`를 거쳐 부르는데, `ais-cli`는 `AisCliMain`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`)에 든 이름만 엔진으로 넘긴다. 태스크 명령이 이 목록에 빠져 있어서 실제 앱에서는 모두 「알 수 없는 이름」(종료 코드 2)으로 거절되던 결함을 러너를 만들면서 찾아 고쳤다(`5b38c33`). 엔진 시험과 화면 시험은 `ais-cli`를 거치지 않아 잡지 못했다. 이제 `TasksTest`가 엔진 명령 이름이 모두 `ais-cli`를 통과하는지 대조한다.
+- **아직 없는 것.** 코드를 고치고 PR을 올리는 러너(4단계), 태스크 안 채팅(정의 에이전트, 3b), 질문을 위 단계 에이전트가 먼저 푸는 계층(5단계). 승인 워크플로우(이슈 #53)는 러너가 코드를 고치기 전에 필요하다. 읽기 전용 러너는 아래 「러너」에 있다.
 
 ### 알림 (`notifications.rs`)
 
-태스크 시스템 2단계다. 알림 목록 저장, 채널 설정, macOS 배너를 호스트의 이 모듈 한 곳에서 맡는다. **외부 설명서에 없는 확장이다.** 러너(3단계)도 화면도 같은 `push`를 거치므로 「어디로 보낼지」가 한 곳에서만 정해진다. 지금은 알림을 만드는 쪽(러너)이 없어서 **설정의 「시험 알림 보내기」**가 유일한 발신자다.
+태스크 시스템 2단계다. 알림 목록 저장, 채널 설정, macOS 배너를 호스트의 이 모듈 한 곳에서 맡는다. **외부 설명서에 없는 확장이다.** 러너(3단계)도 화면도 같은 `push`를 거치므로 「어디로 보낼지」가 한 곳에서만 정해진다. 알림을 만드는 쪽은 러너(질문, 보고, 실패)와 **설정의 「시험 알림 보내기」**다.
 
 - **저장.** 목록은 vault마다 `~/Library/Application Support/aisurada/notifications/items-<vault 경로의 SHA-256 앞 8바이트>.json`에(최근 200개, 새것이 앞), 설정은 모든 vault가 같이 쓰는 `…/notifications/settings.json`에 둔다. vault 안에 두지 않는 까닭은 이 컴퓨터에서만 뜻이 있는 기록이고 vault의 git 이력을 부풀리지 않으려는 것이다. 파일이 없거나 망가졌으면 빈 목록, 기본 설정으로 읽는다(알림은 지워져도 큰일이 아니고 앱이 죽으면 안 된다). 쓸 때는 임시 파일에 쓰고 이름을 바꾼다.
-- **알림 하나.** `id`, `kind`(`question`·`pr`·`failed`·`done`·`test`), `title`(120자), `body`(400자), `taskKey`(`TSK-14`, 없을 수 있다), `at`(밀리초), `read`. `id`를 주면 같은 id가 이미 있을 때 새로 만들지 않는다(같은 일을 두 번 알리지 않으려는 것이다. 러너는 `태스크키-상태` 같은 id를 줄 수 있다).
-- **설정과 보내는 곳.** 채널 스위치 2개(앱 안, macOS)와 소식 4개(질문, 초안 PR, 실패·막힘, Done)별 채널 스위치다. 기본은 모두 켜고 Done만 macOS를 끈다(조용히 알려도 된다). 알림은 설정과 무관하게 **목록(알림 센터)에는 늘 쌓인다**. 설정은 토스트와 배너만 정한다: 토스트는 `앱 안 채널 && 그 소식의 앱 안`, 배너는 `macOS 채널 && 그 소식의 macOS`다. `test`는 채널 스위치만 따른다(`route`).
+- **알림 하나.** `id`, `kind`(`question`·`pr`·`failed`·`done`·`test`), `title`(120자), `body`(400자), `taskKey`(`TSK-14`, 없을 수 있다), `at`(밀리초), `read`. `id`를 주면 같은 id가 이미 있을 때 새로 만들지 않는다(같은 일을 두 번 알리지 않으려는 것이다. 러너는 `run-<실행 id>-done` 같은 id를 준다).
+- **설정과 보내는 곳.** 채널 스위치 2개(앱 안, macOS)와 소식 4개(질문, 리뷰할 일, 실패·막힘, Done)별 채널 스위치다. 기본은 모두 켜고 Done만 macOS를 끈다(조용히 알려도 된다). 알림은 설정과 무관하게 **목록(알림 센터)에는 늘 쌓인다**. 설정은 토스트와 배너만 정한다: 토스트는 `앱 안 채널 && 그 소식의 앱 안`, 배너는 `macOS 채널 && 그 소식의 macOS`다. `test`는 채널 스위치만 따른다(`route`).
 - **명령 5개.** `notifications_list`, `notifications_push`, `notifications_mark_read`, `notifications_settings_get`, `notifications_settings_set`. `push`는 쌓고, 설정에 따라 배너를 보내고, 화면에 사건(`ais://notifications`: `{unread, pushed, toast}`)을 알린 뒤 `{item, toast, banner, unread}`를 돌려준다. `banner`는 `off`, `sent`, `sent-fallback`, `failed: …`다. 열린 vault가 없으면 `push`는 거절하고 `list`는 빈 목록을 낸다.
 - **macOS 배너.** `tauri-plugin-notification`(2.4.0. tauri 2.11.2와 맞는 가장 새 판. 2.5 이상은 tauri 2.12가 필요하다)으로 보내고, 그것이 실패하면 `osascript`(`display notification`)로 한 번 더 시도한다(이때 배너는 Script Editor 이름으로 뜬다). 배너를 누르면 앱이 앞으로 올 뿐 그 태스크로 가지는 않는다(플러그인이 macOS에서 누름 소식을 주지 않는다). 태스크로 가는 단추는 알림 센터와 토스트에 있다.
 - **집중 모드는 macOS가 처리한다**(사용자 결정). 집중 모드에서 aisurada를 허용하지 않으면 macOS가 배너를 막고 알림 센터에 쌓는다. 앱이 집중 모드 상태를 읽어 토스트까지 숨기지는 않는다. 읽는 방법과 권한은 확인하지 못했다.
 - **화면.** 레일 맨 위의 종 단추(안 읽은 수 배지)가 알림 센터를 연다(`ui/NotificationCenter.tsx`: 안 읽음·전체 탭, 모두 읽음, 질문은 「답하기」, 그 밖에는 「태스크 보기」). 토스트는 메인 창 오른쪽 아래에 3개까지 뜨고 8초 뒤에 사라진다. 설정 화면의 「알림」(`ui/NotificationSettings.tsx`)이 채널(Telegram은 자리만), 소식별 스위치, 집중 모드 안내, 시험 알림을 보인다. 화면의 상태는 `ui/notificationsStore.ts`(GitHub 연결처럼 모듈 하나의 저장소)가 들고, 앱이 켜질 때 한 번 읽고 호스트의 사건을 받아 갱신한다. 노트 창은 목록만 따라가고 토스트는 안 띄운다. 스위치는 `.set-switch`(설정 화면 시험이 세는 이름)가 아니라 `.ntf-switch`이고, 모든 화면 모양에서 같게 보이도록 `:root[data-skin]`으로 덮었다.
 - **시험.** 호스트는 `notifications::tests`(기본 설정, 가는 곳 계산, 설정 파일 읽기·쓰기와 모자란 칸 채우기, 알림 검사와 자르기, 쌓기·같은 id·200개 상한, 읽음, vault별 파일, AppleScript 글 탈출, JSON 이름) 10건이고, 실제 macOS 알림을 한 번 보내는 `real_banner_smoke`는 `cargo test -- --ignored real_banner_smoke`로만 돈다(이 컴퓨터에서 `sent`를 확인했다). 화면은 `notifications-ui.test.mjs`(저장소의 읽기·사건 반영·되돌림, 서버 렌더로 본 센터·토스트·설정·레일의 종)다. 알림 센터, 토스트, 설정 화면은 진짜 컴포넌트를 서버 렌더하고 Edge headless로 다섯 화면 모양(밝은 모양과 어두운 모양)에서 그려서 모양을 눈으로 확인했다.
 - **확인하지 못한 것.** 실제 앱 창(WKWebView)에서 종·토스트·설정을 눌러 본 것, 번들한 앱에서 macOS 배너가 aisurada 이름과 아이콘으로 뜨는지(개발 실행은 터미널 이름으로 뜬다), 시스템 설정의 알림 허용 상태가 어떻게 보이는지. 설정의 「시험 알림 보내기」로 직접 확인할 수 있다.
+
+### 러너 (`runner/`)
+
+태스크 시스템 3단계(읽기 전용)다. **외부 설명서에 없는 확장이다.** Ready For Develop인 태스크를 호스트가 집어서 claude에게 저장소와 노트를 **읽게만** 하고, 조사 결과(`[보고]`)를 댓글로 남겨 In Review로 보내거나, 사람만 답할 수 있는 질문(`[질문]`)을 남겨 Waiting Answer로 보낸다. 코드를 고치고 PR을 올리는 일은 4단계다. 앱이 켜져 있는 동안에만 돈다.
+
+| 파일 | 맡은 일 |
+|---|---|
+| `runner/mod.rs` | 언제 누구를 돌릴지: 15초마다 훑기, 동시 실행 수, 「지금 실행」·중지·답하기, 앱을 껐다 켰을 때 이어 가기, 앱을 닫을 때 멈추기, 화면 명령 6개 |
+| `runner/job.rs` | 실행 하나(일곱 걸음)와 보고·질문·실패·중지의 끝맺음 |
+| `runner/protocol.rs` | 태스크를 프롬프트로, claude의 마지막 답을 `[보고]`와 `[질문]`으로, claude를 읽기 전용으로 띄우는 인자, MCP 설정 |
+| `runner/store.rs` | 설정과 실행 기록 파일 |
+| `runner/host.rs` | 엔진(`ais-cli`)·claude·GitHub 저장소 사본·알림을 감싼 trait `Host`(시험은 가짜를 끼운다)와 읽기 전용 작업 폴더 |
+
+cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 6개가 없고(`Command … not found`) 화면은 러너 막대와 「실행」 영역을 그리지 않는다.
+
+**일곱 걸음.** 걸음 이름은 실행 기록의 `step`과 화면의 단계 표시가 같이 쓴다.
+
+| 걸음 | 하는 일 |
+|---|---|
+| 받기 | `get-task`로 태스크를 읽는다 |
+| 집기 | `transition-task to=in-progress actor=runner from=ready-for-develop`. 막혀 있거나 그 사이 바뀌었으면 엔진이 거절하고, 러너는 그 태스크를 60초 쉰다 |
+| 판단 | claude가 있는지, 저장소 이름이 있는지, 읽기 전용 MCP 설정(`claude-mcp config`에 이 vault를 박은 것)을 만든다 |
+| 받아오기 | 앱 소유 사본(`~/Library/Application Support/aisurada/repos/<owner>/<name>`)을 `git fetch --prune`으로 최신으로 맞추고, 거기서 **분리된 HEAD의 읽기 전용 작업 폴더**(`…/runs/<vault 해시>/<TSK-n>/<실행 id>/work`)를 만든다. 사본의 브랜치와 작업 트리는 건드리지 않는다. 태스크에 기준 브랜치(`base`)가 있으면 그 브랜치, 없으면 원격의 기본 브랜치다 |
+| 일하기 | `claude -p`를 작업 폴더에서 돌린다(아래). 사람의 답이 왔거나 앱을 다시 켠 뒤면 같은 세션을 `--resume`으로 잇는다 |
+| 내보내기 | 보고면 `**분석 보고**` 댓글 + In Review + 알림(`pr`), 질문이면 `**질문**` 댓글 + Waiting Answer + 알림(`question`). 실패면 `**실행이 실패했어요**` 댓글 + Failed + 알림(`failed`) |
+| 정리 | 끝났으면 작업 폴더를 `git worktree remove`로 지운다. 질문으로 멈춘 동안에는 남겨 둔다 |
+
+**읽기 전용을 지키는 법.** claude에는 다음 인자를 준다(`protocol::claude_args`). 모두 실제 `claude` 2.1.322로 확인했다.
+
+- `--permission-mode dontAsk --permission-prompts none`: 미리 허용한 도구만 쓰고 나머지는 묻지 않고 거절한다.
+- `--allowedTools "Read(<작업 폴더>/**)" mcp__aisurada`: 파일 읽기와 노트 읽기만 허용한다. **`Read` 규칙에 경로를 주지 않으면 `/etc/hosts`까지 읽혔다.** 경로를 준 규칙 하나가 Read·Grep·Glob을 모두 그 폴더로 가둔다(`/etc`, `~/.ssh` 거절을 확인했다). 노트는 vault 전체를 읽을 수 있다(사용자 결정 2-나: 질문하기 전에 노트에서 먼저 찾는다).
+- `--disallowedTools Bash Edit Write NotebookEdit WebFetch WebSearch Agent Task`: 셸, 쓰기, 웹, 하위 에이전트를 막는다.
+- `--strict-mcp-config --mcp-config <JSON>`: 이 호출이 준 MCP 서버만 쓴다. 서버는 `ais-cli mcp`(`--write` 없음)라서 읽기 도구만 있고, `AISURADA_VAULT`로 이 실행의 vault에 못 박는다. 쓰기 모드 설정이 오면 거절한다.
+- `--output-format json`: 결과 글, 세션 id, 토큰, 비용(`total_cost_usd`)을 한 번에 받는다. 모델은 설정(기본 `sonnet`)에서 정한다.
+
+**상태와 사람이 할 일.** 상태 전이는 모두 엔진의 `transition-task`를 거친다(규칙은 한 곳).
+
+| 지금 | 일어나는 일 | 사람이 할 일 |
+|---|---|---|
+| Ready For Develop | 자동으로 집기가 켜져 있으면 러너가 집고, 꺼져 있으면 「지금 실행」을 눌렀을 때 집는다 | 「지금 실행」 |
+| In Progress | claude가 조사한다. 시간 제한 120분(기다린 시간은 세지 않는다) | 「중지」(Cancelled로 끝나고 Draft로 되돌릴 수 있다) |
+| Waiting Answer | 질문을 기다린다. 질문은 최대 5개이고 다섯 번째 답 뒤에는 `[보고]`를 쓰게 한다 | 상세의 「러너의 질문」 칸에 답. 답은 `**답변**` 댓글로 남고 같은 세션이 이어진다 |
+| In Review | 보고가 댓글로 올라와 있다 | 읽고 Done으로 보내거나 되돌린다 |
+| Failed | 까닭이 댓글과 기록에 있다 | Draft로 되돌려 다시 Ready로 보낸다 |
+
+세션 기록(`~/.claude/projects/…`)이 사라져 `--resume`이 실패하면(`No conversation found`) 새 세션을 열어 태스크와 댓글(질문과 답이 들어 있다)로 이어 간다. 작업 폴더가 사라졌으면 다시 만든다(읽기 전용이라 「초기화」 대신 다시 만든다).
+
+**앱을 닫을 때(사용자 결정 7-나).** 일하는 실행이 있으면 종료 확인에 「러너가 일하는 태스크가 n개 있어요. 앱을 닫으면 멈췄다가 다음에 앱을 켤 때 이어서 해요」가 붙는다. 닫으면 claude를 멈추되(최대 8초 기다린다) 실행 기록은 `running`으로 두고, 다시 켜면 첫 훑기가 같은 세션을 이어 간다. 그 사이 태스크가 다른 상태로 옮겨졌으면(`cancelled` 등) 이어 가지 않고 `abandoned`로 닫고 작업 폴더를 지운다. 워크스페이스를 바꿀 때는 묻지 않는다(실행은 자기 vault로 계속 돈다).
+
+**저장.** 모두 앱 지원 폴더(`~/Library/Application Support/aisurada/runs/`) 아래에 둔다. vault 안에 두지 않는 까닭은 이 컴퓨터에서만 뜻이 있는 기록(작업 폴더 경로, 세션 id)이라 vault의 git 이력을 부풀리지 않으려는 것이다(사용자 결정 3).
+
+| 파일 | 내용 |
+|---|---|
+| `settings.json` | `autoPickup`(스스로 집기, **기본 꺼짐**), `concurrency`(동시 실행 1~6, 기본 3), `model`(기본 `sonnet`, 화면에서는 못 바꾸고 파일로만) |
+| `<vault 해시>/<TSK-n>/<실행 id>/run.json` | 실행 기록: 단계(`running`·`waiting-answer`·`done`·`failed`·`cancelled`·`abandoned`), 걸음, claude 부른 횟수, 질문 수, 일한 시간, 토큰, 비용, 보고 요약, 오류, 세션 id |
+| 같은 폴더의 `events.jsonl` | 걸음별 진행 기록(화면에는 마지막 80줄) |
+
+**명령 6개와 사건.** 열린 vault가 없으면 모두 거절한다.
+
+| 명령 | 하는 일 |
+|---|---|
+| `runner_status` | 설정, claude 유무, 일하는 스레드 수(`running`), 일하는 실행(`active`), 답을 기다리는 실행(`waiting`) |
+| `runner_settings_set` | 설정을 저장한다(범위를 벗어나면 바로잡는다) |
+| `runner_run` | 「지금 실행」. Ready가 아니거나 막혀 있거나 동시 한도에 닿았으면 까닭을 돌려준다 |
+| `runner_stop` | 일하는 중이면 claude를 멈추고 Cancelled로, 답을 기다리는 중이면 바로 Cancelled로 |
+| `runner_answer` | 답을 댓글로 남기고 In Progress로 옮긴 뒤 같은 세션을 잇는다(한도와 무관하게 사람이 누른 일이다) |
+| `runner_runs` | 태스크 하나의 실행 기록과 가장 최근 실행의 진행 기록 |
+
+러너가 태스크를 집거나 질문하거나 끝내면 사건 `ais://runner`(`{taskKey}`)를 보낸다. 화면(`ui/runnerStore.ts`)은 이때 상태를 다시 읽고 `version`을 올려서 태스크 목록과 상세가 다시 읽도록 한다.
+
+**화면.** 태스크 페이지 위의 막대(`ui/RunnerBar.tsx`: 러너 상태 알약, 「Ready가 되면 스스로 집기」, 동시 실행 수), 보드 카드의 「▶ 지금 실행」·「■ 중지」·「러너 · 걸음」 표시, 상세의 「실행」 영역(`ui/RunnerPanel.tsx`: 러너의 질문과 답 칸, 일곱 걸음 표시와 걸린 시간, 지난 실행의 결과·시간·토큰·비용·진행 기록)이다. 「실행」은 활동 탭이 아니라 상세 위쪽의 따로 둔 영역이다.
+
+**알림.** 보고는 종류 `pr`(화면 이름 「리뷰」, 설정의 「리뷰할 일이 생겼을 때」)로, 질문은 `question`, 실패는 `failed`로 쌓는다. `id`는 `run-<실행 id>-done`·`-q<번호>`·`-failed`라 같은 일을 두 번 알리지 않는다. 사람이 직접 중지한 것과 앱을 닫아 끊긴 것은 알리지 않는다.
+
+**시험.**
+
+- 호스트: `runner::` 30건. 보고·질문·답·중지·실패(종료 코드, 시간 초과, `is_error`)·질문 한도·세션 소실·작업 폴더 소실·앱 닫기와 다시 켜기 이어 가기·태스크가 옮겨졌을 때의 정리·우선순위와 동시 한도·막힘, 프롬프트와 claude 인자와 MCP 설정, 파일 저장소, 실제 git으로 만든 읽기 전용 작업 폴더를 가짜 엔진·가짜 claude로 돌린다.
+- **진짜로 도는 시험** `runner::tests::real_cli_and_claude_report_end_to_end`(무시됨): 진짜 `ais-cli`, 격리 엔진, 진짜 `claude`(haiku)로 태스크 하나를 끝까지 돌려 In Review와 댓글을 확인한다. 토큰을 조금 쓴다. 격리 엔진을 띄우고(§3의 4번과 같다: `AISURADA_SIDECAR_SOCKET`을 주고 `serve`) `AISURADA_VAULT`, `AISURADA_SIDECAR_SOCKET`, `AISURADA_SIDECAR_JAR`, `E2E_HOME`(격리 HOME), `E2E_CLI_JAR`(`dist/ais-cli.jar`)를 주고 `cargo test real_cli_and_claude -- --ignored --nocapture`로 돌린다. 이 컴퓨터에서 작은 README 조사 하나가 10초, 약 0.007달러였다.
+- 화면: `runner-ui.test.mjs` 13건(저장소의 읽기·사건·호출 인자, 서버 렌더로 본 막대·「실행」 영역 각 상태·보드 카드), `workspace.test.mjs`의 종료 확인 3건. 새 화면은 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려 눈으로 확인했다.
+- **확인하지 못한 것.** 키체인 자격으로 진짜 GitHub 저장소를 fetch하는 길(`refresh_clone`은 시험에서 가짜로 대신했다), 번들한 앱에서 `claude` 위치 찾기, 질문→답 왕복과 동시 실행 여러 개를 진짜 `claude`로 돌리는 것(가짜 대본으로만), 120분 제한, 앱을 닫을 때 진짜 `claude` 프로세스가 멈추는 것, 실제 앱 창(WKWebView)에서 눌러 본 것.
+- **한계.** 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다(`ais-cli`는 호출마다 JVM을 띄운다). 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 4부의 세션 화면(`/session/<id>`)에 잇지 않았다.
 
 ### GitHub App 연결 (`github.rs`)
 
@@ -532,7 +614,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 
 ### 계약을 건드릴 때
 
-호스트 커맨드(2부 44개, 4부 10개)와 이벤트 5개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`, `ais://notifications`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.
+호스트 커맨드(2부 44개, cargo 기능 `claude` 아래 16개: 4부 10개와 러너 6개)와 이벤트 6개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`, `ais://notifications`, `ais://runner`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.
 
 **설명서와 일부러 다르게 둔 것.** `create_workspace_dir({parent, name})`는 설명서대로라면 저장 위치(`parent`)가 없을 때 실패해야 하지만, 지금은 이름 검사를 모두 통과한 뒤 저장 위치를 만든다(`mkdir -p`). 새 워크스페이스 화면에서 없는 폴더를 적으면 「저장 위치를 찾을 수 없어요」로 막히던 것을 2026-11-04에 바꿨다. 저장 위치가 파일이면 여전히 실패하고, 잘못된 이름은 저장 위치를 만들기 전에 거절한다(`workspace.rs`의 `create_dir_makes_a_missing_parent_after_validating_the_name`).
 
