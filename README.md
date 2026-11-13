@@ -123,7 +123,7 @@ java -jar dist/ais-engine.jar list-resources scope=global --aisurada.vault=/path
 
 ## 태스크 (확장)
 
-외부 설명서에 없는 확장입니다. 사람이 일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡기는 단위입니다. 지금은 **태스크를 만들고 상태를 사람이 바꾸는 데까지**(1단계: 엔진 명령과 화면)이고, 러너와 알림은 아직 없습니다. 앱의 레일에 「태스크」 메뉴가 있어 보드와 목록으로 보고, 태스크를 열어 상태 메뉴로 상태를 바꿉니다. 태스크는 키(`TSK-14`)나 ID(`tk…`)로 부르며, **완료 기준(`criteria`)을 하나 이상 적어야 만들 수 있습니다**. 일이 끝났는지 이 기준으로 확인하기 때문입니다.
+외부 설명서에 없는 확장입니다. 사람이 일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡기는 단위입니다. 지금은 **태스크를 만들고 상태를 사람이 바꾸는 데까지**(1단계: 엔진 명령과 화면)이고, 러너는 아직 없습니다. 앱의 레일에 「태스크」 메뉴가 있어 보드와 목록으로 보고, 태스크를 열어 상태 메뉴로 상태를 바꿉니다. 태스크는 키(`TSK-14`)나 ID(`tk…`)로 부르며, **완료 기준(`criteria`)을 하나 이상 적어야 만들 수 있습니다**. 일이 끝났는지 이 기준으로 확인하기 때문입니다.
 
 ```bash
 java -jar dist/ais-engine.jar create-task 'title=프로젝트를 지울 때 자원 폴더도 정리하기' repo=bnjjong/aisurada 'criteria=["지운 뒤 폴더가 남지 않는다","되살리면 돌아온다"]' type=bug --aisurada.vault=/path/to/vault
@@ -135,6 +135,14 @@ java -jar dist/ais-engine.jar link-tasks TSK-1 TSK-2 type=blocks --aisurada.vaul
 - 명령 9개: `create-task`, `get-task`, `list-tasks`, `update-task`, `transition-task`, `link-tasks`, `add-task-comment`, `delete-task`, `restore-task`. MCP에는 읽기 도구 `list_tasks`, `get_task`만 열립니다. 상태를 바꾸는 일은 사람(화면)과 러너만 합니다.
 - 상태는 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled` 8개이고, 누가 어떤 조건에서 바꾸는지는 `transition-task`가 한 곳에서 검사합니다.
 - 파일은 `.aisurada/tasks/` 아래에만 있어서 노트와 기존 명령을 건드리지 않습니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「태스크」에 있습니다.
+
+## 알림 (확장)
+
+외부 설명서에 없는 확장입니다. 태스크 시스템의 알림으로, 질문이 왔을 때, 초안 PR이 열렸을 때, 실패했을 때, Done이 됐을 때 앱 안과 macOS 알림센터로 알립니다. 알림을 만드는 러너는 아직 없고, 설정의 「시험 알림 보내기」로 가는 길을 확인합니다. 레일 맨 위의 종 단추가 알림 센터(안 읽음·전체, 모두 읽음, 태스크로 가는 단추)를 엽니다.
+
+- 설정 화면의 「알림」에서 앱 안과 macOS를 각각 끄고 켤 수 있고, 소식별로도 고릅니다(기본은 모두 켜고 Done의 macOS만 끕니다). 앱 안 채널을 꺼도 알림은 알림 센터에 쌓입니다. Telegram은 자리만 있습니다.
+- macOS 집중 모드는 macOS가 처리합니다. 집중 모드에서 aisurada를 허용하지 않으면 배너가 막히고 알림 센터에 쌓입니다.
+- 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「알림」에 있습니다.
 
 ## 22장 사실층
 

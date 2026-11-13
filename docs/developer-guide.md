@@ -197,7 +197,7 @@ test-native.sh         화면·호스트 시험 전체
 
 ### 태스크 (`task/`)
 
-사람이 일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡기는 단위다. **외부 설명서에 없는 확장이다.** 지금은 **1단계(태스크 저장, 명령, 상태 전이, 화면)** 까지이고 러너, 알림, 태스크 안 채팅은 아직 없다. 계획은 「태스크 시스템 구현 계획」 문서(5단계, 결정 12개)를 따른다.
+사람이 일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡기는 단위다. **외부 설명서에 없는 확장이다.** 지금은 **1단계(태스크 저장, 명령, 상태 전이, 화면)** 까지이고 러너와 태스크 안 채팅은 아직 없다. 알림은 2단계로 따로 있다(아래 「알림」). 계획은 「태스크 시스템 구현 계획」 문서(5단계, 결정 12개)를 따른다.
 
 - **위치.** `.aisurada/tasks/` 아래다. 노트를 훑는 명령과 기존 명령이 이 영역을 보지 않는다(시험으로 확인).
   `TSK-14.md`(태스크), `TSK-14/activity.jsonl`(활동, 한 줄에 사건 하나, 최근 500줄까지), `.trash/<id>/`(지운 태스크). 실행 기록(러너가 만드는 로그)은 vault가 아니라 앱 폴더에 둔다(결정 3).
@@ -242,7 +242,21 @@ test-native.sh         화면·호스트 시험 전체
   - **새로 불러오기.** 창이 다시 눈에 띄면 다시 읽는다(러너나 다른 창이 바꾼 것을 따라간다).
   - **시험용 `preset`.** 두 페이지는 엔진 없이 처음 모양을 정하는 `preset` 속성을 받는다(앱은 주지 않는다). 서버 렌더 시험이 데이터가 든 보드와 상세를 그려 보는 데 쓴다.
 - **시험.** `TasksTest`(만들기와 필수 값, 거절 문구, 고치기 보호와 모르는 칸 보존, 완료 기준 확인 기록, 번호, 휴지통, 상태 전이 전부, 연결과 막힘, 활동, 목록 거르기, 손으로 망가뜨린 파일, MCP 읽기 도구와 쓰기 도구 없음, 기존 명령과의 공존)와 `McpServerTest`의 도구 개수, 화면은 `tasks-ui.test.mjs`(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 보드·목록·상세·상태 메뉴와 레일)다. 서버 렌더에는 `document`가 없어서 설명(마크다운) 영역은 그리지 않는다. 데이터가 든 보드와 상세는 진짜 엔진으로 만든 임시 vault의 응답을 서버 렌더하고 Edge headless로 그려서 모양을 눈으로 확인했다(밝은 모양과 어두운 모양). 실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.
-- **아직 없는 것.** 러너, 알림, 태스크 안 채팅(정의 에이전트), 실행 기록, 앱 폴더의 작업 폴더(worktree). 승인 워크플로우(이슈 #53)는 러너가 권한 값을 쓰기 전에 필요하다.
+- **아직 없는 것.** 러너, 태스크 안 채팅(정의 에이전트), 실행 기록, 앱 폴더의 작업 폴더(worktree). 승인 워크플로우(이슈 #53)는 러너가 권한 값을 쓰기 전에 필요하다.
+
+### 알림 (`notifications.rs`)
+
+태스크 시스템 2단계다. 알림 목록 저장, 채널 설정, macOS 배너를 호스트의 이 모듈 한 곳에서 맡는다. **외부 설명서에 없는 확장이다.** 러너(3단계)도 화면도 같은 `push`를 거치므로 「어디로 보낼지」가 한 곳에서만 정해진다. 지금은 알림을 만드는 쪽(러너)이 없어서 **설정의 「시험 알림 보내기」**가 유일한 발신자다.
+
+- **저장.** 목록은 vault마다 `~/Library/Application Support/aisurada/notifications/items-<vault 경로의 SHA-256 앞 8바이트>.json`에(최근 200개, 새것이 앞), 설정은 모든 vault가 같이 쓰는 `…/notifications/settings.json`에 둔다. vault 안에 두지 않는 까닭은 이 컴퓨터에서만 뜻이 있는 기록이고 vault의 git 이력을 부풀리지 않으려는 것이다. 파일이 없거나 망가졌으면 빈 목록, 기본 설정으로 읽는다(알림은 지워져도 큰일이 아니고 앱이 죽으면 안 된다). 쓸 때는 임시 파일에 쓰고 이름을 바꾼다.
+- **알림 하나.** `id`, `kind`(`question`·`pr`·`failed`·`done`·`test`), `title`(120자), `body`(400자), `taskKey`(`TSK-14`, 없을 수 있다), `at`(밀리초), `read`. `id`를 주면 같은 id가 이미 있을 때 새로 만들지 않는다(같은 일을 두 번 알리지 않으려는 것이다. 러너는 `태스크키-상태` 같은 id를 줄 수 있다).
+- **설정과 보내는 곳.** 채널 스위치 2개(앱 안, macOS)와 소식 4개(질문, 초안 PR, 실패·막힘, Done)별 채널 스위치다. 기본은 모두 켜고 Done만 macOS를 끈다(조용히 알려도 된다). 알림은 설정과 무관하게 **목록(알림 센터)에는 늘 쌓인다**. 설정은 토스트와 배너만 정한다: 토스트는 `앱 안 채널 && 그 소식의 앱 안`, 배너는 `macOS 채널 && 그 소식의 macOS`다. `test`는 채널 스위치만 따른다(`route`).
+- **명령 5개.** `notifications_list`, `notifications_push`, `notifications_mark_read`, `notifications_settings_get`, `notifications_settings_set`. `push`는 쌓고, 설정에 따라 배너를 보내고, 화면에 사건(`ais://notifications`: `{unread, pushed, toast}`)을 알린 뒤 `{item, toast, banner, unread}`를 돌려준다. `banner`는 `off`, `sent`, `sent-fallback`, `failed: …`다. 열린 vault가 없으면 `push`는 거절하고 `list`는 빈 목록을 낸다.
+- **macOS 배너.** `tauri-plugin-notification`(2.4.0. tauri 2.11.2와 맞는 가장 새 판. 2.5 이상은 tauri 2.12가 필요하다)으로 보내고, 그것이 실패하면 `osascript`(`display notification`)로 한 번 더 시도한다(이때 배너는 Script Editor 이름으로 뜬다). 배너를 누르면 앱이 앞으로 올 뿐 그 태스크로 가지는 않는다(플러그인이 macOS에서 누름 소식을 주지 않는다). 태스크로 가는 단추는 알림 센터와 토스트에 있다.
+- **집중 모드는 macOS가 처리한다**(사용자 결정). 집중 모드에서 aisurada를 허용하지 않으면 macOS가 배너를 막고 알림 센터에 쌓는다. 앱이 집중 모드 상태를 읽어 토스트까지 숨기지는 않는다. 읽는 방법과 권한은 확인하지 못했다.
+- **화면.** 레일 맨 위의 종 단추(안 읽은 수 배지)가 알림 센터를 연다(`ui/NotificationCenter.tsx`: 안 읽음·전체 탭, 모두 읽음, 질문은 「답하기」, 그 밖에는 「태스크 보기」). 토스트는 메인 창 오른쪽 아래에 3개까지 뜨고 8초 뒤에 사라진다. 설정 화면의 「알림」(`ui/NotificationSettings.tsx`)이 채널(Telegram은 자리만), 소식별 스위치, 집중 모드 안내, 시험 알림을 보인다. 화면의 상태는 `ui/notificationsStore.ts`(GitHub 연결처럼 모듈 하나의 저장소)가 들고, 앱이 켜질 때 한 번 읽고 호스트의 사건을 받아 갱신한다. 노트 창은 목록만 따라가고 토스트는 안 띄운다. 스위치는 `.set-switch`(설정 화면 시험이 세는 이름)가 아니라 `.ntf-switch`이고, 모든 화면 모양에서 같게 보이도록 `:root[data-skin]`으로 덮었다.
+- **시험.** 호스트는 `notifications::tests`(기본 설정, 가는 곳 계산, 설정 파일 읽기·쓰기와 모자란 칸 채우기, 알림 검사와 자르기, 쌓기·같은 id·200개 상한, 읽음, vault별 파일, AppleScript 글 탈출, JSON 이름) 10건이고, 실제 macOS 알림을 한 번 보내는 `real_banner_smoke`는 `cargo test -- --ignored real_banner_smoke`로만 돈다(이 컴퓨터에서 `sent`를 확인했다). 화면은 `notifications-ui.test.mjs`(저장소의 읽기·사건 반영·되돌림, 서버 렌더로 본 센터·토스트·설정·레일의 종)다. 알림 센터, 토스트, 설정 화면은 진짜 컴포넌트를 서버 렌더하고 Edge headless로 다섯 화면 모양(밝은 모양과 어두운 모양)에서 그려서 모양을 눈으로 확인했다.
+- **확인하지 못한 것.** 실제 앱 창(WKWebView)에서 종·토스트·설정을 눌러 본 것, 번들한 앱에서 macOS 배너가 aisurada 이름과 아이콘으로 뜨는지(개발 실행은 터미널 이름으로 뜬다), 시스템 설정의 알림 허용 상태가 어떻게 보이는지. 설정의 「시험 알림 보내기」로 직접 확인할 수 있다.
 
 ### GitHub App 연결 (`github.rs`)
 
@@ -518,7 +532,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 
 ### 계약을 건드릴 때
 
-호스트 커맨드(2부 29개, 4부 9개)와 이벤트 4개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.
+호스트 커맨드(2부 44개, 4부 10개)와 이벤트 5개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`, `ais://notifications`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.
 
 **설명서와 일부러 다르게 둔 것.** `create_workspace_dir({parent, name})`는 설명서대로라면 저장 위치(`parent`)가 없을 때 실패해야 하지만, 지금은 이름 검사를 모두 통과한 뒤 저장 위치를 만든다(`mkdir -p`). 새 워크스페이스 화면에서 없는 폴더를 적으면 「저장 위치를 찾을 수 없어요」로 막히던 것을 2026-11-04에 바꿨다. 저장 위치가 파일이면 여전히 실패하고, 잘못된 이름은 저장 위치를 만들기 전에 거절한다(`workspace.rs`의 `create_dir_makes_a_missing_parent_after_validating_the_name`).
 
