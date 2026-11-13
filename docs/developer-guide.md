@@ -256,6 +256,7 @@ java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표�
 |---|---|
 | `AISURADA_SIDECAR_SOCKET` | 소켓 자리. **102바이트 이하**여야 한다. 기본은 `~/Library/Caches/aisurada/ais-<해시>.sock` |
 | `AISURADA_SIDECAR_JAR` | launchd plist에 실을 엔진 jar |
+| `AISURADA_SIDECAR_KEEP_REGISTRATION` | `1`이면 엔진이 없어 띄울 때 이미 있는 plist를 덮어쓰지 않고 그대로 쓴다. 그 plist의 jar가 없으면 평소처럼 다시 쓴다. 개발 실행과 `target/…/bundle` 번들이 호스트와 앱 스크립트를 통해 자동으로 켠다(§7) |
 | `AISURADA_SIDECAR_JAVA` | plist에 실을 `java` (호스트는 이걸로 `ais-cli`를 도는 `java`도 고른다) |
 | `AISURADA_CLI_JAR` | 호스트가 부를 `ais-cli.jar`, `install`이 깔 원본 |
 | `AISURADA_READY_TIMEOUT_SECONDS` | 띄운 뒤 붙기를 기다리는 초 (30) |
@@ -334,6 +335,7 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 - 엔진을 먼저 직접 띄운다(`AISURADA_SIDECAR_SOCKET`을 짧은 경로로 주고 `serve`). 그러면 `ais-cli`가 launchd를 부르지 않고 그 소켓에 붙는다.
 - `java -Duser.home=<격리 HOME>`으로 띄운다. 안 그러면 4부 명령이 진짜 `~/.claude/projects`를 읽는다. (`$HOME` 환경 변수는 JVM의 `user.home`을 바꾸지 못한다.)
+- 이미 있는 등록을 덮어쓰고 싶지 않으면 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 준다. 엔진이 없을 때 plist가 있고 그 jar가 남아 있으면 plist를 다시 쓰지 않고 그대로 띄운다. 개발 실행과 빌드 폴더 번들은 호스트가 알아서 켠다(§7).
 - `ais-cli doctor`로 키, 레이블, 소켓, plist를 진단한다. 등록한 엔진을 지우려면 `launchctl bootout gui/$(id -u)/<레이블>` 뒤에 그 plist를 지운다.
 
 앱을 격리해서 띄우는 전체 순서는 [`beta-hand-check.md`](beta-hand-check.md)의 §1에 있다.
@@ -353,7 +355,7 @@ pnpm preview                        # 호스트 없이 번들 CSP로 화면만 �
 
 `pnpm tauri dev`는 README에 적힌 대로 쓰는 길이고 이 문서를 쓰면서 새로 돌려 보지는 않았다. 개발 서버에 페이지가 붙어 있으면 `curl -X POST localhost:1420/__deeplink --data-raw 'aisurada://doc/<id>'`로 열린 main 창을 이동할 수 있다(개발 판 전용, 번들에서는 빠진다).
 
-**개발 실행은 엔진 jar를 자동으로 넘기지 않는다.** 번들 판은 자원 폴더의 `ais-sidecar.jar`를 `ais-cli`에 넘기지만, `tauri dev`와 `target/…/bundle` 아래 번들은 낡은 사본을 쓰지 않으려고 넘기지 않는다(`sidecar.rs`의 `execute`). 앱이 vault를 열 때 엔진이 없으면 `ais-cli`가 launchd로 엔진을 띄우려 하고, 이때 jar를 못 찾으면 `AIS-400 AISURADA_SIDECAR_JAR 가 없고 …`로 선다. 앱으로 워크스페이스를 만들거나 열어 보려면 앱을 띄우는 터미널에서 먼저 이렇게 한다.
+**개발 실행은 엔진 jar를 자동으로 넘기지 않는다.** 번들 판은 자원 폴더의 `ais-sidecar.jar`를 `ais-cli`에 넘기지만, `tauri dev`와 `target/…/bundle` 아래 번들은 낡은 사본을 쓰지 않으려고 넘기지 않는다(`sidecar.rs`의 `execute`). 대신 jar를 직접 지정하지 않은 개발 실행과 빌드 폴더 번들은 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 `ais-cli`에 넘긴다(호스트 `execute`, 앱 스크립트 `ais-cli`). 엔진이 없을 때 이 스위치가 켜져 있고 `~/Library/LaunchAgents/…plist`가 이미 있으며 그 plist의 jar도 남아 있으면, `ais-cli`는 plist를 다시 쓰지 않고 있는 등록 그대로 엔진을 띄운다(`PlistGenerator.keepsExistingRegistration`). 그래서 빌드 폴더의 앱을 진짜 vault로 띄워도 정식 앱이 해 둔 엔진 등록이 설치본 jar로 바뀌지 않는다. 이런 앱은 이미 등록된 엔진을 쓰므로 그 엔진이 앱보다 낡았으면 화면이 「모르는 명령이다」를 띄울 수 있다(§12). 등록이 아예 없으면(처음 쓰는 HOME 등) 예전처럼 설치본 jar로 등록하고, 설치본도 없으면 `AIS-400 AISURADA_SIDECAR_JAR 가 없고 …`로 선다. 이 규칙은 `PlistGeneratorTest`(스위치 판정), `sidecar.rs`의 `sidecar_export_obeys_dev_build_bundle_and_explicit_override`, `ais-cli-script.test.mjs`가 잰다. 진짜 launchd와 앱 창에서는 확인하지 못했다. 앱으로 워크스페이스를 만들거나 열어 보려면 앱을 띄우는 터미널에서 먼저 이렇게 한다.
 
 ```bash
 unset AISURADA_VAULT AISURADA_SIDECAR_SOCKET              # §3 예시의 값이 남아 있으면 지운다
@@ -377,7 +379,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 
 `native-host/src-tauri/resources/ais-cli`(셸 스크립트)가 번들의 `Contents/Resources/bin/ais-cli`로 들어간다(`tauri.conf.json`의 `resources`).
 
-- 같은 앱의 Java(`Resources/runtime/bin/java`)로 같은 앱의 `ais-cli.jar`를 돈다. 번들 Java는 릴리스 설정(`tauri.release.conf.json`)으로 지은 번들에만 있고, 없으면 PATH의 `java`를 쓴다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다. 엔진 jar는 `AISURADA_SIDECAR_JAR`로 앱의 `ais-sidecar.jar`를 넘긴다. 단 `target/…/bundle` 아래의 개발용 빌드는 낡은 사본을 쓰지 않으려고 넘기지 않는다(호스트 `sidecar.rs`의 규칙과 같다).
+- 같은 앱의 Java(`Resources/runtime/bin/java`)로 같은 앱의 `ais-cli.jar`를 돈다. 번들 Java는 릴리스 설정(`tauri.release.conf.json`)으로 지은 번들에만 있고, 없으면 PATH의 `java`를 쓴다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다. 엔진 jar는 `AISURADA_SIDECAR_JAR`로 앱의 `ais-sidecar.jar`를 넘긴다. 단 `target/…/bundle` 아래의 개발용 빌드는 낡은 사본을 쓰지 않으려고 넘기지 않고, 대신 이미 있는 엔진 등록을 덮어쓰지 않게 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 켠다(호스트 `sidecar.rs`의 규칙과 같다. 사용자가 jar를 정해 두었으면 그 jar를 따르고 스위치는 켜지 않는다).
 - **셸 내장 기능만 쓴다.** Finder나 launchd가 띄운 환경은 PATH가 비어 있다. 실제 번들 검증에서 `dirname` 때문에 서던 것을 고쳤다. 외부 명령은 절대 경로로 부르는 `readlink` 하나뿐이다.
 - 호스트는 앱이 뜰 때 이 폴더를 `ask.rs`의 `set_tools_dir`로 알려 두고, `claude -p`를 띄울 때 PATH 맨 앞에 얹는다. 그래서 앱 안에서 묻는 Claude는 사용자가 래퍼를 만들거나 Java를 깔지 않아도 `ais-cli`를 부를 수 있다. 앱 안 터미널(`pty_start_session`)의 PATH는 바꾸지 않았다. 사용자의 로그인 셸 환경을 따른다.
 - 터미널에서 쓰려면 연동 가이드 2단계의 링크 한 줄이면 된다. 예전 가이드로 만든 `~/.local/bin/ais-cli`(시스템 `java`)가 있어도 앱이 띄우는 Claude에게는 번들 것이 먼저 잡힌다.
@@ -595,7 +597,8 @@ node fixtures/runner-test.mjs
 | 증상 | 원인과 처방 |
 |---|---|
 | `소켓 경로가 102 바이트를 넘는다` | `AISURADA_SIDECAR_SOCKET`을 `$HOME` 바로 아래 같은 짧은 경로로 준다 |
-| 앱에서 `워크스페이스 생성 실패 … AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다` | 개발 실행의 앱이 엔진을 띄우려는데 jar를 못 찾는다(§7). 앱을 띄우는 터미널에서 `AISURADA_SIDECAR_JAR`를 절대 경로로 주고, §3 예시의 `AISURADA_VAULT`와 `AISURADA_SIDECAR_SOCKET`은 `unset`한 뒤 앱을 다시 띄운다 |
+| 화면에 `모르는 명령이다: …`(예: `list-resources`)가 뜬다 | 뒤에서 도는 엔진이 앱보다 낡았다. `launchctl print gui/$(id -u)/co.kcd.aisurada.sidecar.<키>`로 엔진이 쓰는 jar(plist의 `-jar` 다음)를 보고, 낡았으면 새 앱의 `ais-cli.jar install --cli … --sidecar …`로 `~/Library/Application Support/aisurada/bin/`에 깐 뒤 `launchctl kickstart -k gui/$(id -u)/<레이블>`로 다시 띄운다. 정식 앱은 뜰 때 자기 jar로 등록을 맞추지만, 개발 실행과 빌드 폴더 번들은 있는 등록을 그대로 쓴다(§7) |
+| 앱에서 `워크스페이스 생성 실패 … AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다` | 개발 실행의 앱이 엔진을 띄우려는데 등록도 없고 jar도 못 찾는다(§7). 앱을 띄우는 터미널에서 `AISURADA_SIDECAR_JAR`를 절대 경로로 주고, §3 예시의 `AISURADA_VAULT`와 `AISURADA_SIDECAR_SOCKET`은 `unset`한 뒤 앱을 다시 띄운다 |
 | `ais-cli.jar를 못 찾았어요 … 찾아본 자리: …/dist/ais-cli.jar` | `./build.sh`를 안 돌렸거나, 다른 곳에서 `build.sh`가 `dist/`를 지우는 중이다(§8) |
 | 앱 안에서 묻는데 Claude가 `ais-cli`를 못 찾거나 `java`가 없다고 한다 | 개발 실행에는 번들 스크립트도 번들 Java도 없다. 릴리스 설정으로 지은 번들(`tauri.release.conf.json`)만 둘 다 싣는다. 개발 중에는 PATH에 `java`와 `ais-cli`가 있어야 한다(§7) |
 | MCP 클라이언트가 `aisurada` 서버에 못 붙거나 곧 끊는다 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊는다. mcp 모드에서 엔진 길의 출력은 호출마다 모아서 돌려주게 되어 있다(§5). 새로 출력을 더하는 코드는 `System.err`로 쓴다. 직접 보려면 `AISURADA_VAULT`를 주고 `java -jar dist/ais-cli.jar mcp`를 띄운 뒤 표준 입력에 `initialize` 요청 한 줄을 넣어 본다 |

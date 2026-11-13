@@ -315,7 +315,7 @@ java -jar dist/ais-cli.jar list-docs limit=5
 java -jar dist/ais-cli.jar doctor
 ```
 
-떠 있는 엔진이 없을 때 `ais-cli`는 `AISURADA_SIDECAR_JAR`가 가리키는 jar나 `install`로 깐 jar를 launchd로 띄웁니다.
+떠 있는 엔진이 없을 때 `ais-cli`는 `AISURADA_SIDECAR_JAR`가 가리키는 jar나 `install`로 깐 jar를 launchd로 띄웁니다. 이미 있는 등록을 바꾸고 싶지 않으면 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 줍니다(등록한 jar가 남아 있을 때만 그대로 씁니다).
 
 ```bash
 export AISURADA_SIDECAR_JAR=$PWD/dist/ais-sidecar.jar
@@ -349,6 +349,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | `AISURADA_VAULT` | vault 폴더. 엔진(`serve`)에는 필수이고, `ais-cli`와 MCP 서버는 없으면 앱이 연 vault를 따른다 | 없음 |
 | `AISURADA_SIDECAR_SOCKET` | 소켓 자리. 102바이트 이하 | `~/Library/Caches/aisurada/ais-<해시>.sock` |
 | `AISURADA_SIDECAR_JAR` | plist에 실을 엔진 jar | `install`로 깐 jar |
+| `AISURADA_SIDECAR_KEEP_REGISTRATION` | `1`이면 엔진을 띄울 때 이미 있는 plist를 덮어쓰지 않고 그대로 쓴다(그 plist의 jar가 없으면 다시 쓴다). 개발 실행과 빌드 폴더의 앱이 자동으로 켠다 | 꺼짐 |
 | `AISURADA_SIDECAR_JAVA` | plist에 실을 `java` | `ais-cli`를 돌리는 JVM의 `java` |
 | `AISURADA_CLI_JAR` | `install`이 깔 `ais-cli.jar` 원본 | 없음 |
 | `AISURADA_READY_TIMEOUT_SECONDS` | 띄운 뒤 붙기를 기다리는 초 | 30 |
