@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { SessionComposer, formatDroppedPaths, insertDropped, patchComposer, getSessionComposerState } from '../src/plugs/claude/session.tsx';
-import { AGENT_BUSY_NOTICE, LIVE_ELSEWHERE_NOTICE, planSessionShellWith } from '../src/plugs/claude/terminal.ts';
+import { AGENT_BUSY_NOTICE, LIVE_ELSEWHERE_NOTICE, launchNameOf, planSessionShellWith } from '../src/plugs/claude/terminal.ts';
 import { COMPOSER_BLOCK_TEXT, agentLabel, composerBlock, normalizeReadSession, pictureLines, railPersona, resumeCommand, sendToSession } from '../src/plugs/claude/sessionLogic.ts';
 
 const ID = '3f2a9c4e-1b2d-4c3e-8f40-00000000a001';
@@ -18,6 +18,8 @@ test('a session another CLI opened is read here, resumed there, and never sent t
   assert.equal(resumeCommand('codex', ID), `codex resume ${ID}`);
   assert.equal(resumeCommand('gemini', ID), `gemini --resume ${ID}`);
   assert.equal(resumeCommand('claude', ID), `claude --resume ${ID}`);
+  assert.equal(resumeCommand('gemini', ID, 'antigravity'), `agy --conversation ${ID}`, 'an Antigravity conversation is not a Gemini CLI session');
+  assert.equal(resumeCommand('gemini', ID, null), `gemini --resume ${ID}`);
   assert.equal(resumeCommand(undefined, ID), `claude --resume ${ID}`);
   assert.equal(agentLabel('codex'), 'Codex');
   assert.equal(agentLabel(undefined), 'Claude Code');
@@ -168,6 +170,14 @@ test('10.9: the shell plan for term:<session id>', async () => {
   const gemini = planHost({ agent: 'gemini' });
   await (await planSessionShellWith(gemini, `term:${ID}`, ID)).start(80, 24, () => {});
   assert.deepEqual(gemini.calls.start[0], { mode: 'resume', sessionId: ID, agent: 'gemini' }, 'no folder key when none was read');
+  const antigravity = planHost({ agent: 'antigravity', firstCwd: '/Users/df/github/aisurada' });
+  await (await planSessionShellWith(antigravity, `term:${ID}`, ID)).start(80, 24, () => {});
+  assert.deepEqual(antigravity.calls.start[0], { mode: 'resume', sessionId: ID, agent: 'antigravity', cwd: '/Users/df/github/aisurada' }, 'an Antigravity conversation resumes in its own folder');
+  assert.equal(launchNameOf({ agent: 'gemini', client: 'antigravity' }), 'antigravity', 'the client wins over the shared agent name');
+  assert.equal(launchNameOf({ agent: 'gemini' }), 'gemini');
+  assert.equal(launchNameOf({ agent: 'codex' }), 'codex');
+  assert.equal(launchNameOf({}), null, 'no name is Claude');
+  assert.equal(launchNameOf(undefined), null);
   const claudeNamed = planHost({ agent: 'claude', firstCwd: '/first' });
   await (await planSessionShellWith(claudeNamed, `term:${ID}`, ID)).start(80, 24, () => {});
   assert.deepEqual(claudeNamed.calls.start[0], { mode: 'resume', sessionId: ID, cwd: '/first' }, 'a claude session keeps the old action, without an agent key');

@@ -14,6 +14,8 @@ export interface ReadSessionView {
   sessionId: string;
   /** The CLI that opened the session. The engine names it only for Codex and Gemini; no name is Claude. */
   agent: string;
+  /** Set only for an Antigravity conversation (`antigravity`): same agent as Gemini CLI, but another resume command. */
+  client?: string;
   /** `null` when this machine has no record of the session (7.9). */
   file: string | null;
   source: { bytes: number; lines: number; skipped: number; messages: number };
@@ -36,6 +38,7 @@ export function normalizeReadSession(raw: any): ReadSessionView {
   return {
     sessionId: String(raw?.sessionId ?? ''),
     agent: typeof raw?.agent === 'string' && raw.agent ? raw.agent : 'claude',
+    ...(typeof raw?.client === 'string' && raw.client ? { client: raw.client } : {}),
     file: typeof raw?.file === 'string' ? raw.file : null,
     source: { bytes: asCount(raw?.source?.bytes), lines: asCount(raw?.source?.lines), skipped: asCount(raw?.source?.skipped), messages: asCount(raw?.source?.messages) },
     hasMore: raw?.hasMore === true,
@@ -157,7 +160,8 @@ export function agentLabel(agent: string | null | undefined): string {
 }
 
 /** The command that resumes a session in a terminal, by the CLI that opened it. */
-export function resumeCommand(agent: string | null | undefined, sessionId: string): string {
+export function resumeCommand(agent: string | null | undefined, sessionId: string, client?: string | null): string {
+  if (client === 'antigravity') return `agy --conversation ${sessionId}`;
   if (agent === 'codex') return `codex resume ${sessionId}`;
   if (agent === 'gemini') return `gemini --resume ${sessionId}`;
   return `claude --resume ${sessionId}`;

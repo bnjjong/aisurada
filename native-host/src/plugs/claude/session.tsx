@@ -1197,9 +1197,9 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
               <button
                 type="button"
                 className="sess-page-resume"
-                title={resumeCommand(view?.agent, sessionId)}
+                title={resumeCommand(view?.agent, sessionId, view?.client)}
                 onClick={() => {
-                  void navigator.clipboard?.writeText(resumeCommand(view?.agent, sessionId));
+                  void navigator.clipboard?.writeText(resumeCommand(view?.agent, sessionId, view?.client));
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1600);
                 }}

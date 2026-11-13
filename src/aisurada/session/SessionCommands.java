@@ -123,6 +123,8 @@ public final class SessionCommands {
         resp.put("file", res.filePath());
         if (other != null) {
             resp.put("agent", other.agent());
+            String client = AgentTranscripts.clientOf(other);
+            if (client != null) resp.put("client", client);
         }
 
         Map<String, Object> src = new LinkedHashMap<>();
@@ -185,6 +187,8 @@ public final class SessionCommands {
                     item.put("branch", null);
                     item.put("cwd", found.cwd());
                     item.put("agent", found.agent());
+                    String client = AgentTranscripts.clientOf(other);
+                    if (client != null) item.put("client", client);
                     sessions.add(item);
                     continue;
                 }

@@ -24,7 +24,7 @@ pub enum SessionAction {
         #[serde(rename = "sessionId")]
         session_id: String,
         cwd: Option<String>,
-        /// 세션을 연 에이전트(claude, codex, gemini). 없으면 claude.
+        /// 세션을 연 에이전트(claude, codex, gemini, antigravity). 없으면 claude.
         #[serde(default)]
         agent: Option<String>,
     },
@@ -47,12 +47,18 @@ impl SessionAction {
 /// 에이전트별로 세션을 이어 여는 명령을 만든다. 아는 에이전트가 아니면 None이다.
 /// 세션 id는 호출하기 전에 영문자, 숫자, - 로만 이뤄졌는지 검사하므로 셸에 그대로 넣어도 된다.
 /// Gemini는 터미널 안에서 만든 노트가 이 세션을 가리키도록 세션 변수를 함께 넣는다(Gemini 자신은 주지 않는다).
+/// antigravity는 Antigravity(`agy`)의 대화다. 노트에는 Gemini와 같은 gemini로 적혀 있으므로 세션 변수의 에이전트는 gemini이고,
+/// 이어 여는 명령만 `agy --conversation <id>`다(`gemini --resume`은 Gemini CLI의 세션만 찾는다).
 fn resume_command(agent: Option<&str>, session_id: &str) -> Option<String> {
     match agent.unwrap_or("claude") {
         "claude" => Some(format!("claude --resume {}", session_id)),
         "codex" => Some(format!("codex resume {}", session_id)),
         "gemini" => Some(format!(
             "AISURADA_SESSION_ID={id} AISURADA_SESSION_AGENT=gemini gemini --resume {id}",
+            id = session_id
+        )),
+        "antigravity" => Some(format!(
+            "AISURADA_SESSION_ID={id} AISURADA_SESSION_AGENT=gemini agy --conversation {id}",
             id = session_id
         )),
         _ => None,
@@ -110,7 +116,7 @@ pub fn pty_start_session(
         return Err(format!("세션 id 모양이 아니다: {}", sid));
     }
 
-    // 2-1-1. 에이전트 검사: 아는 이름(claude, codex, gemini)이 아니면 거절. 셸 명령에 들어가기 때문이다
+    // 2-1-1. 에이전트 검사: 아는 이름(claude, codex, gemini, antigravity)이 아니면 거절. 셸 명령에 들어가기 때문이다
     if let SessionAction::Resume { agent, session_id, .. } = &session_action {
         if resume_command(agent.as_deref(), session_id).is_none() {
             return Err(format!("아는 에이전트가 아니다: {}", agent.as_deref().unwrap_or("")));
@@ -183,6 +189,16 @@ mod tests {
         );
         let claude = SessionAction::Resume { session_id: "abc".into(), cwd: None, agent: Some("claude".into()) };
         assert_eq!(first_command(&claude, false), "claude --resume abc ; exec zsh -l -i");
+    }
+
+    #[test]
+    fn an_antigravity_conversation_resumes_with_agy_but_is_recorded_as_gemini() {
+        let agy = SessionAction::Resume { session_id: "dbd82a5e-fed5".into(), cwd: None, agent: Some("antigravity".into()) };
+        assert_eq!(
+            first_command(&agy, false),
+            "AISURADA_SESSION_ID=dbd82a5e-fed5 AISURADA_SESSION_AGENT=gemini agy --conversation dbd82a5e-fed5 ; exec zsh -l -i"
+        );
+        assert!(resume_command(Some("antigravity; ls"), "abc").is_none());
     }
 
     #[test]

@@ -268,6 +268,12 @@ public final class AgentSessionTest {
         eq(aisurada.session.AgentTranscripts.locate("../" + aid), null, "경로를 흉내 낸 id는 찾지 않는다");
         var titles = (List<?>) ok(v, "session-titles", aid).get("sessions");
         eq(((Map<?, ?>) titles.get(0)).get("agent"), "gemini", "titles에도 gemini"); eq(((Map<?, ?>) titles.get(0)).get("found"), true, "titles found");
+        // Gemini CLI와 같은 agent라서, 이어 여는 명령을 가르려면 client가 필요하다. Antigravity에만 붙는다
+        eq(((Map<?, ?>) titles.get(0)).get("client"), "antigravity", "Antigravity 기록에는 client가 붙는다");
+        eq(read.get("client"), "antigravity", "read-session에도 client");
+        var geminiCliTitle = (Map<?, ?>) ((List<?>) ok(v, "session-titles", "fd1924a5-3858-4789-8935-5bd929c4c49e").get("sessions")).get(0);
+        eq(geminiCliTitle.get("agent"), "gemini", "Gemini CLI 기록도 gemini"); check(!geminiCliTitle.containsKey("client"), "Gemini CLI 기록에는 client 키가 없다");
+        check(!ok(v, "read-session", "fd1924a5-3858-4789-8935-5bd929c4c49e").containsKey("client"), "Gemini CLI read-session에는 client 키가 없다");
 
         // sqlite3를 못 찾으면 못 읽은 것으로 보고하고 죽지 않는다
         System.setProperty("aisurada.sqlite.bin", home.resolve("no-such-sqlite3").toString());

@@ -46,6 +46,8 @@ export interface PlanHost {
  *
  * A session that Codex or Gemini opened has no row in Claude's live list and nothing of Claude's to release, so with a vault
  * the engine names its agent, and the plan resumes it with that CLI in its own first folder.
+ * Gemini CLI and Antigravity (`agy`) are both the agent `gemini` in a note, but they resume with different commands, so for an
+ * Antigravity conversation the engine also names its `client` and the plan resumes it as `antigravity` (see `launchNameOf`).
  */
 export async function planSessionShellWith(host: PlanHost, tabId: string, sessionId?: string): Promise<SessionShellPlan> {
   if (!sessionId) return { kind: 'plain' };
@@ -82,6 +84,18 @@ export async function planSessionShellWith(host: PlanHost, tabId: string, sessio
   return { kind: 'session', start: (cols, rows, onData) => host.start(tabId, cols, rows, action, onData) };
 }
 
+/**
+ * The name the host launches a session by, from one `session-titles` row: the `client` when the engine names one
+ * (`antigravity`), else the `agent`. No name means Claude's own path.
+ */
+export function launchNameOf(row: unknown): string | null {
+  const item = row as { client?: unknown; agent?: unknown } | null | undefined;
+  for (const value of [item?.client, item?.agent]) {
+    if (typeof value === 'string' && value) return value;
+  }
+  return null;
+}
+
 const tauriPlanHost: PlanHost = {
   alive: (key) => invoke<boolean>('pty_alive', { key }),
   vault: () => invoke<string | null>('vault_root'),
@@ -96,8 +110,7 @@ const tauriPlanHost: PlanHost = {
   agentOf: async (sessionId) => {
     const reply = await invoke<{ status: number; stdout: string }>('sidecar_call', { argv: ['session-titles', sessionId] });
     if (reply.status !== 0) return null;
-    const agent = JSON.parse(reply.stdout)?.sessions?.[0]?.agent;
-    return typeof agent === 'string' && agent ? agent : null;
+    return launchNameOf(JSON.parse(reply.stdout)?.sessions?.[0]);
   },
   release: (vault, sessionId) => invoke<string>('release_agent_session', { vault, sessionId }).catch(() => null),
   start: (key, cols, rows, action, onData) => {

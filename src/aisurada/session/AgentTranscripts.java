@@ -35,6 +35,14 @@ public final class AgentTranscripts {
     /** 찾은 기록. [agent]는 codex 또는 gemini입니다. */
     public record Located(String agent, Path file) {}
 
+    /** Antigravity(agy)의 대화 기록임을 알리는 {@code client} 값. Gemini CLI와 같은 agent(gemini)지만 이어 여는 명령이 다릅니다. */
+    public static final String CLIENT_ANTIGRAVITY = "antigravity";
+
+    /** 기록을 연 프로그램을 agent보다 더 좁게 가를 때의 이름. Antigravity면 {@code antigravity}, 아니면 null입니다. */
+    public static String clientOf(Located located) {
+        return located != null && AntigravityTranscript.isAntigravityFile(located.file()) ? CLIENT_ANTIGRAVITY : null;
+    }
+
     /** 한 회차. who는 user, assistant, tool 가운데 하나입니다. */
     static final class Turn {
         int index;
