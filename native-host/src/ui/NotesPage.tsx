@@ -6,7 +6,7 @@ import { visibleNotes, displayTitle } from "./model.ts";
 import { notesAddress } from "../navigation/routes.ts";
 import { NoteReading } from "../navigation/NoteReading.tsx";
 import { Icon } from "./Icon.tsx";
-import { AgentMark, noteAgents } from "./AgentMark.tsx";
+import { AgentMarks } from "./AgentMark.tsx";
 
 export function NotesPage({
   state,
@@ -102,9 +102,7 @@ export function NotesPage({
             {n.date} · {n.time}{" "}
             {Boolean(n.format && n.format !== "markdown") &&
               String(n.format).toUpperCase()}
-            {noteAgents(n).map((info) => (
-              <AgentMark key={info.role} info={info} />
-            ))}
+            <AgentMarks note={n} />
           </small>
         </button>
         <button

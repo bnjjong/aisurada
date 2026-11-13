@@ -135,3 +135,14 @@ export function AgentMark({ info }: { info: NoteAgent }) {
     </span>
   );
 }
+
+/** [note]에 흔적을 남긴 CLI마다 [AgentMark]를 나란히 그린다. 세션 기록이 없는 노트는 아무것도 그리지 않는다. */
+export function AgentMarks({ note }: { note: Note }) {
+  return (
+    <>
+      {noteAgents(note).map((info) => (
+        <AgentMark key={info.role} info={info} />
+      ))}
+    </>
+  );
+}

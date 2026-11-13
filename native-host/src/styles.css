@@ -1629,6 +1629,9 @@ code.is-symbol { font-weight: 700; }
 .agent-mark + .agent-mark { margin-left: 3px; }
 .agent-mark svg { display: block; }
 .agent-mark[data-agent="other"] { color: var(--muted); }
+/* 한 줄 말줄임 칩(캘린더 주 보기 목록)에서는 글자 앞에 붙여 긴 제목에도 잘리지 않게 한다 */
+.mchip .agent-mark { margin: 0 4px 0 0; }
+.mchip .agent-mark + .agent-mark { margin-left: 0; }
 
 .agenda-note .doc-width-resize {
   display: none;

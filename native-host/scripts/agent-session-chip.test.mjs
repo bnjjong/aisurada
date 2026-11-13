@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NoteSessionChips } from '../src/ui/NoteParts.tsx';
-import { AgentMark, noteAgents } from '../src/ui/AgentMark.tsx';
+import { AgentMark, AgentMarks, noteAgents } from '../src/ui/AgentMark.tsx';
 
 const draw = (note, props = {}) => renderToStaticMarkup(React.createElement(NoteSessionChips, { note, ...props }));
 const base = { id: 'n1', title: 't', body: '', agenda: 'a', agendaId: 'a', format: 'markdown', created: '', date: '', time: '' };
@@ -91,4 +91,12 @@ test('a codex note gets the neutral terminal mark instead of a brand shape', () 
   const html = renderToStaticMarkup(React.createElement(AgentMark, { info }));
   assert.match(html, /data-agent="other"/);
   assert.match(html, /title="Codex가 작성"/);
+});
+
+test('AgentMarks draws one mark per CLI and nothing for a note with no session', () => {
+  const drawMarks = (note) => renderToStaticMarkup(React.createElement(AgentMarks, { note }));
+  assert.equal(drawMarks(base), '');
+  const both = drawMarks({ ...base, sessionId: 'gem-1', sessionAgent: 'gemini', editedSessionId: 'claude-3' });
+  assert.equal(both.match(/class="agent-mark"/g).length, 2);
+  assert.ok(both.indexOf('data-agent="gemini"') < both.indexOf('data-agent="claude"'));
 });

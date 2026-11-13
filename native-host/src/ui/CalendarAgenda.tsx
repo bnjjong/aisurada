@@ -16,6 +16,7 @@ import { Confirm, Modal } from "./Modal.tsx";
 import { Icon } from "./Icon.tsx";
 import { DiffTable } from "./History.tsx";
 import { AgendaRepoLabel } from "./AgendaRepoLabel.tsx";
+import { AgentMarks } from "./AgentMark.tsx";
 export const addDays = (date: string, n: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
@@ -350,6 +351,7 @@ export function Calendar({
                               key={n.id}
                               onClick={() => controller.showPreview(n.id)}
                             >
+                              <AgentMarks note={n} />
                               {n.time} {n.title || "제목 없는 노트"}
                             </button>
                           ))}
@@ -385,6 +387,7 @@ export function Calendar({
                             key={n.id}
                             onClick={() => controller.showPreview(n.id)}
                           >
+                            <AgentMarks note={n} />
                             {n.date.slice(5)} {n.time} {n.title || "제목 없는 노트"}
                           </button>
                         ))}
@@ -591,6 +594,7 @@ export function AgendaPage({
           <small>
             {n.date} · {n.time}{" "}
             {Boolean(n.format && n.format !== "markdown") && String(n.format).toUpperCase()}
+            <AgentMarks note={n} />
           </small>
         </button>
         <button
