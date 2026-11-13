@@ -32,9 +32,15 @@ else
 fi
 
 # 엔진을 띄울 때 쓸 jar는 앱에 든 것으로 한다. 단 개발용 빌드(target/…/bundle)의 사본은 낡을 수 있어
-# 넘기지 않는다. 호스트가 jar를 넘기는 규칙과 같다.
+# 넘기지 않는다. 대신 이미 있는 엔진 등록(launchd plist)을 설치본 jar로 덮어쓰지 않게 스위치를 켠다.
+# 호스트가 jar를 넘기는 규칙과 같다.
 case $resources in
-  */target/debug/bundle/*|*/target/release/bundle/*) ;;
+  */target/debug/bundle/*|*/target/release/bundle/*)
+    if [ -z "${AISURADA_SIDECAR_JAR:-}" ]; then
+      AISURADA_SIDECAR_KEEP_REGISTRATION=1
+      export AISURADA_SIDECAR_KEEP_REGISTRATION
+    fi
+    ;;
   *)
     if [ -z "${AISURADA_SIDECAR_JAR:-}" ] && [ -f "$resources/ais-sidecar.jar" ]; then
       AISURADA_SIDECAR_JAR=$resources/ais-sidecar.jar

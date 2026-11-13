@@ -15,6 +15,8 @@ use tauri::{Manager, Runtime, State};
 
 pub type Environment = BTreeMap<OsString, OsString>;
 const TIMEOUT: Duration = Duration::from_secs(120);
+/// 엔진(`ais-cli`)이 이미 있는 launchd 등록을 덮어쓰지 않고 그대로 쓰게 하는 환경 변수.
+const KEEP_REGISTRATION: &str = "AISURADA_SIDECAR_KEEP_REGISTRATION";
 const TIMEOUT_MESSAGE: &str = "ais-cli 가 120초 안에 안 끝나서 끊었다. 사이드카가 답하지 않는다.";
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Reply {
@@ -174,13 +176,16 @@ fn execute(
         java_candidates(context, &env)
     });
     let java = java.ok_or_else(|| missing("자바 실행 파일", "AISURADA_SIDECAR_JAVA", &paths))?;
+    // 개발 실행(`tauri dev`)과 `target/…/bundle` 아래의 번들은 엔진 사본을 믿지 않아 jar를 넘기지 않는다.
+    // 이런 앱이 정식 앱의 엔진 등록을 설치본 jar로 덮어쓰지 않게, jar를 직접 지정하지 않았다면 등록 유지 스위치를 켠다.
+    let guest = !context.bundled
+        || context
+            .resource
+            .as_ref()
+            .is_some_and(|p| under_build_tree(p));
+    let explicit_jar = env_value(&env, "AISURADA_SIDECAR_JAR").is_some();
     let (sidecar, _) = choose_with(&env, "AISURADA_SIDECAR_JAR", || {
-        if !context.bundled
-            || context
-                .resource
-                .as_ref()
-                .is_some_and(|p| under_build_tree(p))
-        {
+        if guest {
             Vec::new()
         } else {
             module_candidates(context, "ais-sidecar")
@@ -188,8 +193,11 @@ fn execute(
     });
     env.insert("AISURADA_VAULT".into(), vault.into());
     env.remove(std::ffi::OsStr::new("AISURADA_SIDECAR_JAR"));
+    env.remove(std::ffi::OsStr::new(KEEP_REGISTRATION));
     if let Some(path) = sidecar {
         env.insert("AISURADA_SIDECAR_JAR".into(), path.into_os_string());
+    } else if guest && !explicit_jar {
+        env.insert(KEEP_REGISTRATION.into(), "1".into());
     }
     let mut command = Command::new(&java);
     command
@@ -427,37 +435,57 @@ mod tests {
         let jar = temp.path().join("cli.jar");
         touch(&jar);
         let java = temp.path().join("java");
-        script(&java, "printf '%s' \"${AISURADA_SIDECAR_JAR-unset}\"");
+        // 엔진 jar와 등록 유지 스위치를 `jar|스위치`로 찍는다.
+        script(
+            &java,
+            "printf '%s|%s' \"${AISURADA_SIDECAR_JAR-unset}\" \"${AISURADA_SIDECAR_KEEP_REGISTRATION-unset}\"",
+        );
         let e = env(&[
             ("AISURADA_CLI_JAR", jar.to_str().unwrap()),
             ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
         ]);
         let sidecar = c.resource.as_ref().unwrap().join("ais-sidecar.jar");
         touch(&sidecar);
+        let shown = |c: &Context, e: &Environment| {
+            execute(c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout
+        };
+        // 정식 번들: 앱의 jar를 넘기고, 등록은 평소처럼 앱 것으로 쓴다.
         assert_eq!(
-            execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout,
-            sidecar.to_string_lossy()
+            shown(&c, &e),
+            format!("{}|unset", sidecar.to_string_lossy())
         );
+        // 개발 실행: jar를 안 넘기고, 이미 있는 등록은 덮어쓰지 않는다.
         c.bundled = false;
-        assert_eq!(
-            execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout,
-            "unset"
-        );
+        assert_eq!(shown(&c, &e), "unset|1");
         c.bundled = true;
         c.resource = Some(
             temp.path()
                 .join("target/debug/bundle/macos/app/Contents/Resources"),
         );
         touch(&c.resource.as_ref().unwrap().join("ais-sidecar.jar"));
+        // 빌드 폴더의 번들도 같다.
+        assert_eq!(shown(&c, &e), "unset|1");
+        // 사용자가 jar를 정했으면 그 jar로 등록한다(스위치는 끈다).
+        let mut explicit = e.clone();
+        explicit.insert("AISURADA_SIDECAR_JAR".into(), sidecar.as_os_str().into());
         assert_eq!(
-            execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout,
-            "unset"
+            shown(&c, &explicit),
+            format!("{}|unset", sidecar.to_string_lossy())
         );
-        let mut e = e;
-        e.insert("AISURADA_SIDECAR_JAR".into(), sidecar.as_os_str().into());
+        // 정한 jar가 없는 파일이면 jar는 안 넘기지만, 정하겠다는 뜻이 있었으므로 스위치도 켜지 않는다.
+        let mut missing = e.clone();
+        missing.insert(
+            "AISURADA_SIDECAR_JAR".into(),
+            "/no/such/ais-sidecar.jar".into(),
+        );
+        assert_eq!(shown(&c, &missing), "unset|unset");
+        // 호스트가 정한다. 바깥 환경에서 스위치를 물려받지 않는다.
+        let mut inherited = e;
+        inherited.insert(KEEP_REGISTRATION.into(), "1".into());
+        c.resource = Some(temp.path().join("resources"));
         assert_eq!(
-            execute(&c, e, "/v", &[], TIMEOUT).unwrap().stdout,
-            sidecar.to_string_lossy()
+            shown(&c, &inherited),
+            format!("{}|unset", sidecar.to_string_lossy())
         );
     }
     #[test]

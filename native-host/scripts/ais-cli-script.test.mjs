@@ -14,6 +14,7 @@ const script = fileURLToPath(new URL('../src-tauri/resources/ais-cli', import.me
 const FAKE_JAVA = `#!/bin/sh
 for a in "$@"; do printf 'ARG:%s\\n' "$a"; done
 printf 'SIDECAR_JAR:%s\\n' "\${AISURADA_SIDECAR_JAR-unset}"
+printf 'KEEP_REGISTRATION:%s\\n' "\${AISURADA_SIDECAR_KEEP_REGISTRATION-unset}"
 exit "\${FAKE_JAVA_EXIT:-0}"
 `;
 
@@ -39,6 +40,7 @@ function run(file, args, env = {}) {
     status: result.status,
     args: lines.filter(l => l.startsWith('ARG:')).map(l => l.slice(4)),
     sidecar: lines.find(l => l.startsWith('SIDECAR_JAR:'))?.slice('SIDECAR_JAR:'.length),
+    keep: lines.find(l => l.startsWith('KEEP_REGISTRATION:'))?.slice('KEEP_REGISTRATION:'.length),
     stderr: result.stderr,
   };
 }
@@ -54,6 +56,7 @@ test('번들 Java로 번들 ais-cli.jar를 부르고 인자를 그대로 넘긴�
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'get_doc', '{"id":"nd 1","q":"it\'s"}', '한글']);
   assert.equal(r.sidecar, join(resources, 'ais-sidecar.jar'), '엔진 jar도 앱에 든 것으로 넘긴다');
+  assert.equal(r.keep, 'unset', '정식 앱은 자기 jar로 등록하므로 등록 유지 스위치를 켜지 않는다');
 }));
 
 test('종료 코드를 그대로 돌려준다', () => withTemp(root => {
@@ -95,13 +98,22 @@ test('사용자가 AISURADA_SIDECAR_JAR를 정해 두었으면 그것을 따른�
   assert.equal(r.sidecar, '/my/own.jar');
 }));
 
-test('개발용 빌드(target/…/bundle) 안에서는 낡을 수 있는 엔진 jar를 넘기지 않는다', () => withTemp(root => {
+test('개발용 빌드(target/…/bundle) 안에서는 낡을 수 있는 엔진 jar를 넘기지 않고, 이미 있는 엔진 등록을 덮어쓰지 않게 한다', () => withTemp(root => {
   const dev = join(root, 'repo', 'native-host', 'src-tauri', 'target', 'debug', 'bundle', 'macos');
   const resources = fakeApp(dev);
   const r = run(join(resources, 'bin', 'ais-cli'), ['x']);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.sidecar, 'unset');
+  assert.equal(r.keep, '1', '등록 유지 스위치를 켠다');
   assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'x'], 'cli jar는 그대로 쓴다');
+}));
+
+test('개발용 빌드라도 사용자가 엔진 jar를 정했으면 그 jar로 등록하고 스위치는 켜지 않는다', () => withTemp(root => {
+  const dev = join(root, 'repo', 'native-host', 'src-tauri', 'target', 'release', 'bundle', 'macos');
+  const resources = fakeApp(dev);
+  const r = run(join(resources, 'bin', 'ais-cli'), ['x'], { AISURADA_SIDECAR_JAR: '/my/own.jar' });
+  assert.equal(r.sidecar, '/my/own.jar');
+  assert.equal(r.keep, 'unset');
 }));
 
 test('번들 Java가 없는 앱(개발용 빌드)은 PATH의 java를 쓴다', () => withTemp(root => {
