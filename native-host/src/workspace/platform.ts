@@ -44,6 +44,9 @@ export function workspaceServices(): WorkspaceServices {
     notificationsChanged: changed => isTauri()
       ? listen<{ unread: number; pushed: unknown; toast: boolean }>('ais://notifications', event => changed(event.payload))
       : Promise.resolve(() => {}),
+    runnerChanged: changed => isTauri()
+      ? listen<{ taskKey: string | null }>('ais://runner', event => changed(event.payload))
+      : Promise.resolve(() => {}),
     menu: received => isTauri()
       ? getCurrentWebviewWindow().listen<string>('ais://menu', event => received(event.payload))
       : Promise.resolve(() => {}),

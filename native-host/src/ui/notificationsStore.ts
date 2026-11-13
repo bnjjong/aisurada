@@ -63,7 +63,7 @@ export interface NotifySnapshot {
 
 export const EVENT_KINDS: readonly { id: EventKind; label: string; hint: string }[] = [
   { id: "question", label: "질문이 도착했을 때", hint: "위 단계가 못 푼 질문만 와요. 답해야 일이 이어져요" },
-  { id: "pr", label: "초안 PR이 열렸을 때", hint: "리뷰하고 머지할 차례예요" },
+  { id: "pr", label: "리뷰할 일이 생겼을 때", hint: "분석 보고가 올라왔어요(코드를 고치는 단계부터는 초안 PR도). 읽고 Done으로 보내거나 다시 맡겨요" },
   { id: "failed", label: "실패하거나 막혔을 때", hint: "한도를 넘었거나 에이전트가 멈췄어요" },
   { id: "done", label: "Done으로 바뀌었을 때", hint: "조용히 알려도 돼요" },
 ];
@@ -249,7 +249,7 @@ export async function sendTest(call: HostCall): Promise<PushResult | null> {
 // ---------------------------------------------------------------- 표시
 
 export const kindLabel = (k: NotifyKind): string =>
-  ({ question: "질문", pr: "초안 PR", failed: "실패", done: "Done", test: "시험" })[k];
+  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", test: "시험" })[k];
 
 /** 시험 알림의 배너 결과를 사람이 읽을 글로 푼다. */
 export function bannerMessage(banner: string): string {

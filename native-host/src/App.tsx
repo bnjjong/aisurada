@@ -16,6 +16,7 @@ import type { BrandState } from './ui/BrandMark.tsx';
 import { formatRelativeTime } from './ui/dates.ts';
 import { refreshGithub } from './ui/githubStore.ts';
 import { applyChanged, refreshNotifications } from './ui/notificationsStore.ts';
+import { refreshRunner, runnerChanged } from './ui/runnerStore.ts';
 import { NotificationToasts } from './ui/NotificationCenter.tsx';
 
 // Window identity is decided once, before any internal navigation.
@@ -76,6 +77,16 @@ function WorkspaceApp() {
     void controller.listenNotifications(event => applyChanged(event, context.kind === 'main'))?.then(fn => { if (gone) fn(); else unlisten = fn; });
     return () => { gone = true; unlisten?.(); };
   }, [controller]);
+  // 러너: 처음에 상태를 읽고, 호스트가 알려 주는 사건(집었다, 질문했다, 끝났다)마다 다시 읽는다. 메인 창만 맡는다.
+  // vault가 바뀌면 러너 상태도 그 vault의 것으로 다시 읽는다.
+  const vaultPath = state.workspace?.path;
+  useEffect(() => {
+    if (!controller.isNative() || context.kind !== 'main' || !vaultPath) return;
+    void refreshRunner(controller.callHost);
+    let unlisten: (() => void) | undefined, gone = false;
+    void controller.listenRunner(() => { void runnerChanged(controller.callHost); })?.then(fn => { if (gone) fn(); else unlisten = fn; });
+    return () => { gone = true; unlisten?.(); };
+  }, [controller, vaultPath]);
   if (state.booting) return <main className="status-screen" role="status"><Brand state="thinking" />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
   if (state.fatal) {

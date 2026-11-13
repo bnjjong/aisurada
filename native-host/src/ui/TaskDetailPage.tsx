@@ -1,6 +1,6 @@
 // 태스크 상세: Jira 이슈 화면 구조다. 가운데는 설명·완료 기준·연결·활동, 오른쪽은 세부 정보와 Ready For Develop 조건이다.
 // 상태는 상태 메뉴에서 바꾼다. 메뉴에는 사람이 바꿀 수 있는 곳만 나오고, 조건이 모자란 곳은 까닭과 함께 막혀 보인다(엔진이 알려 준다).
-// 채팅은 이 화면에서 필요할 때 여는 선택 기능인데 아직 없다(3단계).
+// 러너(읽기 전용)의 실행은 「실행」 영역에서 보고 시작하고 멈추고 질문에 답한다. 채팅은 이 화면에서 필요할 때 여는 선택 기능인데 아직 없다(3b).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
@@ -11,6 +11,9 @@ import { Icon } from "./Icon.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
 import { PriorityMark, StatusPill, TypeMark } from "./TasksPage.tsx";
 import { TaskFormModal } from "./TaskFormModal.tsx";
+import { RunnerPanel } from "./RunnerPanel.tsx";
+import type { RunnerPanelPreset } from "./RunnerPanel.tsx";
+import { useRunner } from "./runnerStore.ts";
 import { editedLine } from "./resourcesClient.ts";
 import {
   LINK_CHOICES, activityText, activityWho, addComment, checkedLine, deleteTask, explainError, getTask, githubUrl, linkCandidates, linkTasks, listTasks,
@@ -25,6 +28,7 @@ export interface TaskDetailPreset {
   task?: TaskDetail;
   tab?: ActivityTab;
   menuOpen?: boolean;
+  runner?: RunnerPanelPreset;
 }
 
 export function TaskDetailPage({
@@ -49,6 +53,7 @@ export function TaskDetailPage({
   const [tab, setTab] = useState<ActivityTab>(preset?.tab ?? "all");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const runnerVersion = useRunner().version;
 
   const reload = useCallback(async () => {
     try {
@@ -69,6 +74,11 @@ export function TaskDetailPage({
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);
+
+  // 러너가 이 태스크의 상태를 바꾸면(질문, 보고, 실패) 호스트가 사건을 알린다. 그때 다시 읽는다
+  useEffect(() => {
+    if (runnerVersion > 0) void reload();
+  }, [runnerVersion, reload]);
 
   const repos = useMemo(() => repoChoices(ws.projects), [ws.projects]);
   const notes = useMemo(() => ws.notes.map((n) => ({ id: n.id, title: asText(n.title) })), [ws.notes]);
@@ -141,6 +151,8 @@ export function TaskDetailPage({
 
         <div className="task-cols">
           <div className="task-main">
+            <RunnerPanel task={task} controller={controller} preset={preset?.runner} />
+
             <section className="task-sec" aria-label="설명">
               <h2>설명</h2>
               {task.body.trim() ? <ReadMarkdown body={task.body} external /> : <p className="task-empty">설명이 없어요. 「편집」에서 적을 수 있어요.</p>}

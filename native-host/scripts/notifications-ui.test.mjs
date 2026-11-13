@@ -165,7 +165,7 @@ test('texts: banner results, kind names, visible items', () => {
   assert.match(bannerMessage('sent-fallback'), /Script Editor/);
   assert.match(bannerMessage('failed: 권한이 없다'), /보내지 못했어요\. 권한이 없다/);
   assert.equal(kindLabel('question'), '질문');
-  assert.equal(kindLabel('pr'), '초안 PR');
+  assert.equal(kindLabel('pr'), '리뷰');
   const items = [item({ id: 'a', read: false }), item({ id: 'b', read: true })];
   assert.deepEqual(visibleItems(items, 'unread').map((i) => i.id), ['a']);
   assert.deepEqual(visibleItems(items, 'all').map((i) => i.id), ['a', 'b']);
@@ -180,7 +180,7 @@ const noop = () => {};
 test('the panel: unread first by tab, action buttons by kind, unread dot, empty states and the settings button', () => {
   const items = [
     item({ id: 'a', kind: 'question' }),
-    item({ id: 'b', kind: 'pr', title: '초안 PR이 열렸어요', body: '#81', taskKey: 'TSK-6', read: true }),
+    item({ id: 'b', kind: 'pr', title: '리뷰할 일이 생겼어요', body: '분석 보고가 올라왔어요', taskKey: 'TSK-6', read: true }),
     item({ id: 'c', kind: 'test', title: '시험 알림이에요', body: '', taskKey: undefined }),
   ];
   const unreadTab = renderToStaticMarkup(React.createElement(NotificationPanel, { items, unread: 2, tab: 'unread', onTab: noop, onOpen: noop, onReadAll: noop, onSettings: noop }));

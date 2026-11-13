@@ -1,0 +1,44 @@
+/* 러너 화면: 태스크 페이지 위의 막대, 상세의 「실행」 영역, 보드 카드의 작은 표시.
+   색은 styles.css와 각 화면 모양(skin)의 토큰을 따르고, 토큰이 없으면 var()의 둘째 값으로 물러난다. */
+
+.runner-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; background: var(--soft); }
+.runner-bar select { width: auto; min-width: 64px; padding: 4px 8px; font-size: 13px; }
+.runner-error { font-size: 12px; color: var(--err); }
+.runner-pill { display: inline-flex; align-items: center; gap: 8px; height: 24px; padding: 0 12px 0 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--surface); color: var(--muted); box-shadow: 0 0 0 1px var(--line); }
+.runner-pill i { display: block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.runner-pill.is-busy { color: var(--accent-text, var(--accent)); }
+.runner-pill.is-busy i { animation: runner-pulse 1.4s ease-in-out infinite; }
+.runner-pill.is-wait { color: var(--warn); }
+.runner-pill.is-warn { color: var(--err); }
+@keyframes runner-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .runner-pill.is-busy i { animation: none; } }
+
+/* 보드 카드의 러너 표시 */
+.task-run-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--accent-soft, var(--soft)); color: var(--accent-text, var(--accent)); }
+.task-run-chip i { display: block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: runner-pulse 1.4s ease-in-out infinite; }
+.task-card .task-run { align-self: flex-start; padding: 3px 10px; font-size: 11px; }
+
+/* 상세의 「실행」 */
+.runner-panel h3 { margin: 16px 0 8px; font-size: 13px; color: var(--muted); }
+.runner-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.runner-ask { margin-bottom: 14px; padding: 12px 14px; border-radius: 10px; background: var(--warn-bg); }
+.runner-ask-label { margin: 0 0 6px; font-size: 12px; font-weight: 800; color: var(--warn); }
+.runner-ask blockquote { margin: 0 0 10px; padding: 0 0 0 10px; border-left: 3px solid var(--warn); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.runner-ask textarea { width: 100%; margin-bottom: 8px; font-size: 13px; resize: vertical; }
+.runner-now { margin-bottom: 14px; }
+.runner-steps { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0 0 10px; padding: 0; }
+.runner-steps li { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--soft); color: var(--muted); }
+.runner-steps li.is-done { color: var(--ok); background: var(--ok-bg); }
+.runner-steps li.is-current { background: var(--accent); color: var(--accent-ink); }
+.runner-runs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.runner-runs > li { padding: 10px 12px; border-radius: 10px; background: var(--soft); }
+.runner-phase { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--surface); color: var(--muted); }
+.runner-phase-running { background: var(--accent); color: var(--accent-ink); }
+.runner-phase-waiting-answer { background: var(--warn-bg); color: var(--warn); }
+.runner-phase-done { background: var(--ok-bg); color: var(--ok); }
+.runner-phase-failed { background: var(--err-bg); color: var(--err); }
+.runner-summary { margin: 8px 0 0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.runner-fail { margin: 8px 0 0; font-size: 12px; color: var(--err); white-space: pre-wrap; }
+.runner-runs details { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.runner-events { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+.runner-event-step { display: inline-block; min-width: 56px; font-weight: 700; color: var(--ink); }

@@ -293,3 +293,50 @@ test('closeMainWindow requests note window closure and waits before exiting', as
   const order = h.calls.map(c => c.command);
   assert.ok(order.indexOf('begin_quit') >= 0 && order.indexOf('begin_quit') < order.indexOf('close_note_windows'));
 });
+
+test('closing the app asks first when the runner is working, and a "cancel" keeps the app open', async t => {
+  const messages = [];
+  const h = harness(t, {
+    invoke: async (command) => {
+      if (command === 'runner_status') return { running: 2 };
+      if (command === 'note_windows') return [];
+      if (command === 'exit_app') return;
+    },
+  });
+  setLast(h);
+  await h.controller.boot();
+  h.services.host.confirmLeave = async (message) => { messages.push(message); return false; };
+  assert.equal(await h.controller.closeMainWindow(), false);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /러너가 일하는 태스크가 2개 있어요/);
+  assert.match(messages[0], /다음에 앱을 켤 때 이어서 해요/);
+  assert.equal(h.calls.some(c => c.command === 'exit_app'), false, 'cancel must not quit');
+  // 「종료」를 누르면 닫는다
+  h.services.host.confirmLeave = async (message) => { messages.push(message); return true; };
+  assert.equal(await h.controller.closeMainWindow(), true);
+  assert.equal(h.calls.some(c => c.command === 'exit_app'), true);
+});
+
+test('closing the app does not ask when the runner is idle, missing, or answers oddly', async t => {
+  for (const answer of [{ running: 0 }, new Error('Command runner_status not found'), 'x', null, { running: 'many' }]) {
+    const asked = [];
+    const h = harness(t, {
+      invoke: async (command) => {
+        if (command === 'runner_status') { if (answer instanceof Error) throw answer; return answer; }
+        if (command === 'note_windows') return [];
+        if (command === 'exit_app') return;
+      },
+    });
+    setLast(h);
+    await h.controller.boot();
+    h.services.host.confirmLeave = async (message) => { asked.push(message); return false; };
+    assert.equal(await h.controller.closeMainWindow(), true, JSON.stringify(answer));
+    assert.deepEqual(asked, []);
+  }
+});
+
+test('switching workspaces does not ask the runner (its jobs keep their own workspace)', async t => {
+  const h = harness(t); setLast(h);
+  await h.controller.boot();
+  assert.equal(h.calls.some(c => c.command === 'runner_status'), false);
+});

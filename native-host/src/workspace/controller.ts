@@ -406,6 +406,8 @@ export class WorkspaceController {
   });
   /** 호스트가 알림을 쌓거나 읽음으로 바꿀 때마다 부른다. 풀어 줄 함수를 약속으로 돌려준다. */
   listenNotifications = (handler: (event: { unread: number; pushed: unknown; toast: boolean }) => void) => this.services.notificationsChanged?.(handler);
+  /** 호스트의 러너가 바뀔 때마다 부른다. 풀어 줄 함수를 약속으로 돌려준다. */
+  listenRunner = (handler: (event: { taskKey: string | null }) => void) => this.services.runnerChanged?.(handler);
   listenCloseRequested = (handler: () => void) => {
     const promise = this.services.closeRequested?.(handler);
     void promise?.then(fn => { this.unlistenCloseRequested = fn; });
@@ -484,11 +486,13 @@ export class WorkspaceController {
     if (this.context.kind !== 'main' || this.closingMain || this.disposed) return false;
     this.closingMain = true;
     try {
+      // 앱을 닫으면 일하던 러너 실행이 멈춘다(기록은 남아 다음에 앱을 켤 때 이어 간다). 워크스페이스를 바꿀 때는 계속 돌므로 묻지 않는다.
+      const running = await this.runnerRunning();
       const can = await this.canLeave('앱을 종료할까요?', {
         title: '앱을 종료할까요?',
         okLabel: '종료',
         cancelLabel: '취소',
-      });
+      }, running > 0 ? [`러너가 일하는 태스크가 ${running}개 있어요. 앱을 닫으면 멈췄다가 다음에 앱을 켤 때 이어서 해요.`] : []);
       if (!can) return false;
 
       // 열려 있는 독립 노트 창들을 각자의 안전한 닫기 절차(flush 및 미저장 확인)로 닫는다.
@@ -711,9 +715,19 @@ export class WorkspaceController {
     return true;
   }
 
+  /** 러너가 지금 일하는 실행의 수. 러너가 없는 빌드나 응답이 이상하면 0이다(닫기를 막지 않는다). */
+  private async runnerRunning(): Promise<number> {
+    if (this.context.kind !== 'main' || !this.state.workspace || this.state.workspace.sample) return 0;
+    try {
+      const status = await this.services.host.invoke<{ running?: unknown }>('runner_status');
+      return typeof status?.running === 'number' && status.running > 0 ? status.running : 0;
+    } catch { return 0; }
+  }
+
   private async canLeave(
     question = '다른 워크스페이스를 열까요?',
-    options?: { title?: string; okLabel?: string; cancelLabel?: string }
+    options?: { title?: string; okLabel?: string; cancelLabel?: string },
+    extraReasons: string[] = [],
   ): Promise<boolean> {
     if (!this.state.workspace || this.state.workspace.sample) return true;
     const pending = this.services.pending;
@@ -731,13 +745,14 @@ export class WorkspaceController {
     const waiting = waitingAnswers();
     const unsavedA = unsavedAnswers();
 
-    if (settled && count === 0 && waiting === 0 && unsavedA === 0) return true;
+    if (settled && count === 0 && waiting === 0 && unsavedA === 0 && extraReasons.length === 0) return true;
 
     const reasons: string[] = [];
     if (!settled) reasons.push('저장이 끝났는지 확인하지 못했어요.');
     if (count > 0) reasons.push(`저장하지 못한 글이 ${count}개 있어요.`);
     if (waiting > 0) reasons.push(`답을 기다리는 물음이 ${waiting}개 있어요.`);
     if (unsavedA > 0) reasons.push(`저장하지 못한 AI 답이 ${unsavedA}개 있어요.`);
+    reasons.push(...extraReasons);
     reasons.push(question);
     return await this.services.host.confirmLeave(reasons.join(' '), options);
   }

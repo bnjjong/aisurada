@@ -58,6 +58,8 @@ export interface WorkspaceServices {
   selfWritesChanged?(changed: (event: { root: string; relPath: string; from: string }) => void): Promise<() => void>;
   /** 호스트가 알림을 쌓거나 읽음으로 바꿨을 때(`ais://notifications`). */
   notificationsChanged?(changed: (event: { unread: number; pushed: unknown; toast: boolean }) => void): Promise<() => void>;
+  /** 호스트의 러너가 태스크를 집거나 질문하거나 끝냈을 때(`ais://runner`). */
+  runnerChanged?(changed: (event: { taskKey: string | null }) => void): Promise<() => void>;
   windowLabel?: string;
   sanitizeHTML?(html: string): string;
   menu?(received: (id: string) => void): Promise<() => void>;

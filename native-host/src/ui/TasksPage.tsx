@@ -7,6 +7,9 @@ import { asText } from "../workspace/types.ts";
 import { taskAddress } from "../navigation/routes.ts";
 import { Page } from "./OtherPages.tsx";
 import { TaskFormModal } from "./TaskFormModal.tsx";
+import { RunnerBar } from "./RunnerBar.tsx";
+import { activeRunOf, runTask, stopTask, useRunner } from "./runnerStore.ts";
+import type { RunnerSnapshot } from "./runnerStore.ts";
 import {
   BOARD_COLUMNS, NO_FILTER, SHELF, TYPES, explainError, filterChoices, filterTasks, groupByStatus, isActiveFilter, keyNumber,
   listTaskTrash, listTasks, priorityLabel, repoChoices, restoreTask, statusTitle, taskMeta, typeLabel,
@@ -59,6 +62,7 @@ export interface TasksPreset {
   trash?: TaskTrashRow[];
   view?: View;
   shelfOpen?: boolean;
+  runner?: RunnerSnapshot;
 }
 
 export function TasksPage({ state, controller, preset }: { state: WorkspaceState; controller: WorkspaceController; preset?: TasksPreset }) {
@@ -73,6 +77,9 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
   const [creating, setCreating] = useState<{ title: string } | null>(null);
   const [shelfOpen, setShelfOpen] = useState(preset?.shelfOpen ?? false);
   const [quick, setQuick] = useState("");
+  const live = useRunner();
+  const runner = preset?.runner ?? live;
+  const host = controller.callHost;
 
   const setView = (v: View) => {
     setViewState(v);
@@ -104,6 +111,11 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);
 
+  // 러너가 집거나 끝내면 호스트가 사건을 알린다. 그때마다 목록을 다시 읽어 상태 열이 따라가게 한다
+  useEffect(() => {
+    if (live.version > 0) void reload();
+  }, [live.version, reload]);
+
   const all = tasks ?? [];
   const visible = useMemo(() => filterTasks(all, filter), [all, filter]);
   const grouped = useMemo(() => groupByStatus(visible), [visible]);
@@ -127,6 +139,22 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
         </ul>
       )}
       {t.blockedBy.length > 0 && <p className="task-blocked">{t.blockedBy.join(", ")}에 막혀 있어요</p>}
+      {runner.supported && activeRunOf(runner, t.key) && (
+        <span className="task-run-chip">
+          <i aria-hidden="true" />
+          러너 · {activeRunOf(runner, t.key)?.step || "시작"}
+        </span>
+      )}
+      {runner.supported && t.status === "ready-for-develop" && t.blockedBy.length === 0 && !activeRunOf(runner, t.key) && (
+        <button type="button" className="task-run" disabled={!runner.claudeAvailable} onClick={() => void runTask(host, t.key)}>
+          ▶ 지금 실행
+        </button>
+      )}
+      {runner.supported && t.status === "in-progress" && activeRunOf(runner, t.key) && (
+        <button type="button" className="task-run" onClick={() => void stopTask(host, t.key)}>
+          ■ 중지
+        </button>
+      )}
       <div className="task-card-foot">
         <TypeMark type={t.type} />
         <span className="task-key">{t.key}</span>
@@ -206,8 +234,9 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
   return (
     <Page title="태스크" className="task-page">
       <p className="task-intro">
-        일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡겨요. 지금은 티켓을 만들고 상태를 바꾸는 데까지 있어요. 완료 기준은 만들 때 꼭 적어요.
+        일을 티켓으로 적어 두면 러너가 집어 claude에게 맡겨요. 지금 러너는 저장소와 노트를 읽기만 하고, 조사 결과를 댓글로 남기거나 사람에게만 풀 수 있는 질문을 해요. 코드를 고치고 PR을 올리는 일은 아직 없어요. 완료 기준은 만들 때 꼭 적어요.
       </p>
+      <RunnerBar call={host} preset={preset?.runner} />
       <div className="task-toolbar">
         <div className="task-tabs" role="tablist" aria-label="보기">
           <button type="button" role="tab" aria-selected={view === "board"} onClick={() => setView("board")}>
