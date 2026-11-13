@@ -97,7 +97,7 @@ ais-cli gemini-mcp remove
 
 ## 3. 쓸 수 있는 기능
 
-도구는 33개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 15개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
+도구는 35개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 17개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
 
 ### 노트 찾고 읽기
 
@@ -177,6 +177,15 @@ ais-cli gemini-mcp remove
 - 에이전트의 `permission`은 `read`, `edit`, `publish` 가운데 하나이고, `skills`는 스킬 id 목록입니다.
 - AI가 고치면 `editedSession`(과 Claude가 아닐 때 `editedAgent`)이 남고, 고치기 전의 판은 30판까지 이력에 남습니다. 되돌리려면 `get_resource`의 `version`으로 옛 판을 읽고 그 내용으로 `save_resource`를 부릅니다.
 - **지금은 승인 흐름이 없어서** AI가 쓴 변경(참조 켜고 끄기와 권한 포함)이 바로 적용됩니다. 승인 워크플로우는 이슈 [#53](https://github.com/bnjjong/aisurada/issues/53)입니다. 권한 값은 작업 실행기가 없어 아직 어디에도 쓰이지 않습니다.
+
+### 태스크(티켓)
+
+외부 설명서에 없는 확장입니다. 태스크는 사람이 적어 둔 일이고, 나중에 러너가 집어 에이전트에게 맡깁니다. **읽기 도구만 있습니다.** 태스크를 만들고 상태를 바꾸는 일은 사람(화면)과 러너만 하므로, `--write`를 줘도 쓰기 도구는 열리지 않습니다. 상태 이름은 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled`입니다.
+
+| 도구 | 모드 | 하는 일 | 인자 |
+|------|:----:|---------|------|
+| `list_tasks` | R | 태스크 목록을 키가 큰(새) 것부터 냅니다. `blocked`가 true면 다른 태스크에 막힌 것만, `trash`가 true면 휴지통 목록입니다 | `status`, `type`, `repo`, `label`, `q`, `blocked`, `bodies`, `trash` |
+| `get_task` | R | 태스크 1건을 설명, 완료 기준, 연결한 자원, 연결된 태스크(막고 있음·막혀 있음·관련·중복), Ready For Develop 조건, 활동과 함께 읽습니다 | `id*`(키 `TSK-14` 또는 `tk…`), `activity`(최근 개수, 기본 100) |
 
 ### 내보내기
 
@@ -260,7 +269,7 @@ ais-cli gemini-mcp remove
 | 능력 | `tools`만 있고 `listChanged`는 false입니다. 리소스와 프롬프트는 없습니다 |
 | `instructions` | 노트를 고치는 도구에는 `f1`이 꼭 필요하고, 고치기 전에 `get_doc`으로 읽어 `precondition`을 넘기라는 안내를 접속할 때 줍니다 |
 | 도구 주석 | 모든 도구에 `annotations.readOnlyHint`, 쓰기 도구에는 `destructiveHint`도 있습니다 |
-| 입력 스키마 | `additionalProperties: false`. 키는 엔진이 받는 키와 같고, 시험이 도구 34개를 모두 엔진의 「모르는 키다」 문구와 대조합니다 |
+| 입력 스키마 | `additionalProperties: false`. 키는 엔진이 받는 키와 같고, 시험이 도구 36개를 모두 엔진의 「모르는 키다」 문구와 대조합니다 |
 | 오류 | 요청 형식이 틀리면 JSON-RPC 오류(-32700, -32600, -32601, -32602, -32603)이고, 도구가 실패하면 정상 응답에 `isError: true`입니다 |
 | 로그 | 서버의 표준 출력에는 프로토콜 메시지만 나옵니다. 시작 메시지(`aisurada MCP 서버 0.1.0: 읽기 전용`)와 진단은 표준 오류로 갑니다 |
 

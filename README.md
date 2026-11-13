@@ -121,6 +121,21 @@ java -jar dist/ais-engine.jar list-resources scope=global --aisurada.vault=/path
 - 파일은 `.aisurada/resources/` 아래에만 있어서 노트와 기존 명령을 건드리지 않습니다. 고칠 때는 노트처럼 직전에 읽은 `f1` 토큰이 필요하고, 고치기 전의 판은 30판까지 남습니다.
 - 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「프로젝트 자원: 스킬과 에이전트 정의」에 있습니다.
 
+## 태스크 (확장)
+
+외부 설명서에 없는 확장입니다. 사람이 일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡기는 단위입니다. 지금은 **태스크를 만들고 상태를 사람이 바꾸는 데까지**(1단계)이고, 러너와 알림은 아직 없습니다. 태스크는 키(`TSK-14`)나 ID(`tk…`)로 부르며, **완료 기준(`criteria`)을 하나 이상 적어야 만들 수 있습니다**. 일이 끝났는지 이 기준으로 확인하기 때문입니다.
+
+```bash
+java -jar dist/ais-engine.jar create-task 'title=프로젝트를 지울 때 자원 폴더도 정리하기' repo=bnjjong/aisurada 'criteria=["지운 뒤 폴더가 남지 않는다","되살리면 돌아온다"]' type=bug --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar list-tasks status=draft --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar transition-task TSK-1 to=ready-for-develop --aisurada.vault=/path/to/vault
+java -jar dist/ais-engine.jar link-tasks TSK-1 TSK-2 type=blocks --aisurada.vault=/path/to/vault
+```
+
+- 명령 9개: `create-task`, `get-task`, `list-tasks`, `update-task`, `transition-task`, `link-tasks`, `add-task-comment`, `delete-task`, `restore-task`. MCP에는 읽기 도구 `list_tasks`, `get_task`만 열립니다. 상태를 바꾸는 일은 사람(화면)과 러너만 합니다.
+- 상태는 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled` 8개이고, 누가 어떤 조건에서 바꾸는지는 `transition-task`가 한 곳에서 검사합니다.
+- 파일은 `.aisurada/tasks/` 아래에만 있어서 노트와 기존 명령을 건드리지 않습니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「태스크」에 있습니다.
+
 ## 22장 사실층
 
 명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.aisurada/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
@@ -337,7 +352,7 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | `doctor` | 키, 레이블, 소켓, plist, 실행 상태, 동시 상한, 하루 청소를 진단한다. `--plist`는 쓸 plist를 보여 주고, `--prune`은 vault 폴더가 사라진 LaunchAgent를 지운다 |
 | `sweep` | 24시간 넘게 조용한 엔진을 내리고 죽은 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
 | `install` | `ais-cli.jar`와 `ais-sidecar.jar`를 `~/Library/Application Support/aisurada/bin/`에 깐다. `--cli`, `--sidecar`로 원본을 고른다 |
-| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 15개만 내놓고, `--write`를 주면 쓰기 도구까지 33개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
+| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 17개만 내놓고, `--write`를 주면 쓰기 도구까지 35개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
 | `claude-mcp` | Claude Code에 위 서버를 등록한다. `status`, `add [--write]`, `remove`는 `claude mcp`를 부르고, `config [--write]`는 Claude Desktop 설정에 붙여 넣을 조각만 출력한다. 등록에는 vault를 박지 않는다 |
 | `codex-mcp`, `gemini-mcp` | Codex, Antigravity(`agy`)·Gemini CLI에 같은 서버를 같은 방식으로 등록한다(`status`, `add [--write]`, `remove`) |
 | `--help`, `--list` | 사용법과 이름 목록 |

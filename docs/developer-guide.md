@@ -102,6 +102,8 @@ test-native.sh         화면·호스트 시험 전체
 | `write` | 쓰기 공통 부품: 표식 확인, 원자적 쓰기, 폴더 옮기기, id, 프론트매터, 경고, 선결 조건 토큰, 편집 도장 |
 | `vault` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통 읽기 |
 | `git` | vault 자동 커밋, 이력, 스냅숏 |
+| `resource` | 스킬·에이전트 정의(자원) 저장과 참조 계산 |
+| `task` | 태스크(티켓) 모양, 저장, 상태 전이 규칙 |
 | `text` | 다듬기, UTF-16 자르기, URI 따위 글 도구 |
 | `out` | 정해진 바이트 모양의 JSON 쓰기 |
 | `ask`, `chat`, `session` | 4부 명령 7개 (§7의 4부 스위치 참고) |
@@ -193,6 +195,50 @@ test-native.sh         화면·호스트 시험 전체
 - **화면.** 글로벌 페이지(`/resources`, 왼쪽 메뉴의 「스킬·에이전트」)와 프로젝트 페이지(`/project/<slug>`, 레일의 프로젝트 머리에 있는 「프로젝트 페이지」 단추)가 있다. 글로벌 페이지는 공용 스킬·에이전트를 만들고 고치고 지우고(휴지통에서 되살림), 지울 때는 참조하던 프로젝트를 알려 준다. 프로젝트 페이지는 저장소와 아젠다를 보이고, 엔진의 `usable-resources`가 낸 「쓸 수 있는 자원」(출처 꼬리표 「프로젝트 자원」·「글로벌에서 참조」)과 깨진 참조, 에이전트가 필요로 하지만 못 쓰는 스킬(글로벌이면 「참조 추가」)을 보이며, 참조하지 않은 글로벌 자원은 「글로벌 자원 참조하기」에만 나온다. 에이전트를 참조할 때는 그 에이전트가 쓰는 글로벌 스킬을 보여 주고 「스킬도 함께 참조」(`with-skills`)나 「에이전트만 참조」를 고르게 한다(확인하는 것이 곧 명시적인 참조). 이름이 같아도 범위를 붙여 구분한다(`scopeLabel`: 「글로벌 · 이름」). 편집 창(`ResourceFormModal`)은 이름·설명·지침, 에이전트의 권한 3단계·쓸 스킬(글로벌 에이전트는 글로벌 스킬만, 프로젝트 에이전트는 자기 프로젝트의 스킬도)·쓸 저장소, 선택 칸 「도구별 설정」(JSON)을 받는다. 고칠 때는 바뀐 칸만 보내서 모르는 도구 칸이 보존되고(`formToInput`), 마지막에 AI가 고쳤으면(`editedSession`) 알려 준다. 화면은 엔진을 `controller.callEngine`으로 부르고(`ui/resourcesClient.ts`), 창이 다시 눈에 띄면 다시 읽어 AI나 다른 창이 고친 것을 따라간다. 프로젝트 자원의 휴지통은 프로젝트 페이지의 「지운 것」에 있다.
 - **시험.** 화면은 `resources-ui.test.mjs`(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 페이지와 레일)다. 실제 창에서 눌러 본 확인은 없다. 엔진과 MCP는 `ResourcesTest`와 `McpServerTest`의 자원 도구 부분(진짜 엔진과 `--write` 서버로 만들기, `f1` 보호, 참조, 규칙 ④, 지우기·되살리기, 읽기 모드 거절, 세션 기록)이다. `ResourcesTest`(파일 모양, ID 머리, 도구 칸 보존, 같은 이름 규칙, 규칙 ④, 참조 규칙과 거절, 이름을 바꿔도 참조 유지, f1 보호, 기록, 이력과 되돌리기, 30판 상한, 에이전트 검사, 빠진 스킬, 지우기·되살리기, 손으로 망가뜨린 파일, 기존 명령과의 공존).
 
+### 태스크 (`task/`)
+
+사람이 일을 티켓으로 적어 두면 나중에 러너가 집어 에이전트에게 맡기는 단위다. **외부 설명서에 없는 확장이다.** 지금은 **1단계(태스크 저장, 명령, 상태 전이)** 까지이고 러너, 알림, 태스크 안 채팅, 화면은 아직 없다. 계획은 「태스크 시스템 구현 계획」 문서(5단계, 결정 12개)를 따른다.
+
+- **위치.** `.aisurada/tasks/` 아래다. 노트를 훑는 명령과 기존 명령이 이 영역을 보지 않는다(시험으로 확인).
+  `TSK-14.md`(태스크), `TSK-14/activity.jsonl`(활동, 한 줄에 사건 하나, 최근 500줄까지), `.trash/<id>/`(지운 태스크). 실행 기록(러너가 만드는 로그)은 vault가 아니라 앱 폴더에 둔다(결정 3).
+- **키와 ID.** 키 `TSK-<번호>`는 엔진이 매기고 만든 뒤 바뀌지 않는다. 지운 번호(휴지통에 있는 것 포함)를 다시 쓰지 않는다. ID는 `tk…`(노트 `nd…`, 스킬 `sk…`와 같은 형식)이고 파일 안에 있다. 접두 `TSK`는 엔진 오류 코드(`AIS-…`)와 겹치지 않게 골랐다.
+- **파일 모양.** `---` 머리말(YAML)과 설명 본문이다. 머리말은 스킬·에이전트 자원처럼 SnakeYAML로 읽고 쓰므로 `criteria`, `links`, `refs`를 들여쓴 목록으로 적는다(줄 읽개로 읽는 프로젝트·아젠다 파일과 다르다). 모르는 머리말 칸은 지우지 않고 보존한다(시험으로 고정). `key`, `id`, `title`, `type`, `priority`, `status`, `repo`, `project`, `baseBranch`, `labels`, `criteria`, `links`, `refs`, `createdAt`, `editedAt`, `editedSession`, `editedAgent` 순서로 쓴다. 유형은 `feature`·`bug`·`chore`, 우선순위는 `high`·`medium`·`low`다.
+- **완료 기준은 필수다.** `create-task`는 `criteria`가 비면 AIS-400으로 거절한다. 일이 끝났는지 이 기준으로 확인하기 때문이다(사용자 결정, 2026-11-13). `repo`(`owner/name`)와 `title`도 필수다.
+- **명령 9개.** MCP에는 읽기 도구 `list_tasks`, `get_task`만 열린다. 상태를 바꾸는 일은 사람과 러너만 한다.
+
+| 명령 | 하는 일 |
+|---|---|
+| `create-task title= repo= criteria=[…] [type= priority= project= base= body= labels=[…] refs=[…]]` | Draft로 만든다. 응답에 `precondition`(`f1`)이 있다 |
+| `get-task <키 또는 id> [activity=<개수>]` | 설명, 완료 기준, 자원, 연결, `readiness`(Ready 조건), `transitions`(사람이 바꿀 수 있는 곳과 막힌 까닭), 활동을 모두 낸다 |
+| `list-tasks [status= type= repo= label= q= blocked=true bodies=true trash=true]` | 키가 큰 것이 앞이다. 못 읽는 파일은 `skipped`에 이유와 함께 낸다 |
+| `update-task <키> f1=<토큰> [고칠 칸…]` | 노트처럼 직전에 읽은 `f1`이 필요하다(없거나 어긋나면 AIS-412). 같은 값이면 파일도 활동도 안 바꾼다. 목록 칸은 통째로 바뀐다 |
+| `transition-task <키> to=<상태> [actor=human\|runner] [from=<기대하는 지금 상태>]` | 규칙과 조건을 검사하고 바꾼다. `from`이 지금 상태와 다르면 AIS-409 |
+| `link-tasks <건 쪽> <받는 쪽> type=blocks\|relates\|duplicates [remove=true]` | 연결을 걸거나 푼다 |
+| `add-task-comment <키> body=<댓글>` | 활동에 댓글을 남긴다 |
+| `delete-task <키>` / `restore-task <키>` | 휴지통으로 보낸다(활동 기록도 함께) / 되살린다. `empty-trash`는 태스크 휴지통을 비우지 않는다 |
+
+- **상태 전이(`TaskTransitions`).** 상태 8개는 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled`다. 화면, 러너, 명령이 모두 `transition-task`를 거치므로 조건이 한 곳에서만 검사된다. 누가 바꾸는지는 `actor`(`human`이 기본, 러너는 `runner`)로 준다.
+
+| 전이 | 누가 | 조건 |
+|---|---|---|
+| Draft → Ready For Develop | 사람 | 요약, 완료 기준 1개 이상, 저장소가 있어야 한다(`readiness`) |
+| Ready For Develop → Draft | 사람 | |
+| Ready For Develop → In Progress | 사람(「지금 실행」), 러너 | 다른 태스크에 막혀 있지 않아야 한다 |
+| In Progress → Waiting Answer | 러너 | |
+| Waiting Answer → In Progress | 사람, 러너 | |
+| In Progress → In Review | 러너 | |
+| In Review → Done | 사람, 러너 | 지금은 사람이 누른다(결정 1). 러너도 같은 조건으로 부를 수 있게 열어 두었다 |
+| Ready·In Progress·Waiting·In Review → Failed | 러너 | |
+| Draft·Ready·In Progress·Waiting·In Review → Cancelled | 사람 | |
+| Failed·Cancelled → Draft | 사람 | |
+
+  Done에서는 어디로도 갈 수 없다. 그 밖의 쌍은 AIS-409다. `actor`는 믿을 수 있는 인증이 아니라 규칙을 지키게 하는 표시다(이 컴퓨터 안의 약속이다).
+- **연결.** 종류는 `blocks`(건 쪽이 받는 쪽을 막는다), `relates`(관련, 한 번이면 양쪽에 보인다), `duplicates`(건 쪽이 받는 쪽의 중복)다. 연결은 **건 쪽 파일에만** 적고 반대쪽(`blocked-by`, `duplicated-by`)은 읽을 때 계산한다. 두 파일이 어긋날 일이 없다. 자기 자신에게 못 걸고, 서로 막는 순환(`blocks`의 맞은편)은 거절한다. `blocks`로 막힌 태스크는 막은 태스크가 **Done**이 되기 전에는 Ready For Develop → In Progress로 못 간다(Failed·Cancelled는 풀지 않는다). 지운 태스크는 막지 않고, 되살리면 다시 막는다(결정 4).
+- **기록.** 만들기, 상태 바뀜(`from`, `to`), 고침(바뀐 칸 이름), 연결, 댓글이 `activity.jsonl`에 시간순으로 남는다. 고치면 `editedAt`이 남고, 세션 표식이 오면 `editedSession`(과 Claude가 아닐 때 `editedAgent`)이 남는다. 완료 기준을 확인하면 확인한 시각과 쪽(`human`, `runner`)이 항목에 남고, 확인이 풀리면 기록이 지워진다.
+- **쓰기 비용.** 쓰기 명령은 vault 전체 쓰기 잠금과 노트 색인 맞추기(`NoteIndex.reconciled`)를 거치므로 태스크를 쓸 때마다 노트 폴더를 훑는다. 호출 한 번은 노트 17개짜리 vault에서 0.1초 안팎이었다(JVM을 띄우는 시간 포함). 노트가 아주 많은 vault의 값은 재지 않았다.
+- **시험.** `TasksTest`(만들기와 필수 값, 거절 문구, 고치기 보호와 모르는 칸 보존, 완료 기준 확인 기록, 번호, 휴지통, 상태 전이 전부, 연결과 막힘, 활동, 목록 거르기, 손으로 망가뜨린 파일, MCP 읽기 도구와 쓰기 도구 없음, 기존 명령과의 공존)와 `McpServerTest`의 도구 개수다.
+- **아직 없는 것.** 러너, 알림, 태스크 안 채팅(정의 에이전트), 화면(보드·목록·만들기·상세), 실행 기록, 앱 폴더의 작업 폴더(worktree). 승인 워크플로우(이슈 #53)는 러너가 권한 값을 쓰기 전에 필요하다.
+
 ### GitHub App 연결 (`github.rs`)
 
 프로젝트의 GitHub 저장소(앞의 「프로젝트의 저장소와 아젠다의 `projectRepo`」)를 앱이 읽고 받아 오는 호스트 쪽 바탕이다. 사용자가 GitHub에서 직접 만든 GitHub App의 **App ID와 개인 키(PEM)** 로 **설치 토큰**을 받는 방식이고, 사용자 로그인(디바이스 플로우)은 쓰지 않는다. 활동은 앱(봇) 이름으로 남는다.
@@ -232,7 +278,7 @@ java -jar dist/ais-engine.jar get_doc '{"id":"nddemo-00000001"}'   # 도구 표�
 java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표면
 ```
 
-도구 34개와 명령 66개는 `src/aisurada/cmd/CommandRegistry.java`에 있다. 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `java -jar dist/ais-cli.jar --list`로 본다.
+도구 36개와 명령 75개는 `src/aisurada/cmd/CommandRegistry.java`에 있다. 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `java -jar dist/ais-cli.jar --list`로 본다.
 
 ### 설정
 
@@ -319,10 +365,10 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 연결하는 법, 도구 28개의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
 
-- **도구.** 이름은 엔진 도구 34개와 같다. 기본은 읽기 15개만 내놓고 `--write`를 주면 33개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
+- **도구.** 이름은 엔진 도구 36개와 같다. 기본은 읽기 17개만 내놓고 `--write`를 주면 35개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`runEnginePipeline`: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 `System.exit`을 부르는데, `AisCliMain`의 종료 호출은 모두 `exit()` 하나를 거친다. mcp 모드에서만 `exit()`이 프로세스를 끝내는 대신 `CliExit`을 던지고, 그 호출만 `isError`로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.
 - **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(아래 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
-- **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 34개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
+- **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 36개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
 - **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`ClaudeMcpCommand`)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 `codex-mcp`, `gemini-mcp`(`AgentMcpCommand`)가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다(`McpRegistration`). CLI마다 `--` 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 java 경로 뒤) 인자 모양은 `AgentMcpCommandTest`가 가짜 CLI로 못 박고, 진짜 CLI로는 임시 HOME에서 확인했다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.
 
 시험은 `bash test.sh`에 들어 있다. `McpServerTest`는 스키마 대조, 노출 규칙, 가짜 호출기로 프로토콜, 진짜 엔진과 진짜 `mcp` 프로세스의 왕복(읽기·쓰기·낡은 `f1` 거절·휴지통·영구 삭제 거절·vault 없는 환경에서도 서버가 사는지)을 잰다. `ClaudeMcpCommandTest`는 등록 상태를 파일에 두는 가짜 `claude`로 `status`·`add`·`remove`·`config`를 잰다.
