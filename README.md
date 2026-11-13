@@ -1,6 +1,6 @@
 # aisurada
 
-**macOS Apple Silicon 배포:** [0.0.4 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.0.4) · Java 포함 · [설치 안내와 제한 사항](docs/releases/0.0.4.md)
+**macOS Apple Silicon 배포:** [0.0.5 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.0.5) · Java 포함 · [설치 안내와 제한 사항](docs/releases/0.0.5.md)
 
 사용 방법은 [HTML 사용자 가이드](docs/user-guide.html)에 정리했습니다. 파일을 내려받아 브라우저에서 열면 검색·목차·코드 복사·인쇄를 사용할 수 있습니다.
 
