@@ -132,12 +132,12 @@ if (location.pathname.startsWith("/note-window/")) {
   let created, projectId, agendaId, newChild;
   try {
     await until(() => $(".calendar-controls"), "boot");
-    await test("rail-seven-order-settings-three-local-switches", async () => {
+    await test("rail-eight-order-settings-three-local-switches", async () => {
       assert(
         $$(".workspace-rail .nav-item")
           .map((b) => b.textContent.trim())
           .join("|") ===
-          "전체 노트|캘린더|즐겨찾기|연결|템플릿|휴지통|연동 가이드",
+          "전체 노트|캘린더|즐겨찾기|연결|템플릿|스킬·에이전트|휴지통|연동 가이드",
         "rail order",
       );
       const before = (await fetch("/calls").then((r) => r.json())).length;
@@ -505,7 +505,10 @@ if (location.pathname.startsWith("/note-window/")) {
       await until(() => !$(".cmdk-overlay"), "search closed");
     });
     await test("entity-project-and-agenda-form-create", async () => {
-      $('[aria-label="프로젝트 추가"]').click();
+      // 레일의 「＋」 하나가 메뉴를 열고, 거기서 새 프로젝트와 새 아젠다를 고른다.
+      click("새로 만들기");
+      await until(() => $(".act-menu"), "new menu");
+      click("새 프로젝트", $(".act-menu"));
       await until(() => $('[aria-label="프로젝트 이름"]'), "project form");
       fill($('[aria-label="프로젝트 이름"]'), "검증 프로젝트");
       click("만들기", $(".ndf"));
@@ -513,7 +516,9 @@ if (location.pathname.startsWith("/note-window/")) {
       projectId = (await engine(["list-projects"])).find(
         (p) => p.title === "검증 프로젝트",
       ).id;
-      $('[aria-label="아젠다 추가"]').click();
+      click("새로 만들기");
+      await until(() => $(".act-menu"), "new menu");
+      click("새 아젠다", $(".act-menu"));
       await until(() => $('[aria-label="아젠다 이름"]'), "agenda form");
       fill($('[aria-label="아젠다 이름"]'), "새 검증 아젠다");
       const project = (await engine(["list-projects"])).find(
