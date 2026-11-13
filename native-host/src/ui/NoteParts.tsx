@@ -7,6 +7,7 @@ import { Confirm } from "./Modal.tsx";
 import { ActionMenu } from "./ActionMenu.tsx";
 import type { ActionMenuItem } from "./ActionMenu.tsx";
 import { Icon } from "./Icon.tsx";
+import { sessionAgentId, sessionAgentLabel } from "./AgentMark.tsx";
 import { History } from "./History.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
 import {
@@ -952,20 +953,6 @@ function Comments({
       )}
     </section>
   );
-}
-
-/** 노트의 sessionAgent 줄에서 읽은 CLI 이름. 줄이 없거나 claude면 null이다(Claude는 줄을 적지 않는 약속이다. 칩에는 그래도 이름을 보인다). */
-function sessionAgentId(value: unknown): string | null {
-  const agent = asText(value)?.trim();
-  return agent && agent !== "claude" ? agent : null;
-}
-
-/** 칩에 보여 주는 CLI 이름. 모르는 CLI는 줄에 적힌 이름 그대로 보인다. */
-function sessionAgentLabel(agent: string): string {
-  if (agent === "claude") return "Claude Code";
-  if (agent === "codex") return "Codex";
-  if (agent === "gemini") return "Gemini CLI";
-  return agent;
 }
 
 /** 노트 상단 정보줄 아래의 세션 칩. 시험에서도 그려 보려고 내보낸다. */

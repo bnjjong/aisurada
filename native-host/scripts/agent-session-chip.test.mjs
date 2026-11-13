@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NoteSessionChips } from '../src/ui/NoteParts.tsx';
+import { AgentMark, noteAgents } from '../src/ui/AgentMark.tsx';
 
 const draw = (note, props = {}) => renderToStaticMarkup(React.createElement(NoteSessionChips, { note, ...props }));
 const base = { id: 'n1', title: 't', body: '', agenda: 'a', agendaId: 'a', format: 'markdown', created: '', date: '', time: '' };
@@ -44,4 +45,50 @@ test('the terminal button is drawn only when the screen can open one', () => {
 
 test('a note with no session draws no chip', () => {
   assert.equal(draw(base), '');
+});
+
+test('the list marks a note with a session id and no agent line as Claude', () => {
+  assert.deepEqual(noteAgents({ ...base, sessionId: 'claude-1' }), [{ agent: 'claude', role: 'created' }]);
+});
+
+test('the list marks a gemini note and names the role in the tooltip', () => {
+  const [info] = noteAgents({ ...base, sessionId: 'gem-1', sessionAgent: 'gemini' });
+  assert.deepEqual(info, { agent: 'gemini', role: 'created' });
+  const html = renderToStaticMarkup(React.createElement(AgentMark, { info }));
+  assert.match(html, /data-agent="gemini"/);
+  assert.match(html, /title="Gemini CLI가 작성"/);
+});
+
+test('the list marks a note only edited by an agent as edited', () => {
+  assert.deepEqual(noteAgents({ ...base, editedSessionId: 'claude-3' }), [{ agent: 'claude', role: 'edited' }]);
+});
+
+test('the list shows one mark when the same CLI created and edited the note', () => {
+  const note = { ...base, sessionId: 'claude-1', editedSessionId: 'claude-2' };
+  assert.deepEqual(noteAgents(note), [{ agent: 'claude', role: 'both' }]);
+});
+
+test('the list shows both CLIs when they differ, creator first', () => {
+  const note = { ...base, sessionId: 'gem-1', sessionAgent: 'gemini', editedSessionId: 'claude-3' };
+  assert.deepEqual(noteAgents(note), [
+    { agent: 'gemini', role: 'created' },
+    { agent: 'claude', role: 'edited' },
+  ]);
+});
+
+test('the list ignores a repeated edit session id and keeps the creator only', () => {
+  const note = { ...base, sessionId: 'gem-1', sessionAgent: 'gemini', editedSessionId: 'gem-1', editedSessionAgent: 'gemini' };
+  assert.deepEqual(noteAgents(note), [{ agent: 'gemini', role: 'created' }]);
+});
+
+test('the list draws no mark for a note written by a person', () => {
+  assert.deepEqual(noteAgents(base), []);
+  assert.deepEqual(noteAgents({ ...base, sessionId: '  ' }), []);
+});
+
+test('a codex note gets the neutral terminal mark instead of a brand shape', () => {
+  const [info] = noteAgents({ ...base, sessionId: 'codex-1', sessionAgent: 'codex' });
+  const html = renderToStaticMarkup(React.createElement(AgentMark, { info }));
+  assert.match(html, /data-agent="other"/);
+  assert.match(html, /title="Codex가 작성"/);
 });

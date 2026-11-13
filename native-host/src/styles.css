@@ -1624,6 +1624,11 @@ code.is-symbol { font-weight: 700; }
   background: var(--soft);
   border-radius: 6px;
 }
+/* 목록 줄에서 Claude·Gemini 같은 CLI가 만들거나 고친 노트를 알리는 작은 아이콘(AgentMark) */
+.agent-mark { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; line-height: 0; }
+.agent-mark + .agent-mark { margin-left: 3px; }
+.agent-mark svg { display: block; }
+.agent-mark[data-agent="other"] { color: var(--muted); }
 
 .agenda-note .doc-width-resize {
   display: none;
