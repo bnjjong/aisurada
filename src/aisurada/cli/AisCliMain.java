@@ -166,6 +166,15 @@ public final class AisCliMain {
             "recent-sessions"
     );
 
+    /**
+     * 태스크 명령 9개. 엔진({@code CommandRegistry})에는 있지만 이 목록에 빠지면 {@code ais-cli}가 「알 수 없는 이름」으로 거절해
+     * 앱의 태스크 화면과 러너가 모두 못 쓴다. 엔진 이름과 어긋나지 않는지는 {@code TasksTest}가 대조한다.
+     */
+    public static final List<String> ENGINE_COMMANDS_TASKS = List.of(
+            "create-task", "get-task", "list-tasks", "update-task", "transition-task",
+            "link-tasks", "add-task-comment", "delete-task", "restore-task"
+    );
+
     public static void main(String[] args) {
         if (args.length == 0 || "--help".equals(args[0]) || "-h".equals(args[0])) {
             printUsageAndList();
@@ -212,7 +221,7 @@ public final class AisCliMain {
 
         // 도구 이름 26개 또는 사이드카 고유 명령 58개
         boolean isTool = CLI_TOOL_NAMES.contains(firstArg);
-        boolean isCmd = ENGINE_COMMANDS_61.contains(firstArg);
+        boolean isCmd = ENGINE_COMMANDS_61.contains(firstArg) || ENGINE_COMMANDS_TASKS.contains(firstArg);
 
         if (!isTool && !isCmd) {
             printUnknownName(firstArg);
@@ -246,7 +255,7 @@ public final class AisCliMain {
         System.out.println("codex-mcp — Codex에 이 MCP 서버를 등록한다(status, add [--write], remove)");
         System.out.println("gemini-mcp — Antigravity(agy)나 Gemini CLI에 이 MCP 서버를 등록한다(status, add [--write], remove)");
         System.out.println();
-        System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61));
+        System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61) + ", " + String.join(", ", ENGINE_COMMANDS_TASKS));
         System.out.println("  앱이 쓰는 배선입니다. 이름이 하이픈인 것이 표시이고, 도구 이름(밑줄)과 다른 표면입니다.");
     }
 
@@ -275,7 +284,7 @@ public final class AisCliMain {
         System.err.println("알 수 없는 이름: " + name);
         System.err.println("도구: " + String.join(", ", CLI_TOOL_NAMES));
         System.err.println("명령: " + String.join(", ", DIRECT_COMMANDS));
-        System.err.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61));
+        System.err.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61) + ", " + String.join(", ", ENGINE_COMMANDS_TASKS));
         System.err.println("전체 설명은 ais-cli --list 로 본다.");
     }
 

@@ -1,5 +1,7 @@
 package aisurada;
 
+import aisurada.cli.AisCliMain;
+import aisurada.cmd.CommandRegistry;
 import aisurada.engine.EngineResult;
 
 import java.nio.file.Files;
@@ -21,6 +23,13 @@ public final class TasksTest {
     private static final String CRIT = "criteria=[\"지운 뒤 자원 폴더가 남지 않는다\",{\"text\":\"되살리면 폴더도 돌아온다\"}]";
 
     public static void main(String[] args) throws Exception {
+        // 0. 엔진이 받는 명령 이름은 모두 ais-cli가 넘겨 주어야 한다(앱은 ais-cli를 거쳐 엔진을 부른다)
+        var forwarded = new java.util.HashSet<String>(AisCliMain.ENGINE_COMMANDS_61);
+        forwarded.addAll(AisCliMain.ENGINE_COMMANDS_TASKS);
+        for (String name : CommandRegistry.COMMAND_NAMES) {
+            check(forwarded.contains(name), "ais-cli가 엔진 명령 " + name + " 을(를) 넘겨 주지 않는다");
+        }
+
         try (var t = new ChapterTestSupport("tasks")) {
             Path v = t.vault();
             ok(v, "create-project", "title=앱", "repos=[{\"name\":\"app\",\"github\":\"bnjjong/aisurada\"}]");
