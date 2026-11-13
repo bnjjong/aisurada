@@ -702,6 +702,8 @@ public final class ArgsParser {
             return new ParsedArgs(true, "delete-sub-note", List.of(parent, id), Collections.emptyMap(), parent);
         } else if (RESOURCE_TOOLS.containsKey(toolName)) {
             return parseResourceTool(toolName, props);
+        } else if (TASK_TOOLS.containsKey(toolName)) {
+            return parseTaskTool(toolName, props);
         } else {
             throw new AisException(400, "미지원 도구: " + toolName);
         }
@@ -761,6 +763,45 @@ public final class ArgsParser {
                 named.remove("id");
             }
             default -> { }
+        }
+        return new ParsedArgs(true, toolName.replace('_', '-'), positional, named, null);
+    }
+
+    /** 태스크 읽기 도구 2개. 상태를 바꾸는 일은 사람(화면)과 러너만 해서 쓰기 도구는 없다. 키는 도구 스키마(McpTools)와 같아야 한다. */
+    private static final Map<String, List<String>> TASK_TOOLS = new LinkedHashMap<>();
+    static {
+        TASK_TOOLS.put("list_tasks", List.of("status", "type", "repo", "label", "q", "blocked", "bodies", "trash"));
+        TASK_TOOLS.put("get_task", List.of("id", "activity"));
+    }
+    private static final Set<String> TASK_BOOLEAN_KEYS = Set.of("blocked", "bodies", "trash");
+
+    private static ParsedArgs parseTaskTool(String toolName, Map<String, JsonValue> props) {
+        List<String> keys = TASK_TOOLS.get(toolName);
+        validateKeys(toolName, props.keySet(), keys);
+        Map<String, String> named = new LinkedHashMap<>();
+        for (String key : keys) {
+            if (!props.containsKey(key)) continue;
+            JsonValue v = props.get(key);
+            String value;
+            if (TASK_BOOLEAN_KEYS.contains(key)) {
+                if (!(v instanceof JsonValue.JsonLiteral l) || !(l.raw().equals("true") || l.raw().equals("false"))) {
+                    throw new AisException(400, "인자 검증 실패(" + toolName + "): " + key + " 는 true 나 false 여야 한다: " + JsonCompact.compact(v));
+                }
+                value = l.raw();
+            } else if (key.equals("activity")) {
+                if (!(v instanceof JsonValue.JsonLiteral l) || !l.raw().matches("[0-9]{1,6}")) {
+                    throw new AisException(400, "인자 검증 실패(" + toolName + "): activity 는 0 이상의 정수여야 한다: " + JsonCompact.compact(v));
+                }
+                value = l.raw();
+            } else {
+                value = optionalString(toolName, props, key);
+            }
+            named.put(key, value);
+        }
+        List<String> positional = new ArrayList<>();
+        if (toolName.equals("get_task")) {
+            positional.add(requiredString(toolName, props, "id"));
+            named.remove("id");
         }
         return new ParsedArgs(true, toolName.replace('_', '-'), positional, named, null);
     }
@@ -1020,6 +1061,49 @@ public final class ArgsParser {
             case "list-resource-versions" -> {
                 maxPositional = 1;
                 usage = aisurada.cmd.ResourceCommands.VERSIONS_USAGE;
+            }
+            case "create-task" -> {
+                allowedOptions = List.of("actor", "base", "body", "criteria", "labels", "priority", "project", "refs", "repo", "title", "type");
+                maxPositional = 0;
+                usage = aisurada.cmd.TaskCommands.CREATE_USAGE;
+            }
+            case "get-task" -> {
+                allowedOptions = List.of("activity");
+                maxPositional = 1;
+                usage = aisurada.cmd.TaskCommands.GET_USAGE;
+            }
+            case "list-tasks" -> {
+                allowedOptions = List.of("blocked", "bodies", "label", "q", "repo", "status", "trash", "type");
+                maxPositional = 0;
+                usage = aisurada.cmd.TaskCommands.LIST_USAGE;
+            }
+            case "update-task" -> {
+                allowedOptions = List.of("actor", "base", "body", "criteria", "f1", "labels", "priority", "project", "refs", "repo", "title", "type");
+                maxPositional = 1;
+                usage = aisurada.cmd.TaskCommands.UPDATE_USAGE;
+            }
+            case "transition-task" -> {
+                allowedOptions = List.of("actor", "from", "to");
+                maxPositional = 1;
+                usage = aisurada.cmd.TaskCommands.TRANSITION_USAGE;
+            }
+            case "link-tasks" -> {
+                allowedOptions = List.of("actor", "remove", "type");
+                maxPositional = 2;
+                usage = aisurada.cmd.TaskCommands.LINK_USAGE;
+            }
+            case "add-task-comment" -> {
+                allowedOptions = List.of("actor", "body");
+                maxPositional = 1;
+                usage = aisurada.cmd.TaskCommands.COMMENT_USAGE;
+            }
+            case "delete-task" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.TaskCommands.DELETE_USAGE;
+            }
+            case "restore-task" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.TaskCommands.RESTORE_USAGE;
             }
             case "list-agendas" -> {
                 maxPositional = 0;

@@ -205,6 +205,8 @@ public final class EngineExecutor {
                     response = DeleteProject.execute(vaultRoot, parsed);
                 } else if (aisurada.cmd.ResourceCommands.NAMES.contains(parsed.commandName())) {
                     response = aisurada.cmd.ResourceCommands.execute(vaultRoot, parsed, sessionId);
+                } else if (aisurada.cmd.TaskCommands.NAMES.contains(parsed.commandName())) {
+                    response = aisurada.cmd.TaskCommands.execute(vaultRoot, parsed, sessionId);
                 } else if ("list-agendas".equals(parsed.commandName())) {
                     response = ListAgendas.execute(vaultRoot);
                 } else if ("create-agenda".equals(parsed.commandName())) {

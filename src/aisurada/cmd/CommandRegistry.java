@@ -3,7 +3,7 @@ package aisurada.cmd;
 import java.util.*;
 
 /**
- * 도구 34개와 명령 66개 및 사용법 목록을 관리하는 통합 레지스트리.
+ * 도구 36개와 명령 75개 및 사용법 목록을 관리하는 통합 레지스트리.
  * 단일 CommandSpec 테이블을 기반으로 목록과 메타데이터를 자동 생성합니다.
  */
 public final class CommandRegistry {
@@ -76,6 +76,15 @@ public final class CommandRegistry {
             new CommandSpec("set-resource-ref", "set_resource_ref", true, false, ResourceCommands.REF_USAGE),
             new CommandSpec("usable-resources", "usable_resources", false, false, ResourceCommands.USABLE_USAGE),
             new CommandSpec("list-resource-versions", "list_resource_versions", false, false, ResourceCommands.VERSIONS_USAGE),
+            new CommandSpec("create-task", null, true, false, TaskCommands.CREATE_USAGE),
+            new CommandSpec("get-task", "get_task", false, false, TaskCommands.GET_USAGE),
+            new CommandSpec("list-tasks", "list_tasks", false, false, TaskCommands.LIST_USAGE),
+            new CommandSpec("update-task", null, true, false, TaskCommands.UPDATE_USAGE),
+            new CommandSpec("transition-task", null, true, false, TaskCommands.TRANSITION_USAGE),
+            new CommandSpec("link-tasks", null, true, false, TaskCommands.LINK_USAGE),
+            new CommandSpec("add-task-comment", null, true, false, TaskCommands.COMMENT_USAGE),
+            new CommandSpec("delete-task", null, true, false, TaskCommands.DELETE_USAGE),
+            new CommandSpec("restore-task", null, true, false, TaskCommands.RESTORE_USAGE),
             new CommandSpec("recent-sessions", null, false, true, "recent-sessions [days=<일 수>]")
     );
 

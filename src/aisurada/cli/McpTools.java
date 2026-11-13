@@ -12,7 +12,7 @@ import java.util.Set;
 
 /**
  * MCP 클라이언트(Claude 등)에 내놓는 도구의 이름, 설명, 입력 스키마입니다.
- * 이름은 엔진 도구 34개와 같고, 입력 스키마의 키는 {@code ArgsParser}가 받는 키와 같아야 합니다(시험이 잰다).
+ * 이름은 엔진 도구 36개와 같고, 입력 스키마의 키는 {@code ArgsParser}가 받는 키와 같아야 합니다(시험이 잰다).
  *
  * <p>읽기와 쓰기는 엔진의 {@link CommandRegistry#WRITE_COMMANDS}에서 갈라 냅니다. 기본은 읽기 도구만 내놓고,
  * 쓰기 도구는 {@code mcp --write}로 뜰 때만 내놓습니다. 영구 삭제({@code purge_doc})는 어느 쪽으로도 내놓지 않습니다.
@@ -37,7 +37,7 @@ final class McpTools {
 
     private McpTools() {}
 
-    /** 정의된 도구 34개 전부(내놓지 않는 것 포함)를 엔진 도구 차례로 돌려줍니다. */
+    /** 정의된 도구 36개 전부(내놓지 않는 것 포함)를 엔진 도구 차례로 돌려줍니다. */
     static List<Tool> all() {
         return ALL;
     }
@@ -338,6 +338,23 @@ final class McpTools {
         t.add(tool("list_resource_versions",
                 "자원의 고치기 전 판 목록을 낸다(새것이 앞). 되돌리려면 get_resource로 옛 판을 읽고 그 내용으로 save_resource를 부른다.",
                 schema().str("id", "자원 id", true)));
+
+        // ---- 태스크(티켓). 외부 설명서에 없는 확장이다. 읽기 도구만 있다: 상태는 사람(화면)과 러너만 바꾼다 ----
+        t.add(tool("list_tasks",
+                "태스크(티켓) 목록을 낸다. 상태(status), 유형(type), 저장소(repo), 라벨(label), 요약에서 찾을 글(q)로 거른다. blocked=true면 다른 태스크에 막힌 것만, "
+                        + "trash=true면 휴지통 목록이다. 상태 이름은 draft, ready-for-develop, in-progress, waiting-answer, in-review, done, failed, cancelled다.",
+                schema().str("status", "상태 이름", false)
+                        .str("type", "feature, bug, chore", false)
+                        .str("repo", "owner/name", false)
+                        .str("label", "라벨", false)
+                        .str("q", "요약이나 키(TSK-14)에서 찾을 글", false)
+                        .bool("blocked", "true면 다른 태스크에 막힌 것만")
+                        .bool("bodies", "true면 설명까지 싣는다. 기본은 메타만")
+                        .bool("trash", "true면 휴지통 목록")));
+        t.add(tool("get_task",
+                "태스크 1건을 설명, 완료 기준, 연결한 자원, 연결된 태스크, Ready For Develop 조건, 활동과 함께 읽는다. 태스크를 만들고 고치는 것은 사람과 러너가 한다.",
+                schema().str("id", "태스크 키(TSK-14) 또는 id(tk…)", true)
+                        .integer("activity", "최근 활동 개수. 안 주면 100")));
 
         Map<String, Tool> byName = new LinkedHashMap<>();
         for (Tool tool : t) {

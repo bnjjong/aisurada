@@ -100,7 +100,8 @@ public final class AisCliMain {
             "create_sub_note", "list_sub_notes", "get_sub_note", "update_sub_note", "delete_sub_note",
             "write_attachment", "list_attachments", "list_comments", "export_markdown",
             "list_resources", "get_resource", "save_resource", "delete_resource", "restore_resource",
-            "set_resource_ref", "usable_resources", "list_resource_versions"
+            "set_resource_ref", "usable_resources", "list_resource_versions",
+            "list_tasks", "get_task"
     );
 
     /** --list의 도구 설명. 장마다 첫머리 요약에서 지은 1줄이고 계약이 아니다(3.3). */
@@ -138,7 +139,9 @@ public final class AisCliMain {
             Map.entry("restore_resource", "휴지통의 스킬이나 에이전트 정의를 되살린다"),
             Map.entry("set_resource_ref", "프로젝트가 글로벌 자원을 참조하는 것을 켜거나 끈다"),
             Map.entry("usable_resources", "프로젝트가 쓸 수 있는 스킬과 에이전트 정의를 낸다"),
-            Map.entry("list_resource_versions", "스킬이나 에이전트 정의의 고치기 전 판 목록을 낸다")
+            Map.entry("list_resource_versions", "스킬이나 에이전트 정의의 고치기 전 판 목록을 낸다"),
+            Map.entry("list_tasks", "태스크(티켓) 목록을 상태, 유형, 저장소, 라벨로 거른다"),
+            Map.entry("get_task", "태스크 1건을 설명, 완료 기준, 연결, 활동과 함께 낸다")
     );
 
     public static final List<String> DIRECT_COMMANDS = List.of(
