@@ -5,6 +5,7 @@ import { message } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { sanitizeHtml } from '../../lib/sanitize.ts';
 import { readingHTML } from '../../ui/ReadMarkdown.tsx';
+import { highlightCodeBlocks } from '../../editor/codeSyntax.ts';
 import { openDocLink } from './docLinks.ts';
 
 interface ModelProseProps {
@@ -65,6 +66,11 @@ export function ModelProse({ content, className = '', foldable = false }: ModelP
   const [needsFold, setNeedsFold] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const html = useMemo(() => proseHtml(content), [content]);
+
+  // 답의 코드 블록에도 노트와 같은 문법 색을 입힌다. 글자는 그대로이고 색만 바뀌어 접기 높이는 달라지지 않는다.
+  useEffect(() => {
+    if (containerRef.current) highlightCodeBlocks(containerRef.current);
+  }, [html]);
 
   // 4.12: fold when the rendered height is over the fold height plus one line of slack. Both numbers live in
   // CSS variables (`--ask-fold-height`, `--ask-fold-slack`) and are read here, so there is one copy of them.

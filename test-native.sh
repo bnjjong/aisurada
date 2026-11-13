@@ -21,6 +21,7 @@ pnpm --dir native-host exec node --import tsx --test scripts/chapter08.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/chapter09.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/chapter10.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/agent-session-chip.test.mjs
+pnpm --dir native-host exec node --import tsx --test scripts/code-syntax.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/repo-links.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/resources-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/part4-ask-run.test.mjs

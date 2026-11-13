@@ -445,6 +445,24 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 - 설정 값이 있어도 화면에 안 이어진 것이 남아 있다. `detailListWidth`와 `docWidth`는 저장·보정만 되고 읽는 화면이 없다(아젠다 목록은 320px 고정). `railWidth`와 `noteRailWidth`(노트 옆 세션 레일)는 이어져 있다.
 - 시험은 `scripts/chapters14-17.test.mjs`의 「레일 폭」(범위와 보정)과 `scripts/views-checks.js`의 `rail-resize-drag-keyboard-reset-and-persist`(끌기·범위·키보드·더블클릭·저장)다.
 
+### 코드 블록 문법 색 (`editor/codeSyntax.ts`)
+
+코드 블록의 언어별 색을 입히는 곳은 한 모듈이다. 문법을 토큰(키워드, 문자열, 주석 같은 조각)으로 나누는 일은 Prism이 하고, 편집기와 읽기 화면이 같은 모듈과 같은 CSS를 쓴다.
+
+| 화면 | 칠하는 방법 |
+|---|---|
+| 편집기(`Editor.tsx`의 `CodeSyntaxPlugin`) | Lexical의 `registerCodeHighlighting`이 코드 노드를 입력할 때마다 다시 나눠 토큰 노드로 바꾼다. 색은 화면에만 있고 저장되는 Markdown은 그대로다 |
+| 읽기 화면(`ReadMarkdown.tsx`), 외부 문서, 코멘트 | 정화가 끝난 DOM의 `pre > code.language-<이름>`을 `highlightCodeBlocks`가 칠한다 |
+| Claude 응답 글(`plugs/claude/modelProse.tsx`) | 같은 `highlightCodeBlocks`를 쓴다 |
+
+- **문법.** Lexical에 든 Prism에는 Kotlin, Bash, YAML, JSON, Groovy, Dockerfile, properties가 없어서 편집기의 언어 선택 목록(`tools.tsx`의 `languages`)에 있어도 색이 없었다. `codeSyntax.ts`가 이들과 TOML, JSX, TSX를 더 불러오고, 펜스에 흔히 쓰는 이름(`gradle`, `zsh`, `jsonc`, `c++`)을 별칭으로 잇는다. `prismjs`는 이 때문에 직접 의존성이다(1.30.0, Lexical이 쓰는 버전과 같다). 문법을 더하면 `codeSyntax.ts`에 `prism-<이름>.js`를 불러오되, 기대는 문법(Kotlin·Groovy는 clike, JSX는 markup·javascript, TSX는 JSX·typescript)을 먼저 불러온다.
+- **언어를 적지 않은 블록은 칠하지 않는다.** Lexical은 기본값으로 이런 블록의 언어를 `javascript`로 바꾸는데, 그러면 저장할 때 펜스가 ```` ``` ````에서 ```` ```javascript ````로 바뀐다. 그래서 토크나이저의 `defaultLanguage`를 `null`로 둔다. 모르는 언어(`mermaid` 포함)도 그대로 둔다.
+- **색은 CSS 클래스 `token <종류>`로 정한다.** Lexical의 `theme.codeHighlight`가 토큰 종류를 그대로 클래스로 바꾸고, Prism이 만드는 HTML도 같은 클래스를 단다. 색 값은 `styles.css`의 `--tok-*` 변수이고 밝기마다(라이트, OS 다크, `data-theme="dark"`) 값만 다르다. `light-dark()`는 macOS 13의 WebKit에 없어서 쓰지 않는다.
+- **별칭 문제.** Prism은 토큰에 별칭을 달아(`assign-left`는 `variable`) HTML에 둘 다 클래스로 쓰지만, Lexical은 종류 이름 하나만 쓴다. 별칭으로 색이 정해지는 이름(`function-name`, `scalar`, `decorator` 등)도 `styles.css`에 규칙이 있어야 두 화면이 같게 칠해진다. 새 문법을 더했을 때 빠뜨리지 않도록 `code-syntax.test.mjs`가 문법에서 이름을 읽어 CSS와 맞대어 본다.
+- **함께 켜지는 것.** `registerCodeHighlighting`은 색 입히기와 함께 Lexical의 코드 안 편집 기능(들여쓰기, 줄 이동 따위)도 등록한다. Tab은 `tools.tsx`의 기존 처리(우선순위 높음)가 먼저 받아 `\t`을 넣는다. 다른 키 동작은 앱 창에서 손으로 확인하지 않았다.
+- **한계.** 펜스 이름이 대문자(`Kotlin`)이면 읽기 화면은 칠하는데 편집기는 칠하지 않는다(Lexical이 이름을 그대로 비교한다). 문자열 안의 `${…}`처럼 토큰 안에 든 토큰은 읽기 화면에서는 바깥 색을 물려받고 편집기에서는 안쪽 토큰 색을 쓴다. Swift의 `directive`처럼 별칭이 둘로 갈리는 몇몇 토큰은 두 화면의 색이 다를 수 있다.
+- **시험.** `scripts/code-syntax.test.mjs`(`test-native.sh`가 부른다)가 문법 쪽(Kotlin 토큰, 선택 목록의 모든 언어에 문법이 있는지, 모르는 이름과 이스케이프, 별칭 규칙)과 헤드리스 편집기(색이 입혀지는지, 입력해도 색이 따라가는지, 색 때문에 저장되는 Markdown이 달라지지 않는지, 언어 없는 블록이 그대로인지)를 잰다. 실제 번들 조건(Vite, `safari15`)에서 편집기와 읽기 화면을 Edge headless로 그려 라이트·다크 모두 색이 나오는 것을 확인했다. 앱 창(WKWebView)과 Claude 응답 글에서는 확인하지 않았다.
+
 ### 계약을 건드릴 때
 
 호스트 커맨드(2부 29개, 4부 9개)와 이벤트 4개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.

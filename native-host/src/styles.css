@@ -1633,6 +1633,52 @@ code.is-symbol { font-weight: 700; }
 .mchip .agent-mark { margin: 0 4px 0 0; }
 .mchip .agent-mark + .agent-mark { margin-left: 0; }
 
+/* 코드 블록 문법 색. 편집기(Lexical codeHighlight)와 읽기 화면(Prism)이 같은 `token <종류>` 클래스를 쓴다.
+   밝기마다 변수 값만 바꾸고, 아래 규칙은 한 벌이다. light-dark()는 macOS 13 WebKit에 없어서 쓰지 않는다. */
+:root {
+  --tok-comment: #667369; --tok-keyword: #cf222e; --tok-string: #0b7285; --tok-number: #0550ae;
+  --tok-function: #8250df; --tok-class: #953800; --tok-tag: #116329; --tok-attr: #0550ae;
+  --tok-inserted: #1a7f37; --tok-deleted: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tok-comment: #8b9a90; --tok-keyword: #ff7b72; --tok-string: #a5d6ff; --tok-number: #79c0ff;
+    --tok-function: #d2a8ff; --tok-class: #ffa657; --tok-tag: #7ee787; --tok-attr: #79c0ff;
+    --tok-inserted: #3fb950; --tok-deleted: #f85149;
+  }
+}
+:root[data-theme="dark"] {
+  --tok-comment: #8b9a90; --tok-keyword: #ff7b72; --tok-string: #a5d6ff; --tok-number: #79c0ff;
+  --tok-function: #d2a8ff; --tok-class: #ffa657; --tok-tag: #7ee787; --tok-attr: #79c0ff;
+  --tok-inserted: #3fb950; --tok-deleted: #f85149;
+}
+/* Lexical은 토큰의 종류 이름 하나만 클래스로 달고(별칭을 버린다), Prism의 HTML은 별칭까지 단다. 그래서
+   별칭으로 색이 정해지는 이름(assign-left→variable, scalar→string 등)도 같은 그룹에 적어 두 화면의 색을 맞춘다.
+   별칭을 가진 토큰 이름이 모두 여기 있는지는 code-syntax.test.mjs가 문법에서 읽어 확인한다. */
+.token.comment, .token.prolog, .token.doctype, .token.cdata { color: var(--tok-comment); }
+.token.keyword, .token.atrule, .token.important, .token.directive, .token.null, .token.omit,
+.token.file-descriptor, .token.code, .token.code-snippet { color: var(--tok-keyword); }
+.token.string, .token.char, .token.attr-value, .token.template-string, .token.string-literal,
+.token.triple-quoted-string, .token.url, .token.raw-string, .token.scalar, .token.value,
+.token.template-punctuation, .token.url-reference { color: var(--tok-string); }
+.token.builtin, .token.property, .token.attr-name, .token.key, .token.coord, .token.attribute,
+.token.literal-property, .token.string-property, .token.macro, .token.other-directive { color: var(--tok-attr); }
+.token.number, .token.boolean, .token.constant, .token.symbol, .token.date, .token.datetime,
+.token.environment, .token.literal, .token.nil, .token.label, .token.lifetime-annotation { color: var(--tok-number); }
+.token.function, .token.function-variable, .token.function-name, .token.function-definition, .token.macro-name,
+.token.annotation, .token.decorator, .token.title { color: var(--tok-function); }
+.token.class-name, .token.variable, .token.parameter, .token.assign-left, .token.for-or-select,
+.token.generic, .token.type-definition, .token.table { color: var(--tok-class); }
+.token.tag, .token.selector, .token.selector-function-argument, .token.regex, .token.regex-source { color: var(--tok-tag); }
+/* 별칭이 둘인 토큰은 위 그룹이 엇갈리므로 구체적인 선택자로 편집기와 같은 색에 고정한다.
+   shebang은 Prism에서 important, bash의 builtin은 class-name이라는 별칭을 함께 단다. */
+.token.shebang, .token.hashbang { color: var(--tok-comment); }
+.token.builtin.class-name { color: var(--tok-attr); }
+.token.inserted { color: var(--tok-inserted); }
+.token.deleted { color: var(--tok-deleted); }
+.token.bold, .token.title { font-weight: 700; }
+.token.italic { font-style: italic; }
+
 .agenda-note .doc-width-resize {
   display: none;
 }

@@ -49,6 +49,7 @@ import { TableTools } from "./tableTools.tsx";
 import { MermaidLayer } from "./mermaid.tsx";
 import { headingSlug } from "./grammar.ts";
 import { openEditorLink } from "./media.tsx";
+import { codeHighlightTheme, registerCodeSyntax } from "./codeSyntax.ts";
 
 /** [element]가 든 노트의 위쪽 고정 패널(.doc-meta-bar)이 스크롤 영역 위에서 차지하는 높이(px). 패널이 없으면 0. */
 function stickyBarHeight(element: HTMLElement): number {
@@ -96,6 +97,7 @@ const theme = {
   quote: "lex-quote",
   link: "lex-link",
   code: "lex-code",
+  codeHighlight: codeHighlightTheme,
   heading: {
     h1: "lex-h1",
     h2: "lex-h2",
@@ -186,6 +188,7 @@ export function Editor(props: EditorProps) {
             hasNestedTables={false}
           />
           <TabIndentationPlugin />
+          <CodeSyntaxPlugin />
           <LinkPlugin />
           <HorizontalRulePlugin />
           <MarkdownShortcutPlugin transformers={transformers()} />
@@ -198,6 +201,13 @@ export function Editor(props: EditorProps) {
       </div>
     </EditorContext.Provider>
   );
+}
+
+/** 코드 블록에 언어별 문법 색을 입힌다. 색은 화면에만 있고 노트 본문(Markdown)은 바뀌지 않는다. */
+function CodeSyntaxPlugin() {
+  const [editor] = useLexicalComposerContext();
+  useEffect(() => registerCodeSyntax(editor), [editor]);
+  return null;
 }
 
 function EditorBridge(props: EditorProps) {

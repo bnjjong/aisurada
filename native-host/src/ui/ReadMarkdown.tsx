@@ -6,6 +6,7 @@ import { closeBlockEmphasis, fenceTracker, foldParagraphs } from "../editor/gram
 import { sanitizeHtml } from "../lib/sanitize.ts";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { renderDiagram } from "../editor/mermaid.tsx";
+import { highlightCodeBlocks } from "../editor/codeSyntax.ts";
 const escape = (s: string) =>
   s
     .replace(/&/g, "&amp;")
@@ -172,6 +173,10 @@ export function ReadMarkdown({
     });
     return () => observer.disconnect();
   }, []);
+  // 정화가 끝난 뒤 DOM에서 칠한다. Prism이 글자를 이스케이프하므로 정화기를 다시 거칠 필요가 없다.
+  useEffect(() => {
+    if (root.current) highlightCodeBlocks(root.current);
+  }, [rendered]);
   useEffect(() => {
     const element = root.current;
     if (!element) return;
