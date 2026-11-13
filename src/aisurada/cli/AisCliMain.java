@@ -462,21 +462,22 @@ public final class AisCliMain {
         }
     }
 
-    private static void launchEngine(String userHome, String vaultKey, String label, String normalizedVault, Path socketPath) {
+    /**
+     * plist를 만들어 디스크와 다르면 덮어쓰고 이전 등록을 내린다. jar를 못 정하거나 plist를 못 쓰면 종료 코드를 정하고 {@code false}를 준다.
+     */
+    private static boolean writeRegistration(String userHome, String label, String normalizedVault, Path socketPath, Path plistFile, Path logPath) {
         // 3.4: AISURADA_SIDECAR_JAR는 상대 경로든 없는 파일이든 확인 없이 싣는다. 못 정했을 때만 선다
         String sidecarJar = PlistGenerator.resolveSidecarJar(userHome);
         if (sidecarJar == null) {
             Path installed = Paths.get(userHome, "Library", "Application Support", "aisurada", "bin", "ais-sidecar.jar");
             System.err.println("AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다(" + installed + "). `install` 을 돌리거나 jar 의 절대 경로를 AISURADA_SIDECAR_JAR 에 넣는다. 이 값이 plist 에 그대로 실리므로 상대 경로를 쓰면 launchd 가 못 찾는다.");
             exit(2);
-            return;
+            return false;
         }
 
         String sidecarJava = PlistGenerator.resolveSidecarJava();
-        Path logPath = Paths.get(userHome, "Library", "Application Support", "aisurada", "logs", "sidecar-" + vaultKey + ".log");
         String plistContent = PlistGenerator.generatePlist(label, sidecarJava, sidecarJar, normalizedVault, socketPath.toString(), logPath.toString());
 
-        Path plistFile = Paths.get(userHome, "Library", "LaunchAgents", label + ".plist");
         boolean plistDiff = true;
         if (Files.exists(plistFile)) {
             // 3.3 띄우기 2번: 파일은 있는데 못 읽으면(UTF-8이 아님 포함) 덮지 않고 예외로 죽어 종료 코드 1이다
@@ -488,7 +489,7 @@ public final class AisCliMain {
             } catch (Exception e) {
                 e.printStackTrace(System.err);
                 exit(1);
-                return;
+                return false;
             }
         }
 
@@ -501,10 +502,23 @@ public final class AisCliMain {
             } catch (Exception e) {
                 e.printStackTrace(System.err);
                 exit(1);
-                return;
+                return false;
             }
             // bootout의 종료 코드는 안 본다. 못 돌렸거나 10초를 넘기면 종료 코드 4다
             launchctlOrExit(List.of("bootout", "gui/" + uidOrExit() + "/" + label));
+        }
+        return true;
+    }
+
+    private static void launchEngine(String userHome, String vaultKey, String label, String normalizedVault, Path socketPath) {
+        Path logPath = Paths.get(userHome, "Library", "Application Support", "aisurada", "logs", "sidecar-" + vaultKey + ".log");
+        Path plistFile = Paths.get(userHome, "Library", "LaunchAgents", label + ".plist");
+
+        // 빌드 폴더나 개발 실행의 앱은 이미 있는 등록을 덮어쓰지 않는다(PlistGenerator.keepsExistingRegistration)
+        if (PlistGenerator.keepsExistingRegistration(System.getenv(PlistGenerator.KEEP_REGISTRATION_ENV), plistFile)) {
+            System.err.println("이미 있는 엔진 등록을 그대로 쓴다(" + PlistGenerator.KEEP_REGISTRATION_ENV + "): " + plistFile);
+        } else if (!writeRegistration(userHome, label, normalizedVault, socketPath, plistFile, logPath)) {
+            return;
         }
 
         // 동시 상한 3 지키기

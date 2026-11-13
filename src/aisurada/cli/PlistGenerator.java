@@ -48,6 +48,30 @@ public final class PlistGenerator {
         return null;
     }
 
+    /** 이미 있는 엔진 등록(plist)을 덮어쓰지 말고 그대로 띄우라는 스위치. 값이 {@code 1}일 때만 켜진다. */
+    public static final String KEEP_REGISTRATION_ENV = "AISURADA_SIDECAR_KEEP_REGISTRATION";
+
+    /**
+     * 엔진을 띄울 때 [plistFile]에 이미 있는 등록을 그대로 쓸지 판단합니다.
+     * 저장소 빌드 폴더나 {@code tauri dev}로 띄운 앱은 자기 jar를 못 믿어서 jar를 넘기지 않는데, 그러면 등록이 설치본 jar로 바뀝니다.
+     * 설치본이 낡았으면 정식 앱의 등록까지 낡은 엔진으로 되돌아가므로, 이런 앱은 스위치([envValue])를 켜서 등록을 건드리지 않게 합니다.
+     * 기존 plist가 가리키는 jar가 사라졌으면 쓸 수 없는 등록이라 {@code false}를 줘서 평소처럼 다시 씁니다.
+     */
+    public static boolean keepsExistingRegistration(String envValue, Path plistFile) {
+        if (envValue == null || !"1".equals(Trim.trim(envValue))) {
+            return false;
+        }
+        String jar = parseJarFromPlist(plistFile);
+        if (jar == null || jar.isEmpty()) {
+            return false;
+        }
+        try {
+            return Files.isRegularFile(Paths.get(jar));
+        } catch (RuntimeException invalidPath) {
+            return false;
+        }
+    }
+
     public static String resolveSidecarJava() {
         String env = System.getenv("AISURADA_SIDECAR_JAVA");
         if (env != null) {
