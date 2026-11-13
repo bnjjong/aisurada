@@ -308,17 +308,17 @@ pub fn cancel_ask(session_id: String, ask_id: Option<String>) -> Result<bool, St
     Ok(true)
 }
 
-struct ExecResult {
-    exit_code: Option<i32>,
-    timed_out: bool,
-    cancelled: bool,
-    stdout: String,
-    stderr: String,
+pub(crate) struct ExecResult {
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) timed_out: bool,
+    pub(crate) cancelled: bool,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
 }
 
 /// CLI 실행 파일을 한 번 띄워 끝나기를 기다린다. 상한에 닿으면 2부의 `process::run` 이 SIGTERM, 3초, SIGKILL로
 /// 끝내고, 출력 파이프를 다른 프로세스가 쥐고 있어도 상한에서 답한다(5.6).
-fn run_cli_process(
+pub(crate) fn run_cli_process(
     binary: &Path,
     work_dir: &Path,
     vault: &str,

@@ -462,15 +462,34 @@ impl GithubService {
         if dest.exists() && dest.read_dir().map(|mut d| d.next().is_some()).unwrap_or(true) {
             return Err(format!("받을 자리에 이미 다른 폴더가 있다: {}", dest.display()));
         }
-        let (app_id, pem) = self.credentials()?;
-        let jwt = app_jwt(&app_id, &pem, now_secs())?;
-        let github = Github::new(&self.api);
-        let installation = github.repo_installation(&jwt, &owner, &name).map_err(|e| e.to_string())?;
-        let token = self.token_for(&github, &jwt, installation).map_err(|e| e.to_string())?;
+        let token = self.repo_token(&owner, &name)?;
         std::fs::create_dir_all(dest.parent().ok_or("받을 자리를 정하지 못했다")?).map_err(|e| format!("폴더를 만들지 못했다: {e}"))?;
         let url = format!("{}/{}/{}.git", self.git_base, owner, name);
         run_git_clone(&url, &dest, &token)?;
         Ok(CloneResult { path: dest.to_string_lossy().into_owned(), cloned: true })
+    }
+
+    #[cfg(feature = "claude")]
+    /// 받아 둔 저장소를 GitHub의 최신으로 맞춘다(`git fetch --prune origin`). 아직 없으면 먼저 받는다.
+    /// 러너가 읽기 전용 작업 폴더를 만들기 직전에 불러서, 태스크가 낡은 코드를 읽지 않게 한다.
+    pub fn refresh_clone(&self, full_name: &str, root: &Path) -> Result<PathBuf, String> {
+        let cloned = self.ensure_clone(full_name, root)?;
+        let dest = PathBuf::from(&cloned.path);
+        if !cloned.cloned {
+            let (owner, name) = split_full_name(full_name)?;
+            let token = self.repo_token(&owner, &name)?;
+            run_git_fetch(&dest, &token)?;
+        }
+        Ok(dest)
+    }
+
+    /// 그 저장소에 설치된 GitHub 앱의 설치 토큰.
+    fn repo_token(&self, owner: &str, name: &str) -> Result<String, String> {
+        let (app_id, pem) = self.credentials()?;
+        let jwt = app_jwt(&app_id, &pem, now_secs())?;
+        let github = Github::new(&self.api);
+        let installation = github.repo_installation(&jwt, owner, name).map_err(|e| e.to_string())?;
+        self.token_for(&github, &jwt, installation).map_err(|e| e.to_string())
     }
 }
 
@@ -498,7 +517,7 @@ fn split_full_name(full_name: &str) -> Result<(String, String), String> {
 // git clone
 // ---------------------------------------------------------------------------
 
-fn git_binary() -> PathBuf {
+pub(crate) fn git_binary() -> PathBuf {
     if let Some(custom) = std::env::var_os("AISURADA_GIT_BIN") {
         return PathBuf::from(custom);
     }
@@ -525,7 +544,21 @@ fn clone_env(token: &str) -> Vec<(String, String)> {
 
 fn run_git_clone(url: &str, dest: &Path, token: &str) -> Result<(), String> {
     let mut command = Command::new(git_binary());
-    command.args(["clone", "--quiet", url]).arg(dest).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
+    command.args(["clone", "--quiet", url]).arg(dest);
+    // 실패하면 반쯤 받은 폴더를 남기지 않는다
+    run_git_with_token(command, token, Some(dest), "저장소를 받는 데 시간이 너무 오래 걸려 멈췄다", "저장소를 받지 못했다")
+}
+
+#[cfg(feature = "claude")]
+fn run_git_fetch(repo: &Path, token: &str) -> Result<(), String> {
+    let mut command = Command::new(git_binary());
+    command.arg("-C").arg(repo).args(["fetch", "--quiet", "--prune", "origin"]);
+    run_git_with_token(command, token, None, "저장소를 최신으로 맞추는 데 시간이 너무 오래 걸려 멈췄다", "저장소를 최신으로 맞추지 못했다")
+}
+
+/// git 명령 하나를 토큰 환경으로 돌리고 상한 시간을 지킨다. 토큰은 오류 글에서 가린다. [cleanup]은 실패했을 때 지울 폴더다.
+fn run_git_with_token(mut command: Command, token: &str, cleanup: Option<&Path>, timeout_message: &str, failure_message: &str) -> Result<(), String> {
+    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     for (key, value) in clone_env(token) {
         command.env(key, value);
     }
@@ -545,8 +578,10 @@ fn run_git_clone(url: &str, dest: &Path, token: &str) -> Result<(), String> {
             None if started.elapsed() > CLONE_TIMEOUT => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let _ = std::fs::remove_dir_all(dest);
-                return Err("저장소를 받는 데 시간이 너무 오래 걸려 멈췄다".into());
+                if let Some(dir) = cleanup {
+                    let _ = std::fs::remove_dir_all(dir);
+                }
+                return Err(timeout_message.into());
             }
             None => std::thread::sleep(Duration::from_millis(100)),
         }
@@ -555,9 +590,10 @@ fn run_git_clone(url: &str, dest: &Path, token: &str) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        // 실패하면 반쯤 받은 폴더를 남기지 않는다
-        let _ = std::fs::remove_dir_all(dest);
-        Err(format!("저장소를 받지 못했다: {}", message.trim()))
+        if let Some(dir) = cleanup {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+        Err(format!("{failure_message}: {}", message.trim()))
     }
 }
 
@@ -581,6 +617,12 @@ impl GithubState {
 
     fn clone_root(&self) -> PathBuf {
         self.0.clone_root()
+    }
+
+    #[cfg(feature = "claude")]
+    /// 러너처럼 화면 밖에서 저장소를 받아야 하는 곳이 같은 서비스(같은 키체인, 같은 토큰 저장)를 쓰게 한다.
+    pub fn service(&self) -> Arc<GithubService> {
+        self.0.clone()
     }
 }
 

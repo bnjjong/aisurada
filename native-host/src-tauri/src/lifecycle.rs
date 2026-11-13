@@ -84,6 +84,9 @@ pub fn exit_app<R: Runtime>(app: tauri::AppHandle<R>) {
     let state = app.state::<HostState>();
     state.quitting.store(true, Ordering::SeqCst);
     state.reap_terminals();
+    // 일하던 러너 실행을 멈춘다(기록은 남아 다음 실행에서 이어 간다)
+    #[cfg(feature = "claude")]
+    crate::runner::shutdown_for_exit(&app);
     for (label, note) in app.webview_windows() {
         if label.starts_with("note-") {
             let _ = note.close();

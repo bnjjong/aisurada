@@ -67,6 +67,17 @@ pub async fn sidecar_call<R: Runtime>(
     .await
     .map_err(|e| format!("사이드카 호출이 끊겼어요: {e}"))?
 }
+#[cfg(feature = "claude")]
+/// 화면을 거치지 않고 호스트 안에서(러너처럼) 엔진 명령을 한 번 부른다. `sidecar_call`과 같은 길(`ais-cli`)을 쓰므로
+/// 화면이 받는 것과 같은 응답과 같은 거절을 받는다. 호출 스레드를 막으므로 러너의 일꾼 스레드에서만 부른다.
+pub fn call_blocking<R: Runtime>(app: &tauri::AppHandle<R>, vault: &str, argv: &[String]) -> Result<Reply, String> {
+    let context = Context {
+        resource: app.path().resource_dir().ok(),
+        bundled: !tauri::is_dev(),
+        cwd: std::env::current_dir().map_err(|e| format!("작업 폴더를 못 읽었어요: {e}"))?,
+    };
+    execute(&context, std::env::vars_os().collect(), vault, argv, TIMEOUT)
+}
 fn env_value(env: &Environment, key: &str) -> Option<String> {
     env.get(std::ffi::OsStr::new(key))
         .and_then(|v| v.to_str())

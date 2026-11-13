@@ -16,6 +16,8 @@ mod menu;
 mod notes;
 mod notifications;
 mod process;
+#[cfg(feature = "claude")]
+mod runner;
 mod secrets;
 mod self_write;
 mod sidecar;
@@ -106,6 +108,18 @@ fn main() {
             #[cfg(feature = "claude")]
             ask::cancel_ask,
             #[cfg(feature = "claude")]
+            runner::runner_status,
+            #[cfg(feature = "claude")]
+            runner::runner_settings_set,
+            #[cfg(feature = "claude")]
+            runner::runner_run,
+            #[cfg(feature = "claude")]
+            runner::runner_stop,
+            #[cfg(feature = "claude")]
+            runner::runner_answer,
+            #[cfg(feature = "claude")]
+            runner::runner_runs,
+            #[cfg(feature = "claude")]
             agents::list_claude_agents,
             #[cfg(feature = "claude")]
             agents::alive_pids,
@@ -126,6 +140,8 @@ fn main() {
             if let Ok(resources) = app.path().resource_dir() {
                 ask::set_tools_dir(resources.join("bin"));
             }
+            #[cfg(feature = "claude")]
+            runner::install(app.handle());
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;
             let handle = app.handle().clone();
