@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
 import './tasks.css';
+import './notifications.css';
 import './editor-insert.css';
 import './skin-tactile.css';
 import './skin-grid.css';

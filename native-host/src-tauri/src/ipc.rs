@@ -11,6 +11,7 @@ pub const MENU: &str = "ais://menu";
 pub const NAVIGATE: &str = "ais://navigate";
 pub const NOTE_WINDOWS: &str = "ais://note-windows";
 pub const SELF_WRITE: &str = "ais://self-write";
+pub const NOTIFICATIONS: &str = "ais://notifications";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

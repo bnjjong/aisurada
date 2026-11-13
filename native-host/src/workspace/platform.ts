@@ -41,6 +41,9 @@ export function workspaceServices(): WorkspaceServices {
     selfWritesChanged: changed => isTauri()
       ? listen<{ root: string; relPath: string; from: string }>('ais://self-write', event => changed(event.payload))
       : Promise.resolve(() => {}),
+    notificationsChanged: changed => isTauri()
+      ? listen<{ unread: number; pushed: unknown; toast: boolean }>('ais://notifications', event => changed(event.payload))
+      : Promise.resolve(() => {}),
     menu: received => isTauri()
       ? getCurrentWebviewWindow().listen<string>('ais://menu', event => received(event.payload))
       : Promise.resolve(() => {}),

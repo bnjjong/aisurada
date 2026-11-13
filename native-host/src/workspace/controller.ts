@@ -404,6 +404,8 @@ export class WorkspaceController {
     clearTimeout(this.geometryTimer);
     this.geometryTimer = setTimeout(() => this.saveNoteGeometry(geometry), 400);
   });
+  /** 호스트가 알림을 쌓거나 읽음으로 바꿀 때마다 부른다. 풀어 줄 함수를 약속으로 돌려준다. */
+  listenNotifications = (handler: (event: { unread: number; pushed: unknown; toast: boolean }) => void) => this.services.notificationsChanged?.(handler);
   listenCloseRequested = (handler: () => void) => {
     const promise = this.services.closeRequested?.(handler);
     void promise?.then(fn => { this.unlistenCloseRequested = fn; });

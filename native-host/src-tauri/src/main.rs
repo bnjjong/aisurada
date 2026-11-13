@@ -14,6 +14,7 @@ mod lifecycle;
 mod markdown;
 mod menu;
 mod notes;
+mod notifications;
 mod process;
 mod secrets;
 mod self_write;
@@ -36,6 +37,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol("aisframe", |ctx, request, responder| {
             let vault = ctx
                 .app_handle()
@@ -51,6 +53,7 @@ fn main() {
         .manage(lifecycle::HostState::default())
         .manage(secrets::SecretState::default())
         .manage(github::GithubState::default())
+        .manage(notifications::NotifyState::default())
         .invoke_handler(tauri::generate_handler![
             lifecycle::exit_app,
             workspace::allow_workspace,
@@ -87,6 +90,11 @@ fn main() {
             github::github_disconnect,
             github::github_repositories,
             github::github_clone,
+            notifications::notifications_list,
+            notifications::notifications_push,
+            notifications::notifications_mark_read,
+            notifications::notifications_settings_get,
+            notifications::notifications_settings_set,
             secrets::secret_table_probe,
             secrets::secret_table_status,
             secrets::mask_scrollback,

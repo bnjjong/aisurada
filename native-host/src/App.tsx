@@ -15,6 +15,8 @@ import { BrandMark } from './ui/BrandMark.tsx';
 import type { BrandState } from './ui/BrandMark.tsx';
 import { formatRelativeTime } from './ui/dates.ts';
 import { refreshGithub } from './ui/githubStore.ts';
+import { applyChanged, refreshNotifications } from './ui/notificationsStore.ts';
+import { NotificationToasts } from './ui/NotificationCenter.tsx';
 
 // Window identity is decided once, before any internal navigation.
 const context = windowContext(window.location.pathname);
@@ -66,6 +68,14 @@ function WorkspaceApp() {
   useEffect(() => { document.documentElement.dataset.skin = state.skin; }, [state.skin]);
   // 아젠다의 저장소 폴더(GitHub 전용 항목은 앱이 받는 자리)를 풀려면 연결 상태가 필요하다. 호스트가 있을 때만 묻는다.
   useEffect(() => { if (controller.isNative()) void refreshGithub(controller.callHost); }, [controller]);
+  // 알림: 처음에 목록과 설정을 읽고, 호스트가 알려 주는 사건을 받는다. 토스트는 메인 창만 띄운다(노트 창은 목록만 따라간다).
+  useEffect(() => {
+    if (!controller.isNative()) return;
+    void refreshNotifications(controller.callHost);
+    let unlisten: (() => void) | undefined, gone = false;
+    void controller.listenNotifications(event => applyChanged(event, context.kind === 'main'))?.then(fn => { if (gone) fn(); else unlisten = fn; });
+    return () => { gone = true; unlisten?.(); };
+  }, [controller]);
   if (state.booting) return <main className="status-screen" role="status"><Brand state="thinking" />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
   if (state.fatal) {
@@ -114,6 +124,7 @@ function WorkspaceApp() {
     {!state.workspace || state.route.split('?')[0] === '/launcher'
       ? <Launcher controller={controller} state={state} /> : <WorkspaceShell controller={controller} state={state} />}
     {state.notice && <NoticeBox notice={state.notice} onClose={controller.clearNotice} />}
+    {state.workspace && <NotificationToasts controller={controller} />}
   </>;
 }
 

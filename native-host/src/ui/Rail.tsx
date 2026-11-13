@@ -6,6 +6,7 @@ import { agendaOrder, HUE_COLORS, railGroupCollapsed } from "./model.ts";
 import { ActionMenu } from "./ActionMenu.tsx";
 import { LiveBrandMark } from "./BrandMark.tsx";
 import { Icon } from "./Icon.tsx";
+import { NotificationBell } from "./NotificationCenter.tsx";
 import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute, projectAddress } from "../navigation/routes.ts";
 export function Rail({
@@ -147,8 +148,11 @@ export function Rail({
   };
   return (
     <aside className="workspace-rail">
-      <div className="brand" role="img" aria-label="aisurada">
-        <LiveBrandMark />
+      <div className="rail-top">
+        <div className="brand" role="img" aria-label="aisurada">
+          <LiveBrandMark />
+        </div>
+        <NotificationBell controller={controller} />
       </div>
       <div className="workspace-identity" title={ws.path || ws.name}>
         <strong>{ws.name}</strong>
