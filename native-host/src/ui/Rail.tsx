@@ -163,11 +163,12 @@ export function Rail({
           ["connections", "연결"],
           ["templates", "템플릿"],
           ["resources", "스킬·에이전트"],
+          ["tasks", "태스크"],
           ["trash", "휴지통"],
           ["guide", "연동 가이드"],
         ].map(([path, label]) => (
           <button
-            className={`nav-item ${state.route.startsWith("/" + path) ? "active" : ""}`}
+            className={`nav-item ${(path === "tasks" ? state.route.startsWith("/task") : state.route.startsWith("/" + path)) ? "active" : ""}`}
             key={path}
             onClick={() => controller.navigate("/" + path)}
           >
