@@ -111,18 +111,34 @@ test-native.sh         화면·호스트 시험 전체
 
 ### Rust 엔진 이전 (`engine-rs/`)
 
-엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 앱은 아직 이것을 쓰지 않는다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md)에 있다.
+엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 새로고침 길의 읽기 명령 6개(`list_docs`, `list_agendas`, `list_projects`, `list_templates`, `list_trash`, `reindex`)는 앱이 이미 이것으로 읽는다. 나머지 명령은 아직 Java 엔진이다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md), [2단계 읽기 기록](rust-engine-step2-read.md)에 있다.
 
 | 자리 | 내용 |
 |---|---|
-| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리. 지금은 `frontmatter`(노트 머리 YAML 읽기·쓰기)만 있다 |
-| `engine-rs/crates/ais-core/examples/` | `yaml_check`(Java 기준값과 맞대기), `yaml_fuzz_cases`(퍼징 사례 만들기) |
-| `engine-rs/tools/yaml-spike/` | Java 기준값 뽑기(`YamlGroundTruth.java`, `run.sh`)와 손으로 만든 사례(`cases.txt`) |
+| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·프로젝트·템플릿·휴지통 읽기와 훑기), `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
+| `engine-rs/crates/ais-core/examples/` | `compat_check`(Java 엔진과 읽기 응답 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
+| `engine-rs/crates/ais-core/tests/` | 합성 vault로 읽기 동작을 확인하는 통합 시험(Java 없이 돈다) |
+| `engine-rs/tools/compat/` | 합성 vault 생성기 `make-fixture.sh` |
+| `engine-rs/tools/yaml-spike/` | 머리 읽기·쓰기를 Java 기준값과 맞대는 도구(`YamlGroundTruth.java`, `run.sh`, `cases.txt`) |
 
-단위 시험은 Java 없이 돈다. Java 엔진과 맞대려면 먼저 `./build.sh`로 `build/classes`를 만들고, 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
+**앱의 호출 길.** 화면은 `workspace/engine.ts`의 `engineCall` 한 곳으로 엔진을 부른다. 문자열 목록(argv)은 늘 Java 엔진(`sidecar_call` → `ais-cli`)으로 간다. 호출 객체(`Call`, `data/commands.ts`의 `read.docs()` 따위)는 호스트의 `engine_commands`가 알린 명령이면 Rust 엔진(`engine_call`, `src-tauri/src/engine.rs`)으로, 아니면 `toArgv`로 풀어 Java 엔진으로 간다. Rust 응답은 `engine.ts`의 어댑터가 기존 화면 모양으로 바꾼다. **되돌리는 스위치:** 앱을 `AISURADA_ENGINE=java`로 띄우면 `engine_commands`가 빈 목록을 돌려줘서 모든 명령이 Java 엔진으로 간다. 시험과 브라우저의 가짜 호스트에는 `engineCommands`가 없어서 늘 Java 경로다.
 
 ```bash
-(cd engine-rs && cargo test -p ais-core)
+(cd engine-rs && cargo test -p ais-core)                                              # Java 없이 도는 단위·통합 시험
+pnpm --dir native-host exec node --import tsx --test scripts/engine-route.test.mjs    # 화면의 라우팅과 어댑터
+cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked engine::         # 호스트 engine_call (실제 Tauri 호출 경로)
+```
+
+Java 엔진과 읽기 응답을 맞대려면 `./build.sh`로 `dist/ais-engine.jar`를 만든 뒤 아래를 돌린다. `compat_check`는 vault를 읽기만 하고, 응답을 새 모양으로 바꿔 견주며, 어긋남이 0이어야 한다.
+
+```bash
+engine-rs/tools/compat/make-fixture.sh <빈 폴더>        # 합성 vault(진짜 vault 내용 없음)
+(cd engine-rs && cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar <합성 vault> [다른 vault...])
+```
+
+노트 머리 읽기·쓰기를 Java와 맞대려면 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
+
+```bash
 engine-rs/tools/yaml-spike/run.sh <저장소 밖 폴더> --vault <vault 폴더>     # Java 기준값. vault는 읽기만 한다
 (cd engine-rs && cargo run -q -p ais-core --example yaml_check -- <저장소 밖 폴더>/ground-truth.jsonl)
 ```
@@ -706,7 +722,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 | 엔진 전체 | `bash test.sh` | 수 분 | 실제 임시 vault, 실제 serve와 `ais-cli` 왕복 |
 | 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 450건, `cargo test` 102건(무시 1건) |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체 |
-| Rust 엔진 이전 | `(cd engine-rs && cargo test -p ais-core)` | 수 초 | `frontmatter` 단위 시험. Java와 맞대는 법은 §4 「Rust 엔진 이전」 |
+| Rust 엔진 이전 | `(cd engine-rs && cargo test -p ais-core)` | 수 초 | 머리 읽기·쓰기 단위 시험과 합성 vault 통합 시험. Java와 맞대는 법은 §4 「Rust 엔진 이전」 |
 | 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 실제 Java 엔진, 격리 HOME |
 
 두 전체 시험 모두 맨 앞에서 `build.sh`를 돌려 `build/`와 `dist/`를 **지우고 다시 만든다.**
