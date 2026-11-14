@@ -275,3 +275,23 @@ test('쓰기 스위치: init-workspace도 같은 길을 따르고, 꺼져 있으
   await engineCall(off, write.init('내 노트'));
   assert.deepEqual(seen, [['init-workspace', 'name=내 노트', 'templates=[]']]);
 });
+
+test('쓰기 스위치: 즐겨찾기·평가·연결 쓰기도 같은 길을 따르고, 확인 값(f1)은 인자 목록 맨 끝으로 풀린다', async () => {
+  const rust = { set_favorite: () => ({ id: 'n', changed: true }), evaluate_doc: () => ({ id: 'n' }), link_docs: () => ({ id: 'n', changed: true }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  await engineCall(on, write.favorite('n', { favorite: true }, 'f1:abc'));
+  await engineCall(on, write.evaluate('n', { score: 80, note: '좋다' }, 'f1:abc'));
+  await engineCall(on, write.link('a', 'b', 'direct', false, 'f1:abc'));
+  // 실제 IPC는 JSON으로 보내서 undefined 값이 든 키는 사라진다
+  assert.deepEqual(on.calls.map(c => JSON.parse(JSON.stringify(c.args))), [
+    { command: 'set_favorite', args: { id: 'n', favorite: true, f1: 'f1:abc' } },
+    { command: 'evaluate_doc', args: { id: 'n', score: 80, note: '좋다', f1: 'f1:abc' } },
+    { command: 'link_docs', args: { from: 'a', to: 'b', kind: 'direct', f1: 'f1:abc' } },
+  ]);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(['set-favorite', 'evaluate-doc', 'link-docs'].map(n => [n, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(off, write.favorite('n', { favorite: true }, 'f1:abc'));
+  await engineCall(off, write.evaluate('n', { score: 80 }));
+  await engineCall(off, write.link('a', 'b', 'direct', true, 'f1:abc'));
+  assert.deepEqual(seen, [['set-favorite', 'n', 'favorite=true', 'f1=f1:abc'], ['evaluate-doc', 'n', 'score=80'], ['link-docs', 'a', 'b', 'kind=direct', 'remove=true', 'f1=f1:abc']]);
+});

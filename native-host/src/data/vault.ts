@@ -1,7 +1,7 @@
 import { asRow, asText, rows } from '../workspace/types.ts';
 import type { Note, Row, Workspace, WorkspaceServices } from '../workspace/types.ts';
 import { engineCall, engineRefusal, readWorkspace, SidecarCommandError } from '../workspace/engine.ts';
-import { cleanTags, commentId, read, write } from './commands.ts';
+import { cleanTags, commentId, read, toArgv, write } from './commands.ts';
 import type { Call, Fields, NewDoc } from './commands.ts';
 import { SelfWrites } from './selfWrites.ts';
 import { WriteQueues } from './writeQueues.ts';
@@ -34,6 +34,9 @@ export function relations(notes: Note[]): VaultMemory['relations'] {
   }
   return result;
 }
+
+/** 인자 목록이든 호출 객체든 Java 인자 칸(`key=value`) 목록으로 본다(제목을 바꾸는 쓰기인지 가리는 데 쓴다). */
+const argCells = (request: string[] | Call): string[] => Array.isArray(request) ? request : toArgv(request);
 
 export class VaultData {
   private memory = empty();
@@ -322,7 +325,7 @@ export class VaultData {
   }
   unsavedKeys() { return [...new Set([...this.memory.unsaved, ...this.memory.conflicted, ...Object.keys(this.memory.buffers)])]; }
   async settled() { await this.queues.drain(); return !this.queues.pending(); }
-  private async mutate(ref: NoteRef, fields: Row, build: (note: Note) => string[] | null,
+  private async mutate(ref: NoteRef, fields: Row, build: (note: Note) => string[] | Call | null,
     label: string, bodyWrite: boolean, suppressReloadLine = false): Promise<WriteResult> {
     const original = this.note(ref), workspace = this.workspace(), generation = this.generation, key = keyOf(ref);
     if (!original || !workspace) return { ok: false };
@@ -342,14 +345,14 @@ export class VaultData {
         if (has(response, 'path')) { update.path = response.path; this.markOwn(asText(response.path)); }
         if (response.renamed === true || ref.parent && asText(response.path) && response.path !== note.path) this.markOwn(asText(note.path));
         if (has(response, 'evaluation')) update.evaluation = response.evaluation;
-        const titleCell = !ref.parent && argv.find(cell => cell.startsWith('title='));
+        const titleCell = !ref.parent && argCells(argv).find(cell => cell.startsWith('title='));
         if (titleCell) this.savedTitles.set(key, titleCell.slice(6));
         this.replaceNote(ref, update);
         // 10.4: the unsaved mark comes down only when a write that carried the body succeeds.
         // A sub-note's title-only write succeeding leaves it as it was.
         if (has(fields, 'body')) this.setFlag('unsaved', key, false);
         this.success();
-        const warning = argv.some(cell => cell.startsWith('title=')) ? withoutTitleMismatch(asText(response.warning)) : asText(response.warning);
+        const warning = argCells(argv).some(cell => cell.startsWith('title=')) ? withoutTitleMismatch(asText(response.warning)) : asText(response.warning);
         if (response.renamed === true && warning) this.failure(warning);
         return { ok: true, value: response };
       } catch (error) {
