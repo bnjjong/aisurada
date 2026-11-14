@@ -17,6 +17,8 @@
 
 ## 1. 앱을 안전하게 띄우는 법
 
+> **번들 식별자를 바꿔 빌드한다.** 식별자가 설치된 진짜 앱(`co.kcd.aisurada`)과 같으면 가짜 `HOME`을 줘도 웹뷰 저장소(마지막으로 연 작업 공간 등)가 진짜 앱과 공유되어, 격리 앱이 진짜 vault를 열 수 있다. `pnpm --dir native-host tauri build --debug --bundles app --config '{"identifier":"co.kcd.aisurada.handcheck"}'`로 짓는다. Rust 엔진을 확인하는 격리 실행은 [rust-engine-hand-check.md](rust-engine-hand-check.md)의 스크립트가 이 점검까지 한다.
+
 번들 앱을 그냥 켜면(`open aisurada.app`) 진짜 HOME을 쓰고, `ais-cli`가 엔진을 띄우려고 `~/Library/LaunchAgents`에 plist를 쓰고 `launchctl`을 부른다. 그 레이블이 앱 설치본과 같은 꼴이라 이미 깔린 앱의 엔진을 내릴 수 있다. 그래서 아래처럼 **엔진을 먼저 직접 띄우고** 앱 바이너리를 환경 변수와 함께 실행한다. 이렇게 하면 `ais-cli`가 launchd를 부르지 않고 그 소켓에 붙는다(README의 serve 모드 절).
 
 - 빌드한 번들은 `.md`/`.markdown`의 기본 편집기로 등록된다(`fileAssociations`). 그래서 `open 문서.md`를 해도 이 앱이 진짜 HOME으로 뜬다. 이 문서도 `open`으로 열지 말고 에디터나 브라우저로 연다. 2026-11-04에 실제로 그렇게 떴다.
