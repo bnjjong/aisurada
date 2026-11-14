@@ -111,11 +111,11 @@ test-native.sh         화면·호스트 시험 전체
 
 ### Rust 엔진 이전 (`engine-rs/`)
 
-엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 새로고침 길의 읽기 명령 6개(`list_docs`, `list_agendas`, `list_projects`, `list_templates`, `list_trash`, `reindex`)는 앱이 이미 이것으로 읽는다. 나머지 명령은 아직 Java 엔진이다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md), [2단계 읽기 기록](rust-engine-step2-read.md)에 있다.
+엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 읽기 명령 12개는 앱이 이미 이것으로 읽는다: 새로고침 길의 6개(`list_docs`, `list_agendas`, `list_projects`, `list_templates`, `list_trash`, `reindex`)와 노트 하나를 여는 길의 6개(`get_doc`, `list_sub_notes`, `get_sub_note`, `list_comments`, `list_attachments`, `get_agenda_facts`). 나머지 명령은 아직 Java 엔진이다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md), [2단계 새로고침 길 기록](rust-engine-step2-read.md), [2단계 노트 여는 길 기록](rust-engine-step2-open.md)에 있다.
 
 | 자리 | 내용 |
 |---|---|
-| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·프로젝트·템플릿·휴지통 읽기와 훑기), `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
+| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기), `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
 | `engine-rs/crates/ais-core/examples/` | `compat_check`(Java 엔진과 읽기 응답 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
 | `engine-rs/crates/ais-core/tests/` | 합성 vault로 읽기 동작을 확인하는 통합 시험(Java 없이 돈다) |
 | `engine-rs/tools/compat/` | 합성 vault 생성기 `make-fixture.sh` |
