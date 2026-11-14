@@ -18,6 +18,7 @@ const POSITIONAL: Record<string, string[]> = {
   save_ritual_template: ['id'], delete_doc_template: ['id'], update_agenda_facts: ['id'],
   set_favorite: ['id'], evaluate_doc: ['id'], link_docs: ['from', 'to'], update_doc: ['id'],
   create_sub_note: ['parent'], update_sub_note: ['parent', 'id'], delete_sub_note: ['parent', 'id'],
+  create_comment: ['id', 'subId'], update_comment: ['id', 'subId'], delete_comment: ['id', 'subId'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -61,9 +62,12 @@ export const write = {
   createSub: (parent: string): Call => ({ command: 'create_sub_note', args: { parent, title: '새 후속 노트', body: '# 새 후속 노트\n\n', type: 'free' } }),
   updateSub: (parent: string, id: string, fields: Fields, token?: string): Call => ({ command: 'update_sub_note', args: { parent, id, ...fields, f1: token || undefined } }),
   deleteSub: (parent: string, id: string): Call => ({ command: 'delete_sub_note', args: { parent, id } }),
-  createComment: (root: string, sub: string | undefined, id: string, body: string, quote?: string) => command('create-comment', [root, ...(sub ? [sub] : [])], { body, comment_id: id, anchor_quote: quote || undefined }),
-  updateComment: (root: string, sub: string | undefined, id: string, body: string) => command('update-comment', [root, ...(sub ? [sub] : [])], { comment_id: id, body }),
-  deleteComment: (root: string, sub: string | undefined, id: string) => command('delete-comment', [root, ...(sub ? [sub] : [])], { comment_id: id }),
+  createComment: (root: string, sub: string | undefined, id: string, body: string, quote?: string): Call =>
+    ({ command: 'create_comment', args: { id: root, subId: sub || undefined, body, comment_id: id, anchor_quote: quote || undefined } }),
+  updateComment: (root: string, sub: string | undefined, id: string, body: string): Call =>
+    ({ command: 'update_comment', args: { id: root, subId: sub || undefined, comment_id: id, body } }),
+  deleteComment: (root: string, sub: string | undefined, id: string): Call =>
+    ({ command: 'delete_comment', args: { id: root, subId: sub || undefined, comment_id: id } }),
   deleteDoc: (id: string) => ['delete-doc', id], restore: (id: string) => ['restore-doc', id],
   purge: (id: string) => ['purge-doc', id], emptyTrash: () => ['empty-trash'],
   createAgenda: (fields: Fields): Call => ({ command: 'create_agenda', args: fields }),

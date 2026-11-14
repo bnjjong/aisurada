@@ -336,3 +336,22 @@ test('쓰기 스위치: 후속 노트 쓰기 3개도 같은 길을 따르고, �
   await engineCall(off, write.deleteSub('n', 'sn1'));
   assert.deepEqual(seen, [['create-sub-note', 'n', 'title=새 후속 노트', 'body=# 새 후속 노트\n\n', 'type=free'], ['update-sub-note', 'n/sn0', 'sn1', 'body=본문', 'f1=f1:abc'], ['delete-sub-note', 'n', 'sn1']]);
 });
+
+test('쓰기 스위치: 코멘트 쓰기 3개도 같은 길을 따르고, 옛 길에서는 노트와 후속 노트 id가 자리 인자로 풀린다', async () => {
+  const rust = { create_comment: () => ({ id: 'cm1-a', total: 1 }), update_comment: () => ({ id: 'cm1-a', total: 1 }), delete_comment: () => ({ id: 'cm1-a', remaining: 0, markerStripped: false }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  await engineCall(on, write.createComment('n', undefined, 'cm1-a', '본문', '인용'));
+  await engineCall(on, write.updateComment('n', 'sn1', 'cm1-a', '고침'));
+  await engineCall(on, write.deleteComment('n', 'sn1', 'cm1-a'));
+  assert.deepEqual(on.calls.map(c => JSON.parse(JSON.stringify(c.args))), [
+    { command: 'create_comment', args: { id: 'n', body: '본문', comment_id: 'cm1-a', anchor_quote: '인용' } },
+    { command: 'update_comment', args: { id: 'n', subId: 'sn1', comment_id: 'cm1-a', body: '고침' } },
+    { command: 'delete_comment', args: { id: 'n', subId: 'sn1', comment_id: 'cm1-a' } },
+  ]);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(['create-comment', 'update-comment', 'delete-comment'].map(n => [n, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(off, write.createComment('n', undefined, 'cm1-a', '본문'));
+  await engineCall(off, write.updateComment('n', 'sn1', 'cm1-a', '고침'));
+  await engineCall(off, write.deleteComment('n', undefined, 'cm1-a'));
+  assert.deepEqual(seen, [['create-comment', 'n', 'body=본문', 'comment_id=cm1-a'], ['update-comment', 'n', 'sn1', 'comment_id=cm1-a', 'body=고침'], ['delete-comment', 'n', 'comment_id=cm1-a']]);
+});
