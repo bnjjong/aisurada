@@ -8,6 +8,7 @@ import { asRow, asText, workspaceName } from './types.ts';
 import { TabModel } from '../navigation/tabs.ts';
 import { NoteScrollMemory } from '../navigation/scroll.ts';
 import { activeTab, agendaAddress, docAddress, fileAddress, parseRoute, parseSubTab, subAddress, subTabId, tabAddress } from '../navigation/routes.ts';
+import { railTabTarget, rememberRailTab } from '../navigation/railTabs.ts';
 import { connectLinkSource, latestInput } from '../interaction/links.ts';
 import type { AppLink } from '../interaction/links.ts';
 import { shortcutFor, zoomShortcutFor } from '../interaction/shortcuts.ts';
@@ -111,7 +112,7 @@ export class WorkspaceController {
     // so going to the address it is already at (Cmd+K on the same note) counts too.
     const moved = next.route !== this.state.route || (update.route !== undefined && location !== undefined);
     if (moved && next.subNotes) next.subNotes = next.subNotes.arrival === next.route ? { ...next.subNotes, arrival: null } : null;
-    if (next.route !== this.state.route) next.preview = null;
+    if (next.route !== this.state.route) { next.preview = null; rememberRailTab(next.route); }
     if (!next.workspace || parseRoute(next.route).kind === 'launcher') next.searchOpen = false;
     this.state = { ...next, tabs: this.tabs.snapshot() };
     for (const listener of this.listeners) listener();
@@ -354,6 +355,12 @@ export class WorkspaceController {
     if (!this.showingTabs()) return false;
     const shortcut = shortcutFor(event, this.services.mac ?? true, this.services.native ?? false);
     if (!shortcut) return false;
+    if (shortcut.kind === 'railTab') {
+      event.preventDefault();
+      const to = railTabTarget(shortcut.tab, this.state.route);
+      if (to) this.navigate(to);
+      return true;
+    }
     if (shortcut.kind === 'search') { event.preventDefault(); this.patch({ searchOpen: !this.state.searchOpen }); return true; }
     if (shortcut.kind === 'terminal') { event.preventDefault(); void this.handleMenu('ais_open_terminal'); return true; }
     if (shortcut.kind === 'close') { event.preventDefault(); void this.handleMenu('ais_close_tab'); return true; }

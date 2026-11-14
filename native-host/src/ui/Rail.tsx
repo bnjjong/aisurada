@@ -201,6 +201,7 @@ export function Rail({
               aria-selected={selected}
               aria-controls="rail-panel"
               className={`rail-tab ${selected ? "active" : ""}`}
+              title={`${TAB_LABELS[id]} (${id === "notes" ? "⌥1" : "⌥2"})`}
               onClick={() => {
                 // 이미 그 탭의 화면이면 그대로 두고, 아니면 그 탭에서 마지막으로 보던 화면으로 간다
                 const to = railTabTarget(id, state.route);

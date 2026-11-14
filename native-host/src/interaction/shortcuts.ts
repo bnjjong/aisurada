@@ -13,7 +13,8 @@ export type Shortcut =
   | { kind: 'close' }
   | { kind: 'terminal' }
   | { kind: 'cycle'; direction: -1 | 1 }
-  | { kind: 'index'; index: number };
+  | { kind: 'index'; index: number }
+  | { kind: 'railTab'; tab: 'notes' | 'agents' };
 
 /**
  * 화면 배율 단축키: Cmd/Ctrl과 +(1: 키움), -(-1: 줄임), 0(0: 기본 배율). 아니면 null.
@@ -28,8 +29,14 @@ export function zoomShortcutFor(event: KeyInput): 1 | -1 | 0 | null {
 }
 
 export function shortcutFor(event: KeyInput, _mac: boolean, native: boolean): Shortcut | null {
+  if (event.defaultPrevented) return null;
+  // Option(Alt) + 1: 노트 탭, Option(Alt) + 2: 에이전트 탭
+  if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+    if (event.code === 'Digit1' || event.code === 'Numpad1' || event.key === '1') return { kind: 'railTab', tab: 'notes' };
+    if (event.code === 'Digit2' || event.code === 'Numpad2' || event.key === '2') return { kind: 'railTab', tab: 'agents' };
+  }
   // 4.3: the modifier is Cmd or Ctrl, whatever the operating system. Ctrl+K and Ctrl+2 work on macOS too.
-  if (event.defaultPrevented || event.altKey || !(event.metaKey || event.ctrlKey)) return null;
+  if (event.altKey || !(event.metaKey || event.ctrlKey)) return null;
   if (event.key === 'k' || event.key === 'K') return { kind: 'search' };
   if (!native && event.shiftKey && (event.key === 't' || event.key === 'T' || event.code === 'KeyT')) return { kind: 'terminal' };
   if (!native && !event.shiftKey && event.key.toLowerCase() === 'w') return { kind: 'close' };
