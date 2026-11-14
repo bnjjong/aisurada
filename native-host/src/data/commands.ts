@@ -15,6 +15,7 @@ const POSITIONAL: Record<string, string[]> = {
   get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
   list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
   update_agenda: ['id'], delete_agenda: ['id'], update_project: ['id'], delete_project: ['id'],
+  save_ritual_template: ['id'], delete_doc_template: ['id'], update_agenda_facts: ['id'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -68,9 +69,10 @@ export const write = {
   createProject: (fields: Fields): Call => ({ command: 'create_project', args: fields }),
   updateProject: (id: string, fields: Fields): Call => ({ command: 'update_project', args: { id, ...fields } }),
   deleteProject: (id: string): Call => ({ command: 'delete_project', args: { id } }),
-  saveTemplate: (fields: Fields) => command('save-template', [], fields), saveRitual: (id: string, fields: Fields) => command('save-ritual-template', [id], fields),
-  deleteTemplate: (id: string) => ['delete-doc-template', id],
-  facts: (id: string, facts: string) => command('update-agenda-facts', [id], { facts: facts.trim() }),
+  saveTemplate: (fields: Fields): Call => ({ command: 'save_template', args: fields }),
+  saveRitual: (id: string, fields: Fields): Call => ({ command: 'save_ritual_template', args: { id, ...fields } }),
+  deleteTemplate: (id: string): Call => ({ command: 'delete_doc_template', args: { id } }),
+  facts: (id: string, facts: string): Call => ({ command: 'update_agenda_facts', args: { id, facts: facts.trim() } }),
   appendChatTurn: (noteId: string, subId: string | undefined, fields: Fields) =>
     command('append-chat-turn', [noteId, ...(subId ? [subId] : [])], fields),
 };

@@ -243,3 +243,25 @@ test('쓰기 스위치: 프로젝트 쓰기도 같은 길을 따르고, 꺼져 �
   await engineCall(off, write.deleteProject('pj1'));
   assert.deepEqual(seen, [['create-project', 'title=P', `repos=${repos}`], ['update-project', 'pj1', 'repos='], ['delete-project', 'pj1']]);
 });
+
+test('쓰기 스위치: 템플릿과 사실층 쓰기도 같은 길을 따른다', async () => {
+  const rust = { save_template: () => ({ id: 't', action: 'created' }), save_ritual_template: () => ({ id: 'r', action: 'updated' }), delete_doc_template: () => ({ id: 't', removed: [] }), update_agenda_facts: () => ({ id: 'ag', facts: '사실' }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  await engineCall(on, write.saveTemplate({ name: 'N', body: 'B' }));
+  await engineCall(on, write.saveRitual('r', { desc: 'd' }));
+  await engineCall(on, write.deleteTemplate('t'));
+  await engineCall(on, write.facts('ag', '  사실  '));
+  assert.deepEqual(on.calls.map(c => c.args), [
+    { command: 'save_template', args: { name: 'N', body: 'B' } },
+    { command: 'save_ritual_template', args: { id: 'r', desc: 'd' } },
+    { command: 'delete_doc_template', args: { id: 't' } },
+    { command: 'update_agenda_facts', args: { id: 'ag', facts: '사실' } },
+  ]);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(['save-template', 'save-ritual-template', 'delete-doc-template', 'update-agenda-facts'].map(n => [n, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(off, write.saveTemplate({ name: 'N', body: 'B' }));
+  await engineCall(off, write.saveRitual('r', { desc: 'd' }));
+  await engineCall(off, write.deleteTemplate('t'));
+  await engineCall(off, write.facts('ag', '  사실  '));
+  assert.deepEqual(seen, [['save-template', 'name=N', 'body=B'], ['save-ritual-template', 'r', 'desc=d'], ['delete-doc-template', 't'], ['update-agenda-facts', 'ag', 'facts=사실']]);
+});

@@ -74,9 +74,9 @@ test('read/history and remaining write command surfaces retain exact positional 
     [write.deleteComment('r','c','cm1-a'),['delete-comment','r','c','comment_id=cm1-a']],
     [write.link('a','b','attach',true,'T'),['link-docs','a','b','kind=attach','remove=true','f1=T']],
     [write.evaluate('a',{clear:true},'T'),['evaluate-doc','a','clear=true','f1=T']],
-    [write.facts('ag',' text '),['update-agenda-facts','ag','facts=text']],
-    [write.saveTemplate({id:'t',name:'',type:'free',desc:'',body:''}),['save-template','id=t','name=','type=free','desc=','body=']],
-    [write.saveRitual('t',{body:''}),['save-ritual-template','t','body=']],
+    [toArgv(write.facts('ag',' text ')),['update-agenda-facts','ag','facts=text']],
+    [toArgv(write.saveTemplate({id:'t',name:'',type:'free',desc:'',body:''})),['save-template','id=t','name=','type=free','desc=','body=']],
+    [toArgv(write.saveRitual('t',{body:''})),['save-ritual-template','t','body=']],
   ];for(const [actual,expected]of cases)assert.deepEqual(actual,expected);
 });
 test('normalization and comment ids preserve their bounded contracts',()=>{
