@@ -66,11 +66,29 @@ pub async fn engine_call(
         .map_err(|_| EngineError::internal("vault 잠금을 얻지 못했다"))?
         .clone()
         .ok_or_else(|| EngineError::invalid_argument("vault가 아직 열리지 않았어요"))?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let started = std::time::Instant::now();
+    let traced = command.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         Engine::new(vault).call(&command, args.unwrap_or(Value::Null))
     })
     .await
-    .map_err(|e| EngineError::internal(format!("엔진 호출이 끊겼어요: {e}")))?
+    .map_err(|e| EngineError::internal(format!("엔진 호출이 끊겼어요: {e}")))?;
+    if trace_enabled() {
+        let outcome = match &result {
+            Ok(_) => "ok".to_string(),
+            Err(e) => format!("{} {:?}", e.code, e.kind),
+        };
+        eprintln!(
+            "[engine] {traced} {outcome} {}ms",
+            started.elapsed().as_millis()
+        );
+    }
+    result
+}
+
+/// 손으로 확인할 때 어느 명령이 Rust 엔진으로 갔는지 터미널에 한 줄씩 찍는 스위치(`AISURADA_ENGINE_TRACE=1`)
+fn trace_enabled() -> bool {
+    std::env::var("AISURADA_ENGINE_TRACE").is_ok_and(|v| !v.trim().is_empty() && v.trim() != "0")
 }
 
 #[cfg(test)]
