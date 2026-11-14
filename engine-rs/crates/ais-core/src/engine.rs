@@ -50,6 +50,9 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "create_agenda",
     "update_agenda",
     "delete_agenda",
+    "create_project",
+    "update_project",
+    "delete_project",
     "commit_vault",
 ];
 
@@ -201,4 +204,47 @@ fn parse_args<T: DeserializeOwned>(command: &str, args: Value) -> Result<T, Engi
 fn to_json<T: serde::Serialize>(value: T) -> Result<Value, EngineError> {
     serde_json::to_value(value)
         .map_err(|e| EngineError::internal(format!("응답을 JSON으로 못 만들었다: {e}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 읽기 명령의 전부. 쓰기 명령을 `COMMANDS`에 더하고 `WRITE_COMMANDS`에 빠뜨리면 이 시험이 실패한다.
+    /// 그러면 쓰기가 쓰기 스위치 없이 Rust로 가기 때문이다.
+    const READS: &[&str] = &[
+        "list_docs",
+        "list_agendas",
+        "list_projects",
+        "list_templates",
+        "list_trash",
+        "reindex",
+        "get_doc",
+        "list_sub_notes",
+        "get_sub_note",
+        "list_comments",
+        "list_attachments",
+        "get_agenda_facts",
+        "search_docs",
+        "list_tags",
+        "get_template",
+        "history",
+    ];
+
+    #[test]
+    fn every_command_is_either_a_known_read_or_gated_as_a_write() {
+        for command in COMMANDS {
+            assert!(
+                READS.contains(command) != WRITE_COMMANDS.contains(command),
+                "{command}: 읽기 목록과 쓰기 목록 가운데 정확히 한 곳에 있어야 한다"
+            );
+        }
+        for command in WRITE_COMMANDS {
+            assert!(
+                COMMANDS.contains(command),
+                "{command}: 쓰기 명령은 COMMANDS에도 있어야 한다"
+            );
+        }
+        assert!(READS.iter().all(|r| COMMANDS.contains(r)));
+    }
 }
