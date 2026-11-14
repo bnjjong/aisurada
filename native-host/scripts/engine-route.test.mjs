@@ -355,3 +355,25 @@ test('쓰기 스위치: 코멘트 쓰기 3개도 같은 길을 따르고, 옛 �
   await engineCall(off, write.deleteComment('n', undefined, 'cm1-a'));
   assert.deepEqual(seen, [['create-comment', 'n', 'body=본문', 'comment_id=cm1-a'], ['update-comment', 'n', 'sn1', 'comment_id=cm1-a', 'body=고침'], ['delete-comment', 'n', 'comment_id=cm1-a']]);
 });
+
+test('쓰기 스위치: 휴지통 쓰기 4개도 같은 길을 따르고, 옛 길에서는 id가 자리 인자로 풀린다', async () => {
+  const rust = { delete_doc: () => ({ trashId: 'tr1', file: 'tr1' }), restore_doc: () => ({ trashId: 'tr1', restored: true }), purge_doc: () => ({ trashId: 'tr1', purged: true }), empty_trash: () => ({ purged: 0, failed: [], skipped: 0, orphans: 0 }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  await engineCall(on, write.deleteDoc('n'));
+  await engineCall(on, write.restore('tr1'));
+  await engineCall(on, write.purge('tr1'));
+  await engineCall(on, write.emptyTrash());
+  assert.deepEqual(on.calls.map(c => JSON.parse(JSON.stringify(c.args))), [
+    { command: 'delete_doc', args: { id: 'n' } },
+    { command: 'restore_doc', args: { trashId: 'tr1' } },
+    { command: 'purge_doc', args: { trashId: 'tr1' } },
+    { command: 'empty_trash', args: {} },
+  ]);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(['delete-doc', 'restore-doc', 'purge-doc', 'empty-trash'].map(n => [n, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(off, write.deleteDoc('n'));
+  await engineCall(off, write.restore('tr1'));
+  await engineCall(off, write.purge('tr1'));
+  await engineCall(off, write.emptyTrash());
+  assert.deepEqual(seen, [['delete-doc', 'n'], ['restore-doc', 'tr1'], ['purge-doc', 'tr1'], ['empty-trash']]);
+});

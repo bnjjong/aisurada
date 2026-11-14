@@ -19,6 +19,7 @@ const POSITIONAL: Record<string, string[]> = {
   set_favorite: ['id'], evaluate_doc: ['id'], link_docs: ['from', 'to'], update_doc: ['id'],
   create_sub_note: ['parent'], update_sub_note: ['parent', 'id'], delete_sub_note: ['parent', 'id'],
   create_comment: ['id', 'subId'], update_comment: ['id', 'subId'], delete_comment: ['id', 'subId'],
+  delete_doc: ['id'], restore_doc: ['trashId'], purge_doc: ['trashId'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -68,8 +69,10 @@ export const write = {
     ({ command: 'update_comment', args: { id: root, subId: sub || undefined, comment_id: id, body } }),
   deleteComment: (root: string, sub: string | undefined, id: string): Call =>
     ({ command: 'delete_comment', args: { id: root, subId: sub || undefined, comment_id: id } }),
-  deleteDoc: (id: string) => ['delete-doc', id], restore: (id: string) => ['restore-doc', id],
-  purge: (id: string) => ['purge-doc', id], emptyTrash: () => ['empty-trash'],
+  deleteDoc: (id: string): Call => ({ command: 'delete_doc', args: { id } }),
+  restore: (id: string): Call => ({ command: 'restore_doc', args: { trashId: id } }),
+  purge: (id: string): Call => ({ command: 'purge_doc', args: { trashId: id } }),
+  emptyTrash: (): Call => ({ command: 'empty_trash' }),
   createAgenda: (fields: Fields): Call => ({ command: 'create_agenda', args: fields }),
   updateAgenda: (id: string, fields: Fields): Call => ({ command: 'update_agenda', args: { id, ...fields } }),
   deleteAgenda: (id: string): Call => ({ command: 'delete_agenda', args: { id } }),
