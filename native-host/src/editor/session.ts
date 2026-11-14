@@ -2,6 +2,7 @@ import type { WorkspaceController } from '../workspace/controller.ts';
 import type { NoteRef } from '../data/vault.ts';
 import { extractTitle } from '../data/title.ts';
 import { asRow } from '../workspace/types.ts';
+import { read } from '../data/commands.ts';
 
 export type SaveResult = 'saved' | 'unsaved' | 'conflict';
 export type RestoreResult = 'restored' | 'conflict' | 'unsaved' | 'not-recorded' | 'replaced-conflict' | 'replaced-unsaved' | 'unavailable';
@@ -170,7 +171,7 @@ export class EditorSession {
     if (!this.valid() || this.released || this.discarding) return 'unavailable';
     const before = await this.flush('restore'); if (before !== 'saved') return before;
     try {
-      const commit = asRow(await this.controller.callEngine(['commit-vault']));
+      const commit = asRow(await this.controller.callEngine(read.commit()));
       this.controller.lastRestoreCommit = commit;
       if (!commit || !['committed', 'nothing'].includes(String(commit.outcome))) return 'not-recorded';
     } catch { this.controller.lastRestoreCommit = { outcome: 'failed' }; return 'not-recorded'; }

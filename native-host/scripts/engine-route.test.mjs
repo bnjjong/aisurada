@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { engineCall, readWorkspace, SidecarCommandError } from '../src/workspace/engine.ts';
-import { read } from '../src/data/commands.ts';
+import { read, write } from '../src/data/commands.ts';
 
 // 가짜 호스트: 기록을 남기고, 명령마다 정해진 응답을 돌려준다.
 function host({ commands, java = {}, rust = {} } = {}) {
@@ -188,4 +188,37 @@ test('판 목록(history): Rust 엔진으로 가고 응답은 그대로이며, J
 test('판 목록(history): 판 번호가 범위 밖이면 conflict 오류가 된다', async () => {
   const h = host({ commands: ['history'], rust: { history: () => { throw { code: 'AIS-409', kind: 'conflict', message: '판 번호가 범위 밖이다(1 부터 2 까지 있다): 3' }; } } });
   await assert.rejects(engineCall(h, read.history('n1', { number: 3 })), error => error.status === 3 && error.kind === 'conflict' && error.stderr.startsWith('AIS-409 판 번호가 범위 밖이다'));
+});
+
+test('쓰기 스위치: 호스트가 쓰기 명령을 알리면 아젠다 쓰기와 커밋이 Rust 엔진으로 가고, 아니면 Java 인자 그대로 간다', async () => {
+  const row = { id: 'ag1', slug: 'a', title: 'A', hue: 'blue', summary: '', deepLink: 'aisurada://agenda/a?ws=x' };
+  const rust = { create_agenda: () => row, update_agenda: () => row, delete_agenda: args => ({ id: args.id, slug: 'a', archivedPath: 'p', notesDir: 'notes/a' }), commit_vault: () => ({ outcome: 'committed' }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  assert.deepEqual(await engineCall(on, write.createAgenda({ title: 'A', hue: 'blue' })), row);
+  assert.deepEqual(await engineCall(on, write.updateAgenda('ag1', { project: '', summary: '요약' })), row);
+  assert.equal((await engineCall(on, write.deleteAgenda('ag1'))).archivedPath, 'p');
+  assert.deepEqual(await engineCall(on, read.commit()), { outcome: 'committed' });
+  assert.deepEqual(on.calls.map(c => c.args), [
+    { command: 'create_agenda', args: { title: 'A', hue: 'blue' } },
+    { command: 'update_agenda', args: { id: 'ag1', project: '', summary: '요약' } },
+    { command: 'delete_agenda', args: { id: 'ag1' } },
+    { command: 'commit_vault', args: {} },
+  ]);
+
+  // 쓰기 스위치가 꺼져 있으면 호스트가 읽기 명령만 알린다 → 옛 Java 인자 그대로
+  const seen = [];
+  const ok = () => ({ status: 0, stdout: '{}', stderr: '' });
+  const off = host({ commands: ['list_docs'], java: Object.fromEntries(['create-agenda', 'update-agenda', 'delete-agenda', 'commit-vault'].map(n => [n, argv => { seen.push(argv); return ok(); }])) });
+  await engineCall(off, write.createAgenda({ title: 'A', repo: undefined }));
+  await engineCall(off, write.updateAgenda('ag1', { repo: '', project: '' }));
+  await engineCall(off, write.deleteAgenda('ag1'));
+  await engineCall(off, read.commit());
+  assert.deepEqual(seen, [['create-agenda', 'title=A'], ['update-agenda', 'ag1', 'repo=', 'project='], ['delete-agenda', 'ag1'], ['commit-vault']]);
+});
+
+test('쓰기 오류: Rust의 conflict와 invalid_argument는 읽기와 같은 방식으로 오류가 되고 engineRefusal은 이유 글을 돌려준다', async () => {
+  const { engineRefusal } = await import('../src/workspace/engine.ts');
+  const h = host({ commands: ['delete_agenda'], rust: { delete_agenda: () => { throw { code: 'AIS-400', kind: 'invalid_argument', message: '노트가 2건 있는 아젠다는 지울 수 없다. 먼저 그 노트를 옮기거나 버린다: a' }; } } });
+  await assert.rejects(engineCall(h, write.deleteAgenda('ag1')), error => error.status === 3 && error.kind === 'invalid_argument');
+  assert.deepEqual(await engineRefusal(h, write.deleteAgenda('ag1')), { ok: false, reason: 'AIS-400 노트가 2건 있는 아젠다는 지울 수 없다. 먼저 그 노트를 옮기거나 버린다: a' });
 });

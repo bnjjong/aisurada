@@ -15,11 +15,33 @@ fn rust_engine_enabled() -> bool {
     !std::env::var(ENGINE_SWITCH).is_ok_and(|v| v.trim().eq_ignore_ascii_case("java"))
 }
 
+/// 쓰기 명령을 Rust 엔진으로 보내는 스위치. `rust`일 때만 켜진다(기본 꺼짐). 쓰기는 사용자 파일을 바꾸므로 실제 창 확인을 마친 뒤
+/// 기본값을 바꾼다. 읽기 스위치(`AISURADA_ENGINE=java`)가 우선이라 그것이 `java`면 쓰기도 꺼진다.
+const WRITE_SWITCH: &str = "AISURADA_ENGINE_WRITE";
+/// 옛 스냅숏 쓰기(설정으로 켜는 선택 기능, 기본 꺼짐)는 Rust 엔진이 하지 않는다. 켜져 있으면 쓰기를 Java 엔진에 맡긴다.
+const SNAPSHOT_SWITCH: &str = "AISURADA_VAULT_SNAPSHOT_ENABLED";
+
+fn rust_write_enabled() -> bool {
+    let is = |name: &str, want: &str| {
+        std::env::var(name).is_ok_and(|v| v.trim().eq_ignore_ascii_case(want))
+    };
+    rust_engine_enabled() && is(WRITE_SWITCH, "rust") && !is(SNAPSHOT_SWITCH, "true")
+}
+
+/// 알릴 명령 목록. 쓰기 명령은 쓰기 스위치가 켜졌을 때만 낀다.
+fn commands(write_enabled: bool) -> Vec<&'static str> {
+    ais_core::engine::COMMANDS
+        .iter()
+        .copied()
+        .filter(|c| write_enabled || !Engine::is_write(c))
+        .collect()
+}
+
 /// Rust 엔진이 처리하는 명령 이름. 스위치가 `java`면 비어 있어서 모든 명령이 Java 엔진으로 간다.
 #[tauri::command]
 pub fn engine_commands() -> Vec<&'static str> {
     if rust_engine_enabled() {
-        ais_core::engine::COMMANDS.to_vec()
+        commands(rust_write_enabled())
     } else {
         Vec::new()
     }
@@ -33,6 +55,11 @@ pub async fn engine_call(
     command: String,
     args: Option<Value>,
 ) -> Result<Value, EngineError> {
+    if Engine::is_write(&command) && !rust_write_enabled() {
+        return Err(EngineError::unsupported(format!(
+            "쓰기 명령 {command}는 Rust 엔진에서 아직 꺼져 있다({WRITE_SWITCH}=rust로 켠다)"
+        )));
+    }
     let vault = state
         .vault
         .lock()
@@ -207,6 +234,26 @@ mod tests {
         assert_eq!(unsupported["kind"], "unsupported");
 
         let _ = std::fs::remove_dir_all(&vault);
+    }
+
+    #[test]
+    fn write_commands_are_hidden_until_the_write_switch_is_on() {
+        let reads = commands(false);
+        let all = commands(true);
+        assert!(
+            reads.contains(&"list_docs")
+                && !reads.contains(&"create_agenda")
+                && !reads.contains(&"commit_vault")
+        );
+        assert!(
+            all.contains(&"create_agenda")
+                && all.contains(&"commit_vault")
+                && all.contains(&"list_docs")
+        );
+        assert_eq!(
+            all.len(),
+            reads.len() + ais_core::engine::WRITE_COMMANDS.len()
+        );
     }
 
     #[test]

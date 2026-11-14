@@ -14,6 +14,7 @@ export interface Call { command: string; args?: Fields; }
 const POSITIONAL: Record<string, string[]> = {
   get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
   list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
+  update_agenda: ['id'], delete_agenda: ['id'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -34,7 +35,7 @@ export const read = {
   subNote: (parent: string, id: string): Call => ({ command: 'get_sub_note', args: { parent, id } }),
   facts: (id: string): Call => ({ command: 'get_agenda_facts', args: { id } }),
   history: (id: string, fields: Fields = {}): Call => ({ command: 'history', args: { id, ...fields } }),
-  commit: () => ['commit-vault'], schedule: () => ['schedule', 'status', '--json'],
+  commit: (): Call => ({ command: 'commit_vault' }), schedule: () => ['schedule', 'status', '--json'],
   sessionTitles: (ids: string[]) => ['session-titles', ...new Set(ids)],
   readSession: (sessionId: string, limit = 100, urls = true) => ['read-session', sessionId, `limit=${limit}`, `urls=${urls}`],
   listChats: (noteId: string, subId?: string) => ['list-chats', noteId, ...(subId ? [subId] : [])],
@@ -61,8 +62,9 @@ export const write = {
   deleteComment: (root: string, sub: string | undefined, id: string) => command('delete-comment', [root, ...(sub ? [sub] : [])], { comment_id: id }),
   deleteDoc: (id: string) => ['delete-doc', id], restore: (id: string) => ['restore-doc', id],
   purge: (id: string) => ['purge-doc', id], emptyTrash: () => ['empty-trash'],
-  createAgenda: (fields: Fields) => command('create-agenda', [], fields), updateAgenda: (id: string, fields: Fields) => command('update-agenda', [id], fields),
-  deleteAgenda: (id: string) => ['delete-agenda', id],
+  createAgenda: (fields: Fields): Call => ({ command: 'create_agenda', args: fields }),
+  updateAgenda: (id: string, fields: Fields): Call => ({ command: 'update_agenda', args: { id, ...fields } }),
+  deleteAgenda: (id: string): Call => ({ command: 'delete_agenda', args: { id } }),
   createProject: (fields: Fields) => command('create-project', [], fields), updateProject: (id: string, fields: Fields) => command('update-project', [id], fields),
   deleteProject: (id: string) => ['delete-project', id],
   saveTemplate: (fields: Fields) => command('save-template', [], fields), saveRitual: (id: string, fields: Fields) => command('save-ritual-template', [id], fields),

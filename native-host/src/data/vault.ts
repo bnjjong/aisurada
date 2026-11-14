@@ -2,7 +2,7 @@ import { asRow, asText, rows } from '../workspace/types.ts';
 import type { Note, Row, Workspace, WorkspaceServices } from '../workspace/types.ts';
 import { engineCall, engineRefusal, readWorkspace, SidecarCommandError } from '../workspace/engine.ts';
 import { cleanTags, commentId, read, write } from './commands.ts';
-import type { Fields, NewDoc } from './commands.ts';
+import type { Call, Fields, NewDoc } from './commands.ts';
 import { SelfWrites } from './selfWrites.ts';
 import { WriteQueues } from './writeQueues.ts';
 import type { WriteStamp } from './writeQueues.ts';
@@ -411,7 +411,7 @@ export class VaultData {
       current => write.link(from, to, kind, remove, asText(current.precondition)), `문서 저장: ${note.title || '제목 없음'}`, false);
   }
 
-  private async perform(argv: string[], label: string, accepted: (value: Row) => void): Promise<WriteResult> {
+  private async perform(argv: string[] | Call, label: string, accepted: (value: Row) => void): Promise<WriteResult> {
     const generation = this.generation, workspace = this.workspace();
     if (!workspace) return { ok: false };
     try {

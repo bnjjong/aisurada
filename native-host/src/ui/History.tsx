@@ -266,7 +266,7 @@ export function History({
     setBusy(true);
     const result = await controller.restoreNote(keyValue, bodies[selected]);
     if (result === "restored") {
-      await controller.callEngine(["commit-vault"]).catch(() => {});
+      await controller.callEngine(read.commit()).catch(() => {});
       setCurrent(controller.readBuffer(keyValue, fallback));
       await list();
       setNotice(

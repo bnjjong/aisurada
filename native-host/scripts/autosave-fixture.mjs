@@ -1,4 +1,4 @@
-import {VaultData} from '../src/data/vault.ts';import {EditorSession} from '../src/editor/session.ts';import {sampleWorkspace} from '../src/workspace/sample.ts';
+import {toArgv} from '../src/data/commands.ts';import {VaultData} from '../src/data/vault.ts';import {EditorSession} from '../src/editor/session.ts';import {sampleWorkspace} from '../src/workspace/sample.ts';
 export const ok=value=>({status:0,stdout:JSON.stringify(value),stderr:''}),fail=status=>({status,stdout:'',stderr:'AIS-fixture failure'});
 export const spin=async()=>{for(let i=0;i<50;i++)await Promise.resolve()},deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{resolve,promise}};
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -20,7 +20,7 @@ export function fixture(t,options={}){
  };
  const services={native:false,windowLabel:'main',storage:{getItem:()=>null,setItem:()=>{}},now:()=>new Date(),uuid:()=>crypto.randomUUID(),warn:()=>{},host:{invoke}};
  const data=new VaultData(services,()=>ws,(memory,next)=>{if(next)ws=next;for(const fn of listeners)fn()});data.reset(ws);
- const controller={data,getSnapshot:()=>({workspace:ws,vault:data.getSnapshot()}),subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn)},registerEditor:(root,fn)=>{const key=Symbol();flushers.set(key,{root,fn});return()=>flushers.delete(key)},registerRestore:(key,fn)=>{const token=Symbol();restorers.set(token,{key,fn});return()=>restorers.delete(token)},callEngine:async argv=>{const r=await invoke('sidecar_call',{argv});if(r.status)throw Error('engine');return JSON.parse(r.stdout)}};
+ const controller={data,getSnapshot:()=>({workspace:ws,vault:data.getSnapshot()}),subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn)},registerEditor:(root,fn)=>{const key=Symbol();flushers.set(key,{root,fn});return()=>flushers.delete(key)},registerRestore:(key,fn)=>{const token=Symbol();restorers.set(token,{key,fn});return()=>restorers.delete(token)},callEngine:async request=>{const argv=Array.isArray(request)?request:toArgv(request);const r=await invoke('sidecar_call',{argv});if(r.status)throw Error('engine');return JSON.parse(r.stdout)}};
  const session=(ref={id:'a'})=>{const s=new EditorSession(controller,ref,data.note(ref)?.body||'');sessions.push(s);return s};
  t.after(()=>{data.invalidate();for(const s of sessions)s.dispose();data.dispose()});
  return{data,controller,disk,sub,calls,session,flushers,restorers,setHandler:fn=>handler=fn,get ws(){return ws},bodyCalls:()=>calls.filter(a=>a[0].startsWith('update-')&&a.some(v=>v.startsWith('body='))),titles:()=>calls.filter(a=>a[0].startsWith('update-')&&a.some(v=>v.startsWith('title='))&&!a.some(v=>v.startsWith('body=')))};

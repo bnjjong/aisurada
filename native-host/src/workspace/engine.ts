@@ -18,8 +18,12 @@ export class SidecarCommandError extends Error {
   }
 }
 
-export async function engineRefusal(host: HostPort, argv: string[]): Promise<{ ok: true; value: unknown } | { ok: false; reason: string }> {
-  const result = await host.invoke<SidecarResult>('sidecar_call', { argv });
+export async function engineRefusal(host: HostPort, request: string[] | Call): Promise<{ ok: true; value: unknown } | { ok: false; reason: string }> {
+  if (!Array.isArray(request)) {
+    try { return { ok: true, value: await engineCall(host, request) }; }
+    catch (error) { if (error instanceof SidecarCommandError) return { ok: false, reason: error.stderr }; throw error; }
+  }
+  const result = await host.invoke<SidecarResult>('sidecar_call', { argv: request });
   return result.status === 0 ? { ok: true, value: JSON.parse(result.stdout) } : { ok: false, reason: result.stderr.trim() };
 }
 
