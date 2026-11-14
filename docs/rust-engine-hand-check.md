@@ -2,7 +2,7 @@
 
 ## 요약
 
-**결론:** Rust 엔진이 읽는 명령 16개와 쓰는 명령 22개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
+**결론:** Rust 엔진이 읽는 명령 16개와 쓰는 명령 26개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
 
 ## 1. 띄우는 법
 
@@ -17,7 +17,7 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 | 옵션 | 뜻 |
 | --- | --- |
 | (없음) | 읽기만 Rust 엔진. 쓰기는 Java 엔진이다 |
-| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 22개가 Rust 엔진으로 간다 |
+| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 26개가 Rust 엔진으로 간다 |
 | `--engine java` | 모든 명령을 Java 엔진으로 보낸다(`AISURADA_ENGINE=java`). Rust와 견줄 때 쓴다 |
 | `--git` | 합성 vault에 git 저장소와 노트의 판 이력을 만든다(편집 이력 창, 자동 커밋 확인용) |
 
@@ -49,6 +49,7 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 - [ ] 새 작업 공간 만들기(`init_workspace`)
 - [ ] 노트의 즐겨찾기 별, 평가 점수, 다른 노트 연결을 바꾼다 → 그 노트 머리에 `favorite`, `evaluation`, `links` 줄이 생기고 `editedBy: app` 도장이 붙는다(`set_favorite`, `evaluate_doc`, `link_docs`)
 - [ ] 새 노트를 만든다(아젠다와 제목을 정하고 저장) → `notes/<아젠다>/<연-월>/<날짜>-<시각>-<제목>-<꼬리>/note.md`가 생기고 터미널에 `[engine] create_doc ok`가 찍힌다. 같은 날 새 노트를 연달아 만들면 시각이 5분씩 밀린다. 없는 이름의 아젠다로 만들면 `.aisurada/agendas/`에 새 아젠다 파일도 생긴다
+- [ ] 노트를 휴지통으로 보냈다가 되살리고, 다른 노트는 완전 삭제하고, 휴지통을 비운다 → `.aisurada/trash/files/`로 폴더(단일 파일은 확장자가 붙은 이름)가 옮겨지고 `.aisurada/trash/trash.json` 맨 앞에 항목이 생긴다. 되살리면 원래 아젠다의 월별 폴더로 돌아온다(같은 이름이 있으면 `-restored-…`). 즐겨찾기였던 노트를 보내면 「즐겨찾기였어요」 안내가 나온다. 비우면 목록이 `[]`가 된다(`delete_doc`, `restore_doc`, `purge_doc`, `empty_trash`)
 - [ ] 노트에서 본문 일부를 드래그해 코멘트를 달고, 고치고, 지운다 → 노트 폴더의 `comments.json`(후속 노트는 부모 폴더의 `sub-comments/<id>.json`)이 생기고 바뀌고, 마지막 코멘트를 지우면 파일이 사라진다. 지울 때 본문에서 그 코멘트의 앵커 표시가 걷힌다(`create_comment`, `update_comment`, `delete_comment`)
 - [ ] 노트에서 「새 후속 노트」를 만들고 제목·본문을 고친 뒤 지운다 → `…/sub/<날짜>-<시각>-<제목>-<꼬리>/note.md`가 생기고, 제목을 바꾸면 폴더 이름이 새 제목으로 옮겨지고, 지우면 폴더가 없어진다. 부모 본문에 그 노트의 카드 줄(`[제목](#sub:…)`)이 있었다면 지울 때 그 줄도 없어진다(`create_sub_note`, `update_sub_note`, `delete_sub_note`)
 - [ ] 노트 본문을 고치고 0.6초 기다린다(자동 저장) → 터미널에 `[engine] update_doc ok`가 찍히고, 노트 머리의 `editedAt`이 바뀌고, 파일 본문이 새 글이다
