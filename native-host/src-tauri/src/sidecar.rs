@@ -17,6 +17,14 @@ pub type Environment = BTreeMap<OsString, OsString>;
 const TIMEOUT: Duration = Duration::from_secs(120);
 /// 엔진(`ais-cli`)이 이미 있는 launchd 등록을 덮어쓰지 않고 그대로 쓰게 하는 환경 변수.
 const KEEP_REGISTRATION: &str = "AISURADA_SIDECAR_KEEP_REGISTRATION";
+/// 엔진이 「AI 세션이 보낸 요청」으로 읽는 환경변수(`SessionAgents`). 앱이 엔진에 넘기는 환경에서는 지운다.
+const AI_SESSION_ENV: [&str; 5] = [
+    "AISURADA_SESSION_ID",
+    "AISURADA_SESSION_AGENT",
+    "CLAUDE_CODE_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+];
 const TIMEOUT_MESSAGE: &str = "ais-cli 가 120초 안에 안 끝나서 끊었다. 사이드카가 답하지 않는다.";
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Reply {
@@ -67,9 +75,8 @@ pub async fn sidecar_call<R: Runtime>(
     .await
     .map_err(|e| format!("사이드카 호출이 끊겼어요: {e}"))?
 }
-#[cfg(feature = "claude")]
-/// 화면을 거치지 않고 호스트 안에서(러너처럼) 엔진 명령을 한 번 부른다. `sidecar_call`과 같은 길(`ais-cli`)을 쓰므로
-/// 화면이 받는 것과 같은 응답과 같은 거절을 받는다. 호출 스레드를 막으므로 러너의 일꾼 스레드에서만 부른다.
+/// 화면을 거치지 않고 호스트 안에서(러너와 승인 알림처럼) 엔진 명령을 한 번 부른다. `sidecar_call`과 같은 길(`ais-cli`)을 쓰므로
+/// 화면이 받는 것과 같은 응답과 같은 거절을 받는다. 호출 스레드를 막으므로 화면 스레드가 아닌 일꾼 스레드에서만 부른다.
 pub fn call_blocking<R: Runtime>(app: &tauri::AppHandle<R>, vault: &str, argv: &[String]) -> Result<Reply, String> {
     let context = Context {
         resource: app.path().resource_dir().ok(),
@@ -203,6 +210,11 @@ fn execute(
         }
     });
     env.insert("AISURADA_VAULT".into(), vault.into());
+    // 앱 화면과 러너가 부르는 엔진 명령은 사람(앱)의 통로다. 앱을 AI 세션의 터미널에서 띄웠다면 그 세션 표식이 환경에 남아 있을 수 있는데,
+    // 그대로 넘기면 엔진이 화면의 저장과 승인을 AI의 것으로 보고(#53) 승인을 거절하거나 대기에 올린다.
+    for key in AI_SESSION_ENV {
+        env.remove(std::ffi::OsStr::new(key));
+    }
     env.remove(std::ffi::OsStr::new("AISURADA_SIDECAR_JAR"));
     env.remove(std::ffi::OsStr::new(KEEP_REGISTRATION));
     if let Some(path) = sidecar {
@@ -437,6 +449,34 @@ mod tests {
         assert!(execute(&c, e, "/v", &[], TIMEOUT)
             .unwrap_err()
             .contains("못 띄웠어요"));
+    }
+    #[test]
+    #[cfg(unix)]
+    fn ai_session_variables_do_not_reach_the_engine() {
+        let temp = tempfile::tempdir().unwrap();
+        let c = context(temp.path(), false);
+        let jar = temp.path().join("cli.jar");
+        touch(&jar);
+        let java = temp.path().join("java");
+        script(
+            &java,
+            "printf '%s|%s|%s|%s|%s|%s' \"${AISURADA_SESSION_ID-unset}\" \"${AISURADA_SESSION_AGENT-unset}\" \"${CLAUDE_CODE_SESSION_ID-unset}\" \"${CODEX_SESSION_ID-unset}\" \"${CODEX_THREAD_ID-unset}\" \"${KEEP_ME-unset}\"",
+        );
+        let e = env(&[
+            ("AISURADA_CLI_JAR", jar.to_str().unwrap()),
+            ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
+            ("AISURADA_SESSION_ID", "s1"),
+            ("AISURADA_SESSION_AGENT", "codex"),
+            ("CLAUDE_CODE_SESSION_ID", "s2"),
+            ("CODEX_SESSION_ID", "s3"),
+            ("CODEX_THREAD_ID", "s4"),
+            ("KEEP_ME", "yes"),
+        ]);
+        // 세션 표식은 지우고 나머지 환경은 그대로 넘긴다
+        assert_eq!(
+            execute(&c, e, "/v", &[], TIMEOUT).unwrap().stdout,
+            "unset|unset|unset|unset|unset|yes"
+        );
     }
     #[test]
     #[cfg(unix)]
