@@ -38,6 +38,8 @@ export interface HostPort {
   /** 확장자가 맞는 파일 하나를 고르는 대화상자. 없는 환경(시험, 브라우저)에서는 정의하지 않는다. */
   chooseFile?(extensions: string[]): Promise<string | null>;
   confirmLeave(message: string, options?: { title?: string; okLabel?: string; cancelLabel?: string }): Promise<boolean>;
+  /** 앱 안의 Rust 엔진이 처리하는 명령 이름. 정의하지 않는 환경(시험, 브라우저)에서는 모든 명령이 Java 엔진으로 간다. */
+  engineCommands?(): Promise<ReadonlySet<string>>;
 }
 
 // Editors register their pending work here when introduced.

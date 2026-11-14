@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod desktop;
+mod engine;
 #[cfg(feature = "claude")]
 pub mod ask;
 #[cfg(feature = "claude")]
@@ -64,6 +65,8 @@ fn main() {
             workspace::is_workspace,
             workspace::create_workspace_dir,
             sidecar::sidecar_call,
+            engine::engine_commands,
+            engine::engine_call,
             files::write_attachment_bytes,
             files::copy_dropped_attachment,
             files::open_in_default_app,

@@ -10,6 +10,14 @@ import * as fs from '@tauri-apps/plugin-fs';
 import { sanitizeHtml } from '../lib/sanitize.ts';
 import type { WorkspaceServices } from './types.ts';
 
+/** 호스트에 한 번만 묻는다. 못 받으면 빈 집합이라서 모든 명령이 Java 엔진으로 간다. */
+let rustEngineCommands: Promise<ReadonlySet<string>> | undefined;
+const engineCommands = (): Promise<ReadonlySet<string>> => {
+  if (!isTauri()) return Promise.resolve(new Set<string>());
+  rustEngineCommands ??= invoke<string[]>('engine_commands').then(list => new Set(list), () => new Set<string>());
+  return rustEngineCommands;
+};
+
 export function workspaceServices(): WorkspaceServices {
   return {
     native: isTauri(), mac: /Mac|iPhone|iPad/.test(navigator.platform),
@@ -20,6 +28,7 @@ export function workspaceServices(): WorkspaceServices {
         if (!isTauri()) return Promise.reject(new Error('앱에서 워크스페이스를 열어 주세요.'));
         return invoke(command, args);
       },
+      engineCommands,
       documentDir,
       chooseDirectory: () => open({ directory: true, multiple: false }),
       chooseFile: (extensions) => open({ directory: false, multiple: false, filters: [{ name: '파일', extensions }] }),

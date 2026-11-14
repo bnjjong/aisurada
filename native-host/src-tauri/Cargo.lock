@@ -18,9 +18,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ais-core"
+version = "0.0.1"
+dependencies = [
+ "libyaml-safer",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "aisurada-host"
 version = "0.0.6"
 dependencies = [
+ "ais-core",
  "base64 0.22.1",
  "libc",
  "objc2",
@@ -1751,7 +1763,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -2226,6 +2238,12 @@ checksum = "61ff90caf6077a803a240f62fdbe88645a890bbca49ef8174c3cb0404362171d"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "libyaml-safer"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d325b93a27b93b93b7cf4a57d681c5b6a4d8f910e695db989c055eb1e4f657df"
 
 [[package]]
 name = "linux-raw-sys"

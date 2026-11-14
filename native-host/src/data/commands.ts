@@ -5,10 +5,19 @@ const cells = (fields: Fields) => Object.entries(fields).filter(([, value]) => v
 const command = (name: string, positional: string[] = [], fields: Fields = {}, token?: string) =>
   [name, ...positional, ...cells(fields), ...(token ? [`f1=${token}`] : [])];
 
+/**
+ * 엔진 호출 하나: 명령 이름(snake_case)과 인자 객체. Rust 엔진은 이 객체를 그대로 받고, Java 엔진으로 보낼 때는
+ * `toArgv`로 `key=value` 문자열 목록으로 푼다. 옮겨진 명령부터 이 모양으로 만들고, 나머지는 아직 argv 목록이다.
+ */
+export interface Call { command: string; args?: Fields; }
+/** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
+export const toArgv = (call: Call): string[] => [call.command.replace(/_/g, '-'), ...cells(call.args ?? {})];
+
 export const read = {
-  reindex: () => ['reindex'],
-  templates: () => ['list-templates', 'bodies=true'], trash: () => ['list-trash'],
-  agendas: () => ['list-agendas'], projects: () => ['list-projects'], docs: () => ['list-docs', 'limit=0', 'bodies=true'],
+  reindex: (): Call => ({ command: 'reindex' }),
+  templates: (): Call => ({ command: 'list_templates', args: { bodies: true } }), trash: (): Call => ({ command: 'list_trash' }),
+  agendas: (): Call => ({ command: 'list_agendas' }), projects: (): Call => ({ command: 'list_projects' }),
+  docs: (): Call => ({ command: 'list_docs', args: { limit: 0, bodies: true } }),
   subNotes: (parent: string) => ['list-sub-notes', parent, 'bodies=true'],
   comments: (root: string, sub?: string) => ['list-comments', root, ...(sub ? [sub] : [])],
   doc: (id: string) => ['get-doc', id], subNote: (parent: string, id: string) => ['get-sub-note', parent, id],

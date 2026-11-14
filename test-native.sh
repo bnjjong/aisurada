@@ -32,4 +32,5 @@ pnpm --dir native-host exec node --import tsx --test scripts/notifications-ui.te
 pnpm --dir native-host exec node --import tsx --test scripts/runner-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/approvals-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/part4-ask-run.test.mjs
+pnpm --dir native-host exec node --import tsx --test scripts/engine-route.test.mjs
 cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked
