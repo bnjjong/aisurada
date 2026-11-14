@@ -3,6 +3,7 @@ import { App } from './App';
 import './styles.css';
 import './tasks.css';
 import './runner.css';
+import './approvals.css';
 import './notifications.css';
 import './editor-insert.css';
 import './skin-tactile.css';

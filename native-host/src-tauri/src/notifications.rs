@@ -21,7 +21,7 @@ use std::{
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
-pub const KINDS: [&str; 5] = ["question", "pr", "failed", "done", "test"];
+pub const KINDS: [&str; 6] = ["question", "pr", "failed", "done", "approval", "test"];
 /// 목록에 두는 알림의 수. 넘으면 오래된 것부터 버린다.
 pub const MAX_ITEMS: usize = 200;
 const MAX_TITLE: usize = 120;
@@ -76,6 +76,9 @@ pub struct Events {
     pub failed: Channel,
     #[serde(default = "done_default")]
     pub done: Channel,
+    /// 스킬·에이전트 변경이 승인을 기다릴 때(#53). 승인이 늦으면 AI의 일이 막히니 둘 다 켜 둔다.
+    #[serde(default = "on_both")]
+    pub approval: Channel,
 }
 
 fn on_both() -> Channel {
@@ -106,7 +109,7 @@ pub struct Settings {
 
 impl Default for Events {
     fn default() -> Self {
-        Events { question: on_both(), pr: on_both(), failed: on_both(), done: done_default() }
+        Events { question: on_both(), pr: on_both(), failed: on_both(), done: done_default(), approval: on_both() }
     }
 }
 
@@ -130,6 +133,7 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "pr" => settings.events.pr,
         "failed" => settings.events.failed,
         "done" => settings.events.done,
+        "approval" => settings.events.approval,
         _ => Channel { in_app: true, macos: true },
     };
     Route { toast: settings.in_app && event.in_app, banner: settings.macos && event.macos }
@@ -453,6 +457,7 @@ mod tests {
         assert_eq!(s.events.pr, Channel { in_app: true, macos: true });
         assert_eq!(s.events.failed, Channel { in_app: true, macos: true });
         assert_eq!(s.events.done, Channel { in_app: true, macos: false }, "Done is quiet: in-app only");
+        assert_eq!(s.events.approval, Channel { in_app: true, macos: true }, "a change waiting for approval blocks the AI, so it is loud");
     }
 
     #[test]
@@ -460,6 +465,7 @@ mod tests {
         let mut s = Settings::default();
         assert_eq!(route(&s, "question"), Route { toast: true, banner: true });
         assert_eq!(route(&s, "done"), Route { toast: true, banner: false });
+        assert_eq!(route(&s, "approval"), Route { toast: true, banner: true });
         s.in_app = false;
         assert_eq!(route(&s, "question"), Route { toast: false, banner: true }, "channel off beats event on");
         s.macos = false;
@@ -479,6 +485,7 @@ mod tests {
         assert!(!partial.macos);
         assert_eq!(partial.events.pr, Channel { in_app: false, macos: false });
         assert_eq!(partial.events.done, Channel { in_app: true, macos: false }, "a missing event keeps its own default");
+        assert_eq!(partial.events.approval, Channel { in_app: true, macos: true }, "an older settings file has no approval event: it is on");
         let empty: Settings = serde_json::from_str("{}").unwrap();
         assert_eq!(empty, Settings::default());
         let dir = tempfile::tempdir().unwrap();

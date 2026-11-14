@@ -66,3 +66,4 @@
 .ntf-hint { font-size: 12px; color: var(--muted); }
 .ntf-result { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--soft); font-size: 12px; line-height: 1.6; }
 .ntf-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--err-bg); color: var(--err); font-size: 12px; }
+.ntf-ico-approval { background: var(--warn-bg); color: var(--warn); font-size: 12px; }

@@ -9,7 +9,7 @@ import { formatRelativeTime } from "./dates.ts";
 import { dismissToast, kindLabel, markRead, useNotifications, visibleItems } from "./notificationsStore.ts";
 import type { NotifyItem, NotifyKind } from "./notificationsStore.ts";
 
-const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", test: "i" };
+const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", test: "i" };
 
 /** 알림 종류를 나타내는 동그라미. 색은 종류가 정한다(`notifications.css`의 `.ntf-ico-*`). */
 function KindMark({ kind }: { kind: NotifyKind }) {
@@ -20,9 +20,13 @@ function KindMark({ kind }: { kind: NotifyKind }) {
   );
 }
 
-/** 알림 한 줄에 붙는 단추 이름. 질문은 「답하기」, 그 밖의 태스크 알림은 「태스크 보기」. */
+/** 알림 한 줄에 붙는 단추 이름. 질문은 「답하기」, 승인은 「승인하러 가기」, 그 밖의 태스크 알림은 「태스크 보기」. */
 export const actionLabel = (item: Pick<NotifyItem, "kind" | "taskKey">): string | null =>
-  !item.taskKey ? null : item.kind === "question" ? "답하기" : "태스크 보기";
+  item.kind === "approval" ? "승인하러 가기" : !item.taskKey ? null : item.kind === "question" ? "답하기" : "태스크 보기";
+
+/** 알림을 눌렀을 때 갈 곳. 태스크 알림은 그 태스크, 승인 알림은 스킬·에이전트 페이지다. 갈 곳이 없으면 null이다. */
+export const itemAddress = (item: Pick<NotifyItem, "kind" | "taskKey">): string | null =>
+  item.kind === "approval" ? "/resources" : item.taskKey ? taskAddress(item.taskKey) : null;
 
 export type CenterTab = "unread" | "all";
 
@@ -113,9 +117,10 @@ export function NotificationBell({ controller }: { controller: WorkspaceControll
 
   const openItem = (item: NotifyItem) => {
     void markRead(call, [item.id]);
-    if (item.taskKey) {
+    const address = itemAddress(item);
+    if (address) {
       setOpen(false);
-      controller.navigate(taskAddress(item.taskKey));
+      controller.navigate(address);
     }
   };
 
@@ -195,7 +200,8 @@ export function NotificationToasts({ controller }: { controller: WorkspaceContro
   return <ToastStack toasts={n.toasts.map((t) => t.item)} onDismiss={dismissToast} onOpen={(item) => {
     dismissToast(item.id);
     void markRead(controller.callHost, [item.id]);
-    if (item.taskKey) controller.navigate(taskAddress(item.taskKey));
+    const address = itemAddress(item);
+    if (address) controller.navigate(address);
   }} />;
 }
 

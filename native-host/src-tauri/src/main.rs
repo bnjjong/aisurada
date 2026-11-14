@@ -4,6 +4,7 @@ mod desktop;
 pub mod ask;
 #[cfg(feature = "claude")]
 pub mod agents;
+mod approvals;
 mod environment;
 mod files;
 mod frame;
@@ -142,6 +143,7 @@ fn main() {
             }
             #[cfg(feature = "claude")]
             runner::install(app.handle());
+            approvals::install(app.handle());
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;
             let handle = app.handle().clone();

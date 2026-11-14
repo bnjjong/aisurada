@@ -1,0 +1,55 @@
+/* 승인 대기함(#53): 레일 배지, 스킬·에이전트 페이지의 배너, 대기함 창. 색은 앱의 토큰(styles.css)을 쓴다. */
+.nav-badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: var(--surface); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; vertical-align: 1px; }
+
+.apv-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--warn); border-radius: 12px; background: var(--warn-bg); font-size: 13px; line-height: 1.6; }
+.apv-banner strong { font-weight: 700; }
+.apv-banner button { padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+
+.apv-modal { max-width: 860px; }
+.apv-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+.apv-tabs [role="tab"] { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 13px; }
+.apv-tabs [role="tab"][aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); font-weight: 700; }
+.apv-count { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-size: 11px; font-weight: 700; line-height: 17px; display: inline-block; }
+
+.apv-empty { margin: 24px 0; color: var(--muted); font-size: 13px; text-align: center; }
+.apv-error { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--err-bg); color: var(--err); font-size: 13px; }
+.apv-note { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.apv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.apv-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.apv-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.apv-summary { font-size: 14px; }
+.apv-meta { margin: 4px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.apv-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.apv-chip { padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 18px; }
+.apv-chip.apv-fixed { background: var(--warn-bg); color: var(--warn); }
+.apv-status-approved { background: var(--ok-bg); color: var(--ok); }
+.apv-status-rejected, .apv-status-stale { background: var(--err-bg); color: var(--err); }
+.apv-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.apv-actions button { padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.apv-reject label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.apv-reject textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; resize: vertical; }
+
+.apv-compare { margin: 8px 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--soft); }
+.apv-field { margin: 0 0 12px; }
+.apv-field:last-child { margin-bottom: 0; }
+.apv-field h4 { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+.apv-field ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.apv-oneline { margin: 0; font-size: 13px; line-height: 1.6; word-break: break-word; }
+.apv-compare del { background: var(--err-bg); color: var(--err); text-decoration: line-through; }
+.apv-compare ins { background: var(--ok-bg); color: var(--ok); text-decoration: none; }
+.apv-diff { width: 100%; border-collapse: collapse; table-layout: fixed; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.apv-diff th { padding: 2px 6px; text-align: left; color: var(--muted); font: 600 11px/1.6 inherit; }
+.apv-diff td { padding: 0 6px; vertical-align: top; white-space: pre-wrap; word-break: break-word; border-top: 1px solid transparent; }
+.apv-diff td + td { border-left: 1px solid var(--line); }
+.apv-row-change td:first-child, .apv-row-del td:first-child { background: var(--err-bg); }
+.apv-row-change td:last-child, .apv-row-add td:last-child { background: var(--ok-bg); }
+
+.apv-policy { display: grid; gap: 4px; }
+.apv-policy-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.apv-policy-row span { display: grid; gap: 2px; }
+.apv-policy-row small { color: var(--muted); font-size: 12px; }
+.apv-policy-row select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
+.apv-fixed-note { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--ink); }
+
+@media (max-width: 640px) { .apv-banner { flex-direction: column; align-items: flex-start; } .apv-diff { font-size: 11px; } }

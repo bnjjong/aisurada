@@ -7,6 +7,8 @@ import { ActionMenu } from "./ActionMenu.tsx";
 import { LiveBrandMark } from "./BrandMark.tsx";
 import { Icon } from "./Icon.tsx";
 import { NotificationBell } from "./NotificationCenter.tsx";
+import { badgeText } from "./approvalsClient.ts";
+import { useApprovalCounts } from "./approvalsStore.ts";
 import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute, projectAddress } from "../navigation/routes.ts";
 export function Rail({
@@ -17,6 +19,8 @@ export function Rail({
   state: WorkspaceState;
 }) {
   useSessionBadge();
+  // 승인이 필요한 스킬·에이전트 변경의 수(#53). 스킬·에이전트 메뉴에 배지로 붙는다
+  const approvalBadge = badgeText(useApprovalCounts());
   // 「＋」 하나로 새 프로젝트와 새 아젠다 중 고르게 하는 메뉴.
   const addButton = useRef<HTMLButtonElement>(null);
   const [adding, setAdding] = useState(false);
@@ -178,6 +182,7 @@ export function Rail({
           >
             {label}
             {path === "trash" && !!ws.trash.length && ` ${ws.trash.length}`}
+            {path === "resources" && approvalBadge && <span className="nav-badge" role="img" aria-label={`승인이 필요한 변경 ${approvalBadge}개`}>{approvalBadge}</span>}
           </button>
         ))}
       </nav>

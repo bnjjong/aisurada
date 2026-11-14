@@ -2,6 +2,9 @@
 // 프로젝트는 여기 있는 것을 「참조」해야 쓸 수 있다(프로젝트 페이지에서 켠다). 참조하지 않은 것은 어느 프로젝트도 쓰지 않는다.
 import { useCallback, useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
+import { ApprovalsDialog } from "./ApprovalPanel.tsx";
+import { badgeTotal } from "./approvalsClient.ts";
+import { refreshApprovalCounts, useApprovalCounts } from "./approvalsStore.ts";
 import { Confirm } from "./Modal.tsx";
 import { Page } from "./OtherPages.tsx";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
@@ -19,6 +22,8 @@ export function ResourcesPage({ controller }: { controller: WorkspaceController 
   const [error, setError] = useState("");
   const [form, setForm] = useState<{ kind: ResourceKind; existing?: ResourceRow } | null>(null);
   const [confirm, setConfirm] = useState<ResourceRow | null>(null);
+  const [approvals, setApprovals] = useState(false);
+  const counts = useApprovalCounts();
 
   const reload = useCallback(async () => {
     try {
@@ -27,6 +32,7 @@ export function ResourcesPage({ controller }: { controller: WorkspaceController 
       setSkipped(list.skipped);
       setTrash(gone.filter((t) => t.scope === "global"));
       setError("");
+      void refreshApprovalCounts(call);
     } catch (e) {
       setError(explainError(e));
       setRows((prev) => prev ?? []);
@@ -81,6 +87,7 @@ export function ResourcesPage({ controller }: { controller: WorkspaceController 
             <ResourceItem
               key={r.id}
               row={r}
+              badge={r.approval === "dirty" ? <span className="res-kind apv-chip apv-fixed" title="승인한 뒤에 파일이 직접 고쳐졌어요. 보이는 내용은 승인해 둔 판이에요.">직접 고쳐짐</span> : undefined}
               actions={
                 <>
                   <button type="button" onClick={() => void edit(r)}>
@@ -104,9 +111,22 @@ export function ResourcesPage({ controller }: { controller: WorkspaceController 
         여러 프로젝트가 함께 쓰는 <b>글로벌</b> 스킬과 에이전트예요. 프로젝트가 <b>참조</b>해야 그 프로젝트에서 쓸 수 있고, 참조하지 않은 것은
         어느 프로젝트도 쓰지 않아요. 참조는 프로젝트 페이지에서 켜요. 스킬과 에이전트는 특정 AI 도구에 묶이지 않아요.
       </p>
+      {badgeTotal(counts) > 0 && (
+        <div className="apv-banner" role="status">
+          <span>
+            <strong>승인이 필요한 변경이 {badgeTotal(counts)}건 있어요.</strong> AI가 고친 스킬·에이전트는 사람이 승인해야 적용돼요. 그때까지는 이전 판이 쓰여요.
+          </span>
+          <button type="button" className="button-primary" onClick={() => setApprovals(true)}>
+            승인 대기함 열기
+          </button>
+        </div>
+      )}
       <div className="res-toolbar">
         <button type="button" onClick={() => void reload()}>
           새로고침
+        </button>
+        <button type="button" onClick={() => setApprovals(true)}>
+          승인 대기함{badgeTotal(counts) > 0 ? ` ${badgeTotal(counts)}` : ""}
         </button>
       </div>
       {error && <p role="alert" className="res-error">{error}</p>}
@@ -145,6 +165,14 @@ export function ResourcesPage({ controller }: { controller: WorkspaceController 
             ))}
           </ul>
         </section>
+      )}
+      {approvals && (
+        <ApprovalsDialog
+          call={call}
+          names={Object.fromEntries(globals.map((r) => [r.id, r.name]))}
+          close={() => setApprovals(false)}
+          onChanged={() => void reload()}
+        />
       )}
       {form && (
         <ResourceFormModal

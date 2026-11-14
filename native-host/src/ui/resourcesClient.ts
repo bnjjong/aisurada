@@ -28,6 +28,8 @@ export interface ResourceRow {
   referencedBy?: string[];
   /** 쓸 수 있는 자원 목록에서만: `own`(프로젝트 자원) 또는 `ref`(참조한 글로벌 자원) */
   source?: "own" | "ref";
+  /** 승인한 뒤에 파일이 직접 고쳐졌으면 `dirty`(보이는 내용은 승인해 둔 판이다). 엔진의 승인 기록(#53) */
+  approval?: "dirty";
 }
 
 export interface TrashRow {
@@ -126,6 +128,7 @@ export function toResource(v: unknown): ResourceRow | null {
     precondition: text(v.precondition),
     referencedBy: Array.isArray(v.referencedBy) ? strings(v.referencedBy) : undefined,
     source,
+    approval: v.approval === "dirty" ? "dirty" : undefined,
   };
 }
 

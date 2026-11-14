@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
 
 export type HostCall = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-export type NotifyKind = "question" | "pr" | "failed" | "done" | "test";
+export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "test";
 export type EventKind = Exclude<NotifyKind, "test">;
 
 export interface NotifyItem {
@@ -66,6 +66,7 @@ export const EVENT_KINDS: readonly { id: EventKind; label: string; hint: string 
   { id: "pr", label: "리뷰할 일이 생겼을 때", hint: "분석 보고가 올라왔어요(코드를 고치는 단계부터는 초안 PR도). 읽고 Done으로 보내거나 다시 맡겨요" },
   { id: "failed", label: "실패하거나 막혔을 때", hint: "한도를 넘었거나 에이전트가 멈췄어요" },
   { id: "done", label: "Done으로 바뀌었을 때", hint: "조용히 알려도 돼요" },
+  { id: "approval", label: "스킬·에이전트 변경이 승인을 기다릴 때", hint: "AI가 쓴 변경은 사람이 승인해야 적용돼요. 늦으면 AI의 일이 막혀요" },
 ];
 
 export const DEFAULT_SETTINGS: NotifySettings = {
@@ -76,6 +77,7 @@ export const DEFAULT_SETTINGS: NotifySettings = {
     pr: { inApp: true, macos: true },
     failed: { inApp: true, macos: true },
     done: { inApp: true, macos: false },
+    approval: { inApp: true, macos: true },
   },
 };
 
@@ -87,7 +89,7 @@ export const TOAST_MS = 8000;
 // ---------------------------------------------------------------- 읽기
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const KINDS = new Set<string>(["question", "pr", "failed", "done", "test"]);
+const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "test"]);
 
 /** 호스트 행을 알림으로 읽는다. 모양이 틀리면 null이다. */
 export function toItem(v: unknown): NotifyItem | null {
@@ -121,6 +123,7 @@ export function toSettings(v: unknown): NotifySettings {
       pr: channel(events.pr, d.events.pr),
       failed: channel(events.failed, d.events.failed),
       done: channel(events.done, d.events.done),
+      approval: channel(events.approval, d.events.approval),
     },
   };
 }
@@ -249,7 +252,7 @@ export async function sendTest(call: HostCall): Promise<PushResult | null> {
 // ---------------------------------------------------------------- 표시
 
 export const kindLabel = (k: NotifyKind): string =>
-  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", test: "시험" })[k];
+  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", test: "시험" })[k];
 
 /** 시험 알림의 배너 결과를 사람이 읽을 글로 푼다. */
 export function bannerMessage(banner: string): string {

@@ -6,7 +6,7 @@ import {
   DEFAULT_SETTINGS, EVENT_KINDS, MAX_ITEMS, MAX_TOASTS, applyChanged, bannerMessage, dismissToast, getNotificationsSnapshot, kindLabel, markRead,
   refreshNotifications, resetNotificationsStore, saveSettings, sendTest, toItem, toSettings, visibleItems, withSwitch,
 } from '../src/ui/notificationsStore.ts';
-import { NotificationPanel, ToastStack, actionLabel } from '../src/ui/NotificationCenter.tsx';
+import { NotificationPanel, ToastStack, actionLabel, itemAddress } from '../src/ui/NotificationCenter.tsx';
 import { NotificationSettingsView } from '../src/ui/NotificationSettings.tsx';
 import { Rail } from '../src/ui/Rail.tsx';
 
@@ -172,7 +172,12 @@ test('texts: banner results, kind names, visible items', () => {
   assert.equal(actionLabel({ kind: 'question', taskKey: 'TSK-1' }), '답하기');
   assert.equal(actionLabel({ kind: 'pr', taskKey: 'TSK-1' }), '태스크 보기');
   assert.equal(actionLabel({ kind: 'test', taskKey: null }), null);
-  assert.deepEqual(EVENT_KINDS.map((e) => e.id), ['question', 'pr', 'failed', 'done']);
+  assert.equal(actionLabel({ kind: 'approval', taskKey: null }), '승인하러 가기', 'an approval notice has no task but still has somewhere to go');
+  assert.equal(itemAddress({ kind: 'approval', taskKey: null }), '/resources', 'it leads to the skills and agents page');
+  assert.equal(itemAddress({ kind: 'pr', taskKey: 'TSK-3' }), '/task/TSK-3');
+  assert.equal(itemAddress({ kind: 'test', taskKey: null }), null);
+  assert.equal(kindLabel('approval'), '승인');
+  assert.deepEqual(EVENT_KINDS.map((e) => e.id), ['question', 'pr', 'failed', 'done', 'approval']);
 });
 
 const noop = () => {};
@@ -213,7 +218,7 @@ test('the toast stack shows the title, the task key, and one action with a close
   assert.equal(renderToStaticMarkup(React.createElement(ToastStack, { toasts: [], onDismiss: noop, onOpen: noop })).includes('ntf-toast"'), false);
 });
 
-test('the settings section: three channels, the table of four news, the focus-mode note, and the test button', () => {
+test('the settings section: three channels, the table of five news, the focus-mode note, and the test button', () => {
   const view = (extra = {}) => renderToStaticMarkup(React.createElement(NotificationSettingsView, { settings: DEFAULT_SETTINGS, native: true, banner: '', error: '', onChange: noop, onTest: noop, ...extra }));
   const html = view();
   assert.match(html, /aria-label="앱 안 알림"/);
@@ -222,7 +227,7 @@ test('the settings section: three channels, the table of four news, the focus-mo
   assert.match(html, /준비 중이에요/);
   assert.match(html, /집중 모드에서 aisurada를 허용하지 않으면/);
   for (const e of EVENT_KINDS) assert.match(html, new RegExp(`aria-label="${e.label} · 앱 안"`));
-  assert.equal((html.match(/class="ntf-switch"/g) ?? []).length, 3 + 8, 'three channels and four news in two channels');
+  assert.equal((html.match(/class="ntf-switch"/g) ?? []).length, 3 + 10, 'three channels and five news in two channels');
   assert.doesNotMatch(html, /set-switch/, 'not the class the settings acceptance test counts');
   assert.match(html, /시험 알림 보내기/);
   const doneMacos = /aria-label="Done으로 바뀌었을 때 · macOS"[^>]*>/.exec(html)[0];

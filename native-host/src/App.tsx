@@ -15,7 +15,8 @@ import { BrandMark } from './ui/BrandMark.tsx';
 import type { BrandState } from './ui/BrandMark.tsx';
 import { formatRelativeTime } from './ui/dates.ts';
 import { refreshGithub } from './ui/githubStore.ts';
-import { applyChanged, refreshNotifications } from './ui/notificationsStore.ts';
+import { applyChanged, refreshNotifications, toItem } from './ui/notificationsStore.ts';
+import { refreshApprovalCounts, resetApprovalsStore, startApprovalsWatch } from './ui/approvalsStore.ts';
 import { refreshRunner, runnerChanged } from './ui/runnerStore.ts';
 import { NotificationToasts } from './ui/NotificationCenter.tsx';
 
@@ -74,7 +75,11 @@ function WorkspaceApp() {
     if (!controller.isNative()) return;
     void refreshNotifications(controller.callHost);
     let unlisten: (() => void) | undefined, gone = false;
-    void controller.listenNotifications(event => applyChanged(event, context.kind === 'main'))?.then(fn => { if (gone) fn(); else unlisten = fn; });
+    void controller.listenNotifications(event => {
+      applyChanged(event, context.kind === 'main');
+      // 승인을 기다리는 변경이 알려지면 레일의 배지도 바로 맞춘다(#53)
+      if (toItem(event.pushed)?.kind === 'approval') void refreshApprovalCounts(controller.callEngine);
+    })?.then(fn => { if (gone) fn(); else unlisten = fn; });
     return () => { gone = true; unlisten?.(); };
   }, [controller]);
   // 러너: 처음에 상태를 읽고, 호스트가 알려 주는 사건(집었다, 질문했다, 끝났다)마다 다시 읽는다. 메인 창만 맡는다.
@@ -87,6 +92,13 @@ function WorkspaceApp() {
     void controller.listenRunner(() => { void runnerChanged(controller.callHost); })?.then(fn => { if (gone) fn(); else unlisten = fn; });
     return () => { gone = true; unlisten?.(); };
   }, [controller, vaultPath]);
+  // 승인이 필요한 스킬·에이전트 변경의 수(#53): 처음에 읽고, 창이 눈에 띌 때와 일정한 간격으로 다시 읽는다. 메인 창만 맡는다. 샘플에는 엔진이 없다.
+  const sample = state.workspace?.sample;
+  useEffect(() => {
+    resetApprovalsStore();
+    if (context.kind !== 'main' || !vaultPath || sample) return;
+    return startApprovalsWatch(controller.callEngine, window);
+  }, [controller, vaultPath, sample]);
   if (state.booting) return <main className="status-screen" role="status"><Brand state="thinking" />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;
   if (state.fatal) {
