@@ -3,15 +3,19 @@
 pub mod get_agenda_facts;
 pub mod get_doc;
 pub mod get_sub_note;
+pub mod get_template;
+pub mod history;
 pub mod list_agendas;
 pub mod list_attachments;
 pub mod list_comments;
 pub mod list_docs;
 pub mod list_projects;
 pub mod list_sub_notes;
+pub mod list_tags;
 pub mod list_templates;
 pub mod list_trash;
 pub mod reindex;
+pub mod search_docs;
 mod subnote;
 
 use serde::Deserialize;

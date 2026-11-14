@@ -72,13 +72,13 @@ pub enum MetaError {
     BadEvaluation,
 }
 
-fn get<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
+pub(crate) fn get<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
     map.iter()
         .find(|(k, _)| matches!(k, Value::Str(s) if s == key))
         .map(|(_, v)| v)
 }
 
-fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> {
+pub(crate) fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> {
     match get(map, key) {
         Some(Value::Str(s)) => Some(s),
         _ => None,
@@ -86,7 +86,7 @@ fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> {
 }
 
 /// 세션 에이전트 이름을 다듬습니다. claude이거나 이름 모양이 아니면 `None`(줄이 없으면 claude로 본다).
-fn read_agent(raw: Option<&Value>) -> Option<String> {
+pub(crate) fn read_agent(raw: Option<&Value>) -> Option<String> {
     let Some(Value::Str(agent)) = raw else {
         return None;
     };
@@ -513,7 +513,7 @@ fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);

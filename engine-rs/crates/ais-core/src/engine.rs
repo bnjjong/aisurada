@@ -6,8 +6,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    get_agenda_facts, get_doc, get_sub_note, list_agendas, list_attachments, list_comments,
-    list_docs, list_projects, list_sub_notes, list_templates, list_trash, reindex,
+    get_agenda_facts, get_doc, get_sub_note, get_template, history, list_agendas, list_attachments,
+    list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
+    reindex, search_docs,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -31,6 +32,10 @@ pub const COMMANDS: &[&str] = &[
     "list_comments",
     "list_attachments",
     "get_agenda_facts",
+    "search_docs",
+    "list_tags",
+    "get_template",
+    "history",
 ];
 
 impl Engine {
@@ -104,6 +109,31 @@ impl Engine {
                     &NoteIndex::fresh(&self.vault_root),
                     &request,
                 )?)
+            }
+            "search_docs" => {
+                let request: search_docs::SearchDocsRequest = parse_args(command, args)?;
+                to_json(search_docs::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "list_tags" => {
+                let request: list_tags::ListTagsRequest = parse_args(command, args)?;
+                to_json(list_tags::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "get_template" => {
+                let request: get_template::GetTemplateRequest = parse_args(command, args)?;
+                to_json(get_template::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "history" => {
+                let request: history::HistoryRequest = parse_args(command, args)?;
+                to_json(history::execute(&self.vault_root, &request)?)
             }
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"

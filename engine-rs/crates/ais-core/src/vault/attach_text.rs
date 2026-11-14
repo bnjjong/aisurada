@@ -16,7 +16,7 @@ static SCRIPT_STYLE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)<script[\s\S]*?</script>|<style[\s\S]*?</style>").unwrap());
 static TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").unwrap());
 static APOS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"&#0*39;").unwrap());
-static SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
+static SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[ \t\n\x0B\x0C\r]+").unwrap());
 
 /// 노트의 HTML 첨부 글을 뽑습니다. 파일 하나로 된 노트이거나 HTML 첨부가 없으면 `None`입니다.
 pub fn extract(vault_root: &Path, note: &NoteRecord) -> Option<String> {

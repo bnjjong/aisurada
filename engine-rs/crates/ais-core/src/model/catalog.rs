@@ -143,3 +143,10 @@ pub struct ScanSummary {
     pub conflicts: Vec<Conflict>,
     pub unsharded: Vec<String>,
 }
+
+/// 태그와 쓰인 횟수
+#[derive(Debug, Serialize)]
+pub struct TagRow {
+    pub tag: String,
+    pub count: usize,
+}

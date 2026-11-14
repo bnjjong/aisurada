@@ -81,3 +81,82 @@ pub fn encode_uri_component(s: &str) -> String {
     }
     out
 }
+
+/// 검색에서 공백으로 보는 글자: 엔진의 공백에 U+FEFF(BOM)를 더한 것
+pub fn is_search_whitespace(c: char) -> bool {
+    is_whitespace(c) || c == '\u{FEFF}'
+}
+
+/// 앞뒤의 검색 공백을 뗀다.
+pub fn trim_search(s: &str) -> &str {
+    s.trim_matches(is_search_whitespace)
+}
+
+/// 영문 대소문자를 가리지 않고 `needle`이 처음 나오는 자리(UTF-16 코드 단위 번호)
+pub fn find_region_match(text: &[u16], needle: &[u16]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    if needle.len() > text.len() {
+        return None;
+    }
+    (0..=text.len() - needle.len()).find(|&i| {
+        text[i..i + needle.len()]
+            .iter()
+            .zip(needle)
+            .all(|(a, b)| equals_ignore_case(*a, *b))
+    })
+}
+
+/// Java `String.regionMatches(true, …)`가 글자 하나씩 보는 규칙: 같거나, 대문자가 같거나, 대문자의 소문자가 같다.
+fn equals_ignore_case(a: u16, b: u16) -> bool {
+    a == b || upper(a) == upper(b) || lower(upper(a)) == lower(upper(b))
+}
+
+fn upper(unit: u16) -> u16 {
+    map_single(unit, |c| {
+        c.to_uppercase()
+            .next()
+            .filter(|_| c.to_uppercase().count() == 1)
+    })
+}
+
+fn lower(unit: u16) -> u16 {
+    // Java의 `Character.toLowerCase`(한 글자 규칙)는 İ(U+0130)를 i로 본다. Rust의 전체 규칙은 두 글자(i + 결합 점)라 따로 맞춘다.
+    if unit == 0x0130 {
+        return u16::from(b'i');
+    }
+    map_single(unit, |c| {
+        c.to_lowercase()
+            .next()
+            .filter(|_| c.to_lowercase().count() == 1)
+    })
+}
+
+/// 짝이 있는 서로게이트가 아닌 글자 하나에만 대소문자 변환을 적용한다(한 글자로 바뀔 때만).
+fn map_single(unit: u16, convert: impl Fn(char) -> Option<char>) -> u16 {
+    match char::from_u32(u32::from(unit)).and_then(convert) {
+        Some(c) if (c as u32) <= 0xFFFF => c as u16,
+        _ => unit,
+    }
+}
+
+#[cfg(test)]
+mod ignore_case_tests {
+    use super::*;
+
+    fn utf16(s: &str) -> Vec<u16> {
+        s.encode_utf16().collect()
+    }
+
+    #[test]
+    fn ignores_case_per_code_unit() {
+        let find = |text: &str, needle: &str| find_region_match(&utf16(text), &utf16(needle));
+        assert_eq!(find("Hello World", "WORLD"), Some(6));
+        assert_eq!(find("한글 ABC", "abc"), Some(3));
+        assert_eq!(find("abc", "abcd"), None);
+        assert_eq!(find("abc", ""), Some(0));
+        assert!(equals_ignore_case('ǆ' as u16, 'Ǆ' as u16));
+        assert!(equals_ignore_case('İ' as u16, 'i' as u16));
+    }
+}

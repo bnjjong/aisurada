@@ -4,6 +4,6 @@ mod catalog;
 mod notes;
 mod open;
 
-pub use catalog::{ProjectRow, RepoRow, ScanSummary, TemplateRow, TrashRow};
+pub use catalog::{ProjectRow, RepoRow, ScanSummary, TagRow, TemplateRow, TrashRow};
 pub use notes::{AgendaRow, EvaluationRow, LinkRow, NoteRow, Page};
-pub use open::{AttachmentRow, DocRow, FactsRow, SubNoteRow};
+pub use open::{AttachmentRow, DocRow, FactsRow, SearchRow, SubNoteRow};

@@ -500,6 +500,517 @@ fn walk_subs(
     }
 }
 
+/// `search_docs` 응답 `{query, total, returned, truncated?, hint?, docs}`을 새 목록 모양으로 바꾼다.
+fn legacy_search(vault: &Path, java_response: &Value) -> Value {
+    let items: Vec<Value> = java_response
+        .get("docs")
+        .and_then(Value::as_array)
+        .map(|rows| rows.iter().map(|r| note_row(vault, r)).collect())
+        .unwrap_or_default();
+    json!({
+        "items": items,
+        "total": java_response.get("total").cloned().unwrap_or(json!(0)),
+        "returned": items.len(),
+        "truncated": java_response.get("truncated") == Some(&Value::Bool(true)),
+    })
+}
+
+/// `list_tags`: Java는 상한을 건 뒤의 배열만 주므로, 상한 없이 센 전체 개수를 `total`로 넣는다.
+fn legacy_tags(total: usize) -> impl Fn(&Path, &Value) -> Value {
+    move |_, java_response| {
+        let items = java_response.as_array().cloned().unwrap_or_default();
+        json!({
+            "items": items,
+            "total": total,
+            "returned": items.len(),
+            "truncated": total > items.len(),
+        })
+    }
+}
+
+/// 검색어로 쓸 글에 Java 인자 해석이 건드릴 만한 것(`=`, 맨 앞 `-`)이 없는지
+fn is_safe_argument(text: &str) -> bool {
+    !text.contains('=') && !text.starts_with('-')
+}
+
+/// 검색어 사례: 노트의 제목·아이디·태그·아젠다 이름·본문 낱말에서 뽑고, 모서리 사례를 더한다.
+fn search_queries(rows: &[Value]) -> Vec<String> {
+    let mut queries: Vec<String> = Vec::new();
+    let text = |row: &Value, key: &str| {
+        row.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    for row in rows.iter().take(10) {
+        let title = text(row, "title");
+        let id = text(row, "id");
+        queries.push(title.clone());
+        queries.push(title.to_uppercase());
+        queries.push(title.to_lowercase());
+        if let Some(word) = title.split_whitespace().next() {
+            queries.push(word.to_string());
+        }
+        queries.push(id.clone());
+        queries.push(id.to_uppercase());
+        queries.push(format!("#doc:{id}"));
+        queries.push(format!("#doc:{id}/하위"));
+        queries.push(id.chars().take(8).collect());
+        queries.push(text(row, "agendaTitle"));
+        if let Some(tag) = row
+            .get("tags")
+            .and_then(Value::as_array)
+            .and_then(|t| t.first())
+            .and_then(Value::as_str)
+        {
+            queries.push(tag.to_string());
+        }
+        let body = text(row, "body");
+        let words: Vec<&str> = body.split_whitespace().collect();
+        for at in [3, 17, 41, 97] {
+            if let Some(word) = words.get(at).filter(|w| w.chars().count() >= 2) {
+                queries.push(word.to_string());
+            }
+        }
+    }
+    for edge in [
+        "한글",
+        "  앞뒤 공백  ",
+        "\u{FEFF}회의",
+        "zzzz없음-none",
+        "ß",
+        "İ",
+        "ǆ",
+        "e",
+        "의",
+        // add-search-notes.sh가 더하는 노트용(진짜 vault에서는 결과가 비어도 같아야 한다)
+        "alpha",
+        "ALPHA",
+        "알파",
+        "mixed case",
+        "SEARCH",
+        "검색태그",
+        "mkS1",
+        "mkA",
+        "hidden word",
+        "codeonly",
+        "inlinecode",
+        "alt text",
+        "link label",
+        "mkB",
+        "Heading Text",
+        "quoted words",
+        "item two",
+        "numbered one",
+        "cell1",
+        "bold",
+        "under",
+        "mkC",
+        "needleword",
+        "needlehead",
+        "needleemoji",
+        "tiedword",
+        "회의 안건",
+        "회의",
+        "둘째 &",
+        "첫째 문서",
+        "문서 끝",
+        "htmlword",
+        "scriptword",
+        "jsonword",
+        "검색 HTML",
+    ] {
+        queries.push(edge.to_string());
+    }
+    let mut seen = std::collections::HashSet::new();
+    queries
+        .into_iter()
+        .filter(|q| !q.trim().is_empty() && is_safe_argument(q) && seen.insert(q.clone()))
+        .collect()
+}
+
+fn compare_search(
+    report: &mut Report,
+    java: &Java,
+    engine: &Engine,
+    vault: &Path,
+    rows: &[Value],
+    filter_cases: &[(String, Vec<String>, Value)],
+) {
+    let queries = search_queries(rows);
+    for query in &queries {
+        compare(
+            report,
+            vault,
+            format!("search_docs {}", clip(query)),
+            java.run(vault, &["search-docs".to_string(), query.clone()]),
+            engine.call("search_docs", json!({"query": query})),
+            legacy_search,
+        );
+    }
+    // 같은 검색어를 AI 쪽으로 불러도 기록 층 노트가 빠지는 것까지 같아야 한다(Java 도구 표면은 별도 경로라 여기선 앱 쪽만 맞댄다)
+    let probe = queries.first().cloned().unwrap_or_else(|| "e".to_string());
+    for (label, args, limit) in [
+        ("limit=1", "limit=1", json!(1)),
+        ("limit=2", "limit=2", json!(2)),
+        ("limit=200", "limit=200", json!(200)),
+        ("limit=0", "limit=0", json!(0)),
+        ("limit=201", "limit=201", json!(201)),
+        ("limit=-1", "limit=-1", json!(-1)),
+    ] {
+        for query in [probe.as_str(), "e"] {
+            compare(
+                report,
+                vault,
+                format!("search_docs {label} {}", clip(query)),
+                java.run(
+                    vault,
+                    &[
+                        "search-docs".to_string(),
+                        query.to_string(),
+                        args.to_string(),
+                    ],
+                ),
+                engine.call("search_docs", json!({"query": query, "limit": limit})),
+                legacy_search,
+            );
+        }
+    }
+    for blank in ["", " ", "\t"] {
+        compare(
+            report,
+            vault,
+            format!("search_docs 빈 검색어 {blank:?}"),
+            java.run(vault, &["search-docs".to_string(), blank.to_string()]),
+            engine.call("search_docs", json!({"query": blank})),
+            legacy_search,
+        );
+    }
+    // 조건과 함께
+    let word = probe.split_whitespace().next().unwrap_or("e").to_string();
+    for (label, java_filter, rust_filter) in filter_cases {
+        for query in [word.as_str(), "e"] {
+            let mut java_args = vec!["search-docs".to_string(), query.to_string()];
+            java_args.extend(java_filter.iter().cloned());
+            let mut rust_args = rust_filter.clone();
+            rust_args["query"] = json!(query);
+            compare(
+                report,
+                vault,
+                format!("search_docs {label} {}", clip(query)),
+                java.run(vault, &java_args),
+                engine.call("search_docs", rust_args),
+                legacy_search,
+            );
+        }
+    }
+}
+
+fn compare_tags(report: &mut Report, java: &Java, engine: &Engine, vault: &Path, rows: &[Value]) {
+    let mut tags: Vec<String> = Vec::new();
+    for row in rows {
+        for tag in row
+            .get("tags")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+        {
+            if let Some(tag) = tag.as_str()
+                && is_safe_argument(tag)
+                && !tags.iter().any(|t| t == tag)
+            {
+                tags.push(tag.to_string());
+            }
+        }
+    }
+    // (이름, Java 인자, Rust 인자, 상한 없이 센 Java 인자)
+    let mut cases: Vec<(String, Vec<String>, Value, Vec<String>)> = vec![
+        ("전부".into(), vec![], json!({}), vec![]),
+        (
+            "없는 태그".into(),
+            vec!["query=zzz-none".into()],
+            json!({"query": "zzz-none"}),
+            vec!["query=zzz-none".into()],
+        ),
+        (
+            "빈 query".into(),
+            vec!["query=  ".into()],
+            json!({"query": "  "}),
+            vec![],
+        ),
+    ];
+    for tag in tags.iter().take(3) {
+        let q = tag.to_uppercase();
+        cases.push((
+            format!("query={tag}"),
+            vec![format!("query={q}")],
+            json!({"query": q}),
+            vec![format!("query={q}")],
+        ));
+        let head: String = tag.chars().take(2).collect();
+        cases.push((
+            format!("query(앞)={head}"),
+            vec![format!("query={head}")],
+            json!({"query": head}),
+            vec![format!("query={head}")],
+        ));
+    }
+    for limit in [1, 2, 5] {
+        cases.push((
+            format!("limit={limit}"),
+            vec![format!("limit={limit}")],
+            json!({"limit": limit}),
+            vec![],
+        ));
+    }
+    if let Some(tag) = tags.first() {
+        cases.push((
+            format!("query={tag} limit=1"),
+            vec![format!("query={tag}"), "limit=1".into()],
+            json!({"query": tag, "limit": 1}),
+            vec![format!("query={tag}")],
+        ));
+    }
+    for (label, java_args, rust_args, count_args) in cases {
+        let mut full = vec!["list-tags".to_string()];
+        full.extend(count_args);
+        let total = java
+            .run(vault, &full)
+            .ok()
+            .and_then(|v| v.as_array().map(Vec::len))
+            .unwrap_or(0);
+        let mut args = vec!["list-tags".to_string()];
+        args.extend(java_args);
+        compare(
+            report,
+            vault,
+            format!("list_tags {label}"),
+            java.run(vault, &args),
+            engine.call("list_tags", rust_args),
+            legacy_tags(total),
+        );
+    }
+    for limit in [0, -3] {
+        compare(
+            report,
+            vault,
+            format!("list_tags limit={limit}"),
+            java.run(vault, &["list-tags".to_string(), format!("limit={limit}")]),
+            engine.call("list_tags", json!({"limit": limit})),
+            legacy_tags(0),
+        );
+    }
+}
+
+fn compare_get_template(report: &mut Report, java: &Java, engine: &Engine, vault: &Path) {
+    let ids: Vec<String> = java
+        .run(vault, &["list-templates".to_string()])
+        .ok()
+        .and_then(|v| {
+            legacy_page(vault, &v)
+                .get("items")
+                .and_then(Value::as_array)
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(|r| r.get("id").and_then(Value::as_str).map(str::to_string))
+                        .collect()
+                })
+        })
+        .unwrap_or_default();
+    let mut all = ids;
+    for extra in ["zzz-none", "a b", "../x", "a/b", "", "  "] {
+        all.push(extra.to_string());
+    }
+    for id in all {
+        compare(
+            report,
+            vault,
+            format!("get_template {id:?}"),
+            java.run(vault, &["get-template".to_string(), id.clone()]),
+            engine.call("get_template", json!({"id": id})),
+            |_, v| v.clone(),
+        );
+    }
+}
+
+/// `history`: Java와 응답 모양이 같다. 저장소가 없는 vault에서는 판이 없는 응답과 오류만 맞댄다.
+fn compare_history(
+    report: &mut Report,
+    java: &Java,
+    engine: &Engine,
+    vault: &Path,
+    root_ids: &[String],
+) {
+    let mut ids: Vec<String> = root_ids.to_vec();
+    // 지금은 없는 노트(커밋 꼬리 줄로만 찾는다), 없는 id, 안전하지 않은 id
+    for extra in [
+        "ndfx0040-00000040",
+        "ndfx0041-00000041",
+        "ndzz9999-99999999",
+        "a b",
+        "../x",
+    ] {
+        ids.push(extra.to_string());
+    }
+    let identity = |_: &Path, v: &Value| v.clone();
+    for id in &ids {
+        let base = engine.call("history", json!({"id": id}));
+        compare(
+            report,
+            vault,
+            format!("history {id}"),
+            java.run(vault, &["history".to_string(), id.clone()]),
+            base.clone(),
+            identity,
+        );
+        let commits: Vec<String> = base
+            .as_ref()
+            .ok()
+            .and_then(|v| v.get("versions"))
+            .and_then(Value::as_array)
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|r| r.get("commit").and_then(Value::as_str).map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if commits.is_empty() {
+            continue;
+        }
+        // 번호, 커밋, 글자 찾기(대소문자 무시), 범위를 넘는 번호
+        for number in [1, 2, commits.len(), commits.len() + 1] {
+            compare(
+                report,
+                vault,
+                format!("history {id} 번호={number}"),
+                java.run(
+                    vault,
+                    &["history".to_string(), id.clone(), number.to_string()],
+                ),
+                engine.call("history", json!({"id": id, "number": number})),
+                identity,
+            );
+        }
+        for commit in commits.iter().take(3) {
+            compare(
+                report,
+                vault,
+                format!("history {id} commit={}", &commit[..7]),
+                java.run(
+                    vault,
+                    &[
+                        "history".to_string(),
+                        id.clone(),
+                        format!("commit={commit}"),
+                    ],
+                ),
+                engine.call("history", json!({"id": id, "commit": commit})),
+                identity,
+            );
+        }
+        for query in [
+            "keyword",
+            "한글 검색어",
+            "수정",
+            "zzz-none",
+            "  유령  ",
+            "본문",
+        ] {
+            compare(
+                report,
+                vault,
+                format!("history {id} query={query:?}"),
+                java.run(
+                    vault,
+                    &["history".to_string(), id.clone(), format!("query={query}")],
+                ),
+                engine.call("history", json!({"id": id, "query": query})),
+                identity,
+            );
+        }
+        compare(
+            report,
+            vault,
+            format!("history {id} 번호+글자"),
+            java.run(
+                vault,
+                &[
+                    "history".to_string(),
+                    id.clone(),
+                    "2".to_string(),
+                    "query=수정".to_string(),
+                ],
+            ),
+            engine.call("history", json!({"id": id, "number": 2, "query": "수정"})),
+            identity,
+        );
+    }
+    // 오류 사례(어느 vault에서나)
+    let id = ids
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "ndfx0001-00000001".to_string());
+    let missing_commit = "0".repeat(40);
+    let upper_commit = "A".repeat(40);
+    let cases: Vec<(String, Vec<String>, Value)> = vec![
+        (
+            "번호 0".into(),
+            vec![id.clone(), "0".into()],
+            json!({"id": id, "number": 0}),
+        ),
+        (
+            "번호 -1".into(),
+            vec![id.clone(), "-1".into()],
+            json!({"id": id, "number": -1}),
+        ),
+        (
+            "번호 큼".into(),
+            vec![id.clone(), "99999999999".into()],
+            json!({"id": id, "number": 99_999_999_999_i64}),
+        ),
+        (
+            "짧은 커밋".into(),
+            vec![id.clone(), "commit=abc".into()],
+            json!({"id": id, "commit": "abc"}),
+        ),
+        (
+            "대문자 커밋".into(),
+            vec![id.clone(), format!("commit={upper_commit}")],
+            json!({"id": id, "commit": upper_commit}),
+        ),
+        (
+            "목록에 없는 커밋".into(),
+            vec![id.clone(), format!("commit={missing_commit}")],
+            json!({"id": id, "commit": missing_commit}),
+        ),
+        (
+            "번호와 커밋".into(),
+            vec![id.clone(), "1".into(), format!("commit={missing_commit}")],
+            json!({"id": id, "number": 1, "commit": missing_commit}),
+        ),
+        (
+            "번호 1".into(),
+            vec![id.clone(), "1".into()],
+            json!({"id": id, "number": 1}),
+        ),
+        ("빈 id".into(), vec![String::new()], json!({"id": ""})),
+        ("공백 id".into(), vec!["  ".into()], json!({"id": "  "})),
+        ("id 없음".into(), vec![], json!({})),
+    ];
+    for (label, java_args, rust_args) in cases {
+        let mut args = vec!["history".to_string()];
+        args.extend(java_args);
+        compare(
+            report,
+            vault,
+            format!("history {label}"),
+            java.run(vault, &args),
+            engine.call("history", rust_args),
+            identity,
+        );
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let verbose = args.iter().any(|a| a == "--verbose");
@@ -753,10 +1264,10 @@ fn main() -> ExitCode {
             json!({"date": "2026-13-40"}),
         ));
 
-        for (label, java_filter, rust_filter) in cases {
+        for (label, java_filter, rust_filter) in &cases {
             let mut java_args = vec!["list-docs".to_string(), "limit=0".to_string()];
-            java_args.extend(java_filter);
-            let mut rust_args = rust_filter;
+            java_args.extend(java_filter.iter().cloned());
+            let mut rust_args = rust_filter.clone();
             rust_args["limit"] = json!(0);
             compare(
                 &mut report,
@@ -767,6 +1278,27 @@ fn main() -> ExitCode {
                 legacy_docs,
             );
         }
+
+        // 검색·태그·템플릿 하나 읽기. 검색어는 본문까지 있는 줄에서 뽑는다
+        let rows_with_bodies = java
+            .run(
+                vault,
+                &["list-docs".into(), "limit=0".into(), "bodies=true".into()],
+            )
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default();
+        compare_search(
+            &mut report,
+            &java,
+            &engine,
+            vault,
+            &rows_with_bodies,
+            &cases,
+        );
+        compare_tags(&mut report, &java, &engine, vault, &rows);
+        compare_get_template(&mut report, &java, &engine, vault);
+        compare_history(&mut report, &java, &engine, vault, &root_ids);
 
         println!(
             "{name}: {}건 확인, 어긋남 {}건 (노트 {}건)",

@@ -49,14 +49,32 @@ pub fn read_note_file(path: &Path) -> Result<ParsedNoteFile, UnreadableFile> {
 pub fn parse_note_bytes(bytes: &[u8]) -> Result<ParsedNoteFile, UnreadableFile> {
     let token = compute_token(bytes);
     let content = std::str::from_utf8(bytes).map_err(|_| UnreadableFile)?;
+    let split = split_text(content);
+    Ok(ParsedNoteFile {
+        frontmatter: split.frontmatter,
+        body: split.body,
+        token,
+    })
+}
+
+/// 글을 머리와 본문으로 가른 결과입니다.
+pub struct SplitText {
+    /// 울타리가 있고 머리가 맵으로 읽혔을 때만 있다.
+    pub frontmatter: Option<Vec<(Value, Value)>>,
+    /// 울타리 뒤의 본문. 울타리가 없으면 빈 글이다.
+    pub body: String,
+}
+
+/// 이미 UTF-8 글로 읽은 노트 내용을 머리와 본문으로 가릅니다. 맨 앞 BOM은 떼고 보고,
+/// 머리가 길이 상한(UTF-16 16,000자)을 넘으면 머리를 읽지 않습니다. 파일 크기와 UTF-8 검사는 부르는 쪽 몫입니다.
+pub fn split_text(content: &str) -> SplitText {
     let content = content.strip_prefix('\u{FEFF}').unwrap_or(content);
 
     let Some((yaml, raw_body)) = split_fence(content) else {
-        return Ok(ParsedNoteFile {
+        return SplitText {
             frontmatter: None,
             body: String::new(),
-            token,
-        });
+        };
     };
 
     // 본문 앞 줄바꿈을 정리한다: \r\n 1개를 떼고, 이어서 \n 1개를 뗀다
@@ -64,17 +82,15 @@ pub fn parse_note_bytes(bytes: &[u8]) -> Result<ParsedNoteFile, UnreadableFile> 
     let body = body.strip_prefix('\n').unwrap_or(body).to_string();
 
     if utf16_len(yaml) > MAX_FRONTMATTER_UNITS {
-        return Ok(ParsedNoteFile {
+        return SplitText {
             frontmatter: None,
             body,
-            token,
-        });
+        };
     }
-    Ok(ParsedNoteFile {
+    SplitText {
         frontmatter: frontmatter::parse(yaml),
         body,
-        token,
-    })
+    }
 }
 
 /// 울타리로 머리 YAML과 본문을 가릅니다. 마크다운·JSON 노트는 `---` 울타리, HTML 노트는 `<!--aisurada … -->` 울타리입니다.

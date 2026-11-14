@@ -115,3 +115,15 @@ pub struct FactsRow {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub too_large_to_edit: bool,
 }
+
+/// `search_docs`의 한 줄: 노트 줄(본문 없이)에 어디에서 걸렸는지와, 본문에서 걸렸으면 맥락 글이 붙는다.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRow {
+    #[serde(flatten)]
+    pub note: super::NoteRow,
+    /// `id`, `title`, `meta`, `body` 가운데 하나
+    pub matched_in: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<String>,
+}

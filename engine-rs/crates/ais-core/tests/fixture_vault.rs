@@ -8,6 +8,33 @@ use ais_core::engine::Engine;
 use serde_json::{Value, json};
 
 fn fixture() -> PathBuf {
+    make_fixture(false)
+}
+
+/// 검색 시험용 노트(`add-search-notes.sh`)까지 더한 합성 vault
+fn fixture_with_search_notes() -> PathBuf {
+    make_fixture(true)
+}
+
+/// git 저장소와 노트의 판 이력(`add-git-history.sh`)까지 만든 합성 vault
+fn fixture_with_git_history() -> PathBuf {
+    let dir = make_fixture(false);
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/add-git-history.sh");
+    let output = Command::new("bash")
+        .arg(script)
+        .arg(&dir)
+        .output()
+        .expect("bash를 못 돌렸다");
+    assert!(
+        output.status.success(),
+        "git 이력을 못 만들었다: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    dir
+}
+
+fn make_fixture(with_search_notes: bool) -> PathBuf {
     // 시험이 병렬로 돌아도 폴더가 겹치지 않게 번호를 붙인다
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -24,6 +51,20 @@ fn fixture() -> PathBuf {
         "합성 vault를 못 만들었다: {}",
         String::from_utf8_lossy(&status.stderr)
     );
+    if with_search_notes {
+        let script =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/add-search-notes.sh");
+        let status = Command::new("bash")
+            .arg(script)
+            .arg(&dir)
+            .output()
+            .expect("bash를 못 돌렸다");
+        assert!(
+            status.status.success(),
+            "검색용 노트를 못 더했다: {}",
+            String::from_utf8_lossy(&status.stderr)
+        );
+    }
     dir
 }
 
@@ -475,4 +516,338 @@ fn opens_notes_sub_notes_comments_attachments_and_facts() {
     );
 
     let _ = std::fs::remove_dir_all(&vault);
+}
+
+fn short_ids(page: &Value) -> Vec<String> {
+    ids(page)
+        .iter()
+        .map(|id| id.rsplit('-').next().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn searches_tags_and_templates() {
+    let vault = fixture_with_search_notes();
+    let engine = Engine::new(&vault);
+    let search = |args: Value| engine.call("search_docs", args).unwrap();
+
+    // 순위: 제목(만든 시각이 늦은 것 먼저) → 메타(태그) → 본문. AI에게는 기록 층 노트가 안 보인다
+    let alpha = search(json!({"query": "alpha"}));
+    assert_eq!(
+        short_ids(&alpha),
+        ["000000a4", "000000a1", "000000a2", "000000a3"]
+    );
+    let matched: Vec<&str> = alpha["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["matchedIn"].as_str().unwrap())
+        .collect();
+    assert_eq!(matched, ["title", "title", "meta", "body"]);
+    assert!(
+        alpha["items"][0].get("body").is_none(),
+        "검색 줄에는 본문이 없다"
+    );
+    let ai = search(json!({"query": "alpha", "caller": "ai"}));
+    assert_eq!(short_ids(&ai), ["000000a1", "000000a2", "000000a3"]);
+    assert_eq!(ai["total"], 3);
+
+    // 아이디로 찾기: `#doc:` 머리와 `/` 뒤는 떼고 대소문자를 가리지 않는다
+    let by_id = search(json!({"query": " #DOC:ndsr0003-000000a3/아무거나 "}));
+    assert_eq!(short_ids(&by_id), ["000000a3"]);
+    assert_eq!(by_id["items"][0]["matchedIn"], "id");
+    assert!(by_id["items"][0].get("snippet").is_none());
+
+    // 영문 대소문자, 서식 제거, 맥락 글
+    assert_eq!(search(json!({"query": "MIXED case"}))["total"], 1);
+    assert_eq!(
+        search(json!({"query": "scriptword"}))["total"],
+        0,
+        "스크립트는 본문이 아니다"
+    );
+    assert_eq!(
+        search(json!({"query": "jsonword"}))["total"],
+        0,
+        "JSON 노트는 본문을 찾지 않는다"
+    );
+    let markup = search(json!({"query": "mkB"}));
+    assert!(markup["items"][0]["snippet"].as_str().unwrap().starts_with(
+        "mkB Heading Text quoted words item one item two numbered one col a col b cell1"
+    ));
+    let middle = search(json!({"query": "needleword"}));
+    let snippet = middle["items"][0]["snippet"].as_str().unwrap();
+    assert!(
+        snippet.starts_with('…') && snippet.ends_with('…'),
+        "{snippet}"
+    );
+    let head = search(json!({"query": "needlehead"}));
+    assert!(
+        !head["items"][0]["snippet"]
+            .as_str()
+            .unwrap()
+            .starts_with('…')
+    );
+    // 앞뒤 공백과 BOM은 검색어에서 떼고, 본문에 낀 BOM은 맥락 글에서 떼지 않는다
+    assert_eq!(
+        short_ids(&search(json!({"query": "\u{FEFF} 회의록 \u{FEFF}"}))),
+        ["000000ae"]
+    );
+
+    // 같은 만든 시각이면 표기가 늦은 것, 표기도 같으면 id가 큰 것이 먼저
+    assert_eq!(
+        short_ids(&search(json!({"query": "tiedword"}))),
+        ["000000b2", "000000b1", "000000ab", "000000ac", "000000ad"]
+    );
+
+    // 건수와 오류
+    let limited = search(json!({"query": "tiedword", "limit": 2}));
+    assert_eq!(
+        (
+            limited["total"].as_u64(),
+            limited["returned"].as_u64(),
+            limited["truncated"].as_bool()
+        ),
+        (Some(5), Some(2), Some(true))
+    );
+    for bad in [0, 201, -1] {
+        let err = engine
+            .call("search_docs", json!({"query": "e", "limit": bad}))
+            .unwrap_err();
+        assert_eq!(
+            (err.code, err.message.as_str()),
+            (
+                "AIS-400",
+                format!("받을 건수가 범위를 벗어났다: {bad}").as_str()
+            )
+        );
+    }
+    for blank in ["", "  ", "\t"] {
+        let err = engine
+            .call("search_docs", json!({"query": blank}))
+            .unwrap_err();
+        assert!(
+            err.message.starts_with("검색어가 필요하다: search-docs"),
+            "{}",
+            err.message
+        );
+    }
+    let by_agenda = search(json!({"query": "tiedword", "agenda": "work"}));
+    assert_eq!(by_agenda["total"], 0);
+
+    // 태그: 많이 쓰인 것부터, 같으면 바이트 차례. 기록 층 노트의 태그는 세지 않는다. Beta와 beta는 다른 태그
+    let tags = engine.call("list_tags", json!({})).unwrap();
+    assert_eq!(tags["items"][0], json!({"tag": "공통", "count": 3}));
+    assert_eq!(tags["items"][1], json!({"tag": "Beta", "count": 2}));
+    let names: Vec<&str> = tags["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["tag"].as_str().unwrap())
+        .collect();
+    assert!(
+        !names.contains(&"기록") && !names.contains(&"alpha"),
+        "{names:?}"
+    );
+    let beta = engine
+        .call("list_tags", json!({"query": " BETA "}))
+        .unwrap();
+    assert_eq!(
+        beta["items"],
+        json!([{"tag": "Beta", "count": 2}, {"tag": "beta", "count": 1}])
+    );
+    let one = engine
+        .call("list_tags", json!({"query": "beta", "limit": 1}))
+        .unwrap();
+    assert_eq!(
+        (
+            one["total"].as_u64(),
+            one["returned"].as_u64(),
+            one["truncated"].as_bool()
+        ),
+        (Some(2), Some(1), Some(true))
+    );
+    let err = engine.call("list_tags", json!({"limit": 0})).unwrap_err();
+    assert_eq!(
+        (err.code, err.message.as_str()),
+        ("AIS-400", "태그 개수 상한은 1 이상이다: 0")
+    );
+
+    // 템플릿 하나: 본문까지. 모양이 틀리면 400, 없으면 404
+    let template = engine
+        .call("get_template", json!({"id": "plan-basic"}))
+        .unwrap();
+    assert_eq!(
+        (template["name"].as_str(), template["body"].as_str()),
+        (Some("기본 계획"), Some("# 계획\n\n내용\n"))
+    );
+    for (id, code) in [
+        ("a b", "AIS-400"),
+        ("../x", "AIS-400"),
+        ("zzz-none", "AIS-404"),
+        ("", "AIS-400"),
+    ] {
+        let err = engine.call("get_template", json!({"id": id})).unwrap_err();
+        assert_eq!(err.code, code, "{id:?}: {}", err.message);
+    }
+}
+
+#[test]
+fn lists_note_versions_from_git() {
+    let vault = fixture_with_git_history();
+    let engine = Engine::new(&vault);
+    let history = |args: Value| engine.call("history", args);
+    let parent = "ndfx0002-00000002";
+
+    // 판: 시각 내림차순. 11-02의 고침은 같은 내용의 스냅숏에 접히고, main이 아닌 가지의 커밋은 빠진다
+    let all = history(json!({"id": parent})).unwrap();
+    assert_eq!(all["count"], 6);
+    let rows = all["versions"].as_array().unwrap();
+    let sources: Vec<&str> = rows.iter().map(|r| r["source"].as_str().unwrap()).collect();
+    assert_eq!(
+        sources,
+        ["auto", "auto", "snapshot", "manual", "snapshot", "auto"]
+    );
+    assert_eq!(rows[0]["takenAt"], "2026-11-04T09:00:00+09:00");
+    assert_eq!(rows[0]["index"], 1);
+    assert_eq!(rows[2]["path"], "note.md", "스냅숏은 파일 이름만 가진다");
+    assert_eq!(rows[0]["path"], "notes/demo/2026-11/parent/note.md");
+    assert!(rows.iter().all(|r| r["bytes"].as_i64().unwrap() > 0));
+    // 편집 정보는 그 판의 머리에서: 사람이 고친 판, 공백뿐인 편집자, 세션이 딸린 판(에이전트 이름은 소문자로)
+    assert_eq!(rows[3]["editedBy"], "user");
+    assert!(rows[3].get("editedSessionId").is_none());
+    assert!(
+        rows[1].get("editedBy").is_none(),
+        "공백뿐인 editedBy는 없는 것"
+    );
+    assert_eq!(
+        (
+            rows[4]["editedBy"].as_str(),
+            rows[4]["editedSessionId"].as_str(),
+            rows[4]["editedSessionAgent"].as_str()
+        ),
+        (Some("tool"), Some("sess-1111"), Some("codex"))
+    );
+    assert!(all.get("body").is_none() && all.get("matches").is_none());
+
+    // 번호로 고른 판: 파일 전체 글과 머리를 뗀 본문
+    let second_from_last = history(json!({"id": parent, "number": 4})).unwrap();
+    assert!(
+        second_from_last["body"]
+            .as_str()
+            .unwrap()
+            .starts_with("---\nid: ndfx0002-00000002")
+    );
+    assert!(
+        second_from_last["noteBody"]
+            .as_str()
+            .unwrap()
+            .contains("수정 둘 한글 검색어")
+    );
+    assert!(
+        !second_from_last["noteBody"]
+            .as_str()
+            .unwrap()
+            .contains("editedBy")
+    );
+    // 같은 판을 커밋으로도 고른다
+    let commit = rows[3]["commit"].as_str().unwrap();
+    let by_commit = history(json!({"id": parent, "commit": commit})).unwrap();
+    assert_eq!(by_commit["noteBody"], second_from_last["noteBody"]);
+
+    // 글자 찾기: 본문에서(머리는 빼고) 영문 대소문자를 가리지 않고
+    let keyword = history(json!({"id": parent, "query": " KEYWORD "})).unwrap();
+    assert_eq!(keyword["matches"], json!([rows[4]["commit"]]));
+    assert_eq!(
+        history(json!({"id": parent, "query": "한글 검색어"})).unwrap()["matches"],
+        json!([rows[3]["commit"]])
+    );
+    assert_eq!(
+        history(json!({"id": parent, "query": "editedBy"})).unwrap()["matches"],
+        json!([]),
+        "머리는 찾지 않는다"
+    );
+
+    // 모든 필드 노트: 수정 한 번과 되돌림(되돌린 판은 처음 판과 내용이 같아도 사이에 다른 판이 있어 접히지 않는다)
+    assert_eq!(
+        history(json!({"id": "ndfx0001-00000001"})).unwrap()["count"],
+        3
+    );
+    // 폴더 이름이 바뀌었다 돌아온 노트: 내용이 같아 하나로 접힌다
+    let moved = history(json!({"id": "ndfx0003-00000003"})).unwrap();
+    assert_eq!(
+        (
+            moved["count"].as_u64(),
+            moved["versions"][0]["path"].as_str()
+        ),
+        (Some(1), Some("notes/demo/loose/note.md"))
+    );
+    // 지금은 없는 노트는 커밋 메시지 꼬리 줄로 찾는다. 한 커밋이 두 노트를 더했어도 id가 든 파일을 고른다
+    let ghost = history(json!({"id": "ndfx0040-00000040"})).unwrap();
+    assert_eq!(
+        (
+            ghost["count"].as_u64(),
+            ghost["versions"][0]["path"].as_str()
+        ),
+        (Some(1), Some("notes/demo/ghost/note.md"))
+    );
+    let ghost2 = history(json!({"id": "ndfx0041-00000041"})).unwrap();
+    assert_eq!(ghost2["versions"][0]["path"], "notes/demo/ghost2/note.md");
+    assert_eq!(
+        ghost["versions"][0]["commit"],
+        ghost2["versions"][0]["commit"]
+    );
+    // 없거나 안전하지 않은 id는 판이 없다
+    for id in ["ndzz9999-99999999", "a b", "../x"] {
+        assert_eq!(history(json!({"id": id})).unwrap()["count"], 0, "{id}");
+    }
+
+    // 오류
+    let err = |args: Value| history(args).unwrap_err();
+    let out_of_range = err(json!({"id": parent, "number": 7}));
+    assert_eq!(
+        (out_of_range.code, out_of_range.message.as_str()),
+        ("AIS-409", "판 번호가 범위 밖이다(1 부터 6 까지 있다): 7")
+    );
+    assert_eq!(
+        err(json!({"id": parent, "number": 0})).message,
+        "판 번호는 1 이상의 정수여야 한다: 0"
+    );
+    assert_eq!(
+        err(json!({"id": parent, "commit": "ABC"})).message,
+        "커밋은 40 자리 16 진수여야 한다: ABC"
+    );
+    assert!(
+        err(json!({"id": parent, "commit": "0".repeat(40)}))
+            .message
+            .starts_with("그 커밋은 이 노트의 판 목록에 없다")
+    );
+    assert_eq!(
+        err(json!({"id": parent, "number": 1, "commit": commit})).message,
+        "판 번호와 커밋을 함께 줄 수 없다. 하나만 준다"
+    );
+    assert!(
+        err(json!({"id": "  "}))
+            .message
+            .starts_with("인자가 하나 필요하다: history")
+    );
+    assert_eq!(
+        err(json!({"id": "ndzz9999-99999999", "number": 1})).message,
+        "그 노트에는 판이 아직 없다: ndzz9999-99999999"
+    );
+}
+
+#[test]
+fn a_vault_without_git_has_no_versions() {
+    let vault = fixture();
+    let engine = Engine::new(&vault);
+    let none = engine
+        .call("history", json!({"id": "ndfx0002-00000002"}))
+        .unwrap();
+    assert_eq!(
+        (
+            none["count"].as_u64(),
+            none["versions"].as_array().map(Vec::len)
+        ),
+        (Some(0), Some(0))
+    );
 }

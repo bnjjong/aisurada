@@ -49,6 +49,15 @@ impl EngineError {
         }
     }
 
+    /// 지금 상태와 부딪힘(`AIS-409`)
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self {
+            code: "AIS-409",
+            kind: ErrorKind::Conflict,
+            message: message.into(),
+        }
+    }
+
     /// 이 엔진에 없는 명령(`AIS-409`)
     pub fn unsupported(message: impl Into<String>) -> Self {
         Self {
