@@ -10,8 +10,10 @@ import { NoteScrollMemory } from '../navigation/scroll.ts';
 import { activeTab, agendaAddress, docAddress, fileAddress, parseRoute, tabAddress } from '../navigation/routes.ts';
 import { connectLinkSource, latestInput } from '../interaction/links.ts';
 import type { AppLink } from '../interaction/links.ts';
-import { shortcutFor } from '../interaction/shortcuts.ts';
+import { shortcutFor, zoomShortcutFor } from '../interaction/shortcuts.ts';
 import type { KeyInput } from '../interaction/shortcuts.ts';
+import { readTypography, stepScale } from './typography.ts';
+import type { Typography } from './typography.ts';
 import type { RecentWorkspace, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
@@ -69,7 +71,7 @@ export class WorkspaceController {
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
       prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
-      theme: readTheme(services.storage), skin: readSkin(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
+      theme: readTheme(services.storage), skin: readSkin(services.storage), typography: readTypography(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
 
   getSnapshot = () => this.state;
@@ -148,11 +150,30 @@ export class WorkspaceController {
   };
   closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
   reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
-  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), typography: this.typographyNow(), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
+  // 글꼴과 배율은 설정에서 저장소에 쓰고, 모든 창이 저장소를 읽어 따른다. 단 노트 창에서 단축키로 바꾼 배율은
+  // 설정을 공유 저장소에 쓰지 않는 규칙(15.14) 때문에 그 창에만 남는다. 그 창은 다시 저장소를 읽어도 자기 배율을 지킨다.
+  private localScale?: number;
+  private typographyNow = (): Typography => {
+    const saved = readTypography(this.services.storage);
+    return this.localScale === undefined ? saved : { ...saved, scale: this.localScale };
+  };
+  /** 화면 배율을 한 단계 키우거나(1) 줄이거나(-1) 기본(0)으로 돌린다. 메인 창은 저장하고, 노트 창은 그 창에만 적용한다. */
+  zoomBy = (direction: 1 | -1 | 0) => {
+    const next = stepScale(this.state.typography.scale, direction);
+    if (next === this.state.typography.scale) return;
+    if (this.context.kind === 'main') { this.preference({ uiScale: next }); return; }
+    this.localScale = next;
+    this.patch({ typography: this.typographyNow() });
+  };
+  /** 이 창의 웹뷰를 [scale]%로 맞춘다. 웹뷰 확대가 없는 환경에서는 아무 일도 하지 않는다. */
+  applyScale = (scale: number) => {
+    void this.services.setZoom?.(scale / 100).catch(error => this.services.warn('화면 배율을 바꾸지 못했어요', error));
+  };
   // 15.14 (5), C153: a setting changed in a note window lives only in that window. It
   // is applied to this window's memory and is never written to the shared store.
   private windowPrefs?: StoragePort;
-  preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark'; skin?: Skin }) => {
+  preference = (update: Partial<Preferences> & { theme?: 'light' | 'dark'; skin?: Skin; uiScale?: number; uiFont?: string; terminalFont?: string }) => {
     if (this.context.kind !== 'main') {
       if (!this.windowPrefs) {
         const values = new Map<string, string>(), saved = this.services.storage.getItem(KEYS.prefs);
@@ -320,6 +341,9 @@ export class WorkspaceController {
       else return false;
       event.preventDefault(); return true;
     }
+    // 화면 배율은 어느 화면에서나 쓴다(시작 화면, 설정 위에서도).
+    const zoom = zoomShortcutFor(event);
+    if (zoom !== null) { event.preventDefault(); this.zoomBy(zoom); return true; }
     if (!this.showingTabs()) return false;
     const shortcut = shortcutFor(event, this.services.mac ?? true, this.services.native ?? false);
     if (!shortcut) return false;

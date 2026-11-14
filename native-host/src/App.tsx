@@ -3,6 +3,7 @@ import type { ErrorInfo, FormEvent, ReactNode } from 'react';
 import { WorkspaceController } from './workspace/controller.ts';
 import { workspaceServices } from './workspace/platform.ts';
 import { windowContext } from './workspace/types.ts';
+import { applyTypographyVars, TYPOGRAPHY_EVENT } from './workspace/typography.ts';
 import type { WorkspaceState } from './workspace/types.ts';
 import { WorkspaceShell } from './navigation/WorkspaceShell.tsx';
 import { NoteScreen } from './navigation/NoteReading.tsx';
@@ -68,6 +69,13 @@ function WorkspaceApp() {
   }, [controller]);
   useEffect(() => { document.documentElement.dataset.theme = state.theme; }, [state.theme]);
   useEffect(() => { document.documentElement.dataset.skin = state.skin; }, [state.skin]);
+  // 글꼴은 CSS 변수로 걸고, 열려 있는 터미널에는 이벤트로 알린다. 화면 배율은 웹뷰 확대로 맞춘다.
+  const { uiFont, terminalFont, scale } = state.typography;
+  useEffect(() => {
+    applyTypographyVars(document.documentElement, { scale, uiFont, terminalFont });
+    window.dispatchEvent(new Event(TYPOGRAPHY_EVENT));
+  }, [uiFont, terminalFont, scale]);
+  useEffect(() => { controller.applyScale(scale); }, [controller, scale]);
   // 아젠다의 저장소 폴더(GitHub 전용 항목은 앱이 받는 자리)를 풀려면 연결 상태가 필요하다. 호스트가 있을 때만 묻는다.
   useEffect(() => { if (controller.isNative()) void refreshGithub(controller.callHost); }, [controller]);
   // 알림: 처음에 목록과 설정을 읽고, 호스트가 알려 주는 사건을 받는다. 토스트는 메인 창만 띄운다(노트 창은 목록만 따라간다).

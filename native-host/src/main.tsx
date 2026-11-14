@@ -12,9 +12,12 @@ import './skin-glass.css';
 import './skin-modern.css';
 import './rail-night.css';
 import { readSkin } from './workspace/storage.ts';
+import { applyTypographyVars, readTypography } from './workspace/typography.ts';
 
 // 첫 화면부터 고른 모양으로 그린다. 저장소를 못 읽으면 기본 모양을 쓴다.
 try { document.documentElement.dataset.skin = readSkin(window.localStorage); } catch { document.documentElement.dataset.skin = 'tactile'; }
+// 고른 글꼴도 첫 화면부터 쓴다(기본 글꼴로 먼저 그렸다가 바뀌는 깜빡임을 줄인다). 화면 배율은 앱이 열린 뒤에 맞춘다.
+try { applyTypographyVars(document.documentElement, readTypography(window.localStorage)); } catch { /* 저장소를 못 읽으면 기본 글꼴 */ }
 
 // Suppress benign WebKit ResizeObserver loop notifications from registering as unhandled errors
 const isResizeObserverError = (msg: unknown) =>

@@ -67,6 +67,8 @@ export interface WorkspaceServices {
   deepLinks?: import('../interaction/links.ts').DeepLinkSource;
   developmentLinks?(received: (urls: string[]) => void): () => void;
   closeWindow?(): Promise<void>;
+  /** 이 창의 웹뷰를 [factor]배(1이 100%)로 확대·축소한다. 앱이 아닌 환경(시험, 브라우저)에서는 정의하지 않는다. */
+  setZoom?(factor: number): Promise<void>;
   closeRequested?(handler: () => void): Promise<() => void>;
   /** The note window's logical size and position, each time it is moved or resized. */
   noteGeometryChanged?(changed: (geometry: { width: number; height: number; x: number; y: number }) => void): Promise<() => void>;
@@ -129,6 +131,8 @@ export interface WorkspaceState {
   theme: 'light' | 'dark' | 'system';
   /** 화면 모양. 밝기(theme)와는 따로 고른다. */
   skin: Skin;
+  /** 설정의 글꼴과 화면 배율. 앱 글꼴·터미널 글꼴은 CSS 변수로, 배율은 웹뷰 확대로 적용한다. */
+  typography: import('./typography.ts').Typography;
   tabs: TabsSnapshot;
   noteWindows: string[];
   searchOpen: boolean;

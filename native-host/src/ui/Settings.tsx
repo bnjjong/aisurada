@@ -4,6 +4,7 @@ import { ClaudeConnect } from "@claude-plug/connect";
 import { CLAUDE_ENABLED } from "@claude-plug/state";
 import { GithubConnect } from "./GithubConnect.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
+import { TypographySettings } from "./TypographySettings.tsx";
 import { Modal } from "./Modal.tsx";
 import { displayTitle } from "./model.ts";
 /** 설정에서 고를 수 있는 화면 모양. 순서가 곧 화면에 나오는 순서다. */
@@ -73,6 +74,7 @@ export function Settings({
         ))}
         </div>
       </fieldset>
+      <TypographySettings controller={controller} typography={state.typography} />
       {(
         [
           [

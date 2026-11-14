@@ -1,6 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { documentDir } from '@tauri-apps/api/path';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
@@ -72,6 +73,7 @@ export function workspaceServices(): WorkspaceServices {
         .then(([moved, resized]) => () => { moved(); resized(); });
     },
     closeWindow: () => getCurrentWindow().close(),
+    ...(isTauri() ? { setZoom: (factor: number) => getCurrentWebview().setZoom(factor) } : {}),
     closeRequested: isTauri()
       ? handler => getCurrentWindow().onCloseRequested(event => { event.preventDefault(); handler(); })
       : () => Promise.resolve(() => {}),

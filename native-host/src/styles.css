@@ -4,7 +4,10 @@
 @font-face { font-family: 'D2Coding'; font-weight: 400; font-style: normal; font-display: swap; src: url('./assets/fonts/D2Coding-Regular.woff2') format('woff2'); }
 @font-face { font-family: 'D2Coding'; font-weight: 700; font-style: normal; font-display: swap; src: url('./assets/fonts/D2Coding-Bold.woff2') format('woff2'); }
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  /* 설정의 「앱 글꼴」은 --font-ui를 <html>에 덧씌운다("고른 글꼴", var(--font-ui-base)). 비워 두면 기본 목록이다. */
+  --font-ui-base: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-ui: var(--font-ui-base);
+  font-family: var(--font-ui);
   --ink: #26352e;
   --muted: #7a847e;
   --surface: #fdfdfa;
@@ -21,6 +24,8 @@
   --info: #1976d2;
   --info-bg: #e3f2fd;
   --font-mono: 'D2Coding', ui-monospace, Menlo, monospace;
+  /* 터미널이 읽는 글꼴 목록. 설정의 「터미널 글꼴」은 이 변수를 ("고른 글꼴", var(--font-mono))로 덧씌운다. */
+  --font-terminal: var(--font-mono);
   /* [B13] 터미널 및 모달 호환용 공용 테마 변수 별칭 */
   --bg-primary: var(--surface);
   --bg-secondary: var(--soft);
@@ -1500,6 +1505,23 @@ code.is-symbol { font-weight: 700; }
 .set-skin-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
 .set-skin-text strong { display: block; font-size: 14px; font-weight: 600; }
 .set-skin-text small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+/* 설정의 「글꼴과 크기」: 화면 배율 단추 줄과 글꼴 입력 두 줄. 단추는 일반 button이라 스킨의 단추 모양을 따르고, 고른 단추만 :root:root로 색을 덮는다. */
+.set-typo { margin: 24px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.set-typo legend { padding: 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
+.typo-row { display: grid; gap: 8px; margin: 0 0 20px; }
+.typo-row:last-child { margin-bottom: 0; }
+.typo-row > strong { font-size: 13px; font-weight: 600; }
+.typo-row > small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.typo-scale { display: flex; flex-wrap: wrap; gap: 6px; }
+.typo-scale button { min-width: 56px; padding: 7px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+:root:root .typo-scale button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.typo-field { display: flex; gap: 8px; align-items: center; }
+.typo-field input { flex: 1; min-width: 0; padding: 9px 11px; font-size: 13px; }
+.typo-field button { flex: none; padding: 8px 12px; font-size: 12px; }
+.typo-problem { margin: 0; color: var(--err); font-size: 12px; }
+.typo-preview { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.typo-preview-label { color: var(--muted); font-family: var(--font-ui); font-size: 11px; margin-right: 8px; }
+.typo-preview-mono { font-size: 12px; }
 /* 미리보기 그림은 격자·지면의 「모든 요소 반경·그림자 덮기」 규칙에도 흔들리지 않도록 반경과 그림자에만 !important를 쓴다. */
 .skin-preview { display: flex; align-items: center; gap: 10px; height: 68px; padding: 0 14px; border-radius: 8px !important; overflow: hidden; }
 .skin-preview i { display: block; width: 52px; height: 24px; flex: none; }

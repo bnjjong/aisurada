@@ -11,6 +11,7 @@ import { extractLogicalLines } from './logicalLines.ts';
 import { readLogicalLines, selectionToLines } from './terminalBuffer.ts';
 import { PinScrollbackModal } from './PinScrollbackModal.tsx';
 import type { Agenda } from '../../workspace/types.ts';
+import { TYPOGRAPHY_EVENT } from '../../workspace/typography.ts';
 import { planSessionShell } from '@claude-plug/terminal';
 
 interface TerminalHostProps {
@@ -21,11 +22,12 @@ interface TerminalHostProps {
   onNavigate: (path: string) => void;
 }
 
-// 14.8: the CSS token --font-mono is the font list, read here because the terminal library
-// does not read CSS. D2Coding goes first: macOS's monospace fonts have no Hangul.
+// 14.8: the CSS token --font-terminal is the font list, read here because the terminal library
+// does not read CSS. It is --font-mono unless the user chose a terminal font in the settings, and
+// the chosen font is followed by --font-mono, so D2Coding still covers Hangul: macOS's monospace fonts have none.
 const FALLBACK_FONTS = "'D2Coding', ui-monospace, Menlo, monospace";
 const terminalFontFamily = () => {
-  try { return getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || FALLBACK_FONTS; }
+  try { return getComputedStyle(document.documentElement).getPropertyValue('--font-terminal').trim() || FALLBACK_FONTS; }
   catch { return FALLBACK_FONTS; }
 };
 // 14.3 (2): the normal and the bold weight are loaded at 12px, and 2,000ms is the longest it waits.
@@ -121,6 +123,23 @@ export function TerminalHost({ tabKey, isVisible, agendas, onCreateDoc, onNaviga
       termRef.current?.dispose(); termRef.current = null; fitRef.current = null;
     };
   }, [tabKey]);
+
+  // 설정에서 터미널 글꼴을 바꾸면 열려 있는 터미널도 새 글꼴로 다시 그린다. 글꼴 파일이 준비된 뒤에 바꾸고 칸 수를 다시 잰다.
+  useEffect(() => {
+    const changed = () => {
+      const term = termRef.current;
+      if (!term) return;
+      const family = terminalFontFamily();
+      if (family === term.options.fontFamily) return;
+      void loadFonts(family).then(() => {
+        if (!alive.current || termRef.current !== term) return;
+        term.options.fontFamily = family;
+        if (visibleRef.current) fitRef.current?.fit();
+      });
+    };
+    window.addEventListener(TYPOGRAPHY_EVENT, changed);
+    return () => window.removeEventListener(TYPOGRAPHY_EVENT, changed);
+  }, []);
 
   // 14.5: the size is measured when the cell is shown again and while it is shown and its size
   // changes (window size, rail width). Not while hidden: a hidden box has no cell size.
