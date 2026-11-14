@@ -279,7 +279,7 @@ public final class VaultGitTest {
         java.util.concurrent.CountDownLatch locked = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
         Thread writer = new Thread(() -> {
-            ReentrantLock writeLock = WritePipeline.tryAcquireWriteLock(v);
+            WritePipeline.WriteLock writeLock = WritePipeline.tryAcquireWriteLock(v);
             check(writeLock != null, "writer thread acquired write lock");
             locked.countDown();
             try {

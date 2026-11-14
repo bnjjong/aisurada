@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+# 쓰기 잠금 파일(vault 밖)이 실제 홈에 쌓이지 않게 시험 동안 폴더를 따로 쓴다. 자식 프로세스도 환경 변수로 물려받는다.
+export AISURADA_LOCK_DIR="$(mktemp -d)"
+trap 'rm -rf "$AISURADA_LOCK_DIR"' EXIT
 ./build.sh
 JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"

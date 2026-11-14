@@ -89,7 +89,7 @@ public final class VaultGit {
     }
 
     private void attemptMaintenance(String reason, Instant now) {
-        ReentrantLock writeLock = WritePipeline.tryAcquireWriteLock(vault);
+        WritePipeline.WriteLock writeLock = WritePipeline.tryAcquireWriteLock(vault);
         if (writeLock == null) {
             // [결정 2-나] 쓰기 작업 중이면 정비 커밋은 건너뛰고 5초 뒤 다시 시도한다 (교착 방지 및 불완전 커밋 차단)
             retryAfter = now.plusSeconds(5);
