@@ -222,3 +222,24 @@ test('쓰기 오류: Rust의 conflict와 invalid_argument는 읽기와 같은 �
   await assert.rejects(engineCall(h, write.deleteAgenda('ag1')), error => error.status === 3 && error.kind === 'invalid_argument');
   assert.deepEqual(await engineRefusal(h, write.deleteAgenda('ag1')), { ok: false, reason: 'AIS-400 노트가 2건 있는 아젠다는 지울 수 없다. 먼저 그 노트를 옮기거나 버린다: a' });
 });
+
+test('쓰기 스위치: 프로젝트 쓰기도 같은 길을 따르고, 꺼져 있으면 옛 Java 인자 그대로 간다', async () => {
+  const repos = '[{"name":"web","path":"/tmp/w"}]';
+  const row = { id: 'pj1', slug: 'p', title: 'P', hue: 'blue', summary: '' };
+  const rust = { create_project: () => row, update_project: () => row, delete_project: args => ({ id: args.id, slug: 'p', archivedPath: 'a' }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  await engineCall(on, write.createProject({ title: 'P', repos }));
+  await engineCall(on, write.updateProject('pj1', { repos: '' }));
+  await engineCall(on, write.deleteProject('pj1'));
+  assert.deepEqual(on.calls.map(c => c.args), [
+    { command: 'create_project', args: { title: 'P', repos } },
+    { command: 'update_project', args: { id: 'pj1', repos: '' } },
+    { command: 'delete_project', args: { id: 'pj1' } },
+  ]);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(['create-project', 'update-project', 'delete-project'].map(n => [n, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(off, write.createProject({ title: 'P', repos }));
+  await engineCall(off, write.updateProject('pj1', { repos: '' }));
+  await engineCall(off, write.deleteProject('pj1'));
+  assert.deepEqual(seen, [['create-project', 'title=P', `repos=${repos}`], ['update-project', 'pj1', 'repos='], ['delete-project', 'pj1']]);
+});

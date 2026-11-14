@@ -14,7 +14,7 @@ export interface Call { command: string; args?: Fields; }
 const POSITIONAL: Record<string, string[]> = {
   get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
   list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
-  update_agenda: ['id'], delete_agenda: ['id'],
+  update_agenda: ['id'], delete_agenda: ['id'], update_project: ['id'], delete_project: ['id'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -65,8 +65,9 @@ export const write = {
   createAgenda: (fields: Fields): Call => ({ command: 'create_agenda', args: fields }),
   updateAgenda: (id: string, fields: Fields): Call => ({ command: 'update_agenda', args: { id, ...fields } }),
   deleteAgenda: (id: string): Call => ({ command: 'delete_agenda', args: { id } }),
-  createProject: (fields: Fields) => command('create-project', [], fields), updateProject: (id: string, fields: Fields) => command('update-project', [id], fields),
-  deleteProject: (id: string) => ['delete-project', id],
+  createProject: (fields: Fields): Call => ({ command: 'create_project', args: fields }),
+  updateProject: (id: string, fields: Fields): Call => ({ command: 'update_project', args: { id, ...fields } }),
+  deleteProject: (id: string): Call => ({ command: 'delete_project', args: { id } }),
   saveTemplate: (fields: Fields) => command('save-template', [], fields), saveRitual: (id: string, fields: Fields) => command('save-ritual-template', [id], fields),
   deleteTemplate: (id: string) => ['delete-doc-template', id],
   facts: (id: string, facts: string) => command('update-agenda-facts', [id], { facts: facts.trim() }),
