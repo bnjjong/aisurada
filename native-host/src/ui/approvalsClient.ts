@@ -2,6 +2,7 @@
 // 승인하거나 거절한다. 규칙(무엇이 승인 대상이고 누가 AI인지, 승인한 판만 쓰이는 것)은 엔진이 지킨다. 이 층은 엔진 응답의 모양을 정리하고,
 // 비교 화면이 쓰는 순수한 계산(필드별 비교, 줄 단위 비교, 사람이 읽을 글)을 모아 시험으로 잰다.
 import type { EngineCall } from "./resourcesClient.ts";
+import { fromArgv } from "../data/commands.ts";
 
 export type ChangeStatus = "pending" | "approved" | "rejected" | "stale";
 export type PolicyValue = "auto" | "approve";
@@ -209,39 +210,39 @@ export function toOverview(out: unknown): ApprovalsOverview {
 // ---------------------------------------------------------------- 엔진 호출
 
 export async function loadApprovals(call: EngineCall, decided = 20): Promise<ApprovalsOverview> {
-  return toOverview(await call(["list-resource-changes", `decided=${decided}`]));
+  return toOverview(await call(fromArgv(["list-resource-changes", `decided=${decided}`])));
 }
 
 /** 알림과 배지가 쓰는 수만 가볍게 읽는다. */
 export async function loadCounts(call: EngineCall): Promise<ApprovalCounts> {
-  const out = await call(["list-resource-changes", "decided=0"]);
+  const out = await call(fromArgv(["list-resource-changes", "decided=0"]));
   return isRecord(out) && isRecord(out.counts) ? toCounts(out.counts) : toOverview(out).counts;
 }
 
 export async function getChange(call: EngineCall, id: string): Promise<ChangeDetail> {
-  const detail = toDetail(await call(["get-resource-change", id]));
+  const detail = toDetail(await call(fromArgv(["get-resource-change", id])));
   if (!detail) throw new Error("변경 응답의 모양이 틀려요.");
   return detail;
 }
 
 export async function approveChange(call: EngineCall, id: string): Promise<void> {
-  await call(["approve-resource-change", id]);
+  await call(fromArgv(["approve-resource-change", id]));
 }
 
 export async function rejectChange(call: EngineCall, id: string, reason: string): Promise<void> {
   const argv = ["reject-resource-change", id];
   if (reason.trim()) argv.push(`reason=${reason.trim()}`);
-  await call(argv);
+  await call(fromArgv(argv));
 }
 
 export type ResolveAction = "approve" | "revert";
 
 export async function resolveEdit(call: EngineCall, key: string, action: ResolveAction): Promise<void> {
-  await call(["resolve-resource-edit", key, `action=${action}`]);
+  await call(fromArgv(["resolve-resource-edit", key, `action=${action}`]));
 }
 
 export async function savePolicy(call: EngineCall, policy: Policy): Promise<Policy> {
-  const out = await call(["set-resource-policy", `project=${policy.project}`, `global=${policy.global}`, `refs=${policy.refs}`, `permission=${policy.permission}`]);
+  const out = await call(fromArgv(["set-resource-policy", `project=${policy.project}`, `global=${policy.global}`, `refs=${policy.refs}`, `permission=${policy.permission}`]));
   return toPolicy(isRecord(out) ? out.policy : undefined);
 }
 

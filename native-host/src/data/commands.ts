@@ -22,6 +22,9 @@ const POSITIONAL: Record<string, string[]> = {
   delete_doc: ['id'], restore_doc: ['trashId'], purge_doc: ['trashId'],
   get_task: ['id'], update_task: ['id'], transition_task: ['id'], add_task_comment: ['id'], delete_task: ['id'], restore_task: ['id'],
   link_tasks: ['from', 'to'],
+  get_resource: ['id'], delete_resource: ['id'], restore_resource: ['id'], usable_resources: ['project'], list_resource_versions: ['id'],
+  set_resource_ref: ['project', 'id'], get_resource_change: ['id'], approve_resource_change: ['id'], reject_resource_change: ['id'],
+  resolve_resource_edit: ['id'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {

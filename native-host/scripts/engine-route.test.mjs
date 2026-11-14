@@ -403,3 +403,35 @@ test('태스크 명령: 옛 인자 목록을 호출 객체로 바꿔 Rust로 보
   for (const argv of argvs) await engineCall(off, fromArgv(argv));
   assert.deepEqual(seen, argvs);
 });
+
+test('자원·승인 명령: 옛 인자 목록을 호출 객체로 바꿔 Rust로 보내고, 꺼져 있으면 같은 인자 목록으로 Java에 간다', async () => {
+  const argvs = [
+    ['list-resources', 'scope=global', 'kind=skill'],
+    ['get-resource', 'sk1-aaaaaaaa'],
+    ['save-resource', 'id=ap1-aaaaaaaa', 'skills=["sk1-aaaaaaaa"]', 'repo=', 'tools={}', 'f1=f1:abc'],
+    ['delete-resource', 'sk1-aaaaaaaa'],
+    ['restore-resource', 'sk1-aaaaaaaa'],
+    ['set-resource-ref', 'alpha', 'ap1-aaaaaaaa', 'remove=true', 'with-skills=true'],
+    ['usable-resources', 'alpha'],
+    ['list-resource-versions', 'sk1-aaaaaaaa'],
+    ['list-resource-changes', 'decided=20'],
+    ['get-resource-change', 'pc1-aaaaaaaa'],
+    ['approve-resource-change', 'pc1-aaaaaaaa'],
+    ['reject-resource-change', 'pc1-aaaaaaaa', 'reason=이유'],
+    ['resolve-resource-edit', 'refs:alpha', 'action=revert'],
+    ['get-resource-policy'],
+    ['set-resource-policy', 'project=approve', 'global=auto'],
+  ];
+  for (const argv of argvs) assert.deepEqual(toArgv(fromArgv(argv)), argv, argv[0]);
+  assert.deepEqual(fromArgv(['set-resource-ref', 'alpha', 'ap1', 'with-skills=true']), { command: 'set_resource_ref', args: { project: 'alpha', id: 'ap1', 'with-skills': 'true' } });
+  assert.deepEqual(fromArgv(['resolve-resource-edit', 'refs:alpha', 'action=revert']), { command: 'resolve_resource_edit', args: { id: 'refs:alpha', action: 'revert' } });
+  const names = ['list_resources', 'get_resource', 'save_resource', 'delete_resource', 'restore_resource', 'set_resource_ref', 'usable_resources', 'list_resource_versions',
+    'list_resource_changes', 'get_resource_change', 'approve_resource_change', 'reject_resource_change', 'resolve_resource_edit', 'get_resource_policy', 'set_resource_policy'];
+  const on = host({ commands: names, rust: Object.fromEntries(names.map(n => [n, () => ({ ok: n })])) });
+  for (const argv of argvs) await engineCall(on, fromArgv(argv));
+  assert.deepEqual(on.calls.map(c => c.args.command), names);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(argvs.map(a => [a[0], argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  for (const argv of argvs) await engineCall(off, fromArgv(argv));
+  assert.deepEqual(seen, argvs);
+});

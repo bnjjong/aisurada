@@ -13,6 +13,7 @@ import { ApprovalsView, Compare } from '../src/ui/ApprovalPanel.tsx';
 import { ResourcesPage } from '../src/ui/ResourcesPage.tsx';
 import { Rail } from '../src/ui/Rail.tsx';
 import { toResource } from '../src/ui/resourcesClient.ts';
+import { toArgv } from '../src/data/commands.ts';
 
 const view = (extra = {}) => ({
   id: 'ap1-aaaaaaaa', kind: 'agent', scope: 'project', project: '앱', name: '웹 담당', description: '웹을 맡는다', permission: 'read', skills: [], body: '원래 지침\n둘째 줄', ...extra,
@@ -31,7 +32,8 @@ const overview = (extra = {}) => ({
 /** 엔진 호출을 기록하는 가짜. 답은 첫 낱말(명령 이름)로 정한다. */
 const fakeEngine = (answers = {}) => {
   const seen = [];
-  const call = async (argv) => {
+  const call = async (request) => {
+    const argv = Array.isArray(request) ? request : toArgv(request);
     seen.push(argv);
     const a = answers[argv[0]];
     if (a instanceof Error) throw a;

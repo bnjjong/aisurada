@@ -2,6 +2,7 @@
 // 화면이 쓰는 순수한 계산(폼 값 → 저장 인자, 오류 풀이, 참조 확인 목록)을 모아 시험으로 잰다.
 // 규칙은 엔진이 지킨다(참조하지 않은 것은 쓸 수 없는 자원에 안 나온다). 이 층은 규칙을 다시 만들지 않는다.
 
+import { fromArgv } from "../data/commands.ts";
 import type { Call } from "../data/commands.ts";
 
 export type ResourceKind = "skill" | "agent";
@@ -145,13 +146,13 @@ export async function listResources(
   if (opts.global) argv.push("scope=global");
   if (opts.project) argv.push(`project=${opts.project}`);
   if (opts.kind) argv.push(`kind=${opts.kind}`);
-  const out = await call(argv);
+  const out = await call(fromArgv(argv));
   const o = isRecord(out) ? out : {};
   return { resources: rowsOf(o.resources), skipped: strings(o.skipped) };
 }
 
 export async function listTrash(call: EngineCall): Promise<TrashRow[]> {
-  const out = await call(["list-resources", "trash=true"]);
+  const out = await call(fromArgv(["list-resources", "trash=true"]));
   const list = isRecord(out) && Array.isArray(out.trash) ? out.trash : [];
   const rows: TrashRow[] = [];
   for (const v of list) {
@@ -165,13 +166,13 @@ export async function listTrash(call: EngineCall): Promise<TrashRow[]> {
 }
 
 export async function getResource(call: EngineCall, id: string): Promise<ResourceRow> {
-  const row = toResource(await call(["get-resource", id]));
+  const row = toResource(await call(fromArgv(["get-resource", id])));
   if (!row) throw new Error("자원 응답의 모양이 틀려요.");
   return row;
 }
 
 export async function usableResources(call: EngineCall, project: string): Promise<UsableResources> {
-  const out = await call(["usable-resources", project]);
+  const out = await call(fromArgv(["usable-resources", project]));
   const o = isRecord(out) ? out : {};
   const broken = (Array.isArray(o.broken) ? o.broken : []).filter(isRecord).map((b) => ({ id: text(b.id) ?? "", hint: text(b.hint) ?? "" })).filter((b) => b.id);
   const missingSkills: MissingSkill[] = [];
@@ -213,17 +214,17 @@ export function saveArgv(input: SaveInput): string[] {
 }
 
 export async function saveResource(call: EngineCall, input: SaveInput): Promise<ResourceRow> {
-  const row = toResource(await call(saveArgv(input)));
+  const row = toResource(await call(fromArgv(saveArgv(input))));
   if (!row) throw new Error("저장 응답의 모양이 틀려요.");
   return row;
 }
 
 export async function deleteResource(call: EngineCall, id: string): Promise<void> {
-  await call(["delete-resource", id]);
+  await call(fromArgv(["delete-resource", id]));
 }
 
 export async function restoreResource(call: EngineCall, id: string): Promise<void> {
-  await call(["restore-resource", id]);
+  await call(fromArgv(["restore-resource", id]));
 }
 
 /** 프로젝트가 글로벌 자원을 참조하는 것을 켠다(remove면 끈다). withSkills면 에이전트의 글로벌 스킬도 함께 켠다. */
@@ -236,7 +237,7 @@ export async function setReference(
   const argv = ["set-resource-ref", project, id];
   if (opts.remove) argv.push("remove=true");
   if (opts.withSkills) argv.push("with-skills=true");
-  await call(argv);
+  await call(fromArgv(argv));
 }
 
 // ---------------------------------------------------------------- 폼

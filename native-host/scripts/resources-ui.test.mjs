@@ -11,6 +11,7 @@ import {
 import { ResourceItem, resourceMeta } from '../src/ui/ResourceItem.tsx';
 import { ResourcesPage } from '../src/ui/ResourcesPage.tsx';
 import { ProjectPage } from '../src/ui/ProjectPage.tsx';
+import { toArgv } from '../src/data/commands.ts';
 import { Rail } from '../src/ui/Rail.tsx';
 
 const raw = (extra = {}) => ({ id: 'skmwd7nzi4-05049130', kind: 'skill', scope: 'global', name: '번역 검수', description: '번역을 검수한다', path: '.aisurada/resources/global/skills/번역-검수/SKILL.md', ...extra });
@@ -131,7 +132,8 @@ test('the engine calls use the right commands and arguments', async () => {
     'set-resource-ref': { project: '앱' },
     'save-resource': raw({ precondition: 'f1:new' }),
   };
-  const call = async (argv) => {
+  const call = async (request) => {
+    const argv = Array.isArray(request) ? request : toArgv(request);
     seen.push(argv);
     if (argv[0] === 'list-resources' && argv.includes('trash=true')) return { trash: [{ id: 'sk9', kind: 'skill', scope: 'project', project: '앱', name: '지운 것', deletedAt: 't' }, { id: 'x' }] };
     return answers[argv[0]];
