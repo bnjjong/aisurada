@@ -27,6 +27,7 @@ pub mod reindex;
 pub mod search_docs;
 pub mod sub_note_write;
 mod subnote;
+pub mod task_commands;
 pub mod template_write;
 pub mod trash_write;
 

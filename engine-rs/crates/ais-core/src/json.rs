@@ -30,6 +30,25 @@ impl JsonValue {
     }
 }
 
+/// Java 레코드의 `toString` 모양(`JsonString[value=x]` 따위). 옛 오류 문구에 값이 이 모양으로 들어간다.
+pub fn java_record_string(value: &JsonValue) -> String {
+    match value {
+        JsonValue::Str(text) => format!("JsonString[value={text}]"),
+        JsonValue::Literal(raw) => format!("JsonLiteral[raw={raw}]"),
+        JsonValue::Array(items) => {
+            let items: Vec<String> = items.iter().map(java_record_string).collect();
+            format!("JsonArray[elements=[{}]]", items.join(", "))
+        }
+        JsonValue::Object(entries) => {
+            let entries: Vec<String> = entries
+                .iter()
+                .map(|(key, item)| format!("{key}={}", java_record_string(item)))
+                .collect();
+            format!("JsonObject[properties={{{}}}]", entries.join(", "))
+        }
+    }
+}
+
 /// 앞뒤 공백을 떼고 읽는다. 비면 빈 객체(`{}`)로 본다(Java `JsonReader.parse`).
 pub fn parse(raw: &str) -> Result<JsonValue, String> {
     let trimmed = trim(raw);

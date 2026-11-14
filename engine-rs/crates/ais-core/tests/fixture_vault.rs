@@ -2360,3 +2360,239 @@ fn moves_notes_through_the_trash() {
             <= 1_000_000
     );
 }
+
+#[test]
+fn runs_the_task_lifecycle() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+
+    // 만들기: 완료 기준은 필수다. 파일은 SnakeYAML 모양이고 활동에 `created`가 남는다
+    assert_eq!(
+        error("create_task", json!({"title": "t", "repo": "a/b"})).code,
+        "AIS-400"
+    );
+    let created = engine
+        .call(
+            "create_task",
+            json!({"title": "첫 태스크", "repo": "owner/name", "criteria": ["하나", {"text": "둘", "done": true}], "labels": ["b", "a", "b"], "type": "BUG"}),
+        )
+        .unwrap();
+    assert_eq!(
+        (created["key"].as_str(), created["created"].as_bool()),
+        (Some("TSK-1"), Some(true))
+    );
+    assert_eq!(created["status"], "draft");
+    assert_eq!(created["criteriaDone"], 1);
+    let text = read(".aisurada/tasks/TSK-1.md");
+    assert!(
+        text.starts_with("---\nkey: TSK-1\nid: tk")
+            && text.contains("\ntype: bug\npriority: medium\nstatus: draft\nrepo: owner/name\nlabels:\n  - b\n  - a\ncriteria:\n  - text: 하나\n    done: false\n  - text: 둘\n    done: true\n    checkedAt: ")
+            && text.ends_with("---\n\n"),
+        "{text}"
+    );
+    let activity = read(".aisurada/tasks/TSK-1/activity.jsonl");
+    assert!(
+        activity.starts_with("{\"at\":\"")
+            && activity.contains("\"kind\":\"created\",\"by\":\"human\"}\n"),
+        "{activity}"
+    );
+
+    // 고치기: 확인 값이 필요하고, 바뀐 것이 없으면 파일도 활동도 그대로다
+    let token = created["precondition"].as_str().unwrap().to_string();
+    assert_eq!(
+        error("update_task", json!({"id": "TSK-1", "title": "x"})).code,
+        "AIS-412"
+    );
+    let before = read(".aisurada/tasks/TSK-1.md");
+    let same = engine
+        .call(
+            "update_task",
+            json!({"id": "TSK-1", "title": "첫 태스크", "f1": &token}),
+        )
+        .unwrap();
+    assert_eq!(same["changed"], false);
+    assert_eq!(read(".aisurada/tasks/TSK-1.md"), before);
+    let updated = engine
+        .call(
+            "update_task",
+            json!({"id": "TSK-1", "title": "새 제목", "f1": &token, "project": "alpha"}),
+        )
+        .unwrap();
+    assert_eq!(updated["changed"], true);
+    assert!(
+        read(".aisurada/tasks/TSK-1/activity.jsonl")
+            .contains("\"kind\":\"edited\",\"by\":\"human\",\"fields\":[\"title\",\"project\"]}")
+    );
+    assert_eq!(
+        error(
+            "update_task",
+            json!({"id": "TSK-1", "title": "x", "f1": &token})
+        )
+        .code,
+        "AIS-412"
+    );
+
+    // 상태: 사람과 러너가 할 수 있는 전이가 다르고, 사람이 갈 수 있는 곳은 응답에 있다
+    let ready = engine
+        .call(
+            "transition_task",
+            json!({"id": "TSK-1", "to": "ready-for-develop"}),
+        )
+        .unwrap();
+    assert_eq!(ready["from"], "draft");
+    assert!(
+        ready["transitions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["to"] == "in-progress" && t["ok"] == true)
+    );
+    assert!(
+        error("transition_task", json!({"id": "TSK-1", "to": "in-review"}))
+            .message
+            .contains("로는 바꿀 수 없다")
+    );
+    assert_eq!(
+        error(
+            "transition_task",
+            json!({"id": "TSK-1", "to": "in-progress", "from": "draft"})
+        )
+        .message,
+        "상태가 이미 바뀌었다: 지금 ready-for-develop, 기대한 것 draft"
+    );
+
+    // AI 세션이 고치면 세션과(claude가 아니면) 에이전트 이름이 파일과 활동에 남는다
+    let by_ai = engine
+        .call(
+            "transition_task",
+            json!({"id": "TSK-1", "to": "in-progress", "actor": "runner", "caller": "ai", "session": "sess-5", "sessionAgent": "codex"}),
+        )
+        .unwrap();
+    assert_eq!(by_ai["editedSession"], "sess-5");
+    assert_eq!(by_ai["editedAgent"], "codex");
+    let claude = engine
+        .call(
+            "add_task_comment",
+            json!({"id": "TSK-1", "body": " 댓글 ", "actor": "runner", "session": "sess-6", "sessionAgent": "claude"}),
+        )
+        .unwrap();
+    assert_eq!(claude["comment"]["session"], "sess-6");
+    assert!(claude["comment"].get("agent").is_none());
+
+    // 연결과 막힘: 막은 태스크가 Done 이 되기 전에는 시작하지 못한다
+    let second = engine
+        .call(
+            "create_task",
+            json!({"title": "둘째", "repo": "a/b", "criteria": ["x"]}),
+        )
+        .unwrap();
+    let key2 = second["key"].as_str().unwrap();
+    engine
+        .call(
+            "transition_task",
+            json!({"id": key2, "to": "ready-for-develop"}),
+        )
+        .unwrap();
+    let linked = engine
+        .call(
+            "link_tasks",
+            json!({"from": "TSK-1", "to": key2, "type": "blocks"}),
+        )
+        .unwrap();
+    assert_eq!(linked["changed"], true);
+    assert!(
+        linked["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|l| l["type"] == "blocks" && l["key"] == key2)
+    );
+    assert!(
+        error("transition_task", json!({"id": key2, "to": "in-progress"}))
+            .message
+            .starts_with("다른 태스크에 막혀 있어 시작하지 못한다")
+    );
+    assert_eq!(
+        engine.call("get_task", json!({"id": key2})).unwrap()["links"][0]["type"],
+        "blocked-by"
+    );
+    assert!(
+        error(
+            "link_tasks",
+            json!({"from": key2, "to": "TSK-1", "type": "blocks"})
+        )
+        .message
+        .contains("서로 막게 할 수 없다")
+    );
+    let listed = engine.call("list_tasks", json!({"blocked": true})).unwrap();
+    assert_eq!(listed["tasks"].as_array().unwrap().len(), 1);
+
+    // 휴지통: 지우면 활동까지 옮겨지고 번호를 다시 쓰지 않는다. 되살리면 같은 키로 돌아온다
+    let deleted = engine.call("delete_task", json!({"id": key2})).unwrap();
+    assert_eq!(
+        (
+            deleted["trashed"].as_bool(),
+            deleted["wasBlockedBy"][0].as_str()
+        ),
+        (Some(true), Some("TSK-1"))
+    );
+    assert!(!vault.join(format!(".aisurada/tasks/{key2}.md")).exists());
+    assert_eq!(
+        engine.call("list_tasks", json!({"trash": true})).unwrap()["trash"][0]["key"],
+        key2
+    );
+    let third = engine
+        .call(
+            "create_task",
+            json!({"title": "셋째", "repo": "a/b", "criteria": ["x"]}),
+        )
+        .unwrap();
+    assert_eq!(third["key"], "TSK-3");
+    let restored = engine.call("restore_task", json!({"id": key2})).unwrap();
+    assert_eq!(
+        (restored["restored"].as_bool(), restored["key"].as_str()),
+        (Some(true), Some(key2))
+    );
+    assert!(
+        vault
+            .join(format!(".aisurada/tasks/{key2}/activity.jsonl"))
+            .is_file()
+    );
+
+    // 손으로 쓴 파일: 모르는 칸이 고친 뒤에도 남고, 못 읽는 파일은 건너뛴다고 알린다
+    std::fs::write(
+        vault.join(".aisurada/tasks/TSK-20.md"),
+        "---\nkey: TSK-20\nid: tkex0001-00000001\ntitle: 손\nstatus: draft\ncustom: 5\nscore: 1.5\nnested:\n  a: [1, 2]\n---\n본문\n",
+    )
+    .unwrap();
+    std::fs::write(vault.join(".aisurada/tasks/TSK-21.md"), "머리말이 없다\n").unwrap();
+    let hand = engine.call("get_task", json!({"id": "TSK-20"})).unwrap();
+    engine
+        .call(
+            "update_task",
+            json!({"id": "TSK-20", "title": "고침", "f1": hand["precondition"]}),
+        )
+        .unwrap();
+    let rewritten = read(".aisurada/tasks/TSK-20.md");
+    assert!(
+        rewritten.contains("\ncustom: 5\nscore: 1.5\nnested:\n  a:\n    - 1\n    - 2\n---\n본문\n"),
+        "{rewritten}"
+    );
+    let all = engine.call("list_tasks", json!({})).unwrap();
+    assert!(
+        all["skipped"][0]
+            .as_str()
+            .unwrap()
+            .starts_with(".aisurada/tasks/TSK-21.md: 머리말(---)로 시작하지 않는다"),
+        "{all}"
+    );
+    assert_eq!(error("get_task", json!({"id": "TSK-0"})).code, "AIS-400");
+    assert_eq!(
+        error("get_task", json!({"id": "TSK-99"})).message,
+        "태스크를 못 찾았다: TSK-99"
+    );
+}

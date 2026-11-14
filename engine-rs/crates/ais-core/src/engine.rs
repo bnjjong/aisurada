@@ -10,7 +10,7 @@ use crate::commands::{
     get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace, list_agendas,
     list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
     list_templates, list_trash, note_meta_write, project_write, reindex, search_docs,
-    sub_note_write, template_write, trash_write,
+    sub_note_write, task_commands, template_write, trash_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -65,6 +65,15 @@ pub const COMMANDS: &[&str] = &[
     "restore_doc",
     "purge_doc",
     "empty_trash",
+    "get_task",
+    "list_tasks",
+    "create_task",
+    "update_task",
+    "transition_task",
+    "link_tasks",
+    "add_task_comment",
+    "delete_task",
+    "restore_task",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -95,6 +104,13 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "restore_doc",
     "purge_doc",
     "empty_trash",
+    "create_task",
+    "update_task",
+    "transition_task",
+    "link_tasks",
+    "add_task_comment",
+    "delete_task",
+    "restore_task",
     "commit_vault",
 ];
 
@@ -256,6 +272,42 @@ impl Engine {
                 let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
                 to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
             }
+            "get_task" => {
+                let request: task_commands::GetTaskRequest = parse_args(command, args)?;
+                to_json(task_commands::get_task(&self.vault_root, &request)?)
+            }
+            "list_tasks" => {
+                let request: task_commands::ListTasksRequest = parse_args(command, args)?;
+                to_json(task_commands::list_tasks(&self.vault_root, &request)?)
+            }
+            "create_task" => {
+                let request: task_commands::CreateTaskRequest = parse_args(command, args)?;
+                to_json(task_commands::create_task(&self.vault_root, &request)?)
+            }
+            "update_task" => {
+                let request: task_commands::UpdateTaskRequest = parse_args(command, args)?;
+                to_json(task_commands::update_task(&self.vault_root, &request)?)
+            }
+            "transition_task" => {
+                let request: task_commands::TransitionTaskRequest = parse_args(command, args)?;
+                to_json(task_commands::transition_task(&self.vault_root, &request)?)
+            }
+            "link_tasks" => {
+                let request: task_commands::LinkTasksRequest = parse_args(command, args)?;
+                to_json(task_commands::link_tasks(&self.vault_root, &request)?)
+            }
+            "add_task_comment" => {
+                let request: task_commands::AddTaskCommentRequest = parse_args(command, args)?;
+                to_json(task_commands::add_task_comment(&self.vault_root, &request)?)
+            }
+            "delete_task" => {
+                let request: task_commands::TaskRefRequest = parse_args(command, args)?;
+                to_json(task_commands::delete_task(&self.vault_root, &request)?)
+            }
+            "restore_task" => {
+                let request: task_commands::TaskRefRequest = parse_args(command, args)?;
+                to_json(task_commands::restore_task(&self.vault_root, &request)?)
+            }
             "delete_doc" => {
                 let request: trash_write::DeleteDocRequest = parse_args(command, args)?;
                 to_json(trash_write::delete_doc(&self.vault_root, &request)?)
@@ -351,6 +403,8 @@ mod tests {
         "list_tags",
         "get_template",
         "history",
+        "get_task",
+        "list_tasks",
     ];
 
     #[test]

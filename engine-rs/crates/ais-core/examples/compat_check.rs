@@ -3733,6 +3733,1313 @@ fn compare_trash_writes(h: &mut WriteHarness) {
     }
 }
 
+/// 태스크 명령 한 단계. `java`는 `ais-cli` 인자 목록(자리 인자 포함)이고 `rust`는 같은 뜻의 호출 객체다.
+/// `token_of`가 태스크 키면 그 태스크의 지금 확인 값을 `f1`로 더한다.
+fn task_step(
+    h: &mut WriteHarness,
+    label: &str,
+    command: &str,
+    java: &[&str],
+    rust: Value,
+    token_of: Option<&str>,
+) -> Option<Value> {
+    let mut java_args: Vec<String> = java.iter().map(|a| a.to_string()).collect();
+    let mut args = rust;
+    if let Some(key) = token_of {
+        let token = Engine::new(&h.b)
+            .call("get_task", json!({"id": key, "activity": 0}))
+            .ok()
+            .and_then(|v| v["precondition"].as_str().map(str::to_string))
+            .unwrap_or_default();
+        java_args.push(format!("f1={token}"));
+        args["f1"] = json!(token);
+    }
+    let refs: Vec<&str> = java_args.iter().map(String::as_str).collect();
+    h.step(&format!("태스크 {label}"), &refs, command, args)
+}
+
+/// 태스크 명령 맞대기: 만들기·읽기·고치기·상태·연결·댓글·휴지통. 태스크 파일은 진짜 SnakeYAML이 쓴 바이트와 견준다.
+fn compare_task_commands(h: &mut WriteHarness) {
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+    let crit = r#"["첫째 기준","둘째 기준"]"#;
+
+    // ---- 만들기 ----
+    task_step(
+        h,
+        "만들기 최소",
+        "create_task",
+        &[
+            "create-task",
+            "title=기본 작업",
+            "repo=owner/name",
+            &format!("criteria={crit}"),
+        ],
+        json!({"title": "기본 작업", "repo": "owner/name", "criteria": crit}),
+        None,
+    );
+    task_step(
+        h,
+        "만들기 모든 값",
+        "create_task",
+        &[
+            "create-task",
+            "title=  모든 값  ",
+            "repo=my-org/my.repo_1",
+            "criteria=[\"하나\"]",
+            "type=BUG",
+            "priority=High",
+            "project=alpha",
+            "base=release/1.0",
+            "body=# 설명\n\n본문 두 줄\n끝",
+            r#"labels=["백엔드"," api ","백엔드","긴급"]"#,
+            r#"refs=[{"kind":"note","target":"ndfx0002-00000002"},{"kind":"github","target":"owner/name#53","title":"  이슈 제목 "},{"kind":"github","target":"https://github.com/owner/name/pull/7"}]"#,
+            "actor=RUNNER",
+        ],
+        json!({"title": "  모든 값  ", "repo": "my-org/my.repo_1", "criteria": "[\"하나\"]", "type": "BUG", "priority": "High", "project": "alpha", "base": "release/1.0",
+               "body": "# 설명\n\n본문 두 줄\n끝", "labels": r#"["백엔드"," api ","백엔드","긴급"]"#,
+               "refs": r#"[{"kind":"note","target":"ndfx0002-00000002"},{"kind":"github","target":"owner/name#53","title":"  이슈 제목 "},{"kind":"github","target":"https://github.com/owner/name/pull/7"}]"#, "actor": "RUNNER"}),
+        None,
+    );
+    let special_title = "특수: 'a' \"b\" # 해시 - 대시 [대괄호] {중괄호} & 앰퍼 😀";
+    let special_crit = r#"[{"text":"체크됨: 예","done":true,"checkedAt":"2026-11-01T09:00:00+09:00","checkedBy":"human"},{"text":"안 됨","done":false,"checkedAt":"무시됨"},"- 대시로 시작","? 물음표","true","007","2026-11-05","@at","%pct","  앞뒤 공백  ","탭\t포함","yes","null","~","a: b","a #b"]"#;
+    task_step(
+        h,
+        "만들기 특수 글자",
+        "create_task",
+        &[
+            "create-task",
+            &format!("title={special_title}"),
+            "repo=owner/name",
+            &format!("criteria={special_crit}"),
+            "body=줄1\r\n줄2\n\n끝  ",
+        ],
+        json!({"title": special_title, "repo": "owner/name", "criteria": special_crit, "body": "줄1\r\n줄2\n\n끝  "}),
+        None,
+    );
+    task_step(
+        h,
+        "만들기 배열로",
+        "create_task",
+        &[
+            "create-task",
+            "title=배열 인자",
+            "repo=owner/name",
+            r#"criteria=["a",{"text":"b","done":true}]"#,
+            r#"labels=["x","y"]"#,
+            r#"refs=[{"kind":"note","target":"snfx0001-00000011"}]"#,
+        ],
+        json!({"title": "배열 인자", "repo": "owner/name", "criteria": ["a", {"text": "b", "done": true}], "labels": ["x", "y"], "refs": [{"kind": "note", "target": "snfx0001-00000011"}]}),
+        None,
+    );
+    let weird_labels = r###"["yes","null","123","a: b","#x","~","true","2026-11-05","- d","? q","!t","&a","*a","|b",">c","%p","@a","`b"]"###;
+    task_step(
+        h,
+        "만들기 라벨이 YAML 예약어",
+        "create_task",
+        &[
+            "create-task",
+            "title=라벨 시험",
+            "repo=owner/name",
+            "criteria=[\"x\"]",
+            &format!("labels={weird_labels}"),
+        ],
+        json!({"title": "라벨 시험", "repo": "owner/name", "criteria": "[\"x\"]", "labels": weird_labels}),
+        None,
+    );
+    task_step(
+        h,
+        "만들기 설명이 비었고 제목이 한 글자",
+        "create_task",
+        &[
+            "create-task",
+            "title=가",
+            "repo=a/b",
+            "criteria=[\"x\"]",
+            "body=",
+        ],
+        json!({"title": "가", "repo": "a/b", "criteria": "[\"x\"]", "body": ""}),
+        None,
+    );
+    let long_title = "가".repeat(200);
+    task_step(
+        h,
+        "만들기 제목 200자",
+        "create_task",
+        &[
+            "create-task",
+            &format!("title={long_title}"),
+            "repo=a/b",
+            "criteria=[\"x\"]",
+        ],
+        json!({"title": long_title, "repo": "a/b", "criteria": "[\"x\"]"}),
+        None,
+    );
+    let many_crit = format!(
+        "[{}]",
+        (0..50)
+            .map(|n| format!("\"기준 {n}\""))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    task_step(
+        h,
+        "만들기 완료 기준 50개",
+        "create_task",
+        &[
+            "create-task",
+            "title=기준 많음",
+            "repo=a/b",
+            &format!("criteria={many_crit}"),
+        ],
+        json!({"title": "기준 많음", "repo": "a/b", "criteria": many_crit}),
+        None,
+    );
+    let over_crit = format!(
+        "[{}]",
+        (0..51)
+            .map(|n| format!("\"기준 {n}\""))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let over_title = "가".repeat(201);
+    let long_crit = format!("[\"{}\"]", "나".repeat(501));
+    let long_label = format!("[\"{}\"]", "다".repeat(31));
+    let many_labels = format!(
+        "[{}]",
+        (0..21)
+            .map(|n| format!("\"l{n}\""))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let many_refs = format!(
+        "[{}]",
+        (0..51)
+            .map(|n| format!("{{\"kind\":\"note\",\"target\":\"nd{n:04x}-0000{n:04x}\"}}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    for (label, java, rust) in [
+        (
+            "제목 없음",
+            vec!["create-task", "repo=a/b", "criteria=[\"x\"]"],
+            json!({"repo": "a/b", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "제목 공백",
+            vec!["create-task", "title=  ", "repo=a/b", "criteria=[\"x\"]"],
+            json!({"title": "  ", "repo": "a/b", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "제목 201자",
+            vec![
+                "create-task",
+                &format!("title={over_title}"),
+                "repo=a/b",
+                "criteria=[\"x\"]",
+            ],
+            json!({"title": over_title, "repo": "a/b", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "제목에 제어 문자",
+            vec![
+                "create-task",
+                "title=a\u{7}b",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+            ],
+            json!({"title": "a\u{7}b", "repo": "a/b", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "저장소 없음",
+            vec!["create-task", "title=t", "criteria=[\"x\"]"],
+            json!({"title": "t", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "저장소 빈 글",
+            vec!["create-task", "title=t", "repo=", "criteria=[\"x\"]"],
+            json!({"title": "t", "repo": "", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "저장소 모양",
+            vec!["create-task", "title=t", "repo=noslash", "criteria=[\"x\"]"],
+            json!({"title": "t", "repo": "noslash", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "저장소 점점",
+            vec!["create-task", "title=t", "repo=a../b", "criteria=[\"x\"]"],
+            json!({"title": "t", "repo": "a../b", "criteria": "[\"x\"]"}),
+        ),
+        (
+            "기준 없음",
+            vec!["create-task", "title=t", "repo=a/b"],
+            json!({"title": "t", "repo": "a/b"}),
+        ),
+        (
+            "기준 빈 목록",
+            vec!["create-task", "title=t", "repo=a/b", "criteria=[]"],
+            json!({"title": "t", "repo": "a/b", "criteria": "[]"}),
+        ),
+        (
+            "기준 빈 글",
+            vec!["create-task", "title=t", "repo=a/b", "criteria="],
+            json!({"title": "t", "repo": "a/b", "criteria": ""}),
+        ),
+        (
+            "기준 JSON 문법",
+            vec!["create-task", "title=t", "repo=a/b", "criteria=[1,"],
+            json!({"title": "t", "repo": "a/b", "criteria": "[1,"}),
+        ),
+        (
+            "기준이 배열 아님",
+            vec!["create-task", "title=t", "repo=a/b", "criteria={}"],
+            json!({"title": "t", "repo": "a/b", "criteria": "{}"}),
+        ),
+        (
+            "기준 항목 숫자",
+            vec!["create-task", "title=t", "repo=a/b", "criteria=[1]"],
+            json!({"title": "t", "repo": "a/b", "criteria": "[1]"}),
+        ),
+        (
+            "기준 항목 모르는 키",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                r#"criteria=[{"text":"a","zz":1}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": r#"[{"text":"a","zz":1}]"#}),
+        ),
+        (
+            "기준 done 모양",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                r#"criteria=[{"text":"a","done":"yes"}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": r#"[{"text":"a","done":"yes"}]"#}),
+        ),
+        (
+            "기준 글 없음",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                r#"criteria=[{"done":true}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": r#"[{"done":true}]"#}),
+        ),
+        (
+            "기준 51개",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                &format!("criteria={over_crit}"),
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": over_crit}),
+        ),
+        (
+            "기준 501자",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                &format!("criteria={long_crit}"),
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": long_crit}),
+        ),
+        (
+            "type 모름",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "type=epic",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "type": "epic"}),
+        ),
+        (
+            "priority 모름",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "priority=urgent",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "priority": "urgent"}),
+        ),
+        (
+            "base 모양",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "base=-bad",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "base": "-bad"}),
+        ),
+        (
+            "base .lock",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "base=x.lock",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "base": "x.lock"}),
+        ),
+        (
+            "프로젝트 없음",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "project=nope",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "project": "nope"}),
+        ),
+        (
+            "라벨 항목 숫자",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "labels=[1]",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "labels": "[1]"}),
+        ),
+        (
+            "라벨 31자",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                &format!("labels={long_label}"),
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "labels": long_label}),
+        ),
+        (
+            "라벨 21개",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                &format!("labels={many_labels}"),
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "labels": many_labels}),
+        ),
+        (
+            "자원 항목이 객체 아님",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                r#"refs=["x"]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "refs": r#"["x"]"#}),
+        ),
+        (
+            "자원 모르는 키",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                r#"refs=[{"kind":"note","target":"ndfx0002-00000002","zz":1}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "refs": r#"[{"kind":"note","target":"ndfx0002-00000002","zz":1}]"#}),
+        ),
+        (
+            "자원 종류 모름",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                r#"refs=[{"kind":"web","target":"x"}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "refs": r#"[{"kind":"web","target":"x"}]"#}),
+        ),
+        (
+            "자원 대상 모양",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                r#"refs=[{"kind":"note","target":"nope"}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "refs": r#"[{"kind":"note","target":"nope"}]"#}),
+        ),
+        (
+            "자원 겹침",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                r#"refs=[{"kind":"note","target":"ndfx0002-00000002"},{"kind":"note","target":"ndfx0002-00000002","title":"x"}]"#,
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "refs": r#"[{"kind":"note","target":"ndfx0002-00000002"},{"kind":"note","target":"ndfx0002-00000002","title":"x"}]"#}),
+        ),
+        (
+            "자원 51개",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                &format!("refs={many_refs}"),
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "refs": many_refs}),
+        ),
+        (
+            "설명 10만자 넘음",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                &format!("body={}", "a".repeat(100_001)),
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "body": "a".repeat(100_001)}),
+        ),
+        (
+            "actor 모름",
+            vec![
+                "create-task",
+                "title=t",
+                "repo=a/b",
+                "criteria=[\"x\"]",
+                "actor=bot",
+            ],
+            json!({"title": "t", "repo": "a/b", "criteria": "[\"x\"]", "actor": "bot"}),
+        ),
+    ] {
+        task_step(
+            h,
+            &format!("만들기 오류 {label}"),
+            "create_task",
+            &java,
+            rust,
+            None,
+        );
+    }
+
+    // ---- 읽기 ----
+    for (label, java, rust) in [
+        ("보기 키", vec!["get-task", "TSK-1"], json!({"id": "TSK-1"})),
+        (
+            "보기 활동 0",
+            vec!["get-task", "TSK-2", "activity=0"],
+            json!({"id": "TSK-2", "activity": "0"}),
+        ),
+        (
+            "보기 활동 숫자로",
+            vec!["get-task", "TSK-2", "activity=1"],
+            json!({"id": "TSK-2", "activity": 1}),
+        ),
+        (
+            "보기 활동 음수",
+            vec!["get-task", "TSK-1", "activity=-1"],
+            json!({"id": "TSK-1", "activity": "-1"}),
+        ),
+        (
+            "보기 활동 글",
+            vec!["get-task", "TSK-1", "activity=abc"],
+            json!({"id": "TSK-1", "activity": "abc"}),
+        ),
+        (
+            "보기 키 모양",
+            vec!["get-task", "TSK-0"],
+            json!({"id": "TSK-0"}),
+        ),
+        (
+            "보기 없는 키",
+            vec!["get-task", "TSK-999"],
+            json!({"id": "TSK-999"}),
+        ),
+        (
+            "보기 없는 id",
+            vec!["get-task", "tkzz0000-00000000"],
+            json!({"id": "tkzz0000-00000000"}),
+        ),
+        ("보기 id 없음", vec!["get-task"], json!({})),
+        ("보기 공백", vec!["get-task", " "], json!({"id": " "})),
+        ("목록 전체", vec!["list-tasks"], json!({})),
+        (
+            "목록 본문 포함",
+            vec!["list-tasks", "bodies=true"],
+            json!({"bodies": true}),
+        ),
+        (
+            "목록 상태",
+            vec!["list-tasks", "status=Draft"],
+            json!({"status": "Draft"}),
+        ),
+        (
+            "목록 상태 모름",
+            vec!["list-tasks", "status=zzz"],
+            json!({"status": "zzz"}),
+        ),
+        (
+            "목록 유형",
+            vec!["list-tasks", "type=bug"],
+            json!({"type": "bug"}),
+        ),
+        (
+            "목록 유형 모름",
+            vec!["list-tasks", "type=zzz"],
+            json!({"type": "zzz"}),
+        ),
+        (
+            "목록 저장소",
+            vec!["list-tasks", "repo=owner/name"],
+            json!({"repo": "owner/name"}),
+        ),
+        (
+            "목록 저장소 모양",
+            vec!["list-tasks", "repo=zzz"],
+            json!({"repo": "zzz"}),
+        ),
+        (
+            "목록 라벨",
+            vec!["list-tasks", "label=api"],
+            json!({"label": "api"}),
+        ),
+        (
+            "목록 글",
+            vec!["list-tasks", "q=  특수"],
+            json!({"q": "  특수"}),
+        ),
+        (
+            "목록 글이 키",
+            vec!["list-tasks", "q=tsk-3"],
+            json!({"q": "tsk-3"}),
+        ),
+        (
+            "목록 막힌 것만",
+            vec!["list-tasks", "blocked=true"],
+            json!({"blocked": "true"}),
+        ),
+        (
+            "목록 휴지통",
+            vec!["list-tasks", "trash=true"],
+            json!({"trash": true}),
+        ),
+    ] {
+        task_step(
+            h,
+            label,
+            if label.starts_with("보기") {
+                "get_task"
+            } else {
+                "list_tasks"
+            },
+            &java,
+            rust,
+            None,
+        );
+    }
+
+    // ---- 고치기 ----
+    task_step(
+        h,
+        "고치기 제목",
+        "update_task",
+        &["update-task", "TSK-1", "title=새 제목: 콜론"],
+        json!({"id": "TSK-1", "title": "새 제목: 콜론"}),
+        Some("TSK-1"),
+    );
+    task_step(
+        h,
+        "고치기 바뀐 것 없음",
+        "update_task",
+        &["update-task", "TSK-1", "title=새 제목: 콜론"],
+        json!({"id": "TSK-1", "title": "새 제목: 콜론"}),
+        Some("TSK-1"),
+    );
+    task_step(
+        h,
+        "고치기 모든 칸",
+        "update_task",
+        &[
+            "update-task",
+            "TSK-1",
+            "title=T",
+            "type=chore",
+            "priority=low",
+            "repo=x/y",
+            "project=beta",
+            "base=main",
+            "body=새 본문\n두 줄",
+            r#"labels=["a","b"]"#,
+            r#"criteria=[{"text":"첫째 기준","done":true},"둘째 기준","셋째"]"#,
+            r#"refs=[{"kind":"github","target":"x/y#1"}]"#,
+            "actor=runner",
+        ],
+        json!({"id": "TSK-1", "title": "T", "type": "chore", "priority": "low", "repo": "x/y", "project": "beta", "base": "main", "body": "새 본문\n두 줄", "labels": r#"["a","b"]"#,
+               "criteria": r#"[{"text":"첫째 기준","done":true},"둘째 기준","셋째"]"#, "refs": r#"[{"kind":"github","target":"x/y#1"}]"#, "actor": "runner"}),
+        Some("TSK-1"),
+    );
+    task_step(
+        h,
+        "고치기 기준 확인을 풀고 다시 확인",
+        "update_task",
+        &[
+            "update-task",
+            "TSK-1",
+            r#"criteria=[{"text":"첫째 기준","done":false},{"text":"둘째 기준","done":true,"checkedAt":"2026-11-01T00:00:00Z","checkedBy":"me"},"셋째"]"#,
+        ],
+        json!({"id": "TSK-1", "criteria": r#"[{"text":"첫째 기준","done":false},{"text":"둘째 기준","done":true,"checkedAt":"2026-11-01T00:00:00Z","checkedBy":"me"},"셋째"]"#}),
+        Some("TSK-1"),
+    );
+    task_step(
+        h,
+        "고치기 지움(프로젝트·base·저장소·라벨·자원)",
+        "update_task",
+        &[
+            "update-task",
+            "TSK-1",
+            "project=",
+            "base=",
+            "repo=",
+            "labels=[]",
+            "refs=[]",
+        ],
+        json!({"id": "TSK-1", "project": "", "base": "", "repo": "", "labels": "[]", "refs": "[]"}),
+        Some("TSK-1"),
+    );
+    task_step(
+        h,
+        "고치기 배열 인자",
+        "update_task",
+        &[
+            "update-task",
+            "TSK-1",
+            "repo=owner/name",
+            r#"labels=["z"]"#,
+            r#"criteria=["새 기준"]"#,
+        ],
+        json!({"id": "TSK-1", "repo": "owner/name", "labels": ["z"], "criteria": ["새 기준"]}),
+        Some("TSK-1"),
+    );
+    for (label, java, rust, token) in [
+        (
+            "확인 값 없음",
+            vec!["update-task", "TSK-1", "title=x"],
+            json!({"id": "TSK-1", "title": "x"}),
+            None,
+        ),
+        (
+            "확인 값 틀림",
+            vec!["update-task", "TSK-1", "title=x", "f1=f1:deadbeef"],
+            json!({"id": "TSK-1", "title": "x", "f1": "f1:deadbeef"}),
+            None,
+        ),
+        (
+            "제목 공백",
+            vec!["update-task", "TSK-1", "title= "],
+            json!({"id": "TSK-1", "title": " "}),
+            Some("TSK-1"),
+        ),
+        ("키 없음", vec!["update-task"], json!({}), None),
+        (
+            "없는 키",
+            vec!["update-task", "TSK-999", "title=x"],
+            json!({"id": "TSK-999", "title": "x"}),
+            None,
+        ),
+        (
+            "프로젝트 없음",
+            vec!["update-task", "TSK-1", "project=nope"],
+            json!({"id": "TSK-1", "project": "nope"}),
+            Some("TSK-1"),
+        ),
+        (
+            "type 모름",
+            vec!["update-task", "TSK-1", "type=zzz"],
+            json!({"id": "TSK-1", "type": "zzz"}),
+            Some("TSK-1"),
+        ),
+        (
+            "actor 모름",
+            vec!["update-task", "TSK-1", "title=x", "actor=bot"],
+            json!({"id": "TSK-1", "title": "x", "actor": "bot"}),
+            Some("TSK-1"),
+        ),
+    ] {
+        task_step(
+            h,
+            &format!("고치기 오류 {label}"),
+            "update_task",
+            &java,
+            rust,
+            token,
+        );
+    }
+    // 모르는 칸이 있는 손으로 쓴 파일: 모르는 칸은 그대로 남고, 읽을 수 없는 파일은 목록에서 건너뛴다
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-20.md",
+        "---\nkey: TSK-20\nid: tkex0001-00000001\ntitle: 손으로 쓴 태스크\nstatus: Draft\nrepo: a/b\nlabels:\n- 하나\n- 하나\n- ' '\ncriteria:\n- 문자열 기준\n- text: 맵 기준\n  done: 'TRUE'\n  checkedAt: 2026-11-02T10:00:00+09:00\n- {text: ' ', done: true}\nrefs:\n- {kind: note, target: ndfx0002-00000002}\n- {kind: web, target: x}\nlinks:\n- {type: blocks, to: TSK-1}\n- {type: nope, to: TSK-1}\ncustom: 5\nscore: 1.5\nflag: yes\nnested:\n  a: [1, 2]\n  b:\n    c: d\nempty:\nlist:\n- x: 1\n  y: [a, b]\n---\n\n손으로 쓴 본문\n",
+    );
+    put_both(h, ".aisurada/tasks/TSK-21.md", "머리말이 없다\n");
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-22.md",
+        "---\nkey: TSK-23\nid: tkex0002-00000002\ntitle: 이름이 다르다\nstatus: draft\n---\n",
+    );
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-24.md",
+        "---\nkey: TSK-24\nid: tkex0001-00000001\ntitle: id가 겹친다\nstatus: draft\n---\n",
+    );
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-25.md",
+        "---\nkey: TSK-25\nid: tkex0003-00000003\ntitle: 상태 모름\nstatus: zzz\n---\n",
+    );
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-26.md",
+        "---\nkey: TSK-26\nid: nope\ntitle: id 모양\nstatus: draft\n---\n",
+    );
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-27.md",
+        &format!(
+            "---\nkey: TSK-27\nid: tkex0004-00000004\ntitle: 크다\nstatus: draft\n---\n{}",
+            "a".repeat(400_001)
+        ),
+    );
+    task_step(
+        h,
+        "목록에 건너뛴 파일",
+        "list_tasks",
+        &["list-tasks"],
+        json!({}),
+        None,
+    );
+    task_step(
+        h,
+        "보기 손으로 쓴 태스크",
+        "get_task",
+        &["get-task", "TSK-20"],
+        json!({"id": "TSK-20"}),
+        None,
+    );
+    task_step(
+        h,
+        "고치기 손으로 쓴 태스크(모르는 칸이 남는다)",
+        "update_task",
+        &["update-task", "TSK-20", "title=다시 쓴 제목"],
+        json!({"id": "TSK-20", "title": "다시 쓴 제목"}),
+        Some("TSK-20"),
+    );
+
+    // ---- 상태 ----
+    task_step(
+        h,
+        "상태 Draft → Ready",
+        "transition_task",
+        &["transition-task", "TSK-2", "to=ready-for-develop"],
+        json!({"id": "TSK-2", "to": "ready-for-develop"}),
+        None,
+    );
+    for (label, java, rust) in [
+        (
+            "사람이 할 수 없는 전이",
+            vec!["transition-task", "TSK-2", "to=in-review"],
+            json!({"id": "TSK-2", "to": "in-review"}),
+        ),
+        (
+            "러너만 하는 전이를 사람이",
+            vec![
+                "transition-task",
+                "TSK-3",
+                "to=ready-for-develop",
+                "actor=runner",
+            ],
+            json!({"id": "TSK-3", "to": "ready-for-develop", "actor": "runner"}),
+        ),
+        (
+            "기대한 상태와 다름",
+            vec!["transition-task", "TSK-2", "to=in-progress", "from=draft"],
+            json!({"id": "TSK-2", "to": "in-progress", "from": "draft"}),
+        ),
+        (
+            "기대한 상태 모름",
+            vec!["transition-task", "TSK-2", "to=in-progress", "from=zzz"],
+            json!({"id": "TSK-2", "to": "in-progress", "from": "zzz"}),
+        ),
+        (
+            "to 없음",
+            vec!["transition-task", "TSK-2"],
+            json!({"id": "TSK-2"}),
+        ),
+        (
+            "to 모름",
+            vec!["transition-task", "TSK-2", "to=zzz"],
+            json!({"id": "TSK-2", "to": "zzz"}),
+        ),
+        (
+            "actor 모름",
+            vec!["transition-task", "TSK-2", "to=in-progress", "actor=bot"],
+            json!({"id": "TSK-2", "to": "in-progress", "actor": "bot"}),
+        ),
+        (
+            "같은 상태로",
+            vec!["transition-task", "TSK-2", "to=ready-for-develop"],
+            json!({"id": "TSK-2", "to": "ready-for-develop"}),
+        ),
+    ] {
+        task_step(
+            h,
+            &format!("상태 오류 {label}"),
+            "transition_task",
+            &java,
+            rust,
+            None,
+        );
+    }
+    task_step(
+        h,
+        "상태 Ready → In Progress(기대한 상태 맞음)",
+        "transition_task",
+        &[
+            "transition-task",
+            "TSK-2",
+            "to=In_Progress",
+            "from=Ready For Develop",
+        ],
+        json!({"id": "TSK-2", "to": "In_Progress", "from": "Ready For Develop"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 InProgress → Waiting(러너)",
+        "transition_task",
+        &[
+            "transition-task",
+            "TSK-2",
+            "to=waiting-answer",
+            "actor=runner",
+        ],
+        json!({"id": "TSK-2", "to": "waiting-answer", "actor": "runner"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 Waiting → InProgress",
+        "transition_task",
+        &["transition-task", "TSK-2", "to=in-progress"],
+        json!({"id": "TSK-2", "to": "in-progress"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 InProgress → InReview(러너)",
+        "transition_task",
+        &["transition-task", "TSK-2", "to=in-review", "actor=runner"],
+        json!({"id": "TSK-2", "to": "in-review", "actor": "runner"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 InReview → Done",
+        "transition_task",
+        &["transition-task", "TSK-2", "to=done"],
+        json!({"id": "TSK-2", "to": "done"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 Draft → Cancelled",
+        "transition_task",
+        &["transition-task", "TSK-4", "to=cancelled"],
+        json!({"id": "TSK-4", "to": "cancelled"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 Cancelled → Draft",
+        "transition_task",
+        &["transition-task", "TSK-4", "to=draft"],
+        json!({"id": "TSK-4", "to": "draft"}),
+        None,
+    );
+    task_step(
+        h,
+        "상태 Ready 조건이 안 찬 것(저장소를 지움)",
+        "update_task",
+        &["update-task", "TSK-5", "repo="],
+        json!({"id": "TSK-5", "repo": ""}),
+        Some("TSK-5"),
+    );
+    task_step(
+        h,
+        "상태 오류 Ready 조건",
+        "transition_task",
+        &["transition-task", "TSK-5", "to=ready-for-develop"],
+        json!({"id": "TSK-5", "to": "ready-for-develop"}),
+        None,
+    );
+
+    // ---- 연결 ----
+    task_step(
+        h,
+        "연결 막고 있음",
+        "link_tasks",
+        &["link-tasks", "TSK-3", "TSK-4", "type=blocks"],
+        json!({"from": "TSK-3", "to": "TSK-4", "type": "blocks"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 같은 연결을 또",
+        "link_tasks",
+        &["link-tasks", "TSK-3", "TSK-4", "type=blocks"],
+        json!({"from": "TSK-3", "to": "TSK-4", "type": "blocks"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 관련",
+        "link_tasks",
+        &["link-tasks", "TSK-3", "TSK-6", "type=Relates"],
+        json!({"from": "TSK-3", "to": "TSK-6", "type": "Relates"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 관련을 반대쪽에서(바뀐 것 없음)",
+        "link_tasks",
+        &["link-tasks", "TSK-6", "TSK-3", "type=relates"],
+        json!({"from": "TSK-6", "to": "TSK-3", "type": "relates"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 중복",
+        "link_tasks",
+        &["link-tasks", "tkzz", "TSK-7", "type=duplicates"],
+        json!({"from": "tkzz", "to": "TSK-7", "type": "duplicates"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 중복(유효)",
+        "link_tasks",
+        &["link-tasks", "TSK-7", "TSK-8", "type=duplicates"],
+        json!({"from": "TSK-7", "to": "TSK-8", "type": "duplicates"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 막힌 태스크를 시작하려 함",
+        "update_task",
+        &["update-task", "TSK-4", "repo=owner/name"],
+        json!({"id": "TSK-4", "repo": "owner/name"}),
+        Some("TSK-4"),
+    );
+    task_step(
+        h,
+        "연결 Ready로",
+        "transition_task",
+        &["transition-task", "TSK-4", "to=ready-for-develop"],
+        json!({"id": "TSK-4", "to": "ready-for-develop"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 오류 막힌 것을 시작",
+        "transition_task",
+        &["transition-task", "TSK-4", "to=in-progress"],
+        json!({"id": "TSK-4", "to": "in-progress"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 보기(받은 쪽 이름)",
+        "get_task",
+        &["get-task", "TSK-4"],
+        json!({"id": "TSK-4"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 풀기(반대쪽에서도 풀린다)",
+        "link_tasks",
+        &["link-tasks", "TSK-4", "TSK-3", "type=blocks", "remove=true"],
+        json!({"from": "TSK-4", "to": "TSK-3", "type": "blocks", "remove": true}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 풀 것이 없음",
+        "link_tasks",
+        &["link-tasks", "TSK-4", "TSK-3", "type=blocks", "remove=true"],
+        json!({"from": "TSK-4", "to": "TSK-3", "type": "blocks", "remove": "true"}),
+        None,
+    );
+    task_step(
+        h,
+        "연결 다시 걸고",
+        "link_tasks",
+        &["link-tasks", "TSK-3", "TSK-4", "type=blocks"],
+        json!({"from": "TSK-3", "to": "TSK-4", "type": "blocks"}),
+        None,
+    );
+    for (label, java, rust) in [
+        (
+            "서로 막음",
+            vec!["link-tasks", "TSK-4", "TSK-3", "type=blocks"],
+            json!({"from": "TSK-4", "to": "TSK-3", "type": "blocks"}),
+        ),
+        (
+            "자기 자신",
+            vec!["link-tasks", "TSK-3", "TSK-3", "type=blocks"],
+            json!({"from": "TSK-3", "to": "TSK-3", "type": "blocks"}),
+        ),
+        (
+            "종류 모름",
+            vec!["link-tasks", "TSK-3", "TSK-4", "type=zzz"],
+            json!({"from": "TSK-3", "to": "TSK-4", "type": "zzz"}),
+        ),
+        (
+            "종류 없음",
+            vec!["link-tasks", "TSK-3", "TSK-4"],
+            json!({"from": "TSK-3", "to": "TSK-4"}),
+        ),
+        (
+            "인자 하나",
+            vec!["link-tasks", "TSK-3", "type=blocks"],
+            json!({"from": "TSK-3", "type": "blocks"}),
+        ),
+        (
+            "없는 대상",
+            vec!["link-tasks", "TSK-3", "TSK-999", "type=blocks"],
+            json!({"from": "TSK-3", "to": "TSK-999", "type": "blocks"}),
+        ),
+        (
+            "키 모양",
+            vec!["link-tasks", "TSK-3", "x", "type=blocks"],
+            json!({"from": "TSK-3", "to": "x", "type": "blocks"}),
+        ),
+    ] {
+        task_step(
+            h,
+            &format!("연결 오류 {label}"),
+            "link_tasks",
+            &java,
+            rust,
+            None,
+        );
+    }
+    task_step(
+        h,
+        "연결 대상이 Done 이 되면 막힘이 풀림",
+        "transition_task",
+        &["transition-task", "TSK-3", "to=cancelled"],
+        json!({"id": "TSK-3", "to": "cancelled"}),
+        None,
+    );
+
+    // ---- 댓글 ----
+    task_step(
+        h,
+        "댓글",
+        "add_task_comment",
+        &["add-task-comment", "TSK-1", "body=  댓글: 'a' \"b\" 😀  "],
+        json!({"id": "TSK-1", "body": "  댓글: 'a' \"b\" 😀  "}),
+        None,
+    );
+    task_step(
+        h,
+        "댓글 러너",
+        "add_task_comment",
+        &["add-task-comment", "tkzz", "body=x"],
+        json!({"id": "tkzz", "body": "x"}),
+        None,
+    );
+    task_step(
+        h,
+        "댓글 러너(유효)",
+        "add_task_comment",
+        &[
+            "add-task-comment",
+            "TSK-1",
+            "body=[보고] 끝",
+            "actor=runner",
+        ],
+        json!({"id": "TSK-1", "body": "[보고] 끝", "actor": "runner"}),
+        None,
+    );
+    for (label, java, rust) in [
+        (
+            "본문 없음",
+            vec!["add-task-comment", "TSK-1"],
+            json!({"id": "TSK-1"}),
+        ),
+        (
+            "본문 공백",
+            vec!["add-task-comment", "TSK-1", "body=  "],
+            json!({"id": "TSK-1", "body": "  "}),
+        ),
+        (
+            "본문 2만자 넘음",
+            vec![
+                "add-task-comment",
+                "TSK-1",
+                &format!("body={}", "a".repeat(20_001)),
+            ],
+            json!({"id": "TSK-1", "body": "a".repeat(20_001)}),
+        ),
+        (
+            "키 없음",
+            vec!["add-task-comment", "body=x"],
+            json!({"body": "x"}),
+        ),
+        (
+            "actor 모름",
+            vec!["add-task-comment", "TSK-1", "body=x", "actor=bot"],
+            json!({"id": "TSK-1", "body": "x", "actor": "bot"}),
+        ),
+    ] {
+        task_step(
+            h,
+            &format!("댓글 오류 {label}"),
+            "add_task_comment",
+            &java,
+            rust,
+            None,
+        );
+    }
+    task_step(
+        h,
+        "보기 활동이 쌓인 태스크",
+        "get_task",
+        &["get-task", "TSK-1", "activity=3"],
+        json!({"id": "TSK-1", "activity": 3}),
+        None,
+    );
+
+    // ---- 휴지통 ----
+    task_step(
+        h,
+        "지우기 막고 있던 태스크",
+        "delete_task",
+        &["delete-task", "TSK-3"],
+        json!({"id": "TSK-3"}),
+        None,
+    );
+    task_step(
+        h,
+        "지우기 막혀 있던 태스크(키로)",
+        "delete_task",
+        &["delete-task", "TSK-4"],
+        json!({"id": "TSK-4"}),
+        None,
+    );
+    task_step(
+        h,
+        "지우기 오류 이미 지움",
+        "delete_task",
+        &["delete-task", "TSK-3"],
+        json!({"id": "TSK-3"}),
+        None,
+    );
+    task_step(
+        h,
+        "지우기 오류 키 없음",
+        "delete_task",
+        &["delete-task"],
+        json!({}),
+        None,
+    );
+    task_step(
+        h,
+        "휴지통 목록",
+        "list_tasks",
+        &["list-tasks", "trash=true"],
+        json!({"trash": true}),
+        None,
+    );
+    task_step(
+        h,
+        "만들기 지운 번호는 다시 안 씀",
+        "create_task",
+        &[
+            "create-task",
+            "title=번호 확인",
+            "repo=a/b",
+            "criteria=[\"x\"]",
+        ],
+        json!({"title": "번호 확인", "repo": "a/b", "criteria": "[\"x\"]"}),
+        None,
+    );
+    task_step(
+        h,
+        "되살리기 키로",
+        "restore_task",
+        &["restore-task", "TSK-3"],
+        json!({"id": "TSK-3"}),
+        None,
+    );
+    task_step(
+        h,
+        "되살리기 오류 휴지통에 없음",
+        "restore_task",
+        &["restore-task", "TSK-3"],
+        json!({"id": "TSK-3"}),
+        None,
+    );
+    task_step(
+        h,
+        "되살리기 오류 키 없음",
+        "restore_task",
+        &["restore-task"],
+        json!({}),
+        None,
+    );
+    // 제자리에 같은 키가 이미 있으면 되살리지 못한다
+    let trashed = Engine::new(&h.b)
+        .call("list_tasks", json!({"trash": true}))
+        .ok()
+        .and_then(|v| v["trash"][0]["id"].as_str().map(str::to_string))
+        .unwrap_or_default();
+    put_both(
+        h,
+        ".aisurada/tasks/TSK-4.md",
+        "---\nkey: TSK-4\nid: tkcf0001-00000001\ntitle: 자리를 차지한 태스크\nstatus: draft\n---\n",
+    );
+    task_step(
+        h,
+        "되살리기 오류 제자리가 참",
+        "restore_task",
+        &["restore-task", &trashed],
+        json!({"id": trashed}),
+        None,
+    );
+    unsafe {
+        env::remove_var("TZ");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -4887,6 +6194,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_sub_note_writes(&mut h);
     compare_comment_writes(&mut h);
     compare_trash_writes(&mut h);
+    compare_task_commands(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {

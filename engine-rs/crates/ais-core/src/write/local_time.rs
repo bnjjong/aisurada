@@ -15,6 +15,8 @@ pub struct LocalClock {
     pub hour: u32,
     pub minute: u32,
     pub second: u32,
+    /// UTC와의 차(초). 동쪽이 양수
+    pub offset_seconds: i64,
 }
 
 /// 유닉스 밀리초를 이 프로세스의 시간대로 풀어 날짜와 시, 분, 초(초 아래는 버림)를 돌려준다.
@@ -41,6 +43,9 @@ pub fn local_clock(millis: i64) -> LocalClock {
             hour: tm.tm_hour as u32,
             minute: tm.tm_min as u32,
             second: tm.tm_sec.min(59) as u32,
+            // `tm_gmtoff`의 형은 플랫폼마다 다르다(`c_long`)
+            #[allow(clippy::useless_conversion)]
+            offset_seconds: i64::from(tm.tm_gmtoff),
         },
         None => {
             let (year, month, day) =
@@ -51,9 +56,37 @@ pub fn local_clock(millis: i64) -> LocalClock {
                 hour: (rest / 3_600_000) as u32,
                 minute: (rest % 3_600_000 / 60_000) as u32,
                 second: (rest % 60_000 / 1000) as u32,
+                offset_seconds: 0,
             }
         }
     }
+}
+
+/// 이 프로세스의 시간대로 본 `yyyy-MM-ddTHH:mm:ss±HH:MM`(Java `ISO_OFFSET_DATE_TIME`, 초 아래는 버림). 오프셋이 0이면 `Z`다.
+pub fn iso_offset_date_time(millis: i64) -> String {
+    let clock = local_clock(millis);
+    let offset = if clock.offset_seconds == 0 {
+        "Z".to_string()
+    } else {
+        let abs = clock.offset_seconds.abs();
+        let mut text = format!(
+            "{}{:02}:{:02}",
+            if clock.offset_seconds < 0 { '-' } else { '+' },
+            abs / 3600,
+            abs % 3600 / 60
+        );
+        if abs % 60 != 0 {
+            text.push_str(&format!(":{:02}", abs % 60));
+        }
+        text
+    };
+    format!(
+        "{}T{:02}:{:02}:{:02}{offset}",
+        clock.date.iso(),
+        clock.hour,
+        clock.minute,
+        clock.second
+    )
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ pub mod error;
 pub mod frontmatter;
 pub mod json;
 pub mod model;
+pub mod task;
 pub mod text;
 pub mod vault;
 pub mod write;
