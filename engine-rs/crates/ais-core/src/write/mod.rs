@@ -13,6 +13,8 @@
 //! - [`project_file`]: 프로젝트 파일 만들기와 저장소 목록 검사
 //! - [`template_file`]: 템플릿 파일 만들기
 //! - [`warnings`]: 쓰기 응답의 경고 글
+//! - [`note_front`]: 노트 머리(YAML) 만들기
+//! - [`meta_writer`]: 노트 머리만 고쳐 쓰기(편집 도장 판정 포함)
 
 pub mod agenda_file;
 pub mod apparatus;
@@ -21,6 +23,8 @@ pub mod autocommit;
 pub mod confine;
 pub mod lock;
 pub mod marker;
+pub mod meta_writer;
+pub mod note_front;
 pub mod pipeline;
 pub mod precondition;
 pub mod project_file;

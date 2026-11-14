@@ -17,8 +17,7 @@ fn text(key: &str, value: &str) -> (Value, Value) {
 }
 
 fn render(pairs: Vec<(Value, Value)>, body: &str) -> Result<Vec<u8>, EngineError> {
-    let head = dump_general_map(&pairs)
-        .map_err(|e| EngineError::internal(format!("템플릿 머리를 쓰지 못했다: {}", e.0)))?;
+    let head = dump_general_map(&pairs).map_err(|e| EngineError::invalid_argument(e.0))?;
     Ok(format!("---\n{head}---\n{body}").into_bytes())
 }
 

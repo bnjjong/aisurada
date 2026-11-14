@@ -18,6 +18,7 @@ pub mod list_sub_notes;
 pub mod list_tags;
 pub mod list_templates;
 pub mod list_trash;
+pub mod note_meta_write;
 pub mod project_write;
 pub mod reindex;
 pub mod search_docs;

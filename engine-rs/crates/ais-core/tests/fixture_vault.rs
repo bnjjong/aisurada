@@ -1407,3 +1407,159 @@ fn initializes_a_workspace_and_seeds_templates_once() {
     );
     let _ = std::fs::remove_dir_all(dir.parent().unwrap());
 }
+
+#[test]
+fn writes_note_meta_with_stamps_and_preconditions() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let parent = "ndfx0002-00000002";
+    let token = |id: &str| {
+        engine.call("get_doc", json!({"id": id})).unwrap()["precondition"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let file = vault.join("notes/demo/2026-11/parent/note.md");
+    let text = || std::fs::read_to_string(&file).unwrap();
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+
+    // 확인 값이 없으면 아무것도 안 쓰고 412다
+    let before = text();
+    assert_eq!(error("set_favorite", json!({"id": parent})).code, "AIS-412");
+    assert_eq!(text(), before);
+
+    // 앱이 켜면 본문은 그대로이고 머리에 즐겨찾기와 편집 도장이 붙는다
+    let first = token(parent);
+    let on = engine
+        .call("set_favorite", json!({"id": parent, "f1": first}))
+        .unwrap();
+    assert_eq!(
+        (on["favorite"].as_bool(), on["changed"].as_bool()),
+        (Some(true), Some(true))
+    );
+    assert!(on["path"].as_str().unwrap().ends_with("/parent"));
+    assert_ne!(on["precondition"].as_str().unwrap(), first);
+    let written = text();
+    assert!(
+        written.contains("favorite: true\n")
+            && written.contains("editedBy: app\n")
+            && written.contains("editedAt: "),
+        "{written}"
+    );
+    assert!(
+        written.ends_with("# 본문 ndfx0002-00000002\n내용 한 줄.\n"),
+        "본문은 그대로: {written}"
+    );
+    // 같은 확인 값을 다시 쓰면 낡은 값이다
+    assert!(
+        error("set_favorite", json!({"id": parent, "f1": first}))
+            .message
+            .starts_with("다른 쪽이 이 노트를 먼저 고쳤어요.")
+    );
+    // 바뀐 것이 없으면 확인 값 없이도 답하고 파일을 안 건드린다
+    let same = engine
+        .call("set_favorite", json!({"id": parent, "favorite": true}))
+        .unwrap();
+    assert_eq!(same["changed"], false);
+    assert_eq!(text(), written);
+
+    // AI 도구가 고치면 편집자가 tool이고 세션과 에이전트(소문자)가 적힌다
+    let off = engine
+        .call("set_favorite", json!({"id": parent, "favorite": false, "f1": token(parent), "caller": "ai", "session": "sess-1", "sessionAgent": "Codex"}))
+        .unwrap();
+    assert_eq!(off["favorite"], false);
+    let by_tool = text();
+    assert!(
+        by_tool.contains("editedBy: tool\n")
+            && by_tool.contains("editedSessionId: sess-1\n")
+            && by_tool.contains("editedSessionAgent: codex\n"),
+        "{by_tool}"
+    );
+    assert!(!by_tool.contains("favorite: true"));
+
+    // 평가: 반올림해서 0~100으로, 메모는 다듬는다. 범위를 벗어나면 400, 지우면 머리에서 빠진다
+    let rated = engine
+        .call(
+            "evaluate_doc",
+            json!({"id": parent, "score": 87.5, "note": " 메모 ", "f1": token(parent)}),
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            rated["evaluation"]["score"].as_u64(),
+            rated["evaluation"]["note"].as_str()
+        ),
+        (Some(88), Some("메모"))
+    );
+    assert!(text().contains("evaluation:\n  score: 88\n  note: 메모\n  at: "));
+    assert_eq!(
+        error(
+            "evaluate_doc",
+            json!({"id": parent, "score": 100.4, "f1": token(parent)})
+        )
+        .message,
+        "평가 점수는 0 에서 100 사이여야 한다: 100.4"
+    );
+    assert_eq!(
+        error("evaluate_doc", json!({"id": parent, "f1": token(parent)})).code,
+        "AIS-400"
+    );
+    let cleared = engine
+        .call(
+            "evaluate_doc",
+            json!({"id": parent, "clear": true, "f1": token(parent)}),
+        )
+        .unwrap();
+    assert!(cleared["evaluation"].is_null() && !text().contains("evaluation:"));
+
+    // 연결: 더하고, 이미 있으면 그대로, 빼고, 없는 대상은 경고만 붙는다
+    let loose = "ndfx0003-00000003";
+    let linked = engine
+        .call(
+            "link_docs",
+            json!({"from": parent, "to": loose, "f1": token(parent)}),
+        )
+        .unwrap();
+    assert_eq!(
+        (linked["kind"].as_str(), linked["changed"].as_bool()),
+        (Some("direct"), Some(true))
+    );
+    assert!(text().contains("links:\n  - to: ndfx0003-00000003\n    kind: direct\n"));
+    let again = engine
+        .call("link_docs", json!({"from": parent, "to": loose}))
+        .unwrap();
+    assert_eq!(
+        (again["changed"].as_bool(), again["note"].as_str()),
+        (Some(false), Some("이미 있는 연결이에요."))
+    );
+    let ghost = engine.call("link_docs", json!({"from": parent, "to": "ndzz0001-00000001", "kind": "ATTACH", "f1": token(parent)})).unwrap();
+    assert!(
+        ghost["warning"]
+            .as_str()
+            .unwrap()
+            .starts_with("대상 문서 id를 vault에서 찾지 못했어요(ndzz0001-00000001)")
+    );
+    let removed = engine
+        .call(
+            "link_docs",
+            json!({"from": parent, "to": loose, "remove": true, "f1": token(parent)}),
+        )
+        .unwrap();
+    assert_eq!(
+        (removed["removed"].as_bool(), removed["changed"].as_bool()),
+        (Some(true), Some(true))
+    );
+    assert!(!text().contains(loose));
+    assert_eq!(
+        error("link_docs", json!({"from": parent, "to": parent})).message,
+        format!("자기 자신과는 연결할 수 없다: {parent}")
+    );
+
+    // JSON 노트는 확인 값이 없어도 된다
+    let json_note = engine
+        .call("set_favorite", json!({"id": "ndfx0006-00000006"}))
+        .unwrap();
+    assert_eq!(json_note["changed"], true);
+}

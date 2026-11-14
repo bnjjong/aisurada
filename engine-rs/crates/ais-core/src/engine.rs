@@ -8,8 +8,8 @@ use serde_json::Value;
 use crate::commands::{
     agenda_write, commit_vault, facts_write, get_agenda_facts, get_doc, get_sub_note, get_template,
     history, init_workspace, list_agendas, list_attachments, list_comments, list_docs,
-    list_projects, list_sub_notes, list_tags, list_templates, list_trash, project_write, reindex,
-    search_docs, template_write,
+    list_projects, list_sub_notes, list_tags, list_templates, list_trash, note_meta_write,
+    project_write, reindex, search_docs, template_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -49,6 +49,9 @@ pub const COMMANDS: &[&str] = &[
     "delete_doc_template",
     "update_agenda_facts",
     "init_workspace",
+    "set_favorite",
+    "evaluate_doc",
+    "link_docs",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -64,6 +67,9 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "delete_doc_template",
     "update_agenda_facts",
     "init_workspace",
+    "set_favorite",
+    "evaluate_doc",
+    "link_docs",
     "commit_vault",
 ];
 
@@ -212,6 +218,18 @@ impl Engine {
             "init_workspace" => {
                 let request: init_workspace::InitWorkspaceRequest = parse_args(command, args)?;
                 to_json(init_workspace::execute(&self.vault_root, &request)?)
+            }
+            "set_favorite" => {
+                let request: note_meta_write::SetFavoriteRequest = parse_args(command, args)?;
+                to_json(note_meta_write::set_favorite(&self.vault_root, &request)?)
+            }
+            "evaluate_doc" => {
+                let request: note_meta_write::EvaluateDocRequest = parse_args(command, args)?;
+                to_json(note_meta_write::evaluate_doc(&self.vault_root, &request)?)
+            }
+            "link_docs" => {
+                let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
+                to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
             }
             "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(

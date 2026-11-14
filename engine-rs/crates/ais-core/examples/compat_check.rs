@@ -191,9 +191,12 @@ fn compare(
             // 오류는 Java의 `AIS-코드 메시지` 글과 Rust의 코드·메시지가 같은지 본다
             let rust_text = format!("{} {}", r.code, r.message);
             // Java가 예상 밖 예외로 실패하면 오류 글에 스택 추적이 붙으므로, Rust의 메시지가 그 안에 든 것도 같은 실패로 본다
-            report.record(label, j == rust_text || j.contains(&r.message), || {
-                format!("Java 오류: {j}\nRust 오류: {rust_text}")
-            });
+            report.record(
+                label,
+                j == rust_text
+                    || (j.starts_with("Application run failed") && j.contains(&r.message)),
+                || format!("Java 오류: {j}\nRust 오류: {rust_text}"),
+            );
         }
         (Ok(_), Err(r)) => report.record(label, false, || format!("Java는 성공, Rust는 오류: {r}")),
         (Err(j), Ok(_)) => report.record(label, false, || format!("Java는 오류({j}), Rust는 성공")),
@@ -1214,11 +1217,47 @@ struct WriteHarness<'a> {
     b: PathBuf,
     locks: PathBuf,
     step: u32,
+    /// Java가 성공으로 답한 단계 수(양쪽이 똑같이 실패해서 맞아 보이는 일을 가려내는 데 쓴다)
+    succeeded: u32,
 }
 
 const WRITE_NOW: &str = "1794700000000";
 
 impl WriteHarness<'_> {
+    /// 노트의 지금 확인 값(`f1`). 앞 단계에서 두 사본이 같아졌으므로 Rust 사본에서 읽는다.
+    fn token(&self, id: &str) -> String {
+        Engine::new(&self.b)
+            .call("get_doc", json!({"id": id}))
+            .ok()
+            .and_then(|v| v["precondition"].as_str().map(str::to_string))
+            .unwrap_or_default()
+    }
+
+    /// 노트 머리 쓰기 한 단계. `named`는 Java의 `key=value` 인자이고, `rust`는 같은 뜻의 호출 객체다.
+    /// `token_of`가 있으면 그 노트의 지금 확인 값을 `f1`로 더한다.
+    fn note_step(
+        &mut self,
+        label: &str,
+        command: &str,
+        positional: &[&str],
+        named: &[(&str, &str)],
+        rust: Value,
+        token_of: Option<&str>,
+    ) {
+        let java_name = command.replace('_', "-");
+        let mut java_args: Vec<String> = vec![java_name];
+        java_args.extend(positional.iter().map(|p| p.to_string()));
+        java_args.extend(named.iter().map(|(k, v)| format!("{k}={v}")));
+        let mut args = rust;
+        if let Some(id) = token_of {
+            let token = self.token(id);
+            java_args.push(format!("f1={token}"));
+            args["f1"] = json!(token);
+        }
+        let refs: Vec<&str> = java_args.iter().map(String::as_str).collect();
+        self.step(label, &refs, command, args);
+    }
+
     /// 명령 하나를 두 사본에 돌리고 견준다. Java가 성공했으면 그 응답을 돌려준다.
     fn step(
         &mut self,
@@ -1250,7 +1289,19 @@ impl WriteHarness<'_> {
         }
         ais_core::write::apparatus::reset_random_queue();
         let rust_out = Engine::new(&self.b).call(command, args);
+        if env::var_os("HARNESS_TRACE").is_some() {
+            match &java_out {
+                Ok(_) => eprintln!("TRACE ok  {command} {label}"),
+                Err(e) => eprintln!(
+                    "TRACE err {command} {label} :: {}",
+                    clip(e.lines().next().unwrap_or(""))
+                ),
+            }
+        }
         let ok_value = java_out.as_ref().ok().cloned();
+        if ok_value.is_some() {
+            self.succeeded += 1;
+        }
         let vault = self.a.clone();
         // 두 사본의 폴더 경로가 달라서 딥링크의 `ws=` 값만 다르다. Java 쪽을 Rust 사본 경로로 바꿔 견준다.
         let (from, to) = (
@@ -1315,6 +1366,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         b: copy("rust"),
         locks,
         step: 0,
+        succeeded: 0,
     };
     let id_of = |v: &Option<Value>| {
         v.as_ref()
@@ -2026,6 +2078,412 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         );
     }
 
+    // ---- 노트 머리만 고치기: 즐겨찾기, 평가, 연결 ----
+    let parent = "ndfx0002-00000002";
+    let loose = "ndfx0003-00000003";
+    let odd = "ndfx0004-00000004";
+    h.note_step(
+        "뒤집기",
+        "set_favorite",
+        &[parent],
+        &[],
+        json!({"id": parent}),
+        Some(parent),
+    );
+    h.note_step(
+        "다시 뒤집기",
+        "set_favorite",
+        &[parent],
+        &[],
+        json!({"id": parent}),
+        Some(parent),
+    );
+    h.note_step(
+        "켜고 라벨",
+        "set_favorite",
+        &[parent],
+        &[("favorite", "true"), ("category", " 중요: 라벨 ")],
+        json!({"id": parent, "favorite": true, "category": " 중요: 라벨 "}),
+        Some(parent),
+    );
+    h.note_step(
+        "라벨 지움",
+        "set_favorite",
+        &[parent],
+        &[("category", "")],
+        json!({"id": parent, "category": ""}),
+        Some(parent),
+    );
+    h.note_step(
+        "바뀐 것 없음(확인 값 필요 없다)",
+        "set_favorite",
+        &[parent],
+        &[("favorite", "true")],
+        json!({"id": parent, "favorite": true}),
+        None,
+    );
+    h.note_step(
+        "라벨만 줌",
+        "set_favorite",
+        &[parent],
+        &[("category", "보관")],
+        json!({"id": parent, "category": "보관"}),
+        Some(parent),
+    );
+    h.note_step(
+        "끔",
+        "set_favorite",
+        &[parent],
+        &[("favorite", "false")],
+        json!({"id": parent, "favorite": "false"}),
+        Some(parent),
+    );
+    h.note_step(
+        "확인 값 없음",
+        "set_favorite",
+        &[parent],
+        &[],
+        json!({"id": parent}),
+        None,
+    );
+    let other = h.token(loose);
+    h.note_step(
+        "남의 확인 값",
+        "set_favorite",
+        &[parent],
+        &[("f1", &other)],
+        json!({"id": parent, "f1": other}),
+        None,
+    );
+    h.note_step(
+        "모양이 틀린 확인 값",
+        "set_favorite",
+        &[parent],
+        &[("f1", "abc")],
+        json!({"id": parent, "f1": "abc"}),
+        None,
+    );
+    for (label, positional, named, args) in [
+        (
+            "favorite 글",
+            vec![parent],
+            vec![("favorite", "maybe")],
+            json!({"id": parent, "favorite": "maybe"}),
+        ),
+        ("id 없음", vec![], vec![], json!({})),
+        ("id 모양", vec!["nope"], vec![], json!({"id": "nope"})),
+        (
+            "없는 id",
+            vec!["ndzz0001-00000001"],
+            vec![],
+            json!({"id": "ndzz0001-00000001"}),
+        ),
+    ] {
+        h.note_step(label, "set_favorite", &positional, &named, args, None);
+    }
+    for (label, id) in [
+        ("html 노트", "ndfx0005-00000005"),
+        ("확장자 폴더 노트", "ndfx0007-00000007"),
+        ("기록 층 노트", "ndfx0008-00000008"),
+        ("tier 값이 이상한 노트", "ndfx0009-00000009"),
+        ("created 오프셋 노트", "ndfx000a-0000000a"),
+        ("제목이 공백인 노트", odd),
+    ] {
+        h.note_step(
+            label,
+            "set_favorite",
+            &[id],
+            &[],
+            json!({"id": id}),
+            Some(id),
+        );
+    }
+    h.note_step(
+        "제목이 공백인 노트 라벨",
+        "set_favorite",
+        &[odd],
+        &[("category", "새 라벨")],
+        json!({"id": odd, "category": "새 라벨"}),
+        Some(odd),
+    );
+    h.note_step(
+        "json 노트(확인 값 면제)",
+        "set_favorite",
+        &["ndfx0006-00000006"],
+        &[],
+        json!({"id": "ndfx0006-00000006"}),
+        None,
+    );
+
+    let long_note = "가".repeat(1500);
+    for (label, named, args) in [
+        (
+            "반올림",
+            vec![("score", "87.5"), ("note", " 좋음 ")],
+            json!({"id": parent, "score": 87.5, "note": " 좋음 "}),
+        ),
+        (
+            "0점",
+            vec![("score", "0")],
+            json!({"id": parent, "score": 0}),
+        ),
+        (
+            "100점",
+            vec![("score", "100")],
+            json!({"id": parent, "score": "100"}),
+        ),
+        (
+            "100.4",
+            vec![("score", "100.4")],
+            json!({"id": parent, "score": 100.4}),
+        ),
+        (
+            "공백 점수",
+            vec![("score", " 42 ")],
+            json!({"id": parent, "score": " 42 "}),
+        ),
+        (
+            "메모를 자름",
+            vec![("score", "50"), ("note", &long_note)],
+            json!({"id": parent, "score": 50, "note": long_note}),
+        ),
+        (
+            "지움",
+            vec![("clear", "true")],
+            json!({"id": parent, "clear": true}),
+        ),
+        (
+            "또 지움",
+            vec![("clear", "true")],
+            json!({"id": parent, "clear": "true"}),
+        ),
+    ] {
+        h.note_step(
+            &format!("평가 {label}"),
+            "evaluate_doc",
+            &[parent],
+            &named,
+            args,
+            Some(parent),
+        );
+    }
+    h.note_step(
+        "평가 제목이 공백인 노트",
+        "evaluate_doc",
+        &[odd],
+        &[("score", "55")],
+        json!({"id": odd, "score": 55}),
+        Some(odd),
+    );
+    h.note_step(
+        "평가 지움(그 노트)",
+        "evaluate_doc",
+        &[odd],
+        &[("clear", "true")],
+        json!({"id": odd, "clear": true}),
+        Some(odd),
+    );
+    for (label, positional, named, args, token) in [
+        (
+            "score 없음",
+            vec![parent],
+            vec![],
+            json!({"id": parent}),
+            Some(parent),
+        ),
+        (
+            "빈 score",
+            vec![parent],
+            vec![("score", " ")],
+            json!({"id": parent, "score": " "}),
+            Some(parent),
+        ),
+        (
+            "score 글",
+            vec![parent],
+            vec![("score", "abc")],
+            json!({"id": parent, "score": "abc"}),
+            Some(parent),
+        ),
+        (
+            "101",
+            vec![parent],
+            vec![("score", "101")],
+            json!({"id": parent, "score": 101}),
+            Some(parent),
+        ),
+        (
+            "음수",
+            vec![parent],
+            vec![("score", "-1")],
+            json!({"id": parent, "score": -1}),
+            Some(parent),
+        ),
+        (
+            "확인 값 없음",
+            vec![parent],
+            vec![("score", "10")],
+            json!({"id": parent, "score": 10}),
+            None,
+        ),
+        (
+            "clear 글",
+            vec![parent],
+            vec![("clear", "yes")],
+            json!({"id": parent, "clear": "yes"}),
+            None,
+        ),
+        (
+            "id 모양",
+            vec!["nope"],
+            vec![("score", "10")],
+            json!({"id": "nope", "score": 10}),
+            None,
+        ),
+        (
+            "없는 id",
+            vec!["ndzz0001-00000001"],
+            vec![("score", "10")],
+            json!({"id": "ndzz0001-00000001", "score": 10}),
+            None,
+        ),
+    ] {
+        h.note_step(
+            &format!("평가 오류 {label}"),
+            "evaluate_doc",
+            &positional,
+            &named,
+            args,
+            token,
+        );
+    }
+
+    for (label, to, named, args) in [
+        (
+            "더함(기본 direct)",
+            loose,
+            vec![],
+            json!({"from": parent, "to": loose}),
+        ),
+        (
+            "이미 있다",
+            loose,
+            vec![],
+            json!({"from": parent, "to": loose}),
+        ),
+        (
+            "indirect(대문자)",
+            loose,
+            vec![("kind", "INDIRECT")],
+            json!({"from": parent, "to": loose, "kind": "INDIRECT"}),
+        ),
+        (
+            "attach",
+            loose,
+            vec![("kind", "attach")],
+            json!({"from": parent, "to": loose, "kind": "attach"}),
+        ),
+        (
+            "없는 대상(경고)",
+            "ndzz0001-00000001",
+            vec![],
+            json!({"from": parent, "to": "ndzz0001-00000001"}),
+        ),
+        (
+            "빼기",
+            loose,
+            vec![("remove", "true")],
+            json!({"from": parent, "to": loose, "remove": true}),
+        ),
+        (
+            "없는 연결 빼기",
+            loose,
+            vec![("remove", "true")],
+            json!({"from": parent, "to": loose, "remove": "true"}),
+        ),
+    ] {
+        let no_token = label.contains("이미") || label.contains("없는 연결");
+        h.note_step(
+            &format!("연결 {label}"),
+            "link_docs",
+            &[parent, to],
+            &named,
+            args,
+            if no_token { None } else { Some(parent) },
+        );
+    }
+    h.note_step(
+        "연결 제목이 공백인 노트에 더함",
+        "link_docs",
+        &[odd, "ndfx0004-00000004"],
+        &[("kind", "indirect")],
+        json!({"from": odd, "to": "ndfx0004-00000004", "kind": "indirect"}),
+        Some(odd),
+    );
+    h.note_step(
+        "연결 있던 것 빼기",
+        "link_docs",
+        &[odd, "ndfx0002-00000002"],
+        &[("remove", "true")],
+        json!({"from": odd, "to": "ndfx0002-00000002", "remove": true}),
+        Some(odd),
+    );
+    for (label, positional, named, args) in [
+        (
+            "자기 자신",
+            vec![parent, parent],
+            vec![],
+            json!({"from": parent, "to": parent}),
+        ),
+        (
+            "모르는 종류",
+            vec![parent, loose],
+            vec![("kind", "zzz")],
+            json!({"from": parent, "to": loose, "kind": "zzz"}),
+        ),
+        (
+            "remove 글",
+            vec![parent, loose],
+            vec![("remove", "maybe")],
+            json!({"from": parent, "to": loose, "remove": "maybe"}),
+        ),
+        ("대상 없음", vec![parent], vec![], json!({"from": parent})),
+        ("출발 없음", vec![], vec![], json!({})),
+        (
+            "출발 모양",
+            vec!["nope", loose],
+            vec![],
+            json!({"from": "nope", "to": loose}),
+        ),
+        (
+            "대상 모양",
+            vec![parent, "nope"],
+            vec![],
+            json!({"from": parent, "to": "nope"}),
+        ),
+        (
+            "없는 출발",
+            vec!["ndzz0001-00000001", loose],
+            vec![],
+            json!({"from": "ndzz0001-00000001", "to": loose}),
+        ),
+        (
+            "확인 값 없음",
+            vec![parent, loose],
+            vec![],
+            json!({"from": parent, "to": loose}),
+        ),
+    ] {
+        h.note_step(
+            &format!("연결 오류 {label}"),
+            "link_docs",
+            &positional,
+            &named,
+            args,
+            None,
+        );
+    }
+
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {
         let (a, b) = (
@@ -2090,6 +2548,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         b: b1,
         locks: h.locks.clone(),
         step: 500,
+        succeeded: 0,
     };
     init.step(
         "이름 지정",
@@ -2150,6 +2609,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         b: b2,
         locks: init.locks.clone(),
         step: 700,
+        succeeded: 0,
     };
     seeding.step(
         "폴더 이름을 씀",
@@ -2168,6 +2628,11 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         &["init-workspace", "templates=[]"],
         "init_workspace",
         json!({"templates": "[]"}),
+    );
+    println!(
+        "  (쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개. 나머지는 일부러 넣은 오류 사례)",
+        h.step + (init.step - 500) + (seeding.step - 700),
+        h.succeeded + init.succeeded + seeding.succeeded
     );
     let _ = fs::remove_dir_all(&root);
 }

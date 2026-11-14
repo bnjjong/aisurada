@@ -85,6 +85,12 @@ pub(crate) fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> 
     }
 }
 
+/// 파일에 적을 에이전트 이름: 소문자로 바꿔 이름 모양이면 그것, claude이거나 모양이 아니면 `None`(Java `SessionAgents.forFile`)
+pub(crate) fn agent_for_file(agent: &str) -> Option<String> {
+    let lower = trim(agent).to_lowercase();
+    (lower != "claude" && AGENT_NAME.is_match(&lower)).then_some(lower)
+}
+
 /// 세션 에이전트 이름을 다듬습니다. claude이거나 이름 모양이 아니면 `None`(줄이 없으면 claude로 본다).
 pub(crate) fn read_agent(raw: Option<&Value>) -> Option<String> {
     let Some(Value::Str(agent)) = raw else {

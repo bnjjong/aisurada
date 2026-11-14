@@ -18,6 +18,8 @@ pub struct WriteContext {
     pub caller: Caller,
     /// AI 도구가 보낸 세션 id
     pub session: Option<String>,
+    /// 세션을 연 에이전트 이름(`codex` 따위). 없으면 claude로 본다. 노트에 적는 편집 도장이 읽는다.
+    pub session_agent: Option<String>,
 }
 
 pub struct WriteScope {
