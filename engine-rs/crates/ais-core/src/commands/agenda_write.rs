@@ -83,7 +83,7 @@ fn response(info: &AgendaInfo, vault: &Path) -> AgendaWriteResponse {
 }
 
 /// 색 인자: 비면 `None`, 목록에 없으면 400
-fn hue_arg(raw: Option<&str>) -> Result<Option<String>, EngineError> {
+pub(crate) fn hue_arg(raw: Option<&str>) -> Result<Option<String>, EngineError> {
     let hue = trim(raw.unwrap_or(""));
     if hue.is_empty() {
         return Ok(None);

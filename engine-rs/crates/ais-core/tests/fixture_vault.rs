@@ -1142,3 +1142,84 @@ fn commit_vault_answers_with_outcome_and_blocked() {
         (Some("disabled"), Some("off"))
     );
 }
+
+#[test]
+fn writes_projects_through_the_write_foundation() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let repos = r#"[{"name":"web","path":"/tmp/a b","github":"owner/name","githubId":9},{"name":"api","github":"o/n"}]"#;
+
+    let created = engine
+        .call(
+            "create_project",
+            json!({"title": "새 프로젝트", "hue": "teal", "summary": "요약", "repos": repos}),
+        )
+        .unwrap();
+    let id = created["id"].as_str().unwrap().to_string();
+    assert!(id.starts_with("pj") && created["slug"] == "새-프로젝트");
+    assert_eq!(created["repos"][0]["githubId"], 9);
+    let file = vault.join(".aisurada/projects/새-프로젝트.md");
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        format!(
+            "---\nid: {id}\nslug: 새-프로젝트\ntitle: 새 프로젝트\nhue: teal\nrepos: {repos}\n---\n요약"
+        )
+    );
+
+    // 저장소를 통째로 바꾸고 지운다(빈 글)
+    let swapped = engine
+        .call(
+            "update_project",
+            json!({"id": id, "repos": r#"[{"name":"cli","path":"/x"}]"#}),
+        )
+        .unwrap();
+    assert_eq!(swapped["repos"].as_array().unwrap().len(), 1);
+    let cleared = engine
+        .call("update_project", json!({"id": id, "repos": ""}))
+        .unwrap();
+    assert!(cleared.get("repos").is_none());
+    assert!(!std::fs::read_to_string(&file).unwrap().contains("repos:"));
+
+    // 오류는 Java와 같은 문구
+    let message = |command: &str, args: Value| engine.call(command, args).unwrap_err().message;
+    assert_eq!(
+        message("create_project", json!({"title": "x", "repos": "[1]"})),
+        "repos[1] 는 객체여야 한다"
+    );
+    assert_eq!(
+        message("update_project", json!({"id": "nope"})),
+        "프로젝트 id 모양이 아니다: nope"
+    );
+    assert_eq!(
+        message("update_project", json!({"id": "pjzz0001-00000000"})),
+        "Project not found: pjzz0001-00000000"
+    );
+
+    // 아젠다가 쓰는 프로젝트는 못 지우고, 아젠다를 옮기면 휴지통 폴더로 옮긴다
+    let agenda = engine
+        .call(
+            "create_agenda",
+            json!({"title": "소속", "project": "새-프로젝트"}),
+        )
+        .unwrap();
+    assert!(
+        message("delete_project", json!({"id": id}))
+            .starts_with("아젠다가 1건 있는 프로젝트는 지울 수 없다.")
+    );
+    engine
+        .call("update_agenda", json!({"id": agenda["id"], "project": ""}))
+        .unwrap();
+    let deleted = engine.call("delete_project", json!({"id": id})).unwrap();
+    assert_eq!(
+        deleted["archivedPath"],
+        format!(".aisurada/trash/projects/새-프로젝트-{id}.md")
+    );
+    assert!(
+        !file.exists()
+            && vault
+                .join(deleted["archivedPath"].as_str().unwrap())
+                .is_file()
+    );
+}

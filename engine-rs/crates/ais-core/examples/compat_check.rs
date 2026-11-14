@@ -1511,6 +1511,208 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     }
     h.step("id 없음", &["delete-agenda"], "delete_agenda", json!({}));
 
+    // ---- 프로젝트 ----
+    let repos_ok = r#"[{"name":"web","path":"/tmp/a b","github":"owner/name","githubId":123},{"name":"api","github":"o/n"}]"#;
+    let repos_special = r#"[{"name":"q","path":"/tmp/q\"uote\\back\tab","github":"o/n.x_y-z"}]"#;
+    let p_min = h.step(
+        "최소",
+        &["create-project", "title=새 프로젝트"],
+        "create_project",
+        json!({"title": "새 프로젝트"}),
+    );
+    h.step(
+        "같은 이름",
+        &["create-project", "title=새 프로젝트"],
+        "create_project",
+        json!({"title": "새 프로젝트"}),
+    );
+    let p_full = h.step(
+        "모든 값",
+        &["create-project", "title=Alpha: Beta #1", "hue=teal", "summary=요약\n둘째 줄", &format!("repos={repos_ok}")],
+        "create_project",
+        json!({"title": "Alpha: Beta #1", "hue": "teal", "summary": "요약\n둘째 줄", "repos": repos_ok}),
+    );
+    h.step(
+        "저장소 특수 글자",
+        &[
+            "create-project",
+            "title=특수",
+            &format!("repos={repos_special}"),
+        ],
+        "create_project",
+        json!({"title": "특수", "repos": repos_special}),
+    );
+    let too_many = format!("[{}]", vec![r#"{"name":"a","path":"/x"}"#; 21].join(","));
+    for (label, repos) in [
+        ("저장소 객체 아님", "[1]".to_string()),
+        ("저장소 배열 아님", "{}".to_string()),
+        (
+            "모르는 키",
+            r#"[{"name":"a","path":"/x","bad":1}]"#.to_string(),
+        ),
+        ("이름 없음", r#"[{"path":"/x"}]"#.to_string()),
+        ("이름이 글 아님", r#"[{"name":1,"path":"/x"}]"#.to_string()),
+        (
+            "안전하지 않은 이름",
+            r#"[{"name":"a/b","path":"/x"}]"#.to_string(),
+        ),
+        ("상대 경로", r#"[{"name":"a","path":"rel"}]"#.to_string()),
+        (
+            "github 모양",
+            r#"[{"name":"a","github":"nope"}]"#.to_string(),
+        ),
+        (
+            "githubId 0",
+            r#"[{"name":"a","github":"o/n","githubId":0}]"#.to_string(),
+        ),
+        (
+            "githubId 글",
+            r#"[{"name":"a","github":"o/n","githubId":"5"}]"#.to_string(),
+        ),
+        (
+            "githubId만",
+            r#"[{"name":"a","path":"/x","githubId":5}]"#.to_string(),
+        ),
+        ("path도 github도 없음", r#"[{"name":"a"}]"#.to_string()),
+        (
+            "이름 겹침",
+            r#"[{"name":"a","path":"/x"},{"name":"a","path":"/y"}]"#.to_string(),
+        ),
+        ("21개", too_many),
+    ] {
+        h.step(
+            &format!("저장소 오류 {label}"),
+            &["create-project", "title=오류", &format!("repos={repos}")],
+            "create_project",
+            json!({"title": "오류", "repos": repos}),
+        );
+    }
+    for (label, java_args, args) in [
+        ("제목 없음", vec!["create-project"], json!({})),
+        (
+            "모르는 색",
+            vec!["create-project", "title=x", "hue=zzz"],
+            json!({"title": "x", "hue": "zzz"}),
+        ),
+    ] {
+        h.step(label, &java_args, "create_project", args);
+    }
+    if let Some(id) = id_of(&p_full) {
+        h.step(
+            "이름과 색",
+            &["update-project", &id, "title=바뀐 프로젝트", "hue=red"],
+            "update_project",
+            json!({"id": id, "title": "바뀐 프로젝트", "hue": "red"}),
+        );
+        h.step(
+            "요약",
+            &["update-project", &id, "summary=새 요약\n"],
+            "update_project",
+            json!({"id": id, "summary": "새 요약\n"}),
+        );
+        let swapped = r#"[{"name":"cli","path":"/usr/local/cli"}]"#;
+        h.step(
+            "저장소 바꿈",
+            &["update-project", &id, &format!("repos={swapped}")],
+            "update_project",
+            json!({"id": id, "repos": swapped}),
+        );
+        h.step(
+            "저장소 지움",
+            &["update-project", &id, "repos="],
+            "update_project",
+            json!({"id": id, "repos": ""}),
+        );
+        h.step(
+            "아무것도 안 줌",
+            &["update-project", &id],
+            "update_project",
+            json!({"id": id}),
+        );
+        h.step(
+            "저장소 오류",
+            &["update-project", &id, "repos=[1]"],
+            "update_project",
+            json!({"id": id, "repos": "[1]"}),
+        );
+    }
+    for (label, java_args, args) in [
+        ("id 없음", vec!["update-project"], json!({})),
+        (
+            "id 모양 아님",
+            vec!["update-project", "nope"],
+            json!({"id": "nope"}),
+        ),
+        (
+            "없는 id",
+            vec!["update-project", "pjzz0001-00000000", "title=x"],
+            json!({"id": "pjzz0001-00000000", "title": "x"}),
+        ),
+    ] {
+        h.step(
+            &format!("프로젝트 {label}"),
+            &java_args,
+            "update_project",
+            args,
+        );
+    }
+    // 지우기: 아젠다가 쓰는 프로젝트는 거절하고, 아젠다를 옮기면 지운다
+    if let Some(id) = id_of(&p_full) {
+        let slug = p_full
+            .as_ref()
+            .and_then(|v| v["slug"].as_str().map(str::to_string))
+            .unwrap_or_default();
+        let user = h.step(
+            "프로젝트를 쓰는 아젠다",
+            &[
+                "create-agenda",
+                "title=프로젝트 소속",
+                &format!("project={slug}"),
+            ],
+            "create_agenda",
+            json!({"title": "프로젝트 소속", "project": slug}),
+        );
+        h.step(
+            "아젠다가 있다",
+            &["delete-project", &id],
+            "delete_project",
+            json!({"id": id}),
+        );
+        if let Some(agenda) = id_of(&user) {
+            h.step(
+                "아젠다를 옮김",
+                &["update-agenda", &agenda, "project="],
+                "update_agenda",
+                json!({"id": agenda, "project": ""}),
+            );
+        }
+        h.step(
+            "비어 있다",
+            &["delete-project", &id],
+            "delete_project",
+            json!({"id": id}),
+        );
+        h.step(
+            "이미 지웠다",
+            &["delete-project", &id],
+            "delete_project",
+            json!({"id": id}),
+        );
+    }
+    if let Some(id) = id_of(&p_min) {
+        h.step(
+            "최소 프로젝트 지움",
+            &["delete-project", &id],
+            "delete_project",
+            json!({"id": id}),
+        );
+    }
+    h.step(
+        "프로젝트 id 없음",
+        &["delete-project"],
+        "delete_project",
+        json!({}),
+    );
     let _ = fs::remove_dir_all(&root);
 }
 

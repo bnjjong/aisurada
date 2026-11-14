@@ -13,7 +13,12 @@ use crate::text::{compare_utf16, trim, utf16_len};
 
 static PROJECT_ID: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^pj[0-9a-z]+-[0-9a-f]{8}$").unwrap());
-static GITHUB: LazyLock<Regex> = LazyLock::new(|| {
+/// 프로젝트 id 모양인가
+pub fn is_valid_project_id(id: &str) -> bool {
+    PROJECT_ID.is_match(id)
+}
+
+pub(crate) static GITHUB: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$").unwrap()
 });
 

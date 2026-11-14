@@ -10,6 +10,7 @@
 //! - [`pipeline`]: 쓰기 명령 한 번의 길(잠금 → 표식 → 색인 맞추기 → 자동 커밋 기록)
 //! - [`slug`]: 제목에서 폴더·파일 이름(slug) 만들기
 //! - [`agenda_file`]: 아젠다 파일 만들기
+//! - [`project_file`]: 프로젝트 파일 만들기와 저장소 목록 검사
 
 pub mod agenda_file;
 pub mod apparatus;
@@ -20,4 +21,5 @@ pub mod lock;
 pub mod marker;
 pub mod pipeline;
 pub mod precondition;
+pub mod project_file;
 pub mod slug;
