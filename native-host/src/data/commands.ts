@@ -20,6 +20,8 @@ const POSITIONAL: Record<string, string[]> = {
   create_sub_note: ['parent'], update_sub_note: ['parent', 'id'], delete_sub_note: ['parent', 'id'],
   create_comment: ['id', 'subId'], update_comment: ['id', 'subId'], delete_comment: ['id', 'subId'],
   delete_doc: ['id'], restore_doc: ['trashId'], purge_doc: ['trashId'],
+  get_task: ['id'], update_task: ['id'], transition_task: ['id'], add_task_comment: ['id'], delete_task: ['id'], restore_task: ['id'],
+  link_tasks: ['from', 'to'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -27,6 +29,20 @@ export const toArgv = (call: Call): string[] => {
   const placed = positional.map(key => args[key]).filter(value => value !== undefined).map(String);
   const named = Object.fromEntries(Object.entries(args).filter(([key]) => !positional.includes(key)));
   return [call.command.replace(/_/g, '-'), ...placed, ...cells(named)];
+};
+
+/**
+ * `toArgv`의 거꾸로: 옛 `key=value` 문자열 목록을 호출 객체로 바꾼다. 명령 이름은 snake_case로, `POSITIONAL`에 있는 인자는 앞의 자리 값으로 읽고,
+ * 나머지 칸은 `key=value`를 처음 `=`에서 가른다(값은 글 그대로). 태스크 화면이 옛 인자 목록 만드는 함수를 그대로 두고 Rust 길로 보낼 때 쓴다.
+ */
+export const fromArgv = (argv: string[]): Call => {
+  const command = argv[0].replace(/-/g, '_'), positional = POSITIONAL[command] ?? [], rest = argv.slice(1), args: Fields = {};
+  positional.forEach((key, i) => { if (i < rest.length) args[key] = rest[i]; });
+  for (const cell of rest.slice(positional.length)) {
+    const at = cell.indexOf('=');
+    args[at < 0 ? cell : cell.slice(0, at)] = at < 0 ? '' : cell.slice(at + 1);
+  }
+  return Object.keys(args).length ? { command, args } : { command };
 };
 
 export const read = {

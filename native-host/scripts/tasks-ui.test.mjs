@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseRoute, taskAddress } from '../src/navigation/routes.ts';
+import { toArgv } from '../src/data/commands.ts';
 import {
   BOARD_COLUMNS, NO_FILTER, SHELF, activityText, activityWho, addComment, checkedLine, createArgv, createTask, deleteTask, emptyTaskForm, explainError,
   filterChoices, filterTasks, formFromTask, getTask, githubUrl, groupByStatus, isActiveFilter, linkArgv, linkCandidates, linkTasks, listTaskTrash,
@@ -99,7 +100,8 @@ test('linkArgv speaks about this task and flips the owner for the reversed words
 
 test('engine calls: argv, token, from and parsed results', async () => {
   const calls = [];
-  const engine = (answers) => async (argv) => {
+  const engine = (answers) => async (request) => {
+    const argv = Array.isArray(request) ? request : toArgv(request);
     calls.push(argv);
     const a = answers[argv[0]];
     if (a instanceof Error) throw a;

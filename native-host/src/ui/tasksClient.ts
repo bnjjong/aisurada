@@ -7,6 +7,7 @@ import type { EngineCall } from "./resourcesClient.ts";
 import { asText } from "../workspace/types.ts";
 import type { Row } from "../workspace/types.ts";
 import { parseRepos } from "./repoLinks.ts";
+import { fromArgv } from "../data/commands.ts";
 
 export type { EngineCall };
 
@@ -256,13 +257,13 @@ export function toDetail(v: unknown): TaskDetail | null {
 }
 
 export async function listTasks(call: EngineCall): Promise<{ tasks: TaskRow[]; skipped: string[] }> {
-  const out = await call(["list-tasks"]);
+  const out = await call(fromArgv(["list-tasks"]));
   const o = isRecord(out) ? out : {};
   return { tasks: listOf(o.tasks, toTask), skipped: strings(o.skipped) };
 }
 
 export async function listTaskTrash(call: EngineCall): Promise<TaskTrashRow[]> {
-  const out = await call(["list-tasks", "trash=true"]);
+  const out = await call(fromArgv(["list-tasks", "trash=true"]));
   return listOf(isRecord(out) ? out.trash : null, (x) => {
     if (!isRecord(x)) return null;
     const key = text(x.key), id = text(x.id);
@@ -271,7 +272,7 @@ export async function listTaskTrash(call: EngineCall): Promise<TaskTrashRow[]> {
 }
 
 export async function getTask(call: EngineCall, key: string, activity = 100): Promise<TaskDetail> {
-  const d = toDetail(await call(["get-task", key, `activity=${activity}`]));
+  const d = toDetail(await call(fromArgv(["get-task", key, `activity=${activity}`])));
   if (!d) throw new Error("태스크 응답의 모양이 틀려요.");
   return d;
 }
@@ -300,7 +301,7 @@ export function createArgv(form: TaskForm): string[] {
 const refForEngine = (r: TaskRef) => (r.title ? { kind: r.kind, target: r.target, title: r.title } : { kind: r.kind, target: r.target });
 
 export async function createTask(call: EngineCall, form: TaskForm): Promise<TaskDetail> {
-  return detailOf(await call(createArgv(form)));
+  return detailOf(await call(fromArgv(createArgv(form))));
 }
 
 const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -331,18 +332,18 @@ export function updateArgv(existing: TaskDetail, form: TaskForm): string[] | nul
 export async function updateTask(call: EngineCall, existing: TaskDetail, form: TaskForm): Promise<TaskDetail> {
   const argv = updateArgv(existing, form);
   if (!argv) return existing;
-  return detailOf(await call(argv));
+  return detailOf(await call(fromArgv(argv)));
 }
 
 /** 완료 기준 하나의 확인을 뒤집어 저장한다(상세 화면의 체크). */
 export async function toggleCriterion(call: EngineCall, existing: TaskDetail, index: number): Promise<TaskDetail> {
   const next = existing.criteria.map((c, i) => (i === index ? { ...c, done: !c.done } : c));
-  return detailOf(await call(["update-task", existing.key, `f1=${existing.precondition ?? ""}`, `criteria=${JSON.stringify(next.map((c) => ({ text: c.text, done: c.done })))}`]));
+  return detailOf(await call(fromArgv(["update-task", existing.key, `f1=${existing.precondition ?? ""}`, `criteria=${JSON.stringify(next.map((c) => ({ text: c.text, done: c.done })))}`])));
 }
 
 /** 상태를 바꾼다. `from`은 화면이 본 지금 상태다(그 사이에 러너나 다른 창이 먼저 바꿨으면 엔진이 거절한다). */
 export async function transitionTask(call: EngineCall, task: Pick<TaskRow, "key" | "status">, to: TaskStatus): Promise<TaskDetail> {
-  return detailOf(await call(["transition-task", task.key, `to=${to}`, `from=${task.status}`]));
+  return detailOf(await call(fromArgv(["transition-task", task.key, `to=${to}`, `from=${task.status}`])));
 }
 
 /**
@@ -358,19 +359,19 @@ export function linkArgv(current: string, other: string, relation: RelationType,
 }
 
 export async function linkTasks(call: EngineCall, current: string, other: string, relation: RelationType, remove = false): Promise<void> {
-  await call(linkArgv(current, other, relation, remove));
+  await call(fromArgv(linkArgv(current, other, relation, remove)));
 }
 
 export async function addComment(call: EngineCall, key: string, body: string): Promise<void> {
-  await call(["add-task-comment", key, `body=${body.trim()}`]);
+  await call(fromArgv(["add-task-comment", key, `body=${body.trim()}`]));
 }
 
 export async function deleteTask(call: EngineCall, key: string): Promise<void> {
-  await call(["delete-task", key]);
+  await call(fromArgv(["delete-task", key]));
 }
 
 export async function restoreTask(call: EngineCall, key: string): Promise<void> {
-  await call(["restore-task", key]);
+  await call(fromArgv(["restore-task", key]));
 }
 
 // ---------------------------------------------------------------- 폼

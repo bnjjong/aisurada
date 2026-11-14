@@ -2,9 +2,12 @@
 // 화면이 쓰는 순수한 계산(폼 값 → 저장 인자, 오류 풀이, 참조 확인 목록)을 모아 시험으로 잰다.
 // 규칙은 엔진이 지킨다(참조하지 않은 것은 쓸 수 없는 자원에 안 나온다). 이 층은 규칙을 다시 만들지 않는다.
 
+import type { Call } from "../data/commands.ts";
+
 export type ResourceKind = "skill" | "agent";
 export type Permission = "read" | "edit" | "publish";
-export type EngineCall = (argv: string[]) => Promise<unknown>;
+/** 엔진 호출 한 번. 옛 문자열 목록(Java 엔진)이나 호출 객체(Rust 엔진이 맡은 명령)를 받는다. */
+export type EngineCall = (request: string[] | Call) => Promise<unknown>;
 
 export interface ResourceRow {
   id: string;

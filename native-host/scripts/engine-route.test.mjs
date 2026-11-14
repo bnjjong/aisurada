@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { engineCall, readWorkspace, SidecarCommandError } from '../src/workspace/engine.ts';
-import { read, write } from '../src/data/commands.ts';
+import { read, write, fromArgv, toArgv } from '../src/data/commands.ts';
 
 // 가짜 호스트: 기록을 남기고, 명령마다 정해진 응답을 돌려준다.
 function host({ commands, java = {}, rust = {} } = {}) {
@@ -376,4 +376,30 @@ test('쓰기 스위치: 휴지통 쓰기 4개도 같은 길을 따르고, 옛 �
   await engineCall(off, write.purge('tr1'));
   await engineCall(off, write.emptyTrash());
   assert.deepEqual(seen, [['delete-doc', 'n'], ['restore-doc', 'tr1'], ['purge-doc', 'tr1'], ['empty-trash']]);
+});
+
+test('태스크 명령: 옛 인자 목록을 호출 객체로 바꿔 Rust로 보내고, 꺼져 있으면 같은 인자 목록으로 Java에 간다', async () => {
+  const argvs = [
+    ['create-task', 'title=제목', 'repo=a/b', 'criteria=["x"]', 'type=feature'],
+    ['get-task', 'TSK-1', 'activity=100'],
+    ['list-tasks', 'trash=true'],
+    ['update-task', 'TSK-1', 'f1=f1:abc', 'title=a=b', 'labels=[]'],
+    ['transition-task', 'TSK-1', 'to=done', 'from=in-review'],
+    ['link-tasks', 'TSK-1', 'TSK-2', 'type=blocks', 'remove=true'],
+    ['add-task-comment', 'TSK-1', 'body=안녕'],
+    ['delete-task', 'TSK-1'],
+    ['restore-task', 'TSK-1'],
+  ];
+  for (const argv of argvs) assert.deepEqual(toArgv(fromArgv(argv)), argv, argv[0]);
+  assert.deepEqual(fromArgv(['update-task', 'TSK-1', 'f1=f1:abc', 'title=a=b']), { command: 'update_task', args: { id: 'TSK-1', f1: 'f1:abc', title: 'a=b' } });
+  assert.deepEqual(fromArgv(['link-tasks', 'TSK-1', 'TSK-2', 'type=blocks']), { command: 'link_tasks', args: { from: 'TSK-1', to: 'TSK-2', type: 'blocks' } });
+  assert.deepEqual(fromArgv(['list-tasks']), { command: 'list_tasks' });
+  const names = ['create_task', 'get_task', 'list_tasks', 'update_task', 'transition_task', 'link_tasks', 'add_task_comment', 'delete_task', 'restore_task'];
+  const on = host({ commands: names, rust: Object.fromEntries(names.map(n => [n, () => ({ ok: n })])) });
+  for (const argv of argvs) await engineCall(on, fromArgv(argv));
+  assert.deepEqual(on.calls.map(c => c.args.command), names);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(argvs.map(a => [a[0], argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  for (const argv of argvs) await engineCall(off, fromArgv(argv));
+  assert.deepEqual(seen, argvs);
 });
