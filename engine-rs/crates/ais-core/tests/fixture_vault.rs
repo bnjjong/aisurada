@@ -2192,3 +2192,171 @@ fn writes_comments_and_strips_their_anchors() {
         .unwrap();
     assert!(!only_file.exists());
 }
+
+#[test]
+fn moves_notes_through_the_trash() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let loose = "ndfx0003-00000003"; // 즐겨찾기, 라벨 `보관`
+    let html = "ndfx0005-00000005"; // 단일 .html 파일
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+
+    // 보내기: 노트 폴더가 보관 폴더로 옮겨지고 목록 맨 앞에 항목이 생기며, 즐겨찾기였다는 경고가 붙는다
+    let sent = engine.call("delete_doc", json!({"id": loose})).unwrap();
+    let trash_id = sent["trashId"].as_str().unwrap().to_string();
+    assert!(
+        trash_id.starts_with("tr") && sent["file"] == trash_id.as_str(),
+        "{sent}"
+    );
+    assert_eq!(sent["originalPath"], "notes/demo/loose");
+    assert_eq!(
+        (
+            sent["wasFavorite"].as_bool(),
+            sent["favoriteCategory"].as_str()
+        ),
+        (Some(true), Some("보관"))
+    );
+    assert!(
+        sent["warning"]
+            .as_str()
+            .unwrap()
+            .starts_with("이 노트는 즐겨찾기였어요(카테고리 '보관') — "),
+        "{sent}"
+    );
+    assert!(
+        vault
+            .join(".aisurada/trash/files")
+            .join(&trash_id)
+            .join("note.md")
+            .is_file()
+    );
+    assert!(!vault.join("notes/demo/loose").exists());
+    assert_eq!(error("get_doc", json!({"id": loose})).code, "AIS-404");
+    let listed = engine.call("list_trash", Value::Null).unwrap();
+    assert_eq!(listed["items"][0]["trashId"], trash_id.as_str());
+    let manifest = std::fs::read_to_string(vault.join(".aisurada/trash/trash.json")).unwrap();
+    assert!(
+        manifest.starts_with(&format!(
+            "[\n  {{\n    \"trashId\": \"{trash_id}\",\n    \"file\": \"{trash_id}\","
+        )),
+        "{manifest}"
+    );
+    assert_eq!(
+        error("delete_doc", json!({"id": loose})).message,
+        format!("Note not found: {loose}")
+    );
+
+    // 단일 파일 노트는 확장자가 붙은 이름으로 보관된다
+    let page = engine.call("delete_doc", json!({"id": html})).unwrap();
+    let page_trash = page["trashId"].as_str().unwrap().to_string();
+    assert_eq!(page["file"], format!("{page_trash}.html"));
+    assert!(
+        vault
+            .join(".aisurada/trash/files")
+            .join(format!("{page_trash}.html"))
+            .is_file()
+    );
+
+    // 되살리기: 원래 아젠다의 월별 폴더로 돌아오고 같은 id로 다시 읽힌다. 같은 이름이 있으면 `-restored-`가 붙는다
+    let restored = engine
+        .call("restore_doc", json!({"trashId": &trash_id}))
+        .unwrap();
+    assert_eq!(restored["restored"], true);
+    let restored_path = restored["path"].as_str().unwrap();
+    assert_eq!(restored_path, "notes/demo/2026-11/loose");
+    assert_eq!(
+        engine.call("get_doc", json!({"id": loose})).unwrap()["path"],
+        restored_path
+    );
+    assert!(
+        engine.call("list_trash", Value::Null).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|i| i["trashId"] != trash_id.as_str())
+    );
+    std::fs::create_dir_all(vault.join("notes/work/2026-11/page.html")).unwrap();
+    let again = engine
+        .call("restore_doc", json!({"trashId": &page_trash}))
+        .unwrap();
+    assert!(
+        again["path"].as_str().unwrap().contains("-restored-"),
+        "{again}"
+    );
+    assert_eq!(
+        error("restore_doc", json!({"trashId": &trash_id})).message,
+        format!("TrashEntry not found: {trash_id}")
+    );
+    assert_eq!(
+        error("restore_doc", json!({"trashId": "nope"})).code,
+        "AIS-400"
+    );
+    // 보관 파일이 사라진 항목은 되살릴 수 없고 목록에서도 정리된다
+    assert!(
+        error("restore_doc", json!({"trashId": "trfx0003-000000b3"}))
+            .message
+            .starts_with("보관 파일이 사라져 복구할 수 없어요")
+    );
+    assert!(
+        engine.call("list_trash", Value::Null).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|i| i["trashId"] != "trfx0003-000000b3")
+    );
+
+    // 영구 삭제와 비우기(목록에 없는 보관물은 건드리지 않고 세기만 한다)
+    let gone = engine
+        .call("delete_doc", json!({"id": "ndfx0008-00000008"}))
+        .unwrap();
+    let gone_file = vault
+        .join(".aisurada/trash/files")
+        .join(gone["file"].as_str().unwrap());
+    assert!(gone_file.exists());
+    assert_eq!(
+        engine
+            .call("purge_doc", json!({"trashId": gone["trashId"]}))
+            .unwrap()["purged"],
+        true
+    );
+    assert!(!gone_file.exists());
+    std::fs::write(vault.join(".aisurada/trash/files/orphan.txt"), "고아").unwrap();
+    let emptied = engine.call("empty_trash", Value::Null).unwrap();
+    assert_eq!(
+        (emptied["skipped"].as_u64(), emptied["orphans"].as_u64()),
+        (Some(0), Some(1)),
+        "{emptied}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(vault.join(".aisurada/trash/trash.json")).unwrap(),
+        "[]\n"
+    );
+    assert!(vault.join(".aisurada/trash/files/orphan.txt").exists());
+
+    // 목록이 1,000,000바이트를 넘으면 가장 오래된 항목부터 영구 삭제한다
+    let rows: Vec<String> = (0..340)
+        .map(|n| format!("  {{\"trashId\": \"trbg{n:04x}-0000{n:04x}\", \"file\": \"trbg{n:04x}.md\", \"originalPath\": \"notes/demo/2026-11/b{n}\", \"docId\": \"ndbg{n:04x}-0000{n:04x}\", \"agendaId\": \"agfx0001-0000000a\", \"agendaSlug\": \"demo\", \"title\": \"{}\", \"created\": \"2026-11-01T09:00:00+09:00\", \"trashedAt\": \"2026-11-02T01:00:00.000Z\"}}", "가".repeat(1000)))
+        .collect();
+    std::fs::write(
+        vault.join(".aisurada/trash/trash.json"),
+        format!("[\n{}\n]\n", rows.join(",\n")),
+    )
+    .unwrap();
+    let overflow = engine
+        .call("delete_doc", json!({"id": "ndfx0009-00000009"}))
+        .unwrap();
+    assert!(
+        overflow["autoPurged"]
+            .as_array()
+            .is_some_and(|a| !a.is_empty()),
+        "{overflow}"
+    );
+    assert!(
+        std::fs::metadata(vault.join(".aisurada/trash/trash.json"))
+            .unwrap()
+            .len()
+            <= 1_000_000
+    );
+}

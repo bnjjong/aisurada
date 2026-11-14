@@ -28,6 +28,7 @@ pub mod search_docs;
 pub mod sub_note_write;
 mod subnote;
 pub mod template_write;
+pub mod trash_write;
 
 use serde::Deserialize;
 

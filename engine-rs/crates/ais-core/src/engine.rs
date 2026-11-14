@@ -10,7 +10,7 @@ use crate::commands::{
     get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace, list_agendas,
     list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
     list_templates, list_trash, note_meta_write, project_write, reindex, search_docs,
-    sub_note_write, template_write,
+    sub_note_write, template_write, trash_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -61,6 +61,10 @@ pub const COMMANDS: &[&str] = &[
     "create_comment",
     "update_comment",
     "delete_comment",
+    "delete_doc",
+    "restore_doc",
+    "purge_doc",
+    "empty_trash",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -87,6 +91,10 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "create_comment",
     "update_comment",
     "delete_comment",
+    "delete_doc",
+    "restore_doc",
+    "purge_doc",
+    "empty_trash",
     "commit_vault",
 ];
 
@@ -247,6 +255,22 @@ impl Engine {
             "link_docs" => {
                 let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
                 to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
+            }
+            "delete_doc" => {
+                let request: trash_write::DeleteDocRequest = parse_args(command, args)?;
+                to_json(trash_write::delete_doc(&self.vault_root, &request)?)
+            }
+            "restore_doc" => {
+                let request: trash_write::TrashEntryRequest = parse_args(command, args)?;
+                to_json(trash_write::restore_doc(&self.vault_root, &request)?)
+            }
+            "purge_doc" => {
+                let request: trash_write::TrashEntryRequest = parse_args(command, args)?;
+                to_json(trash_write::purge_doc(&self.vault_root, &request)?)
+            }
+            "empty_trash" => {
+                let request: trash_write::EmptyTrashRequest = parse_args(command, args)?;
+                to_json(trash_write::empty_trash(&self.vault_root, &request)?)
             }
             "create_comment" => {
                 let request: comment_write::CommentWriteRequest = parse_args(command, args)?;

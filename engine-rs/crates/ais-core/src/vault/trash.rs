@@ -33,6 +33,8 @@ pub struct TrashRecord {
     pub created: String,
     /// `YYYY-MM-DDTHH:MM:SS.mmmZ`
     pub trashed_at: String,
+    /// 목록 파일에 적힌 차례(0부터). 쓸 때는 이 차례를 지킨다.
+    pub file_order: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +161,7 @@ pub fn scan_trash(vault_root: &Path) -> TrashScan {
             file: file.to_string(),
             created,
             trashed_at: trashed.clone(),
+            file_order: i,
         };
         entries.push((record, trashed, i));
     }

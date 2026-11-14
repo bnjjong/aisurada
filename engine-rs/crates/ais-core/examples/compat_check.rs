@@ -3434,6 +3434,305 @@ fn compare_comment_writes(h: &mut WriteHarness) {
     }
 }
 
+/// 휴지통 쓰기 한 단계
+fn trash_step(h: &mut WriteHarness, label: &str, command: &str, java: &[&str], rust: Value) {
+    h.step(&format!("휴지통 {label}"), java, command, rust);
+}
+
+/// 문서 id로 지금 휴지통 항목 id를 찾는다(양쪽 사본이 같으므로 Rust 사본에서 읽는다).
+fn trash_id_of(h: &WriteHarness, doc_id: &str) -> String {
+    Engine::new(&h.b)
+        .call("list_trash", Value::Null)
+        .ok()
+        .and_then(|v| {
+            v["items"]
+                .as_array()?
+                .iter()
+                .find(|i| i["docId"] == doc_id)
+                .and_then(|i| i["trashId"].as_str().map(str::to_string))
+        })
+        .unwrap_or_else(|| "trzz0000-00000000".to_string())
+}
+
+/// `delete_doc`, `restore_doc`, `purge_doc`, `empty_trash` 맞대기.
+fn compare_trash_writes(h: &mut WriteHarness) {
+    let parent = "ndfx0002-00000002"; // 후속 노트가 달린 폴더 노트
+    let loose = "ndfx0003-00000003"; // 즐겨찾기(라벨 있음)
+    let html = "ndfx0005-00000005"; // 단일 .html 파일
+    let json_note = "ndfx0006-00000006"; // JSON 본문 폴더 노트
+    let record = "ndfx0008-00000008";
+    let ext = "ndfx00c0-000000c0"; // 확장자 폴더 노트(`ext2.md/`)
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+
+    // ---- 휴지통으로 보내기 ----
+    trash_step(
+        h,
+        "보내기 즐겨찾기 노트(경고)",
+        "delete_doc",
+        &["delete-doc", loose],
+        json!({"id": loose}),
+    );
+    trash_step(
+        h,
+        "보내기 후속 노트가 달린 노트",
+        "delete_doc",
+        &["delete-doc", parent],
+        json!({"id": parent}),
+    );
+    trash_step(
+        h,
+        "보내기 단일 .html",
+        "delete_doc",
+        &["delete-doc", html],
+        json!({"id": html}),
+    );
+    trash_step(
+        h,
+        "보내기 JSON 노트",
+        "delete_doc",
+        &["delete-doc", json_note],
+        json!({"id": json_note}),
+    );
+    trash_step(
+        h,
+        "보내기 확장자 폴더 노트",
+        "delete_doc",
+        &["delete-doc", ext],
+        json!({"id": ext}),
+    );
+    trash_step(
+        h,
+        "보내기 기록 층 노트",
+        "delete_doc",
+        &["delete-doc", record],
+        json!({"id": record}),
+    );
+    for (label, java, rust) in [
+        ("보내기 오류 노트 없음", vec!["delete-doc"], json!({})),
+        (
+            "보내기 오류 노트 공백",
+            vec!["delete-doc", " "],
+            json!({"id": " "}),
+        ),
+        (
+            "보내기 오류 노트 모양",
+            vec!["delete-doc", "nope"],
+            json!({"id": "nope"}),
+        ),
+        (
+            "보내기 오류 없는 노트",
+            vec!["delete-doc", "ndzz0001-00000001"],
+            json!({"id": "ndzz0001-00000001"}),
+        ),
+        (
+            "보내기 오류 이미 보낸 노트",
+            vec!["delete-doc", loose],
+            json!({"id": loose}),
+        ),
+    ] {
+        trash_step(h, label, "delete_doc", &java, rust);
+    }
+
+    // ---- 되살리기 ----
+    let loose_trash = trash_id_of(h, loose);
+    let parent_trash = trash_id_of(h, parent);
+    let html_trash = trash_id_of(h, html);
+    trash_step(
+        h,
+        "되살리기 즐겨찾기 노트",
+        "restore_doc",
+        &["restore-doc", &loose_trash],
+        json!({"trashId": loose_trash}),
+    );
+    // 되살릴 자리에 이미 무엇이 있으면 `-restored-<꼬리>`가 붙는다
+    let (restore_dir, restore_name) = {
+        let item = Engine::new(&h.b)
+            .call("list_trash", Value::Null)
+            .ok()
+            .and_then(|v| {
+                v["items"]
+                    .as_array()?
+                    .iter()
+                    .find(|i| i["trashId"] == parent_trash.as_str())
+                    .cloned()
+            })
+            .unwrap();
+        let original = item["originalPath"].as_str().unwrap().to_string();
+        let name = original.rsplit('/').next().unwrap().to_string();
+        let created = item["created"].as_str().unwrap();
+        (format!("notes/demo/{}", &created[..7]), name)
+    };
+    put_both(h, &format!("{restore_dir}/{restore_name}/keep.txt"), "x\n");
+    trash_step(
+        h,
+        "되살리기 같은 이름이 있음",
+        "restore_doc",
+        &["restore-doc", &parent_trash],
+        json!({"trashId": parent_trash}),
+    );
+    trash_step(
+        h,
+        "되살리기 단일 .html",
+        "restore_doc",
+        &["restore-doc", &html_trash],
+        json!({"trashId": html_trash}),
+    );
+    for (label, java, rust) in [
+        ("되살리기 오류 항목 없음", vec!["restore-doc"], json!({})),
+        (
+            "되살리기 오류 항목 공백",
+            vec!["restore-doc", " "],
+            json!({"trashId": " "}),
+        ),
+        (
+            "되살리기 오류 항목 모양",
+            vec!["restore-doc", "nope"],
+            json!({"trashId": "nope"}),
+        ),
+        (
+            "되살리기 오류 없는 항목",
+            vec!["restore-doc", "trzz0000-00000000"],
+            json!({"trashId": "trzz0000-00000000"}),
+        ),
+        (
+            "되살리기 오류 이미 되살린 항목",
+            vec!["restore-doc", &loose_trash],
+            json!({"trashId": loose_trash}),
+        ),
+    ] {
+        trash_step(h, label, "restore_doc", &java, rust);
+    }
+
+    // 원래 아젠다가 사라진 노트: 새 아젠다에 노트를 만들어 보내고, 아젠다를 지운 뒤 되살리면 `recovered`로 간다
+    let created = h.step(
+        "휴지통 임시 아젠다에 노트를 만듦",
+        &["create-doc", "agenda=임시 아젠다", "type=free", "title=임시", "body=# 임시\n", "date=2026-11-03", "time=10:00"],
+        "create_doc",
+        json!({"agenda": "임시 아젠다", "type": "free", "title": "임시", "body": "# 임시\n", "date": "2026-11-03", "time": "10:00"}),
+    );
+    let temp_note = created
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("ndzz0000-00000000")
+        .to_string();
+    trash_step(
+        h,
+        "보내기 임시 노트",
+        "delete_doc",
+        &["delete-doc", &temp_note],
+        json!({"id": temp_note}),
+    );
+    let agenda_id = Engine::new(&h.b)
+        .call("list_agendas", Value::Null)
+        .ok()
+        .and_then(|v| {
+            v["items"]
+                .as_array()?
+                .iter()
+                .find(|a| a["slug"] == "임시-아젠다")
+                .and_then(|a| a["id"].as_str().map(str::to_string))
+        })
+        .unwrap_or_default();
+    h.step(
+        "휴지통 임시 아젠다를 지움",
+        &["delete-agenda", &agenda_id],
+        "delete_agenda",
+        json!({"id": agenda_id}),
+    );
+    let temp_trash = trash_id_of(h, &temp_note);
+    trash_step(
+        h,
+        "되살리기 아젠다가 사라진 노트(recovered로)",
+        "restore_doc",
+        &["restore-doc", &temp_trash],
+        json!({"trashId": temp_trash}),
+    );
+
+    // ---- 보관 파일이 사라진 항목, 영구 삭제, 비우기 ----
+    // 픽스처의 항목들은 보관 파일이 없다. 첫 항목에는 보관 파일을 만들어 영구 삭제하고, 다른 항목은 되살리다 막힌다
+    put_both(
+        h,
+        ".aisurada/trash/files/trfx0001-000000b1/note.html",
+        "<!--aisurada\nid: ndfx0100-00000100\n-->\n<p>x</p>",
+    );
+    trash_step(
+        h,
+        "영구 삭제 보관물과 함께",
+        "purge_doc",
+        &["purge-doc", "trfx0001-000000b1"],
+        json!({"trashId": "trfx0001-000000b1"}),
+    );
+    for (label, java, rust) in [
+        ("영구 삭제 오류 항목 없음", vec!["purge-doc"], json!({})),
+        (
+            "영구 삭제 오류 항목 모양",
+            vec!["purge-doc", "nope"],
+            json!({"trashId": "nope"}),
+        ),
+        (
+            "영구 삭제 오류 없는 항목",
+            vec!["purge-doc", "trzz0000-00000000"],
+            json!({"trashId": "trzz0000-00000000"}),
+        ),
+        (
+            "되살리기 오류 보관 파일이 사라짐(목록이 정리됨)",
+            vec!["restore-doc", "trfx0002-000000b2"],
+            json!({"trashId": "trfx0002-000000b2"}),
+        ),
+    ] {
+        let command = if label.starts_with("영구") {
+            "purge_doc"
+        } else {
+            "restore_doc"
+        };
+        trash_step(h, label, command, &java, rust);
+    }
+    trash_step(
+        h,
+        "영구 삭제 보관 파일이 없는 항목",
+        "purge_doc",
+        &["purge-doc", "trfx0003-000000b3"],
+        json!({"trashId": "trfx0003-000000b3"}),
+    );
+    put_both(h, ".aisurada/trash/files/orphan.txt", "고아\n");
+    trash_step(h, "비우기", "empty_trash", &["empty-trash"], json!({}));
+    trash_step(
+        h,
+        "비우기 이미 빔",
+        "empty_trash",
+        &["empty-trash"],
+        json!({}),
+    );
+
+    // ---- 목록이 1,000,000바이트를 넘으면 가장 오래된 항목부터 영구 삭제 ----
+    let mut manifest = String::from("[\n");
+    for n in 0..340u32 {
+        if n > 0 {
+            manifest.push_str(",\n");
+        }
+        manifest.push_str(&format!(
+            "  {{\"trashId\": \"trbg{n:04x}-0000{n:04x}\", \"file\": \"trbg{n:04x}-0000{n:04x}.md\", \"originalPath\": \"notes/demo/2026-11/big{n}\", \"docId\": \"ndbg{n:04x}-0000{n:04x}\", \"agendaId\": \"agfx0001-0000000a\", \"agendaSlug\": \"demo\", \"title\": \"{}\", \"type\": \"free\", \"format\": \"markdown\", \"created\": \"2026-11-01T09:00:00+09:00\", \"trashedAt\": \"2026-11-02T01:00:00.000Z\"}}",
+            "가".repeat(1000)
+        ));
+    }
+    manifest.push_str("\n]\n");
+    put_both(h, ".aisurada/trash/trash.json", &manifest);
+    put_both(h, ".aisurada/trash/files/trbg0153-00000153.md", "보관물\n");
+    trash_step(
+        h,
+        "보내기 목록이 1MB를 넘음(가장 오래된 항목이 영구 삭제됨)",
+        "delete_doc",
+        &["delete-doc", "ndfx0009-00000009"],
+        json!({"id": "ndfx0009-00000009"}),
+    );
+    unsafe {
+        env::remove_var("TZ");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -4587,6 +4886,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_doc_creates(&mut h);
     compare_sub_note_writes(&mut h);
     compare_comment_writes(&mut h);
+    compare_trash_writes(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {
