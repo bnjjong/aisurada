@@ -6,9 +6,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    commit_vault, get_agenda_facts, get_doc, get_sub_note, get_template, history, list_agendas,
-    list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
-    list_templates, list_trash, reindex, search_docs,
+    agenda_write, commit_vault, get_agenda_facts, get_doc, get_sub_note, get_template, history,
+    list_agendas, list_attachments, list_comments, list_docs, list_projects, list_sub_notes,
+    list_tags, list_templates, list_trash, reindex, search_docs,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -37,6 +37,17 @@ pub const COMMANDS: &[&str] = &[
     "get_template",
     "history",
     "commit_vault",
+    "create_agenda",
+    "update_agenda",
+    "delete_agenda",
+];
+
+/// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
+pub const WRITE_COMMANDS: &[&str] = &[
+    "create_agenda",
+    "update_agenda",
+    "delete_agenda",
+    "commit_vault",
 ];
 
 impl Engine {
@@ -44,6 +55,11 @@ impl Engine {
         Engine {
             vault_root: vault_root.as_ref().to_path_buf(),
         }
+    }
+
+    /// 쓰기 명령인가
+    pub fn is_write(command: &str) -> bool {
+        WRITE_COMMANDS.contains(&command)
     }
 
     /// 이 엔진이 처리하는 명령인가(아니면 호출 쪽이 다른 길로 보낸다)
@@ -135,6 +151,18 @@ impl Engine {
             "history" => {
                 let request: history::HistoryRequest = parse_args(command, args)?;
                 to_json(history::execute(&self.vault_root, &request)?)
+            }
+            "create_agenda" => {
+                let request: agenda_write::CreateAgendaRequest = parse_args(command, args)?;
+                to_json(agenda_write::create(&self.vault_root, &request)?)
+            }
+            "update_agenda" => {
+                let request: agenda_write::UpdateAgendaRequest = parse_args(command, args)?;
+                to_json(agenda_write::update(&self.vault_root, &request)?)
+            }
+            "delete_agenda" => {
+                let request: agenda_write::DeleteAgendaRequest = parse_args(command, args)?;
+                to_json(agenda_write::delete(&self.vault_root, &request)?)
             }
             "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(

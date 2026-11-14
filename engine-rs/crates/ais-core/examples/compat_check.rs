@@ -1,7 +1,8 @@
 //! Java 엔진(단발 모드)과 Rust 엔진이 같은 vault에서 같은 읽기 결과를 내는지 맞댑니다.
 //!
-//! 사용: `cargo run -p ais-core --example compat_check -- <ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>]`
+//! 사용: `cargo run -p ais-core --example compat_check -- <ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>] [--write-fixture=<합성 vault>]`
 //! `--commit-fixture`는 그 vault를 사본 둘로 복사해 `commit_vault`(vault를 고친다)를 견준다. 진짜 vault에는 주지 않는다.
+//! `--write-fixture`는 그 vault를 사본 둘로 복사해 쓰기 명령을 Java와 Rust로 돌리고 응답과 폴더 전체 바이트를 견준다.
 //!
 //! Java 응답은 정리안의 새 모양으로 바꿔서 견줍니다: `date`·`time`·`agendaTitle`·`deepLink`를 빼고, 목록은
 //! `{items, total, returned, truncated}`로 감싸고, 빈 `tags`를 채우고, `folder`를 더합니다. vault는 읽기만 합니다.
@@ -20,12 +21,25 @@ struct Java {
 
 impl Java {
     fn run(&self, vault: &Path, args: &[String]) -> Result<Value, String> {
+        self.run_with(vault, args, &[], &[])
+    }
+
+    /// JVM 속성(`-Dkey=value`)과 환경 변수를 더해서 돌린다. 쓰기 맞대기가 시계·id·잠금 폴더를 고정할 때 쓴다.
+    fn run_with(
+        &self,
+        vault: &Path,
+        args: &[String],
+        props: &[String],
+        envs: &[(String, String)],
+    ) -> Result<Value, String> {
         let output = Command::new("java")
             .arg(format!("-Duser.home={}", self.home.display()))
+            .args(props)
             .arg("-jar")
             .arg(&self.jar)
             .args(args)
             .arg(format!("--aisurada.vault={}", vault.display()))
+            .envs(envs.iter().map(|(k, v)| (k, v)))
             .output()
             .map_err(|e| format!("java를 못 돌렸다: {e}"))?;
         if !output.status.success() {
@@ -1134,10 +1148,380 @@ fn compare_commit_vault(
     let _ = fs::remove_dir_all(&root);
 }
 
+/// 폴더 안의 파일을 (상대 경로 → 내용)으로 모은다. `.git`은 빼고, 심볼릭 링크는 가리키는 곳을 적는다.
+fn tree(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    fn walk(root: &Path, dir: &Path, out: &mut std::collections::BTreeMap<String, Vec<u8>>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let rel = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            if rel == ".git" {
+                continue;
+            }
+            let meta = fs::symlink_metadata(&path).unwrap();
+            if meta.file_type().is_symlink() {
+                let target = fs::read_link(&path)
+                    .map(|t| t.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                out.insert(rel, format!("-> {target}").into_bytes());
+            } else if meta.is_dir() {
+                out.insert(format!("{rel}/"), Vec::new());
+                walk(root, &path, out);
+            } else {
+                out.insert(rel, fs::read(&path).unwrap_or_default());
+            }
+        }
+    }
+    let mut out = std::collections::BTreeMap::new();
+    walk(root, root, &mut out);
+    out
+}
+
+/// 두 폴더가 같은지 본다. 다르면 앞의 몇 곳을 글로 돌려준다.
+fn tree_diff(a: &Path, b: &Path) -> String {
+    let (left, right) = (tree(a), tree(b));
+    let mut diffs = Vec::new();
+    for (path, bytes) in &left {
+        match right.get(path) {
+            None => diffs.push(format!("Java에만 있다: {path}")),
+            Some(other) if other != bytes => diffs.push(format!(
+                "내용이 다르다: {path}\n      Java: {}\n      Rust: {}",
+                clip(&String::from_utf8_lossy(bytes)),
+                clip(&String::from_utf8_lossy(other))
+            )),
+            _ => {}
+        }
+    }
+    for path in right.keys().filter(|p| !left.contains_key(*p)) {
+        diffs.push(format!("Rust에만 있다: {path}"));
+    }
+    diffs.truncate(5);
+    diffs.join("\n    ")
+}
+
+/// 쓰기 맞대기: 합성 vault의 사본 둘에 같은 명령열을 Java(단발)와 Rust로 돌려, 명령마다 응답과 **폴더 전체의 바이트**를 견준다.
+/// 시계와 id의 난수는 두 엔진에 같은 값으로 고정한다(명령마다 난수 목록이 다시 시작하므로 명령 번호로 값을 달리 준다).
+struct WriteHarness<'a> {
+    report: &'a mut Report,
+    java: &'a Java,
+    a: PathBuf,
+    b: PathBuf,
+    locks: PathBuf,
+    step: u32,
+}
+
+const WRITE_NOW: &str = "1794700000000";
+
+impl WriteHarness<'_> {
+    /// 명령 하나를 두 사본에 돌리고 견준다. Java가 성공했으면 그 응답을 돌려준다.
+    fn step(
+        &mut self,
+        label: &str,
+        java_args: &[&str],
+        command: &str,
+        args: Value,
+    ) -> Option<Value> {
+        self.step += 1;
+        let n = self.step;
+        let random = format!("{n:04x}0001,{n:04x}0002,{n:04x}0003,{n:04x}0004");
+        let java_args: Vec<String> = java_args.iter().map(|a| a.to_string()).collect();
+        let java_out = self.java.run_with(
+            &self.a,
+            &java_args,
+            &[
+                format!("-Daisurada.test.now={WRITE_NOW}"),
+                format!("-Daisurada.test.random={random}"),
+                "-Daisurada.vault.autocommit.enabled=false".to_string(),
+            ],
+            &[(
+                "AISURADA_LOCK_DIR".to_string(),
+                self.locks.display().to_string(),
+            )],
+        );
+        // SAFETY: 이 도구는 단일 스레드로 돌고, 환경 변수는 Rust 명령을 부르기 직전에만 바꾼다.
+        unsafe {
+            env::set_var("AISURADA_TEST_RANDOM", &random);
+        }
+        ais_core::write::apparatus::reset_random_queue();
+        let rust_out = Engine::new(&self.b).call(command, args);
+        let ok_value = java_out.as_ref().ok().cloned();
+        let vault = self.a.clone();
+        // 두 사본의 폴더 경로가 달라서 딥링크의 `ws=` 값만 다르다. Java 쪽을 Rust 사본 경로로 바꿔 견준다.
+        let (from, to) = (
+            ais_core::text::encode_uri_component(&self.a.to_string_lossy()),
+            ais_core::text::encode_uri_component(&self.b.to_string_lossy()),
+        );
+        compare(
+            self.report,
+            &vault,
+            format!("{command} {label} 응답"),
+            java_out,
+            rust_out,
+            move |_, v| {
+                let mut v = v.clone();
+                if let Some(link) = v
+                    .get("deepLink")
+                    .and_then(Value::as_str)
+                    .map(|l| l.replace(&from, &to))
+                {
+                    v["deepLink"] = Value::String(link);
+                }
+                v
+            },
+        );
+        let diff = tree_diff(&self.a, &self.b);
+        self.report
+            .record(format!("{command} {label} 폴더"), diff.is_empty(), || {
+                diff.clone()
+            });
+        ok_value
+    }
+}
+
+fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
+    let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("임시 폴더");
+    let locks = root.join("locks");
+    let copy = |name: &str| -> PathBuf {
+        let dst = root.join(name);
+        let status = Command::new("cp")
+            .arg("-R")
+            .arg(fixture)
+            .arg(&dst)
+            .status()
+            .expect("cp");
+        assert!(status.success(), "사본을 못 만들었다");
+        // 쓰기 명령은 워크스페이스 표식이 있어야 일한다. 두 사본에 같게 만든다.
+        fs::write(dst.join(".aisurada/workspace.json"), "{}\n").unwrap();
+        dst
+    };
+    // SAFETY: 단일 스레드에서 한 번만 바꾼다.
+    unsafe {
+        env::set_var("AISURADA_TEST_NOW", WRITE_NOW);
+        env::set_var("AISURADA_LOCK_DIR", &locks);
+        env::set_var("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
+    }
+    let mut h = WriteHarness {
+        report,
+        java,
+        a: copy("java"),
+        b: copy("rust"),
+        locks,
+        step: 0,
+    };
+    let id_of = |v: &Option<Value>| {
+        v.as_ref()
+            .and_then(|r| r["id"].as_str().map(str::to_string))
+    };
+
+    // 프로젝트와 그 저장소(있으면): 아젠다에 연결해 본다
+    let projects = Engine::new(&h.b).call("list_projects", Value::Null).ok();
+    let project = projects
+        .as_ref()
+        .and_then(|p| p["items"].as_array())
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|i| i["repos"].as_array().is_some_and(|r| !r.is_empty()))
+        })
+        .map(|i| {
+            (
+                i["slug"].as_str().unwrap().to_string(),
+                i["repos"][0]["name"].as_str().unwrap().to_string(),
+            )
+        });
+
+    // 아젠다 만들기: 최소, 같은 이름(번호 붙임), 모든 값, 이름에 특수 글자, 요약에 여러 줄
+    let created = h.step(
+        "최소",
+        &["create-agenda", "title=새 아젠다"],
+        "create_agenda",
+        json!({"title": "새 아젠다"}),
+    );
+    h.step(
+        "같은 이름",
+        &["create-agenda", "title=새 아젠다"],
+        "create_agenda",
+        json!({"title": "새 아젠다"}),
+    );
+    let full = h.step(
+        "모든 값",
+        &["create-agenda", "title=Hello World", "hue=teal", "repo=owner/repo", "summary=요약\n두 줄"],
+        "create_agenda",
+        json!({"title": "Hello World", "hue": "teal", "repo": "owner/repo", "summary": "요약\n두 줄"}),
+    );
+    h.step(
+        "특수 글자",
+        &["create-agenda", "title=콜론: 해시 # \"따옴표\" 'a' 😀"],
+        "create_agenda",
+        json!({"title": "콜론: 해시 # \"따옴표\" 'a' 😀"}),
+    );
+    h.step(
+        "긴 이름",
+        &["create-agenda", &format!("title={}", "가".repeat(70))],
+        "create_agenda",
+        json!({"title": "가".repeat(70)}),
+    );
+    if let Some((slug, repo)) = &project {
+        h.step(
+            "프로젝트와 저장소",
+            &[
+                "create-agenda",
+                "title=프로젝트 아젠다",
+                &format!("project={slug}"),
+                &format!("projectRepo={repo}"),
+            ],
+            "create_agenda",
+            json!({"title": "프로젝트 아젠다", "project": slug, "projectRepo": repo}),
+        );
+    }
+    // 만들기 오류
+    for (label, java_args, args) in [
+        ("제목 없음", vec!["create-agenda"], json!({})),
+        (
+            "공백 제목",
+            vec!["create-agenda", "title=   "],
+            json!({"title": "   "}),
+        ),
+        (
+            "모르는 색",
+            vec!["create-agenda", "title=x", "hue=zzz"],
+            json!({"title": "x", "hue": "zzz"}),
+        ),
+        (
+            "안전하지 않은 프로젝트",
+            vec!["create-agenda", "title=x", "project=../x"],
+            json!({"title": "x", "project": "../x"}),
+        ),
+        (
+            "없는 프로젝트의 저장소",
+            vec!["create-agenda", "title=x", "project=nope", "projectRepo=r"],
+            json!({"title": "x", "project": "nope", "projectRepo": "r"}),
+        ),
+        (
+            "프로젝트 없는 저장소",
+            vec!["create-agenda", "title=x", "projectRepo=r"],
+            json!({"title": "x", "projectRepo": "r"}),
+        ),
+    ] {
+        h.step(label, &java_args, "create_agenda", args);
+    }
+
+    // 고치기: 이름과 색, 저장소 지우기와 프로젝트 지우기, 요약, 아무것도 안 바꿈
+    if let Some(id) = id_of(&created) {
+        h.step(
+            "이름과 색",
+            &["update-agenda", &id, "title=바뀐 이름", "hue=red"],
+            "update_agenda",
+            json!({"id": id, "title": "바뀐 이름", "hue": "red"}),
+        );
+        h.step(
+            "요약",
+            &["update-agenda", &id, "summary=새 요약\n둘째 줄\n"],
+            "update_agenda",
+            json!({"id": id, "summary": "새 요약\n둘째 줄\n"}),
+        );
+        h.step(
+            "저장소 설정",
+            &["update-agenda", &id, "repo=o/r"],
+            "update_agenda",
+            json!({"id": id, "repo": "o/r"}),
+        );
+        h.step(
+            "저장소 지움",
+            &["update-agenda", &id, "repo="],
+            "update_agenda",
+            json!({"id": id, "repo": ""}),
+        );
+        h.step(
+            "아무것도 안 줌",
+            &["update-agenda", &id],
+            "update_agenda",
+            json!({"id": id}),
+        );
+        if let Some((slug, repo)) = &project {
+            h.step(
+                "프로젝트 설정",
+                &[
+                    "update-agenda",
+                    &id,
+                    &format!("project={slug}"),
+                    &format!("projectRepo={repo}"),
+                ],
+                "update_agenda",
+                json!({"id": id, "project": slug, "projectRepo": repo}),
+            );
+            h.step(
+                "프로젝트 지움",
+                &["update-agenda", &id, "project="],
+                "update_agenda",
+                json!({"id": id, "project": ""}),
+            );
+        }
+        h.step(
+            "모르는 색",
+            &["update-agenda", &id, "hue=zzz"],
+            "update_agenda",
+            json!({"id": id, "hue": "zzz"}),
+        );
+    }
+    for (label, java_args, args) in [
+        ("id 없음", vec!["update-agenda"], json!({})),
+        (
+            "id 모양 아님",
+            vec!["update-agenda", "nope"],
+            json!({"id": "nope"}),
+        ),
+        (
+            "없는 id",
+            vec!["update-agenda", "agzz0001-00000000", "title=x"],
+            json!({"id": "agzz0001-00000000", "title": "x"}),
+        ),
+    ] {
+        h.step(label, &java_args, "update_agenda", args);
+    }
+
+    // 지우기: 노트가 있는 아젠다는 거절, 비어 있으면 휴지통 폴더로 옮김, 같은 id 두 번
+    h.step(
+        "노트가 있다",
+        &["delete-agenda", "agfx0001-0000000a"],
+        "delete_agenda",
+        json!({"id": "agfx0001-0000000a"}),
+    );
+    if let Some(id) = id_of(&full) {
+        h.step(
+            "비어 있다",
+            &["delete-agenda", &id],
+            "delete_agenda",
+            json!({"id": id}),
+        );
+        h.step(
+            "이미 지웠다",
+            &["delete-agenda", &id],
+            "delete_agenda",
+            json!({"id": id}),
+        );
+    }
+    h.step("id 없음", &["delete-agenda"], "delete_agenda", json!({}));
+
+    let _ = fs::remove_dir_all(&root);
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let verbose = args.iter().any(|a| a == "--verbose");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    let write_fixture: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--write-fixture="))
+        .map(PathBuf::from);
     let commit_fixture: Option<PathBuf> = args
         .iter()
         .find_map(|a| a.strip_prefix("--commit-fixture="))
@@ -1442,6 +1826,21 @@ fn main() -> ExitCode {
                     failure.lines().next().unwrap_or("").to_string()
                 }
             );
+        }
+        total.checked += report.checked;
+        total.failures.extend(report.failures);
+    }
+
+    if let Some(fixture) = &write_fixture {
+        let mut report = Report::default();
+        compare_writes(&mut report, &java, fixture);
+        println!(
+            "쓰기(합성 vault 사본 둘, 폴더 전체 바이트): {}건 확인, 어긋남 {}건",
+            report.checked,
+            report.failures.len()
+        );
+        for failure in &report.failures {
+            println!("  - {}", failure.replace('\n', "\n    "));
         }
         total.checked += report.checked;
         total.failures.extend(report.failures);

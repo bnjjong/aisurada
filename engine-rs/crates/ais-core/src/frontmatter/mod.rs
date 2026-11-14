@@ -11,6 +11,7 @@ mod write;
 
 pub use read::{parse, parse_value};
 pub use value::Value;
+pub(crate) use write::dump_string;
 pub use write::{DumpError, dump_general_map};
 
 #[cfg(test)]

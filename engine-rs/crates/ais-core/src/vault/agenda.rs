@@ -16,7 +16,7 @@ static AGENDA_ID: LazyLock<Regex> =
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_FRONTMATTER_UNITS: usize = 16_000;
-pub(super) const HUES: [&str; 12] = [
+pub const HUES: [&str; 12] = [
     "blue", "violet", "teal", "orange", "pink", "green", "red", "amber", "lime", "cyan", "fuchsia",
     "brown",
 ];

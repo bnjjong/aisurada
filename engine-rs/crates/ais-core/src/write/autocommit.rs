@@ -98,6 +98,29 @@ pub struct AutoCommit {
 }
 
 static SERVING: LazyLock<Mutex<HashMap<String, Arc<AutoCommit>>>> = LazyLock::new(Default::default);
+static TICKERS: LazyLock<Mutex<std::collections::HashSet<String>>> =
+    LazyLock::new(Default::default);
+
+/// 유휴 타이머를 도는 간격
+const TICK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// 이 프로세스가 `vault`에 쓰기 시작하면 유휴 타이머를 한 번만 띄운다. 5초마다 `tick()`을 불러서, 쓰기가 끊긴 지 유휴 시간이
+/// 지났거나 처음 쓴 지 15분이 지난 대기 기록을 커밋한다. 프로세스가 끝나면 함께 끝난다.
+pub fn ensure_ticker(vault: &Path) {
+    let key = absolute_normalized(vault).to_string_lossy().into_owned();
+    if !TICKERS.lock().unwrap().insert(key) {
+        return;
+    }
+    let auto = AutoCommit::serving(vault);
+    let _ = std::thread::Builder::new()
+        .name("ais-autocommit-tick".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(TICK_INTERVAL);
+                auto.tick();
+            }
+        });
+}
 
 impl AutoCommit {
     pub fn new(vault: &Path, config: AutoCommitConfig, clock: Clock, lock_dir: PathBuf) -> Self {

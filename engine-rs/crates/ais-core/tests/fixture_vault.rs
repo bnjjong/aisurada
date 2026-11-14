@@ -977,3 +977,168 @@ fn write_foundation_checks_follow_the_java_rules() {
     std::fs::write(vault.join(".aisurada/workspace.json"), "{}").unwrap();
     assert!(marker::check_workspace_marker(&vault).is_ok());
 }
+
+/// 쓰기 시험이 실제 홈에 잠금 파일을 쌓거나 커밋 대기 기록을 만들지 않게 한 번만 환경을 정한다.
+fn isolate_writes() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let locks = std::env::temp_dir().join(format!("ais-test-locks-{}", std::process::id()));
+        // SAFETY: 쓰기 시험만 이 함수를 부르고, 다른 스레드가 이 환경 변수를 읽는 것은 그 뒤다.
+        unsafe {
+            std::env::set_var("AISURADA_LOCK_DIR", locks);
+            std::env::set_var("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
+        }
+    });
+}
+
+#[test]
+fn writes_agendas_through_the_write_foundation() {
+    isolate_writes();
+    let vault = fixture();
+    let engine = Engine::new(&vault);
+
+    // 표식이 없는 폴더에서는 일하지 않는다
+    let no_marker = engine
+        .call("create_agenda", json!({"title": "새"}))
+        .unwrap_err();
+    assert_eq!(no_marker.code, "AIS-400");
+    assert!(
+        no_marker
+            .message
+            .starts_with("이 폴더는 아직 워크스페이스가 아니다: "),
+        "{}",
+        no_marker.message
+    );
+    assert!(!vault.join(".aisurada/agendas/새.md").exists());
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+
+    // 만들기: 파일 내용은 머리 + 요약이고 응답에는 딥링크가 붙는다
+    let created = engine
+        .call(
+            "create_agenda",
+            json!({"title": "새 아젠다", "hue": "teal", "summary": "요약"}),
+        )
+        .unwrap();
+    let id = created["id"].as_str().unwrap().to_string();
+    assert!(id.starts_with("ag") && created["slug"] == "새-아젠다" && created["hue"] == "teal");
+    assert!(
+        created["deepLink"]
+            .as_str()
+            .unwrap()
+            .starts_with("aisurada://agenda/")
+    );
+    let file = vault.join(".aisurada/agendas/새-아젠다.md");
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        format!("---\nid: {id}\nslug: 새-아젠다\ntitle: 새 아젠다\nhue: teal\n---\n요약")
+    );
+    // 같은 이름이면 번호가 붙고, 새 아젠다는 목록에 보인다
+    let second = engine
+        .call("create_agenda", json!({"title": "새 아젠다"}))
+        .unwrap();
+    assert_eq!(second["slug"], "새-아젠다-2");
+    assert_eq!(engine.call("list_agendas", json!({})).unwrap()["total"], 6);
+
+    // 고치기: 준 칸만 바뀌고 빈 값은 지운다
+    let updated = engine
+        .call(
+            "update_agenda",
+            json!({"id": id, "title": "바뀜", "repo": "o/r", "summary": ""}),
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            updated["title"].as_str(),
+            updated["repo"].as_str(),
+            updated["slug"].as_str()
+        ),
+        (Some("바뀜"), Some("o/r"), Some("새-아젠다"))
+    );
+    let cleared = engine
+        .call("update_agenda", json!({"id": id, "repo": ""}))
+        .unwrap();
+    assert!(cleared.get("repo").is_none());
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(
+        text.contains("title: 바뀜\nhue: teal\n---\n") && !text.contains("repo:"),
+        "{text}"
+    );
+
+    // 오류: 제목 없음, 없는 색, 모양이 틀린 id, 없는 id
+    let message = |command: &str, args: Value| engine.call(command, args).unwrap_err().message;
+    assert_eq!(message("create_agenda", json!({})), "title 이 필요하다");
+    assert_eq!(
+        message("create_agenda", json!({"title": "x", "hue": "zzz"})),
+        "hue 값이 아니다: zzz"
+    );
+    assert_eq!(
+        message("update_agenda", json!({"id": "nope"})),
+        "아젠다 id 모양이 아니다: nope"
+    );
+    assert_eq!(
+        message("update_agenda", json!({"id": "agzz0001-00000000"})),
+        "Agenda not found: agzz0001-00000000"
+    );
+
+    // 지우기: 노트가 있으면 거절하고, 비어 있으면 휴지통 폴더로 옮긴다
+    let has_notes = message("delete_agenda", json!({"id": "agfx0001-0000000a"}));
+    assert!(
+        has_notes.starts_with("노트가 ") && has_notes.contains("건 있는 아젠다는 지울 수 없다"),
+        "{has_notes}"
+    );
+    let deleted = engine.call("delete_agenda", json!({"id": id})).unwrap();
+    assert_eq!(
+        deleted["archivedPath"],
+        format!(".aisurada/trash/agendas/새-아젠다-{id}.md")
+    );
+    assert!(
+        !file.exists()
+            && vault
+                .join(deleted["archivedPath"].as_str().unwrap())
+                .is_file()
+    );
+    assert_eq!(deleted["notesDir"], "notes/새-아젠다");
+}
+
+#[test]
+fn write_commands_refuse_to_run_on_an_unreconcilable_vault() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/add-comment-clash.sh");
+    assert!(
+        Command::new("bash")
+            .arg(script)
+            .arg(&vault)
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    let error = Engine::new(&vault)
+        .call("create_agenda", json!({"title": "새"}))
+        .unwrap_err();
+    assert!(
+        error
+            .message
+            .starts_with("UNIQUE constraint failed: comments.id ("),
+        "{}",
+        error.message
+    );
+    assert!(
+        !vault.join(".aisurada/agendas/새.md").exists(),
+        "일을 하지 않는다"
+    );
+}
+
+#[test]
+fn commit_vault_answers_with_outcome_and_blocked() {
+    isolate_writes();
+    let vault = fixture();
+    let result = Engine::new(&vault).call("commit_vault", json!({})).unwrap();
+    assert_eq!(
+        (result["outcome"].as_str(), result["blocked"].as_str()),
+        (Some("disabled"), Some("off"))
+    );
+}
