@@ -2,7 +2,7 @@
 
 ## 요약
 
-**결론:** Rust 엔진이 읽는 명령 18개와 쓰는 명령 33개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
+**결론:** Rust 엔진이 읽는 명령 25개와 쓰는 명령 41개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
 
 ## 1. 띄우는 법
 
@@ -17,7 +17,7 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 | 옵션 | 뜻 |
 | --- | --- |
 | (없음) | 읽기만 Rust 엔진. 쓰기는 Java 엔진이다 |
-| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 33개가 Rust 엔진으로 간다 |
+| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 41개가 Rust 엔진으로 간다 |
 | `--engine java` | 모든 명령을 Java 엔진으로 보낸다(`AISURADA_ENGINE=java`). Rust와 견줄 때 쓴다 |
 | `--git` | 합성 vault에 git 저장소와 노트의 판 이력을 만든다(편집 이력 창, 자동 커밋 확인용) |
 
@@ -47,6 +47,8 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 - [ ] 문서 템플릿 저장(새로, 고침)과 삭제, 회고 템플릿 고치기(`save_template`, `save_ritual_template`, `delete_doc_template`)
 - [ ] 아젠다 사실층 저장과 지움 → `.aisurada/facts/<slug>.md`(`update_agenda_facts`)
 - [ ] 태스크 화면: 목록과 상세가 보인다(읽기는 옵션 없이도 Rust). 태스크를 만들고(완료 기준을 안 쓰면 거절된다), 제목·본문을 고치고, 완료 기준을 체크하고, 상태를 옮기고, 다른 태스크와 연결하고, 댓글을 달고, 지웠다가 되살린다 → `.aisurada/tasks/TSK-<번호>.md`와 `TSK-<번호>/activity.jsonl`이 생기고 바뀐다. 막은 태스크가 Done 이 되기 전에는 막힌 태스크의 「시작」이 막힌 까닭과 함께 비활성이다(`create_task`, `update_task`, `transition_task`, `link_tasks`, `add_task_comment`, `delete_task`, `restore_task`)
+- [ ] 스킬·에이전트 화면(읽기는 옵션 없이도 Rust): 글로벌 스킬과 에이전트를 만들고, 설명·지침·권한·도구 칸을 고치고, 이름을 바꾸고(파일이나 폴더가 새 이름으로 옮겨진다), 프로젝트 화면에서 글로벌 자원 참조를 켜고 끄고, 지웠다가 되살린다 → `.aisurada/resources/global/`과 `projects/<slug>/` 아래 파일이 생기고 바뀐다. 파일 머리말은 `id`, `name`, `description` 순서이고 고칠 때마다 `.aisurada/resources/.history/<id>/`에 고치기 전 판이 쌓인다. 앱 밖의 승인 기록은 `~/ais-rust-check/home/Library/Application Support/aisurada/approvals/<해시>/ledger.json`에 있고 사람이 한 변경은 `"by": "human"`이다(`save_resource`, `delete_resource`, `restore_resource`, `set_resource_ref`)
+- [ ] 승인 화면: 자원 파일을 편집기로 직접 고치면 「승인 안 된 직접 수정」으로 보이고 목록과 조회에는 승인한 판이 계속 보인다. 「받아들이기」면 지금 파일이 승인한 판이 되고, 「되돌리기」면 승인한 판으로 돌아온다. 승인 정책 네 칸을 바꾸면 저장된다(`resolve_resource_edit`, `set_resource_policy`). AI 세션이 올리는 대기 변경(승인·거절)은 AI 세션이 있어야 만들어지므로 이 점검표에서는 Rust 통합 시험(`queues_ai_resource_changes_until_a_human_approves`)으로 대신했다
 - [ ] 새 작업 공간 만들기(`init_workspace`)
 - [ ] 노트의 즐겨찾기 별, 평가 점수, 다른 노트 연결을 바꾼다 → 그 노트 머리에 `favorite`, `evaluation`, `links` 줄이 생기고 `editedBy: app` 도장이 붙는다(`set_favorite`, `evaluate_doc`, `link_docs`)
 - [ ] 새 노트를 만든다(아젠다와 제목을 정하고 저장) → `notes/<아젠다>/<연-월>/<날짜>-<시각>-<제목>-<꼬리>/note.md`가 생기고 터미널에 `[engine] create_doc ok`가 찍힌다. 같은 날 새 노트를 연달아 만들면 시각이 5분씩 밀린다. 없는 이름의 아젠다로 만들면 `.aisurada/agendas/`에 새 아젠다 파일도 생긴다
