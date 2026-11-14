@@ -142,20 +142,19 @@ try {
     await until(() => !document.querySelector('.nsrail'));
     assert(document.querySelector('.doc-scroll').getBoundingClientRect().width >= b.width + r.width - 2, '레일을 닫아도 본문 칸이 넓어지지 않는다');
   });
-  // 하위 페이지: 머리글은 고정, 본문 칸(.subnote-scroll)만 스크롤한다. 레일이 열리면 이 본문 칸 오른쪽에 붙는다.
+  // 후속 노트: 메인 창에서는 창이 아니라 탭으로 열리고, 일반 노트와 같은 본문 칸(.doc-scroll)·레일 칸(.doc-route) 구조를 쓴다.
   // (하위 노트는 list-sub-notes가 sessionId를 주지 않아 칩의 「열기」가 없다. 그래서 레일 대신 이 구조만 잰다.)
-  await test('subnote-page-header-fixed-body-scrolls-inside', async () => {
+  await test('subnote-opens-as-tab-in-doc-layout', async () => {
     go(`/doc/${cfg.id}`);
     await until(() => document.querySelector('.doc-scroll .child-page-card'));
     document.querySelector('.doc-scroll .child-page-card').click();
-    await until(() => document.querySelector('.subnote-page .subnote-body > .subnote-scroll .note-reading'));
-    const page = document.querySelector('.subnote-page'), head = page.querySelector(':scope > header'), body = page.querySelector('.subnote-scroll');
-    assert(getComputedStyle(page).overflowY === 'hidden', `하위 페이지 상자가 스크롤한다: ${getComputedStyle(page).overflowY}`);
-    assert(getComputedStyle(body).overflowY === 'auto', `하위 본문 칸이 스크롤 상자가 아니다: ${getComputedStyle(body).overflowY}`);
-    const h = head.getBoundingClientRect(), b = body.getBoundingClientRect(), p = page.getBoundingClientRect();
-    assert(b.top >= h.bottom - 1, `머리글이 본문을 가린다: 머리글 bottom=${h.bottom} 본문 top=${b.top}`);
-    assert(b.left >= p.left - 1 && b.right <= p.right + 1 && b.bottom <= p.bottom + 1, '하위 본문 칸이 하위 페이지 밖으로 나갔다');
-    assert(!page.querySelector('.nsrail'), '레일을 열지 않았는데 레일이 있다');
+    await until(() => location.pathname.startsWith('/sub/') && document.querySelector('.doc-route > .doc-scroll .note-reading'));
+    assert(!document.querySelector('.subnote-page'), '메인 창에서 후속 노트가 창으로 떴다');
+    assert(document.querySelector('.tab-item.tab-selected .tab-sub-mark'), '후속 노트 탭에 ↳ 표시가 없다');
+    assert(document.querySelector(`.tab-item[data-tab-id="${cfg.id}"]`), '상위 노트 탭이 열려 있지 않다');
+    const scroll = document.querySelector('.doc-route > .doc-scroll');
+    assert(getComputedStyle(scroll).overflowY === 'auto', `후속 본문 칸이 스크롤 상자가 아니다: ${getComputedStyle(scroll).overflowY}`);
+    assert(!document.querySelector('.nsrail'), '레일을 열지 않았는데 레일이 있다');
   });
 } catch { /* failing check is already in results */ }
 await post('/result', results);

@@ -347,20 +347,21 @@ if (location.pathname.startsWith("/note-window/")) {
       await engine(["commit-vault"]);
       await until(() => $(".subnote-row"), "sub list");
       $(".subnote-row").click();
-      await until(() => $(".subnote-page .lex-content h1"), "sub editor");
-      assert(
-        $('.subnote-fullscreen [aria-label="하위 페이지 닫기"]'),
-        "required sub markers",
+      await until(
+        () => location.pathname.startsWith("/sub/") && $(".lex-content h1"),
+        "sub editor",
       );
-      $(".subnote-page .doc-meta-history").click();
+      assert(!$(".subnote-page"), "sub opened a modal in the main window");
+      assert($(".tab-item.tab-selected .tab-sub-mark"), "required sub tab mark");
+      $(".doc-meta-history").click();
       await until(
         () => $(".nhist-item") && !$(".nhist-restore").disabled,
         "sub history ready",
       );
       esc();
       await until(() => !$(".nhist"), "history escape");
-      assert($(".subnote-page"), "history Esc also closed sub");
-      await trashNote($(".subnote-page"));
+      assert(location.pathname.startsWith("/sub/"), "history Esc also closed sub");
+      await trashNote();
       await until(
         () => $('[aria-label="하위 페이지를 삭제할까요?"]'),
         "sub delete confirm",
@@ -368,7 +369,8 @@ if (location.pathname.startsWith("/note-window/")) {
       click("삭제", $('[aria-label="하위 페이지를 삭제할까요?"]'));
       await until(
         () =>
-          !$(".subnote-page") &&
+          !location.pathname.startsWith("/sub/") &&
+          !$(".tab-sub-mark") &&
           !content().querySelector(".lex-reference-card"),
         "sub deletion",
       );
@@ -384,14 +386,17 @@ if (location.pathname.startsWith("/note-window/")) {
       click("추가", $(".subnotes"));
       await until(
         () =>
-          $(".subnote-page .lex-content h1")?.textContent === "새 후속 노트",
+          location.pathname.startsWith("/sub/") &&
+          $(".lex-content h1")?.textContent === "새 후속 노트",
         "new child",
       );
       const list = await engine(["list-sub-notes", cfg.id, "bodies=true"]);
       newChild = list.subNotes.find((n) => n.title === "새 후속 노트").id;
       assert(newChild, "new child id");
-      $('[aria-label="하위 페이지 닫기"]').click();
-      await until(() => !$(".subnote-page"), "close child");
+      $(".tab-item.tab-selected .tabx-close").click();
+      await until(() => !location.pathname.startsWith("/sub/"), "close child");
+      $('.tab-item[data-tab-id="' + cfg.id + '"] .tab-button').click();
+      await until(() => $(".subnotes"), "parent tab");
     });
     await test("history-query-keeps-selection-and-real-restore", async () => {
       $(".doc-meta-history").click();

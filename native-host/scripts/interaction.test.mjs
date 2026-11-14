@@ -177,19 +177,53 @@ test('목록 17번(C156): 노트 탭의 「새 창으로」는 open_note_window�
   assert.deepEqual(opens()[1].args,{docId:'a',title:null,geometry:null});
   assert.equal(await h.controller.moveNoteWindow('b'),'opened');assert.equal(opens().length,3);
 });
-test('목록 28번(11.7): 하위 페이지는 같은 주소로 옮겨도 닫히고, 도착할 주소에 닿는 바뀜 1번만 봐준다',async t=>{
-  const h=await fixture(t,{});h.controller.navigate('/doc/a');h.controller.openSubNotes('a',['child']);
+// 후속 노트 창(모달)은 탭 바가 없는 노트 창에서만 남았다. 11.7과 4.8의 주소 규칙은 노트 창 기준으로 시험한다.
+test('목록 28번(11.7): 노트 창의 후속 페이지는 같은 주소로 옮겨도 닫히고, 도착할 주소에 닿는 바뀜 1번만 봐준다',async t=>{
+  const h=await fixture(t,{context:{kind:'note',docId:'a'}});h.controller.navigate('/doc/a');h.controller.openSubNotes('a',['child']);
   assert.equal(h.controller.getSnapshot().subNotes.root,'a');assert.equal(h.controller.getSnapshot().subNotes.arrival,null);
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null,'moving to the same address did not close it');
-  h.controller.navigate('/calendar');h.controller.openSubNotes('a',['child']);assert.equal(h.controller.getSnapshot().subNotes.arrival,'/doc/a');
+  h.controller.navigate('/note-window/a');h.controller.openSubNotes('a',['child']);assert.equal(h.controller.getSnapshot().subNotes.arrival,'/doc/a');
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes.root,'a');assert.equal(h.controller.getSnapshot().subNotes.arrival,null);
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null);
 });
-test('목록 28번과 4.8: 링크로 하위 페이지를 열며 같은 주소로 가는 이동 1번은 봐주고 그다음 이동은 센다',async t=>{
-  const h=await fixture(t,{});h.controller.navigate('/doc/a');
+test('목록 28번과 4.8: 노트 창에서 링크로 후속 페이지를 열며 같은 주소로 가는 이동 1번은 봐주고 그다음 이동은 센다',async t=>{
+  const h=await fixture(t,{context:{kind:'note',docId:'a'}});h.controller.navigate('/doc/a');
   h.controller.openSubNotes('a',['child'],true);assert.equal(h.controller.getSnapshot().subNotes.arrival,'/doc/a');
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes.root,'a','the link flow own navigation closed it');
   h.controller.navigate('/doc/a');assert.equal(h.controller.getSnapshot().subNotes,null);
+});
+test('후속 노트 탭: 메인 창은 후속 노트를 창이 아니라 상위 노트 탭 바로 뒤의 탭으로 연다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');h.controller.navigate('/doc/b');h.controller.navigate('/doc/a');
+  h.controller.openSubNotes('a',['child']);
+  assert.equal(h.controller.getSnapshot().route,'/sub/a/child');assert.equal(h.controller.getSnapshot().subNotes,null,'the main window still opened a modal');
+  assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a','sub:a/child','b']);
+  h.controller.openSubNotes('a',['child','grandchild']);h.controller.openSubNotes('a',['other']);
+  assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a','sub:a/child','sub:a/child/grandchild','sub:a/other','b']);
+  assert.equal(h.controller.getSnapshot().route,'/sub/a/other');
+  h.controller.openSubNotes('a',['child']);assert.equal(h.controller.getSnapshot().tabs.openIds.length,5,'an open follow-up tab was opened twice');
+  assert.equal(h.controller.getSnapshot().route,'/sub/a/child');
+});
+test('후속 노트 탭: 열린 탭은 다시 켜도 남고, 노트 id 아래에 저장된다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');h.controller.openSubNotes('a',['child','grandchild']);
+  assert.deepEqual(JSON.parse(h.values.get(KEYS.tabs)).state.openIds,['a','sub:a/child/grandchild']);
+  const again=await fixture(t,{values:{[KEYS.tabs]:h.values.get(KEYS.tabs)}});
+  assert.deepEqual(again.controller.getSnapshot().tabs.openIds,['a','sub:a/child/grandchild']);
+});
+test('후속 노트 탭: 노트를 지우면 그 탭과 아래 후속 탭이 닫히고 상위 탭으로 돌아간다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');h.controller.openSubNotes('a',['child']);h.controller.openSubNotes('a',['child','grandchild']);
+  h.controller.popSubNote();
+  assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a','sub:a/child']);assert.equal(h.controller.getSnapshot().route,'/sub/a/child');
+  h.controller.openSubNotes('a',['child','grandchild']);h.controller.navigate('/sub/a/child');h.controller.popSubNote();
+  assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a'],'the follow-up under the deleted one stayed open');assert.equal(h.controller.getSnapshot().route,'/doc/a');
+  h.controller.popSubNote();assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a'],'popSubNote closed a tab that was not a follow-up');
+});
+test('후속 노트 탭: 노트를 새 창으로 옮기면 그 노트의 후속 탭도 메인 창에서 닫히고, 후속 노트를 열려 하면 그 창을 앞으로 가져온다',async t=>{
+  const h=await fixture(t,{});h.controller.navigate('/doc/a');h.controller.openSubNotes('a',['child']);h.controller.navigate('/doc/b');
+  h.controller.setNoteWindows(['a']);
+  assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['b']);assert.equal(h.controller.getSnapshot().route,'/doc/b');
+  const before=commands(h,'open_note_window').length;h.controller.openSubNotes('a',['child']);
+  assert.equal(commands(h,'open_note_window').length,before+1);assert.equal(h.controller.getSnapshot().route,'/doc/b');assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['b']);
+  h.controller.navigate('/sub/a/child');assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['b'],'an address of a popped-out note opened a main tab');
 });
 test('note window receives only close, flushes before destroy, and never subscribes to deep links', async t => {
   const h=await fixture(t,{context:{kind:'note',docId:'a'},inputs:true});
@@ -263,12 +297,12 @@ test('late asynchronous file lookup cannot overwrite a newer doc link', async t 
   barrier.resolve({kind:'external',path:'/old.md'}); await old; await h.controller.waitForIdle(); assert.equal(h.controller.getSnapshot().route,'/doc/b');
 });
 
-test('host-classified child chains survive the one arrival and close on the next address change', async t => {
+test('host-classified child chains open the follow-up tab together with the parent note tab', async t => {
   const h=await fixture(t,{handler:async cmd=>cmd==='resolve_md_target'?{kind:'note',ws:'/fixture',chain:['a','child','grandchild']}:undefined});
-  await h.controller.receiveURLs(['file:///child.md']); assert.equal(h.controller.getSnapshot().route,'/doc/a');
-  assert.deepEqual(h.controller.getSnapshot().subNotes,{root:'a',ids:['child','grandchild'],arrival:null});
-  h.controller.handleKey(key({key:'Escape'})); assert.deepEqual(h.controller.getSnapshot().subNotes.ids,['child']);
-  h.controller.navigate('/guide'); assert.equal(h.controller.getSnapshot().subNotes,null);
+  await h.controller.receiveURLs(['file:///child.md']); assert.equal(h.controller.getSnapshot().route,'/sub/a/child/grandchild');
+  assert.equal(h.controller.getSnapshot().subNotes,null); assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a','sub:a/child/grandchild']);
+  assert.equal(h.controller.handleKey(key({key:'Escape'})),false,'Escape closed a follow-up tab');
+  h.controller.navigate('/guide'); assert.deepEqual(h.controller.getSnapshot().tabs.openIds,['a','sub:a/child/grandchild']);
 });
 
 test('window links reuse existing windows with null title and validated remembered geometry', async t => {

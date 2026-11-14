@@ -7,7 +7,7 @@ import { waitingAnswers, unsavedAnswers, noteRailNow } from '@claude-plug/state'
 import { asRow, asText, workspaceName } from './types.ts';
 import { TabModel } from '../navigation/tabs.ts';
 import { NoteScrollMemory } from '../navigation/scroll.ts';
-import { activeTab, agendaAddress, docAddress, fileAddress, parseRoute, tabAddress } from '../navigation/routes.ts';
+import { activeTab, agendaAddress, docAddress, fileAddress, parseRoute, parseSubTab, subAddress, subTabId, tabAddress } from '../navigation/routes.ts';
 import { connectLinkSource, latestInput } from '../interaction/links.ts';
 import type { AppLink } from '../interaction/links.ts';
 import { shortcutFor, zoomShortcutFor } from '../interaction/shortcuts.ts';
@@ -89,6 +89,11 @@ export class WorkspaceController {
       const requested = next.route;
       if (update.workspace) this.tabs.attach(update.workspace);
       if (update.workspace || update.noteWindows) {
+        // 새 창으로 옮긴 노트의 탭과 그 노트의 후속 노트 탭은 메인 창에서 닫는다(후속 노트 탭을 먼저 닫아 마지막 주소가 상위 탭으로 남지 않게 한다).
+        for (const id of this.tabs.snapshot().openIds) {
+          const sub = parseSubTab(id);
+          if (sub && next.noteWindows.includes(sub.root)) next.route = this.tabs.close(id, next.route);
+        }
         for (const id of next.noteWindows) next.route = this.tabs.close(id, next.route);
       }
       if (!next.booting) {
@@ -128,9 +133,11 @@ export class WorkspaceController {
       }
     }
     const route = parseRoute(path);
-    if (this.context.kind === 'main' && this.state.workspace && route.kind === 'doc' && this.state.noteWindows.includes(route.id)) {
-      const previous = this.tabs.close(route.id, this.state.route);
-      this.focusNoteWindow(route.id);
+    // 새 창으로 옮긴 노트는 그 노트의 후속 노트도 메인 창 탭으로 열지 않고, 그 창을 앞으로 가져온다.
+    const popped = route.kind === 'doc' ? route.id : route.kind === 'sub' ? route.root : null;
+    if (this.context.kind === 'main' && this.state.workspace && popped !== null && this.state.noteWindows.includes(popped)) {
+      const previous = this.tabs.close(route.kind === 'sub' ? subTabId(route.root, route.ids) : popped, this.state.route);
+      this.focusNoteWindow(popped);
       this.patch({ route: previous }, location === 'external' ? 'replace' : undefined);
       return;
     }
@@ -411,14 +418,39 @@ export class WorkspaceController {
   private flushEditors = async (root?: string) => {
     await Promise.allSettled([...this.editorFlushers.values()].filter(editor => !root || editor.root === root).map(editor => editor.flush()));
   };
-  // 4.8: a link that opens sub-pages always writes the arrival address /doc/<root>, so the one
-  // address change its own navigation makes is forgiven. Other ways write it only when not already there.
-  openSubNotes = (root: string, ids: string[], alwaysArrive = false) => { if (!ids.length) { this.patch({ subNotes: null }); return; } if (this.isPoppedOut(root)) { this.focusNoteWindow(root); return; } this.patch({ subNotes: {
-    root, ids, arrival: !alwaysArrive && this.state.route === docAddress(root) ? null : docAddress(root),
-  } }); };
+  // 후속 노트를 연다. 메인 창에서는 후속 노트가 일반 노트처럼 탭 하나로 열린다(주소 /sub/<최상위 노트>/<후속 id>…).
+  // 탭 바가 없는 노트 창에서는 예전처럼 노트 위에 뜨는 후속 노트 창으로 연다.
+  // 4.8: 그 창을 여는 링크는 도착 주소 /doc/<root>를 쓰고, 그 길에서 생기는 주소 바뀜 한 번은 창을 닫지 않고 넘긴다. 다른 길은 이미 그 주소가 아니면 쓴다.
+  openSubNotes = (root: string, ids: string[], alwaysArrive = false) => {
+    if (!ids.length) { if (this.context.kind !== 'main') this.patch({ subNotes: null }); return; }
+    if (this.isPoppedOut(root)) { this.focusNoteWindow(root); return; }
+    if (this.context.kind === 'main') { this.navigate(subAddress(root, ids)); return; }
+    this.patch({ subNotes: {
+      root, ids, arrival: !alwaysArrive && this.state.route === docAddress(root) ? null : docAddress(root),
+    } });
+  };
+  // 지금 보는 후속 노트를 닫는다. 메인 창에서는 그 후속 노트 탭(과 그 아래 후속 노트 탭들)을, 노트 창에서는 후속 노트 창의 맨 위 한 단계를 닫는다.
   popSubNote = () => {
+    if (this.context.kind === 'main') {
+      const route = parseRoute(this.state.route);
+      if (route.kind === 'sub') this.closeSubNoteTabs(route.root, route.ids);
+      return;
+    }
     const current = this.state.subNotes;
     this.patch({ subNotes: current && current.ids.length > 1 ? { ...current, ids: current.ids.slice(0, -1) } : null });
+  };
+  // 후속 노트 하나와 그 아래 후속 노트의 탭을 모두 닫는다(노트를 지웠을 때). 보던 탭이 닫히면 상위 노트 탭으로 간다. 그 탭이 닫혀 있으면 이웃 탭으로 간다.
+  closeSubNoteTabs = (root: string, ids: string[]) => {
+    if (this.context.kind !== 'main' || !ids.length) return;
+    const own = subTabId(root, ids), below = own + '/';
+    const doomed = this.state.tabs.openIds.filter(id => id === own || id.startsWith(below));
+    if (!doomed.length) return;
+    const wasActive = doomed.includes(activeTab(this.state.route) ?? '');
+    let route = this.state.route;
+    for (const id of doomed) route = this.tabs.close(id, route);
+    const parentTab = ids.length > 1 ? subTabId(root, ids.slice(0, -1)) : root;
+    if (wasActive && this.tabs.snapshot().openIds.includes(parentTab)) route = tabAddress(parentTab);
+    this.patch({ route }, route !== this.state.route ? 'push' : undefined);
   };
 
   private unlistenCloseRequested?: () => void;
@@ -646,7 +678,8 @@ export class WorkspaceController {
       const opened = await this.openLinkWindow(link.id, revision);
       if (opened || revision !== this.linkRevision) return;
     }
-    if (link.chain.length && !this.state.noteWindows.includes(link.id)) this.openSubNotes(link.id, link.chain, true);
+    // 메인 창에서 사슬이 있는 링크는 후속 노트 탭으로 곧장 간다(상위 노트 탭은 탭 모델이 함께 연다).
+    if (link.chain.length && !this.state.noteWindows.includes(link.id)) { this.openSubNotes(link.id, link.chain, true); return; }
     this.navigate(docAddress(link.id));
   }
 

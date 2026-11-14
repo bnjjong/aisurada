@@ -5,6 +5,7 @@ import type { WorkspaceState } from "../workspace/types.ts";
 import { parseRoute, routeTab } from "./routes.ts";
 import type { ScreenRoute } from "./routes.ts";
 import { NoteScreen } from "./NoteReading.tsx";
+import { SubNoteScreen } from "./SubNoteScreen.tsx";
 import { TabBar } from "./TabBar.tsx";
 import { InteractionOverlays } from "../interaction/Overlays.tsx";
 import { VaultBanner } from "../data/VaultBanner.tsx";
@@ -64,7 +65,7 @@ export function WorkspaceShell({ controller, state }: Props) {
   useAskState();
   const route = parseRoute(state.route),
     ws = state.workspace!,
-    rail = route.kind !== "doc" && route.kind !== "file",
+    rail = route.kind !== "doc" && route.kind !== "sub" && route.kind !== "file",
     railWidth = clampRailWidth(state.prefs.railWidth),
     boundaryKey = (() => {
       if (route.kind === "templates") return "templates";
@@ -168,6 +169,15 @@ function RouteContent({
         <Page title="이 노트를 찾을 수 없어요" />
       );
     }
+    case "sub":
+      return (
+        <SubNoteScreen
+          root={route.root}
+          ids={route.ids}
+          controller={controller}
+          state={state}
+        />
+      );
     case "file":
       return <ExternalFile path={route.path} controller={controller} />;
     case "calendar":

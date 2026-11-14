@@ -98,8 +98,8 @@ export function NoteEditor({
         });
         return;
       }
+      // 메인 창에서는 후속 노트가 탭으로 열리며 상위 노트 탭도 함께 열린다.
       controller.openSubNotes(chain[0], [...chain.slice(1), id]);
-      controller.navigate("/doc/" + encodeURIComponent(note.id));
       return;
     }
     controller.openSubNotes(chain[0], [...chain.slice(1), id]);

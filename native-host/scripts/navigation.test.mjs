@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRoute, docAddress, fileAddress, agendaAddress, routeTab, activeTab, tabAddress, findAgenda, calendarView } from '../src/navigation/routes.ts';
+import { parseRoute, docAddress, fileAddress, agendaAddress, routeTab, activeTab, tabAddress, findAgenda, calendarView, subAddress, subTabId, parseSubTab, isNoteTab, isStoredTab, tabRootId } from '../src/navigation/routes.ts';
 import { TabModel, readTabs } from '../src/navigation/tabs.ts';
 import { NoteScrollMemory, rememberNoteScroll } from '../src/navigation/scroll.ts';
 import { WorkspaceController } from '../src/workspace/controller.ts';
@@ -219,4 +219,42 @@ test('focus refresh updates the real current day but leaves sample dates fixed',
   const h = await controllerFixture(t); h.services.now = () => new Date('2026-11-02T00:00:00Z'); h.controller.refresh();
   assert.equal(h.controller.getSnapshot().workspace.today, '2026-11-02');
   await h.controller.sample(); h.controller.refresh(); assert.equal(h.controller.getSnapshot().workspace.today, '2026-06-04');
+});
+
+test('후속 노트 주소와 탭 식별자는 최상위 노트부터 이어지는 사슬을 그대로 오간다', () => {
+  assert.deepEqual(parseRoute('/sub/a/child/grandchild'), { kind: 'sub', root: 'a', ids: ['child', 'grandchild'] });
+  assert.deepEqual(parseRoute(subAddress('한글/a ?', ['b c', '%'])), { kind: 'sub', root: '한글/a ?', ids: ['b c', '%'] });
+  for (const path of ['/sub', '/sub/', '/sub/a', '/sub/a/', '/sub/%ZZ/b']) assert.equal(parseRoute(path).kind, 'unknown', path);
+  assert.equal(routeTab(parseRoute('/sub/a/child')), 'sub:a/child'); assert.equal(activeTab('/sub/a/child'), 'sub:a/child');
+  assert.equal(subTabId('a', ['child', 'g']), 'sub:a/child/g'); assert.equal(tabAddress('sub:a/child/g'), '/sub/a/child/g');
+  assert.deepEqual(parseSubTab('sub:a/child/g'), { root: 'a', ids: ['child', 'g'] });
+  for (const id of ['a', 'sub:a', 'sub:', 'term:a/b', 'ext:/a/b']) assert.equal(parseSubTab(id), null, id);
+  assert.equal(isNoteTab('sub:a/child'), false); assert.equal(isStoredTab('sub:a/child'), true); assert.equal(isStoredTab('term:main'), false); assert.equal(isStoredTab('a'), true);
+  assert.equal(tabRootId('a'), 'a'); assert.equal(tabRootId('sub:a/child'), 'a'); assert.equal(tabRootId('term:main'), null); assert.equal(tabRootId('ext:/a.md'), null);
+});
+
+test('후속 노트 탭은 저장되고, 읽을 때 걸러지지 않으며, 최상위 노트가 사라지면 함께 사라진다', () => {
+  const disk = storage(persisted(['a', 'sub:a/child', 'sub:b/x', 'sub:', 'sub:a']));
+  assert.deepEqual(readTabs(disk).openIds, ['a', 'sub:a/child', 'sub:b/x']);
+  const tabs = new TabModel(disk, true); tabs.attach(workspace(['a', 'b']));
+  assert.deepEqual(tabs.snapshot().openIds, ['a', 'sub:a/child', 'sub:b/x']);
+  tabs.attach(workspace(['b']));
+  assert.deepEqual(tabs.snapshot().openIds, ['sub:b/x']); assert.deepEqual(tabs.visible(), ['sub:b/x']);
+  assert.equal(disk.values.get(KEYS.tabs), '{"state":{"workspaceRoot":"/fixture","openIds":["sub:b/x"]},"version":1}');
+});
+
+test('후속 노트 탭은 같은 최상위 노트의 탭 무리 바로 뒤에 놓이고, 상위 탭이 없으면 함께 열린다', () => {
+  const { tabs } = model();
+  for (const route of ['/doc/a', '/doc/b', '/sub/a/c1', '/sub/b/x', '/sub/a/c1/g', '/sub/a/c2', '/sub/c/y']) tabs.visit(route, workspace());
+  assert.deepEqual(tabs.snapshot().openIds, ['a', 'sub:a/c1', 'sub:a/c1/g', 'sub:a/c2', 'b', 'sub:b/x', 'c', 'sub:c/y']);
+  tabs.visit('/sub/a/c1', workspace()); assert.equal(tabs.snapshot().openIds.length, 8, 'an open follow-up tab was added twice');
+  tabs.close('a', '/doc/a'); tabs.visit('/sub/a/c3', workspace());
+  assert.deepEqual(tabs.snapshot().openIds.slice(0, 4), ['sub:a/c1', 'sub:a/c1/g', 'sub:a/c2', 'sub:a/c3'], 'a closed parent tab came back although follow-ups of it were open');
+});
+
+test('후속 노트 주소의 최상위 노트가 없으면 노트 탭으로, 노트 탭도 없으면 캘린더로 돌린다', () => {
+  const { tabs } = model(['b', 'sub:gone/x']);
+  assert.equal(tabs.visit('/sub/gone/x', workspace()), '/doc/b'); assert.deepEqual(tabs.visible(), ['b']);
+  const empty = new TabModel(storage(), true); empty.attach(workspace());
+  assert.equal(empty.visit('/sub/gone/x', workspace()), '/calendar');
 });

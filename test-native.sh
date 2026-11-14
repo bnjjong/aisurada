@@ -27,6 +27,7 @@ pnpm --dir native-host exec node --import tsx --test scripts/resources-ui.test.m
 pnpm --dir native-host exec node --import tsx --test scripts/tasks-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/rail-tabs.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/typography.test.mjs
+pnpm --dir native-host exec node --import tsx --test scripts/sub-tabs-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/notifications-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/runner-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/approvals-ui.test.mjs

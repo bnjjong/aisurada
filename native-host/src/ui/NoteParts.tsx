@@ -21,9 +21,21 @@ import {
   visibleNotes,
 } from "./model.ts";
 import { stripMarkers } from "../editor/grammar.ts";
-import { agendaAddress, docAddress } from "../navigation/routes.ts";
+import { agendaAddress, docAddress, subAddress } from "../navigation/routes.ts";
 import { openNoteRail, CLAUDE_ENABLED } from "@claude-plug/state";
 export type NoteMode = "tab" | "window" | "agenda" | "preview" | "sub";
+/** 후속 노트의 조상들: 최상위 노트부터 바로 위 부모까지 제목과 그 노트의 화면 주소. 사슬을 아직 모르면 빈 목록이다. */
+function ancestorLinks(controller: WorkspaceController, parent: string): { id: string; title: string; address: string }[] {
+  const chain = controller.data.chain(parent)?.split("/") || [];
+  return chain.map((id, index) => ({
+    id,
+    title:
+      (index === 0
+        ? controller.getSnapshot().workspace?.notes.find((n) => n.id === id)
+        : controller.data.note({ id, parent: chain[index - 1] }))?.title || id,
+    address: index === 0 ? docAddress(id) : subAddress(chain[0], chain.slice(1, index + 1)),
+  }));
+}
 const go = (c: WorkspaceController, path: string) => {
   if (c.context.kind === "note")
     void c.callHost("show_in_main", { path, rail: null, sub: null });
@@ -64,11 +76,16 @@ export function NoteMeta({
       ? controller.data.chain(parent)?.split("/").concat(note.id).join("/") ||
         note.id
       : note.id;
+  // 후속 노트 탭에는 옛 후속 노트 창의 이동 경로가 없다. 대신 상위 노트들로 돌아가는 칩을 둔다.
+  const ancestors = parent && mode === "tab" ? ancestorLinks(controller, parent) : [];
   const remove = async () => {
     if (parent) {
       const result = await controller.data.deleteSubNote(parent, note.id);
-      if (result.ok) controller.removeChildCards(parent, note.id);
-      controller.popSubNote();
+      if (result.ok) {
+        controller.removeChildCards(parent, note.id);
+        // 지운 노트를 보던 후속 노트 탭(창)을 닫는다. 지우지 못했으면 노트가 그대로 있으니 그대로 둔다.
+        controller.popSubNote();
+      }
     } else {
       if (mode === "preview") controller.showPreview(null);
       await controller.data.deleteDoc(note.id);
@@ -266,8 +283,18 @@ export function NoteMeta({
           )}
         </div>
       </div>
-      {(!parent && (agenda || !!note.template) || sessionChips(live).length > 0) && (
+      {(!parent && (agenda || !!note.template) || sessionChips(live).length > 0 || ancestors.length > 0) && (
         <div className="doc-context-chips">
+          {ancestors.map((ancestor) => (
+            <button
+              key={ancestor.id}
+              className="doc-parent-chip"
+              title="상위 노트로 이동"
+              onClick={() => go(controller, ancestor.address)}
+            >
+              ↰ {ancestor.title}
+            </button>
+          ))}
           {!parent &&
             agenda &&
             (mode === "preview" ? (

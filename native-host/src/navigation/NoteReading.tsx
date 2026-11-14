@@ -223,9 +223,15 @@ export function noteDirOf(controller: WorkspaceController | undefined, note: Not
 export function NoteScreen({
   note,
   controller,
+  parent,
+  root,
 }: {
   note: Note;
   controller: WorkspaceController;
+  /** 후속 노트 탭일 때 바로 위 부모 노트의 id. 최상위 노트 화면에는 없다. */
+  parent?: string;
+  /** 후속 노트 탭일 때 사슬 맨 위 최상위 노트의 id. 물음과 세션 레일의 대상이 이것이다. */
+  root?: string;
 }) {
   const noteDir = noteDirOf(controller, note);
   // Ensure noteRailNow is referenced for deep-link / navigation contracts
@@ -254,9 +260,10 @@ export function NoteScreen({
         tabIndex={0}
         aria-label={`${note.title} 본문`}
       >
-        <NoteReading note={note} controller={controller} />
+        {/* 후속 노트도 탭에서는 일반 노트 화면과 같은 모양(본문 폭 조절 포함)으로 보인다. */}
+        <NoteReading note={note} controller={controller} parent={parent} root={root} mode={parent ? "tab" : undefined} />
       </div>
-      <NoteRail note={note} controller={controller} noteDir={noteDir} />
+      <NoteRail note={note} controller={controller} noteDir={noteDir} root={root} />
     </div>
   );
 }

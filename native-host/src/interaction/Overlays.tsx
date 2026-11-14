@@ -4,6 +4,7 @@ import { asText } from "../workspace/types.ts";
 import type { Note, WorkspaceState } from "../workspace/types.ts";
 import { docAddress } from "../navigation/routes.ts";
 import { NoteReading, NoteRail, noteDirOf } from "../navigation/NoteReading.tsx";
+import { holdSubChain } from "../navigation/subNotes.ts";
 import { Settings } from "../ui/Settings.tsx";
 import { Forms } from "../ui/Forms.tsx";
 import { visibleNotes, displayTitle, TYPE_NAMES } from "../ui/model.ts";
@@ -175,6 +176,9 @@ function QuickSearch({
   );
 }
 
+/**
+ * 노트 창에서 후속 노트를 보여 주는 창. 탭 바가 있는 메인 창에서는 후속 노트가 탭으로 열리므로 이 창이 뜨지 않는다.
+ */
 function SubNotePages({
   controller,
   state,
@@ -186,28 +190,14 @@ function SubNotePages({
   const [failure, setFailure] = useState("");
   useEffect(() => {
     let current = true;
-    const release: (() => void)[] = [];
-    void (async () => {
-      const root = state.workspace!.notes.find(
-        (note) => note.id === trail.root,
-      );
-      if (!root) throw new Error("상위 노트를 찾을 수 없어요.");
-      let parent = trail.root;
-      for (const id of trail.ids) {
-        if (!current) return;
-        release.push(controller.data.retainSubNotes(parent));
-        const notes = await controller.data.loadSubNotes(parent);
-        if (!notes.some((note) => note.id === id))
-          throw new Error("하위 노트를 찾을 수 없어요.");
-        parent = id;
-      }
-    })().catch((error) => {
+    const held = holdSubChain(controller, trail.root, trail.ids);
+    held.done.catch((error) => {
       if (current)
         setFailure(error instanceof Error ? error.message : String(error));
     });
     return () => {
       current = false;
-      release.forEach((stop) => stop());
+      held.release();
     };
   }, [controller, trail.root, trail.ids.join("/")]);
   const parent = trail.ids.length > 1 ? trail.ids.at(-2)! : trail.root;

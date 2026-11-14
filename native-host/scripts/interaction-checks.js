@@ -58,12 +58,15 @@ if(location.pathname.startsWith('/note-window/')) {
       assert(document.querySelector('#screen-content h1').textContent==='검증 아젠다','agenda slug failed');
     });
     await test('markdown-note-and-child-chain',async()=>{
+      const sub=(...ids)=>'/sub/'+ids.map(encodeURIComponent).join('/'), grandId='snfixture-00000002';
       await links([file(cfg.rootNote)]);await until(()=>location.pathname===doc(cfg.id));
-      await links([file(cfg.childNote)]);await until(()=>document.querySelector('.subnote-page .note-body')?.textContent.includes('하위 Markdown 파일의 본문'));
-      assert(location.pathname===doc(cfg.id),'child file changed root route');
-      await links([file(cfg.grandchildNote)]);await until(()=>document.querySelector('.subnote-page .note-body')?.textContent.includes('두 단계 사슬의 본문'));
-      press({key:'Escape'});await until(()=>document.querySelector('.subnote-page .note-body')?.textContent.includes('하위 Markdown 파일의 본문'));
-      press({key:'Escape'});await until(()=>!document.querySelector('.subnote-page'));
+      await links([file(cfg.childNote)]);await until(()=>location.pathname===sub(cfg.id,cfg.childId)&&document.querySelector('.note-body')?.textContent.includes('하위 Markdown 파일의 본문'));
+      assert(!document.querySelector('.subnote-page'),'child file opened a modal in the main window');
+      assert(tab(cfg.id)&&tab(`sub:${cfg.id}/${cfg.childId}`),'root and child tabs are not both open');
+      await links([file(cfg.grandchildNote)]);await until(()=>location.pathname===sub(cfg.id,cfg.childId,grandId)&&document.querySelector('.note-body')?.textContent.includes('두 단계 사슬의 본문'));
+      assert(tab(`sub:${cfg.id}/${cfg.childId}/${grandId}`),'grandchild has no tab');
+      press({key:'Escape'});await wait(150);assert(location.pathname===sub(cfg.id,cfg.childId,grandId),'Escape closed a follow-up tab');
+      for(const id of [`sub:${cfg.id}/${cfg.childId}/${grandId}`,`sub:${cfg.id}/${cfg.childId}`]){tab(id).querySelector('.tabx-close').click();await until(()=>!tab(id),'close '+id);}
     });
     await test('external-markdown-through-the-shared-gate',async()=>{
       await links([file(cfg.external)]);await until(()=>document.querySelector('.ext-md'));
