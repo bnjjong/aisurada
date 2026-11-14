@@ -1223,3 +1223,119 @@ fn writes_projects_through_the_write_foundation() {
                 .is_file()
     );
 }
+
+#[test]
+fn writes_templates_and_facts_through_the_write_foundation() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let message = |command: &str, args: Value| engine.call(command, args).unwrap_err().message;
+
+    // 문서 템플릿: 새로 만들면 기본 유형 plan이고, 들여쓴 블록이 있으면 경고가 붙는다
+    let created = engine
+        .call(
+            "save_template",
+            json!({"name": "새 양식", "body": "# 양식\n  # 들여쓴 제목\n"}),
+        )
+        .unwrap();
+    let id = created["id"].as_str().unwrap().to_string();
+    assert!(
+        id.starts_with("tpl-") && created["action"] == "created" && created["builtin"] == false
+    );
+    assert!(
+        created["warning"]
+            .as_str()
+            .unwrap()
+            .starts_with("본문에 들여쓴 블록이 1곳 있어요(2번째 줄 제목)")
+    );
+    let file = vault.join(format!(".aisurada/templates/doc/{id}.md"));
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(
+        text.starts_with(&format!(
+            "---\nid: {id}\nname: 새 양식\ntype: plan\nformat: markdown\n"
+        )),
+        "{text}"
+    );
+    assert!(
+        text.ends_with("builtin: false\n---\n# 양식\n  # 들여쓴 제목\n"),
+        "{text}"
+    );
+    let updated = engine
+        .call(
+            "save_template",
+            json!({"id": id, "type": "BUILD", "desc": "설명"}),
+        )
+        .unwrap();
+    assert_eq!(updated["action"], "updated");
+    assert!(
+        std::fs::read_to_string(&file)
+            .unwrap()
+            .contains("type: build")
+    );
+    assert_eq!(
+        message("save_template", json!({"name": "x"})),
+        format!("새 템플릿은 body 이 필요하다: {}", SAVE_TEMPLATE_USAGE)
+    );
+    assert_eq!(
+        message("save_template", json!({"id": "a b"})),
+        "템플릿 id 모양이 아니다: a b"
+    );
+    assert_eq!(
+        message("save_template", json!({"id": "nope-none"})),
+        "Template not found: nope-none"
+    );
+    let removed = engine
+        .call("delete_doc_template", json!({"id": id}))
+        .unwrap();
+    assert_eq!(
+        removed["removed"],
+        json!([format!(".aisurada/templates/doc/{id}.md")])
+    );
+    assert!(!file.exists());
+    assert_eq!(
+        engine
+            .call("delete_doc_template", json!({"id": id}))
+            .unwrap()["removed"],
+        json!([])
+    );
+
+    // 사실층: 앞뒤 공백을 떼어 한 줄 끝 줄바꿈과 함께 쓰고, 빈 값이면 지운다
+    let demo = "agfx0001-0000000a";
+    let set = engine
+        .call(
+            "update_agenda_facts",
+            json!({"id": demo, "facts": "  지금도 참인 것  "}),
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            set["facts"].as_str(),
+            set["limit"].as_u64(),
+            set["editLimit"].as_u64()
+        ),
+        (Some("지금도 참인 것"), Some(2000), Some(10000))
+    );
+    let facts_file = vault.join(set["path"].as_str().unwrap());
+    assert_eq!(
+        std::fs::read_to_string(&facts_file).unwrap(),
+        "지금도 참인 것\n"
+    );
+    assert_eq!(
+        message("update_agenda_facts", json!({"id": demo})),
+        "facts 가 필요하다. 사실층을 지우려면 빈 값을 준다."
+    );
+    assert_eq!(
+        message(
+            "update_agenda_facts",
+            json!({"id": demo, "facts": "가".repeat(2001)})
+        ),
+        "사실층이 상한을 넘었다: 2001 자. 상한은 2000 자다."
+    );
+    let cleared = engine
+        .call("update_agenda_facts", json!({"id": demo, "facts": " "}))
+        .unwrap();
+    assert!(cleared.get("facts").is_none() && !facts_file.exists());
+}
+
+const SAVE_TEMPLATE_USAGE: &str = "save-template [id=<고칠 템플릿 id. 없으면 새로 만든다>] [name=<이름. 새로 만들 때 필수>] [type=<plan|build|report|research|meeting|free. 새로 만들 때 기본 plan>] [desc=<언제 쓰는 템플릿인지>] [body=<본문. 새로 만들 때 필수>]";

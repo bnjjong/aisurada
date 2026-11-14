@@ -2,6 +2,7 @@
 
 pub mod agenda_write;
 pub mod commit_vault;
+pub mod facts_write;
 pub mod get_agenda_facts;
 pub mod get_doc;
 pub mod get_sub_note;
@@ -20,6 +21,7 @@ pub mod project_write;
 pub mod reindex;
 pub mod search_docs;
 mod subnote;
+pub mod template_write;
 
 use serde::Deserialize;
 

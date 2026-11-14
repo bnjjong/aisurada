@@ -6,9 +6,10 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    agenda_write, commit_vault, get_agenda_facts, get_doc, get_sub_note, get_template, history,
-    list_agendas, list_attachments, list_comments, list_docs, list_projects, list_sub_notes,
-    list_tags, list_templates, list_trash, project_write, reindex, search_docs,
+    agenda_write, commit_vault, facts_write, get_agenda_facts, get_doc, get_sub_note, get_template,
+    history, list_agendas, list_attachments, list_comments, list_docs, list_projects,
+    list_sub_notes, list_tags, list_templates, list_trash, project_write, reindex, search_docs,
+    template_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -43,6 +44,10 @@ pub const COMMANDS: &[&str] = &[
     "create_project",
     "update_project",
     "delete_project",
+    "save_template",
+    "save_ritual_template",
+    "delete_doc_template",
+    "update_agenda_facts",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -53,6 +58,10 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "create_project",
     "update_project",
     "delete_project",
+    "save_template",
+    "save_ritual_template",
+    "delete_doc_template",
+    "update_agenda_facts",
     "commit_vault",
 ];
 
@@ -181,6 +190,22 @@ impl Engine {
             "delete_project" => {
                 let request: project_write::DeleteProjectRequest = parse_args(command, args)?;
                 to_json(project_write::delete(&self.vault_root, &request)?)
+            }
+            "save_template" => {
+                let request: template_write::SaveTemplateRequest = parse_args(command, args)?;
+                to_json(template_write::save_document(&self.vault_root, &request)?)
+            }
+            "save_ritual_template" => {
+                let request: template_write::SaveRitualTemplateRequest = parse_args(command, args)?;
+                to_json(template_write::save_ritual(&self.vault_root, &request)?)
+            }
+            "delete_doc_template" => {
+                let request: template_write::DeleteDocTemplateRequest = parse_args(command, args)?;
+                to_json(template_write::delete_document(&self.vault_root, &request)?)
+            }
+            "update_agenda_facts" => {
+                let request: facts_write::UpdateAgendaFactsRequest = parse_args(command, args)?;
+                to_json(facts_write::update(&self.vault_root, &request)?)
             }
             "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(

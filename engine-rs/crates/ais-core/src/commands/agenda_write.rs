@@ -140,7 +140,7 @@ fn project_repo_arg(
     Ok(Some(name.to_string()))
 }
 
-fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
+pub(crate) fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
     if is_blank(id) {
         return Err(EngineError::invalid_argument(format!(
             "인자가 하나 필요하다: {usage}"
@@ -154,7 +154,7 @@ fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
     Ok(())
 }
 
-fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a AgendaInfo, EngineError> {
+pub(crate) fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a AgendaInfo, EngineError> {
     scope
         .index
         .agendas

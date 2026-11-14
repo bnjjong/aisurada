@@ -1713,6 +1713,318 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         "delete_project",
         json!({}),
     );
+
+    // ---- 템플릿 ----
+    let templates = Engine::new(&h.b).call("list_templates", json!({})).ok();
+    let items: Vec<Value> = templates
+        .as_ref()
+        .and_then(|t| t["items"].as_array().cloned())
+        .unwrap_or_default();
+    let pick = |category: &str, wanted: &dyn Fn(&Value) -> bool| -> Option<String> {
+        items
+            .iter()
+            .find(|i| i["category"] == category && wanted(i))
+            .and_then(|i| i["id"].as_str().map(str::to_string))
+    };
+    let doc_md = pick("doc", &|i| {
+        i["builtin"] != true && i["format"] == "markdown"
+    });
+    let doc_html = pick("doc", &|i| i["format"] == "html");
+    let doc_builtin = pick("doc", &|i| i["builtin"] == true);
+    let ritual = pick("ritual", &|_| true);
+    let indented = "  # 들여쓴 제목\n본문\n  > 인용\n";
+    let made = h.step(
+        "새 템플릿",
+        &["save-template", "name=새 양식", "body=# 양식\n본문\n"],
+        "save_template",
+        json!({"name": "새 양식", "body": "# 양식\n본문\n"}),
+    );
+    h.step(
+        "새 템플릿 모든 값",
+        &[
+            "save-template",
+            "name= 이름 ",
+            "type=Build",
+            "desc=설명: 콜론 # 해시",
+            &format!("body={indented}"),
+        ],
+        "save_template",
+        json!({"name": " 이름 ", "type": "Build", "desc": "설명: 콜론 # 해시", "body": indented}),
+    );
+    for (label, java_args, args) in [
+        (
+            "body 없음",
+            vec!["save-template", "name=x"],
+            json!({"name": "x"}),
+        ),
+        (
+            "공백 body",
+            vec!["save-template", "name=x", "body=  "],
+            json!({"name": "x", "body": "  "}),
+        ),
+        (
+            "name 없음",
+            vec!["save-template", "body=b"],
+            json!({"body": "b"}),
+        ),
+        (
+            "공백 name",
+            vec!["save-template", "name=  ", "body=b"],
+            json!({"name": "  ", "body": "b"}),
+        ),
+        (
+            "모르는 유형",
+            vec!["save-template", "name=x", "body=b", "type=zzz"],
+            json!({"name": "x", "body": "b", "type": "zzz"}),
+        ),
+        (
+            "id 모양 아님",
+            vec!["save-template", "id=a b"],
+            json!({"id": "a b"}),
+        ),
+        (
+            "없는 id",
+            vec!["save-template", "id=nope-none", "name=x"],
+            json!({"id": "nope-none", "name": "x"}),
+        ),
+        (
+            "공백 이름으로 고침",
+            vec!["save-template", "id=plan-basic", "name=  "],
+            json!({"id": "plan-basic", "name": "  "}),
+        ),
+    ] {
+        h.step(
+            &format!("템플릿 {label}"),
+            &java_args,
+            "save_template",
+            args,
+        );
+    }
+    if let Some(id) = id_of(&made) {
+        h.step(
+            "이름·설명·본문 고침",
+            &[
+                "save-template",
+                &format!("id={id}"),
+                "name=고친 이름",
+                "desc=고친 설명",
+                "body=고친 본문\n",
+            ],
+            "save_template",
+            json!({"id": id, "name": "고친 이름", "desc": "고친 설명", "body": "고친 본문\n"}),
+        );
+        h.step(
+            "유형만 고침",
+            &["save-template", &format!("id={id}"), "type=REPORT"],
+            "save_template",
+            json!({"id": id, "type": "REPORT"}),
+        );
+        h.step(
+            "아무것도 안 줌",
+            &["save-template", &format!("id={id}")],
+            "save_template",
+            json!({"id": id}),
+        );
+        h.step(
+            "새 템플릿 지움",
+            &["delete-doc-template", &id],
+            "delete_doc_template",
+            json!({"id": id}),
+        );
+        h.step(
+            "이미 지웠다",
+            &["delete-doc-template", &id],
+            "delete_doc_template",
+            json!({"id": id}),
+        );
+    }
+    if let Some(id) = &doc_md {
+        h.step(
+            "기존 문서 템플릿 고침",
+            &[
+                "save-template",
+                &format!("id={id}"),
+                "body=바뀐 본문\n  | a | b |\n  |---|---|\n",
+            ],
+            "save_template",
+            json!({"id": id, "body": "바뀐 본문\n  | a | b |\n  |---|---|\n"}),
+        );
+    }
+    if let Some(id) = &doc_html {
+        h.step(
+            "html 템플릿을 고치면 md로 바뀐다",
+            &["save-template", &format!("id={id}"), "desc=html에서"],
+            "save_template",
+            json!({"id": id, "desc": "html에서"}),
+        );
+    }
+    if let Some(id) = &doc_builtin {
+        h.step(
+            "빌트인 고침",
+            &["save-template", &format!("id={id}"), "desc=고친 빌트인"],
+            "save_template",
+            json!({"id": id, "desc": "고친 빌트인"}),
+        );
+        h.step(
+            "빌트인 지움",
+            &["delete-doc-template", id],
+            "delete_doc_template",
+            json!({"id": id}),
+        );
+    }
+    if let Some(id) = &ritual {
+        h.step(
+            "리추얼 고침",
+            &[
+                "save-ritual-template",
+                id,
+                "name=회고 이름",
+                "desc=회고 설명",
+                "body=회고 본문\n",
+            ],
+            "save_ritual_template",
+            json!({"id": id, "name": "회고 이름", "desc": "회고 설명", "body": "회고 본문\n"}),
+        );
+        h.step(
+            "리추얼 아무것도 안 줌",
+            &["save-ritual-template", id],
+            "save_ritual_template",
+            json!({"id": id}),
+        );
+        h.step(
+            "리추얼 공백 이름",
+            &["save-ritual-template", id, "name= "],
+            "save_ritual_template",
+            json!({"id": id, "name": " "}),
+        );
+        h.step(
+            "리추얼 지움",
+            &["delete-doc-template", id],
+            "delete_doc_template",
+            json!({"id": id}),
+        );
+        h.step(
+            "문서 id로 리추얼 고침",
+            &["save-template", &format!("id={id}"), "name=x"],
+            "save_template",
+            json!({"id": id, "name": "x"}),
+        );
+    }
+    if let Some(id) = &doc_md {
+        h.step(
+            "문서 id로 리추얼 고침 시도",
+            &["save-ritual-template", id, "name=x"],
+            "save_ritual_template",
+            json!({"id": id, "name": "x"}),
+        );
+    }
+    for (label, java_args, args, command) in [
+        (
+            "리추얼 id 없음",
+            vec!["save-ritual-template"],
+            json!({}),
+            "save_ritual_template",
+        ),
+        (
+            "리추얼 id 모양",
+            vec!["save-ritual-template", "a b"],
+            json!({"id": "a b"}),
+            "save_ritual_template",
+        ),
+        (
+            "리추얼 없는 id",
+            vec!["save-ritual-template", "nope-none"],
+            json!({"id": "nope-none"}),
+            "save_ritual_template",
+        ),
+        (
+            "지움 id 없음",
+            vec!["delete-doc-template"],
+            json!({}),
+            "delete_doc_template",
+        ),
+        (
+            "지움 id 모양",
+            vec!["delete-doc-template", "a/b"],
+            json!({"id": "a/b"}),
+            "delete_doc_template",
+        ),
+        (
+            "없는 템플릿 지움",
+            vec!["delete-doc-template", "nope-none"],
+            json!({"id": "nope-none"}),
+            "delete_doc_template",
+        ),
+    ] {
+        h.step(label, &java_args, command, args);
+    }
+
+    // ---- 사실층 ----
+    let demo = "agfx0001-0000000a";
+    let long = "가".repeat(2001);
+    for (label, java_args, args) in [
+        (
+            "설정",
+            vec![
+                "update-agenda-facts",
+                demo,
+                "facts=  지금도 참인 것\n둘째 줄  ",
+            ],
+            json!({"id": demo, "facts": "  지금도 참인 것\n둘째 줄  "}),
+        ),
+        (
+            "다시 설정",
+            vec!["update-agenda-facts", demo, "facts=바뀐 사실"],
+            json!({"id": demo, "facts": "바뀐 사실"}),
+        ),
+        (
+            "정확히 상한",
+            vec![
+                "update-agenda-facts",
+                demo,
+                &format!("facts={}", "나".repeat(2000)),
+            ],
+            json!({"id": demo, "facts": "나".repeat(2000)}),
+        ),
+        (
+            "상한 초과",
+            vec!["update-agenda-facts", demo, &format!("facts={long}")],
+            json!({"id": demo, "facts": long}),
+        ),
+        (
+            "facts 없음",
+            vec!["update-agenda-facts", demo],
+            json!({"id": demo}),
+        ),
+        (
+            "지움",
+            vec!["update-agenda-facts", demo, "facts= "],
+            json!({"id": demo, "facts": " "}),
+        ),
+        (
+            "이미 없다",
+            vec!["update-agenda-facts", demo, "facts="],
+            json!({"id": demo, "facts": ""}),
+        ),
+        (
+            "없는 아젠다",
+            vec!["update-agenda-facts", "agzz0001-00000000", "facts=x"],
+            json!({"id": "agzz0001-00000000", "facts": "x"}),
+        ),
+        (
+            "id 모양",
+            vec!["update-agenda-facts", "nope", "facts=x"],
+            json!({"id": "nope", "facts": "x"}),
+        ),
+        ("id 없음", vec!["update-agenda-facts"], json!({})),
+    ] {
+        h.step(
+            &format!("사실층 {label}"),
+            &java_args,
+            "update_agenda_facts",
+            args,
+        );
+    }
     let _ = fs::remove_dir_all(&root);
 }
 

@@ -11,6 +11,8 @@
 //! - [`slug`]: 제목에서 폴더·파일 이름(slug) 만들기
 //! - [`agenda_file`]: 아젠다 파일 만들기
 //! - [`project_file`]: 프로젝트 파일 만들기와 저장소 목록 검사
+//! - [`template_file`]: 템플릿 파일 만들기
+//! - [`warnings`]: 쓰기 응답의 경고 글
 
 pub mod agenda_file;
 pub mod apparatus;
@@ -23,3 +25,5 @@ pub mod pipeline;
 pub mod precondition;
 pub mod project_file;
 pub mod slug;
+pub mod template_file;
+pub mod warnings;
