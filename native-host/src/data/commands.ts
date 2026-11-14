@@ -10,18 +10,30 @@ const command = (name: string, positional: string[] = [], fields: Fields = {}, t
  * `toArgv`로 `key=value` 문자열 목록으로 푼다. 옮겨진 명령부터 이 모양으로 만들고, 나머지는 아직 argv 목록이다.
  */
 export interface Call { command: string; args?: Fields; }
+/** Java 엔진이 `key=value`가 아니라 자리(positional)로 받는 인자: 호출 객체의 인자 이름을 그 차례로 앞에 둔다. */
+const POSITIONAL: Record<string, string[]> = {
+  get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
+  list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'],
+};
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
-export const toArgv = (call: Call): string[] => [call.command.replace(/_/g, '-'), ...cells(call.args ?? {})];
+export const toArgv = (call: Call): string[] => {
+  const args = call.args ?? {}, positional = POSITIONAL[call.command] ?? [];
+  const placed = positional.map(key => args[key]).filter(value => value !== undefined).map(String);
+  const named = Object.fromEntries(Object.entries(args).filter(([key]) => !positional.includes(key)));
+  return [call.command.replace(/_/g, '-'), ...placed, ...cells(named)];
+};
 
 export const read = {
   reindex: (): Call => ({ command: 'reindex' }),
   templates: (): Call => ({ command: 'list_templates', args: { bodies: true } }), trash: (): Call => ({ command: 'list_trash' }),
   agendas: (): Call => ({ command: 'list_agendas' }), projects: (): Call => ({ command: 'list_projects' }),
   docs: (): Call => ({ command: 'list_docs', args: { limit: 0, bodies: true } }),
-  subNotes: (parent: string) => ['list-sub-notes', parent, 'bodies=true'],
-  comments: (root: string, sub?: string) => ['list-comments', root, ...(sub ? [sub] : [])],
-  doc: (id: string) => ['get-doc', id], subNote: (parent: string, id: string) => ['get-sub-note', parent, id],
-  facts: (id: string) => ['get-agenda-facts', id], history: (id: string, fields: Fields = {}) => command('history', [id], fields),
+  subNotes: (parent: string): Call => ({ command: 'list_sub_notes', args: { parent, bodies: true } }),
+  comments: (root: string, sub?: string): Call => ({ command: 'list_comments', args: { id: root, subId: sub || undefined } }),
+  doc: (id: string): Call => ({ command: 'get_doc', args: { id } }),
+  subNote: (parent: string, id: string): Call => ({ command: 'get_sub_note', args: { parent, id } }),
+  facts: (id: string): Call => ({ command: 'get_agenda_facts', args: { id } }),
+  history: (id: string, fields: Fields = {}) => command('history', [id], fields),
   commit: () => ['commit-vault'], schedule: () => ['schedule', 'status', '--json'],
   sessionTitles: (ids: string[]) => ['session-titles', ...new Set(ids)],
   readSession: (sessionId: string, limit = 100, urls = true) => ['read-session', sessionId, `limit=${limit}`, `urls=${urls}`],

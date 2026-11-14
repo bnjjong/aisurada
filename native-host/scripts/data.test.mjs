@@ -53,11 +53,17 @@ test('argv preserves whitespace, newlines, quotes, equals, empty fields and plac
   assert.deepEqual(toArgv(read.docs()),['list-docs','limit=0','bodies=true']);
   assert.deepEqual(toArgv(read.templates()),['list-templates','bodies=true']);
   assert.deepEqual([read.reindex(),read.trash(),read.agendas(),read.projects()].map(toArgv),[['reindex'],['list-trash'],['list-agendas'],['list-projects']]);
-  assert.deepEqual(read.comments('root','child'),['list-comments','root','child']);
+  // 노트를 여는 길의 명령도 호출 객체이고, 풀면 예전 자리 인자(positional) 목록과 같다
+  assert.deepEqual(toArgv(read.comments('root','child')),['list-comments','root','child']);
+  assert.deepEqual(toArgv(read.comments('root')),['list-comments','root']);
+  assert.deepEqual(toArgv(read.doc(' id ')),['get-doc',' id ']);
+  assert.deepEqual(toArgv(read.subNotes('r/c')),['list-sub-notes','r/c','bodies=true']);
+  assert.deepEqual(toArgv(read.facts('ag')),['get-agenda-facts','ag']);
+  assert.deepEqual(read.subNote('r/c','d'),{command:'get_sub_note',args:{parent:'r/c',id:'d'}});
 });
 test('read/history and remaining write command surfaces retain exact positional and named cells',()=>{
   const cases=[
-    [read.subNote('r/c','d'),['get-sub-note','r/c','d']],
+    [toArgv(read.subNote('r/c','d')),['get-sub-note','r/c','d']],
     [read.history('a',{commit:'c=1'}),['history','a','commit=c=1']],
     [read.sessionTitles(['a','a','b']),['session-titles','a','b']],
     [read.schedule(),['schedule','status','--json']],

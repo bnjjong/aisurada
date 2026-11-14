@@ -54,7 +54,7 @@ async function rustCall(host: HostPort, call: Call): Promise<unknown> {
     const text = failure ? `${asText(failure.code)} ${asText(failure.message)}`.trim() : String(error);
     throw new SidecarCommandError(call.command, { status: LEGACY_STATUS[kind ?? ''] ?? (kind ? 3 : 1), stdout: '', stderr: text }, kind);
   }
-  return (ADAPTERS[call.command] ?? (v => v))(value);
+  return (ADAPTERS[call.command] ?? (v => v))(value, call);
 }
 
 const withDateAndTime = (row: Row): Row => {
@@ -63,10 +63,22 @@ const withDateAndTime = (row: Row): Row => {
 };
 const items = (value: unknown): Row[] => rows(value, 'items');
 
-/** Rust 엔진의 새 응답을 화면이 지금 쓰는 모양으로 바꾼다. 화면 타입을 새 모양으로 조이면 이 어댑터를 걷어낸다. */
-const ADAPTERS: Record<string, (value: unknown) => unknown> = {
+const withDateAndTimeOf = (value: unknown): unknown => { const row = asRow(value); return row ? withDateAndTime(row) : value; };
+
+/**
+ * Rust 엔진의 새 응답을 화면이 지금 쓰는 모양으로 바꾼다. 화면 타입을 새 모양으로 조이면 이 어댑터를 걷어낸다.
+ * 후속 노트는 화면이 아직 부모 사슬(`루트/자식`)로 부르고 응답의 `ref`와 `parent`를 쓰므로, 부른 사슬로 다시 채운다.
+ */
+const ADAPTERS: Record<string, (value: unknown, call: Call) => unknown> = {
   list_docs: value => items(value).map(withDateAndTime),
   list_agendas: items, list_projects: items, list_templates: items, list_trash: items,
+  get_doc: withDateAndTimeOf,
+  list_sub_notes: (value, call) => {
+    const parent = asText(call.args?.parent);
+    return { parent, subNotes: items(value).map(row => ({ ...withDateAndTime(row), ref: `${parent}/${asText(row.id)}` })) };
+  },
+  get_sub_note: (value, call) => ({ ...asRow(withDateAndTimeOf(value)), parent: asText(call.args?.parent) }),
+  list_attachments: (value, call) => ({ parent: [call.args?.id, call.args?.subId].filter(Boolean).join('/'), attachments: items(value) }),
 };
 
 // 6.2: a report body is HTML only when it starts with a tag name followed by a space, > or /.

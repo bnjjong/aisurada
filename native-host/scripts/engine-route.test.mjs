@@ -123,3 +123,51 @@ test('readWorkspace: Rust 엔진이 노트 목록만 못 읽으면 noteReadFaile
   assert.equal(workspace.noteReadFailed, true);
   assert.deepEqual(workspace.notes, []);
 });
+
+test('노트를 여는 길: Java 경로는 예전 자리 인자(positional) 목록 그대로 보낸다', async () => {
+  const seen = [];
+  const h = host({ java: Object.fromEntries(['get-doc', 'list-sub-notes', 'get-sub-note', 'list-comments', 'get-agenda-facts'].map(name => [name, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(h, read.doc('n1'));
+  await engineCall(h, read.subNotes('n1/s1'));
+  await engineCall(h, read.subNote('n1/s1', 's2'));
+  await engineCall(h, read.comments('n1'));
+  await engineCall(h, read.comments('n1', 's1'));
+  await engineCall(h, read.facts('ag1'));
+  assert.deepEqual(seen, [['get-doc', 'n1'], ['list-sub-notes', 'n1/s1', 'bodies=true'], ['get-sub-note', 'n1/s1', 's2'],
+    ['list-comments', 'n1'], ['list-comments', 'n1', 's1'], ['get-agenda-facts', 'ag1']]);
+});
+
+test('노트를 여는 길: Rust 응답을 옛 모양으로 바꾼다(date·time, 부른 사슬로 채운 ref와 parent)', async () => {
+  const row = (id, extra = {}) => ({ id, created: '2026-11-05T16:08:00+09:00', title: id, links: [], tags: [], path: `notes/x/${id}`, folder: false, ...extra });
+  const rust = {
+    get_doc: args => ({ ...row(args.id, { body: '본문', comments: { state: 'absent' } }) }),
+    list_sub_notes: () => page([row('s1', { rootId: 'n1', parentId: 'n1' }), row('s2', { rootId: 'n1', parentId: 'n1' })]),
+    get_sub_note: args => row(args.id, { rootId: 'n1', parentId: 's1', body: '후속 본문', comments: { state: 'loaded', comments: [] } }),
+    list_comments: () => ({ state: 'loaded', comments: [{ id: 'cm1-a', createdAt: 'x', body: 'b' }] }),
+    list_attachments: () => page([{ name: 'a.png', ref: '![a.png](attach/a.png)' }]),
+    get_agenda_facts: args => ({ id: args.id, slug: 'demo', limit: 2000, editLimit: 10000, facts: '사실' }),
+  };
+  const h = host({ commands: Object.keys(rust), rust });
+
+  const doc = await engineCall(h, read.doc('n1'));
+  assert.deepEqual([doc.date, doc.time, doc.body, doc.comments.state], ['2026-11-05', '16:08', '본문', 'absent']);
+  assert.deepEqual(h.calls[0].args, { command: 'get_doc', args: { id: 'n1' } });
+
+  const subs = await engineCall(h, read.subNotes('n1/s1'));
+  assert.equal(subs.parent, 'n1/s1');
+  assert.deepEqual(subs.subNotes.map(r => [r.id, r.ref, r.date, r.rootId]), [['s1', 'n1/s1/s1', '2026-11-05', 'n1'], ['s2', 'n1/s1/s2', '2026-11-05', 'n1']]);
+  assert.deepEqual(h.calls[1].args, { command: 'list_sub_notes', args: { parent: 'n1/s1', bodies: true } });
+
+  const sub = await engineCall(h, read.subNote('n1/s1', 's9'));
+  assert.deepEqual([sub.id, sub.parent, sub.time, sub.body, sub.comments.state], ['s9', 'n1/s1', '16:08', '후속 본문', 'loaded']);
+
+  assert.equal((await engineCall(h, read.comments('n1', 's1'))).comments[0].id, 'cm1-a');
+  assert.deepEqual(h.calls[3].args, { command: 'list_comments', args: { id: 'n1', subId: 's1' } });
+  assert.equal((await engineCall(h, read.facts('ag1'))).facts, '사실');
+  assert.deepEqual(await engineCall(h, { command: 'list_attachments', args: { id: 'n1', subId: 's1' } }), { parent: 'n1/s1', attachments: [{ name: 'a.png', ref: '![a.png](attach/a.png)' }] });
+});
+
+test('노트를 여는 길: Rust 엔진이 못 찾으면 not_found 오류가 된다', async () => {
+  const h = host({ commands: ['get_doc'], rust: { get_doc: () => { throw { code: 'AIS-404', kind: 'not_found', message: 'Note not found: n9' }; } } });
+  await assert.rejects(engineCall(h, read.doc('n9')), error => error.status === 3 && error.kind === 'not_found' && error.stderr === 'AIS-404 Note not found: n9');
+});

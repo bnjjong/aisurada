@@ -130,8 +130,31 @@ mod tests {
             json!({"command": "list_docs", "args": {"limit": 0, "bodies": true}}),
         )
         .unwrap();
-        assert_eq!(docs["total"], 20);
+        assert_eq!(docs["total"], 21);
         assert!(docs["items"][0]["body"].is_string());
+
+        // 노트 하나를 여는 길: 본문과 코멘트가 붙은 노트, 후속 노트(부모 사슬로), 오류 종류
+        let doc = invoke(
+            &window,
+            "engine_call",
+            json!({"command": "get_doc", "args": {"id": "ndfx0002-00000002"}}),
+        )
+        .unwrap();
+        assert_eq!(doc["comments"]["state"], "loaded");
+        let subs = invoke(
+            &window,
+            "engine_call",
+            json!({"command": "list_sub_notes", "args": {"parent": "ndfx0002-00000002/snfx0002-00000012", "bodies": true}}),
+        )
+        .unwrap();
+        assert_eq!(subs["total"], 2);
+        let no_doc = invoke(
+            &window,
+            "engine_call",
+            json!({"command": "get_doc", "args": {"id": "ndzzzz-00000000"}}),
+        )
+        .unwrap_err();
+        assert_eq!(no_doc["kind"], "not_found");
 
         // 인자가 없어도(null) 빈 인자로 읽고, 틀린 인자와 모르는 값은 종류로 가른다
         let agendas = invoke(&window, "engine_call", json!({"command": "list_agendas"})).unwrap();
@@ -167,7 +190,11 @@ mod tests {
     #[test]
     fn lists_the_commands_the_engine_handles() {
         let commands = engine_commands();
-        assert!(commands.contains(&"list_docs") && commands.contains(&"reindex"));
+        assert!(
+            commands.contains(&"list_docs")
+                && commands.contains(&"reindex")
+                && commands.contains(&"get_doc")
+        );
         assert!(
             !commands.contains(&"update_doc"),
             "쓰기 명령은 아직 Java 엔진이다"
@@ -177,11 +204,11 @@ mod tests {
     #[test]
     fn engine_error_reaches_the_screen_with_code_and_kind() {
         let error = Engine::new("/nonexistent-vault")
-            .call("get_doc", Value::Null)
+            .call("update_doc", Value::Null)
             .unwrap_err();
         let json = serde_json::to_value(&error).unwrap();
         assert_eq!(json["code"], "AIS-409");
         assert_eq!(json["kind"], "unsupported");
-        assert!(json["message"].as_str().unwrap().contains("get_doc"));
+        assert!(json["message"].as_str().unwrap().contains("update_doc"));
     }
 }

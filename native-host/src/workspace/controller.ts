@@ -19,6 +19,7 @@ import type { RecentWorkspace, Skin, StoragePort, WindowContext, Workspace, Work
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
+import type { Call } from '../data/commands.ts';
 import { readPreferences, writePreferences, readNoteWindowGeometry, writeNoteWindowGeometry } from './storage.ts';
 import type { Preferences } from '../ui/model.ts';
 import { RecentNotes } from '../ui/recent.ts';
@@ -745,7 +746,7 @@ export class WorkspaceController {
   /** 폼에서 확장자가 맞는 파일 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */
   chooseFile = (extensions: string[]): Promise<string | null> =>
     this.services.host.chooseFile ? this.services.host.chooseFile(extensions).catch(() => null) : Promise.resolve(null);
-  callEngine = (argv: string[]): Promise<unknown> => engineCall(this.services.host, argv);
+  callEngine = (request: string[] | Call): Promise<unknown> => engineCall(this.services.host, request);
 
   private async discoverHome() {
     try {
