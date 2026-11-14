@@ -2,7 +2,7 @@
 
 ## 요약
 
-**결론:** Rust 엔진이 읽는 명령 16개와 쓰는 명령 15개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
+**결론:** Rust 엔진이 읽는 명령 16개와 쓰는 명령 16개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
 
 ## 1. 띄우는 법
 
@@ -17,7 +17,7 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 | 옵션 | 뜻 |
 | --- | --- |
 | (없음) | 읽기만 Rust 엔진. 쓰기는 Java 엔진이다 |
-| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 15개가 Rust 엔진으로 간다 |
+| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 16개가 Rust 엔진으로 간다 |
 | `--engine java` | 모든 명령을 Java 엔진으로 보낸다(`AISURADA_ENGINE=java`). Rust와 견줄 때 쓴다 |
 | `--git` | 합성 vault에 git 저장소와 노트의 판 이력을 만든다(편집 이력 창, 자동 커밋 확인용) |
 
@@ -48,6 +48,7 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 - [ ] 아젠다 사실층 저장과 지움 → `.aisurada/facts/<slug>.md`(`update_agenda_facts`)
 - [ ] 새 작업 공간 만들기(`init_workspace`)
 - [ ] 노트의 즐겨찾기 별, 평가 점수, 다른 노트 연결을 바꾼다 → 그 노트 머리에 `favorite`, `evaluation`, `links` 줄이 생기고 `editedBy: app` 도장이 붙는다(`set_favorite`, `evaluate_doc`, `link_docs`)
+- [ ] 새 노트를 만든다(아젠다와 제목을 정하고 저장) → `notes/<아젠다>/<연-월>/<날짜>-<시각>-<제목>-<꼬리>/note.md`가 생기고 터미널에 `[engine] create_doc ok`가 찍힌다. 같은 날 새 노트를 연달아 만들면 시각이 5분씩 밀린다. 없는 이름의 아젠다로 만들면 `.aisurada/agendas/`에 새 아젠다 파일도 생긴다
 - [ ] 노트 본문을 고치고 0.6초 기다린다(자동 저장) → 터미널에 `[engine] update_doc ok`가 찍히고, 노트 머리의 `editedAt`이 바뀌고, 파일 본문이 새 글이다
 - [ ] 노트의 제목(첫 헤딩)을 바꾼다 → 노트 폴더 이름이 새 제목으로 옮겨진다. 후속 노트가 있는 노트(`parent`)는 후속 노트와 첨부가 폴더째 따라온다
 - [ ] 노트의 날짜나 시각을 바꾼다 → 폴더 이름의 날짜·시각이 바뀌고, 날짜의 달이 바뀌면 다른 월별 폴더(`2026-12/` 따위)로 옮겨진다
