@@ -9,8 +9,8 @@ use crate::commands::{
     agenda_write, comment_write, commit_vault, doc_create, doc_write, facts_write,
     get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace, list_agendas,
     list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
-    list_templates, list_trash, note_meta_write, project_write, reindex, search_docs,
-    sub_note_write, task_commands, template_write, trash_write,
+    list_templates, list_trash, note_meta_write, project_write, reindex, resource_commands,
+    search_docs, sub_note_write, task_commands, template_write, trash_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -74,6 +74,21 @@ pub const COMMANDS: &[&str] = &[
     "add_task_comment",
     "delete_task",
     "restore_task",
+    "list_resources",
+    "get_resource",
+    "usable_resources",
+    "list_resource_versions",
+    "list_resource_changes",
+    "get_resource_change",
+    "get_resource_policy",
+    "save_resource",
+    "delete_resource",
+    "restore_resource",
+    "set_resource_ref",
+    "approve_resource_change",
+    "reject_resource_change",
+    "resolve_resource_edit",
+    "set_resource_policy",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -111,6 +126,14 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "add_task_comment",
     "delete_task",
     "restore_task",
+    "save_resource",
+    "delete_resource",
+    "restore_resource",
+    "set_resource_ref",
+    "approve_resource_change",
+    "reject_resource_change",
+    "resolve_resource_edit",
+    "set_resource_policy",
     "commit_vault",
 ];
 
@@ -308,6 +331,108 @@ impl Engine {
                 let request: task_commands::TaskRefRequest = parse_args(command, args)?;
                 to_json(task_commands::restore_task(&self.vault_root, &request)?)
             }
+            "list_resources" => {
+                let request: resource_commands::ListResourcesRequest = parse_args(command, args)?;
+                to_json(resource_commands::list_resources(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "get_resource" => {
+                let request: resource_commands::GetResourceRequest = parse_args(command, args)?;
+                to_json(resource_commands::get_resource(&self.vault_root, &request)?)
+            }
+            "usable_resources" => {
+                let request: resource_commands::UsableResourcesRequest = parse_args(command, args)?;
+                to_json(resource_commands::usable_resources(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "list_resource_versions" => {
+                let request: resource_commands::ResourceVersionsRequest =
+                    parse_args(command, args)?;
+                to_json(resource_commands::list_resource_versions(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "list_resource_changes" => {
+                let request: resource_commands::ListResourceChangesRequest =
+                    parse_args(command, args)?;
+                to_json(resource_commands::list_resource_changes(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "get_resource_change" => {
+                let request: resource_commands::ResourceChangeRequest = parse_args(command, args)?;
+                to_json(resource_commands::get_resource_change(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "save_resource" => {
+                let request: resource_commands::SaveResourceRequest = parse_args(command, args)?;
+                to_json(resource_commands::save_resource(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "delete_resource" => {
+                let request: resource_commands::ResourceIdRequest = parse_args(command, args)?;
+                to_json(resource_commands::delete_resource(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "restore_resource" => {
+                let request: resource_commands::ResourceIdRequest = parse_args(command, args)?;
+                to_json(resource_commands::restore_resource(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "set_resource_ref" => {
+                let request: resource_commands::SetResourceRefRequest = parse_args(command, args)?;
+                to_json(resource_commands::set_resource_ref(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "approve_resource_change" => {
+                let request: resource_commands::ChangeDecisionRequest = parse_args(command, args)?;
+                to_json(resource_commands::approve_resource_change(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "reject_resource_change" => {
+                let request: resource_commands::ChangeDecisionRequest = parse_args(command, args)?;
+                to_json(resource_commands::reject_resource_change(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "resolve_resource_edit" => {
+                let request: resource_commands::ResolveResourceEditRequest =
+                    parse_args(command, args)?;
+                to_json(resource_commands::resolve_resource_edit(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "set_resource_policy" => {
+                let request: resource_commands::SetResourcePolicyRequest =
+                    parse_args(command, args)?;
+                to_json(resource_commands::set_resource_policy(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "get_resource_policy" => {
+                to_json(resource_commands::get_resource_policy(&self.vault_root)?)
+            }
             "delete_doc" => {
                 let request: trash_write::DeleteDocRequest = parse_args(command, args)?;
                 to_json(trash_write::delete_doc(&self.vault_root, &request)?)
@@ -405,6 +530,13 @@ mod tests {
         "history",
         "get_task",
         "list_tasks",
+        "list_resources",
+        "get_resource",
+        "usable_resources",
+        "list_resource_versions",
+        "list_resource_changes",
+        "get_resource_change",
+        "get_resource_policy",
     ];
 
     #[test]

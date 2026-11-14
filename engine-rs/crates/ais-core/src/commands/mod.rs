@@ -24,6 +24,7 @@ pub mod list_trash;
 pub mod note_meta_write;
 pub mod project_write;
 pub mod reindex;
+pub mod resource_commands;
 pub mod search_docs;
 pub mod sub_note_write;
 mod subnote;

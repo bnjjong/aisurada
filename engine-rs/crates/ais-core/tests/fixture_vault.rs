@@ -987,6 +987,10 @@ fn isolate_writes() {
         unsafe {
             std::env::set_var("AISURADA_LOCK_DIR", locks);
             std::env::set_var("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
+            std::env::set_var(
+                "AISURADA_APPROVALS_DIR",
+                std::env::temp_dir().join(format!("ais-test-approvals-{}", std::process::id())),
+            );
         }
     });
 }
@@ -2594,5 +2598,372 @@ fn runs_the_task_lifecycle() {
     assert_eq!(
         error("get_task", json!({"id": "TSK-99"})).message,
         "태스크를 못 찾았다: TSK-99"
+    );
+}
+
+/// 승인 기록장(앱 폴더의 `ledger.json`) 글. vault 경로 해시 폴더를 스스로 찾는다.
+fn ledger_text(vault: &Path) -> String {
+    let dir = ais_core::resource::approvals::dir(vault).unwrap();
+    std::fs::read_to_string(dir.join("ledger.json")).unwrap_or_default()
+}
+
+#[test]
+fn queues_ai_resource_changes_until_a_human_approves() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+    let ai = |mut args: Value| {
+        args["caller"] = json!("ai");
+        args["session"] = json!("ai-1");
+        args["sessionAgent"] = json!("codex");
+        args
+    };
+
+    // 사람이 만든 것은 바로 적용되고 승인한 판으로 기록된다(by=human)
+    let skill = engine
+        .call(
+            "save_resource",
+            json!({"kind": "skill", "scope": "global", "name": "리뷰 스킬", "description": "d", "body": "본문"}),
+        )
+        .unwrap();
+    let skill_id = skill["id"].as_str().unwrap().to_string();
+    let agent = engine
+        .call(
+            "save_resource",
+            json!({"kind": "agent", "scope": "global", "name": "리뷰어", "description": "d", "permission": "read"}),
+        )
+        .unwrap();
+    let agent_id = agent["id"].as_str().unwrap().to_string();
+    let agent_path = agent["path"].as_str().unwrap().to_string();
+    assert!(ledger_text(&vault).contains("\"by\": \"human\""));
+
+    // AI가 프로젝트 스킬을 만들면 정책(project=auto)에 따라 바로 적용되고, 기록은 by=policy다. 고친 기록에는 세션과 도구가 남는다
+    let own = engine
+        .call(
+            "save_resource",
+            ai(json!({"kind": "skill", "project": "alpha", "name": "알파 스킬", "description": "d"})),
+        )
+        .unwrap();
+    assert_eq!(own["created"], true);
+    let own_text = read(own["path"].as_str().unwrap());
+    assert!(
+        own_text.contains("editedSession: ai-1\n") && own_text.contains("editedAgent: codex\n"),
+        "{own_text}"
+    );
+    assert!(ledger_text(&vault).contains("\"by\": \"policy\""));
+
+    // 권한 올림은 정책과 상관없이 대기에 오른다. 파일과 목록은 그대로다
+    let before = read(&agent_path);
+    let token = agent["precondition"].as_str().unwrap().to_string();
+    let request = ai(json!({"id": agent_id, "permission": "edit", "f1": token}));
+    let queued = engine.call("save_resource", request.clone()).unwrap();
+    assert_eq!(queued["queued"], true);
+    // 이유는 정책이 승인을 요구하는 갈래들이다(글로벌 변경과 권한 올림)
+    let reasons = queued["reasons"].as_array().unwrap();
+    assert_eq!(
+        reasons
+            .iter()
+            .map(|r| r["category"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["global-change", "permission-raise"]
+    );
+    assert_eq!(reasons[1]["fixed"], true);
+    let change_id = queued["changeId"].as_str().unwrap().to_string();
+    assert!(change_id.starts_with("pc"));
+    assert_eq!(read(&agent_path), before);
+    let listed = engine
+        .call("get_resource", json!({"id": agent_id}))
+        .unwrap();
+    assert_eq!(listed["permission"], "read");
+
+    // 같은 요청을 되풀이해도 쌓이지 않는다
+    let again = engine.call("save_resource", request).unwrap();
+    assert_eq!(
+        (again["duplicate"].as_bool(), again["changeId"].as_str()),
+        (Some(true), Some(change_id.as_str()))
+    );
+    let overview = engine.call("list_resource_changes", json!({})).unwrap();
+    assert_eq!(overview["counts"]["pending"], 1);
+    let detail = engine
+        .call("get_resource_change", json!({"id": change_id}))
+        .unwrap();
+    assert_eq!(detail["changedFields"], json!(["permission"]));
+    assert_eq!(detail["proposer"]["session"], "ai-1");
+    assert_eq!(detail["proposer"]["channel"], "mcp");
+    assert_eq!(detail["args"]["permission"], "edit");
+
+    // 승인, 거절, 직접 처리, 정책 변경은 사람만 한다. 세션 표식만 달려도 AI다
+    for (command, args) in [
+        ("approve_resource_change", json!({"id": change_id})),
+        ("reject_resource_change", json!({"id": change_id})),
+        (
+            "resolve_resource_edit",
+            json!({"id": agent_id, "action": "approve"}),
+        ),
+        ("set_resource_policy", json!({"project": "approve"})),
+    ] {
+        assert_eq!(
+            error(command, ai(args.clone())).code,
+            "AIS-403",
+            "{command}"
+        );
+        assert_eq!(
+            error(command, {
+                let mut by_session = args.clone();
+                by_session["session"] = json!("ai-2");
+                by_session
+            })
+            .code,
+            "AIS-403",
+            "{command} 세션"
+        );
+    }
+
+    // 사람이 승인하면 올린 사람의 기록(세션, 도구, 올린 시각)으로 적용되고 승인 기록은 by=approved다
+    let approved = engine
+        .call("approve_resource_change", json!({"id": change_id}))
+        .unwrap();
+    assert_eq!(approved["approved"], true);
+    assert_eq!(approved["result"]["changed"], true);
+    let after = read(&agent_path);
+    assert!(
+        after.contains("permission: edit\n")
+            && after.contains("editedSession: ai-1\n")
+            && after.contains("editedAgent: codex\n"),
+        "{after}"
+    );
+    assert!(ledger_text(&vault).contains("\"by\": \"approved\""));
+    let done = engine
+        .call("get_resource_change", json!({"id": change_id}))
+        .unwrap();
+    assert_eq!(
+        (done["status"].as_str(), done["decidedBy"].as_str()),
+        (Some("approved"), Some("human"))
+    );
+    // 시각처럼 보이는 글은 SnakeYAML이 따옴표로 감싼다
+    assert!(
+        after.contains(&format!(
+            "editedAt: '{}'\n",
+            done["createdAt"].as_str().unwrap()
+        )),
+        "{after}"
+    );
+    assert_eq!(
+        error("approve_resource_change", json!({"id": change_id})).code,
+        "AIS-409"
+    );
+
+    // 글로벌 자원 만들기는 대기에 올릴 때 보여 준 ID 그대로 만들어진다
+    let create = engine
+        .call(
+            "save_resource",
+            ai(json!({"kind": "skill", "scope": "global", "name": "제안 스킬", "description": "d"})),
+        )
+        .unwrap();
+    assert_eq!(create["reasons"][0]["category"], "global-change");
+    let create_change = create["changeId"].as_str().unwrap().to_string();
+    let planned = engine
+        .call("get_resource_change", json!({"id": create_change}))
+        .unwrap()["forcedId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let made = engine
+        .call("approve_resource_change", json!({"id": create_change}))
+        .unwrap();
+    assert_eq!(made["result"]["id"], planned.as_str());
+
+    // 거절은 이유를 다듬어 남기고 자원은 그대로다
+    let doomed = engine
+        .call("delete_resource", ai(json!({"id": skill_id})))
+        .unwrap();
+    assert_eq!(doomed["queued"], true);
+    let rejected = engine
+        .call(
+            "reject_resource_change",
+            json!({"id": doomed["changeId"], "reason": "  아직 쓴다  "}),
+        )
+        .unwrap();
+    assert_eq!(rejected["rejected"], true);
+    let row = engine
+        .call("get_resource_change", json!({"id": doomed["changeId"]}))
+        .unwrap();
+    assert_eq!(
+        (row["status"].as_str(), row["reason"].as_str()),
+        (Some("rejected"), Some("아직 쓴다"))
+    );
+    assert!(engine.call("get_resource", json!({"id": skill_id})).is_ok());
+
+    // 기준이 바뀌어 적용하지 못하면 낡은 변경(stale)으로 남고 오류를 돌려준다
+    let token = engine
+        .call("get_resource", json!({"id": agent_id}))
+        .unwrap()["precondition"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let late = engine
+        .call(
+            "save_resource",
+            ai(json!({"id": agent_id, "permission": "publish", "f1": token})),
+        )
+        .unwrap();
+    let late_id = late["changeId"].as_str().unwrap().to_string();
+    engine
+        .call(
+            "save_resource",
+            json!({"id": agent_id, "description": "사람이 먼저", "f1": token}),
+        )
+        .unwrap();
+    assert_eq!(
+        error("approve_resource_change", json!({"id": late_id})).code,
+        "AIS-412"
+    );
+    let stale = engine
+        .call("get_resource_change", json!({"id": late_id}))
+        .unwrap();
+    assert_eq!(stale["status"], "stale");
+    assert!(
+        stale["reason"]
+            .as_str()
+            .unwrap()
+            .starts_with("적용하지 못했다: ")
+    );
+
+    // 정책: 글로벌 변경을 auto로 풀면 AI도 바로 적용한다. 권한 올림은 고정이라 여전히 대기한다
+    engine
+        .call("set_resource_policy", json!({"global": "auto"}))
+        .unwrap();
+    assert_eq!(
+        engine.call("get_resource_policy", json!({})).unwrap()["policy"]["global"],
+        "auto"
+    );
+    let token = engine
+        .call("get_resource", json!({"id": agent_id}))
+        .unwrap()["precondition"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let direct = engine
+        .call(
+            "save_resource",
+            ai(json!({"id": agent_id, "description": "AI가 바로", "f1": token})),
+        )
+        .unwrap();
+    assert_eq!(direct["changed"], true);
+    assert!(direct.get("queued").is_none());
+    let token = direct["precondition"].as_str().unwrap().to_string();
+    let raise = engine
+        .call(
+            "save_resource",
+            ai(json!({"id": agent_id, "permission": "publish", "f1": token})),
+        )
+        .unwrap();
+    assert_eq!(raise["queued"], true);
+
+    // 참조 켜기는 고정 종류다. 참조 끄기는 정책(refs=approve)을 따른다
+    let ref_add = engine
+        .call(
+            "set_resource_ref",
+            ai(json!({"project": "alpha", "id": skill_id})),
+        )
+        .unwrap();
+    assert_eq!(ref_add["reasons"][0]["category"], "ref-add");
+    engine
+        .call(
+            "approve_resource_change",
+            json!({"id": ref_add["changeId"]}),
+        )
+        .unwrap();
+    let usable = engine
+        .call("usable_resources", json!({"project": "alpha"}))
+        .unwrap();
+    assert_eq!(usable["skills"].as_array().unwrap().len(), 2);
+    let ref_off = engine
+        .call(
+            "set_resource_ref",
+            ai(json!({"project": "alpha", "id": skill_id, "remove": true})),
+        )
+        .unwrap();
+    assert_eq!(ref_off["reasons"][0]["category"], "ref-remove");
+    assert!(ref_off["summary"].as_str().unwrap().contains("1개 끄기"));
+
+    // 승인한 뒤 손으로 고친 파일은 승인한 판으로 보이고, 목록에 dirty가 붙는다
+    let live = read(&agent_path);
+    std::fs::write(vault.join(&agent_path), format!("{live}\n손으로\n")).unwrap();
+    let rows = engine
+        .call("list_resources", json!({"kind": "agent"}))
+        .unwrap();
+    assert_eq!(rows["resources"][0]["approval"], "dirty");
+    assert_eq!(rows["approvals"]["unapproved"], 1);
+    let overview = engine.call("list_resource_changes", json!({})).unwrap();
+    assert_eq!(overview["unapproved"][0]["state"], "dirty");
+    assert_eq!(overview["unapproved"][0]["id"], agent_id.as_str());
+    engine
+        .call(
+            "resolve_resource_edit",
+            json!({"id": agent_id, "action": "revert"}),
+        )
+        .unwrap();
+    assert_eq!(read(&agent_path), live);
+}
+
+#[test]
+fn reads_resource_arguments_like_the_command_line() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+
+    // 참거짓과 숫자도 명령줄 글처럼 받고, 모르는 칸은 무시한다
+    let skill = engine
+        .call(
+            "save_resource",
+            json!({"kind": "skill", "scope": "global", "name": "글 인자", "description": "d", "bodies": 1}),
+        )
+        .unwrap();
+    assert_eq!(skill["created"], true);
+    let listed = engine
+        .call("list_resources", json!({"bodies": true, "scope": "global"}))
+        .unwrap();
+    assert_eq!(listed["resources"][0]["body"], "");
+    assert_eq!(
+        error(
+            "save_resource",
+            json!({"kind": "skill", "scope": "global", "name": "x"})
+        )
+        .message,
+        "description 이 필요하다"
+    );
+    assert_eq!(
+        error("save_resource", json!({"scope": "global"})).message,
+        "kind 는 skill 이나 agent 여야 한다: null"
+    );
+    // tools는 객체로 줘도 글로 줘도 같다
+    let a = engine
+        .call(
+            "save_resource",
+            json!({"kind": "skill", "scope": "global", "name": "도구 객체", "description": "d", "tools": {"claude": {"n": 1}}}),
+        )
+        .unwrap();
+    let b = engine
+        .call(
+            "save_resource",
+            json!({"kind": "skill", "scope": "global", "name": "도구 글", "description": "d", "tools": "{\"claude\":{\"n\":1}}"}),
+        )
+        .unwrap();
+    assert_eq!(a["tools"], b["tools"]);
+    // 읽기만 하는 명령도 표식이 없는 폴더에서는 일하지 않는다
+    let bare = std::env::temp_dir().join(format!("ais-res-bare-{}", std::process::id()));
+    std::fs::create_dir_all(&bare).unwrap();
+    assert_eq!(
+        Engine::new(&bare)
+            .call("list_resources", json!({}))
+            .unwrap_err()
+            .code,
+        "AIS-400"
     );
 }

@@ -1277,6 +1277,10 @@ impl WriteHarness<'_> {
                 format!("-Daisurada.test.now={WRITE_NOW}"),
                 format!("-Daisurada.test.random={random}"),
                 "-Daisurada.vault.autocommit.enabled=false".to_string(),
+                format!(
+                    "-Daisurada.approvals.dir={}",
+                    self.approvals_base("java").display()
+                ),
             ],
             &[(
                 "AISURADA_LOCK_DIR".to_string(),
@@ -1331,7 +1335,28 @@ impl WriteHarness<'_> {
             .record(format!("{command} {label} 폴더"), diff.is_empty(), || {
                 diff.clone()
             });
+        // 승인 기록(vault 밖의 앱 폴더)은 두 사본이 vault 경로 해시가 다르므로 폴더 이름만 달리 견준다
+        let java_dir =
+            ais_core::resource::approvals::dir_under(&self.approvals_base("java"), &self.a);
+        let rust_dir =
+            ais_core::resource::approvals::dir_under(&self.approvals_base("rust"), &self.b);
+        if java_dir.exists() || rust_dir.exists() {
+            let diff = tree_diff(&java_dir, &rust_dir);
+            self.report.record(
+                format!("{command} {label} 승인 기록"),
+                diff.is_empty(),
+                || diff.clone(),
+            );
+        }
         ok_value
+    }
+
+    /// 승인 기록을 두는 바탕 폴더(두 엔진이 따로 쓴다)
+    fn approvals_base(&self, who: &str) -> PathBuf {
+        self.locks
+            .parent()
+            .unwrap()
+            .join(format!("approvals-{who}"))
     }
 }
 
@@ -5040,6 +5065,1773 @@ fn compare_task_commands(h: &mut WriteHarness) {
     }
 }
 
+/// 자원 명령 한 단계. `java`는 `ais-cli` 인자 목록이고 `rust`는 같은 뜻의 호출 객체다.
+/// `token_of`가 자원 id면 그 자원 파일의 지금 확인 값(`f1`)을 더한다.
+fn res_step(
+    h: &mut WriteHarness,
+    label: &str,
+    command: &str,
+    java: &[&str],
+    rust: Value,
+    token_of: Option<&str>,
+) -> Option<Value> {
+    let mut java_args: Vec<String> = java.iter().map(|a| a.to_string()).collect();
+    let mut args = rust;
+    if let Some(id) = token_of {
+        let token = res_token(h, id);
+        java_args.push(format!("f1={token}"));
+        args["f1"] = json!(token);
+    }
+    let refs: Vec<&str> = java_args.iter().map(String::as_str).collect();
+    h.step(&format!("자원 {label}"), &refs, command, args)
+}
+
+/// 자원 파일의 지금 확인 값. 앞 단계에서 두 사본이 같아졌으므로 Rust 사본에서 읽는다.
+fn res_token(h: &WriteHarness, id: &str) -> String {
+    Engine::new(&h.b)
+        .call("get_resource", json!({"id": id}))
+        .ok()
+        .and_then(|v| v["precondition"].as_str().map(str::to_string))
+        .unwrap_or_default()
+}
+
+/// AI 통로로 Rust 사본에만 돌린다(Java 단발 모드는 AI 표식을 못 보낸다). 대기에 올라가는 요청만 쓴다:
+/// 그러면 vault에 생기는 것은 대기 변경 파일뿐이라, 그 파일을 Java 사본에 그대로 옮겨 두고 승인·거절을 양쪽에서 견줄 수 있다.
+fn res_ai_queue(h: &mut WriteHarness, label: &str, command: &str, mut args: Value) -> Value {
+    h.step += 1;
+    let n = h.step;
+    let random = format!("{n:04x}0001,{n:04x}0002,{n:04x}0003,{n:04x}0004");
+    // SAFETY: 단일 스레드이고, 환경 변수는 Rust 명령을 부르기 직전에만 바꾼다.
+    unsafe {
+        env::set_var("AISURADA_TEST_RANDOM", &random);
+    }
+    ais_core::write::apparatus::reset_random_queue();
+    args["caller"] = json!("ai");
+    args["session"] = json!("ai-session-1");
+    args["sessionAgent"] = json!("codex");
+    let out = Engine::new(&h.b).call(command, args);
+    let queued = out.as_ref().is_ok_and(|v| v["queued"] == json!(true));
+    h.report.record(
+        format!("{command} 자원 AI {label} 대기"),
+        queued,
+        || format!("{out:?}"),
+    );
+    let pending = h.b.join(".aisurada/pending");
+    if let Ok(entries) = fs::read_dir(&pending) {
+        for entry in entries.flatten() {
+            let target = h.a.join(".aisurada/pending").join(entry.file_name());
+            fs::create_dir_all(target.parent().unwrap()).unwrap();
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+    out.unwrap_or(Value::Null)
+}
+
+/// 자원 명령 맞대기: 만들기·고치기·참조·휴지통·승인 기록·직접 고친 파일·대기 변경의 승인/거절. 자원 파일은 진짜 SnakeYAML이 쓴 바이트와 견준다.
+fn compare_resource_commands(h: &mut WriteHarness) {
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+    let id_of = |v: &Option<Value>| {
+        v.as_ref()
+            .and_then(|r| r["id"].as_str().map(str::to_string))
+            .unwrap_or_default()
+    };
+    let path_of = |v: &Option<Value>| {
+        v.as_ref()
+            .and_then(|r| r["path"].as_str().map(str::to_string))
+            .unwrap_or_default()
+    };
+
+    // ---- 처음 읽기: 승인 기록장 기준선이 두 사본에 같은 때에 만들어진다 ----
+    res_step(
+        h,
+        "빈 목록",
+        "list_resources",
+        &["list-resources"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "정책 기본",
+        "get_resource_policy",
+        &["get-resource-policy"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "변경 빈 목록",
+        "list_resource_changes",
+        &["list-resource-changes"],
+        json!({}),
+        None,
+    );
+
+    // ---- 만들기 ----
+    let skill_body = "# 절차\n1. 읽는다\n2. 쓴다\n";
+    let s1 = id_of(&res_step(
+        h,
+        "글로벌 스킬",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=skill",
+            "scope=global",
+            "name=코드 리뷰",
+            "description=PR을 검토한다",
+            &format!("body={skill_body}"),
+        ],
+        json!({"kind": "skill", "scope": "global", "name": "코드 리뷰", "description": "PR을 검토한다", "body": skill_body}),
+        None,
+    ));
+    let special_name = "Deploy: staging #1";
+    let special_desc = "설명: 콜론 # 해시 'a' \"b\" - 대시";
+    let special_body = "줄1\r\n줄2\n\n끝  \n";
+    let s2 = id_of(&res_step(
+        h,
+        "특수 글자 스킬",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=SKILL",
+            "scope=global",
+            &format!("name={special_name}"),
+            &format!("description={special_desc}"),
+            &format!("body={special_body}"),
+        ],
+        json!({"kind": "SKILL", "scope": "global", "name": special_name, "description": special_desc, "body": special_body}),
+        None,
+    ));
+    let tools = r#"{"claude":{"model":"opus","turns":5,"ratio":2.5},"codex":{"list":[1,2.5,true,null,"x: y"],"when":"2026-01-02","note":"multi\nline"}}"#;
+    let skills_s1 = format!("[\"{s1}\"]");
+    let a1 = id_of(&res_step(
+        h,
+        "글로벌 에이전트",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=agent",
+            "scope=global",
+            "name=리뷰어",
+            "description=코드를 본다",
+            "permission=Edit",
+            &format!("skills={skills_s1}"),
+            &format!("tools={tools}"),
+            "body=지침 본문",
+        ],
+        json!({"kind": "agent", "scope": "global", "name": "리뷰어", "description": "코드를 본다", "permission": "Edit",
+               "skills": skills_s1, "tools": tools, "body": "지침 본문"}),
+        None,
+    ));
+    let ps1 = id_of(&res_step(
+        h,
+        "프로젝트 스킬",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=skill",
+            "project=alpha",
+            "name=알파 스킬",
+            "description=알파 전용",
+        ],
+        json!({"kind": "skill", "project": "alpha", "name": "알파 스킬", "description": "알파 전용"}),
+        None,
+    ));
+    let pskills = format!("[\"{s1}\",\"{ps1}\"]");
+    let pa1 = id_of(&res_step(
+        h,
+        "프로젝트 에이전트",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=agent",
+            "project=alpha",
+            "name=알파 에이전트",
+            "description=알파를 맡는다",
+            "permission=publish",
+            &format!("skills={pskills}"),
+            "repo=web",
+        ],
+        json!({"kind": "agent", "project": "alpha", "name": "알파 에이전트", "description": "알파를 맡는다",
+               "permission": "publish", "skills": pskills, "repo": "web"}),
+        None,
+    ));
+
+    // ---- 만들기 오류 ----
+    let long_name = "가".repeat(61);
+    let bad_skills_dup = format!("[\"{s1}\",\"{s1}\"]");
+    let unknown_skill = "[\"sk999-0123abcd\"]".to_string();
+    let proj_skill_for_global = format!("[\"{ps1}\"]");
+    for (label, java, rust) in [
+        (
+            "종류 없음",
+            vec!["scope=global", "name=x", "description=y"],
+            json!({"scope": "global", "name": "x", "description": "y"}),
+        ),
+        (
+            "종류 모름",
+            vec!["kind=zzz", "scope=global", "name=x", "description=y"],
+            json!({"kind": "zzz", "scope": "global", "name": "x", "description": "y"}),
+        ),
+        (
+            "범위 없음",
+            vec!["kind=skill", "name=x", "description=y"],
+            json!({"kind": "skill", "name": "x", "description": "y"}),
+        ),
+        (
+            "범위 둘",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "project=alpha",
+                "name=x",
+                "description=y",
+            ],
+            json!({"kind": "skill", "scope": "global", "project": "alpha", "name": "x", "description": "y"}),
+        ),
+        (
+            "범위 값",
+            vec!["kind=skill", "scope=weird", "name=x", "description=y"],
+            json!({"kind": "skill", "scope": "weird", "name": "x", "description": "y"}),
+        ),
+        (
+            "없는 프로젝트",
+            vec!["kind=skill", "project=nope", "name=x", "description=y"],
+            json!({"kind": "skill", "project": "nope", "name": "x", "description": "y"}),
+        ),
+        (
+            "이름 없음",
+            vec!["kind=skill", "scope=global", "description=y"],
+            json!({"kind": "skill", "scope": "global", "description": "y"}),
+        ),
+        (
+            "설명 없음",
+            vec!["kind=skill", "scope=global", "name=x"],
+            json!({"kind": "skill", "scope": "global", "name": "x"}),
+        ),
+        (
+            "이름 빈 값",
+            vec!["kind=skill", "scope=global", "name=  ", "description=y"],
+            json!({"kind": "skill", "scope": "global", "name": "  ", "description": "y"}),
+        ),
+        (
+            "이름 길이",
+            vec![
+                "kind=skill",
+                "scope=global",
+                &format!("name={long_name}"),
+                "description=y",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": long_name, "description": "y"}),
+        ),
+        (
+            "이름 슬래시",
+            vec!["kind=skill", "scope=global", "name=a/b", "description=y"],
+            json!({"kind": "skill", "scope": "global", "name": "a/b", "description": "y"}),
+        ),
+        (
+            "이름 점만",
+            vec!["kind=skill", "scope=global", "name=...", "description=y"],
+            json!({"kind": "skill", "scope": "global", "name": "...", "description": "y"}),
+        ),
+        (
+            "설명 빈 값",
+            vec!["kind=skill", "scope=global", "name=x", "description= "],
+            json!({"kind": "skill", "scope": "global", "name": "x", "description": " "}),
+        ),
+        (
+            "같은 이름",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "name=코드 리뷰",
+                "description=y",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": "코드 리뷰", "description": "y"}),
+        ),
+        (
+            "스킬에 권한",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "permission=read",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": "x", "description": "y", "permission": "read"}),
+        ),
+        (
+            "스킬에 저장소",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "repo=r",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": "x", "description": "y", "repo": "r"}),
+        ),
+        (
+            "권한 모름",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "permission=root",
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "permission": "root"}),
+        ),
+        (
+            "skills 배열 아님",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "skills={}",
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "skills": "{}"}),
+        ),
+        (
+            "skills 깨진 JSON",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "skills=[\"a\"",
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "skills": "[\"a\""}),
+        ),
+        (
+            "skills 항목 모양",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "skills=[1]",
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "skills": "[1]"}),
+        ),
+        (
+            "skills 겹침",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                &format!("skills={bad_skills_dup}"),
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "skills": bad_skills_dup}),
+        ),
+        (
+            "skills 없는 스킬",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                &format!("skills={unknown_skill}"),
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "skills": unknown_skill}),
+        ),
+        (
+            "글로벌 에이전트가 프로젝트 스킬",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                &format!("skills={proj_skill_for_global}"),
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "skills": proj_skill_for_global}),
+        ),
+        (
+            "글로벌 에이전트에 저장소",
+            vec![
+                "kind=agent",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "repo=web",
+            ],
+            json!({"kind": "agent", "scope": "global", "name": "x", "description": "y", "repo": "web"}),
+        ),
+        (
+            "저장소 이름 틀림",
+            vec![
+                "kind=agent",
+                "project=alpha",
+                "name=x",
+                "description=y",
+                "repo=nope",
+            ],
+            json!({"kind": "agent", "project": "alpha", "name": "x", "description": "y", "repo": "nope"}),
+        ),
+        (
+            "tools 객체 아님",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "tools=[]",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": "x", "description": "y", "tools": "[]"}),
+        ),
+        (
+            "tools 칸 이름",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "tools={\"Claude\":{}}",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": "x", "description": "y", "tools": "{\"Claude\":{}}"}),
+        ),
+        (
+            "tools 깨진 JSON",
+            vec![
+                "kind=skill",
+                "scope=global",
+                "name=x",
+                "description=y",
+                "tools={",
+            ],
+            json!({"kind": "skill", "scope": "global", "name": "x", "description": "y", "tools": "{"}),
+        ),
+    ] {
+        let mut argv = vec!["save-resource"];
+        argv.extend(java.iter().copied());
+        res_step(
+            h,
+            &format!("만들기 오류 {label}"),
+            "save_resource",
+            &argv,
+            rust,
+            None,
+        );
+    }
+
+    // ---- 읽기 ----
+    res_step(
+        h,
+        "목록",
+        "list_resources",
+        &["list-resources"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "목록 지침",
+        "list_resources",
+        &["list-resources", "bodies=true"],
+        json!({"bodies": "true"}),
+        None,
+    );
+    res_step(
+        h,
+        "목록 글로벌만",
+        "list_resources",
+        &["list-resources", "scope=global"],
+        json!({"scope": "global"}),
+        None,
+    );
+    res_step(
+        h,
+        "목록 프로젝트",
+        "list_resources",
+        &["list-resources", "project=alpha", "kind=agent"],
+        json!({"project": "alpha", "kind": "agent"}),
+        None,
+    );
+    res_step(
+        h,
+        "목록 종류 오류",
+        "list_resources",
+        &["list-resources", "kind=zzz"],
+        json!({"kind": "zzz"}),
+        None,
+    );
+    res_step(
+        h,
+        "목록 없는 프로젝트",
+        "list_resources",
+        &["list-resources", "project=nope"],
+        json!({"project": "nope"}),
+        None,
+    );
+    res_step(
+        h,
+        "목록 범위 오류",
+        "list_resources",
+        &["list-resources", "scope=x"],
+        json!({"scope": "x"}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 스킬",
+        "get_resource",
+        &["get-resource", &s1],
+        json!({"id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 에이전트",
+        "get_resource",
+        &["get-resource", &a1],
+        json!({"id": a1}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 id 모양",
+        "get_resource",
+        &["get-resource", "nope"],
+        json!({"id": "nope"}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 없는 id",
+        "get_resource",
+        &["get-resource", "sk999-0123abcd"],
+        json!({"id": "sk999-0123abcd"}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 인자 없음",
+        "get_resource",
+        &["get-resource"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 판 모양",
+        "get_resource",
+        &["get-resource", &s1, "version=A!"],
+        json!({"id": s1, "version": "A!"}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 없는 판",
+        "get_resource",
+        &["get-resource", &s1, "version=zzzz"],
+        json!({"id": s1, "version": "zzzz"}),
+        None,
+    );
+    res_step(
+        h,
+        "판 목록",
+        "list_resource_versions",
+        &["list-resource-versions", &s1],
+        json!({"id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "판 목록 인자 없음",
+        "list_resource_versions",
+        &["list-resource-versions"],
+        json!({}),
+        None,
+    );
+
+    // ---- 고치기 ----
+    res_step(
+        h,
+        "고치기 f1 없음",
+        "save_resource",
+        &["save-resource", &format!("id={s1}"), "description=새 설명"],
+        json!({"id": s1, "description": "새 설명"}),
+        None,
+    );
+    res_step(
+        h,
+        "고치기 f1 낡음",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={s1}"),
+            "description=새 설명",
+            "f1=f1:낡음",
+        ],
+        json!({"id": s1, "description": "새 설명", "f1": "f1:낡음"}),
+        None,
+    );
+    res_step(
+        h,
+        "고치기 설명·지침",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={s1}"),
+            "description=새 설명",
+            "body=고친 지침\n",
+        ],
+        json!({"id": s1, "description": "새 설명", "body": "고친 지침\n"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 변화 없음",
+        "save_resource",
+        &["save-resource", &format!("id={s1}"), "description=새 설명"],
+        json!({"id": s1, "description": "새 설명"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 이름 바꾸기(폴더 이동)",
+        "save_resource",
+        &["save-resource", &format!("id={s1}"), "name=코드 리뷰 v2"],
+        json!({"id": s1, "name": "코드 리뷰 v2"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 이름 같은 이름",
+        "save_resource",
+        &["save-resource", &format!("id={s2}"), "name=코드 리뷰 v2"],
+        json!({"id": s2, "name": "코드 리뷰 v2"}),
+        Some(&s2),
+    );
+    res_step(
+        h,
+        "고치기 에이전트 권한·도구 비움",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={a1}"),
+            "permission=publish",
+            "tools=",
+        ],
+        json!({"id": a1, "permission": "publish", "tools": ""}),
+        Some(&a1),
+    );
+    res_step(
+        h,
+        "고치기 에이전트 skills 비움",
+        "save_resource",
+        &["save-resource", &format!("id={a1}"), "skills="],
+        json!({"id": a1, "skills": ""}),
+        Some(&a1),
+    );
+    res_step(
+        h,
+        "고치기 에이전트 skills 다시",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={a1}"),
+            &format!("skills={skills_s1}"),
+        ],
+        json!({"id": a1, "skills": skills_s1}),
+        Some(&a1),
+    );
+    res_step(
+        h,
+        "고치기 저장소 지움",
+        "save_resource",
+        &["save-resource", &format!("id={pa1}"), "repo="],
+        json!({"id": pa1, "repo": ""}),
+        Some(&pa1),
+    );
+    res_step(
+        h,
+        "고치기 저장소 다시",
+        "save_resource",
+        &["save-resource", &format!("id={pa1}"), "repo=api"],
+        json!({"id": pa1, "repo": "api"}),
+        Some(&pa1),
+    );
+    res_step(
+        h,
+        "고치기 종류 바꿈",
+        "save_resource",
+        &["save-resource", &format!("id={s1}"), "kind=agent"],
+        json!({"id": s1, "kind": "agent"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 범위 바꿈",
+        "save_resource",
+        &["save-resource", &format!("id={s1}"), "project=alpha"],
+        json!({"id": s1, "project": "alpha"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 범위 같음",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={s1}"),
+            "scope=global",
+            "description=또 설명",
+        ],
+        json!({"id": s1, "scope": "global", "description": "또 설명"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 스킬에 권한",
+        "save_resource",
+        &["save-resource", &format!("id={s1}"), "permission=edit"],
+        json!({"id": s1, "permission": "edit"}),
+        Some(&s1),
+    );
+    res_step(
+        h,
+        "고치기 id 모양",
+        "save_resource",
+        &["save-resource", "id=nope", "description=x"],
+        json!({"id": "nope", "description": "x"}),
+        None,
+    );
+    res_step(
+        h,
+        "고치기 없는 id",
+        "save_resource",
+        &["save-resource", "id=sk999-0123abcd", "description=x"],
+        json!({"id": "sk999-0123abcd", "description": "x"}),
+        None,
+    );
+    res_step(
+        h,
+        "고치기 다른 프로젝트 스킬 참조",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={a1}"),
+            &format!("skills={proj_skill_for_global}"),
+        ],
+        json!({"id": a1, "skills": proj_skill_for_global}),
+        Some(&a1),
+    );
+    res_step(
+        h,
+        "판 목록(고친 뒤)",
+        "list_resource_versions",
+        &["list-resource-versions", &s1],
+        json!({"id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 옛 판",
+        "get_resource",
+        &["get-resource", &s1, "version=a"],
+        json!({"id": s1, "version": "a"}),
+        None,
+    );
+    let versions = Engine::new(&h.b)
+        .call("list_resource_versions", json!({"id": s1}))
+        .ok()
+        .and_then(|v| v["versions"].as_array().cloned())
+        .unwrap_or_default();
+    for v in versions
+        .iter()
+        .take(3)
+        .filter_map(|v| v["version"].as_str().map(str::to_string))
+    {
+        res_step(
+            h,
+            &format!("조회 판 {v}"),
+            "get_resource",
+            &["get-resource", &s1, &format!("version={v}")],
+            json!({"id": s1, "version": v}),
+            None,
+        );
+    }
+
+    // ---- 참조 ----
+    res_step(
+        h,
+        "참조 켜기",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &s1],
+        json!({"project": "alpha", "id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 또 켜기",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &s1],
+        json!({"project": "alpha", "id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 에이전트와 스킬",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &a1, "with-skills=true"],
+        json!({"project": "alpha", "id": a1, "with-skills": "true"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 프로젝트 자원",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &ps1],
+        json!({"project": "alpha", "id": ps1}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 없는 자원",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", "sk999-0123abcd"],
+        json!({"project": "alpha", "id": "sk999-0123abcd"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 id 모양",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", "nope"],
+        json!({"project": "alpha", "id": "nope"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 없는 프로젝트",
+        "set_resource_ref",
+        &["set-resource-ref", "nope", &s1],
+        json!({"project": "nope", "id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 인자 모자람",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha"],
+        json!({"project": "alpha"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 끄기",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &s1, "remove=true"],
+        json!({"project": "alpha", "id": s1, "remove": "true"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 끄기 없는 것",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &s1, "remove=true"],
+        json!({"project": "alpha", "id": s1, "remove": true}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 다시 켜기",
+        "set_resource_ref",
+        &["set-resource-ref", "alpha", &s1],
+        json!({"project": "alpha", "id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "쓸 수 있는 자원",
+        "usable_resources",
+        &["usable-resources", "alpha"],
+        json!({"project": "alpha"}),
+        None,
+    );
+    res_step(
+        h,
+        "쓸 수 있는 자원 지침",
+        "usable_resources",
+        &["usable-resources", "alpha", "bodies=true"],
+        json!({"project": "alpha", "bodies": true}),
+        None,
+    );
+    res_step(
+        h,
+        "쓸 수 있는 자원 없는 프로젝트",
+        "usable_resources",
+        &["usable-resources", "nope"],
+        json!({"project": "nope"}),
+        None,
+    );
+    res_step(
+        h,
+        "쓸 수 있는 자원 인자 없음",
+        "usable_resources",
+        &["usable-resources"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "쓸 수 있는 자원 참조 없는 프로젝트",
+        "usable_resources",
+        &["usable-resources", "beta"],
+        json!({"project": "beta"}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 참조한 프로젝트",
+        "get_resource",
+        &["get-resource", &s1],
+        json!({"id": s1}),
+        None,
+    );
+
+    // ---- 지우기·되살리기 ----
+    res_step(
+        h,
+        "지우기 참조된 글로벌 스킬",
+        "delete_resource",
+        &["delete-resource", &s2],
+        json!({"id": s2}),
+        None,
+    );
+    res_step(
+        h,
+        "지우기 프로젝트 에이전트",
+        "delete_resource",
+        &["delete-resource", &pa1],
+        json!({"id": pa1}),
+        None,
+    );
+    res_step(
+        h,
+        "지우기 없는 id",
+        "delete_resource",
+        &["delete-resource", "ap999-0123abcd"],
+        json!({"id": "ap999-0123abcd"}),
+        None,
+    );
+    res_step(
+        h,
+        "지우기 인자 없음",
+        "delete_resource",
+        &["delete-resource"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "휴지통 목록",
+        "list_resources",
+        &["list-resources", "trash=true"],
+        json!({"trash": "true"}),
+        None,
+    );
+    res_step(
+        h,
+        "휴지통 목록 필터",
+        "list_resources",
+        &[
+            "list-resources",
+            "trash=true",
+            "project=alpha",
+            "kind=agent",
+        ],
+        json!({"trash": true, "project": "alpha", "kind": "agent"}),
+        None,
+    );
+    res_step(
+        h,
+        "휴지통 목록 글로벌",
+        "list_resources",
+        &["list-resources", "trash=true", "scope=global"],
+        json!({"trash": "true", "scope": "global"}),
+        None,
+    );
+    res_step(
+        h,
+        "되살리기",
+        "restore_resource",
+        &["restore-resource", &pa1],
+        json!({"id": pa1}),
+        None,
+    );
+    res_step(
+        h,
+        "되살리기 없음",
+        "restore_resource",
+        &["restore-resource", &pa1],
+        json!({"id": pa1}),
+        None,
+    );
+    res_step(
+        h,
+        "되살리기 인자 없음",
+        "restore_resource",
+        &["restore-resource"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "지우고 같은 이름 만들고 되살리기",
+        "delete_resource",
+        &["delete-resource", &ps1],
+        json!({"id": ps1}),
+        None,
+    );
+    let again = id_of(&res_step(
+        h,
+        "같은 이름 새로",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=skill",
+            "project=alpha",
+            "name=알파 스킬",
+            "description=새로",
+        ],
+        json!({"kind": "skill", "project": "alpha", "name": "알파 스킬", "description": "새로"}),
+        None,
+    ));
+    res_step(
+        h,
+        "되살리기 제자리 있음",
+        "restore_resource",
+        &["restore-resource", &ps1],
+        json!({"id": ps1}),
+        None,
+    );
+    res_step(
+        h,
+        "지우기 새 것",
+        "delete_resource",
+        &["delete-resource", &again],
+        json!({"id": again}),
+        None,
+    );
+    res_step(
+        h,
+        "되살리기 옛 것",
+        "restore_resource",
+        &["restore-resource", &ps1],
+        json!({"id": ps1}),
+        None,
+    );
+    res_step(
+        h,
+        "쓸 수 있는 자원(지운 뒤)",
+        "usable_resources",
+        &["usable-resources", "alpha"],
+        json!({"project": "alpha"}),
+        None,
+    );
+
+    // ---- 승인 정책 ----
+    res_step(
+        h,
+        "정책 바꾸기",
+        "set_resource_policy",
+        &["set-resource-policy", "project=approve", "refs=auto"],
+        json!({"project": "approve", "refs": "auto"}),
+        None,
+    );
+    res_step(
+        h,
+        "정책 값 오류",
+        "set_resource_policy",
+        &["set-resource-policy", "global=maybe"],
+        json!({"global": "maybe"}),
+        None,
+    );
+    res_step(
+        h,
+        "정책 칸 없음",
+        "set_resource_policy",
+        &["set-resource-policy"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "정책 읽기",
+        "get_resource_policy",
+        &["get-resource-policy"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "정책 되돌리기",
+        "set_resource_policy",
+        &[
+            "set-resource-policy",
+            "project=auto",
+            "refs=approve",
+            "permission=approve",
+            "global=approve",
+        ],
+        json!({"project": "auto", "refs": "approve", "permission": "approve", "global": "approve"}),
+        None,
+    );
+
+    // ---- 직접 고친 파일: dirty(승인한 뒤 바뀜), new(승인 기록 없음), 참조 목록 ----
+    let s1_path = path_of(&res_step(
+        h,
+        "경로 읽기",
+        "get_resource",
+        &["get-resource", &s1],
+        json!({"id": s1}),
+        None,
+    ));
+    let edited = format!(
+        "{}\n손으로 덧붙인 줄\n",
+        String::from_utf8_lossy(&fs::read(h.b.join(&s1_path)).unwrap())
+    );
+    put_both(h, &s1_path, &edited);
+    res_step(
+        h,
+        "직접 고침 목록",
+        "list_resources",
+        &["list-resources", "bodies=true"],
+        json!({"bodies": true}),
+        None,
+    );
+    res_step(
+        h,
+        "직접 고침 조회",
+        "get_resource",
+        &["get-resource", &s1],
+        json!({"id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "직접 고침 변경 목록",
+        "list_resource_changes",
+        &["list-resource-changes"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "직접 고침 쓸 수 있는 자원",
+        "usable_resources",
+        &["usable-resources", "alpha", "bodies=true"],
+        json!({"project": "alpha", "bodies": "true"}),
+        None,
+    );
+    res_step(
+        h,
+        "직접 고침 위에 고치기",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={s1}"),
+            "description=승인한 판 위에",
+        ],
+        json!({"id": s1, "description": "승인한 판 위에"}),
+        Some(&s1),
+    );
+    put_both(h, &s1_path, &edited);
+    res_step(
+        h,
+        "직접 고침 되돌리기",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", &s1, "action=revert"],
+        json!({"id": s1, "action": "revert"}),
+        None,
+    );
+    res_step(
+        h,
+        "직접 고침 또 처리",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", &s1, "action=approve"],
+        json!({"id": s1, "action": "approve"}),
+        None,
+    );
+    put_both(h, &s1_path, &edited);
+    res_step(
+        h,
+        "직접 고침 받아들이기",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", &s1, "action=approve"],
+        json!({"id": s1, "action": "approve"}),
+        None,
+    );
+    res_step(
+        h,
+        "받아들인 뒤 조회",
+        "get_resource",
+        &["get-resource", &s1],
+        json!({"id": s1}),
+        None,
+    );
+
+    let manual_id = "apmanual1-0123abcd";
+    let manual_rel = ".aisurada/resources/global/agents/손으로-만든.md";
+    let manual = format!(
+        "---\nid: {manual_id}\nname: 손으로 만든\ndescription: 승인 기록 없음\npermission: edit\n---\n본문\n"
+    );
+    put_both(h, manual_rel, &manual);
+    res_step(
+        h,
+        "새 파일 목록",
+        "list_resources",
+        &["list-resources"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "새 파일 조회",
+        "get_resource",
+        &["get-resource", manual_id],
+        json!({"id": manual_id}),
+        None,
+    );
+    res_step(
+        h,
+        "새 파일 고치기",
+        "save_resource",
+        &["save-resource", &format!("id={manual_id}"), "description=x"],
+        json!({"id": manual_id, "description": "x"}),
+        None,
+    );
+    res_step(
+        h,
+        "새 파일 변경 목록",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=0"],
+        json!({"decided": 0}),
+        None,
+    );
+    res_step(
+        h,
+        "새 파일 되돌리기(휴지통)",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", manual_id, "action=revert"],
+        json!({"id": manual_id, "action": "revert"}),
+        None,
+    );
+    put_both(h, manual_rel, &manual);
+    res_step(
+        h,
+        "새 파일 받아들이기",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", manual_id, "action=approve"],
+        json!({"id": manual_id, "action": "approve"}),
+        None,
+    );
+    res_step(
+        h,
+        "새 파일 받아들인 뒤 조회",
+        "get_resource",
+        &["get-resource", manual_id],
+        json!({"id": manual_id}),
+        None,
+    );
+    put_both(
+        h,
+        ".aisurada/resources/global/skills/깨진/SKILL.md",
+        "머리말 없음\n",
+    );
+    put_both(
+        h,
+        ".aisurada/resources/global/agents/큰-id.md",
+        &format!("---\nid: {manual_id}\nname: 같은 id\ndescription: 겹침\n---\n"),
+    );
+    res_step(
+        h,
+        "깨진 파일 목록",
+        "list_resources",
+        &["list-resources"],
+        json!({}),
+        None,
+    );
+
+    let refs_rel = ".aisurada/resources/projects/beta/refs.md";
+    put_both(
+        h,
+        refs_rel,
+        &format!("# 손으로 쓴 목록\n{s1}  # 코드 리뷰\nnot-an-id\n{a1}\n"),
+    );
+    res_step(
+        h,
+        "참조 새 파일 변경 목록",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=0"],
+        json!({"decided": "0"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 새 파일 쓸 수 있는 자원",
+        "usable_resources",
+        &["usable-resources", "beta"],
+        json!({"project": "beta"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 새 파일 되돌리기",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", "refs:beta", "action=revert"],
+        json!({"id": "refs:beta", "action": "revert"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 되돌린 뒤 변경 목록",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=0"],
+        json!({"decided": 0}),
+        None,
+    );
+    put_both(h, refs_rel, &format!("{s1}  # 코드 리뷰\n"));
+    res_step(
+        h,
+        "참조 새 파일 받아들이기",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", "refs:beta", "action=approve"],
+        json!({"id": "refs:beta", "action": "approve"}),
+        None,
+    );
+    put_both(h, refs_rel, &format!("{s1}  # 코드 리뷰\n{a1}  # 리뷰어\n"));
+    res_step(
+        h,
+        "참조 직접 고침 목록",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=0"],
+        json!({"decided": 0}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 직접 고침 쓸 수 있는 자원",
+        "usable_resources",
+        &["usable-resources", "beta"],
+        json!({"project": "beta"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 직접 고침 위에 끄기",
+        "set_resource_ref",
+        &["set-resource-ref", "beta", &s1, "remove=true"],
+        json!({"project": "beta", "id": s1, "remove": "true"}),
+        None,
+    );
+    put_both(h, refs_rel, &format!("{s1}  # 코드 리뷰\n{a1}  # 리뷰어\n"));
+    res_step(
+        h,
+        "참조 직접 고침 되돌리기",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", "refs:beta", "action=revert"],
+        json!({"id": "refs:beta", "action": "revert"}),
+        None,
+    );
+    res_step(
+        h,
+        "참조 처리할 것 없음",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", "refs:beta", "action=approve"],
+        json!({"id": "refs:beta", "action": "approve"}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 action 오류",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", &s1, "action=maybe"],
+        json!({"id": s1, "action": "maybe"}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 action 없음",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", &s1],
+        json!({"id": s1}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 인자 없음",
+        "resolve_resource_edit",
+        &["resolve-resource-edit", "action=approve"],
+        json!({"action": "approve"}),
+        None,
+    );
+
+    let doomed = id_of(&res_step(
+        h,
+        "지울 글로벌 스킬",
+        "save_resource",
+        &[
+            "save-resource",
+            "kind=skill",
+            "scope=global",
+            "name=지울 스킬",
+            "description=곧 지운다",
+        ],
+        json!({"kind": "skill", "scope": "global", "name": "지울 스킬", "description": "곧 지운다"}),
+        None,
+    ));
+    // ---- AI가 올린 대기 변경: Rust 사본에서 올리고 파일을 Java 사본에 옮긴 뒤, 승인과 거절을 두 엔진에 돌린다 ----
+    let token = res_token(h, &a1);
+    let queued = res_ai_queue(
+        h,
+        "권한 올림",
+        "save_resource",
+        json!({"id": a1, "permission": "read", "f1": token}),
+    );
+    let raise_id = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let token = res_token(h, &a1);
+    let queued = res_ai_queue(
+        h,
+        "권한 올림 같은 요청",
+        "save_resource",
+        json!({"id": a1, "permission": "read", "f1": token}),
+    );
+    h.report.record(
+        "자원 AI 같은 요청은 한 건".to_string(),
+        queued["duplicate"] == json!(true) && queued["changeId"] == json!(raise_id),
+        || format!("{queued}"),
+    );
+    let queued = res_ai_queue(
+        h,
+        "글로벌 스킬 만들기",
+        "save_resource",
+        json!({"kind": "skill", "scope": "global", "name": "AI가 제안한 스킬", "description": "제안", "body": "본문"}),
+    );
+    let create_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let queued = res_ai_queue(
+        h,
+        "글로벌 스킬 지우기",
+        "delete_resource",
+        json!({"id": doomed}),
+    );
+    let delete_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let queued = res_ai_queue(
+        h,
+        "참조 끄기",
+        "set_resource_ref",
+        json!({"project": "alpha", "id": s1, "remove": true}),
+    );
+    let ref_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let queued = res_ai_queue(
+        h,
+        "참조 켜기",
+        "set_resource_ref",
+        json!({"project": "beta", "id": a1, "with-skills": true}),
+    );
+    let ref_add_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let token = res_token(h, &pa1);
+    let queued = res_ai_queue(
+        h,
+        "도구 칸 변경",
+        "save_resource",
+        json!({"id": pa1, "tools": r#"{"claude":{"a":1}}"#, "description": "AI가 고친 설명", "f1": token}),
+    );
+    let tools_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let token = res_token(h, &pa1);
+    let queued = res_ai_queue(
+        h,
+        "곧 낡을 변경",
+        "save_resource",
+        json!({"id": pa1, "body": "낡을 지침", "permission": "read", "f1": token}),
+    );
+    let stale_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    let token = res_token(h, &a1);
+    let queued = res_ai_queue(
+        h,
+        "거절할 변경",
+        "save_resource",
+        json!({"id": a1, "name": "AI 이름", "f1": token}),
+    );
+    let reject_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+
+    res_step(
+        h,
+        "대기 목록",
+        "list_resource_changes",
+        &["list-resource-changes"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 하나(권한 올림)",
+        "get_resource_change",
+        &["get-resource-change", &raise_id],
+        json!({"id": raise_id}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 하나(만들기)",
+        "get_resource_change",
+        &["get-resource-change", &create_change],
+        json!({"id": create_change}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 하나(참조)",
+        "get_resource_change",
+        &["get-resource-change", &ref_change],
+        json!({"id": ref_change}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 하나(도구 칸)",
+        "get_resource_change",
+        &["get-resource-change", &tools_change],
+        json!({"id": tools_change}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 id 모양",
+        "get_resource_change",
+        &["get-resource-change", "nope"],
+        json!({"id": "nope"}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 없는 id",
+        "get_resource_change",
+        &["get-resource-change", "pc999-0123abcd"],
+        json!({"id": "pc999-0123abcd"}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 인자 없음",
+        "get_resource_change",
+        &["get-resource-change"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 목록 decided 오류",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=abc"],
+        json!({"decided": "abc"}),
+        None,
+    );
+    res_step(
+        h,
+        "대기 목록 decided 음수",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=-1"],
+        json!({"decided": "-1"}),
+        None,
+    );
+    res_step(
+        h,
+        "조회는 이전 판",
+        "get_resource",
+        &["get-resource", &a1],
+        json!({"id": a1}),
+        None,
+    );
+
+    res_step(
+        h,
+        "승인 도구 칸·설명",
+        "approve_resource_change",
+        &["approve-resource-change", &tools_change],
+        json!({"id": tools_change}),
+        None,
+    );
+    // 낡을 변경: 승인 전에 사람이 같은 자원을 고친다
+    res_step(
+        h,
+        "낡게 만들기",
+        "save_resource",
+        &[
+            "save-resource",
+            &format!("id={pa1}"),
+            "description=사람이 먼저 고침",
+        ],
+        json!({"id": pa1, "description": "사람이 먼저 고침"}),
+        Some(&pa1),
+    );
+    res_step(
+        h,
+        "승인 낡은 변경",
+        "approve_resource_change",
+        &["approve-resource-change", &stale_change],
+        json!({"id": stale_change}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 이미 처리됨",
+        "approve_resource_change",
+        &["approve-resource-change", &stale_change],
+        json!({"id": stale_change}),
+        None,
+    );
+    res_step(
+        h,
+        "거절 이미 처리됨",
+        "reject_resource_change",
+        &["reject-resource-change", &stale_change],
+        json!({"id": stale_change}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 권한 올림",
+        "approve_resource_change",
+        &["approve-resource-change", &raise_id],
+        json!({"id": raise_id}),
+        None,
+    );
+    res_step(
+        h,
+        "조회 승인 뒤",
+        "get_resource",
+        &["get-resource", &a1],
+        json!({"id": a1}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 만들기",
+        "approve_resource_change",
+        &["approve-resource-change", &create_change],
+        json!({"id": create_change}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 참조 끄기",
+        "approve_resource_change",
+        &["approve-resource-change", &ref_change],
+        json!({"id": ref_change}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 참조 켜기",
+        "approve_resource_change",
+        &["approve-resource-change", &ref_add_change],
+        json!({"id": ref_add_change}),
+        None,
+    );
+    res_step(
+        h,
+        "거절 이유 없이",
+        "reject_resource_change",
+        &["reject-resource-change", &reject_change],
+        json!({"id": reject_change}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 지우기(이미 지워진 뒤 아님)",
+        "approve_resource_change",
+        &["approve-resource-change", &delete_change],
+        json!({"id": delete_change}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 인자 없음",
+        "approve_resource_change",
+        &["approve-resource-change"],
+        json!({}),
+        None,
+    );
+    res_step(
+        h,
+        "승인 id 모양",
+        "approve_resource_change",
+        &["approve-resource-change", "nope"],
+        json!({"id": "nope"}),
+        None,
+    );
+    res_step(
+        h,
+        "거절 없는 id",
+        "reject_resource_change",
+        &["reject-resource-change", "pc999-0123abcd"],
+        json!({"id": "pc999-0123abcd"}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 뒤 변경 목록",
+        "list_resource_changes",
+        &["list-resource-changes", "decided=50"],
+        json!({"decided": 50}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 뒤 변경 하나(낡음)",
+        "get_resource_change",
+        &["get-resource-change", &stale_change],
+        json!({"id": stale_change}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 뒤 변경 하나(승인)",
+        "get_resource_change",
+        &["get-resource-change", &raise_id],
+        json!({"id": raise_id}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 뒤 목록",
+        "list_resources",
+        &["list-resources", "bodies=true"],
+        json!({"bodies": true}),
+        None,
+    );
+    let queued = res_ai_queue(h, "거절 이유 있게", "delete_resource", json!({"id": a1}));
+    let reason_change = queued["changeId"].as_str().unwrap_or_default().to_string();
+    res_step(
+        h,
+        "거절 이유 있게",
+        "reject_resource_change",
+        &[
+            "reject-resource-change",
+            &reason_change,
+            "reason=  필요 없다  ",
+        ],
+        json!({"id": reason_change, "reason": "  필요 없다  "}),
+        None,
+    );
+    res_step(
+        h,
+        "처리 뒤 변경 하나(거절)",
+        "get_resource_change",
+        &["get-resource-change", &reason_change],
+        json!({"id": reason_change}),
+        None,
+    );
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -5063,6 +6855,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         env::set_var("AISURADA_TEST_NOW", WRITE_NOW);
         env::set_var("AISURADA_LOCK_DIR", &locks);
         env::set_var("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
+        env::set_var("AISURADA_APPROVALS_DIR", root.join("approvals-rust"));
     }
     let mut h = WriteHarness {
         report,
@@ -5073,6 +6866,16 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         step: 0,
         succeeded: 0,
     };
+    // 자원 명령만 빠르게 돌려 볼 때(`HARNESS_ONLY=resources`): 앞 시나리오를 건너뛴다
+    if env::var("HARNESS_ONLY").as_deref() == Ok("resources") {
+        compare_resource_commands(&mut h);
+        println!(
+            "  (자원 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
+            h.step, h.succeeded
+        );
+        let _ = fs::remove_dir_all(&root);
+        return;
+    }
     let id_of = |v: &Option<Value>| {
         v.as_ref()
             .and_then(|r| r["id"].as_str().map(str::to_string))
@@ -6195,6 +7998,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_comment_writes(&mut h);
     compare_trash_writes(&mut h);
     compare_task_commands(&mut h);
+    compare_resource_commands(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {

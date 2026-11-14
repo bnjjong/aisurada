@@ -41,6 +41,15 @@ impl EngineError {
         }
     }
 
+    /// 호출자에게 허락되지 않은 일(`AIS-403`)
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self {
+            code: "AIS-403",
+            kind: ErrorKind::Forbidden,
+            message: message.into(),
+        }
+    }
+
     pub fn not_found(message: impl Into<String>) -> Self {
         Self {
             code: "AIS-404",
