@@ -111,14 +111,14 @@ test-native.sh         화면·호스트 시험 전체
 
 ### Rust 엔진 이전 (`engine-rs/`)
 
-엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 읽기 명령 12개는 앱이 이미 이것으로 읽는다: 새로고침 길의 6개(`list_docs`, `list_agendas`, `list_projects`, `list_templates`, `list_trash`, `reindex`)와 노트 하나를 여는 길의 6개(`get_doc`, `list_sub_notes`, `get_sub_note`, `list_comments`, `list_attachments`, `get_agenda_facts`). 나머지 명령은 아직 Java 엔진이다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md), [2단계 새로고침 길 기록](rust-engine-step2-read.md), [2단계 노트 여는 길 기록](rust-engine-step2-open.md)에 있다.
+엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 읽기 명령 16개는 앱이 이미 이것으로 읽는다: 새로고침 길의 6개(`list_docs`, `list_agendas`, `list_projects`, `list_templates`, `list_trash`, `reindex`), 노트 하나를 여는 길의 6개(`get_doc`, `list_sub_notes`, `get_sub_note`, `list_comments`, `list_attachments`, `get_agenda_facts`), 그리고 검색·태그·템플릿 하나·판 목록의 4개(`search_docs`, `list_tags`, `get_template`, `history`). 쓰기 명령과 4부·태스크·자원 명령, `ais-cli`와 MCP는 아직 Java 엔진이다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md), [2단계 새로고침 길 기록](rust-engine-step2-read.md), [2단계 노트 여는 길 기록](rust-engine-step2-open.md), [2단계 검색·판 목록 기록](rust-engine-step2-rest.md)에 있다.
 
 | 자리 | 내용 |
 |---|---|
-| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기), `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
+| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 `plain_text`, git 실행 `git`과 노트의 판 목록 `history`), `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
 | `engine-rs/crates/ais-core/examples/` | `compat_check`(Java 엔진과 읽기 응답 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
 | `engine-rs/crates/ais-core/tests/` | 합성 vault로 읽기 동작을 확인하는 통합 시험(Java 없이 돈다) |
-| `engine-rs/tools/compat/` | 합성 vault 생성기 `make-fixture.sh` |
+| `engine-rs/tools/compat/` | 합성 vault 생성기 `make-fixture.sh`, 검색 시험 노트를 덧붙이는 `add-search-notes.sh`, git 저장소와 판 이력을 만드는 `add-git-history.sh` |
 | `engine-rs/tools/yaml-spike/` | 머리 읽기·쓰기를 Java 기준값과 맞대는 도구(`YamlGroundTruth.java`, `run.sh`, `cases.txt`) |
 
 **앱의 호출 길.** 화면은 `workspace/engine.ts`의 `engineCall` 한 곳으로 엔진을 부른다. 문자열 목록(argv)은 늘 Java 엔진(`sidecar_call` → `ais-cli`)으로 간다. 호출 객체(`Call`, `data/commands.ts`의 `read.docs()` 따위)는 호스트의 `engine_commands`가 알린 명령이면 Rust 엔진(`engine_call`, `src-tauri/src/engine.rs`)으로, 아니면 `toArgv`로 풀어 Java 엔진으로 간다. Rust 응답은 `engine.ts`의 어댑터가 기존 화면 모양으로 바꾼다. **되돌리는 스위치:** 앱을 `AISURADA_ENGINE=java`로 띄우면 `engine_commands`가 빈 목록을 돌려줘서 모든 명령이 Java 엔진으로 간다. 시험과 브라우저의 가짜 호스트에는 `engineCommands`가 없어서 늘 Java 경로다.
@@ -133,6 +133,8 @@ Java 엔진과 읽기 응답을 맞대려면 `./build.sh`로 `dist/ais-engine.ja
 
 ```bash
 engine-rs/tools/compat/make-fixture.sh <빈 폴더>        # 합성 vault(진짜 vault 내용 없음)
+engine-rs/tools/compat/add-search-notes.sh <그 폴더>    # 검색 순위·서식·동점 시험 노트를 덧붙인다
+engine-rs/tools/compat/add-git-history.sh <그 폴더>     # git 저장소와 판 이력(`history` 시험용). 작업 트리는 그대로 돌아온다
 (cd engine-rs && cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar <합성 vault> [다른 vault...])
 ```
 
