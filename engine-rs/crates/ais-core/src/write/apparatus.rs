@@ -95,6 +95,15 @@ pub fn format_utc_millis(millis: i64) -> String {
     )
 }
 
+/// Java `Instant.toString()`: UTC `yyyy-MM-ddTHH:mm:ss`에 밀리초가 0이 아니면 `.mmm`을 붙이고 `Z`로 끝낸다.
+pub fn instant_text(millis: i64) -> String {
+    let base = format_utc_millis(millis);
+    match base.strip_suffix(".000Z") {
+        Some(head) => format!("{head}Z"),
+        None => base,
+    }
+}
+
 /// 부호 있는 정수를 소문자 36진수 글로 바꾼다(Java `Long.toString(n, 36)`).
 pub fn to_base36(value: i64) -> String {
     to_base36_unsigned(value.unsigned_abs(), value < 0)

@@ -43,6 +43,7 @@ pub mod precondition;
 pub mod project_file;
 pub mod slug;
 pub mod snake_dump;
+pub mod stamp;
 pub mod sub_note;
 pub mod template_file;
 pub mod trash_file;

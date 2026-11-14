@@ -14,14 +14,13 @@ use serde_json::{Value as Json, json};
 use super::note_meta_write::BoolArg;
 use crate::error::EngineError;
 use crate::task::format::{self, java_trim};
-use crate::task::store::{self, Fields, Scan, Stamp};
+use crate::task::store::{self, Fields, Scan};
 use crate::task::transitions::{self, HUMAN};
 use crate::task::{Task, TaskStatus};
 use crate::text::{is_blank, trim};
-use crate::write::apparatus::now_millis;
-use crate::write::local_time::iso_offset_date_time;
 use crate::write::marker::check_workspace_marker;
 use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::stamp::stamp_of;
 
 #[allow(dead_code)]
 const CREATE_USAGE: &str = "create-task title=<요약> repo=<owner/name> criteria=<완료 기준 JSON 배열. 하나 이상. 예: [\"…\",{\"text\":\"…\"}]> [type=feature|bug|chore] [priority=high|medium|low] [project=<프로젝트 slug>] [base=<기준 브랜치>] [body=<설명>] [labels=<JSON 배열>] [refs=<연결한 자원 JSON 배열. 예: [{\"kind\":\"note\",\"target\":\"nd…\"},{\"kind\":\"github\",\"target\":\"owner/name#53\"}]>] [actor=human|runner]";
@@ -179,27 +178,6 @@ fn actor_of(actor: &Option<String>) -> Result<String, EngineError> {
         )));
     }
     Ok(value)
-}
-
-/// 고친 기록. AI 세션이 고쳤으면 세션 id와(claude가 아니면) CLI 이름이 남고, 사람이 고쳤으면 시각만 남는다.
-fn stamp_of(context: &WriteContext) -> Stamp {
-    let session = context
-        .session
-        .as_deref()
-        .filter(|s| !format::java_blank(s))
-        .map(str::to_string);
-    let agent = session.as_ref().and_then(|_| {
-        context
-            .session_agent
-            .as_deref()
-            .filter(|a| *a != "claude")
-            .map(str::to_string)
-    });
-    Stamp {
-        at: iso_offset_date_time(now_millis()),
-        session,
-        agent,
-    }
 }
 
 #[allow(clippy::too_many_arguments)]

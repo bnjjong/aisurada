@@ -27,6 +27,7 @@ use crate::vault::note_file::compute_token;
 use crate::vault::project::scan_projects;
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
+use crate::write::stamp::Stamp;
 use crate::write::sub_note::remove_tree;
 
 pub const ROOT: &str = ".aisurada/tasks";
@@ -62,13 +63,6 @@ pub struct Fields {
     pub labels: Option<Vec<String>>,
     pub criteria: Option<Vec<Criterion>>,
     pub refs: Option<Vec<Ref>>,
-}
-
-/// 누가 언제 고쳤는지의 기록. 사람이 고쳤으면 `session`은 `None`이다.
-pub struct Stamp {
-    pub at: String,
-    pub session: Option<String>,
-    pub agent: Option<String>,
 }
 
 pub struct TrashEntry {
@@ -842,15 +836,6 @@ pub fn activity(vault: &Path, key: &str, limit: usize) -> Result<Vec<Json>, Engi
 
 // ---------------------------------------------------------------- 지우기·되살리기
 
-/// Java `Instant.toString()`: 밀리초가 0이 아니면 `.mmm`을 붙인다.
-fn instant_text(millis: i64) -> String {
-    let base = crate::write::apparatus::format_utc_millis(millis);
-    match base.strip_suffix(".000Z") {
-        Some(head) => format!("{head}Z"),
-        None => base,
-    }
-}
-
 /// 태스크를 휴지통으로 보낸다(활동 기록도 함께). 되살릴 수 있다.
 pub fn delete(vault: &Path, task: &Task) -> Result<(), EngineError> {
     let trash = root(vault).join(".trash").join(&task.id);
@@ -883,7 +868,7 @@ pub fn delete(vault: &Path, task: &Task) -> Result<(), EngineError> {
         ("relPath".to_string(), JsonValue::Str(task.rel_path.clone())),
         (
             "deletedAt".to_string(),
-            JsonValue::Str(instant_text(now_millis())),
+            JsonValue::Str(crate::write::apparatus::instant_text(now_millis())),
         ),
     ]);
     write_atomic(
