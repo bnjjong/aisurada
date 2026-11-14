@@ -8,6 +8,7 @@ pub mod get_doc;
 pub mod get_sub_note;
 pub mod get_template;
 pub mod history;
+pub mod init_workspace;
 pub mod list_agendas;
 pub mod list_attachments;
 pub mod list_comments;

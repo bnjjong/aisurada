@@ -81,6 +81,20 @@ pub fn next_sub_note_id() -> String {
     next_id("sn")
 }
 
+/// 유닉스 밀리초를 UTC `yyyy-MM-ddTHH:mm:ss.SSSZ`로 보여 준다(워크스페이스 표식의 `createdAt`).
+pub fn format_utc_millis(millis: i64) -> String {
+    let days = millis.div_euclid(86_400_000);
+    let rest = millis.rem_euclid(86_400_000);
+    let (year, month, day) = crate::vault::note_meta::civil_from_days(days);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
+        rest / 3_600_000,
+        rest % 3_600_000 / 60_000,
+        rest % 60_000 / 1000,
+        rest % 1000
+    )
+}
+
 /// 부호 있는 정수를 소문자 36진수 글로 바꾼다(Java `Long.toString(n, 36)`).
 pub fn to_base36(value: i64) -> String {
     to_base36_unsigned(value.unsigned_abs(), value < 0)
@@ -144,6 +158,15 @@ mod tests {
         assert_eq!(to_base36(1_794_649_612_772), "mwg81jok");
         assert_eq!(to_base36(-36), "-10");
         assert_eq!(to_base36_u64(u64::MAX), "3w5e11264sgsf");
+    }
+
+    #[test]
+    fn formats_utc_millis() {
+        assert_eq!(format_utc_millis(0), "1970-01-01T00:00:00.000Z");
+        assert_eq!(
+            format_utc_millis(1_794_700_000_123),
+            "2026-11-14T23:46:40.123Z"
+        );
     }
 
     #[test]

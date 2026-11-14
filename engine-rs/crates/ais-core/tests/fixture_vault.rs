@@ -1339,3 +1339,71 @@ fn writes_templates_and_facts_through_the_write_foundation() {
 }
 
 const SAVE_TEMPLATE_USAGE: &str = "save-template [id=<고칠 템플릿 id. 없으면 새로 만든다>] [name=<이름. 새로 만들 때 필수>] [type=<plan|build|report|research|meeting|free. 새로 만들 때 기본 plan>] [desc=<언제 쓰는 템플릿인지>] [body=<본문. 새로 만들 때 필수>]";
+
+#[test]
+fn initializes_a_workspace_and_seeds_templates_once() {
+    isolate_writes();
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "ais-init-{}-{}/내 작업공간",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let engine = Engine::new(&dir);
+
+    // 표식이 없는 빈 폴더에서도 일하고, 이름을 안 주면 폴더 이름을 쓴다
+    let seeds = r###"[{"category":"doc","id":"plan-x","name":"계획","format":"markdown","desc":"","body":"# 계획\n","type":"plan","builtin":true},{"category":"ritual","id":"morning","name":"아침","format":"markdown","desc":"","body":"## 아침\n","rev":"morning","icon":"Sun"}]"###;
+    let first = engine
+        .call("init_workspace", json!({"templates": seeds}))
+        .unwrap();
+    assert_eq!(first["created"], true);
+    assert_eq!(
+        first["seeded"],
+        json!([
+            ".aisurada/templates/doc/plan-x.md",
+            ".aisurada/templates/ritual/morning.md"
+        ])
+    );
+    let marker: Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.join(".aisurada/workspace.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        (marker["schemaVersion"].as_u64(), marker["name"].as_str()),
+        (Some(1), Some("내 작업공간"))
+    );
+    assert!(marker["createdAt"].as_str().unwrap().ends_with('Z'));
+    for folder in [".aisurada/agendas", "notes"] {
+        assert!(dir.join(folder).is_dir(), "{folder}");
+    }
+
+    // 다시 부르면 아무것도 새로 만들지 않고, 이미 있는 템플릿은 건너뛴다
+    let second = engine
+        .call("init_workspace", json!({"templates": seeds}))
+        .unwrap();
+    assert_eq!(
+        (
+            second["created"].as_bool(),
+            second["seeded"].as_array().map(Vec::len),
+            second["skipped"].as_array().map(Vec::len)
+        ),
+        (Some(false), Some(0), Some(2))
+    );
+
+    // 오류: 글이 아닌 인자, 공백 이름. 뼈대 폴더는 검사보다 먼저 만들어 둔다
+    let message = |args: Value| engine.call("init_workspace", args).unwrap_err().message;
+    assert_eq!(
+        message(json!({"templates": "abc"})),
+        "templates 은 JSON 배열이어야 한다: abc"
+    );
+    assert_eq!(
+        message(json!({"templates": "[1]"})),
+        "templates 항목이 객체가 아니다: 1"
+    );
+    assert_eq!(
+        message(json!({"name": "  "})),
+        "워크스페이스 이름이 비었다. 이름을 주거나 아예 빼서 폴더 이름을 쓰게 한다."
+    );
+    let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+}

@@ -1,9 +1,8 @@
 //! 프로젝트 파일(`.aisurada/projects/<slug>.md`) 만들기와, 사용자가 준 저장소 목록(JSON)의 엄격한 검사.
 
-use serde_json::Value as Json;
-
 use crate::error::EngineError;
 use crate::frontmatter::dump_string;
+use crate::json::{JsonValue, append_string, parse};
 use crate::text::{trim, utf16_len};
 use crate::vault::agenda::is_valid_slug_segment;
 use crate::vault::project::{GITHUB, ProjectInfo, ProjectRepo};
@@ -46,12 +45,15 @@ pub fn repos_json(repos: &[ProjectRepo]) -> String {
     let items: Vec<String> = repos
         .iter()
         .map(|repo| {
-            let mut item = format!("{{\"name\":{}", json_string(&repo.name));
+            let mut item = String::from("{\"name\":");
+            append_string(&mut item, &repo.name);
             if let Some(path) = &repo.path {
-                item.push_str(&format!(",\"path\":{}", json_string(path)));
+                item.push_str(",\"path\":");
+                append_string(&mut item, path);
             }
             if let Some(github) = &repo.github {
-                item.push_str(&format!(",\"github\":{}", json_string(github)));
+                item.push_str(",\"github\":");
+                append_string(&mut item, github);
             }
             if let Some(id) = repo.github_id {
                 item.push_str(&format!(",\"githubId\":{id}"));
@@ -63,41 +65,19 @@ pub fn repos_json(repos: &[ProjectRepo]) -> String {
     format!("[{}]", items.join(","))
 }
 
-/// JSON 문자열 글: `"`, `\`, 제어 문자만 이스케이프하고 나머지는 그대로 쓴다(Java 엔진과 같다).
-fn json_string(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\u{8}' => out.push_str("\\b"),
-            '\t' => out.push_str("\\t"),
-            '\n' => out.push_str("\\n"),
-            '\u{c}' => out.push_str("\\f"),
-            '\r' => out.push_str("\\r"),
-            c if (c as u32) <= 0x1f => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
 fn bad(message: String) -> EngineError {
     EngineError::invalid_argument(message)
 }
 
 /// 사용자가 준 `repos` 글(JSON 배열)을 엄격하게 읽는다. 비었거나 공백이면 저장소 없음이다.
 ///
-/// JSON 문법 오류의 문구는 Java 엔진의 JSON 읽개와 다르다. 모르는 키가 여러 개면 Java는 적은 차례의 첫 키를,
-/// 여기서는 이름 차례의 첫 키를 알린다.
+/// JSON 읽는 규칙(적힌 차례를 지키는 객체, 느슨한 리터럴)과 오류 문구는 Java 엔진의 `JsonReader`와 같다.
 pub fn parse_strict(text: Option<&str>) -> Result<Vec<ProjectRepo>, EngineError> {
     let Some(text) = text.filter(|t| !crate::text::is_blank(t)) else {
         return Ok(Vec::new());
     };
-    let parsed: Json = serde_json::from_str(text)
-        .map_err(|e| bad(format!("repos 는 JSON 배열이어야 한다: {e}")))?;
-    let Json::Array(items) = parsed else {
+    let parsed = parse(text).map_err(|e| bad(format!("repos 는 JSON 배열이어야 한다: {e}")))?;
+    let JsonValue::Array(items) = parsed else {
         return Err(bad("repos 는 JSON 배열이어야 한다".to_string()));
     };
     if items.len() > MAX_ENTRIES {
@@ -117,12 +97,12 @@ pub fn parse_strict(text: Option<&str>) -> Result<Vec<ProjectRepo>, EngineError>
     Ok(repos)
 }
 
-fn entry(item: &Json, index: usize) -> Result<ProjectRepo, EngineError> {
+fn entry(item: &JsonValue, index: usize) -> Result<ProjectRepo, EngineError> {
     let at = format!("repos[{index}]");
-    let Json::Object(object) = item else {
+    let JsonValue::Object(object) = item else {
         return Err(bad(format!("{at} 는 객체여야 한다")));
     };
-    for key in object.keys() {
+    for (key, _) in object {
         if !KEYS.contains(&key.as_str()) {
             return Err(bad(format!(
                 "{at} 의 모르는 키다: {key}. 쓸 수 있는 것은 [name, path, github, githubId] 뿐이다."
@@ -130,9 +110,10 @@ fn entry(item: &Json, index: usize) -> Result<ProjectRepo, EngineError> {
         }
     }
     let text = |key: &str| -> Result<Option<String>, EngineError> {
-        match object.get(key) {
-            None | Some(Json::Null) => Ok(None),
-            Some(Json::String(s)) => Ok(Some(trim(s).to_string())),
+        match item.get(key) {
+            None => Ok(None),
+            Some(v) if v.is_null() => Ok(None),
+            Some(JsonValue::Str(s)) => Ok(Some(trim(s).to_string())),
             Some(_) => Err(bad(format!("{at} 의 {key} 는 글이어야 한다"))),
         }
     };
@@ -163,11 +144,17 @@ fn entry(item: &Json, index: usize) -> Result<ProjectRepo, EngineError> {
             "{at} 의 github 는 owner/name 모양이어야 한다: {github}"
         )));
     }
-    let github_id = match object.get("githubId") {
-        None | Some(Json::Null) => None,
-        Some(Json::Number(n)) => {
-            let ok = n.as_u64().filter(|v| *v > 0 && v.to_string().len() <= 18);
-            Some(ok.ok_or_else(|| bad(format!("{at} 의 githubId 는 양의 정수여야 한다")))?)
+    let github_id = match item.get("githubId") {
+        None => None,
+        Some(v) if v.is_null() => None,
+        Some(JsonValue::Literal(raw)) => {
+            let digits =
+                !raw.is_empty() && raw.len() <= 18 && raw.bytes().all(|b| b.is_ascii_digit());
+            let id = digits
+                .then(|| raw.parse::<u64>().ok())
+                .flatten()
+                .filter(|v| *v > 0);
+            Some(id.ok_or_else(|| bad(format!("{at} 의 githubId 는 양의 정수여야 한다")))?)
         }
         Some(_) => return Err(bad(format!("{at} 의 githubId 는 양의 정수여야 한다"))),
     };
@@ -211,7 +198,9 @@ mod tests {
             repos_json(&repos),
             "[{\"name\":\"web\",\"path\":\"/a \\\"b\\\"\\\\c\\n\",\"github\":\"o/n\",\"githubId\":7},{\"name\":\"api\",\"github\":\"x/y\"}]"
         );
-        assert_eq!(json_string("한\u{1}\u{7f}"), "\"한\\u0001\u{7f}\"");
+        let mut escaped = String::new();
+        append_string(&mut escaped, "한\u{1}\u{7f}");
+        assert_eq!(escaped, "\"한\\u0001\u{7f}\"");
     }
 
     #[test]
@@ -223,6 +212,14 @@ mod tests {
         );
         let msg = |text: &str| parse_strict(Some(text)).unwrap_err().message;
         assert_eq!(msg("{}"), "repos 는 JSON 배열이어야 한다");
+        assert_eq!(
+            msg("[1,"),
+            "repos 는 JSON 배열이어야 한다: Unterminated array"
+        );
+        assert_eq!(
+            msg("[{\"name\":\"a\",\"path\":\"/x\",\"github\":\"o/n\",\"githubId\":5x}]"),
+            "repos[1] 의 githubId 는 양의 정수여야 한다"
+        );
         assert_eq!(msg("[1]"), "repos[1] 는 객체여야 한다");
         assert_eq!(
             msg(r#"[{"name":"a","path":"/x","bad":1}]"#),

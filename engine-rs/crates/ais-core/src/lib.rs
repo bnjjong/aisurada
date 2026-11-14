@@ -7,6 +7,7 @@ pub mod commands;
 pub mod engine;
 pub mod error;
 pub mod frontmatter;
+pub mod json;
 pub mod model;
 pub mod text;
 pub mod vault;

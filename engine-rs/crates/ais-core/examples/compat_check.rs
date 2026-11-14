@@ -2025,6 +2025,150 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
             args,
         );
     }
+
+    // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
+    let pair = |n: u32| -> (PathBuf, PathBuf) {
+        let (a, b) = (
+            root.join(format!("ja{n}/ws")),
+            root.join(format!("ru{n}/ws")),
+        );
+        fs::create_dir_all(&a).unwrap();
+        fs::create_dir_all(&b).unwrap();
+        (a, b)
+    };
+    let doc_md = r##"{"category":"doc","id":"sample-doc","name":"샘플 문서","format":"markdown","desc":"설명: 콜론","body":"# 양식\n본문\n","type":"plan","builtin":true}"##;
+    let doc_html = r#"{"category":"doc","id":"page","name":"페이지","format":"html","desc":"","body":"<h1>x</h1>","type":"report","builtin":false}"#;
+    let doc_json = r#"{"category":"doc","id":"data","name":"데이터","format":"json","desc":"d","body":"{\"cells\":[]}","type":"build","builtin":true}"#;
+    let ritual = r###"{"category":"ritual","id":"morning-ritual","name":"아침","format":"markdown","desc":"d","body":"## 아침\n","rev":"morning","icon":"Sun"}"###;
+    let all = format!("[{doc_md},{doc_html},{doc_json},{ritual}]");
+    let one_doc = |extra: &str| -> String {
+        format!(
+            r#"[{{"category":"doc","id":"a","name":"n","format":"markdown","desc":"","body":"","type":"plan"{extra}}}]"#
+        )
+    };
+    let bad_doc = |field: &str, value: &str| -> String {
+        let mut base = [
+            ("id", r#""a""#),
+            ("name", r#""n""#),
+            ("format", r#""markdown""#),
+            ("desc", r#""""#),
+            ("body", r#""""#),
+            ("type", r#""plan""#),
+            ("builtin", "false"),
+        ];
+        for entry in base.iter_mut() {
+            if entry.0 == field {
+                entry.1 = value;
+            }
+        }
+        let fields: Vec<String> = base.iter().map(|(k, v)| format!("\"{k}\":{v}")).collect();
+        format!(r#"[{{"category":"doc",{}}}]"#, fields.join(","))
+    };
+    let bad_ritual = |field: &str, value: &str| -> String {
+        let mut base = [
+            ("id", r#""r""#),
+            ("name", r#""n""#),
+            ("format", r#""markdown""#),
+            ("desc", r#""""#),
+            ("body", r#""""#),
+            ("rev", r#""morning""#),
+            ("icon", r#""Sun""#),
+        ];
+        for entry in base.iter_mut() {
+            if entry.0 == field {
+                entry.1 = value;
+            }
+        }
+        let fields: Vec<String> = base.iter().map(|(k, v)| format!("\"{k}\":{v}")).collect();
+        format!(r#"[{{"category":"ritual",{}}}]"#, fields.join(","))
+    };
+    let (a1, b1) = pair(1);
+    let mut init = WriteHarness {
+        report: &mut *h.report,
+        java,
+        a: a1,
+        b: b1,
+        locks: h.locks.clone(),
+        step: 500,
+    };
+    init.step(
+        "이름 지정",
+        &["init-workspace", "name=테스트: 워크스페이스 \"x\""],
+        "init_workspace",
+        json!({"name": "테스트: 워크스페이스 \"x\""}),
+    );
+    init.step(
+        "다시 부름",
+        &["init-workspace"],
+        "init_workspace",
+        json!({}),
+    );
+    let mut errors: Vec<(String, String)> = vec![
+        ("글이 아님".into(), "abc".into()),
+        ("객체".into(), "{}".into()),
+        ("문법 오류".into(), "[1,".into()),
+        ("항목이 숫자".into(), "[1]".into()),
+        ("항목이 글".into(), r#"["x"]"#.into()),
+        ("category 없음".into(), r#"[{"a":1}]"#.into()),
+        ("category 숫자".into(), r#"[{"category":1}]"#.into()),
+        ("category 모름".into(), r#"[{"category":"x"}]"#.into()),
+        ("모르는 키".into(), r#"[{"category":"doc","id":"a","zzz":2,"bad":1}]"#.into()),
+        ("id 없음".into(), r#"[{"category":"doc"}]"#.into()),
+        ("id가 객체(순서 유지)".into(), bad_doc("id", r#"{"b":1,"a":[1.0e3,x5]}"#)),
+        ("builtin 글".into(), bad_doc("builtin", r#""yes""#)),
+        ("builtin 없음".into(), r#"[{"category":"doc","id":"a","name":"n","format":"markdown","desc":"","body":"","type":"plan"}]"#.into()),
+        ("id 모양".into(), bad_doc("id", r#""a b""#)),
+        ("이름이 공백".into(), bad_doc("name", r#"" ""#)),
+        ("포맷 모름".into(), bad_doc("format", r#""pdf""#)),
+        ("유형 모름".into(), bad_doc("type", r#""zzz""#)),
+        ("안전하지 않은 id".into(), bad_doc("id", r#""..""#)),
+        ("리추얼 종류".into(), bad_ritual("rev", r#""night""#)),
+        ("리추얼 아이콘".into(), bad_ritual("icon", r#""1x""#)),
+        ("리추얼 키 섞임".into(), r#"[{"category":"ritual","id":"r","name":"n","format":"markdown","desc":"","body":"","rev":"morning","icon":"Sun","type":"plan"}]"#.into()),
+        ("65개".into(), format!("[{}]", vec![one_doc("").trim_matches(['[', ']']).to_string(); 65].join(","))),
+    ];
+    errors.push(("앞뒤 공백".into(), format!("  {}  ", one_doc(""))));
+    for (label, templates) in &errors {
+        init.step(
+            &format!("템플릿 오류 {label}"),
+            &["init-workspace", &format!("templates={templates}")],
+            "init_workspace",
+            json!({"templates": templates}),
+        );
+    }
+    init.step(
+        "공백 이름",
+        &["init-workspace", "name=  "],
+        "init_workspace",
+        json!({"name": "  "}),
+    );
+    let (a2, b2) = pair(2);
+    let mut seeding = WriteHarness {
+        report: &mut *init.report,
+        java,
+        a: a2,
+        b: b2,
+        locks: init.locks.clone(),
+        step: 700,
+    };
+    seeding.step(
+        "폴더 이름을 씀",
+        &["init-workspace", &format!("templates={all}")],
+        "init_workspace",
+        json!({"templates": all}),
+    );
+    seeding.step(
+        "다시 심음(건너뜀)",
+        &["init-workspace", &format!("templates={all}")],
+        "init_workspace",
+        json!({"templates": all}),
+    );
+    seeding.step(
+        "빈 배열",
+        &["init-workspace", "templates=[]"],
+        "init_workspace",
+        json!({"templates": "[]"}),
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
