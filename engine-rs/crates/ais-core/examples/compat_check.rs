@@ -7102,6 +7102,16 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
     // ---- 손으로 쓴 문답 파일 ----
     let ask_rel = |dir: &str| format!("{dir}/ask.json");
     let rust_root = h.b.clone();
+    // 앞 시나리오가 노트를 지우고 옮겨서, 지금 남아 있는 폴더 노트 하나를 손으로 쓴 파일의 자리로 고른다
+    let loose_id = {
+        let index = ais_core::vault::index::NoteIndex::fresh(&rust_root);
+        index
+            .root_notes()
+            .find(|n| !n.is_single_file && !n.is_extension_folder && n.id != parent)
+            .expect("폴더 노트가 있다")
+            .id
+            .clone()
+    };
     // 색인이 보는 노트 폴더(엔진이 문답 파일을 두는 곳)를 vault 기준 상대 경로로
     let note_dir = move |id: &str| -> String {
         let index = ais_core::vault::index::NoteIndex::fresh(&rust_root);
@@ -7114,7 +7124,7 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
             .to_string_lossy()
             .to_string()
     };
-    let loose_dir = note_dir("ndfx0006-00000006");
+    let loose_dir = note_dir(&loose_id);
     let weird = r#"{"v":9,"noteId":"","sessionId":5,"extra":1,"turns":[
       {"id":"a","markId":"","askedAt":"2026-11-14T00:00:00Z","quote":"","question":"q","answer":"a","error":"","model":"m","effort":"e","elapsedMs":"123","sessionLines":"4","images":["attach/ok.png","attach/bad.txt","x.png",5]},
       "문자열",
@@ -7127,13 +7137,13 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
         h,
         "손으로 쓴 파일 읽기",
         "get_ask",
-        &["get-ask", "ndfx0006-00000006"],
-        json!({"id": "ndfx0006-00000006"}),
+        &["get-ask", &loose_id],
+        json!({"id": &loose_id}),
     );
     append_ask(
         h,
         "손으로 쓴 파일에 붙이기",
-        &["ndfx0006-00000006"],
+        &[&loose_id],
         &[("turn-id", "n1")],
         None,
     );
@@ -7141,8 +7151,8 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
         h,
         "손으로 쓴 파일 다시 읽기",
         "get_ask",
-        &["get-ask", "ndfx0006-00000006"],
-        json!({"id": "ndfx0006-00000006"}),
+        &["get-ask", &loose_id],
+        json!({"id": &loose_id}),
     );
     for (label, content) in [
         ("깨진 JSON", "{\"turns\": [".to_string()),
@@ -7158,16 +7168,10 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
             h,
             &format!("{label} 읽기"),
             "get_ask",
-            &["get-ask", "ndfx0006-00000006"],
-            json!({"id": "ndfx0006-00000006"}),
+            &["get-ask", &loose_id],
+            json!({"id": &loose_id}),
         );
-        append_ask(
-            h,
-            &format!("{label}에 붙이기"),
-            &["ndfx0006-00000006"],
-            &[],
-            None,
-        );
+        append_ask(h, &format!("{label}에 붙이기"), &[&loose_id], &[], None);
     }
     // 붙이면 100만 바이트를 넘게 되는 파일
     let fat_turn = format!(
@@ -7175,13 +7179,13 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
         "가".repeat(160_000)
     );
     let fat = format!(
-        r#"{{"v":1,"noteId":"ndfx0006-00000006","sessionId":"s","turns":[{fat_turn},{fat_turn}]}}"#
+        r#"{{"v":1,"noteId":"{loose_id}","sessionId":"s","turns":[{fat_turn},{fat_turn}]}}"#
     );
     put_both(h, &ask_rel(&loose_dir), &fat);
     append_ask(
         h,
         "붙이면 상한 넘음",
-        &["ndfx0006-00000006"],
+        &[&loose_id],
         &[("question", &"나".repeat(20_000))],
         None,
     );
@@ -7423,7 +7427,7 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
     append_chat(h, "대화 붙이기 자리 인자 없음", &[], &[], None);
 
     // ---- 손으로 쓴 대화 파일 ----
-    let chats_dir = format!("{}/chats", note_dir("ndfx0006-00000006"));
+    let chats_dir = format!("{}/chats", note_dir(&loose_id));
     let chat_files: Vec<(&str, String)> = vec![
         ("a-no-created.json", r#"{"v":1,"noteId":" ","sourceSessionId":7,"turns":[{"id":"x","askedAt":"2026-11-14T03:00:00Z","question":"q"},{"id":"y","askedAt":"2026-11-14T04:00:00Z"}]}"#.to_string()),
         ("b-blank-created.json", r#"{"createdAt":"  ","turns":[{"askedAt":""}],"sourceSessionId":"s"}"#.to_string()),
@@ -7448,8 +7452,8 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
         h,
         "손으로 쓴 대화 목록",
         "list_chats",
-        &["list-chats", "ndfx0006-00000006"],
-        json!({"id": "ndfx0006-00000006"}),
+        &["list-chats", &loose_id],
+        json!({"id": &loose_id}),
     );
     for (label, chat_id) in [
         ("빠진 칸 대화", "a-no-created"),
@@ -7460,7 +7464,7 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
         append_chat(
             h,
             &format!("대화 붙이기 {label}"),
-            &["ndfx0006-00000006"],
+            &[&loose_id],
             &[("chat-id", chat_id)],
             None,
         );
@@ -7469,17 +7473,17 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
         h,
         "붙인 뒤 대화 목록",
         "list_chats",
-        &["list-chats", "ndfx0006-00000006"],
-        json!({"id": "ndfx0006-00000006"}),
+        &["list-chats", &loose_id],
+        json!({"id": &loose_id}),
     );
     let fat_chat = format!(
-        r#"{{"v":1,"noteId":"ndfx0006-00000006","chatId":"fat","sourceSessionId":"s","createdAt":"x","turns":[{fat_turn},{fat_turn}]}}"#
+        r#"{{"v":1,"noteId":"{loose_id}","chatId":"fat","sourceSessionId":"s","createdAt":"x","turns":[{fat_turn},{fat_turn}]}}"#
     );
     put_both(h, &format!("{chats_dir}/fat.json"), &fat_chat);
     append_chat(
         h,
         "대화 붙이면 상한 넘음",
-        &["ndfx0006-00000006"],
+        &[&loose_id],
         &[("chat-id", "fat"), ("question", &"나".repeat(20_000))],
         None,
     );
