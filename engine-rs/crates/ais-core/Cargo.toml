@@ -1,6 +1,6 @@
 [package]
 name = "ais-core"
-description = "aisurada vault의 규칙(노트 머리 읽기·쓰기 등)을 담은 라이브러리"
+description = "aisurada vault의 규칙(노트 머리 읽기·쓰기, vault 훑기, 읽기 명령 등)을 담은 라이브러리"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,8 +9,10 @@ publish.workspace = true
 [dependencies]
 libyaml-safer = "0.3"
 regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
 
 [dev-dependencies]
 # 깊이 시험 사례(중첩 50층 안팎)를 읽으려면 JSON 재귀 한도를 풀어야 한다
-serde = "1"
 serde_json = { version = "1", features = ["unbounded_depth"] }
