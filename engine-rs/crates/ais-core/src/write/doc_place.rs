@@ -10,6 +10,7 @@ use regex::Regex;
 use super::confine::{absolute_normalized, check_confinement, has_unusable_path_characters};
 use super::slug;
 use crate::error::EngineError;
+use crate::vault::note_meta::parse_iso_date;
 use crate::vault::scanner::is_sharded;
 
 static DATE_SYNTAX: LazyLock<Regex> = LazyLock::new(|| {
@@ -119,6 +120,27 @@ pub fn parse_time_arg(text: &str) -> Result<(u32, u32), EngineError> {
     Ok((hour.parse().unwrap_or(0), minute.parse().unwrap_or(0)))
 }
 
+/// 색인의 `created`(`yyyy-MM-ddTHH:mm:ss` + 오프셋 글)를 날짜, 시, 분, 오프셋 글로 가른다.
+pub struct CreatedParts {
+    pub date: CivilDate,
+    pub hour: u32,
+    pub minute: u32,
+    pub offset: String,
+}
+
+pub fn read_created(created: &str) -> Option<CreatedParts> {
+    let (year, month, day) = parse_iso_date(created.get(0..10)?)?;
+    if created.as_bytes().get(10) != Some(&b'T') {
+        return None;
+    }
+    Some(CreatedParts {
+        date: CivilDate { year, month, day },
+        hour: created.get(11..13)?.parse().ok()?,
+        minute: created.get(14..16)?.parse().ok()?,
+        offset: created.get(19..)?.to_string(),
+    })
+}
+
 /// 노트 id에서 소문자·숫자만 남겨 뒤 네 글자를 쓴다. 네 글자가 안 되면 있는 대로, 하나도 없으면 `0`이다.
 pub fn id_tail(id: &str) -> String {
     let kept: Vec<char> = id
@@ -134,6 +156,11 @@ pub fn id_tail(id: &str) -> String {
 
 /// 노트 폴더 이름 `<날짜>-<HHmm>-<제목 slug>-<id 꼬리>`
 pub fn folder_name(date: &CivilDate, hour: u32, minute: u32, title: &str, id: &str) -> String {
+    folder_name_from(date, hour, minute, title, id)
+}
+
+/// `folder_name`과 같다. 후속 노트가 만든 시각에서 이름을 지을 때 쓴다.
+pub fn folder_name_from(date: &CivilDate, hour: u32, minute: u32, title: &str, id: &str) -> String {
     format!(
         "{}-{hour:02}{minute:02}-{}-{}",
         date.iso(),

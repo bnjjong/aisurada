@@ -9,7 +9,7 @@ use crate::commands::{
     agenda_write, commit_vault, doc_create, doc_write, facts_write, get_agenda_facts, get_doc,
     get_sub_note, get_template, history, init_workspace, list_agendas, list_attachments,
     list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
-    note_meta_write, project_write, reindex, search_docs, template_write,
+    note_meta_write, project_write, reindex, search_docs, sub_note_write, template_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -54,6 +54,9 @@ pub const COMMANDS: &[&str] = &[
     "link_docs",
     "update_doc",
     "create_doc",
+    "create_sub_note",
+    "update_sub_note",
+    "delete_sub_note",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -74,6 +77,9 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "link_docs",
     "update_doc",
     "create_doc",
+    "create_sub_note",
+    "update_sub_note",
+    "delete_sub_note",
     "commit_vault",
 ];
 
@@ -234,6 +240,18 @@ impl Engine {
             "link_docs" => {
                 let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
                 to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
+            }
+            "create_sub_note" => {
+                let request: sub_note_write::CreateSubNoteRequest = parse_args(command, args)?;
+                to_json(sub_note_write::create_sub_note(&self.vault_root, &request)?)
+            }
+            "update_sub_note" => {
+                let request: sub_note_write::UpdateSubNoteRequest = parse_args(command, args)?;
+                to_json(sub_note_write::update_sub_note(&self.vault_root, &request)?)
+            }
+            "delete_sub_note" => {
+                let request: sub_note_write::DeleteSubNoteRequest = parse_args(command, args)?;
+                to_json(sub_note_write::delete_sub_note(&self.vault_root, &request)?)
             }
             "create_doc" => {
                 let request: doc_create::CreateDocRequest = parse_args(command, args)?;

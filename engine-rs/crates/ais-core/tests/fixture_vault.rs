@@ -1867,3 +1867,167 @@ fn creates_notes_and_agendas_with_warnings() {
         "{by_tool}"
     );
 }
+
+#[test]
+fn writes_sub_notes_and_strips_their_cards() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let parent = "ndfx0002-00000002";
+    let child2 = "snfx0002-00000012";
+    let grand = "snfx0003-00000013";
+    let sub_token = |parent: &str, id: &str| {
+        engine
+            .call("get_sub_note", json!({"parent": parent, "id": id}))
+            .unwrap()["precondition"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+
+    // 만들기: 메인 노트 아래와 후속 노트 아래. 후속 노트 id 하나만으로는 부모를 못 가리킨다
+    let created = engine
+        .call(
+            "create_sub_note",
+            json!({"parent": parent, "title": "새 후속", "body": "# 다른 헤딩\n"}),
+        )
+        .unwrap();
+    let id = created["id"].as_str().unwrap();
+    assert_eq!(created["ref"], format!("{parent}/{id}"));
+    assert!(
+        created["path"].as_str().unwrap().contains("/parent/sub/"),
+        "{created}"
+    );
+    assert!(
+        created["warning"]
+            .as_str()
+            .unwrap()
+            .starts_with("본문 첫 헤딩(\"다른 헤딩\")이 제목(\"새 후속\")과 달라요")
+    );
+    let text = read(&format!("{}/note.md", created["path"].as_str().unwrap()));
+    assert!(
+        text.starts_with("---\nid: sn")
+            && text.contains("type: free\n")
+            && !text.contains("editedBy"),
+        "{text}"
+    );
+    assert_eq!(
+        sub_token(parent, id),
+        created["precondition"].as_str().unwrap()
+    );
+    assert_eq!(
+        engine
+            .call(
+                "create_sub_note",
+                json!({"parent": child2, "title": "t", "body": "b"})
+            )
+            .unwrap_err()
+            .message,
+        format!("노트 id 모양이 아니다: {child2}")
+    );
+    let nested = engine
+        .call(
+            "create_sub_note",
+            json!({"parent": format!(" {parent} / {child2} "), "title": "손자", "body": "x"}),
+        )
+        .unwrap();
+    assert_eq!(nested["parent"], format!("{parent}/{child2}"));
+    assert!(
+        nested["path"].as_str().unwrap().contains("/child2/sub/"),
+        "{nested}"
+    );
+    assert_eq!(
+        engine
+            .call(
+                "create_sub_note",
+                json!({"parent": format!("{parent}/snfx0001-00000011"), "title": "t", "body": "b"})
+            )
+            .unwrap_err()
+            .code,
+        "AIS-500"
+    );
+
+    // 고치기: 본문만 주면 제목은 첫 헤딩을 따르고, 폴더가 정식 이름으로 옮겨진다. AI 호출은 tool 도장을 남긴다
+    let updated = engine
+        .call(
+            "update_sub_note",
+            json!({"parent": parent, "id": child2, "body": "# 헤딩 제목\n\n본문\n", "f1": sub_token(parent, child2)}),
+        )
+        .unwrap();
+    assert_eq!(updated["title"], "헤딩 제목");
+    let updated_path = updated["path"].as_str().unwrap();
+    assert!(
+        updated_path.contains("/sub/2026-11-05-1100-헤딩-제목-0012"),
+        "{updated_path}"
+    );
+    assert!(read(&format!("{updated_path}/note.md")).contains("editedBy: app\n"));
+    assert!(
+        vault.join(updated_path).join("sub/grand").is_dir(),
+        "아래 후속 노트가 따라옴"
+    );
+    let by_tool = engine
+        .call(
+            "update_sub_note",
+            json!({"parent": parent, "id": child2, "tags": ["a", " a ", "b"], "f1": sub_token(parent, child2), "caller": "ai", "session": "sess-3", "sessionAgent": "Codex"}),
+        )
+        .unwrap();
+    let tool_text = read(&format!("{}/note.md", by_tool["path"].as_str().unwrap()));
+    assert!(
+        tool_text.contains("editedBy: tool\n")
+            && tool_text.contains("editedSessionId: sess-3\n")
+            && tool_text.contains("tags:\n  - a\n  - b\n"),
+        "{tool_text}"
+    );
+    assert_eq!(
+        engine
+            .call(
+                "update_sub_note",
+                json!({"parent": parent, "id": child2, "title": "x"})
+            )
+            .unwrap_err()
+            .code,
+        "AIS-412"
+    );
+
+    // 지우기: 부모 본문에서 그 노트의 카드 줄만 걷어내고, 그 노트와 아래를 지운다
+    let under = format!("{parent}/{child2}");
+    engine
+        .call(
+            "update_sub_note",
+            json!({"parent": parent, "id": child2, "body": format!("# 자식\n[카드](#sub:{grand})\n끝\n"), "f1": sub_token(parent, child2)}),
+        )
+        .unwrap();
+    let deleted = engine
+        .call("delete_sub_note", json!({"parent": under, "id": grand}))
+        .unwrap();
+    assert_eq!(
+        (
+            deleted["deleted"].as_bool(),
+            deleted["cardRemoved"].as_bool()
+        ),
+        (Some(true), Some(true))
+    );
+    assert_ne!(deleted["containerBefore"], deleted["containerAfter"]);
+    assert!(!vault.join(deleted["path"].as_str().unwrap()).exists());
+    let container = engine
+        .call("get_sub_note", json!({"parent": parent, "id": child2}))
+        .unwrap();
+    assert!(
+        !container["body"].as_str().unwrap().contains("#sub:"),
+        "{container}"
+    );
+    assert_eq!(
+        engine
+            .call("delete_sub_note", json!({"parent": under, "id": grand}))
+            .unwrap_err()
+            .message,
+        format!("SubNote not found: {parent}/{grand}")
+    );
+    let plain = engine
+        .call("delete_sub_note", json!({"parent": parent, "id": id}))
+        .unwrap();
+    assert_eq!(plain["cardRemoved"], false);
+    assert!(plain.get("containerBefore").is_none());
+}

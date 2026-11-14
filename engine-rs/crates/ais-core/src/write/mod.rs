@@ -18,6 +18,7 @@
 //! - [`doc_place`]: 날짜·시각 인자, 부모 폴더, 폴더 이름, 폴더 옮기기
 //! - [`first_heading`]: 본문 첫 헤딩 글
 //! - [`local_time`]: 이 프로세스의 시간대로 본 날짜와 시각
+//! - [`sub_note`]: 후속 노트 쓰기의 공통 부품(파일 글, 폴더 옮기기, 하위 페이지 카드 걷어내기, 폴더 지우기)
 
 pub mod agenda_file;
 pub mod apparatus;
@@ -35,5 +36,6 @@ pub mod pipeline;
 pub mod precondition;
 pub mod project_file;
 pub mod slug;
+pub mod sub_note;
 pub mod template_file;
 pub mod warnings;

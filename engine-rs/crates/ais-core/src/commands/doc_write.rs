@@ -13,11 +13,12 @@ use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
 use crate::text::{NOTE_ID, cut_utf16, is_blank, trim, utf16_len};
 use crate::vault::note_file::{compute_token, split_text};
-use crate::vault::note_meta::{TEMPLATE_ID, get, parse_iso_date};
+use crate::vault::note_meta::{TEMPLATE_ID, get};
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::atomic::write_atomic;
 use crate::write::doc_place::{
-    CivilDate, check_path, folder_name, parent_folder, parse_date_arg, parse_time_arg, place_folder,
+    check_path, folder_name, parent_folder, parse_date_arg, parse_time_arg, place_folder,
+    read_created,
 };
 use crate::write::meta_writer::{Draft, MAX_FILE_UNITS, judge};
 use crate::write::pipeline::{WriteContext, WriteScope};
@@ -113,27 +114,6 @@ pub(crate) fn to_json_value(item: &Json) -> JsonValue {
         ),
         other => JsonValue::Literal(other.to_string()),
     }
-}
-
-/// 색인의 `created`(`yyyy-MM-ddTHH:mm:ss` + 오프셋 글)를 날짜, 시, 분, 오프셋 글로 가른다.
-struct CreatedParts {
-    date: CivilDate,
-    hour: u32,
-    minute: u32,
-    offset: String,
-}
-
-fn read_created(created: &str) -> Option<CreatedParts> {
-    let (year, month, day) = parse_iso_date(created.get(0..10)?)?;
-    if created.as_bytes().get(10) != Some(&b'T') {
-        return None;
-    }
-    Some(CreatedParts {
-        date: CivilDate { year, month, day },
-        hour: created.get(11..13)?.parse().ok()?,
-        minute: created.get(14..16)?.parse().ok()?,
-        offset: created.get(19..)?.to_string(),
-    })
 }
 
 fn rel_of(vault: &Path, path: &Path) -> String {
@@ -268,6 +248,7 @@ pub fn update_doc(vault: &Path, request: &UpdateDocRequest) -> Result<Json, Engi
             created: &created,
             session_id: session_id.as_deref(),
             session_agent,
+            tier: &meta.tier,
             tags,
             favorite: meta.favorite,
             favorite_category: meta.favorite_category.as_deref(),

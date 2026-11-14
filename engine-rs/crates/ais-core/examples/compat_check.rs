@@ -2344,6 +2344,550 @@ fn compare_doc_creates(h: &mut WriteHarness) {
     }
 }
 
+/// 후속 노트 쓰기 한 단계. `java`는 `ais-cli`의 인자 목록(자리 인자 포함)이고, `rust`는 같은 뜻의 호출 객체다.
+/// `token_of`가 `(부모, id)`면 그 후속 노트의 지금 확인 값을 `f1`로 더한다.
+fn sub_step(
+    h: &mut WriteHarness,
+    label: &str,
+    command: &str,
+    java: &[&str],
+    rust: Value,
+    token_of: Option<(&str, &str)>,
+) {
+    let mut java_args: Vec<String> = java.iter().map(|a| a.to_string()).collect();
+    let mut args = rust;
+    if let Some((parent, id)) = token_of {
+        let token = Engine::new(&h.b)
+            .call("get_sub_note", json!({"parent": parent, "id": id}))
+            .ok()
+            .and_then(|v| v["precondition"].as_str().map(str::to_string))
+            .unwrap_or_default();
+        java_args.push(format!("f1={token}"));
+        args["f1"] = json!(token);
+    }
+    let refs: Vec<&str> = java_args.iter().map(String::as_str).collect();
+    h.step(&format!("후속 {label}"), &refs, command, args);
+}
+
+/// `create_sub_note`, `update_sub_note`, `delete_sub_note` 맞대기.
+fn compare_sub_note_writes(h: &mut WriteHarness) {
+    let parent = "ndfx0002-00000002";
+    let child1 = "snfx0001-00000011"; // 단일 파일 후속 노트
+    let child2 = "snfx0002-00000012"; // 폴더 후속 노트(아래에 후속 노트 여러 개)
+    let grand = "snfx0003-00000013";
+    let deep = "snfx0004-00000014";
+    let under_child2 = format!("{parent}/{child2}");
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+
+    // ---- 만들기 ----
+    sub_step(
+        h,
+        "만들기 최소",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            parent,
+            "title=새 후속",
+            "body=# 새 후속\n\n본문\n",
+        ],
+        json!({"parent": parent, "title": "새 후속", "body": "# 새 후속\n\n본문\n"}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 유형",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            parent,
+            "title=계획",
+            "body=# 계획\n",
+            "type=PLAN",
+        ],
+        json!({"parent": parent, "title": "계획", "body": "# 계획\n", "type": "PLAN"}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 경고",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            parent,
+            "title=경고 모음",
+            "body=# 다른 제목\n  ## 들여쓴\n깨진\u{FFFD}글자\n",
+        ],
+        json!({"parent": parent, "title": "경고 모음", "body": "# 다른 제목\n  ## 들여쓴\n깨진\u{FFFD}글자\n"}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 같은 제목",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            parent,
+            "title=새 후속",
+            "body=# 새 후속\n",
+        ],
+        json!({"parent": parent, "title": "새 후속", "body": "# 새 후속\n"}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 빈 본문",
+        "create_sub_note",
+        &["create-sub-note", parent, "title=빈 본문", "body="],
+        json!({"parent": parent, "title": "빈 본문", "body": ""}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 특수 글자 제목",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            parent,
+            "title=# 해시: 'a' \"b\" 😀 / \\",
+            "body=x",
+        ],
+        json!({"parent": parent, "title": "# 해시: 'a' \"b\" 😀 / \\", "body": "x"}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 후속 노트 아래",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            &under_child2,
+            "title=손자",
+            "body=# 손자\n",
+        ],
+        json!({"parent": under_child2, "title": "손자", "body": "# 손자\n"}),
+        None,
+    );
+    sub_step(
+        h,
+        "만들기 사슬 공백과 빈 조각",
+        "create_sub_note",
+        &[
+            "create-sub-note",
+            &format!(" {parent} // {child2} "),
+            "title=공백 사슬",
+            "body=x",
+        ],
+        json!({"parent": format!(" {parent} // {child2} "), "title": "공백 사슬", "body": "x"}),
+        None,
+    );
+    unsafe {
+        env::set_var("TZ", "America/Los_Angeles");
+    }
+    sub_step(
+        h,
+        "만들기 로스앤젤레스 시간대",
+        "create_sub_note",
+        &["create-sub-note", parent, "title=엘에이", "body=x"],
+        json!({"parent": parent, "title": "엘에이", "body": "x"}),
+        None,
+    );
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+    let chain_wrong = format!("{parent}/{grand}");
+    let chain_single_file = format!("{parent}/{child1}");
+    put_both(
+        h,
+        "notes/work/ext2.md/note.md",
+        "---\nid: ndfx00c0-000000c0\nagenda: work\ntype: free\ntitle: 확장자 폴더\ncreated: '2026-11-10T09:00:00+09:00'\n---\n본문\n",
+    );
+    let huge = "a".repeat(1_000_000);
+    let huge_arg = format!("body={huge}");
+    for (label, java, rust) in [
+        ("부모 없음", vec!["create-sub-note"], json!({})),
+        (
+            "부모 공백",
+            vec!["create-sub-note", " ", "title=t", "body=b"],
+            json!({"parent": " ", "title": "t", "body": "b"}),
+        ),
+        (
+            "부모 모양",
+            vec!["create-sub-note", "nope", "title=t", "body=b"],
+            json!({"parent": "nope", "title": "t", "body": "b"}),
+        ),
+        (
+            "부모에 후속 노트 id만",
+            vec!["create-sub-note", child2, "title=t", "body=b"],
+            json!({"parent": child2, "title": "t", "body": "b"}),
+        ),
+        (
+            "제목 없음",
+            vec!["create-sub-note", parent, "body=b"],
+            json!({"parent": parent, "body": "b"}),
+        ),
+        (
+            "본문 없음",
+            vec!["create-sub-note", parent, "title=t"],
+            json!({"parent": parent, "title": "t"}),
+        ),
+        (
+            "유형 모름",
+            vec!["create-sub-note", parent, "title=t", "body=b", "type=zzz"],
+            json!({"parent": parent, "title": "t", "body": "b", "type": "zzz"}),
+        ),
+        (
+            "제목 공백",
+            vec!["create-sub-note", parent, "title=  ", "body=b"],
+            json!({"parent": parent, "title": "  ", "body": "b"}),
+        ),
+        (
+            "없는 메인 노트",
+            vec!["create-sub-note", "ndzz0001-00000001", "title=t", "body=b"],
+            json!({"parent": "ndzz0001-00000001", "title": "t", "body": "b"}),
+        ),
+        (
+            "없는 메인 노트와 제목 없음",
+            vec!["create-sub-note", "ndzz0001-00000001", "body=b"],
+            json!({"parent": "ndzz0001-00000001", "body": "b"}),
+        ),
+        (
+            "사슬에 없는 후속 노트",
+            vec![
+                "create-sub-note",
+                &format!("{parent}/snzz0001-00000001"),
+                "title=t",
+                "body=b",
+            ],
+            json!({"parent": format!("{parent}/snzz0001-00000001"), "title": "t", "body": "b"}),
+        ),
+        (
+            "사슬 후속 노트 모양",
+            vec![
+                "create-sub-note",
+                &format!("{parent}/nope"),
+                "title=t",
+                "body=b",
+            ],
+            json!({"parent": format!("{parent}/nope"), "title": "t", "body": "b"}),
+        ),
+        (
+            "사슬 부모가 아님",
+            vec!["create-sub-note", &chain_wrong, "title=t", "body=b"],
+            json!({"parent": chain_wrong, "title": "t", "body": "b"}),
+        ),
+        (
+            "단일 파일 후속 노트 아래",
+            vec!["create-sub-note", &chain_single_file, "title=t", "body=b"],
+            json!({"parent": chain_single_file, "title": "t", "body": "b"}),
+        ),
+        (
+            "단일 파일 메인 노트 아래",
+            vec!["create-sub-note", "ndfx0005-00000005", "title=t", "body=b"],
+            json!({"parent": "ndfx0005-00000005", "title": "t", "body": "b"}),
+        ),
+        (
+            "확장자 폴더 메인 노트 아래",
+            vec!["create-sub-note", "ndfx00c0-000000c0", "title=t", "body=b"],
+            json!({"parent": "ndfx00c0-000000c0", "title": "t", "body": "b"}),
+        ),
+        (
+            "저장 상한",
+            vec!["create-sub-note", parent, "title=큼", &huge_arg],
+            json!({"parent": parent, "title": "큼", "body": huge}),
+        ),
+    ] {
+        sub_step(
+            h,
+            &format!("만들기 오류 {label}"),
+            "create_sub_note",
+            &java,
+            rust,
+            None,
+        );
+    }
+
+    // ---- 고치기 ----
+    sub_step(
+        h,
+        "고치기 제목만",
+        "update_sub_note",
+        &["update-sub-note", parent, child2, "title=자식 새 제목"],
+        json!({"parent": parent, "id": child2, "title": "자식 새 제목"}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 본문만(제목은 첫 헤딩을 따름)",
+        "update_sub_note",
+        &[
+            "update-sub-note",
+            parent,
+            child2,
+            "body=# 헤딩이 제목이 됨\n\n본문\n",
+        ],
+        json!({"parent": parent, "id": child2, "body": "# 헤딩이 제목이 됨\n\n본문\n"}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 본문만(헤딩 없음이면 제목 그대로)",
+        "update_sub_note",
+        &["update-sub-note", parent, child2, "body=헤딩 없는 글\n"],
+        json!({"parent": parent, "id": child2, "body": "헤딩 없는 글\n"}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 제목과 본문",
+        "update_sub_note",
+        &[
+            "update-sub-note",
+            parent,
+            child2,
+            "title=명시한 제목",
+            "body=# 다른 헤딩\n  ## 들여쓴\n깨진\u{FFFD}글자\n",
+        ],
+        json!({"parent": parent, "id": child2, "title": "명시한 제목", "body": "# 다른 헤딩\n  ## 들여쓴\n깨진\u{FFFD}글자\n"}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 바뀐 것 없음",
+        "update_sub_note",
+        &["update-sub-note", parent, child2],
+        json!({"parent": parent, "id": child2}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 태그",
+        "update_sub_note",
+        &[
+            "update-sub-note",
+            parent,
+            child2,
+            r#"tags=["b"," a ","a",""]"#,
+        ],
+        json!({"parent": parent, "id": child2, "tags": r#"["b"," a ","a",""]"#}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 태그 배열",
+        "update_sub_note",
+        &["update-sub-note", parent, child2, r#"tags=["x","y"]"#],
+        json!({"parent": parent, "id": child2, "tags": ["x", "y"]}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 태그 비움",
+        "update_sub_note",
+        &["update-sub-note", parent, child2, "tags=[]"],
+        json!({"parent": parent, "id": child2, "tags": "[]"}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "고치기 깊은 후속 노트",
+        "update_sub_note",
+        &[
+            "update-sub-note",
+            &under_child2,
+            grand,
+            "title=손자 새 제목",
+        ],
+        json!({"parent": under_child2, "id": grand, "title": "손자 새 제목"}),
+        Some((&under_child2, grand)),
+    );
+    sub_step(
+        h,
+        "고치기 사슬 모든 조각",
+        "update_sub_note",
+        &[
+            "update-sub-note",
+            &format!("{under_child2}/{grand}"),
+            deep,
+            "title=틀린 부모",
+        ],
+        json!({"parent": format!("{under_child2}/{grand}"), "id": deep, "title": "틀린 부모"}),
+        None,
+    );
+    // 정식 폴더 자리가 이미 차 있으면 -2
+    let taken = "notes/demo/2026-11";
+    let _ = taken;
+    for (label, java, rust, token) in [
+        ("부모 없음", vec!["update-sub-note"], json!({}), None),
+        (
+            "후속 노트 id 없음",
+            vec!["update-sub-note", parent],
+            json!({"parent": parent}),
+            None,
+        ),
+        (
+            "후속 노트 id 공백",
+            vec!["update-sub-note", parent, " "],
+            json!({"parent": parent, "id": " "}),
+            None,
+        ),
+        (
+            "후속 노트 id 모양",
+            vec!["update-sub-note", parent, "nope"],
+            json!({"parent": parent, "id": "nope"}),
+            None,
+        ),
+        (
+            "없는 후속 노트",
+            vec!["update-sub-note", parent, "snzz0001-00000001"],
+            json!({"parent": parent, "id": "snzz0001-00000001"}),
+            None,
+        ),
+        (
+            "바로 아래가 아님",
+            vec!["update-sub-note", parent, grand],
+            json!({"parent": parent, "id": grand}),
+            None,
+        ),
+        (
+            "제목 공백",
+            vec!["update-sub-note", parent, child2, "title= "],
+            json!({"parent": parent, "id": child2, "title": " "}),
+            Some((parent, child2)),
+        ),
+        (
+            "태그 문법",
+            vec!["update-sub-note", parent, child2, "tags=[1,"],
+            json!({"parent": parent, "id": child2, "tags": "[1,"}),
+            Some((parent, child2)),
+        ),
+        (
+            "태그 줄바꿈",
+            vec!["update-sub-note", parent, child2, r#"tags=["a\nb"]"#],
+            json!({"parent": parent, "id": child2, "tags": r#"["a\nb"]"#}),
+            Some((parent, child2)),
+        ),
+        (
+            "확인 값 없음",
+            vec!["update-sub-note", parent, child2, "title=x"],
+            json!({"parent": parent, "id": child2, "title": "x"}),
+            None,
+        ),
+        (
+            "확인 값 틀림",
+            vec![
+                "update-sub-note",
+                parent,
+                child2,
+                "title=x",
+                "f1=f1:deadbeef",
+            ],
+            json!({"parent": parent, "id": child2, "title": "x", "f1": "f1:deadbeef"}),
+            None,
+        ),
+        (
+            "단일 파일 후속 노트(고칠 수 없음)",
+            vec!["update-sub-note", parent, child1, "title=x"],
+            json!({"parent": parent, "id": child1, "title": "x"}),
+            Some((parent, child1)),
+        ),
+    ] {
+        sub_step(
+            h,
+            &format!("고치기 오류 {label}"),
+            "update_sub_note",
+            &java,
+            rust,
+            token,
+        );
+    }
+
+    // ---- 지우기 ----
+    // 부모 본문이 카드 줄을 가진 경우: 후속 노트(child2)가 부모인 때(자리도 정식 이름으로 옮겨진다)와 메인 노트가 부모인 때
+    sub_step(
+        h,
+        "고치기 카드 줄을 넣음",
+        "update_sub_note",
+        &[
+            "update-sub-note",
+            parent,
+            child2,
+            &format!("body=# 자식\n[손자 카드](#sub:{grand}) \n[다른](#sub:{deep})\n끝\n"),
+        ],
+        json!({"parent": parent, "id": child2, "body": format!("# 자식\n[손자 카드](#sub:{grand}) \n[다른](#sub:{deep})\n끝\n")}),
+        Some((parent, child2)),
+    );
+    sub_step(
+        h,
+        "지우기 후속 노트의 카드와 함께",
+        "delete_sub_note",
+        &["delete-sub-note", &under_child2, grand],
+        json!({"parent": under_child2, "id": grand}),
+        None,
+    );
+    sub_step(
+        h,
+        "지우기 카드 없이(아래 후속 노트까지)",
+        "delete_sub_note",
+        &["delete-sub-note", &under_child2, deep.to_string().as_str()],
+        json!({"parent": under_child2, "id": deep}),
+        None,
+    );
+    h.note_step(
+        "본문 메인 노트에 카드 줄을 넣음",
+        "update_doc",
+        &[parent],
+        &[("body", &format!("# 부모\n[첫째](#sub:{child1})\n"))],
+        json!({"id": parent, "body": format!("# 부모\n[첫째](#sub:{child1})\n")}),
+        Some(parent),
+    );
+    sub_step(
+        h,
+        "지우기 메인 노트의 카드와 함께(단일 파일)",
+        "delete_sub_note",
+        &["delete-sub-note", parent, child1],
+        json!({"parent": parent, "id": child1}),
+        None,
+    );
+    for (label, java, rust) in [
+        ("부모 없음", vec!["delete-sub-note"], json!({})),
+        (
+            "후속 노트 id 없음",
+            vec!["delete-sub-note", parent],
+            json!({"parent": parent}),
+        ),
+        (
+            "없는 후속 노트",
+            vec!["delete-sub-note", parent, "snzz0001-00000001"],
+            json!({"parent": parent, "id": "snzz0001-00000001"}),
+        ),
+        (
+            "이미 지운 노트",
+            vec!["delete-sub-note", parent, child1],
+            json!({"parent": parent, "id": child1}),
+        ),
+        (
+            "바로 아래가 아님",
+            vec!["delete-sub-note", parent, "snfx0005-00000015"],
+            json!({"parent": parent, "id": "snfx0005-00000015"}),
+        ),
+    ] {
+        sub_step(
+            h,
+            &format!("지우기 오류 {label}"),
+            "delete_sub_note",
+            &java,
+            rust,
+            None,
+        );
+    }
+    unsafe {
+        env::remove_var("TZ");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -3495,6 +4039,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
 
     compare_doc_updates(&mut h);
     compare_doc_creates(&mut h);
+    compare_sub_note_writes(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {
