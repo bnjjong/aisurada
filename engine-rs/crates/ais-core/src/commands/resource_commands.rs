@@ -20,6 +20,7 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Map, Value as Json, json};
 
+use super::option_text::text_of;
 use crate::commands::Caller;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
@@ -52,16 +53,6 @@ const REJECT_USAGE: &str = "reject-resource-change <변경 id> [reason=<거절 �
 const RESOLVE_USAGE: &str = "resolve-resource-edit <자원 id 또는 refs:<프로젝트 slug>> action=approve|revert. 승인 안 된 직접 수정을 받아들이거나(approve) 승인한 판으로 되돌린다(revert. 새 파일이면 휴지통으로). 사람만 한다";
 const POLICY_SET_USAGE: &str = "set-resource-policy [project=auto|approve] [global=auto|approve] [refs=auto|approve] [permission=auto|approve]. 사람만 한다";
 const DEFAULT_DECIDED: i32 = 20;
-
-/// 호출 객체의 값을 명령줄 옵션 글로 바꾼다. 글은 그대로, 참거짓·숫자는 글자로, 배열·객체는 압축 JSON 글로 만든다. `null`은 안 준 것이다.
-fn text_of(value: &Option<Json>) -> Option<String> {
-    match value {
-        None | Some(Json::Null) => None,
-        Some(Json::String(s)) => Some(s.clone()),
-        Some(other @ (Json::Bool(_) | Json::Number(_))) => Some(other.to_string()),
-        Some(other) => Some(other.to_string()),
-    }
-}
 
 /// 옵션 이름과 글. 이름 차례로 쥔다.
 type Opts = BTreeMap<String, String>;

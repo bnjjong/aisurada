@@ -2967,3 +2967,222 @@ fn reads_resource_arguments_like_the_command_line() {
         "AIS-400"
     );
 }
+
+#[test]
+fn appends_ask_and_chat_turns_next_to_the_note() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+    let (parent, child, single) = (
+        "ndfx0002-00000002",
+        "snfx0002-00000012",
+        "ndfx0004-00000004",
+    );
+    let turn = |extra: Value| {
+        let mut base = json!({
+            "session-id": "sess-1", "turn-id": "t1", "mark-id": "m1", "asked-at": "2026-11-14T10:00:00+09:00",
+            "question": "무엇인가?", "answer": "이것이다.", "model": "opus", "effort": "high", "elapsed-ms": 1200
+        });
+        for (key, value) in extra.as_object().unwrap() {
+            base[key] = value.clone();
+        }
+        base
+    };
+    let with_id = |mut args: Value, id: &str, sub: Option<&str>| {
+        args["id"] = json!(id);
+        if let Some(sub) = sub {
+            args["subId"] = json!(sub);
+        }
+        args
+    };
+
+    // 문답: 파일이 없으면 null, 붙이면 만들어지고 둘째 회차는 첫 세션 id를 지킨다
+    assert_eq!(
+        engine.call("get_ask", json!({"id": parent})).unwrap(),
+        Value::Null
+    );
+    let first = engine
+        .call(
+            "append_ask_turn",
+            with_id(turn(json!({"session-lines": " 3 ", "images": ["attach/a.png", "attach/b.jpg"], "quote": "인용"})), parent, None),
+        )
+        .unwrap();
+    let ask_path = first["path"].as_str().unwrap().to_string();
+    assert!(ask_path.ends_with("/ask.json"), "{ask_path}");
+    assert_eq!(first["turns"][0]["sessionLines"], 3);
+    assert_eq!(
+        first["turns"][0]["images"],
+        json!(["attach/a.png", "attach/b.jpg"])
+    );
+    let text = std::fs::read_to_string(vault.join(&ask_path)).unwrap();
+    assert!(
+        text.starts_with("{\n  \"v\": 1,\n  \"noteId\": \"ndfx0002-00000002\",\n  \"sessionId\": \"sess-1\",\n  \"turns\": [\n    {\n      \"id\": \"t1\",\n      \"markId\": \"m1\",\n      \"askedAt\": \"2026-11-14T10:00:00+09:00\",\n      \"quote\": \"인용\",")
+            && text.ends_with("}\n"),
+        "{text}"
+    );
+    let second = engine
+        .call(
+            "append_ask_turn",
+            with_id(
+                turn(json!({"turn-id": "t2", "session-id": "ignored", "error": ""})),
+                parent,
+                None,
+            ),
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            second["sessionId"].as_str(),
+            second["turns"].as_array().map(Vec::len)
+        ),
+        (Some("sess-1"), Some(2))
+    );
+    assert_eq!(second["turns"][1]["error"], "");
+    let read = engine.call("get_ask", json!({"id": parent})).unwrap();
+    assert!(
+        read["turns"][1].get("error").is_none(),
+        "읽을 때 빈 error는 없는 칸이다: {read}"
+    );
+
+    // 후속 노트는 자기 폴더에 따로 둔다
+    let sub = engine
+        .call(
+            "append_ask_turn",
+            with_id(turn(json!({})), parent, Some(child)),
+        )
+        .unwrap();
+    assert_ne!(sub["path"], first["path"]);
+    assert_eq!(sub["noteId"], child);
+
+    // 인자 오류는 노트를 찾기 전에 낸다. 단일 파일 노트에는 둘 수 없다(AIS-500)
+    for (args, message) in [
+        (
+            with_id(turn(json!({"model": "  "})), parent, None),
+            "model 이 필요하다",
+        ),
+        (
+            with_id(turn(json!({"elapsed-ms": -1})), parent, None),
+            "elapsed-ms 은 숫자여야 한다: -1",
+        ),
+        (
+            with_id(turn(json!({"images": "pic.png"})), parent, None),
+            "그림 자리가 attach/<그림 파일 이름> 꼴이 아니다: pic.png",
+        ),
+        (
+            with_id(turn(json!({"session-lines": 0})), parent, None),
+            "session-lines 은 1 이상이어야 한다: 0",
+        ),
+    ] {
+        assert_eq!(error("append_ask_turn", args).message, message);
+    }
+    let blocked = error("append_ask_turn", with_id(turn(json!({})), single, None));
+    assert_eq!(blocked.code, "AIS-500");
+    assert!(
+        blocked
+            .message
+            .starts_with("폴더로 안 올라간 단일 파일 노트에는 문답을 둘 수 없다: "),
+        "{}",
+        blocked.message
+    );
+    assert_eq!(
+        error("get_ask", json!({"id": parent, "subId": " "})).code,
+        "AIS-400"
+    );
+    assert_eq!(
+        error("get_ask", json!({"id": "ndzz0001-00000001"})).code,
+        "AIS-404"
+    );
+
+    // 레일 대화: 만든 시각 순(읽을 수 없는 시각은 뒤), 같으면 대화 id 순. 못 읽는 파일은 이름만 알린다
+    let chat = |extra: Value| {
+        let mut base = json!({
+            "chat-id": "chat-1", "source-session": "sess-x", "turn-id": "t1", "asked-at": "2026-11-14T10:00:00+09:00",
+            "question": "q", "answer": "a", "model": "opus", "effort": "high", "elapsed-ms": 900
+        });
+        for (key, value) in extra.as_object().unwrap() {
+            base[key] = value.clone();
+        }
+        base
+    };
+    let none = engine.call("list_chats", json!({"id": parent})).unwrap();
+    assert_eq!(none, json!({"chats": [], "unreadable": []}));
+    engine
+        .call("append_chat_turn", with_id(chat(json!({})), parent, None))
+        .unwrap();
+    engine
+        .call(
+            "append_chat_turn",
+            with_id(
+                chat(json!({"turn-id": "t2", "source-session": "ignored"})),
+                parent,
+                None,
+            ),
+        )
+        .unwrap();
+    engine
+        .call(
+            "append_chat_turn",
+            with_id(
+                chat(json!({"chat-id": "chat-0", "asked-at": "2026-11-13T00:00:00Z"})),
+                parent,
+                None,
+            ),
+        )
+        .unwrap();
+    let chats_dir = vault
+        .join(ask_path.trim_end_matches("ask.json"))
+        .join("chats");
+    std::fs::write(
+        chats_dir.join("zz-bad-time.json"),
+        r#"{"createdAt":"어제","turns":[]}"#,
+    )
+    .unwrap();
+    std::fs::write(chats_dir.join("broken.json"), "{").unwrap();
+    std::fs::write(chats_dir.join("bad name.json"), "{}").unwrap();
+    std::fs::write(chats_dir.join("note.txt"), "{}").unwrap();
+    let listed = engine.call("list_chats", json!({"id": parent})).unwrap();
+    let ids: Vec<&str> = listed["chats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["chatId"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["chat-0", "chat-1", "zz-bad-time"]);
+    assert_eq!(listed["unreadable"], json!(["broken.json"]));
+    assert_eq!(listed["chats"][1]["sourceSessionId"], "sess-x");
+    assert_eq!(listed["chats"][1]["turns"].as_array().unwrap().len(), 2);
+    assert_eq!(listed["chats"][2]["createdAt"], "어제");
+    let appended = engine
+        .call("append_chat_turn", with_id(chat(json!({"chat-id": "fresh", "images": "attach/a.png,, attach/b.gif ", "error": ""})), parent, Some(child)))
+        .unwrap();
+    assert_eq!(appended["chat"]["noteId"], child);
+    assert_eq!(
+        appended["chat"]["turns"][0]["images"],
+        json!(["attach/a.png", "attach/b.gif"])
+    );
+    assert!(
+        appended["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("/chats/fresh.json")
+    );
+    assert_eq!(
+        error(
+            "append_chat_turn",
+            with_id(chat(json!({"chat-id": "broken"})), parent, None)
+        )
+        .message,
+        "레일 대화 파일을 못 읽어 붙일 수 없다: Unterminated object"
+    );
+    assert_eq!(
+        error(
+            "append_chat_turn",
+            with_id(chat(json!({"chat-id": "a b"})), parent, None)
+        )
+        .message,
+        "대화 id 모양이 아니다: a b"
+    );
+    assert_eq!(error("list_chats", json!({"id": single})).code, "AIS-500");
+}

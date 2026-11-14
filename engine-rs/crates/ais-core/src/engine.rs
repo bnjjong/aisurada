@@ -6,11 +6,11 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    agenda_write, comment_write, commit_vault, doc_create, doc_write, facts_write,
-    get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace, list_agendas,
-    list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
-    list_templates, list_trash, note_meta_write, project_write, reindex, resource_commands,
-    search_docs, sub_note_write, task_commands, template_write, trash_write,
+    agenda_write, ask_chat_commands, comment_write, commit_vault, doc_create, doc_write,
+    facts_write, get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace,
+    list_agendas, list_attachments, list_comments, list_docs, list_projects, list_sub_notes,
+    list_tags, list_templates, list_trash, note_meta_write, project_write, reindex,
+    resource_commands, search_docs, sub_note_write, task_commands, template_write, trash_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -89,6 +89,10 @@ pub const COMMANDS: &[&str] = &[
     "reject_resource_change",
     "resolve_resource_edit",
     "set_resource_policy",
+    "get_ask",
+    "list_chats",
+    "append_ask_turn",
+    "append_chat_turn",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -134,6 +138,8 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "reject_resource_change",
     "resolve_resource_edit",
     "set_resource_policy",
+    "append_ask_turn",
+    "append_chat_turn",
     "commit_vault",
 ];
 
@@ -430,6 +436,28 @@ impl Engine {
                     &request,
                 )?)
             }
+            "get_ask" => {
+                let request: ask_chat_commands::NoteRefRequest = parse_args(command, args)?;
+                to_json(ask_chat_commands::get_ask(&self.vault_root, &request)?)
+            }
+            "list_chats" => {
+                let request: ask_chat_commands::NoteRefRequest = parse_args(command, args)?;
+                to_json(ask_chat_commands::list_chats(&self.vault_root, &request)?)
+            }
+            "append_ask_turn" => {
+                let request: ask_chat_commands::AppendAskTurnRequest = parse_args(command, args)?;
+                to_json(ask_chat_commands::append_ask_turn(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "append_chat_turn" => {
+                let request: ask_chat_commands::AppendChatTurnRequest = parse_args(command, args)?;
+                to_json(ask_chat_commands::append_chat_turn(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
             "get_resource_policy" => {
                 to_json(resource_commands::get_resource_policy(&self.vault_root)?)
             }
@@ -537,6 +565,8 @@ mod tests {
         "list_resource_changes",
         "get_resource_change",
         "get_resource_policy",
+        "get_ask",
+        "list_chats",
     ];
 
     #[test]

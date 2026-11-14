@@ -1287,6 +1287,12 @@ impl WriteHarness<'_> {
                 self.locks.display().to_string(),
             )],
         );
+        // 두 사본의 폴더 경로가 오류 글에 들어가면(단일 파일 노트 따위) Java 쪽 경로를 Rust 사본 경로로 바꿔 견준다
+        let (a_path, b_path) = (
+            self.a.to_string_lossy().to_string(),
+            self.b.to_string_lossy().to_string(),
+        );
+        let java_out = java_out.map_err(|e| e.replace(&a_path, &b_path));
         // SAFETY: 이 도구는 단일 스레드로 돌고, 환경 변수는 Rust 명령을 부르기 직전에만 바꾼다.
         unsafe {
             env::set_var("AISURADA_TEST_RANDOM", &random);
@@ -6832,6 +6838,653 @@ fn compare_resource_commands(h: &mut WriteHarness) {
     );
 }
 
+/// 문답·레일 대화 명령 한 단계. `java`는 `ais-cli` 인자 목록(자리 인자 포함)이고 `rust`는 같은 뜻의 호출 객체다.
+fn ask_step(
+    h: &mut WriteHarness,
+    label: &str,
+    command: &str,
+    java: &[&str],
+    rust: Value,
+) -> Option<Value> {
+    h.step(&format!("문답 {label}"), java, command, rust)
+}
+
+/// 문답·레일 대화 명령 맞대기: 읽기(`get_ask`, `list_chats`)와 붙이기(`append_ask_turn`, `append_chat_turn`).
+/// 손으로 쓴 파일(모르는 칸, 틀린 모양, 너무 큰 파일, 깨진 JSON)도 두 엔진이 같은 글로 읽는지 본다.
+fn compare_ask_chat_commands(h: &mut WriteHarness) {
+    let parent = "ndfx0002-00000002";
+    let child = "snfx0002-00000012";
+    let grand = "snfx0003-00000013";
+    let other = "ndfx0004-00000004";
+    let at = "2026-11-14T10:00:00+09:00";
+
+    // ---- 문답 읽기: 파일이 없으면 null, 인자 오류 ----
+    ask_step(
+        h,
+        "읽기 파일 없음",
+        "get_ask",
+        &["get-ask", parent],
+        json!({"id": parent}),
+    );
+    ask_step(
+        h,
+        "읽기 후속 노트 파일 없음",
+        "get_ask",
+        &["get-ask", parent, child],
+        json!({"id": parent, "subId": child}),
+    );
+    ask_step(h, "읽기 인자 없음", "get_ask", &["get-ask"], json!({}));
+    ask_step(
+        h,
+        "읽기 노트 id 모양",
+        "get_ask",
+        &["get-ask", "nope"],
+        json!({"id": "nope"}),
+    );
+    ask_step(
+        h,
+        "읽기 하위 id 모양",
+        "get_ask",
+        &["get-ask", parent, "nope"],
+        json!({"id": parent, "subId": "nope"}),
+    );
+    ask_step(
+        h,
+        "읽기 하위 id 비어 있음",
+        "get_ask",
+        &["get-ask", parent, " "],
+        json!({"id": parent, "subId": " "}),
+    );
+    ask_step(
+        h,
+        "읽기 없는 노트",
+        "get_ask",
+        &["get-ask", "ndzz0001-00000001"],
+        json!({"id": "ndzz0001-00000001"}),
+    );
+    ask_step(
+        h,
+        "읽기 없는 후속 노트",
+        "get_ask",
+        &["get-ask", parent, "snzz0001-00000001"],
+        json!({"id": parent, "subId": "snzz0001-00000001"}),
+    );
+
+    // ---- 문답 붙이기 ----
+    let base = |extra: &[(&str, &str)]| -> (Vec<String>, Value) {
+        let mut named: Vec<(String, String)> = vec![
+            ("session-id".into(), "sess-1".into()),
+            ("turn-id".into(), "t1".into()),
+            ("mark-id".into(), "m1".into()),
+            ("asked-at".into(), at.into()),
+            ("question".into(), "무엇인가?".into()),
+            ("answer".into(), "이것이다.".into()),
+            ("model".into(), "opus".into()),
+            ("effort".into(), "high".into()),
+            ("elapsed-ms".into(), "1200".into()),
+        ];
+        for (k, v) in extra {
+            match named.iter_mut().find(|(name, _)| name == k) {
+                Some(slot) => slot.1 = v.to_string(),
+                None => named.push((k.to_string(), v.to_string())),
+            }
+        }
+        let java: Vec<String> = named.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        let rust: Map<String, Value> = named.into_iter().map(|(k, v)| (k, json!(v))).collect();
+        (java, Value::Object(rust))
+    };
+    let append_ask = |h: &mut WriteHarness,
+                      label: &str,
+                      id: &[&str],
+                      extra: &[(&str, &str)],
+                      drop_key: Option<&str>| {
+        let (mut java, mut rust) = base(extra);
+        if let Some(key) = drop_key {
+            java.retain(|a| !a.starts_with(&format!("{key}=")));
+            rust.as_object_mut().unwrap().remove(key);
+        }
+        let mut argv: Vec<String> = vec!["append-ask-turn".into()];
+        argv.extend(id.iter().map(|s| s.to_string()));
+        argv.extend(java);
+        rust["id"] = json!(id.first().copied().unwrap_or(""));
+        if let Some(sub) = id.get(1) {
+            rust["subId"] = json!(sub);
+        }
+        let refs: Vec<&str> = argv.iter().map(String::as_str).collect();
+        ask_step(h, label, "append_ask_turn", &refs, rust);
+    };
+    append_ask(h, "붙이기 새 파일", &[parent], &[], None);
+    append_ask(
+        h,
+        "붙이기 둘째 회차",
+        &[parent],
+        &[
+            ("turn-id", "t2"),
+            ("mark-id", "m2"),
+            ("session-id", "sess-ignored"),
+        ],
+        None,
+    );
+    append_ask(
+        h,
+        "붙이기 모든 칸",
+        &[parent],
+        &[
+            ("turn-id", "t3"),
+            ("quote", "인용한 \"대목\"\n둘째 줄"),
+            ("error", "실패: 시간 초과"),
+            ("session-lines", " 42 "),
+            ("images", "attach/a.png, attach/한글.JPG ,, attach/c.svg"),
+            ("question", "줄1\r\n줄2\t탭 😀"),
+            ("answer", ""),
+        ],
+        None,
+    );
+    append_ask(
+        h,
+        "붙이기 후속 노트",
+        &[parent, child],
+        &[("turn-id", "s1")],
+        None,
+    );
+    append_ask(
+        h,
+        "붙이기 손자 노트",
+        &[parent, grand],
+        &[("turn-id", "g1")],
+        None,
+    );
+    append_ask(
+        h,
+        "붙이기 빈 인용과 빈 오류",
+        &[parent, child],
+        &[("turn-id", "s2"), ("quote", ""), ("error", "")],
+        None,
+    );
+    append_ask(h, "붙이기 단일 파일 노트", &[other], &[], None);
+    ask_step(
+        h,
+        "읽기 메인",
+        "get_ask",
+        &["get-ask", parent],
+        json!({"id": parent}),
+    );
+    ask_step(
+        h,
+        "읽기 후속",
+        "get_ask",
+        &["get-ask", parent, child],
+        json!({"id": parent, "subId": child}),
+    );
+    ask_step(
+        h,
+        "읽기 단일 파일 노트",
+        "get_ask",
+        &["get-ask", other],
+        json!({"id": other}),
+    );
+    ask_step(
+        h,
+        "읽기 후속 노트(빈 값 칸)",
+        "get_ask",
+        &["get-ask", parent, child],
+        json!({"id": parent, "subId": child}),
+    );
+    let long_text = "가".repeat(20_001);
+    let long_quote = "나".repeat(2_001);
+    let edge_text = "가".repeat(20_000);
+    for (label, extra, drop_key) in [
+        ("인자 없음", vec![], Some("session-id")),
+        ("turn-id 없음", vec![], Some("turn-id")),
+        ("mark-id 없음", vec![], Some("mark-id")),
+        ("asked-at 없음", vec![], Some("asked-at")),
+        ("question 없음", vec![], Some("question")),
+        ("answer 없음", vec![], Some("answer")),
+        ("model 없음", vec![], Some("model")),
+        ("effort 없음", vec![], Some("effort")),
+        ("elapsed-ms 없음", vec![], Some("elapsed-ms")),
+        ("model 공백", vec![("model", "  ")], None),
+        ("elapsed-ms 글", vec![("elapsed-ms", "abc")], None),
+        ("elapsed-ms 음수", vec![("elapsed-ms", "-1")], None),
+        (
+            "elapsed-ms 32비트 넘침",
+            vec![("elapsed-ms", "2147483648")],
+            None,
+        ),
+        ("elapsed-ms 소수", vec![("elapsed-ms", "1.5")], None),
+        ("질문 길이", vec![("question", long_text.as_str())], None),
+        ("답변 길이", vec![("answer", long_text.as_str())], None),
+        ("인용 길이", vec![("quote", long_quote.as_str())], None),
+        ("session-lines 0", vec![("session-lines", "0")], None),
+        ("session-lines 글", vec![("session-lines", "x")], None),
+        ("session-lines 공백", vec![("session-lines", "  ")], None),
+        (
+            "그림 9장",
+            vec![(
+                "images",
+                "attach/1.png,attach/2.png,attach/3.png,attach/4.png,attach/5.png,attach/6.png,attach/7.png,attach/8.png,attach/9.png",
+            )],
+            None,
+        ),
+        ("그림 자리", vec![("images", "pic.png")], None),
+        ("그림 이름", vec![("images", "attach/a.txt")], None),
+        ("그림 숨김 파일", vec![("images", "attach/.a.png")], None),
+        ("그림 빈 이름", vec![("images", "attach/")], None),
+    ] {
+        append_ask(
+            h,
+            &format!("붙이기 오류 {label}"),
+            &[parent],
+            &extra,
+            drop_key,
+        );
+    }
+    append_ask(
+        h,
+        "붙이기 경계 길이",
+        &[parent],
+        &[("turn-id", "edge"), ("question", edge_text.as_str())],
+        None,
+    );
+    append_ask(h, "붙이기 없는 노트", &["ndzz0001-00000001"], &[], None);
+    append_ask(
+        h,
+        "붙이기 없는 후속 노트",
+        &[parent, "snzz0001-00000001"],
+        &[],
+        None,
+    );
+    append_ask(h, "붙이기 노트 id 모양", &["nope"], &[], None);
+    append_ask(h, "붙이기 하위 id 모양", &[parent, "nope"], &[], None);
+    append_ask(h, "붙이기 하위 id 비어 있음", &[parent, " "], &[], None);
+    append_ask(h, "붙이기 자리 인자 없음", &[], &[], None);
+
+    // ---- 손으로 쓴 문답 파일 ----
+    let ask_rel = |dir: &str| format!("{dir}/ask.json");
+    let rust_root = h.b.clone();
+    // 색인이 보는 노트 폴더(엔진이 문답 파일을 두는 곳)를 vault 기준 상대 경로로
+    let note_dir = move |id: &str| -> String {
+        let index = ais_core::vault::index::NoteIndex::fresh(&rust_root);
+        let note = index.note(id).expect("노트가 있다");
+        note.content_file
+            .parent()
+            .unwrap()
+            .strip_prefix(&rust_root)
+            .unwrap()
+            .to_string_lossy()
+            .to_string()
+    };
+    let loose_dir = note_dir("ndfx0006-00000006");
+    let weird = r#"{"v":9,"noteId":"","sessionId":5,"extra":1,"turns":[
+      {"id":"a","markId":"","askedAt":"2026-11-14T00:00:00Z","quote":"","question":"q","answer":"a","error":"","model":"m","effort":"e","elapsedMs":"123","sessionLines":"4","images":["attach/ok.png","attach/bad.txt","x.png",5]},
+      "문자열",
+      {"id":7,"askedAt":null,"question":[],"elapsedMs":7600.5,"sessionLines":-3,"images":[]},
+      {"id":"b","elapsedMs":1e3,"sessionLines":2147483648,"images":"attach/a.png","unknown":true},
+      {"id":"c","elapsedMs":9007199254740993,"sessionLines":5,"error":"실패","markId":"mm"}
+    ]}"#;
+    put_both(h, &ask_rel(&loose_dir), weird);
+    ask_step(
+        h,
+        "손으로 쓴 파일 읽기",
+        "get_ask",
+        &["get-ask", "ndfx0006-00000006"],
+        json!({"id": "ndfx0006-00000006"}),
+    );
+    append_ask(
+        h,
+        "손으로 쓴 파일에 붙이기",
+        &["ndfx0006-00000006"],
+        &[("turn-id", "n1")],
+        None,
+    );
+    ask_step(
+        h,
+        "손으로 쓴 파일 다시 읽기",
+        "get_ask",
+        &["get-ask", "ndfx0006-00000006"],
+        json!({"id": "ndfx0006-00000006"}),
+    );
+    for (label, content) in [
+        ("깨진 JSON", "{\"turns\": [".to_string()),
+        ("최상위가 배열", "[]".to_string()),
+        ("빈 파일", String::new()),
+        (
+            "너무 큼",
+            format!("{{\"turns\":[],\"pad\":\"{}\"}}", "x".repeat(1_000_000)),
+        ),
+    ] {
+        put_both(h, &ask_rel(&loose_dir), &content);
+        ask_step(
+            h,
+            &format!("{label} 읽기"),
+            "get_ask",
+            &["get-ask", "ndfx0006-00000006"],
+            json!({"id": "ndfx0006-00000006"}),
+        );
+        append_ask(
+            h,
+            &format!("{label}에 붙이기"),
+            &["ndfx0006-00000006"],
+            &[],
+            None,
+        );
+    }
+    // 붙이면 100만 바이트를 넘게 되는 파일
+    let fat_turn = format!(
+        r#"{{"id":"fat","askedAt":"x","question":"{}","answer":"","model":"m","effort":"e","elapsedMs":1}}"#,
+        "가".repeat(160_000)
+    );
+    let fat = format!(
+        r#"{{"v":1,"noteId":"ndfx0006-00000006","sessionId":"s","turns":[{fat_turn},{fat_turn}]}}"#
+    );
+    put_both(h, &ask_rel(&loose_dir), &fat);
+    append_ask(
+        h,
+        "붙이면 상한 넘음",
+        &["ndfx0006-00000006"],
+        &[("question", &"나".repeat(20_000))],
+        None,
+    );
+
+    // ---- 레일 대화 읽기와 붙이기 ----
+    ask_step(
+        h,
+        "대화 목록 없음",
+        "list_chats",
+        &["list-chats", parent],
+        json!({"id": parent}),
+    );
+    ask_step(
+        h,
+        "대화 목록 후속 노트 없음",
+        "list_chats",
+        &["list-chats", parent, child],
+        json!({"id": parent, "subId": child}),
+    );
+    ask_step(
+        h,
+        "대화 목록 인자 없음",
+        "list_chats",
+        &["list-chats"],
+        json!({}),
+    );
+    ask_step(
+        h,
+        "대화 목록 노트 id 모양",
+        "list_chats",
+        &["list-chats", "nope"],
+        json!({"id": "nope"}),
+    );
+    ask_step(
+        h,
+        "대화 목록 하위 id 모양",
+        "list_chats",
+        &["list-chats", parent, "nope"],
+        json!({"id": parent, "subId": "nope"}),
+    );
+    ask_step(
+        h,
+        "대화 목록 없는 노트",
+        "list_chats",
+        &["list-chats", "ndzz0001-00000001"],
+        json!({"id": "ndzz0001-00000001"}),
+    );
+    ask_step(
+        h,
+        "대화 목록 없는 후속 노트",
+        "list_chats",
+        &["list-chats", parent, "snzz0001-00000001"],
+        json!({"id": parent, "subId": "snzz0001-00000001"}),
+    );
+
+    let chat_base = |extra: &[(&str, &str)]| -> (Vec<String>, Value) {
+        let mut named: Vec<(String, String)> = vec![
+            ("chat-id".into(), "chat-1".into()),
+            ("source-session".into(), "sess-x".into()),
+            ("turn-id".into(), "t1".into()),
+            ("asked-at".into(), at.into()),
+            ("question".into(), "무엇인가?".into()),
+            ("answer".into(), "이것이다.".into()),
+            ("model".into(), "opus".into()),
+            ("effort".into(), "high".into()),
+            ("elapsed-ms".into(), "900".into()),
+        ];
+        for (k, v) in extra {
+            match named.iter_mut().find(|(name, _)| name == k) {
+                Some(slot) => slot.1 = v.to_string(),
+                None => named.push((k.to_string(), v.to_string())),
+            }
+        }
+        let java: Vec<String> = named.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        let rust: Map<String, Value> = named.into_iter().map(|(k, v)| (k, json!(v))).collect();
+        (java, Value::Object(rust))
+    };
+    let append_chat = |h: &mut WriteHarness,
+                       label: &str,
+                       id: &[&str],
+                       extra: &[(&str, &str)],
+                       drop_key: Option<&str>| {
+        let (mut java, mut rust) = chat_base(extra);
+        if let Some(key) = drop_key {
+            java.retain(|a| !a.starts_with(&format!("{key}=")));
+            rust.as_object_mut().unwrap().remove(key);
+        }
+        let mut argv: Vec<String> = vec!["append-chat-turn".into()];
+        argv.extend(id.iter().map(|s| s.to_string()));
+        argv.extend(java);
+        rust["id"] = json!(id.first().copied().unwrap_or(""));
+        if let Some(sub) = id.get(1) {
+            rust["subId"] = json!(sub);
+        }
+        let refs: Vec<&str> = argv.iter().map(String::as_str).collect();
+        ask_step(h, label, "append_chat_turn", &refs, rust);
+    };
+    append_chat(h, "대화 붙이기 새 대화", &[parent], &[], None);
+    append_chat(
+        h,
+        "대화 붙이기 같은 대화 둘째",
+        &[parent],
+        &[
+            ("turn-id", "t2"),
+            ("asked-at", "2026-11-14T11:00:00+09:00"),
+            ("source-session", "ignored"),
+        ],
+        None,
+    );
+    append_chat(
+        h,
+        "대화 붙이기 더 이른 대화",
+        &[parent],
+        &[("chat-id", "chat-0"), ("asked-at", "2026-11-13T00:00:00Z")],
+        None,
+    );
+    append_chat(
+        h,
+        "대화 붙이기 모든 칸",
+        &[parent],
+        &[
+            ("chat-id", "Chat_A-2"),
+            ("turn-id", "t9"),
+            ("error", ""),
+            ("images", "attach/a.png, attach/b.webp"),
+            ("question", "줄1\r\n줄2 😀"),
+            ("answer", ""),
+            ("asked-at", "2026-11-14T10:00:00Z"),
+        ],
+        None,
+    );
+    append_chat(
+        h,
+        "대화 붙이기 후속 노트",
+        &[parent, child],
+        &[("chat-id", "sub-chat")],
+        None,
+    );
+    append_chat(
+        h,
+        "대화 붙이기 손자 노트",
+        &[parent, grand],
+        &[("chat-id", "grand-chat")],
+        None,
+    );
+    ask_step(
+        h,
+        "대화 목록 메인",
+        "list_chats",
+        &["list-chats", parent],
+        json!({"id": parent}),
+    );
+    ask_step(
+        h,
+        "대화 목록 후속",
+        "list_chats",
+        &["list-chats", parent, child],
+        json!({"id": parent, "subId": child}),
+    );
+    let long_id = "a".repeat(65);
+    let long_session = "s".repeat(129);
+    let edge_session = "s".repeat(128);
+    for (label, extra, drop_key) in [
+        ("chat-id 없음", vec![], Some("chat-id")),
+        ("chat-id 모양", vec![("chat-id", "a b")], None),
+        ("chat-id 길이", vec![("chat-id", long_id.as_str())], None),
+        ("chat-id 점", vec![("chat-id", "a.b")], None),
+        ("source-session 없음", vec![], Some("source-session")),
+        (
+            "source-session 길이",
+            vec![("source-session", long_session.as_str())],
+            None,
+        ),
+        ("turn-id 없음", vec![], Some("turn-id")),
+        ("asked-at 없음", vec![], Some("asked-at")),
+        ("question 없음", vec![], Some("question")),
+        ("answer 없음", vec![], Some("answer")),
+        ("model 없음", vec![], Some("model")),
+        ("effort 없음", vec![], Some("effort")),
+        ("elapsed-ms 없음", vec![], Some("elapsed-ms")),
+        ("elapsed-ms 글", vec![("elapsed-ms", "abc")], None),
+        ("elapsed-ms 음수", vec![("elapsed-ms", "-5")], None),
+        ("elapsed-ms 넘침", vec![("elapsed-ms", "2147483648")], None),
+        ("질문 길이", vec![("question", long_text.as_str())], None),
+        ("답 길이", vec![("answer", long_text.as_str())], None),
+        (
+            "그림 9장",
+            vec![(
+                "images",
+                "attach/1.png,attach/2.png,attach/3.png,attach/4.png,attach/5.png,attach/6.png,attach/7.png,attach/8.png,attach/9.png",
+            )],
+            None,
+        ),
+        ("그림 자리", vec![("images", "pic.png")], None),
+        ("그림 이름", vec![("images", "attach/a.exe")], None),
+    ] {
+        append_chat(
+            h,
+            &format!("대화 붙이기 오류 {label}"),
+            &[parent],
+            &extra,
+            drop_key,
+        );
+    }
+    append_chat(
+        h,
+        "대화 붙이기 경계 길이",
+        &[parent],
+        &[
+            ("chat-id", "edge"),
+            ("source-session", edge_session.as_str()),
+            ("question", edge_text.as_str()),
+            ("images", "  "),
+        ],
+        None,
+    );
+    append_chat(
+        h,
+        "대화 붙이기 없는 노트",
+        &["ndzz0001-00000001"],
+        &[],
+        None,
+    );
+    append_chat(
+        h,
+        "대화 붙이기 없는 후속 노트",
+        &[parent, "snzz0001-00000001"],
+        &[],
+        None,
+    );
+    append_chat(h, "대화 붙이기 노트 id 모양", &["nope"], &[], None);
+    append_chat(
+        h,
+        "대화 붙이기 하위 id 비어 있음",
+        &[parent, " "],
+        &[],
+        None,
+    );
+    append_chat(h, "대화 붙이기 자리 인자 없음", &[], &[], None);
+
+    // ---- 손으로 쓴 대화 파일 ----
+    let chats_dir = format!("{}/chats", note_dir("ndfx0006-00000006"));
+    let chat_files: Vec<(&str, String)> = vec![
+        ("a-no-created.json", r#"{"v":1,"noteId":" ","sourceSessionId":7,"turns":[{"id":"x","askedAt":"2026-11-14T03:00:00Z","question":"q"},{"id":"y","askedAt":"2026-11-14T04:00:00Z"}]}"#.to_string()),
+        ("b-blank-created.json", r#"{"createdAt":"  ","turns":[{"askedAt":""}],"sourceSessionId":"s"}"#.to_string()),
+        ("c-bad-created.json", r#"{"createdAt":"어제","sourceSessionId":"s","turns":[]}"#.to_string()),
+        ("d-offset.json", r#"{"createdAt":"2026-11-14T12:00:00+09:00","sourceSessionId":"s","turns":[{"id":"1","elapsedMs":"77","images":["attach/a.png","bad"],"error":"","unknown":1},3,{"elapsedMs":1.5}]}"#.to_string()),
+        ("e-same-time.json", r#"{"createdAt":"2026-11-14T03:00:00Z","sourceSessionId":"s","turns":[]}"#.to_string()),
+        ("f-same-time.json", r#"{"createdAt":"2026-11-14T03:00:00.000Z","sourceSessionId":"s","turns":[]}"#.to_string()),
+        ("g-no-seconds.json", r#"{"createdAt":"2026-11-14T03:00+00:00","sourceSessionId":"s","turns":[]}"#.to_string()),
+        ("h-broken.json", "{\"turns\": [".to_string()),
+        ("i-array.json", "[]".to_string()),
+        ("j-big.json", format!("{{\"turns\":[],\"pad\":\"{}\"}}", "x".repeat(1_000_000))),
+        ("k-fraction.json", r#"{"createdAt":"2026-11-14T03:00:00.5Z","sourceSessionId":"s","turns":[]}"#.to_string()),
+        ("bad name.json", "{}".to_string()),
+        ("note.txt", "{}".to_string()),
+        (".json", "{}".to_string()),
+        ("z-after-deleted-field.json", r#"{"noteId":"ndother-00000000","chatId":"ignored","createdAt":"2026-11-14T03:00:00Z","turns":[]}"#.to_string()),
+    ];
+    for (name, content) in &chat_files {
+        put_both(h, &format!("{chats_dir}/{name}"), content);
+    }
+    ask_step(
+        h,
+        "손으로 쓴 대화 목록",
+        "list_chats",
+        &["list-chats", "ndfx0006-00000006"],
+        json!({"id": "ndfx0006-00000006"}),
+    );
+    for (label, chat_id) in [
+        ("빠진 칸 대화", "a-no-created"),
+        ("깨진 대화", "h-broken"),
+        ("배열 대화", "i-array"),
+        ("큰 대화", "j-big"),
+    ] {
+        append_chat(
+            h,
+            &format!("대화 붙이기 {label}"),
+            &["ndfx0006-00000006"],
+            &[("chat-id", chat_id)],
+            None,
+        );
+    }
+    ask_step(
+        h,
+        "붙인 뒤 대화 목록",
+        "list_chats",
+        &["list-chats", "ndfx0006-00000006"],
+        json!({"id": "ndfx0006-00000006"}),
+    );
+    let fat_chat = format!(
+        r#"{{"v":1,"noteId":"ndfx0006-00000006","chatId":"fat","sourceSessionId":"s","createdAt":"x","turns":[{fat_turn},{fat_turn}]}}"#
+    );
+    put_both(h, &format!("{chats_dir}/fat.json"), &fat_chat);
+    append_chat(
+        h,
+        "대화 붙이면 상한 넘음",
+        &["ndfx0006-00000006"],
+        &[("chat-id", "fat"), ("question", &"나".repeat(20_000))],
+        None,
+    );
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -6867,6 +7520,15 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         succeeded: 0,
     };
     // 자원 명령만 빠르게 돌려 볼 때(`HARNESS_ONLY=resources`): 앞 시나리오를 건너뛴다
+    if env::var("HARNESS_ONLY").as_deref() == Ok("ask") {
+        compare_ask_chat_commands(&mut h);
+        println!(
+            "  (문답·대화 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
+            h.step, h.succeeded
+        );
+        let _ = fs::remove_dir_all(&root);
+        return;
+    }
     if env::var("HARNESS_ONLY").as_deref() == Ok("resources") {
         compare_resource_commands(&mut h);
         println!(
@@ -7999,6 +8661,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_trash_writes(&mut h);
     compare_task_commands(&mut h);
     compare_resource_commands(&mut h);
+    compare_ask_chat_commands(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {

@@ -1,6 +1,7 @@
 //! 명령 실행기. 요청은 이름과 인자 객체로 받고, 응답은 JSON으로 돌려줍니다.
 
 pub mod agenda_write;
+pub mod ask_chat_commands;
 pub mod comment_write;
 pub mod commit_vault;
 pub mod doc_create;
@@ -22,6 +23,7 @@ pub mod list_tags;
 pub mod list_templates;
 pub mod list_trash;
 pub mod note_meta_write;
+pub mod option_text;
 pub mod project_write;
 pub mod reindex;
 pub mod resource_commands;
