@@ -137,7 +137,7 @@ if (location.pathname.startsWith("/note-window/")) {
         $$(".workspace-rail .nav-item")
           .map((b) => b.textContent.trim())
           .join("|") ===
-          "전체 노트|캘린더|즐겨찾기|연결|템플릿|스킬·에이전트|휴지통|연동 가이드",
+          "전체 노트|캘린더|즐겨찾기|연결|템플릿|휴지통",
         "rail order",
       );
       const before = (await fetch("/calls").then((r) => r.json())).length;

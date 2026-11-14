@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
@@ -7,10 +7,33 @@ import { ActionMenu } from "./ActionMenu.tsx";
 import { LiveBrandMark } from "./BrandMark.tsx";
 import { Icon } from "./Icon.tsx";
 import { NotificationBell } from "./NotificationCenter.tsx";
-import { badgeText } from "./approvalsClient.ts";
+import { badgeText, badgeTotal } from "./approvalsClient.ts";
 import { useApprovalCounts } from "./approvalsStore.ts";
+import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
 import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute, projectAddress } from "../navigation/routes.ts";
+import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
+import type { RailTab } from "../navigation/railTabs.ts";
+
+const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트" };
+/** 탭마다 보이는 메뉴(주소 조각, 글). 연동 가이드는 두 탭 공통이라 아래 줄에 있다 */
+const NAV_ITEMS: Record<RailTab, ReadonlyArray<readonly [string, string]>> = {
+  notes: [
+    ["notes", "전체 노트"],
+    ["calendar", "캘린더"],
+    ["favorites", "즐겨찾기"],
+    ["connections", "연결"],
+    ["templates", "템플릿"],
+    ["trash", "휴지통"],
+  ],
+  agents: [
+    ["tasks", "태스크"],
+    ["resources", "스킬·에이전트"],
+  ],
+};
+/** 숫자를 배지 글로. 0이면 빈 글, 99를 넘으면 99+ */
+const countText = (n: number) => (n <= 0 ? "" : n > 99 ? "99+" : String(n));
+
 export function Rail({
   controller,
   state,
@@ -20,7 +43,16 @@ export function Rail({
 }) {
   useSessionBadge();
   // 승인이 필요한 스킬·에이전트 변경의 수(#53). 스킬·에이전트 메뉴에 배지로 붙는다
-  const approvalBadge = badgeText(useApprovalCounts());
+  const approvalCounts = useApprovalCounts();
+  const approvalBadge = badgeText(approvalCounts);
+  // 러너가 사람의 답을 기다리는 태스크의 수. 태스크 메뉴에 배지로 붙는다
+  const runner = useRunner();
+  const waitingAnswers = runner.waiting.length;
+  // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
+  const mineBadge = countText(waitingAnswers + badgeTotal(approvalCounts));
+  // 켜질 탭은 화면 주소가 정한다. 주소가 탭을 정하지 않는 화면이면 직전에 켜 둔 탭이다
+  const tab = activeRailTab(state.route);
+  useEffect(() => rememberRailTab(state.route), [state.route]);
   // 「＋」 하나로 새 프로젝트와 새 아젠다 중 고르게 하는 메뉴.
   const addButton = useRef<HTMLButtonElement>(null);
   const [adding, setAdding] = useState(false);
@@ -69,13 +101,6 @@ export function Rail({
             </button>
             {id && (
               <span className="rail-acts">
-                <button
-                  title="프로젝트 페이지(스킬·에이전트)"
-                  aria-label={`${name} 프로젝트 페이지 열기`}
-                  onClick={() => controller.navigate(projectAddress(slug))}
-                >
-                  <Icon name="popout" />
-                </button>
                 <button
                   title="프로젝트 편집"
                   aria-label={`${name} 프로젝트 편집`}
@@ -163,18 +188,34 @@ export function Rail({
         {ws.sample && <span className="sample-badge">샘플</span>}
         {ws.path && <span className="workspace-path" title={ws.path}>{ws.path}</span>}
       </div>
-      <nav data-rail-section="nav" aria-label="워크스페이스 메뉴">
-        {[
-          ["notes", "전체 노트"],
-          ["calendar", "캘린더"],
-          ["favorites", "즐겨찾기"],
-          ["connections", "연결"],
-          ["templates", "템플릿"],
-          ["resources", "스킬·에이전트"],
-          ["tasks", "태스크"],
-          ["trash", "휴지통"],
-          ["guide", "연동 가이드"],
-        ].map(([path, label]) => (
+      <div className="rail-tabs" role="tablist" aria-label="레일 구역" data-rail-section="tabs">
+        {RAIL_TABS.map((id) => {
+          const selected = id === tab;
+          const badge = id === "agents" ? mineBadge : "";
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`rail-tab-${id}`}
+              aria-selected={selected}
+              aria-controls="rail-panel"
+              className={`rail-tab ${selected ? "active" : ""}`}
+              onClick={() => {
+                // 이미 그 탭의 화면이면 그대로 두고, 아니면 그 탭에서 마지막으로 보던 화면으로 간다
+                const to = railTabTarget(id, state.route);
+                if (to) controller.navigate(to);
+              }}
+            >
+              {TAB_LABELS[id]}
+              {badge && <span className="rail-tab-badge" role="img" aria-label={`내 차례 ${badge}건`}>{badge}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="rail-panel" id="rail-panel" role="tabpanel" aria-labelledby={`rail-tab-${tab}`}>
+      <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : "에이전트 메뉴"}>
+        {NAV_ITEMS[tab].map(([path, label]) => (
           <button
             className={`nav-item ${(path === "tasks" ? state.route.startsWith("/task") : state.route.startsWith("/" + path)) ? "active" : ""}`}
             key={path}
@@ -182,10 +223,52 @@ export function Rail({
           >
             {label}
             {path === "trash" && !!ws.trash.length && ` ${ws.trash.length}`}
+            {path === "tasks" && waitingAnswers > 0 && <span className="nav-badge" role="img" aria-label={`사람의 답을 기다리는 태스크 ${waitingAnswers}개`}>{countText(waitingAnswers)}</span>}
             {path === "resources" && approvalBadge && <span className="nav-badge" role="img" aria-label={`승인이 필요한 변경 ${approvalBadge}개`}>{approvalBadge}</span>}
           </button>
         ))}
       </nav>
+      {tab === "agents" && runner.supported && (
+        <button
+          type="button"
+          className={`rail-runner ${runnerTone(runner)}`}
+          title="러너 설정은 태스크 화면 맨 위에서 바꿔요"
+          onClick={() => controller.navigate("/tasks")}
+        >
+          <i aria-hidden="true" />
+          러너 · {runnerSummary(runner)}
+        </button>
+      )}
+      {tab === "agents" ? (
+      <section data-rail-section="resources" className="agenda-summary rail-resources">
+        <header>
+          <h2>프로젝트 자원</h2>
+        </header>
+        {ws.projects.length === 0 && (
+          <p className="rail-hint">프로젝트를 만들면 프로젝트별 스킬·에이전트가 여기에 나와요.</p>
+        )}
+        {ws.projects.map((p) => {
+          const slug = asText(p.slug),
+            name = asText(p.title),
+            isActive = route.kind === "project" && route.slug === slug;
+          return (
+            <div className={`rail-agenda ${isActive ? "active" : ""}`} key={asText(p.id) || slug}>
+              <button
+                type="button"
+                className="agenda-name"
+                title="프로젝트 페이지(스킬·에이전트)"
+                aria-label={`${name} 프로젝트 페이지 열기`}
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => controller.navigate(projectAddress(slug))}
+              >
+                <Icon name="folder" size={16} />
+                {name}
+              </button>
+            </div>
+          );
+        })}
+      </section>
+      ) : (
       <section data-rail-section="agendas" className="agenda-summary">
         <header>
           <h2>{ws.projects.length > 0 ? "프로젝트" : "아젠다"}</h2>
@@ -236,6 +319,8 @@ export function Rail({
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
       </section>
+      )}
+      </div>
       <footer className="rail-footer">
         <button
           className="iconbtn icon-btn"
@@ -256,6 +341,16 @@ export function Rail({
           onClick={() => controller.settings(true)}
         >
           ⚙
+        </button>
+        {/* 연동 가이드는 두 탭이 같이 쓰므로 탭 메뉴가 아니라 이 줄에 둔다 */}
+        <button
+          className={`iconbtn icon-btn ${route.kind === "guide" ? "active" : ""}`}
+          title="연동 가이드"
+          aria-label="연동 가이드"
+          aria-current={route.kind === "guide" ? "page" : undefined}
+          onClick={() => controller.navigate("/guide")}
+        >
+          ?
         </button>
         <button
           className="rail-back"

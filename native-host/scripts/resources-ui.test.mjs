@@ -221,10 +221,14 @@ test('the project page shows the project, its repos and agendas, and states the 
   assert.match(renderToStaticMarkup(React.createElement(ProjectPage, { slug: '없음', state: state('/project/x'), controller: fakeController() })), /이 프로젝트를 찾을 수 없어요/);
 });
 
-test('the rail links to the global page and to each project page', () => {
-  const html = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') }));
-  assert.match(html, /스킬·에이전트/);
+test('the agents tab links to the global page and to each project page, and the notes tab no longer does', () => {
+  const html = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/resources') }));
+  assert.match(html, /class="nav-item active">스킬·에이전트/);
   assert.match(html, /앱 프로젝트 페이지 열기/);
-  const onPage = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/resources') }));
-  assert.match(onPage, /class="nav-item active">스킬·에이전트/);
+  assert.doesNotMatch(html, /rail-agenda active/, 'no project row is active on the global page');
+  const onProject = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/project/' + encodeURIComponent('앱')) }));
+  assert.match(onProject, /class="rail-agenda active"/, 'the open project row is marked');
+  const notes = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') }));
+  assert.doesNotMatch(notes, /프로젝트 페이지 열기/, 'the notes tab keeps only the project edit and add buttons');
+  assert.doesNotMatch(notes, /스킬·에이전트</);
 });

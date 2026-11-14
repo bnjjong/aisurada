@@ -1,14 +1,13 @@
 // 태스크 페이지 위의 러너 막대: 러너가 지금 무엇을 하는지, 스스로 집을지, 동시에 몇 개까지 돌릴지.
 // 러너 자체는 호스트가 돈다(`runner/`). 이 막대는 상태를 보여 주고 설정을 호스트에 적을 뿐이다.
 import type { HostCall, RunnerSnapshot } from "./runnerStore.ts";
-import { MAX_CONCURRENCY, MIN_CONCURRENCY, runnerSummary, saveRunnerSettings, useRunner } from "./runnerStore.ts";
+import { MAX_CONCURRENCY, MIN_CONCURRENCY, runnerSummary, runnerTone, saveRunnerSettings, useRunner } from "./runnerStore.ts";
 
 export function RunnerBar({ call, preset }: { call: HostCall; preset?: RunnerSnapshot }) {
   const live = useRunner();
   const s = preset ?? live;
   if (!s.supported) return null;
-  const busy = s.active.length > 0;
-  const tone = !s.claudeAvailable ? "is-warn" : busy ? "is-busy" : s.waiting.length ? "is-wait" : "is-idle";
+  const tone = runnerTone(s);
   const change = (patch: Partial<RunnerSnapshot["settings"]>) => void saveRunnerSettings(call, { ...s.settings, ...patch });
   return (
     <div className="runner-bar" role="group" aria-label="러너">

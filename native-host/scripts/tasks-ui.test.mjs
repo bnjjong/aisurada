@@ -273,7 +273,9 @@ test('the pages draw their loading state before the engine answers, and the rail
   const detailHtml = renderToStaticMarkup(React.createElement(TaskDetailPage, { taskKey: 'TSK-1', state: state('/task/TSK-1'), controller: fakeController() }));
   assert.match(detailHtml, /불러오는 중이에요/);
   const rail = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') }));
-  assert.match(rail, />태스크</);
+  assert.doesNotMatch(rail, />태스크</, 'the notes tab has no tasks item');
+  assert.match(rail, /role="tab"[^>]*>에이전트/, 'the agents tab is one click away');
+  assert.match(renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/resources') })), />태스크</);
   const onList = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/tasks') }));
   assert.match(onList, /class="nav-item active">태스크/);
   const onDetail = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/task/TSK-9') }));

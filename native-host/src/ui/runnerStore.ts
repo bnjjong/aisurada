@@ -257,6 +257,10 @@ export const activeRunOf = (s: RunnerSnapshot, taskKey: string) => s.active.find
 /** 이 태스크의 사람의 답을 기다리는 실행. 없으면 undefined */
 export const waitingRunOf = (s: RunnerSnapshot, taskKey: string) => s.waiting.find((r) => r.taskKey === taskKey);
 
+/** 러너 표시의 색 단계. 막대와 레일의 러너 표시가 같이 쓴다. */
+export const runnerTone = (s: RunnerSnapshot): "is-warn" | "is-busy" | "is-wait" | "is-idle" =>
+  !s.claudeAvailable ? "is-warn" : s.active.length > 0 ? "is-busy" : s.waiting.length ? "is-wait" : "is-idle";
+
 /** 막대의 한 줄 요약. */
 export function runnerSummary(s: RunnerSnapshot): string {
   if (!s.claudeAvailable) return "claude를 못 찾았어요";
