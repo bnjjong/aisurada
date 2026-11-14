@@ -47,7 +47,7 @@ function fixture(t, options={}) {
 test('argv preserves whitespace, newlines, quotes, equals, empty fields and places opaque tokens last',()=>{
   assert.deepEqual(toArgv(write.updateDoc(' id ',{body:'a\n"b"=c',tags:[]},'opaque token')),['update-doc',' id ','body=a\n"b"=c','tags=[]','f1=opaque token']);
   assert.deepEqual(write.updateSub('a/c','d',{title:'',body:''},''),['update-sub-note','a/c','d','title=','body=']);
-  assert.deepEqual(write.createDoc({agenda:'s',type:'free',title:'',body:'',date:'d',time:'t',tags:[],tier:'other'}),['create-doc','agenda=s','type=free','title=','body=','date=d','time=t','format=markdown','tags=[]']);
+  assert.deepEqual(toArgv(write.createDoc({agenda:'s',type:'free',title:'',body:'',date:'d',time:'t',tags:[],tier:'other'})),['create-doc','agenda=s','type=free','title=','body=','date=d','time=t','format=markdown','tags=[]']);
   // 옮겨진 명령은 호출 객체이고, Java 엔진으로 보낼 때 풀면 예전 문자열 목록과 같다
   assert.deepEqual(read.docs(),{command:'list_docs',args:{limit:0,bodies:true}});
   assert.deepEqual(toArgv(read.docs()),['list-docs','limit=0','bodies=true']);

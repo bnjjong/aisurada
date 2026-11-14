@@ -49,9 +49,9 @@ export interface NewDoc {
 }
 export const write = {
   init: (name: string): Call => ({ command: 'init_workspace', args: { name, templates: '[]' } }),
-  createDoc: (doc: NewDoc) => command('create-doc', [], { agenda: doc.agenda, type: doc.type, title: doc.title,
+  createDoc: (doc: NewDoc): Call => ({ command: 'create_doc', args: { agenda: doc.agenda, type: doc.type, title: doc.title,
     body: doc.body, date: doc.date, time: doc.time, format: 'markdown', tags: doc.tags,
-    template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined }),
+    template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined } }),
   updateDoc: (id: string, fields: Fields, token?: string): Call => ({ command: 'update_doc', args: { id, ...fields, f1: token || undefined } }),
   favorite: (id: string, fields: Fields, token?: string): Call => ({ command: 'set_favorite', args: { id, ...fields, f1: token || undefined } }),
   evaluate: (id: string, fields: Fields, token?: string): Call => ({ command: 'evaluate_doc', args: { id, ...fields, f1: token || undefined } }),

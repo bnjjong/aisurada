@@ -306,3 +306,14 @@ test('쓰기 스위치: update_doc도 같은 길을 따르고, 태그는 배열 
   await engineCall(off, write.updateDoc('n', { title: '새 제목', tags: ['a', 'b'], time: '09:30' }, 'f1:abc'));
   assert.deepEqual(seen, [['update-doc', 'n', 'title=새 제목', 'tags=["a","b"]', 'time=09:30', 'f1=f1:abc']]);
 });
+
+test('쓰기 스위치: create_doc도 같은 길을 따르고, 옛 길에서는 예전 인자 목록 그대로 풀린다', async () => {
+  const on = host({ commands: ['create_doc'], rust: { create_doc: () => ({ id: 'ndx-00000001', agenda: 'demo', agendaCreated: false, path: 'notes/demo/x', precondition: 'f1:new' }) } });
+  const doc = { agenda: 'demo', type: 'free', title: '새 노트', body: '본문', date: '2026-11-01', time: '12:30', tags: ['a'], template: 't', tier: 'record' };
+  assert.equal((await engineCall(on, write.createDoc(doc))).id, 'ndx-00000001');
+  assert.deepEqual(JSON.parse(JSON.stringify(on.calls[0].args)), { command: 'create_doc', args: { ...doc, format: 'markdown' } });
+  const seen = [];
+  const off = host({ commands: [], java: { 'create-doc': argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; } } });
+  await engineCall(off, write.createDoc({ ...doc, tier: 'reading', template: undefined }));
+  assert.deepEqual(seen, [['create-doc', 'agenda=demo', 'type=free', 'title=새 노트', 'body=본문', 'date=2026-11-01', 'time=12:30', 'format=markdown', 'tags=["a"]']]);
+});
