@@ -317,3 +317,22 @@ test('쓰기 스위치: create_doc도 같은 길을 따르고, 옛 길에서는 
   await engineCall(off, write.createDoc({ ...doc, tier: 'reading', template: undefined }));
   assert.deepEqual(seen, [['create-doc', 'agenda=demo', 'type=free', 'title=새 노트', 'body=본문', 'date=2026-11-01', 'time=12:30', 'format=markdown', 'tags=["a"]']]);
 });
+
+test('쓰기 스위치: 후속 노트 쓰기 3개도 같은 길을 따르고, 옛 길에서는 부모와 id가 자리 인자로 풀린다', async () => {
+  const rust = { create_sub_note: () => ({ id: 'sn1', ref: 'n/sn1' }), update_sub_note: () => ({ id: 'sn1', precondition: 'f1:new' }), delete_sub_note: () => ({ id: 'sn1', deleted: true }) };
+  const on = host({ commands: Object.keys(rust), rust });
+  await engineCall(on, write.createSub('n'));
+  await engineCall(on, write.updateSub('n/sn0', 'sn1', { title: '제목', tags: ['a'] }, 'f1:abc'));
+  await engineCall(on, write.deleteSub('n', 'sn1'));
+  assert.deepEqual(on.calls.map(c => JSON.parse(JSON.stringify(c.args))), [
+    { command: 'create_sub_note', args: { parent: 'n', title: '새 후속 노트', body: '# 새 후속 노트\n\n', type: 'free' } },
+    { command: 'update_sub_note', args: { parent: 'n/sn0', id: 'sn1', title: '제목', tags: ['a'], f1: 'f1:abc' } },
+    { command: 'delete_sub_note', args: { parent: 'n', id: 'sn1' } },
+  ]);
+  const seen = [];
+  const off = host({ commands: [], java: Object.fromEntries(['create-sub-note', 'update-sub-note', 'delete-sub-note'].map(n => [n, argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
+  await engineCall(off, write.createSub('n'));
+  await engineCall(off, write.updateSub('n/sn0', 'sn1', { body: '본문' }, 'f1:abc'));
+  await engineCall(off, write.deleteSub('n', 'sn1'));
+  assert.deepEqual(seen, [['create-sub-note', 'n', 'title=새 후속 노트', 'body=# 새 후속 노트\n\n', 'type=free'], ['update-sub-note', 'n/sn0', 'sn1', 'body=본문', 'f1=f1:abc'], ['delete-sub-note', 'n', 'sn1']]);
+});

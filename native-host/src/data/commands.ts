@@ -17,6 +17,7 @@ const POSITIONAL: Record<string, string[]> = {
   update_agenda: ['id'], delete_agenda: ['id'], update_project: ['id'], delete_project: ['id'],
   save_ritual_template: ['id'], delete_doc_template: ['id'], update_agenda_facts: ['id'],
   set_favorite: ['id'], evaluate_doc: ['id'], link_docs: ['from', 'to'], update_doc: ['id'],
+  create_sub_note: ['parent'], update_sub_note: ['parent', 'id'], delete_sub_note: ['parent', 'id'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -57,9 +58,9 @@ export const write = {
   evaluate: (id: string, fields: Fields, token?: string): Call => ({ command: 'evaluate_doc', args: { id, ...fields, f1: token || undefined } }),
   link: (from: string, to: string, kind: string, remove: boolean, token?: string): Call =>
     ({ command: 'link_docs', args: { from, to, kind, remove: remove || undefined, f1: token } }),
-  createSub: (parent: string) => command('create-sub-note', [parent], { title: '새 후속 노트', body: '# 새 후속 노트\n\n', type: 'free' }),
-  updateSub: (parent: string, id: string, fields: Fields, token?: string) => command('update-sub-note', [parent, id], fields, token),
-  deleteSub: (parent: string, id: string) => ['delete-sub-note', parent, id],
+  createSub: (parent: string): Call => ({ command: 'create_sub_note', args: { parent, title: '새 후속 노트', body: '# 새 후속 노트\n\n', type: 'free' } }),
+  updateSub: (parent: string, id: string, fields: Fields, token?: string): Call => ({ command: 'update_sub_note', args: { parent, id, ...fields, f1: token || undefined } }),
+  deleteSub: (parent: string, id: string): Call => ({ command: 'delete_sub_note', args: { parent, id } }),
   createComment: (root: string, sub: string | undefined, id: string, body: string, quote?: string) => command('create-comment', [root, ...(sub ? [sub] : [])], { body, comment_id: id, anchor_quote: quote || undefined }),
   updateComment: (root: string, sub: string | undefined, id: string, body: string) => command('update-comment', [root, ...(sub ? [sub] : [])], { comment_id: id, body }),
   deleteComment: (root: string, sub: string | undefined, id: string) => command('delete-comment', [root, ...(sub ? [sub] : [])], { comment_id: id }),

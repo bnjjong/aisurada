@@ -46,7 +46,7 @@ function fixture(t, options={}) {
 
 test('argv preserves whitespace, newlines, quotes, equals, empty fields and places opaque tokens last',()=>{
   assert.deepEqual(toArgv(write.updateDoc(' id ',{body:'a\n"b"=c',tags:[]},'opaque token')),['update-doc',' id ','body=a\n"b"=c','tags=[]','f1=opaque token']);
-  assert.deepEqual(write.updateSub('a/c','d',{title:'',body:''},''),['update-sub-note','a/c','d','title=','body=']);
+  assert.deepEqual(toArgv(write.updateSub('a/c','d',{title:'',body:''},'')),['update-sub-note','a/c','d','title=','body=']);
   assert.deepEqual(toArgv(write.createDoc({agenda:'s',type:'free',title:'',body:'',date:'d',time:'t',tags:[],tier:'other'})),['create-doc','agenda=s','type=free','title=','body=','date=d','time=t','format=markdown','tags=[]']);
   // 옮겨진 명령은 호출 객체이고, Java 엔진으로 보낼 때 풀면 예전 문자열 목록과 같다
   assert.deepEqual(read.docs(),{command:'list_docs',args:{limit:0,bodies:true}});
@@ -68,7 +68,8 @@ test('read/history and remaining write command surfaces retain exact positional 
     [toArgv(read.history('a',{number:2,query:'q'})),['history','a','2','query=q']],
     [read.sessionTitles(['a','a','b']),['session-titles','a','b']],
     [read.schedule(),['schedule','status','--json']],
-    [write.createSub('r/c'),['create-sub-note','r/c','title=새 후속 노트','body=# 새 후속 노트\n\n','type=free']],
+    [toArgv(write.createSub('r/c')),['create-sub-note','r/c','title=새 후속 노트','body=# 새 후속 노트\n\n','type=free']],
+    [toArgv(write.deleteSub('r/c','d')),['delete-sub-note','r/c','d']],
     [write.createComment('r','c','cm1-a','text','quote'),['create-comment','r','c','body=text','comment_id=cm1-a','anchor_quote=quote']],
     [write.updateComment('r',undefined,'cm1-a','new'),['update-comment','r','comment_id=cm1-a','body=new']],
     [write.deleteComment('r','c','cm1-a'),['delete-comment','r','c','comment_id=cm1-a']],
