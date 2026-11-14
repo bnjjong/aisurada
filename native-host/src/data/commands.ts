@@ -16,7 +16,7 @@ const POSITIONAL: Record<string, string[]> = {
   list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
   update_agenda: ['id'], delete_agenda: ['id'], update_project: ['id'], delete_project: ['id'],
   save_ritual_template: ['id'], delete_doc_template: ['id'], update_agenda_facts: ['id'],
-  set_favorite: ['id'], evaluate_doc: ['id'], link_docs: ['from', 'to'],
+  set_favorite: ['id'], evaluate_doc: ['id'], link_docs: ['from', 'to'], update_doc: ['id'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -52,9 +52,9 @@ export const write = {
   createDoc: (doc: NewDoc) => command('create-doc', [], { agenda: doc.agenda, type: doc.type, title: doc.title,
     body: doc.body, date: doc.date, time: doc.time, format: 'markdown', tags: doc.tags,
     template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined }),
-  updateDoc: (id: string, fields: Fields, token?: string) => command('update-doc', [id], fields, token),
-  favorite: (id: string, fields: Fields, token?: string): Call => ({ command: 'set_favorite', args: { id, ...fields, f1: token } }),
-  evaluate: (id: string, fields: Fields, token?: string): Call => ({ command: 'evaluate_doc', args: { id, ...fields, f1: token } }),
+  updateDoc: (id: string, fields: Fields, token?: string): Call => ({ command: 'update_doc', args: { id, ...fields, f1: token || undefined } }),
+  favorite: (id: string, fields: Fields, token?: string): Call => ({ command: 'set_favorite', args: { id, ...fields, f1: token || undefined } }),
+  evaluate: (id: string, fields: Fields, token?: string): Call => ({ command: 'evaluate_doc', args: { id, ...fields, f1: token || undefined } }),
   link: (from: string, to: string, kind: string, remove: boolean, token?: string): Call =>
     ({ command: 'link_docs', args: { from, to, kind, remove: remove || undefined, f1: token } }),
   createSub: (parent: string) => command('create-sub-note', [parent], { title: '새 후속 노트', body: '# 새 후속 노트\n\n', type: 'free' }),

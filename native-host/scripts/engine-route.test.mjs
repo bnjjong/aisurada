@@ -295,3 +295,14 @@ test('쓰기 스위치: 즐겨찾기·평가·연결 쓰기도 같은 길을 따
   await engineCall(off, write.link('a', 'b', 'direct', true, 'f1:abc'));
   assert.deepEqual(seen, [['set-favorite', 'n', 'favorite=true', 'f1=f1:abc'], ['evaluate-doc', 'n', 'score=80'], ['link-docs', 'a', 'b', 'kind=direct', 'remove=true', 'f1=f1:abc']]);
 });
+
+test('쓰기 스위치: update_doc도 같은 길을 따르고, 태그는 배열 그대로 가며 옛 길에서는 JSON 글로 풀린다', async () => {
+  const on = host({ commands: ['update_doc'], rust: { update_doc: () => ({ id: 'n', path: 'notes/demo/n', precondition: 'f1:new', renamed: false }) } });
+  const response = await engineCall(on, write.updateDoc('n', { title: '새 제목', tags: ['a', 'b'], body: '본문' }, 'f1:abc'));
+  assert.equal(response.precondition, 'f1:new');
+  assert.deepEqual(JSON.parse(JSON.stringify(on.calls[0].args)), { command: 'update_doc', args: { id: 'n', title: '새 제목', tags: ['a', 'b'], body: '본문', f1: 'f1:abc' } });
+  const seen = [];
+  const off = host({ commands: [], java: { 'update-doc': argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; } } });
+  await engineCall(off, write.updateDoc('n', { title: '새 제목', tags: ['a', 'b'], time: '09:30' }, 'f1:abc'));
+  assert.deepEqual(seen, [['update-doc', 'n', 'title=새 제목', 'tags=["a","b"]', 'time=09:30', 'f1=f1:abc']]);
+});
