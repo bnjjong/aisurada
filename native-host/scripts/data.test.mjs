@@ -64,7 +64,8 @@ test('argv preserves whitespace, newlines, quotes, equals, empty fields and plac
 test('read/history and remaining write command surfaces retain exact positional and named cells',()=>{
   const cases=[
     [toArgv(read.subNote('r/c','d')),['get-sub-note','r/c','d']],
-    [read.history('a',{commit:'c=1'}),['history','a','commit=c=1']],
+    [toArgv(read.history('a',{commit:'c=1'})),['history','a','commit=c=1']],
+    [toArgv(read.history('a',{number:2,query:'q'})),['history','a','2','query=q']],
     [read.sessionTitles(['a','a','b']),['session-titles','a','b']],
     [read.schedule(),['schedule','status','--json']],
     [write.createSub('r/c'),['create-sub-note','r/c','title=새 후속 노트','body=# 새 후속 노트\n\n','type=free']],

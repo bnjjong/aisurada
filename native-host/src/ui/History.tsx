@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { asRow, asText, rows } from "../workspace/types.ts";
 import type { Row } from "../workspace/types.ts";
+import { read } from "../data/commands.ts";
 import { Modal } from "./Modal.tsx";
 import { compareBodies } from "../editor/diff.ts";
 import type { DiffRow } from "../editor/diff.ts";
@@ -157,7 +158,7 @@ export function History({
     live = useRef(true);
   const list = async () => {
     try {
-      const value = asRow(await controller.callEngine(["history", id]));
+      const value = asRow(await controller.callEngine(read.history(id)));
       if (!live.current) return;
       const all = rows(value, "versions");
       setVersions(all);
@@ -206,7 +207,7 @@ export function History({
         setSearchNote("");
         return;
       }
-      void controller.callEngine(["history", id, "query=" + term]).then(
+      void controller.callEngine(read.history(id, { query: term })).then(
         (value) => {
           if (!active) return;
           const r = asRow(value);
@@ -241,7 +242,7 @@ export function History({
       let work = cache.current.get(commit);
       if (!work) {
         work = controller
-          .callEngine(["history", id, "commit=" + commit])
+          .callEngine(read.history(id, { commit }))
           .then((value) => asText(asRow(value)?.noteBody));
         cache.current.set(commit, work);
       }

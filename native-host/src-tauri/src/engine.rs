@@ -156,6 +156,28 @@ mod tests {
         .unwrap_err();
         assert_eq!(no_doc["kind"], "not_found");
 
+        // 판 목록: git 저장소가 없는 vault는 판이 없고, 번호를 주면 conflict다
+        let history = invoke(
+            &window,
+            "engine_call",
+            json!({"command": "history", "args": {"id": "ndfx0002-00000002"}}),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                history["count"].as_u64(),
+                history["versions"].as_array().map(Vec::len)
+            ),
+            (Some(0), Some(0))
+        );
+        let no_version = invoke(
+            &window,
+            "engine_call",
+            json!({"command": "history", "args": {"id": "ndfx0002-00000002", "number": 1}}),
+        )
+        .unwrap_err();
+        assert_eq!(no_version["kind"], "conflict");
+
         // 인자가 없어도(null) 빈 인자로 읽고, 틀린 인자와 모르는 값은 종류로 가른다
         let agendas = invoke(&window, "engine_call", json!({"command": "list_agendas"})).unwrap();
         assert_eq!(agendas["total"], 4);
@@ -194,6 +216,8 @@ mod tests {
             commands.contains(&"list_docs")
                 && commands.contains(&"reindex")
                 && commands.contains(&"get_doc")
+                && commands.contains(&"search_docs")
+                && commands.contains(&"history")
         );
         assert!(
             !commands.contains(&"update_doc"),

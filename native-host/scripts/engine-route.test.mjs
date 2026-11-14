@@ -171,3 +171,21 @@ test('노트를 여는 길: Rust 엔진이 못 찾으면 not_found 오류가 된
   const h = host({ commands: ['get_doc'], rust: { get_doc: () => { throw { code: 'AIS-404', kind: 'not_found', message: 'Note not found: n9' }; } } });
   await assert.rejects(engineCall(h, read.doc('n9')), error => error.status === 3 && error.kind === 'not_found' && error.stderr === 'AIS-404 Note not found: n9');
 });
+
+test('판 목록(history): Rust 엔진으로 가고 응답은 그대로이며, Java 경로는 자리 인자(번호)를 둔다', async () => {
+  const response = { id: 'n1', count: 1, noteBody: '본문', versions: [{ index: 1, commit: 'a'.repeat(40) }] };
+  const h = host({ commands: ['history'], rust: { history: () => response } });
+  assert.deepEqual(await engineCall(h, read.history('n1', { commit: 'a'.repeat(40) })), response);
+  assert.deepEqual(h.calls[0].args, { command: 'history', args: { id: 'n1', commit: 'a'.repeat(40) } });
+
+  const seen = [];
+  const java = host({ java: { history: argv => { seen.push(argv); return { status: 0, stdout: JSON.stringify(response), stderr: '' }; } } });
+  await engineCall(java, read.history('n1', { number: 2, query: '글자' }));
+  await engineCall(java, read.history('n1'));
+  assert.deepEqual(seen, [['history', 'n1', '2', 'query=글자'], ['history', 'n1']]);
+});
+
+test('판 목록(history): 판 번호가 범위 밖이면 conflict 오류가 된다', async () => {
+  const h = host({ commands: ['history'], rust: { history: () => { throw { code: 'AIS-409', kind: 'conflict', message: '판 번호가 범위 밖이다(1 부터 2 까지 있다): 3' }; } } });
+  await assert.rejects(engineCall(h, read.history('n1', { number: 3 })), error => error.status === 3 && error.kind === 'conflict' && error.stderr.startsWith('AIS-409 판 번호가 범위 밖이다'));
+});

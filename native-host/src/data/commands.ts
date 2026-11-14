@@ -13,7 +13,7 @@ export interface Call { command: string; args?: Fields; }
 /** Java 엔진이 `key=value`가 아니라 자리(positional)로 받는 인자: 호출 객체의 인자 이름을 그 차례로 앞에 둔다. */
 const POSITIONAL: Record<string, string[]> = {
   get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
-  list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'],
+  list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -33,7 +33,7 @@ export const read = {
   doc: (id: string): Call => ({ command: 'get_doc', args: { id } }),
   subNote: (parent: string, id: string): Call => ({ command: 'get_sub_note', args: { parent, id } }),
   facts: (id: string): Call => ({ command: 'get_agenda_facts', args: { id } }),
-  history: (id: string, fields: Fields = {}) => command('history', [id], fields),
+  history: (id: string, fields: Fields = {}): Call => ({ command: 'history', args: { id, ...fields } }),
   commit: () => ['commit-vault'], schedule: () => ['schedule', 'status', '--json'],
   sessionTitles: (ids: string[]) => ['session-titles', ...new Set(ids)],
   readSession: (sessionId: string, limit = 100, urls = true) => ['read-session', sessionId, `limit=${limit}`, `urls=${urls}`],
