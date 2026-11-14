@@ -313,7 +313,7 @@ pub fn link_docs(vault: &Path, request: &LinkDocsRequest) -> Result<Value, Engin
 }
 
 /// Java `Double.toString`의 흔한 모양: 정수값도 `101.0`처럼 소수점을 달고, 아주 크거나 작으면 `1.0E10`
-fn java_double_string(value: f64) -> String {
+pub(crate) fn java_double_string(value: f64) -> String {
     if value.is_nan() {
         return "NaN".to_string();
     }

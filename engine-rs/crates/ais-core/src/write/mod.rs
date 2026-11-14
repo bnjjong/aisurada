@@ -18,6 +18,7 @@
 //! - [`doc_place`]: 날짜·시각 인자, 부모 폴더, 폴더 이름, 폴더 옮기기
 //! - [`first_heading`]: 본문 첫 헤딩 글
 //! - [`local_time`]: 이 프로세스의 시간대로 본 날짜와 시각
+//! - [`snake_dump`]: SnakeYAML과 같은 YAML 방출기(태스크·자원 파일)
 //! - [`json_out`]: 파일에 쓰는 JSON 글(들여쓰기 두 칸)
 //! - [`trash_file`]: 휴지통 목록 파일과 보관 폴더 쓰기
 //! - [`comments_file`]: 코멘트 파일 쓰기와 앵커 표시 걷어내기
@@ -41,6 +42,7 @@ pub mod pipeline;
 pub mod precondition;
 pub mod project_file;
 pub mod slug;
+pub mod snake_dump;
 pub mod sub_note;
 pub mod template_file;
 pub mod trash_file;
