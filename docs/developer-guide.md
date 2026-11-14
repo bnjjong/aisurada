@@ -594,13 +594,13 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 |---|---|
 | 저장 | `aisurada.prefs.v1`의 `state.uiScale`(위 여섯 값만), `state.uiFont`, `state.terminalFont`. 화면 모양(skin)처럼 16장의 설정 21개 밖 **확장 값**이라 고르기 전에는 `readPreferences` 결과에 나타나지 않는다. `workspace/typography.ts`의 `readTypography`가 읽고, 이상한 값은 항목별로 기본이다. 글꼴 글은 `; { } < > \`와 주석 표시, 200자 초과를 받지 않는다 |
 | 앱 글꼴 | `styles.css`의 `--font-ui-base`(기본 목록)와 `--font-ui`(`:root`의 `font-family`가 읽는다). 고르면 `<html>`에 `--font-ui: "고른 글꼴", var(--font-ui-base)`를 덧씌우고, 비우면 지운다(`applyTypographyVars`). 쉼표·따옴표가 없는 이름은 한 글꼴로 보고 따옴표로 감싸고(`Source Han 2`처럼 공백·숫자가 있어도 되게), 끝에 기본 목록이 붙어서 고른 글꼴에 없는 글자(한글 등)는 기본 글꼴이 채운다. `main.tsx`가 첫 그리기 전에 걸고 `App.tsx`가 상태를 따라간다 |
-| 터미널 글꼴 | `--font-terminal`(기본은 `var(--font-mono)`). `TerminalHost.tsx`가 이 변수를 읽는다(전에는 `--font-mono`). 바꾸면 `ais:typography` window 이벤트로 열려 있는 터미널이 `options.fontFamily`를 바꾸고 칸 수를 다시 잰다. 노트의 코드 블록은 이 설정을 따르지 않는다(`--font-mono`와 고정 목록 그대로) |
+| 터미널 글꼴 | `--font-terminal`(기본은 `var(--font-mono)`). `TerminalHost.tsx`가 이 변수를 읽는다(전에는 `--font-mono`). 바꾸면 `ais:typography` window 이벤트로 열려 있는 터미널이 `options.fontFamily`를 바꾸고 칸 수를 다시 잰다. 터미널이 쥔 글꼴은 `.term-screen`의 `data-font-family`에도 적는다(WebGL로 그리면 글꼴이 DOM에 안 드러나서 실제 창 점검이 이것을 읽는다). 노트의 코드 블록은 이 설정을 따르지 않는다(`--font-mono`와 고정 목록 그대로) |
 | 화면 크기 | 웹뷰 확대다. `services.setZoom` → Tauri `getCurrentWebview().setZoom(배율 / 100)`(macOS는 WKWebView의 `pageZoom`). `core:webview:allow-set-webview-zoom` 권한이 `capabilities/main.json`과 `note.json`에 있다(`contracts.test.mjs`가 두 목록이 같은지 잰다). CSS `zoom`은 쓰지 않았다. 앱이 아닌 환경(브라우저, 시험)에서는 `setZoom`이 없어 글꼴만 바뀐다 |
 | 단축키 | `interaction/shortcuts.ts`의 `zoomShortcutFor`(Cmd/Ctrl과 +·-·0, 키 이름과 물리 키 이름을 모두 본다). `controller.handleKey`가 탭 단축키보다 먼저, 어느 화면에서나 듣는다. 한 단계는 `stepScale`(맨 끝에서 멈춤, 0은 100%) |
 | 창마다 | 메인 창은 바꾼 값을 저장소에 쓴다. 노트 창은 설정을 공유 저장소에 쓰지 않는 규칙(15.14) 때문에 단축키로 바꾼 배율이 그 창에만 남고(`controller`의 `localScale`), 글꼴은 저장소(`storage` 이벤트, 포커스)를 따라간다. 설정 화면은 메인 창에만 있다 |
 | 화면 | `ui/TypographySettings.tsx`. 글꼴 입력은 500ms 멈췄을 때, 칸을 떠날 때, Enter에서 저장한다(글자마다 저장하면 입력 중간의 이름이 그대로 적용된다). 쓸 수 없는 글이면 오류 문구를 보이고 직전 값을 지킨다. 배율 단추는 일반 `button`에 `aria-pressed`라 스킨의 단추 모양을 따르고, 고른 단추의 색만 `:root:root`로 덮는다. 설정 인수 시험이 `.set-switch`를 3개로 세므로 그 클래스는 쓰지 않는다 |
 
-시험은 `scripts/typography.test.mjs`(15건: 값 읽기·보정, 글꼴 목록 만들기, CSS 변수, 단축키, 컨트롤러의 메인·노트 창 동작, 설정 구역 렌더)이고 `test-native.sh`가 부른다. `views-checks.js`의 설정 점검에는 아직 이 구역이 없다.
+시험은 `scripts/typography.test.mjs`(15건: 값 읽기·보정, 글꼴 목록 만들기, CSS 변수, 단축키, 컨트롤러의 메인·노트 창 동작, 설정 구역 렌더)이고 `test-native.sh`가 부른다. 실제 창 점검에도 두 건이 있다. `views-checks.js`의 `typography-zoom-font-and-shortcuts-in-the-real-webview`는 배율 단추와 ⌘ - / ⌘ = / ⌘ 0으로 창의 CSS 너비(`innerWidth`)가 배율만큼 줄고 늘어나는지(실제 웹뷰 확대), 앱 글꼴의 적용·저장·오류 문구·기본값을 재고, `navigation-checks.js`의 `terminal-font-and-zoom-follow-the-settings`는 열려 있는 터미널의 글꼴이 바뀌고 150%로 확대한 채 터미널 화면이 칸 안에 들어오는지 잰다.
 
 ### 좌측 메뉴(레일)의 두 탭: 노트와 에이전트
 
@@ -825,7 +825,7 @@ node fixtures/runner-test.mjs
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
 - MCP 서버(`ais-cli mcp`)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(`✔ Connected`), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).
 - 설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).
-- 설정의 「글꼴과 크기」는 브라우저(개발 서버, 샘플 vault)에서 다섯 모양 모두 눈으로 보고, 글꼴 입력·오류 문구·기본값·배율 단추·단축키 이벤트를 눌러 확인했다. **실제 앱 창에서 웹뷰 확대(`setZoom`)가 되는지, 확대한 채 터미널과 편집기 팝오버가 맞는지, 열려 있는 터미널의 글꼴이 바뀌는지는 못 봤다.** 호스트는 새 권한 이름으로 `cargo check`가 통과하는 데까지만 확인했다.
+- 설정의 「글꼴과 크기」는 브라우저(개발 서버, 샘플 vault)에서 다섯 모양 모두 눈으로 보았다. 실제 WKWebView 점검(`test:views:acceptance` 28건, `test:navigation:acceptance` 13건, 둘 다 4부를 뺀 판)에서 웹뷰 확대가 되는 것(`innerWidth`가 배율만큼 변함), ⌘ 단축키, 앱 글꼴 적용·오류·기본값, 열려 있는 터미널의 글꼴 변경, 150% 확대 중 터미널 화면이 칸 안에 드는 것까지 확인했다. **못 본 것:** 터미널과 편집기가 확대된 채로 눈에 어떻게 보이는지(글자가 또렷한지, 편집기 팝오버 위치)는 화면을 직접 보지 못했다(점검은 DOM 값과 크기만 잰다). 노트 창(`note-*`)에서 같은 권한으로 확대되는지는 점검이 없고(권한 목록이 메인과 같다는 것만 계약 시험이 잰다), 4부를 켠 판은 안 돌렸다.
 - 앱에 든 Java로 도는 `ais-cli`는 릴리스 설정의 디버그 번들에서 실제로 확인했다(`verify-release.mjs` 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.
 - 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
 - 물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.
