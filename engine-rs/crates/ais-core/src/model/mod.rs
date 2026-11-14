@@ -2,6 +2,8 @@
 
 mod catalog;
 mod notes;
+mod open;
 
 pub use catalog::{ProjectRow, RepoRow, ScanSummary, TemplateRow, TrashRow};
 pub use notes::{AgendaRow, EvaluationRow, LinkRow, NoteRow, Page};
+pub use open::{AttachmentRow, DocRow, FactsRow, SubNoteRow};

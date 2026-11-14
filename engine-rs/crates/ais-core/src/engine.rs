@@ -6,7 +6,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    list_agendas, list_docs, list_projects, list_templates, list_trash, reindex,
+    get_agenda_facts, get_doc, get_sub_note, list_agendas, list_attachments, list_comments,
+    list_docs, list_projects, list_sub_notes, list_templates, list_trash, reindex,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -24,6 +25,12 @@ pub const COMMANDS: &[&str] = &[
     "list_templates",
     "list_trash",
     "reindex",
+    "get_doc",
+    "list_sub_notes",
+    "get_sub_note",
+    "list_comments",
+    "list_attachments",
+    "get_agenda_facts",
 ];
 
 impl Engine {
@@ -56,6 +63,48 @@ impl Engine {
             }
             "list_trash" => to_json(list_trash::execute(&self.vault_root)),
             "reindex" => to_json(reindex::execute(&self.vault_root)),
+            "get_doc" => {
+                let request: get_doc::GetDocRequest = parse_args(command, args)?;
+                to_json(get_doc::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "list_sub_notes" => {
+                let request: list_sub_notes::ListSubNotesRequest = parse_args(command, args)?;
+                to_json(list_sub_notes::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "get_sub_note" => {
+                let request: get_sub_note::GetSubNoteRequest = parse_args(command, args)?;
+                to_json(get_sub_note::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "list_comments" => {
+                let request: list_comments::ListCommentsRequest = parse_args(command, args)?;
+                to_json(list_comments::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "list_attachments" => {
+                let request: list_attachments::ListAttachmentsRequest = parse_args(command, args)?;
+                to_json(list_attachments::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
+            "get_agenda_facts" => {
+                let request: get_agenda_facts::GetAgendaFactsRequest = parse_args(command, args)?;
+                to_json(get_agenda_facts::execute(
+                    &NoteIndex::fresh(&self.vault_root),
+                    &request,
+                )?)
+            }
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"
             ))),

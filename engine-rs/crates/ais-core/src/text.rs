@@ -58,3 +58,26 @@ pub fn cut_utf16(s: &str, max_units: usize) -> String {
     }
     out
 }
+
+/// JavaScript `encodeURIComponent`와 같은 퍼센트 인코딩입니다(`A-Za-z0-9 - _ . ! ~ * ' ( )`만 그대로 둔다).
+pub fn encode_uri_component(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'!'
+            | b'~'
+            | b'*'
+            | b'\''
+            | b'('
+            | b')' => out.push(byte as char),
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}

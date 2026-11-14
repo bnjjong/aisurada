@@ -2,6 +2,8 @@
 
 pub mod agenda;
 pub mod attach_text;
+pub mod comments;
+pub mod facts;
 pub mod filter;
 pub mod index;
 pub mod note_file;

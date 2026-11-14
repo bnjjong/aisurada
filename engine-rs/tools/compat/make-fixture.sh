@@ -410,4 +410,53 @@ write_file .aisurada/trash/trash.json <<'EOF2'
 ]
 EOF2
 
+# ---------- 코멘트 ----------
+# 객체 모양: 규칙에 안 맞는 항목은 빠지고, 같은 id는 처음 것만, 만든 시각 차례로 나온다
+write_file notes/demo/2026-11/parent/comments.json <<'EOF3'
+{"comments": [
+  {"id": "cmabc-1a2b3c4d", "createdAt": "2026-11-05T12:00:00+09:00", "body": "두 번째 코멘트", "editedAt": "2026-11-05T13:00:00+09:00", "anchor": {"quote": "가리킨 글"}},
+  {"id": "cmabc-0a0b0c0d", "createdAt": "2026-11-05T10:00:00+09:00", "body": "첫 번째 코멘트", "anchor": {"quote": ""}},
+  {"id": "cmabc-1a2b3c4d", "createdAt": "2026-11-05T09:00:00+09:00", "body": "같은 id는 뒤라서 빠진다"},
+  {"id": "CMABC-FFFF", "createdAt": "2026-11-05T12:00:00+09:00", "body": "대소문자를 가리지 않고, 같은 시각이면 id 차례"},
+  {"id": "bad id", "createdAt": "x", "body": "id 모양이 아니다"},
+  {"id": "cmabc-nocreated", "body": "만든 시각이 없다"},
+  {"id": "cmabc-nobody1", "createdAt": "2026-11-05T11:00:00+09:00", "body": 5},
+  {"id": "cmabc-emptyat", "createdAt": "", "body": "만든 시각이 비었다"},
+  "not an object", 7, null
+]}
+EOF3
+# 후속 노트의 코멘트: 메인 노트 폴더의 sub-comments/ (정상), 손자의 코멘트는 JSON이 아니다
+write_file notes/demo/2026-11/parent/sub-comments/snfx0001-00000011.json <<'EOF3'
+[{"id": "cmsub-00000001", "createdAt": "2026-11-05T10:30:00+09:00", "body": "후속 노트 코멘트"}]
+EOF3
+mkdir -p notes/demo/2026-11/parent/sub/child2/sub-comments
+echo "이건 JSON이 아니다" > notes/demo/2026-11/parent/sub/child2/sub-comments/snfx0003-00000013.json
+# 코멘트 파일이 너무 큰 노트, 파일 하나 노트
+mkdir -p notes/work/bigcomments
+note notes/work/bigcomments/note.md ndfx0020-00000020 '2026-11-14T09:00:00+09:00'
+head -c 210000 /dev/zero | tr '\0' 'a' > notes/work/bigcomments/comments.json
+echo "[]" > notes/work/rec/comments.json
+
+# ---------- 첨부(이름 규칙) ----------
+write_file "notes/demo/2026-11/parent/attach/지도 (1).PNG" <<'EOF3'
+png
+EOF3
+echo x > "notes/demo/2026-11/parent/attach/a]b.pdf"
+echo x > notes/demo/2026-11/parent/attach/.hidden.png
+echo x > notes/demo/2026-11/parent/attach/partial.tmp
+echo x > notes/demo/2026-11/parent/attach/noext
+echo x > "notes/demo/2026-11/parent/attach/it's!~*.svg"
+mkdir -p notes/demo/2026-11/parent/attach/folder.png
+mkdir -p notes/demo/2026-11/parent/sub/child2/attach
+echo x > notes/demo/2026-11/parent/sub/child2/attach/pic.JPG
+
+# ---------- 아젠다 사실층 ----------
+write_file .aisurada/facts/demo.md <<'EOF3'
+
+  지금도 참인 것: 합성 vault다.  
+
+EOF3
+head -c 12000 /dev/zero | tr '\0' 'b' > .aisurada/facts/work.md
+echo "   " > ".aisurada/facts/기록.md"
+
 echo "합성 vault를 만들었다: $ROOT"

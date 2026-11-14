@@ -67,6 +67,10 @@ impl AgendaTable {
         self.slug_to_info.contains_key(slug)
     }
 
+    pub fn by_id(&self, id: &str) -> Option<&AgendaInfo> {
+        self.id_to_info.get(id)
+    }
+
     pub fn by_slug(&self, slug: &str) -> Option<&AgendaInfo> {
         self.slug_to_info.get(slug)
     }
@@ -262,7 +266,7 @@ pub fn is_valid_slug_segment(s: &str) -> bool {
         && s.chars().all(|c| c >= ' ')
 }
 
-fn is_valid_agenda_id(id: &str) -> bool {
+pub fn is_valid_agenda_id(id: &str) -> bool {
     id == "ag-recovered" || AGENDA_ID.is_match(id)
 }
 

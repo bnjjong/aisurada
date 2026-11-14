@@ -165,7 +165,7 @@ fn compare(
     label: String,
     java: Result<Value, String>,
     rust: Result<Value, ais_core::error::EngineError>,
-    convert: fn(&Path, &Value) -> Value,
+    convert: impl Fn(&Path, &Value) -> Value,
 ) {
     match (java, rust) {
         (Ok(j), Ok(r)) => {
@@ -181,6 +181,322 @@ fn compare(
         }
         (Ok(_), Err(r)) => report.record(label, false, || format!("Java는 성공, Rust는 오류: {r}")),
         (Err(j), Ok(_)) => report.record(label, false, || format!("Java는 오류({j}), Rust는 성공")),
+    }
+}
+
+/// 후속 노트 줄을 새 모양으로 바꾼다. `ref`·`parent`·`date`·`time`을 빼고 `rootId`·`parentId`·`folder`를 더한다.
+fn sub_row(vault: &Path, row: &Value, root: &str, parent: &str) -> Value {
+    let mut map = row.as_object().cloned().unwrap_or_default();
+    for key in ["date", "time", "ref", "parent"] {
+        map.remove(key);
+    }
+    map.entry("tags").or_insert_with(|| json!([]));
+    map.insert("rootId".into(), json!(root));
+    map.insert("parentId".into(), json!(parent));
+    let path = map.get("path").and_then(Value::as_str).unwrap_or("");
+    map.insert("folder".into(), Value::Bool(vault.join(path).is_dir()));
+    Value::Object(map)
+}
+
+/// `{parent, attachments}` 봉투를 목록으로 바꾼다.
+fn legacy_attachments(_vault: &Path, java_response: &Value) -> Value {
+    page(
+        java_response
+            .get("attachments")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default(),
+    )
+}
+
+fn pairs(java: &Java, vault: &Path, args: &[&str]) -> Result<Value, String> {
+    java.run(
+        vault,
+        &args.iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+    )
+}
+
+/// 노트 하나를 여는 길의 명령(`get_doc`, 후속 노트, 코멘트, 첨부, 사실층)을 모든 노트와 후속 노트에서 맞댄다.
+fn compare_open(
+    report: &mut Report,
+    java: &Java,
+    engine: &Engine,
+    vault: &Path,
+    root_ids: &[String],
+    agenda_ids: &[String],
+) {
+    for id in root_ids {
+        compare(
+            report,
+            vault,
+            format!("get_doc {id}"),
+            pairs(java, vault, &["get-doc", id]),
+            engine.call("get_doc", json!({"id": id})),
+            note_row,
+        );
+        compare(
+            report,
+            vault,
+            format!("list_comments {id}"),
+            pairs(java, vault, &["list-comments", id]),
+            engine.call("list_comments", json!({"id": id})),
+            |_, v| v.clone(),
+        );
+        compare(
+            report,
+            vault,
+            format!("list_attachments {id}"),
+            pairs(java, vault, &["list-attachments", id]),
+            engine.call("list_attachments", json!({"id": id})),
+            legacy_attachments,
+        );
+        walk_subs(report, java, engine, vault, id, id, id);
+    }
+    for id in agenda_ids {
+        compare(
+            report,
+            vault,
+            format!("get_agenda_facts {id}"),
+            pairs(java, vault, &["get-agenda-facts", id]),
+            engine.call("get_agenda_facts", json!({"id": id})),
+            |_, v| v.clone(),
+        );
+    }
+
+    // 오류: 같은 코드와 같은 글이어야 한다
+    let missing = "ndzzzz-00000000";
+    let root = root_ids
+        .first()
+        .cloned()
+        .unwrap_or_else(|| missing.to_string());
+    let cases: Vec<(String, Vec<String>, &str, Value)> = vec![
+        (
+            "get_doc 모양 아님".into(),
+            vec!["get-doc".into(), "없는-id".into()],
+            "get_doc",
+            json!({"id": "없는-id"}),
+        ),
+        (
+            "get_doc 없음".into(),
+            vec!["get-doc".into(), missing.into()],
+            "get_doc",
+            json!({"id": missing}),
+        ),
+        (
+            "get_doc 인자 없음".into(),
+            vec!["get-doc".into()],
+            "get_doc",
+            json!({}),
+        ),
+        (
+            "list_sub_notes 모양 아님".into(),
+            vec!["list-sub-notes".into(), "bad".into()],
+            "list_sub_notes",
+            json!({"parent": "bad"}),
+        ),
+        (
+            "list_sub_notes 없는 메인".into(),
+            vec!["list-sub-notes".into(), missing.into()],
+            "list_sub_notes",
+            json!({"parent": missing}),
+        ),
+        (
+            "list_sub_notes 없는 후속".into(),
+            vec!["list-sub-notes".into(), format!("{root}/snzzzz-00000000")],
+            "list_sub_notes",
+            json!({"parent": format!("{root}/snzzzz-00000000")}),
+        ),
+        (
+            "list_sub_notes 후속 모양 아님".into(),
+            vec!["list-sub-notes".into(), format!("{root}/bad")],
+            "list_sub_notes",
+            json!({"parent": format!("{root}/bad")}),
+        ),
+        (
+            "get_sub_note 없음".into(),
+            vec![
+                "get-sub-note".into(),
+                root.clone(),
+                "snzzzz-00000000".into(),
+            ],
+            "get_sub_note",
+            json!({"parent": root, "id": "snzzzz-00000000"}),
+        ),
+        (
+            "get_sub_note 모양 아님".into(),
+            vec!["get-sub-note".into(), root.clone(), "bad".into()],
+            "get_sub_note",
+            json!({"parent": root, "id": "bad"}),
+        ),
+        (
+            "list_comments 모양 아님".into(),
+            vec!["list-comments".into(), "bad".into()],
+            "list_comments",
+            json!({"id": "bad"}),
+        ),
+        (
+            "list_comments 없음".into(),
+            vec!["list-comments".into(), missing.into()],
+            "list_comments",
+            json!({"id": missing}),
+        ),
+        (
+            "list_comments 후속 없음".into(),
+            vec![
+                "list-comments".into(),
+                root.clone(),
+                "snzzzz-00000000".into(),
+            ],
+            "list_comments",
+            json!({"id": root, "subId": "snzzzz-00000000"}),
+        ),
+        (
+            "list_attachments 없음".into(),
+            vec!["list-attachments".into(), missing.into()],
+            "list_attachments",
+            json!({"id": missing}),
+        ),
+        (
+            "list_attachments 후속 없음".into(),
+            vec![
+                "list-attachments".into(),
+                root.clone(),
+                "snzzzz-00000000".into(),
+            ],
+            "list_attachments",
+            json!({"id": root, "subId": "snzzzz-00000000"}),
+        ),
+        (
+            "get_agenda_facts 모양 아님".into(),
+            vec!["get-agenda-facts".into(), "x".into()],
+            "get_agenda_facts",
+            json!({"id": "x"}),
+        ),
+        (
+            "get_agenda_facts 없음".into(),
+            vec!["get-agenda-facts".into(), "agzzzz-00000000".into()],
+            "get_agenda_facts",
+            json!({"id": "agzzzz-00000000"}),
+        ),
+    ];
+    for (label, java_args, command, args) in cases {
+        compare(
+            report,
+            vault,
+            label,
+            java.run(vault, &java_args),
+            engine.call(command, args),
+            |_, v| v.clone(),
+        );
+    }
+}
+
+/// `container`(메인 노트이거나 후속 노트) 바로 아래 후속 노트를 사슬(`chain`)로 부르고, 각 후속 노트로 내려간다.
+fn walk_subs(
+    report: &mut Report,
+    java: &Java,
+    engine: &Engine,
+    vault: &Path,
+    root: &str,
+    chain: &str,
+    container: &str,
+) {
+    let java_list = pairs(java, vault, &["list-sub-notes", chain, "bodies=true"]);
+    let (root_s, container_s) = (root.to_string(), container.to_string());
+    let convert = move |v: &Path, j: &Value| {
+        page(
+            j.get("subNotes")
+                .and_then(Value::as_array)
+                .map(|rows| {
+                    rows.iter()
+                        .map(|r| sub_row(v, r, &root_s, &container_s))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        )
+    };
+    compare(
+        report,
+        vault,
+        format!("list_sub_notes {chain}"),
+        java_list.clone(),
+        engine.call("list_sub_notes", json!({"parent": chain, "bodies": true})),
+        &convert,
+    );
+    if chain != root {
+        // 후속 노트 id 하나만 줘도 같은 결과여야 한다
+        compare(
+            report,
+            vault,
+            format!("list_sub_notes {container}(id만)"),
+            java_list.clone(),
+            engine.call(
+                "list_sub_notes",
+                json!({"parent": container, "bodies": true}),
+            ),
+            &convert,
+        );
+    }
+    let Ok(list) = &java_list else { return };
+    for row in list
+        .get("subNotes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
+        let Some(sub) = row.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let (root_s, container_s) = (root.to_string(), container.to_string());
+        let convert_one = move |v: &Path, j: &Value| sub_row(v, j, &root_s, &container_s);
+        let java_sub = pairs(java, vault, &["get-sub-note", chain, sub]);
+        compare(
+            report,
+            vault,
+            format!("get_sub_note {chain}/{sub}"),
+            java_sub.clone(),
+            engine.call("get_sub_note", json!({"parent": chain, "id": sub})),
+            &convert_one,
+        );
+        compare(
+            report,
+            vault,
+            format!("get_sub_note {sub}(id만)"),
+            java_sub,
+            engine.call("get_sub_note", json!({"id": sub})),
+            &convert_one,
+        );
+        compare(
+            report,
+            vault,
+            format!("list_comments {root}/{sub}"),
+            pairs(java, vault, &["list-comments", root, sub]),
+            engine.call("list_comments", json!({"id": root, "subId": sub})),
+            |_, v| v.clone(),
+        );
+        compare(
+            report,
+            vault,
+            format!("list_attachments {root}/{sub}"),
+            pairs(java, vault, &["list-attachments", root, sub]),
+            engine.call("list_attachments", json!({"id": root, "subId": sub})),
+            legacy_attachments,
+        );
+        if row
+            .get("path")
+            .and_then(Value::as_str)
+            .is_some_and(|p| vault.join(p).is_dir())
+        {
+            walk_subs(
+                report,
+                java,
+                engine,
+                vault,
+                root,
+                &format!("{chain}/{sub}"),
+                sub,
+            );
+        }
     }
 }
 
@@ -299,6 +615,31 @@ fn main() -> ExitCode {
             engine.call("reindex", Value::Null).map(without_elapsed),
             |_, v| v.clone(),
         );
+
+        // 노트 하나를 여는 길: 모든 노트와 후속 노트, 아젠다 사실층
+        let root_ids: Vec<String> = java
+            .run(vault, &["list-docs".into(), "limit=0".into()])
+            .ok()
+            .and_then(|v| {
+                v.as_array().map(|rows| {
+                    rows.iter()
+                        .filter_map(|r| r.get("id").and_then(Value::as_str).map(str::to_string))
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
+        let agenda_ids: Vec<String> = java
+            .run(vault, &["list-agendas".into()])
+            .ok()
+            .and_then(|v| {
+                v.as_array().map(|rows| {
+                    rows.iter()
+                        .filter_map(|r| r.get("id").and_then(Value::as_str).map(str::to_string))
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
+        compare_open(&mut report, &java, &engine, vault, &root_ids, &agenda_ids);
 
         // 조건: vault의 실제 값에서 뽑는다
         let docs = java

@@ -8,7 +8,10 @@ use ais_core::engine::Engine;
 use serde_json::{Value, json};
 
 fn fixture() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ais-core-fixture-{}", std::process::id()));
+    // 시험이 병렬로 돌아도 폴더가 겹치지 않게 번호를 붙인다
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let dir = std::env::temp_dir().join(format!("ais-core-fixture-{}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/make-fixture.sh");
     let status = Command::new("bash")
@@ -38,7 +41,7 @@ fn reads_the_synthetic_vault() {
     let vault = fixture();
     let engine = Engine::new(&vault);
 
-    // 목록: 20개 노트를 만든 시각 차례로. 건수 제한이 없으면 잘리지 않는다
+    // 목록: 21개 노트를 만든 시각 차례로. 건수 제한이 없으면 잘리지 않는다
     let docs = engine.call("list_docs", json!({"limit": 0})).unwrap();
     assert_eq!(
         (
@@ -46,7 +49,7 @@ fn reads_the_synthetic_vault() {
             docs["returned"].as_u64(),
             docs["truncated"].as_bool()
         ),
-        (Some(20), Some(20), Some(false))
+        (Some(21), Some(21), Some(false))
     );
     let created: Vec<&str> = docs["items"]
         .as_array()
@@ -71,13 +74,13 @@ fn reads_the_synthetic_vault() {
             limited["total"].as_u64(),
             limited["truncated"].as_bool()
         ),
-        (Some(5), Some(20), Some(true))
+        (Some(5), Some(21), Some(true))
     );
-    assert_eq!(engine.call("list_docs", json!({})).unwrap()["returned"], 20);
+    assert_eq!(engine.call("list_docs", json!({})).unwrap()["returned"], 21);
 
     // 호출자: AI에게는 기록 층 노트(2건)가 안 보이고 tier 표시도 없다
     let ai = engine.call("list_docs", json!({"caller": "ai"})).unwrap();
-    assert_eq!(ai["total"], 18);
+    assert_eq!(ai["total"], 19);
     assert!(
         ai["items"]
             .as_array()
@@ -233,7 +236,7 @@ fn reads_the_synthetic_vault() {
     let summary = engine.call("reindex", Value::Null).unwrap();
     assert_eq!(
         (summary["indexed"].as_u64(), summary["agendas"].as_u64()),
-        (Some(20), Some(4))
+        (Some(21), Some(4))
     );
     let kinds: Vec<&str> = summary["skipped"]
         .as_array()
@@ -251,10 +254,225 @@ fn reads_the_synthetic_vault() {
 
     // 이 엔진에 없는 명령은 unsupported로 알린다
     assert_eq!(
-        serde_json::to_value(engine.call("get_doc", json!({})).unwrap_err().kind).unwrap(),
+        serde_json::to_value(engine.call("update_doc", json!({})).unwrap_err().kind).unwrap(),
         json!("unsupported")
     );
-    assert!(Engine::supports("list_docs") && !Engine::supports("get_doc"));
+    assert!(
+        Engine::supports("list_docs")
+            && Engine::supports("get_doc")
+            && !Engine::supports("update_doc")
+    );
+
+    let _ = std::fs::remove_dir_all(&vault);
+}
+
+#[test]
+fn opens_notes_sub_notes_comments_attachments_and_facts() {
+    let vault = fixture();
+    let engine = Engine::new(&vault);
+    let parent = "ndfx0002-00000002";
+
+    // get_doc: 본문과 코멘트가 붙고, 응답에 date·time·agendaTitle·deepLink가 없다
+    let doc = engine.call("get_doc", json!({"id": parent})).unwrap();
+    assert_eq!(
+        (doc["comments"]["state"].as_str(), doc["folder"].as_bool()),
+        (Some("loaded"), Some(true))
+    );
+    assert!(doc["body"].as_str().unwrap().contains("본문 ndfx0002"));
+    assert!(doc.get("deepLink").is_none() && doc.get("date").is_none());
+    // 파일 하나로 된 노트는 코멘트가 없다. 없는 노트와 모양이 틀린 id는 오류 종류로 가른다
+    assert_eq!(
+        engine
+            .call("get_doc", json!({"id": "ndfx0004-00000004"}))
+            .unwrap()["comments"]["state"],
+        "absent"
+    );
+    let kinds = |id: &str| {
+        serde_json::to_value(engine.call("get_doc", json!({"id": id})).unwrap_err().kind).unwrap()
+    };
+    assert_eq!(
+        (kinds("ndzzzz-00000000"), kinds("없는-id")),
+        (json!("not_found"), json!("invalid_argument"))
+    );
+    // AI에게는 기록 층 노트가 열리지 않는다
+    let refused = engine
+        .call(
+            "get_doc",
+            json!({"id": "ndfx0008-00000008", "caller": "ai"}),
+        )
+        .unwrap_err();
+    assert_eq!(
+        (refused.code, serde_json::to_value(refused.kind).unwrap()),
+        ("AIS-409", json!("forbidden"))
+    );
+
+    // 후속 노트: 부모 사슬로도, 후속 노트 id 하나로도 같은 결과. 바로 아래 노트만, 만든 시각 차례
+    let by_chain = engine
+        .call(
+            "list_sub_notes",
+            json!({"parent": format!("{parent}/snfx0002-00000012"), "bodies": true}),
+        )
+        .unwrap();
+    let by_id = engine
+        .call(
+            "list_sub_notes",
+            json!({"parent": "snfx0002-00000012", "bodies": true}),
+        )
+        .unwrap();
+    assert_eq!(by_chain, by_id);
+    let ids: Vec<&str> = by_id["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["snfx0003-00000013", "snfx0004-00000014"]);
+    assert_eq!(
+        (
+            by_id["items"][0]["rootId"].as_str(),
+            by_id["items"][0]["parentId"].as_str()
+        ),
+        (Some(parent), Some("snfx0002-00000012"))
+    );
+    let top = engine
+        .call("list_sub_notes", json!({"parent": parent}))
+        .unwrap();
+    assert_eq!(top["total"], 2);
+    assert!(
+        top["items"][0].get("body").is_none(),
+        "본문은 bodies일 때만"
+    );
+    // 잘못된 사슬: 부모가 아닌 노트 아래로 부르면 없는 후속 노트(404)다
+    let wrong = engine
+        .call(
+            "list_sub_notes",
+            json!({"parent": format!("{parent}/snfx0003-00000013")}),
+        )
+        .unwrap_err();
+    assert_eq!(wrong.code, "AIS-404");
+    assert!(
+        engine
+            .call(
+                "get_sub_note",
+                json!({"parent": parent, "id": "snfx0003-00000013"})
+            )
+            .is_err(),
+        "손자는 메인 노트 바로 아래가 아니다"
+    );
+    let sub = engine
+        .call("get_sub_note", json!({"id": "snfx0001-00000011"}))
+        .unwrap();
+    assert_eq!(
+        (
+            sub["comments"]["state"].as_str(),
+            sub["comments"]["comments"][0]["id"].as_str()
+        ),
+        (Some("loaded"), Some("cmsub-00000001"))
+    );
+
+    // 코멘트: 규칙에 안 맞는 항목과 같은 id는 빠지고 시각·id 차례. JSON이 아닌 파일은 unreadable
+    let comments = engine.call("list_comments", json!({"id": parent})).unwrap();
+    let comment_ids: Vec<&str> = comments["comments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        comment_ids,
+        ["cmabc-0a0b0c0d", "CMABC-FFFF", "cmabc-1a2b3c4d"]
+    );
+    assert_eq!(comments["comments"][2]["anchor"]["quote"], "가리킨 글");
+    assert!(
+        comments["comments"][0].get("anchor").is_none(),
+        "빈 인용문은 앵커가 아니다"
+    );
+    assert_eq!(
+        engine
+            .call(
+                "list_comments",
+                json!({"id": parent, "subId": "snfx0003-00000013"})
+            )
+            .unwrap()["state"],
+        "unreadable"
+    );
+    assert_eq!(
+        engine
+            .call("list_comments", json!({"id": "ndfx0020-00000020"}))
+            .unwrap()["state"],
+        "unreadable"
+    );
+
+    // 첨부: 규칙에 맞는 이름만, 이름 차례. 그림은 ![…], 그 밖은 […] 참조
+    let attachments = engine
+        .call("list_attachments", json!({"id": parent}))
+        .unwrap();
+    let names: Vec<&str> = attachments["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "a-first.htm",
+            "a]b.pdf",
+            "b-second.html",
+            "it's!~*.svg",
+            "readme.txt",
+            "지도 (1).PNG"
+        ]
+    );
+    assert_eq!(attachments["items"][1]["ref"], "[ab.pdf](attach/a%5Db.pdf)");
+    assert_eq!(
+        attachments["items"][5]["ref"],
+        "![지도 (1).PNG](attach/%EC%A7%80%EB%8F%84%20%281%29.PNG)"
+    );
+    assert_eq!(
+        engine
+            .call(
+                "list_attachments",
+                json!({"id": parent, "subId": "snfx0002-00000012"})
+            )
+            .unwrap()["total"],
+        1
+    );
+
+    // 사실층: 읽은 글, 상한을 넘은 글, 빈 파일
+    let facts = engine
+        .call("get_agenda_facts", json!({"id": "agfx0001-0000000a"}))
+        .unwrap();
+    assert_eq!(
+        (
+            facts["facts"].as_str(),
+            facts["limit"].as_u64(),
+            facts["editLimit"].as_u64()
+        ),
+        (
+            Some("지금도 참인 것: 합성 vault다."),
+            Some(2000),
+            Some(10000)
+        )
+    );
+    assert_eq!(
+        engine
+            .call("get_agenda_facts", json!({"id": "agfx0002-0000000b"}))
+            .unwrap()["tooLargeToEdit"],
+        true
+    );
+    assert!(
+        engine
+            .call("get_agenda_facts", json!({"id": "agfx0003-0000000c"}))
+            .unwrap()
+            .get("facts")
+            .is_none()
+    );
+    assert!(
+        engine
+            .call("get_agenda_facts", json!({"id": "agzzzz-00000000"}))
+            .is_err()
+    );
 
     let _ = std::fs::remove_dir_all(&vault);
 }

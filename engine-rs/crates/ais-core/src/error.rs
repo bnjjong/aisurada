@@ -58,6 +58,17 @@ impl EngineError {
         }
     }
 
+    /// AI 호출자에게는 기록 층 노트를 보여 주지 않는다(`AIS-409`, 종류는 허락되지 않음)
+    pub fn record_tier(note_id: &str) -> Self {
+        Self {
+            code: "AIS-409",
+            kind: ErrorKind::Forbidden,
+            message: format!(
+                "도구 표면이 읽을 수 없는 노트다(층=record): {note_id}. 기계가 남긴 기록 노트는 앱에서만 열립니다."
+            ),
+        }
+    }
+
     pub fn internal(message: impl Into<String>) -> Self {
         Self {
             code: "AIS-500",
