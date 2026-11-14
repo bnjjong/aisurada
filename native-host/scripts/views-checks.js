@@ -175,6 +175,42 @@ if (location.pathname.startsWith("/note-window/")) {
         "settings invoked engine",
       );
     });
+    // 설정의 「글꼴과 크기」: 화면 크기는 실제 웹뷰 확대라서 창의 CSS 너비(innerWidth)가 배율만큼 줄어든다.
+    await test("typography-zoom-font-and-shortcuts-in-the-real-webview", async () => {
+      const prefs = () => JSON.parse(localStorage.getItem("aisurada.prefs.v1")).state;
+      const scale = (label) => $$(".typo-scale button").find((b) => b.textContent === label);
+      const near = (width, factor) => Math.abs(innerWidth - width / factor) <= 2;
+      $('button.iconbtn[title="설정"]').click();
+      await until(() => $(".settings-modal .set-typo"), "typography section");
+      assert(scale("100%").getAttribute("aria-pressed") === "true", "default scale is 100%");
+      const width = innerWidth;
+      scale("125%").click();
+      await until(() => near(width, 1.25), `zoom 125% (innerWidth ${innerWidth} from ${width})`);
+      assert(prefs().uiScale === 125, "scale saved");
+      assert(scale("125%").getAttribute("aria-pressed") === "true", "125% pressed");
+      // 단축키: Cmd+- 는 한 단계(110%), Cmd+0 은 100%
+      key(document.body, "-", { code: "Minus", metaKey: true });
+      await until(() => near(width, 1.1), `Cmd+- to 110% (innerWidth ${innerWidth})`);
+      assert(prefs().uiScale === 110, "shortcut saved");
+      key(document.body, "=", { code: "Equal", metaKey: true });
+      await until(() => near(width, 1.25), "Cmd+= back to 125%");
+      key(document.body, "0", { code: "Digit0", metaKey: true });
+      await until(() => innerWidth === width, `Cmd+0 to 100% (innerWidth ${innerWidth})`);
+      // 앱 글꼴: 멈추면 저장하고, 본문 글꼴이 바뀌고, 「기본값」으로 돌아온다
+      fill($("#typo-ui-font"), "Georgia");
+      await until(() => document.documentElement.style.getPropertyValue("--font-ui") === '"Georgia", var(--font-ui-base)', "font variable");
+      assert(/^Georgia/.test(getComputedStyle(document.body).fontFamily), "body font " + getComputedStyle(document.body).fontFamily);
+      assert(prefs().uiFont === "Georgia", "font saved");
+      fill($("#typo-ui-font"), "x; y");
+      await pause(900);
+      assert($(".typo-problem"), "problem text");
+      assert(prefs().uiFont === "Georgia", "invalid text must not be saved");
+      click("기본값", $("#typo-ui-font").closest(".typo-row"));
+      await until(() => !document.documentElement.style.getPropertyValue("--font-ui"), "font variable removed");
+      assert(prefs().uiFont === "", "font reset saved");
+      esc();
+      await until(() => !$(".settings-modal"), "settings closed");
+    });
     await test("rail-resize-drag-keyboard-reset-and-persist", async () => {
       const handle = () => $(".rail-resize"),
         width = () => Math.round($(".workspace-rail").getBoundingClientRect().width),

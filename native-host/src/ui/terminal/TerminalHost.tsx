@@ -80,6 +80,8 @@ export function TerminalHost({ tabKey, isVisible, agendas, onCreateDoc, onNaviga
         term.loadAddon(new unicode.Unicode11Addon());
         term.unicode.activeVersion = '11';
         term.open(hostRef.current);
+        // 터미널이 지금 쥐고 있는 글꼴을 DOM에 보인다(WebGL로 그리면 글꼴이 DOM에 안 드러나서, 실제 창 점검이 읽는다).
+        hostRef.current.dataset.fontFamily = term.options.fontFamily ?? '';
         try {
           const { WebglAddon } = await import('@xterm/addon-webgl');
           const webgl = new WebglAddon();
@@ -134,6 +136,7 @@ export function TerminalHost({ tabKey, isVisible, agendas, onCreateDoc, onNaviga
       void loadFonts(family).then(() => {
         if (!alive.current || termRef.current !== term) return;
         term.options.fontFamily = family;
+        if (hostRef.current) hostRef.current.dataset.fontFamily = term.options.fontFamily ?? '';
         if (visibleRef.current) fitRef.current?.fit();
       });
     };

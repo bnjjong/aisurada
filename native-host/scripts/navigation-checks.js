@@ -119,6 +119,35 @@ if (location.pathname.startsWith('/note-window/')) {
         document.querySelector('.pin-modal .btn-secondary').click(); await until(() => !document.querySelector('.pin-modal'));
         close('term:main'); go('/calendar'); await until(() => h1() === '캘린더');
       });
+      // 설정의 「터미널 글꼴」: 열려 있는 터미널이 새 글꼴을 읽는다. xterm은 글꼴 옵션을 글자 크기 재는 요소의 font-family에 쓴다.
+      await test('terminal-font-and-zoom-follow-the-settings', async () => {
+        go('/terminal'); await until(() => document.querySelector('[data-terminal-key="term:main"] .xterm .xterm-screen'), 40000, 'xterm mounted');
+        const measured = () => document.querySelector('[data-terminal-key="term:main"] .term-screen')?.dataset.fontFamily || '';
+        await until(() => measured(), 10000, 'terminal font published');
+        assert(/^'?"?D2Coding/.test(measured()), 'default terminal font ' + measured());
+        const prefs = () => JSON.parse(localStorage.getItem('aisurada.prefs.v1')).state;
+        document.querySelector('button.iconbtn[title="설정"]').click(); await until(() => document.querySelector('#typo-terminal-font'), 10000, 'settings');
+        const input = document.querySelector('#typo-terminal-font');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Monaco'); input.dispatchEvent(new Event('input', { bubbles: true }));
+        await until(() => /^"?Monaco/.test(measured()) && /D2Coding/.test(measured()), 10000, 'terminal font changed: ' + measured());
+        assert(prefs().terminalFont === 'Monaco', 'terminal font saved');
+        // 확대한 채로도 터미널이 그대로 있고 칸을 다시 잰다
+        const width = innerWidth;
+        [...document.querySelectorAll('.typo-scale button')].find(b => b.textContent === '150%').click();
+        await until(() => Math.abs(innerWidth - width / 1.5) <= 2, 10000, 'zoom 150% with the terminal open');
+        await wait(500);
+        const screenWidth = document.querySelector('[data-terminal-key="term:main"] .xterm-screen').getBoundingClientRect().width;
+        const hostWidth = document.querySelector('[data-terminal-key="term:main"] .term-screen').getBoundingClientRect().width;
+        assert(screenWidth > 0 && screenWidth <= hostWidth, `terminal screen ${screenWidth} inside host ${hostWidth}`);
+        [...document.querySelectorAll('.typo-scale button')].find(b => b.textContent === '100%').click();
+        await until(() => innerWidth === width, 10000, 'zoom back to 100%');
+        [...document.querySelectorAll('.typo-row')].find(row => row.querySelector('#typo-terminal-font')).querySelector('button').click();
+        await until(() => /D2Coding/.test(measured()) && !/Monaco/.test(measured()), 10000, 'terminal font reset: ' + measured());
+        assert(prefs().terminalFont === '', 'terminal font reset saved');
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        await until(() => !document.querySelector('.settings-modal'), 10000, 'settings closed');
+        close('term:main'); go('/calendar'); await until(() => h1() === '캘린더');
+      });
       await test('agenda-query-and-template-initial-open', async () => {
         go(`/agenda/demo?open=${cfg.id},${cfg.legacyId}`); await until(() => document.querySelectorAll('.agenda-note').length === 2);
         assert(document.querySelector('.tab-main [aria-selected="true"]'), 'agenda pane made a note tab active');
