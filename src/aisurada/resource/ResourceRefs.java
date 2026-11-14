@@ -32,17 +32,15 @@ public final class ResourceRefs {
         return ResourceStore.scopeDir(vault, project).resolve("refs.md");
     }
 
-    /** 참조 목록을 너그럽게 읽는다. ID 모양이 아닌 줄은 건너뛰고, 겹친 ID는 처음 것만 둔다. */
+    /** 참조 목록을 너그럽게 읽는다. ID 모양이 아닌 줄은 건너뛰고, 겹친 ID는 처음 것만 둔다. 파일의 지금 모습 그대로이고 승인 여부는 보지 않는다. */
     public static List<Entry> read(Path vault, String project) {
+        byte[] bytes = liveBytes(vault, project);
+        return bytes.length == 0 ? new ArrayList<>() : parse(new String(bytes, StandardCharsets.UTF_8));
+    }
+
+    /** 참조 목록 글을 읽는다. */
+    public static List<Entry> parse(String text) {
         List<Entry> out = new ArrayList<>();
-        Path f = file(vault, project);
-        if (!Files.isRegularFile(f)) return out;
-        String text;
-        try {
-            text = Files.readString(f, StandardCharsets.UTF_8);
-        } catch (IOException | RuntimeException e) {
-            return out;
-        }
         for (String raw : text.split("\n")) {
             String line = raw.trim();
             if (line.isEmpty() || line.startsWith("#")) continue;
@@ -53,6 +51,62 @@ public final class ResourceRefs {
             out.add(new Entry(id, m.group(2) == null ? "" : m.group(2).trim()));
         }
         return out;
+    }
+
+    /** 파일의 지금 바이트. 파일이 없거나 못 읽으면 빈 배열이다. */
+    public static byte[] liveBytes(Path vault, String project) {
+        Path f = file(vault, project);
+        try {
+            return Files.isRegularFile(f) ? Files.readAllBytes(f) : new byte[0];
+        } catch (IOException | RuntimeException e) {
+            return new byte[0];
+        }
+    }
+
+    /** 참조 목록 파일이 있는 프로젝트들의 slug(승인 기준선을 만들 때 쓴다). */
+    public static List<String> projectsWithRefsFile(Path vault) {
+        List<String> out = new ArrayList<>();
+        Path projects = ResourceStore.root(vault).resolve("projects");
+        if (!Files.isDirectory(projects)) return out;
+        try (var ds = Files.newDirectoryStream(projects)) {
+            for (Path p : ds) {
+                String n = p.getFileName().toString();
+                if (!n.startsWith(".") && Files.isDirectory(p) && Files.isRegularFile(p.resolve("refs.md"))) out.add(n);
+            }
+        } catch (IOException e) {
+            return out;
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    /** 참조 목록의 승인 상태. */
+    public enum State {
+        /** 승인한 판과 같다(또는 승인 기록도 파일도 없다). */
+        APPROVED,
+        /** 승인한 뒤에 파일이 바뀌었다. 승인해 둔 사본을 쓴다. */
+        DIRTY,
+        /** 승인 기록이 없는데 파일이 있다. 쓰지 않는다(빈 목록으로 본다). */
+        UNTRUSTED
+    }
+
+    public static State state(Path vault, String project) {
+        byte[] live = liveBytes(vault, project);
+        Approvals.Entry e = Approvals.ledger(vault).items().get(Approvals.refsKey(project));
+        if (e == null) return live.length == 0 ? State.APPROVED : State.UNTRUSTED;
+        return aisurada.write.DocToken.compute(live).equals(e.token()) ? State.APPROVED : State.DIRTY;
+    }
+
+    /** 승인한 판의 참조 목록. 실행과 목록이 쓰는 것은 이쪽이다. 직접 고친 파일은 승인해 둔 사본으로 읽고, 기록 없는 새 파일은 비어 있는 것으로 본다. */
+    public static List<Entry> readApproved(Path vault, String project) {
+        return switch (state(vault, project)) {
+            case APPROVED -> read(vault, project);
+            case DIRTY -> {
+                byte[] copy = Approvals.copy(vault, Approvals.refsKey(project));
+                yield copy == null ? new ArrayList<>() : parse(new String(copy, StandardCharsets.UTF_8));
+            }
+            case UNTRUSTED -> new ArrayList<>();
+        };
     }
 
     /** 참조 목록을 쓴다. 비면 파일을 지운다. */

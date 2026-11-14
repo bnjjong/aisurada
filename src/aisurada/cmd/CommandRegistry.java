@@ -3,7 +3,7 @@ package aisurada.cmd;
 import java.util.*;
 
 /**
- * 도구 36개와 명령 75개 및 사용법 목록을 관리하는 통합 레지스트리.
+ * 도구 38개와 명령 82개 및 사용법 목록을 관리하는 통합 레지스트리.
  * 단일 CommandSpec 테이블을 기반으로 목록과 메타데이터를 자동 생성합니다.
  */
 public final class CommandRegistry {
@@ -76,6 +76,13 @@ public final class CommandRegistry {
             new CommandSpec("set-resource-ref", "set_resource_ref", true, false, ResourceCommands.REF_USAGE),
             new CommandSpec("usable-resources", "usable_resources", false, false, ResourceCommands.USABLE_USAGE),
             new CommandSpec("list-resource-versions", "list_resource_versions", false, false, ResourceCommands.VERSIONS_USAGE),
+            new CommandSpec("list-resource-changes", "list_resource_changes", false, false, ResourceCommands.CHANGES_USAGE),
+            new CommandSpec("get-resource-change", "get_resource_change", false, false, ResourceCommands.CHANGE_GET_USAGE),
+            new CommandSpec("approve-resource-change", null, true, false, ResourceCommands.APPROVE_USAGE),
+            new CommandSpec("reject-resource-change", null, true, false, ResourceCommands.REJECT_USAGE),
+            new CommandSpec("resolve-resource-edit", null, true, false, ResourceCommands.RESOLVE_USAGE),
+            new CommandSpec("get-resource-policy", null, false, false, ResourceCommands.POLICY_GET_USAGE),
+            new CommandSpec("set-resource-policy", null, true, false, ResourceCommands.POLICY_SET_USAGE),
             new CommandSpec("create-task", null, true, false, TaskCommands.CREATE_USAGE),
             new CommandSpec("get-task", "get_task", false, false, TaskCommands.GET_USAGE),
             new CommandSpec("list-tasks", "list_tasks", false, false, TaskCommands.LIST_USAGE),

@@ -709,7 +709,7 @@ public final class ArgsParser {
         }
     }
 
-    /** 스킬·에이전트 자원 도구 8개. 키는 도구 스키마(McpTools)와 같아야 하고, 값이 있는 칸만 명령줄과 같은 옵션 맵으로 옮긴다. */
+    /** 스킬·에이전트 자원 도구 10개. 키는 도구 스키마(McpTools)와 같아야 하고, 값이 있는 칸만 명령줄과 같은 옵션 맵으로 옮긴다. */
     private static final Map<String, List<String>> RESOURCE_TOOLS = new LinkedHashMap<>();
     static {
         RESOURCE_TOOLS.put("list_resources", List.of("kind", "scope", "project", "bodies", "trash"));
@@ -720,6 +720,8 @@ public final class ArgsParser {
         RESOURCE_TOOLS.put("set_resource_ref", List.of("project", "id", "remove", "withSkills"));
         RESOURCE_TOOLS.put("usable_resources", List.of("project", "bodies"));
         RESOURCE_TOOLS.put("list_resource_versions", List.of("id"));
+        RESOURCE_TOOLS.put("list_resource_changes", List.of());
+        RESOURCE_TOOLS.put("get_resource_change", List.of("id"));
     }
     private static final Set<String> RESOURCE_BOOLEAN_KEYS = Set.of("bodies", "trash", "remove", "withSkills");
 
@@ -748,7 +750,7 @@ public final class ArgsParser {
         // 자리 인자: 프로젝트 slug 와 자원 id 는 명령줄에서 자리 인자로 받는다
         List<String> positional = new ArrayList<>();
         switch (toolName) {
-            case "get_resource", "delete_resource", "restore_resource", "list_resource_versions" -> {
+            case "get_resource", "delete_resource", "restore_resource", "list_resource_versions", "get_resource_change" -> {
                 positional.add(requiredString(toolName, props, "id"));
                 named.remove("id");
             }
@@ -1061,6 +1063,38 @@ public final class ArgsParser {
             case "list-resource-versions" -> {
                 maxPositional = 1;
                 usage = aisurada.cmd.ResourceCommands.VERSIONS_USAGE;
+            }
+            case "list-resource-changes" -> {
+                allowedOptions = List.of("decided");
+                maxPositional = 0;
+                usage = aisurada.cmd.ResourceCommands.CHANGES_USAGE;
+            }
+            case "get-resource-change" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.CHANGE_GET_USAGE;
+            }
+            case "approve-resource-change" -> {
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.APPROVE_USAGE;
+            }
+            case "reject-resource-change" -> {
+                allowedOptions = List.of("reason");
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.REJECT_USAGE;
+            }
+            case "resolve-resource-edit" -> {
+                allowedOptions = List.of("action");
+                maxPositional = 1;
+                usage = aisurada.cmd.ResourceCommands.RESOLVE_USAGE;
+            }
+            case "get-resource-policy" -> {
+                maxPositional = 0;
+                usage = aisurada.cmd.ResourceCommands.POLICY_GET_USAGE;
+            }
+            case "set-resource-policy" -> {
+                allowedOptions = List.of("global", "permission", "project", "refs");
+                maxPositional = 0;
+                usage = aisurada.cmd.ResourceCommands.POLICY_SET_USAGE;
             }
             case "create-task" -> {
                 allowedOptions = List.of("actor", "base", "body", "criteria", "labels", "priority", "project", "refs", "repo", "title", "type");

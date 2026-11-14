@@ -134,7 +134,9 @@ public final class ResourcesTest {
             check(stderr(error(v, 400, "save-resource", "id=" + sid, "f1=" + tok, "permission=read")).contains("에이전트에만"), "스킬에 에이전트 칸 거절");
             error(v, 404, "save-resource", "id=skmwzzzzzz-00000000", "f1=" + tok, "name=x");
 
-            // 10. 기록: 사람이 고치면 시각만, AI 세션이 고치면 세션 ID(와 Claude 가 아닌 CLI 이름)가 남는다
+            // 10. 기록: 사람이 고치면 시각만, AI 세션이 고치면 세션 ID(와 Claude 가 아닌 CLI 이름)가 남는다.
+            //     (글로벌 자원을 AI 가 바로 고치게 정책을 잠깐 연다. 승인 흐름은 ApprovalsTest 가 잰다)
+            ok(v, "set-resource-policy", "global=auto");
             var byAi = ok(v, "save-resource", "id=" + sid, "f1=" + tok, "description=AI 가 고친 설명", SID_MARK, "codex-thread-9", AGENT_MARK, "codex");
             eq(byAi.get("editedSession"), "codex-thread-9", "세션 ID 기록");
             eq(byAi.get("editedAgent"), "codex", "CLI 이름 기록");
@@ -143,6 +145,7 @@ public final class ResourcesTest {
             check(!byClaude.containsKey("editedAgent"), "클로드는 CLI 이름을 안 적는다");
             var byHuman = ok(v, "save-resource", "id=" + sid, "f1=" + byClaude.get("precondition"), "description=사람이 고친 설명");
             check(!byHuman.containsKey("editedSession") && !byHuman.containsKey("editedAgent"), "사람이 고치면 세션 기록이 없다");
+            ok(v, "set-resource-policy", "global=approve");
 
             // 11. 이력: 고치기 전의 판이 남고, 옛 판으로 되돌릴 수 있다. 30판까지만 둔다
             var vers = ok(v, "list-resource-versions", sid);
@@ -206,6 +209,10 @@ public final class ResourcesTest {
             Files.writeString(v.resolve(".aisurada/resources/global/agents/손으로.md"),
                     "---\nid: apmwhand000-0000abcd\nname: 손으로\ndescription: 손으로 쓴 에이전트\npermission: root\ntools:\n  gemini:\n    flag: true\n  claude:\n    a: 1\n---\n본문\n");
             var broken = ok(v, "list-resources", "scope=global");
+            check(list0(broken, "resources").stream().noneMatch(r -> "손으로".equals(r.get("name"))), "승인 기록이 없는 손으로 만든 파일은 목록에 나오지 않는다(#53)");
+            String handId = (String) list0(ok(v, "list-resource-changes"), "unapproved").stream().filter(r -> "손으로".equals(r.get("name"))).findFirst().get().get("id");
+            ok(v, "resolve-resource-edit", handId, "action=approve");
+            broken = ok(v, "list-resources", "scope=global");
             List<Object> skipped = (List<Object>) broken.get("skipped");
             check(skipped != null && skipped.size() == 2, "망가진 것과 id 가 겹친 것 두 개를 건너뛴다: " + skipped);
             check(skipped.stream().anyMatch(s -> String.valueOf(s).contains("망가짐/SKILL.md")) && skipped.stream().anyMatch(s -> String.valueOf(s).contains("id 가 다른 자원과 겹친다")), "건너뛴 이유가 경로와 함께 나온다");

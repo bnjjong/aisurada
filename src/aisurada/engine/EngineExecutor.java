@@ -204,7 +204,7 @@ public final class EngineExecutor {
                 } else if ("delete-project".equals(parsed.commandName())) {
                     response = DeleteProject.execute(vaultRoot, parsed);
                 } else if (aisurada.cmd.ResourceCommands.NAMES.contains(parsed.commandName())) {
-                    response = aisurada.cmd.ResourceCommands.execute(vaultRoot, parsed, sessionId);
+                    response = aisurada.cmd.ResourceCommands.execute(vaultRoot, parsed, sessionId, isTool);
                 } else if (aisurada.cmd.TaskCommands.NAMES.contains(parsed.commandName())) {
                     response = aisurada.cmd.TaskCommands.execute(vaultRoot, parsed, sessionId);
                 } else if ("list-agendas".equals(parsed.commandName())) {

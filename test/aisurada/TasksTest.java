@@ -26,6 +26,7 @@ public final class TasksTest {
         // 0. 엔진이 받는 명령 이름은 모두 ais-cli가 넘겨 주어야 한다(앱은 ais-cli를 거쳐 엔진을 부른다)
         var forwarded = new java.util.HashSet<String>(AisCliMain.ENGINE_COMMANDS_61);
         forwarded.addAll(AisCliMain.ENGINE_COMMANDS_TASKS);
+        forwarded.addAll(AisCliMain.ENGINE_COMMANDS_APPROVALS);
         for (String name : CommandRegistry.COMMAND_NAMES) {
             check(forwarded.contains(name), "ais-cli가 엔진 명령 " + name + " 을(를) 넘겨 주지 않는다");
         }

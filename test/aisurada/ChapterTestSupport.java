@@ -16,11 +16,14 @@ import java.util.*;
 final class ChapterTestSupport implements AutoCloseable {
     static int checks;
     final Path temp;
-    private final String name, oldNow, oldRandom;
+    private final String name, oldNow, oldRandom, oldApprovals;
     private final TimeZone oldZone;
     ChapterTestSupport(String name) throws Exception {
         this.name = name; temp = Files.createTempDirectory("aisurada-" + name + "-");
         oldNow = System.getProperty("aisurada.test.now"); oldRandom = System.getProperty("aisurada.test.random"); oldZone = TimeZone.getDefault();
+        // 승인 기록장(#53)은 앱 폴더에 두므로, 시험은 임시 폴더로 돌려서 진짜 앱 폴더를 건드리지 않게 한다
+        oldApprovals = System.getProperty("aisurada.approvals.dir");
+        System.setProperty("aisurada.approvals.dir", temp.resolve("approvals").toString());
         System.setProperty("aisurada.test.now", Long.toString(Instant.parse("2026-10-21T05:05:07.123Z").toEpochMilli()));
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
     }
@@ -76,6 +79,7 @@ final class ChapterTestSupport implements AutoCloseable {
         EngineConfig.activate(null); TimeZone.setDefault(oldZone);
         if (oldNow == null) System.clearProperty("aisurada.test.now"); else System.setProperty("aisurada.test.now", oldNow);
         if (oldRandom == null) System.clearProperty("aisurada.test.random"); else System.setProperty("aisurada.test.random", oldRandom);
+        if (oldApprovals == null) System.clearProperty("aisurada.approvals.dir"); else System.setProperty("aisurada.approvals.dir", oldApprovals);
         TestApparatus.resetRandomQueue();
         try (var paths = Files.walk(temp)) { for (Path p : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(p); }
     }

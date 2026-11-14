@@ -13,6 +13,9 @@ import java.util.Set;
  *
  * <p>규칙: 쓸 수 있는 자원 = 프로젝트 자원 + 참조한 글로벌 자원. 참조하지 않은 글로벌 자원은 여기에 나오지 않고, 화면의 선택 목록, AI가 보는
  * 목록, 실행에 내려 주는 입력은 모두 이 결과만 써야 합니다. 그래서 규칙이 한 곳에서만 지켜집니다.
+ *
+ * <p>여기서 보는 것은 <b>승인한 판</b>뿐입니다(#53). 자원은 {@link ResourceStore#scanServed}, 참조 목록은
+ * {@link ResourceRefs#readApproved}로 읽어서, 사람이 승인하지 않은 변경은 실행 입력에 들어오지 않습니다.
  */
 public final class ResourceResolver {
 
@@ -38,7 +41,7 @@ public final class ResourceResolver {
 
     public static Usable resolve(Path vault, String project) {
         ResourceStore.requireProject(vault, project);
-        ResourceStore.Scan scan = ResourceStore.scan(vault);
+        ResourceStore.Served scan = ResourceStore.scanServed(vault);
         Map<String, Resource> globals = new HashMap<>();
         Map<String, Resource> all = new HashMap<>();
         for (Resource r : scan.items()) {
@@ -52,7 +55,7 @@ public final class ResourceResolver {
             if (project.equals(r.project())) add(r, "own", skills, agents);
         }
         List<Broken> broken = new ArrayList<>();
-        for (ResourceRefs.Entry e : ResourceRefs.read(vault, project)) {
+        for (ResourceRefs.Entry e : ResourceRefs.readApproved(vault, project)) {
             Resource g = globals.get(e.id());
             if (g == null) {
                 broken.add(new Broken(e.id(), e.hint()));

@@ -101,6 +101,7 @@ public final class AisCliMain {
             "write_attachment", "list_attachments", "list_comments", "export_markdown",
             "list_resources", "get_resource", "save_resource", "delete_resource", "restore_resource",
             "set_resource_ref", "usable_resources", "list_resource_versions",
+            "list_resource_changes", "get_resource_change",
             "list_tasks", "get_task"
     );
 
@@ -140,6 +141,8 @@ public final class AisCliMain {
             Map.entry("set_resource_ref", "프로젝트가 글로벌 자원을 참조하는 것을 켜거나 끈다"),
             Map.entry("usable_resources", "프로젝트가 쓸 수 있는 스킬과 에이전트 정의를 낸다"),
             Map.entry("list_resource_versions", "스킬이나 에이전트 정의의 고치기 전 판 목록을 낸다"),
+            Map.entry("list_resource_changes", "승인을 기다리는 스킬·에이전트 변경과 승인 안 된 직접 수정을 낸다"),
+            Map.entry("get_resource_change", "승인 대기 변경 1건을 이전 판과 새 판과 함께 낸다"),
             Map.entry("list_tasks", "태스크(티켓) 목록을 상태, 유형, 저장소, 라벨로 거른다"),
             Map.entry("get_task", "태스크 1건을 설명, 완료 기준, 연결, 활동과 함께 낸다")
     );
@@ -173,6 +176,15 @@ public final class AisCliMain {
     public static final List<String> ENGINE_COMMANDS_TASKS = List.of(
             "create-task", "get-task", "list-tasks", "update-task", "transition-task",
             "link-tasks", "add-task-comment", "delete-task", "restore-task"
+    );
+
+    /**
+     * 승인 워크플로 명령 7개(#53). 사람이 앱에서 승인·거절하고 정책을 바꾸는 길이라서 도구 이름(MCP)으로는 열지 않는다.
+     * 이 목록에 빠지면 앱의 승인 화면이 「알 수 없는 이름」으로 거절된다. 엔진 이름과의 대조는 {@code TasksTest} 0장이 한다.
+     */
+    public static final List<String> ENGINE_COMMANDS_APPROVALS = List.of(
+            "list-resource-changes", "get-resource-change", "approve-resource-change", "reject-resource-change",
+            "resolve-resource-edit", "get-resource-policy", "set-resource-policy"
     );
 
     public static void main(String[] args) {
@@ -221,7 +233,7 @@ public final class AisCliMain {
 
         // 도구 이름 26개 또는 사이드카 고유 명령 58개
         boolean isTool = CLI_TOOL_NAMES.contains(firstArg);
-        boolean isCmd = ENGINE_COMMANDS_61.contains(firstArg) || ENGINE_COMMANDS_TASKS.contains(firstArg);
+        boolean isCmd = ENGINE_COMMANDS_61.contains(firstArg) || ENGINE_COMMANDS_TASKS.contains(firstArg) || ENGINE_COMMANDS_APPROVALS.contains(firstArg);
 
         if (!isTool && !isCmd) {
             printUnknownName(firstArg);
@@ -255,7 +267,7 @@ public final class AisCliMain {
         System.out.println("codex-mcp — Codex에 이 MCP 서버를 등록한다(status, add [--write], remove)");
         System.out.println("gemini-mcp — Antigravity(agy)나 Gemini CLI에 이 MCP 서버를 등록한다(status, add [--write], remove)");
         System.out.println();
-        System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61) + ", " + String.join(", ", ENGINE_COMMANDS_TASKS));
+        System.out.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61) + ", " + String.join(", ", ENGINE_COMMANDS_TASKS) + ", " + String.join(", ", ENGINE_COMMANDS_APPROVALS));
         System.out.println("  앱이 쓰는 배선입니다. 이름이 하이픈인 것이 표시이고, 도구 이름(밑줄)과 다른 표면입니다.");
     }
 
@@ -284,7 +296,7 @@ public final class AisCliMain {
         System.err.println("알 수 없는 이름: " + name);
         System.err.println("도구: " + String.join(", ", CLI_TOOL_NAMES));
         System.err.println("명령: " + String.join(", ", DIRECT_COMMANDS));
-        System.err.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61) + ", " + String.join(", ", ENGINE_COMMANDS_TASKS));
+        System.err.println("사이드카 고유 명령: " + String.join(", ", ENGINE_COMMANDS_61) + ", " + String.join(", ", ENGINE_COMMANDS_TASKS) + ", " + String.join(", ", ENGINE_COMMANDS_APPROVALS));
         System.err.println("전체 설명은 ais-cli --list 로 본다.");
     }
 

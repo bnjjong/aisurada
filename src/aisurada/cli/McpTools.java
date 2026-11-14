@@ -12,7 +12,7 @@ import java.util.Set;
 
 /**
  * MCP 클라이언트(Claude 등)에 내놓는 도구의 이름, 설명, 입력 스키마입니다.
- * 이름은 엔진 도구 36개와 같고, 입력 스키마의 키는 {@code ArgsParser}가 받는 키와 같아야 합니다(시험이 잰다).
+ * 이름은 엔진 도구 38개와 같고, 입력 스키마의 키는 {@code ArgsParser}가 받는 키와 같아야 합니다(시험이 잰다).
  *
  * <p>읽기와 쓰기는 엔진의 {@link CommandRegistry#WRITE_COMMANDS}에서 갈라 냅니다. 기본은 읽기 도구만 내놓고,
  * 쓰기 도구는 {@code mcp --write}로 뜰 때만 내놓습니다. 영구 삭제({@code purge_doc})는 어느 쪽으로도 내놓지 않습니다.
@@ -37,7 +37,7 @@ final class McpTools {
 
     private McpTools() {}
 
-    /** 정의된 도구 36개 전부(내놓지 않는 것 포함)를 엔진 도구 차례로 돌려줍니다. */
+    /** 정의된 도구 38개 전부(내놓지 않는 것 포함)를 엔진 도구 차례로 돌려줍니다. */
     static List<Tool> all() {
         return ALL;
     }
@@ -302,7 +302,9 @@ final class McpTools {
                 schema().str("id", "자원 id(sk… 또는 ap…)", true)
                         .str("version", "list_resource_versions가 준 판 이름", false)));
         t.add(tool("save_resource",
-                "스킬이나 에이전트 정의를 만들거나 고친다. id를 안 주면 새로 만든다(kind, scope나 project, name, description이 필요하다). id를 주면 준 칸만 고친다(f1이 꼭 필요하고 종류·범위·id는 못 바꾼다). "
+                "스킬이나 에이전트 정의를 만들거나 고친다. 승인이 필요한 변경(권한 올림, 도구 칸 변경, 정책이 승인을 요구하는 범위)은 바로 적용되지 않고 응답에 queued=true와 changeId가 오고, "
+                        + "사람이 앱에서 승인해야 적용된다. 그때까지 목록과 조회에는 이전 판이 그대로 보이니 같은 변경을 되풀이해 보내지 말고 get_resource_change로 처리 결과를 본다. "
+                        + "id를 안 주면 새로 만든다(kind, scope나 project, name, description이 필요하다). id를 주면 준 칸만 고친다(f1이 꼭 필요하고 종류·범위·id는 못 바꾼다). "
                         + "스킬과 에이전트 정의는 특정 AI 도구에 종속되지 않는다. 도구별 차이는 tools 칸에만 두고, 모르는 도구 칸도 지우지 않고 보존한다. "
                         + "에이전트의 permission은 read, edit, publish 가운데 하나이고, skills는 그 에이전트가 쓸 스킬의 id 목록이다.",
                 schema().str("id", "고칠 자원 id. 안 주면 새로 만든다", false)
@@ -338,6 +340,12 @@ final class McpTools {
         t.add(tool("list_resource_versions",
                 "자원의 고치기 전 판 목록을 낸다(새것이 앞). 되돌리려면 get_resource로 옛 판을 읽고 그 내용으로 save_resource를 부른다.",
                 schema().str("id", "자원 id", true)));
+        t.add(tool("list_resource_changes",
+                "승인을 기다리는 스킬·에이전트 변경(pending), 승인 안 된 직접 수정(unapproved), 최근 결정이 난 변경(decided)을 낸다. 내가 보낸 변경이 적용됐는지 거절됐는지 여기서 본다.",
+                schema()));
+        t.add(tool("get_resource_change",
+                "승인 대기 변경 1건을 이전 판(before)과 새 판(after)과 함께 낸다. status는 pending, approved, rejected, stale(승인 전에 대상이 바뀌어 적용 못 함) 가운데 하나다.",
+                schema().str("id", "변경 id(pc…)", true)));
 
         // ---- 태스크(티켓). 외부 설명서에 없는 확장이다. 읽기 도구만 있다: 상태는 사람(화면)과 러너만 바꾼다 ----
         t.add(tool("list_tasks",
