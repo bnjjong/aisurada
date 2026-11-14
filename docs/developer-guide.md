@@ -176,7 +176,7 @@ test-native.sh         화면·호스트 시험 전체
 - **참조(`refs.md`).** 프로젝트 폴더의 `refs.md`에 줄마다 `<ID>  # <이름 힌트>`를 적는다. 엔진은 ID만 읽고 힌트는 읽는 사람을 위한 것이다(참조를 켜고 끌 때마다 지금 이름으로 새로 적는다). 프로젝트 파일이 아니라 따로 두는 까닭은, 설명서가 프로젝트 파일의 줄을 정해 두었고 그 파일을 모르는 옛 빌드가 다시 쓸 때 모르는 줄을 버리기 때문이다. 글로벌 자원만 참조한다(프로젝트 자원은 참조하지 않아도 쓸 수 있다). 참조한 글로벌 자원을 지우면(휴지통) 「깨진 참조」로 알리고, 되살리면 이어진다.
 - **쓸 수 있는 자원을 계산하는 곳은 하나다.** `ResourceResolver.resolve`가 프로젝트 자원 + 참조한 글로벌 자원을 낸다(출처 `own`/`ref`). 깨진 참조(`broken`)와, 쓸 수 있는 에이전트가 필요로 하지만 쓸 수 없는 스킬(`missingSkills`, 글로벌 스킬이면 `canReference: true`라 참조해서 채울 수 있다)도 같이 낸다. 화면의 선택 목록, AI가 보는 목록, 실행 입력은 모두 이 결과만 써야 규칙 ④가 새지 않는다. **빠진 스킬은 스스로 쓸 수 있게 되지 않는다**(자동으로 참조하지 않는다). `set-resource-ref`의 `with-skills=true`가 에이전트를 참조할 때 그 에이전트의 글로벌 스킬도 함께 참조하게 해 준다.
 - **에이전트 검사.** `skills`는 존재하는 스킬이어야 하고, 글로벌 에이전트는 글로벌 스킬만, 프로젝트 에이전트는 글로벌 스킬과 자기 프로젝트의 스킬을 쓴다. `repo`는 프로젝트 에이전트만 줄 수 있고 그 프로젝트의 저장소 이름이어야 한다(글로벌 에이전트에는 저장소 칸이 없다).
-- **명령 8개**(명령줄과 MCP 도구 모두. 도구 이름은 밑줄 이름이고 `with-skills`는 `withSkills`다. 틀린 값은 쓰기 전에 AIS-400, 없는 것은 AIS-404). MCP에서는 읽기 4개(`list_resources`, `get_resource`, `usable_resources`, `list_resource_versions`)가 기본 모드에도 보이고, 쓰기 4개(`save_resource`, `delete_resource`, `restore_resource`, `set_resource_ref`)는 노트와 같이 `--write`일 때만 보인다(설정의 「노트를 만들고 고치는 것도 허용」). 도구는 같은 `ResourceCommands`로 가고, 인자 해석(`ArgsParser`의 `RESOURCE_TOOLS`)이 JSON 인자를 명령줄과 같은 옵션 맵으로 바꾼다.
+- **명령 15개**(명령줄과 MCP 도구 모두. 도구 이름은 밑줄 이름이고 `with-skills`는 `withSkills`다. 틀린 값은 쓰기 전에 AIS-400, 없는 것은 AIS-404). 앞의 8개는 자원을 다루고, 뒤의 7개는 승인 워크플로(아래)다. MCP에서는 읽기 6개(`list_resources`, `get_resource`, `usable_resources`, `list_resource_versions`, `list_resource_changes`, `get_resource_change`)가 기본 모드에도 보이고, 쓰기 4개(`save_resource`, `delete_resource`, `restore_resource`, `set_resource_ref`)는 노트와 같이 `--write`일 때만 보인다(설정의 「노트를 만들고 고치는 것도 허용」). 승인·거절·정책 변경(`approve-resource-change` 따위)은 MCP 도구가 아니다. 도구는 같은 `ResourceCommands`로 가고, 인자 해석(`ArgsParser`의 `RESOURCE_TOOLS`)이 JSON 인자를 명령줄과 같은 옵션 맵으로 바꾼다.
 
 | 명령 | 하는 일 |
 |---|---|
@@ -191,7 +191,21 @@ test-native.sh         화면·호스트 시험 전체
 - **고치기 보호.** 고칠 때는 노트처럼 직전에 읽은 `f1`이 필요하다(없거나 어긋나면 AIS-412, 종료 코드 5). 실제로 달라지는 게 없으면 파일도 기록도 안 바꾼다. 종류·범위·ID는 못 바꾼다. 쓰기는 같은 폴더의 임시 파일에 쓰고 원자적으로 이름을 바꾼다.
 - **기록과 되돌리기.** 고치면 `editedAt`이 남고, 세션 표식이 오면 `editedSession`(과 Claude가 아닐 때 `editedAgent`)이 남는다. 사람이 고치면 세션 칸이 없다. 고치기 전의 판은 `.history/<id>/`에 30판까지 남고, 옛 판의 내용으로 `save-resource`를 부르면 되돌려진다. 지운 것은 `.trash/<id>/`에 있고 `empty-trash`가 이 휴지통을 비우지 않는다(노트 휴지통과 따로다).
 - **손으로 고친 파일.** 머리말이 없거나 id가 겹친 파일은 목록에서 건너뛰고 이유를 알린다. 나머지 자원은 그대로 읽는다.
-- **지금의 한계.** ① 프로젝트를 지워도(`delete-project`) 그 프로젝트의 자원 폴더는 남는다. 함께 휴지통으로 옮기는 일은 아직 안 했다. ② 작업 실행기가 없다. ③ AI가 쓰는 범위는 「프로젝트·글로벌 자원의 내용, 참조, 권한까지」로 정했지만 승인 흐름이 없어 지금은 모두 바로 적용된다(1단계의 임시 방침, 이슈 #53). 권한 값은 실행기가 없어 아직 아무 데도 쓰이지 않는다. ④ MCP 서버로 쓰면 세션 표식이 넘어가 `editedSession`(과 `editedAgent`)이 남는 것을 시험(`McpServerTest`)으로 확인했다. 명령줄 `ais-cli`로 직접 부를 때 세션 표식이 넘어가는지는 확인하지 못했다.
+- **지금의 한계.** ① 프로젝트를 지워도(`delete-project`) 그 프로젝트의 자원 폴더는 남는다. 함께 휴지통으로 옮기는 일은 아직 안 했다. ② 작업 실행기가 없다. ③ AI가 쓴 변경의 승인 흐름은 엔진에만 있고(아래 「승인 워크플로」) 화면의 승인 패널·배지·알림은 아직 없다. 러너가 에이전트 정의를 읽는 부분은 4단계에서 생기며, 그때 이 승인된 판만 읽는다. ④ MCP 서버로 쓰면 세션 표식이 넘어가 `editedSession`(과 `editedAgent`)이 남는 것을 시험(`McpServerTest`)으로 확인했다. 명령줄 `ais-cli`로 직접 부를 때 세션 표식이 넘어가는지는 확인하지 못했다.
+#### 승인 워크플로(이슈 #53)
+
+AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람이 승인한 판만 쓰이게 한다. 에이전트의 권한(`read`/`edit`/`publish`)과 참조가 AI 스스로에 의해 풀리지 않게 하려는 것이다. 엔진 조각만 만들었고 화면은 아직 없다.
+
+- **AI의 통로 판별.** 세션 표식이 달린 요청이나 MCP 도구 이름(밑줄)으로 부른 요청은 AI다. 앱 화면은 명령 이름(하이픈)으로 세션 표식 없이 부르므로 사람이다. 사람이 낸 변경은 정책과 상관없이 바로 적용한다.
+- **정책(`set-resource-policy`, 사람만).** 칸 4개가 각각 `auto`(AI가 써도 바로 적용)나 `approve`(승인 필요)다. 기본은 `project=auto`(프로젝트 자원의 내용), `global=approve`(글로벌 자원 변경), `refs=approve`(참조 끄기), `permission=approve`(권한 내림). **권한 올림, 도구 칸(`tools`) 변경, 참조 켜기는 정책과 상관없이 늘 승인이 필요하다**(`Approvals.Category`의 `fixed`). `tools`는 도구별 허용 도구 목록 같은 권한성 값이 들어갈 수 있어서 같이 묶었다. 되살리기는 예전 판이 없는 만들기로 본다.
+- **대기 변경.** 승인이 필요하면 적용하지 않고 `.aisurada/pending/<pc…>.json`에 올린다(vault 안이라 이력에 남고 vault를 옮겨도 따라온다). 응답은 오류가 아니라 `queued: true`, `changeId`, 까닭(`reasons`), 안내 글이다. 같은 변경을 되풀이하면 새로 쌓지 않고 같은 `changeId`에 `duplicate: true`를 준다. 대기 중에는 `list-resources`, `get-resource`, `usable-resources`, MCP 조회 모두에 이전 판이 그대로 보인다.
+- **승인·거절.** `approve-resource-change <id>`는 같은 명령 경로를 한 번 더 지나 적용하고(승인 때의 검사와 평소 검사가 갈라지지 않는다) 쓴 이는 올린 AI의 세션으로 남긴다. 만들기는 대기에 올릴 때 보인 ID로 만든다. 승인 전에 대상이 바뀌었으면(`f1`이 어긋났거나 이름이 겹침) 적용하지 않고 `stale`로 남기고 AIS-412/409를 낸다. `reject-resource-change <id> [reason=]`는 이유를 남긴다. 결정이 난 변경은 최근 200건까지 남는다. AI가 승인·거절·정책 변경·직접 수정 처리를 부르면 AIS-403이다(MCP 도구도 아니고, 세션 표식이 달린 `ais-cli`도 거절한다).
+- **승인한 판의 지문(P2).** 승인할 때 파일 바이트의 SHA-256(`f1:…`)과 사본을 앱 폴더(`~/Library/Application Support/aisurada/approvals/<vault 해시>/`의 `ledger.json`, `copies/`)에 적는다. 읽는 쪽(`ResourceStore.scanServed`, `ResourceRefs.readApproved`, `ResourceResolver`)은 지금 파일의 지문이 기록과 맞을 때만 그 파일을 쓴다. 파일을 직접 고쳐 어긋나면(`dirty`) 승인해 둔 사본을 대신 쓰고 화면 목록에는 `approval: dirty`가 붙는다. 기록 없이 생긴 새 파일(`new`)은 아예 쓰지 않고 조회도 404다. 이런 것은 `list-resource-changes`의 `unapproved`에 이전·지금 판과 함께 나온다. 사람이 `save-resource`로 고치면 **승인한 판 위에** 얹어 쓰고 직접 고친 내용은 이어받지 않는다(AI가 사소한 변경으로 직접 고친 내용을 세탁하지 못하게 한다). `resolve-resource-edit <id|refs:<프로젝트>> action=approve|revert`가 직접 고친 것을 받아들이거나 승인한 판으로 되돌린다(새 파일이면 휴지통으로).
+- **기준선과 깨진 기록장.** 기록장이 없는 vault는 처음 읽을 때 있는 자원과 참조 목록을 모두 승인한 것으로 받아들인다(이 기능 전에 만든 자원이 못 쓰이게 되지 않게). 기록장이 깨졌으면 비어 있는 것으로 보지 않고 AIS-500으로 멈춘다(모든 파일이 다시 승인된 것이 되지 않게).
+- **명령.** `list-resource-changes [decided=<건수>]`(대기·승인 안 된 직접 수정·결정 난 것, `counts.pending`/`counts.unapproved`는 화면 배지용. `list-resources`도 `approvals` 칸에 같은 수를 낸다), `get-resource-change <id>`(이전 판 `before`, 새 판 `after`, 바뀐 칸 `changedFields`), `approve-resource-change`, `reject-resource-change`, `resolve-resource-edit`, `get-resource-policy`, `set-resource-policy`. 앞의 둘만 MCP 읽기 도구다. 새 명령 7개는 `AisCliMain.ENGINE_COMMANDS_APPROVALS`에도 있어야 앱이 `ais-cli`로 부를 수 있고, `TasksTest`가 레지스트리와 대조한다.
+- **한계.** 지문도 앱 폴더에 있어서 앱 폴더를 쓸 수 있는 프로세스(셸을 마음대로 쓰는 AI)는 위조할 수 있다. 그것은 이 장치가 아니라 실행 격리(작업 폴더와 도구 허용 목록)의 몫이다. 이 장치가 막는 것은 프롬프트 주입에 속아 MCP나 `ais-cli`로 고치는 AI와 파일을 실수로 직접 고친 경우다. 기본 정책은 프로젝트 자원의 내용(지침 글)을 AI가 바로 고치게 둔다. 그 지침을 쓰는 에이전트의 권한은 승인된 값이지만, 지침 자체가 바뀌는 위험은 `project=approve`로 줄인다. 앱 폴더의 승인 기록은 vault를 옮기면 따라오지 않는다(옮긴 뒤 처음 읽을 때 기준선으로 다시 받아들인다).
+- **시험.** `ApprovalsTest`(통로 판별, 정책별 동작, 고정 종류, 대기 중에는 이전 판이 보임, 승인·거절·stale·중복, AI의 승인 거절, 만들기·지우기·되살리기, 직접 수정 걸러내기와 받아들이기·되돌리기, 새 파일, 참조 목록 직접 수정, 기준선, 깨진 기록장)과 `McpServerTest`(진짜 MCP 서버와 진짜 `ais-cli`로 AI의 변경이 대기하고 사람의 `ais-cli`로 승인하는 길, 세션 표식이 달린 `ais-cli`의 승인 거절).
+
 - **화면.** 글로벌 페이지(`/resources`, 왼쪽 메뉴의 「스킬·에이전트」)와 프로젝트 페이지(`/project/<slug>`, 레일의 프로젝트 머리에 있는 「프로젝트 페이지」 단추)가 있다. 글로벌 페이지는 공용 스킬·에이전트를 만들고 고치고 지우고(휴지통에서 되살림), 지울 때는 참조하던 프로젝트를 알려 준다. 프로젝트 페이지는 저장소와 아젠다를 보이고, 엔진의 `usable-resources`가 낸 「쓸 수 있는 자원」(출처 꼬리표 「프로젝트 자원」·「글로벌에서 참조」)과 깨진 참조, 에이전트가 필요로 하지만 못 쓰는 스킬(글로벌이면 「참조 추가」)을 보이며, 참조하지 않은 글로벌 자원은 「글로벌 자원 참조하기」에만 나온다. 에이전트를 참조할 때는 그 에이전트가 쓰는 글로벌 스킬을 보여 주고 「스킬도 함께 참조」(`with-skills`)나 「에이전트만 참조」를 고르게 한다(확인하는 것이 곧 명시적인 참조). 이름이 같아도 범위를 붙여 구분한다(`scopeLabel`: 「글로벌 · 이름」). 편집 창(`ResourceFormModal`)은 이름·설명·지침, 에이전트의 권한 3단계·쓸 스킬(글로벌 에이전트는 글로벌 스킬만, 프로젝트 에이전트는 자기 프로젝트의 스킬도)·쓸 저장소, 선택 칸 「도구별 설정」(JSON)을 받는다. 고칠 때는 바뀐 칸만 보내서 모르는 도구 칸이 보존되고(`formToInput`), 마지막에 AI가 고쳤으면(`editedSession`) 알려 준다. 화면은 엔진을 `controller.callEngine`으로 부르고(`ui/resourcesClient.ts`), 창이 다시 눈에 띄면 다시 읽어 AI나 다른 창이 고친 것을 따라간다. 프로젝트 자원의 휴지통은 프로젝트 페이지의 「지운 것」에 있다.
 - **시험.** 화면은 `resources-ui.test.mjs`(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 페이지와 레일)다. 실제 창에서 눌러 본 확인은 없다. 엔진과 MCP는 `ResourcesTest`와 `McpServerTest`의 자원 도구 부분(진짜 엔진과 `--write` 서버로 만들기, `f1` 보호, 참조, 규칙 ④, 지우기·되살리기, 읽기 모드 거절, 세션 기록)이다. `ResourcesTest`(파일 모양, ID 머리, 도구 칸 보존, 같은 이름 규칙, 규칙 ④, 참조 규칙과 거절, 이름을 바꿔도 참조 유지, f1 보호, 기록, 이력과 되돌리기, 30판 상한, 에이전트 검사, 빠진 스킬, 지우기·되살리기, 손으로 망가뜨린 파일, 기존 명령과의 공존).
 
@@ -379,7 +393,7 @@ java -jar dist/ais-engine.jar get_doc '{"id":"nddemo-00000001"}'   # 도구 표�
 java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표면
 ```
 
-도구 36개와 명령 75개는 `src/aisurada/cmd/CommandRegistry.java`에 있다. 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `java -jar dist/ais-cli.jar --list`로 본다.
+도구 38개와 명령 82개는 `src/aisurada/cmd/CommandRegistry.java`에 있다. 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `java -jar dist/ais-cli.jar --list`로 본다.
 
 ### 설정
 
@@ -466,10 +480,10 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 연결하는 법, 도구 28개의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
 
-- **도구.** 이름은 엔진 도구 36개와 같다. 기본은 읽기 17개만 내놓고 `--write`를 주면 35개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
+- **도구.** 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 37개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`runEnginePipeline`: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 `System.exit`을 부르는데, `AisCliMain`의 종료 호출은 모두 `exit()` 하나를 거친다. mcp 모드에서만 `exit()`이 프로세스를 끝내는 대신 `CliExit`을 던지고, 그 호출만 `isError`로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.
 - **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(아래 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
-- **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 36개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
+- **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 38개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
 - **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`ClaudeMcpCommand`)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 `codex-mcp`, `gemini-mcp`(`AgentMcpCommand`)가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다(`McpRegistration`). CLI마다 `--` 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 java 경로 뒤) 인자 모양은 `AgentMcpCommandTest`가 가짜 CLI로 못 박고, 진짜 CLI로는 임시 HOME에서 확인했다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.
 
 시험은 `bash test.sh`에 들어 있다. `McpServerTest`는 스키마 대조, 노출 규칙, 가짜 호출기로 프로토콜, 진짜 엔진과 진짜 `mcp` 프로세스의 왕복(읽기·쓰기·낡은 `f1` 거절·휴지통·영구 삭제 거절·vault 없는 환경에서도 서버가 사는지)을 잰다. `ClaudeMcpCommandTest`는 등록 상태를 파일에 두는 가짜 `claude`로 `status`·`add`·`remove`·`config`를 잰다.

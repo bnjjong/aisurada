@@ -107,7 +107,7 @@ java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=
 
 ## 프로젝트 자원: 스킬과 에이전트 정의 (확장)
 
-외부 설명서에 없는 확장입니다. 프로젝트에서 AI에게 작업을 시키기 위한 바탕으로, 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의(마크다운 파일 하나)를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 **ID(`sk…`, `ap…`)로 참조**해야 쓸 수 있고, 참조하지 않은 것은 쓰지 않습니다. 명령줄로도, MCP 도구(`list_resources`, `save_resource` 등 8개)로도 쓸 수 있습니다. 쓰기 도구는 노트와 같이 `mcp --write`일 때만 보입니다.
+외부 설명서에 없는 확장입니다. 프로젝트에서 AI에게 작업을 시키기 위한 바탕으로, 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의(마크다운 파일 하나)를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 **ID(`sk…`, `ap…`)로 참조**해야 쓸 수 있고, 참조하지 않은 것은 쓰지 않습니다. 명령줄로도, MCP 도구(`list_resources`, `save_resource` 등 10개)로도 쓸 수 있습니다. 쓰기 도구는 노트와 같이 `mcp --write`일 때만 보입니다. **AI가 쓴 변경은 정책에 따라 승인 대기에 올라가고, 사람이 승인한 판만 쓰입니다**(권한 올림·도구 칸 변경·참조 켜기는 늘 승인이 필요합니다).
 
 ```bash
 java -jar dist/ais-engine.jar save-resource kind=skill scope=global 'name=번역 검수' 'description=번역을 검수한다' 'body=# 지침' --aisurada.vault=/path/to/vault
@@ -118,6 +118,7 @@ java -jar dist/ais-engine.jar list-resources scope=global --aisurada.vault=/path
 ```
 
 - 명령 8개: `list-resources`, `get-resource`, `save-resource`, `delete-resource`, `restore-resource`, `set-resource-ref`, `usable-resources`, `list-resource-versions`.
+- 승인 명령 7개: `list-resource-changes`, `get-resource-change`, `approve-resource-change`, `reject-resource-change`, `resolve-resource-edit`, `get-resource-policy`, `set-resource-policy`. 승인·거절·정책 변경은 사람만 합니다(AI가 부르면 AIS-403).
 - 파일은 `.aisurada/resources/` 아래에만 있어서 노트와 기존 명령을 건드리지 않습니다. 고칠 때는 노트처럼 직전에 읽은 `f1` 토큰이 필요하고, 고치기 전의 판은 30판까지 남습니다.
 - 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「프로젝트 자원: 스킬과 에이전트 정의」에 있습니다.
 
