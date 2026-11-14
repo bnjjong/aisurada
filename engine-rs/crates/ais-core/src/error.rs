@@ -49,6 +49,15 @@ impl EngineError {
         }
     }
 
+    /// 고치기 전에 읽은 내용이 그 사이 바뀌었거나 확인 값이 없음(`AIS-412`)
+    pub fn precondition_failed(message: impl Into<String>) -> Self {
+        Self {
+            code: "AIS-412",
+            kind: ErrorKind::PreconditionFailed,
+            message: message.into(),
+        }
+    }
+
     /// 지금 상태와 부딪힘(`AIS-409`)
     pub fn conflict(message: impl Into<String>) -> Self {
         Self {

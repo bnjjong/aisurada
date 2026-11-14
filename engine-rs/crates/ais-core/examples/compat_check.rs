@@ -1,6 +1,7 @@
 //! Java 엔진(단발 모드)과 Rust 엔진이 같은 vault에서 같은 읽기 결과를 내는지 맞댑니다.
 //!
-//! 사용: `cargo run -p ais-core --example compat_check -- <ais-engine.jar> <vault 폴더>... [--verbose]`
+//! 사용: `cargo run -p ais-core --example compat_check -- <ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>]`
+//! `--commit-fixture`는 그 vault를 사본 둘로 복사해 `commit_vault`(vault를 고친다)를 견준다. 진짜 vault에는 주지 않는다.
 //!
 //! Java 응답은 정리안의 새 모양으로 바꿔서 견줍니다: `date`·`time`·`agendaTitle`·`deepLink`를 빼고, 목록은
 //! `{items, total, returned, truncated}`로 감싸고, 빈 `tags`를 채우고, `folder`를 더합니다. vault는 읽기만 합니다.
@@ -175,7 +176,8 @@ fn compare(
         (Err(j), Err(r)) => {
             // 오류는 Java의 `AIS-코드 메시지` 글과 Rust의 코드·메시지가 같은지 본다
             let rust_text = format!("{} {}", r.code, r.message);
-            report.record(label, j == rust_text, || {
+            // Java가 예상 밖 예외로 실패하면 오류 글에 스택 추적이 붙으므로, Rust의 메시지가 그 안에 든 것도 같은 실패로 본다
+            report.record(label, j == rust_text || j.contains(&r.message), || {
                 format!("Java 오류: {j}\nRust 오류: {rust_text}")
             });
         }
@@ -1011,10 +1013,135 @@ fn compare_history(
     }
 }
 
+/// `commit_vault`: vault를 고치므로 지정한 합성 vault(git 이력 포함)의 사본 둘에서만 돌린다.
+/// 같은 변경을 두 사본에 만들고 Java(단발)와 Rust가 각각 커밋하게 해서 응답, 커밋 메시지, 작성자, 담긴 파일과 트리를 견준다.
+fn compare_commit_vault(
+    report: &mut Report,
+    java: &Java,
+    engine_for: &dyn Fn(&Path) -> Engine,
+    fixture: &Path,
+) {
+    let root = env::temp_dir().join(format!("ais-commit-compat-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("임시 폴더");
+    let git = |vault: &Path, args: &[&str]| -> String {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(vault)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .output()
+            .expect("git");
+        String::from_utf8_lossy(&out.stdout).trim_end().to_string()
+    };
+    let copy = |name: &str| -> PathBuf {
+        let dst = root.join(name);
+        let status = Command::new("cp")
+            .arg("-R")
+            .arg(fixture)
+            .arg(&dst)
+            .status()
+            .expect("cp");
+        assert!(status.success(), "사본을 못 만들었다");
+        dst
+    };
+    let observe = |vault: &Path| -> Value {
+        json!({
+            "message": git(vault, &["log", "-1", "--format=%B"]),
+            "author": git(vault, &["log", "-1", "--format=%an <%ae> / %cn <%ce>"]),
+            "tree": git(vault, &["rev-parse", "HEAD^{tree}"]),
+            "files": git(vault, &["show", "--name-status", "--format=", "HEAD"]),
+            "count": git(vault, &["rev-list", "--count", "HEAD"]),
+        })
+    };
+
+    type Scenario<'a> = (&'a str, Box<dyn Fn(&Path) + 'a>);
+    let scenarios: Vec<Scenario> = vec![
+        ("변경 없음", Box::new(|_| {})),
+        (
+            "노트 고침·더함·지움과 노트 아닌 파일, .tmp",
+            Box::new(|v| {
+                let note = v.join("notes/demo/2026-11/first/note.md");
+                let text = fs::read_to_string(&note).unwrap();
+                fs::write(&note, format!("{text}\n덧붙임\n")).unwrap();
+                fs::create_dir_all(v.join("notes/demo/newone")).unwrap();
+                fs::write(
+                v.join("notes/demo/newone/note.md"),
+                "---\nid: ndzz0001-0000aaaa\nagenda: demo\ntype: free\ntitle: 새\ncreated: '2026-11-12T09:00:00+09:00'\n---\n\n새\n",
+            )
+            .unwrap();
+                fs::remove_dir_all(v.join("notes/demo/2026-11/parent/sub")).unwrap();
+                fs::write(v.join("notes/readme.txt"), "x").unwrap();
+                fs::write(v.join("notes/skip.md.tmp"), "임시").unwrap();
+            }),
+        ),
+        (
+            "main이 아닌 가지",
+            Box::new(|v| {
+                git(v, &["switch", "-q", "-c", "other"]);
+                fs::write(v.join("notes/readme.txt"), "x").unwrap();
+            }),
+        ),
+        (
+            "새 index.lock",
+            Box::new(|v| {
+                fs::write(v.join("notes/readme.txt"), "x").unwrap();
+                fs::write(v.join(".git/index.lock"), "").unwrap();
+            }),
+        ),
+        (
+            "병합 중",
+            Box::new(|v| {
+                fs::write(v.join("notes/readme.txt"), "x").unwrap();
+                fs::write(v.join(".git/MERGE_HEAD"), "").unwrap();
+            }),
+        ),
+    ];
+    for (label, mutate) in scenarios {
+        let (a, b) = (copy("java"), copy("rust"));
+        for vault in [&a, &b] {
+            mutate(vault);
+        }
+        let java_out = java.run(&a, &["commit-vault".to_string()]);
+        let rust_out = engine_for(&b).call("commit_vault", Value::Null);
+        compare(
+            report,
+            &a,
+            format!("commit_vault {label} 응답"),
+            java_out,
+            rust_out,
+            |_, v| v.clone(),
+        );
+        report.record(
+            format!("commit_vault {label} 결과물"),
+            observe(&a) == observe(&b),
+            || first_diff(&observe(&a), &observe(&b), "$"),
+        );
+        let _ = fs::remove_dir_all(&a);
+        let _ = fs::remove_dir_all(&b);
+    }
+    // 저장소가 아닌 폴더
+    let plain = root.join("plain");
+    fs::create_dir_all(plain.join(".aisurada")).unwrap();
+    compare(
+        report,
+        &plain,
+        "commit_vault 저장소 아님".to_string(),
+        java.run(&plain, &["commit-vault".to_string()]),
+        engine_for(&plain).call("commit_vault", Value::Null),
+        |_, v| v.clone(),
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let verbose = args.iter().any(|a| a == "--verbose");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    let commit_fixture: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--commit-fixture="))
+        .map(PathBuf::from);
     if positional.len() < 2 {
         eprintln!("사용법: compat_check <ais-engine.jar> <vault 폴더>... [--verbose]");
         return ExitCode::from(2);
@@ -1315,6 +1442,21 @@ fn main() -> ExitCode {
                     failure.lines().next().unwrap_or("").to_string()
                 }
             );
+        }
+        total.checked += report.checked;
+        total.failures.extend(report.failures);
+    }
+
+    if let Some(fixture) = &commit_fixture {
+        let mut report = Report::default();
+        compare_commit_vault(&mut report, &java, &|vault| Engine::new(vault), fixture);
+        println!(
+            "commit_vault(합성 vault 사본): {}건 확인, 어긋남 {}건",
+            report.checked,
+            report.failures.len()
+        );
+        for failure in &report.failures {
+            println!("  - {}", failure.replace('\n', "\n    "));
         }
         total.checked += report.checked;
         total.failures.extend(report.failures);

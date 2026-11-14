@@ -851,3 +851,129 @@ fn a_vault_without_git_has_no_versions() {
         (Some(0), Some(0))
     );
 }
+
+#[test]
+fn reconciled_index_refuses_writes_when_comment_ids_clash() {
+    use ais_core::vault::index::NoteIndex;
+    let vault = fixture();
+    // 겹침이 없으면 읽기용과 쓰기용이 같은 노트를 본다
+    let clean = NoteIndex::reconciled(&vault).expect("겹침이 없다");
+    assert_eq!(clean.root_notes().count(), 21);
+
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/add-comment-clash.sh");
+    let output = Command::new("bash")
+        .arg(script)
+        .arg(&vault)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let error = NoteIndex::reconciled(&vault)
+        .err()
+        .expect("코멘트 id가 겹친다");
+    assert_eq!(error.code, "AIS-500");
+    assert!(
+        error
+            .message
+            .starts_with("UNIQUE constraint failed: comments.id (cmabc-"),
+        "{}",
+        error.message
+    );
+    assert!(
+        error.message.ends_with("zcopy/comments.json)"),
+        "{}",
+        error.message
+    );
+
+    // 읽기는 처음 겹친 노트부터 뒤의 노트를 뺀 목록을 읽는다
+    let docs = Engine::new(&vault)
+        .call("list_docs", json!({"limit": 0}))
+        .unwrap();
+    let total = docs["total"].as_u64().unwrap();
+    assert!(total < 21, "겹친 노트와 그 뒤가 빠진다: {total}");
+    assert!(!ids(&docs).contains(&"ndcc0001-0000cc01".to_string()));
+}
+
+#[test]
+fn write_foundation_checks_follow_the_java_rules() {
+    use ais_core::vault::index::NoteIndex;
+    use ais_core::write::{marker, precondition};
+
+    let vault = fixture();
+    let index = NoteIndex::fresh(&vault);
+    let note = index.note("ndfx0002-00000002").unwrap();
+    let token = note.token.clone().unwrap();
+    let action = "고치지";
+
+    // 읽은 값 그대로면 통과하고 파일 바이트를 돌려준다
+    let bytes = precondition::check(&index.vault_root, note, Some(&token), action).unwrap();
+    assert_eq!(bytes, std::fs::read(&note.content_file).unwrap());
+    // 없거나 비면 412, 모양이 틀려도 412
+    for missing in [None, Some("")] {
+        let error = precondition::check(&index.vault_root, note, missing, action).unwrap_err();
+        assert_eq!(
+            (
+                error.code,
+                error
+                    .message
+                    .starts_with("선결 조건 토큰이 안 왔어요. 아무것도 쓰지 않았습니다: notes/")
+            ),
+            ("AIS-412", true)
+        );
+    }
+    let malformed = precondition::check(&index.vault_root, note, Some("abc"), action).unwrap_err();
+    assert!(
+        malformed
+            .message
+            .starts_with("선결 조건 토큰의 모양이 아니에요."),
+        "{}",
+        malformed.message
+    );
+    // JSON 노트는 확인 값이 없어도 된다
+    let json_note = index.note("ndfx0006-00000006").unwrap();
+    assert!(precondition::check(&index.vault_root, json_note, None, action).is_ok());
+    // 읽은 뒤 파일이 바뀌면 낡은 값이다
+    std::fs::write(
+        &note.content_file,
+        "---\nid: ndfx0002-00000002\n---\n\n바뀜\n",
+    )
+    .unwrap();
+    let stale = precondition::check(&index.vault_root, note, Some(&token), action).unwrap_err();
+    assert!(
+        stale
+            .message
+            .starts_with("다른 쪽이 이 노트를 먼저 고쳤어요."),
+        "{}",
+        stale.message
+    );
+    // 파일이 없으면 500
+    std::fs::remove_file(&note.content_file).unwrap();
+    let gone =
+        precondition::check(&index.vault_root, note, Some(&token), "메타를 저장하지").unwrap_err();
+    assert_eq!(gone.code, "AIS-500");
+    assert!(
+        gone.message
+            .starts_with("노트 본문 파일을 못 읽어 메타를 저장하지 않았다: notes/"),
+        "{}",
+        gone.message
+    );
+
+    // 워크스페이스 표식: 합성 vault에는 없고, 만들면 통과한다
+    let error = marker::check_workspace_marker(&vault).unwrap_err();
+    assert_eq!(error.code, "AIS-400");
+    assert!(
+        error
+            .message
+            .starts_with("이 폴더는 아직 워크스페이스가 아니다: "),
+        "{}",
+        error.message
+    );
+    assert!(error.message.ends_with(". .aisurada/workspace.json 이 없다. 경로가 맞는지 보고, 새로 만들 자리면 init-workspace 를 먼저 부른다."));
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}").unwrap();
+    assert!(marker::check_workspace_marker(&vault).is_ok());
+}

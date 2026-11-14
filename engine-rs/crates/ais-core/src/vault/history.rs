@@ -416,7 +416,7 @@ fn safe_path(path: &str) -> bool {
 }
 
 /// 파일 앞부분 바이트에서 머리의 `id:` 줄을 읽는다. 머리가 없거나 id 모양이 아니면 `None`.
-fn header_id(bytes: &[u8]) -> Option<String> {
+pub(crate) fn header_id(bytes: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(bytes);
     if !text.starts_with("---") {
         return None;
@@ -475,7 +475,7 @@ fn batch_input(specs: &[String]) -> Vec<u8> {
 }
 
 /// `git cat-file --batch` 응답을 본문마다 자른다. 본문의 줄바꿈이 아니라 머리의 바이트 수를 따른다.
-fn read_batch(count: usize, output: &[u8]) -> Vec<Option<Vec<u8>>> {
+pub(crate) fn read_batch(count: usize, output: &[u8]) -> Vec<Option<Vec<u8>>> {
     let mut bodies: Vec<Option<Vec<u8>>> = Vec::new();
     let mut offset = 0;
     for _ in 0..count {

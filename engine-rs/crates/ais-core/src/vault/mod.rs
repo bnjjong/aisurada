@@ -2,6 +2,7 @@
 
 pub mod agenda;
 pub mod attach_text;
+pub mod comment_copy;
 pub mod comments;
 pub mod facts;
 pub mod filter;

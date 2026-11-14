@@ -71,6 +71,14 @@ impl Git {
                     .env_remove("GIT_INDEX_FILE")
                     .env("GIT_DIR", self.vault.join(".git"))
                     .env("GIT_WORK_TREE", &self.vault);
+                // 앱이 남기는 커밋의 작성자는 늘 aisurada-auto다(판 목록이 이것으로 자동·수동을 가른다)
+                if args.first() == Some(&"commit") {
+                    command
+                        .env("GIT_AUTHOR_NAME", "aisurada-auto")
+                        .env("GIT_COMMITTER_NAME", "aisurada-auto")
+                        .env("GIT_AUTHOR_EMAIL", "noreply@aisurada.local")
+                        .env("GIT_COMMITTER_EMAIL", "noreply@aisurada.local");
+                }
                 Duration::from_secs(60)
             }
             Mode::Legacy => Duration::from_secs(5),

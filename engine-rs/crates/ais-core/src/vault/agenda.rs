@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::Skipped;
+use crate::error::EngineError;
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim, utf16_len};
 
 static AGENDA_ID: LazyLock<Regex> =
@@ -109,6 +110,8 @@ impl AgendaTable {
 pub struct AgendaScan {
     pub table: AgendaTable,
     pub skipped: Vec<Skipped>,
+    /// 읽기 명령은 건너뛰고 지나가지만 쓰기 명령은 일을 하지 않고 실패하는 첫 문제(제목이 빈 아젠다, 같은 slug에 다른 id)
+    pub fatal: Option<EngineError>,
 }
 
 fn skip(skipped: &mut Vec<Skipped>, path: &str, reason: &str) {
@@ -201,6 +204,11 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
             }
         };
         if is_blank(&title) {
+            if scan.fatal.is_none() {
+                scan.fatal = Some(EngineError::invalid_argument(format!(
+                    "아젠다 제목이 비었다: {slug}"
+                )));
+            }
             skip(&mut scan.skipped, &rel, "아젠다 제목이 비었다");
             continue;
         }
@@ -225,8 +233,12 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
         if let Some(existing) = scan.table.slug_to_info.get(&slug)
             && existing.id != id
         {
-            // 같은 slug에 다른 id: 읽기 명령은 아젠다 훑기를 멈추고 표를 비운다
+            // 같은 slug에 다른 id: 읽기 명령은 아젠다 훑기를 멈추고 표를 비운다(쓰기 명령은 실패한다)
+            let fatal = scan.fatal.take().unwrap_or_else(|| {
+                EngineError::internal(format!("Duplicate agenda slug with different id: {slug}"))
+            });
             scan.table = AgendaTable::default();
+            scan.fatal = Some(fatal);
             return scan;
         }
         scan.table.insert(AgendaInfo {

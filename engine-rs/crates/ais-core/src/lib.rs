@@ -10,3 +10,4 @@ pub mod frontmatter;
 pub mod model;
 pub mod text;
 pub mod vault;
+pub mod write;

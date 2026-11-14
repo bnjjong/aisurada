@@ -6,9 +6,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    get_agenda_facts, get_doc, get_sub_note, get_template, history, list_agendas, list_attachments,
-    list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
-    reindex, search_docs,
+    commit_vault, get_agenda_facts, get_doc, get_sub_note, get_template, history, list_agendas,
+    list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
+    list_templates, list_trash, reindex, search_docs,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -36,6 +36,7 @@ pub const COMMANDS: &[&str] = &[
     "list_tags",
     "get_template",
     "history",
+    "commit_vault",
 ];
 
 impl Engine {
@@ -67,7 +68,7 @@ impl Engine {
                 to_json(list_templates::execute(&self.vault_root, &request)?)
             }
             "list_trash" => to_json(list_trash::execute(&self.vault_root)),
-            "reindex" => to_json(reindex::execute(&self.vault_root)),
+            "reindex" => to_json(reindex::execute(&self.vault_root)?),
             "get_doc" => {
                 let request: get_doc::GetDocRequest = parse_args(command, args)?;
                 to_json(get_doc::execute(
@@ -135,6 +136,7 @@ impl Engine {
                 let request: history::HistoryRequest = parse_args(command, args)?;
                 to_json(history::execute(&self.vault_root, &request)?)
             }
+            "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"
             ))),

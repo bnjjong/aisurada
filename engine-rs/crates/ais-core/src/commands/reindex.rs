@@ -6,15 +6,17 @@
 use std::path::Path;
 use std::time::Instant;
 
+use crate::error::EngineError;
 use crate::model::ScanSummary;
 use crate::vault::Skipped;
 use crate::vault::index::NoteIndex;
 use crate::vault::template::{Category, scan_templates};
 use crate::vault::trash::scan_trash;
 
-pub fn execute(vault_root: &Path) -> ScanSummary {
+/// 색인 맞추기로 훑는다. 맞추기를 세우는 문제(코멘트 id가 파일 사이에서 겹침 등)가 있으면 요약 대신 오류를 돌려준다.
+pub fn execute(vault_root: &Path) -> Result<ScanSummary, EngineError> {
     let started = Instant::now();
-    let index = NoteIndex::fresh(vault_root);
+    let index = NoteIndex::reconciled(vault_root)?;
 
     let mut skipped: Vec<Skipped> = index.agendas.skipped.clone();
     skipped.extend(index.scan.skipped.iter().cloned());
@@ -39,7 +41,7 @@ pub fn execute(vault_root: &Path) -> ScanSummary {
     }
 
     let indexed = index.scan.notes.len();
-    ScanSummary {
+    Ok(ScanSummary {
         mode: "full",
         elapsed_ms: started.elapsed().as_millis(),
         agendas: index.agendas.table.slug_count(),
@@ -50,5 +52,5 @@ pub fn execute(vault_root: &Path) -> ScanSummary {
         skipped,
         conflicts: index.scan.conflicts.clone(),
         unsharded: index.scan.unsharded.clone(),
-    }
+    })
 }

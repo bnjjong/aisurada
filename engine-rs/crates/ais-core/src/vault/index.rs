@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::agenda::{AgendaScan, scan_agendas};
+use super::comment_copy;
 use super::scanner::{NoteRecord, NoteScan, scan_notes};
+use crate::error::EngineError;
 
 pub struct NoteIndex {
     pub vault_root: PathBuf,
@@ -17,12 +19,31 @@ pub struct NoteIndex {
 }
 
 impl NoteIndex {
-    /// 디스크를 새로 훑어 색인을 만듭니다.
+    /// 디스크를 새로 훑어 읽기용 색인을 만듭니다. 맞추기를 세우는 문제가 있어도 읽을 수 있는 만큼 읽습니다.
     pub fn fresh(vault_root: &Path) -> NoteIndex {
+        Self::build(vault_root).0
+    }
+
+    /// 쓰기용으로 디스크를 훑습니다(색인 맞추기). 맞추기를 세우는 문제(제목이 빈 아젠다, 같은 slug에 다른 id,
+    /// 코멘트 id가 파일 사이에서 겹침)를 만나면 쓰기가 일을 하지 않도록 오류로 돌려줍니다.
+    pub fn reconciled(vault_root: &Path) -> Result<NoteIndex, EngineError> {
+        match Self::build(vault_root) {
+            (_, Some(fatal)) => Err(fatal),
+            (index, None) => Ok(index),
+        }
+    }
+
+    fn build(vault_root: &Path) -> (NoteIndex, Option<EngineError>) {
         let vault_root =
             std::path::absolute(vault_root).unwrap_or_else(|_| vault_root.to_path_buf());
-        let agendas = scan_agendas(&vault_root);
-        let scan = scan_notes(&vault_root, &agendas.table);
+        let mut agendas = scan_agendas(&vault_root);
+        let mut scan = scan_notes(&vault_root, &agendas.table);
+        let mut fatal = agendas.fatal.take();
+        // 코멘트 id가 겹치는 노트부터 뒤는 읽기 목록에서 뺀다
+        if let Some((at, error)) = comment_copy::first_failure(&vault_root, &scan.notes) {
+            scan.notes.truncate(at);
+            fatal.get_or_insert(error);
+        }
 
         let mut order: Vec<usize> = (0..scan.notes.len()).collect();
         order.sort_by(|&a, &b| compare_created_then_path(&scan.notes[a], &scan.notes[b]));
@@ -32,13 +53,16 @@ impl NoteIndex {
             .enumerate()
             .map(|(i, n)| (n.id.clone(), i))
             .collect();
-        NoteIndex {
-            vault_root,
-            agendas,
-            scan,
-            order,
-            by_id,
-        }
+        (
+            NoteIndex {
+                vault_root,
+                agendas,
+                scan,
+                order,
+                by_id,
+            },
+            fatal,
+        )
     }
 
     /// id로 메인 노트를 찾습니다.
@@ -74,4 +98,57 @@ fn compare_created_then_path(a: &NoteRecord, b: &NoteRecord) -> std::cmp::Orderi
                 .as_bytes()
                 .cmp(b.rel_path.replace('/', "\u{1}").as_bytes())
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn scratch() -> PathBuf {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "ais-index-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".aisurada/agendas")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn same_slug_with_another_id_fails_reconcile_but_reads_an_empty_table() {
+        let vault = scratch();
+        let agenda = |file: &str, id: &str| {
+            fs::write(
+                vault.join(".aisurada/agendas").join(file),
+                format!("---\nid: {id}\nslug: same\ntitle: 같다\n---\n"),
+            )
+            .unwrap();
+        };
+        agenda("a.md", "aga00001-0000000a");
+        agenda("b.md", "agb00001-0000000b");
+        let error = NoteIndex::reconciled(&vault).err().expect("겹친 slug");
+        assert_eq!(
+            error.message,
+            "Duplicate agenda slug with different id: same"
+        );
+        assert_eq!(NoteIndex::fresh(&vault).agendas.table.slug_count(), 0);
+        fs::remove_dir_all(&vault).unwrap();
+    }
+
+    #[test]
+    fn a_clean_vault_reconciles() {
+        let vault = scratch();
+        fs::write(
+            vault.join(".aisurada/agendas/ok.md"),
+            "---\nid: agok0001-0000000c\nslug: ok\ntitle: 정상\n---\n",
+        )
+        .unwrap();
+        let index = NoteIndex::reconciled(&vault).unwrap();
+        assert_eq!(index.agendas.table.slug_count(), 1);
+        fs::remove_dir_all(&vault).unwrap();
+    }
 }
