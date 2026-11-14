@@ -1,6 +1,8 @@
 // The real host behind `AskHost`: the Tauri commands the drag question uses.
 import { claudeSelfWrites } from '../../data/selfWrites.ts';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { engineReply } from '../../workspace/engine.ts';
+import { engineCommands } from '../../workspace/engineCommands.ts';
 import type { AskClaudeArgs, AskAnswer, AskHost, EngineReply } from './askRun.ts';
 
 /**
@@ -18,9 +20,13 @@ export async function askClaudeBridge(args: AskClaudeArgs | Record<string, unkno
   }
 }
 
+/** Rust 엔진으로 옮긴 묻기·대화 명령 4개. 호스트가 알리면 Rust 엔진으로 가고, 아니면 예전처럼 Java 엔진으로 간다. */
+const ROUTED = new Set(['get-ask', 'append-ask-turn', 'list-chats', 'append-chat-turn']);
+const enginePort = { invoke: (command: string, args?: Record<string, unknown>) => invoke<any>(command, args), engineCommands };
+
 export const tauriAskHost: AskHost = {
   native: isTauri(),
-  engine: (argv) => invoke<EngineReply>('sidecar_call', { argv }),
+  engine: (argv) => (ROUTED.has(argv[0]) ? engineReply(enginePort, argv) : invoke<EngineReply>('sidecar_call', { argv })),
   askClaude: askClaudeBridge,
   askRuntime: () => invoke<string>('ask_runtime'),
   // 2.8: the same door as a body picture: the bytes are the IPC body, the folder and name ride in headers.

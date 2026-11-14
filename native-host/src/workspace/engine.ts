@@ -1,9 +1,11 @@
 import { asRow, asText, rows } from './types.ts';
 import type { Agenda, HostPort, Note, Row, Workspace } from './types.ts';
-import { read, toArgv } from '../data/commands.ts';
+import { fromArgv, read, toArgv } from '../data/commands.ts';
 import type { Call } from '../data/commands.ts';
 
 interface SidecarResult { status: number; stdout: string; stderr: string; }
+/** 엔진을 부르는 데 필요한 호스트의 부분: 명령 호출과 Rust 엔진이 처리하는 명령 목록. */
+export type EnginePort = Pick<HostPort, 'invoke'> & Partial<Pick<HostPort, 'engineCommands'>>;
 
 export class SidecarCommandError extends Error {
   readonly status: number;
@@ -31,13 +33,30 @@ export async function engineRefusal(host: HostPort, request: string[] | Call): P
  * 엔진 호출의 길목. 호출 객체(`Call`)는 호스트가 Rust 엔진으로 처리한다고 알린 명령이면 Rust 엔진으로, 아니면 Java 엔진으로 보낸다.
  * 문자열 목록(argv)은 늘 Java 엔진이다. 어느 쪽이든 화면은 같은 모양의 응답을 받는다(Rust 응답은 어댑터가 기존 모양으로 바꾼다).
  */
-export async function engineCall(host: HostPort, request: string[] | Call): Promise<unknown> {
+export async function engineCall(host: EnginePort, request: string[] | Call): Promise<unknown> {
   if (Array.isArray(request)) return javaCall(host, request);
   const supported = await host.engineCommands?.().catch(() => undefined);
   return supported?.has(request.command) ? rustCall(host, request) : javaCall(host, toArgv(request));
 }
 
-async function javaCall(host: HostPort, argv: string[]): Promise<unknown> {
+/**
+ * 옛 `{status, stdout, stderr}` 응답이 필요한 호출자(Claude 연동의 묻기·대화)를 위한 길. 인자 목록을 호출 객체로 바꿔,
+ * 호스트가 Rust 엔진이 처리한다고 알린 명령이면 Rust 엔진으로 보내고 결과를 옛 응답 모양으로 되돌린다.
+ * 알리지 않은 명령은 인자 목록 그대로 Java 엔진으로 보내고 응답을 건드리지 않는다.
+ */
+export async function engineReply(host: EnginePort, argv: string[]): Promise<SidecarResult> {
+  const call = fromArgv(argv);
+  const supported = await host.engineCommands?.().catch(() => undefined);
+  if (!supported?.has(call.command)) return host.invoke<SidecarResult>('sidecar_call', { argv });
+  try {
+    return { status: 0, stdout: JSON.stringify(await rustCall(host, call)), stderr: '' };
+  } catch (error) {
+    if (error instanceof SidecarCommandError) return { status: error.status, stdout: '', stderr: error.stderr };
+    throw error;
+  }
+}
+
+async function javaCall(host: EnginePort, argv: string[]): Promise<unknown> {
   const result = await host.invoke<SidecarResult>('sidecar_call', { argv });
   if (result.status !== 0) {
     throw new SidecarCommandError(argv[0], result);
@@ -48,7 +67,7 @@ async function javaCall(host: HostPort, argv: string[]): Promise<unknown> {
 /** Rust 엔진의 오류 종류를 옛 종료 코드에 맞춘다(화면이 쓰기 충돌을 종료 코드 5로 가르는 곳이 아직 있다). */
 const LEGACY_STATUS: Record<string, number> = { precondition_failed: 5, internal: 1 };
 
-async function rustCall(host: HostPort, call: Call): Promise<unknown> {
+async function rustCall(host: EnginePort, call: Call): Promise<unknown> {
   let value: unknown;
   try {
     value = await host.invoke('engine_call', { command: call.command, args: call.args ?? {} });

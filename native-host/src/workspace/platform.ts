@@ -8,15 +8,8 @@ import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { confirm, open } from '@tauri-apps/plugin-dialog';
 import * as fs from '@tauri-apps/plugin-fs';
 import { sanitizeHtml } from '../lib/sanitize.ts';
+import { engineCommands } from './engineCommands.ts';
 import type { WorkspaceServices } from './types.ts';
-
-/** 호스트에 한 번만 묻는다. 못 받으면 빈 집합이라서 모든 명령이 Java 엔진으로 간다. */
-let rustEngineCommands: Promise<ReadonlySet<string>> | undefined;
-const engineCommands = (): Promise<ReadonlySet<string>> => {
-  if (!isTauri()) return Promise.resolve(new Set<string>());
-  rustEngineCommands ??= invoke<string[]>('engine_commands').then(list => new Set(list), () => new Set<string>());
-  return rustEngineCommands;
-};
 
 export function workspaceServices(): WorkspaceServices {
   return {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { engineCall, readWorkspace, SidecarCommandError } from '../src/workspace/engine.ts';
+import { engineCall, engineReply, readWorkspace, SidecarCommandError } from '../src/workspace/engine.ts';
 import { read, write, fromArgv, toArgv } from '../src/data/commands.ts';
 
 // 가짜 호스트: 기록을 남기고, 명령마다 정해진 응답을 돌려준다.
@@ -434,4 +434,32 @@ test('자원·승인 명령: 옛 인자 목록을 호출 객체로 바꿔 Rust�
   const off = host({ commands: [], java: Object.fromEntries(argvs.map(a => [a[0], argv => { seen.push(argv); return { status: 0, stdout: '{}', stderr: '' }; }])) });
   for (const argv of argvs) await engineCall(off, fromArgv(argv));
   assert.deepEqual(seen, argvs);
+});
+
+test('문답·대화 명령: 선택 자리 인자(후속 노트 id)를 이름 칸과 헷갈리지 않고, 옛 응답 모양으로 되돌린다', async () => {
+  const note = 'ndfx0002-00000002', sub = 'snfx0002-00000012';
+  const argvs = [
+    ['get-ask', note], ['get-ask', note, sub], ['list-chats', note], ['list-chats', note, sub],
+    ['append-ask-turn', note, 'session-id=s1', 'turn-id=t1', 'question=a=b', 'answer='],
+    ['append-ask-turn', note, sub, 'session-id=s1', 'turn-id=t1', 'quote=줄1\n줄2'],
+    ['append-chat-turn', note, 'chat-id=c1', 'elapsed-ms=5'],
+    ['append-chat-turn', note, sub, 'chat-id=c1', 'elapsed-ms=5'],
+  ];
+  for (const argv of argvs) assert.deepEqual(toArgv(fromArgv(argv)), argv, argv.join(' '));
+  assert.deepEqual(fromArgv(['append-ask-turn', note, 'session-id=s1', 'question=a=b']), { command: 'append_ask_turn', args: { id: note, 'session-id': 's1', question: 'a=b' } });
+  assert.deepEqual(fromArgv(['list-chats', note, sub]), { command: 'list_chats', args: { id: note, subId: sub } });
+  const names = ['get_ask', 'list_chats', 'append_ask_turn', 'append_chat_turn'];
+  // 알리면 Rust로 가고, 응답은 옛 `{status, stdout, stderr}` 모양이다(없는 문답은 stdout `null`)
+  const on = host({ commands: names, rust: { get_ask: () => null, list_chats: () => ({ chats: [], unreadable: [] }), append_ask_turn: () => { throw { code: 'AIS-400', kind: 'invalid_argument', message: 'model 이 필요하다' }; }, append_chat_turn: () => ({ chat: {}, path: 'p' }) } });
+  assert.deepEqual(await engineReply(on, ['get-ask', note]), { status: 0, stdout: 'null', stderr: '' });
+  assert.deepEqual(await engineReply(on, ['list-chats', note, sub]), { status: 0, stdout: '{"chats":[],"unreadable":[]}', stderr: '' });
+  assert.deepEqual(await engineReply(on, ['append-ask-turn', note, 'session-id=s']), { status: 3, stdout: '', stderr: 'AIS-400 model 이 필요하다' });
+  assert.equal((await engineReply(on, ['append-chat-turn', note, 'chat-id=c'])).status, 0);
+  assert.deepEqual(on.calls.map(c => c.args.command), ['get_ask', 'list_chats', 'append_ask_turn', 'append_chat_turn']);
+  assert.deepEqual(on.calls[1].args.args, { id: note, subId: sub });
+  // 알리지 않으면 인자 목록 그대로 Java로 가고 응답을 건드리지 않는다
+  const seen = [];
+  const off = host({ commands: [], java: { 'get-ask': argv => { seen.push(argv); return { status: 0, stdout: ' {"a": 1}\n', stderr: '' }; } } });
+  assert.deepEqual(await engineReply(off, ['get-ask', note]), { status: 0, stdout: ' {"a": 1}\n', stderr: '' });
+  assert.deepEqual(seen, [['get-ask', note]]);
 });

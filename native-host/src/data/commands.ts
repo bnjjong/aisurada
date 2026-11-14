@@ -25,6 +25,7 @@ const POSITIONAL: Record<string, string[]> = {
   get_resource: ['id'], delete_resource: ['id'], restore_resource: ['id'], usable_resources: ['project'], list_resource_versions: ['id'],
   set_resource_ref: ['project', 'id'], get_resource_change: ['id'], approve_resource_change: ['id'], reject_resource_change: ['id'],
   resolve_resource_edit: ['id'],
+  get_ask: ['id', 'subId'], append_ask_turn: ['id', 'subId'], list_chats: ['id', 'subId'], append_chat_turn: ['id', 'subId'],
 };
 /** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
@@ -34,14 +35,21 @@ export const toArgv = (call: Call): string[] => {
   return [call.command.replace(/_/g, '-'), ...placed, ...cells(named)];
 };
 
+/** 이름 인자 칸(`key=value`)의 앞부분 */
+const NAMED_CELL = /^[A-Za-z][A-Za-z0-9_-]*=/;
 /**
  * `toArgv`의 거꾸로: 옛 `key=value` 문자열 목록을 호출 객체로 바꾼다. 명령 이름은 snake_case로, `POSITIONAL`에 있는 인자는 앞의 자리 값으로 읽고,
  * 나머지 칸은 `key=value`를 처음 `=`에서 가른다(값은 글 그대로). 태스크 화면이 옛 인자 목록 만드는 함수를 그대로 두고 Rust 길로 보낼 때 쓴다.
  */
 export const fromArgv = (argv: string[]): Call => {
   const command = argv[0].replace(/-/g, '_'), positional = POSITIONAL[command] ?? [], rest = argv.slice(1), args: Fields = {};
-  positional.forEach((key, i) => { if (i < rest.length) args[key] = rest[i]; });
-  for (const cell of rest.slice(positional.length)) {
+  // 자리 인자는 앞에서부터 `key=value`가 아닌 칸이다. 뒤쪽 자리 인자가 선택(후속 노트 id)이어도 이름 칸을 자리로 읽지 않는다.
+  let used = 0;
+  for (const key of positional) {
+    if (used >= rest.length || NAMED_CELL.test(rest[used])) break;
+    args[key] = rest[used++];
+  }
+  for (const cell of rest.slice(used)) {
     const at = cell.indexOf('=');
     args[at < 0 ? cell : cell.slice(0, at)] = at < 0 ? '' : cell.slice(at + 1);
   }
