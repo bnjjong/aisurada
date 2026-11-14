@@ -9,7 +9,7 @@ use super::agenda::AgendaTable;
 use crate::frontmatter::Value;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, cut_utf16, is_blank, trim};
 
-static TEMPLATE_ID: LazyLock<Regex> =
+pub(crate) static TEMPLATE_ID: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z0-9._-]{1,128}$").unwrap());
 static AGENT_NAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-z][a-z0-9-]{0,31}$").unwrap());

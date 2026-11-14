@@ -279,8 +279,12 @@ pub fn scan_notes(vault_root: &Path, agendas: &AgendaTable) -> NoteScan {
     }
 }
 
-/// 월별 폴더 배치인지 디스크로 판정한다: `notes/<아젠다>/YYYY-MM/` 아래에 노트가 바로 있는 곳이 하나라도 있으면 그렇다.
-fn is_sharded(vault: &Path) -> bool {
+/// 월별 폴더 배치인지 판정한다. 환경 변수 `AISURADA_NOTES_SHARD_BY_MONTH`(`true`·`on`·`yes`·`1` / `false`·`off`·`no`·`0`)가
+/// 있으면 그 값을 따르고, 없으면 디스크를 본다: `notes/<아젠다>/YYYY-MM/` 아래에 노트가 바로 있는 곳이 하나라도 있으면 그렇다.
+pub(crate) fn is_sharded(vault: &Path) -> bool {
+    if let Some(forced) = shard_override() {
+        return forced;
+    }
     let Ok(agendas) = fs::read_dir(vault.join("notes")) else {
         return false;
     };
@@ -302,6 +306,17 @@ fn is_sharded(vault: &Path) -> bool {
         }
     }
     false
+}
+
+/// 환경 변수로 정한 배치. 비었거나 모르는 값이면 없는 것으로 본다(Java는 모르는 값에서 시작 오류를 낸다).
+fn shard_override() -> Option<bool> {
+    let raw = std::env::var("AISURADA_NOTES_SHARD_BY_MONTH").ok()?;
+    let text = raw.trim_matches(|c: char| c <= ' ').to_ascii_lowercase();
+    match text.as_str() {
+        "true" | "on" | "yes" | "1" => Some(true),
+        "false" | "off" | "no" | "0" => Some(false),
+        _ => None,
+    }
 }
 
 fn contains_direct_note(dir: &Path) -> bool {

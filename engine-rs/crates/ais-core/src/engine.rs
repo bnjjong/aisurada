@@ -6,10 +6,10 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    agenda_write, commit_vault, facts_write, get_agenda_facts, get_doc, get_sub_note, get_template,
-    history, init_workspace, list_agendas, list_attachments, list_comments, list_docs,
-    list_projects, list_sub_notes, list_tags, list_templates, list_trash, note_meta_write,
-    project_write, reindex, search_docs, template_write,
+    agenda_write, commit_vault, doc_write, facts_write, get_agenda_facts, get_doc, get_sub_note,
+    get_template, history, init_workspace, list_agendas, list_attachments, list_comments,
+    list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
+    note_meta_write, project_write, reindex, search_docs, template_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -52,6 +52,7 @@ pub const COMMANDS: &[&str] = &[
     "set_favorite",
     "evaluate_doc",
     "link_docs",
+    "update_doc",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -70,6 +71,7 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "set_favorite",
     "evaluate_doc",
     "link_docs",
+    "update_doc",
     "commit_vault",
 ];
 
@@ -230,6 +232,10 @@ impl Engine {
             "link_docs" => {
                 let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
                 to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
+            }
+            "update_doc" => {
+                let request: doc_write::UpdateDocRequest = parse_args(command, args)?;
+                to_json(doc_write::update_doc(&self.vault_root, &request)?)
             }
             "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(

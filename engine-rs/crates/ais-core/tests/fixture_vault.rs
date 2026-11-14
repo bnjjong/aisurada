@@ -295,13 +295,13 @@ fn reads_the_synthetic_vault() {
 
     // 이 엔진에 없는 명령은 unsupported로 알린다
     assert_eq!(
-        serde_json::to_value(engine.call("update_doc", json!({})).unwrap_err().kind).unwrap(),
+        serde_json::to_value(engine.call("no_such_command", json!({})).unwrap_err().kind).unwrap(),
         json!("unsupported")
     );
     assert!(
         Engine::supports("list_docs")
             && Engine::supports("get_doc")
-            && !Engine::supports("update_doc")
+            && !Engine::supports("no_such_command")
     );
 
     let _ = std::fs::remove_dir_all(&vault);
@@ -1562,4 +1562,162 @@ fn writes_note_meta_with_stamps_and_preconditions() {
         .call("set_favorite", json!({"id": "ndfx0006-00000006"}))
         .unwrap();
     assert_eq!(json_note["changed"], true);
+}
+
+#[test]
+fn updates_note_text_and_moves_the_note_to_its_canonical_place() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let loose = "ndfx0003-00000003";
+    let parent = "ndfx0002-00000002";
+    let token = |id: &str| {
+        engine.call("get_doc", json!({"id": id})).unwrap()["precondition"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let error = |args: Value| engine.call("update_doc", args).unwrap_err();
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+
+    // 확인 값이 없으면 아무것도 안 쓴다
+    let before = read("notes/demo/loose/note.md");
+    assert_eq!(error(json!({"id": loose, "title": "x"})).code, "AIS-412");
+    assert_eq!(read("notes/demo/loose/note.md"), before);
+    // 입력 검사 순서: id → 태그 → 날짜 → 시각 → 제목
+    assert_eq!(error(json!({})).code, "AIS-400");
+    assert_eq!(
+        error(json!({"id": "nope"})).message,
+        "노트 id 모양이 아니다: nope"
+    );
+    assert_eq!(
+        error(json!({"id": loose, "title": " ", "tags": "[1]"})).message,
+        "tags 항목이 문자열이 아니다: 1"
+    );
+    assert_eq!(
+        error(json!({"id": loose, "title": " "})).message,
+        format!("노트 제목이 비었다: {loose}")
+    );
+    assert_eq!(
+        error(json!({"id": "ndzz0001-00000001"})).message,
+        "Note not found: ndzz0001-00000001"
+    );
+    assert_eq!(
+        error(json!({"id": loose, "tags": ""})).message,
+        "tags 은 JSON 배열이어야 한다: "
+    );
+    assert_eq!(
+        error(json!({"id": loose, "date": "2026-01-01\n"})).message,
+        "date 은 YYYY-MM-DD 모양이어야 한다: 2026-01-01\n"
+    );
+
+    // 제목과 본문을 고치면 월별 폴더의 정식 이름으로 옮겨지고, 머리에 앱 도장이 붙는다
+    let first = engine
+        .call(
+            "update_doc",
+            json!({"id": loose, "title": "새 제목", "body": "# 다른 헤딩\n본문\n", "tags": ["b", " a ", "", "b"], "f1": token(loose)}),
+        )
+        .unwrap();
+    assert_eq!(first["renamed"], true);
+    let path = first["path"].as_str().unwrap().to_string();
+    assert!(
+        path.starts_with("notes/demo/2026-11/2026-11-06-0800-"),
+        "{path}"
+    );
+    assert!(path.ends_with("-0003"), "{path}");
+    assert!(!vault.join("notes/demo/loose").exists());
+    let text = read(&format!("{path}/note.md"));
+    assert!(
+        text.contains("title: 새 제목\n") && text.contains("editedBy: app\n"),
+        "{text}"
+    );
+    assert!(text.contains("tags:\n  - b\n  - a\n"), "{text}");
+    assert!(text.ends_with("---\n# 다른 헤딩\n본문\n"), "{text}");
+    assert!(
+        first["warning"]
+            .as_str()
+            .unwrap()
+            .starts_with("본문 첫 헤딩(\"다른 헤딩\")이 제목(\"새 제목\")과 달라요"),
+        "{first}"
+    );
+    assert_eq!(token(loose), first["precondition"].as_str().unwrap());
+
+    // 같은 값을 다시 쓰면 도장을 건드리지 않고 자리도 그대로다
+    let again = engine
+        .call(
+            "update_doc",
+            json!({"id": loose, "title": "새 제목", "body": "# 다른 헤딩\n본문\n", "f1": token(loose)}),
+        )
+        .unwrap();
+    assert_eq!(
+        (again["renamed"].as_bool(), again["path"].as_str()),
+        (Some(false), Some(path.as_str()))
+    );
+    assert_eq!(read(&format!("{path}/note.md")), text);
+
+    // 시각만 바꾸면 날짜와 오프셋(Z)은 그대로 지킨다. 명령줄 꼴의 tags 글도 받는다
+    let timed = engine
+        .call(
+            "update_doc",
+            json!({"id": loose, "time": "23:59", "tags": "[\"x\"]", "f1": token(loose)}),
+        )
+        .unwrap();
+    assert!(
+        timed["path"].as_str().unwrap().contains("2026-11-06-2359-"),
+        "{timed}"
+    );
+    assert!(
+        read(&format!("{}/note.md", timed["path"].as_str().unwrap()))
+            .contains("2026-11-06T23:59:00Z")
+    );
+
+    // AI 호출은 날짜와 시각을 받지 않고, 도장은 tool과 세션이 적힌다
+    let by_tool = engine
+        .call(
+            "update_doc",
+            json!({"id": loose, "date": "2030-01-01", "time": "01:01", "title": "AI 제목", "f1": token(loose), "caller": "ai", "session": "sess-9", "sessionAgent": "Codex"}),
+        )
+        .unwrap();
+    let tool_path = by_tool["path"].as_str().unwrap();
+    assert!(
+        tool_path.contains("2026-11-06-2359-"),
+        "날짜와 시각은 무시: {tool_path}"
+    );
+    let tool_text = read(&format!("{tool_path}/note.md"));
+    assert!(
+        tool_text.contains("editedBy: tool\n")
+            && tool_text.contains("editedSessionId: sess-9\n")
+            && tool_text.contains("editedSessionAgent: codex\n"),
+        "{tool_text}"
+    );
+
+    // 후속 노트가 있는 폴더 노트는 폴더째 옮겨진다
+    let moved = engine
+        .call(
+            "update_doc",
+            json!({"id": parent, "date": "2026-12-24", "f1": token(parent)}),
+        )
+        .unwrap();
+    let moved_path = moved["path"].as_str().unwrap();
+    assert!(
+        moved_path.starts_with("notes/demo/2026-12/2026-12-24-0900-"),
+        "{moved_path}"
+    );
+    assert!(vault.join(moved_path).join("sub/child1.md").is_file());
+
+    // JSON 노트는 본문을 못 고치고, 단일 .html 노트는 이름만 바뀌며 옛 파일이 사라진다
+    assert_eq!(
+        error(json!({"id": "ndfx0006-00000006", "body": "x"})).code,
+        "AIS-500"
+    );
+    let page = engine
+        .call(
+            "update_doc",
+            json!({"id": "ndfx0005-00000005", "title": "새 페이지", "f1": token("ndfx0005-00000005")}),
+        )
+        .unwrap();
+    assert!(page["path"].as_str().unwrap().ends_with(".html"), "{page}");
+    assert!(!vault.join("notes/work/page.html").exists());
+    assert!(vault.join(page["path"].as_str().unwrap()).is_file());
 }

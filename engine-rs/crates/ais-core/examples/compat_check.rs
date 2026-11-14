@@ -1335,6 +1335,579 @@ impl WriteHarness<'_> {
     }
 }
 
+/// 두 사본에 같은 파일을 둔다.
+fn put_both(h: &WriteHarness, rel: &str, content: &str) {
+    for root in [&h.a, &h.b] {
+        let path = root.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+}
+
+/// 파일 바이트에서 바로 계산한 확인 값(`get_doc`이 값을 안 주는 확장자 폴더 노트용)
+fn file_token(h: &WriteHarness, rel: &str) -> String {
+    ais_core::vault::note_file::compute_token(&fs::read(h.b.join(rel)).unwrap())
+}
+
+/// `update_doc` 한 단계. `named`는 Java의 `key=value`이고, 호출 객체는 같은 글을 그대로 담는다(`tags`도 명령줄 글 꼴).
+/// `rust`가 있으면 그것을 대신 쓴다(`tags`를 배열로 주는 경우).
+fn update_step(
+    h: &mut WriteHarness,
+    label: &str,
+    id: &str,
+    named: &[(&str, &str)],
+    rust: Option<Value>,
+    token: bool,
+) {
+    let mut args = rust.unwrap_or_else(|| {
+        let mut map = Map::new();
+        for (key, value) in named {
+            map.insert(key.to_string(), json!(value));
+        }
+        Value::Object(map)
+    });
+    args["id"] = json!(id);
+    h.note_step(
+        &format!("본문 {label}"),
+        "update_doc",
+        &[id],
+        named,
+        args,
+        token.then_some(id),
+    );
+}
+
+/// `update_doc` 맞대기: 값 하나씩 고치기, 태그·날짜·시각 검사, 노트 종류별 자리 옮기기, 빈자리 고르기, 월별 배치 스위치, 저장 상한.
+fn compare_doc_updates(h: &mut WriteHarness) {
+    let parent = "ndfx0002-00000002";
+    let loose = "ndfx0003-00000003";
+    let single = "ndfx0004-00000004";
+    let html = "ndfx0005-00000005";
+    let json_note = "ndfx0006-00000006";
+    let ext = "ndfx0007-00000007";
+    let record = "ndfx0008-00000008";
+    let odd = "ndfx0009-00000009";
+    let old = "ndfx000a-0000000a";
+
+    // ---- 폴더 노트 하나로 값마다 ----
+    update_step(
+        h,
+        "제목만",
+        loose,
+        &[("title", "새 제목: 콜론 / 슬래시")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "본문만(헤딩이 제목과 다름)",
+        loose,
+        &[("body", "# 다른 헤딩\n\n내용\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "바뀐 것 없음",
+        loose,
+        &[
+            ("title", "새 제목: 콜론 / 슬래시"),
+            ("body", "# 다른 헤딩\n\n내용\n"),
+        ],
+        None,
+        true,
+    );
+    update_step(h, "인자 없이 확인 값만", loose, &[], None, true);
+    update_step(h, "본문 비움", loose, &[("body", "")], None, true);
+    update_step(
+        h,
+        "CRLF 본문",
+        loose,
+        &[("body", "가\r\n나\r\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "깨진 글자가 늘어남",
+        loose,
+        &[("body", "깨진\u{FFFD}글자\n\u{FFFD}\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "깨진 글자가 그대로",
+        loose,
+        &[("body", "깨진\u{FFFD}글자\n\u{FFFD}\n새 줄\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "들여쓴 블록",
+        loose,
+        &[("body", "  ## 들여쓴\n본문\n\t> 인용\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "헤딩이 제목과 같음",
+        loose,
+        &[("body", "# 새 제목: 콜론 / 슬래시\n\n본문\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "제목 양끝 공백이 그대로 들어감",
+        loose,
+        &[("title", "  공백 제목  ")],
+        None,
+        true,
+    );
+
+    // ---- 태그 ----
+    update_step(
+        h,
+        "tags 교체",
+        loose,
+        &[("tags", r#"["b","a"]"#)],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "tags 배열로 교체",
+        loose,
+        &[("tags", r#"["x","y"]"#)],
+        Some(json!({"tags": ["x", "y"]})),
+        true,
+    );
+    update_step(
+        h,
+        "tags 정리",
+        loose,
+        &[("tags", r#"[" a ","a",""," ","b","a "]"#)],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "tags 배열 정리",
+        loose,
+        &[("tags", r#"[" a ","a",""," ","b","a "]"#)],
+        Some(json!({"tags": [" a ", "a", "", " ", "b", "a "]})),
+        true,
+    );
+    update_step(h, "tags 비움", loose, &[("tags", "[]")], None, true);
+    update_step(
+        h,
+        "tags 줄바꿈",
+        loose,
+        &[("tags", r#"["a\nb"]"#)],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "tags 줄바꿈(배열)",
+        loose,
+        &[("tags", r#"["a\nb"]"#)],
+        Some(json!({"tags": ["a\nb"]})),
+        true,
+    );
+    update_step(h, "tags 객체", loose, &[("tags", r#"{"a":1}"#)], None, true);
+    update_step(h, "tags 글", loose, &[("tags", r#""x""#)], None, true);
+    update_step(h, "tags 문법 오류", loose, &[("tags", "[1,")], None, true);
+    update_step(h, "tags 항목 숫자", loose, &[("tags", "[1]")], None, true);
+    update_step(
+        h,
+        "tags 항목 객체",
+        loose,
+        &[("tags", r#"[{"a":1.0e3}]"#)],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "tags 특수 글자",
+        loose,
+        &[("tags", r##"["# 해시","콜론: x","'따옴표'","\"큰\"","😀"]"##)],
+        None,
+        true,
+    );
+
+    // ---- 템플릿 ----
+    update_step(
+        h,
+        "템플릿",
+        loose,
+        &[("template", "my-tpl_1.v2")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "템플릿 모양이 틀림(버림)",
+        loose,
+        &[("template", "bad tpl!")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "템플릿 공백을 다듬음",
+        loose,
+        &[("template", "  spaced  ")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "템플릿 빈 글(버림)",
+        loose,
+        &[("template", "")],
+        None,
+        true,
+    );
+
+    // ---- 날짜와 시각 ----
+    update_step(h, "날짜만", loose, &[("date", "2026-12-25")], None, true);
+    update_step(h, "시각만", loose, &[("time", "23:59")], None, true);
+    update_step(
+        h,
+        "날짜와 시각과 제목",
+        loose,
+        &[
+            ("date", "2027-01-02"),
+            ("time", "03:04"),
+            ("title", "새해 제목"),
+        ],
+        None,
+        true,
+    );
+    for (label, date) in [
+        ("달력에 없음", "2026-02-30"),
+        ("모양", "26-1-1"),
+        ("월", "2026-13-01"),
+        ("0000년 앞 부호", "-0000-01-01"),
+        ("한 자리 달", "2026-1-01"),
+        ("윤일 아님", "2026-02-29"),
+        ("윤일", "2028-02-29"),
+        ("연도 한도 밖", "+1000000000-01-01"),
+        ("연도 int 밖", "+9999999999-01-01"),
+    ] {
+        update_step(
+            h,
+            &format!("날짜 {label}"),
+            loose,
+            &[("date", date)],
+            None,
+            true,
+        );
+    }
+    for (label, time) in [
+        ("24시", "24:00"),
+        ("한 자리 시", "9:05"),
+        ("60분", "12:60"),
+        ("콜론 없음", "1200"),
+        ("0시", "00:00"),
+    ] {
+        update_step(
+            h,
+            &format!("시각 {label}"),
+            loose,
+            &[("time", time)],
+            None,
+            true,
+        );
+    }
+
+    // ---- 이상한 연도: 쓴 뒤 읽을 수 없게 되는 노트가 있어서 버릴 노트에서 한다 ----
+    for (n, years) in [
+        (
+            0xb0,
+            vec![
+                ("0년", "-00000-03-04"),
+                ("기원전 1년", "-0001-03-04"),
+                ("0000년", "0000-01-01"),
+            ],
+        ),
+        (0xb1, vec![("다섯 자리 연도", "+12345-03-04")]),
+        (0xb2, vec![("연도 한도 안", "+999999999-01-01")]),
+    ] {
+        let id = format!("ndfx00{n:02x}-000000{n:02x}");
+        put_both(
+            h,
+            &format!("notes/work/year{n:02x}/note.md"),
+            &format!(
+                "---\nid: {id}\nagenda: work\ntype: free\ntitle: 연도 시험\ncreated: '2026-11-10T09:00:00+09:00'\n---\n본문\n"
+            ),
+        );
+        for (label, date) in years {
+            update_step(
+                h,
+                &format!("날짜 {label}"),
+                &id,
+                &[("date", date)],
+                None,
+                true,
+            );
+        }
+    }
+
+    // ---- 입력 오류 ----
+    update_step(h, "제목 공백", loose, &[("title", "   ")], None, true);
+    update_step(h, "제목 빈 글", loose, &[("title", "")], None, true);
+    update_step(h, "확인 값 없음", loose, &[("title", "x")], None, false);
+    update_step(
+        h,
+        "확인 값 모양",
+        loose,
+        &[("title", "x"), ("f1", "abc")],
+        None,
+        false,
+    );
+    update_step(
+        h,
+        "확인 값 틀림",
+        loose,
+        &[("title", "x"), ("f1", "f1:deadbeef")],
+        None,
+        false,
+    );
+    h.note_step("id 없음", "update_doc", &[], &[], json!({}), None);
+    h.note_step(
+        "id 공백",
+        "update_doc",
+        &[" "],
+        &[("title", "x")],
+        json!({"id": " ", "title": "x"}),
+        None,
+    );
+    update_step(h, "id 모양", "nope", &[("title", "x")], None, false);
+    update_step(
+        h,
+        "없는 노트",
+        "ndzz0001-00000001",
+        &[("title", "x")],
+        None,
+        false,
+    );
+
+    // ---- 노트 종류별 ----
+    update_step(
+        h,
+        "폴더 노트 아래 후속 노트가 있는 상위",
+        parent,
+        &[("date", "2026-11-20"), ("title", "상위 새 제목")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "상위 본문만",
+        parent,
+        &[("body", "# 상위 새 제목\n\n본문\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "단일 .md 제목(빈 제목이던 노트)",
+        single,
+        &[("title", "단일 파일 제목")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "단일 .md 본문만",
+        odd,
+        &[("body", "다른 본문\n")],
+        None,
+        true,
+    );
+    update_step(h, "단일 .md 시각만", odd, &[("time", "07:07")], None, true);
+    update_step(
+        h,
+        "단일 .html 제목",
+        html,
+        &[("title", "HTML 새 제목")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "단일 .html 본문(들여쓴 블록이어도 경고 없음)",
+        html,
+        &[("body", "  ## <h2>x</h2>\n<p>본문</p>\n")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "단일 .html 날짜",
+        html,
+        &[("date", "2026-10-01")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "JSON 노트 본문",
+        json_note,
+        &[("body", "x")],
+        None,
+        false,
+    );
+    update_step(
+        h,
+        "JSON 노트 제목",
+        json_note,
+        &[("title", "JSON 새 제목")],
+        None,
+        false,
+    );
+    update_step(
+        h,
+        "JSON 노트 태그",
+        json_note,
+        &[("tags", r#"["j"]"#)],
+        None,
+        false,
+    );
+    let ext_token = file_token(h, "notes/work/ext.md/note.md");
+    update_step(
+        h,
+        "확장자 폴더 확인 값 없음",
+        ext,
+        &[("title", "확장자 새 제목")],
+        None,
+        false,
+    );
+    update_step(
+        h,
+        "확장자 폴더 제목",
+        ext,
+        &[("title", "확장자 새 제목"), ("f1", &ext_token)],
+        None,
+        false,
+    );
+    update_step(
+        h,
+        "기록 층 제목",
+        record,
+        &[("title", "기록 새 제목"), ("tags", r#"["기록","새"]"#)],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "오프셋이 -12:00인 노트 시각만",
+        old,
+        &[("time", "10:30")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "오프셋이 -12:00인 노트 날짜만",
+        old,
+        &[("date", "2026-01-02")],
+        None,
+        true,
+    );
+
+    // ---- 빈자리 고르기: 정식 자리가 이미 차 있으면 -2, -3 ----
+    let canonical =
+        |h: &WriteHarness, date: &str, hhmm: &str, title: &str, tail: &str, month: &str| {
+            let _ = h;
+            format!(
+                "notes/work/{month}/{date}-{hhmm}-{}-{tail}",
+                ais_core::write::slug::build(title, 50)
+            )
+        };
+    let taken = canonical(h, "2026-11-08", "0800", "충돌", "0008", "2026-11");
+    put_both(h, &format!("{taken}/keep.txt"), "x\n");
+    update_step(h, "빈자리 -2", record, &[("title", "충돌")], None, true);
+    // 기록 노트는 이미 `충돌`로 옮겨졌으므로, 같은 이름을 한 번 더 막고 다른 제목에서 되돌려 본다
+    put_both(h, &format!("{taken}-2/keep.txt"), "x\n");
+    update_step(h, "제목 바꿨다가", record, &[("title", "다른")], None, true);
+    update_step(
+        h,
+        "되돌리기(-3까지 차 있음)",
+        record,
+        &[("title", "충돌")],
+        None,
+        true,
+    );
+
+    // ---- 저장 상한: 상한 바로 아래 노트의 제목을 길게 ----
+    let filler = "a".repeat(999_800);
+    put_both(
+        h,
+        "notes/work/big/note.md",
+        &format!(
+            "---\nid: ndfx00a0-000000a0\nagenda: work\ntype: free\ntitle: 큰 노트\ncreated: '2026-11-10T09:00:00+09:00'\n---\n{filler}"
+        ),
+    );
+    update_step(
+        h,
+        "상한 안(제목 조금)",
+        "ndfx00a0-000000a0",
+        &[("title", "큰 노트 둘")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "상한 초과",
+        "ndfx00a0-000000a0",
+        &[("title", &"긴".repeat(300))],
+        None,
+        true,
+    );
+
+    // ---- 월별 배치 스위치 ----
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("AISURADA_NOTES_SHARD_BY_MONTH", "false");
+    }
+    update_step(
+        h,
+        "월별 배치 끔: 제목",
+        parent,
+        &[("title", "월별 끔")],
+        None,
+        true,
+    );
+    update_step(
+        h,
+        "월별 배치 끔: 날짜",
+        loose,
+        &[("date", "2026-09-09")],
+        None,
+        true,
+    );
+    unsafe {
+        env::set_var("AISURADA_NOTES_SHARD_BY_MONTH", "ON");
+    }
+    update_step(
+        h,
+        "월별 배치 켬: 제목",
+        loose,
+        &[("title", "월별 켬")],
+        None,
+        true,
+    );
+    unsafe {
+        env::remove_var("AISURADA_NOTES_SHARD_BY_MONTH");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -2483,6 +3056,8 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
             None,
         );
     }
+
+    compare_doc_updates(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {
