@@ -6,10 +6,11 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    agenda_write, commit_vault, doc_create, doc_write, facts_write, get_agenda_facts, get_doc,
-    get_sub_note, get_template, history, init_workspace, list_agendas, list_attachments,
-    list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
-    note_meta_write, project_write, reindex, search_docs, sub_note_write, template_write,
+    agenda_write, comment_write, commit_vault, doc_create, doc_write, facts_write,
+    get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace, list_agendas,
+    list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
+    list_templates, list_trash, note_meta_write, project_write, reindex, search_docs,
+    sub_note_write, template_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -57,6 +58,9 @@ pub const COMMANDS: &[&str] = &[
     "create_sub_note",
     "update_sub_note",
     "delete_sub_note",
+    "create_comment",
+    "update_comment",
+    "delete_comment",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -80,6 +84,9 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "create_sub_note",
     "update_sub_note",
     "delete_sub_note",
+    "create_comment",
+    "update_comment",
+    "delete_comment",
     "commit_vault",
 ];
 
@@ -240,6 +247,18 @@ impl Engine {
             "link_docs" => {
                 let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
                 to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
+            }
+            "create_comment" => {
+                let request: comment_write::CommentWriteRequest = parse_args(command, args)?;
+                to_json(comment_write::create_comment(&self.vault_root, &request)?)
+            }
+            "update_comment" => {
+                let request: comment_write::CommentWriteRequest = parse_args(command, args)?;
+                to_json(comment_write::update_comment(&self.vault_root, &request)?)
+            }
+            "delete_comment" => {
+                let request: comment_write::CommentWriteRequest = parse_args(command, args)?;
+                to_json(comment_write::delete_comment(&self.vault_root, &request)?)
             }
             "create_sub_note" => {
                 let request: sub_note_write::CreateSubNoteRequest = parse_args(command, args)?;

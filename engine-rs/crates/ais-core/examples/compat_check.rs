@@ -2888,6 +2888,552 @@ fn compare_sub_note_writes(h: &mut WriteHarness) {
     }
 }
 
+/// 코멘트 쓰기 한 단계. `java`는 `ais-cli` 인자 목록(자리 인자 포함)이고 `rust`는 같은 뜻의 호출 객체다.
+fn comment_step(h: &mut WriteHarness, label: &str, command: &str, java: &[&str], rust: Value) {
+    h.step(&format!("코멘트 {label}"), java, command, rust);
+}
+
+/// `create_comment`, `update_comment`, `delete_comment` 맞대기.
+fn compare_comment_writes(h: &mut WriteHarness) {
+    let parent = "ndfx0002-00000002";
+    let child2 = "snfx0002-00000012";
+    let grand = "snfx0003-00000013";
+    let work_note = "ndfx0004-00000004"; // 코멘트 파일이 없는 노트(앞 단계에서 폴더가 됐을 수 있다)
+    let json_note = "ndfx0006-00000006"; // JSON 본문 노트
+    let big = "ndfx0020-00000020"; // 코멘트 파일이 너무 큼
+    let rec = "ndfx0008-00000008"; // 코멘트 파일이 `[]`
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+
+    // ---- 만들기 ----
+    comment_step(
+        h,
+        "만들기 메인 노트(번호 발급)",
+        "create_comment",
+        &["create-comment", parent, "body=새 코멘트"],
+        json!({"id": parent, "body": "새 코멘트"}),
+    );
+    comment_step(
+        h,
+        "만들기 식별자와 앵커",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            "body=앵커 있는 코멘트",
+            "comment_id=cmnew-00000001",
+            "anchor_quote=가리킨 글",
+        ],
+        json!({"id": parent, "body": "앵커 있는 코멘트", "comment_id": "cmnew-00000001", "anchor_quote": "가리킨 글"}),
+    );
+    comment_step(
+        h,
+        "만들기 앵커가 공백(저장 안 함)",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            "body=공백 앵커",
+            "comment_id=cmnew-00000002",
+            "anchor_quote=   ",
+        ],
+        json!({"id": parent, "body": "공백 앵커", "comment_id": "cmnew-00000002", "anchor_quote": "   "}),
+    );
+    comment_step(
+        h,
+        "만들기 식별자 공백을 다듬음",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            "body=다듬음",
+            "comment_id=  cmnew-00000003  ",
+        ],
+        json!({"id": parent, "body": "다듬음", "comment_id": "  cmnew-00000003  "}),
+    );
+    comment_step(
+        h,
+        "만들기 식별자 모양이 아니어도 받는다",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            "body=이상한 식별자",
+            "comment_id=weird id!",
+        ],
+        json!({"id": parent, "body": "이상한 식별자", "comment_id": "weird id!"}),
+    );
+    comment_step(
+        h,
+        "만들기 특수 글자 본문",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            "body=줄\n\"따옴표\"\t\\ 😀 \u{7f}",
+            "comment_id=cmnew-00000004",
+        ],
+        json!({"id": parent, "body": "줄\n\"따옴표\"\t\\ 😀 \u{7f}", "comment_id": "cmnew-00000004"}),
+    );
+    comment_step(
+        h,
+        "만들기 후속 노트",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            child2,
+            "body=후속 코멘트",
+            "comment_id=cmnew-00000005",
+        ],
+        json!({"id": parent, "subId": child2, "body": "후속 코멘트", "comment_id": "cmnew-00000005"}),
+    );
+    comment_step(
+        h,
+        "만들기 후속 노트(파일이 아직 없음)",
+        "create_comment",
+        &["create-comment", parent, child2, "body=둘째 후속 코멘트"],
+        json!({"id": parent, "subId": child2, "body": "둘째 후속 코멘트"}),
+    );
+    comment_step(
+        h,
+        "만들기 코멘트 파일이 없는 노트",
+        "create_comment",
+        &[
+            "create-comment",
+            work_note,
+            "body=새 파일",
+            "comment_id=cmzz-00000001",
+        ],
+        json!({"id": work_note, "body": "새 파일", "comment_id": "cmzz-00000001"}),
+    );
+    comment_step(
+        h,
+        "만들기 JSON 노트",
+        "create_comment",
+        &[
+            "create-comment",
+            json_note,
+            "body=JSON 노트",
+            "comment_id=cmjson-00000001",
+        ],
+        json!({"id": json_note, "body": "JSON 노트", "comment_id": "cmjson-00000001"}),
+    );
+    comment_step(
+        h,
+        "만들기 `[]` 파일에",
+        "create_comment",
+        &["create-comment", rec, "body=기록 노트"],
+        json!({"id": rec, "body": "기록 노트"}),
+    );
+    let long_quote = "가".repeat(2_000);
+    let too_long_quote = "가".repeat(2_001);
+    let limit_body = "나".repeat(20_000);
+    let over_body = "나".repeat(20_001);
+    for (label, java, rust) in [
+        (
+            "앵커 상한(2000자)",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "body=상한".to_string(),
+                format!("anchor_quote={long_quote}"),
+                "comment_id=cmlim-00000001".to_string(),
+            ],
+            json!({"id": parent, "body": "상한", "anchor_quote": long_quote, "comment_id": "cmlim-00000001"}),
+        ),
+        (
+            "본문 상한(20000자)",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                format!("body={limit_body}"),
+                "comment_id=cmlim-00000002".to_string(),
+            ],
+            json!({"id": parent, "body": limit_body, "comment_id": "cmlim-00000002"}),
+        ),
+        (
+            "오류 앵커가 너무 김",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "body=x".to_string(),
+                format!("anchor_quote={too_long_quote}"),
+            ],
+            json!({"id": parent, "body": "x", "anchor_quote": too_long_quote}),
+        ),
+        (
+            "오류 본문이 너무 김",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                format!("body={over_body}"),
+            ],
+            json!({"id": parent, "body": over_body}),
+        ),
+        (
+            "오류 노트 없음",
+            vec!["create-comment".to_string()],
+            json!({}),
+        ),
+        (
+            "오류 노트 공백",
+            vec![
+                "create-comment".to_string(),
+                " ".to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": " ", "body": "x"}),
+        ),
+        (
+            "오류 노트 모양",
+            vec![
+                "create-comment".to_string(),
+                "nope".to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": "nope", "body": "x"}),
+        ),
+        (
+            "오류 후속 노트 모양",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "nope".to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": parent, "subId": "nope", "body": "x"}),
+        ),
+        (
+            "오류 본문 없음",
+            vec!["create-comment".to_string(), parent.to_string()],
+            json!({"id": parent}),
+        ),
+        (
+            "오류 본문 공백",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "body=  ".to_string(),
+            ],
+            json!({"id": parent, "body": "  "}),
+        ),
+        (
+            "오류 없는 노트",
+            vec![
+                "create-comment".to_string(),
+                "ndzz0001-00000001".to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": "ndzz0001-00000001", "body": "x"}),
+        ),
+        (
+            "오류 없는 후속 노트",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "snzz0001-00000001".to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": parent, "subId": "snzz0001-00000001", "body": "x"}),
+        ),
+        (
+            "오류 이미 있는 식별자",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "body=x".to_string(),
+                "comment_id=cmnew-00000001".to_string(),
+            ],
+            json!({"id": parent, "body": "x", "comment_id": "cmnew-00000001"}),
+        ),
+        (
+            "오류 이미 있는 식별자(대소문자만 다름은 다른 것)",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                "body=x".to_string(),
+                "comment_id=CMNEW-00000001".to_string(),
+            ],
+            json!({"id": parent, "body": "x", "comment_id": "CMNEW-00000001"}),
+        ),
+        (
+            "오류 코멘트 파일이 너무 큼",
+            vec![
+                "create-comment".to_string(),
+                big.to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": big, "body": "x"}),
+        ),
+        (
+            "오류 코멘트 파일이 JSON이 아님",
+            vec![
+                "create-comment".to_string(),
+                parent.to_string(),
+                grand.to_string(),
+                "body=x".to_string(),
+            ],
+            json!({"id": parent, "subId": grand, "body": "x"}),
+        ),
+    ] {
+        let refs: Vec<&str> = java.iter().map(String::as_str).collect();
+        comment_step(h, label, "create_comment", &refs, rust);
+    }
+
+    // ---- 고치기 ----
+    comment_step(
+        h,
+        "고치기 본문",
+        "update_comment",
+        &[
+            "update-comment",
+            parent,
+            "comment_id=cmabc-0a0b0c0d",
+            "body=고친 첫 코멘트",
+        ],
+        json!({"id": parent, "comment_id": "cmabc-0a0b0c0d", "body": "고친 첫 코멘트"}),
+    );
+    comment_step(
+        h,
+        "고치기 이미 고친 코멘트를 또",
+        "update_comment",
+        &[
+            "update-comment",
+            parent,
+            "comment_id=cmabc-1a2b3c4d",
+            "body=또 고침",
+        ],
+        json!({"id": parent, "comment_id": "cmabc-1a2b3c4d", "body": "또 고침"}),
+    );
+    comment_step(
+        h,
+        "고치기 식별자 공백을 다듬음",
+        "update_comment",
+        &[
+            "update-comment",
+            parent,
+            "comment_id=  cmnew-00000001  ",
+            "body=공백 식별자",
+        ],
+        json!({"id": parent, "comment_id": "  cmnew-00000001  ", "body": "공백 식별자"}),
+    );
+    comment_step(
+        h,
+        "고치기 후속 노트",
+        "update_comment",
+        &[
+            "update-comment",
+            parent,
+            child2,
+            "comment_id=cmnew-00000005",
+            "body=후속 고침",
+        ],
+        json!({"id": parent, "subId": child2, "comment_id": "cmnew-00000005", "body": "후속 고침"}),
+    );
+    for (label, java, rust) in [
+        (
+            "오류 식별자 없음",
+            vec!["update-comment", parent, "body=x"],
+            json!({"id": parent, "body": "x"}),
+        ),
+        (
+            "오류 본문 없음",
+            vec!["update-comment", parent, "comment_id=cmabc-0a0b0c0d"],
+            json!({"id": parent, "comment_id": "cmabc-0a0b0c0d"}),
+        ),
+        (
+            "오류 본문 공백",
+            vec![
+                "update-comment",
+                parent,
+                "comment_id=cmabc-0a0b0c0d",
+                "body= ",
+            ],
+            json!({"id": parent, "comment_id": "cmabc-0a0b0c0d", "body": " "}),
+        ),
+        (
+            "오류 그 코멘트가 없다",
+            vec![
+                "update-comment",
+                parent,
+                "comment_id=cmzz-00000000",
+                "body=x",
+            ],
+            json!({"id": parent, "comment_id": "cmzz-00000000", "body": "x"}),
+        ),
+        (
+            "오류 필터로 빠진 코멘트",
+            vec![
+                "update-comment",
+                parent,
+                "comment_id=cmabc-nocreated",
+                "body=x",
+            ],
+            json!({"id": parent, "comment_id": "cmabc-nocreated", "body": "x"}),
+        ),
+        (
+            "오류 다른 노트의 코멘트",
+            vec![
+                "update-comment",
+                work_note,
+                "comment_id=cmabc-0a0b0c0d",
+                "body=x",
+            ],
+            json!({"id": work_note, "comment_id": "cmabc-0a0b0c0d", "body": "x"}),
+        ),
+    ] {
+        comment_step(h, label, "update_comment", &java, rust);
+    }
+
+    // ---- 지우기: 본문에 앵커 표시를 넣어 두고 지운다 ----
+    h.note_step(
+        "본문 메인 노트에 앵커 표시를 넣음",
+        "update_doc",
+        &[parent],
+        &[("body", "# 부모\n<!--aisc:cmabc-0a0b0c0d-->첫<!--/aisc:cmabc-0a0b0c0d--> 그리고 <!--aisc:cmnew-00000001-->둘<!--/aisc:cmnew-00000001-->\n")],
+        json!({"id": parent, "body": "# 부모\n<!--aisc:cmabc-0a0b0c0d-->첫<!--/aisc:cmabc-0a0b0c0d--> 그리고 <!--aisc:cmnew-00000001-->둘<!--/aisc:cmnew-00000001-->\n"}),
+        Some(parent),
+    );
+    comment_step(
+        h,
+        "지우기 앵커 표시와 함께",
+        "delete_comment",
+        &["delete-comment", parent, "comment_id=cmabc-0a0b0c0d"],
+        json!({"id": parent, "comment_id": "cmabc-0a0b0c0d"}),
+    );
+    comment_step(
+        h,
+        "지우기 앵커 표시 없이",
+        "delete_comment",
+        &["delete-comment", parent, "comment_id=cmnew-00000002"],
+        json!({"id": parent, "comment_id": "cmnew-00000002"}),
+    );
+    comment_step(
+        h,
+        "지우기 후속 노트(표시 없음)",
+        "delete_comment",
+        &[
+            "delete-comment",
+            parent,
+            child2,
+            "comment_id=cmnew-00000005",
+        ],
+        json!({"id": parent, "subId": child2, "comment_id": "cmnew-00000005"}),
+    );
+    // 후속 노트 본문에 앵커 표시를 넣고 지운다(그 후속 노트의 폴더가 정식 이름으로 옮겨질 수 있다)
+    comment_step(
+        h,
+        "만들기 후속 노트(표시를 넣을 것)",
+        "create_comment",
+        &[
+            "create-comment",
+            parent,
+            child2,
+            "body=표시 코멘트",
+            "comment_id=cmmark-00000001",
+        ],
+        json!({"id": parent, "subId": child2, "body": "표시 코멘트", "comment_id": "cmmark-00000001"}),
+    );
+    let marked = "# 자식\n<!--aisc:cmmark-00000001-->표시<!--/aisc:cmmark-00000001-->\n";
+    let token = Engine::new(&h.b)
+        .call("get_sub_note", json!({"parent": parent, "id": child2}))
+        .ok()
+        .and_then(|v| v["precondition"].as_str().map(str::to_string))
+        .unwrap_or_default();
+    h.step(
+        "코멘트 후속 노트 본문에 앵커 표시를 넣음",
+        &[
+            "update-sub-note",
+            parent,
+            child2,
+            &format!("body={marked}"),
+            &format!("f1={token}"),
+        ],
+        "update_sub_note",
+        json!({"parent": parent, "id": child2, "body": marked, "f1": token}),
+    );
+    comment_step(
+        h,
+        "지우기 후속 노트 앵커 표시와 함께",
+        "delete_comment",
+        &[
+            "delete-comment",
+            parent,
+            child2,
+            "comment_id=cmmark-00000001",
+        ],
+        json!({"id": parent, "subId": child2, "comment_id": "cmmark-00000001"}),
+    );
+    for (label, java, rust) in [
+        (
+            "오류 식별자 없음",
+            vec!["delete-comment", parent],
+            json!({"id": parent}),
+        ),
+        (
+            "오류 그 코멘트가 없다",
+            vec!["delete-comment", parent, "comment_id=cmzz-00000000"],
+            json!({"id": parent, "comment_id": "cmzz-00000000"}),
+        ),
+        (
+            "오류 이미 지운 코멘트",
+            vec!["delete-comment", parent, "comment_id=cmabc-0a0b0c0d"],
+            json!({"id": parent, "comment_id": "cmabc-0a0b0c0d"}),
+        ),
+        (
+            "오류 JSON 노트(앵커를 못 걷어냄)",
+            vec!["delete-comment", json_note, "comment_id=cmjson-00000001"],
+            json!({"id": json_note, "comment_id": "cmjson-00000001"}),
+        ),
+    ] {
+        comment_step(h, label, "delete_comment", &java, rust);
+    }
+    // 마지막 코멘트를 지우면 파일이 사라진다
+    comment_step(
+        h,
+        "지우기 마지막 코멘트(파일이 사라짐)",
+        "delete_comment",
+        &["delete-comment", work_note, "comment_id=cmzz-00000001"],
+        json!({"id": work_note, "comment_id": "cmzz-00000001"}),
+    );
+    // 코멘트 파일이 JSON이 아닌 후속 노트에는 쓰지 않는다(파일은 그대로 남는다)
+    let root_path = Engine::new(&h.b)
+        .call("get_doc", json!({"id": parent}))
+        .ok()
+        .and_then(|v| v["path"].as_str().map(str::to_string))
+        .unwrap_or_default();
+    put_both(
+        h,
+        &format!("{root_path}/sub-comments/{child2}.json"),
+        "이건 JSON이 아니다",
+    );
+    comment_step(
+        h,
+        "오류 코멘트 파일이 JSON이 아님(후속 노트)",
+        "create_comment",
+        &["create-comment", parent, child2, "body=x"],
+        json!({"id": parent, "subId": child2, "body": "x"}),
+    );
+    comment_step(
+        h,
+        "오류 코멘트 파일이 JSON이 아님(지우기)",
+        "delete_comment",
+        &[
+            "delete-comment",
+            parent,
+            child2,
+            "comment_id=cmnew-00000005",
+        ],
+        json!({"id": parent, "subId": child2, "comment_id": "cmnew-00000005"}),
+    );
+    unsafe {
+        env::remove_var("TZ");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -4040,6 +4586,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_doc_updates(&mut h);
     compare_doc_creates(&mut h);
     compare_sub_note_writes(&mut h);
+    compare_comment_writes(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {

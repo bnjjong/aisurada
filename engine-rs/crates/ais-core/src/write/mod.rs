@@ -18,15 +18,19 @@
 //! - [`doc_place`]: 날짜·시각 인자, 부모 폴더, 폴더 이름, 폴더 옮기기
 //! - [`first_heading`]: 본문 첫 헤딩 글
 //! - [`local_time`]: 이 프로세스의 시간대로 본 날짜와 시각
+//! - [`json_out`]: 파일에 쓰는 JSON 글(들여쓰기 두 칸)
+//! - [`comments_file`]: 코멘트 파일 쓰기와 앵커 표시 걷어내기
 //! - [`sub_note`]: 후속 노트 쓰기의 공통 부품(파일 글, 폴더 옮기기, 하위 페이지 카드 걷어내기, 폴더 지우기)
 
 pub mod agenda_file;
 pub mod apparatus;
 pub mod atomic;
 pub mod autocommit;
+pub mod comments_file;
 pub mod confine;
 pub mod doc_place;
 pub mod first_heading;
+pub mod json_out;
 pub mod local_time;
 pub mod lock;
 pub mod marker;

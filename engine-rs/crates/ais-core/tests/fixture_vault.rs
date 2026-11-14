@@ -2031,3 +2031,164 @@ fn writes_sub_notes_and_strips_their_cards() {
     assert_eq!(plain["cardRemoved"], false);
     assert!(plain.get("containerBefore").is_none());
 }
+
+#[test]
+fn writes_comments_and_strips_their_anchors() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let parent = "ndfx0002-00000002";
+    let loose = "ndfx0003-00000003";
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+
+    // 만들기: 번호를 발급하고 앵커는 공백뿐이면 저장하지 않는다. 파일은 `{"v": 1, "comments": [...]}`로 다시 쓰인다
+    let created = engine
+        .call(
+            "create_comment",
+            json!({"id": parent, "body": "새 코멘트", "anchor_quote": "인용"}),
+        )
+        .unwrap();
+    let new_id = created["id"].as_str().unwrap().to_string();
+    assert!(
+        new_id.starts_with("cm") && created["total"] == 4,
+        "{created}"
+    );
+    assert_eq!(created["path"], "notes/demo/2026-11/parent/comments.json");
+    let file = read("notes/demo/2026-11/parent/comments.json");
+    assert!(
+        file.starts_with(
+            "{\n  \"v\": 1,\n  \"comments\": [\n    {\n      \"id\": \"cmabc-0a0b0c0d\","
+        ),
+        "{file}"
+    );
+    assert!(
+        file.contains(
+            "\"anchor\": {\n        \"quote\": \"인용\"\n      },\n      \"body\": \"새 코멘트\""
+        ),
+        "{file}"
+    );
+    assert!(file.ends_with("\n  ]\n}\n"));
+    let listed = engine.call("list_comments", json!({"id": parent})).unwrap();
+    assert_eq!(listed["comments"].as_array().unwrap().len(), 4);
+    let blank_quote = engine
+        .call("create_comment", json!({"id": parent, "body": "공백 앵커", "comment_id": " cmblank-00000001 ", "anchor_quote": "  "}))
+        .unwrap();
+    assert_eq!(blank_quote["id"], "cmblank-00000001");
+    let written: Value =
+        serde_json::from_str(&read("notes/demo/2026-11/parent/comments.json")).unwrap();
+    let row = written["comments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "cmblank-00000001")
+        .unwrap();
+    assert!(row.get("anchor").is_none(), "{row}");
+
+    // 고치기: 만든 시각 뒤로 editedAt이 붙는다. 없는 코멘트와 중복 식별자는 409다
+    let edited = engine
+        .call(
+            "update_comment",
+            json!({"id": parent, "comment_id": &new_id, "body": "고친 코멘트"}),
+        )
+        .unwrap();
+    assert_eq!(edited["total"], 5);
+    assert!(read("notes/demo/2026-11/parent/comments.json").contains("\"editedAt\": \""));
+    assert_eq!(
+        error(
+            "update_comment",
+            json!({"id": parent, "comment_id": "cmzz-00000000", "body": "x"})
+        )
+        .message,
+        "그 코멘트가 없다: cmzz-00000000"
+    );
+    assert_eq!(
+        error(
+            "create_comment",
+            json!({"id": parent, "body": "x", "comment_id": &new_id})
+        )
+        .code,
+        "AIS-409"
+    );
+    assert_eq!(
+        error("create_comment", json!({"id": parent, "body": "  "})).message,
+        "코멘트 본문이 비었다."
+    );
+    assert!(
+        error("update_comment", json!({"id": parent, "body": "x"}))
+            .message
+            .starts_with("comment_id 이 필요하다")
+    );
+
+    // 후속 노트의 코멘트는 바로 위 노트 폴더의 sub-comments/ 에 놓인다
+    let child2 = "snfx0002-00000012";
+    let sub = engine
+        .call(
+            "create_comment",
+            json!({"id": parent, "subId": child2, "body": "후속", "comment_id": "cmsub-00000009"}),
+        )
+        .unwrap();
+    assert_eq!(
+        sub["path"],
+        format!("notes/demo/2026-11/parent/sub-comments/{child2}.json")
+    );
+
+    // 지우기: 본문에서 그 코멘트의 앵커 표시만 걷어내고, 마지막 코멘트를 지우면 파일이 사라진다
+    let token = engine.call("get_doc", json!({"id": parent})).unwrap()["precondition"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    engine
+        .call(
+            "update_doc",
+            json!({"id": parent, "body": format!("# 부모\n<!--aisc:{new_id}-->첫<!--/aisc:{new_id}--> <!--aisc:cmabc-1a2b3c4d-->둘<!--/aisc:cmabc-1a2b3c4d-->\n"), "f1": token}),
+        )
+        .unwrap();
+    let deleted = engine
+        .call(
+            "delete_comment",
+            json!({"id": parent, "comment_id": &new_id}),
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            deleted["markerStripped"].as_bool(),
+            deleted["remaining"].as_u64()
+        ),
+        (Some(true), Some(4))
+    );
+    assert_ne!(deleted["bodyBefore"], deleted["bodyAfter"]);
+    let body = engine.call("get_doc", json!({"id": parent})).unwrap()["body"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        body.contains("첫 <!--aisc:cmabc-1a2b3c4d-->둘<!--/aisc:cmabc-1a2b3c4d-->")
+            && !body.contains(&new_id),
+        "{body}"
+    );
+    let plain = engine
+        .call(
+            "delete_comment",
+            json!({"id": parent, "comment_id": "cmblank-00000001"}),
+        )
+        .unwrap();
+    assert_eq!(plain["markerStripped"], false);
+    assert!(plain.get("bodyBefore").is_none());
+    let only = engine
+        .call(
+            "create_comment",
+            json!({"id": loose, "body": "하나뿐", "comment_id": "cmone-00000001"}),
+        )
+        .unwrap();
+    let only_file = vault.join(only["path"].as_str().unwrap());
+    assert!(only_file.is_file());
+    engine
+        .call(
+            "delete_comment",
+            json!({"id": loose, "comment_id": "cmone-00000001"}),
+        )
+        .unwrap();
+    assert!(!only_file.exists());
+}

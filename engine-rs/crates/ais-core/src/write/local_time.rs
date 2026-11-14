@@ -8,15 +8,16 @@ unsafe extern "C" {
     fn tzset();
 }
 
-/// 어느 순간을 시간대로 풀어 본 날짜와 시, 분
+/// 어느 순간을 시간대로 풀어 본 날짜와 시, 분, 초
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LocalClock {
     pub date: CivilDate,
     pub hour: u32,
     pub minute: u32,
+    pub second: u32,
 }
 
-/// 유닉스 밀리초를 이 프로세스의 시간대로 풀어 날짜와 시, 분(초 아래는 버림)을 돌려준다.
+/// 유닉스 밀리초를 이 프로세스의 시간대로 풀어 날짜와 시, 분, 초(초 아래는 버림)를 돌려준다.
 /// 시간대를 못 읽으면 UTC로 본다.
 pub fn local_clock(millis: i64) -> LocalClock {
     let seconds = millis.div_euclid(1000) as libc::time_t;
@@ -39,6 +40,7 @@ pub fn local_clock(millis: i64) -> LocalClock {
             },
             hour: tm.tm_hour as u32,
             minute: tm.tm_min as u32,
+            second: tm.tm_sec.min(59) as u32,
         },
         None => {
             let (year, month, day) =
@@ -48,6 +50,7 @@ pub fn local_clock(millis: i64) -> LocalClock {
                 date: CivilDate { year, month, day },
                 hour: (rest / 3_600_000) as u32,
                 minute: (rest % 3_600_000 / 60_000) as u32,
+                second: (rest % 60_000 / 1000) as u32,
             }
         }
     }
