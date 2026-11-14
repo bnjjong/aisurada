@@ -78,6 +78,7 @@ AISURADA_VAULT="$VAULT_DIR" AISURADA_SIDECAR_SOCKET="$HOME/aisurada-dev.sock" ja
 src/aisurada/          엔진과 클라이언트 (Java)
 test/aisurada/         엔진 시험 (JDK만, 외부 프레임워크 없음)
 fixtures/              34장 받아들임 묶음과 실행기 (node)
+engine-rs/             엔진을 Rust로 옮기는 작업 공간 (진행 중, 앱은 아직 쓰지 않는다)
 native-host/
   src/                 화면 (React)
   src-tauri/           호스트 (Rust)
@@ -107,6 +108,26 @@ test-native.sh         화면·호스트 시험 전체
 | `text` | 다듬기, UTF-16 자르기, URI 따위 글 도구 |
 | `out` | 정해진 바이트 모양의 JSON 쓰기 |
 | `ask`, `chat`, `session` | 4부 명령 7개 (§7의 4부 스위치 참고) |
+
+### Rust 엔진 이전 (`engine-rs/`)
+
+엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 앱은 아직 이것을 쓰지 않는다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md)에 있다.
+
+| 자리 | 내용 |
+|---|---|
+| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리. 지금은 `frontmatter`(노트 머리 YAML 읽기·쓰기)만 있다 |
+| `engine-rs/crates/ais-core/examples/` | `yaml_check`(Java 기준값과 맞대기), `yaml_fuzz_cases`(퍼징 사례 만들기) |
+| `engine-rs/tools/yaml-spike/` | Java 기준값 뽑기(`YamlGroundTruth.java`, `run.sh`)와 손으로 만든 사례(`cases.txt`) |
+
+단위 시험은 Java 없이 돈다. Java 엔진과 맞대려면 먼저 `./build.sh`로 `build/classes`를 만들고, 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
+
+```bash
+(cd engine-rs && cargo test -p ais-core)
+engine-rs/tools/yaml-spike/run.sh <저장소 밖 폴더> --vault <vault 폴더>     # Java 기준값. vault는 읽기만 한다
+(cd engine-rs && cargo run -q -p ais-core --example yaml_check -- <저장소 밖 폴더>/ground-truth.jsonl)
+```
+
+퍼징 사례는 `cargo run -q -p ais-core --example yaml_fuzz_cases -- <ground-truth.jsonl> <건수> <시드> > 사례.txt`로 만들고, `run.sh <다른 폴더> --cases 사례.txt`로 기준값을 다시 뽑아 같은 `yaml_check`에 넣는다. `yaml_check`의 「실패」 열이 0이어야 하고, 「경고」는 Rust가 Java보다 너그럽게 읽은 입력이다.
 
 ### 호스트 모듈 (`native-host/src-tauri/src/`)
 
@@ -685,6 +706,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 | 엔진 전체 | `bash test.sh` | 수 분 | 실제 임시 vault, 실제 serve와 `ais-cli` 왕복 |
 | 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 450건, `cargo test` 102건(무시 1건) |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체 |
+| Rust 엔진 이전 | `(cd engine-rs && cargo test -p ais-core)` | 수 초 | `frontmatter` 단위 시험. Java와 맞대는 법은 §4 「Rust 엔진 이전」 |
 | 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 실제 Java 엔진, 격리 HOME |
 
 두 전체 시험 모두 맨 앞에서 `build.sh`를 돌려 `build/`와 `dist/`를 **지우고 다시 만든다.**

@@ -110,7 +110,7 @@ footer.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);co
 <li><a href="#1-구성-한눈에-보기">1. 구성 한눈에 보기</a></li>
 <li><a href="#2-준비물">2. 준비물</a></li>
 <li><a href="#3-처음-시작하기">3. 처음 시작하기</a></li>
-<li><a href="#4-저장소-구조">4. 저장소 구조</a><ul><li><a href="#엔진-패키지-srcaisurada">엔진 패키지 (src/aisurada/)</a></li><li><a href="#호스트-모듈-native-hostsrc-taurisrc">호스트 모듈 (native-host/src-tauri/src/)</a></li><li><a href="#화면-모듈-native-hostsrc">화면 모듈 (native-host/src/)</a></li></ul></li>
+<li><a href="#4-저장소-구조">4. 저장소 구조</a><ul><li><a href="#엔진-패키지-srcaisurada">엔진 패키지 (src/aisurada/)</a></li><li><a href="#rust-엔진-이전-engine-rs">Rust 엔진 이전 (engine-rs/)</a></li><li><a href="#호스트-모듈-native-hostsrc-taurisrc">호스트 모듈 (native-host/src-tauri/src/)</a></li><li><a href="#화면-모듈-native-hostsrc">화면 모듈 (native-host/src/)</a></li></ul></li>
 <li><a href="#5-엔진-쓰는-법">5. 엔진 쓰는 법</a><ul><li><a href="#세션-에이전트codexgemini-확장">세션 에이전트(Codex·Gemini) 확장</a></li><li><a href="#세션-목록-저장소-projects-패널은-없앴다">세션 목록 저장소 (PROJECTS 패널은 없앴다)</a></li><li><a href="#프로젝트의-저장소와-아젠다의-projectrepo">프로젝트의 저장소와 아젠다의 projectRepo</a></li><li><a href="#프로젝트-자원-스킬과-에이전트-정의-resource">프로젝트 자원: 스킬과 에이전트 정의 (resource/)</a></li><li><a href="#태스크-task">태스크 (task/)</a></li><li><a href="#알림-notificationsrs">알림 (notifications.rs)</a></li><li><a href="#러너-runner">러너 (runner/)</a></li><li><a href="#github-app-연결-githubrs">GitHub App 연결 (github.rs)</a></li><li><a href="#앱이-연-vault-current-vaultjson">앱이 연 vault (current-vault.json)</a></li><li><a href="#두-가지-모양">두 가지 모양</a></li><li><a href="#두-가지-표면">두 가지 표면</a></li><li><a href="#설정">설정</a></li><li><a href="#종료-코드">종료 코드</a></li><li><a href="#vault의-모양">vault의 모양</a></li><li><a href="#쓰기-규칙-고칠-때-지킬-것">쓰기 규칙 (고칠 때 지킬 것)</a></li><li><a href="#명령을-새로-넣는-길">명령을 새로 넣는 길</a></li><li><a href="#mcp-서버-ais-cli-mcp">MCP 서버 (ais-cli mcp)</a></li></ul></li>
 <li><a href="#6-ais-cli와-launchd-건드리기-전에">6. ais-cli와 launchd — 건드리기 전에</a></li>
 <li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#앱에-든-ais-cli">앱에 든 ais-cli</a></li><li><a href="#4부-스위치-3개">4부 스위치 3개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#글꼴과-화면-크기-typography">글꼴과 화면 크기 (typography)</a></li><li><a href="#좌측-메뉴레일의-두-탭-노트와-에이전트">좌측 메뉴(레일)의 두 탭: 노트와 에이전트</a></li><li><a href="#후속-노트-탭">후속 노트 탭</a></li><li><a href="#좌측-메뉴레일의-프로젝트아젠다-목록">좌측 메뉴(레일)의 프로젝트·아젠다 목록</a></li><li><a href="#좌측-메뉴레일-폭">좌측 메뉴(레일) 폭</a></li><li><a href="#코드-블록-문법-색-editorcodesyntaxts">코드 블록 문법 색 (editor/codeSyntax.ts)</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
@@ -185,6 +185,7 @@ AISURADA_VAULT=&quot;$VAULT_DIR&quot; AISURADA_SIDECAR_SOCKET=&quot;$HOME/aisura
 <div class="code"><div class="code-bar"><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>src/aisurada/          엔진과 클라이언트 (Java)
 test/aisurada/         엔진 시험 (JDK만, 외부 프레임워크 없음)
 fixtures/              34장 받아들임 묶음과 실행기 (node)
+engine-rs/             엔진을 Rust로 옮기는 작업 공간 (진행 중, 앱은 아직 쓰지 않는다)
 native-host/
   src/                 화면 (React)
   src-tauri/           호스트 (Rust)
@@ -211,6 +212,18 @@ test-native.sh         화면·호스트 시험 전체</code></pre></div>
 <tr><td><code>out</code></td><td>정해진 바이트 모양의 JSON 쓰기</td></tr>
 <tr><td><code>ask</code>, <code>chat</code>, <code>session</code></td><td>4부 명령 7개 (§7의 4부 스위치 참고)</td></tr>
 </tbody></table></div>
+<h3 id="rust-엔진-이전-engine-rs"><a class="anchor" href="#rust-엔진-이전-engine-rs" aria-label="이 절의 링크">#</a>Rust 엔진 이전 (<code>engine-rs/</code>)</h3>
+<p>엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 앱은 아직 이것을 쓰지 않는다. 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 <a href="rust-engine-step1-yaml.md">1단계 기록</a>에 있다.</p>
+<div class="table-wrap"><table><thead><tr><th>자리</th><th>내용</th></tr></thead><tbody>
+<tr><td><code>engine-rs/crates/ais-core/</code></td><td>vault 규칙 라이브러리. 지금은 <code>frontmatter</code>(노트 머리 YAML 읽기·쓰기)만 있다</td></tr>
+<tr><td><code>engine-rs/crates/ais-core/examples/</code></td><td><code>yaml_check</code>(Java 기준값과 맞대기), <code>yaml_fuzz_cases</code>(퍼징 사례 만들기)</td></tr>
+<tr><td><code>engine-rs/tools/yaml-spike/</code></td><td>Java 기준값 뽑기(<code>YamlGroundTruth.java</code>, <code>run.sh</code>)와 손으로 만든 사례(<code>cases.txt</code>)</td></tr>
+</tbody></table></div>
+<p>단위 시험은 Java 없이 돈다. Java 엔진과 맞대려면 먼저 <code>./build.sh</code>로 <code>build/classes</code>를 만들고, 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo test -p ais-core)
+engine-rs/tools/yaml-spike/run.sh &lt;저장소 밖 폴더&gt; --vault &lt;vault 폴더&gt;     # Java 기준값. vault는 읽기만 한다
+(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example yaml_check -- &lt;저장소 밖 폴더&gt;/ground-truth.jsonl)</code></pre></div>
+<p>퍼징 사례는 <code>cargo run -q -p ais-core --example yaml_fuzz_cases -- &lt;ground-truth.jsonl&gt; &lt;건수&gt; &lt;시드&gt; &gt; 사례.txt</code>로 만들고, <code>run.sh &lt;다른 폴더&gt; --cases 사례.txt</code>로 기준값을 다시 뽑아 같은 <code>yaml_check</code>에 넣는다. <code>yaml_check</code>의 「실패」 열이 0이어야 하고, 「경고」는 Rust가 Java보다 너그럽게 읽은 입력이다.</p>
 <h3 id="호스트-모듈-native-hostsrc-taurisrc"><a class="anchor" href="#호스트-모듈-native-hostsrc-taurisrc" aria-label="이 절의 링크">#</a>호스트 모듈 (<code>native-host/src-tauri/src/</code>)</h3>
 <p><code>workspace.rs</code>(vault 허용·만들기), <code>github.rs</code>(GitHub App 연결, 아래 「GitHub App 연결」), <code>sidecar.rs</code>(<code>sidecar_call</code>), <code>files.rs</code>(그림 첨부 쓰기, 기본 앱 열기), <code>markdown.rs</code>(외부 마크다운), <code>notes.rs</code>(노트 창), <code>terminal.rs</code>(PTY), <code>secrets.rs</code>(비밀 가림), <code>menu.rs</code>, <code>layout.rs</code>(창 자리), <code>frame.rs</code>(<code>aisframe://</code>), <code>self_write.rs</code>, <code>process.rs</code>(자식 실행과 시간 상한), <code>ipc.rs</code>(이벤트 이름). <code>notifications.rs</code>(알림, 아래 「알림」), <code>approvals.rs</code>(승인 대기 알림, 아래 「승인 워크플로」). 4부는 <code>ask.rs</code>, <code>agents.rs</code>, <code>session_image.rs</code>, <code>dictation.rs</code>, <code>session_shell.rs</code>이고, 읽기 전용 러너 <code>runner/</code>(아래 「러너」)도 같이 cargo 기능 <code>claude</code> 아래에 있다.</p>
 <h3 id="화면-모듈-native-hostsrc"><a class="anchor" href="#화면-모듈-native-hostsrc" aria-label="이 절의 링크">#</a>화면 모듈 (<code>native-host/src/</code>)</h3>
@@ -707,6 +720,7 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 <tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>수 분</td><td>실제 임시 vault, 실제 serve와 <code>ais-cli</code> 왕복</td></tr>
 <tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>수 분</td><td>타입 검사, 화면 빌드 2종, Node 시험 450건, <code>cargo test</code> 102건(무시 1건)</td></tr>
 <tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체</td></tr>
+<tr><td>Rust 엔진 이전</td><td><code>(cd engine-rs &amp;&amp; cargo test -p ais-core)</code></td><td>수 초</td><td><code>frontmatter</code> 단위 시험. Java와 맞대는 법은 §4 「Rust 엔진 이전」</td></tr>
 <tr><td>실제 창 점검</td><td><code>pnpm test:*:acceptance</code></td><td>종류당 수 분</td><td>실제 WKWebView, 실제 Java 엔진, 격리 HOME</td></tr>
 </tbody></table></div>
 <p>두 전체 시험 모두 맨 앞에서 <code>build.sh</code>를 돌려 <code>build/</code>와 <code>dist/</code>를 <strong>지우고 다시 만든다.</strong></p>

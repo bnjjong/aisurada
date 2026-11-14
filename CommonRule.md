@@ -95,6 +95,7 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 |---------|---------------------------|
 | 엔진 (`src/`, `test/`) | 컴파일(`./build.sh`가 끝까지 되는지) |
 | 화면·호스트 (`native-host/`) | `pnpm --dir native-host typecheck` |
+| Rust 엔진 이전 (`engine-rs/`) | `(cd engine-rs && cargo build -p ais-core --examples)` |
 | 문서 | 없음 |
 
 시험을 돌릴 때는 바꾼 곳에 맞춰 아래에서 고른다. 릴리스 전에는 전부 돌린다.
@@ -103,6 +104,7 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 |---------|---------|
 | 엔진 (`src/`, `test/`) | `bash test.sh` |
 | 화면·호스트 (`native-host/`) | `bash test-native.sh` |
+| Rust 엔진 이전 (`engine-rs/`) | `(cd engine-rs && cargo test -p ais-core)`. Java와 맞대는 법은 `docs/developer-guide.md` §4 |
 | 받아들임 묶음 (`fixtures/`) | `docs/developer-guide.md` §8의 34장 명령 3개 |
 | 편집기, 저장, 창, 목록 같은 화면 동작 | 해당 `pnpm --dir native-host test:*:acceptance` |
 | 4부 (묻기, 세션) | `pnpm --dir native-host test:part4:acceptance` |
