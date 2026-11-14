@@ -47,7 +47,7 @@ export interface NewDoc {
   tags: string[]; template?: string; tier?: string;
 }
 export const write = {
-  init: (name: string) => command('init-workspace', [], { name, templates: [] }),
+  init: (name: string): Call => ({ command: 'init_workspace', args: { name, templates: '[]' } }),
   createDoc: (doc: NewDoc) => command('create-doc', [], { agenda: doc.agenda, type: doc.type, title: doc.title,
     body: doc.body, date: doc.date, time: doc.time, format: 'markdown', tags: doc.tags,
     template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined }),

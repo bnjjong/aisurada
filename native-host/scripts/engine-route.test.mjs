@@ -265,3 +265,13 @@ test('쓰기 스위치: 템플릿과 사실층 쓰기도 같은 길을 따른다
   await engineCall(off, write.facts('ag', '  사실  '));
   assert.deepEqual(seen, [['save-template', 'name=N', 'body=B'], ['save-ritual-template', 'r', 'desc=d'], ['delete-doc-template', 't'], ['update-agenda-facts', 'ag', 'facts=사실']]);
 });
+
+test('쓰기 스위치: init-workspace도 같은 길을 따르고, 꺼져 있으면 옛 인자(templates=[]) 그대로 간다', async () => {
+  const on = host({ commands: ['init_workspace'], rust: { init_workspace: () => ({ created: true, seeded: [], skipped: [] }) } });
+  assert.equal((await engineCall(on, write.init('내 노트'))).created, true);
+  assert.deepEqual(on.calls[0].args, { command: 'init_workspace', args: { name: '내 노트', templates: '[]' } });
+  const seen = [];
+  const off = host({ commands: [], java: { 'init-workspace': argv => { seen.push(argv); return { status: 0, stdout: '{"created":false}', stderr: '' }; } } });
+  await engineCall(off, write.init('내 노트'));
+  assert.deepEqual(seen, [['init-workspace', 'name=내 노트', 'templates=[]']]);
+});
