@@ -2,6 +2,10 @@
 
 pub mod list_agendas;
 pub mod list_docs;
+pub mod list_projects;
+pub mod list_templates;
+pub mod list_trash;
+pub mod reindex;
 
 use serde::Deserialize;
 

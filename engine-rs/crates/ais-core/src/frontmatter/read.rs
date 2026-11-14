@@ -41,6 +41,15 @@ static NULL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:~|null|Null|NUL
 /// 문서가 둘 이상, 깊이·별칭 상한 초과, 모르는 태그, 정의되지 않은 별칭, 최상위가 맵이 아님.
 /// 자기 자신을 가리키는 구조(`a: &x [*x]`)도 `None`입니다. Java 엔진은 순환 구조를 그대로 만들지만 노트 머리에 쓸 일이 없습니다.
 pub fn parse(yaml: &str) -> Option<Vec<(Value, Value)>> {
+    match parse_value(yaml)? {
+        Value::Map(pairs) => Some(pairs),
+        _ => None,
+    }
+}
+
+/// YAML(또는 JSON) 글을 읽어 최상위 값을 그대로 돌려줍니다. 최상위가 맵이 아니어도 됩니다(휴지통 목록처럼 배열인 파일용).
+/// 못 읽는 경우(빈 글, 문법 오류, 상한 초과 등)는 `None`입니다.
+pub fn parse_value(yaml: &str) -> Option<Value> {
     if yaml.is_empty() {
         return None;
     }
@@ -52,10 +61,7 @@ pub fn parse(yaml: &str) -> Option<Vec<(Value, Value)>> {
         flattening: HashSet::new(),
         merge_depth: 0,
     };
-    match constructor.construct(tree.root?)? {
-        Value::Map(pairs) => Some(pairs),
-        _ => None,
-    }
+    constructor.construct(tree.root?)
 }
 
 enum NodeKind {

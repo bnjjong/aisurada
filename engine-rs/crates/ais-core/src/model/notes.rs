@@ -1,6 +1,3 @@
-//! 앱이 받는 응답 모양입니다. 목록은 늘 `{items, total, returned, truncated}`이고, 노트 줄에는 `date`·`time`·`agendaTitle`이 없습니다
-//! (`created`와 아젠다 표에서 얻을 수 있는 값이라 뺐다).
-
 use serde::Serialize;
 
 use crate::commands::Caller;

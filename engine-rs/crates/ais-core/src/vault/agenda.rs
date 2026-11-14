@@ -15,7 +15,7 @@ static AGENDA_ID: LazyLock<Regex> =
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_FRONTMATTER_UNITS: usize = 16_000;
-const HUES: [&str; 12] = [
+pub(super) const HUES: [&str; 12] = [
     "blue", "violet", "teal", "orange", "pink", "green", "red", "amber", "lime", "cyan", "fuchsia",
     "brown",
 ];
@@ -240,11 +240,9 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
 }
 
 /// 아젠다·프로젝트 파일의 울타리 가르기. `---`로 시작해야 하고, 닫는 `\n---`가 있어야 하고, 머리가 16,000자 이하여야 한다.
-fn split_fence(content: &str) -> Option<(&str, &str)> {
-    if !content.starts_with("---") {
-        return None;
-    }
-    let first_lf = 3 + content[3..].find('\n')?;
+pub(super) fn split_fence(content: &str) -> Option<(&str, &str)> {
+    let after_open = content.strip_prefix("---")?;
+    let first_lf = 3 + after_open.find('\n')?;
     let close = first_lf + content[first_lf..].find("\n---")?;
     let front = &content[first_lf + 1..close + 1];
     if utf16_len(front) > MAX_FRONTMATTER_UNITS {
@@ -282,7 +280,7 @@ fn extract_title_from_body(body: &str) -> String {
 }
 
 /// 한 줄짜리 `키: 값` 읽개. 들여쓴 줄, `#` 줄, 콜론 뒤에 공백이 없는 줄은 건너뛴다.
-fn parse_line_reader(text: &str) -> HashMap<String, String> {
+pub(super) fn parse_line_reader(text: &str) -> HashMap<String, String> {
     let mut result = HashMap::new();
     for line in text.split(['\n', '\r']) {
         let Some(first) = line.chars().next() else {

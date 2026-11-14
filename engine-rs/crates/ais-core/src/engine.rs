@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::commands::{list_agendas, list_docs};
+use crate::commands::{
+    list_agendas, list_docs, list_projects, list_templates, list_trash, reindex,
+};
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
 
@@ -15,7 +17,14 @@ pub struct Engine {
 }
 
 /// 이 엔진이 처리하는 명령 이름
-pub const COMMANDS: &[&str] = &["list_docs", "list_agendas"];
+pub const COMMANDS: &[&str] = &[
+    "list_docs",
+    "list_agendas",
+    "list_projects",
+    "list_templates",
+    "list_trash",
+    "reindex",
+];
 
 impl Engine {
     pub fn new(vault_root: impl AsRef<Path>) -> Self {
@@ -40,6 +49,13 @@ impl Engine {
                 )?)
             }
             "list_agendas" => to_json(list_agendas::execute(&NoteIndex::fresh(&self.vault_root))),
+            "list_projects" => to_json(list_projects::execute(&self.vault_root)),
+            "list_templates" => {
+                let request: list_templates::ListTemplatesRequest = parse_args(command, args)?;
+                to_json(list_templates::execute(&self.vault_root, &request)?)
+            }
+            "list_trash" => to_json(list_trash::execute(&self.vault_root)),
+            "reindex" => to_json(reindex::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"
             ))),

@@ -6,7 +6,10 @@ pub mod filter;
 pub mod index;
 pub mod note_file;
 pub mod note_meta;
+pub mod project;
 pub mod scanner;
+pub mod template;
+pub mod trash;
 
 use serde::Serialize;
 

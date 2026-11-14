@@ -9,7 +9,7 @@ mod read;
 mod value;
 mod write;
 
-pub use read::parse;
+pub use read::{parse, parse_value};
 pub use value::Value;
 pub use write::{DumpError, dump_general_map};
 

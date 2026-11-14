@@ -3,7 +3,7 @@
 #
 # 사용: engine-rs/tools/compat/make-fixture.sh <빈 폴더>
 #
-# 만드는 것: 아젠다 4개와 노트 40여 개. JSON·HTML 노트, 확장자 폴더 노트, 깊은 후속 노트, 충돌 사본, 심볼릭 링크,
+# 만드는 것: 아젠다 4개, 노트 40여 개, 프로젝트·템플릿·휴지통 항목. JSON·HTML 노트, 확장자 폴더 노트, 깊은 후속 노트, 충돌 사본, 심볼릭 링크,
 # 깨진 파일, 크기 초과 파일, `created` 변형, 태그·링크·평가의 경계 값, 월별 폴더 배치와 그 밖의 배치를 담는다.
 set -euo pipefail
 
@@ -292,5 +292,122 @@ note "notes/기록/😀emoji/note.md" ndfx001a-0000001a '2026-11-13T09:00:00+09:
 note "notes/기록/ｆullwidth/note.md" ndfx001b-0000001b '2026-11-13T09:00:00+09:00'
 mkdir -p notes/empty-title notes/no-agenda-file
 note notes/no-agenda-file/x.md ndfx001c-0000001c '2026-11-13T10:00:00+09:00'
+
+
+# ---------- 프로젝트 ----------
+write_file .aisurada/projects/alpha.md <<'EOF2'
+---
+id: pjfx0001-000000a1
+slug: alpha
+title: 알파 프로젝트
+hue: orange
+repos: [{"name":"web","path":"/Users/example/web","github":"example/web","githubId":12345},{"name":"web","path":"/dup"},{"name":"api","github":"example/api"},{"name":"bad","path":"relative"},{"name":"extra","github":"example/x","unknown":1},{"name":"idonly","githubId":9}]
+---
+알파 요약 첫 줄
+둘째 줄
+EOF2
+write_file .aisurada/projects/beta.md <<'EOF2'
+---
+id: pjfx0002-000000a2
+hue: nope
+repos: not-json
+---
+
+EOF2
+write_file .aisurada/projects/gamma.md <<'EOF2'
+---
+id: pjfx0003-000000a3
+slug: alpha
+---
+같은 slug를 다른 id가 쓰면 뺀다
+EOF2
+write_file .aisurada/projects/badid.md <<'EOF2'
+---
+id: not-a-project
+---
+EOF2
+write_file .aisurada/projects/nofront.md <<'EOF2'
+머리 없음
+EOF2
+
+# ---------- 템플릿 ----------
+write_file .aisurada/templates/doc/plan-basic.md <<'EOF2'
+---
+id: plan-basic
+name: 기본 계획
+type: plan
+desc: 설명이다
+builtin: false
+---
+# 계획
+
+내용
+EOF2
+write_file .aisurada/templates/doc/page.html <<'EOF2'
+<!--aisurada
+name:   HTML 문서
+type: weird
+-->
+<p>html</p>
+EOF2
+write_file .aisurada/templates/doc/data.json <<'EOF2'
+---
+id: data-json
+---
+{}
+EOF2
+write_file .aisurada/templates/doc/bad-id.md <<'EOF2'
+---
+id: has space
+---
+EOF2
+write_file .aisurada/templates/doc/unsafe.md <<'EOF2'
+---
+id: ../up
+---
+EOF2
+write_file .aisurada/templates/doc/nofront.md <<'EOF2'
+머리 없음
+EOF2
+echo "---" > .aisurada/templates/doc/unterminated.md
+head -c 1100000 /dev/zero | tr '\0' 'a' > .aisurada/templates/doc/too-big.md
+write_file .aisurada/templates/ritual/morning.md <<'EOF2'
+---
+id: morning-1
+name: 아침 회고
+rev: evening
+format: markdown
+icon: moon
+desc: 저녁에 쓴다
+---
+회고 본문
+EOF2
+write_file .aisurada/templates/ritual/weekly.md <<'EOF2'
+---
+rev: weekly
+icon: '9bad'
+---
+주간
+EOF2
+write_file .aisurada/templates/ritual/plain.md <<'EOF2'
+---
+name: ''
+---
+EOF2
+
+# ---------- 휴지통 ----------
+write_file .aisurada/trash/trash.json <<'EOF2'
+[
+  {"trashId": "trfx0001-000000b1", "docId": "ndfx0100-00000100", "agendaId": "agfx0001-0000000a", "agendaSlug": "demo", "title": "먼저 버림", "type": "plan", "format": "html", "originalPath": "notes/demo/a", "file": "trfx0001-000000b1", "created": "2026-11-01T09:00:00+09:00", "trashedAt": "2026-11-02T01:00:00Z"},
+  {"trashId": "trfx0002-000000b2", "docId": "ndfx0101-00000101", "agendaId": "ag-recovered", "agendaSlug": "demo", "title": "  ", "type": "weird", "format": "weird", "originalPath": "notes/demo/b", "file": "f2", "created": "2026-11-01", "trashedAt": "2026-11-03T01:00:00.123Z"},
+  {"trashId": "trfx0003-000000b3", "docId": "ndfx0102-00000102", "agendaId": "agfx0001-0000000a", "agendaSlug": "demo", "originalPath": "notes/demo/c", "file": "f3", "created": "2026-11-01T09:00", "trashedAt": "2026-11-03T10:00:00+09:00"},
+  {"trashId": "trfx0004-000000b4", "docId": "ndfx0103-00000103", "agendaId": "agfx0001-0000000a", "agendaSlug": "demo", "originalPath": "notes/demo/d", "file": "f4", "created": "2026-11-01T09:00:00Z", "trashedAt": "2026-11-03T01:00:00.123Z"},
+  {"trashId": "bad-id", "docId": "ndfx0104-00000104", "agendaId": "agfx0001-0000000a", "agendaSlug": "demo", "originalPath": "x", "file": "f5", "created": "2026-11-01", "trashedAt": "2026-11-03"},
+  {"trashId": "trfx0006-000000b6", "docId": "bad", "agendaId": "agfx0001-0000000a", "agendaSlug": "demo", "originalPath": "x", "file": "f6", "created": "2026-11-01", "trashedAt": "2026-11-03"},
+  {"trashId": "trfx0007-000000b7", "docId": "ndfx0105-00000105", "agendaId": "agfx0001-0000000a", "agendaSlug": "demo", "originalPath": "x", "file": "f7", "created": "not a date", "trashedAt": "2026-11-03"},
+  "not an object",
+  {"file": "only-file"}
+]
+EOF2
 
 echo "합성 vault를 만들었다: $ROOT"

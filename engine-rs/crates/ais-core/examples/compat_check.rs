@@ -67,6 +67,21 @@ fn legacy_docs(vault: &Path, java_response: &Value) -> Value {
     )
 }
 
+/// 프로젝트·템플릿·휴지통: 배열이거나, 일부를 못 읽었을 때의 `{templates|trash: […], incomplete}` 봉투다.
+fn legacy_page(_vault: &Path, java_response: &Value) -> Value {
+    let items = match java_response {
+        Value::Array(rows) => rows.clone(),
+        Value::Object(o) => o
+            .get("templates")
+            .or(o.get("trash"))
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    page(items)
+}
+
 fn legacy_agendas(_vault: &Path, java_response: &Value) -> Value {
     page(
         java_response
@@ -216,6 +231,73 @@ fn main() -> ExitCode {
             java.run(vault, &["list-agendas".to_string()]),
             engine.call("list_agendas", Value::Null),
             legacy_agendas,
+        );
+
+        // 프로젝트, 템플릿(본문 유무와 갈래·유형 조건), 휴지통
+        compare(
+            &mut report,
+            vault,
+            "list_projects".to_string(),
+            java.run(vault, &["list-projects".to_string()]),
+            engine.call("list_projects", Value::Null),
+            legacy_page,
+        );
+        compare(
+            &mut report,
+            vault,
+            "list_trash".to_string(),
+            java.run(vault, &["list-trash".to_string()]),
+            engine.call("list_trash", Value::Null),
+            legacy_page,
+        );
+        let template_cases: [(&str, Vec<&str>, Value); 7] = [
+            ("메타만", vec![], json!({})),
+            ("bodies", vec!["bodies=true"], json!({"bodies": true})),
+            (
+                "category=doc",
+                vec!["category=doc", "bodies=true"],
+                json!({"category": "doc", "bodies": true}),
+            ),
+            (
+                "category=RITUAL",
+                vec!["category=RITUAL"],
+                json!({"category": "RITUAL"}),
+            ),
+            ("type=plan", vec!["type=plan"], json!({"type": "plan"})),
+            (
+                "잘못된 갈래",
+                vec!["category=zzz"],
+                json!({"category": "zzz"}),
+            ),
+            ("잘못된 유형", vec!["type=zzz"], json!({"type": "zzz"})),
+        ];
+        for (label, java_extra, rust_args) in template_cases {
+            let mut java_args = vec!["list-templates".to_string()];
+            java_args.extend(java_extra.iter().map(|a| a.to_string()));
+            compare(
+                &mut report,
+                vault,
+                format!("list_templates {label}"),
+                java.run(vault, &java_args),
+                engine.call("list_templates", rust_args),
+                legacy_page,
+            );
+        }
+        // reindex: 걸린 시간만 다르므로 빼고 견준다
+        let without_elapsed = |mut v: Value| {
+            if let Some(o) = v.as_object_mut() {
+                o.remove("elapsedMs");
+            }
+            v
+        };
+        compare(
+            &mut report,
+            vault,
+            "reindex".to_string(),
+            java.run(vault, &["reindex".to_string()])
+                .map(without_elapsed),
+            engine.call("reindex", Value::Null).map(without_elapsed),
+            |_, v| v.clone(),
         );
 
         // 조건: vault의 실제 값에서 뽑는다
