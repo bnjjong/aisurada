@@ -69,7 +69,7 @@ pub(crate) fn parse_tags(raw: &Json) -> Result<Vec<String>, EngineError> {
                 _ => return Err(not_array()),
             }
         }
-        Json::Array(items) => items.iter().map(json_from_call).collect(),
+        Json::Array(items) => items.iter().map(to_json_value).collect(),
         other => {
             return Err(EngineError::invalid_argument(format!(
                 "tags 은 JSON 배열이어야 한다: {other}"
@@ -100,14 +100,15 @@ pub(crate) fn parse_tags(raw: &Json) -> Result<Vec<String>, EngineError> {
     Ok(result)
 }
 
-fn json_from_call(item: &Json) -> JsonValue {
+/// 호출 객체의 JSON 값을 엔진의 JSON 값으로 바꾼다(숫자는 `serde_json`이 찍는 글 그대로 남는다).
+pub(crate) fn to_json_value(item: &Json) -> JsonValue {
     match item {
         Json::String(text) => JsonValue::Str(text.clone()),
-        Json::Array(items) => JsonValue::Array(items.iter().map(json_from_call).collect()),
+        Json::Array(items) => JsonValue::Array(items.iter().map(to_json_value).collect()),
         Json::Object(entries) => JsonValue::Object(
             entries
                 .iter()
-                .map(|(key, value)| (key.clone(), json_from_call(value)))
+                .map(|(key, value)| (key.clone(), to_json_value(value)))
                 .collect(),
         ),
         other => JsonValue::Literal(other.to_string()),

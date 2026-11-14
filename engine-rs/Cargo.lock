@@ -15,6 +15,7 @@ dependencies = [
 name = "ais-core"
 version = "0.0.1"
 dependencies = [
+ "libc",
  "libyaml-safer",
  "regex",
  "serde",

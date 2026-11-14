@@ -17,6 +17,7 @@
 //! - [`meta_writer`]: 노트 머리만 고쳐 쓰기(편집 도장 판정 포함)
 //! - [`doc_place`]: 날짜·시각 인자, 부모 폴더, 폴더 이름, 폴더 옮기기
 //! - [`first_heading`]: 본문 첫 헤딩 글
+//! - [`local_time`]: 이 프로세스의 시간대로 본 날짜와 시각
 
 pub mod agenda_file;
 pub mod apparatus;
@@ -25,6 +26,7 @@ pub mod autocommit;
 pub mod confine;
 pub mod doc_place;
 pub mod first_heading;
+pub mod local_time;
 pub mod lock;
 pub mod marker;
 pub mod meta_writer;

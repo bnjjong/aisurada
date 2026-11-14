@@ -1908,6 +1908,442 @@ fn compare_doc_updates(h: &mut WriteHarness) {
     }
 }
 
+/// `create_doc` 한 단계. `named`는 Java의 `key=value`이고, 호출 객체는 같은 글을 그대로 담는다.
+/// `rust`가 있으면 그것을 대신 쓴다(`tags`와 `links`를 배열로 주는 경우).
+fn create_step(h: &mut WriteHarness, label: &str, named: &[(&str, &str)], rust: Option<Value>) {
+    let args = rust.unwrap_or_else(|| {
+        let mut map = Map::new();
+        for (key, value) in named {
+            map.insert(key.to_string(), json!(value));
+        }
+        Value::Object(map)
+    });
+    h.note_step(
+        &format!("만들기 {label}"),
+        "create_doc",
+        &[],
+        named,
+        args,
+        None,
+    );
+}
+
+/// `create_doc`의 기본 인자(demo 아젠다, 자유 유형, 짧은 본문)에 `extra`를 덮어쓴 목록
+fn create_base<'a>(extra: &[(&'a str, &'a str)]) -> Vec<(&'a str, &'a str)> {
+    let mut named: Vec<(&'a str, &'a str)> = vec![
+        ("agenda", "demo"),
+        ("type", "free"),
+        ("title", "새 노트"),
+        ("body", "# 새 노트\n\n본문\n"),
+    ];
+    for (key, value) in extra {
+        named.retain(|(k, _)| k != key);
+        named.push((key, value));
+    }
+    named
+}
+
+/// `create_doc` 맞대기: 필수 인자와 값 검사, 아젠다 찾기·만들기, 시각 배정, 경고, 월별 배치, 시간대, 저장 상한.
+fn compare_doc_creates(h: &mut WriteHarness) {
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+
+    // ---- 기본, 시각 배정(같은 날 겹치면 5분씩 미룸) ----
+    create_step(h, "최소", &create_base(&[]), None);
+    create_step(h, "같은 제목(경고)", &create_base(&[]), None);
+    create_step(
+        h,
+        "또 같은 제목(시각 미룸)",
+        &create_base(&[("title", "  새   노트 ")]),
+        None,
+    );
+    create_step(
+        h,
+        "대소문자만 다른 제목",
+        &create_base(&[("title", "NEW 노트"), ("body", "본문")]),
+        None,
+    );
+    create_step(
+        h,
+        "시각 지정",
+        &create_base(&[("time", "09:00"), ("date", "2026-11-05")]),
+        None,
+    );
+    create_step(
+        h,
+        "날짜만 지정(그날 노트와 겹침)",
+        &create_base(&[("date", "2026-11-05"), ("title", "그날")]),
+        None,
+    );
+    create_step(
+        h,
+        "즐겨찾기 노트와 같은 제목",
+        &create_base(&[("agenda", "demo"), ("title", "제목 ndfx0003-00000003")]),
+        None,
+    );
+    create_step(
+        h,
+        "모든 값",
+        &create_base(&[
+            ("date", "2026-12-24"),
+            ("time", "10:20"),
+            ("format", "markdown"),
+            ("template", "my-tpl"),
+            ("tags", r#"["b"," a ","a",""]"#),
+            (
+                "links",
+                r#"[{"to":"ndfx0002-00000002","kind":"DIRECT"},{"to":"ndfx0002-00000002","kind":"direct"},{"to":"ndfx0003-00000003","kind":"Attach"}]"#,
+            ),
+            ("title", "모든 값: 콜론 / 슬래시"),
+        ]),
+        None,
+    );
+    create_step(
+        h,
+        "배열로 태그와 링크",
+        &create_base(&[
+            ("title", "배열"),
+            ("tags", r#"["x","y"]"#),
+            ("links", r#"[{"to":"ndfx0002-00000002","kind":"indirect"}]"#),
+        ]),
+        Some(
+            json!({"agenda": "demo", "type": "free", "title": "배열", "body": "# 새 노트\n\n본문\n", "tags": ["x", "y"], "links": [{"to": "ndfx0002-00000002", "kind": "indirect"}]}),
+        ),
+    );
+    create_step(
+        h,
+        "기록 층",
+        &create_base(&[("tier", "RECORD"), ("title", "기록 노트")]),
+        None,
+    );
+    create_step(
+        h,
+        "읽기 층 지정",
+        &create_base(&[("tier", "Reading"), ("title", "읽기 노트")]),
+        None,
+    );
+    create_step(
+        h,
+        "유형 대소문자",
+        &create_base(&[("type", "PLAN"), ("title", "유형")]),
+        None,
+    );
+    create_step(
+        h,
+        "제목 양끝 공백은 그대로",
+        &create_base(&[("title", "  공백  ")]),
+        None,
+    );
+    create_step(
+        h,
+        "특수 글자 제목",
+        &create_base(&[("title", "# 해시: 'a' \"b\" 😀 / \\")]),
+        None,
+    );
+    create_step(
+        h,
+        "빈 본문",
+        &create_base(&[("body", ""), ("title", "빈 본문")]),
+        None,
+    );
+    create_step(
+        h,
+        "CRLF 본문",
+        &create_base(&[("body", "가\r\n나\r\n"), ("title", "CRLF")]),
+        None,
+    );
+
+    // ---- 아젠다 찾기와 만들기 ----
+    create_step(
+        h,
+        "아젠다 slug",
+        &create_base(&[("agenda", "work"), ("title", "업무")]),
+        None,
+    );
+    create_step(
+        h,
+        "아젠다 이름(대소문자 무시)",
+        &create_base(&[("agenda", "데모 아젠다"), ("title", "이름으로")]),
+        None,
+    );
+    create_step(
+        h,
+        "아젠다 이름 앞뒤 공백",
+        &create_base(&[("agenda", "  work  "), ("title", "공백 아젠다")]),
+        None,
+    );
+    create_step(
+        h,
+        "새 아젠다",
+        &create_base(&[("agenda", "신규 아젠다"), ("title", "신규")]),
+        None,
+    );
+    create_step(
+        h,
+        "방금 만든 아젠다 slug",
+        &create_base(&[("agenda", "신규-아젠다"), ("title", "신규 둘")]),
+        None,
+    );
+    create_step(
+        h,
+        "새 아젠다 영문 이름",
+        &create_base(&[("agenda", "Hello World"), ("title", "영문")]),
+        None,
+    );
+    create_step(
+        h,
+        "새 아젠다 긴 이름",
+        &create_base(&[("agenda", &"가".repeat(70)), ("title", "긴 아젠다")]),
+        None,
+    );
+    create_step(
+        h,
+        "새 아젠다 특수 글자",
+        &create_base(&[("agenda", "a/b:c"), ("title", "특수")]),
+        None,
+    );
+    create_step(h, "아젠다 공백", &create_base(&[("agenda", "   ")]), None);
+
+    // ---- 경고 ----
+    create_step(
+        h,
+        "들여쓴 블록과 헤딩 불일치",
+        &create_base(&[
+            ("title", "경고 모음"),
+            ("body", "# 다른 제목\n  ## 들여쓴\n"),
+        ]),
+        None,
+    );
+    create_step(
+        h,
+        "깨진 글자",
+        &create_base(&[("title", "깨짐"), ("body", "가\u{FFFD}\n\u{FFFD}")]),
+        None,
+    );
+    create_step(
+        h,
+        "헤딩 없음",
+        &create_base(&[("title", "헤딩 없음"), ("body", "그냥 글")]),
+        None,
+    );
+
+    // ---- 입력 오류(검사 차례대로) ----
+    create_step(h, "format html", &create_base(&[("format", "html")]), None);
+    create_step(
+        h,
+        "format 대문자",
+        &create_base(&[("format", "Markdown")]),
+        None,
+    );
+    for (label, drop) in [
+        ("agenda 없음", "agenda"),
+        ("type 없음", "type"),
+        ("title 없음", "title"),
+        ("body 없음", "body"),
+    ] {
+        let named: Vec<(&str, &str)> = create_base(&[])
+            .into_iter()
+            .filter(|(k, _)| *k != drop)
+            .collect();
+        create_step(h, label, &named, None);
+    }
+    create_step(h, "type 모름", &create_base(&[("type", "zzz")]), None);
+    create_step(
+        h,
+        "type 공백이 낌",
+        &create_base(&[("type", " plan")]),
+        None,
+    );
+    create_step(h, "제목 공백", &create_base(&[("title", "   ")]), None);
+    create_step(h, "제목 빈 글", &create_base(&[("title", "")]), None);
+    for (label, date) in [
+        ("달력에 없음", "2026-02-30"),
+        ("모양", "26-1-1"),
+        ("연도 한도 밖", "+1000000000-01-01"),
+    ] {
+        create_step(
+            h,
+            &format!("날짜 {label}"),
+            &create_base(&[("date", date)]),
+            None,
+        );
+    }
+    for (label, time) in [("24시", "24:00"), ("한 자리", "9:05")] {
+        create_step(
+            h,
+            &format!("시각 {label}"),
+            &create_base(&[("time", time)]),
+            None,
+        );
+    }
+    for (label, tags) in [
+        ("객체", r#"{"a":1}"#),
+        ("문법", "[1,"),
+        ("항목 숫자", "[1]"),
+        ("줄바꿈", r#"["a\nb"]"#),
+        ("항목 객체", r#"[{"a":1}]"#),
+    ] {
+        create_step(
+            h,
+            &format!("tags {label}"),
+            &create_base(&[("tags", tags)]),
+            None,
+        );
+    }
+    for (label, links) in [
+        ("객체", r#"{"a":1}"#),
+        ("문법", "[{"),
+        ("항목이 글", r#"["x"]"#),
+        (
+            "모르는 키",
+            r#"[{"to":"ndfx0002-00000002","kind":"direct","zz":1,"aa":2}]"#,
+        ),
+        ("to 없음", r#"[{"kind":"direct"}]"#),
+        ("to 숫자", r#"[{"to":5,"kind":"direct"}]"#),
+        ("kind 없음", r#"[{"to":"ndfx0002-00000002"}]"#),
+        ("kind 모름", r#"[{"to":"ndfx0002-00000002","kind":"zzz"}]"#),
+        ("id 모양", r#"[{"to":"nope","kind":"direct"}]"#),
+        (
+            "중복 키는 뒤가 이김",
+            r#"[{"to":"nope","to":"ndfx0002-00000002","kind":"direct"}]"#,
+        ),
+    ] {
+        create_step(
+            h,
+            &format!("links {label}"),
+            &create_base(&[("links", links)]),
+            None,
+        );
+    }
+    let long_to = format!(r#"[{{"to":"{}","kind":"direct"}}]"#, "a".repeat(201));
+    let long_kind = format!(
+        r#"[{{"to":"ndfx0002-00000002","kind":"{}"}}]"#,
+        "k".repeat(201)
+    );
+    create_step(
+        h,
+        "links to가 김",
+        &create_base(&[("links", &long_to)]),
+        None,
+    );
+    create_step(
+        h,
+        "links kind가 김",
+        &create_base(&[("links", &long_kind)]),
+        None,
+    );
+    create_step(h, "tier 모름", &create_base(&[("tier", "zzz")]), None);
+    create_step(h, "tier 빈 글", &create_base(&[("tier", "")]), None);
+    create_step(
+        h,
+        "템플릿 모양이 틀림(버림)",
+        &create_base(&[("template", "bad tpl!"), ("title", "템플릿 버림")]),
+        None,
+    );
+    create_step(
+        h,
+        "템플릿 공백을 다듬음",
+        &create_base(&[("template", "  spaced "), ("title", "템플릿 다듬음")]),
+        None,
+    );
+
+    // ---- 월별 배치 스위치 ----
+    unsafe {
+        env::set_var("AISURADA_NOTES_SHARD_BY_MONTH", "no");
+    }
+    create_step(
+        h,
+        "월별 배치 끔",
+        &create_base(&[("title", "월별 끔"), ("date", "2026-08-08")]),
+        None,
+    );
+    unsafe {
+        env::set_var("AISURADA_NOTES_SHARD_BY_MONTH", "1");
+    }
+    create_step(
+        h,
+        "월별 배치 켬",
+        &create_base(&[
+            ("agenda", "work"),
+            ("title", "월별 켬"),
+            ("date", "2026-07-07"),
+        ]),
+        None,
+    );
+    unsafe {
+        env::remove_var("AISURADA_NOTES_SHARD_BY_MONTH");
+    }
+
+    // ---- 이상한 연도 ----
+    create_step(
+        h,
+        "0년",
+        &create_base(&[
+            ("date", "-00000-03-04"),
+            ("time", "01:02"),
+            ("title", "영년"),
+        ]),
+        None,
+    );
+    create_step(
+        h,
+        "기원전 1년",
+        &create_base(&[
+            ("date", "-0001-03-04"),
+            ("time", "01:03"),
+            ("title", "기원전"),
+        ]),
+        None,
+    );
+    create_step(
+        h,
+        "다섯 자리 연도",
+        &create_base(&[
+            ("date", "+12345-03-04"),
+            ("time", "01:04"),
+            ("title", "먼 미래"),
+        ]),
+        None,
+    );
+
+    // ---- 시간대: 같은 순간이 서울과 로스앤젤레스에서 다른 날이다 ----
+    unsafe {
+        env::set_var("TZ", "America/Los_Angeles");
+    }
+    create_step(
+        h,
+        "시간대 로스앤젤레스",
+        &create_base(&[("title", "엘에이")]),
+        None,
+    );
+    create_step(
+        h,
+        "시간대 로스앤젤레스 둘째",
+        &create_base(&[("title", "엘에이 둘")]),
+        None,
+    );
+    unsafe {
+        env::set_var("TZ", "Asia/Seoul");
+    }
+
+    // ---- 저장 상한: 새 아젠다를 먼저 만들고 노트를 못 쓰는 경우 ----
+    create_step(
+        h,
+        "상한 초과(새 아젠다가 남음)",
+        &create_base(&[
+            ("agenda", "상한 시험"),
+            ("title", "큼"),
+            ("body", &"a".repeat(1_000_000)),
+        ]),
+        None,
+    );
+    unsafe {
+        env::remove_var("TZ");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -3058,6 +3494,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     }
 
     compare_doc_updates(&mut h);
+    compare_doc_creates(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {

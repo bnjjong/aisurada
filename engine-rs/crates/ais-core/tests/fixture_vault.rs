@@ -1721,3 +1721,149 @@ fn updates_note_text_and_moves_the_note_to_its_canonical_place() {
     assert!(!vault.join("notes/work/page.html").exists());
     assert!(vault.join(page["path"].as_str().unwrap()).is_file());
 }
+
+#[test]
+fn creates_notes_and_agendas_with_warnings() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |args: Value| engine.call("create_doc", args).unwrap_err();
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+
+    // 필수 인자와 값 검사
+    assert!(
+        error(json!({"type": "free", "title": "t", "body": "b"}))
+            .message
+            .starts_with("agenda 이 필요하다: create-doc ")
+    );
+    assert_eq!(
+        error(json!({"agenda": "demo", "type": "zzz", "title": "t", "body": "b"})).message,
+        "모르는 유형 이다: zzz. 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다."
+    );
+    assert_eq!(
+        error(json!({"agenda": "demo", "type": "free", "title": " ", "body": "b"})).message,
+        "노트 제목이 비었다"
+    );
+    assert_eq!(
+        error(json!({"agenda": "demo", "type": "free", "title": "t", "body": "b", "links": [{"to": "nope", "kind": "direct"}]})).message,
+        "노트 id 모양이 아니다: nope"
+    );
+
+    // 날짜와 시각을 주면 월별 폴더의 정식 이름에 쓰고, 태그와 연결은 배열로도 받는다
+    let first = engine
+        .call(
+            "create_doc",
+            json!({
+                "agenda": "demo", "type": "PLAN", "title": "새 노트", "body": "# 다른 헤딩\n  ## 들여씀\n",
+                "date": "2026-12-24", "time": "10:20", "tags": [" b ", "b", ""],
+                "links": [{"to": "ndfx0002-00000002", "kind": "DIRECT"}, {"to": "ndfx0002-00000002", "kind": "direct"}],
+                "template": " my-tpl "
+            }),
+        )
+        .unwrap();
+    let id = first["id"].as_str().unwrap();
+    let path = first["path"].as_str().unwrap();
+    assert!(
+        path.starts_with("notes/demo/2026-12/2026-12-24-1020-"),
+        "{path}"
+    );
+    assert_eq!(first["date"], "2026-12-24");
+    assert_eq!(first["agendaCreated"], false);
+    assert!(
+        first["deepLink"]
+            .as_str()
+            .unwrap()
+            .starts_with(&format!("aisurada://doc/{id}?ws="))
+    );
+    let text = read(&format!("{path}/note.md"));
+    assert!(
+        text.contains("type: plan\n")
+            && text.contains("created: '2026-12-24T10:20:00+09:00'\n")
+            && text.contains("tags:\n  - b\n")
+            && text.contains("template: my-tpl\n")
+            && text.contains("links:\n  - to: ndfx0002-00000002\n    kind: direct\n"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("editedBy"),
+        "새 노트에는 편집 도장이 없다: {text}"
+    );
+    let warning = first["warning"].as_str().unwrap();
+    assert!(
+        warning.contains("들여쓴 블록이 1곳")
+            && warning.contains("본문 첫 헤딩(\"다른 헤딩\")이 제목(\"새 노트\")과 달라요"),
+        "{warning}"
+    );
+    assert_eq!(
+        engine.call("get_doc", json!({"id": id})).unwrap()["precondition"],
+        first["precondition"]
+    );
+
+    // 같은 아젠다에 같은 제목이 있으면 그 노트를 알린다
+    let again = engine
+        .call(
+            "create_doc",
+            json!({"agenda": "demo", "type": "free", "title": " 새  노트 ", "body": "# 새 노트\n", "date": "2026-12-24", "time": "10:21"}),
+        )
+        .unwrap();
+    assert!(
+        again["warning"].as_str().unwrap().starts_with(&format!(
+            "같은 아젠다에 제목이 같은 노트가 이미 있어요: {id}(2026-12-24)"
+        )),
+        "{again}"
+    );
+
+    // 없는 아젠다 이름은 새로 만들고(저장소·프로젝트 없음), 다음에는 slug로 찾는다
+    let created = engine
+        .call(
+            "create_doc",
+            json!({"agenda": "신규 아젠다", "type": "free", "title": "t", "body": "b", "date": "2026-12-25", "time": "00:00", "tier": "record"}),
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            created["agenda"].as_str(),
+            created["agendaCreated"].as_bool()
+        ),
+        (Some("신규-아젠다"), Some(true))
+    );
+    let agenda_file = read(".aisurada/agendas/신규-아젠다.md");
+    assert!(
+        agenda_file.contains("title: 신규 아젠다\n") && !agenda_file.contains("project"),
+        "{agenda_file}"
+    );
+    assert!(
+        read(&format!("{}/note.md", created["path"].as_str().unwrap())).contains("tier: record\n")
+    );
+    let found = engine
+        .call(
+            "create_doc",
+            json!({"agenda": "신규-아젠다", "type": "free", "title": "t2", "body": "b", "date": "2026-12-25", "time": "00:01"}),
+        )
+        .unwrap();
+    assert_eq!(found["agendaCreated"], false);
+
+    // AI 도구 호출은 층을 받지 않고, 세션과 에이전트가 머리에 적히며, 원본 요청 절이 없으면 경고가 붙는다
+    let by_tool = engine
+        .call(
+            "create_doc",
+            json!({"agenda": "demo", "type": "free", "title": "AI 노트", "body": "# AI 노트\n\n요약\n", "date": "2026-12-26", "time": "00:00",
+                   "tier": "record", "caller": "ai", "session": "sess-1", "sessionAgent": "Codex"}),
+        )
+        .unwrap();
+    let tool_text = read(&format!("{}/note.md", by_tool["path"].as_str().unwrap()));
+    assert!(
+        tool_text.contains("sessionId: sess-1\n")
+            && tool_text.contains("sessionAgent: codex\n")
+            && !tool_text.contains("tier:"),
+        "{tool_text}"
+    );
+    assert!(
+        by_tool["warning"]
+            .as_str()
+            .unwrap()
+            .contains("\"## 원본 요청\" 절이 없어요"),
+        "{by_tool}"
+    );
+}

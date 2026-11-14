@@ -2,6 +2,7 @@
 
 pub mod agenda_write;
 pub mod commit_vault;
+pub mod doc_create;
 pub mod doc_write;
 pub mod facts_write;
 pub mod get_agenda_facts;

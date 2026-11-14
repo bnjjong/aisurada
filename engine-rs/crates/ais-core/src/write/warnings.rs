@@ -5,9 +5,17 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::first_heading;
-use crate::text::{is_whitespace, trim};
+use crate::text::{compare_utf16, cut_utf16, is_whitespace, trim, utf16_len};
+use crate::vault::scanner::NoteRecord;
 
 static CALLOUT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\[![a-zA-Z0-9_]+\]").unwrap());
+static ORIGINAL_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?m)(?:^|[\r\x{85}\x{2028}\x{2029}])#{2,6}[ \t\n\x0B\f\r]*원본[ \t\n\x0B\f\r]*요청",
+    )
+    .unwrap()
+});
+static ASCII_SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[ \t\n\x0B\f\r]+").unwrap());
 
 /// 줄 맨 앞이 아니라 들여써서 편집기가 변환하지 못하는 블록(제목, 인용, 콜아웃, 하위 페이지 카드, 표)을 찾아 알린다.
 /// 코드 울타리 안은 보지 않는다. 없으면 `None`이다.
@@ -81,6 +89,76 @@ fn classify(r: &str, lines: &[&str], index: usize) -> Option<&'static str> {
         return Some("표");
     }
     None
+}
+
+/// 새 노트를 만든 응답에 붙는 경고 전부를 줄바꿈으로 이어 붙인다. 차례는 같은 제목, 들여쓴 블록, 제목과 첫 헤딩, 깨진 글자,
+/// (AI 도구 호출일 때만) 원본 요청 절 없음이다. 없으면 `None`이다.
+pub fn detect_warnings(
+    is_tool: bool,
+    body: &str,
+    raw_title: &str,
+    same_agenda_notes: &[&NoteRecord],
+) -> Option<String> {
+    let mut found: Vec<String> = Vec::new();
+    found.extend(detect_duplicate_title_warning(same_agenda_notes, raw_title));
+    found.extend(detect_indented_blocks_warning(Some(body)));
+    found.extend(detect_title_mismatch_warning(body, raw_title));
+    if body.contains('\u{FFFD}') {
+        found.push(broken_char_warning(body, count_broken_chars(body)));
+    }
+    if is_tool {
+        found.extend(detect_missing_original_request_warning(body));
+    }
+    (!found.is_empty()).then(|| found.join("\n"))
+}
+
+/// 같은 아젠다에 제목이 같은 노트(앞뒤 공백, 연속 공백, 대소문자를 무시)가 이미 있으면 그 노트들을 알린다.
+pub fn detect_duplicate_title_warning(
+    same_agenda_notes: &[&NoteRecord],
+    raw_title: &str,
+) -> Option<String> {
+    let key = make_title_key(raw_title);
+    let mut matches: Vec<&&NoteRecord> = same_agenda_notes
+        .iter()
+        .filter(|note| make_title_key(&note.meta.title) == key)
+        .collect();
+    if matches.is_empty() {
+        return None;
+    }
+    matches.sort_by(|a, b| compare_utf16(&a.rel_path, &b.rel_path));
+    let items: Vec<String> = matches
+        .iter()
+        .map(|note| {
+            let created = &note.meta.created;
+            let date = if utf16_len(created) >= 10 {
+                cut_utf16(created, 10)
+            } else {
+                String::new()
+            };
+            if note.meta.favorite {
+                format!("{}({date}, 즐겨찾기)", note.meta.id)
+            } else {
+                format!("{}({date})", note.meta.id)
+            }
+        })
+        .collect();
+    Some(format!(
+        "같은 아젠다에 제목이 같은 노트가 이미 있어요: {}. 기존 노트를 고쳐 쓰려던 거면 지금 만든 노트를 delete_doc으로 지우고 update_doc({{ id, body }})으로 그 노트를 키우세요 — 즐겨찾기·평가·연결은 노트 id에 붙어서 새 노트로 따라오지 않습니다.",
+        items.join(", ")
+    ))
+}
+
+/// 앞뒤를 다듬고 연속 공백을 하나로 줄여 소문자로 바꾼 제목
+pub fn make_title_key(title: &str) -> String {
+    ASCII_SPACES.replace_all(trim(title), " ").to_lowercase()
+}
+
+/// `## 요약` 다음에 `## 원본 요청` 절이 없으면 알린다(AI 도구 호출만).
+pub fn detect_missing_original_request_warning(body: &str) -> Option<String> {
+    if ORIGINAL_REQUEST.is_match(body) {
+        return None;
+    }
+    Some("본문에 \"## 원본 요청\" 절이 없어요 — 반년 뒤에도 \"무엇을 요청했나\"에 답하려면 `## 요약` 바로 다음에 `## 원본 요청`(사용자의 말을 인용부호로 원문 그대로)을 두세요. 대화 중에 갈래를 골랐으면 `## 대화에서 좁힌 범위`도 그 바로 다음에 둡니다.".to_string())
 }
 
 /// 본문 첫 헤딩이 제목과 다르면 알린다. 앱은 본문을 고칠 때 제목을 첫 헤딩에 맞추므로 미리 알려 두는 경고다.
