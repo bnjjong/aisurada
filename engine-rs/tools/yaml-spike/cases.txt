@@ -1,0 +1,558 @@
+#### note-standard
+id: ndabc-00000002
+agenda: demo
+type: free
+title: 샘플 노트 — 제목에 줄표와 한글
+created: '2026-11-14T15:59:00+09:00'
+editedBy: app
+editedAt: '2026-11-14T16:10:00+09:00'
+tags:
+  - sample
+  - rust
+favorite: true
+favoriteCategory: 중요
+template: decision
+evaluation:
+  score: 80
+  note: 좋음
+  at: '2026-11-14T16:10:00+09:00'
+links:
+  - to: ndabc-00000001
+    kind: indirect
+#### note-session-agent
+id: ndabc-00000001
+agenda: demo
+type: free
+title: with session
+created: '2026-11-14T15:59:00+09:00'
+sessionId: dbd82a5e-fed5-40c1-9d69-c9fc011986db
+sessionAgent: gemini
+tier: record
+#### bool-words
+a: true
+b: True
+c: TRUE
+d: yes
+e: No
+f: on
+g: OFF
+h: y
+i: n
+j: 'yes'
+k: "no"
+l: Yes
+m: oN
+#### bool-keys
+yes: 1
+no: 2
+true: 3
+on: 4
+y: 5
+#### int-forms
+a: 10
+b: -3
+c: +7
+d: 010
+e: 0x1F
+f: 0b101
+g: 1_000
+h: 0o17
+i: 1:30
+j: 12345678901234567890
+k: 09
+l: 0
+m: -0
+n: 00
+o: 0_7
+p: 1:30:15
+q: 0x_FF
+r: 2147483648
+s: -2147483649
+t: 007
+u: 08
+#### float-forms
+a: 1.5
+b: 1e3
+c: .5
+d: -.inf
+e: .nan
+f: 1_0.5
+g: 1:30.5
+h: 1.
+i: +.INF
+j: 6.02e+23
+k: 1E-2
+l: .Inf
+m: -0.0
+n: 1.5e
+#### float-weird
+a: _
+#### float-weird-2
+a: 1._
+#### float-weird-3
+a: 1e
+#### null-forms
+a: ~
+b: null
+c: Null
+d:
+e: NULL
+f: nULL
+g: Nil
+h: 'null'
+i: ''
+#### timestamps
+a: 2026-11-14
+b: 2026-11-14T13:00:00+09:00
+c: 2026-11-14 13:00:00
+d: 2026-11-14T13:00:00Z
+e: '2026-11-14'
+#### strings-quoted
+a: 'it''s'
+b: "tab\there"
+c: "é\x41\U0001F600"
+d: "line1\nline2"
+e: ' leading'
+f: "한글 \"따옴표\""
+g: 'trailing '
+h: "\0\a\b\e\v\f\r"
+i: "\N\_\L\P"
+j: "multi \
+  line"
+#### strings-plain-multiline
+a: first
+  second
+  third
+b: one
+
+  two
+#### strings-colon-error
+a: foo: bar
+#### strings-hash
+a: foo # comment
+b: foo#bar
+c: "foo # bar"
+#### block-literal
+a: |
+  line1
+  line2
+b: |-
+  no trailing
+c: |+
+  keep
+
+d: |2
+    indented
+  tail
+e: |
+
+  after blank
+f: |
+  tail blanks
+
+
+#### block-folded
+a: >
+  folded one
+  folded two
+
+  new para
+b: >-
+  strip
+c: >+
+  keep
+
+e: >
+  a
+    indented
+  b
+#### block-folded-indent-indicator
+d: >2
+    more indented
+  back
+#### block-in-list-under-key
+items:
+  - one
+  - |
+    literal in list
+  - >
+    folded in list
+#### flow-collections
+tags: [a, b, 'c d', "e"]
+m: {x: 1, y: [2, 3], z: {w: null}}
+e1: []
+e2: {}
+n: [[1, 2], [3]]
+#### seq-block
+tags:
+  - one
+  - 2
+  - true
+  - ~
+  - 'quoted'
+nested:
+  - - a
+    - b
+  - - c
+maps:
+  - to: x
+    kind: direct
+  - to: y
+    kind: attach
+#### seq-empty-items
+a:
+  -
+  - x
+#### anchors-basic
+a: &x [1, 2]
+b: *x
+c: &s text
+d: *s
+#### anchors-merge
+base: &base
+  k1: v1
+  k2: v2
+child:
+  <<: *base
+  k2: override
+  k3: v3
+#### anchors-merge-list
+b1: &b1 {x: 1}
+b2: &b2 {y: 2, x: 9}
+c:
+  <<: [*b1, *b2]
+  z: 3
+#### merge-after-explicit
+base: &base {a: 1, b: 2}
+c:
+  b: 20
+  <<: *base
+  d: 4
+#### merge-nested
+r: &r {x: 1}
+s: &s
+  <<: *r
+  y: 2
+t:
+  <<: *s
+  z: 3
+#### merge-dup-in-source
+src: &src
+  k: 1
+  k: 2
+c:
+  <<: *src
+#### merge-nested-override
+r: &r {x: 1}
+s: &s
+  <<: *r
+  x: 99
+  y: 2
+t:
+  <<: *s
+  z: 3
+#### merge-inline-source-dup
+c: {<<: {k: 1, k: 2}}
+#### merge-inline-source-override
+c: {<<: {<<: {x: 1}, x: 2}}
+#### merge-seq-non-map
+c:
+  <<: [1, 2]
+#### merge-scalar
+c:
+  <<: 5
+#### merge-overlap-three
+a: &a {k: a, only_a: 1}
+b: &b {k: b, only_b: 2}
+c: &c {k: c, only_c: 3}
+d:
+  <<: [*a, *b, *c]
+  k: explicit
+e:
+  <<: [*a, *b, *c]
+#### merge-top-level
+<<: {a: 1}
+b: 2
+#### merge-two-keys
+a: &a {x: 1}
+b: &b {y: 2}
+c:
+  <<: *a
+  <<: *b
+#### anchors-undefined-alias
+a: *nope
+#### anchors-recursive
+a: &x [*x]
+#### merge-scalar-value
+a: <<
+#### tag-str
+a: !!str 123
+b: !!str true
+c: !!str
+#### tag-int-float-bool
+a: !!int "42"
+b: !!float 1
+c: !!bool "true"
+d: !!int 0x10
+#### tag-null
+a: !!null ''
+b: !!null null
+#### tag-custom
+a: !custom x
+#### tag-binary
+a: !!binary aGVsbG8=
+#### tag-set
+a: !!set {x, y}
+#### tag-timestamp
+a: !!timestamp 2026-11-14
+#### tag-map-seq
+a: !!map {x: 1}
+b: !!seq [1, 2]
+#### keys-nonstring
+1: a
+2.5: b
+null: c
+true: d
+? [x, y]
+: e
+#### keys-nonstring-2
+? complex
+: v
+#### keys-duplicate
+a: 1
+b: 2
+a: 3
+#### keys-special
+"with space": 1
+'quote''s': 2
+"yes": 3
+"1:30": 4
+"": 5
+? |
+  multi
+: 6
+#### doc-multi
+a: 1
+---
+b: 2
+#### doc-explicit-start
+---
+a: 1
+#### doc-explicit-end
+a: 1
+...
+#### doc-comment-only
+# just a comment
+#### doc-empty
+
+#### doc-top-list
+- a
+- b
+#### doc-top-scalar
+just text
+#### doc-top-flow-map
+{a: 1, b: [2]}
+#### doc-top-null
+~
+#### tab-indent
+a:
+	b: 1
+#### bad-indent
+a: 1
+ b: 2
+#### unterminated-quote
+a: 'oops
+#### bad-escape
+a: "\q"
+#### bom-and-crlf
+a: 1
+b: two
+#### trailing-spaces
+a: value
+b:   spaced
+#### value-starts-special
+a: "@at"
+b: '`tick'
+c: '%pct'
+d: '- dash'
+e: '[bracket'
+f: '{brace'
+g: '#hash'
+h: '&amp'
+i: '*star'
+j: '!bang'
+k: '|pipe'
+l: '>gt'
+m: '?q'
+n: ':colon'
+o: ',comma'
+p: '='
+q: '<<'
+#### quoted-needs-quote-on-dump
+a: '123'
+b: 'yes'
+c: '1:30'
+d: 'null'
+e: '2026-11-14'
+f: '0x1F'
+g: '1e3'
+h: '.5'
+i: '~'
+j: 'true'
+k: 'a: b'
+l: 'x #y'
+m: ' lead'
+n: 'trail '
+o: 'trail:'
+p: 'it''s'
+q: ''
+r: 'y'
+s: 'On'
+t: '1_000'
+u: '+1'
+v: '0o17'
+w: '2026-11-14T13:00:00Z'
+#### dump-long-title
+title: 이것은 아주아주 긴 제목입니다 이것은 아주아주 긴 제목입니다 이것은 아주아주 긴 제목입니다 이것은 아주아주 긴 제목입니다 이것은 아주아주 긴 제목입니다 끝
+long: aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq rrrr ssss tttt uuuu vvvv wwww xxxx yyyy zzzz
+nospace: aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkkllllmmmmnnnnooooppppqqqqrrrrssssttttuuuuvvvvwwwwxxxxyyyyzzzz0000
+#### dump-nested-depth-fold
+a:
+  b:
+    c:
+      d: aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq rrrr ssss tttt
+list:
+  - aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq rrrr ssss tttt uuuu
+#### dump-newlines
+a: "x\ny"
+b: "x\ny\n"
+c: "x\ny\n\n"
+d: "\n"
+e: "\n\nx"
+f: "x\n y"
+g: "\n x"
+h: "  indented first\nsecond"
+i: "trailing space \nnext"
+#### dump-nonprintable
+a: "ctrl\u0001char"
+b: "tab\tinside"
+c: "nbsp here"
+d: "nel\u0085x"
+e: "ls x"
+f: "bom﻿x"
+g: "emoji 😀 ok"
+h: "del\u007f"
+i: "mixed\u0001 😀"
+j: "cr\rx"
+#### dump-emoji-long
+a: 😀😀😀😀😀😀😀😀😀😀 aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp
+#### dump-keys
+"yes": 1
+"1:30": 2
+"a b": 3
+"x:": 4
+"#k": 5
+'it''s': 6
+"tab\tkey": 7
+"null": 8
+"123": 9
+"é": 10
+"": 11
+#### dump-containers
+e1: []
+e2: {}
+l:
+  - []
+  - {}
+  - - nested
+  - k: v
+    k2: w
+  - - - deep
+m:
+  inner:
+    - a
+    - b: 1
+      c: 2
+#### dump-ints-bools-nulls
+i: 10
+n: ~
+b: true
+l:
+  - 1
+  - ~
+  - false
+#### list-in-list-map
+a:
+  - - k: v
+      k2: w
+    - x
+  - y
+#### engine-agenda
+id: ag-0001
+slug: demo-agenda
+title: 데모 아젠다
+hue: '210'
+repo: ~
+#### engine-project
+id: pr-0001
+slug: demo-project
+title: demo-project
+hue: '30'
+repos: {"engine":"x"}
+#### alias-count-over-limit
+a: &a [1]
+b1: *a
+b2: *a
+b3: *a
+b4: *a
+b5: *a
+b6: *a
+b7: *a
+b8: *a
+b9: *a
+b10: *a
+b11: *a
+b12: *a
+b13: *a
+b14: *a
+b15: *a
+b16: *a
+b17: *a
+b18: *a
+b19: *a
+b20: *a
+b21: *a
+b22: *a
+b23: *a
+b24: *a
+b25: *a
+b26: *a
+b27: *a
+b28: *a
+b29: *a
+b30: *a
+b31: *a
+b32: *a
+b33: *a
+b34: *a
+b35: *a
+b36: *a
+b37: *a
+b38: *a
+b39: *a
+b40: *a
+b41: *a
+b42: *a
+b43: *a
+b44: *a
+b45: *a
+b46: *a
+b47: *a
+b48: *a
+b49: *a
+b50: *a
+b51: *a
+b52: *a
+b53: *a
+b54: *a
+b55: *a
