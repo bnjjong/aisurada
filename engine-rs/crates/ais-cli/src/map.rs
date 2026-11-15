@@ -22,13 +22,35 @@ pub struct EngineCall {
 /// 자리 인자가 들어갈 인자 이름. 앞에서부터 차례로 채운다.
 fn positional_names(command: &str) -> &'static [&'static str] {
     match command {
-        "get-doc" | "get-template" | "update-agenda" | "delete-agenda" | "update-project"
-        | "delete-project" | "get-agenda-facts" | "update-agenda-facts" | "save-ritual-template"
-        | "delete-doc-template" | "set-favorite" | "evaluate-doc" | "update-doc" | "delete-doc"
-        | "get-task" | "update-task" | "transition-task" | "add-task-comment" | "delete-task"
-        | "restore-task" | "get-resource" | "delete-resource" | "restore-resource"
-        | "list-resource-versions" | "get-resource-change" | "approve-resource-change"
-        | "reject-resource-change" | "resolve-resource-edit" | "read-session" => &["id"],
+        "get-doc"
+        | "get-template"
+        | "update-agenda"
+        | "delete-agenda"
+        | "update-project"
+        | "delete-project"
+        | "get-agenda-facts"
+        | "update-agenda-facts"
+        | "save-ritual-template"
+        | "delete-doc-template"
+        | "set-favorite"
+        | "evaluate-doc"
+        | "update-doc"
+        | "delete-doc"
+        | "get-task"
+        | "update-task"
+        | "transition-task"
+        | "add-task-comment"
+        | "delete-task"
+        | "restore-task"
+        | "get-resource"
+        | "delete-resource"
+        | "restore-resource"
+        | "list-resource-versions"
+        | "get-resource-change"
+        | "approve-resource-change"
+        | "reject-resource-change"
+        | "resolve-resource-edit"
+        | "read-session" => &["id"],
         "list-sub-notes" | "create-sub-note" => &["parent"],
         "get-sub-note" | "update-sub-note" | "delete-sub-note" => &["parent", "id"],
         "list-comments" | "list-attachments" | "create-comment" | "update-comment"
@@ -87,7 +109,7 @@ pub fn to_call(
 }
 
 /// 자리 인자는 이름표를 붙이고, 옵션은 글 그대로 넘긴다.
-fn plain_args(parsed: &ParsedCommand) -> Map<String, Value> {
+pub(crate) fn plain_args(parsed: &ParsedCommand) -> Map<String, Value> {
     let mut args = Map::new();
     for (key, value) in &parsed.options {
         args.insert(key.clone(), json!(value));
@@ -103,7 +125,11 @@ fn plain_args(parsed: &ParsedCommand) -> Map<String, Value> {
 
 /// 위치 인자 `index`번의 값. 없으면 빈 글.
 fn positional(parsed: &ParsedCommand, index: usize) -> &str {
-    parsed.positional.get(index).map(String::as_str).unwrap_or("")
+    parsed
+        .positional
+        .get(index)
+        .map(String::as_str)
+        .unwrap_or("")
 }
 
 /// `bodies` 옵션: `true`면 참, `false`나 빈 글이면 거짓, 그 밖은 오류
@@ -157,7 +183,9 @@ fn filter_args(parsed: &ParsedCommand, args: &mut Map<String, Value>) -> Result<
                 other => {
                     return Err(CliError::new(
                         400,
-                        format!("모르는 즐겨찾기 값 이다: {other}. 쓸 수 있는 것은 [true, false] 뿐이다."),
+                        format!(
+                            "모르는 즐겨찾기 값 이다: {other}. 쓸 수 있는 것은 [true, false] 뿐이다."
+                        ),
                     ));
                 }
             }
@@ -235,10 +263,9 @@ fn history_args(parsed: &ParsedCommand) -> Result<Map<String, Value>, CliError> 
     args.insert("id".into(), json!(positional(parsed, 0)));
     if let Some(raw) = parsed.positional.get(1) {
         // 판 번호는 다듬지 않고 읽는다. 읽지 못하면 1 미만과 같은 오류다.
-        let number = raw
-            .parse::<i32>()
-            .ok()
-            .ok_or_else(|| CliError::new(400, format!("판 번호는 1 이상의 정수여야 한다: {raw}")))?;
+        let number = raw.parse::<i32>().ok().ok_or_else(|| {
+            CliError::new(400, format!("판 번호는 1 이상의 정수여야 한다: {raw}"))
+        })?;
         args.insert("number".into(), json!(number));
     }
     for key in ["commit", "query"] {
@@ -279,15 +306,26 @@ mod tests {
     #[test]
     fn list_docs_limit_follows_the_command_surface_rules() {
         assert_eq!(call("list-docs", &[]).unwrap().args, json!({}));
-        assert_eq!(call("list-docs", &["limit=0"]).unwrap().args, json!({"limit": 0}));
-        assert_eq!(call("list-docs", &["limit=-3"]).unwrap().args, json!({"limit": 0}));
-        assert_eq!(call("list-docs", &["limit= "]).unwrap().args, json!({"limit": 100}));
+        assert_eq!(
+            call("list-docs", &["limit=0"]).unwrap().args,
+            json!({"limit": 0})
+        );
+        assert_eq!(
+            call("list-docs", &["limit=-3"]).unwrap().args,
+            json!({"limit": 0})
+        );
+        assert_eq!(
+            call("list-docs", &["limit= "]).unwrap().args,
+            json!({"limit": 100})
+        );
         assert_eq!(
             call("list-docs", &["limit=abc"]).unwrap_err().message,
             "limit 은 숫자여야 한다: abc"
         );
         assert_eq!(
-            call("list-docs", &["limit=99999999999"]).unwrap_err().message,
+            call("list-docs", &["limit=99999999999"])
+                .unwrap_err()
+                .message,
             "limit 은 숫자여야 한다: 99999999999"
         );
     }
@@ -300,7 +338,9 @@ mod tests {
             json!({"tags": ["a", " b ", ""], "favorite": true, "type": "plan"})
         );
         assert_eq!(
-            super::tests::call("list-docs", &["favorite=maybe"]).unwrap_err().message,
+            super::tests::call("list-docs", &["favorite=maybe"])
+                .unwrap_err()
+                .message,
             "모르는 즐겨찾기 값 이다: maybe. 쓸 수 있는 것은 [true, false] 뿐이다."
         );
     }

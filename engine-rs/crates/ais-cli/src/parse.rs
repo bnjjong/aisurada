@@ -87,7 +87,10 @@ mod tests {
 
     fn parse(name: &str, args: &[&str]) -> Result<ParsedCommand, CliError> {
         let spec = registry::command(name).expect("명세");
-        parse_command(spec, &args.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+        parse_command(
+            spec,
+            &args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        )
     }
 
     #[test]

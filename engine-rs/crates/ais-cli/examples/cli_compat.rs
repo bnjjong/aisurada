@@ -135,9 +135,10 @@ impl Harness {
             home: self.root.join("home").to_string_lossy().into_owned(),
             cwd: self.root.to_string_lossy().into_owned(),
         };
-        cli_env
-            .vars
-            .insert("AISURADA_VAULT".into(), self.b.to_string_lossy().into_owned());
+        cli_env.vars.insert(
+            "AISURADA_VAULT".into(),
+            self.b.to_string_lossy().into_owned(),
+        );
         for (key, value) in extra_env {
             cli_env.vars.insert((*key).into(), (*value).into());
         }
@@ -209,9 +210,17 @@ impl Harness {
         });
         // 안쪽 실패(종료 코드 1)는 Java가 스택 추적을 붙이고, 휴지통 경고는 Java 로거가 시각을 붙여 찍으므로(Rust는 이 경고를 내지 않는다) 글을 견주지 않는다
         if java.code != 1 && !java_err.contains("aisurada.cmd.TrashCommands") {
-            self.record(format!("{label} 오류 글"), java_err == rust.stderr, || {
-                format!("Java: {}\n    Rust: {}", clip(&java_err), clip(&rust.stderr))
-            });
+            self.record(
+                format!("{label} 오류 글"),
+                java_err == rust.stderr,
+                || {
+                    format!(
+                        "Java: {}\n    Rust: {}",
+                        clip(&java_err),
+                        clip(&rust.stderr)
+                    )
+                },
+            );
         }
         let parsed = (
             serde_json::from_str::<Value>(&java_out),
@@ -222,11 +231,17 @@ impl Harness {
                 // 걸린 시간은 돌릴 때마다 다르다
                 strip_key(&mut j, "elapsedMs");
                 strip_key(&mut r, "elapsedMs");
-                self.record(format!("{label} 응답"), j == r, || first_diff(&j, &r, "$"));
+                self.record(format!("{label} 응답"), j == r, || {
+                    first_diff(&j, &r, "$")
+                });
             }
             _ => {
                 self.record(format!("{label} 출력"), java_out == rust.stdout, || {
-                    format!("Java: {}\n    Rust: {}", clip(&java_out), clip(&rust.stdout))
+                    format!(
+                        "Java: {}\n    Rust: {}",
+                        clip(&java_out),
+                        clip(&rust.stdout)
+                    )
                 });
             }
         }
@@ -240,7 +255,9 @@ impl Harness {
     fn record(&mut self, label: String, ok: bool, detail: impl FnOnce() -> String) {
         self.report.checked += 1;
         if !ok {
-            self.report.failures.push(format!("{label}\n    {}", detail()));
+            self.report
+                .failures
+                .push(format!("{label}\n    {}", detail()));
         }
     }
 
@@ -252,9 +269,10 @@ impl Harness {
             home: self.root.join("home").to_string_lossy().into_owned(),
             cwd: self.root.to_string_lossy().into_owned(),
         };
-        cli_env
-            .vars
-            .insert("AISURADA_VAULT".into(), self.b.to_string_lossy().into_owned());
+        cli_env.vars.insert(
+            "AISURADA_VAULT".into(),
+            self.b.to_string_lossy().into_owned(),
+        );
         let outcome = ais_cli::run(&args, &cli_env);
         serde_json::from_str(&outcome.stdout).unwrap_or(Value::Null)
     }
@@ -318,7 +336,11 @@ fn first_diff(a: &Value, b: &Value, path: &str) -> String {
             }
             String::new()
         }
-        _ => format!("{path}: Java {} / Rust {}", clip(&a.to_string()), clip(&b.to_string())),
+        _ => format!(
+            "{path}: Java {} / Rust {}",
+            clip(&a.to_string()),
+            clip(&b.to_string())
+        ),
     }
 }
 
@@ -330,7 +352,11 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            let rel = path.strip_prefix(root).unwrap().to_string_lossy().to_string();
+            let rel = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
             if rel == ".git" {
                 continue;
             }
@@ -356,10 +382,20 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
 fn tree_diff(a: &Path, b: &Path) -> String {
     let (left, right) = (tree(a), tree(b));
     let mut diffs = Vec::new();
+    // 승인 대기 파일(`.aisurada/pending/*.json`)은 앱이 읽는 JSON이라 키 차례가 다른 것은 같은 것으로 본다
+    // (Java는 넣은 차례, Rust는 이름 차례로 쓴다).
+    let same_json = |path: &str, a: &[u8], b: &[u8]| {
+        path.starts_with(".aisurada/pending/")
+            && path.ends_with(".json")
+            && matches!(
+                (serde_json::from_slice::<Value>(a), serde_json::from_slice::<Value>(b)),
+                (Ok(x), Ok(y)) if x == y
+            )
+    };
     for (path, bytes) in &left {
         match right.get(path) {
             None => diffs.push(format!("Java에만 있다: {path}")),
-            Some(other) if other != bytes => diffs.push(format!(
+            Some(other) if other != bytes && !same_json(path, bytes, other) => diffs.push(format!(
                 "내용이 다르다: {path}\n      Java: {}\n      Rust: {}",
                 clip(&String::from_utf8_lossy(bytes)),
                 clip(&String::from_utf8_lossy(other))
@@ -416,7 +452,10 @@ fn cases_parse_errors(h: &mut Harness) {
         ("모르는 옵션 get-doc", vec!["get-doc", "x=1"]),
         ("자리 인자 초과", vec!["get-doc", "a", "b"]),
         ("자리 인자 초과 list-docs", vec!["list-docs", "a"]),
-        ("double dash는 버린다", vec!["list-docs", "--json", "limit=1"]),
+        (
+            "double dash는 버린다",
+            vec!["list-docs", "--json", "limit=1"],
+        ),
         ("limit 숫자 아님", vec!["list-docs", "limit=abc"]),
         ("limit 범위 밖", vec!["list-docs", "limit=99999999999"]),
         ("limit 빈 글", vec!["list-docs", "limit="]),
@@ -448,7 +487,10 @@ fn cases_parse_errors(h: &mut Harness) {
         ("list-comments 없는 id", vec!["list-comments", "zzzz"]),
         ("list-attachments 없는 id", vec!["list-attachments", "zzzz"]),
         ("get-agenda-facts 없는 id", vec!["get-agenda-facts", "zzzz"]),
-        ("list-templates 갈래 잘못", vec!["list-templates", "category=zzz"]),
+        (
+            "list-templates 갈래 잘못",
+            vec!["list-templates", "category=zzz"],
+        ),
     ] {
         h.run(label, &args, false);
     }
@@ -459,29 +501,65 @@ fn cases_reads(h: &mut Harness) {
     for (label, args) in [
         ("list-docs 기본", vec!["list-docs"]),
         ("list-docs 전부", vec!["list-docs", "limit=0"]),
-        ("list-docs 본문", vec!["list-docs", "limit=0", "bodies=true"]),
+        (
+            "list-docs 본문",
+            vec!["list-docs", "limit=0", "bodies=true"],
+        ),
         ("list-docs 1건", vec!["list-docs", "limit=1"]),
         ("list-docs 3건", vec!["list-docs", "limit=3", "bodies=true"]),
-        ("list-docs 빈 bodies", vec!["list-docs", "limit=0", "bodies="]),
-        ("list-docs favorite", vec!["list-docs", "limit=0", "favorite=true"]),
-        ("list-docs type=plan", vec!["list-docs", "limit=0", "type=plan"]),
-        ("list-docs type=PLAN", vec!["list-docs", "limit=0", "type=PLAN"]),
-        ("list-docs agenda=demo", vec!["list-docs", "limit=0", "agenda=demo"]),
-        ("list-docs from", vec!["list-docs", "limit=0", "from=2026-01-01"]),
-        ("list-docs to", vec!["list-docs", "limit=0", "to=2026-06-30"]),
-        ("list-docs 기간", vec!["list-docs", "limit=0", "from=2026-01-01", "to=2026-12-31"]),
+        (
+            "list-docs 빈 bodies",
+            vec!["list-docs", "limit=0", "bodies="],
+        ),
+        (
+            "list-docs favorite",
+            vec!["list-docs", "limit=0", "favorite=true"],
+        ),
+        (
+            "list-docs type=plan",
+            vec!["list-docs", "limit=0", "type=plan"],
+        ),
+        (
+            "list-docs type=PLAN",
+            vec!["list-docs", "limit=0", "type=PLAN"],
+        ),
+        (
+            "list-docs agenda=demo",
+            vec!["list-docs", "limit=0", "agenda=demo"],
+        ),
+        (
+            "list-docs from",
+            vec!["list-docs", "limit=0", "from=2026-01-01"],
+        ),
+        (
+            "list-docs to",
+            vec!["list-docs", "limit=0", "to=2026-06-30"],
+        ),
+        (
+            "list-docs 기간",
+            vec!["list-docs", "limit=0", "from=2026-01-01", "to=2026-12-31"],
+        ),
         ("list-agendas", vec!["list-agendas"]),
         ("list-projects", vec!["list-projects"]),
         ("list-trash", vec!["list-trash"]),
         ("list-templates", vec!["list-templates"]),
         ("list-templates 본문", vec!["list-templates", "bodies=true"]),
-        ("list-templates doc", vec!["list-templates", "category=doc", "bodies=true"]),
-        ("list-templates ritual", vec!["list-templates", "category=RITUAL"]),
+        (
+            "list-templates doc",
+            vec!["list-templates", "category=doc", "bodies=true"],
+        ),
+        (
+            "list-templates ritual",
+            vec!["list-templates", "category=RITUAL"],
+        ),
         ("list-templates type", vec!["list-templates", "type=plan"]),
         ("list-tags", vec!["list-tags"]),
         ("list-tags 2건", vec!["list-tags", "limit=2"]),
         ("list-tags 질의", vec!["list-tags", "query=a"]),
-        ("list-tags 질의 limit", vec!["list-tags", "query=a", "limit=1"]),
+        (
+            "list-tags 질의 limit",
+            vec!["list-tags", "query=a", "limit=1"],
+        ),
         ("search-docs e", vec!["search-docs", "e"]),
         ("search-docs 1건", vec!["search-docs", "e", "limit=1"]),
         ("search-docs 200건", vec!["search-docs", "e", "limit=200"]),
@@ -493,7 +571,11 @@ fn cases_reads(h: &mut Harness) {
     // 아젠다·템플릿·노트마다 열기
     let agendas = strings(&h.peek(&["list-agendas"]), "id");
     for id in &agendas {
-        h.run(&format!("get-agenda-facts {id}"), &["get-agenda-facts", id], false);
+        h.run(
+            &format!("get-agenda-facts {id}"),
+            &["get-agenda-facts", id],
+            false,
+        );
     }
     let templates = strings(&h.peek(&["list-templates"]), "id");
     for id in &templates {
@@ -503,9 +585,21 @@ fn cases_reads(h: &mut Harness) {
     let ids = strings(&rows, "id");
     for id in &ids {
         h.run(&format!("get-doc {id}"), &["get-doc", id], false);
-        h.run(&format!("list-comments {id}"), &["list-comments", id], false);
-        h.run(&format!("list-attachments {id}"), &["list-attachments", id], false);
-        h.run(&format!("list-sub-notes {id}"), &["list-sub-notes", id], false);
+        h.run(
+            &format!("list-comments {id}"),
+            &["list-comments", id],
+            false,
+        );
+        h.run(
+            &format!("list-attachments {id}"),
+            &["list-attachments", id],
+            false,
+        );
+        h.run(
+            &format!("list-sub-notes {id}"),
+            &["list-sub-notes", id],
+            false,
+        );
         h.run(
             &format!("list-sub-notes bodies {id}"),
             &["list-sub-notes", id, "bodies=true"],
@@ -513,7 +607,11 @@ fn cases_reads(h: &mut Harness) {
         );
         let subs = h.peek(&["list-sub-notes", id]);
         for sub in strings(&subs, "id") {
-            h.run(&format!("get-sub-note {id} {sub}"), &["get-sub-note", id, &sub], false);
+            h.run(
+                &format!("get-sub-note {id} {sub}"),
+                &["get-sub-note", id, &sub],
+                false,
+            );
             h.run(
                 &format!("list-comments {id} {sub}"),
                 &["list-comments", id, &sub],
@@ -532,27 +630,46 @@ fn cases_reads(h: &mut Harness) {
             && !title.contains('=')
             && !title.starts_with('-')
         {
-            h.run(&format!("search-docs {title}"), &["search-docs", title], false);
+            h.run(
+                &format!("search-docs {title}"),
+                &["search-docs", title],
+                false,
+            );
         }
-        for tag in row["tags"].as_array().cloned().unwrap_or_default().iter().take(1) {
+        for tag in row["tags"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .take(1)
+        {
             if let Some(tag) = tag.as_str()
                 && !tag.contains(',')
             {
                 let arg = format!("tag={tag}");
-                h.run(&format!("list-docs {arg}"), &["list-docs", "limit=0", &arg], false);
+                h.run(
+                    &format!("list-docs {arg}"),
+                    &["list-docs", "limit=0", &arg],
+                    false,
+                );
                 h.run(&format!("search-docs {tag}"), &["search-docs", tag], false);
             }
         }
     }
 }
 
-
 /// 쓰기 명령: 아젠다·프로젝트·템플릿·노트·후속 노트·코멘트·첨부·휴지통과 세션 표식. 명령마다 폴더 전체 바이트를 견준다.
 fn cases_writes(h: &mut Harness) {
     // 아젠다와 프로젝트
     let created = h.run(
         "create-agenda",
-        &["create-agenda", "title=신규 아젠다", "hue=teal", "repo=example/new", "summary=설명 한 줄"],
+        &[
+            "create-agenda",
+            "title=신규 아젠다",
+            "hue=teal",
+            "repo=example/new",
+            "summary=설명 한 줄",
+        ],
         true,
     );
     let agenda_id = created
@@ -560,13 +677,34 @@ fn cases_writes(h: &mut Harness) {
         .and_then(|v| v["id"].as_str())
         .unwrap_or("agfx0001-0000000a")
         .to_string();
-    h.run("create-agenda 제목 없음", &["create-agenda", "hue=teal"], true);
-    h.run("update-agenda", &["update-agenda", &agenda_id, "summary=바뀐 설명", "hue=blue"], true);
-    h.run("update-agenda 빈 repo", &["update-agenda", &agenda_id, "repo="], true);
-    h.run("update-agenda 없는 id", &["update-agenda", "zzzz", "title=x"], true);
+    h.run(
+        "create-agenda 제목 없음",
+        &["create-agenda", "hue=teal"],
+        true,
+    );
+    h.run(
+        "update-agenda",
+        &["update-agenda", &agenda_id, "summary=바뀐 설명", "hue=blue"],
+        true,
+    );
+    h.run(
+        "update-agenda 빈 repo",
+        &["update-agenda", &agenda_id, "repo="],
+        true,
+    );
+    h.run(
+        "update-agenda 없는 id",
+        &["update-agenda", "zzzz", "title=x"],
+        true,
+    );
     let project = h.run(
         "create-project",
-        &["create-project", "title=새 프로젝트", "hue=orange", "summary=요약"],
+        &[
+            "create-project",
+            "title=새 프로젝트",
+            "hue=orange",
+            "summary=요약",
+        ],
         true,
     );
     let project_id = project
@@ -574,22 +712,48 @@ fn cases_writes(h: &mut Harness) {
         .and_then(|v| v["id"].as_str())
         .unwrap_or("pjfx0001-000000a1")
         .to_string();
-    h.run("update-project", &["update-project", &project_id, "title=고친 프로젝트"], true);
+    h.run(
+        "update-project",
+        &["update-project", &project_id, "title=고친 프로젝트"],
+        true,
+    );
     h.run(
         "update-project repos",
-        &["update-project", &project_id, "repos=[{\"name\":\"web\",\"github\":\"example/web\"}]"],
+        &[
+            "update-project",
+            &project_id,
+            "repos=[{\"name\":\"web\",\"github\":\"example/web\"}]",
+        ],
         true,
     );
     h.run("delete-project", &["delete-project", &project_id], true);
-    h.run("update-agenda-facts", &["update-agenda-facts", &agenda_id, "facts=지금도 참인 사실"], true);
-    h.run("get-agenda-facts 새 아젠다", &["get-agenda-facts", &agenda_id], false);
-    h.run("update-agenda-facts 지움", &["update-agenda-facts", &agenda_id, "facts="], true);
+    h.run(
+        "update-agenda-facts",
+        &["update-agenda-facts", &agenda_id, "facts=지금도 참인 사실"],
+        true,
+    );
+    h.run(
+        "get-agenda-facts 새 아젠다",
+        &["get-agenda-facts", &agenda_id],
+        false,
+    );
+    h.run(
+        "update-agenda-facts 지움",
+        &["update-agenda-facts", &agenda_id, "facts="],
+        true,
+    );
     h.run("delete-agenda", &["delete-agenda", &agenda_id], true);
 
     // 템플릿
     let template = h.run(
         "save-template",
-        &["save-template", "name=명령줄 템플릿", "type=plan", "desc=설명", "body=# 제목\n\n본문"],
+        &[
+            "save-template",
+            "name=명령줄 템플릿",
+            "type=plan",
+            "desc=설명",
+            "body=# 제목\n\n본문",
+        ],
         true,
     );
     let template_id = template
@@ -597,18 +761,50 @@ fn cases_writes(h: &mut Harness) {
         .and_then(|v| v["id"].as_str())
         .unwrap_or("cli-t")
         .to_string();
-    h.run("save-template 필수 없음", &["save-template", "desc=이름이 없다"], true);
-    h.run("save-template 고치기", &["save-template", &format!("id={template_id}"), "desc=바뀐 설명"], true);
+    h.run(
+        "save-template 필수 없음",
+        &["save-template", "desc=이름이 없다"],
+        true,
+    );
+    h.run(
+        "save-template 고치기",
+        &[
+            "save-template",
+            &format!("id={template_id}"),
+            "desc=바뀐 설명",
+        ],
+        true,
+    );
     h.run("get-template", &["get-template", &template_id], false);
-    h.run("save-ritual-template", &["save-ritual-template", "cli-r", "name=리추얼", "body=# 아침"], true);
-    h.run("delete-doc-template", &["delete-doc-template", &template_id], true);
+    h.run(
+        "save-ritual-template",
+        &[
+            "save-ritual-template",
+            "cli-r",
+            "name=리추얼",
+            "body=# 아침",
+        ],
+        true,
+    );
+    h.run(
+        "delete-doc-template",
+        &["delete-doc-template", &template_id],
+        true,
+    );
 
     // 노트
     let doc = h.run(
         "create-doc",
         &[
-            "create-doc", "agenda=demo", "type=plan", "title=명령줄 노트", "body=# 본문\n\n내용",
-            "date=2026-11-15", "time=10:00", "format=markdown", "tags=[\"a\",\"b\"]",
+            "create-doc",
+            "agenda=demo",
+            "type=plan",
+            "title=명령줄 노트",
+            "body=# 본문\n\n내용",
+            "date=2026-11-15",
+            "time=10:00",
+            "format=markdown",
+            "tags=[\"a\",\"b\"]",
         ],
         true,
     );
@@ -618,34 +814,86 @@ fn cases_writes(h: &mut Harness) {
         .unwrap_or("")
         .to_string();
     h.run("create-doc 필수 없음", &["create-doc", "agenda=demo"], true);
-    h.run("create-doc 없는 아젠다", &["create-doc", "agenda=zzz", "type=plan", "title=x", "body=y"], true);
+    h.run(
+        "create-doc 없는 아젠다",
+        &["create-doc", "agenda=zzz", "type=plan", "title=x", "body=y"],
+        true,
+    );
     if !id.is_empty() {
         let t = format!("f1={}", h.token(&id));
-        h.run("update-doc", &["update-doc", &id, "title=고친 제목", "body=# 고침\n\n새 내용", &t], true);
+        h.run(
+            "update-doc",
+            &[
+                "update-doc",
+                &id,
+                "title=고친 제목",
+                "body=# 고침\n\n새 내용",
+                &t,
+            ],
+            true,
+        );
         let t = format!("f1={}", h.token(&id));
-        h.run("update-doc 태그", &["update-doc", &id, "tags=[\"x\"]", &t], true);
-        h.run("update-doc f1 없음", &["update-doc", &id, "title=확인값 없음"], true);
-        h.run("update-doc f1 틀림", &["update-doc", &id, "title=틀림", "f1=f1:zzz"], true);
+        h.run(
+            "update-doc 태그",
+            &["update-doc", &id, "tags=[\"x\"]", &t],
+            true,
+        );
+        h.run(
+            "update-doc f1 없음",
+            &["update-doc", &id, "title=확인값 없음"],
+            true,
+        );
+        h.run(
+            "update-doc f1 틀림",
+            &["update-doc", &id, "title=틀림", "f1=f1:zzz"],
+            true,
+        );
         let t = format!("f1={}", h.token(&id));
-        h.run("set-favorite", &["set-favorite", &id, "favorite=true", "category=중요", &t], true);
+        h.run(
+            "set-favorite",
+            &["set-favorite", &id, "favorite=true", "category=중요", &t],
+            true,
+        );
         let t = format!("f1={}", h.token(&id));
-        h.run("evaluate-doc", &["evaluate-doc", &id, "score=4", "note=좋음", &t], true);
+        h.run(
+            "evaluate-doc",
+            &["evaluate-doc", &id, "score=4", "note=좋음", &t],
+            true,
+        );
         let t = format!("f1={}", h.token(&id));
-        h.run("evaluate-doc 점수 잘못", &["evaluate-doc", &id, "score=abc", &t], true);
+        h.run(
+            "evaluate-doc 점수 잘못",
+            &["evaluate-doc", &id, "score=abc", &t],
+            true,
+        );
         let other = h.peek(&["list-docs", "limit=0"]);
         let other = strings(&other, "id")
             .into_iter()
             .find(|candidate| *candidate != id)
             .unwrap_or_default();
         let t = format!("f1={}", h.token(&id));
-        h.run("link-docs", &["link-docs", &id, &other, "kind=indirect", &t], true);
+        h.run(
+            "link-docs",
+            &["link-docs", &id, &other, "kind=indirect", &t],
+            true,
+        );
         let t = format!("f1={}", h.token(&id));
-        h.run("link-docs 해제", &["link-docs", &id, &other, "remove=true", &t], true);
+        h.run(
+            "link-docs 해제",
+            &["link-docs", &id, &other, "remove=true", &t],
+            true,
+        );
 
         // 후속 노트와 코멘트, 첨부
         let sub = h.run(
             "create-sub-note",
-            &["create-sub-note", &id, "title=후속", "body=# 후속\n\n내용", "type=free"],
+            &[
+                "create-sub-note",
+                &id,
+                "title=후속",
+                "body=# 후속\n\n내용",
+                "type=free",
+            ],
             true,
         );
         let sub_id = sub
@@ -659,34 +907,67 @@ fn cases_writes(h: &mut Harness) {
                 .unwrap_or("")
                 .to_string();
             let t = format!("f1={sub_token}");
-            h.run("update-sub-note", &["update-sub-note", &id, &sub_id, "title=고친 후속", &t], true);
-            h.run("get-sub-note 새 후속", &["get-sub-note", &id, &sub_id], false);
+            h.run(
+                "update-sub-note",
+                &["update-sub-note", &id, &sub_id, "title=고친 후속", &t],
+                true,
+            );
+            h.run(
+                "get-sub-note 새 후속",
+                &["get-sub-note", &id, &sub_id],
+                false,
+            );
             h.run("list-sub-notes 새 후속", &["list-sub-notes", &id], false);
             h.run(
                 "create-comment 후속",
-                &["create-comment", &id, &sub_id, "comment_id=cmcli-0000000a", "body=후속 코멘트"],
+                &[
+                    "create-comment",
+                    &id,
+                    &sub_id,
+                    "comment_id=cmcli-0000000a",
+                    "body=후속 코멘트",
+                ],
                 true,
             );
             h.run("delete-sub-note", &["delete-sub-note", &id, &sub_id], true);
         }
         h.run(
             "create-comment",
-            &["create-comment", &id, "comment_id=cmcli-00000001", "body=첫 코멘트", "anchor_quote=본문"],
+            &[
+                "create-comment",
+                &id,
+                "comment_id=cmcli-00000001",
+                "body=첫 코멘트",
+                "anchor_quote=본문",
+            ],
             true,
         );
         h.run(
             "update-comment",
-            &["update-comment", &id, "comment_id=cmcli-00000001", "body=고친 코멘트"],
+            &[
+                "update-comment",
+                &id,
+                "comment_id=cmcli-00000001",
+                "body=고친 코멘트",
+            ],
             true,
         );
         h.run("list-comments 새 코멘트", &["list-comments", &id], false);
-        h.run("delete-comment", &["delete-comment", &id, "comment_id=cmcli-00000001"], true);
+        h.run(
+            "delete-comment",
+            &["delete-comment", &id, "comment_id=cmcli-00000001"],
+            true,
+        );
         h.run(
             "write-attachment",
             &["write-attachment", &id, "name=memo.md", "content=첨부 내용"],
             true,
         );
-        h.run("list-attachments 새 첨부", &["list-attachments", &id], false);
+        h.run(
+            "list-attachments 새 첨부",
+            &["list-attachments", &id],
+            false,
+        );
         h.run("get-doc 새 노트", &["get-doc", &id], false);
 
         // 휴지통
@@ -702,14 +983,473 @@ fn cases_writes(h: &mut Harness) {
     h.run("empty-trash", &["empty-trash"], true);
 
     // 날짜별 도구와 색인
-    h.run("plan-day dryRun", &["plan-day", "date=2026-11-15", "dryRun=true"], true);
-    h.run("plan-day 저장", &["plan-day", "date=2026-11-15", "agenda=demo"], true);
+    h.run(
+        "plan-day dryRun",
+        &["plan-day", "date=2026-11-15", "dryRun=true"],
+        true,
+    );
+    h.run(
+        "plan-day 저장",
+        &["plan-day", "date=2026-11-15", "agenda=demo"],
+        true,
+    );
     h.run("check-notes", &["check-notes", "date=2026-11-15"], true);
-    h.run("facts-brief", &["facts-brief", "from=2026-01-01", "to=2026-12-31", "min-new-file=1"], true);
+    h.run(
+        "facts-brief",
+        &[
+            "facts-brief",
+            "from=2026-01-01",
+            "to=2026-12-31",
+            "min-new-file=1",
+        ],
+        true,
+    );
     h.run("export-markdown", &["export-markdown"], true);
     h.run("verify-shard", &["verify-shard"], false);
     h.run("shard-notes 미리보기", &["shard-notes"], true);
     h.run("reindex", &["reindex"], true);
+}
+
+/// 도구 표면(JSON 인자) 읽기: 필터·검색·노트 열기·후속 노트·템플릿·자원·태스크와 인자 검증 오류
+fn cases_tools_read(h: &mut Harness) {
+    let rows = h.peek(&["list-docs", "limit=0"]);
+    let ids = strings(&rows, "id");
+    let first = ids.first().cloned().unwrap_or_default();
+    let parent_note = "ndfx0002-00000002";
+    for (label, tool, json) in [
+        ("list_docs", "list_docs", "{}"),
+        ("list_docs 빈 글", "list_docs", ""),
+        ("list_docs agenda", "list_docs", r#"{"agenda":"demo"}"#),
+        ("list_docs type", "list_docs", r#"{"type":"plan"}"#),
+        ("list_docs tag", "list_docs", r#"{"tag":"공통"}"#),
+        ("list_docs favorite", "list_docs", r#"{"favorite":true}"#),
+        (
+            "list_docs favorite false",
+            "list_docs",
+            r#"{"favorite":false}"#,
+        ),
+        (
+            "list_docs 기간",
+            "list_docs",
+            r#"{"dateFrom":"2026-01-01","dateTo":"2026-12-31"}"#,
+        ),
+        ("list_docs date", "list_docs", r#"{"date":"2026-11-05"}"#),
+        ("list_docs 모르는 키", "list_docs", r#"{"zzz":1,"aaa":2}"#),
+        (
+            "list_docs favorite 문자열",
+            "list_docs",
+            r#"{"favorite":"yes"}"#,
+        ),
+        ("list_docs agenda 숫자", "list_docs", r#"{"agenda":5}"#),
+        (
+            "list_docs 날짜 잘못",
+            "list_docs",
+            r#"{"date":"2026-13-40"}"#,
+        ),
+        ("list_docs 배열", "list_docs", "[1]"),
+        ("list_docs 깨진 JSON", "list_docs", "{"),
+        ("search_docs", "search_docs", r#"{"query":"e"}"#),
+        ("search_docs 한글", "search_docs", r#"{"query":"데모"}"#),
+        (
+            "search_docs limit",
+            "search_docs",
+            r#"{"query":"e","limit":1}"#,
+        ),
+        (
+            "search_docs 필터",
+            "search_docs",
+            r#"{"query":"e","agenda":"demo","type":"plan"}"#,
+        ),
+        ("search_docs 질의 없음", "search_docs", "{}"),
+        ("search_docs 질의 공백", "search_docs", r#"{"query":"  "}"#),
+        (
+            "search_docs limit 0",
+            "search_docs",
+            r#"{"query":"e","limit":0}"#,
+        ),
+        (
+            "search_docs limit 201",
+            "search_docs",
+            r#"{"query":"e","limit":201}"#,
+        ),
+        (
+            "search_docs limit 소수",
+            "search_docs",
+            r#"{"query":"e","limit":1.5}"#,
+        ),
+        (
+            "search_docs limit 문자열",
+            "search_docs",
+            r#"{"query":"e","limit":"5"}"#,
+        ),
+        ("list_tags", "list_tags", "{}"),
+        ("list_tags 질의", "list_tags", r#"{"query":"a","limit":2}"#),
+        ("list_tags limit 0", "list_tags", r#"{"limit":0}"#),
+        ("list_templates", "list_templates", "{}"),
+        (
+            "list_templates 갈래",
+            "list_templates",
+            r#"{"category":"doc","type":"plan"}"#,
+        ),
+        (
+            "list_templates 갈래 잘못",
+            "list_templates",
+            r#"{"category":"x"}"#,
+        ),
+        ("list_trash", "list_trash", "{}"),
+        ("list_trash 모르는 키", "list_trash", r#"{"a":1}"#),
+        ("get_template 없음", "get_template", r#"{"id":"zzzz"}"#),
+        ("get_doc 없음", "get_doc", r#"{"id":"zzzz-0000"}"#),
+        ("get_doc id 없음", "get_doc", "{}"),
+        ("get_doc id 숫자", "get_doc", r#"{"id":5}"#),
+        (
+            "list_sub_notes 없음",
+            "list_sub_notes",
+            r#"{"parent":"zzzz"}"#,
+        ),
+        (
+            "list_comments parent 셋",
+            "list_comments",
+            r#"{"parent":"a/b/c"}"#,
+        ),
+        (
+            "list_comments parent 빈",
+            "list_comments",
+            r#"{"parent":" / "}"#,
+        ),
+        (
+            "list_attachments parent 빈",
+            "list_attachments",
+            r#"{"parent":""}"#,
+        ),
+        ("list_resources", "list_resources", "{}"),
+        (
+            "list_resources 조건",
+            "list_resources",
+            r#"{"kind":"skill","scope":"global","bodies":true}"#,
+        ),
+        (
+            "list_resources bodies 문자열",
+            "list_resources",
+            r#"{"bodies":"true"}"#,
+        ),
+        ("get_resource 없음", "get_resource", r#"{"id":"zzzz"}"#),
+        ("list_resource_changes", "list_resource_changes", "{}"),
+        ("list_tasks", "list_tasks", "{}"),
+        (
+            "list_tasks 조건",
+            "list_tasks",
+            r#"{"status":"draft","bodies":true,"blocked":false}"#,
+        ),
+        ("get_task 없음", "get_task", r#"{"id":"TSK-999"}"#),
+        (
+            "get_task activity",
+            "get_task",
+            r#"{"id":"TSK-999","activity":3}"#,
+        ),
+        (
+            "get_task activity 잘못",
+            "get_task",
+            r#"{"id":"TSK-1","activity":-1}"#,
+        ),
+        ("미지원 도구", "export_markdown", r#"{"x":1}"#),
+    ] {
+        let mut args = vec![tool];
+        if !json.is_empty() {
+            args.push(json);
+        }
+        h.run(&format!("도구 {label}"), &args, false);
+    }
+    h.run("도구 인자 둘", &["get_doc", "{}", "{}"], false);
+    h.run(
+        "도구 -- 칸은 버린다",
+        &["get_doc", "--x", r#"{"id":"zzzz-0000"}"#],
+        false,
+    );
+
+    // 노트마다 열기: 기록 층 노트는 도구 표면에서 막혀야 한다
+    for id in &ids {
+        h.run(
+            &format!("도구 get_doc {id}"),
+            &["get_doc", &format!(r#"{{"id":"{id}"}}"#)],
+            false,
+        );
+        h.run(
+            &format!("도구 list_comments {id}"),
+            &["list_comments", &format!(r#"{{"parent":"{id}"}}"#)],
+            false,
+        );
+        h.run(
+            &format!("도구 list_attachments {id}"),
+            &["list_attachments", &format!(r#"{{"parent":"{id}"}}"#)],
+            false,
+        );
+        h.run(
+            &format!("도구 list_sub_notes {id}"),
+            &["list_sub_notes", &format!(r#"{{"parent":"{id}"}}"#)],
+            false,
+        );
+    }
+    for sub in strings(&h.peek(&["list-sub-notes", parent_note]), "id") {
+        h.run(
+            &format!("도구 get_sub_note {sub}"),
+            &[
+                "get_sub_note",
+                &format!(r#"{{"parent":"{parent_note}","id":"{sub}"}}"#),
+            ],
+            false,
+        );
+        h.run(
+            &format!("도구 list_comments 후속 {sub}"),
+            &[
+                "list_comments",
+                &format!(r#"{{"parent":"{parent_note}/{sub}"}}"#),
+            ],
+            false,
+        );
+        h.run(
+            &format!("도구 list_attachments 후속 {sub}"),
+            &[
+                "list_attachments",
+                &format!(r#"{{"parent":"{parent_note}/{sub}"}}"#),
+            ],
+            false,
+        );
+    }
+    let _ = first;
+    for tpl in strings(&h.peek(&["list-templates"]), "id") {
+        h.run(
+            &format!("도구 get_template {tpl}"),
+            &["get_template", &format!(r#"{{"id":"{tpl}"}}"#)],
+            false,
+        );
+    }
+}
+
+/// 도구 표면 쓰기: 노트 머리·후속 노트·첨부·템플릿·휴지통과 자원 변경(승인 대기). AI 호출이라 기록 층과 확인 값 규칙이 다르다.
+fn cases_tools_write(h: &mut Harness) {
+    let created = h.run(
+        "도구 create_doc",
+        &[
+            "create_doc",
+            r##"{"agenda":"demo","type":"plan","title":"도구 노트","body":"# 도구\n\n본문","date":"2026-11-15","time":"11:00","tags":["a","b"],"links":[]}"##,
+        ],
+        true,
+    );
+    let id = created
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("")
+        .to_string();
+    h.run(
+        "도구 create_doc 필수 없음",
+        &["create_doc", r#"{"agenda":"demo"}"#],
+        true,
+    );
+    h.run(
+        "도구 create_doc tags 잘못",
+        &[
+            "create_doc",
+            r#"{"agenda":"demo","type":"plan","title":"x","body":"y","tags":[1]}"#,
+        ],
+        true,
+    );
+    h.run(
+        "도구 create_doc links 잘못",
+        &[
+            "create_doc",
+            r#"{"agenda":"demo","type":"plan","title":"x","body":"y","links":["a"]}"#,
+        ],
+        true,
+    );
+    h.run(
+        "도구 create_doc template 길이",
+        &[
+            "create_doc",
+            &format!(
+                r#"{{"agenda":"demo","type":"plan","title":"x","body":"y","template":"{}"}}"#,
+                "t".repeat(201)
+            ),
+        ],
+        true,
+    );
+    if id.is_empty() {
+        return;
+    }
+    let token = h.token(&id);
+    h.run(
+        "도구 update_doc",
+        &[
+            "update_doc",
+            &format!(
+                r##"{{"id":"{id}","title":"고친 도구 노트","body":"# 고침\n","f1":"{token}"}}"##
+            ),
+        ],
+        true,
+    );
+    h.run(
+        "도구 update_doc f1 없음",
+        &["update_doc", &format!(r#"{{"id":"{id}","title":"x"}}"#)],
+        true,
+    );
+    let token = h.token(&id);
+    h.run(
+        "도구 set_favorite",
+        &[
+            "set_favorite",
+            &format!(r#"{{"id":"{id}","favorite":true,"category":"중요","f1":"{token}"}}"#),
+        ],
+        true,
+    );
+    let token = h.token(&id);
+    h.run(
+        "도구 evaluate_doc",
+        &[
+            "evaluate_doc",
+            &format!(r#"{{"id":"{id}","score":4,"note":"좋음","f1":"{token}"}}"#),
+        ],
+        true,
+    );
+    let token = h.token(&id);
+    h.run(
+        "도구 evaluate_doc 점수 잘못",
+        &[
+            "evaluate_doc",
+            &format!(r#"{{"id":"{id}","score":"x","f1":"{token}"}}"#),
+        ],
+        true,
+    );
+    let other = strings(&h.peek(&["list-docs", "limit=0"]), "id")
+        .into_iter()
+        .find(|candidate| *candidate != id)
+        .unwrap_or_default();
+    let token = h.token(&id);
+    h.run(
+        "도구 link_docs",
+        &[
+            "link_docs",
+            &format!(r#"{{"from":"{id}","to":"{other}","kind":"indirect","f1":"{token}"}}"#),
+        ],
+        true,
+    );
+    let sub = h.run(
+        "도구 create_sub_note",
+        &[
+            "create_sub_note",
+            &format!(
+                r##"{{"parent":"{id}","title":"도구 후속","body":"# 후속\n","type":"free"}}"##
+            ),
+        ],
+        true,
+    );
+    let sub_id = sub
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("")
+        .to_string();
+    if !sub_id.is_empty() {
+        let token = h.peek(&["get-sub-note", &id, &sub_id])["precondition"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        h.run(
+            "도구 update_sub_note",
+            &[
+                "update_sub_note",
+                &format!(
+                    r#"{{"parent":"{id}","id":"{sub_id}","title":"고친 후속","f1":"{token}"}}"#
+                ),
+            ],
+            true,
+        );
+        h.run(
+            "도구 write_attachment 후속",
+            &[
+                "write_attachment",
+                &format!(r#"{{"parent":"{id}/{sub_id}","name":"n.md","content":"후속 첨부"}}"#),
+            ],
+            true,
+        );
+        h.run(
+            "도구 delete_sub_note",
+            &[
+                "delete_sub_note",
+                &format!(r#"{{"parent":"{id}","id":"{sub_id}"}}"#),
+            ],
+            true,
+        );
+    }
+    h.run(
+        "도구 write_attachment",
+        &[
+            "write_attachment",
+            &format!(r#"{{"parent":"{id}","name":"memo.md","content":"첨부 내용"}}"#),
+        ],
+        true,
+    );
+    h.run(
+        "도구 write_attachment content 없음",
+        &[
+            "write_attachment",
+            &format!(r#"{{"parent":"{id}","name":"memo.md"}}"#),
+        ],
+        true,
+    );
+    h.run(
+        "도구 get_doc 새 노트",
+        &["get_doc", &format!(r#"{{"id":"{id}"}}"#)],
+        false,
+    );
+    h.run(
+        "도구 save_template",
+        &[
+            "save_template",
+            r##"{"name":"도구 템플릿","type":"plan","desc":"설명","body":"# 본문"}"##,
+        ],
+        true,
+    );
+    h.run(
+        "도구 plan_day",
+        &["plan_day", r#"{"date":"2026-11-15","dryRun":true}"#],
+        true,
+    );
+    h.run(
+        "도구 plan_day dryRun 문자열",
+        &["plan_day", r#"{"dryRun":"true"}"#],
+        true,
+    );
+    h.run("도구 export_markdown", &["export_markdown", "{}"], true);
+    h.run(
+        "도구 delete_doc",
+        &["delete_doc", &format!(r#"{{"id":"{id}"}}"#)],
+        true,
+    );
+    let trash = strings(&h.peek(&["list-trash"]), "trashId");
+    if let Some(entry) = trash.first() {
+        h.run(
+            "도구 restore_doc",
+            &["restore_doc", &format!(r#"{{"trashId":"{entry}"}}"#)],
+            true,
+        );
+    }
+    h.run(
+        "도구 purge_doc 없음",
+        &["purge_doc", r#"{"trashId":"trzzzz-0000"}"#],
+        true,
+    );
+
+    // 자원: AI의 변경은 승인 대기에 오를 수 있다
+    h.run(
+        "도구 save_resource",
+        &["save_resource", r##"{"kind":"skill","scope":"global","name":"도구 스킬","description":"설명","body":"# 지침"}"##],
+        true,
+    );
+    h.run("도구 list_resources 뒤", &["list_resources", "{}"], false);
+    h.run(
+        "도구 list_resource_changes 뒤",
+        &["list_resource_changes", "{}"],
+        false,
+    );
 }
 
 /// `reindex-paths`: 지정 경로만 훑기. 폴더, 노트 하나, 후속 노트 폴더, 없는 자리, 바깥으로 나가는 경로, 200칸 초과
@@ -720,27 +1460,61 @@ fn cases_reindex_paths(h: &mut Harness) {
     for (label, args) in [
         ("경로 없음", vec!["reindex-paths"]),
         ("아젠다 폴더", vec!["reindex-paths", "notes/demo"]),
-        ("여러 곳", vec!["reindex-paths", "notes/demo", "notes/work", "/notes/demo/", " notes/demo "]),
+        (
+            "여러 곳",
+            vec![
+                "reindex-paths",
+                "notes/demo",
+                "notes/work",
+                "/notes/demo/",
+                " notes/demo ",
+            ],
+        ),
         ("노트 파일", vec!["reindex-paths", "notes/work/ext.md"]),
         ("월별 폴더", vec!["reindex-paths", "notes/demo/2026-11"]),
-        ("폴더 노트", vec!["reindex-paths", "notes/demo/2026-11/parent"]),
-        ("후속 노트 폴더", vec!["reindex-paths", "notes/demo/2026-11/parent/sub"]),
-        ("없는 자리", vec!["reindex-paths", "notes/demo/nothing-here"]),
+        (
+            "폴더 노트",
+            vec!["reindex-paths", "notes/demo/2026-11/parent"],
+        ),
+        (
+            "후속 노트 폴더",
+            vec!["reindex-paths", "notes/demo/2026-11/parent/sub"],
+        ),
+        (
+            "없는 자리",
+            vec!["reindex-paths", "notes/demo/nothing-here"],
+        ),
         ("없는 아젠다", vec!["reindex-paths", "notes/zzz"]),
-        ("notes 밖", vec!["reindex-paths", "other/place", ".aisurada/agendas"]),
+        (
+            "notes 밖",
+            vec!["reindex-paths", "other/place", ".aisurada/agendas"],
+        ),
         ("notes만", vec!["reindex-paths", "notes"]),
         ("바깥으로", vec!["reindex-paths", "notes/demo/../../.."]),
         ("조각이 빈", vec!["reindex-paths", "notes/ /x"]),
-        ("충돌 사본", vec!["reindex-paths", "notes/demo/a (conflicted copy)"]),
+        (
+            "충돌 사본",
+            vec!["reindex-paths", "notes/demo/a (conflicted copy)"],
+        ),
         ("옵션 모양", vec!["reindex-paths", "--x", "notes/work"]),
     ] {
         h.run(&format!("reindex-paths {label}"), &args, false);
     }
     // 칸이 64개를 넘는 요청은 Java ais-cli(클라이언트)가 보내기 전에 거절한다. 그래서 200칸 초과의 전체 훑기 물러서기는 엔진끼리만 견준다.
-    let cli = h.rust(&many_args.iter().map(|a| a.to_string()).collect::<Vec<_>>(), &[]);
-    h.record("reindex-paths 201칸은 칸 수 한도로 거절".to_string(), cli.code == 1, || format!("{cli:?}"));
+    let cli = h.rust(
+        &many_args.iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+        &[],
+    );
+    h.record(
+        "reindex-paths 201칸은 칸 수 한도로 거절".to_string(),
+        cli.code == 1,
+        || format!("{cli:?}"),
+    );
     h.step += 1;
-    let java = h.java(&many_args.iter().map(|a| a.to_string()).collect::<Vec<_>>(), &[]);
+    let java = h.java(
+        &many_args.iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+        &[],
+    );
     let rust = ais_core::engine::Engine::new(&h.b).call("reindex_paths", json!({"paths": many}));
     let mut java_value: Value = serde_json::from_str(&java.stdout).unwrap_or(Value::Null);
     let mut rust_value = rust.ok().unwrap_or(Value::Null);
@@ -755,13 +1529,24 @@ fn cases_reindex_paths(h: &mut Harness) {
 
 /// `history`: git 이력이 있는 합성 vault에서 판 목록, 번호·커밋·검색어로 고르기, 오류
 fn cases_history(h: &mut Harness) {
-    let ids = ["ndfx0002-00000002", "ndfx0001-00000001", "ndfx0003-00000003", "ndfx0040-00000040", "ndfx0041-00000041", "ndfx0099-00000099"];
+    let ids = [
+        "ndfx0002-00000002",
+        "ndfx0001-00000001",
+        "ndfx0003-00000003",
+        "ndfx0040-00000040",
+        "ndfx0041-00000041",
+        "ndfx0099-00000099",
+    ];
     for id in ids {
         h.run(&format!("history {id}"), &["history", id], false);
         h.run(&format!("history {id} 1"), &["history", id, "1"], false);
         h.run(&format!("history {id} 2"), &["history", id, "2"], false);
         h.run(&format!("history {id} 9"), &["history", id, "9"], false);
-        h.run(&format!("history {id} 검색"), &["history", id, "query=내용"], false);
+        h.run(
+            &format!("history {id} 검색"),
+            &["history", id, "query=내용"],
+            false,
+        );
         // 첫 판의 커밋으로 고르기
         let first = h.peek(&["history", id]);
         if let Some(commit) = first["versions"]
@@ -769,7 +1554,11 @@ fn cases_history(h: &mut Harness) {
             .and_then(|v| v.first())
             .and_then(|v| v["commit"].as_str())
         {
-            h.run(&format!("history {id} 커밋"), &["history", id, &format!("commit={commit}")], false);
+            h.run(
+                &format!("history {id} 커밋"),
+                &["history", id, &format!("commit={commit}")],
+                false,
+            );
             h.run(
                 &format!("history {id} 번호와 커밋"),
                 &["history", id, "1", &format!("commit={commit}")],
@@ -777,8 +1566,20 @@ fn cases_history(h: &mut Harness) {
             );
         }
     }
-    h.run("history 커밋 모양", &["history", "ndfx0002-00000002", "commit=zz"], false);
-    h.run("history 없는 커밋", &["history", "ndfx0002-00000002", &format!("commit={}", "a".repeat(40))], false);
+    h.run(
+        "history 커밋 모양",
+        &["history", "ndfx0002-00000002", "commit=zz"],
+        false,
+    );
+    h.run(
+        "history 없는 커밋",
+        &[
+            "history",
+            "ndfx0002-00000002",
+            &format!("commit={}", "a".repeat(40)),
+        ],
+        false,
+    );
     h.run("commit-vault", &["commit-vault"], true);
 }
 
@@ -788,8 +1589,15 @@ fn cases_families(h: &mut Harness) {
     let task = h.run(
         "create-task",
         &[
-            "create-task", "title=명령줄 태스크", "repo=example/demo", "criteria=[\"첫 기준\",{\"text\":\"둘째 기준\"}]",
-            "type=feature", "priority=high", "base=main", "body=설명", "labels=[\"cli\"]",
+            "create-task",
+            "title=명령줄 태스크",
+            "repo=example/demo",
+            "criteria=[\"첫 기준\",{\"text\":\"둘째 기준\"}]",
+            "type=feature",
+            "priority=high",
+            "base=main",
+            "body=설명",
+            "labels=[\"cli\"]",
         ],
         true,
     );
@@ -798,10 +1606,19 @@ fn cases_families(h: &mut Harness) {
         .and_then(|v| v["key"].as_str().or(v["id"].as_str()))
         .unwrap_or("TSK-1")
         .to_string();
-    h.run("create-task 기준 없음", &["create-task", "title=x", "repo=example/demo"], true);
+    h.run(
+        "create-task 기준 없음",
+        &["create-task", "title=x", "repo=example/demo"],
+        true,
+    );
     let second = h.run(
         "create-task 둘째",
-        &["create-task", "title=둘째 태스크", "repo=example/demo", "criteria=[\"기준\"]"],
+        &[
+            "create-task",
+            "title=둘째 태스크",
+            "repo=example/demo",
+            "criteria=[\"기준\"]",
+        ],
         true,
     );
     let second_key = second
@@ -810,23 +1627,77 @@ fn cases_families(h: &mut Harness) {
         .unwrap_or("TSK-2")
         .to_string();
     h.run("get-task", &["get-task", &key], false);
-    h.run("get-task activity", &["get-task", &key, "activity=1"], false);
+    h.run(
+        "get-task activity",
+        &["get-task", &key, "activity=1"],
+        false,
+    );
     h.run("list-tasks", &["list-tasks"], false);
-    h.run("list-tasks 조건", &["list-tasks", "status=draft", "type=feature", "repo=example/demo", "bodies=true"], false);
+    h.run(
+        "list-tasks 조건",
+        &[
+            "list-tasks",
+            "status=draft",
+            "type=feature",
+            "repo=example/demo",
+            "bodies=true",
+        ],
+        false,
+    );
     h.run("list-tasks 휴지통", &["list-tasks", "trash=true"], false);
-    let token = h.peek(&["get-task", &key])["precondition"].as_str().unwrap_or("").to_string();
-    h.run("update-task", &["update-task", &key, "title=고친 태스크", &format!("f1={token}")], true);
-    h.run("transition-task", &["transition-task", &key, "to=ready-for-develop", "actor=human"], true);
-    h.run("transition-task 어긋남", &["transition-task", &key, "to=done", "from=draft"], true);
-    h.run("link-tasks", &["link-tasks", &key, &second_key, "type=blocks"], true);
-    h.run("add-task-comment", &["add-task-comment", &key, "body=댓글", "actor=human"], true);
+    let token = h.peek(&["get-task", &key])["precondition"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    h.run(
+        "update-task",
+        &[
+            "update-task",
+            &key,
+            "title=고친 태스크",
+            &format!("f1={token}"),
+        ],
+        true,
+    );
+    h.run(
+        "transition-task",
+        &[
+            "transition-task",
+            &key,
+            "to=ready-for-develop",
+            "actor=human",
+        ],
+        true,
+    );
+    h.run(
+        "transition-task 어긋남",
+        &["transition-task", &key, "to=done", "from=draft"],
+        true,
+    );
+    h.run(
+        "link-tasks",
+        &["link-tasks", &key, &second_key, "type=blocks"],
+        true,
+    );
+    h.run(
+        "add-task-comment",
+        &["add-task-comment", &key, "body=댓글", "actor=human"],
+        true,
+    );
     h.run("delete-task", &["delete-task", &second_key], true);
     h.run("restore-task", &["restore-task", &second_key], true);
 
     // 자원과 승인
     let skill = h.run(
         "save-resource",
-        &["save-resource", "kind=skill", "scope=global", "name=명령줄 스킬", "description=설명", "body=# 지침"],
+        &[
+            "save-resource",
+            "kind=skill",
+            "scope=global",
+            "name=명령줄 스킬",
+            "description=설명",
+            "body=# 지침",
+        ],
         true,
     );
     let rid = skill
@@ -835,36 +1706,101 @@ fn cases_families(h: &mut Harness) {
         .unwrap_or("")
         .to_string();
     h.run("list-resources", &["list-resources"], false);
-    h.run("list-resources 본문", &["list-resources", "bodies=true", "kind=skill", "scope=global"], false);
+    h.run(
+        "list-resources 본문",
+        &[
+            "list-resources",
+            "bodies=true",
+            "kind=skill",
+            "scope=global",
+        ],
+        false,
+    );
     if !rid.is_empty() {
         h.run("get-resource", &["get-resource", &rid], false);
-        let token = h.peek(&["get-resource", &rid])["precondition"].as_str().unwrap_or("").to_string();
+        let token = h.peek(&["get-resource", &rid])["precondition"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
         h.run(
             "save-resource 고치기",
-            &["save-resource", &format!("id={rid}"), "description=바뀐 설명", &format!("f1={token}")],
+            &[
+                "save-resource",
+                &format!("id={rid}"),
+                "description=바뀐 설명",
+                &format!("f1={token}"),
+            ],
             true,
         );
-        h.run("list-resource-versions", &["list-resource-versions", &rid], false);
+        h.run(
+            "list-resource-versions",
+            &["list-resource-versions", &rid],
+            false,
+        );
         let project = strings(&h.peek(&["list-projects"]), "slug")
             .into_iter()
             .next()
             .unwrap_or_else(|| "alpha".to_string());
-        h.run("set-resource-ref", &["set-resource-ref", &project, &rid, "with-skills=true"], true);
-        h.run("usable-resources", &["usable-resources", &project, "bodies=true"], false);
-        h.run("set-resource-ref 해제", &["set-resource-ref", &project, &rid, "remove=true"], true);
+        h.run(
+            "set-resource-ref",
+            &["set-resource-ref", &project, &rid, "with-skills=true"],
+            true,
+        );
+        h.run(
+            "usable-resources",
+            &["usable-resources", &project, "bodies=true"],
+            false,
+        );
+        h.run(
+            "set-resource-ref 해제",
+            &["set-resource-ref", &project, &rid, "remove=true"],
+            true,
+        );
         h.run("delete-resource", &["delete-resource", &rid], true);
         h.run("restore-resource", &["restore-resource", &rid], true);
     }
     h.run("list-resource-changes", &["list-resource-changes"], false);
-    h.run("list-resource-changes 결정", &["list-resource-changes", "decided=true"], false);
-    h.run("get-resource-change 없음", &["get-resource-change", "rczzzz"], false);
-    h.run("approve-resource-change 없음", &["approve-resource-change", "rczzzz"], true);
-    h.run("reject-resource-change 없음", &["reject-resource-change", "rczzzz", "reason=이유"], true);
-    h.run("resolve-resource-edit 없음", &["resolve-resource-edit", "rczzzz", "action=accept"], true);
+    h.run(
+        "list-resource-changes 결정",
+        &["list-resource-changes", "decided=true"],
+        false,
+    );
+    h.run(
+        "get-resource-change 없음",
+        &["get-resource-change", "rczzzz"],
+        false,
+    );
+    h.run(
+        "approve-resource-change 없음",
+        &["approve-resource-change", "rczzzz"],
+        true,
+    );
+    h.run(
+        "reject-resource-change 없음",
+        &["reject-resource-change", "rczzzz", "reason=이유"],
+        true,
+    );
+    h.run(
+        "resolve-resource-edit 없음",
+        &["resolve-resource-edit", "rczzzz", "action=accept"],
+        true,
+    );
     h.run("get-resource-policy", &["get-resource-policy"], false);
-    h.run("set-resource-policy", &["set-resource-policy", "global=approve", "project=auto"], true);
-    h.run("set-resource-policy 값 잘못", &["set-resource-policy", "global=manual"], true);
-    h.run("set-resource-policy 칸 없음", &["set-resource-policy"], true);
+    h.run(
+        "set-resource-policy",
+        &["set-resource-policy", "global=approve", "project=auto"],
+        true,
+    );
+    h.run(
+        "set-resource-policy 값 잘못",
+        &["set-resource-policy", "global=manual"],
+        true,
+    );
+    h.run(
+        "set-resource-policy 칸 없음",
+        &["set-resource-policy"],
+        true,
+    );
 
     // 문답과 대화
     let rows = h.peek(&["list-docs", "limit=0"]);
@@ -873,9 +1809,19 @@ fn cases_families(h: &mut Harness) {
     h.run(
         "append-ask-turn",
         &[
-            "append-ask-turn", &note, "session-id=11111111-1111-1111-1111-111111111111", "turn-id=t1", "mark-id=m1",
-            "asked-at=2026-11-15T09:00:00+09:00", "quote=본문", "question=무엇인가", "answer=이것이다", "model=sonnet",
-            "effort=low", "elapsed-ms=1200", "session-lines=3",
+            "append-ask-turn",
+            &note,
+            "session-id=11111111-1111-1111-1111-111111111111",
+            "turn-id=t1",
+            "mark-id=m1",
+            "asked-at=2026-11-15T09:00:00+09:00",
+            "quote=본문",
+            "question=무엇인가",
+            "answer=이것이다",
+            "model=sonnet",
+            "effort=low",
+            "elapsed-ms=1200",
+            "session-lines=3",
         ],
         true,
     );
@@ -884,8 +1830,16 @@ fn cases_families(h: &mut Harness) {
     h.run(
         "append-chat-turn",
         &[
-            "append-chat-turn", &note, "chat-id=cc1", "source-session=22222222-2222-2222-2222-222222222222", "turn-id=t1",
-            "asked-at=2026-11-15T09:10:00+09:00", "question=대화 질문", "answer=대화 답", "model=sonnet", "effort=low",
+            "append-chat-turn",
+            &note,
+            "chat-id=cc1",
+            "source-session=22222222-2222-2222-2222-222222222222",
+            "turn-id=t1",
+            "asked-at=2026-11-15T09:10:00+09:00",
+            "question=대화 질문",
+            "answer=대화 답",
+            "model=sonnet",
+            "effort=low",
             "elapsed-ms=800",
         ],
         true,
@@ -893,46 +1847,127 @@ fn cases_families(h: &mut Harness) {
     h.run("list-chats 뒤", &["list-chats", &note], false);
 
     // 세션 읽기(합성 세션 홈이 비어 있어 오류 글과 빈 결과를 견준다)
-    h.run("read-session 없음", &["read-session", "33333333-3333-3333-3333-333333333333"], false);
+    h.run(
+        "read-session 없음",
+        &["read-session", "33333333-3333-3333-3333-333333333333"],
+        false,
+    );
     h.run(
         "read-session 옵션",
-        &["read-session", "33333333-3333-3333-3333-333333333333", "limit=5", "before=2", "urls=true"],
+        &[
+            "read-session",
+            "33333333-3333-3333-3333-333333333333",
+            "limit=5",
+            "before=2",
+            "urls=true",
+        ],
         false,
     );
     h.run("read-session 모양 잘못", &["read-session", "x"], false);
     h.run(
         "session-titles",
-        &["session-titles", "33333333-3333-3333-3333-333333333333", "44444444-4444-4444-4444-444444444444"],
+        &[
+            "session-titles",
+            "33333333-3333-3333-3333-333333333333",
+            "44444444-4444-4444-4444-444444444444",
+        ],
         false,
     );
-    h.run("session-titles 모양 잘못", &["session-titles", "a", "b"], false);
+    h.run(
+        "session-titles 모양 잘못",
+        &["session-titles", "a", "b"],
+        false,
+    );
     h.run("recent-sessions", &["recent-sessions", "days=3"], false);
-    h.run("recent-sessions 잘못", &["recent-sessions", "days=x"], false);
+    h.run(
+        "recent-sessions 잘못",
+        &["recent-sessions", "days=x"],
+        false,
+    );
 }
 
-/// 명령 표면은 세션 표식(환경변수)을 노트에 남기지 않는다. 세션은 도구 표면(AI)의 호출에만 뜻이 있다(Java `CreateDoc`: "도구 표면 전용").
-/// 도구 표면 쪽 시험은 도구 표면을 옮긴 뒤에 더한다. 이 사례는 마지막에 둔다(Rust 사본에만 쓰므로 두 사본이 이 뒤로는 달라진다).
+/// 세션 표식(환경변수)은 도구 표면(AI)의 호출에만 뜻이 있다(Java `CreateDoc`: "도구 표면 전용"). 명령 표면은 남기지 않고, 도구 표면은
+/// 만든 노트에 `sessionId`와(claude가 아니면) `sessionAgent`를 남긴다. Java 단발 모드는 세션 표식을 받을 길이 없어(표식이 NUL 글자를
+/// 쓰는 소켓 요청에만 실린다) Rust 사본에만 돌리고 결과 값을 직접 본다. 마지막에 둔다(이 뒤로는 두 사본이 달라진다).
 fn cases_session_env(h: &mut Harness) {
-    for (label, vars) in [
-        ("claude", vec![("CLAUDE_CODE_SESSION_ID", "sess-claude-1")]),
-        ("고정 쌍", vec![("AISURADA_SESSION_ID", "sess-pin-1"), ("AISURADA_SESSION_AGENT", "gemini")]),
-    ] {
+    type Case = (
+        &'static str,
+        bool,
+        Vec<(&'static str, &'static str)>,
+        Option<&'static str>,
+        Option<&'static str>,
+    );
+    let cases: Vec<Case> = vec![
+        (
+            "명령 표면 claude",
+            false,
+            vec![("CLAUDE_CODE_SESSION_ID", "sess-claude-1")],
+            None,
+            None,
+        ),
+        (
+            "도구 claude",
+            true,
+            vec![("CLAUDE_CODE_SESSION_ID", "sess-claude-1")],
+            Some("sess-claude-1"),
+            None,
+        ),
+        (
+            "도구 codex",
+            true,
+            vec![("CODEX_THREAD_ID", "sess-codex-1")],
+            Some("sess-codex-1"),
+            Some("codex"),
+        ),
+        (
+            "도구 고정 쌍",
+            true,
+            vec![
+                ("AISURADA_SESSION_ID", "sess-pin-1"),
+                ("AISURADA_SESSION_AGENT", "gemini"),
+            ],
+            Some("sess-pin-1"),
+            Some("gemini"),
+        ),
+        (
+            "도구 둘 다 보임",
+            true,
+            vec![("CLAUDE_CODE_SESSION_ID", "c"), ("CODEX_THREAD_ID", "x")],
+            None,
+            None,
+        ),
+        ("도구 없음", true, vec![], None, None),
+    ];
+    for (label, tool, vars, want_id, want_agent) in cases {
         h.step += 1;
-        let title = format!("title=세션 {label}");
-        let args: Vec<String> = ["create-doc", "agenda=demo", "type=plan", &title, "body=# 세션\n"]
-            .iter()
-            .map(|a| a.to_string())
-            .collect();
+        let title = format!("세션 {label}");
+        let args: Vec<String> = if tool {
+            vec![
+                "create_doc".into(),
+                format!(
+                    r##"{{"agenda":"demo","type":"plan","title":"{title}","body":"# 세션\n"}}"##
+                ),
+            ]
+        } else {
+            vec![
+                "create-doc".into(),
+                "agenda=demo".into(),
+                "type=plan".into(),
+                format!("title={title}"),
+                "body=# 세션\n".into(),
+            ]
+        };
         let outcome = h.rust(&args, &vars);
         let id = serde_json::from_str::<Value>(&outcome.stdout)
             .ok()
             .and_then(|v| v["id"].as_str().map(str::to_string))
             .unwrap_or_default();
         let doc = h.peek(&["get-doc", &id]);
+        let (got_id, got_agent) = (doc["sessionId"].as_str(), doc["sessionAgent"].as_str());
         h.record(
-            format!("명령 표면은 세션을 남기지 않는다 {label}"),
-            outcome.code == 0 && doc["sessionId"].is_null() && doc["sessionAgent"].is_null(),
-            || format!("종료 {} {}", outcome.code, clip(&doc.to_string())),
+            format!("세션 표식 {label}"),
+            outcome.code == 0 && got_id == want_id && got_agent == want_agent,
+            || format!("종료 {} id {got_id:?} agent {got_agent:?} 기대 {want_id:?} {want_agent:?}\n    {}", outcome.code, clip(&outcome.stderr)),
         );
     }
 }
@@ -950,12 +1985,14 @@ fn main() -> ExitCode {
     cases_surface(&mut h);
     cases_parse_errors(&mut h);
     cases_reads(&mut h);
+    cases_tools_read(&mut h);
     cases_reindex_paths(&mut h);
     if args.iter().any(|a| a == "--history") {
         cases_history(&mut h);
     }
     cases_writes(&mut h);
     cases_families(&mut h);
+    cases_tools_write(&mut h);
     cases_session_env(&mut h);
 
     let _ = json!(null);

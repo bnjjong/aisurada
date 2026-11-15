@@ -12,6 +12,7 @@ pub mod output;
 pub mod parse;
 pub mod registry;
 mod spec_table;
+pub mod tool;
 
 use ais_core::engine::Engine;
 
@@ -99,7 +100,10 @@ fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome 
     };
     if 1 + rest.len() + marker_cells > 64 {
         return Outcome::err(
-            format!("인자 개수가 64개를 초과했습니다: {}\n", 1 + rest.len() + marker_cells),
+            format!(
+                "인자 개수가 64개를 초과했습니다: {}\n",
+                1 + rest.len() + marker_cells
+            ),
             1,
         );
     }
@@ -109,10 +113,7 @@ fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome 
 
     // 3. 해석하고 엔진을 부른다
     let outcome = if is_tool {
-        Err(CliError::new(
-            409,
-            format!("{name} 도구 표면은 Rust ais-cli에 아직 없다. 5a의 다음 단계에서 옮긴다."),
-        ))
+        run_tool(name, rest, &vault, session.as_ref())
     } else {
         run_command(name, rest, &vault, session.as_ref())
     };
@@ -124,6 +125,17 @@ fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome 
         },
         Err(error) => Outcome::from_error(&error),
     }
+}
+
+fn run_tool(
+    name: &str,
+    rest: &[String],
+    vault: &str,
+    session: Option<&env::SessionSource>,
+) -> Result<legacy::Legacy, CliError> {
+    let call = tool::parse_tool(name, rest, session)?;
+    let response = Engine::new(vault).call(&call.command, call.args.clone())?;
+    Ok(legacy::to_legacy(&call, vault, response))
 }
 
 fn run_command(

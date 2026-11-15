@@ -111,7 +111,9 @@ pub fn tool_description(name: &str) -> &'static str {
         "set_resource_ref" => "프로젝트가 글로벌 자원을 참조하는 것을 켜거나 끈다",
         "usable_resources" => "프로젝트가 쓸 수 있는 스킬과 에이전트 정의를 낸다",
         "list_resource_versions" => "스킬이나 에이전트 정의의 고치기 전 판 목록을 낸다",
-        "list_resource_changes" => "승인을 기다리는 스킬·에이전트 변경과 승인 안 된 직접 수정을 낸다",
+        "list_resource_changes" => {
+            "승인을 기다리는 스킬·에이전트 변경과 승인 안 된 직접 수정을 낸다"
+        }
         "get_resource_change" => "승인 대기 변경 1건을 이전 판과 새 판과 함께 낸다",
         "list_tasks" => "태스크(티켓) 목록을 상태, 유형, 저장소, 라벨로 거른다",
         "get_task" => "태스크 1건을 설명, 완료 기준, 연결, 활동과 함께 낸다",

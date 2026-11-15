@@ -37,6 +37,7 @@ public class DumpSpecs {
         out.append("//! `engine-rs/tools/compat/gen-spec-table.sh`가 Java 엔진의 `CommandRegistry`와 `ArgsParser`에서 뽑아 쓴다.\n");
         out.append("//! Java 엔진이 사라지기 전에 한 번 더 만들어 두면 이 표가 Java와 같은 명령줄 규칙의 기준으로 남는다.\n\n");
         out.append("use crate::registry::Spec;\n\n");
+        out.append("#[rustfmt::skip]\n");
         out.append("pub const SPECS: &[Spec] = &[\n");
         for (CommandSpec s : CommandRegistry.SPECS) {
             String name = s.name();

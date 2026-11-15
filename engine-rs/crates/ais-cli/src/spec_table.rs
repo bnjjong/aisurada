@@ -5,6 +5,7 @@
 
 use crate::registry::Spec;
 
+#[rustfmt::skip]
 pub const SPECS: &[Spec] = &[
     Spec {
         name: "reindex",

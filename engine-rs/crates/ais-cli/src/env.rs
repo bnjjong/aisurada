@@ -114,8 +114,7 @@ fn is_agent_name(value: &str) -> bool {
         Some(first) if first.is_ascii_lowercase() => {}
         _ => return false,
     }
-    value.len() <= 32
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    value.len() <= 32 && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// 파일에 적을 에이전트 이름. claude와 모양이 틀린 값은 `None`이다(줄이 없으면 읽는 쪽이 claude로 본다).
