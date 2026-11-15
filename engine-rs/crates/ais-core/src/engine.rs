@@ -10,7 +10,8 @@ use crate::commands::{
     facts_write, get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace,
     list_agendas, list_attachments, list_comments, list_docs, list_projects, list_sub_notes,
     list_tags, list_templates, list_trash, note_meta_write, project_write, reindex,
-    resource_commands, search_docs, sub_note_write, task_commands, template_write, trash_write,
+    resource_commands, search_docs, session_commands, sub_note_write, task_commands,
+    template_write, trash_write,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
@@ -93,6 +94,9 @@ pub const COMMANDS: &[&str] = &[
     "list_chats",
     "append_ask_turn",
     "append_chat_turn",
+    "read_session",
+    "session_titles",
+    "recent_sessions",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -458,6 +462,18 @@ impl Engine {
                     &request,
                 )?)
             }
+            "read_session" => {
+                let request: session_commands::ReadSessionRequest = parse_args(command, args)?;
+                to_json(session_commands::read_session(&request)?)
+            }
+            "session_titles" => {
+                let request: session_commands::SessionTitlesRequest = parse_args(command, args)?;
+                to_json(session_commands::session_titles(&request)?)
+            }
+            "recent_sessions" => {
+                let request: session_commands::RecentSessionsRequest = parse_args(command, args)?;
+                to_json(session_commands::recent_sessions(&request)?)
+            }
             "get_resource_policy" => {
                 to_json(resource_commands::get_resource_policy(&self.vault_root)?)
             }
@@ -567,6 +583,9 @@ mod tests {
         "get_resource_policy",
         "get_ask",
         "list_chats",
+        "read_session",
+        "session_titles",
+        "recent_sessions",
     ];
 
     #[test]

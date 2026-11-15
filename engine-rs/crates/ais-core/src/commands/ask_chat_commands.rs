@@ -916,8 +916,14 @@ fn compare_created_at(a: &str, b: &str) -> Ordering {
     }
 }
 
+/// `Instant.parse`처럼 초가 반드시 있는 시각만 읽는다(Claude 기록의 시각).
+pub(crate) fn parse_instant_strict(text: &str) -> Option<i128> {
+    INSTANT.captures(text)?.get(6)?;
+    parse_instant(text)
+}
+
 /// `Instant.parse`나 `OffsetDateTime.parse`로 읽히는 시각을 나노초로(읽히지 않으면 `None`)
-fn parse_instant(text: &str) -> Option<i128> {
+pub(crate) fn parse_instant(text: &str) -> Option<i128> {
     if is_blank(text) {
         return None;
     }
