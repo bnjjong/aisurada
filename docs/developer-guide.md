@@ -83,7 +83,7 @@ test-native.sh         화면·호스트 시험 전체
 
 | 자리 | 내용 |
 |---|---|
-| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 `plain_text`, git 실행 `git`과 노트의 판 목록 `history`, 코멘트 id 겹침 검사 `comment_copy`), `kernel`(공용 커널: 호출자 `actor`, Java 글·수 규칙 `java`, 날짜·시각 `time`, id 모양 `ids`, 경로 가두기 `confine`. 다른 영역을 쓰지 않는다), `write`(쓰기 공통 기반: `lock`, `atomic`, `precondition`, `marker`, `apparatus`, `autocommit`, `pipeline`, `slug`, `agenda_file`, `project_file`, `template_file`, `warnings`, `note_front`, `meta_writer`, `snake_dump`), `task`(태스크), `resource`(스킬·에이전트 정의와 승인), `session`(에이전트 세션 읽기), `json`, `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
+| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 `plain_text`, git 실행 `git`과 노트의 판 목록 `history`, 코멘트 id 겹침 검사 `comment_copy`), `kernel`(공용 커널: 호출자 `actor`, Java 글·수 규칙 `java`, 날짜·시각 `time`, id 모양 `ids`, 경로 가두기 `confine`, 값 객체 `doc_type`·`tier`(기록 층 가시성 정책)·`link_kind`·`task_link`·`hue`, 내용 확인 값 `token`. 다른 영역을 쓰지 않는다), `write`(쓰기 공통 기반: `lock`, `atomic`, `precondition`, `marker`, `apparatus`, `autocommit`, `pipeline`, `slug`, `agenda_file`, `project_file`, `template_file`, `warnings`, `note_front`, `meta_writer`, `snake_dump`), `task`(태스크), `resource`(스킬·에이전트 정의와 승인), `session`(에이전트 세션 읽기), `json`, `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
 | `engine-rs/crates/ais-cli/` | `ais-cli`: `registry`·`spec_table`(이름과 명령 명세 표), `parse`(명령 표면)·`tool`(도구 표면) 인자 해석, `map`(엔진 호출로 바꿈), `legacy`(엔진 응답을 옛 응답 모양으로 바꿈), `output`(키를 정렬한 JSON 쓰기), `env`(vault 정하기, 세션 표식). `mcp`·`mcp_tools`(MCP 서버와 도구 표), `register`·`agent_cli`(`claude-mcp`·`codex-mcp`·`gemini-mcp`), `old_sidecar`·`doctor`·`install`·`migrate`(옛 사이드카 정리, 진단, 첫 실행 이주) |
 | `engine-rs/crates/ais-cli/examples/` | `cli_compat`(기준 Java 단발 엔진과 명령줄 단위로 맞댐), `mcp_compat`(기준 Java MCP 서버와 JSON-RPC 대화를 맞댐) |
 | `engine-rs/crates/ais-core/examples/` | `compat_check`(기준 Java 엔진과 읽기·쓰기 맞대기), `snake_check`(SnakeYAML 방출기 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
@@ -719,7 +719,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 80초(188건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 6건(골든 재생, 직렬화 골든, 의존 방향 3, 명령 표 교차)이 들어 있다(§4) |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 80~100초(198건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 7건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합 4, 명령 표 교차)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「기존 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
