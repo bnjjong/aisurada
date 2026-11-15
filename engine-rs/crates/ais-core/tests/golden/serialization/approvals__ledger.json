@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "policy": {
+    "project": "auto",
+    "global": "approve",
+    "refs": "approve",
+    "permission": "approve"
+  },
+  "items": {
+    "res:skmwh21ips-00070001": {
+      "token": "f1:86542b32e8613b5d8b073ca74060ef7a7882dec4513ab33102f8dcc5c932bf23",
+      "at": "2026-11-14T23:46:40Z",
+      "by": "human"
+    },
+    "res:apmwh21ips-00080001": {
+      "token": "f1:3cf9916c23ddf8822da44331aa82a60436fd65a51d36bdf382ca7937ef0c4dfe",
+      "at": "2026-11-14T23:46:40Z",
+      "by": "human"
+    }
+  }
+}

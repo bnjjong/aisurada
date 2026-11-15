@@ -1,0 +1,67 @@
+[
+  {
+    "trashId": "trmwh21ips-000a0001",
+    "file": "trmwh21ips-000a0001.md",
+    "originalPath": "notes/work/odd-tier.md",
+    "docId": "ndfx0009-00000009",
+    "agendaId": "agfx0002-0000000b",
+    "agendaSlug": "work",
+    "title": "제목 ndfx0009-00000009",
+    "type": "free",
+    "format": "markdown",
+    "created": "2026-11-08T08:00:00+09:00",
+    "trashedAt": "2026-11-14T23:46:40.000Z"
+  },
+  {
+    "trashId": "trfx0001-000000b1",
+    "file": "trfx0001-000000b1",
+    "originalPath": "notes/demo/a",
+    "docId": "ndfx0100-00000100",
+    "agendaId": "agfx0001-0000000a",
+    "agendaSlug": "demo",
+    "title": "먼저 버림",
+    "type": "plan",
+    "format": "html",
+    "created": "2026-11-01T09:00:00+09:00",
+    "trashedAt": "2026-11-02T01:00:00.000Z"
+  },
+  {
+    "trashId": "trfx0002-000000b2",
+    "file": "f2",
+    "originalPath": "notes/demo/b",
+    "docId": "ndfx0101-00000101",
+    "agendaId": "ag-recovered",
+    "agendaSlug": "demo",
+    "title": "ndfx0101-00000101",
+    "type": "build",
+    "format": "markdown",
+    "created": "2026-11-01T00:00:00+09:00",
+    "trashedAt": "2026-11-03T01:00:00.123Z"
+  },
+  {
+    "trashId": "trfx0003-000000b3",
+    "file": "f3",
+    "originalPath": "notes/demo/c",
+    "docId": "ndfx0102-00000102",
+    "agendaId": "agfx0001-0000000a",
+    "agendaSlug": "demo",
+    "title": "ndfx0102-00000102",
+    "type": "build",
+    "format": "markdown",
+    "created": "2026-11-01T09:00:00+09:00",
+    "trashedAt": "2026-11-03T01:00:00.000Z"
+  },
+  {
+    "trashId": "trfx0004-000000b4",
+    "file": "f4",
+    "originalPath": "notes/demo/d",
+    "docId": "ndfx0103-00000103",
+    "agendaId": "agfx0001-0000000a",
+    "agendaSlug": "demo",
+    "title": "ndfx0103-00000103",
+    "type": "build",
+    "format": "markdown",
+    "created": "2026-11-01T09:00:00Z",
+    "trashedAt": "2026-11-03T01:00:00.123Z"
+  }
+]

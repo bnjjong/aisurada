@@ -1,0 +1,53 @@
+{
+  "id": "pcmwh21ips-00090001",
+  "status": "pending",
+  "command": "save-resource",
+  "createdAt": "2026-11-15T08:46:40+09:00",
+  "proposer": {
+    "session": "ai-1",
+    "agent": "codex",
+    "channel": "mcp"
+  },
+  "categories": [
+    "global-change",
+    "permission-raise"
+  ],
+  "reasons": [
+    "global-change",
+    "permission-raise"
+  ],
+  "fixed": true,
+  "target": {
+    "kind": "agent",
+    "scope": "global",
+    "id": "apmwh21ips-00080001",
+    "name": "리뷰어"
+  },
+  "args": {
+    "f1": "f1:3cf9916c23ddf8822da44331aa82a60436fd65a51d36bdf382ca7937ef0c4dfe",
+    "id": "apmwh21ips-00080001",
+    "permission": "edit"
+  },
+  "positional": [],
+  "before": {
+    "id": "apmwh21ips-00080001",
+    "kind": "agent",
+    "scope": "global",
+    "name": "리뷰어",
+    "description": "d",
+    "permission": "read",
+    "skills": [],
+    "body": ""
+  },
+  "after": {
+    "id": "apmwh21ips-00080001",
+    "kind": "agent",
+    "scope": "global",
+    "name": "리뷰어",
+    "description": "d",
+    "permission": "edit",
+    "skills": [],
+    "body": ""
+  },
+  "summary": "글로벌 에이전트 '리뷰어' 고치기(권한 read → edit)"
+}
