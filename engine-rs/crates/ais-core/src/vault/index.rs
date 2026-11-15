@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::agenda::{AgendaScan, scan_agendas};
+use super::agenda::{AgendaScan, AgendaTable, scan_agendas};
 use super::comment_copy;
-use super::scanner::{NoteRecord, NoteScan, scan_notes};
+use super::scanner::{NoteRecord, NoteScan, scan_note_paths, scan_notes};
 use crate::error::EngineError;
 
 pub struct NoteIndex {
@@ -33,11 +33,33 @@ impl NoteIndex {
         }
     }
 
+    /// 받은 vault 상대 경로가 가리키는 노트만 훑어 색인을 만든다(`reindex_paths`). 경로 검사에 걸리거나 맞추기를 세우는 문제가 있으면 오류다.
+    pub fn reconciled_paths(vault_root: &Path, paths: &[String]) -> Result<NoteIndex, EngineError> {
+        let path_error = std::cell::RefCell::new(None);
+        let (index, fatal) = Self::build_with(vault_root, |root, table| {
+            scan_note_paths(root, table, paths).unwrap_or_else(|error| {
+                *path_error.borrow_mut() = Some(error);
+                NoteScan::default()
+            })
+        });
+        match (path_error.into_inner(), fatal) {
+            (Some(error), _) | (None, Some(error)) => Err(error),
+            (None, None) => Ok(index),
+        }
+    }
+
     fn build(vault_root: &Path) -> (NoteIndex, Option<EngineError>) {
+        Self::build_with(vault_root, scan_notes)
+    }
+
+    fn build_with(
+        vault_root: &Path,
+        scan_with: impl FnOnce(&Path, &AgendaTable) -> NoteScan,
+    ) -> (NoteIndex, Option<EngineError>) {
         let vault_root =
             std::path::absolute(vault_root).unwrap_or_else(|_| vault_root.to_path_buf());
         let mut agendas = scan_agendas(&vault_root);
-        let mut scan = scan_notes(&vault_root, &agendas.table);
+        let mut scan = scan_with(&vault_root, &agendas.table);
         let mut fatal = agendas.fatal.take();
         // 코멘트 id가 겹치는 노트부터 뒤는 읽기 목록에서 뺀다
         if let Some((at, error)) = comment_copy::first_failure(&vault_root, &scan.notes) {

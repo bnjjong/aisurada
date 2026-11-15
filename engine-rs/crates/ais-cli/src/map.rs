@@ -72,6 +72,11 @@ pub fn to_call(
             args.insert("ids".into(), json!(parsed.positional));
             args
         }
+        "reindex-paths" => {
+            let mut args = Map::new();
+            args.insert("paths".into(), json!(parsed.positional));
+            args
+        }
         _ => plain_args(parsed),
     };
     attach_session(&mut args, session);

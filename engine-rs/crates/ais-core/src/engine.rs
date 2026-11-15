@@ -37,6 +37,7 @@ pub const COMMANDS: &[&str] = &[
     "list_templates",
     "list_trash",
     "reindex",
+    "reindex_paths",
     "get_doc",
     "list_sub_notes",
     "get_sub_note",
@@ -203,6 +204,10 @@ impl Engine {
             }
             "list_trash" => to_json(list_trash::execute(&self.vault_root)),
             "reindex" => to_json(reindex::execute(&self.vault_root)?),
+            "reindex_paths" => {
+                let request: reindex::ReindexPathsRequest = parse_args(command, args)?;
+                to_json(reindex::execute_paths(&self.vault_root, &request)?)
+            }
             "get_doc" => {
                 let request: get_doc::GetDocRequest = parse_args(command, args)?;
                 to_json(get_doc::execute(
@@ -617,6 +622,7 @@ mod tests {
         "list_templates",
         "list_trash",
         "reindex",
+        "reindex_paths",
         "get_doc",
         "list_sub_notes",
         "get_sub_note",

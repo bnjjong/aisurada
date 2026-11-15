@@ -14,7 +14,9 @@ use super::agenda::AgendaTable;
 use super::note_file::{ParsedNoteFile, read_note_file};
 use super::note_meta::{MetaData, MetaError, parse_meta};
 use super::{Conflict, Skipped};
-use crate::text::compare_utf16;
+use crate::error::EngineError;
+use crate::text::{compare_utf16, is_blank, trim};
+use crate::write::confine;
 
 static CONFLICT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)conflicted copy|\(conflicted\b|충돌(된)?\s*사본|conflicted version").unwrap()
@@ -240,17 +242,88 @@ impl Collector {
     }
 }
 
+impl Collector {
+    fn new(vault_root: &Path) -> Collector {
+        Collector {
+            vault: vault_root.to_path_buf(),
+            skipped: Vec::new(),
+            conflicts: Vec::new(),
+            candidates: Vec::new(),
+            seen: HashSet::new(),
+        }
+    }
+
+    /// 받은 vault 상대 경로 하나가 가리키는 자리만 후보로 모은다. 폴더면 그 아래를 전체 훑기와 같은 규칙으로 모으고,
+    /// 노트 하나(파일이나 폴더)면 그것만 모은다. 조각 검사나 기준 폴더 가둠에 걸리면 오류다(노트 파일은 아직 열지 않았다).
+    fn collect_path(&mut self, raw: &str) -> Result<(), EngineError> {
+        let pieces: Vec<&str> = raw.split('/').filter(|piece| !is_blank(piece)).collect();
+        if pieces.len() < 2 {
+            return Ok(());
+        }
+        let agenda = pieces[1];
+        confine::check_segment(&self.vault, agenda)?;
+        let mut current = confine::normalize(&self.vault.join("notes").join(agenda));
+        // 두 번째 조각의 기준만 vault다. `notes/..`은 vault 자신이라 통과한다.
+        confine::check_confinement(&self.vault, &current)?;
+        if !is_dir(&current) {
+            return Ok(());
+        }
+        let mut depth = 0;
+        for piece in &pieces[2..] {
+            confine::check_segment(&current, piece)?;
+            let next = confine::normalize(&current.join(piece));
+            confine::check_confinement(&current, &next)?;
+            if fs::metadata(&next).is_err() {
+                return Ok(());
+            }
+            let name = next
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let ordinary = is_dir(&next)
+                && !is_symlink(&next)
+                && !RESERVED_NAMES.contains(&name.as_str())
+                && !CONFLICT.is_match(&name)
+                && find_folder_content_file(&next).is_none()
+                && depth < MAX_SCAN_DEPTH;
+            if !ordinary {
+                self.collect_entry(&name, &next, agenda, depth);
+                return Ok(());
+            }
+            current = next;
+            depth += 1;
+        }
+        self.collect_folder(&current, agenda, depth);
+        Ok(())
+    }
+}
+
 /// vault의 `notes/`를 훑어 노트를 모읍니다.
 pub fn scan_notes(vault_root: &Path, agendas: &AgendaTable) -> NoteScan {
-    let mut collector = Collector {
-        vault: vault_root.to_path_buf(),
-        skipped: Vec::new(),
-        conflicts: Vec::new(),
-        candidates: Vec::new(),
-        seen: HashSet::new(),
-    };
+    let mut collector = Collector::new(vault_root);
     collector.collect_all();
+    open_collected(collector, agendas)
+}
 
+/// 받은 vault 상대 경로(`notes/…`)가 가리키는 자리만 훑는다. 트림한 앞뒤 `/`를 떼고 `notes/`로 시작하는 것만, 같은 경로는 한 번만 본다.
+pub fn scan_note_paths(
+    vault_root: &Path,
+    agendas: &AgendaTable,
+    paths: &[String],
+) -> Result<NoteScan, EngineError> {
+    let mut collector = Collector::new(vault_root);
+    let mut seen: HashSet<String> = HashSet::new();
+    for raw in paths {
+        let path = trim(raw).trim_matches('/');
+        if path.starts_with("notes/") && seen.insert(path.to_string()) {
+            collector.collect_path(path)?;
+        }
+    }
+    Ok(open_collected(collector, agendas))
+}
+
+/// 모은 후보를 하나씩 열어 노트 목록을 만든다.
+fn open_collected(mut collector: Collector, agendas: &AgendaTable) -> NoteScan {
     let mut notes: Vec<NoteRecord> = Vec::new();
     let mut ids: HashSet<String> = HashSet::new();
     let mut opening_skipped: Vec<Skipped> = Vec::new();

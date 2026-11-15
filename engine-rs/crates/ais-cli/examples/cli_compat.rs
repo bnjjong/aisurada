@@ -712,6 +712,76 @@ fn cases_writes(h: &mut Harness) {
     h.run("reindex", &["reindex"], true);
 }
 
+/// `reindex-paths`: 지정 경로만 훑기. 폴더, 노트 하나, 후속 노트 폴더, 없는 자리, 바깥으로 나가는 경로, 200칸 초과
+fn cases_reindex_paths(h: &mut Harness) {
+    let many: Vec<String> = (0..201).map(|i| format!("notes/demo/n{i}")).collect();
+    let mut many_args: Vec<&str> = vec!["reindex-paths"];
+    many_args.extend(many.iter().map(String::as_str));
+    for (label, args) in [
+        ("경로 없음", vec!["reindex-paths"]),
+        ("아젠다 폴더", vec!["reindex-paths", "notes/demo"]),
+        ("여러 곳", vec!["reindex-paths", "notes/demo", "notes/work", "/notes/demo/", " notes/demo "]),
+        ("노트 파일", vec!["reindex-paths", "notes/work/ext.md"]),
+        ("월별 폴더", vec!["reindex-paths", "notes/demo/2026-11"]),
+        ("폴더 노트", vec!["reindex-paths", "notes/demo/2026-11/parent"]),
+        ("후속 노트 폴더", vec!["reindex-paths", "notes/demo/2026-11/parent/sub"]),
+        ("없는 자리", vec!["reindex-paths", "notes/demo/nothing-here"]),
+        ("없는 아젠다", vec!["reindex-paths", "notes/zzz"]),
+        ("notes 밖", vec!["reindex-paths", "other/place", ".aisurada/agendas"]),
+        ("notes만", vec!["reindex-paths", "notes"]),
+        ("바깥으로", vec!["reindex-paths", "notes/demo/../../.."]),
+        ("조각이 빈", vec!["reindex-paths", "notes/ /x"]),
+        ("충돌 사본", vec!["reindex-paths", "notes/demo/a (conflicted copy)"]),
+        ("옵션 모양", vec!["reindex-paths", "--x", "notes/work"]),
+    ] {
+        h.run(&format!("reindex-paths {label}"), &args, false);
+    }
+    // 칸이 64개를 넘는 요청은 Java ais-cli(클라이언트)가 보내기 전에 거절한다. 그래서 200칸 초과의 전체 훑기 물러서기는 엔진끼리만 견준다.
+    let cli = h.rust(&many_args.iter().map(|a| a.to_string()).collect::<Vec<_>>(), &[]);
+    h.record("reindex-paths 201칸은 칸 수 한도로 거절".to_string(), cli.code == 1, || format!("{cli:?}"));
+    h.step += 1;
+    let java = h.java(&many_args.iter().map(|a| a.to_string()).collect::<Vec<_>>(), &[]);
+    let rust = ais_core::engine::Engine::new(&h.b).call("reindex_paths", json!({"paths": many}));
+    let mut java_value: Value = serde_json::from_str(&java.stdout).unwrap_or(Value::Null);
+    let mut rust_value = rust.ok().unwrap_or(Value::Null);
+    strip_key(&mut java_value, "elapsedMs");
+    strip_key(&mut rust_value, "elapsedMs");
+    h.record(
+        "reindex-paths 201칸 엔진".to_string(),
+        java.code == 0 && java_value == rust_value && java_value["mode"] == "full",
+        || first_diff(&java_value, &rust_value, "$"),
+    );
+}
+
+/// `history`: git 이력이 있는 합성 vault에서 판 목록, 번호·커밋·검색어로 고르기, 오류
+fn cases_history(h: &mut Harness) {
+    let ids = ["ndfx0002-00000002", "ndfx0001-00000001", "ndfx0003-00000003", "ndfx0040-00000040", "ndfx0041-00000041", "ndfx0099-00000099"];
+    for id in ids {
+        h.run(&format!("history {id}"), &["history", id], false);
+        h.run(&format!("history {id} 1"), &["history", id, "1"], false);
+        h.run(&format!("history {id} 2"), &["history", id, "2"], false);
+        h.run(&format!("history {id} 9"), &["history", id, "9"], false);
+        h.run(&format!("history {id} 검색"), &["history", id, "query=내용"], false);
+        // 첫 판의 커밋으로 고르기
+        let first = h.peek(&["history", id]);
+        if let Some(commit) = first["versions"]
+            .as_array()
+            .and_then(|v| v.first())
+            .and_then(|v| v["commit"].as_str())
+        {
+            h.run(&format!("history {id} 커밋"), &["history", id, &format!("commit={commit}")], false);
+            h.run(
+                &format!("history {id} 번호와 커밋"),
+                &["history", id, "1", &format!("commit={commit}")],
+                false,
+            );
+        }
+    }
+    h.run("history 커밋 모양", &["history", "ndfx0002-00000002", "commit=zz"], false);
+    h.run("history 없는 커밋", &["history", "ndfx0002-00000002", &format!("commit={}", "a".repeat(40))], false);
+    h.run("commit-vault", &["commit-vault"], true);
+}
+
 /// 태스크·자원·승인·문답·대화·세션: 명령줄 인자(자리 인자 이름, 글 그대로 넘기는 옵션, JSON 글)가 엔진까지 제대로 닿는지
 fn cases_families(h: &mut Harness) {
     // 태스크
@@ -880,6 +950,10 @@ fn main() -> ExitCode {
     cases_surface(&mut h);
     cases_parse_errors(&mut h);
     cases_reads(&mut h);
+    cases_reindex_paths(&mut h);
+    if args.iter().any(|a| a == "--history") {
+        cases_history(&mut h);
+    }
     cases_writes(&mut h);
     cases_families(&mut h);
     cases_session_env(&mut h);
