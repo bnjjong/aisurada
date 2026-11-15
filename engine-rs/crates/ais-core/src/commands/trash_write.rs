@@ -95,8 +95,7 @@ fn rel_of(vault: &Path, path: &Path) -> String {
 }
 
 /// 노트를 휴지통으로 보낸다: 노트 폴더(또는 파일)를 보관 폴더로 옮기고 목록 맨 앞에 항목을 더한다.
-pub fn delete_doc(vault: &Path, request: &DeleteDocRequest) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "delete_doc", &request.context)?;
+pub fn delete_doc(vault: &Path, request: &DeleteDocRequest, scope: &WriteScope) -> Result<Json, EngineError> {
     require_id(&request.id, "delete-doc <노트 id>")?;
     if !NOTE_ID.is_match(&request.id) {
         return Err(EngineError::invalid_argument(format!(
@@ -201,8 +200,7 @@ pub fn delete_doc(vault: &Path, request: &DeleteDocRequest) -> Result<Json, Engi
 }
 
 /// 휴지통 항목을 되살린다. 원래 아젠다가 없어졌으면 `recovered` 아젠다(없으면 만든다)로 보낸다.
-pub fn restore_doc(vault: &Path, request: &TrashEntryRequest) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "restore_doc", &request.context)?;
+pub fn restore_doc(vault: &Path, request: &TrashEntryRequest, scope: &WriteScope) -> Result<Json, EngineError> {
     let entry = find_entry(
         vault,
         &request.trash_id,
@@ -320,7 +318,6 @@ fn rewrite_agenda(source: &Path, format: &str, slug: &str) -> Result<(), EngineE
 
 /// 휴지통 항목을 영구 삭제한다(보관물과 목록의 항목).
 pub fn purge_doc(vault: &Path, request: &TrashEntryRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "purge_doc", &request.context)?;
     let first = find_entry(
         vault,
         &request.trash_id,
@@ -337,8 +334,7 @@ pub fn purge_doc(vault: &Path, request: &TrashEntryRequest) -> Result<Json, Engi
 }
 
 /// 휴지통을 비운다. 지운 개수, 못 지운 항목, 못 읽어 건너뛴 항목 수, 목록에 없는 보관물(고아) 수를 알린다.
-pub fn empty_trash(vault: &Path, request: &EmptyTrashRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "empty_trash", &request.context)?;
+pub fn empty_trash(vault: &Path) -> Result<Json, EngineError> {
     let (entries, skipped) = entries_in_file_order(vault);
     let names: HashSet<&str> = entries.iter().map(|e| e.file.as_str()).collect();
     let orphans = fs::read_dir(vault.join(".aisurada/trash/files"))

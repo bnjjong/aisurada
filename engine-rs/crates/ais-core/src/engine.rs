@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 use crate::ports::Ports;
 use std::sync::Arc;
+use crate::write::pipeline::{self, HasWriteContext, WriteContext, WriteScope};
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -26,12 +27,70 @@ struct ExportMarkdownRequest {
     context: crate::write::pipeline::WriteContext,
 }
 
+/// 쓰기 요청 종류마다 `context` 칸에서 [`WriteContext`]를 꺼내는 구현을 붙인다.
+macro_rules! write_context {
+    ($request:ty) => {
+        impl HasWriteContext for $request {
+            fn write_context(&self) -> &WriteContext {
+                &self.context
+            }
+        }
+    };
+}
+
+write_context!(agenda_write::CreateAgendaRequest);
+write_context!(agenda_write::UpdateAgendaRequest);
+write_context!(agenda_write::DeleteAgendaRequest);
+write_context!(project_write::CreateProjectRequest);
+write_context!(project_write::UpdateProjectRequest);
+write_context!(project_write::DeleteProjectRequest);
+write_context!(template_write::SaveTemplateRequest);
+write_context!(template_write::SaveRitualTemplateRequest);
+write_context!(template_write::DeleteDocTemplateRequest);
+write_context!(facts_write::UpdateAgendaFactsRequest);
+write_context!(init_workspace::InitWorkspaceRequest);
+write_context!(note_meta_write::SetFavoriteRequest);
+write_context!(note_meta_write::EvaluateDocRequest);
+write_context!(note_meta_write::LinkDocsRequest);
+write_context!(task_commands::CreateTaskRequest);
+write_context!(task_commands::UpdateTaskRequest);
+write_context!(task_commands::TransitionTaskRequest);
+write_context!(task_commands::LinkTasksRequest);
+write_context!(task_commands::AddTaskCommentRequest);
+write_context!(task_commands::TaskRefRequest);
+write_context!(resource_commands::SaveResourceRequest);
+write_context!(resource_commands::ResourceIdRequest);
+write_context!(resource_commands::SetResourceRefRequest);
+write_context!(resource_commands::ChangeDecisionRequest);
+write_context!(ask_chat_commands::AppendAskTurnRequest);
+write_context!(ask_chat_commands::AppendChatTurnRequest);
+write_context!(write_attachment::WriteAttachmentRequest);
+write_context!(shard_notes::ShardNotesRequest);
+write_context!(daily_notes::PlanDayRequest);
+write_context!(daily_notes::CheckNotesRequest);
+write_context!(facts_brief::FactsBriefRequest);
+write_context!(trash_write::DeleteDocRequest);
+write_context!(trash_write::TrashEntryRequest);
+write_context!(trash_write::EmptyTrashRequest);
+write_context!(comment_write::CommentWriteRequest);
+write_context!(sub_note_write::CreateSubNoteRequest);
+write_context!(sub_note_write::UpdateSubNoteRequest);
+write_context!(sub_note_write::DeleteSubNoteRequest);
+write_context!(doc_create::CreateDocRequest);
+write_context!(doc_write::UpdateDocRequest);
+write_context!(resource_commands::ResolveResourceEditRequest);
+write_context!(resource_commands::SetResourcePolicyRequest);
+write_context!(ExportMarkdownRequest);
+
 /// vault 하나를 맡는 엔진. 요청마다 vault를 새로 훑으므로 상태가 없다.
 pub struct Engine {
     vault_root: PathBuf,
     /// 이 엔진이 명령을 부르는 동안 현재 스레드에 거는 약속 묶음. 없으면 기본 어댑터(환경 변수와 실제 시계)를 쓴다.
     ports: Option<Arc<Ports>>,
 }
+
+/// 워크스페이스 표식 검사를 건너뛰는 쓰기 명령. 표식을 처음 만드는 `init_workspace`는 표식이 아직 없는 폴더에서 부른다.
+const MARKER_EXEMPT: &[&str] = &["init_workspace"];
 
 /// 이 엔진이 처리하는 명령 이름
 pub const COMMANDS: &[&str] = &[
@@ -206,6 +265,29 @@ impl Engine {
         self.dispatch(command, args)
     }
 
+    /// 쓰기 명령의 디스패치. 요청을 읽고, **범위를 이 한 곳에서 열고**(잠금 → 표식·색인 맞추기 → 자동 커밋 기록), 명령이 일하게 한 뒤 응답을 JSON으로 바꾼다.
+    /// 명령은 범위를 열지 않는다. 열린 범위(`&WriteScope`)를 받는다. 범위는 응답을 만든 뒤에, 성공이든 실패든 놓인다.
+    /// `ledger_baseline`은 자원 명령용이다: 범위를 연 직후 승인 기록장이 없으면 기준선을 만든다(쓰기보다 먼저여야 방금 쓴 파일이 기준선에 섞이지 않는다).
+    fn write<Req, T>(
+        &self,
+        command: &str,
+        args: Value,
+        ledger_baseline: bool,
+        run: impl FnOnce(&Req, &WriteScope) -> Result<T, EngineError>,
+    ) -> Result<Value, EngineError>
+    where
+        Req: serde::de::DeserializeOwned + HasWriteContext,
+        T: serde::Serialize,
+    {
+        let request: Req = parse_args(command, args)?;
+        let marker_required = !MARKER_EXEMPT.contains(&command);
+        let scope = pipeline::open(&self.vault_root, marker_required, request.write_context())?;
+        if ledger_baseline {
+            crate::resource::approvals::ledger(&self.vault_root)?;
+        }
+        to_json(run(&request, &scope)?)
+    }
+
     fn dispatch(&self, command: &str, args: Value) -> Result<Value, EngineError> {
         match command {
             "list_docs" => {
@@ -294,62 +376,20 @@ impl Engine {
                 let request: history::HistoryRequest = parse_args(command, args)?;
                 to_json(history::execute(&self.vault_root, &request)?)
             }
-            "create_agenda" => {
-                let request: agenda_write::CreateAgendaRequest = parse_args(command, args)?;
-                to_json(agenda_write::create(&self.vault_root, &request)?)
-            }
-            "update_agenda" => {
-                let request: agenda_write::UpdateAgendaRequest = parse_args(command, args)?;
-                to_json(agenda_write::update(&self.vault_root, &request)?)
-            }
-            "delete_agenda" => {
-                let request: agenda_write::DeleteAgendaRequest = parse_args(command, args)?;
-                to_json(agenda_write::delete(&self.vault_root, &request)?)
-            }
-            "create_project" => {
-                let request: project_write::CreateProjectRequest = parse_args(command, args)?;
-                to_json(project_write::create(&self.vault_root, &request)?)
-            }
-            "update_project" => {
-                let request: project_write::UpdateProjectRequest = parse_args(command, args)?;
-                to_json(project_write::update(&self.vault_root, &request)?)
-            }
-            "delete_project" => {
-                let request: project_write::DeleteProjectRequest = parse_args(command, args)?;
-                to_json(project_write::delete(&self.vault_root, &request)?)
-            }
-            "save_template" => {
-                let request: template_write::SaveTemplateRequest = parse_args(command, args)?;
-                to_json(template_write::save_document(&self.vault_root, &request)?)
-            }
-            "save_ritual_template" => {
-                let request: template_write::SaveRitualTemplateRequest = parse_args(command, args)?;
-                to_json(template_write::save_ritual(&self.vault_root, &request)?)
-            }
-            "delete_doc_template" => {
-                let request: template_write::DeleteDocTemplateRequest = parse_args(command, args)?;
-                to_json(template_write::delete_document(&self.vault_root, &request)?)
-            }
-            "update_agenda_facts" => {
-                let request: facts_write::UpdateAgendaFactsRequest = parse_args(command, args)?;
-                to_json(facts_write::update(&self.vault_root, &request)?)
-            }
-            "init_workspace" => {
-                let request: init_workspace::InitWorkspaceRequest = parse_args(command, args)?;
-                to_json(init_workspace::execute(&self.vault_root, &request)?)
-            }
-            "set_favorite" => {
-                let request: note_meta_write::SetFavoriteRequest = parse_args(command, args)?;
-                to_json(note_meta_write::set_favorite(&self.vault_root, &request)?)
-            }
-            "evaluate_doc" => {
-                let request: note_meta_write::EvaluateDocRequest = parse_args(command, args)?;
-                to_json(note_meta_write::evaluate_doc(&self.vault_root, &request)?)
-            }
-            "link_docs" => {
-                let request: note_meta_write::LinkDocsRequest = parse_args(command, args)?;
-                to_json(note_meta_write::link_docs(&self.vault_root, &request)?)
-            }
+            "create_agenda" => self.write::<agenda_write::CreateAgendaRequest, _>(command, args, false, |request, scope| agenda_write::create(&self.vault_root, request, scope)),
+            "update_agenda" => self.write::<agenda_write::UpdateAgendaRequest, _>(command, args, false, |request, scope| agenda_write::update(&self.vault_root, request, scope)),
+            "delete_agenda" => self.write::<agenda_write::DeleteAgendaRequest, _>(command, args, false, |request, scope| agenda_write::delete(&self.vault_root, request, scope)),
+            "create_project" => self.write::<project_write::CreateProjectRequest, _>(command, args, false, |request, _scope| project_write::create(&self.vault_root, request)),
+            "update_project" => self.write::<project_write::UpdateProjectRequest, _>(command, args, false, |request, _scope| project_write::update(&self.vault_root, request)),
+            "delete_project" => self.write::<project_write::DeleteProjectRequest, _>(command, args, false, |request, scope| project_write::delete(&self.vault_root, request, scope)),
+            "save_template" => self.write::<template_write::SaveTemplateRequest, _>(command, args, false, |request, _scope| template_write::save_document(&self.vault_root, request)),
+            "save_ritual_template" => self.write::<template_write::SaveRitualTemplateRequest, _>(command, args, false, |request, _scope| template_write::save_ritual(&self.vault_root, request)),
+            "delete_doc_template" => self.write::<template_write::DeleteDocTemplateRequest, _>(command, args, false, |request, _scope| template_write::delete_document(&self.vault_root, request)),
+            "update_agenda_facts" => self.write::<facts_write::UpdateAgendaFactsRequest, _>(command, args, false, |request, scope| facts_write::update(&self.vault_root, request, scope)),
+            "init_workspace" => self.write::<init_workspace::InitWorkspaceRequest, _>(command, args, false, |request, _scope| init_workspace::execute(&self.vault_root, request)),
+            "set_favorite" => self.write::<note_meta_write::SetFavoriteRequest, _>(command, args, false, |request, scope| note_meta_write::set_favorite(&self.vault_root, request, scope)),
+            "evaluate_doc" => self.write::<note_meta_write::EvaluateDocRequest, _>(command, args, false, |request, scope| note_meta_write::evaluate_doc(&self.vault_root, request, scope)),
+            "link_docs" => self.write::<note_meta_write::LinkDocsRequest, _>(command, args, false, |request, scope| note_meta_write::link_docs(&self.vault_root, request, scope)),
             "get_task" => {
                 let request: task_commands::GetTaskRequest = parse_args(command, args)?;
                 to_json(task_commands::get_task(&self.vault_root, &request)?)
@@ -358,34 +398,13 @@ impl Engine {
                 let request: task_commands::ListTasksRequest = parse_args(command, args)?;
                 to_json(task_commands::list_tasks(&self.vault_root, &request)?)
             }
-            "create_task" => {
-                let request: task_commands::CreateTaskRequest = parse_args(command, args)?;
-                to_json(task_commands::create_task(&self.vault_root, &request)?)
-            }
-            "update_task" => {
-                let request: task_commands::UpdateTaskRequest = parse_args(command, args)?;
-                to_json(task_commands::update_task(&self.vault_root, &request)?)
-            }
-            "transition_task" => {
-                let request: task_commands::TransitionTaskRequest = parse_args(command, args)?;
-                to_json(task_commands::transition_task(&self.vault_root, &request)?)
-            }
-            "link_tasks" => {
-                let request: task_commands::LinkTasksRequest = parse_args(command, args)?;
-                to_json(task_commands::link_tasks(&self.vault_root, &request)?)
-            }
-            "add_task_comment" => {
-                let request: task_commands::AddTaskCommentRequest = parse_args(command, args)?;
-                to_json(task_commands::add_task_comment(&self.vault_root, &request)?)
-            }
-            "delete_task" => {
-                let request: task_commands::TaskRefRequest = parse_args(command, args)?;
-                to_json(task_commands::delete_task(&self.vault_root, &request)?)
-            }
-            "restore_task" => {
-                let request: task_commands::TaskRefRequest = parse_args(command, args)?;
-                to_json(task_commands::restore_task(&self.vault_root, &request)?)
-            }
+            "create_task" => self.write::<task_commands::CreateTaskRequest, _>(command, args, false, |request, _scope| task_commands::create_task(&self.vault_root, request)),
+            "update_task" => self.write::<task_commands::UpdateTaskRequest, _>(command, args, false, |request, _scope| task_commands::update_task(&self.vault_root, request)),
+            "transition_task" => self.write::<task_commands::TransitionTaskRequest, _>(command, args, false, |request, _scope| task_commands::transition_task(&self.vault_root, request)),
+            "link_tasks" => self.write::<task_commands::LinkTasksRequest, _>(command, args, false, |request, _scope| task_commands::link_tasks(&self.vault_root, request)),
+            "add_task_comment" => self.write::<task_commands::AddTaskCommentRequest, _>(command, args, false, |request, _scope| task_commands::add_task_comment(&self.vault_root, request)),
+            "delete_task" => self.write::<task_commands::TaskRefRequest, _>(command, args, false, |request, _scope| task_commands::delete_task(&self.vault_root, request)),
+            "restore_task" => self.write::<task_commands::TaskRefRequest, _>(command, args, false, |request, _scope| task_commands::restore_task(&self.vault_root, request)),
             "list_resources" => {
                 let request: resource_commands::ListResourcesRequest = parse_args(command, args)?;
                 to_json(resource_commands::list_resources(
@@ -427,64 +446,14 @@ impl Engine {
                     &request,
                 )?)
             }
-            "save_resource" => {
-                let request: resource_commands::SaveResourceRequest = parse_args(command, args)?;
-                to_json(resource_commands::save_resource(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "delete_resource" => {
-                let request: resource_commands::ResourceIdRequest = parse_args(command, args)?;
-                to_json(resource_commands::delete_resource(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "restore_resource" => {
-                let request: resource_commands::ResourceIdRequest = parse_args(command, args)?;
-                to_json(resource_commands::restore_resource(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "set_resource_ref" => {
-                let request: resource_commands::SetResourceRefRequest = parse_args(command, args)?;
-                to_json(resource_commands::set_resource_ref(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "approve_resource_change" => {
-                let request: resource_commands::ChangeDecisionRequest = parse_args(command, args)?;
-                to_json(resource_commands::approve_resource_change(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "reject_resource_change" => {
-                let request: resource_commands::ChangeDecisionRequest = parse_args(command, args)?;
-                to_json(resource_commands::reject_resource_change(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "resolve_resource_edit" => {
-                let request: resource_commands::ResolveResourceEditRequest =
-                    parse_args(command, args)?;
-                to_json(resource_commands::resolve_resource_edit(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "set_resource_policy" => {
-                let request: resource_commands::SetResourcePolicyRequest =
-                    parse_args(command, args)?;
-                to_json(resource_commands::set_resource_policy(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
+            "save_resource" => self.write::<resource_commands::SaveResourceRequest, _>(command, args, true, |request, _scope| resource_commands::save_resource(&self.vault_root, request)),
+            "delete_resource" => self.write::<resource_commands::ResourceIdRequest, _>(command, args, true, |request, _scope| resource_commands::delete_resource(&self.vault_root, request)),
+            "restore_resource" => self.write::<resource_commands::ResourceIdRequest, _>(command, args, true, |request, _scope| resource_commands::restore_resource(&self.vault_root, request)),
+            "set_resource_ref" => self.write::<resource_commands::SetResourceRefRequest, _>(command, args, true, |request, _scope| resource_commands::set_resource_ref(&self.vault_root, request)),
+            "approve_resource_change" => self.write::<resource_commands::ChangeDecisionRequest, _>(command, args, true, |request, _scope| resource_commands::approve_resource_change(&self.vault_root, request)),
+            "reject_resource_change" => self.write::<resource_commands::ChangeDecisionRequest, _>(command, args, true, |request, _scope| resource_commands::reject_resource_change(&self.vault_root, request)),
+            "resolve_resource_edit" => self.write::<resource_commands::ResolveResourceEditRequest, _>(command, args, true, |request, _scope| resource_commands::resolve_resource_edit(&self.vault_root, request)),
+            "set_resource_policy" => self.write::<resource_commands::SetResourcePolicyRequest, _>(command, args, true, |request, _scope| resource_commands::set_resource_policy(&self.vault_root, request)),
             "get_ask" => {
                 let request: ask_chat_commands::NoteRefRequest = parse_args(command, args)?;
                 to_json(ask_chat_commands::get_ask(&self.vault_root, &request)?)
@@ -493,20 +462,8 @@ impl Engine {
                 let request: ask_chat_commands::NoteRefRequest = parse_args(command, args)?;
                 to_json(ask_chat_commands::list_chats(&self.vault_root, &request)?)
             }
-            "append_ask_turn" => {
-                let request: ask_chat_commands::AppendAskTurnRequest = parse_args(command, args)?;
-                to_json(ask_chat_commands::append_ask_turn(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "append_chat_turn" => {
-                let request: ask_chat_commands::AppendChatTurnRequest = parse_args(command, args)?;
-                to_json(ask_chat_commands::append_chat_turn(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
+            "append_ask_turn" => self.write::<ask_chat_commands::AppendAskTurnRequest, _>(command, args, false, |request, scope| ask_chat_commands::append_ask_turn(&self.vault_root, request, scope)),
+            "append_chat_turn" => self.write::<ask_chat_commands::AppendChatTurnRequest, _>(command, args, false, |request, scope| ask_chat_commands::append_chat_turn(&self.vault_root, request, scope)),
             "read_session" => {
                 let request: session_commands::ReadSessionRequest = parse_args(command, args)?;
                 to_json(session_commands::read_session(&request)?)
@@ -519,91 +476,31 @@ impl Engine {
                 let request: session_commands::RecentSessionsRequest = parse_args(command, args)?;
                 to_json(session_commands::recent_sessions(&request)?)
             }
-            "write_attachment" => {
-                let request: write_attachment::WriteAttachmentRequest = parse_args(command, args)?;
-                to_json(write_attachment::write_attachment(
-                    &self.vault_root,
-                    &request,
-                )?)
-            }
-            "shard_notes" => {
-                let request: shard_notes::ShardNotesRequest = parse_args(command, args)?;
-                to_json(shard_notes::shard_notes(&self.vault_root, &request)?)
-            }
+            "write_attachment" => self.write::<write_attachment::WriteAttachmentRequest, _>(command, args, false, |request, scope| write_attachment::write_attachment(&self.vault_root, request, scope)),
+            "shard_notes" => self.write::<shard_notes::ShardNotesRequest, _>(command, args, false, |request, _scope| shard_notes::shard_notes(&self.vault_root, request)),
             "verify_shard" => {
                 let request: shard_notes::VerifyShardRequest = parse_args(command, args)?;
                 to_json(shard_notes::verify_shard(&self.vault_root, &request)?)
             }
-            "plan_day" => {
-                let request: daily_notes::PlanDayRequest = parse_args(command, args)?;
-                to_json(daily_notes::plan_day(&self.vault_root, &request)?)
-            }
-            "check_notes" => {
-                let request: daily_notes::CheckNotesRequest = parse_args(command, args)?;
-                to_json(daily_notes::check_notes(&self.vault_root, &request)?)
-            }
-            "facts_brief" => {
-                let request: facts_brief::FactsBriefRequest = parse_args(command, args)?;
-                to_json(facts_brief::facts_brief(&self.vault_root, &request)?)
-            }
-            "export_markdown" => {
-                let request: ExportMarkdownRequest = parse_args(command, args)?;
-                to_json(export_markdown::export_markdown(
-                    &self.vault_root,
-                    &request.context,
-                )?)
-            }
+            "plan_day" => self.write::<daily_notes::PlanDayRequest, _>(command, args, false, |request, scope| daily_notes::plan_day(&self.vault_root, request, scope)),
+            "check_notes" => self.write::<daily_notes::CheckNotesRequest, _>(command, args, false, |request, scope| daily_notes::check_notes(&self.vault_root, request, scope)),
+            "facts_brief" => self.write::<facts_brief::FactsBriefRequest, _>(command, args, false, |request, scope| facts_brief::facts_brief(&self.vault_root, request, scope)),
+            "export_markdown" => self.write::<ExportMarkdownRequest, _>(command, args, false, |_request, scope| export_markdown::export_markdown(&self.vault_root, scope)),
             "get_resource_policy" => {
                 to_json(resource_commands::get_resource_policy(&self.vault_root)?)
             }
-            "delete_doc" => {
-                let request: trash_write::DeleteDocRequest = parse_args(command, args)?;
-                to_json(trash_write::delete_doc(&self.vault_root, &request)?)
-            }
-            "restore_doc" => {
-                let request: trash_write::TrashEntryRequest = parse_args(command, args)?;
-                to_json(trash_write::restore_doc(&self.vault_root, &request)?)
-            }
-            "purge_doc" => {
-                let request: trash_write::TrashEntryRequest = parse_args(command, args)?;
-                to_json(trash_write::purge_doc(&self.vault_root, &request)?)
-            }
-            "empty_trash" => {
-                let request: trash_write::EmptyTrashRequest = parse_args(command, args)?;
-                to_json(trash_write::empty_trash(&self.vault_root, &request)?)
-            }
-            "create_comment" => {
-                let request: comment_write::CommentWriteRequest = parse_args(command, args)?;
-                to_json(comment_write::create_comment(&self.vault_root, &request)?)
-            }
-            "update_comment" => {
-                let request: comment_write::CommentWriteRequest = parse_args(command, args)?;
-                to_json(comment_write::update_comment(&self.vault_root, &request)?)
-            }
-            "delete_comment" => {
-                let request: comment_write::CommentWriteRequest = parse_args(command, args)?;
-                to_json(comment_write::delete_comment(&self.vault_root, &request)?)
-            }
-            "create_sub_note" => {
-                let request: sub_note_write::CreateSubNoteRequest = parse_args(command, args)?;
-                to_json(sub_note_write::create_sub_note(&self.vault_root, &request)?)
-            }
-            "update_sub_note" => {
-                let request: sub_note_write::UpdateSubNoteRequest = parse_args(command, args)?;
-                to_json(sub_note_write::update_sub_note(&self.vault_root, &request)?)
-            }
-            "delete_sub_note" => {
-                let request: sub_note_write::DeleteSubNoteRequest = parse_args(command, args)?;
-                to_json(sub_note_write::delete_sub_note(&self.vault_root, &request)?)
-            }
-            "create_doc" => {
-                let request: doc_create::CreateDocRequest = parse_args(command, args)?;
-                to_json(doc_create::create_doc(&self.vault_root, &request)?)
-            }
-            "update_doc" => {
-                let request: doc_write::UpdateDocRequest = parse_args(command, args)?;
-                to_json(doc_write::update_doc(&self.vault_root, &request)?)
-            }
+            "delete_doc" => self.write::<trash_write::DeleteDocRequest, _>(command, args, false, |request, scope| trash_write::delete_doc(&self.vault_root, request, scope)),
+            "restore_doc" => self.write::<trash_write::TrashEntryRequest, _>(command, args, false, |request, scope| trash_write::restore_doc(&self.vault_root, request, scope)),
+            "purge_doc" => self.write::<trash_write::TrashEntryRequest, _>(command, args, false, |request, _scope| trash_write::purge_doc(&self.vault_root, request)),
+            "empty_trash" => self.write::<trash_write::EmptyTrashRequest, _>(command, args, false, |_request, _scope| trash_write::empty_trash(&self.vault_root)),
+            "create_comment" => self.write::<comment_write::CommentWriteRequest, _>(command, args, false, |request, scope| comment_write::create_comment(&self.vault_root, request, scope)),
+            "update_comment" => self.write::<comment_write::CommentWriteRequest, _>(command, args, false, |request, scope| comment_write::update_comment(&self.vault_root, request, scope)),
+            "delete_comment" => self.write::<comment_write::CommentWriteRequest, _>(command, args, false, |request, scope| comment_write::delete_comment(&self.vault_root, request, scope)),
+            "create_sub_note" => self.write::<sub_note_write::CreateSubNoteRequest, _>(command, args, false, |request, scope| sub_note_write::create_sub_note(&self.vault_root, request, scope)),
+            "update_sub_note" => self.write::<sub_note_write::UpdateSubNoteRequest, _>(command, args, false, |request, scope| sub_note_write::update_sub_note(&self.vault_root, request, scope)),
+            "delete_sub_note" => self.write::<sub_note_write::DeleteSubNoteRequest, _>(command, args, false, |request, scope| sub_note_write::delete_sub_note(&self.vault_root, request, scope)),
+            "create_doc" => self.write::<doc_create::CreateDocRequest, _>(command, args, false, |request, scope| doc_create::create_doc(&self.vault_root, request, scope)),
+            "update_doc" => self.write::<doc_write::UpdateDocRequest, _>(command, args, false, |request, scope| doc_write::update_doc(&self.vault_root, request, scope)),
             "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"

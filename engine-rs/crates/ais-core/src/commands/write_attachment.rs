@@ -67,8 +67,8 @@ fn check_name(name: &str) -> Result<(), EngineError> {
 pub fn write_attachment(
     vault: &Path,
     request: &WriteAttachmentRequest,
+    scope: &WriteScope,
 ) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "write_attachment", &request.context)?;
     if is_blank(&request.id) {
         return Err(EngineError::invalid_argument(format!(
             "인자가 하나 필요하다: {USAGE}"

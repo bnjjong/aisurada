@@ -12,15 +12,14 @@ use crate::text::is_blank;
 use crate::vault::scanner::Format;
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{absolute_normalized, check_confinement, check_segment, normalize};
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::sub_note::{read_derived, remove_tree};
 
 static SINGLE_FILE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)^.*\.(md|html|json)$").unwrap());
 static EXTENSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(md|html|json)$").unwrap());
 
-pub fn export_markdown(vault: &Path, context: &WriteContext) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "export_markdown", context)?;
+pub fn export_markdown(vault: &Path, scope: &WriteScope) -> Result<Json, EngineError> {
     let mut exports: Vec<(String, String)> = Vec::new();
     let (mut total, mut html, mut json_notes, mut unsafe_count, mut exported) = (0, 0, 0, 0, 0);
     for note in scope.index.root_notes() {

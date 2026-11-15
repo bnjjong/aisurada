@@ -109,8 +109,7 @@ fn append(
     }
 }
 
-pub fn plan_day(vault: &Path, request: &PlanDayRequest) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "plan_day", &request.context)?;
+pub fn plan_day(vault: &Path, request: &PlanDayRequest, scope: &WriteScope) -> Result<Json, EngineError> {
     let date = date_option(&request.date)?;
     let dry_run = bool_option(&request.dry_run, "dryRun")?;
     let index = &scope.index;
@@ -168,11 +167,12 @@ pub fn plan_day(vault: &Path, request: &PlanDayRequest) -> Result<Json, EngineEr
             context: request.context.clone(),
             ..CreateDocRequest::default()
         };
-        let saved = create_doc_in(vault, &scope, &create)?;
+        let saved = create_doc_in(vault, scope, &create)?;
         result.insert("saved".into(), json!(true));
-        for key in ["id", "agenda", "agendaCreated", "path"] {
-            result.insert(key.into(), saved.get(key).cloned().unwrap_or(Json::Null));
-        }
+        result.insert("id".into(), json!(saved.id));
+        result.insert("agenda".into(), json!(saved.agenda));
+        result.insert("agendaCreated".into(), json!(saved.agenda_created));
+        result.insert("path".into(), json!(saved.path));
     }
     result.insert("body".into(), json!(body));
     Ok(Json::Object(result))
@@ -305,8 +305,7 @@ struct Pending {
     line: String,
 }
 
-pub fn check_notes(vault: &Path, request: &CheckNotesRequest) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "check_notes", &request.context)?;
+pub fn check_notes(vault: &Path, request: &CheckNotesRequest, scope: &WriteScope) -> Result<Json, EngineError> {
     let date = date_option(&request.date)?;
     let start = date - 14;
     let index = &scope.index;

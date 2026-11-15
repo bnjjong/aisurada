@@ -111,10 +111,9 @@ fn rel_of(vault: &Path, path: &Path) -> String {
 }
 
 /// 노트 한 건의 제목, 본문, 태그, 템플릿, 날짜, 시각을 고치고, 그 값으로 다시 계산한 정식 자리로 노트를 옮긴다.
-pub fn update_doc(vault: &Path, request: &UpdateDocRequest) -> Result<Json, EngineError> {
+pub fn update_doc(vault: &Path, request: &UpdateDocRequest, scope: &WriteScope) -> Result<Json, EngineError> {
     const USAGE: &str = "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [f1=<직전에 읽은 토큰>]";
     let context = &request.context;
-    let scope = WriteScope::begin(vault, "update_doc", context)?;
 
     require_note_id(&request.id, USAGE)?;
     let note_id = request.id.as_str();

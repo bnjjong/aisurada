@@ -125,30 +125,41 @@ fn check_body(body: Option<&str>, usage: &str) -> Result<(), EngineError> {
     Ok(())
 }
 
-pub fn create_comment(vault: &Path, request: &CommentWriteRequest) -> Result<Json, EngineError> {
-    execute(vault, request, Kind::Create, "create_comment")
+pub fn create_comment(
+    vault: &Path,
+    request: &CommentWriteRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
+    execute(vault, request, Kind::Create, scope)
 }
 
-pub fn update_comment(vault: &Path, request: &CommentWriteRequest) -> Result<Json, EngineError> {
-    execute(vault, request, Kind::Update, "update_comment")
+pub fn update_comment(
+    vault: &Path,
+    request: &CommentWriteRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
+    execute(vault, request, Kind::Update, scope)
 }
 
-pub fn delete_comment(vault: &Path, request: &CommentWriteRequest) -> Result<Json, EngineError> {
-    execute(vault, request, Kind::Delete, "delete_comment")
+pub fn delete_comment(
+    vault: &Path,
+    request: &CommentWriteRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
+    execute(vault, request, Kind::Delete, scope)
 }
 
 fn execute(
     vault: &Path,
     request: &CommentWriteRequest,
     kind: Kind,
-    command: &str,
+    scope: &WriteScope,
 ) -> Result<Json, EngineError> {
     let usage = match kind {
         Kind::Create => CREATE_USAGE,
         Kind::Update => UPDATE_USAGE,
         Kind::Delete => DELETE_USAGE,
     };
-    let scope = WriteScope::begin(vault, command, &request.context)?;
 
     if is_blank(&request.id) {
         return Err(EngineError::invalid_argument(format!(

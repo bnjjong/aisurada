@@ -81,7 +81,6 @@ fn find(projects: &[ProjectInfo], id: &str) -> Result<ProjectInfo, EngineError> 
 }
 
 pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow, EngineError> {
-    let _scope = WriteScope::begin(vault, "create_project", &request.context)?;
     let title = trim(request.title.as_deref().unwrap_or(""));
     if title.is_empty() {
         return Err(EngineError::invalid_argument("title 이 필요하다"));
@@ -123,7 +122,6 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
 
 pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow, EngineError> {
     const USAGE: &str = "update-project <프로젝트 id> [title=<이름>] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>]";
-    let _scope = WriteScope::begin(vault, "update_project", &request.context)?;
     require_id(&request.id, USAGE)?;
     let hue = hue_arg(request.hue.as_deref())?;
     let current = find(&scan_projects(vault), &request.id)?;
@@ -157,9 +155,9 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
 pub fn delete(
     vault: &Path,
     request: &DeleteProjectRequest,
+    scope: &WriteScope,
 ) -> Result<DeleteProjectResponse, EngineError> {
     const USAGE: &str = "delete-project <프로젝트 id>";
-    let scope = WriteScope::begin(vault, "delete_project", &request.context)?;
     require_id(&request.id, USAGE)?;
     let project = find(&scan_projects(vault), &request.id)?;
     let agendas = scope

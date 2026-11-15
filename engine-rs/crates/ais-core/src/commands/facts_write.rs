@@ -39,9 +39,9 @@ pub struct UpdateAgendaFactsResponse {
 pub fn update(
     vault: &Path,
     request: &UpdateAgendaFactsRequest,
+    scope: &WriteScope,
 ) -> Result<UpdateAgendaFactsResponse, EngineError> {
     const USAGE: &str = "update-agenda-facts <아젠다 id> facts=<지금도 참인 것. 빈 값이면 지운다>";
-    let scope = WriteScope::begin(vault, "update_agenda_facts", &request.context)?;
     require_id(&request.id, USAGE)?;
     let Some(raw) = &request.facts else {
         return Err(EngineError::invalid_argument(

@@ -35,7 +35,7 @@ use crate::write::apparatus::now_millis;
 use crate::write::json_out::{literal, string};
 use crate::write::local_time::iso_offset_date_time;
 use crate::write::marker::check_workspace_marker;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteContext;
 use crate::write::stamp::stamp_of;
 
 const GET_USAGE: &str = "get-resource <자원 id> [version=<list-resource-versions 의 판>]";
@@ -221,16 +221,6 @@ fn begin_read(vault: &Path) -> Result<(), EngineError> {
     check_workspace_marker(vault)?;
     approvals::ledger(vault)?;
     Ok(())
-}
-
-fn begin_write(
-    vault: &Path,
-    command: &str,
-    context: &WriteContext,
-) -> Result<WriteScope, EngineError> {
-    let scope = WriteScope::begin(vault, command, context)?;
-    approvals::ledger(vault)?;
-    Ok(scope)
 }
 
 // ---------------------------------------------------------------- 목록·보기
@@ -504,7 +494,6 @@ pub fn list_resource_versions(
 // ---------------------------------------------------------------- 저장·지우기
 
 pub fn save_resource(vault: &Path, request: &SaveResourceRequest) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "save_resource", &request.context)?;
     let opts = collect(&[
         ("body", &request.body),
         ("description", &request.description),
@@ -663,7 +652,6 @@ fn fields_of(opts: &Opts) -> Result<Fields, EngineError> {
 }
 
 pub fn delete_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "delete_resource", &request.context)?;
     let id = only_id(&request.id, DELETE_USAGE)?;
     delete(&run(vault, &request.context), id)
 }
@@ -706,7 +694,6 @@ fn delete(run: &Run, id: &str) -> Result<Json, EngineError> {
 }
 
 pub fn restore_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "restore_resource", &request.context)?;
     let id = only_id(&request.id, RESTORE_USAGE)?;
     restore(&run(vault, &request.context), id)
 }
@@ -746,7 +733,6 @@ pub fn set_resource_ref(
     vault: &Path,
     request: &SetResourceRefRequest,
 ) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "set_resource_ref", &request.context)?;
     let (Some(project), Some(id)) = (text_of(&request.project), text_of(&request.id)) else {
         return Err(EngineError::invalid_argument(format!(
             "set-resource-ref 는 프로젝트 slug 와 글로벌 자원 id 를 받는다: {REF_USAGE}"
@@ -1430,7 +1416,6 @@ pub fn approve_resource_change(
     vault: &Path,
     request: &ChangeDecisionRequest,
 ) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "approve_resource_change", &request.context)?;
     require_human(is_ai(&request.context), "승인")?;
     let id = only_id(&request.id, APPROVE_USAGE)?;
     let mut change = pending_change(vault, id)?;
@@ -1462,7 +1447,6 @@ pub fn reject_resource_change(
     vault: &Path,
     request: &ChangeDecisionRequest,
 ) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "reject_resource_change", &request.context)?;
     require_human(is_ai(&request.context), "거절")?;
     let id = only_id(&request.id, REJECT_USAGE)?;
     let mut change = pending_change(vault, id)?;
@@ -1576,7 +1560,6 @@ pub fn resolve_resource_edit(
     vault: &Path,
     request: &ResolveResourceEditRequest,
 ) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "resolve_resource_edit", &request.context)?;
     require_human(is_ai(&request.context), "승인 안 된 직접 수정의 처리")?;
     let key = only_id(&request.id, RESOLVE_USAGE)?;
     let action = text_of(&request.action);
@@ -1648,7 +1631,6 @@ pub fn set_resource_policy(
     vault: &Path,
     request: &SetResourcePolicyRequest,
 ) -> Result<Json, EngineError> {
-    let _scope = begin_write(vault, "set_resource_policy", &request.context)?;
     require_human(is_ai(&request.context), "승인 정책 변경")?;
     let opts = collect(&[
         ("project", &request.project),

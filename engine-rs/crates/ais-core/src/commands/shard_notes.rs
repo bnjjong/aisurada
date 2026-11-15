@@ -25,7 +25,7 @@ use crate::write::atomic::write_atomic;
 use crate::write::confine::{absolute_normalized, check_confinement, check_segment};
 use crate::write::doc_place::move_path;
 use crate::write::local_time::local_clock;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteContext;
 
 static NOTE_FILE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)^.*\.(md|html|json)$").unwrap());
@@ -227,7 +227,6 @@ fn mapping_path(vault: &Path, apply: bool) -> PathBuf {
 }
 
 pub fn shard_notes(vault: &Path, request: &ShardNotesRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "shard_notes", &request.context)?;
     let apply = bool_option(&request.apply, "apply")?;
     migrate(vault, apply)
 }

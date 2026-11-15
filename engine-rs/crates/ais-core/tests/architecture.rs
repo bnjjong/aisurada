@@ -402,3 +402,28 @@ fn adapters_depend_on_ports_only_and_only_ports_wires_them() {
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
+
+/// 쓰기 범위는 디스패처(`engine.rs`) 한 곳에서만 연다. 명령 함수는 열린 범위(`&WriteScope`)를 받는다.
+/// 옛 `WriteScope::begin`은 없어졌고, 새 입구 `pipeline::open`은 `engine.rs`와 `write/pipeline.rs`에만 나온다.
+#[test]
+fn write_scope_is_opened_only_by_the_dispatcher() {
+    let src = manifest().join("src");
+    let mut files = Vec::new();
+    rust_files(&src, &mut files);
+    let mut bad = Vec::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = code_without_tests(&fs::read_to_string(&file).unwrap());
+        if text.contains("WriteScope::begin") {
+            bad.push(format!("{rel}: 옛 WriteScope::begin이 남았다"));
+        }
+        if text.contains("pipeline::open(") && rel != "engine.rs" {
+            bad.push(format!("{rel}: 디스패처가 아닌 곳에서 쓰기 범위를 연다"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

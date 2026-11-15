@@ -493,8 +493,7 @@ pub fn get_ask(vault: &Path, request: &NoteRefRequest) -> Result<Json, EngineErr
 }
 
 /// 문답에 회차 하나를 붙인다. 인자를 모두 검사한 뒤에야 노트를 찾고, 파일이 100만 바이트를 넘게 되면 붙이지 않는다.
-pub fn append_ask_turn(vault: &Path, request: &AppendAskTurnRequest) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "append_ask_turn", &request.context)?;
+pub fn append_ask_turn(vault: &Path, request: &AppendAskTurnRequest, scope: &WriteScope) -> Result<Json, EngineError> {
     // 자리 인자 모양, 이름 인자 순으로 먼저 재고 나서야 색인에서 노트를 찾는다(2.7의 하는 일)
     let ids = check_ids(&request.id, &request.sub_id, "append-ask-turn")?;
     let required =
@@ -796,8 +795,8 @@ pub fn list_chats(vault: &Path, request: &NoteRefRequest) -> Result<Json, Engine
 pub fn append_chat_turn(
     vault: &Path,
     request: &AppendChatTurnRequest,
+    scope: &WriteScope,
 ) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "append_chat_turn", &request.context)?;
     // 자리 인자 모양, 이름 인자 순으로 먼저 재고 나서야 색인에서 노트를 찾는다(8.13의 붙이는 차례)
     let ids = check_ids(&request.id, &request.sub_id, "append-chat-turn")?;
     let chat_id = require_trimmed(&request.chat_id, "chat-id 이 필요하다")?;

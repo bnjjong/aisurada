@@ -20,7 +20,7 @@ use crate::task::transitions::{self, HUMAN};
 use crate::task::{Task, TaskStatus};
 use crate::text::{is_blank, trim};
 use crate::write::marker::check_workspace_marker;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteContext;
 use crate::write::stamp::stamp_of;
 
 #[allow(dead_code)]
@@ -338,7 +338,6 @@ fn refetch<'a>(scan: &'a Scan, task: &'a Task) -> &'a Task {
 // ---------------------------------------------------------------- 쓰기
 
 pub fn create_task(vault: &Path, request: &CreateTaskRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "create_task", &request.context)?;
     let fields = fields_of(
         &request.title,
         &request.task_type,
@@ -360,7 +359,6 @@ pub fn create_task(vault: &Path, request: &CreateTaskRequest) -> Result<Json, En
 }
 
 pub fn update_task(vault: &Path, request: &UpdateTaskRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "update_task", &request.context)?;
     let reference = only_ref(&request.id, UPDATE_USAGE)?;
     let scan = store::scan(vault);
     let cur = store::find(&scan, reference)?;
@@ -393,7 +391,6 @@ pub fn update_task(vault: &Path, request: &UpdateTaskRequest) -> Result<Json, En
 }
 
 pub fn transition_task(vault: &Path, request: &TransitionTaskRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "transition_task", &request.context)?;
     let reference = only_ref(&request.id, TRANSITION_USAGE)?;
     let scan = store::scan(vault);
     let cur = store::find(&scan, reference)?;
@@ -424,7 +421,6 @@ pub fn transition_task(vault: &Path, request: &TransitionTaskRequest) -> Result<
 }
 
 pub fn link_tasks(vault: &Path, request: &LinkTasksRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "link_tasks", &request.context)?;
     let (Some(from_ref), Some(to_ref)) = (request.from.as_deref(), request.to.as_deref()) else {
         return Err(EngineError::invalid_argument(format!(
             "link-tasks 는 건 쪽 키와 받는 쪽 키를 받는다: {LINK_USAGE}"
@@ -466,7 +462,6 @@ pub fn add_task_comment(
     vault: &Path,
     request: &AddTaskCommentRequest,
 ) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "add_task_comment", &request.context)?;
     let reference = only_ref(&request.id, COMMENT_USAGE)?;
     let scan = store::scan(vault);
     let task = store::find(&scan, reference)?;
@@ -477,7 +472,6 @@ pub fn add_task_comment(
 }
 
 pub fn delete_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "delete_task", &request.context)?;
     let reference = only_ref(&request.id, DELETE_USAGE)?;
     let scan = store::scan(vault);
     let task = store::find(&scan, reference)?;
@@ -510,7 +504,6 @@ pub fn delete_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, Engin
 }
 
 pub fn restore_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, EngineError> {
-    let _scope = WriteScope::begin(vault, "restore_task", &request.context)?;
     let reference = only_ref(&request.id, RESTORE_USAGE)?;
     let task = store::restore(vault, reference)?;
     let scan = store::scan(vault);

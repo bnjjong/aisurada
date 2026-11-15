@@ -7,7 +7,7 @@ use crate::kernel::tier::Tier;
 use crate::kernel::link_kind::LinkKind;
 
 use serde::Deserialize;
-use serde_json::{Value as Json, json};
+use serde_json::Value as Json;
 
 use super::Caller;
 use super::doc_write::parse_tags;
@@ -57,10 +57,29 @@ pub struct CreateDocRequest {
     pub context: WriteContext,
 }
 
+/// 새 노트를 만든 결과. `create_doc`의 응답이고, 쓰기 범위를 이미 잡은 `plan_day`가 같은 길로 노트를 만들 때 이어받는 값이다
+/// (예전에는 JSON에서 키 네 개를 뽑아 썼다. 명령끼리의 약속에 타입을 준다).
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatedDoc {
+    pub id: String,
+    pub agenda: String,
+    pub agenda_created: bool,
+    pub date: String,
+    pub path: String,
+    pub precondition: String,
+    pub deep_link: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+}
+
 /// 새 노트 한 건을 만든다.
-pub fn create_doc(vault: &Path, request: &CreateDocRequest) -> Result<Json, EngineError> {
-    let scope = WriteScope::begin(vault, "create_doc", &request.context)?;
-    create_doc_in(vault, &scope, request)
+pub fn create_doc(
+    vault: &Path,
+    request: &CreateDocRequest,
+    scope: &WriteScope,
+) -> Result<CreatedDoc, EngineError> {
+    create_doc_in(vault, scope, request)
 }
 
 /// 이미 쓰기 범위를 잡은 명령(`plan_day`)이 같은 길로 노트를 만든다.
@@ -68,7 +87,7 @@ pub fn create_doc_in(
     vault: &Path,
     scope: &WriteScope,
     request: &CreateDocRequest,
-) -> Result<Json, EngineError> {
+) -> Result<CreatedDoc, EngineError> {
     let context = &request.context;
     let tool = context.caller == Caller::Ai;
 
@@ -203,23 +222,20 @@ pub fn create_doc_in(
     }
     write_atomic(&note_dir.join("note.md"), text.as_bytes())?;
 
-    let mut response = json!({
-        "id": note_id,
-        "agenda": agenda_slug,
-        "agendaCreated": agenda_created,
-        "date": date.iso(),
-        "path": note_rel,
-        "precondition": compute_token(text.as_bytes()),
-        "deepLink": format!(
+    Ok(CreatedDoc {
+        deep_link: format!(
             "aisurada://doc/{}?ws={}",
             encode_uri_component(&note_id),
             encode_uri_component(&scope.index.vault_root.to_string_lossy())
         ),
-    });
-    if let Some(warning) = warning {
-        response["warning"] = json!(warning);
-    }
-    Ok(response)
+        precondition: compute_token(text.as_bytes()),
+        id: note_id,
+        agenda: agenda_slug,
+        agenda_created,
+        date: date.iso(),
+        path: note_rel,
+        warning,
+    })
 }
 
 /// 그날의 겹치지 않는 시각. 지금 시각(분)에서 시작해, 같은 날 읽기 층 노트가 이미 쓰는 시각이면 23:55 앞까지 5분씩 미룬다.

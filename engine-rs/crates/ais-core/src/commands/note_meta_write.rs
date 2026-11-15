@@ -111,9 +111,8 @@ fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a NoteRecord, EngineErr
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {id}")))
 }
 
-pub fn set_favorite(vault: &Path, request: &SetFavoriteRequest) -> Result<Value, EngineError> {
+pub fn set_favorite(vault: &Path, request: &SetFavoriteRequest, scope: &WriteScope) -> Result<Value, EngineError> {
     const USAGE: &str = "set-favorite <노트 id> [favorite=true|false. 안 주면 지금 값을 뒤집는다] [category=<라벨. 빈 값이면 지운다>] [f1=<직전에 읽은 토큰>]";
-    let scope = WriteScope::begin(vault, "set_favorite", &request.context)?;
     require_note_id(&request.id, USAGE)?;
     let favorite = bool_arg("favorite", &request.favorite)?;
     let token = f1_arg(&request.f1);
@@ -157,9 +156,8 @@ pub fn set_favorite(vault: &Path, request: &SetFavoriteRequest) -> Result<Value,
     Ok(response)
 }
 
-pub fn evaluate_doc(vault: &Path, request: &EvaluateDocRequest) -> Result<Value, EngineError> {
+pub fn evaluate_doc(vault: &Path, request: &EvaluateDocRequest, scope: &WriteScope) -> Result<Value, EngineError> {
     const USAGE: &str = "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]";
-    let scope = WriteScope::begin(vault, "evaluate_doc", &request.context)?;
     require_note_id(&request.id, USAGE)?;
     let clear = bool_arg("clear", &request.clear)?.unwrap_or(false);
     let mut score = 0.0;
@@ -221,9 +219,8 @@ pub fn evaluate_doc(vault: &Path, request: &EvaluateDocRequest) -> Result<Value,
     }))
 }
 
-pub fn link_docs(vault: &Path, request: &LinkDocsRequest) -> Result<Value, EngineError> {
+pub fn link_docs(vault: &Path, request: &LinkDocsRequest, scope: &WriteScope) -> Result<Value, EngineError> {
     const USAGE: &str = "link-docs <출발 노트 id> <대상 노트 id> [kind=direct|indirect|attach] [remove=true] [f1=<직전에 읽은 토큰>]";
-    let scope = WriteScope::begin(vault, "link_docs", &request.context)?;
     if is_blank(&request.from) {
         return Err(EngineError::invalid_argument(format!(
             "인자가 하나 필요하다: {USAGE}"

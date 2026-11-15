@@ -167,8 +167,8 @@ pub(crate) fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a AgendaInfo
 pub fn create(
     vault: &Path,
     request: &CreateAgendaRequest,
+    scope: &WriteScope,
 ) -> Result<AgendaWriteResponse, EngineError> {
-    let scope = WriteScope::begin(vault, "create_agenda", &request.context)?;
     let title = trim(request.title.as_deref().unwrap_or(""));
     if title.is_empty() {
         return Err(EngineError::invalid_argument("title 이 필요하다"));
@@ -222,9 +222,9 @@ pub fn create(
 pub fn update(
     vault: &Path,
     request: &UpdateAgendaRequest,
+    scope: &WriteScope,
 ) -> Result<AgendaWriteResponse, EngineError> {
     const USAGE: &str = "update-agenda <아젠다 id> [title=<이름>] [hue=<색>] [repo=<저장소. 빈 값이면 지운다>] [summary=<한 문단 설명>] [project=<프로젝트 slug. 빈 값이면 미분류로>] [projectRepo=<프로젝트의 저장소 이름. 빈 값이면 지운다>]";
-    let scope = WriteScope::begin(vault, "update_agenda", &request.context)?;
     require_id(&request.id, USAGE)?;
     let hue = hue_arg(request.hue.as_deref())?;
     let project_given = request.project.is_some();
@@ -278,9 +278,9 @@ pub fn update(
 pub fn delete(
     vault: &Path,
     request: &DeleteAgendaRequest,
+    scope: &WriteScope,
 ) -> Result<DeleteAgendaResponse, EngineError> {
     const USAGE: &str = "delete-agenda <아젠다 id>";
-    let scope = WriteScope::begin(vault, "delete_agenda", &request.context)?;
     require_id(&request.id, USAGE)?;
     let agenda = find(&scope, &request.id)?;
     let table = &scope.index.agendas.table;

@@ -14,7 +14,7 @@ use crate::text::{is_blank, trim};
 use crate::vault::template::{Category, TemplateRecord, scan_templates};
 use crate::write::apparatus::next_id;
 use crate::write::atomic::write_atomic;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteContext;
 use crate::write::template_file::{doc_rel_path, render_doc, render_ritual, ritual_rel_path};
 use crate::write::warnings::detect_indented_blocks_warning;
 
@@ -155,7 +155,6 @@ pub fn save_document(
     vault: &Path,
     request: &SaveTemplateRequest,
 ) -> Result<SaveTemplateResponse, EngineError> {
-    let _scope = WriteScope::begin(vault, "save_template", &request.context)?;
     let id = request.id.clone().filter(|i| !i.is_empty());
     let Some(id) = id else {
         // 새로 만든다
@@ -227,7 +226,6 @@ pub fn save_ritual(
     vault: &Path,
     request: &SaveRitualTemplateRequest,
 ) -> Result<SaveTemplateResponse, EngineError> {
-    let _scope = WriteScope::begin(vault, "save_ritual_template", &request.context)?;
     positional_id(&request.id, RITUAL_USAGE)?;
     validate_name(&request.name)?;
     let templates = scan_templates(vault).templates;
@@ -270,7 +268,6 @@ pub fn delete_document(
     vault: &Path,
     request: &DeleteDocTemplateRequest,
 ) -> Result<DeleteDocTemplateResponse, EngineError> {
-    let _scope = WriteScope::begin(vault, "delete_doc_template", &request.context)?;
     positional_id(&request.id, DELETE_USAGE)?;
     let mut removed = Vec::new();
     if let Some(existing) = find(vault, &request.id) {

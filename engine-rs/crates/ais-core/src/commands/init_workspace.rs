@@ -17,7 +17,7 @@ use crate::vault::agenda::is_valid_slug_segment;
 use crate::kernel::time::format_utc_millis;
 use crate::write::apparatus::now_millis;
 use crate::write::atomic::write_atomic;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteContext;
 use crate::write::template_file::{doc_rel_path, render_doc, render_ritual, ritual_rel_path};
 
 const MAX_TEMPLATES: usize = 64;
@@ -79,7 +79,6 @@ pub fn execute(
     vault: &Path,
     request: &InitWorkspaceRequest,
 ) -> Result<InitWorkspaceResponse, EngineError> {
-    let _scope = WriteScope::begin(vault, "init_workspace", &request.context)?;
     let seeds = read_templates(request.templates.as_deref())?;
     if request.name.as_deref().is_some_and(is_blank) {
         return Err(bad(
