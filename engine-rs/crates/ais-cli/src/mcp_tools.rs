@@ -1,7 +1,8 @@
-//! MCP 도구 정의 표. 손으로 고치지 않는다.
+//! MCP 도구 정의 표. Java 엔진을 지운 뒤로는 이 파일이 원본이라 직접 고친다.
 //!
-//! `engine-rs/tools/compat/gen-mcp-tools.sh`가 Java `McpTools`에서 뽑아 쓴다. 이름과 설명, 입력 스키마(한 줄 JSON 글),
-//! 쓰기·삭제성 깃발이 Java 서버와 같다.
+//! 처음에는 `engine-rs/tools/compat/gen-mcp-tools.sh`가 Java `McpTools`(태그 `java-engine-final`)에서 뽑아 썼다. 이름과 설명,
+//! 입력 스키마(한 줄 JSON 글), 쓰기·삭제성 깃발이 기준 Java 서버와 같아야 `mcp_compat`가 어긋남 0으로 끝난다.
+//! 생성기는 이제 이 파일을 덮어쓰지 않고 `target/oracle-tables/`에 기준 표를 뽑아 견주는 데만 쓴다.
 
 use crate::mcp::McpTool;
 

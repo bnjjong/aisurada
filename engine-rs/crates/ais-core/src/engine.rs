@@ -115,7 +115,7 @@ pub const COMMANDS: &[&str] = &[
     "facts_brief",
 ];
 
-/// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
+/// 쓰기 명령. 앱도 이 명령을 이 엔진으로 보낸다(Java 엔진과 함께 쓰기 스위치를 없앴다).
 pub const WRITE_COMMANDS: &[&str] = &[
     "create_agenda",
     "update_agenda",

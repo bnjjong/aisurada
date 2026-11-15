@@ -32,10 +32,10 @@ public class DumpSpecs {
         Pattern allowedPattern = Pattern.compile("쓸 수 있는 것은 \\[(.*)\\] 뿐이다\\.$");
         Pattern maxPattern = Pattern.compile("받는 자리 인자는 (\\d+) 개인데");
         StringBuilder out = new StringBuilder();
-        out.append("//! 명령 명세 표. 손으로 고치지 않는다.\n");
+        out.append("//! 명령 명세 표. Java 엔진을 지운 뒤로는 이 파일이 원본이라 직접 고친다.\n");
         out.append("//!\n");
-        out.append("//! `engine-rs/tools/compat/gen-spec-table.sh`가 Java 엔진의 `CommandRegistry`와 `ArgsParser`에서 뽑아 쓴다.\n");
-        out.append("//! Java 엔진이 사라지기 전에 한 번 더 만들어 두면 이 표가 Java와 같은 명령줄 규칙의 기준으로 남는다.\n\n");
+        out.append("//! 처음에는 `engine-rs/tools/compat/gen-spec-table.sh`가 Java 엔진의 `CommandRegistry`와 `ArgsParser`(태그 `java-engine-final`)에서 뽑아 썼다.\n");
+        out.append("//! 생성기는 이제 이 파일을 덮어쓰지 않고 `target/oracle-tables/`에 기준 표를 뽑아 견주는 데만 쓴다.\n\n");
         out.append("use crate::registry::Spec;\n\n");
         out.append("#[rustfmt::skip]\n");
         out.append("pub const SPECS: &[Spec] = &[\n");
