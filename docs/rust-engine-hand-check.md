@@ -2,7 +2,7 @@
 
 ## 요약
 
-**결론:** Rust 엔진이 읽는 명령 27개와 쓰는 명령 43개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
+**결론:** Rust 엔진이 읽는 명령 30개와 쓰는 명령 43개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
 
 ## 1. 띄우는 법
 
@@ -32,6 +32,11 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 - [ ] 「폴더 열기」로 vault를 열면 노트 40여 개와 아젠다 4개가 보인다. 터미널에 `[engine] list_docs ok`, `list_agendas ok`, `reindex ok`가 찍힌다
 - [ ] 노트를 열면 본문, 코멘트, 첨부, 후속 노트 탭(`모든 필드가 있는 노트`와 부모·자식 노트), 아젠다 사실층이 보인다(`get_doc`, `list_comments`, `list_attachments`, `list_sub_notes`, `get_agenda_facts`)
 - [ ] 같은 vault를 `--engine java`로 띄워 노트 수, 순서, 후속 노트, 코멘트가 같은지 견준다
+
+### 읽기: 세션 기록(옵션 없이 띄운다)
+
+- [ ] 격리 홈(`~/ais-rust-check/home`)의 `.claude/projects/<프로젝트>/<세션 id>.jsonl`에 줄 몇 개짜리 합성 기록을 만들어 두고 앱의 세션 화면을 열면 회차가 보인다. 이력 창에서 그 세션 id가 적힌 노트의 편집자 칸에 제목이 나온다(`read_session`, `session_titles`, `recent_sessions`). 진짜 대화 기록은 격리 홈에 없으므로 이 확인은 합성 기록으로만 한다
+- [ ] 같은 방식으로 `.codex/sessions/2026/11/14/rollout-…-<id>.jsonl`이나 `.gemini/tmp/<프로젝트>/chats/session-…-<id 앞 8자>.jsonl`을 만들면 세션 화면이 에이전트 이름과 함께 읽는다
 
 ### 읽기: 편집 이력(`--git`)
 

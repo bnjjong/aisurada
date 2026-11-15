@@ -8084,7 +8084,6 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     }
     if env::var("HARNESS_ONLY").as_deref() == Ok("ask") {
         compare_ask_chat_commands(&mut h);
-        compare_session_commands(&mut h);
         println!(
             "  (문답·대화 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
             h.step, h.succeeded
@@ -9225,6 +9224,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_task_commands(&mut h);
     compare_resource_commands(&mut h);
     compare_ask_chat_commands(&mut h);
+    compare_session_commands(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {
