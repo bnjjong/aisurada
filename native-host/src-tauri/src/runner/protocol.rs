@@ -291,7 +291,7 @@ pub fn claude_args(session_id: &str, resume: bool, model: &str, mcp_config: &str
 
 /// `claude-mcp config`가 낸 `mcpServers` 조각에 이 실행이 다루는 vault를 박고, 한 줄 JSON으로 돌려준다.
 /// 서버는 `--write` 없이 뜬 읽기 전용이어야 하므로 args에 `--write`가 있으면 거절한다.
-pub fn mcp_config_for(config_output: &str, vault: &str, keep_registration: bool) -> Result<String, String> {
+pub fn mcp_config_for(config_output: &str, vault: &str) -> Result<String, String> {
     let mut v: Value = serde_json::from_str(config_output.trim()).map_err(|e| format!("MCP 설정을 읽지 못했다: {e}"))?;
     let server = v
         .get_mut("mcpServers")
@@ -307,9 +307,6 @@ pub fn mcp_config_for(config_output: &str, vault: &str, keep_registration: bool)
         .or_insert_with(|| Value::Object(Default::default()));
     let env = env.as_object_mut().ok_or("MCP env가 객체가 아니다")?;
     env.insert("AISURADA_VAULT".into(), Value::String(vault.to_string()));
-    if keep_registration && !env.contains_key("AISURADA_SIDECAR_JAR") {
-        env.insert("AISURADA_SIDECAR_KEEP_REGISTRATION".into(), Value::String("1".into()));
-    }
     serde_json::to_string(&v).map_err(|e| e.to_string())
 }
 
@@ -433,22 +430,20 @@ mod tests {
 
     #[test]
     fn mcp_config_pins_the_vault_and_refuses_write_mode() {
-        let cfg = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/j","args":["-jar","/a.jar","mcp"],"env":{"AISURADA_SIDECAR_JAR":"/s.jar"}}}}"#;
-        let out: Value = serde_json::from_str(&mcp_config_for(cfg, "/my vault", true).unwrap()).unwrap();
-        let env = &out["mcpServers"]["aisurada"]["env"];
-        assert_eq!(env["AISURADA_VAULT"], "/my vault");
-        assert_eq!(env["AISURADA_SIDECAR_JAR"], "/s.jar");
-        assert!(env.get("AISURADA_SIDECAR_KEEP_REGISTRATION").is_none(), "엔진 jar가 있으면 등록 유지 스위치는 필요 없다");
-        // env 가 비어 있으면 만들어서 박는다
-        let no_env = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/j","args":["-jar","/a.jar","mcp"]}}}"#;
-        let out: Value = serde_json::from_str(&mcp_config_for(no_env, "/v", true).unwrap()).unwrap();
-        assert_eq!(out["mcpServers"]["aisurada"]["env"]["AISURADA_SIDECAR_KEEP_REGISTRATION"], "1");
-        let out: Value = serde_json::from_str(&mcp_config_for(no_env, "/v", false).unwrap()).unwrap();
-        assert!(out["mcpServers"]["aisurada"]["env"].get("AISURADA_SIDECAR_KEEP_REGISTRATION").is_none());
-        let write = r#"{"mcpServers":{"aisurada":{"command":"/j","args":["-jar","/a.jar","mcp","--write"]}}}"#;
-        assert!(mcp_config_for(write, "/v", false).unwrap_err().contains("쓰기"));
-        assert!(mcp_config_for("{}", "/v", false).is_err());
-        assert!(mcp_config_for("망가짐", "/v", false).is_err());
+        let cfg = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/app/bin/ais-cli","args":["mcp"],"env":{}}}}"#;
+        let out: Value = serde_json::from_str(&mcp_config_for(cfg, "/my vault").unwrap()).unwrap();
+        let server = &out["mcpServers"]["aisurada"];
+        assert_eq!(server["command"], "/app/bin/ais-cli");
+        assert_eq!(server["args"], json!(["mcp"]));
+        assert_eq!(server["env"]["AISURADA_VAULT"], "/my vault");
+        // env 칸이 없어도 vault를 박는다
+        let no_env = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/c","args":["mcp"]}}}"#;
+        let out: Value = serde_json::from_str(&mcp_config_for(no_env, "/v").unwrap()).unwrap();
+        assert_eq!(out["mcpServers"]["aisurada"]["env"]["AISURADA_VAULT"], "/v");
+        let write = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/c","args":["mcp","--write"]}}}"#;
+        assert!(mcp_config_for(write, "/v").unwrap_err().contains("쓰기"));
+        assert!(mcp_config_for("{}", "/v").is_err());
+        assert!(mcp_config_for("망가짐", "/v").is_err());
     }
 
     #[test]

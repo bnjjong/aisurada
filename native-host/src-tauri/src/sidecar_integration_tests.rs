@@ -1,12 +1,12 @@
-//! Isolated subprocess test: native IPC -> real java ais-cli -> a test-owned serve engine.
+//! Isolated subprocess test: native IPC -> the in-process Rust ais-cli -> a temporary vault (no Java, no sidecar).
 use crate::{environment, lifecycle::HostState, sidecar, workspace};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     ffi::OsString,
     fs,
-    path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    path::Path,
+    process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -33,7 +33,7 @@ fn invoke(window: &WebviewWindow<MockRuntime>, name: &str, value: Value) -> Resu
     .map(|v| v.deserialize().unwrap())
 }
 #[test]
-#[ignore = "invoked only by the isolated real-engine test"]
+#[ignore = "invoked only by the isolated engine test"]
 fn ipc_probe() {
     let root = std::env::var("AISURADA_VAULT").unwrap();
     let app = mock_builder()
@@ -75,9 +75,10 @@ fn ipc_probe() {
     assert_eq!(out["status"], 3);
     assert_eq!(out["stdout"], "");
     assert!(out["stderr"].as_str().unwrap().starts_with("AIS-404"));
+    // 문답 명령도 이 엔진이 한다(옛 4부 없는 판의 AIS-409가 아니다). 인자가 없으면 인자 오류다
     let out = invoke(&main, "sidecar_call", json!({"argv":["get-ask"]})).unwrap();
     assert_eq!(out["status"], 3);
-    assert!(out["stderr"].as_str().unwrap().starts_with("AIS-409"));
+    assert!(out["stderr"].as_str().unwrap().starts_with("AIS-400"), "{out}");
     let out = invoke(
         &main,
         "sidecar_call",
@@ -98,44 +99,15 @@ fn ipc_probe() {
     assert!(!record.contains("parent-session-should-not-leak"));
     assert!(std::env::var_os("CLAUDE_CODE_SESSION_ID").is_none());
 }
-struct Server {
-    child: Child,
-    socket: PathBuf,
-}
-impl Drop for Server {
-    fn drop(&mut self) {
-        let _ = Command::new("/bin/kill")
-            .args(["-TERM", &self.child.id().to_string()])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < deadline {
-            if matches!(self.child.try_wait(), Ok(Some(_))) {
-                let _ = fs::remove_file(&self.socket);
-                return;
-            }
-            thread::sleep(Duration::from_millis(20));
-        }
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-        let _ = fs::remove_file(&self.socket);
-    }
-}
-fn quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
-}
 #[test]
 #[cfg(unix)]
-fn real_engine_round_trip_uses_isolated_home_and_socket() {
-    use std::os::unix::fs::PermissionsExt;
+fn real_engine_round_trip_uses_isolated_home() {
     let temp = tempfile::Builder::new()
         .prefix("ais-host-")
         .tempdir_in("/tmp")
         .unwrap();
     let home = temp.path().join("home");
     let vault = temp.path().join("vault");
-    let socket = temp.path().join("engine.sock");
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(vault.join(".aisurada/agendas")).unwrap();
     fs::create_dir_all(vault.join("notes/demo/root")).unwrap();
@@ -146,78 +118,13 @@ fn real_engine_round_trip_uses_isolated_home_and_socket() {
     )
     .unwrap();
     fs::write(vault.join("notes/demo/root/note.md"),"---\nid: ndfixture-00000001\nagenda: demo\ntitle: 시험\ntype: free\ncreated: '2026-06-16T10:00:00+09:00'\n---\n실제 엔진\n").unwrap();
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-    let cli = repo.join("dist/ais-cli.jar");
-    // 이 시험은 4부를 뺀 판의 답(AIS-409)을 재므로 4부를 뺀 사이드카를 띄운다(1장 1.1)
-    let engine = repo.join("dist/ais-sidecar-noclaude.jar");
-    assert!(
-        cli.is_file() && engine.is_file(),
-        "run bash test-native.sh to build Java jars first"
-    );
-    let java = std::env::var_os("JAVA_HOME")
-        .map(|v| PathBuf::from(v).join("bin/java"))
-        .filter(|p| p.is_file())
-        .or_else(|| {
-            std::env::var_os("PATH").and_then(|path| {
-                std::env::split_paths(&path)
-                    .map(|p| p.join("java"))
-                    .find(|p| p.is_file())
-            })
-        })
-        .unwrap_or_else(|| PathBuf::from("/usr/bin/java"));
-    let wrapper = temp.path().join("java");
-    fs::write(
-        &wrapper,
-        format!(
-            "#!/bin/sh\nexec {} {} \"$@\"\n",
-            quote(java.to_str().unwrap()),
-            quote(&format!("-Duser.home={}", home.display()))
-        ),
-    )
-    .unwrap();
-    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o700)).unwrap();
     let mut env: BTreeMap<OsString, OsString> = BTreeMap::new();
-    for (key, value) in [
-        ("HOME", home.as_os_str()),
-        ("AISURADA_VAULT", vault.as_os_str()),
-        ("AISURADA_SIDECAR_SOCKET", socket.as_os_str()),
-        ("AISURADA_CLI_JAR", cli.as_os_str()),
-        ("AISURADA_SIDECAR_JAVA", wrapper.as_os_str()),
-    ] {
+    for (key, value) in [("HOME", home.as_os_str()), ("AISURADA_VAULT", vault.as_os_str())] {
         env.insert(key.into(), value.into());
     }
     env.insert("PATH".into(), "/usr/bin:/bin".into());
     env.insert("AISURADA_VAULT_AUTOCOMMIT_ENABLED".into(), "false".into());
-    let error_log = temp.path().join("engine.err");
-    let child = Command::new(&wrapper)
-        .arg("-jar")
-        .arg(&engine)
-        .arg("serve")
-        .env_clear()
-        .envs(&env)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(fs::File::create(&error_log).unwrap())
-        .spawn()
-        .unwrap();
-    let mut server = Server {
-        child,
-        socket: socket.clone(),
-    };
-    let deadline = Instant::now() + Duration::from_secs(15);
-    while !socket.exists() && Instant::now() < deadline {
-        assert!(
-            server.child.try_wait().unwrap().is_none(),
-            "engine failed: {}",
-            fs::read_to_string(&error_log).unwrap()
-        );
-        thread::sleep(Duration::from_millis(25));
-    }
-    assert!(socket.exists(), "engine not ready");
+    // 앱을 AI 세션의 터미널에서 띄운 것처럼 세션 표식을 환경에 남겨 두면, 앱이 엔진에 넘기기 전에 지워야 한다
     env.insert("CLAUDECODE".into(), "1".into());
     env.insert(
         "CLAUDE_CODE_SESSION_ID".into(),

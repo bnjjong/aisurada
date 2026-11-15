@@ -22,6 +22,7 @@ mod process;
 mod runner;
 mod secrets;
 mod self_write;
+mod migration;
 mod sidecar;
 mod terminal;
 mod workspace;
@@ -147,6 +148,7 @@ fn main() {
             #[cfg(feature = "claude")]
             runner::install(app.handle());
             approvals::install(app.handle());
+            migration::install(app.handle());
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;
             let handle = app.handle().clone();

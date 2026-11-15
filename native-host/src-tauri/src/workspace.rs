@@ -113,6 +113,10 @@ pub fn allow_workspace<R: Runtime>(
             Ok(())
         },
     );
+    // vault를 열었으면 자동 커밋을 지켜본다: 유휴 타이머를 띄우고, 앱이 닫힌 동안 단발 `ais-cli`가 남긴 대기 기록을 이어받아 커밋한다
+    if result.is_ok() && !cfg!(test) && Path::new(&opened).is_dir() {
+        ais_core::write::autocommit::watch(Path::new(&opened));
+    }
     // vault를 열었으면 파일에 적는다. 못 적어도 vault 열기는 막지 않는다. 시험은 사용자의 진짜 포인터를 덮어쓰지 않게 건너뛴다
     if result.is_ok() && !cfg!(test) {
         if let Some(home) = std::env::var_os("HOME") {

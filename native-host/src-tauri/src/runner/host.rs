@@ -53,8 +53,6 @@ pub trait Host: Send + Sync + 'static {
     fn changed(&self, task_key: Option<&str>);
     /// 설정과 실행 기록을 두는 폴더
     fn root(&self) -> PathBuf;
-    /// 엔진 jar 없이 뜬 개발 실행인지(`claude-mcp config` 결과에 등록 유지 스위치를 더할지 정한다).
-    fn is_guest_build(&self) -> bool;
 }
 
 /// 실제 앱의 [Host].
@@ -117,9 +115,6 @@ impl<R: Runtime> Host for AppHost<R> {
         default_root()
     }
 
-    fn is_guest_build(&self) -> bool {
-        tauri::is_dev()
-    }
 }
 
 // ---------------------------------------------------------------------------

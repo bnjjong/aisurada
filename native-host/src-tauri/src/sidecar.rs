@@ -1,4 +1,7 @@
-//! Chapter 5: the only native-host bridge to the Java CLI.
+//! Chapter 5: the only native-host bridge to the engine's command line (`ais-cli`).
+//!
+//! 기본 길은 앱 안에서 Rust `ais-cli`(`ais_cli::run`)를 같은 프로세스로 부르는 것이다. 사이드카도 프로세스 띄우기도 없다.
+//! 되돌리는 길(`AISURADA_ENGINE=java`)과 스냅숏 쓰기를 켠 사용자의 쓰기 명령은 옛 Java `ais-cli.jar`로 돌린다(5d에서 지운다).
 use crate::{
     lifecycle::HostState,
     process::{self, Outcome},
@@ -33,7 +36,7 @@ pub struct Reply {
     pub stderr: String,
 }
 #[derive(Clone)]
-struct Context {
+pub(crate) struct Context {
     resource: Option<PathBuf>,
     bundled: bool,
     cwd: PathBuf,
@@ -179,7 +182,124 @@ fn java_candidates(context: &Context, env: &Environment) -> Vec<PathBuf> {
     candidates.push(PathBuf::from("/usr/bin/java"));
     candidates
 }
+/// 엔진 명령을 한 번 부르는 길을 고른다. 기본은 앱 안의 Rust `ais-cli`다.
 fn execute(
+    context: &Context,
+    env: Environment,
+    vault: &str,
+    argv: &[String],
+    timeout: Duration,
+) -> Result<Reply, String> {
+    if uses_java(&env, argv) {
+        return execute_java(context, env, vault, argv, timeout);
+    }
+    Ok(execute_rust(context, env, vault, argv))
+}
+
+/// 옛 Java 길로 보낼 호출인가: 되돌리는 스위치(`AISURADA_ENGINE=java`)가 켜졌거나, 스냅숏 쓰기(옛 설정, Rust 엔진은 안 한다)를 켠
+/// 사용자의 쓰기 명령이다.
+fn uses_java(env: &Environment, argv: &[String]) -> bool {
+    let is = |key: &str, want: &str| env_value(env, key).is_some_and(|v| v.eq_ignore_ascii_case(want));
+    if is("AISURADA_ENGINE", "java") {
+        return true;
+    }
+    is("AISURADA_VAULT_SNAPSHOT_ENABLED", "true")
+        && argv
+            .first()
+            .is_some_and(|name| ais_core::engine::Engine::is_write(&name.trim().replace('-', "_")))
+}
+
+/// 앱에 든 `ais-cli` 실행 파일의 자리. MCP 서버로 에이전트에 등록할 명령이 이것이다.
+/// 환경변수 `AISURADA_CLI_BIN`, 앱 번들의 `bin/ais-cli`, 소스 저장소의 빌드 폴더(`engine-rs/target/{release,debug}`) 차례다. 못 찾으면 빈 글이다.
+fn cli_exe(context: &Context, env: &Environment) -> String {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(explicit) = env_value(env, "AISURADA_CLI_BIN") {
+        candidates.push(PathBuf::from(explicit));
+    }
+    if let Some(resource) = &context.resource {
+        candidates.push(resource.join("bin/ais-cli"));
+    }
+    for root in context.cwd.ancestors().take(3) {
+        if root.join("engine-rs/Cargo.toml").is_file() {
+            for profile in ["release", "debug"] {
+                candidates.push(root.join(format!("engine-rs/target/{profile}/ais-cli")));
+            }
+            break;
+        }
+    }
+    candidates
+        .into_iter()
+        .find(|p| p.is_file())
+        .map(|p| p.canonicalize().unwrap_or(p).to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// `ais_cli`가 읽는 환경. 앱이 부르는 명령은 사람(앱)의 통로이므로 AI 세션 표식은 지운다(#53). 호스트의 나머지 환경은 그대로 넘긴다
+/// (엔진의 잠금 폴더, 자동 커밋 설정 같은 변수를 `ais-core`가 프로세스 환경에서 읽기 때문이다).
+pub(crate) fn cli_env(context: &Context, env: &Environment, vault: &str) -> ais_cli::env::Env {
+    let mut vars: BTreeMap<String, String> = env
+        .iter()
+        .filter_map(|(k, v)| Some((k.to_str()?.to_string(), v.to_str()?.to_string())))
+        .collect();
+    for key in AI_SESSION_ENV {
+        vars.remove(key);
+    }
+    vars.insert("AISURADA_VAULT".into(), vault.into());
+    ais_cli::env::Env {
+        home: vars.get("HOME").cloned().unwrap_or_default(),
+        cwd: context.cwd.to_string_lossy().into_owned(),
+        exe: cli_exe(context, env),
+        session: None,
+        vars,
+    }
+}
+
+/// 정식 앱(번들된 앱, 개발 실행과 빌드 폴더의 번들이 아닌 것)이고 번들에 `bin/ais-cli`가 있을 때만 `ais-cli`의 환경을 돌려준다.
+/// 기기 전체에 영향을 주는 일(옛 사이드카 정리, MCP 재등록)은 이런 앱에서만 하려는 것이다. 되돌리는 스위치(`AISURADA_ENGINE=java`)가 켜졌어도 `None`이다.
+pub(crate) fn official_cli_env<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<ais_cli::env::Env> {
+    let context = Context {
+        resource: app.path().resource_dir().ok(),
+        bundled: !tauri::is_dev(),
+        cwd: std::env::current_dir().ok()?,
+    };
+    let env: Environment = std::env::vars_os().collect();
+    let in_build_tree = context.resource.as_ref().is_some_and(|p| under_build_tree(p));
+    if !context.bundled || in_build_tree || uses_java(&env, &[]) {
+        return None;
+    }
+    let cli_env = cli_env(&context, &env, "");
+    (!cli_env.exe.is_empty()
+        && context.resource.as_ref().is_some_and(|r| std::path::Path::new(&cli_env.exe).starts_with(r.canonicalize().unwrap_or_else(|_| r.clone()))))
+    .then_some(cli_env)
+}
+
+/// 앱 안에서 Rust `ais-cli`를 부른다. 엔진 안의 예상 밖 실패(패닉)가 앱을 죽이지 않게 종료 코드 1의 답으로 바꾼다.
+fn execute_rust(context: &Context, env: Environment, vault: &str, argv: &[String]) -> Reply {
+    let cli_env = cli_env(context, &env, vault);
+    let argv = argv.to_vec();
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ais_cli::run(&argv, &cli_env))) {
+        Ok(outcome) => Reply {
+            status: outcome.code,
+            stdout: outcome.stdout,
+            stderr: outcome.stderr,
+        },
+        Err(panic) => {
+            let detail = panic
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| panic.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_default();
+            Reply {
+                status: 1,
+                stdout: String::new(),
+                stderr: format!("엔진 안에서 예외가 났다: {detail}\n"),
+            }
+        }
+    }
+}
+
+/// 옛 Java 길: `java -jar ais-cli.jar`를 프로세스로 띄운다.
+fn execute_java(
     context: &Context,
     mut env: Environment,
     vault: &str,
@@ -335,6 +455,80 @@ mod tests {
         );
     }
     #[test]
+    fn the_rust_cli_runs_in_process_and_reports_exit_codes() {
+        let temp = tempfile::tempdir().unwrap();
+        let vault = temp.path().join("vault");
+        fs::create_dir_all(&vault).unwrap();
+        let c = context(temp.path(), false);
+        let e = env(&[("HOME", temp.path().to_str().unwrap())]);
+        let listed = execute(&c, e.clone(), vault.to_str().unwrap(), &["list-docs".into()], TIMEOUT).unwrap();
+        assert_eq!((listed.status, listed.stdout.as_str()), (0, "[]\n"), "{}", listed.stderr);
+        let unknown = execute(&c, e.clone(), vault.to_str().unwrap(), &["nope".into()], TIMEOUT).unwrap();
+        assert_eq!(unknown.status, 2);
+        assert!(unknown.stderr.starts_with("알 수 없는 이름: nope"));
+        // vault가 없는 폴더는 종료 코드 2의 오류로 알린다
+        let missing = execute(&c, e, "/no/such/vault", &["list-docs".into()], TIMEOUT).unwrap();
+        assert_eq!(missing.status, 2);
+        assert!(missing.stderr.contains("vault 뿌리가 폴더가 아니다"));
+    }
+    #[test]
+    fn the_cli_environment_drops_ai_session_markers_and_names_the_vault() {
+        let temp = tempfile::tempdir().unwrap();
+        let c = context(temp.path(), true);
+        let bin = c.resource.as_ref().unwrap().join("bin/ais-cli");
+        touch(&bin);
+        let e = env(&[
+            ("HOME", "/home/x"),
+            ("PATH", "/usr/bin"),
+            ("AISURADA_VAULT", "/stale"),
+            ("AISURADA_SESSION_ID", "s1"),
+            ("CLAUDE_CODE_SESSION_ID", "s2"),
+            ("CODEX_THREAD_ID", "s3"),
+            ("KEEP_ME", "yes"),
+        ]);
+        let cli = cli_env(&c, &e, "/my vault");
+        assert_eq!(cli.vars.get("AISURADA_VAULT").map(String::as_str), Some("/my vault"));
+        assert_eq!(cli.vars.get("KEEP_ME").map(String::as_str), Some("yes"));
+        for key in AI_SESSION_ENV {
+            assert!(!cli.vars.contains_key(key), "{key}는 지워야 한다");
+        }
+        assert_eq!(cli.home, "/home/x");
+        assert!(cli.session.is_none());
+        // 등록할 실행 파일은 앱 번들의 bin/ais-cli다
+        assert_eq!(Path::new(&cli.exe), bin.canonicalize().unwrap());
+    }
+    #[test]
+    fn the_cli_executable_is_found_by_env_then_bundle_then_source_checkout() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut c = context(temp.path(), false);
+        assert_eq!(cli_exe(&c, &env(&[])), "", "아무것도 없으면 빈 글");
+        let checkout = temp.path().join("work");
+        c.cwd = checkout.join("native-host/src-tauri");
+        touch(&checkout.join("engine-rs/Cargo.toml"));
+        touch(&checkout.join("engine-rs/target/debug/ais-cli"));
+        assert!(cli_exe(&c, &env(&[])).ends_with("engine-rs/target/debug/ais-cli"));
+        touch(&checkout.join("engine-rs/target/release/ais-cli"));
+        assert!(cli_exe(&c, &env(&[])).ends_with("engine-rs/target/release/ais-cli"), "release가 먼저");
+        touch(&c.resource.as_ref().unwrap().join("bin/ais-cli"));
+        assert!(cli_exe(&c, &env(&[])).contains("resources/bin/ais-cli"), "번들이 먼저");
+        let explicit = temp.path().join("custom-cli");
+        touch(&explicit);
+        assert!(cli_exe(&c, &env(&[("AISURADA_CLI_BIN", explicit.to_str().unwrap())])).ends_with("custom-cli"));
+    }
+    #[test]
+    fn rollback_switches_send_calls_to_the_java_path() {
+        let writes: Vec<String> = vec!["update-doc".into()];
+        let reads: Vec<String> = vec!["list-docs".into()];
+        assert!(!uses_java(&env(&[]), &writes), "기본은 Rust");
+        assert!(uses_java(&env(&[("AISURADA_ENGINE", " Java ")]), &reads));
+        // 스냅숏 쓰기를 켠 사용자는 쓰기만 Java로 간다
+        let snapshot = env(&[("AISURADA_VAULT_SNAPSHOT_ENABLED", "true")]);
+        assert!(uses_java(&snapshot, &writes));
+        assert!(!uses_java(&snapshot, &reads));
+        assert!(uses_java(&snapshot, &["create_doc".into()]), "도구 이름도 쓰기다");
+        assert!(!uses_java(&env(&[("AISURADA_VAULT_SNAPSHOT_ENABLED", "false")]), &writes));
+    }
+    #[test]
     fn build_bundle_detection_is_by_adjacent_components() {
         for path in [
             "/a/target/debug/bundle/macos/app/Contents/Resources",
@@ -394,7 +588,7 @@ mod tests {
             ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
             ("AISURADA_SIDECAR_JAR", "/missing"),
         ]);
-        let result = execute(
+        let result = execute_java(
             &c,
             e,
             "/vault//",
@@ -425,17 +619,17 @@ mod tests {
             ("AISURADA_SIDECAR_JAVA", java.to_str().unwrap()),
         ]);
         script(&java, "printf '\\377'; printf '\\376' >&2; exit 3");
-        let r = execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap();
+        let r = execute_java(&c, e.clone(), "/v", &[], TIMEOUT).unwrap();
         assert_eq!(r.stdout, "�");
         assert_eq!(r.stderr, "�");
         assert_eq!(r.status, 3);
         script(&java, "kill -TERM $$");
         assert_eq!(
-            execute(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().status,
+            execute_java(&c, e.clone(), "/v", &[], TIMEOUT).unwrap().status,
             -1
         );
         script(&java, "exec /bin/sleep 10");
-        let r = execute(&c, e.clone(), "/v", &[], Duration::from_millis(50)).unwrap();
+        let r = execute_java(&c, e.clone(), "/v", &[], Duration::from_millis(50)).unwrap();
         assert_eq!(
             r,
             Reply {
@@ -446,7 +640,7 @@ mod tests {
         );
         fs::remove_file(&java).unwrap();
         fs::create_dir(&java).unwrap();
-        assert!(execute(&c, e, "/v", &[], TIMEOUT)
+        assert!(execute_java(&c, e, "/v", &[], TIMEOUT)
             .unwrap_err()
             .contains("못 띄웠어요"));
     }
@@ -474,7 +668,7 @@ mod tests {
         ]);
         // 세션 표식은 지우고 나머지 환경은 그대로 넘긴다
         assert_eq!(
-            execute(&c, e, "/v", &[], TIMEOUT).unwrap().stdout,
+            execute_java(&c, e, "/v", &[], TIMEOUT).unwrap().stdout,
             "unset|unset|unset|unset|unset|yes"
         );
     }
@@ -498,7 +692,7 @@ mod tests {
         let sidecar = c.resource.as_ref().unwrap().join("ais-sidecar.jar");
         touch(&sidecar);
         let shown = |c: &Context, e: &Environment| {
-            execute(c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout
+            execute_java(c, e.clone(), "/v", &[], TIMEOUT).unwrap().stdout
         };
         // 정식 번들: 앱의 jar를 넘기고, 등록은 평소처럼 앱 것으로 쓴다.
         assert_eq!(

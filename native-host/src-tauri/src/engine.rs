@@ -1,6 +1,6 @@
 //! 앱 안에 들어온 Rust 엔진(`ais-core`)을 화면이 부르는 길.
 //!
-//! 옮겨진 명령은 `sidecar_call`(Java 엔진을 `ais-cli` 프로세스로 부름) 대신 이 길로 앱 안에서 바로 처리한다.
+//! 옮겨진 명령은 `sidecar_call`(`ais-cli`의 명령줄 길) 대신 이 길로 앱 안에서 바로 처리한다.
 //! 화면은 먼저 `engine_commands`로 어떤 명령이 옮겨졌는지 묻고, 옮겨진 명령만 `engine_call`로 보낸다.
 
 use crate::lifecycle::HostState;
@@ -15,17 +15,20 @@ fn rust_engine_enabled() -> bool {
     !std::env::var(ENGINE_SWITCH).is_ok_and(|v| v.trim().eq_ignore_ascii_case("java"))
 }
 
-/// 쓰기 명령을 Rust 엔진으로 보내는 스위치. `rust`일 때만 켜진다(기본 꺼짐). 쓰기는 사용자 파일을 바꾸므로 실제 창 확인을 마친 뒤
-/// 기본값을 바꾼다. 읽기 스위치(`AISURADA_ENGINE=java`)가 우선이라 그것이 `java`면 쓰기도 꺼진다.
+/// 쓰기 명령을 옛 Java 엔진으로 되돌리는 스위치. `java`일 때만 쓰기가 꺼진다. 5단계 전에는 쓰기가 기본 꺼짐(`rust`로 켬)이었으나,
+/// 실제 창 확인을 마치고 기본을 켬으로 바꿨다. 읽기 스위치(`AISURADA_ENGINE=java`)가 우선이라 그것이 `java`면 쓰기도 꺼진다.
 const WRITE_SWITCH: &str = "AISURADA_ENGINE_WRITE";
 /// 옛 스냅숏 쓰기(설정으로 켜는 선택 기능, 기본 꺼짐)는 Rust 엔진이 하지 않는다. 켜져 있으면 쓰기를 Java 엔진에 맡긴다.
 const SNAPSHOT_SWITCH: &str = "AISURADA_VAULT_SNAPSHOT_ENABLED";
 
 fn rust_write_enabled() -> bool {
-    let is = |name: &str, want: &str| {
-        std::env::var(name).is_ok_and(|v| v.trim().eq_ignore_ascii_case(want))
-    };
-    rust_engine_enabled() && is(WRITE_SWITCH, "rust") && !is(SNAPSHOT_SWITCH, "true")
+    write_enabled(|name| std::env::var(name).ok())
+}
+
+/// 환경 읽는 법을 받는 [`rust_write_enabled`]의 몸(시험이 환경을 건드리지 않고 확인한다).
+fn write_enabled(get: impl Fn(&str) -> Option<String>) -> bool {
+    let is = |name: &str, want: &str| get(name).is_some_and(|v| v.trim().eq_ignore_ascii_case(want));
+    !is(ENGINE_SWITCH, "java") && !is(WRITE_SWITCH, "java") && !is(SNAPSHOT_SWITCH, "true")
 }
 
 /// 알릴 명령 목록. 쓰기 명령은 쓰기 스위치가 켜졌을 때만 낀다.
@@ -57,7 +60,7 @@ pub async fn engine_call(
 ) -> Result<Value, EngineError> {
     if Engine::is_write(&command) && !rust_write_enabled() {
         return Err(EngineError::unsupported(format!(
-            "쓰기 명령 {command}는 Rust 엔진에서 아직 꺼져 있다({WRITE_SWITCH}=rust로 켠다)"
+            "쓰기 명령 {command}는 Rust 엔진에서 꺼져 있다({WRITE_SWITCH}=java나 스냅숏 쓰기 설정 때문이다)"
         )));
     }
     let vault = state
@@ -243,13 +246,14 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(bad_args["kind"], "invalid_argument");
-        let unsupported = invoke(
+        // 쓰기 명령도 기본으로 Rust 엔진이 받는다(되돌리는 스위치를 안 켰다면). 거절은 쓰기 스위치가 아니라 인자 때문이다
+        let write = invoke(
             &window,
             "engine_call",
             json!({"command": "update_doc", "args": {}}),
         )
         .unwrap_err();
-        assert_eq!(unsupported["kind"], "unsupported");
+        assert_ne!(write["kind"], "unsupported");
 
         let _ = std::fs::remove_dir_all(&vault);
     }
@@ -283,11 +287,24 @@ mod tests {
                 && commands.contains(&"get_doc")
                 && commands.contains(&"search_docs")
                 && commands.contains(&"history")
+                && commands.contains(&"update_doc"),
+            "읽기와 쓰기 명령을 모두 알린다"
         );
-        assert!(
-            !commands.contains(&"update_doc"),
-            "쓰기 명령은 아직 Java 엔진이다"
-        );
+    }
+
+    #[test]
+    fn writes_are_on_by_default_and_each_rollback_switch_turns_them_off() {
+        let with = |pairs: &'static [(&'static str, &'static str)]| {
+            write_enabled(move |name| {
+                pairs.iter().find(|(k, _)| *k == name).map(|(_, v)| v.to_string())
+            })
+        };
+        assert!(with(&[]), "기본은 켜짐");
+        assert!(with(&[("AISURADA_ENGINE_WRITE", "rust")]), "옛 값 rust도 켜짐");
+        assert!(!with(&[("AISURADA_ENGINE_WRITE", " JAVA ")]));
+        assert!(!with(&[("AISURADA_ENGINE", "java")]));
+        assert!(!with(&[("AISURADA_VAULT_SNAPSHOT_ENABLED", "true")]));
+        assert!(with(&[("AISURADA_VAULT_SNAPSHOT_ENABLED", "false")]));
     }
 
     #[test]

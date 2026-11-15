@@ -21,8 +21,10 @@ portable-pty = "=0.9.0"
 libc = "0.2"
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 ring = "0.17"
-# Java 엔진을 Rust로 옮기는 중이다. 옮긴 읽기 명령은 이 라이브러리를 앱 안에서 직접 부른다(engine.rs).
+# Java 엔진을 Rust로 옮겼다. 앱은 이 라이브러리를 앱 안에서 직접 부른다(engine.rs).
 ais-core = { path = "../../engine-rs/crates/ais-core" }
+# 앱이 엔진의 명령줄(`ais-cli`)을 같은 프로세스 안에서 부른다(sidecar.rs). 사이드카도 프로세스 띄우기도 없다.
+ais-cli = { path = "../../engine-rs/crates/ais-cli" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

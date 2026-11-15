@@ -18,6 +18,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ais-cli"
+version = "0.0.1"
+dependencies = [
+ "ais-core",
+ "libc",
+ "serde_json",
+]
+
+[[package]]
 name = "ais-core"
 version = "0.0.1"
 dependencies = [
@@ -33,6 +42,7 @@ dependencies = [
 name = "aisurada-host"
 version = "0.0.6"
 dependencies = [
+ "ais-cli",
  "ais-core",
  "base64 0.22.1",
  "libc",

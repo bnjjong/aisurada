@@ -88,7 +88,7 @@ impl Host for Fake {
     fn engine(&self, _vault: &str, argv: &[String]) -> Result<Reply, String> {
         let mut tasks = self.tasks.lock().unwrap();
         match argv[0].as_str() {
-            "claude-mcp" => ok(json!({"mcpServers": {"aisurada": {"type": "stdio", "command": "/j", "args": ["-jar", "/a.jar", "mcp"], "env": {"AISURADA_SIDECAR_JAR": "/s.jar"}}}})),
+            "claude-mcp" => ok(json!({"mcpServers": {"aisurada": {"type": "stdio", "command": "/app/bin/ais-cli", "args": ["mcp"], "env": {}}}})),
             "list-tasks" => {
                 let want = opt(argv, "status");
                 let rows: Vec<Value> = tasks
@@ -194,9 +194,6 @@ impl Host for Fake {
         self.root.clone()
     }
 
-    fn is_guest_build(&self) -> bool {
-        false
-    }
 }
 
 fn git(dir: &Path, args: &[&str]) {
@@ -597,13 +594,13 @@ fn status_lists_active_and_waiting_runs() {
 // 실제 ais-cli·격리 엔진·claude로 끝까지 도는 시험(손으로만 돌린다)
 // ---------------------------------------------------------------------------
 
-/// 가짜 대신 진짜 `ais-cli`(java -jar)와 진짜 claude를 쓰는 호스트. 저장소 사본만 임시 git 저장소다.
+/// 가짜 대신 진짜 `ais-cli`(Rust, 같은 프로세스)와 진짜 claude를 쓰는 호스트. 저장소 사본만 임시 git 저장소다.
 struct RealHost {
     root: PathBuf,
     clone: PathBuf,
     vault: String,
     env: Vec<(String, String)>,
-    cli_jar: String,
+    cli_bin: String,
 }
 
 impl Host for RealHost {
@@ -611,29 +608,18 @@ impl Host for RealHost {
         Some(self.vault.clone())
     }
 
-    fn engine(&self, _vault: &str, argv: &[String]) -> Result<Reply, String> {
-        let out = Command::new("java")
-            .arg(format!("-Duser.home={}", self.env.iter().find(|(k, _)| k == "E2E_HOME").unwrap().1))
-            .arg("-jar")
-            .arg(&self.cli_jar)
-            .args(argv)
-            .envs(self.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-            .output()
-            .map_err(|e| e.to_string())?;
-        let mut stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-        if argv[0] == "claude-mcp" {
-            // 격리 엔진으로 이어지도록 MCP 서버 환경에 소켓과 홈을 더한다(실제 앱은 필요 없는 시험용 배선)
-            let mut v: Value = serde_json::from_str(&stdout).map_err(|e| e.to_string())?;
-            for key in ["AISURADA_SIDECAR_SOCKET", "AISURADA_SIDECAR_JAR"] {
-                if let Some((_, val)) = self.env.iter().find(|(k, _)| k == key) {
-                    v["mcpServers"]["aisurada"]["env"][key] = json!(val);
-                }
-            }
-            let home = &self.env.iter().find(|(k, _)| k == "E2E_HOME").unwrap().1;
-            v["mcpServers"]["aisurada"]["args"] = json!([format!("-Duser.home={home}"), "-jar", self.cli_jar, "mcp"]);
-            stdout = v.to_string();
-        }
-        Ok(Reply { status: out.status.code().unwrap_or(-1), stdout, stderr: String::from_utf8_lossy(&out.stderr).into_owned() })
+    fn engine(&self, vault: &str, argv: &[String]) -> Result<Reply, String> {
+        let mut vars: std::collections::BTreeMap<String, String> = self.env.iter().cloned().collect();
+        vars.insert("AISURADA_VAULT".into(), vault.to_string());
+        let env = ais_cli::env::Env {
+            home: vars.get("E2E_HOME").cloned().unwrap_or_default(),
+            cwd: std::env::current_dir().map_err(|e| e.to_string())?.to_string_lossy().into_owned(),
+            exe: self.cli_bin.clone(),
+            session: None,
+            vars,
+        };
+        let out = ais_cli::run(argv, &env);
+        Ok(Reply { status: out.code, stdout: out.stdout, stderr: out.stderr })
     }
 
     fn clone_dir(&self, _full_name: &str) -> Result<PathBuf, String> {
@@ -665,15 +651,12 @@ impl Host for RealHost {
         self.root.clone()
     }
 
-    fn is_guest_build(&self) -> bool {
-        false
-    }
 }
 
-/// 격리 엔진(`AISURADA_VAULT`, `AISURADA_SIDECAR_SOCKET`, `E2E_HOME`, `E2E_CLI_JAR`)이 떠 있어야 한다.
+/// 격리된 vault와 홈(`AISURADA_VAULT`, `E2E_HOME`)과 빌드한 `ais-cli` 실행 파일(`E2E_CLI_BIN`)이 있어야 한다.
 /// 태스크 하나를 만들어 Ready로 보낸 뒤 진짜 claude가 저장소 사본을 읽고 보고하는지 본다. 토큰을 조금 쓴다.
 #[test]
-#[ignore = "진짜 claude를 부른다. 격리 엔진을 띄우고 환경변수를 준 뒤 --ignored 로 돌린다"]
+#[ignore = "진짜 claude를 부른다. 격리 vault와 환경변수를 준 뒤 --ignored 로 돌린다"]
 fn real_cli_and_claude_report_end_to_end() {
     let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k} 가 필요하다"));
     let temp = tempfile::tempdir().unwrap();
@@ -685,11 +668,11 @@ fn real_cli_and_claude_report_end_to_end() {
     git(&origin, &["commit", "-q", "-m", "init"]);
     let clone = temp.path().join("clone");
     assert!(Command::new("git").args(["clone", "-q"]).arg(&origin).arg(&clone).status().unwrap().success());
-    let env: Vec<(String, String)> = ["AISURADA_VAULT", "AISURADA_SIDECAR_SOCKET", "AISURADA_SIDECAR_JAR", "E2E_HOME"]
+    let env: Vec<(String, String)> = ["AISURADA_VAULT", "E2E_HOME", "AISURADA_LOCK_DIR", "AISURADA_VAULT_AUTOCOMMIT_ENABLED"]
         .iter()
         .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_string(), v)))
         .collect();
-    let host = Arc::new(RealHost { root: temp.path().join("runs"), clone, vault: var("AISURADA_VAULT"), env, cli_jar: var("E2E_CLI_JAR") });
+    let host = Arc::new(RealHost { root: temp.path().join("runs"), clone, vault: var("AISURADA_VAULT"), env, cli_bin: var("E2E_CLI_BIN") });
     let ctx = Ctx { host: host.clone(), vault: host.vault.clone(), settings: Settings { model: "haiku".into(), ..Settings::default() } };
     let created = ctx
         .call(&["create-task", "title=README에서 빌드와 시험 명령 찾기", "repo=o/r", "criteria=[\"빌드 명령을 알려 준다\",\"시험 명령을 알려 준다\"]", "body=저장소의 README를 읽고 빌드와 시험 명령을 알려 줘. 질문 없이 바로 보고해."])

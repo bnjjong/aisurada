@@ -236,7 +236,7 @@ impl Run<'_> {
         if reply.status != 0 {
             return Err(format!("MCP 설정을 만들지 못했다: {}", protocol::clip(&reply.stderr, 300)));
         }
-        protocol::mcp_config_for(&reply.stdout, &self.ctx.vault, self.ctx.host.is_guest_build())
+        protocol::mcp_config_for(&reply.stdout, &self.ctx.vault)
     }
 
     fn work(&mut self, mut input: Input) -> Ending {
