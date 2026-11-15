@@ -1,6 +1,7 @@
 //! Java MCP 서버와 Rust MCP 서버가 같은 JSON-RPC 대화에 같은 답을 내는지 한 줄씩 견준다.
 //!
-//! 사용: `cargo run -p ais-cli --example mcp_compat -- <기준 폴더(ais-cli.jar, ais-engine.jar)>`
+//! 사용: `cargo run -p ais-cli --example mcp_compat -- <기준 폴더(ais-cli.jar, ais-engine.jar)> [--record=<테이프>]`
+//! 기준 없이 녹화한 Java 답으로 다시 견주려면 `cargo run -p ais-cli --example mcp_compat -- --replay=<테이프>`(골든 시험).
 //! 기준 폴더는 `engine-rs/tools/compat/build-oracle.sh`가 태그 `java-engine-final`에서 지어 `engine-rs/target/oracle/`에 둔다.
 //!
 //! 도구 호출은 두 서버 모두 엔진 대신 같은 가짜 호출기(`tools/compat/DriveMcp.java`)가 받는다. 그래서 여기서 보는 것은 프로토콜 층이다:
@@ -13,6 +14,11 @@ use std::{env, fs};
 
 use ais_cli::mcp::{Call, McpServer};
 use ais_cli::registry::CLI_TOOL_NAMES;
+use serde_json::json;
+
+#[allow(dead_code)]
+#[path = "../../ais-core/examples/support/tape.rs"]
+mod tape;
 
 /// 가짜 호출기: Java `DriveMcp.fake`와 같다.
 fn fake(args: &[String], session: Option<ais_cli::env::SessionSource>) -> Call {
@@ -160,13 +166,34 @@ fn cases() -> Vec<String> {
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    let Some(dist) = args.first() else {
+    let record: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--record="))
+        .map(PathBuf::from);
+    let replay: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--replay="))
+        .map(PathBuf::from);
+    let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    // 재생은 기준 폴더(jar)가 필요 없다
+    let dist: Option<&Path> = positional.first().map(|d| Path::new(d.as_str()));
+    if replay.is_none() && dist.is_none() {
         eprintln!(
-            "사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)>"
+            "사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)> [--record=<테이프>]\n        mcp_compat --replay=<테이프>"
         );
         return ExitCode::from(2);
+    }
+    let mut tape = match (&replay, &record) {
+        (Some(path), _) => match tape::Tape::replay(path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
+        (None, Some(path)) => tape::Tape::record(path.clone()),
+        (None, None) => tape::Tape::live(),
     };
-    let dist = Path::new(dist);
     let root: PathBuf = env::temp_dir().join(format!("ais-mcp-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).expect("임시 폴더");
@@ -175,45 +202,66 @@ fn main() -> ExitCode {
     let case_file = root.join("cases.jsonl");
     fs::write(&case_file, cases.join("\n") + "\n").expect("사례 파일");
 
-    // Java 구동기를 같은 패키지 이름으로 컴파일한다(서버 클래스가 패키지 안에서만 보인다)
-    let classpath = format!(
-        "{}:{}",
-        dist.join("ais-cli.jar").display(),
-        dist.join("ais-engine.jar").display()
-    );
+    // Java 구동기를 같은 패키지 이름으로 컴파일한다(서버 클래스가 패키지 안에서만 보인다). 재생은 Java를 쓰지 않는다.
+    let mut classpath = String::new();
     let compiled = root.join("classes");
-    fs::create_dir_all(&compiled).unwrap();
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/DriveMcp.java");
-    let status = Command::new("javac")
-        .args(["-encoding", "UTF-8", "-cp", &classpath, "-d"])
-        .arg(&compiled)
-        .arg(&source)
-        .status()
-        .expect("javac");
-    assert!(status.success(), "DriveMcp를 못 지었다");
+    if let (None, Some(dist)) = (&replay, dist) {
+        classpath = format!(
+            "{}:{}",
+            dist.join("ais-cli.jar").display(),
+            dist.join("ais-engine.jar").display()
+        );
+        fs::create_dir_all(&compiled).unwrap();
+        let source =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/DriveMcp.java");
+        let status = Command::new("javac")
+            .args(["-encoding", "UTF-8", "-cp", &classpath, "-d"])
+            .arg(&compiled)
+            .arg(&source)
+            .status()
+            .expect("javac");
+        assert!(status.success(), "DriveMcp를 못 지었다");
+    }
 
     let mut checked = 0usize;
     let mut failures: Vec<String> = Vec::new();
     for write in [false, true] {
-        let mut command = Command::new("java");
-        command
-            .arg("-cp")
-            .arg(format!("{classpath}:{}", compiled.display()))
-            .arg("aisurada.cli.DriveMcp")
-            .arg(&case_file);
-        if write {
-            command.arg("--write");
+        let key = vec![write.to_string()];
+        let java_lines: Vec<String> = if replay.is_some() {
+            tape.next("mcp", &key)
+                .unwrap_or_else(|e| panic!("{e}"))
+                .as_array()
+                .map(|lines| {
+                    lines
+                        .iter()
+                        .map(|l| l.as_str().unwrap_or_default().to_string())
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            let mut command = Command::new("java");
+            command
+                .arg("-cp")
+                .arg(format!("{classpath}:{}", compiled.display()))
+                .arg("aisurada.cli.DriveMcp")
+                .arg(&case_file);
+            if write {
+                command.arg("--write");
+            }
+            let output = command.output().expect("java");
+            assert!(
+                output.status.success(),
+                "Java 구동기 실패: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(str::to_string)
+                .collect()
+        };
+        if tape.is_record() {
+            tape.push("mcp", key, &json!(java_lines));
         }
-        let output = command.output().expect("java");
-        assert!(
-            output.status.success(),
-            "Java 구동기 실패: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let java_lines: Vec<String> = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(str::to_string)
-            .collect();
 
         let mut server = McpServer::new(write, Box::new(fake));
         let mut index = 0usize;
@@ -248,6 +296,16 @@ fn main() -> ExitCode {
         println!("  어긋남: {failure}");
     }
     let _ = fs::remove_dir_all(&root);
+    // 어긋남이 있으면 녹화를 버린다. 재생은 테이프가 남지 않았는지 본다.
+    if failures.is_empty() {
+        if let Err(e) = tape.finish() {
+            println!("테이프 오류: {e}");
+            return ExitCode::from(1);
+        }
+        if tape.is_record() {
+            println!("테이프 {}줄을 적었다", tape.recorded_len());
+        }
+    }
     if failures.is_empty() {
         ExitCode::SUCCESS
     } else {

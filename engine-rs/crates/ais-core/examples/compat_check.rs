@@ -1,13 +1,16 @@
 //! Java 엔진(단발 모드)과 Rust 엔진이 같은 vault에서 같은 읽기 결과를 내는지 맞댑니다.
 //!
 //! 기준(옛 Java 엔진)은 `engine-rs/tools/compat/build-oracle.sh`가 태그 `java-engine-final`에서 지어 `engine-rs/target/oracle/`에 둔다.
-//! 사용: `cargo run -p ais-core --example compat_check -- <기준 ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>] [--write-fixture=<합성 vault>]`
+//! 사용: `cargo run -p ais-core --example compat_check -- <기준 ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>] [--write-fixture=<합성 vault>] [--record=<테이프 파일>]`
+//! `--record`는 어긋남이 0일 때만 기준(Java) 응답과 폴더 해시를 테이프에 적는다. 같은 입력을 기준 엔진 없이 다시 돌리려면
+//! `cargo run -p ais-core --example compat_check -- --replay=<테이프 파일> <vault 폴더>... [같은 --write-fixture, --commit-fixture]`(골든 시험, `tests/golden.rs`).
 //! `--commit-fixture`는 그 vault를 사본 둘로 복사해 `commit_vault`(vault를 고친다)를 견준다. 진짜 vault에는 주지 않는다.
 //! `--write-fixture`는 그 vault를 사본 둘로 복사해 쓰기 명령을 Java와 Rust로 돌리고 응답과 폴더 전체 바이트를 견준다.
 //!
 //! Java 응답은 정리안의 새 모양으로 바꿔서 견줍니다: `date`·`time`·`agendaTitle`·`deepLink`를 빼고, 목록은
 //! `{items, total, returned, truncated}`로 감싸고, 빈 `tags`를 채우고, `folder`를 더합니다. vault는 읽기만 합니다.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::{env, fs};
@@ -15,9 +18,15 @@ use std::{env, fs};
 use ais_core::engine::Engine;
 use serde_json::{Map, Value, json};
 
+#[allow(dead_code)]
+#[path = "support/tape.rs"]
+mod tape;
+
+/// 기준(옛 Java 엔진). 테이프가 재생 방식이면 엔진을 돌리지 않고 녹화된 응답을 돌려준다.
 struct Java {
     jar: String,
     home: PathBuf,
+    tape: RefCell<tape::Tape>,
 }
 
 impl Java {
@@ -27,6 +36,80 @@ impl Java {
 
     /// JVM 속성(`-Dkey=value`)과 환경 변수를 더해서 돌린다. 쓰기 맞대기가 시계·id·잠금 폴더를 고정할 때 쓴다.
     fn run_with(
+        &self,
+        vault: &Path,
+        args: &[String],
+        props: &[String],
+        envs: &[(String, String)],
+    ) -> Result<Value, String> {
+        let key: Vec<String> = {
+            let tape = self.tape.borrow();
+            args.iter().map(|a| tape.norm_str(a)).collect()
+        };
+        if self.tape.borrow().is_replay() {
+            let value = self
+                .tape
+                .borrow_mut()
+                .next("run", &key)
+                .unwrap_or_else(|e| panic!("{e}"));
+            return match value.get("err") {
+                Some(e) => Err(e.as_str().unwrap_or_default().to_string()),
+                None => Ok(value["ok"].clone()),
+            };
+        }
+        let result = self.launch(vault, args, props, envs);
+        if self.tape.borrow().is_record() {
+            let value = match &result {
+                Ok(v) => json!({"ok": v}),
+                Err(e) => json!({"err": e}),
+            };
+            self.tape.borrow_mut().push("run", key, &value);
+        }
+        result
+    }
+
+    /// 두 폴더가 같은지 본다(`tree_diff`). 녹화는 기준 쪽 폴더(`a`)의 파일별 해시를 적고,
+    /// 재생은 `a`를 만들 기준 엔진이 없으므로 Rust 쪽 폴더(`b`)의 해시를 그 녹화와 견준다.
+    fn folders(&self, lineage: &str, a: &Path, b: &Path) -> String {
+        if self.tape.borrow().is_replay() {
+            let recorded = self
+                .tape
+                .borrow_mut()
+                .next_tree(lineage)
+                .unwrap_or_else(|e| panic!("{e}"));
+            let local = self.digests(b);
+            return tape::digest_diff(&recorded, &local);
+        }
+        let diff = tree_diff(a, b);
+        if self.tape.borrow().is_record() {
+            let digests = self.digests(a);
+            self.tape.borrow_mut().push_tree(lineage, &digests);
+        }
+        diff
+    }
+
+    /// 기준 쪽에서만 읽을 수 있는 값(예: 기준이 커밋한 git 상태)을 테이프에 싣는다. 재생은 계산하지 않고 녹화값을 쓴다.
+    fn taped(&self, kind: &str, compute: impl FnOnce() -> Value) -> Value {
+        if self.tape.borrow().is_replay() {
+            return self
+                .tape
+                .borrow_mut()
+                .next(kind, &[])
+                .unwrap_or_else(|e| panic!("{e}"));
+        }
+        let value = compute();
+        if self.tape.borrow().is_record() {
+            self.tape.borrow_mut().push(kind, Vec::new(), &value);
+        }
+        value
+    }
+
+    /// 폴더의 파일별 SHA-256(`Tape::digest_files`)
+    fn digests(&self, root: &Path) -> Value {
+        self.tape.borrow().digest_files(&tree(root))
+    }
+
+    fn launch(
         &self,
         vault: &Path,
         args: &[String],
@@ -1042,6 +1125,7 @@ fn compare_commit_vault(
     let root = env::temp_dir().join(format!("ais-commit-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).expect("임시 폴더");
+    java.tape.borrow_mut().register_root(&root);
     let git = |vault: &Path, args: &[&str]| -> String {
         let out = Command::new("git")
             .args(args)
@@ -1130,10 +1214,11 @@ fn compare_commit_vault(
             rust_out,
             |_, v| v.clone(),
         );
+        let (seen_a, seen_b) = (java.taped("observe", || observe(&a)), observe(&b));
         report.record(
             format!("commit_vault {label} 결과물"),
-            observe(&a) == observe(&b),
-            || first_diff(&observe(&a), &observe(&b), "$"),
+            seen_a == seen_b,
+            || first_diff(&seen_a, &seen_b, "$"),
         );
         let _ = fs::remove_dir_all(&a);
         let _ = fs::remove_dir_all(&b);
@@ -1354,7 +1439,7 @@ impl WriteHarness<'_> {
                 v
             },
         );
-        let diff = tree_diff(&self.a, &self.b);
+        let diff = self.java.folders("vault", &self.a, &self.b);
         self.report
             .record(format!("{command} {label} 폴더"), diff.is_empty(), || {
                 diff.clone()
@@ -1365,7 +1450,7 @@ impl WriteHarness<'_> {
         let rust_dir =
             ais_core::resource::approvals::dir_under(&self.approvals_base("rust"), &self.b);
         if java_dir.exists() || rust_dir.exists() {
-            let diff = tree_diff(&java_dir, &rust_dir);
+            let diff = self.java.folders("approvals", &java_dir, &rust_dir);
             self.report.record(
                 format!("{command} {label} 승인 기록"),
                 diff.is_empty(),
@@ -1386,6 +1471,34 @@ impl WriteHarness<'_> {
             .parent()
             .unwrap()
             .join(format!("approvals-{who}"))
+    }
+}
+
+/// 세션 홈의 파일마다 수정 시각을 고정한다. 지금 수정 시각의 차례(같으면 경로 차례)를 지켜서 `WRITE_NOW`보다 10분 앞에서 1초씩 늘린다.
+/// 두 엔진이 같은 값을 읽고, 실행 시각과 상관없이 응답이 같아지게 한다(골든 재생).
+fn pin_session_mtimes(home: &Path) {
+    fn walk(dir: &Path, out: &mut Vec<(std::time::SystemTime, PathBuf)>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if let Ok(modified) = fs::metadata(&path).and_then(|m| m.modified()) {
+                out.push((modified, path));
+            }
+        }
+    }
+    let mut files = Vec::new();
+    walk(home, &mut files);
+    files.sort();
+    let base = std::time::UNIX_EPOCH
+        + std::time::Duration::from_millis(WRITE_NOW.parse::<u64>().unwrap() - 600_000);
+    for (rank, (_, path)) in files.iter().enumerate() {
+        let when = base + std::time::Duration::from_secs(rank as u64);
+        let file = fs::OpenOptions::new().write(true).open(path).expect("세션 파일");
+        file.set_modified(when).expect("수정 시각 고정");
     }
 }
 
@@ -7991,7 +8104,8 @@ fn compare_session_commands(h: &mut WriteHarness) {
         &many_java,
         json!({"ids": many}),
     );
-    // 최근 세션
+    // 최근 세션: `lastActiveAt`은 세션 파일의 수정 시각이라 실행 때마다 달라진다. 골든 재생이 녹화본과 같은 값을 보도록 고정한다.
+    pin_session_mtimes(&h.session_home());
     step(
         h,
         "최근 기본",
@@ -8703,6 +8817,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).expect("임시 폴더");
+    java.tape.borrow_mut().register_root(&root);
     let locks = root.join("locks");
     let copy = |name: &str| -> PathBuf {
         let dst = root.join(name);
@@ -10057,6 +10172,14 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let verbose = args.iter().any(|a| a == "--verbose");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    let record: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--record="))
+        .map(PathBuf::from);
+    let replay: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--replay="))
+        .map(PathBuf::from);
     let write_fixture: Option<PathBuf> = args
         .iter()
         .find_map(|a| a.strip_prefix("--write-fixture="))
@@ -10065,22 +10188,47 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--commit-fixture="))
         .map(PathBuf::from);
-    if positional.len() < 2 {
-        eprintln!(
-            "사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose]"
-        );
+    // 재생은 기준 엔진(jar)이 없으므로 위치 인자가 모두 vault다
+    let (jar, vaults): (String, &[&String]) = if replay.is_some() {
+        (String::new(), &positional[..])
+    } else {
+        match positional.split_first() {
+            Some((jar, vaults)) if !vaults.is_empty() => ((*jar).clone(), vaults),
+            _ => {
+                eprintln!(
+                    "사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose] [--record=<테이프>]\n        compat_check --replay=<테이프> <vault 폴더>..."
+                );
+                return ExitCode::from(2);
+            }
+        }
+    };
+    if replay.is_some() && vaults.is_empty() {
+        eprintln!("사용법: compat_check --replay=<테이프> <vault 폴더>...");
         return ExitCode::from(2);
     }
     let home = env::temp_dir().join("ais-compat-home");
     fs::create_dir_all(&home).ok();
+    let tape = match (&replay, &record) {
+        (Some(path), _) => match tape::Tape::replay(path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
+        (None, Some(path)) => tape::Tape::record(path.clone()),
+        (None, None) => tape::Tape::live(),
+    };
     let java = Java {
-        jar: positional[0].clone(),
+        jar,
         home,
+        tape: RefCell::new(tape),
     };
 
     let mut total = Report::default();
-    for vault in &positional[1..] {
+    for vault in vaults {
         let vault = Path::new(vault);
+        java.tape.borrow_mut().register_root(vault);
         let engine = Engine::new(vault);
         let mut report = Report::default();
         let name = vault
@@ -10408,6 +10556,21 @@ fn main() -> ExitCode {
         total.checked,
         total.failures.len()
     );
+    // 어긋남이 있으면 녹화를 버린다(어긋난 응답을 정답으로 박제하지 않는다). 재생은 테이프가 남지 않았는지 본다.
+    if total.failures.is_empty() {
+        match java.tape.borrow().finish() {
+            Ok(()) if java.tape.borrow().is_record() => println!(
+                "테이프 {}줄을 적었다: {}",
+                java.tape.borrow().recorded_len(),
+                record.as_ref().map(|p| p.display().to_string()).unwrap_or_default()
+            ),
+            Ok(()) => {}
+            Err(e) => {
+                println!("테이프 오류: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
     if total.failures.is_empty() {
         ExitCode::SUCCESS
     } else {

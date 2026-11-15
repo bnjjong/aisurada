@@ -13,3 +13,10 @@ publish = false
 strip = true
 lto = "thin"
 codegen-units = 1
+
+# 골든 재생(tools/golden/run.sh)용 빌드. 맞대기 하네스는 명령 수천 건과 폴더 해시를 돌려서 debug 빌드로는 6분이 넘고, 최적화하면 1분 안쪽이다.
+# dev 설정은 그대로 두고(디버깅 경험을 바꾸지 않는다) 이 프로필로만 최적화한다.
+[profile.golden]
+inherits = "dev"
+opt-level = 2
+debug = false

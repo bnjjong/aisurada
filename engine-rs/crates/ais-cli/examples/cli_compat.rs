@@ -9,6 +9,7 @@
 //!
 //! 진짜 vault에는 주지 않는다(쓰기 명령이 있다). 합성 vault는 `engine-rs/tools/compat/make-fixture.sh`로 만든다.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -16,6 +17,10 @@ use std::{env, fs};
 
 use ais_cli::env::Env;
 use serde_json::{Value, json};
+
+#[allow(dead_code)]
+#[path = "../../ais-core/examples/support/tape.rs"]
+mod tape;
 
 const NOW: &str = "1794700000000";
 
@@ -38,6 +43,8 @@ struct Report {
 struct Harness {
     report: Report,
     jar: String,
+    /// 기준(Java) 응답을 녹화하고 재생하는 테이프(`--record`, `--replay`)
+    tape: RefCell<tape::Tape>,
     root: PathBuf,
     a: PathBuf,
     b: PathBuf,
@@ -46,10 +53,11 @@ struct Harness {
 }
 
 impl Harness {
-    fn new(jar: &str, fixture: &Path, verbose: bool) -> Harness {
+    fn new(jar: &str, fixture: &Path, verbose: bool, mut tape: tape::Tape) -> Harness {
         let root = env::temp_dir().join(format!("ais-cli-compat-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("임시 폴더");
+        tape.register_root(&root);
         let copy = |name: &str| -> PathBuf {
             let dst = root.join(name);
             let status = Command::new("cp")
@@ -77,6 +85,7 @@ impl Harness {
         Harness {
             report: Report::default(),
             jar: jar.to_string(),
+            tape: RefCell::new(tape),
             root,
             a,
             b,
@@ -85,7 +94,52 @@ impl Harness {
         }
     }
 
+    /// 기준(Java) 호출. 테이프가 재생이면 엔진을 돌리지 않고 녹화한 결과를 돌려준다.
     fn java(&self, args: &[String], extra_env: &[(&str, &str)]) -> Raw {
+        let key: Vec<String> = {
+            let tape = self.tape.borrow();
+            args.iter().map(|a| tape.norm_str(a)).collect()
+        };
+        if self.tape.borrow().is_replay() {
+            let v = self
+                .tape
+                .borrow_mut()
+                .next("cli", &key)
+                .unwrap_or_else(|e| panic!("{e}"));
+            return Raw {
+                code: v["code"].as_i64().unwrap_or(-1) as i32,
+                stdout: v["stdout"].as_str().unwrap_or_default().to_string(),
+                stderr: v["stderr"].as_str().unwrap_or_default().to_string(),
+            };
+        }
+        let raw = self.launch_java(args, extra_env);
+        if self.tape.borrow().is_record() {
+            let value = json!({"code": raw.code, "stdout": raw.stdout, "stderr": raw.stderr});
+            self.tape.borrow_mut().push("cli", key, &value);
+        }
+        raw
+    }
+
+    /// 두 사본 폴더가 같은지 본다. 녹화는 기준 쪽(`a`) 폴더의 파일별 해시를 적고, 재생은 Rust 쪽(`b`) 폴더를 그 녹화와 견준다.
+    fn folders(&self) -> String {
+        if self.tape.borrow().is_replay() {
+            let recorded = self
+                .tape
+                .borrow_mut()
+                .next_tree("vault")
+                .unwrap_or_else(|e| panic!("{e}"));
+            let local = self.tape.borrow().digest_files(&tree(&self.b));
+            return tape::digest_diff(&recorded, &local);
+        }
+        let diff = tree_diff(&self.a, &self.b);
+        if self.tape.borrow().is_record() {
+            let digests = self.tape.borrow().digest_files(&tree(&self.a));
+            self.tape.borrow_mut().push_tree("vault", &digests);
+        }
+        diff
+    }
+
+    fn launch_java(&self, args: &[String], extra_env: &[(&str, &str)]) -> Raw {
         let random = self.random();
         let mut command = Command::new("java");
         command
@@ -249,7 +303,7 @@ impl Harness {
             }
         }
         if write {
-            let diff = tree_diff(&self.a, &self.b);
+            let diff = self.folders();
             self.record(format!("{label} 폴더"), diff.is_empty(), || diff.clone());
         }
         serde_json::from_str(&rust.stdout).ok()
@@ -1981,13 +2035,37 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let verbose = args.iter().any(|a| a == "--verbose");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
-    if positional.len() < 2 {
-        eprintln!(
-            "사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose]"
-        );
-        return ExitCode::from(2);
-    }
-    let mut h = Harness::new(positional[0], Path::new(positional[1]), verbose);
+    let record: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--record="))
+        .map(PathBuf::from);
+    let replay: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--replay="))
+        .map(PathBuf::from);
+    // 재생은 기준 엔진(jar)이 없으므로 위치 인자는 합성 vault 하나다
+    let (jar, fixture) = match (&replay, positional.as_slice()) {
+        (Some(_), [fixture]) => (String::new(), (*fixture).clone()),
+        (None, [jar, fixture]) => ((*jar).clone(), (*fixture).clone()),
+        _ => {
+            eprintln!(
+                "사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose] [--history] [--record=<테이프>]\n        cli_compat --replay=<테이프> <합성 vault> [--history]"
+            );
+            return ExitCode::from(2);
+        }
+    };
+    let tape = match (&replay, &record) {
+        (Some(path), _) => match tape::Tape::replay(path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
+        (None, Some(path)) => tape::Tape::record(path.clone()),
+        (None, None) => tape::Tape::live(),
+    };
+    let mut h = Harness::new(&jar, Path::new(&fixture), verbose, tape);
 
     cases_surface(&mut h);
     cases_parse_errors(&mut h);
@@ -2014,6 +2092,14 @@ fn main() -> ExitCode {
         println!("  어긋남: {failure}");
     }
     let failed = !report.failures.is_empty();
+    // 어긋남이 있으면 녹화를 버린다. 재생은 테이프가 남지 않았는지 본다.
+    let tape_error = if failed { None } else { h.tape.borrow().finish().err() };
+    if let Some(e) = &tape_error {
+        println!("테이프 오류: {e}");
+    } else if !failed && h.tape.borrow().is_record() {
+        println!("테이프 {}줄을 적었다", h.tape.borrow().recorded_len());
+    }
+    let failed = failed || tape_error.is_some();
     let _ = fs::remove_dir_all(&h.root);
     if failed {
         ExitCode::from(1)
