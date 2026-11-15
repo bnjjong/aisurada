@@ -1827,9 +1827,16 @@ body.col-resizing {
   -webkit-user-select: none !important;
 }
 
-/* 부록 F.3: 코멘트 글줄 720px 상한 */
+/* 코멘트 영역 너비 100% 꽉 채우기 */
 .note-comment-thread {
-  max-width: 720px;
+  width: 100%;
+}
+.note-comment-thread .comment-compose {
+  width: 100%;
+}
+.note-comment-thread textarea {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ───────── 팝업 노트 크기 조절 손잡이: 팝업의 오른쪽 아래 모서리 ─────────
