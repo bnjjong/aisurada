@@ -1,7 +1,7 @@
-// 앱에 든 ais-cli 스크립트(src-tauri/resources/ais-cli)가 번들 Java로 번들 jar를 부르는지 잰다.
-// 진짜 셸 스크립트를 가짜 앱 폴더에서 돌린다. 진짜 Java나 엔진은 쓰지 않는다.
+// 개발용 번들의 ais-cli 스크립트(src-tauri/resources/ais-cli)가 저장소의 빌드 폴더에서 Rust 실행 파일을 찾아 넘기는지 잰다.
+// 진짜 셸 스크립트를 가짜 저장소 폴더에서 돌린다. 진짜 엔진은 쓰지 않는다. 정식 번들에는 이 스크립트가 아니라 Rust 실행 파일이 들어간다.
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,124 +10,78 @@ import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(new URL('../src-tauri/resources/ais-cli', import.meta.url));
 
-// 인자를 한 줄에 하나씩 찍고 jar 환경 변수를 보여 주는 가짜 java
-const FAKE_JAVA = `#!/bin/sh
+// 인자를 한 줄에 하나씩 찍고 자기 이름표를 보여 주는 가짜 ais-cli
+const fakeBinary = tag => `#!/bin/sh
+printf 'WHO:${tag}\\n'
 for a in "$@"; do printf 'ARG:%s\\n' "$a"; done
-printf 'SIDECAR_JAR:%s\\n' "\${AISURADA_SIDECAR_JAR-unset}"
-printf 'KEEP_REGISTRATION:%s\\n' "\${AISURADA_SIDECAR_KEEP_REGISTRATION-unset}"
-exit "\${FAKE_JAVA_EXIT:-0}"
+exit "\${FAKE_EXIT:-0}"
 `;
 
-function fakeApp(root, { withRuntime = true } = {}) {
-  const resources = join(root, 'aisurada.app', 'Contents', 'Resources');
-  mkdirSync(join(resources, 'bin'), { recursive: true });
-  copyFileSync(script, join(resources, 'bin', 'ais-cli'));
-  chmodSync(join(resources, 'bin', 'ais-cli'), 0o755);
-  writeFileSync(join(resources, 'ais-cli.jar'), '');
-  writeFileSync(join(resources, 'ais-sidecar.jar'), '');
-  if (withRuntime) {
-    mkdirSync(join(resources, 'runtime', 'bin'), { recursive: true });
-    writeFileSync(join(resources, 'runtime', 'bin', 'java'), FAKE_JAVA);
-    chmodSync(join(resources, 'runtime', 'bin', 'java'), 0o755);
+function fakeRepo(root, { release = true, debug = false } = {}) {
+  const repo = realpathSync(root);
+  mkdirSync(join(repo, 'engine-rs/target/release'), { recursive: true });
+  mkdirSync(join(repo, 'engine-rs/target/debug'), { recursive: true });
+  writeFileSync(join(repo, 'engine-rs/Cargo.toml'), '[workspace]\n');
+  for (const [profile, on] of [['release', release], ['debug', debug]]) {
+    if (!on) continue;
+    const file = join(repo, 'engine-rs/target', profile, 'ais-cli');
+    writeFileSync(file, fakeBinary(profile));
+    chmodSync(file, 0o755);
   }
-  return realpathSync(resources);
+  const resources = join(repo, 'native-host/src-tauri/target/debug/bundle/macos/aisurada.app/Contents/Resources');
+  mkdirSync(join(resources, 'bin'), { recursive: true });
+  copyFileSync(script, join(resources, 'bin/ais-cli'));
+  chmodSync(join(resources, 'bin/ais-cli'), 0o755);
+  return { repo, launcher: join(resources, 'bin/ais-cli') };
 }
 
 function run(file, args, env = {}) {
   const result = spawnSync(file, args, { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', ...env } });
-  const lines = result.stdout.split('\n').filter(Boolean);
-  return {
-    status: result.status,
-    args: lines.filter(l => l.startsWith('ARG:')).map(l => l.slice(4)),
-    sidecar: lines.find(l => l.startsWith('SIDECAR_JAR:'))?.slice('SIDECAR_JAR:'.length),
-    keep: lines.find(l => l.startsWith('KEEP_REGISTRATION:'))?.slice('KEEP_REGISTRATION:'.length),
-    stderr: result.stderr,
-  };
+  return { status: result.status, lines: result.stdout.split('\n').filter(Boolean), stderr: result.stderr };
 }
 
-function withTemp(fn) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'ais-cli-script-')));
-  try { return fn(root); } finally { rmSync(root, { recursive: true, force: true }); }
-}
+test('finds the repository build, prefers release over debug and passes arguments through', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ais-cli-script-'));
+  try {
+    const { launcher } = fakeRepo(root, { release: true, debug: true });
+    const out = run(launcher, ['get_doc', '{"id":"x y"}', '한글']);
+    assert.equal(out.status, 0);
+    assert.deepEqual(out.lines, ['WHO:release', 'ARG:get_doc', 'ARG:{"id":"x y"}', 'ARG:한글']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
-test('번들 Java로 번들 ais-cli.jar를 부르고 인자를 그대로 넘긴다', () => withTemp(root => {
-  const resources = fakeApp(root);
-  const r = run(join(resources, 'bin', 'ais-cli'), ['get_doc', '{"id":"nd 1","q":"it\'s"}', '한글']);
-  assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'get_doc', '{"id":"nd 1","q":"it\'s"}', '한글']);
-  assert.equal(r.sidecar, join(resources, 'ais-sidecar.jar'), '엔진 jar도 앱에 든 것으로 넘긴다');
-  assert.equal(r.keep, 'unset', '정식 앱은 자기 jar로 등록하므로 등록 유지 스위치를 켜지 않는다');
-}));
+test('falls back to the debug build and keeps the exit code', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ais-cli-script-'));
+  try {
+    const { launcher } = fakeRepo(root, { release: false, debug: true });
+    const out = run(launcher, [], { FAKE_EXIT: '3' });
+    assert.equal(out.status, 3);
+    assert.deepEqual(out.lines, ['WHO:debug']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
-test('종료 코드를 그대로 돌려준다', () => withTemp(root => {
-  const resources = fakeApp(root);
-  assert.equal(run(join(resources, 'bin', 'ais-cli'), ['x'], { FAKE_JAVA_EXIT: '7' }).status, 7);
-}));
+test('works when called through a symlink and with an empty PATH', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ais-cli-script-'));
+  try {
+    const { launcher } = fakeRepo(root);
+    const bin = join(root, 'home-bin');
+    mkdirSync(bin);
+    symlinkSync(launcher, join(bin, 'ais-cli'));
+    const out = run(join(bin, 'ais-cli'), ['x'], { PATH: '' });
+    assert.deepEqual(out.lines, ['WHO:release', 'ARG:x']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
-test('심볼릭 링크로 불러도 앱 안의 자리를 찾는다(절대 링크, 상대 링크, 링크의 링크)', () => withTemp(root => {
-  const resources = fakeApp(root);
-  const real = join(resources, 'bin', 'ais-cli');
-  mkdirSync(join(root, 'home', '.local', 'bin'), { recursive: true });
-  const absolute = join(root, 'home', '.local', 'bin', 'ais-cli');
-  symlinkSync(real, absolute);
-  const second = join(root, 'home', 'ais');
-  symlinkSync('.local/bin/ais-cli', second); // 상대 링크가 다른 링크를 가리킨다
-  for (const file of [absolute, second]) {
-    const r = run(file, ['list_tags']);
-    assert.equal(r.status, 0, `${file}: ${r.stderr}`);
-    assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'list_tags'], file);
-  }
-}));
-
-test('PATH가 비어 있어도 돈다(Finder나 launchd가 띄운 환경에는 dirname 같은 명령이 PATH에 없다)', () => withTemp(root => {
-  const resources = fakeApp(root);
-  const real = join(resources, 'bin', 'ais-cli');
-  mkdirSync(join(root, 'home', '.local', 'bin'), { recursive: true });
-  const link = join(root, 'home', '.local', 'bin', 'ais-cli');
-  symlinkSync(real, link);
-  for (const file of [real, link]) {
-    const r = run(file, ['list_tags'], { PATH: '/nonexistent' });
-    assert.equal(r.status, 0, `${file}: ${r.stderr}`);
-    assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'list_tags'], file);
-  }
-}));
-
-test('사용자가 AISURADA_SIDECAR_JAR를 정해 두었으면 그것을 따른다', () => withTemp(root => {
-  const resources = fakeApp(root);
-  const r = run(join(resources, 'bin', 'ais-cli'), ['x'], { AISURADA_SIDECAR_JAR: '/my/own.jar' });
-  assert.equal(r.sidecar, '/my/own.jar');
-}));
-
-test('개발용 빌드(target/…/bundle) 안에서는 낡을 수 있는 엔진 jar를 넘기지 않고, 이미 있는 엔진 등록을 덮어쓰지 않게 한다', () => withTemp(root => {
-  const dev = join(root, 'repo', 'native-host', 'src-tauri', 'target', 'debug', 'bundle', 'macos');
-  const resources = fakeApp(dev);
-  const r = run(join(resources, 'bin', 'ais-cli'), ['x']);
-  assert.equal(r.status, 0, r.stderr);
-  assert.equal(r.sidecar, 'unset');
-  assert.equal(r.keep, '1', '등록 유지 스위치를 켠다');
-  assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'x'], 'cli jar는 그대로 쓴다');
-}));
-
-test('개발용 빌드라도 사용자가 엔진 jar를 정했으면 그 jar로 등록하고 스위치는 켜지 않는다', () => withTemp(root => {
-  const dev = join(root, 'repo', 'native-host', 'src-tauri', 'target', 'release', 'bundle', 'macos');
-  const resources = fakeApp(dev);
-  const r = run(join(resources, 'bin', 'ais-cli'), ['x'], { AISURADA_SIDECAR_JAR: '/my/own.jar' });
-  assert.equal(r.sidecar, '/my/own.jar');
-  assert.equal(r.keep, 'unset');
-}));
-
-test('번들 Java가 없는 앱(개발용 빌드)은 PATH의 java를 쓴다', () => withTemp(root => {
-  const resources = fakeApp(root, { withRuntime: false });
-  const bin = join(root, 'path-bin');
-  mkdirSync(bin);
-  writeFileSync(join(bin, 'java'), FAKE_JAVA);
-  chmodSync(join(bin, 'java'), 0o755);
-  const r = run(join(resources, 'bin', 'ais-cli'), ['list_docs'], { PATH: `${bin}:/usr/bin:/bin` });
-  assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(r.args, ['-jar', join(resources, 'ais-cli.jar'), 'list_docs']);
-}));
-
-test('스크립트는 실행 권한이 있고 sh 문법이 맞다', () => {
-  execFileSync('/bin/sh', ['-n', script]);
-  execFileSync('test', ['-x', script]);
+test('AISURADA_CLI_BIN wins, and a missing build is reported with exit code 127', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ais-cli-script-'));
+  try {
+    const { launcher } = fakeRepo(root, { release: false, debug: false });
+    const none = run(launcher, []);
+    assert.equal(none.status, 127);
+    assert.match(none.stderr, /ais-cli 실행 파일을 못 찾았다/);
+    const custom = join(root, 'custom');
+    writeFileSync(custom, fakeBinary('custom'));
+    chmodSync(custom, 0o755);
+    assert.deepEqual(run(launcher, ['a'], { AISURADA_CLI_BIN: custom }).lines, ['WHO:custom', 'ARG:a']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

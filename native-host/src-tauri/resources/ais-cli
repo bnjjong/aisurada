@@ -1,7 +1,7 @@
 #!/bin/sh
-# aisurada.app 안의 ais-cli. 같은 앱에 든 Java로 같은 앱의 ais-cli.jar를 돌린다.
-# 그래서 Java를 따로 깔지 않아도 되고, 어디서 심볼릭 링크로 불러도 앱 안의 진짜 자리를 찾아 간다.
-#   ln -s /Applications/aisurada.app/Contents/Resources/bin/ais-cli ~/.local/bin/ais-cli
+# 개발용 번들(`target/…/bundle`)의 ais-cli. 정식 번들(`pnpm release:build`)에는 이 자리에 Rust 실행 파일이 들어간다.
+# 이 스크립트는 저장소의 빌드 폴더에서 찾은 실행 파일(engine-rs/target/{release,debug}/ais-cli)로 그대로 넘긴다.
+#   먼저 (cd engine-rs && cargo build -p ais-cli)로 지어 둔다. AISURADA_CLI_BIN으로 다른 실행 파일을 줄 수도 있다.
 #
 # PATH가 비어 있어도(Finder나 launchd가 띄운 환경) 돌아야 하므로 셸 내장 기능만 쓴다.
 # 외부 명령은 절대 경로로 부르는 readlink 하나뿐이다.
@@ -22,31 +22,28 @@ case $self in
   */*) dir=${self%/*} ;;
   *) dir=. ;;
 esac
-resources=$(cd "$dir/.." && pwd -P)
+here=$(cd "$dir" && pwd -P)
 
-if [ -x "$resources/runtime/bin/java" ]; then
-  java=$resources/runtime/bin/java
-else
-  # 개발용 빌드에는 Java가 들어 있지 않다. 호스트(sidecar.rs)와 같은 차례로 시스템 Java를 쓴다.
-  java=$(command -v java 2>/dev/null || echo /usr/bin/java)
+bin=${AISURADA_CLI_BIN:-}
+if [ -z "$bin" ]; then
+  # 위로 올라가며 engine-rs/Cargo.toml이 있는 저장소 뿌리를 찾는다
+  d=$here
+  while [ -n "$d" ] && [ "$d" != "/" ]; do
+    if [ -f "$d/engine-rs/Cargo.toml" ]; then
+      for profile in release debug; do
+        if [ -x "$d/engine-rs/target/$profile/ais-cli" ]; then
+          bin=$d/engine-rs/target/$profile/ais-cli
+          break
+        fi
+      done
+      break
+    fi
+    d=${d%/*}
+  done
 fi
 
-# 엔진을 띄울 때 쓸 jar는 앱에 든 것으로 한다. 단 개발용 빌드(target/…/bundle)의 사본은 낡을 수 있어
-# 넘기지 않는다. 대신 이미 있는 엔진 등록(launchd plist)을 설치본 jar로 덮어쓰지 않게 스위치를 켠다.
-# 호스트가 jar를 넘기는 규칙과 같다.
-case $resources in
-  */target/debug/bundle/*|*/target/release/bundle/*)
-    if [ -z "${AISURADA_SIDECAR_JAR:-}" ]; then
-      AISURADA_SIDECAR_KEEP_REGISTRATION=1
-      export AISURADA_SIDECAR_KEEP_REGISTRATION
-    fi
-    ;;
-  *)
-    if [ -z "${AISURADA_SIDECAR_JAR:-}" ] && [ -f "$resources/ais-sidecar.jar" ]; then
-      AISURADA_SIDECAR_JAR=$resources/ais-sidecar.jar
-      export AISURADA_SIDECAR_JAR
-    fi
-    ;;
-esac
-
-exec "$java" -jar "$resources/ais-cli.jar" "$@"
+if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+  echo "ais-cli 실행 파일을 못 찾았다. (cd engine-rs && cargo build -p ais-cli) 로 짓거나 AISURADA_CLI_BIN에 자리를 준다." >&2
+  exit 127
+fi
+exec "$bin" "$@"

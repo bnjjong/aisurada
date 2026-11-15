@@ -7,3 +7,9 @@ version = "0.0.1"
 edition = "2024"
 license = "MIT"
 publish = false
+
+# 앱에 동봉하는 `ais-cli`를 작게 만든다(공개 배포용 release 빌드).
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1

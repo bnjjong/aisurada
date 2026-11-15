@@ -11,7 +11,7 @@ pnpm tauri dev
 
 Node.js 22.12 이상과 pnpm 10.33.4를 사용한다. `pnpm dev`는 Vite 서버만, `pnpm tauri dev`는 실제 앱까지 띄운다. `pnpm build`는 타입 검사 후 4부를 켠 화면을 `dist/`에 만들고 빌드 계약을 검사한다. 4부를 뺀 화면은 `pnpm build:noclaude`(`vite build --mode noclaude`)다. `pnpm preview`는 호스트 없이 화면을 보며 번들 CSP를 적용한다. 개발 서버 포트는 1420이며 충돌 시 실패한다.
 
-macOS 앱은 `pnpm tauri build --debug --bundles app`으로 만든다. 산출물은 `src-tauri/target/debug/bundle/macos/aisurada.app`이다. 최적화 빌드는 `--debug`를 뺀다. 번들 빌드는 화면과 저장소의 Java jar도 새로 짓는다. 앱 설치나 launchd 등록은 하지 않는다.
+macOS 앱은 `pnpm tauri build --debug --bundles app`으로 만든다. 산출물은 `src-tauri/target/debug/bundle/macos/aisurada.app`이다. 최적화 빌드는 `--debug`를 뺀다. 번들 빌드는 화면을 새로 짓는다. 개발용 번들의 `bin/ais-cli`는 저장소의 `engine-rs/target/{release,debug}/ais-cli`를 찾아 넘기는 스크립트이므로 먼저 `(cd ../engine-rs && cargo build -p ais-cli)`로 지어 둔다. 앱 설치나 launchd 등록은 하지 않는다.
 
 검증은 저장소 루트에서 `bash test-native.sh`로 실행한다. Rust/Cargo, Node, pnpm, JDK 21, Xcode 도구가 필요하다. `Cargo.lock`과 `pnpm-lock.yaml`의 Tauri 2.11.2 호환 조합을 사용한다. 실제 macOS webview 점검은 다음과 같다.
 
@@ -79,8 +79,8 @@ pnpm --dir native-host install --frozen-lockfile
 pnpm --dir native-host release:build
 ```
 
-`release:build`는 고정된 Temurin JRE 아카이브의 SHA-256을 확인하고, Java·JAR·라이선스·사용자 가이드를 포함한 ad-hoc 서명 앱과 DMG를 만듭니다. 번들 검증 및 별도 프로세스의 노트 저장·재시작 검사를 통과하면 `native-host/.release/artifacts/`에 업로드 파일과 체크섬을 준비합니다. Java 런타임·원본 소스 아카이브는 `.release/cache/`에 캐시하며 Git에 넣지 않습니다. 기본 개발 번들 설정은 그대로 사용하고, 시험 배포는 `src-tauri/tauri.release.conf.json`을 덧씌웁니다.
+`release:build`는 Rust `ais-cli`를 release로 짓고(`scripts/prepare-cli.mjs`), 그 실행 파일·라이선스·사용자 가이드를 포함한 ad-hoc 서명 앱과 DMG를 만듭니다. Java 실행 환경과 jar는 동봉하지 않습니다. 번들 검증(`verify-release.mjs`: 실행 파일이 노트를 만들고 읽는지, MCP 서버가 표준 입출력으로 답하는지, Java가 없는지)과 별도 프로세스의 노트 저장·재시작 검사를 통과하면 `native-host/.release/artifacts/`에 업로드 파일과 체크섬을 준비합니다. 기본 개발 번들 설정은 그대로 사용하고, 시험 배포는 `src-tauri/tauri.release.conf.json`을 덧씌웁니다.
 
-이 시험판의 macOS 최소 설정은 13.0이며, Java는 포함하지만 Git·Claude CLI는 포함하지 않습니다. Apple 공증은 하지 않습니다. 공개 빌드는 개인 `secret-names.txt`를 포함하지 않는 견본 분류표를 사용합니다. [설치 안내와 제한 사항](../docs/releases/0.0.1.md)을 참고하세요.
+이 시험판의 macOS 최소 설정은 13.0이며, Git·Claude CLI는 포함하지 않습니다(Java도 필요 없습니다). Apple 공증은 하지 않습니다. 공개 빌드는 개인 `secret-names.txt`를 포함하지 않는 견본 분류표를 사용합니다. [설치 안내와 제한 사항](../docs/releases/0.0.1.md)을 참고하세요.
 
 GitHub Actions의 **Build trial release → Run workflow**에서 기존 버전 태그를 지정하면, 기존 검사와 동일한 배포 빌드를 실행하고 GitHub Pre-release 초안을 만듭니다. 설치 확인 후 공개합니다. 이미 공개된 릴리스는 덮어쓰지 않습니다. 새 버전에서는 앱 버전 3곳과 Cargo.lock, 릴리스 본문 `docs/releases/<버전>.md`를 함께 갱신합니다.

@@ -16,6 +16,8 @@ const status = (over) => ({ claudeFound: true, registered: false, write: false, 
 test('상태 글을 읽는다', () => {
   assert.deepEqual(parseConnectStatus('{"claudeFound":true,"registered":true,"write":true,"detail":"x"}'),
     { claudeFound: true, registered: true, write: true, detail: 'x' });
+  assert.deepEqual(parseConnectStatus('{"claudeFound":true,"registered":true,"write":false,"detail":"j","stale":true}'),
+    { claudeFound: true, registered: true, write: false, detail: 'j', stale: true }, '낡은 등록은 stale로 알린다');
   assert.deepEqual(parseConnectStatus('{"claudeFound":false,"registered":false}'),
     { claudeFound: false, registered: false, write: false, detail: '' }, 'write와 detail이 없어도 기본값을 채운다');
   for (const bad of ['', 'not json', '[]', '{}', '{"claudeFound":"yes","registered":false}', 'null']) {

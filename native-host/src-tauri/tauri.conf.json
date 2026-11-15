@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build && pnpm backend:jars",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -56,8 +56,6 @@
       }
     ],
     "resources": {
-      "../../dist/ais-cli.jar": "ais-cli.jar",
-      "../../dist/ais-sidecar.jar": "ais-sidecar.jar",
       "resources/ais-cli": "bin/ais-cli"
     },
     "icon": [

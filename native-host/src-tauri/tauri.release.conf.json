@@ -3,8 +3,8 @@
   "bundle": {
     "targets": ["app", "dmg"],
     "resources": {
-      "../.release/runtime/": "runtime/",
-      "../runtime-lock.json": "runtime-source.json",
+      "resources/ais-cli": null,
+      "../.release/bin/ais-cli": "bin/ais-cli",
       "../../LICENSE": "LICENSE.txt",
       "../../docs/user-guide.html": "user-guide.html"
     },

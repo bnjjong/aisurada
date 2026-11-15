@@ -15,10 +15,10 @@ if (tag && tag !== `v${pkg.version}`) throw Error(`Tag ${tag} does not match app
 // Never expose a developer-specific name classification table in a public binary.
 const env = { ...process.env, AISURADA_RELEASE_BUILD: '1' };
 // Drop only generated release resources, including read-only files from older JRE copies.
-for (const path of ['src-tauri/target/release/runtime', 'src-tauri/target/release/bundle', '.release/artifacts']) {
+for (const path of ['src-tauri/target/release/runtime', 'src-tauri/target/release/bundle', '.release/artifacts', '.release/bin', '.release/runtime']) {
   rmSync(join(host, path), { recursive: true, force: true });
 }
-execFileSync(process.execPath, [join(host, 'scripts/prepare-runtime.mjs')], { cwd: host, env, stdio: 'inherit' });
+execFileSync(process.execPath, [join(host, 'scripts/prepare-cli.mjs')], { cwd: host, env, stdio: 'inherit' });
 execFileSync('pnpm', ['tauri', 'build', '--config', 'src-tauri/tauri.release.conf.json', '--bundles', 'app,dmg'], {
   cwd: host, env, stdio: 'inherit',
 });

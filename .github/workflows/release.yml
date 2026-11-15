@@ -50,7 +50,7 @@ jobs:
         run: |
           bash test.sh
           bash test-native.sh
-      - name: Build and verify Java-inclusive trial DMG
+      - name: Build and verify trial DMG
         run: pnpm --dir native-host release:build
       - name: Prepare GitHub pre-release draft
         env:
@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           version="${AISURADA_RELEASE_TAG#v}"
-          assets=(native-host/.release/artifacts/*.dmg native-host/.release/artifacts/SHA256SUMS native-host/.release/artifacts/validation.json native-host/.release/artifacts/user-guide.html native-host/.release/artifacts/OpenJDK*-sources_*.tar.gz)
+          assets=(native-host/.release/artifacts/*.dmg native-host/.release/artifacts/SHA256SUMS native-host/.release/artifacts/validation.json native-host/.release/artifacts/user-guide.html)
           if gh release view "$AISURADA_RELEASE_TAG" >/dev/null 2>&1; then
             test "$(gh release view "$AISURADA_RELEASE_TAG" --json isDraft --jq .isDraft)" = true
             gh release upload "$AISURADA_RELEASE_TAG" "${assets[@]}" --clobber
