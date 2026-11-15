@@ -500,7 +500,7 @@ HTML 노트와 템플릿은 `---` 대신 `<!--aisurada` … `-->` 머리를 쓴�
 - `update_doc`, 메타 쓰기 3개, `update_sub_note`는 직전에 읽은 토큰 `f1`이 지금 파일 바이트와 맞아야 쓴다. 안 왔거나 어긋나면 `AIS-412`, 종료 코드 5.
 - 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍는다.
 - 쓰기 명령은 일하기 전에 vault를 훑고, 노트로 못 읽는 파일이 있으면 아무것도 안 쓰고 종료 코드 1로 선다.
-- 자동 커밋은 쓸 때마다 대기 기록(`vault/.git/aisurada-pending.json`)을 남기고, 유휴 시간이 지나거나 작성자·도구 세션이 바뀌면 커밋한다. `.git`이 있는 `main` 브랜치에서만 돈다. 유휴 타이머는 앱과 MCP 서버만 돌리고(`ais_core::write::autocommit::watch`), 단발 `ais-cli`는 기록만 남기고 끝난다. 남은 기록은 다음에 도는 앱이나 MCP 서버가 이어받는다.
+- 자동 커밋은 쓸 때마다 대기 기록(`vault/.git/aisurada-pending.json`)을 남기고, 마지막 쓰기 뒤 유휴 시간이 지나거나, 계속 써서 유휴가 오지 않아도 처음 쓴 지 15분이 지나거나(`OVERDUE_MILLIS`), 작성자·도구 세션이 바뀌면 커밋한다. `.git`이 있는 `main` 브랜치에서만 돈다. 유휴 타이머는 앱과 MCP 서버만 돌리고(`ais_core::write::autocommit::watch`), 단발 `ais-cli`는 기록만 남기고 끝난다. 남은 기록은 다음에 도는 앱이나 MCP 서버가 이어받는다.
 
 ### 명령을 새로 넣는 길
 
