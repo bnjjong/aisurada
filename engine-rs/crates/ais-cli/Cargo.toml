@@ -1,0 +1,19 @@
+[package]
+name = "ais-cli"
+description = "aisurada 명령줄 클라이언트. Java ais-cli와 같은 명령줄·종료 코드·출력으로 Rust 엔진을 부른다"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "ais_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ais-cli"
+path = "src/main.rs"
+
+[dependencies]
+ais-core = { path = "../ais-core" }
+serde_json = "1"
