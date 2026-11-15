@@ -207,8 +207,8 @@ impl Harness {
                 clip(&rust.stderr)
             )
         });
-        // 안쪽 실패(종료 코드 1)는 Java가 스택 추적을 붙이므로 글을 견주지 않는다
-        if java.code != 1 {
+        // 안쪽 실패(종료 코드 1)는 Java가 스택 추적을 붙이고, 휴지통 경고는 Java 로거가 시각을 붙여 찍으므로(Rust는 이 경고를 내지 않는다) 글을 견주지 않는다
+        if java.code != 1 && !java_err.contains("aisurada.cmd.TrashCommands") {
             self.record(format!("{label} 오류 글"), java_err == rust.stderr, || {
                 format!("Java: {}\n    Rust: {}", clip(&java_err), clip(&rust.stderr))
             });
@@ -218,7 +218,10 @@ impl Harness {
             serde_json::from_str::<Value>(&rust.stdout),
         );
         match parsed {
-            (Ok(j), Ok(r)) => {
+            (Ok(mut j), Ok(mut r)) => {
+                // 걸린 시간은 돌릴 때마다 다르다
+                strip_key(&mut j, "elapsedMs");
+                strip_key(&mut r, "elapsedMs");
                 self.record(format!("{label} 응답"), j == r, || first_diff(&j, &r, "$"));
             }
             _ => {
@@ -261,6 +264,18 @@ impl Harness {
             .as_str()
             .unwrap_or("")
             .to_string()
+    }
+}
+
+/// 값 안의 모든 객체에서 키 하나를 뺀다.
+fn strip_key(value: &mut Value, key: &str) {
+    match value {
+        Value::Object(map) => {
+            map.remove(key);
+            map.values_mut().for_each(|v| strip_key(v, key));
+        }
+        Value::Array(items) => items.iter_mut().for_each(|v| strip_key(v, key)),
+        _ => {}
     }
 }
 
@@ -531,6 +546,327 @@ fn cases_reads(h: &mut Harness) {
     }
 }
 
+
+/// 쓰기 명령: 아젠다·프로젝트·템플릿·노트·후속 노트·코멘트·첨부·휴지통과 세션 표식. 명령마다 폴더 전체 바이트를 견준다.
+fn cases_writes(h: &mut Harness) {
+    // 아젠다와 프로젝트
+    let created = h.run(
+        "create-agenda",
+        &["create-agenda", "title=신규 아젠다", "hue=teal", "repo=example/new", "summary=설명 한 줄"],
+        true,
+    );
+    let agenda_id = created
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("agfx0001-0000000a")
+        .to_string();
+    h.run("create-agenda 제목 없음", &["create-agenda", "hue=teal"], true);
+    h.run("update-agenda", &["update-agenda", &agenda_id, "summary=바뀐 설명", "hue=blue"], true);
+    h.run("update-agenda 빈 repo", &["update-agenda", &agenda_id, "repo="], true);
+    h.run("update-agenda 없는 id", &["update-agenda", "zzzz", "title=x"], true);
+    let project = h.run(
+        "create-project",
+        &["create-project", "title=새 프로젝트", "hue=orange", "summary=요약"],
+        true,
+    );
+    let project_id = project
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("pjfx0001-000000a1")
+        .to_string();
+    h.run("update-project", &["update-project", &project_id, "title=고친 프로젝트"], true);
+    h.run(
+        "update-project repos",
+        &["update-project", &project_id, "repos=[{\"name\":\"web\",\"github\":\"example/web\"}]"],
+        true,
+    );
+    h.run("delete-project", &["delete-project", &project_id], true);
+    h.run("update-agenda-facts", &["update-agenda-facts", &agenda_id, "facts=지금도 참인 사실"], true);
+    h.run("get-agenda-facts 새 아젠다", &["get-agenda-facts", &agenda_id], false);
+    h.run("update-agenda-facts 지움", &["update-agenda-facts", &agenda_id, "facts="], true);
+    h.run("delete-agenda", &["delete-agenda", &agenda_id], true);
+
+    // 템플릿
+    let template = h.run(
+        "save-template",
+        &["save-template", "name=명령줄 템플릿", "type=plan", "desc=설명", "body=# 제목\n\n본문"],
+        true,
+    );
+    let template_id = template
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("cli-t")
+        .to_string();
+    h.run("save-template 필수 없음", &["save-template", "desc=이름이 없다"], true);
+    h.run("save-template 고치기", &["save-template", &format!("id={template_id}"), "desc=바뀐 설명"], true);
+    h.run("get-template", &["get-template", &template_id], false);
+    h.run("save-ritual-template", &["save-ritual-template", "cli-r", "name=리추얼", "body=# 아침"], true);
+    h.run("delete-doc-template", &["delete-doc-template", &template_id], true);
+
+    // 노트
+    let doc = h.run(
+        "create-doc",
+        &[
+            "create-doc", "agenda=demo", "type=plan", "title=명령줄 노트", "body=# 본문\n\n내용",
+            "date=2026-11-15", "time=10:00", "format=markdown", "tags=[\"a\",\"b\"]",
+        ],
+        true,
+    );
+    let id = doc
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("")
+        .to_string();
+    h.run("create-doc 필수 없음", &["create-doc", "agenda=demo"], true);
+    h.run("create-doc 없는 아젠다", &["create-doc", "agenda=zzz", "type=plan", "title=x", "body=y"], true);
+    if !id.is_empty() {
+        let t = format!("f1={}", h.token(&id));
+        h.run("update-doc", &["update-doc", &id, "title=고친 제목", "body=# 고침\n\n새 내용", &t], true);
+        let t = format!("f1={}", h.token(&id));
+        h.run("update-doc 태그", &["update-doc", &id, "tags=[\"x\"]", &t], true);
+        h.run("update-doc f1 없음", &["update-doc", &id, "title=확인값 없음"], true);
+        h.run("update-doc f1 틀림", &["update-doc", &id, "title=틀림", "f1=f1:zzz"], true);
+        let t = format!("f1={}", h.token(&id));
+        h.run("set-favorite", &["set-favorite", &id, "favorite=true", "category=중요", &t], true);
+        let t = format!("f1={}", h.token(&id));
+        h.run("evaluate-doc", &["evaluate-doc", &id, "score=4", "note=좋음", &t], true);
+        let t = format!("f1={}", h.token(&id));
+        h.run("evaluate-doc 점수 잘못", &["evaluate-doc", &id, "score=abc", &t], true);
+        let other = h.peek(&["list-docs", "limit=0"]);
+        let other = strings(&other, "id")
+            .into_iter()
+            .find(|candidate| *candidate != id)
+            .unwrap_or_default();
+        let t = format!("f1={}", h.token(&id));
+        h.run("link-docs", &["link-docs", &id, &other, "kind=indirect", &t], true);
+        let t = format!("f1={}", h.token(&id));
+        h.run("link-docs 해제", &["link-docs", &id, &other, "remove=true", &t], true);
+
+        // 후속 노트와 코멘트, 첨부
+        let sub = h.run(
+            "create-sub-note",
+            &["create-sub-note", &id, "title=후속", "body=# 후속\n\n내용", "type=free"],
+            true,
+        );
+        let sub_id = sub
+            .as_ref()
+            .and_then(|v| v["id"].as_str())
+            .unwrap_or("")
+            .to_string();
+        if !sub_id.is_empty() {
+            let sub_token = h.peek(&["get-sub-note", &id, &sub_id])["precondition"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
+            let t = format!("f1={sub_token}");
+            h.run("update-sub-note", &["update-sub-note", &id, &sub_id, "title=고친 후속", &t], true);
+            h.run("get-sub-note 새 후속", &["get-sub-note", &id, &sub_id], false);
+            h.run("list-sub-notes 새 후속", &["list-sub-notes", &id], false);
+            h.run(
+                "create-comment 후속",
+                &["create-comment", &id, &sub_id, "comment_id=cmcli-0000000a", "body=후속 코멘트"],
+                true,
+            );
+            h.run("delete-sub-note", &["delete-sub-note", &id, &sub_id], true);
+        }
+        h.run(
+            "create-comment",
+            &["create-comment", &id, "comment_id=cmcli-00000001", "body=첫 코멘트", "anchor_quote=본문"],
+            true,
+        );
+        h.run(
+            "update-comment",
+            &["update-comment", &id, "comment_id=cmcli-00000001", "body=고친 코멘트"],
+            true,
+        );
+        h.run("list-comments 새 코멘트", &["list-comments", &id], false);
+        h.run("delete-comment", &["delete-comment", &id, "comment_id=cmcli-00000001"], true);
+        h.run(
+            "write-attachment",
+            &["write-attachment", &id, "name=memo.md", "content=첨부 내용"],
+            true,
+        );
+        h.run("list-attachments 새 첨부", &["list-attachments", &id], false);
+        h.run("get-doc 새 노트", &["get-doc", &id], false);
+
+        // 휴지통
+        h.run("delete-doc", &["delete-doc", &id], true);
+        let trash = h.peek(&["list-trash"]);
+        let trash_ids = strings(&trash, "trashId");
+        if let Some(first) = trash_ids.first() {
+            h.run("restore-doc", &["restore-doc", first], true);
+        }
+        h.run("list-trash 뒤", &["list-trash"], false);
+        h.run("purge-doc 없는 항목", &["purge-doc", "trzzzz-0000"], true);
+    }
+    h.run("empty-trash", &["empty-trash"], true);
+
+    // 날짜별 도구와 색인
+    h.run("plan-day dryRun", &["plan-day", "date=2026-11-15", "dryRun=true"], true);
+    h.run("plan-day 저장", &["plan-day", "date=2026-11-15", "agenda=demo"], true);
+    h.run("check-notes", &["check-notes", "date=2026-11-15"], true);
+    h.run("facts-brief", &["facts-brief", "from=2026-01-01", "to=2026-12-31", "min-new-file=1"], true);
+    h.run("export-markdown", &["export-markdown"], true);
+    h.run("verify-shard", &["verify-shard"], false);
+    h.run("shard-notes 미리보기", &["shard-notes"], true);
+    h.run("reindex", &["reindex"], true);
+}
+
+/// 태스크·자원·승인·문답·대화·세션: 명령줄 인자(자리 인자 이름, 글 그대로 넘기는 옵션, JSON 글)가 엔진까지 제대로 닿는지
+fn cases_families(h: &mut Harness) {
+    // 태스크
+    let task = h.run(
+        "create-task",
+        &[
+            "create-task", "title=명령줄 태스크", "repo=example/demo", "criteria=[\"첫 기준\",{\"text\":\"둘째 기준\"}]",
+            "type=feature", "priority=high", "base=main", "body=설명", "labels=[\"cli\"]",
+        ],
+        true,
+    );
+    let key = task
+        .as_ref()
+        .and_then(|v| v["key"].as_str().or(v["id"].as_str()))
+        .unwrap_or("TSK-1")
+        .to_string();
+    h.run("create-task 기준 없음", &["create-task", "title=x", "repo=example/demo"], true);
+    let second = h.run(
+        "create-task 둘째",
+        &["create-task", "title=둘째 태스크", "repo=example/demo", "criteria=[\"기준\"]"],
+        true,
+    );
+    let second_key = second
+        .as_ref()
+        .and_then(|v| v["key"].as_str().or(v["id"].as_str()))
+        .unwrap_or("TSK-2")
+        .to_string();
+    h.run("get-task", &["get-task", &key], false);
+    h.run("get-task activity", &["get-task", &key, "activity=1"], false);
+    h.run("list-tasks", &["list-tasks"], false);
+    h.run("list-tasks 조건", &["list-tasks", "status=draft", "type=feature", "repo=example/demo", "bodies=true"], false);
+    h.run("list-tasks 휴지통", &["list-tasks", "trash=true"], false);
+    let token = h.peek(&["get-task", &key])["precondition"].as_str().unwrap_or("").to_string();
+    h.run("update-task", &["update-task", &key, "title=고친 태스크", &format!("f1={token}")], true);
+    h.run("transition-task", &["transition-task", &key, "to=ready-for-develop", "actor=human"], true);
+    h.run("transition-task 어긋남", &["transition-task", &key, "to=done", "from=draft"], true);
+    h.run("link-tasks", &["link-tasks", &key, &second_key, "type=blocks"], true);
+    h.run("add-task-comment", &["add-task-comment", &key, "body=댓글", "actor=human"], true);
+    h.run("delete-task", &["delete-task", &second_key], true);
+    h.run("restore-task", &["restore-task", &second_key], true);
+
+    // 자원과 승인
+    let skill = h.run(
+        "save-resource",
+        &["save-resource", "kind=skill", "scope=global", "name=명령줄 스킬", "description=설명", "body=# 지침"],
+        true,
+    );
+    let rid = skill
+        .as_ref()
+        .and_then(|v| v["id"].as_str())
+        .unwrap_or("")
+        .to_string();
+    h.run("list-resources", &["list-resources"], false);
+    h.run("list-resources 본문", &["list-resources", "bodies=true", "kind=skill", "scope=global"], false);
+    if !rid.is_empty() {
+        h.run("get-resource", &["get-resource", &rid], false);
+        let token = h.peek(&["get-resource", &rid])["precondition"].as_str().unwrap_or("").to_string();
+        h.run(
+            "save-resource 고치기",
+            &["save-resource", &format!("id={rid}"), "description=바뀐 설명", &format!("f1={token}")],
+            true,
+        );
+        h.run("list-resource-versions", &["list-resource-versions", &rid], false);
+        let project = strings(&h.peek(&["list-projects"]), "slug")
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "alpha".to_string());
+        h.run("set-resource-ref", &["set-resource-ref", &project, &rid, "with-skills=true"], true);
+        h.run("usable-resources", &["usable-resources", &project, "bodies=true"], false);
+        h.run("set-resource-ref 해제", &["set-resource-ref", &project, &rid, "remove=true"], true);
+        h.run("delete-resource", &["delete-resource", &rid], true);
+        h.run("restore-resource", &["restore-resource", &rid], true);
+    }
+    h.run("list-resource-changes", &["list-resource-changes"], false);
+    h.run("list-resource-changes 결정", &["list-resource-changes", "decided=true"], false);
+    h.run("get-resource-change 없음", &["get-resource-change", "rczzzz"], false);
+    h.run("approve-resource-change 없음", &["approve-resource-change", "rczzzz"], true);
+    h.run("reject-resource-change 없음", &["reject-resource-change", "rczzzz", "reason=이유"], true);
+    h.run("resolve-resource-edit 없음", &["resolve-resource-edit", "rczzzz", "action=accept"], true);
+    h.run("get-resource-policy", &["get-resource-policy"], false);
+    h.run("set-resource-policy", &["set-resource-policy", "global=approve", "project=auto"], true);
+    h.run("set-resource-policy 값 잘못", &["set-resource-policy", "global=manual"], true);
+    h.run("set-resource-policy 칸 없음", &["set-resource-policy"], true);
+
+    // 문답과 대화
+    let rows = h.peek(&["list-docs", "limit=0"]);
+    let note = strings(&rows, "id").into_iter().next().unwrap_or_default();
+    h.run("get-ask", &["get-ask", &note], false);
+    h.run(
+        "append-ask-turn",
+        &[
+            "append-ask-turn", &note, "session-id=11111111-1111-1111-1111-111111111111", "turn-id=t1", "mark-id=m1",
+            "asked-at=2026-11-15T09:00:00+09:00", "quote=본문", "question=무엇인가", "answer=이것이다", "model=sonnet",
+            "effort=low", "elapsed-ms=1200", "session-lines=3",
+        ],
+        true,
+    );
+    h.run("get-ask 뒤", &["get-ask", &note], false);
+    h.run("list-chats", &["list-chats", &note], false);
+    h.run(
+        "append-chat-turn",
+        &[
+            "append-chat-turn", &note, "chat-id=cc1", "source-session=22222222-2222-2222-2222-222222222222", "turn-id=t1",
+            "asked-at=2026-11-15T09:10:00+09:00", "question=대화 질문", "answer=대화 답", "model=sonnet", "effort=low",
+            "elapsed-ms=800",
+        ],
+        true,
+    );
+    h.run("list-chats 뒤", &["list-chats", &note], false);
+
+    // 세션 읽기(합성 세션 홈이 비어 있어 오류 글과 빈 결과를 견준다)
+    h.run("read-session 없음", &["read-session", "33333333-3333-3333-3333-333333333333"], false);
+    h.run(
+        "read-session 옵션",
+        &["read-session", "33333333-3333-3333-3333-333333333333", "limit=5", "before=2", "urls=true"],
+        false,
+    );
+    h.run("read-session 모양 잘못", &["read-session", "x"], false);
+    h.run(
+        "session-titles",
+        &["session-titles", "33333333-3333-3333-3333-333333333333", "44444444-4444-4444-4444-444444444444"],
+        false,
+    );
+    h.run("session-titles 모양 잘못", &["session-titles", "a", "b"], false);
+    h.run("recent-sessions", &["recent-sessions", "days=3"], false);
+    h.run("recent-sessions 잘못", &["recent-sessions", "days=x"], false);
+}
+
+/// 명령 표면은 세션 표식(환경변수)을 노트에 남기지 않는다. 세션은 도구 표면(AI)의 호출에만 뜻이 있다(Java `CreateDoc`: "도구 표면 전용").
+/// 도구 표면 쪽 시험은 도구 표면을 옮긴 뒤에 더한다. 이 사례는 마지막에 둔다(Rust 사본에만 쓰므로 두 사본이 이 뒤로는 달라진다).
+fn cases_session_env(h: &mut Harness) {
+    for (label, vars) in [
+        ("claude", vec![("CLAUDE_CODE_SESSION_ID", "sess-claude-1")]),
+        ("고정 쌍", vec![("AISURADA_SESSION_ID", "sess-pin-1"), ("AISURADA_SESSION_AGENT", "gemini")]),
+    ] {
+        h.step += 1;
+        let title = format!("title=세션 {label}");
+        let args: Vec<String> = ["create-doc", "agenda=demo", "type=plan", &title, "body=# 세션\n"]
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+        let outcome = h.rust(&args, &vars);
+        let id = serde_json::from_str::<Value>(&outcome.stdout)
+            .ok()
+            .and_then(|v| v["id"].as_str().map(str::to_string))
+            .unwrap_or_default();
+        let doc = h.peek(&["get-doc", &id]);
+        h.record(
+            format!("명령 표면은 세션을 남기지 않는다 {label}"),
+            outcome.code == 0 && doc["sessionId"].is_null() && doc["sessionAgent"].is_null(),
+            || format!("종료 {} {}", outcome.code, clip(&doc.to_string())),
+        );
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let verbose = args.iter().any(|a| a == "--verbose");
@@ -544,6 +880,9 @@ fn main() -> ExitCode {
     cases_surface(&mut h);
     cases_parse_errors(&mut h);
     cases_reads(&mut h);
+    cases_writes(&mut h);
+    cases_families(&mut h);
+    cases_session_env(&mut h);
 
     let _ = json!(null);
     let report = &h.report;
