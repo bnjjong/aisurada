@@ -66,7 +66,7 @@ ais-cli claude-mcp remove          # 연결 끊기
 쓰기를 허용하려면 `args` 끝에 `"--write"`를 더합니다. 다른 MCP 클라이언트도 같은 형태(`command`, `args`, `env`)를 받으면 붙일 수 있습니다.
 
 - 등록에는 실행 파일의 **절대 경로**가 들어갑니다. 앱을 옮기거나 지우면 연결이 끊기니 그때는 다시 연결합니다.
-- Java 시절(`java -jar … ais-cli.jar mcp`)에 만든 등록은 지금은 없는 jar를 가리킵니다. `ais-cli doctor`가 낡았다고 알려 주고, `ais-cli doctor --fix`가 같은 모드로 다시 등록합니다. 정식 앱은 새 판을 처음 열 때 한 번 이것을 합니다.
+- Java 시절에 만든 등록은 지금은 없는 jar 파일을 가리킵니다. `ais-cli doctor`가 낡았다고 알려 주고, `ais-cli doctor --fix`가 같은 모드로 다시 등록합니다. 정식 앱은 새 판을 처음 열 때 한 번 이것을 합니다.
 
 ### 2-4. 어느 vault를 쓰나
 
@@ -305,11 +305,12 @@ printf '%s\n' \
 
 확인한 것(2026-11-05 기준):
 
-- `bash test.sh`(5d에서 178건 통과)의 `crates/ais-cli/tests/mcp_stdio.rs`(진짜 `mcp` 프로세스와 표준 입출력 왕복)와 `register.rs`(가짜 에이전트 CLI로 등록)가 통과합니다. Java 시절의 `McpServerTest`와 `ClaudeMcpCommandTest`는 Java와 함께 지웠습니다.
+- `bash test.sh`(5d에서 178건 통과)의 `crates/ais-cli/tests/mcp_stdio.rs`(진짜 `mcp` 프로세스와 표준 입출력 왕복)와 `register.rs`(가짜 에이전트 CLI로 등록)가 통과합니다. Java 시절의 MCP 서버 시험과 등록 시험 클래스는 Java와 함께 지웠습니다.
 - 기준 Java MCP 서버와 JSON-RPC 대화를 맞댄 `mcp_compat`이 어긋남 0으로 끝났습니다(5d, 174건).
 - 진짜 Claude Code 2.1.318을 격리 HOME에서 `add`, `--write`로 바꿔 끼우기, `✔ Connected`, `remove`까지 확인했습니다.
 - 이 문서의 도구 수(읽기 19, 쓰기 37)는 5d에서 `tools/list`를 직접 불러 세었습니다. 인자 표, §6의 응답과 오류 글, §7의 직접 시험 예시는 격리 vault에 `mcp --write` 서버를 띄워 직접 부르고 얻은 것입니다. 모델이 아니라 사람이 JSON-RPC를 손으로 보냈습니다.
-- `f1` 없이 `update_doc`을 부르면 거절되는 것은 직접 불러 확인했습니다. 나머지 네 도구(`set_favorite`, `evaluate_doc`, `link_docs`, `update_sub_note`)가 같은 검사를 받는 것은 2026-11-05에 Java 엔진 코드(`PreconditionChecker`)로 확인했고 하나씩 불러 보지는 않았습니다.
+- §3의 인자 표 37행을 `engine-rs/crates/ais-cli/src/mcp_tools.rs`의 입력 스키마와 대조했습니다(2026-11-16, 스크립트로 읽어서 견줌). 도구 이름, 필수 표시 `*`, 읽기·쓰기·`!` 표시, 인자 이름이 모두 맞았습니다. `search_docs`의 `list_docs` 거름 조건 8개는 두 도구의 스키마가 같았고, `limit`의 기본 20과 최대 200, `get_task`의 `activity` 기본 100, `list_templates`의 `category` 값(`doc`·`ritual`)도 스키마 설명과 같았습니다. 표를 고친 곳은 없습니다.
+- `f1` 없이 `update_doc`을 부르면 거절되는 것은 직접 불러 확인했습니다. 나머지 네 도구(`set_favorite`, `evaluate_doc`, `link_docs`, `update_sub_note`)가 같은 검사를 받는 것은 2026-11-16에 Rust 엔진 코드를 읽어 확인했습니다. 마크다운 노트는 `update_doc`(`commands/doc_write.rs`), `update_sub_note`(`commands/sub_note_write.rs`), 나머지 셋(`write/meta_writer.rs`)이 모두 `write/precondition.rs`의 `check`를 거치고, 토큰이 없으면 AIS-412로 거절합니다. 하나씩 불러 보지는 않았습니다.
 
 못 한 것:
 

@@ -12,7 +12,7 @@ aisurada vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진(`ais-c
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 31개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`, 24장의 템플릿 쓰기 3개, 25~30장의 회고·휴지통·내보내기·샤드·플랜 쓰기 8개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 엔진의 쓰기 목록(`WRITE_COMMANDS`)으로 50개입니다. 그 가운데 설명서가 정한 31개는 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`, 24장의 템플릿 쓰기 3개, 25~30장의 회고·휴지통·내보내기·샤드·플랜 쓰기 8개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다. 나머지 19개는 확장과 4부 쪽입니다. 태스크 쓰기 7개, 자원 쓰기 4개와 승인 쓰기 4개, 문답·대화를 잇는 `append-ask-turn`·`append-chat-turn`, `facts-brief`, `commit-vault`입니다(아래 「프로젝트 자원」, 「태스크」).
 
 `ais-cli`는 명령 1개를 처리하고 끝나는 단발 실행 파일입니다. 호출마다 vault를 새로 훑어서 답하므로 상주 프로세스가 없고, 떠 있는 동안 바뀐 파일도 다음 호출에 보입니다. 표준 입출력으로 오래 도는 것은 MCP 서버로 서는 `ais-cli mcp`뿐입니다. 데스크톱 앱은 같은 코드를 프로세스 안에서 직접 부릅니다.
 
@@ -235,7 +235,7 @@ dist/ais-cli verify-shard
 
 ## 33장 설정과 기기 위 파일
 
-엔진 설정의 우선순위와 값 규칙, vault 키와 기기 위 파일 자리를 지원합니다. 이 엔진은 영속 SQLite 색인 대신 vault를 다시 훑습니다. [33장 완료 문서](docs/rebuild-p1-chapter33-complete.md)에 구현과 검증 범위를 기록했습니다. 같은 키를 명령줄에 여러 번 주면 `=`가 있는 칸의 값만 쉼표로 잇습니다(3.1).
+설정은 환경 변수로만 받습니다([환경 변수](#환경-변수) 표). Java 엔진이 받던 명령줄 `--키=값`, JVM 옵션 `-D키=값`, 색인 폴더 `AISURADA_DB_HOME`은 Java와 함께 없어졌습니다. 이 엔진은 영속 SQLite 색인 대신 vault를 다시 훑습니다. 기기 위 파일 가운데 잠금 폴더(`AISURADA_LOCK_DIR`)와 승인 기록 폴더(`AISURADA_APPROVALS_DIR`)는 환경 변수로 자리를 바꿀 수 있습니다. [33장 완료 문서](docs/rebuild-p1-chapter33-complete.md)는 Java 시절의 구현과 검증 범위를 적은 기록이라 지금 코드와 다를 수 있습니다.
 
 ## 34장 받아들임 검사
 
@@ -250,6 +250,7 @@ node fixtures/runner-test.mjs
 ```
 
 - 실행기는 34.1의 옵션 문법, 묶음 무결성(sha256), `--out` 겹침(장치와 inode), 거르개, 판정 9가지, `report.json`, 자가 점검과 변형 8가지를 따릅니다. 어댑터 계약은 34.5이고, 이 엔진의 어댑터 `fixtures/aisurada.adapter.json`은 묶음 밖에 둡니다.
+- 이 묶음은 기준 jar(Java 엔진)로만 돌립니다. Rust `ais-cli`는 JSON 키를 정렬해서 쓰므로 키 차례까지 글자로 견주는 이 묶음과는 맞지 않는 사례가 있습니다(5d에서 잰 값: 기대값 27건 가운데 11건은 완전히 같고 16건은 키 차례만 다름). Rust 엔진을 기준으로 묶음을 다시 세우는 일은 [#66](https://github.com/bnjjong/aisurada/issues/66)에서 다룹니다.
 - 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 27건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
 
 자세한 것은 [34장 완료 노트](docs/rebuild-p1-chapter34-complete.md)에 있습니다.
@@ -417,7 +418,7 @@ Tauri 2 호스트의 1~2장 기반은 [native-host](native-host/README.md)에 �
 
 3~4장의 공통 IPC 규약과 vault 커맨드 네 개도 연결했습니다. [3장 완료 기록](docs/rebuild-p2-chapter03-complete.md)과 [4장 완료 기록](docs/rebuild-p2-chapter04-complete.md)에 실제 Tauri IPC 검증과 경계 동작을 정리했습니다.
 
-5~6장의 `sidecar_call`과 자식 프로세스 실행·환경 정리도 연결했습니다. [5장 완료 기록](docs/rebuild-p2-chapter05-complete.md)과 [6장 완료 기록](docs/rebuild-p2-chapter06-complete.md)에 실제 Java 엔진 왕복, jar 탐색과 시간 초과 검증을 기록했습니다.
+5~6장의 `sidecar_call`과 자식 프로세스 실행·환경 정리도 연결했습니다. [5장 완료 기록](docs/rebuild-p2-chapter05-complete.md)과 [6장 완료 기록](docs/rebuild-p2-chapter06-complete.md)은 구현 당시 Java 엔진을 쓰던 때의 기록(Java 엔진 왕복, jar 탐색, 시간 초과 검증)입니다. 지금 호스트는 엔진을 프로세스 안에서 직접 부르므로 jar 탐색은 없습니다([개발자 가이드](docs/developer-guide.md)의 「호출 방식」).
 
 7~8장의 그림 첨부 쓰기·기본 앱 열기·자기 쓰기 알림도 지원합니다. [7장 완료 기록](docs/rebuild-p2-chapter07-complete.md)과 [8장 완료 기록](docs/rebuild-p2-chapter08-complete.md)에 파일 경계와 실제 Tauri IPC 이벤트 검증을 기록했습니다.
 
