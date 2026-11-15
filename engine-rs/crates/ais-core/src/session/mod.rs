@@ -73,11 +73,12 @@ impl Located {
 // ---------------------------------------------------------------- 위치
 
 fn home_for(variable: &str) -> Option<PathBuf> {
-    let custom = std::env::var(variable).unwrap_or_default();
+    let env = crate::ports::env();
+    let custom = env.var(variable).unwrap_or_default();
     if !custom.trim().is_empty() {
         return Some(PathBuf::from(custom.trim()));
     }
-    let home = std::env::var("HOME").unwrap_or_default();
+    let home = env.var("HOME").unwrap_or_default();
     (!home.trim().is_empty()).then(|| PathBuf::from(home))
 }
 

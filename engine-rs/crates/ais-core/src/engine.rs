@@ -1,6 +1,8 @@
 //! 엔진의 진입점. 앱의 `engine_call`, `ais-cli`, MCP가 모두 이 한 곳으로 들어옵니다.
 
 use std::path::{Path, PathBuf};
+use crate::ports::Ports;
+use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -27,6 +29,8 @@ struct ExportMarkdownRequest {
 /// vault 하나를 맡는 엔진. 요청마다 vault를 새로 훑으므로 상태가 없다.
 pub struct Engine {
     vault_root: PathBuf,
+    /// 이 엔진이 명령을 부르는 동안 현재 스레드에 거는 약속 묶음. 없으면 기본 어댑터(환경 변수와 실제 시계)를 쓴다.
+    ports: Option<Arc<Ports>>,
 }
 
 /// 이 엔진이 처리하는 명령 이름
@@ -173,6 +177,16 @@ impl Engine {
     pub fn new(vault_root: impl AsRef<Path>) -> Self {
         Engine {
             vault_root: vault_root.as_ref().to_path_buf(),
+            ports: None,
+        }
+    }
+
+    /// 시계, 난수, 환경 변수, 잠금, git, sqlite3를 바꿔 끼운 약속 묶음으로 일하는 엔진(시험과 다른 저장소 구현을 위한 자리).
+    /// 명령을 부르는 동안만 이 묶음이 현재 스레드에 걸린다. 엔진이 새로 만든 스레드는 기본 어댑터를 쓴다.
+    pub fn with_ports(vault_root: impl AsRef<Path>, ports: Ports) -> Self {
+        Engine {
+            vault_root: vault_root.as_ref().to_path_buf(),
+            ports: Some(Arc::new(ports)),
         }
     }
 
@@ -188,6 +202,11 @@ impl Engine {
 
     /// 이름과 인자 객체로 명령을 실행하고 응답 JSON을 돌려줍니다.
     pub fn call(&self, command: &str, args: Value) -> Result<Value, EngineError> {
+        let _installed = self.ports.clone().map(crate::ports::install);
+        self.dispatch(command, args)
+    }
+
+    fn dispatch(&self, command: &str, args: Value) -> Result<Value, EngineError> {
         match command {
             "list_docs" => {
                 let request: list_docs::ListDocsRequest = parse_args(command, args)?;

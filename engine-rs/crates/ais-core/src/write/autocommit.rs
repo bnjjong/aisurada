@@ -16,9 +16,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
+use crate::ports::{CurrentLock, VaultLock};
 
 use super::confine::absolute_normalized;
-use super::lock;
 use crate::text::trim;
 use crate::vault::git::Git;
 use crate::vault::history::{header_id, read_batch};
@@ -37,16 +37,15 @@ pub struct AutoCommitConfig {
 }
 
 impl AutoCommitConfig {
-    /// 환경 변수에서 읽는다. 값이 틀리면 기본값을 쓴다.
+    /// 환경 변수에서 읽는다(`ports::EnvSource`). 값이 틀리면 기본값을 쓴다.
     pub fn from_env() -> Self {
+        let env = crate::ports::env();
         let enabled = !matches!(
-            std::env::var("AISURADA_VAULT_AUTOCOMMIT_ENABLED")
-                .as_deref()
-                .map(trim),
-            Ok("false")
+            env.var("AISURADA_VAULT_AUTOCOMMIT_ENABLED").as_deref().map(trim),
+            Some("false")
         );
-        let idle_seconds = std::env::var("AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS")
-            .ok()
+        let idle_seconds = env
+            .var("AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS")
             .and_then(|v| trim(&v).parse::<i64>().ok())
             .filter(|n| *n >= 0)
             .unwrap_or(DEFAULT_IDLE_SECONDS);
@@ -112,7 +111,7 @@ pub struct AutoCommit {
     config: AutoCommitConfig,
     clock: Clock,
     git: Git,
-    lock_dir: PathBuf,
+    lock: Arc<dyn VaultLock>,
     state: Mutex<Pending>,
 }
 
@@ -155,14 +154,14 @@ pub fn watch(vault: &Path) {
 }
 
 impl AutoCommit {
-    pub fn new(vault: &Path, config: AutoCommitConfig, clock: Clock, lock_dir: PathBuf) -> Self {
+    pub fn new(vault: &Path, config: AutoCommitConfig, clock: Clock, lock: Arc<dyn VaultLock>) -> Self {
         let vault = absolute_normalized(vault);
         AutoCommit {
             git: Git::strict(&vault),
             vault,
             config,
             clock,
-            lock_dir,
+            lock,
             state: Mutex::new(Pending::default()),
         }
     }
@@ -179,7 +178,7 @@ impl AutoCommit {
                     vault,
                     AutoCommitConfig::from_env(),
                     Arc::new(super::apparatus::now_millis),
-                    lock::default_lock_dir(),
+                    Arc::new(CurrentLock),
                 ))
             })
             .clone()
@@ -310,7 +309,7 @@ impl AutoCommit {
     }
 
     fn attempt_maintenance(&self, state: &mut Pending, reason: &str, now: i64) {
-        match lock::try_acquire(&self.vault, &self.lock_dir) {
+        match self.lock.try_acquire(&self.vault) {
             Ok(Some(_guard)) => {
                 // 잠금을 기다리는 사이 다른 프로세스가 커밋했을 수 있어서 다시 읽는다
                 self.load(state);
@@ -537,6 +536,7 @@ fn read_head(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::flock_lock::FlockLock;
     use std::process::Command;
     use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
     use std::time::{Duration, SystemTime};
@@ -603,7 +603,7 @@ mod tests {
                 idle_seconds: 300,
             },
             clock,
-            dir.join("locks"),
+            Arc::new(FlockLock::in_dir(dir.join("locks"))),
         )
     }
 
@@ -679,7 +679,7 @@ mod tests {
                 idle_seconds: 300,
             },
             real_clock(),
-            dir.join("locks"),
+            Arc::new(FlockLock::in_dir(dir.join("locks"))),
         );
         assert_eq!(
             off.commit("restore"),
@@ -809,7 +809,7 @@ mod tests {
         ac.after_write(false, None);
         now.fetch_add(301_000, Ordering::SeqCst);
 
-        let held = lock::acquire(&vault, &dir.join("locks")).unwrap();
+        let held = crate::adapters::flock_lock::acquire(&vault, &dir.join("locks")).unwrap();
         ac.tick();
         assert!(ac.has_pending(), "쓰기 중에는 정비 커밋을 건너뛴다");
         drop(held);
@@ -909,7 +909,7 @@ mod tests {
                 idle_seconds: 300,
             },
             real_clock(),
-            dir.join("locks"),
+            Arc::new(FlockLock::in_dir(dir.join("locks"))),
         );
         off.after_write(false, None);
         assert!(!vault.join(".git/aisurada-pending.json").exists());

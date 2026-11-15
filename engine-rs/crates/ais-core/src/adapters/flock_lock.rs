@@ -4,6 +4,8 @@
 //! 2. **프로세스 사이:** vault 밖에 둔 잠금 파일에 운영체제 파일 잠금(`flock`)을 건다. 앱(Rust)과 Java 사이드카처럼
 //!    따로 도는 프로세스가 같은 vault에 동시에 쓰지 않게 한다. Java 엔진의 쓰기 파이프라인도 같은 파일을 잡는다.
 //!
+//! `ports::VaultLock`의 기본 어댑터(`FlockLock`)다. 잠금 폴더는 환경 변수 `AISURADA_LOCK_DIR`(없으면 홈의 앱 지원 폴더)이거나 만들 때 준 폴더다.
+//!
 //! 잠금 파일은 vault 내용이 아니므로 vault 밖(사용자 홈의 앱 지원 폴더)에 두고, 이름은 vault 실제 경로의 SHA-256이다.
 //! macOS에서는 Java `FileChannel.lock`(fcntl)과 `flock`이 서로를 막는 것을 확인했다.
 
@@ -14,8 +16,9 @@ use std::sync::{Arc, Condvar, LazyLock, Mutex};
 
 use sha2::{Digest, Sha256};
 
-use super::confine::absolute_normalized;
 use crate::error::EngineError;
+use crate::kernel::confine::absolute_normalized;
+use crate::ports::{LockHandle, VaultLock};
 
 /// 잠금 폴더를 바꾸는 환경 변수(시험용)
 pub const LOCK_DIR_ENV: &str = "AISURADA_LOCK_DIR";
@@ -165,6 +168,35 @@ fn lock_file(file: File, wait: bool) -> Result<Option<File>, EngineError> {
         Err(TryLockError::Error(e)) => {
             Err(EngineError::internal(format!("쓰기 잠금을 못 잡았다: {e}")))
         }
+    }
+}
+
+/// 파일 잠금(`flock`) 어댑터. 잠금 폴더를 만들 때 정하지 않으면 잡을 때마다 [`default_lock_dir`]을 읽는다.
+#[derive(Default)]
+pub struct FlockLock {
+    dir: Option<PathBuf>,
+}
+
+impl FlockLock {
+    /// 잠금 폴더를 못 박는다(시험과 자동 커밋 정비가 쓴다).
+    pub fn in_dir(dir: impl Into<PathBuf>) -> Self {
+        FlockLock {
+            dir: Some(dir.into()),
+        }
+    }
+
+    fn dir(&self) -> PathBuf {
+        self.dir.clone().unwrap_or_else(default_lock_dir)
+    }
+}
+
+impl VaultLock for FlockLock {
+    fn acquire(&self, vault: &Path) -> Result<LockHandle, EngineError> {
+        acquire(vault, &self.dir()).map(LockHandle::new)
+    }
+
+    fn try_acquire(&self, vault: &Path) -> Result<Option<LockHandle>, EngineError> {
+        Ok(try_acquire(vault, &self.dir())?.map(LockHandle::new))
     }
 }
 

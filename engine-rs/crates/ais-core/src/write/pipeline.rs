@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::autocommit::{AutoCommit, ensure_ticker};
-use super::lock::{self, WriteGuard};
+use crate::ports::LockHandle;
 use super::marker::check_workspace_marker;
 use crate::kernel::actor::Caller;
 use crate::error::EngineError;
@@ -29,7 +29,7 @@ pub struct WriteScope {
     tool: bool,
     session: Option<String>,
     // 맨 마지막에 놓이도록 마지막 필드로 둔다(쓴 쪽 기록이 먼저, 잠금이 나중에 풀린다)
-    _guard: WriteGuard,
+    _guard: LockHandle,
 }
 
 impl WriteScope {
@@ -39,7 +39,7 @@ impl WriteScope {
         command: &str,
         context: &WriteContext,
     ) -> Result<WriteScope, EngineError> {
-        let guard = lock::acquire(vault, &lock::default_lock_dir())?;
+        let guard = crate::ports::lock().acquire(vault)?;
         if command != "init_workspace" {
             check_workspace_marker(vault)?;
         }

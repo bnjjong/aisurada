@@ -270,10 +270,11 @@ fn sha256_hex(text: &str) -> String {
 
 /// 기록 폴더들을 두는 바탕 폴더. 환경 변수 `AISURADA_APPROVALS_DIR`가 있으면 그것, 없으면 `~/Library/Application Support/aisurada/approvals`다.
 pub fn base_dir() -> Result<PathBuf, EngineError> {
-    match std::env::var("AISURADA_APPROVALS_DIR") {
-        Ok(over) if !over.trim().is_empty() => Ok(PathBuf::from(over)),
+    let env = crate::ports::env();
+    match env.var("AISURADA_APPROVALS_DIR") {
+        Some(over) if !over.trim().is_empty() => Ok(PathBuf::from(over)),
         _ => {
-            let home = std::env::var("HOME").unwrap_or_default();
+            let home = env.var("HOME").unwrap_or_default();
             if home.trim().is_empty() {
                 return Err(EngineError::internal(
                     "승인 기록 폴더를 정하지 못했다(HOME 이 없다)",

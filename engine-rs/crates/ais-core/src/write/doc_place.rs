@@ -4,6 +4,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+pub use crate::kernel::time::CivilDate;
 
 use regex::Regex;
 
@@ -21,55 +22,6 @@ static DATE_SYNTAX: LazyLock<Regex> = LazyLock::new(|| {
 });
 static TIME_SYNTAX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^([01][0-9]|2[0-3]):[0-5][0-9]$").unwrap());
-
-/// 그레고리력 날짜. 연도는 Java `LocalDate`처럼 0과 음수, 다섯 자리 이상도 쓴다.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CivilDate {
-    pub year: i64,
-    pub month: u32,
-    pub day: u32,
-}
-
-impl CivilDate {
-    /// `LocalDate.toString()`: 폴더 이름과 응답에 쓰는 ISO 글. 0년은 `0000`, 기원전 1년은 `-0001`, 9999년 뒤는 `+12345`.
-    pub fn iso(&self) -> String {
-        format!("{}-{:02}-{:02}", iso_year(self.year), self.month, self.day)
-    }
-
-    /// `yyyy-MM-dd`로 찍은 글: `created`에 쓴다. 연도는 기원 연도라 0년은 `0001`, 기원전 1년은 `0002`다.
-    pub fn era_text(&self) -> String {
-        format!("{}-{:02}-{:02}", era_year(self.year), self.month, self.day)
-    }
-
-    /// `yyyy-MM`로 찍은 글: 월별 폴더 이름
-    pub fn era_month(&self) -> String {
-        format!("{}-{:02}", era_year(self.year), self.month)
-    }
-}
-
-fn iso_year(year: i64) -> String {
-    let abs = year.abs();
-    if abs < 1000 {
-        if year < 0 {
-            format!("-{abs:04}")
-        } else {
-            format!("{abs:04}")
-        }
-    } else if year > 9999 {
-        format!("+{year}")
-    } else {
-        year.to_string()
-    }
-}
-
-fn era_year(year: i64) -> String {
-    let era = if year >= 1 { year } else { 1 - year };
-    if era > 9999 {
-        format!("+{era}")
-    } else {
-        format!("{era:04}")
-    }
-}
 
 fn is_leap(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0

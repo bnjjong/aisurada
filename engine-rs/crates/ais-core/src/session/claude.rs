@@ -834,9 +834,7 @@ pub fn recent_sessions(projects_dir: Option<&Path>, days: i32) -> Recent {
     else {
         return empty;
     };
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis() as i64);
+    let now = crate::ports::clock().now_millis();
     let cutoff = now - i64::from(days) * 86_400_000;
     let id_pattern = Regex::new(SESSION_ID).unwrap();
 

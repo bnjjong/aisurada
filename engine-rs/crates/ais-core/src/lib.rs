@@ -3,6 +3,7 @@
 //! 호스트(Tauri 앱)와 `ais-cli`가 같은 코드를 쓰도록 UI와 프로세스 경계에 기대지 않는 규칙만 둡니다.
 //! 진입점은 [`engine::Engine::call`]입니다.
 
+pub mod adapters;
 pub mod commands;
 pub mod engine;
 pub mod error;
@@ -10,6 +11,7 @@ pub mod frontmatter;
 pub mod json;
 pub mod kernel;
 pub mod model;
+pub mod ports;
 pub mod resource;
 pub mod session;
 pub mod task;

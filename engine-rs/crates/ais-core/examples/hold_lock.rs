@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use ais_core::write::lock;
+use ais_core::adapters::flock_lock as lock;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

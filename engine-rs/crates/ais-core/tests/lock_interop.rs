@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-use ais_core::write::lock;
+use ais_core::adapters::flock_lock as lock;
 
 #[test]
 fn a_java_write_waits_while_rust_holds_the_write_lock() {

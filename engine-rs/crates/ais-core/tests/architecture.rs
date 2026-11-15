@@ -323,3 +323,82 @@ fn closed_set_literals_live_only_in_the_kernel() {
         bad.join("\n  ")
     );
 }
+
+/// 주석 줄과 시험 모듈(`#[cfg(test)] mod tests`부터 파일 끝)을 뺀 코드. 시험 코드는 바깥 세상을 직접 만져도 된다.
+fn code_without_tests(text: &str) -> String {
+    let code = code(text);
+    match code.find("#[cfg(test)]\nmod tests") {
+        Some(at) => code[..at].to_string(),
+        None => code,
+    }
+}
+
+/// 시계, 환경 변수, 프로세스, 시간대는 어댑터(`adapters/`)만 직접 부른다. 나머지 코드는 포트(`ports/`)를 거친다.
+/// `ais-cli`는 그 자체가 명령줄 어댑터라 이 규칙의 대상이 아니다.
+#[test]
+fn clock_env_process_and_timezone_calls_stay_in_adapters() {
+    const OUTSIDE: &[&str] = &[
+        "SystemTime::now",
+        "env::var",
+        "Command::new",
+        "tzset",
+        "localtime_r",
+    ];
+    let src = manifest().join("src");
+    let mut files = Vec::new();
+    rust_files(&src, &mut files);
+    let mut bad = Vec::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        // 어댑터와, 파일 전체가 시험인 `tests.rs`는 건너뛴다
+        if rel.starts_with("adapters/") || rel.ends_with("/tests.rs") {
+            continue;
+        }
+        let text = code_without_tests(&fs::read_to_string(&file).unwrap());
+        for pattern in OUTSIDE {
+            let n = text.matches(pattern).count();
+            if n > 0 {
+                bad.push(format!("{rel}: {pattern} {n}번"));
+            }
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "어댑터 밖에서 시계·환경 변수·프로세스·시간대를 직접 부른다. ports::{{clock, env, vcs, sqlite, ids}}를 거친다.\n  {}",
+        bad.join("\n  ")
+    );
+}
+
+/// 어댑터는 포트를 해내는 바깥 코드라 포트와 바탕 모듈만 쓴다. 규칙을 담은 영역(vault, write, task, …)을 거꾸로 부르지 않는다.
+/// 그리고 안쪽 코드(시험 모듈 밖)가 어댑터를 직접 쓰는 곳은 기본 묶음을 엮는 `ports/mod.rs` 하나뿐이다.
+#[test]
+fn adapters_depend_on_ports_only_and_only_ports_wires_them() {
+    const ADAPTER_MAY_USE: &[&str] = &["ports", "kernel", "error", "text", "json", "adapters"];
+    let src = manifest().join("src");
+    let mut files = Vec::new();
+    rust_files(&src, &mut files);
+    let mut bad = Vec::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = code_without_tests(&fs::read_to_string(&file).unwrap());
+        let targets = crate_targets(&text);
+        if rel.starts_with("adapters/") {
+            for to in targets {
+                if !ADAPTER_MAY_USE.contains(&to.as_str()) {
+                    bad.push(format!("{rel}: 어댑터가 {to}를 쓴다"));
+                }
+            }
+        } else if rel != "ports/mod.rs" && targets.iter().any(|t| t == "adapters") {
+            bad.push(format!("{rel}: 안쪽 코드가 어댑터를 직접 쓴다"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

@@ -3,7 +3,7 @@
 //! - [`apparatus`]: 시험용 시계와 난수, id 발급
 //! - [`confine`]: 경로 조각 검사와 기준 폴더 가두기
 //! - [`atomic`]: 임시 파일에 쓰고 이름을 바꿔 한 번에 교체하는 쓰기
-//! - [`lock`]: vault별 쓰기 잠금(프로세스 안 줄 세우기와 프로세스 간 파일 잠금)
+//! - 쓰기 잠금: `ports::VaultLock`(어댑터 `adapters/flock_lock.rs`: 프로세스 안 줄 세우기와 프로세스 간 파일 잠금)
 //! - [`precondition`]: 고치기 전 확인 값(`f1`) 검사
 //! - [`marker`]: 워크스페이스 표식 검사
 //! - [`autocommit`]: git 자동 커밋
@@ -34,7 +34,6 @@ pub mod doc_place;
 pub mod first_heading;
 pub mod json_out;
 pub mod local_time;
-pub mod lock;
 pub mod marker;
 pub mod meta_writer;
 pub mod note_front;

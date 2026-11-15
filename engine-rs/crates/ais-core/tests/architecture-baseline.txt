@@ -1,5 +1,9 @@
 # 의존 방향 시험의 기준. UPDATE_ARCH_BASELINE=1 cargo test -p ais-core --test architecture 로 새로 쓴다.
 # edge <부르는 모듈> -> <불리는 모듈> <횟수> / <패턴> <크레이트>/<파일> <횟수>
+edge adapters -> error 1
+edge adapters -> kernel 3
+edge adapters -> ports 7
+edge adapters -> text 2
 edge commands -> error 34
 edge commands -> frontmatter 4
 edge commands -> json 5
@@ -13,6 +17,7 @@ edge commands -> vault 74
 edge commands -> write 97
 edge engine -> commands 1
 edge engine -> error 1
+edge engine -> ports 2
 edge engine -> vault 1
 edge engine -> write 1
 edge json -> text 1
@@ -22,15 +27,20 @@ edge kernel -> json 1
 edge kernel -> text 4
 edge model -> kernel 2
 edge model -> vault 9
+edge ports -> adapters 1
+edge ports -> error 1
+edge ports -> kernel 1
 edge resource -> error 6
 edge resource -> frontmatter 5
 edge resource -> json 4
 edge resource -> kernel 13
+edge resource -> ports 1
 edge resource -> text 5
 edge resource -> vault 1
 edge resource -> write 15
 edge session -> json 5
 edge session -> kernel 6
+edge session -> ports 3
 edge session -> text 4
 edge task -> error 3
 edge task -> frontmatter 2
@@ -42,26 +52,30 @@ edge task -> write 6
 edge vault -> error 5
 edge vault -> frontmatter 6
 edge vault -> kernel 16
+edge vault -> ports 3
 edge vault -> text 15
-edge write -> error 12
+edge write -> adapters 2
+edge write -> error 11
 edge write -> frontmatter 7
 edge write -> json 4
-edge write -> kernel 15
-edge write -> text 11
+edge write -> kernel 16
+edge write -> ports 6
+edge write -> text 10
 edge write -> vault 19
 env cli/env.rs 2
-env core/resource/approvals.rs 2
-env core/session/antigravity.rs 2
-env core/session/mod.rs 2
-env core/vault/scanner.rs 1
-env core/write/apparatus.rs 2
-env core/write/autocommit.rs 2
-env core/write/lock.rs 2
+env core/adapters/flock_lock.rs 2
+env core/adapters/process_env.rs 1
+env core/adapters/queue_ids.rs 1
+env core/adapters/sqlite_cli.rs 2
+env core/adapters/system_clock.rs 1
 fs cli/agent_cli.rs 1
 fs cli/doctor.rs 1
 fs cli/env.rs 1
 fs cli/migrate.rs 2
 fs cli/old_sidecar.rs 4
+fs core/adapters/flock_lock.rs 9
+fs core/adapters/queue_ids.rs 1
+fs core/adapters/sqlite_cli.rs 2
 fs core/commands/agenda_write.rs 2
 fs core/commands/ask_chat_commands.rs 6
 fs core/commands/doc_write.rs 1
@@ -78,7 +92,7 @@ fs core/resource/changes.rs 4
 fs core/resource/refs.rs 3
 fs core/resource/resolver.rs 1
 fs core/resource/store.rs 19
-fs core/session/antigravity.rs 4
+fs core/session/antigravity.rs 2
 fs core/session/claude.rs 18
 fs core/session/codex.rs 4
 fs core/session/gemini.rs 6
@@ -97,21 +111,19 @@ fs core/vault/project.rs 4
 fs core/vault/scanner.rs 8
 fs core/vault/template.rs 4
 fs core/vault/trash.rs 3
-fs core/write/apparatus.rs 1
 fs core/write/atomic.rs 15
 fs core/write/autocommit.rs 34
 fs core/write/comments_file.rs 1
 fs core/write/doc_place.rs 2
-fs core/write/lock.rs 9
 fs core/write/precondition.rs 2
 fs core/write/sub_note.rs 9
 process cli/agent_cli.rs 1
 process cli/old_sidecar.rs 1
-process core/session/antigravity.rs 1
-process core/vault/git.rs 1
+process core/adapters/git_cli.rs 1
+process core/adapters/sqlite_cli.rs 1
 process core/write/autocommit.rs 1
 systemtime cli/doctor.rs 1
-systemtime core/session/claude.rs 1
-systemtime core/write/apparatus.rs 2
+systemtime core/adapters/queue_ids.rs 1
+systemtime core/adapters/system_clock.rs 1
 systemtime core/write/autocommit.rs 1
-tz core/write/local_time.rs 3
+tz core/adapters/system_clock.rs 3

@@ -7,12 +7,8 @@
 //! 엔진에는 SQLite 라이브러리가 없어서 시스템의 `sqlite3`(macOS는 `/usr/bin/sqlite3`)를 읽기 전용으로 부른다. 큰 도구 결과까지
 //! 가져오지 않도록, 단계마다 필요한 앞부분만 SQL로 잘라서 받는다.
 
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::LazyLock;
-use std::sync::mpsc;
-use std::time::Duration;
 
 use regex::{Regex, RegexBuilder};
 
@@ -30,7 +26,6 @@ static CONVERSATION_ID: LazyLock<Regex> = LazyLock::new(|| {
 const META_PREFIX_BYTES: usize = 1200;
 const MCP_TAIL_BYTES: usize = 160;
 const ID_TAIL_BYTES: usize = 60;
-const SQLITE_TIMEOUT_SECONDS: u64 = 60;
 
 fn steps_sql() -> String {
     // 줄을 잇는 `\`는 다음 줄의 앞 공백을 먹으므로, 낱말 사이 공백은 앞 줄 끝에 둔다
@@ -302,78 +297,13 @@ fn percent_encode_path(path: &str) -> String {
 }
 
 fn run(uri: &str, sql: &str, columns: usize) -> Result<Vec<Vec<String>>, String> {
-    let sqlite = sqlite_binary().ok_or_else(|| {
-        "Antigravity 대화 기록은 sqlite3로 읽는데 찾지 못했다(macOS는 /usr/bin/sqlite3). AISURADA_SQLITE_BIN으로 자리를 알려 줄 수 있다.".to_string()
-    })?;
-    let mut child = Command::new(sqlite)
-        .args([
-            "-batch",
-            "-readonly",
-            "-cmd",
-            ".timeout 3000",
-            "-separator",
-            "|",
-            uri,
-            sql,
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    let mut stdout = child.stdout.take().ok_or("sqlite3 출력을 못 열었다")?;
-    let (sender, receiver) = mpsc::channel();
-    std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let _ = stdout.read_to_end(&mut bytes);
-        let _ = sender.send(bytes);
-    });
-    let bytes = match receiver.recv_timeout(Duration::from_secs(SQLITE_TIMEOUT_SECONDS)) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            let _ = child.kill();
-            return Err(format!(
-                "sqlite3가 {SQLITE_TIMEOUT_SECONDS}초 안에 끝나지 않았다"
-            ));
-        }
-    };
-    let status = child.wait().map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err(format!(
-            "sqlite3가 대화 기록을 열지 못했다(종료 코드 {})",
-            status.code().unwrap_or(-1)
-        ));
-    }
-    let text = String::from_utf8_lossy(&bytes);
+    let text = crate::ports::sqlite().query(uri, sql)?;
     Ok(super::reader_lines(&text)
         .into_iter()
         .filter(|line| !line.is_empty())
         .map(|line| line.split('|').map(str::to_string).collect::<Vec<_>>())
         .filter(|cells| cells.len() == columns)
         .collect())
-}
-
-/// 시험용 환경 변수, 기본 자리, PATH 차례로 sqlite3를 찾는다. 없으면 `None`.
-fn sqlite_binary() -> Option<PathBuf> {
-    fn executable(path: &Path) -> bool {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    }
-    let custom = std::env::var("AISURADA_SQLITE_BIN").unwrap_or_default();
-    if !custom.trim().is_empty() {
-        let path = PathBuf::from(custom.trim());
-        return executable(&path).then_some(path);
-    }
-    let system = PathBuf::from("/usr/bin/sqlite3");
-    if executable(&system) {
-        return Some(system);
-    }
-    std::env::var("PATH")
-        .ok()?
-        .split(':')
-        .filter(|d| !d.trim().is_empty())
-        .map(|d| Path::new(d).join("sqlite3"))
-        .find(|c| executable(c))
 }
 
 fn unhex(hex: &str) -> Vec<u8> {

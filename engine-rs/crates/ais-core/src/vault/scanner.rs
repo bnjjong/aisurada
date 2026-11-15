@@ -393,7 +393,7 @@ pub(crate) fn is_sharded(vault: &Path) -> bool {
 
 /// 환경 변수로 정한 배치. 비었거나 모르는 값이면 없는 것으로 본다(Java는 모르는 값에서 시작 오류를 낸다).
 fn shard_override() -> Option<bool> {
-    let raw = std::env::var("AISURADA_NOTES_SHARD_BY_MONTH").ok()?;
+    let raw = crate::ports::env().var("AISURADA_NOTES_SHARD_BY_MONTH")?;
     let text = raw.trim_matches(|c: char| c <= ' ').to_ascii_lowercase();
     match text.as_str() {
         "true" | "on" | "yes" | "1" => Some(true),
