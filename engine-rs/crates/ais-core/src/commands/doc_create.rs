@@ -56,8 +56,17 @@ pub struct CreateDocRequest {
 
 /// 새 노트 한 건을 만든다.
 pub fn create_doc(vault: &Path, request: &CreateDocRequest) -> Result<Json, EngineError> {
+    let scope = WriteScope::begin(vault, "create_doc", &request.context)?;
+    create_doc_in(vault, &scope, request)
+}
+
+/// 이미 쓰기 범위를 잡은 명령(`plan_day`)이 같은 길로 노트를 만든다.
+pub fn create_doc_in(
+    vault: &Path,
+    scope: &WriteScope,
+    request: &CreateDocRequest,
+) -> Result<Json, EngineError> {
     let context = &request.context;
-    let scope = WriteScope::begin(vault, "create_doc", context)?;
     let tool = context.caller == Caller::Ai;
 
     if let Some(format) = request.format.as_deref()
@@ -127,14 +136,14 @@ pub fn create_doc(vault: &Path, request: &CreateDocRequest) -> Result<Json, Engi
         return Err(EngineError::invalid_argument("아젠다 이름이 비었다"));
     }
 
-    let (agenda_slug, agenda_created) = lookup_or_create_agenda(vault, &scope, agenda_key)?;
+    let (agenda_slug, agenda_created) = lookup_or_create_agenda(vault, scope, agenda_key)?;
 
     // 날짜와 시각 배정
     let now = local_clock(now_millis());
     let date = given_date.unwrap_or(now.date);
     let (hour, minute) = match given_time {
         Some(time) => time,
-        None => schedule_time(&date, &scope, now.hour, now.minute),
+        None => schedule_time(&date, scope, now.hour, now.minute),
     };
     let created = format!("{}T{hour:02}:{minute:02}:00+09:00", date.era_text());
 

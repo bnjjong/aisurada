@@ -6,15 +6,23 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::commands::{
-    agenda_write, ask_chat_commands, comment_write, commit_vault, doc_create, doc_write,
-    facts_write, get_agenda_facts, get_doc, get_sub_note, get_template, history, init_workspace,
-    list_agendas, list_attachments, list_comments, list_docs, list_projects, list_sub_notes,
-    list_tags, list_templates, list_trash, note_meta_write, project_write, reindex,
-    resource_commands, search_docs, session_commands, sub_note_write, task_commands,
-    template_write, trash_write,
+    agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, doc_create,
+    doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc, get_sub_note,
+    get_template, history, init_workspace, list_agendas, list_attachments, list_comments,
+    list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
+    note_meta_write, project_write, reindex, resource_commands, search_docs, session_commands,
+    shard_notes, sub_note_write, task_commands, template_write, trash_write, write_attachment,
 };
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
+
+/// `export_markdown`은 인자 없이 호출 맥락만 받는다.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ExportMarkdownRequest {
+    #[serde(flatten)]
+    context: crate::write::pipeline::WriteContext,
+}
 
 /// vault 하나를 맡는 엔진. 요청마다 vault를 새로 훑으므로 상태가 없다.
 pub struct Engine {
@@ -97,6 +105,13 @@ pub const COMMANDS: &[&str] = &[
     "read_session",
     "session_titles",
     "recent_sessions",
+    "write_attachment",
+    "export_markdown",
+    "shard_notes",
+    "verify_shard",
+    "plan_day",
+    "check_notes",
+    "facts_brief",
 ];
 
 /// 쓰기 명령. 앱이 이 명령을 Rust로 보내는 것은 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)가 켜졌을 때뿐이다.
@@ -144,6 +159,12 @@ pub const WRITE_COMMANDS: &[&str] = &[
     "set_resource_policy",
     "append_ask_turn",
     "append_chat_turn",
+    "write_attachment",
+    "export_markdown",
+    "shard_notes",
+    "plan_day",
+    "check_notes",
+    "facts_brief",
     "commit_vault",
 ];
 
@@ -474,6 +495,40 @@ impl Engine {
                 let request: session_commands::RecentSessionsRequest = parse_args(command, args)?;
                 to_json(session_commands::recent_sessions(&request)?)
             }
+            "write_attachment" => {
+                let request: write_attachment::WriteAttachmentRequest = parse_args(command, args)?;
+                to_json(write_attachment::write_attachment(
+                    &self.vault_root,
+                    &request,
+                )?)
+            }
+            "shard_notes" => {
+                let request: shard_notes::ShardNotesRequest = parse_args(command, args)?;
+                to_json(shard_notes::shard_notes(&self.vault_root, &request)?)
+            }
+            "verify_shard" => {
+                let request: shard_notes::VerifyShardRequest = parse_args(command, args)?;
+                to_json(shard_notes::verify_shard(&self.vault_root, &request)?)
+            }
+            "plan_day" => {
+                let request: daily_notes::PlanDayRequest = parse_args(command, args)?;
+                to_json(daily_notes::plan_day(&self.vault_root, &request)?)
+            }
+            "check_notes" => {
+                let request: daily_notes::CheckNotesRequest = parse_args(command, args)?;
+                to_json(daily_notes::check_notes(&self.vault_root, &request)?)
+            }
+            "facts_brief" => {
+                let request: facts_brief::FactsBriefRequest = parse_args(command, args)?;
+                to_json(facts_brief::facts_brief(&self.vault_root, &request)?)
+            }
+            "export_markdown" => {
+                let request: ExportMarkdownRequest = parse_args(command, args)?;
+                to_json(export_markdown::export_markdown(
+                    &self.vault_root,
+                    &request.context,
+                )?)
+            }
             "get_resource_policy" => {
                 to_json(resource_commands::get_resource_policy(&self.vault_root)?)
             }
@@ -586,6 +641,7 @@ mod tests {
         "read_session",
         "session_titles",
         "recent_sessions",
+        "verify_shard",
     ];
 
     #[test]

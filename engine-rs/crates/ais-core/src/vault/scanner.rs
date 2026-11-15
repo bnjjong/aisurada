@@ -25,6 +25,16 @@ static YEAR_MONTH: LazyLock<Regex> =
 const RESERVED_NAMES: [&str; 4] = ["attach", "sub", "sub-comments", "chats"];
 const MAX_SCAN_DEPTH: usize = 8;
 
+/// 동기화 충돌 사본 이름인가
+pub(crate) fn is_conflict_name(name: &str) -> bool {
+    CONFLICT.is_match(name)
+}
+
+/// 노트 폴더 안에서 노트로 세지 않는 예약 이름인가
+pub(crate) fn is_reserved_name(name: &str) -> bool {
+    RESERVED_NAMES.contains(&name)
+}
+
 /// 본문 형식
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {

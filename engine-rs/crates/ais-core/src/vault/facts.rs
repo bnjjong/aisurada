@@ -23,6 +23,19 @@ pub struct Facts {
     pub too_large: bool,
 }
 
+/// 상한을 넘은 사실층 대신 실어 주는 안내 문구
+pub const OVER_LIMIT_MESSAGE: &str = "이 아젠다의 사실층이 상한(2000 자)을 넘어 안 싣는다. .aisurada/facts/ 아래 파일을 상한 아래로 줄이면 다시 실린다.";
+
+/// 사실층 글(상한 [`LIMIT`]). 파일이 없거나 비면 `None`이고, 상한을 넘으면 안내 문구를 돌려준다.
+pub fn read_facts(vault_root: &Path, agenda_slug: &str) -> Option<String> {
+    let result = read(vault_root, agenda_slug, LIMIT);
+    if result.too_large {
+        Some(OVER_LIMIT_MESSAGE.to_string())
+    } else {
+        result.facts
+    }
+}
+
 /// 고칠 때 보여 줄 사실층을 읽는다(상한 [`EDIT_LIMIT`]).
 pub fn read_for_edit(vault_root: &Path, agenda_slug: &str) -> Facts {
     read(vault_root, agenda_slug, EDIT_LIMIT)

@@ -978,7 +978,7 @@ pub(crate) fn parse_instant(text: &str) -> Option<i128> {
 }
 
 /// 1970-01-01부터 센 날수(그레고리력)
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub(crate) fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;

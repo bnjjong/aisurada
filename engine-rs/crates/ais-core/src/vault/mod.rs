@@ -5,6 +5,7 @@ pub mod attach_text;
 pub mod comment_copy;
 pub mod comments;
 pub mod facts;
+pub mod file_size;
 pub mod filter;
 pub mod git;
 pub mod history;

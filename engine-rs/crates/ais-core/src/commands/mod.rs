@@ -4,8 +4,11 @@ pub mod agenda_write;
 pub mod ask_chat_commands;
 pub mod comment_write;
 pub mod commit_vault;
+pub mod daily_notes;
 pub mod doc_create;
 pub mod doc_write;
+pub mod export_markdown;
+pub mod facts_brief;
 pub mod facts_write;
 pub mod get_agenda_facts;
 pub mod get_doc;
@@ -29,11 +32,13 @@ pub mod reindex;
 pub mod resource_commands;
 pub mod search_docs;
 pub mod session_commands;
+pub mod shard_notes;
 pub mod sub_note_write;
 mod subnote;
 pub mod task_commands;
 pub mod template_write;
 pub mod trash_write;
+pub mod write_attachment;
 
 use serde::Deserialize;
 

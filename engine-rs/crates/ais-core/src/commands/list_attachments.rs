@@ -97,7 +97,7 @@ fn is_valid_attachment_name(name: &str) -> bool {
 }
 
 /// 본문에 붙여 넣을 마크다운 참조: 그림은 `![이름](attach/…)`, 그 밖은 `[이름](attach/…)`
-fn make_ref(name: &str) -> String {
+pub(crate) fn make_ref(name: &str) -> String {
     let extension = name
         .rsplit_once('.')
         .map(|(_, ext)| ext.to_lowercase())
