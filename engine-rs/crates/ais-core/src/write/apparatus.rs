@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::Read;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::kernel::time::format_utc_millis;
 
 use crate::text::trim;
 
@@ -79,20 +80,6 @@ pub fn next_note_id() -> String {
 /// 후속 노트 id(`sn`)
 pub fn next_sub_note_id() -> String {
     next_id("sn")
-}
-
-/// 유닉스 밀리초를 UTC `yyyy-MM-ddTHH:mm:ss.SSSZ`로 보여 준다(워크스페이스 표식의 `createdAt`).
-pub fn format_utc_millis(millis: i64) -> String {
-    let days = millis.div_euclid(86_400_000);
-    let rest = millis.rem_euclid(86_400_000);
-    let (year, month, day) = crate::vault::note_meta::civil_from_days(days);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
-        rest / 3_600_000,
-        rest % 3_600_000 / 60_000,
-        rest % 60_000 / 1000,
-        rest % 1000
-    )
 }
 
 /// Java `Instant.toString()`: UTC `yyyy-MM-ddTHH:mm:ss`에 밀리초가 0이 아니면 `.mmm`을 붙이고 `Z`로 끝낸다.

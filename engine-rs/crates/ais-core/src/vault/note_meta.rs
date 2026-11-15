@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::sync::LazyLock;
+use crate::kernel::time::{civil_from_days, days_from_civil};
 
 use regex::Regex;
 
@@ -491,7 +492,7 @@ fn utc_instant(
     nanos: u32,
     offset_seconds: i64,
 ) -> String {
-    let local = days_from_civil(year, month, day) * 86_400
+    let local = days_from_civil(year, i64::from(month), i64::from(day)) * 86_400
         + i64::from(hour) * 3600
         + i64::from(minute) * 60
         + i64::from(second);
@@ -506,30 +507,6 @@ fn utc_instant(
         secs % 60,
         nanos / 1_000_000
     )
-}
-
-/// 1970-01-01부터 센 날수(양력 proleptic)
-fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
-    let y = if month <= 2 { year - 1 } else { year };
-    let era = y.div_euclid(400);
-    let yoe = y.rem_euclid(400);
-    let mp = (i64::from(month) + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + i64::from(day) - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
-}
-
-pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use super::{
     str_key, str_of,
 };
 use crate::json::JsonValue;
-use crate::task::format::java_blank;
+use crate::kernel::java::java_blank;
 
 type Object = [(String, JsonValue)];
 

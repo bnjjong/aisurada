@@ -8,6 +8,7 @@ pub mod engine;
 pub mod error;
 pub mod frontmatter;
 pub mod json;
+pub mod kernel;
 pub mod model;
 pub mod resource;
 pub mod session;

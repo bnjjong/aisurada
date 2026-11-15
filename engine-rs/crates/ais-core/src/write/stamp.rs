@@ -17,7 +17,7 @@ pub fn stamp_of(context: &WriteContext) -> Stamp {
     let session = context
         .session
         .as_deref()
-        .filter(|s| !crate::task::format::java_blank(s))
+        .filter(|s| !crate::kernel::java::java_blank(s))
         .map(str::to_string);
     let agent = session.as_ref().and_then(|_| {
         context

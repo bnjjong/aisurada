@@ -7,7 +7,8 @@ use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
 use super::Caller;
-use super::doc_write::{parse_tags, to_json_value};
+use super::doc_write::parse_tags;
+use crate::kernel::java::to_json_value;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
 use crate::text::{NOTE_ID, compare_utf16, encode_uri_component, is_blank, trim, utf16_len};

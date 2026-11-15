@@ -9,7 +9,7 @@ use regex::Regex;
 use serde::Deserialize;
 use serde_json::{Map, Value as Json, json};
 
-use super::ask_chat_commands::days_from_civil;
+use crate::kernel::time::days_from_civil;
 use super::doc_create::{CreateDocRequest, create_doc_in};
 use super::facts_brief::{iso_text, parse_iso_date};
 use super::option_text::text_of;
@@ -272,7 +272,7 @@ fn offset_date_time(text: &str) -> Option<Odt> {
         return None;
     }
     let local_days = days_from_civil(year, month, day);
-    if crate::vault::note_meta::civil_from_days(local_days) != (year, month as u32, day as u32) {
+    if crate::kernel::time::civil_from_days(local_days) != (year, month as u32, day as u32) {
         return None;
     }
     let nanos = c.get(7).map_or(0, |m| {

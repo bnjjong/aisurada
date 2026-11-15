@@ -13,7 +13,7 @@ use super::{
     Parsed, Turn, add_text, add_tool, arr_of, get, obj_of, read_lines, read_object, str_key, str_of,
 };
 use crate::json::{self, JsonValue};
-use crate::task::format::java_blank;
+use crate::kernel::java::java_blank;
 
 /// 대화가 시작될 때 CLI가 사용자 줄로 끼워 넣는 환경 설명. 사용자가 쓴 글이 아니다.
 const INJECTED_PREFIX: &str = "<session_context>";

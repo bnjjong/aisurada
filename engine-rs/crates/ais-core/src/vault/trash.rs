@@ -2,18 +2,14 @@
 
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
+use crate::kernel::ids::TRASH_ID;
+use crate::kernel::ids::AGENDA_ID;
 
-use regex::Regex;
 
 use super::note_meta::parse_created;
 use crate::frontmatter::{self, Value};
 use crate::text::{NOTE_ID, trim};
 
-static TRASH_ID: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^tr[0-9a-z]+-[0-9a-f]{8}$").unwrap());
-static AGENDA_ID: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^ag[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 
 const MANIFEST: &str = ".aisurada/trash/trash.json";
 const MAX_MANIFEST_BYTES: u64 = 10_000_000;

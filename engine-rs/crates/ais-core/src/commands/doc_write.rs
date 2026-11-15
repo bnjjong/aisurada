@@ -3,6 +3,7 @@
 
 use std::fs;
 use std::path::Path;
+use crate::kernel::java::to_json_value;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -99,21 +100,6 @@ pub(crate) fn parse_tags(raw: &Json) -> Result<Vec<String>, EngineError> {
         }
     }
     Ok(result)
-}
-
-/// 호출 객체의 JSON 값을 엔진의 JSON 값으로 바꾼다(숫자는 `serde_json`이 찍는 글 그대로 남는다).
-pub(crate) fn to_json_value(item: &Json) -> JsonValue {
-    match item {
-        Json::String(text) => JsonValue::Str(text.clone()),
-        Json::Array(items) => JsonValue::Array(items.iter().map(to_json_value).collect()),
-        Json::Object(entries) => JsonValue::Object(
-            entries
-                .iter()
-                .map(|(key, value)| (key.clone(), to_json_value(value)))
-                .collect(),
-        ),
-        other => JsonValue::Literal(other.to_string()),
-    }
 }
 
 fn rel_of(vault: &Path, path: &Path) -> String {

@@ -1110,7 +1110,7 @@ fn java_text(value: &JsonValue) -> String {
                 |_| {
                     text.parse::<f64>().map_or_else(
                         |_| text.to_string(),
-                        crate::commands::note_meta_write::java_double_string,
+                        crate::kernel::java::java_double_string,
                     )
                 },
                 |n| n.to_string(),

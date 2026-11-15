@@ -9,8 +9,9 @@
 //! 리팩토링으로 횟수가 **줄어도** 실패한다. 줄어든 값을 기준에 반영해 다시는 되돌아가지 못하게 하려는 것이다.
 //! 기준을 새로 쓸 때는 `UPDATE_ARCH_BASELINE=1 cargo test -p ais-core --test architecture`를 돌린다(바뀐 줄은 `git diff`로 리뷰한다).
 //!
-//! 지금 있는 「거꾸로 된 의존」 10줄기(분석 보고서 기준): `write→commands`, `write→task`, `vault→write`, `task→commands`, `resource→commands`,
-//! `resource→task`, `session→commands`, `session→task`, `session→write`, `model→commands`. 1단계(공용 커널)부터 이 줄을 하나씩 줄인다.
+//! 「거꾸로 된 의존」(안쪽 모듈이 명령 층이나 옆 컨텍스트를 쓰는 길) 10줄기를 1단계(공용 커널)에서 모두 끊었다. 이제 새로 생기면 실패한다.
+//! 끊은 줄기: `write→commands`, `write→task`, `vault→write`, `task→commands`, `resource→commands`, `resource→task`, `session→commands`,
+//! `session→task`, `session→write`, `model→commands`. 여러 영역이 같이 쓰던 코드는 `kernel`로 옮겼다.
 //!
 //! 세는 방법(규칙을 여기 못박는다): `//`로 시작하는 줄(주석, 문서 주석)은 뺀다. 문자열 안의 글자와 `#[cfg(test)]` 코드는 구별하지 않는다.
 
@@ -241,21 +242,10 @@ fn dependencies_and_outside_calls_match_the_baseline() {
 }
 
 #[test]
-fn the_reverse_dependency_edges_stay_within_the_known_ten() {
-    // 이 줄들은 지금 있는 거꾸로 된 의존이다(분석 보고서). 여기 없는 안쪽 → 명령 층 참조는 새 위반이다.
-    const KNOWN: &[(&str, &str)] = &[
-        ("write", "commands"),
-        ("write", "task"),
-        ("vault", "write"),
-        ("task", "commands"),
-        ("resource", "commands"),
-        ("resource", "task"),
-        ("session", "commands"),
-        ("session", "task"),
-        ("session", "write"),
-        ("model", "commands"),
-    ];
-    // 안쪽 모듈은 명령 층(commands)을 못 쓴다. 안쪽 모듈이 옆 컨텍스트(task, vault, write)를 쓰는 것도 지금 알려진 줄만 허용한다.
+fn inner_modules_do_not_use_the_command_layer_or_sideways_contexts() {
+    // 거꾸로 된 의존 10줄기는 1단계에서 모두 끊었다. 목록은 비었고, 여기에 줄이 늘면 새 위반을 허용하는 것이다.
+    const KNOWN: &[(&str, &str)] = &[];
+    // 안쪽 모듈은 명령 층(commands)을 못 쓴다. 안쪽 모듈이 옆 컨텍스트(task, vault, write)를 쓰는 것도 알려진 줄만 허용한다.
     let inner = ["write", "vault", "task", "resource", "session", "model"];
     let now = measure();
     let mut unknown = Vec::new();
@@ -269,8 +259,18 @@ fn the_reverse_dependency_edges_stay_within_the_known_ten() {
             unknown.push(key.to_string());
         }
     }
-    assert!(
-        unknown.is_empty(),
-        "새 거꾸로 된 의존이다: {unknown:?}"
-    );
+    assert!(unknown.is_empty(), "새 거꾸로 된 의존이다: {unknown:?}");
+}
+
+#[test]
+fn the_kernel_uses_no_context_module() {
+    // 공용 커널은 영역(vault, write, task, resource, session, commands, model, engine)을 쓰지 않는다. 쓰는 것은 바탕 모듈뿐이다.
+    const BASE: &[&str] = &["text", "json", "frontmatter", "error", "kernel"];
+    let now = measure();
+    let bad: Vec<&str> = now
+        .keys()
+        .filter_map(|k| k.strip_prefix("edge kernel -> "))
+        .filter(|to| !BASE.contains(to))
+        .collect();
+    assert!(bad.is_empty(), "커널이 영역을 쓴다: {bad:?}");
 }

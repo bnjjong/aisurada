@@ -7,9 +7,8 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
+use crate::kernel::ids::COMMENT_ID;
 
-use regex::Regex;
 
 use super::note_meta::{get, parse_created};
 use super::scanner::NoteRecord;
@@ -17,8 +16,6 @@ use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::text::is_blank;
 
-static COMMENT_ID: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^cm[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 
 /// 메인 노트를 훑은 차례대로 보며 처음 코멘트 id가 겹치는 노트의 번호와 오류를 돌려준다. 겹침이 없으면 `None`이다.
 pub fn first_failure(vault_root: &Path, notes: &[NoteRecord]) -> Option<(usize, EngineError)> {

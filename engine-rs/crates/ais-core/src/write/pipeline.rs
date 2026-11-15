@@ -7,7 +7,7 @@ use std::sync::Arc;
 use super::autocommit::{AutoCommit, ensure_ticker};
 use super::lock::{self, WriteGuard};
 use super::marker::check_workspace_marker;
-use crate::commands::Caller;
+use crate::kernel::actor::Caller;
 use crate::error::EngineError;
 use crate::vault::index::NoteIndex;
 

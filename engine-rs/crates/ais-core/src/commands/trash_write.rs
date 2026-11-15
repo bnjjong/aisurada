@@ -4,9 +4,8 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
+use crate::kernel::ids::TRASH_ID;
 
-use regex::Regex;
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
@@ -18,7 +17,8 @@ use crate::vault::note_file::read_note_file;
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, is_sharded};
 use crate::vault::trash::TrashRecord;
-use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
+use crate::kernel::time::format_utc_millis;
+use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_confinement, check_segment, normalize};
 use crate::write::doc_place::move_path;
@@ -26,8 +26,6 @@ use crate::write::pipeline::{WriteContext, WriteScope};
 use crate::write::sub_note::remove_tree;
 use crate::write::trash_file::{archive_path, entries_in_file_order, save};
 
-static TRASH_ID: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^tr[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 
 const RECOVERED_AGENDA: &str = "---\nid: ag-recovered\nslug: recovered\ntitle: 복구함\nhue: blue\n---\n복구함\n\n삭제됐다가 복구된 노트 중, 원래 아젠다가 사라진 것들이 모이는 곳이에요.";
 

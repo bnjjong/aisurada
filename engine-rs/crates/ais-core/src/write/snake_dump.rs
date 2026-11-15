@@ -364,7 +364,7 @@ fn represent(value: &Value) -> Result<(String, Tag, Style), String> {
             } else if f.is_infinite() {
                 (if *f > 0.0 { ".inf" } else { "-.inf" }).to_string()
             } else {
-                crate::commands::note_meta_write::java_double_string(*f)
+                crate::kernel::java::java_double_string(*f)
             };
             (text, Tag::Float, Style::Plain)
         }

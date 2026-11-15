@@ -3,7 +3,7 @@
 //! 고치기 전 확인 값(`f1`)을 검사하고, 머리를 새로 지은 글이 파일의 옛 머리를 그대로 옮긴 글과 같으면 편집 도장
 //! (`editedBy`, `editedAt`, …)을 건드리지 않고, 다르면 지금 시각과 쓴 쪽으로 도장을 새로 찍는다.
 
-use crate::commands::Caller;
+use crate::kernel::actor::Caller;
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
 use crate::text::{cut_utf16, trim, utf16_len};
@@ -214,7 +214,7 @@ pub fn judge(
 /// 한국 시각(+09:00)으로 분까지 적은 글 `yyyy-MM-ddTHH:mm:00+09:00`
 pub(crate) fn kst_minute(millis: i64) -> String {
     let local = millis + 9 * 3_600_000;
-    let (year, month, day) = crate::vault::note_meta::civil_from_days(local.div_euclid(86_400_000));
+    let (year, month, day) = crate::kernel::time::civil_from_days(local.div_euclid(86_400_000));
     let rest = local.rem_euclid(86_400_000);
     format!(
         "{year:04}-{month:02}-{day:02}T{:02}:{:02}:00+09:00",

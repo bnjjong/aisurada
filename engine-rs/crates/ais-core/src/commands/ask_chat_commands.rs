@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use crate::kernel::time::parse_instant;
 
 use regex::Regex;
 use serde::Deserialize;
@@ -32,10 +33,6 @@ const MAX_ATTACHMENT_NAME_LENGTH: usize = 120;
 const IMAGE_EXTENSIONS: [&str; 8] = ["svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp"];
 
 static CHAT_ID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Za-z0-9_-]{1,64}$").unwrap());
-// `Instant.parse`와 `OffsetDateTime.parse`가 받는 모양(대소문자 무시, 초와 소수는 있어도 없어도, 끝은 `Z`나 `+09:00`)
-static INSTANT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2}(?::\d{2})?)$").unwrap()
-});
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -914,77 +911,6 @@ fn compare_created_at(a: &str, b: &str) -> Ordering {
         (None, Some(_)) => Ordering::Greater,
         (None, None) => Ordering::Equal,
     }
-}
-
-/// `Instant.parse`처럼 초가 반드시 있는 시각만 읽는다(Claude 기록의 시각).
-pub(crate) fn parse_instant_strict(text: &str) -> Option<i128> {
-    INSTANT.captures(text)?.get(6)?;
-    parse_instant(text)
-}
-
-/// `Instant.parse`나 `OffsetDateTime.parse`로 읽히는 시각을 나노초로(읽히지 않으면 `None`)
-pub(crate) fn parse_instant(text: &str) -> Option<i128> {
-    if is_blank(text) {
-        return None;
-    }
-    let c = INSTANT.captures(text)?;
-    let num = |i: usize| c.get(i).and_then(|m| m.as_str().parse::<i64>().ok());
-    let (year, month, day) = (num(1)?, num(2)?, num(3)?);
-    let (hour, minute, second) = (num(4)?, num(5)?, num(6).unwrap_or(0));
-    if !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 {
-        return None;
-    }
-    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    let days_in_month = [
-        31,
-        if leap { 29 } else { 28 },
-        31,
-        30,
-        31,
-        30,
-        31,
-        31,
-        30,
-        31,
-        30,
-        31,
-    ];
-    if day < 1 || day > days_in_month[month as usize - 1] {
-        return None;
-    }
-    let nanos = c.get(7).map_or(0, |m| {
-        let digits = m.as_str();
-        digits.parse::<i64>().unwrap_or(0) * 10_i64.pow(9 - digits.len() as u32)
-    });
-    let offset = c.get(8)?.as_str();
-    let offset_seconds: i64 = if offset.eq_ignore_ascii_case("z") {
-        0
-    } else {
-        let sign = if offset.starts_with('-') { -1 } else { 1 };
-        let part = |from: usize| {
-            offset
-                .get(from..from + 2)
-                .and_then(|p| p.parse::<i64>().ok())
-        };
-        let (h, m, s) = (part(1)?, part(4)?, part(7).unwrap_or(0));
-        if m > 59 || s > 59 || h * 3600 + m * 60 + s > 18 * 3600 {
-            return None;
-        }
-        sign * (h * 3600 + m * 60 + s)
-    };
-    let seconds = days_from_civil(year, month, day) * 86_400 + hour * 3600 + minute * 60 + second
-        - offset_seconds;
-    Some(i128::from(seconds) * 1_000_000_000 + i128::from(nanos))
-}
-
-/// 1970-01-01부터 센 날수(그레고리력)
-pub(crate) fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let y = if month <= 2 { year - 1 } else { year };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let doy = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
 }
 
 #[cfg(test)]

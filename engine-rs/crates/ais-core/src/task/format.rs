@@ -4,6 +4,7 @@
 //! 본문은 파일에서 늘 끝에 줄바꿈 하나가 붙은 채 적히고, 읽을 때 그 하나를 뗀다.
 
 use std::sync::LazyLock;
+pub use crate::kernel::ids::TASK_ID as ID;
 
 use regex::Regex;
 use serde_json::Value as Json;
@@ -34,8 +35,6 @@ pub const DEFAULT_TYPE: &str = "feature";
 pub const DEFAULT_PRIORITY: &str = "medium";
 
 pub static KEY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^TSK-[1-9][0-9]{0,8}$").unwrap());
-pub static ID: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^tk[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 static REPO: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$").unwrap());
 static BRANCH: LazyLock<Regex> =
@@ -80,56 +79,9 @@ pub fn number_of(key: &str) -> u32 {
     }
 }
 
-// ---------------------------------------------------------------- Java 글 규칙
+// ---------------------------------------------------------------- Java 글 규칙(공용 커널이 정의한다)
 
-/// Java `String.trim()`: U+0020 이하를 뗀다.
-pub fn java_trim(s: &str) -> &str {
-    s.trim_matches(|c: char| c <= ' ')
-}
-
-/// Java `Character.isWhitespace`
-fn java_whitespace(c: char) -> bool {
-    matches!(c,
-        '\t' | '\n' | '\u{B}' | '\u{C}' | '\r' | '\u{1C}'..='\u{1F}' | ' '
-        | '\u{1680}' | '\u{2000}'..='\u{2006}' | '\u{2008}'..='\u{200A}' | '\u{2028}' | '\u{2029}' | '\u{205F}' | '\u{3000}')
-}
-
-/// Java `String.isBlank()`
-pub fn java_blank(s: &str) -> bool {
-    s.chars().all(java_whitespace)
-}
-
-/// Java `String.valueOf(Object)`: 값을 글로. `None`은 Java `null`이다.
-pub fn value_to_string(value: &Value) -> Option<String> {
-    match value {
-        Value::Null => None,
-        Value::Str(s) => Some(s.clone()),
-        Value::Bool(b) => Some(b.to_string()),
-        Value::Int(text) => Some(text.clone()),
-        Value::Float(f) => Some(crate::commands::note_meta_write::java_double_string(*f)),
-        Value::List(items) => {
-            let items: Vec<String> = items
-                .iter()
-                .map(|v| value_to_string(v).unwrap_or_else(|| "null".to_string()))
-                .collect();
-            Some(format!("[{}]", items.join(", ")))
-        }
-        Value::Map(entries) => {
-            let entries: Vec<String> = entries
-                .iter()
-                .map(|(k, v)| {
-                    format!(
-                        "{}={}",
-                        value_to_string(k).unwrap_or_else(|| "null".to_string()),
-                        value_to_string(v).unwrap_or_else(|| "null".to_string())
-                    )
-                })
-                .collect();
-            Some(format!("{{{}}}", entries.join(", ")))
-        }
-        Value::Other => Some("?".to_string()),
-    }
-}
+pub use crate::kernel::java::{java_blank, java_trim, value_to_string};
 
 fn get<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
     map.iter()
@@ -577,7 +529,7 @@ fn array_arg(raw: &Json, field: &str) -> Result<Vec<JsonValue>, EngineError> {
         }
         Json::Array(items) => Ok(items
             .iter()
-            .map(crate::commands::doc_write::to_json_value)
+            .map(crate::kernel::java::to_json_value)
             .collect()),
         _ => Err(bad(format!("{field} 는 JSON 배열이어야 한다"))),
     }

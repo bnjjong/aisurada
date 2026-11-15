@@ -19,7 +19,7 @@ use regex::{Regex, RegexBuilder};
 use super::protobuf::{self, Field};
 use super::{Parsed, Turn, add_text, add_tool};
 use crate::json::{self, JsonValue};
-use crate::task::format::java_blank;
+use crate::kernel::java::java_blank;
 
 /// 대화 id는 UUID다. 파일 이름으로 쓰므로 이 모양만 받는다.
 static CONVERSATION_ID: LazyLock<Regex> = LazyLock::new(|| {
@@ -204,7 +204,7 @@ fn timestamp(time: &Option<Vec<Field>>) -> Option<String> {
 
 /// Java `Instant.toString()`: 나노초가 0이 아니면 3, 6, 9자리 가운데 필요한 만큼 소수를 붙인다.
 fn instant_text(seconds: i64, nanos: u32) -> String {
-    let base = crate::write::apparatus::format_utc_millis(seconds.saturating_mul(1000));
+    let base = crate::kernel::time::format_utc_millis(seconds.saturating_mul(1000));
     let head = &base[..base.len() - 5]; // `.000Z`를 뗀다
     let fraction = if nanos == 0 {
         String::new()

@@ -3,16 +3,13 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
+use crate::kernel::ids::AGENDA_ID;
 
-use regex::Regex;
 
 use super::Skipped;
 use crate::error::EngineError;
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim, utf16_len};
 
-static AGENDA_ID: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^ag[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_FRONTMATTER_UNITS: usize = 16_000;

@@ -8,14 +8,11 @@ pub mod refs;
 pub mod resolver;
 pub mod store;
 
-use std::sync::LazyLock;
+use crate::kernel::ids::RESOURCE_ID as ID_SHAPE;
 
-use regex::Regex;
 
 use crate::frontmatter::Value;
 
-static ID_SHAPE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(sk|ap)[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 
 /// 자원 종류
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

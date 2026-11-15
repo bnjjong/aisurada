@@ -2,6 +2,7 @@
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같다.
 
 use std::path::Path;
+use crate::kernel::java::java_double_string;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -10,7 +11,8 @@ use crate::error::EngineError;
 use crate::text::{NOTE_ID, cut_utf16, is_blank, trim};
 use crate::vault::note_meta::{Evaluation, Link};
 use crate::vault::scanner::NoteRecord;
-use crate::write::apparatus::{format_utc_millis, now_millis};
+use crate::kernel::time::format_utc_millis;
+use crate::write::apparatus::now_millis;
 use crate::write::meta_writer::{MetaState, write_meta};
 use crate::write::pipeline::{WriteContext, WriteScope};
 
@@ -310,48 +312,4 @@ pub fn link_docs(vault: &Path, request: &LinkDocsRequest) -> Result<Value, Engin
         ));
     }
     Ok(response)
-}
-
-/// Java `Double.toString`의 흔한 모양: 정수값도 `101.0`처럼 소수점을 달고, 아주 크거나 작으면 `1.0E10`
-pub(crate) fn java_double_string(value: f64) -> String {
-    if value.is_nan() {
-        return "NaN".to_string();
-    }
-    if value.is_infinite() {
-        return if value > 0.0 { "Infinity" } else { "-Infinity" }.to_string();
-    }
-    let abs = value.abs();
-    if abs == 0.0 || (1e-3..1e7).contains(&abs) {
-        let text = format!("{value}");
-        return if text.contains('.') {
-            text
-        } else {
-            format!("{text}.0")
-        };
-    }
-    let scientific = format!("{value:e}");
-    let (mantissa, exponent) = scientific.split_once('e').unwrap_or((&scientific, "0"));
-    let mantissa = if mantissa.contains('.') {
-        mantissa.to_string()
-    } else {
-        format!("{mantissa}.0")
-    };
-    format!("{mantissa}E{exponent}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn prints_doubles_like_java() {
-        assert_eq!(java_double_string(101.0), "101.0");
-        assert_eq!(java_double_string(-1.0), "-1.0");
-        assert_eq!(java_double_string(100.5), "100.5");
-        assert_eq!(java_double_string(1e10), "1.0E10");
-        assert_eq!(java_double_string(1.5e-5), "1.5E-5");
-        assert_eq!(java_double_string(f64::NAN), "NaN");
-        assert_eq!(java_double_string(f64::INFINITY), "Infinity");
-        assert_eq!(java_double_string(0.0), "0.0");
-    }
 }

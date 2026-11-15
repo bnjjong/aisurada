@@ -49,7 +49,7 @@ pub fn local_clock(millis: i64) -> LocalClock {
         },
         None => {
             let (year, month, day) =
-                crate::vault::note_meta::civil_from_days(millis.div_euclid(86_400_000));
+                crate::kernel::time::civil_from_days(millis.div_euclid(86_400_000));
             let rest = millis.rem_euclid(86_400_000);
             LocalClock {
                 date: CivilDate { year, month, day },

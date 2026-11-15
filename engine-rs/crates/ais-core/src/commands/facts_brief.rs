@@ -5,12 +5,12 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Map, Value as Json, json};
 
-use super::ask_chat_commands::days_from_civil;
+use crate::kernel::time::days_from_civil;
 use super::option_text::text_of;
 use crate::error::EngineError;
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim};
 use crate::vault::facts;
-use crate::vault::note_meta::civil_from_days;
+use crate::kernel::time::civil_from_days;
 use crate::write::apparatus::now_millis;
 use crate::write::local_time::local_clock;
 use crate::write::pipeline::{WriteContext, WriteScope};

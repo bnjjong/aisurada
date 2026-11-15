@@ -13,9 +13,8 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
+use crate::kernel::ids::CHANGE_ID as ID_SHAPE;
 
-use regex::Regex;
 
 use super::format::value_to_json;
 use super::{Resource, ResourceKind};
@@ -34,8 +33,6 @@ pub const APPROVED: &str = "approved";
 pub const REJECTED: &str = "rejected";
 pub const STALE: &str = "stale";
 
-static ID_SHAPE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^pc[0-9a-z]+-[0-9a-f]{8}$").unwrap());
 
 /// 변경 하나. JSON 객체이고 칸 차례를 지킨다.
 pub type Change = JsonValue;

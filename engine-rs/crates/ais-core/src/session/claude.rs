@@ -12,7 +12,7 @@ use serde_json::{Value as Json, json};
 use super::{
     Turn, add_text_turn, extract_urls, get, obj_of, read_lines, slice, str_key, turn_json,
 };
-use crate::commands::ask_chat_commands::parse_instant_strict;
+use crate::kernel::time::parse_instant_strict;
 use crate::json::{self, JsonValue};
 use crate::text::{compare_utf16, is_blank, trim};
 

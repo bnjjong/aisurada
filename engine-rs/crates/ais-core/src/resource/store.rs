@@ -375,7 +375,7 @@ pub fn find(vault: &Path, id: &str) -> Result<Resource, EngineError> {
 
 /// 프로젝트 slug가 실제 프로젝트인지 확인한다. 아니면 `AIS-404`다.
 pub fn require_project(vault: &Path, slug: &str) -> Result<ProjectInfo, EngineError> {
-    if crate::task::format::java_blank(slug) {
+    if crate::kernel::java::java_blank(slug) {
         return Err(EngineError::invalid_argument("프로젝트 slug 가 필요하다"));
     }
     scan_projects(vault)
@@ -476,13 +476,13 @@ pub fn plan_update(
     f1: Option<&str>,
     stamp: &Stamp,
 ) -> Result<Plan, EngineError> {
-    let Some(f1) = f1.filter(|t| !crate::task::format::java_blank(t)) else {
+    let Some(f1) = f1.filter(|t| !crate::kernel::java::java_blank(t)) else {
         return Err(EngineError::precondition_failed(format!(
             "f1 이 필요하다. get-resource 로 읽은 precondition 을 f1= 으로 넘긴다: {}",
             cur.rel_path
         )));
     };
-    if Some(crate::task::format::java_trim(f1)) != cur.token.as_deref() {
+    if Some(crate::kernel::java::java_trim(f1)) != cur.token.as_deref() {
         return Err(EngineError::precondition_failed(format!(
             "읽은 뒤에 파일이 바뀌었다. 다시 읽고 고친다: {}",
             cur.rel_path

@@ -16,7 +16,7 @@ use regex::Regex;
 use serde_json::{Map, Value as Json, json};
 
 use crate::json::{self, JsonValue};
-use crate::task::format::{java_blank, java_trim};
+use crate::kernel::java::{java_blank, java_trim};
 use crate::text::{is_blank, trim, utf16_len};
 
 pub const MAX_TEXT_CHARS: usize = 2000;

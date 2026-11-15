@@ -12,7 +12,7 @@ use regex::Regex;
 
 use super::{ResourceKind, approvals, store};
 use crate::error::EngineError;
-use crate::task::format::java_trim;
+use crate::kernel::java::java_trim;
 use crate::vault::note_file::compute_token;
 use crate::write::atomic::write_atomic;
 

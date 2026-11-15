@@ -40,13 +40,5 @@ pub mod template_write;
 pub mod trash_write;
 pub mod write_attachment;
 
-use serde::Deserialize;
-
-/// 호출자. 앱과 AI는 보이는 것이 다르다(AI에게는 기록 층 노트가 안 보인다).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Caller {
-    #[default]
-    App,
-    Ai,
-}
+/// 호출자는 공용 커널이 정의한다(`kernel::actor`). 바깥 크레이트가 쓰는 옛 경로를 위해 다시 내보낸다.
+pub use crate::kernel::actor::Caller;

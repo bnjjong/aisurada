@@ -29,7 +29,7 @@ pub mod apparatus;
 pub mod atomic;
 pub mod autocommit;
 pub mod comments_file;
-pub mod confine;
+pub use crate::kernel::confine;
 pub mod doc_place;
 pub mod first_heading;
 pub mod json_out;

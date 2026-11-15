@@ -14,7 +14,8 @@ use serde::Serialize;
 
 use super::git::Git;
 use super::note_file::split_text;
-use super::note_meta::{civil_from_days, read_agent, text as text_of};
+use super::note_meta::{read_agent, text as text_of};
+use crate::kernel::time::civil_from_days;
 use crate::frontmatter::Value;
 use crate::text::{is_blank, trim, utf16_len};
 

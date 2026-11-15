@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::commands::Caller;
+use crate::kernel::actor::Caller;
 use crate::vault::agenda::AgendaInfo;
 use crate::vault::note_meta::{Evaluation, Link};
 use crate::vault::scanner::NoteRecord;
