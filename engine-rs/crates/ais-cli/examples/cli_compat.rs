@@ -1,6 +1,7 @@
 //! Java 엔진(단발 모드)과 Rust `ais-cli`가 같은 명령줄에 같은 결과를 내는지 맞댄다.
 //!
-//! 사용: `cargo run -p ais-cli --example cli_compat -- <ais-engine.jar> <합성 vault> [--verbose]`
+//! 사용: `cargo run -p ais-cli --example cli_compat -- <기준 ais-engine.jar> <합성 vault> [--verbose]`
+//! 기준 jar는 `engine-rs/tools/compat/build-oracle.sh`가 태그 `java-engine-final`에서 지어 `engine-rs/target/oracle/`에 둔다.
 //!
 //! 합성 vault를 사본 둘(Java용, Rust용)로 복사해 같은 명령줄을 차례로 돌린다. 명령마다 종료 코드, 표준 오류 글, 표준 출력 JSON(키 차례는
 //! 무시)을 견주고, 쓰기 명령 뒤에는 두 사본 폴더 전체의 바이트도 견준다. 엔진 호환(`ais-core`의 `compat_check`)이 엔진 값을 이미 맞댔으므로
@@ -1981,7 +1982,7 @@ fn main() -> ExitCode {
     let verbose = args.iter().any(|a| a == "--verbose");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if positional.len() < 2 {
-        eprintln!("사용법: cli_compat <ais-engine.jar> <합성 vault> [--verbose]");
+        eprintln!("사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose]");
         return ExitCode::from(2);
     }
     let mut h = Harness::new(positional[0], Path::new(positional[1]), verbose);

@@ -1,7 +1,7 @@
 //! Rust 쓰기 잠금과 Java 엔진의 쓰기 파이프라인이 서로를 막는지 실제 `ais-engine.jar`로 확인합니다.
 //!
-//! `AISURADA_JAR`(예: `dist/ais-engine.jar`의 경로)가 없으면 건너뜁니다. 사용:
-//! `AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test -p ais-core --test lock_interop -- --nocapture`
+//! `AISURADA_JAR`(기준 엔진 `engine-rs/target/oracle/ais-engine.jar`의 경로, `tools/compat/build-oracle.sh`가 짓는다)가 없으면 건너뜁니다. 사용:
+//! `AISURADA_JAR=$PWD/target/oracle/ais-engine.jar cargo test -p ais-core --test lock_interop -- --nocapture`
 
 use std::path::PathBuf;
 use std::process::Command;

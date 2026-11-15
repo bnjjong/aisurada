@@ -1,6 +1,7 @@
 //! Java 엔진(단발 모드)과 Rust 엔진이 같은 vault에서 같은 읽기 결과를 내는지 맞댑니다.
 //!
-//! 사용: `cargo run -p ais-core --example compat_check -- <ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>] [--write-fixture=<합성 vault>]`
+//! 기준(옛 Java 엔진)은 `engine-rs/tools/compat/build-oracle.sh`가 태그 `java-engine-final`에서 지어 `engine-rs/target/oracle/`에 둔다.
+//! 사용: `cargo run -p ais-core --example compat_check -- <기준 ais-engine.jar> <vault 폴더>... [--verbose] [--commit-fixture=<git 이력이 있는 합성 vault>] [--write-fixture=<합성 vault>]`
 //! `--commit-fixture`는 그 vault를 사본 둘로 복사해 `commit_vault`(vault를 고친다)를 견준다. 진짜 vault에는 주지 않는다.
 //! `--write-fixture`는 그 vault를 사본 둘로 복사해 쓰기 명령을 Java와 Rust로 돌리고 응답과 폴더 전체 바이트를 견준다.
 //!
@@ -10065,7 +10066,7 @@ fn main() -> ExitCode {
         .find_map(|a| a.strip_prefix("--commit-fixture="))
         .map(PathBuf::from);
     if positional.len() < 2 {
-        eprintln!("사용법: compat_check <ais-engine.jar> <vault 폴더>... [--verbose]");
+        eprintln!("사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose]");
         return ExitCode::from(2);
     }
     let home = env::temp_dir().join("ais-compat-home");

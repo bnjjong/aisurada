@@ -9,8 +9,9 @@ import java.util.*;
  * 줄마다 {@code 입력 맵 JSON <탭> 기대 YAML(JSON 글)}이고, 입력의 값은 글·수·참거짓·null·배열·객체다.
  *
  * <pre>
- * javac -cp lib/snakeyaml-2.4.jar -d /tmp/snake-cases engine-rs/tools/compat/SnakeCases.java
- * java -cp /tmp/snake-cases:lib/snakeyaml-2.4.jar SnakeCases /tmp/snake-cases.tsv 1 40000
+ * ORACLE=$(engine-rs/tools/compat/build-oracle.sh)   # SnakeYAML이 든 기준 jar
+ * javac -cp $ORACLE/ais-engine.jar -d /tmp/snake-cases engine-rs/tools/compat/SnakeCases.java
+ * java -cp /tmp/snake-cases:$ORACLE/ais-engine.jar SnakeCases /tmp/snake-cases.tsv 1 40000
  * (cd engine-rs && cargo run -p ais-core --example snake_check -- /tmp/snake-cases.tsv)
  * </pre>
  */

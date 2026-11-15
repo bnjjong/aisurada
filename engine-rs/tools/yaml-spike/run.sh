@@ -14,10 +14,8 @@ OUT="${1:?출력 폴더를 주세요}"
 shift || true
 mkdir -p "$OUT"
 
-# Java 엔진 클래스가 없으면 짓는다
-if [[ ! -d "$ROOT/build/classes" ]]; then
-    "$ROOT/build.sh" > /dev/null
-fi
+# 기준(옛 Java 엔진, 태그 java-engine-final)을 지어 둔다. jar에 SnakeYAML이 들어 있다.
+ORACLE="$("$ROOT/engine-rs/tools/compat/build-oracle.sh" | tail -1)"
 
 # 중첩 깊이 경계(엔진은 깊이 50 안팎에서 선다)를 재는 사례를 만든다
 nest_map() {
@@ -44,7 +42,7 @@ nest_flow() {
 
 args=(--cases "$TOOLS/cases.txt" --cases "$OUT/depth-cases.txt" "$@")
 
-java -Dfile.encoding=UTF-8 -cp "$ROOT/build/classes:$ROOT/lib/snakeyaml-2.4.jar" \
+java -Dfile.encoding=UTF-8 -cp "$ORACLE/ais-engine.jar" \
     "$TOOLS/YamlGroundTruth.java" "${args[@]}" > "$OUT/ground-truth.jsonl"
 
 echo "기준값 $(wc -l < "$OUT/ground-truth.jsonl" | tr -d ' ')건을 $OUT/ground-truth.jsonl 에 썼다"

@@ -1,6 +1,7 @@
 //! Java MCP 서버와 Rust MCP 서버가 같은 JSON-RPC 대화에 같은 답을 내는지 한 줄씩 견준다.
 //!
-//! 사용: `cargo run -p ais-cli --example mcp_compat -- <dist 폴더(ais-cli.jar, ais-engine.jar)>`
+//! 사용: `cargo run -p ais-cli --example mcp_compat -- <기준 폴더(ais-cli.jar, ais-engine.jar)>`
+//! 기준 폴더는 `engine-rs/tools/compat/build-oracle.sh`가 태그 `java-engine-final`에서 지어 `engine-rs/target/oracle/`에 둔다.
 //!
 //! 도구 호출은 두 서버 모두 엔진 대신 같은 가짜 호출기(`tools/compat/DriveMcp.java`)가 받는다. 그래서 여기서 보는 것은 프로토콜 층이다:
 //! 초기화·도구 목록(읽기 모드와 쓰기 모드의 38개)·호출 결과 모양·오류 코드·Codex 세션 출처 규칙. 도구가 엔진에서 하는 일은
@@ -160,7 +161,7 @@ fn cases() -> Vec<String> {
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let Some(dist) = args.first() else {
-        eprintln!("사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 dist 폴더>");
+        eprintln!("사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)>");
         return ExitCode::from(2);
     };
     let dist = Path::new(dist);
