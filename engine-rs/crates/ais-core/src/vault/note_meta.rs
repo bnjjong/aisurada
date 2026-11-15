@@ -3,6 +3,9 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 use crate::kernel::time::{civil_from_days, days_from_civil};
+use crate::kernel::doc_type::DocType;
+use crate::kernel::tier::Tier;
+use crate::kernel::link_kind::LinkKind;
 
 use regex::Regex;
 
@@ -14,9 +17,6 @@ pub(crate) static TEMPLATE_ID: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z0-9._-]{1,128}$").unwrap());
 static AGENT_NAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-z][a-z0-9-]{0,31}$").unwrap());
-
-const ALLOWED_TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
-const ALLOWED_KINDS: [&str; 3] = ["direct", "indirect", "attach"];
 
 /// 노트 사이의 연결 하나
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,7 +47,7 @@ pub struct MetaData {
     /// 세션을 연 에이전트. 줄이 없으면(claude) `None`
     pub session_agent: Option<String>,
     /// `reading` 또는 `record`
-    pub tier: String,
+    pub tier: Tier,
     pub edited_by: Option<String>,
     pub edited_at: Option<String>,
     pub edited_session_id: Option<String>,
@@ -144,7 +144,7 @@ pub fn parse_meta(
 
     // 3. type
     let doc_type = match text(map, "type") {
-        Some(t) if ALLOWED_TYPES.contains(&t) => t.to_string(),
+        Some(t) if DocType::parse(t).is_some() => t.to_string(),
         _ => "build".to_string(),
     };
 
@@ -171,12 +171,9 @@ pub fn parse_meta(
     }
 
     // 8. tier
-    let mut tier = "reading".to_string();
+    let mut tier = Tier::Reading;
     if !is_sub_note && let Some(raw) = text(map, "tier") {
-        let t = trim(raw);
-        if t != "reading" && !t.is_empty() {
-            tier = "record".to_string();
-        }
+        tier = Tier::from_front(trim(raw));
     }
 
     // 9. 도장
@@ -224,7 +221,7 @@ pub fn parse_meta(
             let (Some(to), Some(kind)) = (text(entries, "to"), text(entries, "kind")) else {
                 continue;
             };
-            if !NOTE_ID.is_match(to) || !ALLOWED_KINDS.contains(&kind) {
+            if !NOTE_ID.is_match(to) || LinkKind::parse(kind).is_none() {
                 continue;
             }
             let self_ref = to == id || (is_sub_note && root_note_id == Some(to));

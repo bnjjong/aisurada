@@ -4,6 +4,8 @@
 //! 부모는 `메인 노트 id`이거나 `메인 노트 id/후속 노트 id/…` 사슬이다. 읽기 쪽과 달리 후속 노트 id 하나만으로는 부모를 가리킬 수 없다.
 
 use std::path::Path;
+use crate::kernel::doc_type::DocType;
+use crate::kernel::tier::Tier;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -12,7 +14,8 @@ use super::doc_write::parse_tags;
 use crate::error::EngineError;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::vault::index::NoteIndex;
-use crate::vault::note_file::{compute_token, split_text};
+use crate::kernel::token::compute_token;
+use crate::vault::note_file::split_text;
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::apparatus::{next_sub_note_id, now_millis};
 use crate::write::confine::{check_confinement, has_unusable_path_characters};
@@ -26,7 +29,6 @@ use crate::write::sub_note::{
 };
 use crate::write::{first_heading, precondition, warnings};
 
-const ALLOWED_TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -172,12 +174,12 @@ pub fn create_sub_note(vault: &Path, request: &CreateSubNoteRequest) -> Result<J
         .as_deref()
         .ok_or_else(|| EngineError::invalid_argument(format!("body 이 필요하다: {USAGE}")))?;
     let raw_type = request.doc_type.as_deref().unwrap_or("free");
-    let doc_type = ALLOWED_TYPES
-        .iter()
-        .find(|allowed| allowed.eq_ignore_ascii_case(raw_type))
+    let doc_type = DocType::parse_ignore_ascii_case(raw_type)
+        .map(DocType::as_str)
         .ok_or_else(|| {
             EngineError::invalid_argument(format!(
-                "모르는 유형 이다: {raw_type}. 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다."
+                "모르는 유형 이다: {raw_type}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                DocType::NAMES_TEXT
             ))
         })?;
     if is_blank(title) {
@@ -216,7 +218,7 @@ pub fn create_sub_note(vault: &Path, request: &CreateSubNoteRequest) -> Result<J
         created: &created,
         session_id: None,
         session_agent: None,
-        tier: "reading",
+        tier: Tier::Reading,
         edited_by: None,
         edited_at: None,
         edited_session_id: None,
@@ -333,7 +335,7 @@ pub fn update_sub_note(vault: &Path, request: &UpdateSubNoteRequest) -> Result<J
             created: &meta.created,
             session_id: None,
             session_agent: None,
-            tier: "reading",
+            tier: Tier::Reading,
             tags,
             favorite: false,
             favorite_category: None,

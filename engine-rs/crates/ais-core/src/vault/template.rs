@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+use crate::kernel::doc_type::DocType;
 
 use regex::Regex;
 
@@ -15,7 +16,6 @@ static ID_SHAPE: LazyLock<Regex> =
 static ICON_SHAPE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z][A-Za-z0-9]{0,63}$").unwrap());
 
-const DOC_TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_FRONTMATTER_UNITS: usize = 16_000;
 
@@ -179,7 +179,7 @@ fn scan_category(vault_root: &Path, category: Category, scan: &mut TemplateScan)
                     "markdown"
                 };
                 let doc_type = match get(&fm, "type") {
-                    Some(Value::Str(t)) if DOC_TYPES.contains(&t.as_str()) => t.clone(),
+                    Some(Value::Str(t)) if DocType::parse(t).is_some() => t.clone(),
                     _ => "build".to_string(),
                 };
                 let builtin = match get(&fm, "builtin") {

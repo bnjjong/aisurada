@@ -64,7 +64,7 @@ fn date_option(raw: &Option<Json>) -> Result<i64, EngineError> {
 fn reading_notes(index: &crate::vault::index::NoteIndex) -> Vec<&NoteRecord> {
     let mut notes: Vec<&NoteRecord> = Vec::new();
     for note in index.root_notes() {
-        if note.meta.tier != "reading" {
+        if !note.meta.tier.is_reading() {
             continue;
         }
         notes.push(note);

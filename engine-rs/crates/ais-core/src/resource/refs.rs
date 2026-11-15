@@ -13,7 +13,7 @@ use regex::Regex;
 use super::{ResourceKind, approvals, store};
 use crate::error::EngineError;
 use crate::kernel::java::java_trim;
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::write::atomic::write_atomic;
 
 /// 목록 한 줄. `hint`는 쓴 때의 이름이다.

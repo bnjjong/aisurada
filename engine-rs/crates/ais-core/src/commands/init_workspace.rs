@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+use crate::kernel::doc_type::DocType;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -29,7 +30,6 @@ const SKELETON: [&str; 4] = [
 const DOC_FIELDS: [&str; 7] = ["id", "name", "format", "desc", "body", "type", "builtin"];
 const RITUAL_FIELDS: [&str; 7] = ["id", "name", "format", "desc", "body", "rev", "icon"];
 const FORMATS: [&str; 3] = ["markdown", "html", "json"];
-const TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 const REVS: [&str; 3] = ["morning", "evening", "weekly"];
 
 static ID_SHAPE: LazyLock<Regex> =
@@ -308,10 +308,11 @@ fn check_values(seed: &Seed) -> Result<(), EngineError> {
         )));
     }
     if seed.doc {
-        if !TYPES.contains(&seed.doc_type.as_str()) {
+        if DocType::parse(&seed.doc_type).is_none() {
             return Err(bad(format!(
-                "모르는 노트 유형이다: {}. 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다.",
-                seed.doc_type
+                "모르는 노트 유형이다: {}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                seed.doc_type,
+                DocType::NAMES_TEXT
             )));
         }
         return Ok(());

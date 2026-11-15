@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use crate::kernel::ids::AGENDA_ID;
+use crate::kernel::hue::{DEFAULT_HUE, is_hue};
 
 
 use super::Skipped;
@@ -13,10 +14,6 @@ use crate::text::{compare_utf16, is_blank, is_whitespace, trim, utf16_len};
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_FRONTMATTER_UNITS: usize = 16_000;
-pub const HUES: [&str; 12] = [
-    "blue", "violet", "teal", "orange", "pink", "green", "red", "amber", "lime", "cyan", "fuchsia",
-    "brown",
-];
 
 /// 아젠다 하나
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,8 +208,8 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
         }
 
         let hue = match kv.get("hue").map(|h| trim(h)) {
-            Some(h) if HUES.contains(&h) => h.to_string(),
-            _ => "blue".to_string(),
+            Some(h) if is_hue(h) => h.to_string(),
+            _ => DEFAULT_HUE.to_string(),
         };
         let repo = kv
             .get("repo")

@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::error::EngineError;
 use crate::model::AgendaRow;
 use crate::text::{encode_uri_component, is_blank, trim};
-use crate::vault::agenda::{AgendaInfo, HUES, is_valid_agenda_id, is_valid_slug_segment};
+use crate::kernel::hue::is_hue;
+use crate::vault::agenda::{AgendaInfo, is_valid_agenda_id, is_valid_slug_segment};
 use crate::vault::project::scan_projects;
 use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
 use crate::write::apparatus::next_id;
@@ -88,7 +89,7 @@ pub(crate) fn hue_arg(raw: Option<&str>) -> Result<Option<String>, EngineError> 
     if hue.is_empty() {
         return Ok(None);
     }
-    if !HUES.contains(&hue) {
+    if !is_hue(hue) {
         return Err(EngineError::invalid_argument(format!(
             "hue 값이 아니다: {hue}"
         )));

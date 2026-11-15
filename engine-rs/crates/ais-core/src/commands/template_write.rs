@@ -4,6 +4,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+use crate::kernel::doc_type::DocType;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,6 @@ use crate::write::warnings::detect_indented_blocks_warning;
 const SAVE_USAGE: &str = "save-template [id=<고칠 템플릿 id. 없으면 새로 만든다>] [name=<이름. 새로 만들 때 필수>] [type=<plan|build|report|research|meeting|free. 새로 만들 때 기본 plan>] [desc=<언제 쓰는 템플릿인지>] [body=<본문. 새로 만들 때 필수>]";
 const DELETE_USAGE: &str = "delete-doc-template <문서 템플릿 id>";
 const RITUAL_USAGE: &str = "save-ritual-template <리추얼 템플릿 id> [name=<이름>] [desc=<언제 쓰는 양식인지>] [body=<본문>]";
-const TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 
 static ID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Za-z0-9._-]{1,128}$").unwrap());
 
@@ -103,9 +103,10 @@ fn validate_name(name: &Option<String>) -> Result<(), EngineError> {
 fn type_arg(raw: &Option<String>) -> Result<Option<String>, EngineError> {
     let Some(raw) = raw else { return Ok(None) };
     let lowered = raw.to_lowercase();
-    if !TYPES.contains(&lowered.as_str()) {
+    if DocType::parse(&lowered).is_none() {
         return Err(EngineError::invalid_argument(format!(
-            "모르는 템플릿 유형 이다: {raw}. 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다."
+            "모르는 템플릿 유형 이다: {raw}. 쓸 수 있는 것은 [{}] 뿐이다.",
+            DocType::NAMES_TEXT
         )));
     }
     Ok(Some(lowered))

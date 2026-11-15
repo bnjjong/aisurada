@@ -2,8 +2,8 @@
 
 use std::fs;
 use std::path::Path;
+use crate::kernel::token::compute_token;
 
-use sha2::{Digest, Sha256};
 
 use crate::frontmatter::{self, Value};
 use crate::text::utf16_len;
@@ -25,17 +25,6 @@ pub struct ParsedNoteFile {
 /// 본문 파일을 읽지 못했다: 없거나, 1MB를 넘거나, UTF-8이 아니다.
 #[derive(Debug)]
 pub struct UnreadableFile;
-
-/// 파일 전체 바이트의 SHA-256으로 고치기 전 확인 값을 만듭니다.
-pub fn compute_token(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut token = String::with_capacity(3 + 64);
-    token.push_str("f1:");
-    for byte in digest {
-        token.push_str(&format!("{byte:02x}"));
-    }
-    token
-}
 
 /// 본문 파일을 읽어 머리, 본문, 확인 값을 돌려줍니다.
 pub fn read_note_file(path: &Path) -> Result<ParsedNoteFile, UnreadableFile> {

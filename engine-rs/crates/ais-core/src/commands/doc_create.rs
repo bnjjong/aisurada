@@ -2,6 +2,9 @@
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 파일 글은 바이트까지 같다.
 
 use std::path::Path;
+use crate::kernel::doc_type::DocType;
+use crate::kernel::tier::Tier;
+use crate::kernel::link_kind::LinkKind;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -13,7 +16,7 @@ use crate::error::EngineError;
 use crate::json::{self, JsonValue};
 use crate::text::{NOTE_ID, compare_utf16, encode_uri_component, is_blank, trim, utf16_len};
 use crate::vault::agenda::AgendaInfo;
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::vault::note_meta::{Link, TEMPLATE_ID};
 use crate::vault::scanner::NoteRecord;
 use crate::write::apparatus::{next_id, next_note_id, now_millis};
@@ -29,7 +32,6 @@ use crate::write::pipeline::{WriteContext, WriteScope};
 use crate::write::{agenda_file, slug, warnings};
 
 const USAGE: &str = "create-doc agenda=<slug 또는 이름> type=<유형> title=<제목> body=<본문> [date=<YYYY-MM-DD>] [time=<HH:MM>] [format=markdown] [links=<JSON 배열>] [tags=<JSON 배열>] [template=<템플릿 id>] [tier=reading|record]";
-const ALLOWED_TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 
 /// `create_doc` 요청. `links`와 `tags`는 호출 객체에서는 배열, 명령줄에서는 JSON 배열 글로 온다.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -85,12 +87,12 @@ pub fn create_doc_in(
         .doc_type
         .as_deref()
         .ok_or_else(|| EngineError::invalid_argument(format!("type 이 필요하다: {USAGE}")))?;
-    let canonical_type = ALLOWED_TYPES
-        .iter()
-        .find(|allowed| allowed.eq_ignore_ascii_case(raw_type))
+    let canonical_type = DocType::parse_ignore_ascii_case(raw_type)
+        .map(DocType::as_str)
         .ok_or_else(|| {
             EngineError::invalid_argument(format!(
-                "모르는 유형 이다: {raw_type}. 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다."
+                "모르는 유형 이다: {raw_type}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                DocType::NAMES_TEXT
             ))
         })?;
     let raw_title = request
@@ -112,17 +114,14 @@ pub fn create_doc_in(
         None => Vec::new(),
     };
     // 노트 층은 명령 표면만 받는다
-    let mut tier = "reading";
+    let mut tier = Tier::Reading;
     if !tool && let Some(raw) = request.tier.as_deref() {
-        tier = if raw.eq_ignore_ascii_case("reading") {
-            "reading"
-        } else if raw.eq_ignore_ascii_case("record") {
-            "record"
-        } else {
-            return Err(EngineError::invalid_argument(format!(
-                "모르는 노트 층 이다: {raw}. 쓸 수 있는 것은 [reading, record] 뿐이다."
-            )));
-        };
+        tier = Tier::parse_ignore_ascii_case(raw).ok_or_else(|| {
+            EngineError::invalid_argument(format!(
+                "모르는 노트 층 이다: {raw}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                Tier::NAMES_TEXT
+            ))
+        })?;
     }
     if is_blank(raw_title) {
         return Err(EngineError::invalid_argument("노트 제목이 비었다"));
@@ -229,7 +228,7 @@ fn schedule_time(date: &CivilDate, scope: &WriteScope, hour: u32, minute: u32) -
     let occupied: std::collections::HashSet<&str> = scope
         .index
         .root_notes()
-        .filter(|note| !note.meta.tier.eq_ignore_ascii_case("record"))
+        .filter(|note| !note.meta.tier.is_record())
         .filter_map(|note| {
             let created = note.meta.created.as_str();
             (created.get(0..10) == Some(day.as_str()))
@@ -365,12 +364,12 @@ fn parse_link(entries: &[(String, JsonValue)]) -> Result<Link, EngineError> {
     };
     let to = text_of("to")?;
     let kind = text_of("kind")?;
-    let kind = ["direct", "indirect", "attach"]
-        .iter()
-        .find(|allowed| allowed.eq_ignore_ascii_case(&kind))
+    let kind = LinkKind::parse_ignore_ascii_case(&kind)
+        .map(LinkKind::as_str)
         .ok_or_else(|| {
             EngineError::invalid_argument(format!(
-                "모르는 관계 종류 이다: {kind}. 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다."
+                "모르는 관계 종류 이다: {kind}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                LinkKind::NAMES_TEXT
             ))
         })?;
     if !NOTE_ID.is_match(&to) {

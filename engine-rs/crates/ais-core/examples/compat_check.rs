@@ -1513,7 +1513,7 @@ fn put_both(h: &WriteHarness, rel: &str, content: &str) {
 
 /// 파일 바이트에서 바로 계산한 확인 값(`get_doc`이 값을 안 주는 확장자 폴더 노트용)
 fn file_token(h: &WriteHarness, rel: &str) -> String {
-    ais_core::vault::note_file::compute_token(&fs::read(h.b.join(rel)).unwrap())
+    ais_core::kernel::token::compute_token(&fs::read(h.b.join(rel)).unwrap())
 }
 
 /// `update_doc` 한 단계. `named`는 Java의 `key=value`이고, 호출 객체는 같은 글을 그대로 담는다(`tags`도 명령줄 글 꼴).
@@ -8180,7 +8180,7 @@ fn compare_note_tools(h: &mut WriteHarness) {
                 !n.is_single_file
                     && !n.is_extension_folder
                     && !n.sub_notes.is_empty()
-                    && n.meta.tier == "reading"
+                    && n.meta.tier.is_reading()
             })
             .or_else(|| {
                 index

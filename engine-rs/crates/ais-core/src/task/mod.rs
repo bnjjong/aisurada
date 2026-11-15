@@ -6,6 +6,7 @@ pub mod store;
 pub mod transitions;
 
 use crate::frontmatter::Value;
+use crate::kernel::task_link::TaskLinkKind;
 
 /// 태스크 상태
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -82,7 +83,7 @@ pub struct Criterion {
 /// 태스크끼리의 연결(건 쪽 파일에만 적는다). `kind`는 `blocks`, `relates`, `duplicates`
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Link {
-    pub kind: String,
+    pub kind: TaskLinkKind,
     pub to: String,
 }
 

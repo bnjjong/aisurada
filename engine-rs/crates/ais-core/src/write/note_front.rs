@@ -3,6 +3,7 @@
 
 use crate::frontmatter::dump_string;
 use crate::vault::note_meta::{Evaluation, Link};
+use crate::kernel::tier::Tier;
 
 pub struct NoteFront<'a> {
     pub id: &'a str,
@@ -12,7 +13,7 @@ pub struct NoteFront<'a> {
     pub created: &'a str,
     pub session_id: Option<&'a str>,
     pub session_agent: Option<&'a str>,
-    pub tier: &'a str,
+    pub tier: Tier,
     pub edited_by: Option<&'a str>,
     pub edited_at: Option<&'a str>,
     pub edited_session_id: Option<&'a str>,
@@ -42,8 +43,8 @@ impl NoteFront<'_> {
                 line("sessionAgent", agent);
             }
         }
-        if self.tier.eq_ignore_ascii_case("record") {
-            out.push_str("tier: record\n");
+        if self.tier.is_record() {
+            out.push_str(&format!("tier: {}\n", Tier::Record.as_str()));
         }
         if let (Some(by), Some(at)) = (self.edited_by, self.edited_at) {
             let mut line = |key: &str, value: &str| {

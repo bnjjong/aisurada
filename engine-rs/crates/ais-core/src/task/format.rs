@@ -4,6 +4,7 @@
 //! 본문은 파일에서 늘 끝에 줄바꿈 하나가 붙은 채 적히고, 읽을 때 그 하나를 뗀다.
 
 use std::sync::LazyLock;
+use crate::kernel::task_link::TaskLinkKind;
 pub use crate::kernel::ids::TASK_ID as ID;
 
 use regex::Regex;
@@ -14,7 +15,7 @@ use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
 use crate::text::{NOTE_ID, SUB_NOTE_ID, trim, utf16_len};
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::write::snake_dump::dump_map;
 
 pub const MAX_FILE_BYTES: usize = 400_000;
@@ -30,7 +31,6 @@ pub const MAX_COMMENT: usize = 20_000;
 
 pub const TYPES: [&str; 3] = ["feature", "bug", "chore"];
 pub const PRIORITIES: [&str; 3] = ["high", "medium", "low"];
-pub const LINK_TYPES: [&str; 3] = ["blocks", "relates", "duplicates"];
 pub const DEFAULT_TYPE: &str = "feature";
 pub const DEFAULT_PRIORITY: &str = "medium";
 
@@ -257,7 +257,10 @@ fn link_list(value: Option<&Value>) -> Vec<Link> {
             let (Some(kind), Some(to)) = (str_of(m, "type"), str_of(m, "to")) else {
                 continue;
             };
-            if !LINK_TYPES.contains(&kind.as_str()) || !KEY.is_match(&to) {
+            let Some(kind) = TaskLinkKind::parse(&kind) else {
+                continue;
+            };
+            if !KEY.is_match(&to) {
                 continue;
             }
             let link = Link { kind, to };
@@ -363,7 +366,7 @@ pub fn render(task: &Task) -> Result<Vec<u8>, EngineError> {
             .iter()
             .map(|l| {
                 Value::Map(vec![
-                    (text("type"), text(&l.kind)),
+                    (text("type"), text(l.kind.as_str())),
                     (text("to"), text(&l.to)),
                 ])
             })

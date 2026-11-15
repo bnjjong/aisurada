@@ -274,3 +274,52 @@ fn the_kernel_uses_no_context_module() {
         .collect();
     assert!(bad.is_empty(), "커널이 영역을 쓴다: {bad:?}");
 }
+
+/// 값 객체(`kernel`)로 모은 닫힌 집합의 글자는 `kernel` 밖에 쓰지 않는다. 층, 문서 유형, 연결 종류, 색의 목록과 판정은 한 곳이 정본이다.
+/// 허용은 「이 파일에 이 글자가 이만큼」 꼴로만 적는다(표기 그대로 응답이나 시험 값으로 쓰는 곳).
+#[test]
+fn closed_set_literals_live_only_in_the_kernel() {
+    // (찾을 글, 이유, 허용 목록 [(파일, 횟수)])
+    #[allow(clippy::type_complexity)]
+    let rules: &[(&str, &[(&str, usize)])] = &[
+        ("\"record\"", &[]),
+        ("\"reading\"", &[]),
+        ("\"plan\", \"build\"", &[]),
+        ("[plan, build", &[]),
+        ("\"indirect\"", &[]),
+        ("\"duplicates\"", &[]),
+        ("\"relates\"", &[]),
+        // 태스크 응답의 `blocks` 칸 이름이다(연결 종류가 아니라 응답 필드)
+        ("\"blocks\"", &[("commands/task_commands.rs", 1)]),
+    ];
+    let src = manifest().join("src");
+    let mut files = Vec::new();
+    rust_files(&src, &mut files);
+    let mut bad = Vec::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        if rel.starts_with("kernel/") {
+            continue;
+        }
+        let text = code(&fs::read_to_string(&file).unwrap());
+        for (pattern, allowed) in rules {
+            let n = text.matches(pattern).count();
+            let ok = allowed
+                .iter()
+                .find(|(f, _)| *f == rel)
+                .map_or(0, |(_, count)| *count);
+            if n > ok {
+                bad.push(format!("{rel}: {pattern} {n}번(허용 {ok})"));
+            }
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "kernel로 모은 글자가 밖에 있다. 값 객체(Tier, DocType, LinkKind, TaskLinkKind, Hue)를 쓴다.\n  {}",
+        bad.join("\n  ")
+    );
+}

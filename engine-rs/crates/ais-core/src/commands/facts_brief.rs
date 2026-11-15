@@ -136,7 +136,7 @@ pub fn facts_brief(vault: &Path, request: &FactsBriefRequest) -> Result<Json, En
     let mut counts: Vec<(String, usize)> = Vec::new();
     for note in scope.index.root_notes() {
         let meta = &note.meta;
-        if meta.tier != "reading"
+        if !meta.tier.is_reading()
             || meta.date.as_bytes() < first.as_bytes()
             || meta.date.as_bytes() > last.as_bytes()
             || !table.has_slug(&meta.agenda_slug)

@@ -24,7 +24,7 @@ pub fn export_markdown(vault: &Path, context: &WriteContext) -> Result<Json, Eng
     let mut exports: Vec<(String, String)> = Vec::new();
     let (mut total, mut html, mut json_notes, mut unsafe_count, mut exported) = (0, 0, 0, 0, 0);
     for note in scope.index.root_notes() {
-        if note.meta.tier != "reading" {
+        if !note.meta.tier.is_reading() {
             continue;
         }
         total += 1;

@@ -7,7 +7,8 @@ use crate::kernel::actor::Caller;
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
 use crate::text::{cut_utf16, trim, utf16_len};
-use crate::vault::note_file::{compute_token, split_text};
+use crate::kernel::token::compute_token;
+use crate::vault::note_file::split_text;
 use crate::vault::note_meta::{Evaluation, Link, MetaData, agent_for_file, get};
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::apparatus::now_millis;
@@ -15,6 +16,7 @@ use crate::write::atomic::write_atomic;
 use crate::write::note_front::NoteFront;
 use crate::write::pipeline::WriteContext;
 use crate::write::precondition;
+use crate::kernel::tier::Tier;
 
 /// 저장 상한(UTF-16 글자)
 pub(crate) const MAX_FILE_UNITS: usize = 1_000_000;
@@ -88,7 +90,7 @@ pub fn write_meta(
             created: &meta.created,
             session_id: session_id.as_deref(),
             session_agent,
-            tier: &meta.tier,
+            tier: meta.tier,
             tags: &meta.tags,
             favorite: state.favorite,
             favorite_category: state.favorite_category,
@@ -123,7 +125,7 @@ pub struct Draft<'a> {
     pub session_id: Option<&'a str>,
     pub session_agent: Option<&'a str>,
     /// 머리에 적을 층(`record`일 때만 줄이 생긴다). 후속 노트는 층을 안 적는 값을 준다
-    pub tier: &'a str,
+    pub tier: Tier,
     pub tags: &'a [String],
     pub favorite: bool,
     pub favorite_category: Option<&'a str>,

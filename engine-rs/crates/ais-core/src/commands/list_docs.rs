@@ -30,7 +30,7 @@ pub fn execute(index: &NoteIndex, request: &ListDocsRequest) -> Result<Page<Note
     let candidates: Vec<_> = index
         .root_notes()
         // AI에게는 기록 층 노트를 보여 주지 않는다
-        .filter(|note| !(request.caller == Caller::Ai && note.meta.tier == "record"))
+        .filter(|note| note.meta.tier.visible_to(request.caller))
         .filter(|note| filter::matches(note, &criteria))
         .collect();
     let total = candidates.len();

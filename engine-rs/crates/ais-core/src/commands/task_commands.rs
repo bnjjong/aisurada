@@ -7,6 +7,7 @@
 
 use std::cmp::Reverse;
 use std::path::Path;
+use crate::kernel::task_link::TaskLinkKind;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -220,7 +221,7 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
     let blocks: Vec<&str> = task
         .links
         .iter()
-        .filter(|l| l.kind == "blocks" && scan.by_key(&l.to).is_some())
+        .filter(|l| l.kind == TaskLinkKind::Blocks && scan.by_key(&l.to).is_some())
         .map(|l| l.to.as_str())
         .collect();
     let mut m = json!({
@@ -486,14 +487,14 @@ pub fn delete_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, Engin
         .filter(|o| {
             o.links
                 .iter()
-                .any(|l| l.kind == "blocks" && l.to == task.key)
+                .any(|l| l.kind == TaskLinkKind::Blocks && l.to == task.key)
         })
         .map(|o| o.key.as_str())
         .collect();
     let blocked: Vec<&str> = task
         .links
         .iter()
-        .filter(|l| l.kind == "blocks")
+        .filter(|l| l.kind == TaskLinkKind::Blocks)
         .map(|l| l.to.as_str())
         .collect();
     store::delete(vault, task)?;

@@ -3,7 +3,8 @@
 use std::collections::HashSet;
 
 use crate::frontmatter::dump_string;
-use crate::vault::agenda::{AgendaInfo, HUES};
+use crate::kernel::hue::{HUES, position_or_default};
+use crate::vault::agenda::AgendaInfo;
 
 /// 같은 이름의 아젠다·프로젝트를 `이름-2`부터 이 번호까지 센다.
 pub const MAX_SLUG_SUFFIX: usize = 100;
@@ -26,11 +27,7 @@ pub fn pick_free_slug(base: &str, taken: &HashSet<String>) -> Option<String> {
 pub fn least_used_hue<'a>(used: impl IntoIterator<Item = &'a str>) -> &'static str {
     let mut counts = [0usize; HUES.len()];
     for hue in used {
-        let at = HUES
-            .iter()
-            .position(|h| *h == hue)
-            .unwrap_or_else(|| HUES.iter().position(|h| *h == "blue").unwrap_or(0));
-        counts[at] += 1;
+        counts[position_or_default(hue)] += 1;
     }
     let mut chosen = 0;
     for (i, count) in counts.iter().enumerate() {

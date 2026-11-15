@@ -80,7 +80,7 @@ pub fn resolve_container<'a>(
 
 /// AI에게는 기록 층 메인 노트를 열어 주지 않는다.
 pub fn check_readable(root: &NoteRecord, caller: Caller) -> Result<(), EngineError> {
-    if caller == Caller::Ai && root.meta.tier == "record" {
+    if !root.meta.tier.visible_to(caller) {
         return Err(EngineError::record_tier(&root.id));
     }
     Ok(())

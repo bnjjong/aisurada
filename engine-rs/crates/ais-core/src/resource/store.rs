@@ -22,7 +22,7 @@ use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
 use crate::text::compare_utf16;
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::vault::project::{ProjectInfo, scan_projects};
 use crate::write::apparatus::{instant_text, next_id, now_millis, to_base36};
 use crate::write::atomic::write_atomic;

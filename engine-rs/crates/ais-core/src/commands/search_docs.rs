@@ -67,7 +67,7 @@ pub fn execute(
         let id_target = id_target.split('/').next().unwrap_or("");
 
         for note in index.root_notes() {
-            if (request.caller == Caller::Ai && note.meta.tier == "record")
+            if !note.meta.tier.visible_to(request.caller)
                 || !filter::matches(note, &criteria)
                 || trim_search(&note.meta.title).is_empty()
             {

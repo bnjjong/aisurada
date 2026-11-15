@@ -3,7 +3,7 @@
 //! 검사 순서: 본문 파일을 읽을 수 있는가(500) → 확인 값이 왔는가(412) → 모양이 맞는가(412) → 지금 파일과 같은가(412).
 
 use crate::error::EngineError;
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::vault::scanner::NoteRecord;
 
 /// 본문 파일 크기 상한
@@ -53,7 +53,7 @@ pub fn check(
             "선결 조건 토큰이 안 왔어요. 아무것도 쓰지 않았습니다: {rel}\nget_doc 으로 이 노트를 읽고, 그 응답의 precondition 을 f1 인자에 그대로 실어 다시 부릅니다.\n방금 만들거나 방금 고친 노트면 그 쓰기 응답이 이미 다음 토큰을 줍니다. 다시 읽지 말고 그 값을 씁니다."
         )));
     };
-    if !token.starts_with("f1:") {
+    if !token.starts_with(crate::kernel::token::PREFIX) {
         return Err(EngineError::precondition_failed(format!(
             "선결 조건 토큰의 모양이 아니에요. 아무것도 쓰지 않았습니다: {rel}\nget_doc 응답의 precondition 을 글자 그대로 f1 인자에 되돌립니다. 계산해서 만드는 값이 아닙니다.\n해시를 직접 구해 넣지 않습니다. 이 대조가 묻는 것은 그 파일을 방금 읽었는가 입니다."
         )));

@@ -13,7 +13,8 @@ use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
 use crate::text::{NOTE_ID, cut_utf16, is_blank, trim, utf16_len};
-use crate::vault::note_file::{compute_token, split_text};
+use crate::kernel::token::compute_token;
+use crate::vault::note_file::split_text;
 use crate::vault::note_meta::{TEMPLATE_ID, get};
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::atomic::write_atomic;
@@ -234,7 +235,7 @@ pub fn update_doc(vault: &Path, request: &UpdateDocRequest) -> Result<Json, Engi
             created: &created,
             session_id: session_id.as_deref(),
             session_agent,
-            tier: &meta.tier,
+            tier: meta.tier,
             tags,
             favorite: meta.favorite,
             favorite_category: meta.favorite_category.as_deref(),

@@ -12,7 +12,7 @@ use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
 use crate::kernel::java::{java_blank, java_trim, value_to_string};
 use crate::text::{is_blank, trim, utf16_len};
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::write::confine::has_unusable_path_characters;
 use crate::write::slug;
 use crate::write::snake_dump::dump_map;

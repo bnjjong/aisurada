@@ -1,6 +1,7 @@
 //! `list_templates`: 템플릿을 문서 템플릿 먼저, 이어서 id 차례로 돌려줍니다.
 
 use std::path::Path;
+use crate::kernel::doc_type::DocType;
 
 use serde::Deserialize;
 
@@ -9,7 +10,6 @@ use crate::model::{Page, TemplateRow};
 use crate::text::{compare_utf16, trim};
 use crate::vault::template::{Category, scan_templates};
 
-const DOC_TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -44,11 +44,12 @@ pub fn execute(
     };
     let doc_type = match non_empty(&request.doc_type).map(str::to_lowercase) {
         None => None,
-        Some(t) if DOC_TYPES.contains(&t.as_str()) => Some(t),
+        Some(t) if DocType::parse(&t).is_some() => Some(t),
         Some(_) => {
             let given = non_empty(&request.doc_type).unwrap_or("");
             return Err(EngineError::invalid_argument(format!(
-                "모르는 템플릿 유형 이다: {given}. 쓸 수 있는 것은 [plan, build, report, research, meeting, free] 뿐이다."
+                "모르는 템플릿 유형 이다: {given}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                DocType::NAMES_TEXT
             )));
         }
     };

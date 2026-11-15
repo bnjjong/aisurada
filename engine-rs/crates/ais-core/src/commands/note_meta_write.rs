@@ -3,6 +3,7 @@
 
 use std::path::Path;
 use crate::kernel::java::java_double_string;
+use crate::kernel::link_kind::LinkKind;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -240,15 +241,16 @@ pub fn link_docs(vault: &Path, request: &LinkDocsRequest) -> Result<Value, Engin
             )));
         }
     }
-    let mut kind = "direct".to_string();
+    let mut kind = LinkKind::Direct.as_str().to_string();
     if let Some(raw) = &request.kind
         && !trim(raw).is_empty()
     {
         let lower = trim(raw).to_lowercase();
-        if !["direct", "indirect", "attach"].contains(&lower.as_str()) {
+        if LinkKind::parse(&lower).is_none() {
             return Err(EngineError::invalid_argument(format!(
-                "모르는 관계 종류 이다: {}. 쓸 수 있는 것은 [direct, indirect, attach] 뿐이다.",
-                trim(raw)
+                "모르는 관계 종류 이다: {}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                trim(raw),
+                LinkKind::NAMES_TEXT
             )));
         }
         kind = lower;

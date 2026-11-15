@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+use crate::kernel::tier::Tier;
 
 use regex::Regex;
 
@@ -81,7 +82,7 @@ pub fn file_text(
         created: &meta.created,
         session_id: None,
         session_agent: None,
-        tier: "reading",
+        tier: Tier::Reading,
         edited_by: meta.edited_by.as_deref(),
         edited_at: meta.edited_at.as_deref(),
         edited_session_id: meta.edited_session_id.as_deref(),
@@ -219,7 +220,7 @@ pub fn rewrite_root(vault: &Path, root: &NoteRecord, body: &str) -> Result<Vec<u
         created: &meta.created,
         session_id: session_id.as_deref(),
         session_agent,
-        tier: &meta.tier,
+        tier: meta.tier,
         edited_by: meta.edited_by.as_deref(),
         edited_at: meta.edited_at.as_deref(),
         edited_session_id: meta.edited_session_id.as_deref(),

@@ -12,18 +12,19 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use crate::kernel::task_link::TaskLinkKind;
 
 use serde_json::Value as Json;
 
 use super::format::{
-    self, DEFAULT_PRIORITY, DEFAULT_TYPE, KEY, LINK_TYPES, MAX_FILE_BYTES, MAX_LINKS,
+    self, DEFAULT_PRIORITY, DEFAULT_TYPE, KEY, MAX_FILE_BYTES, MAX_LINKS,
 };
 use super::transitions;
 use super::{Criterion, Link, Ref, Task, TaskStatus};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
 use crate::text::compare_utf16;
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::vault::project::scan_projects;
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
@@ -209,7 +210,7 @@ pub fn unfinished_blockers(scan: &Scan, key: &str) -> Vec<String> {
     scan.items
         .iter()
         .filter(|t| t.status != TaskStatus::Done)
-        .filter(|t| t.links.iter().any(|l| l.kind == "blocks" && l.to == key))
+        .filter(|t| t.links.iter().any(|l| l.kind == TaskLinkKind::Blocks && l.to == key))
         .map(|t| t.key.clone())
         .collect()
 }
@@ -220,7 +221,7 @@ pub fn related(scan: &Scan, task: &Task) -> Vec<Related> {
     for link in &task.links {
         if let Some(other) = scan.by_key(&link.to) {
             out.push(Related {
-                kind: link.kind.clone(),
+                kind: link.kind.as_str().to_string(),
                 key: other.key.clone(),
                 title: other.title.clone(),
                 status: other.status,
@@ -235,16 +236,12 @@ pub fn related(scan: &Scan, task: &Task) -> Vec<Related> {
             if link.to != task.key {
                 continue;
             }
-            let inverse = match link.kind.as_str() {
-                "blocks" => "blocked-by",
-                "duplicates" => "duplicated-by",
-                _ => "relates",
-            };
-            if inverse == "relates"
+            let inverse = link.kind.inverse_label();
+            if link.kind == TaskLinkKind::Relates
                 && task
                     .links
                     .iter()
-                    .any(|x| x.kind == "relates" && x.to == other.key)
+                    .any(|x| x.kind == TaskLinkKind::Relates && x.to == other.key)
             {
                 continue;
             }
@@ -582,12 +579,12 @@ pub fn link(
     stamp: &Stamp,
     actor: &str,
 ) -> Result<Option<Task>, EngineError> {
-    if !LINK_TYPES.contains(&kind) {
+    let Some(kind) = TaskLinkKind::parse(kind) else {
         return Err(EngineError::invalid_argument(format!(
             "type 은 [{}] 가운데 하나여야 한다: {kind}",
-            LINK_TYPES.join(", ")
+            TaskLinkKind::NAMES_TEXT
         )));
-    }
+    };
     if from.key == to.key {
         return Err(EngineError::invalid_argument(format!(
             "자기 자신에게는 연결할 수 없다: {}",
@@ -595,11 +592,11 @@ pub fn link(
         )));
     }
     let forward = Link {
-        kind: kind.to_string(),
+        kind,
         to: to.key.clone(),
     };
     let backward = Link {
-        kind: kind.to_string(),
+        kind,
         to: from.key.clone(),
     };
     let (owner, links, event_kind): (&Task, Vec<Link>, &str);
@@ -622,12 +619,12 @@ pub fn link(
         if from.links.contains(&forward) {
             return Ok(None);
         }
-        if kind == "relates" && to.links.contains(&backward) {
+        if kind == TaskLinkKind::Relates && to.links.contains(&backward) {
             return Ok(None);
         }
-        if kind == "blocks"
+        if kind == TaskLinkKind::Blocks
             && to.links.contains(&Link {
-                kind: "blocks".to_string(),
+                kind: TaskLinkKind::Blocks,
                 to: from.key.clone(),
             })
         {
@@ -672,7 +669,7 @@ pub fn link(
                 actor,
                 event_kind,
                 vec![
-                    ("type".to_string(), JsonValue::Str(kind.to_string())),
+                    ("type".to_string(), JsonValue::Str(kind.as_str().to_string())),
                     ("with".to_string(), JsonValue::Str(other.clone())),
                     (
                         "direction".to_string(),

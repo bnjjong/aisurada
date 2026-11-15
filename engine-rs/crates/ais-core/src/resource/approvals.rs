@@ -14,7 +14,7 @@ use super::format::PERMISSIONS;
 use super::{Resource, ResourceKind, tools_equal};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::vault::note_file::compute_token;
+use crate::kernel::token::compute_token;
 use crate::write::apparatus::{instant_text, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::absolute_normalized;

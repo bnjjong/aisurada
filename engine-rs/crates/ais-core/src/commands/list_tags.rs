@@ -36,7 +36,7 @@ pub fn execute(index: &NoteIndex, request: &ListTagsRequest) -> Result<Page<TagR
         .map(str::to_ascii_lowercase);
 
     let mut counts: HashMap<&str, usize> = HashMap::new();
-    for note in index.root_notes().filter(|n| n.meta.tier != "record") {
+    for note in index.root_notes().filter(|n| !n.meta.tier.is_record()) {
         for tag in &note.meta.tags {
             *counts.entry(tag).or_default() += 1;
         }

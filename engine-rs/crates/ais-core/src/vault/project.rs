@@ -8,7 +8,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value as Json;
 
-use super::agenda::{HUES, is_valid_slug_segment, parse_line_reader, split_fence};
+use super::agenda::{is_valid_slug_segment, parse_line_reader, split_fence};
+use crate::kernel::hue::is_hue;
 use crate::text::{compare_utf16, trim, utf16_len};
 
 static PROJECT_ID: LazyLock<Regex> =
@@ -116,7 +117,7 @@ fn read_project(file_name: &str, path: &Path) -> Option<ProjectInfo> {
         _ => slug.clone(),
     };
     let hue = match kv.get("hue").map(|s| trim(s)) {
-        Some(h) if HUES.contains(&h) => h.to_string(),
+        Some(h) if is_hue(h) => h.to_string(),
         _ => "blue".to_string(),
     };
     // 요약은 닫는 울타리 뒤 줄바꿈 하나만 떼고 그대로 둔다

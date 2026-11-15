@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 use crate::kernel::ids::TRASH_ID;
 use crate::kernel::ids::AGENDA_ID;
+use crate::kernel::doc_type::DocType;
 
 
 use super::note_meta::parse_created;
@@ -13,7 +14,6 @@ use crate::text::{NOTE_ID, trim};
 
 const MANIFEST: &str = ".aisurada/trash/trash.json";
 const MAX_MANIFEST_BYTES: u64 = 10_000_000;
-const DOC_TYPES: [&str; 6] = ["plan", "build", "report", "research", "meeting", "free"];
 
 #[derive(Debug, Clone)]
 pub struct TrashRecord {
@@ -143,7 +143,7 @@ pub fn scan_trash(vault_root: &Path) -> TrashScan {
             title,
             agenda_slug: agenda_slug.to_string(),
             agenda_id: agenda_id.to_string(),
-            doc_type: if DOC_TYPES.contains(&doc_type) {
+            doc_type: if DocType::parse(doc_type).is_some() {
                 doc_type.to_string()
             } else {
                 "build".to_string()
