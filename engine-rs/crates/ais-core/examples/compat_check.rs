@@ -10066,7 +10066,9 @@ fn main() -> ExitCode {
         .find_map(|a| a.strip_prefix("--commit-fixture="))
         .map(PathBuf::from);
     if positional.len() < 2 {
-        eprintln!("사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose]");
+        eprintln!(
+            "사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose]"
+        );
         return ExitCode::from(2);
     }
     let home = env::temp_dir().join("ais-compat-home");

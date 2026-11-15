@@ -1982,7 +1982,9 @@ fn main() -> ExitCode {
     let verbose = args.iter().any(|a| a == "--verbose");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if positional.len() < 2 {
-        eprintln!("사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose]");
+        eprintln!(
+            "사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose]"
+        );
         return ExitCode::from(2);
     }
     let mut h = Harness::new(positional[0], Path::new(positional[1]), verbose);

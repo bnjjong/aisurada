@@ -161,7 +161,9 @@ fn cases() -> Vec<String> {
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let Some(dist) = args.first() else {
-        eprintln!("사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)>");
+        eprintln!(
+            "사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)>"
+        );
         return ExitCode::from(2);
     };
     let dist = Path::new(dist);
