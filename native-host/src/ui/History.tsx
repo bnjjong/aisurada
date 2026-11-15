@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { asRow, asText, rows } from "../workspace/types.ts";
 import type { Row } from "../workspace/types.ts";
-import { read } from "../data/commands.ts";
+import { fromArgv, read } from "../data/commands.ts";
 import { Modal } from "./Modal.tsx";
 import { compareBodies } from "../editor/diff.ts";
 import type { DiffRow } from "../editor/diff.ts";
@@ -174,7 +174,7 @@ export function History({
         ),
       ];
       if (sessions.length)
-        void controller.callEngine(["session-titles", ...sessions]).then(
+        void controller.callEngine(fromArgv(["session-titles", ...sessions])).then(
           (value) => {
             if (live.current)
               setTitles(

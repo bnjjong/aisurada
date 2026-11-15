@@ -20,8 +20,8 @@ export async function askClaudeBridge(args: AskClaudeArgs | Record<string, unkno
   }
 }
 
-/** Rust 엔진으로 옮긴 묻기·대화 명령 4개. 호스트가 알리면 Rust 엔진으로 가고, 아니면 예전처럼 Java 엔진으로 간다. */
-const ROUTED = new Set(['get-ask', 'append-ask-turn', 'list-chats', 'append-chat-turn']);
+/** Rust 엔진으로 옮긴 묻기·대화·세션 읽기 명령 7개. 호스트가 알리면 Rust 엔진으로 가고, 아니면 예전처럼 Java 엔진으로 간다. */
+const ROUTED = new Set(['get-ask', 'append-ask-turn', 'list-chats', 'append-chat-turn', 'read-session', 'session-titles', 'recent-sessions']);
 const enginePort = { invoke: (command: string, args?: Record<string, unknown>) => invoke<any>(command, args), engineCommands };
 
 export const tauriAskHost: AskHost = {

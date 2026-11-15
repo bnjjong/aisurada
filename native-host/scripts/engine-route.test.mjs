@@ -463,3 +463,19 @@ test('문답·대화 명령: 선택 자리 인자(후속 노트 id)를 이름 �
   assert.deepEqual(await engineReply(off, ['get-ask', note]), { status: 0, stdout: ' {"a": 1}\n', stderr: '' });
   assert.deepEqual(seen, [['get-ask', note]]);
 });
+
+test('세션 읽기 명령: 자리 인자 여럿(session-titles)을 배열로 바꾸고, 알리면 Rust로 가며 옛 응답 모양을 돌려준다', async () => {
+  const ids = ['aaaaaaaa-1111-2222-3333-444444444444', 'bbbbbbbb-1111-2222-3333-444444444444'];
+  const argvs = [['read-session', ids[0], 'limit=100', 'urls=true'], ['session-titles', ...ids], ['session-titles'], ['recent-sessions', 'days=7']];
+  for (const argv of argvs) assert.deepEqual(toArgv(fromArgv(argv)), argv, argv.join(' '));
+  assert.deepEqual(fromArgv(['session-titles', ...ids]), { command: 'session_titles', args: { ids } });
+  assert.deepEqual(fromArgv(['read-session', ids[0], 'limit=100']), { command: 'read_session', args: { id: ids[0], limit: '100' } });
+  const names = ['read_session', 'session_titles', 'recent_sessions'];
+  const on = host({ commands: names, rust: { read_session: () => ({ turns: [] }), session_titles: () => ({ sessions: [] }), recent_sessions: () => ({ days: 7, dropped: 0, sessions: [] }) } });
+  assert.deepEqual(await engineReply(on, ['session-titles', ...ids]), { status: 0, stdout: '{"sessions":[]}', stderr: '' });
+  assert.deepEqual(on.calls[0].args.args, { ids });
+  assert.equal((await engineReply(on, ['read-session', ids[0], 'limit=5'])).status, 0);
+  assert.deepEqual(on.calls[1].args.args, { id: ids[0], limit: '5' });
+  const off = host({ commands: [], java: { 'recent-sessions': () => ({ status: 0, stdout: '{"days":7}', stderr: '' }) } });
+  assert.deepEqual(await engineReply(off, ['recent-sessions', 'days=7']), { status: 0, stdout: '{"days":7}', stderr: '' });
+});

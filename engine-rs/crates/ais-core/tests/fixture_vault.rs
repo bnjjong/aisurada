@@ -3186,3 +3186,196 @@ fn appends_ask_and_chat_turns_next_to_the_note() {
     );
     assert_eq!(error("list_chats", json!({"id": single})).code, "AIS-500");
 }
+
+#[test]
+fn reads_session_transcripts_of_every_agent() {
+    // 세션 기록은 vault 밖 홈 아래에 있다. 이 시험만 쓰는 홈을 한 번 정한다.
+    static HOME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    let home = HOME.get_or_init(|| {
+        let home = std::env::temp_dir().join(format!("ais-session-home-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        // SAFETY: 이 환경 변수를 읽는 것은 세션 읽기 명령뿐이고, 이 시험만 세션 명령을 부른다.
+        unsafe {
+            std::env::set_var("AISURADA_CLAUDE_HOME", &home);
+            std::env::set_var("AISURADA_CODEX_HOME", &home);
+            std::env::set_var("AISURADA_GEMINI_HOME", &home);
+        }
+        home
+    });
+    let write = |rel: &str, text: &str| {
+        let path = home.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    };
+    let vault = fixture();
+    let engine = Engine::new(&vault);
+    let call = |command: &str, args: Value| engine.call(command, args);
+
+    // Claude: 회차, 도구 짝짓기(초와 실패), 할 일, 돌고 있는 에이전트, 주소, 실행 상태
+    let claude = "aaaaaaaa-1111-2222-3333-444444444444";
+    let lines = [
+        r#"{"type":"user","timestamp":"2026-11-14T01:00:00Z","cwd":"/w/p","gitBranch":"main","entrypoint":"cli","message":{"content":"질문 https://example.com/doc. 끝"}}"#,
+        "깨진 줄",
+        r#"{"type":"assistant","timestamp":"2026-11-14T01:00:01Z","effort":"high","message":{"model":"claude-opus","usage":{"input_tokens":1,"cache_read_input_tokens":2},"content":[{"type":"text","text":"답"},{"type":"tool_use","id":"t1","name":"TaskCreate","input":{}},{"type":"tool_use","id":"t2","name":"Agent","input":{"description":"하위 일"}},{"type":"tool_use","id":"t3","name":"Bash","input":{"command":"ls\n-la"}}]}}"#,
+        r#"{"type":"user","timestamp":"2026-11-14T01:00:03.500Z","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"Task #1 created successfully: 할 일"},{"type":"tool_result","tool_use_id":"t3","content":"x","is_error":true}]}}"#,
+    ];
+    write(
+        &format!(".claude/projects/-w-p/{claude}.jsonl"),
+        &(lines.join("\n") + "\n"),
+    );
+    let read = call("read_session", json!({"id": claude, "urls": "true"})).unwrap();
+    assert_eq!(
+        (
+            read["source"]["lines"].as_u64(),
+            read["source"]["skipped"].as_u64(),
+            read["source"]["messages"].as_u64()
+        ),
+        (Some(4), Some(1), Some(5))
+    );
+    assert_eq!(
+        read["urls"],
+        json!([{"url": "https://example.com/doc", "count": 1}])
+    );
+    assert_eq!(
+        read["todos"],
+        json!([{"number": 1, "title": "할 일", "status": "pending"}])
+    );
+    assert_eq!(
+        read["runningAgents"],
+        json!([{"what": "하위 일", "at": "2026-11-14T01:00:01Z"}])
+    );
+    assert_eq!(
+        read["runState"],
+        json!({"model": "claude-opus", "effort": "high", "contextTokens": 3, "quotaBlocked": false})
+    );
+    let bash = &read["turns"][4];
+    assert_eq!(
+        (
+            bash["tool"]["name"].as_str(),
+            bash["tool"]["arg"].as_str(),
+            bash["tool"]["failed"].as_bool(),
+            bash["tool"]["seconds"].as_f64()
+        ),
+        (Some("Bash"), Some("ls"), Some(true), Some(2.5))
+    );
+    assert_eq!(read["hasMore"], false);
+    let paged = call("read_session", json!({"id": claude, "limit": 1})).unwrap();
+    assert_eq!(
+        paged["turns"].as_array().unwrap().len(),
+        4,
+        "끝에서 거꾸로 글 회차 1개와 그 뒤의 도구 회차들"
+    );
+    assert_eq!(paged["hasMore"], true);
+
+    // 제목과 최근 세션(CLI 입구만, 파일 수정 시각이 7일 안)
+    write(
+        &format!(".claude/projects/-w-p/{claude}.jsonl"),
+        &(lines.join("\n") + "\n{\"type\":\"ai-title\",\"aiTitle\":\"붙은 제목\"}\n"),
+    );
+    let titles = call(
+        "session_titles",
+        json!({"ids": [claude, "12345678-0000-0000-0000-000000000000"]}),
+    )
+    .unwrap();
+    assert_eq!(
+        titles["sessions"][0],
+        json!({"sessionId": claude, "found": true, "title": "붙은 제목", "branch": "main", "cwd": "/w/p"})
+    );
+    assert_eq!(titles["sessions"][1]["found"], false);
+    let recent = call("recent_sessions", json!({})).unwrap();
+    assert_eq!(recent["sessions"][0]["sessionId"], claude);
+    assert_eq!(recent["dropped"], 0);
+
+    // Codex 새 형식, Gemini(되감기와 주입된 줄 제외), 없는 세션은 빈 응답
+    let codex = "11111111-aaaa-bbbb-cccc-111111111111";
+    let codex_lines = [
+        r#"{"timestamp":"t","type":"session_meta","payload":{"cwd":"/w/codex"}}"#,
+        r#"{"timestamp":"t1","type":"event_msg","payload":{"type":"item_completed","item":{"type":"UserMessage","content":[{"text":"코덱스"}]}}}"#,
+        r#"{"timestamp":"t2","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["/bin/zsh","-lc","cargo test"],"exit_code":1,"duration":{"secs":2,"nanos":340000000}}}}"#,
+    ];
+    write(
+        &format!(".codex/sessions/2026/11/14/rollout-2026-11-14T05-00-00-{codex}.jsonl"),
+        &(codex_lines.join("\n") + "\n"),
+    );
+    let found = call("read_session", json!({"id": codex})).unwrap();
+    assert_eq!(found["agent"], "codex");
+    assert_eq!(
+        found["turns"][1]["tool"],
+        json!({"name": "shell", "arg": "cargo test", "seconds": 2.3, "failed": true})
+    );
+    let gemini = "33333333-aaaa-bbbb-cccc-333333333333";
+    let gemini_lines = [
+        format!(r#"{{"sessionId":"{gemini}"}}"#),
+        r#"{"id":"a","type":"user","content":"<session_context>x</session_context>"}"#.to_string(),
+        r#"{"id":"b","type":"user","content":"되감길 질문"}"#.to_string(),
+        r#"{"$rewindTo":"b"}"#.to_string(),
+        r#"{"id":"c","type":"user","content":"남는 질문"}"#.to_string(),
+    ];
+    write(
+        &format!(
+            ".gemini/tmp/projx/chats/session-2026-11-14T07-00-{}.jsonl",
+            &gemini[..8]
+        ),
+        &(gemini_lines.join("\n") + "\n"),
+    );
+    write(
+        ".gemini/projects.json",
+        r#"{"projects":{"/w/gemini":"projx"}}"#,
+    );
+    let found = call("read_session", json!({"id": gemini})).unwrap();
+    assert_eq!(
+        (
+            found["agent"].as_str(),
+            found["source"]["messages"].as_u64(),
+            found["turns"][0]["text"].as_str()
+        ),
+        (Some("gemini"), Some(1), Some("남는 질문"))
+    );
+    let titles = call("session_titles", json!({"ids": [gemini]})).unwrap();
+    assert_eq!(
+        titles["sessions"][0],
+        json!({"sessionId": gemini, "found": true, "title": "남는 질문", "branch": null, "cwd": "/w/gemini", "agent": "gemini"})
+    );
+    let none = call(
+        "read_session",
+        json!({"id": "12345678-0000-0000-0000-000000000000", "note": "ndnone0000-0000"}),
+    )
+    .unwrap();
+    assert_eq!(
+        (
+            none["file"].clone(),
+            none["noteMentions"].clone(),
+            none["turns"].clone()
+        ),
+        (Value::Null, json!([]), json!([]))
+    );
+
+    // 인자 오류
+    for (args, message) in [
+        (
+            json!({}),
+            "인자가 하나 필요하다: read-session <세션 id> [limit=<개수>] [before=<순번>] [urls=true] [note=<노트 id>] [author=<노트 id>,...]",
+        ),
+        (json!({"id": "nope"}), "세션 식별자 모양이 아니에요: nope"),
+        (
+            json!({"id": claude, "limit": "x"}),
+            "limit 은 숫자여야 한다: x",
+        ),
+        (
+            json!({"id": claude, "urls": "yes"}),
+            "urls 은 true 나 false 여야 한다: yes",
+        ),
+        (
+            json!({"id": claude, "note": "BAD"}),
+            "노트 id 모양이 아니에요: BAD",
+        ),
+    ] {
+        assert_eq!(call("read_session", args).unwrap_err().message, message);
+    }
+    assert_eq!(
+        call("recent_sessions", json!({"days": 31}))
+            .unwrap_err()
+            .message,
+        "days 는 1 부터 30 사이여야 해요: 31"
+    );
+}

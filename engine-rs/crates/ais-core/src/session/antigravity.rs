@@ -33,20 +33,21 @@ const ID_TAIL_BYTES: usize = 60;
 const SQLITE_TIMEOUT_SECONDS: u64 = 60;
 
 fn steps_sql() -> String {
+    // 줄을 잇는 `\`는 다음 줄의 앞 공백을 먹으므로, 낱말 사이 공백은 앞 줄 끝에 둔다
     format!(
-        "select idx, step_type, status, ifnull(length(error_details),0), hex(substr(metadata,1,{META_PREFIX_BYTES})),\
- case when step_type=132 and instr(metadata, cast('\"ServerName\"' as blob))>0\
- then hex(substr(metadata, instr(metadata, cast('\"ServerName\"' as blob)), {MCP_TAIL_BYTES})) else '' end,\
- case when step_type=132 and instr(metadata, cast('\"id\":\"' as blob))>0\
- then hex(substr(metadata, instr(metadata, cast('\"id\":\"' as blob)), {ID_TAIL_BYTES})) else '' end,\
- case when step_type in (14,15) then hex(step_payload) else '' end\
- from steps order by idx"
+        "select idx, step_type, status, ifnull(length(error_details),0), hex(substr(metadata,1,{META_PREFIX_BYTES})), \
+         case when step_type=132 and instr(metadata, cast('\"ServerName\"' as blob))>0 \
+         then hex(substr(metadata, instr(metadata, cast('\"ServerName\"' as blob)), {MCP_TAIL_BYTES})) else '' end, \
+         case when step_type=132 and instr(metadata, cast('\"id\":\"' as blob))>0 \
+         then hex(substr(metadata, instr(metadata, cast('\"id\":\"' as blob)), {ID_TAIL_BYTES})) else '' end, \
+         case when step_type in (14,15) then hex(step_payload) else '' end \
+         from steps order by idx"
     )
 }
 
-const META_SQL: &str = "select 'T', hex(substr(data,1,1500)) from trajectory_metadata_blob limit 1;\
- select 'E', hex(data) from executor_metadata order by idx desc limit 1;\
- select 'G', hex(data) from gen_metadata order by idx desc limit 1;";
+const META_SQL: &str = "select 'T', hex(substr(data,1,1500)) from trajectory_metadata_blob limit 1; \
+     select 'E', hex(data) from executor_metadata order by idx desc limit 1; \
+     select 'G', hex(data) from gen_metadata order by idx desc limit 1;";
 
 /// 대화 id로 기록 파일을 찾는다. 폴더 두 곳(antigravity-cli, antigravity)을 차례로 본다. 없거나 id 모양이 틀리면 `None`.
 pub fn find(directories: &[PathBuf], session_id: &str) -> Option<PathBuf> {

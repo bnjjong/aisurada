@@ -3,6 +3,7 @@
 // (예전에는 왼쪽 레일의 PROJECTS 패널이 이 파일에 같이 있었다. 패널은 없어졌고 저장소만 남았다.)
 import { useEffect, useSyncExternalStore } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { tauriAskHost } from "./askHost.ts";
 
 import type { ClaudeSession } from './sessionTypes.ts';
 export type { ClaudeSession };
@@ -12,12 +13,6 @@ interface AgentsResponse {
   stdout: string;
   error?: string | null;
   elapsedMs: number;
-}
-
-interface SidecarResult {
-  status: number;
-  stdout: string;
-  stderr: string;
 }
 
 interface SessionStoreState {
@@ -194,7 +189,7 @@ async function refreshSessionList(vaultPath?: string) {
     titlesQueries.length > 0
       ? Promise.all(
           titlesQueries.map((chunk) =>
-            invoke<SidecarResult>("sidecar_call", { argv: ["session-titles", ...chunk] })
+            tauriAskHost.engine(["session-titles", ...chunk])
               .then((r) => (r.status === 0 ? JSON.parse(r.stdout) : null))
               .catch(() => null)
           )
@@ -205,7 +200,7 @@ async function refreshSessionList(vaultPath?: string) {
       ? invoke<string[]>("held_agent_sessions", { vault: vaultPath }).catch(() => [])
       : Promise.resolve([]),
     // D. recent-sessions (6.5)
-    invoke<SidecarResult>("sidecar_call", { argv: ["recent-sessions", "days=7"] })
+    tauriAskHost.engine(["recent-sessions", "days=7"])
       .then((r) => (r.status === 0 ? JSON.parse(r.stdout) : null))
       .catch(() => null),
   ]);

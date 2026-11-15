@@ -1281,6 +1281,9 @@ impl WriteHarness<'_> {
                     "-Daisurada.approvals.dir={}",
                     self.approvals_base("java").display()
                 ),
+                format!("-Daisurada.claude.home={}", self.session_home().display()),
+                format!("-Daisurada.codex.home={}", self.session_home().display()),
+                format!("-Daisurada.gemini.home={}", self.session_home().display()),
             ],
             &[(
                 "AISURADA_LOCK_DIR".to_string(),
@@ -1355,6 +1358,11 @@ impl WriteHarness<'_> {
             );
         }
         ok_value
+    }
+
+    /// 세션 기록을 읽는 합성 홈(두 엔진이 같은 폴더를 읽는다)
+    fn session_home(&self) -> PathBuf {
+        self.locks.parent().unwrap().join("session-home")
     }
 
     /// 승인 기록을 두는 바탕 폴더(두 엔진이 따로 쓴다)
@@ -7489,6 +7497,544 @@ fn compare_ask_chat_commands(h: &mut WriteHarness) {
     );
 }
 
+// ---------------------------------------------------------------- 세션 기록 읽기(4d)
+
+fn pb_varint(mut value: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    loop {
+        let byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if value == 0 {
+            out.push(byte);
+            return out;
+        }
+        out.push(byte | 0x80);
+    }
+}
+
+fn pb_num(field: u32, value: u64) -> Vec<u8> {
+    let mut out = pb_varint(u64::from(field) << 3);
+    out.extend(pb_varint(value));
+    out
+}
+
+fn pb_len(field: u32, bytes: &[u8]) -> Vec<u8> {
+    let mut out = pb_varint((u64::from(field) << 3) | 2);
+    out.extend(pb_varint(bytes.len() as u64));
+    out.extend_from_slice(bytes);
+    out
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02X}")).collect()
+}
+
+/// 합성 Antigravity 대화 기록(SQLite)을 시스템의 `sqlite3`로 만든다.
+fn make_antigravity_db(path: &Path, cwd: &str) {
+    let time = |secs: u64, nanos: u64| {
+        let mut t = pb_num(1, secs);
+        t.extend(pb_num(2, nanos));
+        pb_len(1, &t)
+    };
+    let user_meta = time(1_794_700_000, 123_000_000);
+    let model_meta = time(1_794_700_005, 0);
+    let user_payload = pb_len(
+        19,
+        &pb_len(
+            2,
+            "안티그래비티에게 묻는다 https://example.com/agy 끝".as_bytes(),
+        ),
+    );
+    let model_payload = pb_len(
+        20,
+        &[
+            pb_len(1, "답한다".as_bytes()),
+            pb_len(3, "생각은 뺀다".as_bytes()),
+        ]
+        .concat(),
+    );
+    let empty_payload = pb_len(19, &pb_len(2, b"   "));
+    let tool = |name: &str, args: &str| {
+        let call = [pb_len(2, name.as_bytes()), pb_len(3, args.as_bytes())].concat();
+        [time(1_794_700_010, 1_000), pb_len(4, &call)].concat()
+    };
+    let mcp_args = r#"{"x":1,"ServerName":"srv","ToolName":"search"}"#;
+    let rows: Vec<String> = vec![
+        format!(
+            "(0,14,0,NULL,X'{}',X'{}')",
+            hex(&user_meta),
+            hex(&user_payload)
+        ),
+        format!(
+            "(1,15,0,NULL,X'{}',X'{}')",
+            hex(&model_meta),
+            hex(&model_payload)
+        ),
+        format!(
+            "(2,14,5,NULL,X'{}',X'{}')",
+            hex(&user_meta),
+            hex(&empty_payload)
+        ),
+        format!(
+            "(3,132,0,NULL,X'{}',NULL)",
+            hex(&tool(
+                "run_command",
+                r#"{"CommandLine":"ls -la","description":"목록을 본다"}"#
+            ))
+        ),
+        format!(
+            "(4,132,7,NULL,X'{}',NULL)",
+            hex(&tool("view_file", r#"{"AbsolutePath":"/tmp/a.txt"}"#))
+        ),
+        format!(
+            "(5,132,0,X'01',X'{}',NULL)",
+            hex(&tool("call_mcp_tool", mcp_args))
+        ),
+        format!("(6,101,0,NULL,X'{}',NULL)", hex(&user_meta)),
+        "(7,14,0,NULL,X'',NULL)".to_string(),
+    ];
+    let cwd_url = format!("file://{cwd}");
+    let trajectory = pb_len(7, cwd_url.as_bytes());
+    let executor = pb_len(
+        10,
+        &pb_len(1, &pb_len(28, "gemini-3.8-flash-high".as_bytes())),
+    );
+    let generated = pb_len(1, &pb_len(21, "Gemini 화면 이름".as_bytes()));
+    let sql = format!(
+        "create table steps(idx integer, step_type integer, status integer, error_details blob, metadata blob, step_payload blob);\
+         create table trajectory_metadata_blob(data blob); create table executor_metadata(idx integer, data blob); create table gen_metadata(idx integer, data blob);\
+         insert into steps values {};\
+         insert into trajectory_metadata_blob values (X'{}');\
+         insert into executor_metadata values (0, X'{}');\
+         insert into gen_metadata values (0, X'{}');",
+        rows.join(","),
+        hex(&trajectory),
+        hex(&executor),
+        hex(&generated)
+    );
+    let _ = fs::remove_file(path);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let status = Command::new("/usr/bin/sqlite3")
+        .arg(path)
+        .arg(sql)
+        .status()
+        .expect("sqlite3");
+    assert!(status.success(), "합성 Antigravity 기록을 못 만들었다");
+}
+
+/// 세션 읽기 맞대기: 합성 홈(`session-home`)에 네 가지 형식의 기록을 만들어 두 엔진이 같은 글로 읽는지 본다.
+fn compare_session_commands(h: &mut WriteHarness) {
+    let home = h.locks.parent().unwrap().join("session-home");
+    let _ = fs::remove_dir_all(&home);
+    let write = |rel: &str, content: &str| {
+        let path = home.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    };
+    let set_age = |rel: &str, seconds_ago: u64| {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(home.join(rel))
+            .unwrap();
+        let when = std::time::SystemTime::now() - std::time::Duration::from_secs(seconds_ago);
+        file.set_modified(when).unwrap();
+    };
+
+    // ---- Claude ----
+    let a = "aaaaaaaa-1111-2222-3333-444444444444";
+    let long_text = format!("긴 글 😀 {}", "가".repeat(2100));
+    let note = "ndclaude01-0001";
+    let claude_lines = vec![
+        r#"{"type":"custom-title","customTitle":"꼬리 제목 아님","sessionId":"x"}"#.to_string(),
+        r#"{"type":"user","timestamp":"2026-11-14T01:00:00.000Z","cwd":"/work/proj","gitBranch":"feat/x","entrypoint":"cli","message":{"role":"user","content":"처음 질문 https://github.com/a/b/pull/1. 그리고 http://localhost:3000/x 와 https://example.com/page, 끝"}}"#.to_string(),
+        String::new(),
+        r#"   "#.to_string(),
+        "{깨진 줄".to_string(),
+        "[1,2]".to_string(),
+        r#"{"timestamp":"2026-11-14T01:00:01Z","message":{"content":"type 없음"}}"#.to_string(),
+        format!(r#"{{"type":"assistant","timestamp":"2026-11-14T01:00:02.500Z","effort":"high","message":{{"model":"claude-opus","usage":{{"input_tokens":10,"cache_creation_input_tokens":5,"cache_read_input_tokens":100}},"content":[{{"type":"text","text":"{long_text}"}},{{"type":"tool_use","id":"t1","name":"Bash","input":{{"command":"ls -la\n둘째 줄","description":""}}}},{{"type":"tool_use","id":"t2","name":"TaskCreate","input":{{"subject":"할 일"}}}},{{"type":"tool_use","id":"t3","name":"Agent","input":{{"description":"하위 에이전트 일"}}}},{{"type":"tool_use","id":"t4","name":"Read","input":{{"file_path":"/very/long/{}/file.rs"}}}},{{"type":"tool_use","id":"t5","name":"TaskUpdate","input":{{"status":"completed","subject":"고친 제목"}}}},{{"type":"tool_use","id":"t6","name":"Edit","input":{{"file_path":"{}"}}}}]}}}}"#, "경".repeat(130), "x".repeat(130)),
+        format!(r#"{{"type":"user","timestamp":"2026-11-14T01:00:05.250Z","message":{{"role":"user","content":[{{"type":"tool_result","tool_use_id":"t1","content":"출력"}},{{"type":"tool_result","tool_use_id":"t2","content":"Task #1 created successfully: 할 일 제목 "}},{{"type":"tool_result","tool_use_id":"t5","content":"Updated task #1 status","is_error":true}},{{"type":"tool_result","tool_use_id":"t4","content":["배열"]}},{{"type":"tool_result","tool_use_id":"nope","content":"x"}},{{"type":"text","text":"사용자가 {note} 노트를 말한다"}},{{"type":"text","text":"   "}}]}}}}"#),
+        r#"{"type":"assistant","timestamp":"2026-11-14T01:00:06Z","message":{"model":"<synthetic>","content":"합성 답"},"quotaLimits":{"resetsAt":1794700000}}"#.to_string(),
+        r#"{"type":"assistant","timestamp":"2026-11-14T01:00:07Z","message":{"model":"claude-sonnet","usage":{"output_tokens":3},"content":[{"type":"text","text":"문자열 입력 없음"}]}}"#.to_string(),
+        r#"{"type":"assistant","timestamp":"2026-11-14T01:00:08Z","quotaLimits":{"resetsAt":1794709999},"message":{"model":"claude-sonnet","content":"quota 뒤"}}"#.to_string(),
+        r#"{"type":"user","timestamp":"2026-11-14T01:00:09Z","message":{"content":[{"type":"tool_result","tool_use_id":"t6","content":"Task #x created successfully"}]}}"#.to_string(),
+        r#"{"type":"user","timestamp":"2026-11-14T01:00:10Z","message":{"content":[{"type":"tool_result","tool_use_id":"t3","content":"Task #99999999999 created successfully: 큰 번호"}]}}"#.to_string(),
+        format!(r#"{{"type":"user","timestamp":"2026-11-14T01:00:11Z","message":{{"content":"{note} 다시"}}}}"#),
+        r#"{"type":"ai-title","aiTitle":"AI가 붙인 제목","sessionId":"x"}"#.to_string(),
+    ];
+    write(
+        &format!(".claude/projects/-work-proj/{a}.jsonl"),
+        &(claude_lines.join("\r\n") + "\n"),
+    );
+    set_age(&format!(".claude/projects/-work-proj/{a}.jsonl"), 3600);
+    // 제목 규칙 4가지와 폴더 안의 custom-title.json
+    let t_custom = "bbbbbbbb-1111-2222-3333-444444444444";
+    write(
+        &format!(".claude/projects/-work-proj/{t_custom}.jsonl"),
+        "{\"type\":\"custom-title\",\"customTitle\":\"직접 붙인 제목\"}\n{\"type\":\"ai-title\",\"aiTitle\":\"AI 제목\"}\n{\"type\":\"user\",\"entrypoint\":\"cli\",\"timestamp\":\"2026-11-14T02:00:00Z\",\"gitBranch\":\"main\",\"cwd\":\"/w/b\",\"message\":{\"content\":\"x\"}}\n",
+    );
+    let t_file = "cccccccc-1111-2222-3333-444444444444";
+    write(
+        &format!(".claude/projects/-work-proj/{t_file}.jsonl"),
+        "{\"type\":\"user\",\"entrypoint\":\"cli\",\"timestamp\":\"2026-11-14T03:00:00Z\",\"cwd\":\"/w/c\",\"message\":{\"content\":\"x\"}}\n{\"type\":\"ai-title\",\"aiTitle\":\"AI 제목\"}\n",
+    );
+    write(
+        &format!(".claude/projects/-work-proj/{t_file}/custom-title.json"),
+        r#"{"customTitle":"폴더의 제목"}"#,
+    );
+    set_age(&format!(".claude/projects/-work-proj/{t_file}.jsonl"), 7200);
+    let t_none = "dddddddd-1111-2222-3333-444444444444";
+    write(
+        &format!(".claude/projects/-other/{t_none}.jsonl"),
+        "{\"type\":\"user\",\"entrypoint\":\"sdk-cli\",\"message\":{\"content\":\"x\"}}\n",
+    );
+    // 64KB를 넘는 파일: 머리와 꼬리 창만 본다(꼬리에서 branch, 머리에서 cwd)
+    let big = "eeeeeeee-1111-2222-3333-444444444444";
+    let mut big_text = String::from(
+        "{\"type\":\"user\",\"entrypoint\":\"cli\",\"timestamp\":\"2026-11-14T04:00:00Z\",\"cwd\":\"/w/big\",\"gitBranch\":\"head-branch\",\"message\":{\"content\":\"머리\"}}\n",
+    );
+    for i in 0..1400 {
+        big_text.push_str(&format!(
+            "{{\"type\":\"assistant\",\"message\":{{\"content\":\"채움 {i} 가나다라마바사\"}}}}\n"
+        ));
+    }
+    big_text.push_str("{\"type\":\"user\",\"gitBranch\":\"tail\\u0020branch\",\"message\":{\"content\":\"꼬리\"}}\n");
+    big_text.push_str("{\"type\":\"custom-title\",\"customTitle\":\"꼬리의 직접 제목\"}\n");
+    write(
+        &format!(".claude/projects/-work-proj/{big}.jsonl"),
+        &big_text,
+    );
+    set_age(&format!(".claude/projects/-work-proj/{big}.jsonl"), 100);
+    // 오래된 세션(7일 밖)과 깨진 UTF-8 바이트
+    let old = "ffffffff-1111-2222-3333-444444444444";
+    write(
+        &format!(".claude/projects/-work-proj/{old}.jsonl"),
+        "{\"type\":\"user\",\"entrypoint\":\"cli\",\"message\":{\"content\":\"옛\"}}\n",
+    );
+    set_age(
+        &format!(".claude/projects/-work-proj/{old}.jsonl"),
+        40 * 86_400,
+    );
+    let broken = "99999999-1111-2222-3333-444444444444";
+    let mut bytes = b"{\"type\":\"user\",\"entrypoint\":\"cli\",\"message\":{\"content\":\"\xff\xfe\xe2\x82 \xEB\x81\x9D\"}}\n".to_vec();
+    bytes.extend_from_slice("{\"type\":\"assistant\",\"message\":{\"content\":\"답\"}}".as_bytes());
+    let path = home.join(format!(".claude/projects/-work-proj/{broken}.jsonl"));
+    fs::write(&path, bytes).unwrap();
+
+    // ---- Codex ----
+    let cx_new = "11111111-aaaa-bbbb-cccc-111111111111";
+    let codex_new = [
+        r#"{"timestamp":"2026-11-14T05:00:00Z","type":"session_meta","payload":{"cwd":"/work/codex","id":"x"}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:01Z","type":"turn_context","payload":{"model":"gpt-5","cwd":"/ignored"}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"UserMessage","content":[{"type":"input_text","text":"코덱스에게"},{"type":"text","text":"둘째 조각"}]}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","content":"그냥 글"}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:04Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["/bin/zsh","-lc","cargo test\n--all"],"exit_code":1,"duration":{"secs":2,"nanos":340000000}}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:05Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["ls","-la"],"exit_code":0}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:06Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"McpToolCall","server":"srv","tool":"find","status":"failed","duration":{"secs":0,"nanos":50000000}}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:07Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"McpToolCall","status":"completed"}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:08Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","status":"completed","changes":{"/a/b/c.rs":{},"d.md":{}}}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:09Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"Reasoning"}}}"#,
+        r#"{"timestamp":"2026-11-14T05:00:10Z","type":"event_msg","payload":{"type":"user_message","message":"새 형식이 있으면 무시"}}"#,
+        "\"item_completed\" 깨진 줄",
+        r#"{"type":"unrelated"}"#,
+    ];
+    write(
+        &format!(".codex/sessions/2026/11/14/rollout-2026-11-14T05-00-00-{cx_new}.jsonl"),
+        &(codex_new.join("\n") + "\n"),
+    );
+    let cx_old = "22222222-aaaa-bbbb-cccc-222222222222";
+    let codex_old = [
+        r#"{"timestamp":"2026-11-14T06:00:00Z","type":"session_meta","payload":{"cwd":"/work/codex-old"}}"#,
+        r#"{"timestamp":"2026-11-14T06:00:01Z","type":"event_msg","payload":{"type":"user_message","message":"예전 질문 https://example.org/old"}}"#,
+        r#"{"timestamp":"2026-11-14T06:00:02Z","type":"event_msg","payload":{"type":"agent_message","message":"예전 답"}}"#,
+        r#"{"timestamp":"2026-11-14T06:00:03Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"git status\"]}"}}"#,
+        r#"{"timestamp":"2026-11-14T06:00:04Z","type":"response_item","payload":{"type":"function_call","name":"raw","arguments":"JSON 아님"}}"#,
+        r#"{"timestamp":"2026-11-14T06:00:05Z","type":"response_item","payload":{"type":"function_call","name":"nocommand","arguments":"{\"x\":1}"}}"#,
+    ];
+    write(
+        &format!(".codex/sessions/2026/11/14/rollout-2026-11-14T06-00-00-{cx_old}.jsonl"),
+        &(codex_old.join("\n") + "\n"),
+    );
+
+    // ---- Gemini CLI ----
+    let gm = "33333333-aaaa-bbbb-cccc-333333333333";
+    let gemini = [
+        format!(r#"{{"sessionId":"{gm}","projectHash":"h","startTime":"2026-11-14T07:00:00Z","kind":"main"}}"#),
+        r#"{"id":"m1","type":"user","timestamp":"2026-11-14T07:00:01Z","content":[{"text":"<session_context>환경</session_context>"}]}"#.to_string(),
+        r#"{"id":"m2","type":"user","timestamp":"2026-11-14T07:00:02Z","content":[{"text":"제미나이 질문"}]}"#.to_string(),
+        r#"{"id":"m3","type":"gemini","timestamp":"2026-11-14T07:00:03Z","model":"gemini-3","content":"답","toolCalls":[{"name":"read_file","args":{"file_path":"/a/b.rs"},"status":"success"},{"name":"run","args":{"command":"ls"},"status":"error"},{"name":"nostatus","args":{}},{"name":"nullstatus","status":null,"args":{"dir_path":"/d"}},{"args":{}}]}"#.to_string(),
+        r#"{"$set":{"lastUpdated":"x"}}"#.to_string(),
+        r#"{"id":"m4","type":"user","timestamp":"2026-11-14T07:00:04Z","content":"되감을 질문"}"#.to_string(),
+        r#"{"id":"m5","type":"gemini","timestamp":"2026-11-14T07:00:05Z","content":[{"text":"되감길 답"}]}"#.to_string(),
+        r#"{"$rewindTo":"m4"}"#.to_string(),
+        r#"{"$rewindTo":"unknown"}"#.to_string(),
+        r#"{"id":"m6","type":"user","timestamp":"2026-11-14T07:00:06Z","content":"되감은 뒤 질문 https://gemini.example.com/doc"}"#.to_string(),
+        "깨진 줄".to_string(),
+    ];
+    write(
+        &format!(
+            ".gemini/tmp/projx/chats/session-2026-11-14T07-00-{}.jsonl",
+            &gm[..8]
+        ),
+        &(gemini.join("\n") + "\n"),
+    );
+    write(
+        ".gemini/projects.json",
+        r#"{"projects":{"/work/gemini":"projx","/other":"other"}}"#,
+    );
+
+    // ---- Antigravity ----
+    let agy = "44444444-aaaa-bbbb-cccc-444444444444";
+    make_antigravity_db(
+        &home.join(format!(".gemini/antigravity-cli/conversations/{agy}.db")),
+        "/work/agy dir%20x",
+    );
+
+    let ids = [
+        a, t_custom, t_file, t_none, big, old, broken, cx_new, cx_old, gm, agy,
+    ];
+    let step = |h: &mut WriteHarness, label: &str, command: &str, java: &[&str], rust: Value| {
+        h.step(&format!("세션 {label}"), java, command, rust);
+    };
+    for id in ids {
+        step(
+            h,
+            &format!("읽기 {id}"),
+            "read_session",
+            &["read-session", id],
+            json!({"id": id}),
+        );
+        step(
+            h,
+            &format!("읽기 주소 {id}"),
+            "read_session",
+            &["read-session", id, "urls=true", "limit=2"],
+            json!({"id": id, "urls": "true", "limit": "2"}),
+        );
+    }
+    step(
+        h,
+        "읽기 before",
+        "read_session",
+        &["read-session", a, "before=3", "limit=1"],
+        json!({"id": a, "before": "3", "limit": "1"}),
+    );
+    step(
+        h,
+        "읽기 before 범위 밖",
+        "read_session",
+        &["read-session", a, "before=999", "limit=0"],
+        json!({"id": a, "before": "999", "limit": "0"}),
+    );
+    step(
+        h,
+        "읽기 limit 큰 값",
+        "read_session",
+        &["read-session", a, "limit=100000", "before=-5"],
+        json!({"id": a, "limit": "100000", "before": "-5"}),
+    );
+    step(
+        h,
+        "읽기 노트 언급",
+        "read_session",
+        &["read-session", a, &format!("note={note}")],
+        json!({"id": a, "note": note}),
+    );
+    step(
+        h,
+        "읽기 글쓴이",
+        "read_session",
+        &[
+            "read-session",
+            a,
+            &format!("author=ndnone0000-0000,{note}"),
+            "limit=1",
+        ],
+        json!({"id": a, "author": format!("ndnone0000-0000,{note}"), "limit": "1"}),
+    );
+    step(
+        h,
+        "읽기 글쓴이 없음",
+        "read_session",
+        &["read-session", a, "author=ndnone0000-0000"],
+        json!({"id": a, "author": "ndnone0000-0000"}),
+    );
+    step(
+        h,
+        "읽기 노트 언급 Codex",
+        "read_session",
+        &["read-session", cx_new, "note=ndclaude01-0001"],
+        json!({"id": cx_new, "note": "ndclaude01-0001"}),
+    );
+    step(
+        h,
+        "읽기 없는 세션",
+        "read_session",
+        &[
+            "read-session",
+            "12345678-0000-0000-0000-000000000000",
+            "note=ndclaude01-0001",
+        ],
+        json!({"id": "12345678-0000-0000-0000-000000000000", "note": "ndclaude01-0001"}),
+    );
+    for (label, java, rust) in [
+        ("인자 없음", vec!["read-session"], json!({})),
+        (
+            "세션 id 모양",
+            vec!["read-session", "nope"],
+            json!({"id": "nope"}),
+        ),
+        (
+            "세션 id 공백",
+            vec!["read-session", " aaaaaaaa-1111"],
+            json!({"id": " aaaaaaaa-1111"}),
+        ),
+        (
+            "limit 글",
+            vec!["read-session", a, "limit=x"],
+            json!({"id": a, "limit": "x"}),
+        ),
+        (
+            "before 글",
+            vec!["read-session", a, "before=1.5"],
+            json!({"id": a, "before": "1.5"}),
+        ),
+        (
+            "urls 글",
+            vec!["read-session", a, "urls=yes"],
+            json!({"id": a, "urls": "yes"}),
+        ),
+        (
+            "note 모양",
+            vec!["read-session", a, "note=BAD"],
+            json!({"id": a, "note": "BAD"}),
+        ),
+        (
+            "author 모양",
+            vec!["read-session", a, "author=ndnone0000-0000, ndclaude01-0001"],
+            json!({"id": a, "author": "ndnone0000-0000, ndclaude01-0001"}),
+        ),
+        (
+            "author 9개",
+            vec![
+                "read-session",
+                a,
+                "author=a000000000,a000000001,a000000002,a000000003,a000000004,a000000005,a000000006,a000000007,a000000008",
+            ],
+            json!({"id": a, "author": "a000000000,a000000001,a000000002,a000000003,a000000004,a000000005,a000000006,a000000007,a000000008"}),
+        ),
+    ] {
+        step(
+            h,
+            &format!("읽기 오류 {label}"),
+            "read_session",
+            &java,
+            rust,
+        );
+    }
+    // 제목: 한 번에 여럿(Claude, Codex, Gemini, Antigravity, 없는 것 섞어서)
+    let mut titles_java: Vec<&str> = vec!["session-titles"];
+    titles_java.extend(ids.iter().copied());
+    titles_java.push("12345678-0000-0000-0000-000000000000");
+    let mut titles_ids: Vec<Value> = ids.iter().map(|i| json!(i)).collect();
+    titles_ids.push(json!("12345678-0000-0000-0000-000000000000"));
+    step(
+        h,
+        "제목 여럿",
+        "session_titles",
+        &titles_java,
+        json!({"ids": titles_ids}),
+    );
+    step(
+        h,
+        "제목 하나",
+        "session_titles",
+        &["session-titles", gm],
+        json!({"ids": [gm]}),
+    );
+    step(
+        h,
+        "제목 없음",
+        "session_titles",
+        &["session-titles"],
+        json!({"ids": []}),
+    );
+    step(
+        h,
+        "제목 모양 오류",
+        "session_titles",
+        &["session-titles", a, "nope"],
+        json!({"ids": [a, "nope"]}),
+    );
+    let many: Vec<String> = (0..201).map(|i| format!("{i:08x}-0000")).collect();
+    let mut many_java: Vec<&str> = vec!["session-titles"];
+    many_java.extend(many.iter().map(String::as_str));
+    step(
+        h,
+        "제목 201개",
+        "session_titles",
+        &many_java,
+        json!({"ids": many}),
+    );
+    // 최근 세션
+    step(
+        h,
+        "최근 기본",
+        "recent_sessions",
+        &["recent-sessions"],
+        json!({}),
+    );
+    step(
+        h,
+        "최근 1일",
+        "recent_sessions",
+        &["recent-sessions", "days=1"],
+        json!({"days": "1"}),
+    );
+    step(
+        h,
+        "최근 30일",
+        "recent_sessions",
+        &["recent-sessions", "days=30"],
+        json!({"days": 30}),
+    );
+    step(
+        h,
+        "최근 days 0",
+        "recent_sessions",
+        &["recent-sessions", "days=0"],
+        json!({"days": "0"}),
+    );
+    step(
+        h,
+        "최근 days 31",
+        "recent_sessions",
+        &["recent-sessions", "days=31"],
+        json!({"days": "31"}),
+    );
+    step(
+        h,
+        "최근 days 글",
+        "recent_sessions",
+        &["recent-sessions", "days=x"],
+        json!({"days": "x"}),
+    );
+    // 합성 기록이 비어 있어서 양쪽이 똑같이 빈 응답을 내는 일이 아닌지 가려낸다
+    for (id, least) in [(a, 8), (cx_new, 4), (cx_old, 3), (gm, 3), (agy, 3)] {
+        let messages = Engine::new(&h.b)
+            .call("read_session", json!({"id": id}))
+            .ok()
+            .and_then(|v| v["source"]["messages"].as_u64())
+            .unwrap_or(0);
+        h.report.record(
+            format!("세션 합성 기록이 비어 있지 않다 {id}"),
+            messages >= least,
+            || format!("회차 {messages}개"),
+        );
+    }
+    let _ = fs::remove_dir_all(&home);
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -7513,6 +8059,9 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         env::set_var("AISURADA_LOCK_DIR", &locks);
         env::set_var("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false");
         env::set_var("AISURADA_APPROVALS_DIR", root.join("approvals-rust"));
+        env::set_var("AISURADA_CLAUDE_HOME", root.join("session-home"));
+        env::set_var("AISURADA_CODEX_HOME", root.join("session-home"));
+        env::set_var("AISURADA_GEMINI_HOME", root.join("session-home"));
     }
     let mut h = WriteHarness {
         report,
@@ -7524,8 +8073,18 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         succeeded: 0,
     };
     // 자원 명령만 빠르게 돌려 볼 때(`HARNESS_ONLY=resources`): 앞 시나리오를 건너뛴다
+    if env::var("HARNESS_ONLY").as_deref() == Ok("session") {
+        compare_session_commands(&mut h);
+        println!(
+            "  (세션 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
+            h.step, h.succeeded
+        );
+        let _ = fs::remove_dir_all(&root);
+        return;
+    }
     if env::var("HARNESS_ONLY").as_deref() == Ok("ask") {
         compare_ask_chat_commands(&mut h);
+        compare_session_commands(&mut h);
         println!(
             "  (문답·대화 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
             h.step, h.succeeded
