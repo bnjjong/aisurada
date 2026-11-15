@@ -22,6 +22,8 @@ pub struct Env {
     pub home: String,
     /// 상대 경로를 풀 기준 폴더
     pub cwd: String,
+    /// 지금 도는 `ais-cli` 실행 파일의 절대 경로. 에이전트에 MCP 서버로 등록할 명령이 이것이다.
+    pub exe: String,
     /// 이 호출이 직접 정한 세션 출처. 환경변수보다 먼저 쓴다(MCP 요청에 실려 온 세션 id가 이것이다).
     pub session: Option<SessionSource>,
 }
@@ -35,6 +37,11 @@ impl Env {
             cwd: std::env::current_dir()
                 .map(|dir| dir.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
+            exe: std::env::current_exe()
+                .ok()
+                .and_then(|path| path.canonicalize().ok().or(Some(path)))
+                .map(|path| path.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             session: None,
         }
     }
@@ -177,6 +184,7 @@ mod tests {
                 .collect(),
             home: "/nonexistent-home".to_string(),
             cwd: "/work".to_string(),
+            exe: String::new(),
             session: None,
         }
     }

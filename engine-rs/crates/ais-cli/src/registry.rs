@@ -257,10 +257,10 @@ pub fn list_text() -> String {
     }
     text.push('\n');
     for line in [
-        "doctor — 사이드카와 관련 파일의 상태를 진단합니다",
-        "sweep — 오래 조용한 사이드카를 정리합니다",
+        "doctor — vault, git, MCP 등록, 남은 옛 사이드카의 상태를 진단합니다",
+        "sweep — 남은 옛 사이드카(Java)를 내리고 흔적을 지웁니다",
         "schedule — 주기적 작업을 다룹니다",
-        "install — 실행에 필요한 jar 파일을 설치합니다",
+        "install — 설치할 파일이 없음을 안내하고, 남은 옛 jar를 알려 줍니다",
         "mcp — Claude 같은 MCP 클라이언트가 노트를 읽도록 MCP 서버로 선다(표준 입출력). 쓰기 도구는 --write를 줄 때만 연다",
         "claude-mcp — Claude Code에 이 MCP 서버를 등록한다(status, add [--write], remove)",
         "codex-mcp — Codex에 이 MCP 서버를 등록한다(status, add [--write], remove)",

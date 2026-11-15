@@ -4,14 +4,19 @@
 //! 인자를 풀고(`parse`), 엔진 호출로 바꾸고(`map`), Rust 엔진(`ais-core`)을 부르고, 응답을 Java와 같은 모양으로
 //! 되돌려(`legacy`) 찍는다(`output`). 종료 코드도 같다: 0 성공, 2 이름이나 vault를 못 정함, 3 AIS 오류, 5 확인 값 어긋남, 1 안쪽 실패.
 
+pub mod agent_cli;
+pub mod doctor;
 pub mod env;
 pub mod error;
+pub mod install;
 pub mod legacy;
 pub mod map;
 pub mod mcp;
 mod mcp_tools;
+pub mod old_sidecar;
 pub mod output;
 pub mod parse;
+pub mod register;
 pub mod registry;
 mod spec_table;
 pub mod tool;
@@ -67,6 +72,15 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
         // 모르는 이름으로 본다
         return Outcome::err(registry::unknown_name_text(first), 2);
     }
+    match first {
+        "doctor" => return doctor::run(&args[1..], env),
+        "sweep" => return install::sweep(&args[1..], env),
+        "install" => return install::install(env),
+        "claude-mcp" => return register::claude_mcp(&args[1..], env),
+        "codex-mcp" => return register::agent_mcp(register::Kind::Codex, &args[1..], env),
+        "gemini-mcp" => return register::agent_mcp(register::Kind::Gemini, &args[1..], env),
+        _ => {}
+    }
     if first == "mcp" {
         // 표준 입출력으로 한참 도는 명령이라 한 번에 글을 돌려주는 이 길이 아니라 `main`이 직접 연다.
         return Outcome::err(
@@ -74,13 +88,6 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
             1,
         );
     }
-    if registry::DIRECT_COMMANDS.contains(&first) {
-        return Outcome::from_error(&CliError::new(
-            409,
-            format!("{first} 는 Rust ais-cli에 아직 없다. 5b 단계에서 옮긴다."),
-        ));
-    }
-
     let is_tool = registry::is_tool_name(first);
     if !is_tool && !registry::is_engine_command(first) {
         return Outcome::err(registry::unknown_name_text(first), 2);

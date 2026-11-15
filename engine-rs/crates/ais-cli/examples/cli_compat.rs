@@ -134,6 +134,7 @@ impl Harness {
             vars: BTreeMap::new(),
             home: self.root.join("home").to_string_lossy().into_owned(),
             cwd: self.root.to_string_lossy().into_owned(),
+            exe: String::new(),
             session: None,
         };
         cli_env.vars.insert(
@@ -269,6 +270,7 @@ impl Harness {
             vars: BTreeMap::new(),
             home: self.root.join("home").to_string_lossy().into_owned(),
             cwd: self.root.to_string_lossy().into_owned(),
+            exe: String::new(),
             session: None,
         };
         cli_env.vars.insert(
