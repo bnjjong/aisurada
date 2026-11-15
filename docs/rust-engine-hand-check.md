@@ -2,7 +2,7 @@
 
 ## 요약
 
-**결론:** Rust 엔진이 읽는 명령 30개와 쓰는 명령 43개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
+**결론:** Rust 엔진이 읽는 명령 31개와 쓰는 명령 49개를 실제 앱 창에서 확인하는 일은 **사람이 눌러야 하는 부분이 남아 있다.** 아래 한 줄로 격리 환경에서 앱을 띄우고 점검표를 따라 누르면 된다. 앱이 어느 명령을 Rust 엔진으로 보냈는지는 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`로 한 줄씩 찍힌다. 이슈 [#54](https://github.com/bnjjong/aisurada/issues/54), [#61](https://github.com/bnjjong/aisurada/issues/61)이 이 확인의 기록 자리다.
 
 ## 1. 띄우는 법
 
@@ -17,7 +17,7 @@ engine-rs/tools/hand-check/run.sh --write rust --git
 | 옵션 | 뜻 |
 | --- | --- |
 | (없음) | 읽기만 Rust 엔진. 쓰기는 Java 엔진이다 |
-| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 43개가 Rust 엔진으로 간다 |
+| `--write rust` | 쓰기 스위치(`AISURADA_ENGINE_WRITE=rust`)를 켠다. 쓰기 49개가 Rust 엔진으로 간다 |
 | `--engine java` | 모든 명령을 Java 엔진으로 보낸다(`AISURADA_ENGINE=java`). Rust와 견줄 때 쓴다 |
 | `--git` | 합성 vault에 git 저장소와 노트의 판 이력을 만든다(편집 이력 창, 자동 커밋 확인용) |
 
