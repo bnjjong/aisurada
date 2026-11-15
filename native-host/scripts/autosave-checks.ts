@@ -2,17 +2,27 @@
 import {createElement as el, useSyncExternalStore} from 'react';import {createRoot} from 'react-dom/client';
 import {WorkspaceController} from '../src/workspace/controller.ts';import {workspaceServices} from '../src/workspace/platform.ts';
 import {NoteReading} from '../src/navigation/NoteReading.tsx';import {VaultBanner} from '../src/data/VaultBanner.tsx';import '../src/styles.css';
-import type {NoteRef} from '../src/data/vault.ts';
+import type {NoteRef} from '../src/data/vault.ts';import {toArgv} from '../src/data/commands.ts';
 const cfg=(window as any).__AIS_FIXTURE__,services=workspaceServices(),invoke=services.host.invoke;
 // 「버리기」의 확인 창은 네이티브 창이라 이 점검이 눌러 줄 수 없다. 이 번들은 대화상자 플러그인 자리에 대역(scripts/acceptance/dialog-stub.ts)이 들어가므로, 그 상태를 읽고 답을 정한다.
 const dialog:{asked:string[];options:({title?:string;okLabel?:string;cancelLabel?:string}|undefined)[];answer:boolean}=(window as any).__AIS_DIALOG__;
 const calls:{argv:string[];status:number;time:number}[]=[];let failures=0,holdWatch=false,offset=0;
 services.now=()=>new Date(Date.now()+offset);const watch=services.watch;services.watch=(root,changed)=>watch(root,paths=>{if(!holdWatch)changed(paths)});
 services.host.invoke=async<T>(command:string,args?:Record<string,unknown>):Promise<T>=>{
- const argv=command==='sidecar_call'?args?.argv as string[]:undefined;
+ // 엔진을 부르는 길은 둘이다(문자열 목록 `sidecar_call`, 호출 객체 `engine_call`). 점검은 어느 길이든 같은 문자열 목록으로 센다.
+ const typed=command==='engine_call';
+ const argv=command==='sidecar_call'?args?.argv as string[]:typed?toArgv({command:args?.command as string,args:args?.args as Record<string,never>|undefined}):undefined;
  const body=argv?.[0].startsWith('update-')&&argv.some(v=>v.startsWith('body='));
- const result:any=body&&failures-->0?{status:4,stdout:'',stderr:'fixture I/O failure'}:await invoke<T>(command,args);
- if(argv)calls.push({argv:[...argv],status:result.status,time:Date.now()});return result;
+ if(body&&failures-->0){
+  calls.push({argv:[...argv!],status:4,time:Date.now()});
+  // 문자열 목록 길은 종료 코드 4의 답으로, 호출 객체 길은 엔진 오류로 실패를 흉내 낸다
+  if(typed)throw{code:'AIS-500',kind:'internal',message:'fixture I/O failure'};
+  return{status:4,stdout:'',stderr:'fixture I/O failure'} as T;
+ }
+ try{
+  const result:any=await invoke<T>(command,args);
+  if(argv)calls.push({argv:[...argv],status:typed?0:result.status,time:Date.now()});return result;
+ }catch(error){if(argv&&typed)calls.push({argv:[...argv],status:(error as {code?:string})?.code==='AIS-412'?5:3,time:Date.now()});throw error}
 };
 const controller=new WorkspaceController(services,{kind:'main'},'/doc/'+cfg.id),data=controller.data;
 const engine=async(argv:string[])=>{const r:any=await invoke('sidecar_call',{argv});if(r.status!==0)throw Error(`${argv[0]}: ${r.status} ${r.stderr}`);return JSON.parse(r.stdout)};

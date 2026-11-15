@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod call_log;
 mod desktop;
 mod engine;
 #[cfg(feature = "claude")]

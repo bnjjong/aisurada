@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertScreenBundle } from './screen-contracts.mjs';
 
 const host = fileURLToPath(new URL('..', import.meta.url)), repo = resolve(host, '..');
@@ -105,13 +105,17 @@ const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin/java') : '
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 const wrapper = join(root, 'java');
 const callLog = join(root, 'java-calls.jsonl');
+// 앱이 엔진을 부르는 길은 둘이다: 문자열 목록을 받는 `sidecar_call`과 호출 객체를 받는 `engine_call`. 호스트가 두 길의 호출을 이 파일에 적고
+// (`AISURADA_CALL_LOG`), 점검은 어느 길로 갔든 같은 문자열 목록(argv)으로 센다.
+const hostCallLog = join(root, 'host-calls.jsonl');
+const { toArgv } = await import(pathToFileURL(join(host, 'src/data/commands.ts')).href);
 const logger = join(root, 'record-java.py');
 write(logger, `import os,sys,json,time\nfd=os.open(${JSON.stringify(callLog)}, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0o600)\nos.write(fd,(json.dumps({'args':sys.argv[1:],'start':time.time_ns()//1000000})+'\\n').encode())\nos.close(fd)\nos.execv(${JSON.stringify(java)},[${JSON.stringify(java)},${JSON.stringify('-Duser.home=' + home)},*sys.argv[1:]])\n`);
 write(wrapper, `#!/bin/sh\nexec /usr/bin/python3 ${quote(logger)} "$@"\n`); chmodSync(wrapper, 0o700);
 const env = { ...process.env, HOME: home, ZDOTDIR: join(root, 'zdot'), HISTFILE: join(root, 'history'),
   CARGO_HOME: process.env.CARGO_HOME || join(homedir(), '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), '.rustup'),
   AISURADA_VAULT: vault, AISURADA_CLI_JAR: join(repo, 'dist/ais-cli.jar'), AISURADA_SIDECAR_JAVA: wrapper,
-  AISURADA_SIDECAR_SOCKET: join(root, 'engine.sock'), AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
+  AISURADA_SIDECAR_SOCKET: join(root, 'engine.sock'), AISURADA_CALL_LOG: hostCallLog, AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
 if (askMarksCheck) env.AISURADA_CLAUDE_BIN = join(root, 'fake-claude');
 for (const key of ['AISURADA_SIDECAR_JAR', 'CLAUDE_CODE_SESSION_ID', 'AISURADA_ASK_RUNTIME', 'AISURADA_ASK_USE_AGENT']) delete env[key];
 if (!existsSync(join(repo, 'dist/ais-sidecar.jar'))) throw Error('Run bash build.sh first');
@@ -135,8 +139,8 @@ const server = createServer(async (req, res) => {
   if (path === '/note-result') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(noteResult || null)); return; }
   if (path === '/editor-cases') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(editorCases)); return; }
   if (path === '/calls') {
-    const calls = existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
-    const commands = calls.filter(call => call.args[1] === join(repo, 'dist/ais-cli.jar')).map(call => ({ args: { argv: call.args.slice(2) }, start: call.start }));
+    const lines = existsSync(hostCallLog) ? readFileSync(hostCallLog, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
+    const commands = lines.map(call => ({ args: { argv: call.kind === 'sidecar' ? call.argv : toArgv({ command: call.command, args: call.args }) }, start: call.start }));
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(commands)); return;
   }
   if (path === '/bootstrap.js' || path === '/workspace-checks.js') {

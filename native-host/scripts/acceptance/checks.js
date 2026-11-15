@@ -276,8 +276,9 @@ if (location.pathname.startsWith("/note-window/")) {
       ).status !== 0,
     ));
   test("engine-part4", async () => {
+    // 엔진(Rust ais-cli)은 4부 명령을 늘 갖는다(옛 4부 없는 jar의 AIS-409는 없다). 호스트가 4부 명령을 등록하지 않았는지만 아래에서 본다.
     const r = await invoke("sidecar_call", { argv: ["get-ask", cfg.id] });
-    assert(r.status === 3 && r.stderr.includes("AIS-409"));
+    assert(r.status === 0 && r.stdout.trim() === "null", "get-ask: " + JSON.stringify(r));
     for (const name of [
       "ask_claude",
       "ask_runtime",

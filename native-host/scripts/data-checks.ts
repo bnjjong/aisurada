@@ -3,7 +3,7 @@ import { WorkspaceController } from '../src/workspace/controller.ts';
 import { workspaceServices } from '../src/workspace/platform.ts';
 import { windowContext, asRow, asText } from '../src/workspace/types.ts';
 import type { Row } from '../src/workspace/types.ts';
-import { read } from '../src/data/commands.ts';
+import { read, toArgv } from '../src/data/commands.ts';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { VaultBanner } from '../src/data/VaultBanner.tsx';
@@ -21,7 +21,9 @@ const services = workspaceServices(), invoke = services.host.invoke, calls: stri
 let offset = 0, intercept: ((argv: string[], result: unknown) => Promise<unknown>) | undefined;
 services.now = () => new Date(Date.now() + offset);
 services.host.invoke = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
-  const argv = command === 'sidecar_call' ? args?.argv as string[] : undefined;
+  // 엔진을 부르는 길은 둘이다(문자열 목록 `sidecar_call`, 호출 객체 `engine_call`). 점검은 어느 길이든 같은 문자열 목록으로 센다.
+  const argv = command === 'sidecar_call' ? args?.argv as string[]
+    : command === 'engine_call' ? toArgv({ command: args?.command as string, args: args?.args as Record<string, never> | undefined }) : undefined;
   if (argv) calls.push([...argv]);
   const result = await invoke<T>(command, args);
   return argv && intercept ? await intercept(argv, result) as T : result;

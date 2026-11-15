@@ -58,6 +58,7 @@ pub async fn engine_call(
     command: String,
     args: Option<Value>,
 ) -> Result<Value, EngineError> {
+    crate::call_log::engine(&command, &args);
     if Engine::is_write(&command) && !rust_write_enabled() {
         return Err(EngineError::unsupported(format!(
             "쓰기 명령 {command}는 Rust 엔진에서 꺼져 있다({WRITE_SWITCH}=java나 스냅숏 쓰기 설정 때문이다)"

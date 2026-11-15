@@ -49,7 +49,8 @@ if (location.pathname.startsWith('/note-window/')) {
       const initial = (await calls()).slice(0, 7);
       const names = initial.map(c => c.args.argv[0]);
       assert(names[0] === 'init-workspace' && JSON.stringify(names.slice(1,4).sort()) === JSON.stringify(['list-templates','list-trash','reindex']) && JSON.stringify(names.slice(4).sort()) === JSON.stringify(['list-agendas','list-docs','list-projects']), 'initial command groups: ' + names.join(', '));
-      assert(JSON.stringify(initial.find(c => c.args.argv[0] === 'list-docs').args.argv) === JSON.stringify(['list-docs', 'limit=0', 'bodies=true']), 'bodies or unlimited flag missing');
+      // 호스트가 적은 호출 객체의 인자는 이름 차례로 정렬돼 있으므로, 인자 칸의 차례는 따지지 않는다
+      assert(JSON.stringify(initial.find(c => c.args.argv[0] === 'list-docs').args.argv.slice().sort()) === JSON.stringify(['list-docs', 'limit=0', 'bodies=true'].sort()), 'bodies or unlimited flag missing');
     });
     await test('legacy-note-readable', async () => {
       const result = await invoke('sidecar_call', { argv: ['list-docs', 'limit=0', 'bodies=true'] });
