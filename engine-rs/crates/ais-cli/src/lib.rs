@@ -117,7 +117,11 @@ fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome 
         run_command(name, rest, &vault, session.as_ref())
     };
     match outcome {
-        Ok(response) => Outcome::out(output::stringify(&response)),
+        Ok(legacy) => Outcome {
+            stdout: output::stringify(&legacy.value),
+            stderr: legacy.diagnostics,
+            code: 0,
+        },
         Err(error) => Outcome::from_error(&error),
     }
 }
@@ -127,7 +131,7 @@ fn run_command(
     rest: &[String],
     vault: &str,
     session: Option<&env::SessionSource>,
-) -> Result<serde_json::Value, CliError> {
+) -> Result<legacy::Legacy, CliError> {
     let spec = registry::command(name)
         .ok_or_else(|| CliError::new(409, format!("이 판에는 {name}이 없다")))?;
     let parsed = parse::parse_command(spec, rest)?;
