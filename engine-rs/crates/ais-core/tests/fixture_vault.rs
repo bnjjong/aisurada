@@ -3379,3 +3379,112 @@ fn reads_session_transcripts_of_every_agent() {
         "days 는 1 부터 30 사이여야 해요: 31"
     );
 }
+
+#[test]
+fn runs_the_note_tool_commands() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+    let parent = "ndfx0002-00000002";
+
+    // 첨부: 글 확장자만, 같은 이름은 덮고, 이름 규칙은 처음 걸린 하나만 알린다
+    let first = engine
+        .call(
+            "write_attachment",
+            json!({"id": parent, "name": " 메모.MD ", "content": "본문"}),
+        )
+        .unwrap();
+    assert_eq!(
+        (first["name"].as_str(), first["parent"].as_str()),
+        (Some("메모.MD"), Some(parent))
+    );
+    let path = first["path"].as_str().unwrap().to_string();
+    assert_eq!(std::fs::read_to_string(vault.join(&path)).unwrap(), "본문");
+    engine
+        .call(
+            "write_attachment",
+            json!({"id": parent, "name": "메모.MD", "content": ""}),
+        )
+        .unwrap();
+    assert_eq!(std::fs::read_to_string(vault.join(&path)).unwrap(), "");
+    for (name, message) in [
+        ("a/b.txt", "첨부 파일명에 경로 구분자가 있다: a/b.txt"),
+        ("a..txt", "첨부 파일명에 상위 디렉터리 참조가 있다: a..txt"),
+        (".a.txt", "첨부 파일명이 점으로 시작한다: .a.txt"),
+        ("noext", "첨부 파일명에 확장자가 없다: noext"),
+        (
+            "a.png",
+            "텍스트로 쓸 수 없는 확장자다(이미지 같은 바이너리는 attach/ 에 직접 둔다): a.png",
+        ),
+    ] {
+        assert_eq!(
+            error(
+                "write_attachment",
+                json!({"id": parent, "name": name, "content": "x"})
+            )
+            .message,
+            message
+        );
+    }
+    assert_eq!(
+        error("write_attachment", json!({"id": parent, "name": "a.txt"}))
+            .message
+            .split(':')
+            .next(),
+        Some("content 이 필요하다")
+    );
+
+    // 사실층 요약과 내보내기와 데일리 플랜
+    let brief = engine
+        .call(
+            "facts_brief",
+            json!({"from": "2026-11-01", "to": "2026-11-30", "min-new-file": 1}),
+        )
+        .unwrap();
+    assert!(brief["count"].as_u64().unwrap() >= 1, "{brief}");
+    assert!(brief["section"].as_str().unwrap().starts_with("### "));
+    assert_eq!(
+        error(
+            "facts_brief",
+            json!({"from": "2026-12-01", "to": "2026-11-01"})
+        )
+        .message,
+        "날짜 구간이 뒤집혔다: 2026-12-01 ~ 2026-11-01"
+    );
+    let exported = engine.call("export_markdown", json!({})).unwrap();
+    assert!(exported["exported"].as_u64().unwrap() >= 1);
+    assert!(vault.join(".aisurada/md-export").is_dir());
+    let dry = engine
+        .call(
+            "plan_day",
+            json!({"date": "2026-11-09", "agenda": "demo", "dryRun": true}),
+        )
+        .unwrap();
+    assert_eq!(
+        (dry["saved"].as_bool(), dry["date"].as_str()),
+        (Some(false), Some("2026-11-09"))
+    );
+    assert!(
+        dry["body"]
+            .as_str()
+            .unwrap()
+            .starts_with("# 2026-11-09 데일리 플랜\n\n## 어제 한 일")
+    );
+    let saved = engine
+        .call("plan_day", json!({"date": "2026-11-09", "agenda": "demo"}))
+        .unwrap();
+    assert_eq!(saved["saved"], true);
+    assert!(vault.join(saved["path"].as_str().unwrap()).exists());
+
+    // 샤드: 계획은 매핑 파일만 쓰고, 이동은 폴더를 옮기고, 검증은 어긋남을 알린다
+    let plan = engine.call("shard_notes", json!({})).unwrap();
+    assert_eq!(plan["applied"], false);
+    assert!(vault.join(".aisurada/migration/shard-plan.tsv").exists());
+    assert_eq!(error("verify_shard", json!({})).code, "AIS-404");
+    assert_eq!(
+        error("shard_notes", json!({"apply": "yes"})).message,
+        "apply 은 true 나 false 여야 한다: yes"
+    );
+}

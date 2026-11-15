@@ -1321,6 +1321,10 @@ impl WriteHarness<'_> {
             ais_core::text::encode_uri_component(&self.a.to_string_lossy()),
             ais_core::text::encode_uri_component(&self.b.to_string_lossy()),
         );
+        let (a_dir, b_dir) = (
+            self.a.to_string_lossy().to_string(),
+            self.b.to_string_lossy().to_string(),
+        );
         compare(
             self.report,
             &vault,
@@ -1329,6 +1333,16 @@ impl WriteHarness<'_> {
             rust_out,
             move |_, v| {
                 let mut v = v.clone();
+                // 응답 안의 사본 폴더 경로(`dest`, `mappingFile` 따위)도 Rust 사본 경로로 바꿔 견준다
+                fn swap(value: &mut Value, from: &str, to: &str) {
+                    match value {
+                        Value::String(s) if s.contains(from) => *s = s.replace(from, to),
+                        Value::Array(items) => items.iter_mut().for_each(|i| swap(i, from, to)),
+                        Value::Object(map) => map.values_mut().for_each(|i| swap(i, from, to)),
+                        _ => {}
+                    }
+                }
+                swap(&mut v, &a_dir, &b_dir);
                 if let Some(link) = v
                     .get("deepLink")
                     .and_then(Value::as_str)
@@ -8035,6 +8049,655 @@ fn compare_session_commands(h: &mut WriteHarness) {
     let _ = fs::remove_dir_all(&home);
 }
 
+// ---------------------------------------------------------------- 노트 잔여 명령(4e)
+
+/// 노트 도구 명령 맞대기: 첨부 쓰기, 마크다운 내보내기, 사실층 요약, 데일리 플랜, 답 없는 코멘트 점검, 샤드 이동과 검증.
+fn compare_note_tools(h: &mut WriteHarness) {
+    let step = |h: &mut WriteHarness, label: &str, command: &str, java: &[&str], rust: Value| {
+        h.step(&format!("노트도구 {label}"), java, command, rust)
+    };
+    // 앞 시나리오가 노트를 지우고 옮겨서, 지금 남아 있는 폴더 노트와 후속 노트를 색인에서 고른다
+    let (parent, sub) = {
+        let index = ais_core::vault::index::NoteIndex::fresh(&h.b);
+        let root = index
+            .root_notes()
+            .find(|n| {
+                !n.is_single_file
+                    && !n.is_extension_folder
+                    && !n.sub_notes.is_empty()
+                    && n.meta.tier == "reading"
+            })
+            .or_else(|| {
+                index
+                    .root_notes()
+                    .find(|n| !n.is_single_file && !n.is_extension_folder)
+            })
+            .expect("폴더 노트가 있다");
+        let sub = root
+            .sub_notes
+            .iter()
+            .find(|s| !s.is_single_file)
+            .map(|s| s.id.clone());
+        (root.id.clone(), sub)
+    };
+    let single = {
+        let index = ais_core::vault::index::NoteIndex::fresh(&h.b);
+        index
+            .root_notes()
+            .find(|n| n.is_single_file)
+            .map(|n| n.id.clone())
+    };
+
+    // ---- write_attachment ----
+    step(
+        h,
+        "첨부 새 파일",
+        "write_attachment",
+        &[
+            "write-attachment",
+            &parent,
+            "name=메모.md",
+            "content=# 제목\n본문 😀\n",
+        ],
+        json!({"id": parent, "name": "메모.md", "content": "# 제목\n본문 😀\n"}),
+    );
+    step(
+        h,
+        "첨부 같은 이름 덮기",
+        "write_attachment",
+        &[
+            "write-attachment",
+            &parent,
+            "name=메모.md",
+            "content=덮었다",
+        ],
+        json!({"id": parent, "name": "메모.md", "content": "덮었다"}),
+    );
+    step(
+        h,
+        "첨부 빈 내용",
+        "write_attachment",
+        &["write-attachment", &parent, "name=  빈.TXT  ", "content="],
+        json!({"id": parent, "name": "  빈.TXT  ", "content": ""}),
+    );
+    step(
+        h,
+        "첨부 SVG",
+        "write_attachment",
+        &[
+            "write-attachment",
+            &parent,
+            "name=그림.svg",
+            "content=<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+        ],
+        json!({"id": parent, "name": "그림.svg", "content": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>"}),
+    );
+    step(
+        h,
+        "첨부 HTML",
+        "write_attachment",
+        &[
+            "write-attachment",
+            &parent,
+            "name=페이지.html",
+            "content=<p>안녕 &amp; 반가워</p>",
+        ],
+        json!({"id": parent, "name": "페이지.html", "content": "<p>안녕 &amp; 반가워</p>"}),
+    );
+    if let Some(sub) = &sub {
+        step(
+            h,
+            "첨부 후속 노트",
+            "write_attachment",
+            &[
+                "write-attachment",
+                &parent,
+                sub,
+                "name=sub.json",
+                "content={\"a\":1}",
+            ],
+            json!({"id": parent, "subId": sub, "name": "sub.json", "content": "{\"a\":1}"}),
+        );
+        step(
+            h,
+            "첨부 후속 노트 빈 칸",
+            "write_attachment",
+            &[
+                "write-attachment",
+                &parent,
+                " ",
+                "name=blank-sub.csv",
+                "content=a,b",
+            ],
+            json!({"id": parent, "subId": " ", "name": "blank-sub.csv", "content": "a,b"}),
+        );
+    }
+    if let Some(single) = &single {
+        step(
+            h,
+            "첨부 단일 파일 노트",
+            "write_attachment",
+            &["write-attachment", single, "name=a.txt", "content=x"],
+            json!({"id": single, "name": "a.txt", "content": "x"}),
+        );
+    }
+    let long_name = format!("{}.txt", "가".repeat(118));
+    let too_long = format!("{}.txt", "가".repeat(117));
+    for (label, java, rust) in [
+        ("인자 없음", vec!["write-attachment"], json!({})),
+        (
+            "노트 id 모양",
+            vec!["write-attachment", "nope", "name=a.txt", "content=x"],
+            json!({"id": "nope", "name": "a.txt", "content": "x"}),
+        ),
+        (
+            "후속 id 모양",
+            vec![
+                "write-attachment",
+                &parent,
+                "nope",
+                "name=a.txt",
+                "content=x",
+            ],
+            json!({"id": parent, "subId": "nope", "name": "a.txt", "content": "x"}),
+        ),
+        (
+            "name 없음",
+            vec!["write-attachment", &parent, "content=x"],
+            json!({"id": parent, "content": "x"}),
+        ),
+        (
+            "content 없음",
+            vec!["write-attachment", &parent, "name=a.txt"],
+            json!({"id": parent, "name": "a.txt"}),
+        ),
+        (
+            "이름 빈 값",
+            vec!["write-attachment", &parent, "name=  ", "content=x"],
+            json!({"id": parent, "name": "  ", "content": "x"}),
+        ),
+        (
+            "이름 길이",
+            vec![
+                "write-attachment",
+                &parent,
+                &format!("name={too_long}"),
+                "content=x",
+            ],
+            json!({"id": parent, "name": too_long, "content": "x"}),
+        ),
+        (
+            "이름 경계 길이",
+            vec![
+                "write-attachment",
+                &parent,
+                &format!("name={long_name}"),
+                "content=x",
+            ],
+            json!({"id": parent, "name": long_name, "content": "x"}),
+        ),
+        (
+            "이름 슬래시",
+            vec!["write-attachment", &parent, "name=a/b.txt", "content=x"],
+            json!({"id": parent, "name": "a/b.txt", "content": "x"}),
+        ),
+        (
+            "이름 점점",
+            vec!["write-attachment", &parent, "name=a..txt", "content=x"],
+            json!({"id": parent, "name": "a..txt", "content": "x"}),
+        ),
+        (
+            "이름 점 시작",
+            vec!["write-attachment", &parent, "name=.a.txt", "content=x"],
+            json!({"id": parent, "name": ".a.txt", "content": "x"}),
+        ),
+        (
+            "이름 제어문자",
+            vec!["write-attachment", &parent, "name=a\u{1}b.txt", "content=x"],
+            json!({"id": parent, "name": "a\u{1}b.txt", "content": "x"}),
+        ),
+        (
+            "이름 확장자 없음",
+            vec!["write-attachment", &parent, "name=noext", "content=x"],
+            json!({"id": parent, "name": "noext", "content": "x"}),
+        ),
+        (
+            "이름 이미지 확장자",
+            vec!["write-attachment", &parent, "name=a.png", "content=x"],
+            json!({"id": parent, "name": "a.png", "content": "x"}),
+        ),
+        (
+            "이름 끝 점",
+            vec!["write-attachment", &parent, "name=a.", "content=x"],
+            json!({"id": parent, "name": "a.", "content": "x"}),
+        ),
+        (
+            "없는 노트",
+            vec![
+                "write-attachment",
+                "ndzz0001-00000001",
+                "name=a.txt",
+                "content=x",
+            ],
+            json!({"id": "ndzz0001-00000001", "name": "a.txt", "content": "x"}),
+        ),
+        (
+            "없는 후속 노트",
+            vec![
+                "write-attachment",
+                &parent,
+                "snzz0001-00000001",
+                "name=a.txt",
+                "content=x",
+            ],
+            json!({"id": parent, "subId": "snzz0001-00000001", "name": "a.txt", "content": "x"}),
+        ),
+    ] {
+        step(
+            h,
+            &format!("첨부 오류 {label}"),
+            "write_attachment",
+            &java,
+            rust,
+        );
+    }
+
+    // ---- facts_brief ----
+    step(h, "사실층 기본", "facts_brief", &["facts-brief"], json!({}));
+    step(
+        h,
+        "사실층 구간",
+        "facts_brief",
+        &[
+            "facts-brief",
+            "from=2026-11-01",
+            "to=2026-11-30",
+            "min-new-file=1",
+        ],
+        json!({"from": "2026-11-01", "to": "2026-11-30", "min-new-file": "1"}),
+    );
+    step(
+        h,
+        "사실층 하루",
+        "facts_brief",
+        &[
+            "facts-brief",
+            "from=2026-11-07",
+            "to=2026-11-07",
+            "min-new-file=1",
+        ],
+        json!({"from": "2026-11-07", "to": "2026-11-07", "min-new-file": 1}),
+    );
+    step(
+        h,
+        "사실층 큰 최소",
+        "facts_brief",
+        &[
+            "facts-brief",
+            "from=2026-01-01",
+            "to=2026-12-31",
+            "min-new-file=1000",
+        ],
+        json!({"from": "2026-01-01", "to": "2026-12-31", "min-new-file": "1000"}),
+    );
+    for (label, java, rust) in [
+        (
+            "from 모양",
+            vec!["facts-brief", "from=2026-1-1"],
+            json!({"from": "2026-1-1"}),
+        ),
+        (
+            "to 달력 밖",
+            vec!["facts-brief", "to=2026-02-30"],
+            json!({"to": "2026-02-30"}),
+        ),
+        (
+            "뒤집힘",
+            vec!["facts-brief", "from=2026-12-01", "to=2026-11-01"],
+            json!({"from": "2026-12-01", "to": "2026-11-01"}),
+        ),
+        (
+            "min 글",
+            vec!["facts-brief", "min-new-file=x"],
+            json!({"min-new-file": "x"}),
+        ),
+        (
+            "min 0",
+            vec!["facts-brief", "min-new-file=0"],
+            json!({"min-new-file": "0"}),
+        ),
+    ] {
+        step(
+            h,
+            &format!("사실층 오류 {label}"),
+            "facts_brief",
+            &java,
+            rust,
+        );
+    }
+    put_both(
+        h,
+        ".aisurada/facts/demo.md",
+        "# 데모 사실층\n\n\n첫 줄\r\n둘째 줄  \n\n",
+    );
+    step(
+        h,
+        "사실층 제목 줄 떼기",
+        "facts_brief",
+        &[
+            "facts-brief",
+            "from=2026-11-01",
+            "to=2026-11-30",
+            "min-new-file=1",
+        ],
+        json!({"from": "2026-11-01", "to": "2026-11-30", "min-new-file": "1"}),
+    );
+
+    // ---- plan_day, check_notes ----
+    step(
+        h,
+        "플랜 미리 보기",
+        "plan_day",
+        &["plan-day", "date=2026-11-08"],
+        json!({"date": "2026-11-08"}),
+    );
+    step(h, "플랜 오늘", "plan_day", &["plan-day"], json!({}));
+    step(
+        h,
+        "플랜 dryRun",
+        "plan_day",
+        &["plan-day", "date=2026-11-10", "agenda=demo", "dryRun=true"],
+        json!({"date": "2026-11-10", "agenda": "demo", "dryRun": "true"}),
+    );
+    step(
+        h,
+        "플랜 저장",
+        "plan_day",
+        &["plan-day", "date=2026-11-09", "agenda=demo"],
+        json!({"date": "2026-11-09", "agenda": "demo"}),
+    );
+    step(
+        h,
+        "플랜 새 아젠다에 저장",
+        "plan_day",
+        &["plan-day", "date=2026-11-12", "agenda=새 플랜 아젠다"],
+        json!({"date": "2026-11-12", "agenda": "새 플랜 아젠다"}),
+    );
+    step(
+        h,
+        "플랜 오류 날짜",
+        "plan_day",
+        &["plan-day", "date=내일"],
+        json!({"date": "내일"}),
+    );
+    step(
+        h,
+        "플랜 오류 dryRun",
+        "plan_day",
+        &["plan-day", "dryRun=maybe"],
+        json!({"dryRun": "maybe"}),
+    );
+    step(
+        h,
+        "점검 코멘트 없음",
+        "check_notes",
+        &["check-notes", "date=2026-11-14"],
+        json!({"date": "2026-11-14"}),
+    );
+    // 편집 도장이 옛날인 노트와 도장이 없는 새 노트에 코멘트를 달면 「답 없는 코멘트」로 잡힌다
+    put_both(
+        h,
+        "notes/work/check-note/note.md",
+        "---\nid: ndfx9990-00009990\nagenda: work\ntype: plan\ntitle: 점검 노트\ncreated: '2026-11-10T08:00:00+09:00'\neditedBy: app\neditedAt: '2026-11-10T09:00:00+09:00'\n---\n본문\n",
+    );
+    for id in ["ndfx9990-00009990", parent.as_str()] {
+        step(
+            h,
+            &format!("코멘트 만들기 {id}"),
+            "create_comment",
+            &["create-comment", id, "body=답 없는 코멘트"],
+            json!({"id": id, "body": "답 없는 코멘트"}),
+        );
+    }
+    step(
+        h,
+        "점검 코멘트 뒤",
+        "check_notes",
+        &["check-notes", "date=2026-11-15"],
+        json!({"date": "2026-11-15"}),
+    );
+    step(
+        h,
+        "점검 날짜 밖",
+        "check_notes",
+        &["check-notes", "date=2027-06-01"],
+        json!({"date": "2027-06-01"}),
+    );
+    step(
+        h,
+        "점검 기본 날짜",
+        "check_notes",
+        &["check-notes"],
+        json!({}),
+    );
+    step(
+        h,
+        "점검 오류 날짜",
+        "check_notes",
+        &["check-notes", "date=2026-13-01"],
+        json!({"date": "2026-13-01"}),
+    );
+
+    // ---- export_markdown ----
+    step(
+        h,
+        "내보내기",
+        "export_markdown",
+        &["export-markdown"],
+        json!({}),
+    );
+    put_both(h, ".aisurada/md-export/남은-파일.md", "지워져야 한다");
+    step(
+        h,
+        "내보내기 다시(옛 파일 지움)",
+        "export_markdown",
+        &["export-markdown"],
+        json!({}),
+    );
+
+    // ---- verify_shard 오류, shard_notes 계획과 이동, 다시 검증 ----
+    step(
+        h,
+        "검증 매핑 없음",
+        "verify_shard",
+        &["verify-shard"],
+        json!({}),
+    );
+    step(
+        h,
+        "검증 없는 파일",
+        "verify_shard",
+        &["verify-shard", "file=nope.tsv"],
+        json!({"file": "nope.tsv"}),
+    );
+    // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
+    unsafe {
+        env::set_var("AISURADA_NOTES_SHARD_BY_MONTH", "true");
+    }
+    step(h, "샤드 계획", "shard_notes", &["shard-notes"], json!({}));
+    step(
+        h,
+        "샤드 apply 오류",
+        "shard_notes",
+        &["shard-notes", "apply=yes"],
+        json!({"apply": "yes"}),
+    );
+    put_both(h, "notes/work/깨진-노트/note.md", "머리말 없음\n");
+    put_both(
+        h,
+        "notes/work/날짜-밖/note.md",
+        "---\nid: ndfx9999-00009999\ntype: plan\ntitle: 날짜 밖\ncreated: 2026-02-30T09:00:00+09:00\n---\n본문\n",
+    );
+    put_both(
+        h,
+        "notes/work/충돌 (conflicted copy)/note.md",
+        "---\nid: ndfx9998-00009998\ntype: plan\ntitle: 충돌\ncreated: '2026-11-01T09:00:00+09:00'\n---\n",
+    );
+    put_both(
+        h,
+        "notes/work/loose-note/note.md",
+        "---\nid: ndfx9997-00009997\nagenda: work\ntype: plan\ntitle: 느슨한 노트\ncreated: '2026-11-03T09:00:00+09:00'\n---\n본문\n",
+    );
+    put_both(h, "notes/work/loose-note/attach/a.txt", "첨부");
+    put_both(
+        h,
+        "notes/work/loose-file.md",
+        "---\nid: ndfx9996-00009996\nagenda: work\ntype: plan\ntitle: 단일\ncreated: '2026-10-03T09:00:00+09:00'\n---\n본문\n",
+    );
+    step(
+        h,
+        "샤드 계획 두 번째",
+        "shard_notes",
+        &["shard-notes"],
+        json!({}),
+    );
+    step(
+        h,
+        "샤드 이동",
+        "shard_notes",
+        &["shard-notes", "apply=true"],
+        json!({"apply": "true"}),
+    );
+    step(
+        h,
+        "샤드 이동 다시(이미 자리)",
+        "shard_notes",
+        &["shard-notes", "apply=true"],
+        json!({"apply": true}),
+    );
+    step(
+        h,
+        "검증 기준 파일 둘",
+        "verify_shard",
+        &["verify-shard"],
+        json!({}),
+    );
+    let maps: Vec<String> = fs::read_dir(h.b.join(".aisurada/migration"))
+        .map(|d| {
+            d.flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .filter(|n| n.starts_with("shard-map-"))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut maps = maps;
+    maps.sort();
+    if let Some(first) = maps.first() {
+        step(
+            h,
+            "검증 첫 회차",
+            "verify_shard",
+            &["verify-shard", &format!("file={first}")],
+            json!({"file": first}),
+        );
+    }
+    if let Some(second) = maps.get(1) {
+        step(
+            h,
+            "검증 둘째 회차",
+            "verify_shard",
+            &["verify-shard", &format!("file={second}")],
+            json!({"file": second}),
+        );
+    }
+    // 이동한 노트를 고치고 지워 어긋남을 만든다
+    put_both(
+        h,
+        "notes/work/2026-11/loose-note/attach/a.txt",
+        "첨부가 바뀌었다",
+    );
+    put_both(h, "notes/work/2026-11/loose-note/attach/extra.txt", "더");
+    if let Some(first) = maps.first() {
+        step(
+            h,
+            "검증 크기 어긋남",
+            "verify_shard",
+            &["verify-shard", &format!("file={first}")],
+            json!({"file": first}),
+        );
+        for root in [&h.a, &h.b] {
+            let _ = fs::remove_dir_all(root.join("notes/work/2026-10"));
+        }
+        step(
+            h,
+            "검증 자리 없음",
+            "verify_shard",
+            &["verify-shard", &format!("file={first}")],
+            json!({"file": first}),
+        );
+        put_both(h, "notes/work/loose-file.md", "옛 자리에도 남았다");
+        step(
+            h,
+            "검증 옛 자리에 남음",
+            "verify_shard",
+            &["verify-shard", &format!("file={first}")],
+            json!({"file": first}),
+        );
+    }
+    // 양쪽이 똑같이 아무 일도 안 해서 맞아 보이는 일이 아닌지 가려낸다
+    let engine = Engine::new(&h.b);
+    let checks: Vec<(&str, bool)> = vec![
+        (
+            "내보낸 마크다운이 있다",
+            fs::read_dir(h.b.join(".aisurada/md-export")).is_ok_and(|d| d.count() > 0),
+        ),
+        (
+            "샤드 이동이 일어났다",
+            h.b.join("notes/work/2026-11/loose-note/note.md").exists()
+                || h.b.join("notes/work/2026-10/loose-file.md").exists(),
+        ),
+        (
+            "답 없는 코멘트가 잡힌다",
+            engine
+                .call("check_notes", json!({"date": "2026-11-15"}))
+                .is_ok_and(|v| v["count"].as_u64().unwrap_or(0) >= 1),
+        ),
+        (
+            "사실층 요약에 아젠다가 든다",
+            engine
+                .call(
+                    "facts_brief",
+                    json!({"from": "2026-11-01", "to": "2026-11-30", "min-new-file": 1}),
+                )
+                .is_ok_and(|v| v["count"].as_u64().unwrap_or(0) >= 1),
+        ),
+        (
+            "첨부가 쓰였다",
+            fs::read_dir(
+                h.b.join(
+                    ais_core::vault::index::NoteIndex::fresh(&h.b)
+                        .note(&parent)
+                        .map(|n| n.rel_path.clone())
+                        .unwrap_or_default(),
+                )
+                .join("attach"),
+            )
+            .is_ok_and(|d| d.count() >= 3),
+        ),
+    ];
+    for (label, ok) in checks {
+        h.report.record(
+            format!("노트도구 비어 있지 않다: {label}"),
+            ok,
+            || "일이 안 일어났다".to_string(),
+        );
+    }
+    // SAFETY: 단일 스레드이다.
+    unsafe {
+        env::remove_var("AISURADA_NOTES_SHARD_BY_MONTH");
+    }
+}
+
 fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     let root = env::temp_dir().join(format!("ais-write-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -8073,6 +8736,15 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         succeeded: 0,
     };
     // 자원 명령만 빠르게 돌려 볼 때(`HARNESS_ONLY=resources`): 앞 시나리오를 건너뛴다
+    if env::var("HARNESS_ONLY").as_deref() == Ok("tools") {
+        compare_note_tools(&mut h);
+        println!(
+            "  (노트 도구 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
+            h.step, h.succeeded
+        );
+        let _ = fs::remove_dir_all(&root);
+        return;
+    }
     if env::var("HARNESS_ONLY").as_deref() == Ok("session") {
         compare_session_commands(&mut h);
         println!(
@@ -9225,6 +9897,7 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_resource_commands(&mut h);
     compare_ask_chat_commands(&mut h);
     compare_session_commands(&mut h);
+    compare_note_tools(&mut h);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {
