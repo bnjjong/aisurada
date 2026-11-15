@@ -2,8 +2,8 @@
 //! 건드리지 않은 부분의 글자가 바뀌지 않는다.
 
 use crate::frontmatter::dump_string;
-use crate::vault::note_meta::{Evaluation, Link};
 use crate::kernel::tier::Tier;
+use crate::vault::note_meta::{Evaluation, Link};
 
 pub struct NoteFront<'a> {
     pub id: &'a str,

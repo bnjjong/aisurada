@@ -3,9 +3,9 @@
 //! 머리말은 SnakeYAML이 쓰는 모양이라(`write/snake_dump.rs`) 파일 글이 Java와 바이트까지 같다. 모르는 칸은 `extra`에 보존한다.
 //! 본문은 파일에서 늘 끝에 줄바꿈 하나가 붙은 채 적히고, 읽을 때 그 하나를 뗀다.
 
-use std::sync::LazyLock;
-use crate::kernel::task_link::TaskLinkKind;
 pub use crate::kernel::ids::TASK_ID as ID;
+use crate::kernel::task_link::TaskLinkKind;
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde_json::Value as Json;
@@ -14,8 +14,8 @@ use super::{Criterion, Link, Ref, Task, TaskStatus};
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
-use crate::text::{NOTE_ID, SUB_NOTE_ID, trim, utf16_len};
 use crate::kernel::token::compute_token;
+use crate::text::{NOTE_ID, SUB_NOTE_ID, trim, utf16_len};
 use crate::write::snake_dump::dump_map;
 
 pub const MAX_FILE_BYTES: usize = 400_000;

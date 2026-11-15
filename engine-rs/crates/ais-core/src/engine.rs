@@ -1,9 +1,9 @@
 //! 엔진의 진입점. 앱의 `engine_call`, `ais-cli`, MCP가 모두 이 한 곳으로 들어옵니다.
 
-use std::path::{Path, PathBuf};
 use crate::ports::Ports;
-use std::sync::Arc;
 use crate::write::pipeline::{self, HasWriteContext, WriteContext, WriteScope};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -376,20 +376,90 @@ impl Engine {
                 let request: history::HistoryRequest = parse_args(command, args)?;
                 to_json(history::execute(&self.vault_root, &request)?)
             }
-            "create_agenda" => self.write::<agenda_write::CreateAgendaRequest, _>(command, args, false, |request, scope| agenda_write::create(&self.vault_root, request, scope)),
-            "update_agenda" => self.write::<agenda_write::UpdateAgendaRequest, _>(command, args, false, |request, scope| agenda_write::update(&self.vault_root, request, scope)),
-            "delete_agenda" => self.write::<agenda_write::DeleteAgendaRequest, _>(command, args, false, |request, scope| agenda_write::delete(&self.vault_root, request, scope)),
-            "create_project" => self.write::<project_write::CreateProjectRequest, _>(command, args, false, |request, _scope| project_write::create(&self.vault_root, request)),
-            "update_project" => self.write::<project_write::UpdateProjectRequest, _>(command, args, false, |request, _scope| project_write::update(&self.vault_root, request)),
-            "delete_project" => self.write::<project_write::DeleteProjectRequest, _>(command, args, false, |request, scope| project_write::delete(&self.vault_root, request, scope)),
-            "save_template" => self.write::<template_write::SaveTemplateRequest, _>(command, args, false, |request, _scope| template_write::save_document(&self.vault_root, request)),
-            "save_ritual_template" => self.write::<template_write::SaveRitualTemplateRequest, _>(command, args, false, |request, _scope| template_write::save_ritual(&self.vault_root, request)),
-            "delete_doc_template" => self.write::<template_write::DeleteDocTemplateRequest, _>(command, args, false, |request, _scope| template_write::delete_document(&self.vault_root, request)),
-            "update_agenda_facts" => self.write::<facts_write::UpdateAgendaFactsRequest, _>(command, args, false, |request, scope| facts_write::update(&self.vault_root, request, scope)),
-            "init_workspace" => self.write::<init_workspace::InitWorkspaceRequest, _>(command, args, false, |request, _scope| init_workspace::execute(&self.vault_root, request)),
-            "set_favorite" => self.write::<note_meta_write::SetFavoriteRequest, _>(command, args, false, |request, scope| note_meta_write::set_favorite(&self.vault_root, request, scope)),
-            "evaluate_doc" => self.write::<note_meta_write::EvaluateDocRequest, _>(command, args, false, |request, scope| note_meta_write::evaluate_doc(&self.vault_root, request, scope)),
-            "link_docs" => self.write::<note_meta_write::LinkDocsRequest, _>(command, args, false, |request, scope| note_meta_write::link_docs(&self.vault_root, request, scope)),
+            "create_agenda" => self.write::<agenda_write::CreateAgendaRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| agenda_write::create(&self.vault_root, request, scope),
+            ),
+            "update_agenda" => self.write::<agenda_write::UpdateAgendaRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| agenda_write::update(&self.vault_root, request, scope),
+            ),
+            "delete_agenda" => self.write::<agenda_write::DeleteAgendaRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| agenda_write::delete(&self.vault_root, request, scope),
+            ),
+            "create_project" => self.write::<project_write::CreateProjectRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| project_write::create(&self.vault_root, request),
+            ),
+            "update_project" => self.write::<project_write::UpdateProjectRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| project_write::update(&self.vault_root, request),
+            ),
+            "delete_project" => self.write::<project_write::DeleteProjectRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| project_write::delete(&self.vault_root, request, scope),
+            ),
+            "save_template" => self.write::<template_write::SaveTemplateRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| template_write::save_document(&self.vault_root, request),
+            ),
+            "save_ritual_template" => self.write::<template_write::SaveRitualTemplateRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| template_write::save_ritual(&self.vault_root, request),
+            ),
+            "delete_doc_template" => self.write::<template_write::DeleteDocTemplateRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| template_write::delete_document(&self.vault_root, request),
+            ),
+            "update_agenda_facts" => self.write::<facts_write::UpdateAgendaFactsRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| facts_write::update(&self.vault_root, request, scope),
+            ),
+            "init_workspace" => self.write::<init_workspace::InitWorkspaceRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| init_workspace::execute(&self.vault_root, request),
+            ),
+            "set_favorite" => self.write::<note_meta_write::SetFavoriteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| note_meta_write::set_favorite(&self.vault_root, request, scope),
+            ),
+            "evaluate_doc" => self.write::<note_meta_write::EvaluateDocRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| note_meta_write::evaluate_doc(&self.vault_root, request, scope),
+            ),
+            "link_docs" => self.write::<note_meta_write::LinkDocsRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| note_meta_write::link_docs(&self.vault_root, request, scope),
+            ),
             "get_task" => {
                 let request: task_commands::GetTaskRequest = parse_args(command, args)?;
                 to_json(task_commands::get_task(&self.vault_root, &request)?)
@@ -398,13 +468,48 @@ impl Engine {
                 let request: task_commands::ListTasksRequest = parse_args(command, args)?;
                 to_json(task_commands::list_tasks(&self.vault_root, &request)?)
             }
-            "create_task" => self.write::<task_commands::CreateTaskRequest, _>(command, args, false, |request, _scope| task_commands::create_task(&self.vault_root, request)),
-            "update_task" => self.write::<task_commands::UpdateTaskRequest, _>(command, args, false, |request, _scope| task_commands::update_task(&self.vault_root, request)),
-            "transition_task" => self.write::<task_commands::TransitionTaskRequest, _>(command, args, false, |request, _scope| task_commands::transition_task(&self.vault_root, request)),
-            "link_tasks" => self.write::<task_commands::LinkTasksRequest, _>(command, args, false, |request, _scope| task_commands::link_tasks(&self.vault_root, request)),
-            "add_task_comment" => self.write::<task_commands::AddTaskCommentRequest, _>(command, args, false, |request, _scope| task_commands::add_task_comment(&self.vault_root, request)),
-            "delete_task" => self.write::<task_commands::TaskRefRequest, _>(command, args, false, |request, _scope| task_commands::delete_task(&self.vault_root, request)),
-            "restore_task" => self.write::<task_commands::TaskRefRequest, _>(command, args, false, |request, _scope| task_commands::restore_task(&self.vault_root, request)),
+            "create_task" => self.write::<task_commands::CreateTaskRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::create_task(&self.vault_root, request),
+            ),
+            "update_task" => self.write::<task_commands::UpdateTaskRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::update_task(&self.vault_root, request),
+            ),
+            "transition_task" => self.write::<task_commands::TransitionTaskRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::transition_task(&self.vault_root, request),
+            ),
+            "link_tasks" => self.write::<task_commands::LinkTasksRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::link_tasks(&self.vault_root, request),
+            ),
+            "add_task_comment" => self.write::<task_commands::AddTaskCommentRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::add_task_comment(&self.vault_root, request),
+            ),
+            "delete_task" => self.write::<task_commands::TaskRefRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::delete_task(&self.vault_root, request),
+            ),
+            "restore_task" => self.write::<task_commands::TaskRefRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| task_commands::restore_task(&self.vault_root, request),
+            ),
             "list_resources" => {
                 let request: resource_commands::ListResourcesRequest = parse_args(command, args)?;
                 to_json(resource_commands::list_resources(
@@ -446,14 +551,61 @@ impl Engine {
                     &request,
                 )?)
             }
-            "save_resource" => self.write::<resource_commands::SaveResourceRequest, _>(command, args, true, |request, _scope| resource_commands::save_resource(&self.vault_root, request)),
-            "delete_resource" => self.write::<resource_commands::ResourceIdRequest, _>(command, args, true, |request, _scope| resource_commands::delete_resource(&self.vault_root, request)),
-            "restore_resource" => self.write::<resource_commands::ResourceIdRequest, _>(command, args, true, |request, _scope| resource_commands::restore_resource(&self.vault_root, request)),
-            "set_resource_ref" => self.write::<resource_commands::SetResourceRefRequest, _>(command, args, true, |request, _scope| resource_commands::set_resource_ref(&self.vault_root, request)),
-            "approve_resource_change" => self.write::<resource_commands::ChangeDecisionRequest, _>(command, args, true, |request, _scope| resource_commands::approve_resource_change(&self.vault_root, request)),
-            "reject_resource_change" => self.write::<resource_commands::ChangeDecisionRequest, _>(command, args, true, |request, _scope| resource_commands::reject_resource_change(&self.vault_root, request)),
-            "resolve_resource_edit" => self.write::<resource_commands::ResolveResourceEditRequest, _>(command, args, true, |request, _scope| resource_commands::resolve_resource_edit(&self.vault_root, request)),
-            "set_resource_policy" => self.write::<resource_commands::SetResourcePolicyRequest, _>(command, args, true, |request, _scope| resource_commands::set_resource_policy(&self.vault_root, request)),
+            "save_resource" => self.write::<resource_commands::SaveResourceRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| resource_commands::save_resource(&self.vault_root, request),
+            ),
+            "delete_resource" => self.write::<resource_commands::ResourceIdRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| resource_commands::delete_resource(&self.vault_root, request),
+            ),
+            "restore_resource" => self.write::<resource_commands::ResourceIdRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| resource_commands::restore_resource(&self.vault_root, request),
+            ),
+            "set_resource_ref" => self.write::<resource_commands::SetResourceRefRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| resource_commands::set_resource_ref(&self.vault_root, request),
+            ),
+            "approve_resource_change" => self.write::<resource_commands::ChangeDecisionRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| {
+                    resource_commands::approve_resource_change(&self.vault_root, request)
+                },
+            ),
+            "reject_resource_change" => self.write::<resource_commands::ChangeDecisionRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| {
+                    resource_commands::reject_resource_change(&self.vault_root, request)
+                },
+            ),
+            "resolve_resource_edit" => self
+                .write::<resource_commands::ResolveResourceEditRequest, _>(
+                    command,
+                    args,
+                    true,
+                    |request, _scope| {
+                        resource_commands::resolve_resource_edit(&self.vault_root, request)
+                    },
+                ),
+            "set_resource_policy" => self.write::<resource_commands::SetResourcePolicyRequest, _>(
+                command,
+                args,
+                true,
+                |request, _scope| resource_commands::set_resource_policy(&self.vault_root, request),
+            ),
             "get_ask" => {
                 let request: ask_chat_commands::NoteRefRequest = parse_args(command, args)?;
                 to_json(ask_chat_commands::get_ask(&self.vault_root, &request)?)
@@ -462,8 +614,22 @@ impl Engine {
                 let request: ask_chat_commands::NoteRefRequest = parse_args(command, args)?;
                 to_json(ask_chat_commands::list_chats(&self.vault_root, &request)?)
             }
-            "append_ask_turn" => self.write::<ask_chat_commands::AppendAskTurnRequest, _>(command, args, false, |request, scope| ask_chat_commands::append_ask_turn(&self.vault_root, request, scope)),
-            "append_chat_turn" => self.write::<ask_chat_commands::AppendChatTurnRequest, _>(command, args, false, |request, scope| ask_chat_commands::append_chat_turn(&self.vault_root, request, scope)),
+            "append_ask_turn" => self.write::<ask_chat_commands::AppendAskTurnRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| {
+                    ask_chat_commands::append_ask_turn(&self.vault_root, request, scope)
+                },
+            ),
+            "append_chat_turn" => self.write::<ask_chat_commands::AppendChatTurnRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| {
+                    ask_chat_commands::append_chat_turn(&self.vault_root, request, scope)
+                },
+            ),
             "read_session" => {
                 let request: session_commands::ReadSessionRequest = parse_args(command, args)?;
                 to_json(session_commands::read_session(&request)?)
@@ -476,31 +642,122 @@ impl Engine {
                 let request: session_commands::RecentSessionsRequest = parse_args(command, args)?;
                 to_json(session_commands::recent_sessions(&request)?)
             }
-            "write_attachment" => self.write::<write_attachment::WriteAttachmentRequest, _>(command, args, false, |request, scope| write_attachment::write_attachment(&self.vault_root, request, scope)),
-            "shard_notes" => self.write::<shard_notes::ShardNotesRequest, _>(command, args, false, |request, _scope| shard_notes::shard_notes(&self.vault_root, request)),
+            "write_attachment" => self.write::<write_attachment::WriteAttachmentRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| {
+                    write_attachment::write_attachment(&self.vault_root, request, scope)
+                },
+            ),
+            "shard_notes" => self.write::<shard_notes::ShardNotesRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| shard_notes::shard_notes(&self.vault_root, request),
+            ),
             "verify_shard" => {
                 let request: shard_notes::VerifyShardRequest = parse_args(command, args)?;
                 to_json(shard_notes::verify_shard(&self.vault_root, &request)?)
             }
-            "plan_day" => self.write::<daily_notes::PlanDayRequest, _>(command, args, false, |request, scope| daily_notes::plan_day(&self.vault_root, request, scope)),
-            "check_notes" => self.write::<daily_notes::CheckNotesRequest, _>(command, args, false, |request, scope| daily_notes::check_notes(&self.vault_root, request, scope)),
-            "facts_brief" => self.write::<facts_brief::FactsBriefRequest, _>(command, args, false, |request, scope| facts_brief::facts_brief(&self.vault_root, request, scope)),
-            "export_markdown" => self.write::<ExportMarkdownRequest, _>(command, args, false, |_request, scope| export_markdown::export_markdown(&self.vault_root, scope)),
+            "plan_day" => self.write::<daily_notes::PlanDayRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| daily_notes::plan_day(&self.vault_root, request, scope),
+            ),
+            "check_notes" => self.write::<daily_notes::CheckNotesRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| daily_notes::check_notes(&self.vault_root, request, scope),
+            ),
+            "facts_brief" => self.write::<facts_brief::FactsBriefRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| facts_brief::facts_brief(&self.vault_root, request, scope),
+            ),
+            "export_markdown" => {
+                self.write::<ExportMarkdownRequest, _>(command, args, false, |_request, scope| {
+                    export_markdown::export_markdown(&self.vault_root, scope)
+                })
+            }
             "get_resource_policy" => {
                 to_json(resource_commands::get_resource_policy(&self.vault_root)?)
             }
-            "delete_doc" => self.write::<trash_write::DeleteDocRequest, _>(command, args, false, |request, scope| trash_write::delete_doc(&self.vault_root, request, scope)),
-            "restore_doc" => self.write::<trash_write::TrashEntryRequest, _>(command, args, false, |request, scope| trash_write::restore_doc(&self.vault_root, request, scope)),
-            "purge_doc" => self.write::<trash_write::TrashEntryRequest, _>(command, args, false, |request, _scope| trash_write::purge_doc(&self.vault_root, request)),
-            "empty_trash" => self.write::<trash_write::EmptyTrashRequest, _>(command, args, false, |_request, _scope| trash_write::empty_trash(&self.vault_root)),
-            "create_comment" => self.write::<comment_write::CommentWriteRequest, _>(command, args, false, |request, scope| comment_write::create_comment(&self.vault_root, request, scope)),
-            "update_comment" => self.write::<comment_write::CommentWriteRequest, _>(command, args, false, |request, scope| comment_write::update_comment(&self.vault_root, request, scope)),
-            "delete_comment" => self.write::<comment_write::CommentWriteRequest, _>(command, args, false, |request, scope| comment_write::delete_comment(&self.vault_root, request, scope)),
-            "create_sub_note" => self.write::<sub_note_write::CreateSubNoteRequest, _>(command, args, false, |request, scope| sub_note_write::create_sub_note(&self.vault_root, request, scope)),
-            "update_sub_note" => self.write::<sub_note_write::UpdateSubNoteRequest, _>(command, args, false, |request, scope| sub_note_write::update_sub_note(&self.vault_root, request, scope)),
-            "delete_sub_note" => self.write::<sub_note_write::DeleteSubNoteRequest, _>(command, args, false, |request, scope| sub_note_write::delete_sub_note(&self.vault_root, request, scope)),
-            "create_doc" => self.write::<doc_create::CreateDocRequest, _>(command, args, false, |request, scope| doc_create::create_doc(&self.vault_root, request, scope)),
-            "update_doc" => self.write::<doc_write::UpdateDocRequest, _>(command, args, false, |request, scope| doc_write::update_doc(&self.vault_root, request, scope)),
+            "delete_doc" => self.write::<trash_write::DeleteDocRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| trash_write::delete_doc(&self.vault_root, request, scope),
+            ),
+            "restore_doc" => self.write::<trash_write::TrashEntryRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| trash_write::restore_doc(&self.vault_root, request, scope),
+            ),
+            "purge_doc" => self.write::<trash_write::TrashEntryRequest, _>(
+                command,
+                args,
+                false,
+                |request, _scope| trash_write::purge_doc(&self.vault_root, request),
+            ),
+            "empty_trash" => self.write::<trash_write::EmptyTrashRequest, _>(
+                command,
+                args,
+                false,
+                |_request, _scope| trash_write::empty_trash(&self.vault_root),
+            ),
+            "create_comment" => self.write::<comment_write::CommentWriteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| comment_write::create_comment(&self.vault_root, request, scope),
+            ),
+            "update_comment" => self.write::<comment_write::CommentWriteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| comment_write::update_comment(&self.vault_root, request, scope),
+            ),
+            "delete_comment" => self.write::<comment_write::CommentWriteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| comment_write::delete_comment(&self.vault_root, request, scope),
+            ),
+            "create_sub_note" => self.write::<sub_note_write::CreateSubNoteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| sub_note_write::create_sub_note(&self.vault_root, request, scope),
+            ),
+            "update_sub_note" => self.write::<sub_note_write::UpdateSubNoteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| sub_note_write::update_sub_note(&self.vault_root, request, scope),
+            ),
+            "delete_sub_note" => self.write::<sub_note_write::DeleteSubNoteRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| sub_note_write::delete_sub_note(&self.vault_root, request, scope),
+            ),
+            "create_doc" => self.write::<doc_create::CreateDocRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| doc_create::create_doc(&self.vault_root, request, scope),
+            ),
+            "update_doc" => self.write::<doc_write::UpdateDocRequest, _>(
+                command,
+                args,
+                false,
+                |request, scope| doc_write::update_doc(&self.vault_root, request, scope),
+            ),
             "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"

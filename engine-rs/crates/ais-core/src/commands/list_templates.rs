@@ -1,7 +1,7 @@
 //! `list_templates`: 템플릿을 문서 템플릿 먼저, 이어서 id 차례로 돌려줍니다.
 
-use std::path::Path;
 use crate::kernel::doc_type::DocType;
+use std::path::Path;
 
 use serde::Deserialize;
 
@@ -9,7 +9,6 @@ use crate::error::EngineError;
 use crate::model::{Page, TemplateRow};
 use crate::text::{compare_utf16, trim};
 use crate::vault::template::{Category, scan_templates};
-
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]

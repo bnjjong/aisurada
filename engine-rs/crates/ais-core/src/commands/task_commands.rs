@@ -5,9 +5,9 @@
 //! 태스크는 키(`TSK-14`)나 id(`tk…`)로 부른다. 완료 기준은 만들 때 반드시 적어야 하고, 상태 전이의 규칙과 조건은
 //! `transition_task`가 한 곳에서 검사한다(`task::transitions`).
 
+use crate::kernel::task_link::TaskLinkKind;
 use std::cmp::Reverse;
 use std::path::Path;
-use crate::kernel::task_link::TaskLinkKind;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};

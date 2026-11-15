@@ -5,11 +5,11 @@
 //! 두 파일은 노트(또는 후속 노트) 폴더 안에 둔다. 읽을 때는 너그럽다: 모르는 칸은 버리고, 깨진 UTF-8은 대체 글자로 읽고, 틀린 모양의 칸은
 //! 기본값으로 읽는다. 쓸 때는 읽은 것(이 모양으로 다듬은 것)에 새 회차를 붙여 다시 쓴다.
 
+use crate::kernel::time::parse_instant;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
-use crate::kernel::time::parse_instant;
 
 use regex::Regex;
 use serde::Deserialize;
@@ -493,7 +493,11 @@ pub fn get_ask(vault: &Path, request: &NoteRefRequest) -> Result<Json, EngineErr
 }
 
 /// 문답에 회차 하나를 붙인다. 인자를 모두 검사한 뒤에야 노트를 찾고, 파일이 100만 바이트를 넘게 되면 붙이지 않는다.
-pub fn append_ask_turn(vault: &Path, request: &AppendAskTurnRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn append_ask_turn(
+    vault: &Path,
+    request: &AppendAskTurnRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     // 자리 인자 모양, 이름 인자 순으로 먼저 재고 나서야 색인에서 노트를 찾는다(2.7의 하는 일)
     let ids = check_ids(&request.id, &request.sub_id, "append-ask-turn")?;
     let required =

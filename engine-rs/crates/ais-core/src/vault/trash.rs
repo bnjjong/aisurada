@@ -1,16 +1,14 @@
 //! 휴지통 읽기. `.aisurada/trash/trash.json`(JSON이자 YAML인 목록)을 읽어 항목마다 검사합니다.
 
+use crate::kernel::doc_type::DocType;
+use crate::kernel::ids::AGENDA_ID;
+use crate::kernel::ids::TRASH_ID;
 use std::fs;
 use std::path::Path;
-use crate::kernel::ids::TRASH_ID;
-use crate::kernel::ids::AGENDA_ID;
-use crate::kernel::doc_type::DocType;
-
 
 use super::note_meta::parse_created;
 use crate::frontmatter::{self, Value};
 use crate::text::{NOTE_ID, trim};
-
 
 const MANIFEST: &str = ".aisurada/trash/trash.json";
 const MAX_MANIFEST_BYTES: u64 = 10_000_000;

@@ -1,23 +1,23 @@
 //! 휴지통 쓰기: `delete_doc`(휴지통으로 보내기), `restore_doc`(되살리기), `purge_doc`(영구 삭제), `empty_trash`(비우기).
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 목록 파일은 바이트까지 같다.
 
+use crate::kernel::ids::TRASH_ID;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use crate::kernel::ids::TRASH_ID;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
+use crate::kernel::time::format_utc_millis;
 use crate::text::{NOTE_ID, cut_utf16, is_blank};
 use crate::vault::agenda::is_valid_slug_segment;
 use crate::vault::note_file::read_note_file;
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, is_sharded};
 use crate::vault::trash::TrashRecord;
-use crate::kernel::time::format_utc_millis;
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_confinement, check_segment, normalize};
@@ -25,7 +25,6 @@ use crate::write::doc_place::move_path;
 use crate::write::pipeline::{WriteContext, WriteScope};
 use crate::write::sub_note::remove_tree;
 use crate::write::trash_file::{archive_path, entries_in_file_order, save};
-
 
 const RECOVERED_AGENDA: &str = "---\nid: ag-recovered\nslug: recovered\ntitle: 복구함\nhue: blue\n---\n복구함\n\n삭제됐다가 복구된 노트 중, 원래 아젠다가 사라진 것들이 모이는 곳이에요.";
 
@@ -95,7 +94,11 @@ fn rel_of(vault: &Path, path: &Path) -> String {
 }
 
 /// 노트를 휴지통으로 보낸다: 노트 폴더(또는 파일)를 보관 폴더로 옮기고 목록 맨 앞에 항목을 더한다.
-pub fn delete_doc(vault: &Path, request: &DeleteDocRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn delete_doc(
+    vault: &Path,
+    request: &DeleteDocRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     require_id(&request.id, "delete-doc <노트 id>")?;
     if !NOTE_ID.is_match(&request.id) {
         return Err(EngineError::invalid_argument(format!(
@@ -200,7 +203,11 @@ pub fn delete_doc(vault: &Path, request: &DeleteDocRequest, scope: &WriteScope) 
 }
 
 /// 휴지통 항목을 되살린다. 원래 아젠다가 없어졌으면 `recovered` 아젠다(없으면 만든다)로 보낸다.
-pub fn restore_doc(vault: &Path, request: &TrashEntryRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn restore_doc(
+    vault: &Path,
+    request: &TrashEntryRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     let entry = find_entry(
         vault,
         &request.trash_id,

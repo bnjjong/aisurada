@@ -9,13 +9,13 @@ use regex::Regex;
 use serde::Deserialize;
 use serde_json::{Map, Value as Json, json};
 
-use crate::kernel::time::days_from_civil;
 use super::doc_create::{CreateDocRequest, create_doc_in};
 use super::facts_brief::{iso_text, parse_iso_date};
 use super::option_text::text_of;
 use super::shard_notes::bool_option;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
+use crate::kernel::time::days_from_civil;
 use crate::text::{compare_utf16, is_blank, trim};
 use crate::vault::comments::{CommentsEnvelope, read_comments};
 use crate::vault::note_file::read_note_file;
@@ -109,7 +109,11 @@ fn append(
     }
 }
 
-pub fn plan_day(vault: &Path, request: &PlanDayRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn plan_day(
+    vault: &Path,
+    request: &PlanDayRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     let date = date_option(&request.date)?;
     let dry_run = bool_option(&request.dry_run, "dryRun")?;
     let index = &scope.index;
@@ -305,7 +309,11 @@ struct Pending {
     line: String,
 }
 
-pub fn check_notes(vault: &Path, request: &CheckNotesRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn check_notes(
+    vault: &Path,
+    request: &CheckNotesRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     let date = date_option(&request.date)?;
     let start = date - 14;
     let index = &scope.index;

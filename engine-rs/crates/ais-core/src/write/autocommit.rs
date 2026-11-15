@@ -11,12 +11,12 @@
 //! 커밋 메시지 모양(`Aisurada-Writer`, `Aisurada-Reason`, `Aisurada-Session`, `Aisurada-Notes` 꼬리 줄)은 판 목록이 읽으므로
 //! 바꾸지 않는다.
 
+use crate::ports::{CurrentLock, VaultLock};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
-use crate::ports::{CurrentLock, VaultLock};
 
 use super::confine::absolute_normalized;
 use crate::text::trim;
@@ -41,7 +41,9 @@ impl AutoCommitConfig {
     pub fn from_env() -> Self {
         let env = crate::ports::env();
         let enabled = !matches!(
-            env.var("AISURADA_VAULT_AUTOCOMMIT_ENABLED").as_deref().map(trim),
+            env.var("AISURADA_VAULT_AUTOCOMMIT_ENABLED")
+                .as_deref()
+                .map(trim),
             Some("false")
         );
         let idle_seconds = env
@@ -154,7 +156,12 @@ pub fn watch(vault: &Path) {
 }
 
 impl AutoCommit {
-    pub fn new(vault: &Path, config: AutoCommitConfig, clock: Clock, lock: Arc<dyn VaultLock>) -> Self {
+    pub fn new(
+        vault: &Path,
+        config: AutoCommitConfig,
+        clock: Clock,
+        lock: Arc<dyn VaultLock>,
+    ) -> Self {
         let vault = absolute_normalized(vault);
         AutoCommit {
             git: Git::strict(&vault),

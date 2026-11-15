@@ -1,9 +1,9 @@
 //! 템플릿 읽기. `.aisurada/templates/doc/`(문서 템플릿)와 `.aisurada/templates/ritual/`(회고 템플릿)의 파일을 읽습니다.
 
+use crate::kernel::doc_type::DocType;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
-use crate::kernel::doc_type::DocType;
 
 use regex::Regex;
 

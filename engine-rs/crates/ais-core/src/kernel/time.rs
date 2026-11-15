@@ -205,7 +205,10 @@ mod tests {
     #[test]
     fn formats_utc_millis_and_reads_instants_strictly() {
         assert_eq!(format_utc_millis(0), "1970-01-01T00:00:00.000Z");
-        assert_eq!(format_utc_millis(1_794_700_000_123), "2026-11-14T23:46:40.123Z");
+        assert_eq!(
+            format_utc_millis(1_794_700_000_123),
+            "2026-11-14T23:46:40.123Z"
+        );
         // 초가 없는 시각은 느슨하게는 읽히고 엄격하게는 안 읽힌다
         assert!(parse_instant("2026-11-14T23:46Z").is_some());
         assert!(parse_instant_strict("2026-11-14T23:46Z").is_none());

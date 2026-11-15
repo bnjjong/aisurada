@@ -15,8 +15,8 @@ use serde::Serialize;
 use super::git::Git;
 use super::note_file::split_text;
 use super::note_meta::{read_agent, text as text_of};
-use crate::kernel::time::civil_from_days;
 use crate::frontmatter::Value;
+use crate::kernel::time::civil_from_days;
 use crate::text::{is_blank, trim, utf16_len};
 
 /// 판 시각을 보여 줄 때 쓰는 시간대(+09:00)의 초 단위 어긋남

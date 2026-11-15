@@ -15,8 +15,8 @@ use super::note_file::{ParsedNoteFile, read_note_file};
 use super::note_meta::{MetaData, MetaError, parse_meta};
 use super::{Conflict, Skipped};
 use crate::error::EngineError;
-use crate::text::{compare_utf16, is_blank, trim};
 use crate::kernel::confine;
+use crate::text::{compare_utf16, is_blank, trim};
 
 static CONFLICT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)conflicted copy|\(conflicted\b|충돌(된)?\s*사본|conflicted version").unwrap()

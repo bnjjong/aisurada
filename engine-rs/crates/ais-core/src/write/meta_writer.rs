@@ -3,11 +3,12 @@
 //! 고치기 전 확인 값(`f1`)을 검사하고, 머리를 새로 지은 글이 파일의 옛 머리를 그대로 옮긴 글과 같으면 편집 도장
 //! (`editedBy`, `editedAt`, …)을 건드리지 않고, 다르면 지금 시각과 쓴 쪽으로 도장을 새로 찍는다.
 
-use crate::kernel::actor::Caller;
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
-use crate::text::{cut_utf16, trim, utf16_len};
+use crate::kernel::actor::Caller;
+use crate::kernel::tier::Tier;
 use crate::kernel::token::compute_token;
+use crate::text::{cut_utf16, trim, utf16_len};
 use crate::vault::note_file::split_text;
 use crate::vault::note_meta::{Evaluation, Link, MetaData, agent_for_file, get};
 use crate::vault::scanner::{Format, NoteRecord};
@@ -16,7 +17,6 @@ use crate::write::atomic::write_atomic;
 use crate::write::note_front::NoteFront;
 use crate::write::pipeline::WriteContext;
 use crate::write::precondition;
-use crate::kernel::tier::Tier;
 
 /// 저장 상한(UTF-16 글자)
 pub(crate) const MAX_FILE_UNITS: usize = 1_000_000;

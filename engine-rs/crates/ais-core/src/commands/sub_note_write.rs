@@ -3,18 +3,18 @@
 //!
 //! 부모는 `메인 노트 id`이거나 `메인 노트 id/후속 노트 id/…` 사슬이다. 읽기 쪽과 달리 후속 노트 id 하나만으로는 부모를 가리킬 수 없다.
 
-use std::path::Path;
 use crate::kernel::doc_type::DocType;
 use crate::kernel::tier::Tier;
+use std::path::Path;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
 use super::doc_write::parse_tags;
 use crate::error::EngineError;
+use crate::kernel::token::compute_token;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::vault::index::NoteIndex;
-use crate::kernel::token::compute_token;
 use crate::vault::note_file::split_text;
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::apparatus::{next_sub_note_id, now_millis};
@@ -28,7 +28,6 @@ use crate::write::sub_note::{
     rewrite_root, rewrite_sub, root_agenda, strip_child_cards,
 };
 use crate::write::{first_heading, precondition, warnings};
-
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -160,7 +159,11 @@ fn require_two(parent: &str, id: &str, usage: &str) -> Result<(), EngineError> {
 }
 
 /// 후속 노트 한 건을 메인 노트나 후속 노트 아래에 만든다. 폴더 노트에만 둘 수 있다.
-pub fn create_sub_note(vault: &Path, request: &CreateSubNoteRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn create_sub_note(
+    vault: &Path,
+    request: &CreateSubNoteRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     const USAGE: &str = "create-sub-note <부모 노트 id> title=<제목> body=<본문> [type=<유형>]";
     require_one(&request.parent, USAGE)?;
     let parent = resolve_parent(&scope.index, &request.parent)?;
@@ -268,7 +271,11 @@ pub fn create_sub_note(vault: &Path, request: &CreateSubNoteRequest, scope: &Wri
 }
 
 /// 후속 노트의 제목, 본문, 태그를 고치고 정식 폴더로 옮긴다. 본문만 주면 제목은 본문의 첫 헤딩을 따른다.
-pub fn update_sub_note(vault: &Path, request: &UpdateSubNoteRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn update_sub_note(
+    vault: &Path,
+    request: &UpdateSubNoteRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     const USAGE: &str = "update-sub-note <부모 노트 id> <하위 노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [f1=<직전에 읽은 토큰>]";
     let context = &request.context;
     require_two(&request.parent, &request.id, USAGE)?;
@@ -372,7 +379,11 @@ pub fn update_sub_note(vault: &Path, request: &UpdateSubNoteRequest, scope: &Wri
 }
 
 /// 후속 노트를 지운다(그 아래 후속 노트와 첨부까지). 부모 본문에 이 노트를 가리키는 하위 페이지 카드 줄이 있으면 먼저 걷어낸다.
-pub fn delete_sub_note(vault: &Path, request: &DeleteSubNoteRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn delete_sub_note(
+    vault: &Path,
+    request: &DeleteSubNoteRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     const USAGE: &str = "delete-sub-note <부모 노트 id> <하위 노트 id>";
     require_two(&request.parent, &request.id, USAGE)?;
     let parent = resolve_parent(&scope.index, &request.parent)?;

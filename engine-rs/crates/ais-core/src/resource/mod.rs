@@ -10,9 +10,7 @@ pub mod store;
 
 use crate::kernel::ids::RESOURCE_ID as ID_SHAPE;
 
-
 use crate::frontmatter::Value;
-
 
 /// 자원 종류
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

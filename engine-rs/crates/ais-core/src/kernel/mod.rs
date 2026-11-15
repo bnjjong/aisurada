@@ -23,5 +23,5 @@ pub mod java;
 pub mod link_kind;
 pub mod task_link;
 pub mod tier;
-pub mod token;
 pub mod time;
+pub mod token;

@@ -2,19 +2,19 @@
 //! 표식(`.aisurada/workspace.json`)이 없으면 만든다. 이미 있는 것은 건드리지 않아서 여러 번 불러도 된다.
 //! 인자 이름, 응답 필드, 검사 순서와 오류 문구는 Java 엔진과 같다.
 
+use crate::kernel::doc_type::DocType;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
-use crate::kernel::doc_type::DocType;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::EngineError;
 use crate::json::{self, JsonValue, append_string};
+use crate::kernel::time::format_utc_millis;
 use crate::text::{compare_utf16, is_blank};
 use crate::vault::agenda::is_valid_slug_segment;
-use crate::kernel::time::format_utc_millis;
 use crate::write::apparatus::now_millis;
 use crate::write::atomic::write_atomic;
 use crate::write::pipeline::WriteContext;

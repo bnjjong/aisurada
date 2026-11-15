@@ -1,22 +1,22 @@
 //! 새 노트를 만드는 쓰기 `create_doc`. 아젠다 찾기·만들기, 날짜와 시각 배정, 노트 폴더 쓰기, 경고까지 한 번에 한다.
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 파일 글은 바이트까지 같다.
 
-use std::path::Path;
 use crate::kernel::doc_type::DocType;
-use crate::kernel::tier::Tier;
 use crate::kernel::link_kind::LinkKind;
+use crate::kernel::tier::Tier;
+use std::path::Path;
 
 use serde::Deserialize;
 use serde_json::Value as Json;
 
 use super::Caller;
 use super::doc_write::parse_tags;
-use crate::kernel::java::to_json_value;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
+use crate::kernel::java::to_json_value;
+use crate::kernel::token::compute_token;
 use crate::text::{NOTE_ID, compare_utf16, encode_uri_component, is_blank, trim, utf16_len};
 use crate::vault::agenda::AgendaInfo;
-use crate::kernel::token::compute_token;
 use crate::vault::note_meta::{Link, TEMPLATE_ID};
 use crate::vault::scanner::NoteRecord;
 use crate::write::apparatus::{next_id, next_note_id, now_millis};

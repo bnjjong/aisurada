@@ -50,7 +50,8 @@ fn mcp_tool_names(write: bool) -> BTreeSet<String> {
 
 /// `commands.ts`의 `POSITIONAL` 객체에 적힌 명령 이름(밑줄)
 fn screen_positional_names() -> BTreeSet<String> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../native-host/src/data/commands.ts");
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../native-host/src/data/commands.ts");
     let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let start = text
         .find("const POSITIONAL")
@@ -122,7 +123,10 @@ fn differences() -> Vec<String> {
     // 도구(MCP): 도구 이름은 명세 표와 엔진이 알아야 한다. 읽기 모드 도구는 쓰기 모드 도구의 부분이다
     let tools_read = mcp_tool_names(false);
     let tools_write = mcp_tool_names(true);
-    let cli_tools: BTreeSet<String> = registry::CLI_TOOL_NAMES.iter().map(|t| t.to_string()).collect();
+    let cli_tools: BTreeSet<String> = registry::CLI_TOOL_NAMES
+        .iter()
+        .map(|t| t.to_string())
+        .collect();
     for name in &tools_write {
         if !engine.contains(name) {
             diffs.push(format!("MCP 도구가 엔진에 없다: {name}"));
@@ -135,7 +139,9 @@ fn differences() -> Vec<String> {
         diffs.push(format!("읽기 모드에만 있는 MCP 도구: {name}"));
     }
     for name in cli_tools.difference(&tools_write) {
-        diffs.push(format!("CLI_TOOL_NAMES에는 있고 MCP 쓰기 모드 도구에는 없다: {name}"));
+        diffs.push(format!(
+            "CLI_TOOL_NAMES에는 있고 MCP 쓰기 모드 도구에는 없다: {name}"
+        ));
     }
 
     // 화면: 자리 인자를 받는 명령은 엔진이 알아야 한다
@@ -160,11 +166,17 @@ fn command_tables_agree_except_for_known_differences() {
     assert!(
         new.is_empty(),
         "명령 목록에 새 어긋남이 생겼다. 표를 맞추거나 의도한 것이면 KNOWN에 적는다.\n  {}",
-        new.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n  ")
+        new.iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join("\n  ")
     );
     assert!(
         gone.is_empty(),
         "알려진 어긋남이 사라졌다. KNOWN에서 지운다.\n  {}",
-        gone.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n  ")
+        gone.iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join("\n  ")
     );
 }

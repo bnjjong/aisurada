@@ -11,8 +11,8 @@ use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
 use crate::kernel::java::{java_blank, java_trim, value_to_string};
-use crate::text::{is_blank, trim, utf16_len};
 use crate::kernel::token::compute_token;
+use crate::text::{is_blank, trim, utf16_len};
 use crate::write::confine::has_unusable_path_characters;
 use crate::write::slug;
 use crate::write::snake_dump::dump_map;
@@ -281,10 +281,7 @@ fn json_arg(raw: &Json, field: &str) -> Result<Option<(JsonValue, usize)>, Engin
         }
         other => {
             let length = utf16_len(&other.to_string());
-            Ok(Some((
-                crate::kernel::java::to_json_value(other),
-                length,
-            )))
+            Ok(Some((crate::kernel::java::to_json_value(other), length)))
         }
     }
 }
@@ -391,9 +388,7 @@ pub fn value_to_json(value: &Value) -> JsonValue {
         Value::Null | Value::Other => JsonValue::Literal("null".to_string()),
         Value::Bool(b) => JsonValue::Literal(b.to_string()),
         Value::Int(digits) => JsonValue::Literal(digits.clone()),
-        Value::Float(f) => {
-            JsonValue::Literal(crate::kernel::java::java_double_string(*f))
-        }
+        Value::Float(f) => JsonValue::Literal(crate::kernel::java::java_double_string(*f)),
         Value::Str(s) => JsonValue::Str(s.clone()),
         Value::List(items) => JsonValue::Array(items.iter().map(value_to_json).collect()),
         Value::Map(entries) => JsonValue::Object(

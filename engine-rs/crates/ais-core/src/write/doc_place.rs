@@ -1,10 +1,10 @@
 //! 노트를 놓을 자리 계산: 날짜·시각 인자 읽기, 부모 폴더(월별 배치 여부), 폴더 이름, 폴더 옮기기.
 //! 규칙은 Java 엔진의 `UpdateDoc`·`CreateDoc`·`NoteMover`·`ShardLayout`과 같다.
 
+pub use crate::kernel::time::CivilDate;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
-pub use crate::kernel::time::CivilDate;
 
 use regex::Regex;
 

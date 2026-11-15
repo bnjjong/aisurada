@@ -4,18 +4,16 @@
 //! 색인(Java 엔진의 SQLite)은 코멘트 id를 유일하게 요구하므로, 읽기 명령은 처음 겹친 노트부터 뒤의 노트를 목록에서 빼고,
 //! 쓰기 명령은 일을 하지 않고 실패한다. 이 검사는 코멘트 읽기(`comments.rs`)와 별개의 규칙을 쓴다.
 
+use crate::kernel::ids::COMMENT_ID;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use crate::kernel::ids::COMMENT_ID;
-
 
 use super::note_meta::{get, parse_created};
 use super::scanner::NoteRecord;
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::text::is_blank;
-
 
 /// 메인 노트를 훑은 차례대로 보며 처음 코멘트 id가 겹치는 노트의 번호와 오류를 돌려준다. 겹침이 없으면 `None`이다.
 pub fn first_failure(vault_root: &Path, notes: &[NoteRecord]) -> Option<(usize, EngineError)> {

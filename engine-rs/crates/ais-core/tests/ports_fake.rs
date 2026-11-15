@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 
 use ais_core::adapters::flock_lock::FlockLock;
 use ais_core::engine::Engine;
-use ais_core::kernel::time::{LocalClock, civil_from_days};
 use ais_core::kernel::time::CivilDate;
+use ais_core::kernel::time::{LocalClock, civil_from_days};
 use ais_core::ports::{
     Clock, CommandResult, EnvSource, GitMode, IdSource, Ports, SqliteReader, VersionControl,
 };
@@ -143,12 +143,19 @@ fn an_engine_with_fake_ports_works_without_any_environment_variable() {
     // 날짜와 시각은 가짜 시계와 가짜 시간대(UTC)로 정해진다
     assert_eq!(created["date"], "2026-11-14", "{created}");
     assert!(
-        created["path"].as_str().unwrap().contains("2026-11-14-2346-"),
+        created["path"]
+            .as_str()
+            .unwrap()
+            .contains("2026-11-14-2346-"),
         "{created}"
     );
     // 잠금 파일은 환경 변수(`AISURADA_LOCK_DIR`)가 아니라 약속에 준 폴더에 생겼다
     let locks = std::fs::read_dir(root.join("locks")).expect("가짜 잠금 폴더");
-    assert!(locks.flatten().any(|e| e.file_name().to_string_lossy().ends_with(".lock")));
+    assert!(
+        locks
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().ends_with(".lock"))
+    );
     // 자동 커밋은 가짜 환경 변수로 꺼졌으니 git을 부르지 않았다
     assert_eq!(*vcs.0.lock().unwrap(), 0);
     // 같은 프로세스의 기본 어댑터에는 영향이 없다(걸었던 묶음은 호출이 끝나면 풀린다)

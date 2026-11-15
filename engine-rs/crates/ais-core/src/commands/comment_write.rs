@@ -9,10 +9,10 @@ use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
 use crate::error::EngineError;
+use crate::kernel::token::compute_token;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::vault::comments::{Anchor, Comment, CommentsEnvelope, read_comments};
 use crate::vault::index::NoteIndex;
-use crate::kernel::token::compute_token;
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::comments_file::{strip_anchors, write_comments};

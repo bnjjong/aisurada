@@ -2,10 +2,10 @@
 //! 부모 본문의 하위 페이지 카드 걷어내기, 폴더 지우기. 규칙은 Java 엔진의 `SubNoteWriter`, `DerivedBodyWriter`,
 //! `ChildPageCards`, `TreeRemover`와 같다.
 
+use crate::kernel::tier::Tier;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
-use crate::kernel::tier::Tier;
 
 use regex::Regex;
 

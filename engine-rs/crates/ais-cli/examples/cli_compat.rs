@@ -2093,7 +2093,11 @@ fn main() -> ExitCode {
     }
     let failed = !report.failures.is_empty();
     // 어긋남이 있으면 녹화를 버린다. 재생은 테이프가 남지 않았는지 본다.
-    let tape_error = if failed { None } else { h.tape.borrow().finish().err() };
+    let tape_error = if failed {
+        None
+    } else {
+        h.tape.borrow().finish().err()
+    };
     if let Some(e) = &tape_error {
         println!("테이프 오류: {e}");
     } else if !failed && h.tape.borrow().is_record() {

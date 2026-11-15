@@ -1,18 +1,18 @@
 //! 노트 머리만 고치는 쓰기: `set_favorite`(즐겨찾기), `evaluate_doc`(평가), `link_docs`(연결 더하기·빼기).
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같다.
 
-use std::path::Path;
 use crate::kernel::java::java_double_string;
 use crate::kernel::link_kind::LinkKind;
+use std::path::Path;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::error::EngineError;
+use crate::kernel::time::format_utc_millis;
 use crate::text::{NOTE_ID, cut_utf16, is_blank, trim};
 use crate::vault::note_meta::{Evaluation, Link};
 use crate::vault::scanner::NoteRecord;
-use crate::kernel::time::format_utc_millis;
 use crate::write::apparatus::now_millis;
 use crate::write::meta_writer::{MetaState, write_meta};
 use crate::write::pipeline::{WriteContext, WriteScope};
@@ -111,7 +111,11 @@ fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a NoteRecord, EngineErr
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {id}")))
 }
 
-pub fn set_favorite(vault: &Path, request: &SetFavoriteRequest, scope: &WriteScope) -> Result<Value, EngineError> {
+pub fn set_favorite(
+    vault: &Path,
+    request: &SetFavoriteRequest,
+    scope: &WriteScope,
+) -> Result<Value, EngineError> {
     const USAGE: &str = "set-favorite <노트 id> [favorite=true|false. 안 주면 지금 값을 뒤집는다] [category=<라벨. 빈 값이면 지운다>] [f1=<직전에 읽은 토큰>]";
     require_note_id(&request.id, USAGE)?;
     let favorite = bool_arg("favorite", &request.favorite)?;
@@ -156,7 +160,11 @@ pub fn set_favorite(vault: &Path, request: &SetFavoriteRequest, scope: &WriteSco
     Ok(response)
 }
 
-pub fn evaluate_doc(vault: &Path, request: &EvaluateDocRequest, scope: &WriteScope) -> Result<Value, EngineError> {
+pub fn evaluate_doc(
+    vault: &Path,
+    request: &EvaluateDocRequest,
+    scope: &WriteScope,
+) -> Result<Value, EngineError> {
     const USAGE: &str = "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]";
     require_note_id(&request.id, USAGE)?;
     let clear = bool_arg("clear", &request.clear)?.unwrap_or(false);
@@ -219,7 +227,11 @@ pub fn evaluate_doc(vault: &Path, request: &EvaluateDocRequest, scope: &WriteSco
     }))
 }
 
-pub fn link_docs(vault: &Path, request: &LinkDocsRequest, scope: &WriteScope) -> Result<Value, EngineError> {
+pub fn link_docs(
+    vault: &Path,
+    request: &LinkDocsRequest,
+    scope: &WriteScope,
+) -> Result<Value, EngineError> {
     const USAGE: &str = "link-docs <출발 노트 id> <대상 노트 id> [kind=direct|indirect|attach] [remove=true] [f1=<직전에 읽은 토큰>]";
     if is_blank(&request.from) {
         return Err(EngineError::invalid_argument(format!(

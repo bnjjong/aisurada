@@ -1,11 +1,11 @@
 //! 노트 머리 맵에서 메타데이터를 꺼내 다듬습니다. 키마다 모양을 검사하고 틀린 값은 기본값으로 물러섭니다.
 
+use crate::kernel::doc_type::DocType;
+use crate::kernel::link_kind::LinkKind;
+use crate::kernel::tier::Tier;
+use crate::kernel::time::{civil_from_days, days_from_civil};
 use std::collections::HashSet;
 use std::sync::LazyLock;
-use crate::kernel::time::{civil_from_days, days_from_civil};
-use crate::kernel::doc_type::DocType;
-use crate::kernel::tier::Tier;
-use crate::kernel::link_kind::LinkKind;
 
 use regex::Regex;
 

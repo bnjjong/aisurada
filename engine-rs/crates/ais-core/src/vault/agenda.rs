@@ -1,16 +1,14 @@
 //! 아젠다(노트를 묶는 폴더 단위) 읽기. `.aisurada/agendas/*.md`의 머리를 한 줄짜리 `키: 값` 읽개로 읽습니다.
 
+use crate::kernel::hue::{DEFAULT_HUE, is_hue};
+use crate::kernel::ids::AGENDA_ID;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use crate::kernel::ids::AGENDA_ID;
-use crate::kernel::hue::{DEFAULT_HUE, is_hue};
-
 
 use super::Skipped;
 use crate::error::EngineError;
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim, utf16_len};
-
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_FRONTMATTER_UNITS: usize = 16_000;

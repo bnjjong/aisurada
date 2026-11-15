@@ -1497,7 +1497,10 @@ fn pin_session_mtimes(home: &Path) {
         + std::time::Duration::from_millis(WRITE_NOW.parse::<u64>().unwrap() - 600_000);
     for (rank, (_, path)) in files.iter().enumerate() {
         let when = base + std::time::Duration::from_secs(rank as u64);
-        let file = fs::OpenOptions::new().write(true).open(path).expect("세션 파일");
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(path)
+            .expect("세션 파일");
         file.set_modified(when).expect("수정 시각 고정");
     }
 }
@@ -10562,7 +10565,10 @@ fn main() -> ExitCode {
             Ok(()) if java.tape.borrow().is_record() => println!(
                 "테이프 {}줄을 적었다: {}",
                 java.tape.borrow().recorded_len(),
-                record.as_ref().map(|p| p.display().to_string()).unwrap_or_default()
+                record
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default()
             ),
             Ok(()) => {}
             Err(e) => {

@@ -90,7 +90,10 @@ mod tests {
     #[test]
     fn argument_reading_ignores_ascii_case() {
         assert_eq!(Tier::parse_ignore_ascii_case("RECORD"), Some(Tier::Record));
-        assert_eq!(Tier::parse_ignore_ascii_case("Reading"), Some(Tier::Reading));
+        assert_eq!(
+            Tier::parse_ignore_ascii_case("Reading"),
+            Some(Tier::Reading)
+        );
         assert_eq!(Tier::parse_ignore_ascii_case("x"), None);
         assert_eq!(Tier::Record.as_str(), "record");
     }

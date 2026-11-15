@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::kernel::tier::Tier;
+use serde::Serialize;
 
 use crate::kernel::actor::Caller;
 use crate::vault::agenda::AgendaInfo;
@@ -120,7 +120,8 @@ impl NoteRow {
     ) -> Self {
         let meta = &note.meta;
         // 앱에게는 기록 층 노트에 `record`를 붙이고, AI에게는 기록 층 노트를 아예 보여 주지 않는다(호출 쪽에서 거른다).
-        let tier = (caller == Caller::App && meta.tier.is_record()).then_some(Tier::Record.as_str());
+        let tier =
+            (caller == Caller::App && meta.tier.is_record()).then_some(Tier::Record.as_str());
         // 편집 세션 id는 앱이 고친 노트에는 싣지 않는다
         let app_edit = meta.edited_by.as_deref() == Some("app");
         NoteRow {

@@ -168,9 +168,7 @@ fn measure() -> BTreeMap<String, usize> {
             for (name, pattern) in PATTERNS {
                 let n = text.matches(pattern).count();
                 if n > 0 {
-                    *counts
-                        .entry(format!("{name} {krate}/{rel}"))
-                        .or_default() += n;
+                    *counts.entry(format!("{name} {krate}/{rel}")).or_default() += n;
                 }
             }
         }

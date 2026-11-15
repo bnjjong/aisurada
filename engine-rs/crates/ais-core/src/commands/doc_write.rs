@@ -1,9 +1,9 @@
 //! 노트 본문 쓰기 명령: `update_doc`(제목·본문·태그·템플릿·날짜·시각 고치기).
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 파일 글은 바이트까지 같다.
 
+use crate::kernel::java::to_json_value;
 use std::fs;
 use std::path::Path;
-use crate::kernel::java::to_json_value;
 
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -12,8 +12,8 @@ use super::Caller;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
-use crate::text::{NOTE_ID, cut_utf16, is_blank, trim, utf16_len};
 use crate::kernel::token::compute_token;
+use crate::text::{NOTE_ID, cut_utf16, is_blank, trim, utf16_len};
 use crate::vault::note_file::split_text;
 use crate::vault::note_meta::{TEMPLATE_ID, get};
 use crate::vault::scanner::{Format, NoteRecord};
@@ -111,7 +111,11 @@ fn rel_of(vault: &Path, path: &Path) -> String {
 }
 
 /// 노트 한 건의 제목, 본문, 태그, 템플릿, 날짜, 시각을 고치고, 그 값으로 다시 계산한 정식 자리로 노트를 옮긴다.
-pub fn update_doc(vault: &Path, request: &UpdateDocRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn update_doc(
+    vault: &Path,
+    request: &UpdateDocRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     const USAGE: &str = "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [f1=<직전에 읽은 토큰>]";
     let context = &request.context;
 

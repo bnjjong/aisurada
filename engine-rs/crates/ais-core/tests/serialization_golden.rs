@@ -53,7 +53,11 @@ fn collect(root: &Path, rel_dir: &str, out: &mut BTreeMap<String, String>, tag: 
             if path.is_dir() {
                 walk(root, &path, out, tag);
             } else {
-                let rel = path.strip_prefix(root).unwrap().to_string_lossy().to_string();
+                let rel = path
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
                 out.insert(
                     format!("{tag}/{rel}"),
                     String::from_utf8_lossy(&fs::read(&path).unwrap()).into_owned(),

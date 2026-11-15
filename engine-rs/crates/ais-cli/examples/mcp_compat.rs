@@ -212,8 +212,7 @@ fn main() -> ExitCode {
             dist.join("ais-engine.jar").display()
         );
         fs::create_dir_all(&compiled).unwrap();
-        let source =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/DriveMcp.java");
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/compat/DriveMcp.java");
         let status = Command::new("javac")
             .args(["-encoding", "UTF-8", "-cp", &classpath, "-d"])
             .arg(&compiled)

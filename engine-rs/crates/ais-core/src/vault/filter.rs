@@ -1,7 +1,7 @@
 //! `list_docs`·`search_docs`가 함께 쓰는 노트 조건. 인자를 차례대로 검사하고 노트가 조건에 맞는지 가립니다.
 
-use std::collections::HashSet;
 use crate::kernel::doc_type::DocType;
+use std::collections::HashSet;
 
 use serde::Deserialize;
 
@@ -10,7 +10,6 @@ use super::note_meta::parse_iso_date;
 use super::scanner::NoteRecord;
 use crate::error::EngineError;
 use crate::text::{compare_utf16, trim};
-
 
 /// 호출자가 준 조건. 값이 없거나 빈 글이면 그 조건은 걸지 않는다.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -58,7 +57,10 @@ pub fn build(agendas: &AgendaTable, filter: &DocFilter) -> Result<Criteria, Engi
     if let Some(input) = non_empty(&filter.doc_type) {
         let matched = DocType::parse_ignore_ascii_case(input).map(DocType::as_str);
         criteria.doc_type = Some(matched.ok_or_else(|| {
-            EngineError::invalid_argument(format!("모르는 유형 이다: {input}. 쓸 수 있는 것은 [{}] 뿐이다.", DocType::NAMES_TEXT))
+            EngineError::invalid_argument(format!(
+                "모르는 유형 이다: {input}. 쓸 수 있는 것은 [{}] 뿐이다.",
+                DocType::NAMES_TEXT
+            ))
         })?);
     }
 

@@ -5,12 +5,12 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Map, Value as Json, json};
 
-use crate::kernel::time::days_from_civil;
 use super::option_text::text_of;
 use crate::error::EngineError;
+use crate::kernel::time::civil_from_days;
+use crate::kernel::time::days_from_civil;
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim};
 use crate::vault::facts;
-use crate::kernel::time::civil_from_days;
 use crate::write::apparatus::now_millis;
 use crate::write::local_time::local_clock;
 use crate::write::pipeline::{WriteContext, WriteScope};
@@ -113,7 +113,11 @@ fn body(facts: &str) -> String {
     joined.trim_end_matches(is_whitespace).to_string()
 }
 
-pub fn facts_brief(vault: &Path, request: &FactsBriefRequest, scope: &WriteScope) -> Result<Json, EngineError> {
+pub fn facts_brief(
+    vault: &Path,
+    request: &FactsBriefRequest,
+    scope: &WriteScope,
+) -> Result<Json, EngineError> {
     let from = date(&request.from, "from")?;
     let to = date(&request.to, "to")?;
     let min_new_file = minimum(&request.min_new_file)?;

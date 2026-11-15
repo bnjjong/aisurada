@@ -1,10 +1,10 @@
 //! 템플릿 쓰기: `save_template`(문서 템플릿 만들기·고치기), `save_ritual_template`(회고 템플릿 고치기),
 //! `delete_doc_template`(문서 템플릿 지우기). 인자 이름과 응답 필드는 Java 엔진과 같다.
 
+use crate::kernel::doc_type::DocType;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
-use crate::kernel::doc_type::DocType;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};

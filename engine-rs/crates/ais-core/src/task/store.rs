@@ -9,22 +9,20 @@
 //!
 //! 연결은 건 쪽 파일에만 적고 반대쪽(막혀 있음 따위)은 읽을 때 계산하므로 두 파일이 어긋날 일이 없다.
 
+use crate::kernel::task_link::TaskLinkKind;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::kernel::task_link::TaskLinkKind;
 
 use serde_json::Value as Json;
 
-use super::format::{
-    self, DEFAULT_PRIORITY, DEFAULT_TYPE, KEY, MAX_FILE_BYTES, MAX_LINKS,
-};
+use super::format::{self, DEFAULT_PRIORITY, DEFAULT_TYPE, KEY, MAX_FILE_BYTES, MAX_LINKS};
 use super::transitions;
 use super::{Criterion, Link, Ref, Task, TaskStatus};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::text::compare_utf16;
 use crate::kernel::token::compute_token;
+use crate::text::compare_utf16;
 use crate::vault::project::scan_projects;
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
@@ -210,7 +208,11 @@ pub fn unfinished_blockers(scan: &Scan, key: &str) -> Vec<String> {
     scan.items
         .iter()
         .filter(|t| t.status != TaskStatus::Done)
-        .filter(|t| t.links.iter().any(|l| l.kind == TaskLinkKind::Blocks && l.to == key))
+        .filter(|t| {
+            t.links
+                .iter()
+                .any(|l| l.kind == TaskLinkKind::Blocks && l.to == key)
+        })
         .map(|t| t.key.clone())
         .collect()
 }
@@ -669,7 +671,10 @@ pub fn link(
                 actor,
                 event_kind,
                 vec![
-                    ("type".to_string(), JsonValue::Str(kind.as_str().to_string())),
+                    (
+                        "type".to_string(),
+                        JsonValue::Str(kind.as_str().to_string()),
+                    ),
                     ("with".to_string(), JsonValue::Str(other.clone())),
                     (
                         "direction".to_string(),

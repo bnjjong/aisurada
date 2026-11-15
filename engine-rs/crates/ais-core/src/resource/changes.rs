@@ -11,10 +11,9 @@
 //! `args{명령에 준 옵션}`, `positional[명령에 준 자리 인자]`, `forcedId`(만들기), `before{…}`, `after{…}`(보여 주기용 칸), `summary`,
 //! `decidedAt`, `decidedBy`, `reason`. 적용할 때는 `command`, `args`, `positional`로 같은 명령 경로를 한 번 더 지난다.
 
+use crate::kernel::ids::CHANGE_ID as ID_SHAPE;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::kernel::ids::CHANGE_ID as ID_SHAPE;
-
 
 use super::format::value_to_json;
 use super::{Resource, ResourceKind};
@@ -32,7 +31,6 @@ pub const PENDING: &str = "pending";
 pub const APPROVED: &str = "approved";
 pub const REJECTED: &str = "rejected";
 pub const STALE: &str = "stale";
-
 
 /// 변경 하나. JSON 객체이고 칸 차례를 지킨다.
 pub type Change = JsonValue;
