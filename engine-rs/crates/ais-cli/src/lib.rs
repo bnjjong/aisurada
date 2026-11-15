@@ -8,6 +8,8 @@ pub mod env;
 pub mod error;
 pub mod legacy;
 pub mod map;
+pub mod mcp;
+mod mcp_tools;
 pub mod output;
 pub mod parse;
 pub mod registry;
@@ -64,6 +66,13 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
     if first == "schedule" {
         // 모르는 이름으로 본다
         return Outcome::err(registry::unknown_name_text(first), 2);
+    }
+    if first == "mcp" {
+        // 표준 입출력으로 한참 도는 명령이라 한 번에 글을 돌려주는 이 길이 아니라 `main`이 직접 연다.
+        return Outcome::err(
+            "mcp는 표준 입출력 서버라서 main에서만 연다.\n".to_string(),
+            1,
+        );
     }
     if registry::DIRECT_COMMANDS.contains(&first) {
         return Outcome::from_error(&CliError::new(

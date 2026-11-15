@@ -22,6 +22,8 @@ pub struct Env {
     pub home: String,
     /// 상대 경로를 풀 기준 폴더
     pub cwd: String,
+    /// 이 호출이 직접 정한 세션 출처. 환경변수보다 먼저 쓴다(MCP 요청에 실려 온 세션 id가 이것이다).
+    pub session: Option<SessionSource>,
 }
 
 impl Env {
@@ -33,6 +35,7 @@ impl Env {
             cwd: std::env::current_dir()
                 .map(|dir| dir.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
+            session: None,
         }
     }
 
@@ -128,6 +131,9 @@ pub fn agent_for_file(agent: &str) -> Option<String> {
 /// 래퍼가 넣은 `AISURADA_SESSION_ID`와 `AISURADA_SESSION_AGENT`가 둘 다 쓸 수 있으면 그 쌍이 이긴다. 아니면 에이전트 고유 변수를 보고,
 /// 둘 이상의 에이전트가 동시에 보이면 어느 쪽이 안쪽인지 모르므로 정하지 않는다(엉뚱한 세션보다 빈 칸이 낫다).
 pub fn session_from_env(env: &Env) -> Option<SessionSource> {
+    if env.session.is_some() {
+        return env.session.clone();
+    }
     let get = |name: &str| trim(env.var(name).unwrap_or("")).to_string();
     let pinned_id = get("AISURADA_SESSION_ID");
     let pinned_agent = get("AISURADA_SESSION_AGENT").to_lowercase();
@@ -171,6 +177,7 @@ mod tests {
                 .collect(),
             home: "/nonexistent-home".to_string(),
             cwd: "/work".to_string(),
+            session: None,
         }
     }
 
