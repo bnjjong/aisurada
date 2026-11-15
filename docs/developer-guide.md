@@ -87,7 +87,9 @@ test-native.sh         화면·호스트 시험 전체
 | `engine-rs/crates/ais-cli/` | `ais-cli`: `registry`·`spec_table`(이름과 명령 명세 표), `parse`(명령 표면)·`tool`(도구 표면) 인자 해석, `map`(엔진 호출로 바꿈), `legacy`(엔진 응답을 옛 응답 모양으로 바꿈), `output`(키를 정렬한 JSON 쓰기), `env`(vault 정하기, 세션 표식). `mcp`·`mcp_tools`(MCP 서버와 도구 표), `register`·`agent_cli`(`claude-mcp`·`codex-mcp`·`gemini-mcp`), `old_sidecar`·`doctor`·`install`·`migrate`(옛 사이드카 정리, 진단, 첫 실행 이주) |
 | `engine-rs/crates/ais-cli/examples/` | `cli_compat`(기준 Java 단발 엔진과 명령줄 단위로 맞댐), `mcp_compat`(기준 Java MCP 서버와 JSON-RPC 대화를 맞댐) |
 | `engine-rs/crates/ais-core/examples/` | `compat_check`(기준 Java 엔진과 읽기·쓰기 맞대기), `snake_check`(SnakeYAML 방출기 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
-| `engine-rs/crates/ais-core/tests/` | 합성 vault로 동작을 확인하는 통합 시험(Java 없이 돈다). `lock_interop.rs`는 `AISURADA_JAR`가 있을 때만 기준 `ais-engine.jar`와 쓰기 잠금을 맞대는 시험 |
+| `engine-rs/crates/ais-core/tests/` | 합성 vault로 동작을 확인하는 통합 시험(Java 없이 돈다). `lock_interop.rs`는 `AISURADA_JAR`가 있을 때만 기준 `ais-engine.jar`와 쓰기 잠금을 맞대는 시험. 리팩토링 안전망: `architecture.rs`(모듈 사이 의존과 바깥 직접 호출을 `architecture-baseline.txt`에 박제), `serialization_golden.rs`(태스크·자원 기록장·승인 대기 변경·휴지통 목록의 파일 바이트를 `golden/serialization/`에 박제) |
+| `engine-rs/crates/ais-cli/tests/` | `ais-cli` 프로세스·등록·정리·MCP 시험. 리팩토링 안전망: `golden.rs`(기준 엔진 없이 맞대기 재생), `command_tables.rs`(명령 정보를 따로 적은 표들의 교차 검사) |
+| `engine-rs/golden/`, `engine-rs/tools/golden/` | 기준 Java 응답과 폴더 해시를 녹화한 테이프(`compat.ndjson`, `cli.ndjson`, `mcp.ndjson`)와 녹화·재생 스크립트 `run.sh` |
 | `engine-rs/tools/compat/` | 기준 jar를 태그에서 짓는 `build-oracle.sh`, 명령 명세 표 생성기 `gen-spec-table.sh`(`DumpSpecs.java`), MCP 도구 표 생성기 `gen-mcp-tools.sh`(`DumpMcpTools.java`), MCP 맞대기용 Java 구동기 `DriveMcp.java`, 합성 vault 생성기 `make-fixture.sh`, 검색 시험 노트를 덧붙이는 `add-search-notes.sh`, git 저장소와 판 이력을 만드는 `add-git-history.sh`, 코멘트 id가 겹치는 노트를 더하는 `add-comment-clash.sh` |
 | `engine-rs/tools/yaml-spike/` | 머리 읽기·쓰기를 Java 기준값과 맞대는 도구(`YamlGroundTruth.java`, `run.sh`, `cases.txt`) |
 
@@ -129,6 +131,15 @@ Rust `ais-cli`를 기준 Java 단발 엔진과 명령줄 단위로 맞대려면 
 ```
 
 MCP 도구 표(`mcp_tools.rs`)도 마찬가지로 직접 고치고, `engine-rs/tools/compat/gen-mcp-tools.sh`가 기준 표를 같은 자리에 뽑는다(현재 표와 같음을 확인했다).
+
+**골든 시험: 기준 엔진 없이 맞대기.** 위 맞대기 셋(`compat_check`, `cli_compat`, `mcp_compat`)은 태그에서 기준 엔진을 지어야(JDK 21) 돈다. 어긋남 0을 확인한 순간의 기준(Java) 응답과 폴더 파일별 해시를 테이프(`engine-rs/golden/*.ndjson`)에 녹화해 두면, 같은 하네스를 Java 없이 다시 돌려 지금 Rust 엔진이 그때와 같은 답과 같은 폴더 바이트를 내는지 볼 수 있다. 리팩토링([계획](refactor-ddd-hexagonal-plan.md))이 동작을 바꾸지 않았다는 증거로 쓴다. 하네스는 시계와 난수를 고정해 결정적이라서 호출 순서가 곧 테이프의 열쇠이고, 재생 때 호출 인자가 같은지도 확인한다. 임시 폴더 경로는 자리표시자로 적고 재생 때 지금 경로로 되돌린다(`ais-core/examples/support/tape.rs`).
+
+```bash
+engine-rs/tools/golden/run.sh replay   # Java 없이 셋을 녹화본과 견준다(`cargo test -p ais-cli --test golden`이 같은 일을 한다)
+engine-rs/tools/golden/run.sh record   # 기준 Java(JDK 21)와 어긋남 0일 때만 테이프를 새로 쓴다. 동작을 알고 바꿨을 때만 하고, 이유를 커밋 본문에 적는다
+```
+
+`record`는 어긋남이 하나라도 있으면 테이프를 쓰지 않는다(어긋난 응답을 정답으로 굳히지 않는다). 승인 대기 변경 파일(`.aisurada/pending/*.json`)은 맞대기가 키 차례를 같게 보므로 테이프도 읽은 값을 정렬해 센다. 이 파일의 바이트 자체는 `serialization_golden.rs`가 못박는다. 시험이 의존 방향을 지키는지(`architecture.rs`)와 명령 정보를 적은 표들이 어긋나지 않는지(`command_tables.rs`)도 Java 없이 돈다. 둘 다 지금 모양을 기준으로 박제해 새 위반이 생기거나 줄어도 실패하며, 기준을 새로 쓰는 법은 각 파일 머리말에 있다.
 
 노트 머리 읽기·쓰기를 Java와 맞대려면 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
 
@@ -708,10 +719,10 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 14초(178건) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다 |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 80초(183건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 5건(골든 재생, 직렬화 골든, 의존 방향, 명령 표 교차)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「기존 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
-| 기준 맞대기 | §4 「기준과 맞대기」 | | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다 |
+| 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
 | 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 앱 안의 Rust 엔진, 격리 HOME. 먼저 `(cd engine-rs && cargo build -p ais-cli)`로 점검이 쓸 실행 파일을 지어 둔다 |
 
 `test.sh`는 `dist/`를 건드리지 않는다. `build.sh`는 `dist/ais-cli`를 만들고, 실제 창 점검은 `dist/`가 아니라 `engine-rs/target/debug/ais-cli`(또는 `AISURADA_CLI_BIN`)를 쓴다.
