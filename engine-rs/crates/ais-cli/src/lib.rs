@@ -13,6 +13,7 @@ pub mod legacy;
 pub mod map;
 pub mod mcp;
 mod mcp_tools;
+pub mod migrate;
 pub mod old_sidecar;
 pub mod output;
 pub mod parse;

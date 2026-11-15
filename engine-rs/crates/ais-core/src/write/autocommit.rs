@@ -1,8 +1,12 @@
 //! git 자동 커밋: 쓰기가 일어나면 기록해 두었다가, 한동안 조용하거나 쓰는 쪽이 바뀌면 vault를 한 커밋으로 남긴다.
 //!
-//! 쓴 쪽(앱/도구), 세션, 처음과 마지막 쓴 시각의 **대기 기록은 프로세스 메모리**에 둔다(Java 엔진과 같은 구조).
-//! 앱(Rust)과 Java 사이드카가 따로 쓰는 동안에는 각자 기록해서 커밋 메시지의 「쓴 쪽」 표시가 어긋날 수 있다.
-//! 커밋은 `git add -A`라 변경이 빠지지는 않는다. JVM을 걷어낼 때 이 기록을 `.git/` 안 파일로 올려 공유한다.
+//! 쓴 쪽(앱/도구), 세션, 처음과 마지막 쓴 시각의 **대기 기록은 vault의 `.git/aisurada-pending.json`에 둔다.** 앱, MCP 서버, 단발
+//! `ais-cli`가 같은 파일을 읽고 고치므로 프로세스가 달라도 커밋 메시지의 「쓴 쪽」 표시가 어긋나지 않는다. 읽고 고치는 일은 모두
+//! vault 쓰기 잠금을 쥔 채(쓰기 앞뒤, 정비 커밋) 하고, 잠금 없이 읽는 것은 「커밋할 때가 됐나」를 가볍게 보는 데만 쓴다.
+//!
+//! 유휴 타이머는 오래 사는 프로세스(앱, MCP 서버)만 돌린다. 단발 `ais-cli`는 기록만 남기고 끝나므로, 앱이나 MCP 서버가 vault를 열 때
+//! [`watch`]를 불러 남은 기록을 이어받아 커밋한다. 그때까지 안 뜨면 커밋이 늦어질 뿐 변경은 빠지지 않는다(커밋은 `git add -A`).
+//! `git`이 없는 폴더(저장소가 아닌 vault)는 파일을 만들지 않고 프로세스 메모리에만 둔다.
 //!
 //! 커밋 메시지 모양(`Aisurada-Writer`, `Aisurada-Reason`, `Aisurada-Session`, `Aisurada-Notes` 꼬리 줄)은 판 목록이 읽으므로
 //! 바꾸지 않는다.
@@ -70,6 +74,18 @@ impl CommitResult {
 /// 시계(유닉스 밀리초). 시험에서 바꿔 끼운다.
 pub type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
 
+/// 대기 기록 파일(`.git/aisurada-pending.json`)의 내용. 쓴 쪽과 세션, 처음과 마지막 쓴 시각(유닉스 밀리초)이다.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct PendingFile {
+    writers: Vec<String>,
+    sessions: Vec<String>,
+    pairs: Vec<String>,
+    first_write: Option<i64>,
+    last_write: Option<i64>,
+}
+
+/// 이 프로세스가 아는 대기 기록. 파일에 올리는 앞부분과, 이 프로세스만 아는 재시도 정보(`retry_after`, `failures`)로 이뤄진다.
 #[derive(Default)]
 struct Pending {
     writers: Vec<String>,
@@ -80,6 +96,9 @@ struct Pending {
     retry_after: i64,
     failures: u32,
 }
+
+/// 대기 기록 파일 이름(`.git/` 안)
+const PENDING_FILE: &str = "aisurada-pending.json";
 
 /// 넣은 차례를 지키는 집합에 넣는다.
 fn add(set: &mut Vec<String>, value: String) {
@@ -105,11 +124,11 @@ static TICKERS: LazyLock<Mutex<std::collections::HashSet<String>>> =
 const TICK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// 이 프로세스가 `vault`에 쓰기 시작하면 유휴 타이머를 한 번만 띄운다. 5초마다 `tick()`을 불러서, 쓰기가 끊긴 지 유휴 시간이
-/// 지났거나 처음 쓴 지 15분이 지난 대기 기록을 커밋한다. 프로세스가 끝나면 함께 끝난다.
-pub fn ensure_ticker(vault: &Path) {
+/// 지났거나 처음 쓴 지 15분이 지난 대기 기록을 커밋한다. 프로세스가 끝나면 함께 끝난다. 새로 띄웠으면 `true`다.
+pub fn ensure_ticker(vault: &Path) -> bool {
     let key = absolute_normalized(vault).to_string_lossy().into_owned();
     if !TICKERS.lock().unwrap().insert(key) {
-        return;
+        return false;
     }
     let auto = AutoCommit::serving(vault);
     let _ = std::thread::Builder::new()
@@ -120,6 +139,19 @@ pub fn ensure_ticker(vault: &Path) {
                 auto.tick();
             }
         });
+    true
+}
+
+/// 오래 사는 프로세스(앱, MCP 서버)가 vault를 열 때 부른다. 유휴 타이머를 띄우고, 앞서 단발 `ais-cli`나 닫힌 앱이 남긴 대기 기록이
+/// 유휴 시간이 지났으면 곧바로 커밋한다. 커밋은 느릴 수 있어 별도 스레드에서 한다.
+pub fn watch(vault: &Path) {
+    // 이 프로세스에서 이 vault를 처음 지켜볼 때만 남은 기록을 이어받는다(여러 번 불러도 스레드가 늘지 않는다)
+    if ensure_ticker(vault) {
+        let auto = AutoCommit::serving(vault);
+        let _ = std::thread::Builder::new()
+            .name("ais-autocommit-recover".into())
+            .spawn(move || auto.tick());
+    }
 }
 
 impl AutoCommit {
@@ -157,15 +189,68 @@ impl AutoCommit {
         (self.clock)()
     }
 
+    /// 대기 기록을 파일에 올릴 수 있는가: 자동 커밋이 켜져 있고 vault가 git 저장소여야 한다.
+    fn persistent(&self) -> bool {
+        self.config.enabled && self.vault.join(".git").is_dir()
+    }
+
+    fn pending_path(&self) -> PathBuf {
+        self.vault.join(".git").join(PENDING_FILE)
+    }
+
+    /// 파일의 대기 기록을 메모리 기록에 덮어쓴다. 다른 프로세스가 고치거나 커밋해서 지웠을 수 있어서, 읽기 전에 늘 이것을 부른다.
+    /// 파일이 없으면 대기 기록이 없는 것이다. 읽을 수 없는 파일은 무시하고 메모리 기록을 그대로 둔다(다음 쓰기가 새로 쓴다).
+    fn load(&self, state: &mut Pending) {
+        if !self.persistent() {
+            return;
+        }
+        let file = match fs::read(self.pending_path()) {
+            Ok(bytes) => match serde_json::from_slice::<PendingFile>(&bytes) {
+                Ok(file) => file,
+                Err(_) => return,
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => PendingFile::default(),
+            Err(_) => return,
+        };
+        state.writers = file.writers;
+        state.sessions = file.sessions;
+        state.pairs = file.pairs;
+        state.first_write = file.first_write;
+        state.last_write = file.last_write;
+    }
+
+    /// 메모리의 대기 기록을 파일에 올린다. 비었으면 파일을 지운다. 못 써도 쓰기의 실패가 아니다(메모리 기록은 남는다).
+    fn save(&self, state: &Pending) {
+        if !self.persistent() {
+            return;
+        }
+        if state.pairs.is_empty() {
+            let _ = fs::remove_file(self.pending_path());
+            return;
+        }
+        let file = PendingFile {
+            writers: state.writers.clone(),
+            sessions: state.sessions.clone(),
+            pairs: state.pairs.clone(),
+            first_write: state.first_write,
+            last_write: state.last_write,
+        };
+        if let Ok(bytes) = serde_json::to_vec(&file) {
+            let _ = super::atomic::write_atomic(&self.pending_path(), &bytes);
+        }
+    }
+
     /// 쓰기 앞에서 부른다. 앞서 기록된 쓴 쪽이 이번 쓴 쪽과 다르면 먼저 커밋해서 둘이 한 커밋에 섞이지 않게 한다.
     pub fn before_write(&self, tool: bool, session: Option<&str>) {
         let mut state = self.state.lock().unwrap();
+        self.load(&mut state);
         let pair = pair_of(tool, session);
         if !state.pairs.is_empty()
             && !(state.pairs.len() == 1 && state.pairs.contains(&pair))
             && self.now() >= state.retry_after
         {
             self.attempt_locked(&mut state, "writer");
+            self.save(&state);
         }
     }
 
@@ -175,6 +260,7 @@ impl AutoCommit {
             return;
         }
         let mut state = self.state.lock().unwrap();
+        self.load(&mut state);
         add(
             &mut state.writers,
             if tool { "tool" } else { "app" }.to_string(),
@@ -186,11 +272,13 @@ impl AutoCommit {
         let now = self.now();
         state.first_write.get_or_insert(now);
         state.last_write = Some(now);
+        self.save(&state);
     }
 
     /// 주기적으로 부른다. 마지막 쓰기 뒤 유휴 시간이 지났거나, 처음 쓴 지 15분이 넘었으면 정비 커밋을 시도한다.
     pub fn tick(&self) {
         let mut state = self.state.lock().unwrap();
+        self.load(&mut state);
         let now = self.now();
         if state.pairs.is_empty() || now < state.retry_after {
             return;
@@ -207,19 +295,29 @@ impl AutoCommit {
 
     /// 대기 중인 기록이 있는가
     pub fn has_pending(&self) -> bool {
-        !self.state.lock().unwrap().pairs.is_empty()
+        let mut state = self.state.lock().unwrap();
+        self.load(&mut state);
+        !state.pairs.is_empty()
     }
 
     /// 재시도 시각을 기다리지 않고 한 번 시도한다(시작과 종료 때 쓴다). 커밋 실패는 쓰기의 실패가 아니다.
     pub fn commit(&self, reason: &str) -> CommitResult {
         let mut state = self.state.lock().unwrap();
-        self.attempt_locked(&mut state, reason)
+        self.load(&mut state);
+        let result = self.attempt_locked(&mut state, reason);
+        self.save(&state);
+        result
     }
 
     fn attempt_maintenance(&self, state: &mut Pending, reason: &str, now: i64) {
         match lock::try_acquire(&self.vault, &self.lock_dir) {
             Ok(Some(_guard)) => {
-                self.attempt_locked(state, reason);
+                // 잠금을 기다리는 사이 다른 프로세스가 커밋했을 수 있어서 다시 읽는다
+                self.load(state);
+                if !state.pairs.is_empty() {
+                    self.attempt_locked(state, reason);
+                    self.save(state);
+                }
             }
             // 쓰기 중이면 정비 커밋은 건너뛰고 5초 뒤 다시 시도한다(불완전한 커밋을 막는다)
             _ => state.retry_after = now + 5_000,
@@ -720,6 +818,123 @@ mod tests {
         now.fetch_add(6_000, Ordering::SeqCst);
         ac.tick();
         assert!(!ac.has_pending());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// 같은 vault를 두 프로세스가 연 것처럼 인스턴스 둘을 만든다(메모리는 따로이고 `.git/` 안 파일만 같다).
+    fn second_process(dir: &Path, vault: &Path, clock: Clock) -> AutoCommit {
+        auto(dir, vault, clock)
+    }
+
+    #[test]
+    fn the_pending_record_is_shared_through_a_file_in_git_dir() {
+        let (dir, vault) = repo();
+        let writer = auto(&dir, &vault, real_clock());
+        let other = second_process(&dir, &vault, real_clock());
+        let file = vault.join(".git/aisurada-pending.json");
+
+        note(
+            &vault,
+            "notes/a/note.md",
+            "ndaa-00000001",
+            "단발 호출이 고침",
+        );
+        writer.after_write(true, Some("s1"));
+        assert!(file.is_file(), "대기 기록이 파일로 올라간다");
+        assert!(other.has_pending(), "다른 프로세스가 그 기록을 본다");
+
+        // 다른 프로세스가 커밋하면 쓴 쪽과 세션이 그대로 커밋 메시지에 실린다
+        assert_eq!(other.commit("startup").outcome, "committed");
+        let message = git(&vault, &["log", "-1", "--format=%B"]);
+        assert!(
+            message
+                .contains("Aisurada-Writer: tool\nAisurada-Reason: startup\nAisurada-Session: s1"),
+            "{message}"
+        );
+        assert!(!file.exists(), "커밋하면 파일이 지워진다");
+        assert!(!writer.has_pending(), "처음 프로세스도 커밋된 것을 안다");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn another_process_commits_an_idle_record_on_tick_and_a_writer_change_commits_first() {
+        let (dir, vault) = repo();
+        let now = Arc::new(AtomicI64::new(1_000_000_000_000));
+        let clock: Clock = {
+            let now = now.clone();
+            Arc::new(move || now.load(Ordering::SeqCst))
+        };
+        let single_shot = auto(&dir, &vault, clock.clone());
+        let resident = second_process(&dir, &vault, clock);
+
+        note(
+            &vault,
+            "notes/a/note.md",
+            "ndaa-00000001",
+            "앱을 닫은 동안 고침",
+        );
+        single_shot.after_write(true, Some("s2"));
+        now.fetch_add(299_000, Ordering::SeqCst);
+        resident.tick();
+        assert!(resident.has_pending(), "유휴 시간이 아직 안 됐다");
+        now.fetch_add(1_000, Ordering::SeqCst);
+        resident.tick();
+        assert!(
+            !single_shot.has_pending(),
+            "상주 프로세스가 단발 호출의 기록을 이어받아 커밋했다"
+        );
+        let message = git(&vault, &["log", "-1", "--format=%B"]);
+        assert!(
+            message.contains("Aisurada-Reason: idle") && message.contains("Aisurada-Session: s2"),
+            "{message}"
+        );
+
+        // 다른 프로세스가 앱의 기록을 남겨 두면, 도구가 쓰려 할 때 앱의 변경을 먼저 커밋한다
+        note(&vault, "notes/a/note.md", "ndaa-00000001", "앱이 고침");
+        resident.after_write(false, None);
+        let before = count(&vault);
+        single_shot.before_write(true, Some("s3"));
+        assert_eq!(count(&vault), before + 1);
+        assert!(git(&vault, &["log", "-1", "--format=%B"]).contains("Aisurada-Writer: app"));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_vault_without_git_or_with_autocommit_off_leaves_no_file() {
+        let (dir, vault) = repo();
+        let off = AutoCommit::new(
+            &vault,
+            AutoCommitConfig {
+                enabled: false,
+                idle_seconds: 300,
+            },
+            real_clock(),
+            dir.join("locks"),
+        );
+        off.after_write(false, None);
+        assert!(!vault.join(".git/aisurada-pending.json").exists());
+
+        let plain = dir.join("plain");
+        fs::create_dir_all(&plain).unwrap();
+        let memory_only = auto(&dir, &plain, real_clock());
+        memory_only.after_write(false, None);
+        assert!(
+            memory_only.has_pending(),
+            "저장소가 아니어도 이 프로세스 안에서는 기록한다"
+        );
+        assert!(!plain.join(".git").exists());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_unreadable_record_file_does_not_stop_writes() {
+        let (dir, vault) = repo();
+        let ac = auto(&dir, &vault, real_clock());
+        fs::write(vault.join(".git/aisurada-pending.json"), "{깨진").unwrap();
+        ac.after_write(false, None);
+        assert!(ac.has_pending(), "다음 쓰기가 새 기록을 쓴다");
+        assert_eq!(ac.commit("restore").outcome, "nothing");
+        assert!(!vault.join(".git/aisurada-pending.json").exists());
         fs::remove_dir_all(&dir).unwrap();
     }
 }

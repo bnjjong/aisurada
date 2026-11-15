@@ -1,7 +1,7 @@
-//! `ais-cli doctor [--prune [--dry-run]]`: 지금 기기의 상태를 읽기만 하며 보여 준다.
+//! `ais-cli doctor [--prune [--dry-run]] [--fix]`: 지금 기기의 상태를 읽기만 하며 보여 준다.
 //!
 //! Java 시절에는 사이드카의 소켓·상태 파일·plist를 진단했다. 사이드카가 없는 지금은 어느 vault를 쓰는지, vault의 git 상태, 이 실행 파일,
-//! 에이전트에 등록된 MCP 서버, 그리고 걷어 내야 할 옛 사이드카 흔적을 보여 준다. `--prune`은 걷어 내기(`sweep`)까지 한다.
+//! 에이전트에 등록된 MCP 서버, 그리고 걷어 내야 할 옛 사이드카 흔적을 보여 준다. `--prune`은 걷어 내기(`sweep`)까지, `--fix`는 거기에 낡은 MCP 등록의 재등록까지 한다.
 
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -148,11 +148,13 @@ fn registration_line(label: &str, found_key: &str, output: &str) -> String {
 
 pub fn run(args: &[String], env: &Env) -> Outcome {
     let mut prune = false;
+    let mut fix = false;
     let mut dry_run = false;
     let mut notes: Vec<String> = Vec::new();
     for arg in args {
         match arg.as_str() {
             "--prune" => prune = true,
+            "--fix" => fix = true,
             "--dry-run" => dry_run = true,
             "--plist" => notes.push(
                 "알림: 사이드카가 없어서 plist를 만들지 않는다(--plist는 이제 아무 일도 안 한다)"
@@ -240,7 +242,18 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
         stderr: notes.iter().map(|n| format!("{n}\n")).collect(),
         code: 0,
     };
-    if prune {
+    if fix {
+        // 옛 사이드카를 걷어 내고 낡은 MCP 등록을 새 실행 파일로 다시 등록한다
+        let migrated = crate::migrate::run(env);
+        outcome.stdout.push('\n');
+        outcome.stdout.push_str(&(migrated.lines.join("\n") + "\n"));
+        for left in &migrated.left {
+            outcome.stderr.push_str(&format!("{left}\n"));
+        }
+        if !migrated.left.is_empty() {
+            outcome.code = 1;
+        }
+    } else if prune {
         let report = old_sidecar::sweep(env, home, dry_run);
         outcome.stdout.push('\n');
         outcome.stdout.push_str(&(report.lines.join("\n") + "\n"));

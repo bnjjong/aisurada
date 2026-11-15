@@ -59,6 +59,13 @@ pub fn resolve_vault(env: &Env) -> Option<String> {
     }
 }
 
+/// 이 호출이 쓸 vault의 정리된 절대 경로(앞뒤 공백을 떼고 `.`·`..`을 정리한 것). 못 정했으면 `None`이다.
+pub fn resolved_vault_path(env: &Env) -> Option<String> {
+    let raw = resolve_vault(env)?;
+    let trimmed = trim(&raw).to_string();
+    Some(normalize_path(&trimmed, &env.cwd).unwrap_or(trimmed))
+}
+
 /// 앱이 적어 둔 쪽지의 vault 경로. 파일이 없거나 JSON이 아니거나 절대 경로가 아니면 `None`.
 fn read_pointer(home: &str) -> Option<String> {
     if is_blank(home) {

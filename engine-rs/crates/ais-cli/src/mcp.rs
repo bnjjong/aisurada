@@ -362,6 +362,7 @@ pub fn run_stdio(args: &[String], env: &Env) -> i32 {
     );
 
     let base = env.clone();
+    watch_vault(&base);
     let mut server = McpServer::new(
         write,
         Box::new(move |args, session| call_engine(&base, args, session)),
@@ -376,8 +377,19 @@ pub fn run_stdio(args: &[String], env: &Env) -> i32 {
     }
 }
 
+/// 이 서버가 다루는 vault의 자동 커밋을 지켜본다. 단발 `ais-cli`가 앱이 닫힌 동안 남긴 대기 기록을 이어받아 커밋하려는 것이다.
+/// 호출마다 vault를 다시 정하므로 호출마다 부른다(같은 vault면 처음 한 번만 일한다).
+fn watch_vault(env: &Env) {
+    if let Some(vault) = crate::env::resolved_vault_path(env)
+        && std::path::Path::new(&vault).is_dir()
+    {
+        ais_core::write::autocommit::watch(std::path::Path::new(&vault));
+    }
+}
+
 /// 도구 한 번을 명령줄과 같은 길로 부른다. 안쪽에서 패닉이 나도 서버는 살아 있게 종료 코드 1로 바꾼다.
 fn call_engine(base: &Env, args: &[String], session: Option<SessionSource>) -> Call {
+    watch_vault(base);
     let mut env = base.clone();
     env.session = session;
     let args = args.to_vec();

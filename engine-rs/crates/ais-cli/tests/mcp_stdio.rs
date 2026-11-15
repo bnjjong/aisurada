@@ -164,3 +164,95 @@ fn bad_arguments_and_help_exit_cleanly() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("사용법: ais-cli mcp [--write]"));
     let _ = std::fs::remove_dir_all(&vault);
 }
+
+/// 앱이 닫힌 동안 단발 `ais-cli`가 남긴 대기 기록을, 나중에 뜬 MCP 서버가 이어받아 커밋한다(결정 2: 상주 사이드카 없이 자동 커밋).
+#[test]
+fn mcp_server_commits_the_record_a_single_shot_cli_left_behind() {
+    let vault = fixture("recover");
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&vault)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "tester")
+            .env("GIT_COMMITTER_NAME", "tester")
+            .env("GIT_AUTHOR_EMAIL", "t@example.invalid")
+            .env("GIT_COMMITTER_EMAIL", "t@example.invalid")
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    git(&["init", "-q", "-b", "main"]);
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "init"]);
+    let commits = || {
+        git(&["rev-list", "--count", "HEAD"])
+            .trim()
+            .parse::<u32>()
+            .unwrap()
+    };
+    let before = commits();
+
+    // 단발 호출: 노트를 쓰고 곧바로 끝난다. 유휴 타이머는 5초 뒤에야 도는데 그 전에 프로세스가 끝난다.
+    let env = |command: &mut Command| {
+        command
+            .env_clear()
+            .env("AISURADA_VAULT", &vault)
+            .env("AISURADA_LOCK_DIR", vault.join("../locks-for-mcp-test"))
+            .env("AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS", "0")
+            .env("HOME", &vault);
+    };
+    let mut cli = Command::new(env!("CARGO_BIN_EXE_ais-cli"));
+    cli.args([
+        "create_doc",
+        r##"{"agenda":"demo","type":"plan","title":"단발이 남긴 노트","body":"# 본문\n"}"##,
+    ]);
+    env(&mut cli);
+    let out = cli.output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        commits(),
+        before,
+        "단발 호출은 커밋하지 않고 대기 기록만 남긴다"
+    );
+    assert!(vault.join(".git/aisurada-pending.json").is_file());
+
+    // 나중에 뜬 MCP 서버가 첫 도구 호출에서 남은 기록을 이어받아 커밋한다
+    let mut server = Command::new(env!("CARGO_BIN_EXE_ais-cli"));
+    server
+        .arg("mcp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    env(&mut server);
+    let mut child = server.spawn().unwrap();
+    {
+        let stdin = child.stdin.as_mut().unwrap();
+        writeln!(stdin, "{}", call(1, "list_tags", json!({}))).unwrap();
+        stdin.flush().unwrap();
+    }
+    let mut committed = false;
+    for _ in 0..50 {
+        if commits() > before {
+            committed = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    drop(child.stdin.take());
+    let _ = child.wait_with_output();
+    assert!(committed, "MCP 서버가 남은 기록을 커밋해야 한다");
+    let message = git(&["log", "-1", "--format=%B"]);
+    // `create_doc` 도구 표면의 호출이라 쓴 쪽은 도구(tool)로 남는다
+    assert!(
+        message.contains("Aisurada-Writer: tool") && message.contains("Aisurada-Reason: idle"),
+        "{message}"
+    );
+    assert!(!vault.join(".git/aisurada-pending.json").exists());
+    let _ = std::fs::remove_dir_all(&vault);
+}

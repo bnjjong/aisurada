@@ -297,3 +297,99 @@ fn install_only_explains() {
         .exists()
     );
 }
+
+#[test]
+fn doctor_fix_sweeps_and_reregisters_a_stale_mcp_with_the_same_mode() {
+    let h = Home::new("fix");
+    seed(&h);
+    // 상태에 낡은 Java 등록(쓰기 모드)이 들어 있고, add-json이 오면 그 값을 상태에 적는 가짜 claude
+    let claude = h.root.join("claude");
+    let state = h.root.join("claude-state");
+    std::fs::write(&state, "java -jar /App/ais-cli.jar mcp --write").unwrap();
+    std::fs::write(
+        &claude,
+        "#!/bin/bash\nprintf '%s\\n' \"$*\" >> \"$FAKE_LOG\"\nS=\"$FAKE_STATE\"\ncase \"$1 $2\" in\n  \"mcp get\") [ -f \"$S\" ] && { echo \"Command: $(cat \"$S\")\"; exit 0; }; exit 1 ;;\n  \"mcp remove\") rm -f \"$S\"; exit 0 ;;\n  \"mcp add-json\") printf '%s' \"$4\" > \"$S\"; exit 0 ;;\nesac\nexit 9\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut env = h.env();
+    env.vars
+        .insert("AISURADA_CLAUDE_BIN".into(), claude.display().to_string());
+    env.vars.insert(
+        "AISURADA_CODEX_BIN".into(),
+        h.root.join("none-codex").display().to_string(),
+    );
+    env.vars
+        .insert("FAKE_STATE".into(), state.display().to_string());
+    env.vars
+        .insert("AISURADA_VAULT".into(), h.root.display().to_string());
+
+    let out = run(&env, &["doctor", "--fix"]);
+    assert_eq!(out.code, 0, "{}\n{}", out.stdout, out.stderr);
+    assert!(
+        out.stdout
+            .contains("Claude Code의 낡은 MCP 등록을 새 실행 파일로 다시 등록했다(읽기+쓰기)"),
+        "{}",
+        out.stdout
+    );
+    let registered = std::fs::read_to_string(&state).unwrap();
+    assert!(
+        registered.contains("/fake/ais-cli") && registered.contains("\"--write\""),
+        "{registered}"
+    );
+    assert!(!registered.contains(".jar"));
+    assert!(!h.exists("Library/LaunchAgents/co.kcd.aisurada.sidecar.abc123.plist"));
+
+    // 다시 돌리면 할 일이 없다
+    let again = run(&env, &["doctor", "--fix"]);
+    assert_eq!(again.code, 0);
+    assert!(again.stdout.contains("걷어 낼 옛 사이드카 흔적이 없다"));
+    assert!(!again.stdout.contains("다시 등록했다"));
+}
+
+#[test]
+fn migration_leaves_a_note_when_the_executable_is_unknown() {
+    let h = Home::new("noexe");
+    let claude = h.root.join("claude");
+    std::fs::write(
+        &claude,
+        "#!/bin/bash\necho 'Command: java -jar /App/ais-cli.jar mcp'\nexit 0\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut env = h.env();
+    env.exe = String::new();
+    env.vars
+        .insert("AISURADA_CLAUDE_BIN".into(), claude.display().to_string());
+    let migration = ais_cli::migrate::run(&env);
+    assert_eq!(migration.left.len(), 1, "{:?}", migration.left);
+    assert!(migration.left[0].contains("ais-cli 실행 파일의 자리를 모른다"));
+}
+
+#[test]
+fn run_once_marks_a_finished_migration_and_skips_the_next_time() {
+    let h = Home::new("once");
+    seed(&h);
+    let env = h.env();
+    let first = ais_cli::migrate::run_once(&env).expect("처음에는 이주를 한다");
+    assert!(first.left.is_empty(), "{:?}", first.left);
+    assert!(h.exists("Library/Application Support/aisurada/rust-engine-migrated"));
+    assert!(!h.exists("Library/LaunchAgents/co.kcd.aisurada.sidecar.abc123.plist"));
+    assert!(
+        ais_cli::migrate::run_once(&env).is_none(),
+        "표시가 있으면 다시 하지 않는다"
+    );
+}
+
+#[test]
+fn run_once_does_not_mark_when_something_is_left() {
+    let h = Home::new("once-left");
+    // 도는 사이드카(이 프로세스의 pid)는 지우지 못하므로 남는다
+    h.write(
+        "Library/Application Support/aisurada/run/live.json",
+        &format!("{{\"pid\": {}, \"vault\": \"/v\"}}", std::process::id()),
+    );
+    let env = h.env();
+    assert!(!ais_cli::migrate::run_once(&env).unwrap().left.is_empty());
+    assert!(!h.exists("Library/Application Support/aisurada/rust-engine-migrated"));
+}
