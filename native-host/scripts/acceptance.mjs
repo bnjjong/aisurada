@@ -89,16 +89,7 @@ for (const name of ["run.command", "bin", "tool.py"]) {
 const app = join(noteDir, "attach/Some.app");
 mkdir(app);
 refused.push(app);
-const java = process.env.JAVA_HOME
-  ? join(process.env.JAVA_HOME, "bin/java")
-  : "/usr/bin/java";
 const quote = (s) => "'" + s.replaceAll("'", "'\\''") + "'";
-const wrapper = join(root, "java");
-write(
-  wrapper,
-  `#!/bin/sh\nexec ${quote(java)} ${quote("-Duser.home=" + home)} "$@"\n`,
-);
-chmodSync(wrapper, 0o700);
 const fake = join(root, "bin/claude");
 write(
   fake,
@@ -113,21 +104,16 @@ const env = {
   CARGO_HOME: process.env.CARGO_HOME || join(homedir(), ".cargo"),
   RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), ".rustup"),
   AISURADA_VAULT: vault,
-  AISURADA_CLI_JAR: join(repo, "dist/ais-cli.jar"),
-  AISURADA_SIDECAR_JAVA: wrapper,
-  AISURADA_SIDECAR_SOCKET: join(root, "engine.sock"),
+  AISURADA_LOCK_DIR: join(root, "locks"),
   AISURADA_VAULT_AUTOCOMMIT_ENABLED: "false",
   PATH: join(root, "bin") + ":" + process.env.PATH,
 };
 for (const k of [
-  "AISURADA_SIDECAR_JAR",
   "CLAUDE_CODE_SESSION_ID",
   "AISURADA_ASK_RUNTIME",
   "AISURADA_ASK_USE_AGENT",
 ])
   delete env[k];
-if (!existsSync(join(repo, "dist/ais-cli.jar")))
-  throw Error("Run bash build.sh first");
 const config = {
   root,
   vault,
@@ -220,17 +206,6 @@ const start = (cmd, args, options = {}) => {
 let result = [];
 let failure;
 try {
-  const engine = start(wrapper, [
-    "-jar",
-    // 이 점검은 4부를 뺀 합성(호스트 --no-default-features)이라 엔진도 4부를 뺀 사이드카를 띄운다
-    join(repo, "dist/ais-sidecar-noclaude.jar"),
-    "serve",
-  ]);
-  for (let i = 0; i < 600 && !existsSync(env.AISURADA_SIDECAR_SOCKET); i++) {
-    if (engine.exitCode !== null) throw Error("engine exited");
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  if (!existsSync(env.AISURADA_SIDECAR_SOCKET)) throw Error("engine not ready");
   const native = start(join(host, "node_modules/.bin/tauri"), [
     "dev",
     "--config",

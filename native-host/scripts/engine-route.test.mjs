@@ -12,7 +12,7 @@ function host({ commands, java = {}, rust = {} } = {}) {
       calls.push({ command, args });
       if (command === 'sidecar_call') {
         const handler = java[args.argv[0]];
-        if (!handler) throw new Error(`Java 응답이 없다: ${args.argv[0]}`);
+        if (!handler) throw new Error(`명령줄 응답이 없다: ${args.argv[0]}`);
         return handler(args.argv);
       }
       if (command === 'engine_call') {
@@ -28,13 +28,13 @@ function host({ commands, java = {}, rust = {} } = {}) {
 const javaOk = value => () => ({ status: 0, stdout: JSON.stringify(value), stderr: '' });
 const page = items => ({ items, total: items.length, returned: items.length, truncated: false });
 
-test('engineCommands가 없는 호스트(시험, 브라우저)는 호출 객체도 Java 엔진으로 풀어서 보낸다', async () => {
+test('engineCommands가 없는 호스트(시험, 브라우저)는 호출 객체도 명령줄 길로 풀어서 보낸다', async () => {
   const h = host({ java: { 'list-docs': javaOk([{ id: 'a' }]) } });
   assert.deepEqual(await engineCall(h, read.docs()), [{ id: 'a' }]);
   assert.deepEqual(h.calls, [{ command: 'sidecar_call', args: { argv: ['list-docs', 'limit=0', 'bodies=true'] } }]);
 });
 
-test('문자열 목록(argv)은 Rust 엔진이 지원하는 이름이어도 늘 Java 엔진으로 간다', async () => {
+test('문자열 목록(argv)은 Rust 엔진이 지원하는 이름이어도 늘 명령줄 길로 간다', async () => {
   const h = host({ commands: ['list_docs'], java: { 'list-docs': javaOk([]) } });
   await engineCall(h, ['list-docs', 'limit=0']);
   assert.deepEqual(h.calls.map(c => c.command), ['sidecar_call']);
@@ -53,13 +53,13 @@ test('호스트가 지원한다고 알린 명령은 Rust 엔진으로 가고, �
   assert.deepEqual(h.calls.map(c => c.command), ['engine_call', 'engine_call']);
 });
 
-test('호스트가 지원 목록에 안 넣은 호출 객체는 Java 엔진으로 간다', async () => {
+test('호스트가 지원 목록에 안 넣은 호출 객체는 명령줄 길로 간다', async () => {
   const h = host({ commands: ['list_agendas'], java: { 'list-trash': javaOk([{ trashId: 't' }]) } });
   assert.deepEqual(await engineCall(h, read.trash()), [{ trashId: 't' }]);
   assert.deepEqual(h.calls.map(c => c.command), ['sidecar_call']);
 });
 
-test('지원 목록을 못 받으면(오류) Java 엔진으로 간다', async () => {
+test('지원 목록을 못 받으면(오류) 명령줄 길로 간다', async () => {
   const h = host({ commands: new Error('호스트에 그 명령이 없다'), java: { reindex: javaOk({ mode: 'full' }) } });
   assert.deepEqual(await engineCall(h, read.reindex()), { mode: 'full' });
   assert.deepEqual(h.calls.map(c => c.command), ['sidecar_call']);

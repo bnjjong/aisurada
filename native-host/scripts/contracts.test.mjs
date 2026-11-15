@@ -7,11 +7,21 @@ test('bundle identity, deferred main creation and flat resource map', () => {
   assert.equal(config.identifier, 'co.kcd.aisurada');
   assert.equal(config.productName, 'aisurada');
   assert.deepEqual(config.app.windows, [{title:'aisurada',width:1040,height:720,minWidth:900,minHeight:540,create:false}]);
-  assert.equal(config.bundle.resources['../../dist/ais-cli.jar'], 'ais-cli.jar');
-  assert.equal(config.bundle.resources['../../dist/ais-sidecar.jar'], 'ais-sidecar.jar');
+  // 5단계 뒤의 번들에는 Java 실행 환경도 jar도 없다. 개발용 번들은 bin/ais-cli 스크립트만 싣는다
+  assert.deepEqual(config.bundle.resources, {'resources/ais-cli': 'bin/ais-cli'});
   for (const source of Object.keys(config.bundle.resources)) assert.ok(existsSync(new URL('../src-tauri/' + source, import.meta.url)));
   assert.deepEqual(config.plugins['deep-link'].desktop.schemes, ['aisurada']);
   assert.deepEqual(config.bundle.fileAssociations[0].ext, ['md','markdown']);
+});
+test('release bundle ships the Rust ais-cli binary and no Java', () => {
+  const release = read('tauri.release.conf.json');
+  // 릴리스 설정이 개발용 스크립트를 빼고(null) 지은 실행 파일을 같은 자리에 넣는다(JSON merge patch)
+  assert.equal(release.bundle.resources['resources/ais-cli'], null);
+  assert.equal(release.bundle.resources['../.release/bin/ais-cli'], 'bin/ais-cli');
+  const merged = {...config.bundle.resources};
+  for (const [key, value] of Object.entries(release.bundle.resources)) { if (value === null) delete merged[key]; else merged[key] = value; }
+  assert.deepEqual(Object.values(merged).filter(target => target === 'bin/ais-cli'), ['bin/ais-cli'], 'exactly one source for bin/ais-cli');
+  for (const target of Object.values(merged)) assert.ok(!/\.jar$|^runtime/.test(target), `Java resource still bundled: ${target}`);
 });
 test('empty filesystem scope and exact distinct window capabilities', () => {
   const main = read('capabilities/main.json'), note = read('capabilities/note.json');

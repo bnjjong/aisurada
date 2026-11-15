@@ -101,24 +101,19 @@ if (part4Check) {
   ].map(line => JSON.stringify(line)).join('\n') + '\n');
 }
 const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, today };
-const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin/java') : '/usr/bin/java';
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
-const wrapper = join(root, 'java');
-const callLog = join(root, 'java-calls.jsonl');
 // 앱이 엔진을 부르는 길은 둘이다: 문자열 목록을 받는 `sidecar_call`과 호출 객체를 받는 `engine_call`. 호스트가 두 길의 호출을 이 파일에 적고
 // (`AISURADA_CALL_LOG`), 점검은 어느 길로 갔든 같은 문자열 목록(argv)으로 센다.
 const hostCallLog = join(root, 'host-calls.jsonl');
 const { toArgv } = await import(pathToFileURL(join(host, 'src/data/commands.ts')).href);
-const logger = join(root, 'record-java.py');
-write(logger, `import os,sys,json,time\nfd=os.open(${JSON.stringify(callLog)}, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0o600)\nos.write(fd,(json.dumps({'args':sys.argv[1:],'start':time.time_ns()//1000000})+'\\n').encode())\nos.close(fd)\nos.execv(${JSON.stringify(java)},[${JSON.stringify(java)},${JSON.stringify('-Duser.home=' + home)},*sys.argv[1:]])\n`);
-write(wrapper, `#!/bin/sh\nexec /usr/bin/python3 ${quote(logger)} "$@"\n`); chmodSync(wrapper, 0o700);
+// 점검 준비(워크스페이스 초기화, 편집기 사례 심기)에 쓰는 ais-cli 실행 파일. 앱이 쓰는 것과 같은 엔진이다.
+const cli = process.env.AISURADA_CLI_BIN || join(repo, 'engine-rs/target/debug/ais-cli');
+if (!existsSync(cli)) throw Error('Build ais-cli first: (cd engine-rs && cargo build -p ais-cli)');
 const env = { ...process.env, HOME: home, ZDOTDIR: join(root, 'zdot'), HISTFILE: join(root, 'history'),
   CARGO_HOME: process.env.CARGO_HOME || join(homedir(), '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), '.rustup'),
-  AISURADA_VAULT: vault, AISURADA_CLI_JAR: join(repo, 'dist/ais-cli.jar'), AISURADA_SIDECAR_JAVA: wrapper,
-  AISURADA_SIDECAR_SOCKET: join(root, 'engine.sock'), AISURADA_CALL_LOG: hostCallLog, AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
+  AISURADA_VAULT: vault, AISURADA_LOCK_DIR: join(root, 'locks'), AISURADA_CALL_LOG: hostCallLog, AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
 if (askMarksCheck) env.AISURADA_CLAUDE_BIN = join(root, 'fake-claude');
-for (const key of ['AISURADA_SIDECAR_JAR', 'CLAUDE_CODE_SESSION_ID', 'AISURADA_ASK_RUNTIME', 'AISURADA_ASK_USE_AGENT']) delete env[key];
-if (!existsSync(join(repo, 'dist/ais-sidecar.jar'))) throw Error('Run bash build.sh first');
+for (const key of ['CLAUDE_CODE_SESSION_ID', 'AISURADA_ASK_RUNTIME', 'AISURADA_ASK_USE_AGENT']) delete env[key];
 let finish, noteResult;
 const completed = new Promise(resolve => { finish = resolve; });
 const boot = `window.__AIS_FIXTURE__=${JSON.stringify(cfg)};
@@ -191,21 +186,15 @@ try {
       if (await new Promise(resolve => git.on('exit', resolve))) throw Error('Fixture second version failed');
     }
   }
-  const engine = start(wrapper, ['-jar', join(repo, 'dist/ais-sidecar.jar'), 'serve']);
-  for (let n = 0; n < 600 && !existsSync(env.AISURADA_SIDECAR_SOCKET); n++) {
-    if (engine.exitCode !== null) throw Error('engine exited');
-    await new Promise(resolve => setTimeout(resolve, 25));
-  }
-  if (!existsSync(env.AISURADA_SIDECAR_SOCKET)) throw Error('engine not ready');
   if (editorCheck) {
-    const initialized = spawn(wrapper, ['-jar', join(repo, 'dist/ais-cli.jar'), 'init-workspace', 'name=검증 공간', 'templates=[]'], { cwd: host, env });
+    const initialized = spawn(cli, ['init-workspace', 'name=검증 공간', 'templates=[]'], { cwd: host, env });
     let initializationError = ''; initialized.stdout.resume(); initialized.stderr.on('data', chunk => { initializationError += chunk; });
     if (await new Promise(resolve => initialized.on('exit', resolve))) throw Error(initializationError);
     // Seed through the real engine before the UI starts, so watch reads cannot
     // mix with the roundtrip measurements. These are independent PDF fixtures.
     for (const c of editorCases) {
       c.original = `# 왕복 ${c.id}\n\n${c.input}\n\n왕복 사례 끝`;
-      const child = spawn(wrapper, ['-jar', join(repo, 'dist/ais-cli.jar'), 'create-doc', 'agenda=demo', 'type=free', `title=왕복 ${c.id}`, `body=${c.original}`, 'format=markdown'], { cwd: host, env });
+      const child = spawn(cli, ['create-doc', 'agenda=demo', 'type=free', `title=왕복 ${c.id}`, `body=${c.original}`, 'format=markdown'], { cwd: host, env });
       let out = '', err = ''; child.stdout.on('data', chunk => { out += chunk; }); child.stderr.on('data', chunk => { err += chunk; });
       const code = await new Promise(resolve => child.on('exit', resolve));
       if (code) throw Error(`Seed ${c.id}: ${err}`);

@@ -311,14 +311,14 @@ test('a read started before creation cannot remove the real id after the create 
   const reading=h.data.reconcile();await tick();await h.data.createDoc({agendaId:'ag',type:'free',title:'New',body:'new',date:'2026-11-01',time:'12:30',tags:[]});
   gate.resolve();await reading;assert.ok(h.workspace.notes.some(note=>note.id==='real'&&note.precondition==='CREATED'));
 });
-test('C188: a renaming title write drops only the engine title-mismatch notice, whose head matches the engine source',async t=>{
+test('C188: a renaming title write drops only the engine title-mismatch notice, whose head matches the Rust engine source',async t=>{
   const mismatch='본문 첫 헤딩("snake\\_case")이 제목("snake_case")과 달라요 — 앱에서 고치면 제목이 바뀝니다.';
   let warning=mismatch+'\n옛 노트 삭제 실패 — 같은 id가 둘 남았을 수 있어요(정리 필요): notes/demo/a';
   const h=fixture(t,{handler:async argv=>argv[0]==='update-doc'?ok({path:'notes/demo/moved',precondition:'T1',renamed:true,warning}):undefined});
   await h.data.updateNote({id:'a'},{title:'snake_case'});assert.deepEqual(h.data.getSnapshot().failures.map(line=>line.text),['옛 노트 삭제 실패 — 같은 id가 둘 남았을 수 있어요(정리 필요): notes/demo/a']);
   h.data.dismissFailures();warning=mismatch;await h.data.updateNote({id:'a'},{title:'snake_case 2'});assert.deepEqual(h.data.getSnapshot().failures,[]);
-  const engine=readFileSync(new URL('../../src/aisurada/write/WarningsDetector.java',import.meta.url),'utf8');
-  assert.ok(engine.includes('return "'+TITLE_MISMATCH_HEAD.replace('"','\\"')+'"'),'engine title-mismatch sentence head changed');
+  const engine=readFileSync(new URL('../../engine-rs/crates/ais-core/src/write/warnings.rs',import.meta.url),'utf8');
+  assert.ok(engine.includes('"'+TITLE_MISMATCH_HEAD.replace('"','\\"')),'engine title-mismatch sentence head changed');
 });
 test('failure banner deduplicates to ten lines and success retains only active conflict failures',async t=>{
   const h=fixture(t,{handler:async argv=>argv[0]==='update-doc'?fail(4):undefined});

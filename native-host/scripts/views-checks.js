@@ -1,4 +1,4 @@
-// Full production React UI + real Tauri/Java, using only the isolated fixture.
+// Full production React UI + real Tauri and the Rust engine, using only the isolated fixture.
 const cfg = window.__AIS_FIXTURE__,
   invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -929,7 +929,7 @@ if (location.pathname.startsWith("/note-window/")) {
       const step2 = $$(".guide-step")[1].textContent;
       assert(!step2.includes("aisurada-mcp.js") && !step2.includes("mcpServers"), "C119 guide still registers the removed MCP server");
       assert(step2.includes('ln -sf "$APP/bin/ais-cli" ~/.local/bin/ais-cli') && step2.includes("export AISURADA_VAULT="), "C119 guide lacks the CLI mode setup");
-      // The app ships its own Java, so the guide must not send people to a system Java.
+      // The app ships its own ais-cli, so the guide must not send people to a system Java.
       assert(!/\bjava\b/.test(step2) && !step2.includes("install --cli"), "guide step 2 still needs a system Java");
       assert(!$(".set-ask-timeout"), "AI control visible");
     });

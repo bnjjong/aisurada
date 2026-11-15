@@ -24,7 +24,6 @@
     "test:interaction:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --interaction",
     "test:navigation:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --navigation",
     "test:workspace:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs",
-    "backend:jars": "bash ../build.sh",
     "release:cli": "node scripts/prepare-cli.mjs",
     "release:build": "node scripts/release-build.mjs",
     "release:verify": "node scripts/verify-release.mjs",
