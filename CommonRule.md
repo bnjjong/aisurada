@@ -32,9 +32,9 @@
 
 ## 3. 이름 규칙
 
-- 프로젝트 이름은 `aisurada`, 접두는 `ais`다(`ais-cli`, `ais-engine.jar`, `AIS-409`, `AISURADA_*`, `.aisurada/`).
+- 프로젝트 이름은 `aisurada`, 접두는 `ais`다(`ais-cli`, `ais-core`, `AIS-409`, `AISURADA_*`, `.aisurada/`).
 - 새 코드, 문서, 시험에 옛 이름(`withlog`, `wl`과 그 대문자·카멜 변형)을 쓰지 않는다. 옛 이름이 허용되는 곳은 `docs/` 아래 옛 기록, `docs/developer-guide.md` §10의 옛 이름 대응표, 외부 설명서의 제목과 파일 경로뿐이다.
-- 이름이나 문구를 바꿀 때는 **글자 수를 숫자로 박아 둔 코드**(오프셋, 고정 폭 머리)가 없는지 먼저 찾는다. 예: HTML 머리 마커 `<!--aisurada`의 길이, 소켓 프레임 머리 4바이트. 숫자 대신 문자열의 `length()`를 쓴다.
+- 이름이나 문구를 바꿀 때는 **글자 수를 숫자로 박아 둔 코드**(오프셋, 고정 폭 머리)가 없는지 먼저 찾는다. 예: HTML 머리 마커 `<!--aisurada`의 길이. 숫자 대신 문자열의 길이(`len()`, UTF-16이면 그 단위)를 쓴다.
 - 일괄 치환은 단어 경계를 지키고(`newline`, `rawLimit` 같은 일반 단어를 건드리지 않는다), 끝난 뒤 남은 옛 이름이 없는지 훑는다. 바이너리 파일과 긴 base64 줄은 치환하지 않는다.
 
 ---
@@ -73,7 +73,6 @@ footer (선택: BREAKING CHANGE, 해결됨/관련 이슈)
 
 ```bash
 git worktree add -b <브랜치> <경로> main
-mkdir -p <경로>/lib && cp lib/snakeyaml-2.4.jar <경로>/lib/          # lib/는 git이 무시한다
 cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # APFS 복제(약 12GB지만 거의 공간을 안 쓴다)
 (cd <경로>/native-host && pnpm install --frozen-lockfile --offline)
 ```
@@ -93,25 +92,23 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 
 | 바꾼 곳 | 평소에 보는 것(빌드 확인) |
 |---------|---------------------------|
-| 엔진 (`src/`, `test/`) | 컴파일(`./build.sh`가 끝까지 되는지) |
 | 화면·호스트 (`native-host/`) | `pnpm --dir native-host typecheck` |
-| Rust 엔진 이전 (`engine-rs/`) | `(cd engine-rs && cargo build --workspace --examples)` |
+| 엔진 (`engine-rs/`) | `(cd engine-rs && cargo build --workspace --examples)` |
 | 문서 | 없음 |
 
 시험을 돌릴 때는 바꾼 곳에 맞춰 아래에서 고른다. 릴리스 전에는 전부 돌린다.
 
 | 바꾼 곳 | 돌릴 것 |
 |---------|---------|
-| 엔진 (`src/`, `test/`) | `bash test.sh` |
 | 화면·호스트 (`native-host/`) | `bash test-native.sh` |
-| Rust 엔진 이전 (`engine-rs/`) | `(cd engine-rs && cargo test --workspace)`. Java와 맞대는 법은 `docs/developer-guide.md` §4 |
-| 받아들임 묶음 (`fixtures/`) | `docs/developer-guide.md` §8의 34장 명령 3개 |
+| 엔진 (`engine-rs/`) | `bash test.sh`(= `cargo test --workspace`). 옛 Java 엔진과 맞대는 법은 `docs/developer-guide.md` §4 |
+| 받아들임 묶음 (`fixtures/`) | `docs/developer-guide.md` §8의 34장 명령 3개(기준 엔진은 `build-oracle.sh`로 짓는다) |
 | 편집기, 저장, 창, 목록 같은 화면 동작 | 해당 `pnpm --dir native-host test:*:acceptance` |
 | 4부 (묻기, 세션) | `pnpm --dir native-host test:part4:acceptance` |
 | 이름, 번들, 권한, 호스트 계약 | 위를 모두 + `pnpm --dir native-host tauri build --debug --bundles app` |
 
-- `build.sh`, `test.sh`, `test-native.sh`, `tauri build`, acceptance는 `dist/`와 `build/`를 지웠다 다시 만든다. **같은 폴더에서 둘 이상을 동시에 돌리지 않는다.** 다른 세션이 돌리는 중이면 별도 worktree에서 한다.
-- 앱을 직접 띄울 때는 진짜 HOME과 launchd를 건드리지 않게 격리한다(엔진을 먼저 직접 띄우고, `AISURADA_SIDECAR_SOCKET`을 102바이트 이하 경로로 준다). `open 문서.md`는 쓰지 않는다. 번들이 `.md` 기본 편집기라서 앱이 진짜 HOME으로 뜬다.
+- `tauri build`와 acceptance는 `native-host/dist/`(화면 빌드)를 지웠다 다시 만들고, `build.sh`는 `dist/`를 다시 쓴다. **같은 폴더에서 둘 이상을 동시에 돌리지 않는다.** 다른 세션이 돌리는 중이면 별도 worktree에서 한다. acceptance는 `engine-rs/target/debug/ais-cli`가 있어야 한다(`cd engine-rs && cargo build -p ais-cli`).
+- 앱을 직접 띄울 때는 진짜 HOME과 진짜 vault를 건드리지 않게 격리한다(가짜 `HOME`과 합성 vault, 식별자를 바꾼 번들. `docs/rust-engine-hand-check.md`). `open 문서.md`는 쓰지 않는다. 번들이 `.md` 기본 편집기라서 앱이 진짜 HOME으로 뜬다.
 
 ---
 
@@ -119,4 +116,4 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 
 - [`docs/developer-guide.md`](docs/developer-guide.md): 구성, 빌드와 시험, 엔진 사용법, 자주 막히는 곳
 - [`docs/beta-hand-check.md`](docs/beta-hand-check.md): 앱을 격리해서 띄우는 법과 손 확인 점검표
-- [`README.md`](README.md): 엔진 명령, 환경 변수, 종료 코드
+- [`README.md`](README.md): `ais-cli` 명령, 환경 변수, 종료 코드

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-bash build.sh
 pnpm --dir native-host build
 pnpm --dir native-host test:screen
 pnpm --dir native-host test:workspace

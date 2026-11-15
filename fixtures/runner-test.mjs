@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // fixtures/expect 실행기를 재는 시험. 설명서 34.1의 옵션 문법, 무결성, --out, 거르개, 어댑터, 준비 걸음,
 // 판정 9가지, 경고, 구현 환경, 신호를 시험용 작은 묶음과 대본대로 답하는 가짜 엔진으로 잰다.
-// 그다음 진짜 묶음의 자가 점검(--mutants)과, dist/ais-engine.jar가 있으면 이 엔진 회차를 돈다.
+// 그다음 진짜 묶음의 자가 점검(--mutants)과, 기준 엔진(engine-rs/target/oracle/ais-engine.jar, build-oracle.sh가 태그에서 지음)이 있으면 그 회차를 돈다.
 // 마지막 [11]은 34장 판 확인이 짚은 갈래를 지금 실행기에 맞춘 것을 잰다.
 //
 //   node fixtures/runner-test.mjs
@@ -334,9 +334,9 @@ console.log('\n[9] 진짜 묶음: 자가 점검과 변형 8가지');
   check('자가 점검 종료 코드 0, 변형 8가지를 모두 잡음', [r.code, /변형 8가지 가운데 8가지를 잡았다/.test(r.stderr)], [0, true]);
 }
 
-const jar = path.join(REPO, 'dist', 'ais-engine.jar');
+const jar = path.join(REPO, 'engine-rs', 'target', 'oracle', 'ais-engine.jar');
 if (fs.existsSync(jar)) {
-  console.log('\n[10] 진짜 묶음: 이 엔진(dist/ais-engine.jar)');
+  console.log('\n[10] 진짜 묶음: 기준 엔진(engine-rs/target/oracle/ais-engine.jar)');
   const javaBin = spawnSync('sh', ['-c', 'command -v java'], { encoding: 'utf8' }).stdout.trim();
   const o = freshOut();
   const r = runner(BUNDLE, ['--engine', path.join(HERE, 'aisurada.adapter.json'), '--out', o], { AISX_IMPL_JAVA: javaBin, AISX_IMPL_JAR: jar });

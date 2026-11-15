@@ -3,7 +3,7 @@
   "version": 1,
   "surface": "engine",
   "name": "aisurada",
-  "note": "이 저장소의 Java 엔진(dist/ais-engine.jar)을 부르는 어댑터. 34.5의 9번대로 묶음 폴더 밖에 둔다. 색인이 없는 구현이라 --aisurada.db.home 을 안 준다.",
+  "note": "기준(oracle) Java 엔진(engine-rs/tools/compat/build-oracle.sh가 태그 java-engine-final에서 지은 engine-rs/target/oracle/ais-engine.jar, AISX_IMPL_JAR로 줌)을 부르는 어댑터. 5단계에서 Java 엔진을 저장소에서 지웠고 Rust ais-cli는 JSON 키 차례가 달라 이 묶음의 글자 견줌에는 안 맞는다. 34.5의 9번대로 묶음 폴더 밖에 둔다. 색인이 없는 구현이라 --aisurada.db.home 을 안 준다.",
   "prefix": [
     "${AISX_IMPL_JAVA}",
     "-XX:TieredStopAtLevel=1",

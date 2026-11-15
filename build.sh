@@ -1,75 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# JDK 21 이상이 필요하다. JAVA_HOME이 있으면 그것을, 없으면 PATH의 javac와 jar를 쓴다.
-if [[ -n "${JAVA_HOME:-}" ]]; then
-    JAVAC="$JAVA_HOME/bin/javac"
-    JAR="$JAVA_HOME/bin/jar"
-else
-    JAVAC="javac"
-    JAR="jar"
-fi
-
-SNAKEYAML_VERSION="2.4"
-SNAKEYAML_SHA1="e0666b825b796f85521f02360e77f4c92c5a7a07"
-
+# Rust `ais-cli`(release)를 지어 dist/ais-cli에 둔다. Rust 1.85 이상(edition 2024)이 필요하다.
+# Java 엔진은 5단계에서 저장소에서 지웠다. 맞대기의 기준이 필요하면 engine-rs/tools/compat/build-oracle.sh를 쓴다.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-LIB_DIR="$SCRIPT_DIR/lib"
-BUILD_DIR="$SCRIPT_DIR/build"
-CLASSES_DIR="$BUILD_DIR/classes"
-DIST_DIR="$SCRIPT_DIR/dist"
-SNAKEYAML_JAR="$LIB_DIR/snakeyaml-$SNAKEYAML_VERSION.jar"
-
-sha1_of() {
-    if command -v shasum >/dev/null 2>&1; then
-        shasum -a 1 "$1" | cut -d' ' -f1
-    else
-        sha1sum "$1" | cut -d' ' -f1
-    fi
-}
-
-# SnakeYAML이 없으면 Maven Central에서 받고, 체크섬이 다르면 멈춘다
-if [[ ! -f "$SNAKEYAML_JAR" ]]; then
-    mkdir -p "$LIB_DIR"
-    curl -fsSL -o "$SNAKEYAML_JAR" \
-        "https://repo1.maven.org/maven2/org/yaml/snakeyaml/$SNAKEYAML_VERSION/snakeyaml-$SNAKEYAML_VERSION.jar"
-    if [[ "$(sha1_of "$SNAKEYAML_JAR")" != "$SNAKEYAML_SHA1" ]]; then
-        rm -f "$SNAKEYAML_JAR"
-        echo "snakeyaml-$SNAKEYAML_VERSION.jar 의 SHA-1이 다르다" >&2
-        exit 1
-    fi
-fi
-
-rm -rf "$BUILD_DIR" "$DIST_DIR"
-mkdir -p "$CLASSES_DIR" "$DIST_DIR"
-
-# Unpack snakeyaml into classes directory
-(cd "$CLASSES_DIR" && "$JAR" -xf "$SNAKEYAML_JAR")
-rm -rf "$CLASSES_DIR/META-INF/MANIFEST.MF"
-
-# Find and compile Java source files (src/ only)
-find "$SCRIPT_DIR/src" -name "*.java" > "$BUILD_DIR/sources.txt"
-"$JAVAC" -encoding UTF-8 --release 21 -d "$CLASSES_DIR" -cp "$CLASSES_DIR" @"$BUILD_DIR/sources.txt"
-
-# 4부 스위치. 켠 판(ais-engine.jar, ais-sidecar.jar)은 part4=true를, 뺀 판은 part4=false를 싣는다
-printf 'part4=true\n' > "$CLASSES_DIR/aisurada/engine-build.properties"
-
-# Build fat jars
-"$JAR" --create --file "$DIST_DIR/ais-engine.jar" --main-class aisurada.cli.Main -C "$CLASSES_DIR" .
-"$JAR" --create --file "$DIST_DIR/ais-cli.jar" --main-class aisurada.cli.AisCliMain -C "$CLASSES_DIR" .
-cp "$DIST_DIR/ais-engine.jar" "$DIST_DIR/ais-sidecar.jar"
-
-# 4부를 뺀 판은 4부 클래스(ask, chat, session)를 아예 안 싣고 4부 명령 7개에 AIS-409로 답한다
-NOCLAUDE_DIR="$BUILD_DIR/classes-noclaude"
-rm -rf "$NOCLAUDE_DIR"
-cp -R "$CLASSES_DIR" "$NOCLAUDE_DIR"
-rm -rf "$NOCLAUDE_DIR/aisurada/ask" "$NOCLAUDE_DIR/aisurada/chat" "$NOCLAUDE_DIR/aisurada/session"
-printf 'part4=false\n' > "$NOCLAUDE_DIR/aisurada/engine-build.properties"
-"$JAR" --create --file "$DIST_DIR/ais-sidecar-noclaude.jar" --main-class aisurada.cli.Main -C "$NOCLAUDE_DIR" .
-
-echo "Build successful: $DIST_DIR/ais-engine.jar"
-echo "Build successful: $DIST_DIR/ais-cli.jar"
-echo "Build successful: $DIST_DIR/ais-sidecar.jar"
-echo "Build successful: $DIST_DIR/ais-sidecar-noclaude.jar"
+cargo build --release --locked --manifest-path engine-rs/Cargo.toml -p ais-cli
+mkdir -p dist
+cp engine-rs/target/release/ais-cli dist/ais-cli
+echo "dist/ais-cli"
