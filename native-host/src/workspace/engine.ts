@@ -11,7 +11,7 @@ export class SidecarCommandError extends Error {
   readonly status: number;
   readonly command: string;
   readonly stderr: string;
-  /** Rust 엔진이 낸 오류의 종류(`conflict`, `not_found` …). Java 엔진의 오류에는 없다. */
+  /** `engine_call` 길의 오류 종류(`conflict`, `not_found` …). 명령줄 길(`sidecar_call`)의 오류에는 없다. */
   readonly kind?: string;
   constructor(command: string, result: SidecarResult, kind?: string) {
     super(`동기화 엔진 명령이 실패했어요(${command}, 종료 코드 ${result.status}): ${result.stderr.trim()}`);
@@ -34,9 +34,9 @@ export async function engineRefusal(host: HostPort, request: string[] | Call): P
  * 문자열 목록(argv)은 늘 명령줄 길이다. 어느 쪽이든 화면은 같은 모양의 응답을 받는다(Rust 응답은 어댑터가 기존 모양으로 바꾼다).
  */
 export async function engineCall(host: EnginePort, request: string[] | Call): Promise<unknown> {
-  if (Array.isArray(request)) return javaCall(host, request);
+  if (Array.isArray(request)) return cliCall(host, request);
   const supported = await host.engineCommands?.().catch(() => undefined);
-  return supported?.has(request.command) ? rustCall(host, request) : javaCall(host, toArgv(request));
+  return supported?.has(request.command) ? rustCall(host, request) : cliCall(host, toArgv(request));
 }
 
 /**
@@ -56,7 +56,7 @@ export async function engineReply(host: EnginePort, argv: string[]): Promise<Sid
   }
 }
 
-async function javaCall(host: EnginePort, argv: string[]): Promise<unknown> {
+async function cliCall(host: EnginePort, argv: string[]): Promise<unknown> {
   const result = await host.invoke<SidecarResult>('sidecar_call', { argv });
   if (result.status !== 0) {
     throw new SidecarCommandError(argv[0], result);
