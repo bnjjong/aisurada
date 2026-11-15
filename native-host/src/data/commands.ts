@@ -6,11 +6,11 @@ const command = (name: string, positional: string[] = [], fields: Fields = {}, t
   [name, ...positional, ...cells(fields), ...(token ? [`f1=${token}`] : [])];
 
 /**
- * 엔진 호출 하나: 명령 이름(snake_case)과 인자 객체. Rust 엔진은 이 객체를 그대로 받고, Java 엔진으로 보낼 때는
+ * 엔진 호출 하나: 명령 이름(snake_case)과 인자 객체. `engine_call`은 이 객체를 그대로 받고, 명령줄 길로 보낼 때는
  * `toArgv`로 `key=value` 문자열 목록으로 푼다. 옮겨진 명령부터 이 모양으로 만들고, 나머지는 아직 argv 목록이다.
  */
 export interface Call { command: string; args?: Fields; }
-/** Java 엔진이 `key=value`가 아니라 자리(positional)로 받는 인자: 호출 객체의 인자 이름을 그 차례로 앞에 둔다. */
+/** 명령줄이 `key=value`가 아니라 자리(positional)로 받는 인자: 호출 객체의 인자 이름을 그 차례로 앞에 둔다. */
 const POSITIONAL: Record<string, string[]> = {
   get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
   list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
@@ -30,7 +30,7 @@ const POSITIONAL: Record<string, string[]> = {
 };
 /** 자리 인자를 여럿 받는 명령: 호출 객체에서는 그 인자들을 이 이름의 배열로 둔다. */
 const VARIADIC: Record<string, string> = { session_titles: 'ids' };
-/** 호출 객체를 Java 엔진이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
+/** 호출 객체를 명령줄이 받는 문자열 목록으로 푼다(`list_docs` → `list-docs`). */
 export const toArgv = (call: Call): string[] => {
   const args = call.args ?? {}, positional = POSITIONAL[call.command] ?? [];
   const variadic = VARIADIC[call.command];

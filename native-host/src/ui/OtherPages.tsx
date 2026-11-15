@@ -729,8 +729,8 @@ export function Guide() {
       `aisurada의 노트는 ais-cli로 읽고 씁니다.\n목록: ais-cli list-docs limit=20\n읽기: ais-cli get-doc <노트 id>\n쓰기 전 토큰을 받고 f1=<precondition>을 함께 보냅니다.`,
     ],
     // Step 2 sets up the CLI mode the step-1 skill assumes. The app ships an
-    // `ais-cli` script (Contents/Resources/bin) that runs the Java bundled in the
-    // app, so nothing here needs a system Java: linking it is enough.
+    // `ais-cli` binary (Contents/Resources/bin), a single Rust executable, so
+    // nothing here needs Java or a helper process: linking it is enough.
     [
       "2. ais-cli를 셸에 두기",
       [

@@ -60,7 +60,7 @@ const TerminalHost = lazy(() => import('../../ui/terminal/TerminalHost.tsx').the
 async function callEngine<T = any>(argv: string[]): Promise<T> {
   const reply = await tauriAskHost.engine(argv);
   if (reply.status === 0 && reply.stdout) return JSON.parse(reply.stdout) as T;
-  throw new Error(reply.stderr?.trim() || '사이드카 명령 실패');
+  throw new Error(reply.stderr?.trim() || '엔진 명령 실패');
 }
 
 /** `session-titles <id>` and its `cwd`; `null` when it cannot be read or is absent (7.10). */

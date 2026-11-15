@@ -30,8 +30,8 @@ export async function engineRefusal(host: HostPort, request: string[] | Call): P
 }
 
 /**
- * 엔진 호출의 길목. 호출 객체(`Call`)는 호스트가 Rust 엔진으로 처리한다고 알린 명령이면 Rust 엔진으로, 아니면 Java 엔진으로 보낸다.
- * 문자열 목록(argv)은 늘 Java 엔진이다. 어느 쪽이든 화면은 같은 모양의 응답을 받는다(Rust 응답은 어댑터가 기존 모양으로 바꾼다).
+ * 엔진 호출의 길목. 호출 객체(`Call`)는 호스트가 Rust 엔진으로 처리한다고 알린 명령이면 Rust 엔진으로, 아니면 명령줄 길(`sidecar_call`, Rust `ais-cli`)로 보낸다.
+ * 문자열 목록(argv)은 늘 명령줄 길이다. 어느 쪽이든 화면은 같은 모양의 응답을 받는다(Rust 응답은 어댑터가 기존 모양으로 바꾼다).
  */
 export async function engineCall(host: EnginePort, request: string[] | Call): Promise<unknown> {
   if (Array.isArray(request)) return javaCall(host, request);
@@ -42,7 +42,7 @@ export async function engineCall(host: EnginePort, request: string[] | Call): Pr
 /**
  * 옛 `{status, stdout, stderr}` 응답이 필요한 호출자(Claude 연동의 묻기·대화)를 위한 길. 인자 목록을 호출 객체로 바꿔,
  * 호스트가 Rust 엔진이 처리한다고 알린 명령이면 Rust 엔진으로 보내고 결과를 옛 응답 모양으로 되돌린다.
- * 알리지 않은 명령은 인자 목록 그대로 Java 엔진으로 보내고 응답을 건드리지 않는다.
+ * 알리지 않은 명령은 인자 목록 그대로 명령줄 길로 보내고 응답을 건드리지 않는다.
  */
 export async function engineReply(host: EnginePort, argv: string[]): Promise<SidecarResult> {
   const call = fromArgv(argv);

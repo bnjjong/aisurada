@@ -7,7 +7,7 @@ import type { Call } from "../data/commands.ts";
 
 export type ResourceKind = "skill" | "agent";
 export type Permission = "read" | "edit" | "publish";
-/** 엔진 호출 한 번. 옛 문자열 목록(Java 엔진)이나 호출 객체(Rust 엔진이 맡은 명령)를 받는다. */
+/** 엔진 호출 한 번. 문자열 목록(명령줄 길)이나 호출 객체(`engine_call`이 맡은 명령)를 받는다. */
 export type EngineCall = (request: string[] | Call) => Promise<unknown>;
 
 export interface ResourceRow {

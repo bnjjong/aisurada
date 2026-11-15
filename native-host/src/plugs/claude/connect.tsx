@@ -1,5 +1,5 @@
 // 설정 화면의 「Claude 연결」. Claude Code가 이 워크스페이스의 노트를 MCP 도구로 읽고 쓰게 연결한다.
-// 일은 모두 `ais-cli claude-mcp`가 한다(엔진 쪽 ClaudeMcpCommand). 화면은 `sidecar_call`로 부르기만 하므로
+// 일은 모두 `ais-cli claude-mcp`가 한다(Rust `ais-cli`의 register.rs). 화면은 `sidecar_call`로 부르기만 하므로
 // 호스트 커맨드를 더하지 않는다.
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,6 +9,8 @@ export interface ConnectStatus {
   registered: boolean;
   write: boolean;
   detail: string;
+  /** Java 시절의 jar를 가리키는 낡은 등록이다. 앱을 새로 받으면 그 자리가 없어서 다시 연결해야 한다. 없으면(true가 아니면) 낡지 않다. */
+  stale?: boolean;
 }
 interface Reply {
   status: number;
@@ -29,6 +31,7 @@ export function parseConnectStatus(stdout: string): ConnectStatus | null {
       registered: row.registered,
       write: row.write === true,
       detail: typeof row.detail === "string" ? row.detail : "",
+      ...(row.stale === true ? { stale: true } : {}),
     };
   } catch {
     return null;
@@ -67,6 +70,7 @@ export function ConnectView({
   else if (!status) line = "확인하는 중이에요…";
   else if (!status.claudeFound) line = "Claude Code를 찾지 못했어요. 설치한 뒤 설정을 다시 열어 주세요.";
   else if (!status.registered) line = "연결되어 있지 않아요.";
+  else if (status.stale) line = "예전 앱의 경로로 연결되어 있어요. 아래에서 다시 연결해 주세요.";
   else line = status.write ? "연결되어 있어요 · 노트를 읽고 쓸 수 있어요" : "연결되어 있어요 · 노트를 읽기만 해요";
   return (
     <fieldset className="set-connect">

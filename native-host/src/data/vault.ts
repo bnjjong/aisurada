@@ -35,7 +35,7 @@ export function relations(notes: Note[]): VaultMemory['relations'] {
   return result;
 }
 
-/** 인자 목록이든 호출 객체든 Java 인자 칸(`key=value`) 목록으로 본다(제목을 바꾸는 쓰기인지 가리는 데 쓴다). */
+/** 인자 목록이든 호출 객체든 명령줄 인자 칸(`key=value`) 목록으로 본다(제목을 바꾸는 쓰기인지 가리는 데 쓴다). */
 const argCells = (request: string[] | Call): string[] => Array.isArray(request) ? request : toArgv(request);
 
 export class VaultData {
