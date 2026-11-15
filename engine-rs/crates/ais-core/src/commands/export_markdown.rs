@@ -9,7 +9,6 @@ use serde_json::{Map, Value as Json, json};
 
 use crate::error::EngineError;
 use crate::text::is_blank;
-use crate::vault::attach_text;
 use crate::vault::scanner::Format;
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{absolute_normalized, check_confinement, check_segment, normalize};
@@ -29,7 +28,6 @@ pub fn export_markdown(vault: &Path, context: &WriteContext) -> Result<Json, Eng
             continue;
         }
         total += 1;
-        let _ = attach_text::extract(vault, note);
         match note.format {
             Format::Html => {
                 html += 1;

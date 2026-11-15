@@ -11,7 +11,6 @@ use serde::Deserialize;
 use serde_json::{Map, Value as Json, json};
 
 use super::option_text::text_of;
-use super::reindex;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::text::{compare_utf16, is_blank, trim};
@@ -230,12 +229,7 @@ fn mapping_path(vault: &Path, apply: bool) -> PathBuf {
 pub fn shard_notes(vault: &Path, request: &ShardNotesRequest) -> Result<Json, EngineError> {
     let _scope = WriteScope::begin(vault, "shard_notes", &request.context)?;
     let apply = bool_option(&request.apply, "apply")?;
-    let result = migrate(vault, apply);
-    if apply {
-        // 색인을 못 맞춰도 이동 결과는 그대로 돌려준다(Java는 안내 줄만 낸다)
-        let _ = reindex::execute(vault);
-    }
-    result
+    migrate(vault, apply)
 }
 
 fn migrate(vault: &Path, apply: bool) -> Result<Json, EngineError> {

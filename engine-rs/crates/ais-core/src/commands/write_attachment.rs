@@ -12,7 +12,6 @@ use super::list_attachments::make_ref;
 use super::option_text::text_of;
 use crate::error::EngineError;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
-use crate::vault::attach_text;
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::{WriteContext, WriteScope};
@@ -107,11 +106,7 @@ pub fn write_attachment(
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {root_id}")))?;
     let owner =
         match sub_id {
-            None => {
-                // 메인 노트는 get_doc과 같은 길로 읽어 HTML 첨부도 연다(18.5)
-                let _ = attach_text::extract(vault, root);
-                root
-            }
+            None => root,
             Some(sub) => root.sub_notes.iter().find(|s| s.id == sub).ok_or_else(|| {
                 EngineError::not_found(format!("SubNote not found: {root_id}/{sub}"))
             })?,

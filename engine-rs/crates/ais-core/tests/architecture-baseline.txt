@@ -9,7 +9,7 @@ edge commands -> resource 5
 edge commands -> session 2
 edge commands -> task 6
 edge commands -> text 33
-edge commands -> vault 79
+edge commands -> vault 76
 edge commands -> write 97
 edge engine -> commands 1
 edge engine -> error 1

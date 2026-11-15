@@ -17,7 +17,6 @@ use super::shard_notes::bool_option;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::text::{compare_utf16, is_blank, trim};
-use crate::vault::attach_text;
 use crate::vault::comments::{CommentsEnvelope, read_comments};
 use crate::vault::note_file::read_note_file;
 use crate::vault::scanner::NoteRecord;
@@ -62,16 +61,12 @@ fn date_option(raw: &Option<Json>) -> Result<i64, EngineError> {
 }
 
 /// 읽기 층 메인 노트를 만든 시각 내림차순(같으면 경로 차례)으로
-fn reading_notes<'a>(
-    vault: &Path,
-    index: &'a crate::vault::index::NoteIndex,
-) -> Vec<&'a NoteRecord> {
+fn reading_notes(index: &crate::vault::index::NoteIndex) -> Vec<&NoteRecord> {
     let mut notes: Vec<&NoteRecord> = Vec::new();
     for note in index.root_notes() {
         if note.meta.tier != "reading" {
             continue;
         }
-        let _ = attach_text::extract(vault, note);
         notes.push(note);
     }
     notes.sort_by(|a, b| {
@@ -119,7 +114,7 @@ pub fn plan_day(vault: &Path, request: &PlanDayRequest) -> Result<Json, EngineEr
     let date = date_option(&request.date)?;
     let dry_run = bool_option(&request.dry_run, "dryRun")?;
     let index = &scope.index;
-    let notes = reading_notes(vault, index);
+    let notes = reading_notes(index);
     let date_text = iso_text(date);
     let previous_limit = iso_text(date - 1);
     let previous = notes
@@ -315,7 +310,7 @@ pub fn check_notes(vault: &Path, request: &CheckNotesRequest) -> Result<Json, En
     let date = date_option(&request.date)?;
     let start = date - 14;
     let index = &scope.index;
-    let notes = reading_notes(vault, index);
+    let notes = reading_notes(index);
     let mut stamps: HashMap<&str, Odt> = HashMap::new();
     for note in &notes {
         if note.format == crate::vault::scanner::Format::Json {
