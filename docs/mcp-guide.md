@@ -2,7 +2,7 @@
 
 Claude 같은 MCP 클라이언트가 aisurada의 노트를 도구로 찾고, 읽고, 만들고, 고치게 하는 방법과 쓸 수 있는 기능을 정리한 문서입니다. 연결하는 사람과 도구를 고치는 사람이 함께 읽도록 썼고, 프로토콜 이야기는 맨 뒤 §7에 모았습니다.
 
-MCP 서버는 앱에 든 `ais-cli`의 한 모드(`ais-cli mcp`)입니다. 별도 프로그램을 깔 필요가 없고, 릴리스 번들에는 Java가 들어 있어서 Java를 따로 설치하지 않아도 됩니다(Java가 없는 깨끗한 Mac에서의 확인은 아직입니다. §9).
+MCP 서버는 앱에 든 `ais-cli`의 한 모드(`ais-cli mcp`)입니다. `ais-cli`는 Rust로 지은 실행 파일 하나라서 별도 프로그램이나 Java를 깔 필요가 없습니다.
 
 ## 1. 한눈에
 
@@ -10,7 +10,7 @@ MCP 서버는 앱에 든 `ais-cli`의 한 모드(`ais-cli mcp`)입니다. 별도
 |------|------|
 | 서버 이름 | `aisurada` (버전 0.1.0) |
 | 전송 | 표준 입출력(stdio). 한 줄에 JSON-RPC 메시지 하나 |
-| 내놓는 도구 | 읽기 전용 모드 13개, 쓰기 모드 28개 |
+| 내놓는 도구 | 읽기 전용 모드 19개, 쓰기 모드 37개 |
 | 기본값 | **읽기 전용.** 노트를 만들고 고치려면 연결할 때 쓰기를 따로 허용해야 합니다 |
 | 영구 삭제 | 어느 모드에서도 열지 않습니다(`purge_doc`). 휴지통 비우기는 앱에서 사람이 합니다 |
 | 다루는 범위 | 서버 하나가 한 번에 vault 하나를 다룹니다. vault는 **도구를 부를 때마다** 정합니다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 열어 둔 vault입니다(§2-4) |
@@ -45,7 +45,7 @@ ais-cli claude-mcp remove          # 연결 끊기
 ```
 
 - Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부릅니다. 그래서 `claude` 명령(Claude Code)이 있어야 합니다. 못 찾으면 `AISURADA_CLAUDE_BIN`으로 자리를 알려 줍니다.
-- 등록되는 Java와 `ais-cli.jar`는 이 명령을 돌린 바로 그것입니다. 앱의 `bin/ais-cli`로 돌리면 앱에 든 것이 등록됩니다.
+- 등록되는 것은 이 명령을 돌린 `ais-cli` 실행 파일입니다. 앱의 `bin/ais-cli`로 돌리면 앱에 든 것이 등록됩니다.
 - `status`의 출력 예: `{"claudeFound":true,"registered":false,"write":false,"detail":""}`
 - 종료 코드: 0은 성공, 1은 `claude`를 못 돌렸거나 실패, 2는 쓰는 법이 틀린 것입니다. `--write`는 `add`와 `config`에서만 받습니다.
 - 예전 판은 `AISURADA_VAULT`를 등록에 박았습니다. 그때 만든 등록은 `add`를 다시 하면 바뀝니다(앞의 등록을 지우고 새로 더합니다).
@@ -59,15 +59,14 @@ ais-cli claude-mcp remove          # 연결 끊기
 
 ```json
 {"mcpServers":{"aisurada":{"type":"stdio",
-  "command":"<앱의 Java 경로>/bin/java",
-  "args":["-jar","<앱 또는 dist>/ais-cli.jar","mcp"],
-  "env":{"AISURADA_SIDECAR_JAR":"<앱 또는 dist>/ais-sidecar.jar"}}}}
+  "command":"<앱 또는 dist>/ais-cli",
+  "args":["mcp"]}}}
 ```
 
 쓰기를 허용하려면 `args` 끝에 `"--write"`를 더합니다. 다른 MCP 클라이언트도 같은 형태(`command`, `args`, `env`)를 받으면 붙일 수 있습니다.
 
-- 등록에는 Java와 jar의 **절대 경로**가 들어갑니다. 앱을 옮기거나 지우면 연결이 끊기니 그때는 다시 연결합니다.
-- `AISURADA_SIDECAR_JAR`가 `env`에 같이 들어갈 수 있습니다. 엔진을 띄울 jar의 자리입니다.
+- 등록에는 실행 파일의 **절대 경로**가 들어갑니다. 앱을 옮기거나 지우면 연결이 끊기니 그때는 다시 연결합니다.
+- Java 시절(`java -jar … ais-cli.jar mcp`)에 만든 등록은 지금은 없는 jar를 가리킵니다. `ais-cli doctor`가 낡았다고 알려 주고, `ais-cli doctor --fix`가 같은 모드로 다시 등록합니다. 정식 앱은 새 판을 처음 열 때 한 번 이것을 합니다.
 
 ### 2-4. 어느 vault를 쓰나
 
@@ -77,7 +76,7 @@ ais-cli claude-mcp remove          # 연결 끊기
 - **격리된 앱은 진짜 포인터를 건드리지 않습니다.** 손 확인이나 시험이 가짜 HOME으로 앱을 띄우면 그 HOME 아래에 파일을 적습니다. 진짜 HOME의 파일은 진짜 앱만 고칩니다.
 - **어떻게 등록됐는지는 `claude mcp get aisurada`로 봅니다.** 출력의 `Environment`에 `AISURADA_VAULT=…`가 있으면 예전 판이 vault를 박은 등록입니다. 그 경로의 vault만 쓰니 `ais-cli claude-mcp add --write`로 다시 등록합니다(`ais-cli claude-mcp status`의 `detail`에도 같은 글이 들어 있습니다).
 - **연결한 뒤에는 새 Claude 세션을 엽니다.** 이미 떠 있던 세션은 새로 등록한 서버를 보지 못하고 「aisurada MCP가 연결돼 있지 않다」고 답할 수 있습니다. 같은 까닭으로, 등록을 바꾸기 전부터 떠 있던 서버는 옛 등록(박힌 vault)으로 계속 돕니다.
-- **시험용으로 직접 띄운 엔진에는 연결하지 않는 것을 권합니다.** 개발 중에 `AISURADA_SIDECAR_SOCKET`으로 엔진을 직접 띄워 쓰는 경우, 이 값은 등록에 자동으로 들어가지 않습니다. 그 엔진이 꺼진 채 도구를 부르면 서버가 엔진을 띄우려다 진짜 launchd에 등록을 시도할 수 있습니다(§7). 꼭 붙여야 하면 직접 등록(§2-3)의 `env`에 그 값을 넣습니다.
+- **엔진을 따로 띄울 일이 없습니다.** Java 시절에는 엔진을 직접 띄워 쓰는 개발 방식이 있었지만 지금은 서버가 호출마다 엔진을 프로세스 안에서 돌립니다. vault를 고정하려면 서버를 띄우는 환경에 `AISURADA_VAULT`를 줍니다.
 
 ### 2-5. Codex와 Antigravity·Gemini CLI
 
@@ -90,14 +89,14 @@ ais-cli gemini-mcp add --write
 ais-cli gemini-mcp remove
 ```
 
-- `claude-mcp`와 같은 방식입니다. 설정 파일을 직접 고치지 않고 각 CLI의 등록 명령(`codex mcp add`, `agy mcp add`, `gemini mcp add -s user`)만 부릅니다. 등록에는 vault를 박지 않고, 등록되는 Java와 `ais-cli.jar`는 이 명령을 돌린 것(앱의 `bin/ais-cli`로 돌리면 앱에 든 것)입니다.
+- `claude-mcp`와 같은 방식입니다. 설정 파일을 직접 고치지 않고 각 CLI의 등록 명령(`codex mcp add`, `agy mcp add`, `gemini mcp add -s user`)만 부릅니다. 등록에는 vault를 박지 않고, 등록되는 것은 이 명령을 돌린 `ais-cli` 실행 파일(앱의 `bin/ais-cli`로 돌리면 앱에 든 것)입니다.
 - 실행 파일을 못 찾으면 `AISURADA_CODEX_BIN`, `AISURADA_GEMINI_BIN`(또는 `AISURADA_ANTIGRAVITY_BIN`)으로 자리를 알려 줍니다. Gemini 쪽은 `antigravity`, `agy`, `gemini` 차례로 찾고, `status`와 `add`의 응답에 어느 CLI를 썼는지(`cli`)가 들어 있습니다.
 - 두 CLI에서 이 서버로 만든 노트에 세션 ID를 남기는 법은 [개발자 가이드](developer-guide.md)의 「세션 에이전트 확장」을 봅니다.
 - 설정 화면의 연결 버튼은 Claude 것뿐입니다. Codex와 Gemini는 이 명령으로만 등록합니다.
 
 ## 3. 쓸 수 있는 기능
 
-도구는 35개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 17개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
+도구는 37개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 19개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
 
 ### 노트 찾고 읽기
 
@@ -169,6 +168,8 @@ ais-cli gemini-mcp remove
 | `get_resource` | R | 1건을 지침과 `precondition`(`f1:…`)과 함께 읽습니다. `version`을 주면 옛 판을 읽습니다 | `id*`, `version` |
 | `usable_resources` | R | 프로젝트가 쓸 수 있는 자원(프로젝트 자원 + 참조한 글로벌 자원)을 냅니다. 깨진 참조(`broken`)와 필요하지만 못 쓰는 스킬(`missingSkills`)도 냅니다 | `project*`, `bodies` |
 | `list_resource_versions` | R | 고치기 전의 판 목록(새것이 앞)을 냅니다 | `id*` |
+| `list_resource_changes` | R | 승인을 기다리는 스킬·에이전트 변경(pending), 승인 안 된 직접 수정(unapproved), 최근 결정이 난 변경(decided)을 냅니다. 내가 보낸 변경이 적용됐는지 거절됐는지 여기서 봅니다 | (없음) |
+| `get_resource_change` | R | 승인 대기 변경 1건을 이전 판(`before`)과 새 판(`after`)과 함께 냅니다. `status`는 pending, approved, rejected, stale(승인 전에 대상이 바뀌어 적용 못 함) 가운데 하나입니다 | `id*` |
 | `save_resource` | W! | 만들거나 고칩니다. `id`가 없으면 새로 만들고(`kind*`, `scope`나 `project`, `name*`, `description*`), 있으면 준 칸만 고칩니다(`f1` 필수, 종류·범위·id는 못 바꿈) | `id`, `kind`, `scope`, `project`, `name`, `description`, `body`, `permission`, `skills`, `repo`, `tools`, `f1` |
 | `delete_resource` | W! | 휴지통으로 보냅니다(스킬은 폴더째). 응답의 `referencedBy`는 참조하던 프로젝트들입니다 | `id*` |
 | `restore_resource` | W | 휴지통의 자원을 되살립니다. 제자리에 같은 이름이 있으면 거절됩니다 | `id*` |
@@ -273,9 +274,9 @@ ais-cli gemini-mcp remove
 | 오류 | 요청 형식이 틀리면 JSON-RPC 오류(-32700, -32600, -32601, -32602, -32603)이고, 도구가 실패하면 정상 응답에 `isError: true`입니다 |
 | 로그 | 서버의 표준 출력에는 프로토콜 메시지만 나옵니다. 시작 메시지(`aisurada MCP 서버 0.1.0: 읽기 전용`)와 진단은 표준 오류로 갑니다 |
 
-도구 호출은 단발 `ais-cli`와 같은 길(소켓 찾기, 엔진 띄우기, 요청 왕복)로 엔진에 닿습니다. JVM은 서버가 뜰 때 한 번만 띄우고 호출마다 재사용합니다. 엔진이 안 떠 있으면 첫 호출이 엔진을 띄우므로 그 호출이 조금 느릴 수 있습니다.
+도구 호출은 단발 `ais-cli`와 같은 길로, 서버 프로세스 안에서 엔진을 직접 돌립니다. 띄울 엔진이 따로 없으니 첫 호출이 느려지는 일도 없습니다. 서버는 도구를 부를 때마다 vault의 자동 커밋을 지켜봅니다(유휴 시간이 지나면 커밋하는 타이머가 서버 안에서 돕니다).
 
-직접 시험해 보려면 vault를 주고 서버에 줄을 흘려 넣습니다. 이 호출은 진짜 엔진 길을 타므로, 시험용 vault로 하고 격리 방법은 [손 확인 문서](beta-hand-check.md)를 봅니다.
+직접 시험해 보려면 vault를 주고 서버에 줄을 흘려 넣습니다. 이 호출은 진짜 엔진을 돌리므로, 시험용 vault로 하고 격리 방법은 [손 확인 문서](beta-hand-check.md)를 봅니다.
 
 ```bash
 export AISURADA_VAULT="/absolute/path/to/vault"
@@ -283,10 +284,10 @@ printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual","version":"1"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_tags","arguments":{}}}' \
-  | java -jar dist/ais-cli.jar mcp
+  | dist/ais-cli mcp
 ```
 
-도구를 더하거나 인자를 바꾸는 법은 [개발자 가이드](developer-guide.md)의 「MCP 서버」에 있습니다. 인자를 바꾸면 `McpTools`의 스키마도 같이 고쳐야 하고, 안 고치면 `bash test.sh`의 `McpServerTest`가 멈춥니다.
+도구를 더하거나 인자를 바꾸는 법은 [개발자 가이드](developer-guide.md)의 「MCP 서버」에 있습니다. 인자를 바꾸면 `engine-rs/crates/ais-cli/src/mcp_tools.rs`의 스키마와 명령줄 인자 명세(`spec_table.rs`)도 같이 고칩니다. 둘 다 Java 엔진을 지운 뒤로는 직접 고치는 원본입니다.
 
 ## 8. 문제 해결
 
@@ -294,20 +295,21 @@ printf '%s\n' \
 |------|-----------|
 | 연결했는데 도구가 안 보임 | `claude mcp get aisurada`(또는 `ais-cli claude-mcp status`)로 등록과 `✔ Connected`를 봅니다. 서버는 목록 변경 알림을 보내지 않으므로, 연결을 바꾼 뒤에는 Claude Code를 새 세션으로 엽니다(새 세션이 필요한지는 확인하지 못했습니다) |
 | 쓰기 도구가 없음 | 읽기 전용으로 연결된 것입니다. 설정의 **노트를 만들고 고치는 것도 허용**을 켜고 **이 설정으로 다시 연결**을 누르거나 `ais-cli claude-mcp add --write`를 합니다 |
-| 앱을 옮기거나 지운 뒤 끊김 | 등록에 든 Java와 jar의 절대 경로가 없어진 것입니다. 다시 연결합니다 |
+| 앱을 옮기거나 지운 뒤 끊김 | 등록에 든 `ais-cli`의 절대 경로가 없어진 것입니다. 다시 연결합니다(`ais-cli doctor --fix`도 됩니다) |
 | 도구가 모두 실패함 | `AIS-400 vault를 정하지 못했다…`이면 `AISURADA_VAULT`도 없고 앱이 vault를 연 적도 없는 것입니다. 앱을 열어 vault를 열면 다음 호출부터 됩니다(서버는 죽지 않습니다). 서버가 뜰 때 표준 오류에도 같은 안내를 냅니다 |
 | 노트가 엉뚱한 vault에 생김 | 예전 판이 `AISURADA_VAULT`를 박은 등록일 수 있습니다. `claude mcp get aisurada`(Codex는 `codex mcp get aisurada`)의 `Environment`에 `AISURADA_VAULT`가 있으면 `ais-cli claude-mcp add --write`(`codex-mcp`, `gemini-mcp`도 같습니다)로 다시 등록합니다. 앱이 지금 연 vault는 `~/Library/Application Support/aisurada/current-vault.json`에 있습니다 |
-| 클라이언트가 곧 끊김 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊습니다. 새 출력은 `System.err`로 씁니다([개발자 가이드](developer-guide.md)의 자주 막히는 곳) |
+| 클라이언트가 곧 끊김 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊습니다. 새 출력은 표준 오류(`eprintln!`)로 씁니다([개발자 가이드](developer-guide.md)의 자주 막히는 곳) |
 | `claude` 명령을 못 찾음 | Claude Code가 없거나 PATH 밖에 있습니다. `AISURADA_CLAUDE_BIN`에 실행 파일 자리를 줍니다 |
 
 ## 9. 확인한 것과 못 한 것
 
 확인한 것(2026-11-05 기준):
 
-- `bash test.sh`의 `McpServerTest`(스키마 대조, 노출 규칙, 프로토콜, 진짜 엔진과 진짜 `mcp` 프로세스의 왕복)와 `ClaudeMcpCommandTest`가 통과합니다.
+- `bash test.sh`(5d에서 178건 통과)의 `crates/ais-cli/tests/mcp_stdio.rs`(진짜 `mcp` 프로세스와 표준 입출력 왕복)와 `register.rs`(가짜 에이전트 CLI로 등록)가 통과합니다. Java 시절의 `McpServerTest`와 `ClaudeMcpCommandTest`는 Java와 함께 지웠습니다.
+- 기준 Java MCP 서버와 JSON-RPC 대화를 맞댄 `mcp_compat`이 어긋남 0으로 끝났습니다(5d, 174건).
 - 진짜 Claude Code 2.1.318을 격리 HOME에서 `add`, `--write`로 바꿔 끼우기, `✔ Connected`, `remove`까지 확인했습니다.
-- 이 문서의 도구 수(읽기 13, 쓰기 28)와 인자 표, §6의 응답과 오류 글, §7의 직접 시험 예시는 격리 vault에 `mcp --write` 서버를 띄워 직접 부르고 얻은 것입니다. 모델이 아니라 사람이 JSON-RPC를 손으로 보냈습니다.
-- `f1` 없이 `update_doc`을 부르면 거절되는 것은 직접 불러 확인했습니다. 나머지 네 도구(`set_favorite`, `evaluate_doc`, `link_docs`, `update_sub_note`)가 같은 검사를 받는 것은 엔진 코드(`PreconditionChecker`)로 확인했고 하나씩 불러 보지는 않았습니다.
+- 이 문서의 도구 수(읽기 19, 쓰기 37)는 5d에서 `tools/list`를 직접 불러 세었습니다. 인자 표, §6의 응답과 오류 글, §7의 직접 시험 예시는 격리 vault에 `mcp --write` 서버를 띄워 직접 부르고 얻은 것입니다. 모델이 아니라 사람이 JSON-RPC를 손으로 보냈습니다.
+- `f1` 없이 `update_doc`을 부르면 거절되는 것은 직접 불러 확인했습니다. 나머지 네 도구(`set_favorite`, `evaluate_doc`, `link_docs`, `update_sub_note`)가 같은 검사를 받는 것은 2026-11-05에 Java 엔진 코드(`PreconditionChecker`)로 확인했고 하나씩 불러 보지는 않았습니다.
 
 못 한 것:
 
@@ -315,4 +317,4 @@ printf '%s\n' \
 - **Claude Desktop 연결.** 설정 조각을 만드는 것까지만 했고, 붙여서 동작하는지는 확인하지 못했습니다.
 - **MCP 규격 공식 문서와의 대조.** 규격은 다른 자료로 짰습니다.
 - **설정 화면 버튼을 진짜 `claude`로 눌러 보는 것.** 자동 시험은 가짜 `claude`로 했습니다([손 확인 문서](beta-hand-check.md) §4-4).
-- **서명, 공증을 거친 배포본, Java가 없는 깨끗한 Mac.**
+- **서명, 공증을 거친 배포본.** (Java를 번들하지 않으므로 「Java가 없는 깨끗한 Mac」은 이제 따로 확인할 일이 아니다.)

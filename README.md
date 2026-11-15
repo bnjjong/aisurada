@@ -1,10 +1,10 @@
 # aisurada
 
-**macOS Apple Silicon 배포:** [0.0.6 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.0.6) · Java 포함 · [설치 안내와 제한 사항](docs/releases/0.0.6.md)
+**macOS Apple Silicon 배포:** [0.0.6 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.0.6) · Java 엔진 포함 판 · [설치 안내와 제한 사항](docs/releases/0.0.6.md)
 
 사용 방법은 [HTML 사용자 가이드](docs/user-guide.html)에 정리했습니다. 파일을 내려받아 브라우저에서 열면 검색·목차·코드 복사·인쇄를 사용할 수 있습니다.
 
-aisurada vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, 그 엔진을 띄워 두고 부르는 클라이언트 `ais-cli`입니다. Java 21 하나와 SnakeYAML만으로 짓습니다.
+aisurada vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진(`ais-core`)과, 그 엔진을 부르는 명령줄 `ais-cli`입니다. Rust로 짓고, 실행 파일 `ais-cli` 하나가 전부입니다. JVM도 상주 프로세스도 없습니다. 예전 Java 엔진은 태그 `java-engine-final`에만 남겼고, Rust 엔진과 답을 맞대 보는 기준(오라클)으로만 씁니다.
 
 데스크톱 앱은 [native-host](native-host/README.md)에 있습니다. 2부 Tauri 호스트 위에 3부 React 화면을 단계별로 연결하고 있습니다. 제공된 13장까지 workspace·리치 편집기·자동저장·충돌 처리와 노트 메타·목록·검색·이력 복원·외부 Markdown·설정 화면을 연결했습니다. [3부 구현 순서](docs/rebuild-p3-plan.md)와 [11~13장 기록](docs/rebuild-p3-chapters11-13-complete.md)에 구현·검증 및 미제공 자료 때문에 재구성한 범위를 구분했습니다. 14~18장과 부록의 본문은 제공되지 않았습니다.
 
@@ -14,12 +14,9 @@ aisurada vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진과, �
 
 vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 31개입니다. 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`, 24장의 템플릿 쓰기 3개, 25~30장의 회고·휴지통·내보내기·샤드·플랜 쓰기 8개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다.
 
-엔진은 두 가지 모양으로 돕니다.
+`ais-cli`는 명령 1개를 처리하고 끝나는 단발 실행 파일입니다. 호출마다 vault를 새로 훑어서 답하므로 상주 프로세스가 없고, 떠 있는 동안 바뀐 파일도 다음 호출에 보입니다. 표준 입출력으로 오래 도는 것은 MCP 서버로 서는 `ais-cli mcp`뿐입니다. 데스크톱 앱은 같은 코드를 프로세스 안에서 직접 부릅니다.
 
-- **단발 모드**: 명령 1개를 처리하고 끝납니다.
-- **serve 모드**: vault 1개를 맡아 유닉스 도메인 소켓에서 요청을 받습니다. 요청마다 vault를 다시 훑어서, 떠 있는 동안 바뀐 파일도 다음 요청에 보입니다. 10분 동안 요청이 없으면 스스로 내려갑니다.
-
-`ais-cli`는 serve 모드 엔진에 붙어 명령을 보내고 답을 그대로 흘립니다. 떠 있는 엔진이 없으면 macOS launchd에 LaunchAgent로 등록해 띄우고 30초까지 기다립니다.
+아래 명령 예시의 `dist/ais-cli`는 `./build.sh`가 만드는 실행 파일입니다. vault는 `export AISURADA_VAULT=/path/to/vault`로 주는 것으로 봅니다([실행](#실행)).
 
 | 명령 | 답하는 것 |
 |---|---|
@@ -43,18 +40,18 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 | `update_sub_note` | 하위 노트의 제목, 본문, 태그(명령 표면만)를 고치고 다시 계산한 폴더 이름으로 같은 `sub/` 안에서 폴더째 옮긴다. 본문만 주면 첫 헤딩이 제목이 된다 |
 | `delete_sub_note` | 직계 컨테이너 본문에서 그 하위 노트의 카드 줄을 걷고 하위 노트 폴더를 휴지통 없이 통째로 지운다. 카드를 걷었으면 컨테이너의 앞뒤 토큰을 함께 답한다 |
 
-도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.aisurada/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `AIS-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `AIS-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`는 노트의 git 판과 옛 스냅숏을 합쳐 조회하고, `commit-vault`는 현재 변경의 커밋 결과를 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)는 기본 jar에서 실행됩니다. `ais-sidecar-noclaude.jar`는 4부 클래스를 싣지 않으며 이름 인자와 자리 인자 검사를 거친 뒤 `AIS-409 이 판에는 4부(Claude 연동)가 없다.`로 답합니다. 런타임 속성과 환경 변수는 이 빌드 경계를 바꾸지 못합니다. serve는 시작·종료·유휴·15분 경과·작성자 또는 도구 세션 전환 때 vault를 자동 커밋합니다. 단발 모드는 자동 커밋하지 않습니다. 시험용 JVM 속성 `aisurada.test.now`(시계. 도장과 평가 시각도 따른다)와 `aisurada.test.random`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 소켓 요청의 세션 표식으로만 받고, 그것을 대신하는 시험용 속성은 없습니다.
+도구 이름(`get_doc`)과 명령 이름(`get-doc`)을 모두 받습니다. `create_doc`은 vault에 워크스페이스 표식 `.aisurada/workspace.json`이 있어야 쓰고, 파일은 같은 폴더의 임시 파일에 쓴 뒤 원자적 이름 바꾸기로 둡니다. 이름 바꾸기가 실패하면(대상 자리에 폴더가 있는 것 같은) 다른 길로 다시 하지 않고 `AIS-500`으로 섭니다. `update_doc`, 메타를 고치는 3개, `update_sub_note`는 직전에 읽은 토큰(`f1`)이 지금 파일 바이트와 맞아야 쓰고, 안 왔거나 어긋나면 아무것도 안 쓰고 `AIS-412`와 종료 코드 5로 답합니다. 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍습니다. `history`는 노트의 git 판과 예전에 남은 스냅숏을 합쳐 조회하고, `commit-vault`는 현재 변경의 커밋 결과를 답합니다. 쓰기 명령은 모두 일하기 전에 vault를 훑어서, 노트로 못 읽는 파일 가운데 훑기를 세우는 것(깨진 YAML 명시 태그, 같은 slug를 다른 id로 쓰는 아젠다 같은 것)이 있으면 아무것도 안 쓰고 종료 코드 1로 섭니다. 4부(Claude 연동) 명령 7개(`get-ask`, `read-session` 등)도 같은 실행 파일에서 돕니다. 자동 커밋은 vault를 쓸 때마다 대기 기록(`vault/.git/aisurada-pending.json`)을 남기고, 유휴 시간이 지나거나 작성자 또는 도구 세션이 바뀌면 커밋합니다. 유휴 타이머는 앱과 MCP 서버(`ais-cli mcp`)만 돌리고, 단발로 부른 `ais-cli`는 기록만 남겨 두었다가 다음에 도는 앱이나 MCP 서버가 커밋합니다. 시험용 환경 변수 `AISURADA_TEST_NOW`(시계. 도장과 평가 시각도 따른다)와 `AISURADA_TEST_RANDOM`(id의 무작위 조각)은 계약이 아니고, 주지 않으면 아무 일도 안 합니다. 도장에 적는 세션 값은 MCP 요청의 세션 표식이나 `AISURADA_SESSION_ID`와 `AISURADA_SESSION_AGENT`로만 받습니다.
 
 ## 19장 코멘트
 
 코멘트 읽기 `list_comments`(도구) / `list-comments`(명령)와 명령 전용 쓰기 `create-comment`, `update-comment`, `delete-comment`를 지원합니다. 위 18장까지의 기본 명령 목록에 추가된 범위입니다.
 
 ```bash
-java -jar dist/ais-engine.jar list_comments '{"parent":"nddemo-00000001"}' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar list-comments nddemo-00000001 sndemo-00000001 --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar create-comment nddemo-00000001 'body=확인했습니다' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar update-comment nddemo-00000001 'comment_id=<코멘트id>' 'body=고친 글' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘트id>' --aisurada.vault=/path/to/vault
+dist/ais-cli list_comments '{"parent":"nddemo-00000001"}'
+dist/ais-cli list-comments nddemo-00000001 sndemo-00000001
+dist/ais-cli create-comment nddemo-00000001 'body=확인했습니다'
+dist/ais-cli update-comment nddemo-00000001 'comment_id=<코멘트id>' 'body=고친 글'
+dist/ais-cli delete-comment nddemo-00000001 'comment_id=<코멘트id>'
 ```
 
 목록은 `absent`, `loaded`, `unreadable` 봉투를 구별합니다. 하위 노트 코멘트는 직계 컨테이너의 `sub-comments/<하위 id>.json`에서 읽고 씁니다. 쓰기 3개는 못 읽은 파일을 덮지 않고 AIS-409로 서며, f1을 받지 않습니다. 삭제는 코멘트가 달린 본문 마커를 먼저 걷고 코멘트 항목을 지웁니다. 본문이 바뀌었으면 앞뒤 토큰을 답하고, JSON/HTML 본문은 마커가 없어도 거절합니다.
@@ -63,17 +60,17 @@ java -jar dist/ais-engine.jar delete-comment nddemo-00000001 'comment_id=<코멘
 
 이 구현은 호출마다 새로 훑으므로 옛 색인 행·코멘트 표의 낡음·본문 쓰기 뒤 색인 재삽입을 재현하지 않습니다(8.6). 코멘트 사본 읽기가 세우는 오류가 있으면 쓰기 전에 실패할 수 있습니다. 쓰기 공통 단계에서 작성자와 도구 세션을 기록하고, 작성자 전환 전 자동 커밋을 시도합니다.
 
-격리된 실제 Java 엔진/파일 및 serve·ais-cli 검증은 `bash test.sh`로 실행합니다. 외부 시험 프레임워크 없이 JDK 21만 사용하며 임시 vault·HOME·소켓만 만들고 지웁니다. [19장 원문](docs/engine-manual/19-comments.md), [Java 엔진 완료 노트](docs/review-chapter-19-engine-complete.md)를 참고하세요. 이전 [19장 앱 완료 노트](docs/review-chapter-19-complete.md)는 별도 aisurada TypeScript 작업 기록입니다.
+Rust 시험 묶음은 `bash test.sh`로 돌립니다. [19장 원문](docs/engine-manual/19-comments.md), [Java 엔진 완료 노트](docs/review-chapter-19-engine-complete.md)를 참고하세요. 이전 [19장 앱 완료 노트](docs/review-chapter-19-complete.md)는 별도 aisurada TypeScript 작업 기록입니다.
 
 ## 20장 아젠다
 
 아젠다를 읽고 만들고 고치고 지우는 명령 4개 `list-agendas`, `create-agenda`, `update-agenda`, `delete-agenda`를 지원합니다. 명령 표면(하이픈 이름)에만 있고, `list_agendas` 같은 밑줄 이름은 모르는 명령(종료 코드 2)입니다.
 
 ```bash
-java -jar dist/ais-engine.jar list-agendas --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar create-agenda 'title=광고 플랫폼' 'summary=광고 지표와 입찰을 다룬다.' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar update-agenda <아젠다 id> 'title=새 이름' 'repo=' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar delete-agenda <아젠다 id> --aisurada.vault=/path/to/vault
+dist/ais-cli list-agendas
+dist/ais-cli create-agenda 'title=광고 플랫폼' 'summary=광고 지표와 입찰을 다룬다.'
+dist/ais-cli update-agenda <아젠다 id> 'title=새 이름' 'repo='
+dist/ais-cli delete-agenda <아젠다 id>
 ```
 
 - `list-agendas`는 읽기라 워크스페이스 표식이 없어도 답하고, slug 차례로 냅니다. `repo`와 `project`는 값이 없으면 키째 뺍니다.
@@ -90,10 +87,10 @@ java -jar dist/ais-engine.jar delete-agenda <아젠다 id> --aisurada.vault=/pat
 아젠다를 묶는 프로젝트를 읽고 만들고 고치고 지우는 명령 4개 `list-projects`, `create-project`, `update-project`, `delete-project`를 지원합니다. 아젠다 명령처럼 명령 표면에만 있고, `list_projects` 같은 밑줄 이름은 모르는 명령(종료 코드 2)입니다.
 
 ```bash
-java -jar dist/ais-engine.jar list-projects --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar create-project 'title=광고 플랫폼' 'summary=광고 쪽 아젠다를 묶는다.' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar update-project <프로젝트 id> 'title=새 이름' hue=teal --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=/path/to/vault
+dist/ais-cli list-projects
+dist/ais-cli create-project 'title=광고 플랫폼' 'summary=광고 쪽 아젠다를 묶는다.'
+dist/ais-cli update-project <프로젝트 id> 'title=새 이름' hue=teal
+dist/ais-cli delete-project <프로젝트 id>
 ```
 
 - 프로젝트는 `.aisurada/projects/<slug>.md` 파일 1개가 1개입니다. 키는 `id`, `slug`, `title`, `hue` 4개이고 본문이 `summary`입니다. 응답은 `id`, `slug`, `title`, `hue`, `summary` 차례이고 `deepLink`가 없습니다.
@@ -110,11 +107,11 @@ java -jar dist/ais-engine.jar delete-project <프로젝트 id> --aisurada.vault=
 외부 설명서에 없는 확장입니다. 프로젝트에서 AI에게 작업을 시키기 위한 바탕으로, 스킬(`SKILL.md`가 든 폴더)과 에이전트 정의(마크다운 파일 하나)를 **글로벌**과 **프로젝트** 두 범위로 보관합니다. 프로젝트는 글로벌 자원을 **ID(`sk…`, `ap…`)로 참조**해야 쓸 수 있고, 참조하지 않은 것은 쓰지 않습니다. 명령줄로도, MCP 도구(`list_resources`, `save_resource` 등 10개)로도 쓸 수 있습니다. 쓰기 도구는 노트와 같이 `mcp --write`일 때만 보입니다. **AI가 쓴 변경은 정책에 따라 승인 대기에 올라가고, 사람이 승인한 판만 쓰입니다**(권한 올림·도구 칸 변경·참조 켜기는 늘 승인이 필요합니다).
 
 ```bash
-java -jar dist/ais-engine.jar save-resource kind=skill scope=global 'name=번역 검수' 'description=번역을 검수한다' 'body=# 지침' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar save-resource kind=agent scope=global 'name=코드 리뷰어' 'description=코드를 리뷰한다' permission=edit 'skills=["<스킬 id>"]' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar set-resource-ref <프로젝트 slug> <글로벌 자원 id> with-skills=true --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar usable-resources <프로젝트 slug> --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar list-resources scope=global --aisurada.vault=/path/to/vault
+dist/ais-cli save-resource kind=skill scope=global 'name=번역 검수' 'description=번역을 검수한다' 'body=# 지침'
+dist/ais-cli save-resource kind=agent scope=global 'name=코드 리뷰어' 'description=코드를 리뷰한다' permission=edit 'skills=["<스킬 id>"]'
+dist/ais-cli set-resource-ref <프로젝트 slug> <글로벌 자원 id> with-skills=true
+dist/ais-cli usable-resources <프로젝트 slug>
+dist/ais-cli list-resources scope=global
 ```
 
 - 명령 8개: `list-resources`, `get-resource`, `save-resource`, `delete-resource`, `restore-resource`, `set-resource-ref`, `usable-resources`, `list-resource-versions`.
@@ -127,10 +124,10 @@ java -jar dist/ais-engine.jar list-resources scope=global --aisurada.vault=/path
 외부 설명서에 없는 확장입니다. 사람이 일을 티켓으로 적어 두면 러너가 집어 에이전트에게 맡기는 단위입니다. 태스크를 만들고 상태를 바꾸는 것(1단계)에 더해, 읽기 전용 러너(3단계, 아래 「러너」)가 있습니다. 앱의 레일에 「태스크」 메뉴가 있어 보드와 목록으로 보고, 태스크를 열어 상태 메뉴로 상태를 바꿉니다. 태스크는 키(`TSK-14`)나 ID(`tk…`)로 부르며, **완료 기준(`criteria`)을 하나 이상 적어야 만들 수 있습니다**. 일이 끝났는지 이 기준으로 확인하기 때문입니다.
 
 ```bash
-java -jar dist/ais-engine.jar create-task 'title=프로젝트를 지울 때 자원 폴더도 정리하기' repo=bnjjong/aisurada 'criteria=["지운 뒤 폴더가 남지 않는다","되살리면 돌아온다"]' type=bug --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar list-tasks status=draft --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar transition-task TSK-1 to=ready-for-develop --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar link-tasks TSK-1 TSK-2 type=blocks --aisurada.vault=/path/to/vault
+dist/ais-cli create-task 'title=프로젝트를 지울 때 자원 폴더도 정리하기' repo=bnjjong/aisurada 'criteria=["지운 뒤 폴더가 남지 않는다","되살리면 돌아온다"]' type=bug
+dist/ais-cli list-tasks status=draft
+dist/ais-cli transition-task TSK-1 to=ready-for-develop
+dist/ais-cli link-tasks TSK-1 TSK-2 type=blocks
 ```
 
 - 명령 9개: `create-task`, `get-task`, `list-tasks`, `update-task`, `transition-task`, `link-tasks`, `add-task-comment`, `delete-task`, `restore-task`. MCP에는 읽기 도구 `list_tasks`, `get_task`만 열립니다. 상태를 바꾸는 일은 사람(화면)과 러너만 합니다.
@@ -161,24 +158,24 @@ java -jar dist/ais-engine.jar link-tasks TSK-1 TSK-2 type=blocks --aisurada.vaul
 명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.aisurada/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
 
 ```bash
-java -jar dist/ais-engine.jar get-agenda-facts <아젠다 id> --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar update-agenda-facts <아젠다 id> 'facts=지금도 참인 것' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar facts-brief from=2026-06-16 to=2026-06-25 --aisurada.vault=/path/to/vault
+dist/ais-cli get-agenda-facts <아젠다 id>
+dist/ais-cli update-agenda-facts <아젠다 id> 'facts=지금도 참인 것'
+dist/ais-cli facts-brief from=2026-06-16 to=2026-06-25
 ```
 
 - 저장은 다듬은 글 2,000 UTF-16 단위까지 받고, LF 1개를 붙여 원자적으로 씁니다. `facts=`는 파일을 지웁니다.
 - 편집용 읽기는 10,000단위까지 원문을 줍니다. 넘으면 `tooLargeToEdit: true`를 주고, AI용 읽기는 2,000단위를 넘으면 고정 안내 문장을 줍니다.
 - 브리핑은 창 안 읽기 층 루트 노트를 셉니다. 사실층이 있으면 1건부터, 없으면 기본 5건부터 실으며, 노트 수 내림차순과 slug UTF-16 순으로 냅니다.
-- `facts-brief`는 파일을 바꾸지 않아도 쓰기 깃발을 따라 워크스페이스 표식과 쓰기 전 훑기를 요구하고, serve의 자동 커밋 대기 기록에 `app`으로 남습니다.
+- `facts-brief`는 파일을 바꾸지 않아도 쓰기 깃발을 따라 워크스페이스 표식과 쓰기 전 훑기를 요구하고, 자동 커밋 대기 기록에 `app`으로 남습니다.
 
-22.9의 읽기 버퍼·다듬기 경계 동작을 유지했습니다. 색인을 저장하지 않는 이 구현에서는 새 아젠다가 즉시 보이고, 지운 아젠다의 옛 행은 남지 않습니다. `bash test.sh`가 사실층 파일·UTF-8 경계·serve와 `ais-cli` 왕복을 검증합니다. 자세한 내용은 [22장 완료 노트](docs/rebuild-p1-chapter22-complete.md)에 있습니다.
+22.9의 읽기 버퍼·다듬기 경계 동작을 유지했습니다. 색인을 저장하지 않는 이 구현에서는 새 아젠다가 즉시 보이고, 지운 아젠다의 옛 행은 남지 않습니다. 시험은 `bash test.sh`로 돌립니다. 자세한 내용은 [22장 완료 노트](docs/rebuild-p1-chapter22-complete.md)에 있습니다.
 
 ## 23장 init-workspace
 
 vault 폴더 1개를 워크스페이스로 갖추는 `init-workspace`를 지원합니다. 명령 표면에만 있고 `init_workspace`는 모르는 명령(종료 코드 2)입니다.
 
 ```bash
-java -jar dist/ais-engine.jar init-workspace name=새-vault 'templates=[]' --aisurada.vault=/path/to/new-vault
+AISURADA_VAULT=/path/to/new-vault dist/ais-cli init-workspace name=새-vault 'templates=[]'
 ```
 
 - 골격 폴더 `.aisurada/agendas`, `.aisurada/templates/doc`, `.aisurada/templates/ritual`, `notes`를 만들고, `templates=`로 받은 템플릿 가운데 그 파일 자리가 빈 것만 심고, 맨 마지막에 `.aisurada/workspace.json`을 없을 때만 씁니다. 아무것도 덮지 않아서 몇 번을 불러도 안전합니다.
@@ -193,10 +190,10 @@ java -jar dist/ais-engine.jar init-workspace name=새-vault 'templates=[]' --ais
 읽기 `list_templates` / `list-templates`, `get_template` / `get-template`에 쓰기 `save_template` / `save-template`, 명령 전용 `delete-doc-template`, `save-ritual-template`를 지원합니다.
 
 ```bash
-java -jar dist/ais-engine.jar save_template '{"name":"조사 노트","type":"research","body":"# 조사\n"}' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar save-template id=<템플릿 id> 'desc=고친 설명' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar save-ritual-template t-morning 'name=내 모닝' --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar delete-doc-template <템플릿 id> --aisurada.vault=/path/to/vault
+dist/ais-cli save_template '{"name":"조사 노트","type":"research","body":"# 조사\n"}'
+dist/ais-cli save-template id=<템플릿 id> 'desc=고친 설명'
+dist/ais-cli save-ritual-template t-morning 'name=내 모닝'
+dist/ais-cli delete-doc-template <템플릿 id>
 ```
 
 새 문서 템플릿은 본문과 이름이 필요하고, 기존 템플릿은 준 칸만 바꿉니다. HTML·JSON에서 마크다운으로 고칠 때는 새 파일을 쓴 뒤 옛 확장자 파일을 지웁니다. 빌트인·리추얼 삭제는 거절하고, 리추얼 고치기는 같은 rev가 여러 파일에 있으면 거절합니다. 목록의 `bodies=true`와 못 읽은 파일의 진단도 지원합니다.
@@ -218,19 +215,19 @@ java -jar dist/ais-engine.jar delete-doc-template <템플릿 id> --aisurada.vaul
 | 30 | `check-notes` — [노트 점검](docs/rebuild-p1-chapter30-complete.md) |
 
 ```bash
-java -jar dist/ais-engine.jar plan-day date=2026-06-22 dryRun=true --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar check-notes date=2026-06-22 --aisurada.vault=/path/to/vault
+dist/ais-cli plan-day date=2026-06-22 dryRun=true
+dist/ais-cli check-notes date=2026-06-22
 ```
 
-샤드는 방향을 못박아 계획을 확인한 뒤 적용하고 기준값과 대조합니다. `ais-cli` 뒤의 설정 옵션은 이미 뜬 엔진의 방향을 바꾸지 않으므로, 방향을 정하는 이관은 단발 모드로 실행합니다.
+샤드는 방향을 못박아 계획을 확인한 뒤 적용하고 기준값과 대조합니다. 방향은 환경 변수 `AISURADA_NOTES_SHARD_BY_MONTH`(`true`·`on`·`yes`·`1` / `false`·`off`·`no`·`0`)로 정하고, 계획을 확인하는 호출과 적용하는 호출에 같은 값을 줍니다.
 
 ```bash
-java -jar dist/ais-engine.jar shard-notes --aisurada.notes.shard.by.month=true --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar shard-notes apply=true --aisurada.notes.shard.by.month=true --aisurada.vault=/path/to/vault
-java -jar dist/ais-engine.jar verify-shard --aisurada.vault=/path/to/vault
+AISURADA_NOTES_SHARD_BY_MONTH=true dist/ais-cli shard-notes
+AISURADA_NOTES_SHARD_BY_MONTH=true dist/ais-cli shard-notes apply=true
+dist/ais-cli verify-shard
 ```
 
-회고·휴지통의 목록 진단, 플랜의 같은 제목 경고, 샤드의 불일치 진단은 소켓 응답의 stderr에도 전달합니다. `bash test.sh`는 장별 시험과 실제 serve·ais-cli 왕복을 함께 실행합니다.
+회고·휴지통의 목록 진단, 플랜의 같은 제목 경고, 샤드의 불일치 진단은 stderr에도 냅니다. 시험은 `bash test.sh`로 돌립니다.
 
 ## 32장 4부 이음매
 
@@ -245,8 +242,8 @@ java -jar dist/ais-engine.jar verify-shard --aisurada.vault=/path/to/vault
 설명서 34장의 받아들임 묶음 `fixtures/expect`를 설명서만 보고 다시 지었습니다. 실행기가 케이스마다 엔진을 셸 없이 불러 종료 코드와 stdout 바이트를 맞댑니다. node 20 이상의 내장 모듈만 씁니다.
 
 ```bash
-./build.sh
-AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$PWD/dist/ais-engine.jar" \
+ORACLE="$(bash engine-rs/tools/compat/build-oracle.sh)"   # 태그 java-engine-final에서 지은 기준 jar
+AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$ORACLE/ais-engine.jar" \
   node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out /tmp/aisx-run-1
 node fixtures/expect/run.mjs --self-check --mutants --out /tmp/aisx-self-1
 node fixtures/runner-test.mjs
@@ -264,46 +261,44 @@ node fixtures/runner-test.mjs
 `reindex-paths`와 공통 쓰기의 자동 커밋·작성자 기록을 구현했습니다. 경로별 재색인은 명령 표면에서만 받고, 옵션 없이 경로 argv를 그대로 보냅니다.
 
 ```bash
-java -jar dist/ais-engine.jar reindex-paths notes/demo/hello/note.md --aisurada.vault=/path/to/vault
+dist/ais-cli reindex-paths notes/demo/hello/note.md
 ```
 
 노트 내부 경로는 루트 노트로 접고 중복은 한 번만 엽니다. 200개를 넘겨 `mode: full`이 되어도 템플릿·회고·휴지통은 검사하지 않습니다. 색인이 없는 구현이므로 `indexed`는 이번에 읽은 노트 수, `unchanged`와 `removed`는 0입니다(8.6).
 
-자동 커밋은 `.git` 폴더가 있는 `main` 브랜치에서 동작합니다. `AISURADA_VAULT_AUTOCOMMIT_ENABLED=false`로 끄고, `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS`로 유휴 시간을 정합니다(기본 300초). git 잠금·병합 중 상태는 건너뛰고, 실패는 재시도하되 노트 쓰기의 성공 여부를 바꾸지 않습니다. 훅·서명은 끄고 `*.tmp`를 제외한 vault 변경을 담습니다. `history <노트 id> [번호] [commit=<40자 커밋>] [query=<글자>]`는 수동·자동 커밋과 옛 스냅숏을 합쳐 보여 줍니다. `commit-vault`는 즉시 시도한 결과를 `outcome`과 선택적인 `blocked`로 돌려주며, git 실패도 종료 코드 0입니다. 두 명령은 명령 표면에만 있고 워크스페이스 표식이나 색인을 요구하지 않습니다. 선택 기능 `AISURADA_VAULT_SNAPSHOT_ENABLED=true`는 본문을 덮기 직전에 노트별 참조에 옛 바이트를 남깁니다(기본 false). 자세한 계약과 유지한 경계는 [31장 완료 문서](docs/rebuild-p1-chapter31-complete.md)에 있습니다.
+자동 커밋은 `.git` 폴더가 있는 `main` 브랜치에서 동작합니다. `AISURADA_VAULT_AUTOCOMMIT_ENABLED=false`로 끄고, `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS`로 유휴 시간을 정합니다(기본 300초). 대기 기록은 `vault/.git/aisurada-pending.json`에 남고 프로세스 사이에 공유합니다. git 잠금·병합 중 상태는 건너뛰고, 실패는 재시도하되 노트 쓰기의 성공 여부를 바꾸지 않습니다. 훅·서명은 끄고 `*.tmp`를 제외한 vault 변경을 담습니다. `history <노트 id> [번호] [commit=<40자 커밋>] [query=<글자>]`는 수동·자동 커밋과 옛 스냅숏을 합쳐 보여 줍니다. `commit-vault`는 즉시 시도한 결과를 `outcome`과 선택적인 `blocked`로 돌려주며, git 실패도 종료 코드 0입니다. 두 명령은 명령 표면에만 있고 워크스페이스 표식이나 색인을 요구하지 않습니다. 본문을 덮기 직전에 옛 바이트를 남기던 스냅숏 쓰기(`AISURADA_VAULT_SNAPSHOT_ENABLED`)는 Rust 이전 때 지웠습니다. 이미 남은 스냅숏은 `history`가 계속 읽습니다. 자세한 계약과 유지한 경계는 [31장 완료 문서](docs/rebuild-p1-chapter31-complete.md)에 있습니다.
 
-`bash test.sh`는 코멘트·경로 재색인·자동 커밋을 실제 임시 파일과 git 저장소로 검증합니다. [누락 기능 완료 노트](docs/rebuild-p1-chapters01-20-gaps-complete.md)에 구현과 시험 근거를 기록했습니다.
+자동 커밋 시험은 `bash test.sh`가 실제 임시 git 저장소로 돌립니다. [누락 기능 완료 노트](docs/rebuild-p1-chapters01-20-gaps-complete.md)에 구현과 시험 근거를 기록했습니다.
 
 ## 빌드
 
-JDK 21 이상이 필요합니다. `JAVA_HOME`이 있으면 그것을, 없으면 `PATH`의 `javac`와 `jar`를 씁니다.
+Rust 툴체인(`cargo`)이 필요합니다. 의존 크레이트는 `Cargo.lock`으로 고정하고, 빌드는 `--locked`로 합니다.
 
 ```bash
 ./build.sh
 ```
 
-SnakeYAML 2.4는 처음 빌드할 때 Maven Central에서 내려받아 체크섬을 확인합니다. 산출물은 3개입니다.
+산출물은 `dist/ais-cli` 하나입니다(Apple Silicon 맥 기준). 명령줄, MCP 서버(`ais-cli mcp`), 진단(`doctor`)을 모두 이 파일이 맡습니다. 데스크톱 앱 번들에도 같은 실행 파일을 `bin/ais-cli`로 넣습니다.
 
-| 파일 | 쓰임 |
-|---|---|
-| `dist/ais-engine.jar` | 엔진. 단발 모드와 serve 모드 |
-| `dist/ais-sidecar.jar` | `ais-engine.jar`와 같은 파일. `ais-cli`가 설치하고 띄우는 이름 |
-| `dist/ais-cli.jar` | 클라이언트 |
+예전 Java 엔진의 기준 jar(맞대기용)가 필요하면 태그에서 지어 씁니다. 결과는 `engine-rs/target/oracle/`에 캐시합니다.
+
+```bash
+bash engine-rs/tools/compat/build-oracle.sh   # 지은 폴더를 출력한다. JDK 21 이상이 필요하다
+```
 
 ## 실행
 
-### 단발 모드
+### 단발 호출
 
-vault 폴더의 절대 경로를 환경 변수나 인자로 줍니다.
+vault 폴더의 절대 경로를 환경 변수로 줍니다. 주지 않으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 따릅니다.
 
 ```bash
 export AISURADA_VAULT=/path/to/vault
 
-java -jar dist/ais-engine.jar list-docs
-java -jar dist/ais-engine.jar search-docs 첫
-java -jar dist/ais-engine.jar get_doc '{"id":"nddemo-00000001"}'
-java -jar dist/ais-engine.jar list_tags '{}'
-
-java -jar dist/ais-engine.jar list-docs --aisurada.vault=/path/to/vault
+dist/ais-cli list-docs
+dist/ais-cli search-docs 첫
+dist/ais-cli get_doc '{"id":"nddemo-00000001"}'
+dist/ais-cli list_tags '{}'
 ```
 
 가장 작은 vault는 아젠다 파일 1개와 노트 1개입니다.
@@ -334,45 +329,28 @@ tags: [예시]
 안녕하세요, 첫 노트입니다.
 ```
 
-### serve 모드와 `ais-cli`
+### 엔진 없이 도는 방식과 옛 사이드카
 
-엔진을 직접 띄워 두면 `ais-cli`는 엔진을 띄우려고 launchd를 부르지 않고 그 소켓에 붙습니다.
+`ais-cli`는 엔진 프로세스를 띄우지 않고 호출마다 그 자리에서 vault를 읽고 씁니다. 소켓도 launchd 등록도 없습니다. 같은 vault에 동시에 쓰는 호출은 잠금 파일(`~/Library/Application Support/aisurada/locks/`, 환경 변수 `AISURADA_LOCK_DIR`로 바꿈)로 한 줄로 세웁니다.
 
-```bash
-export AISURADA_VAULT=/path/to/vault
-
-# 터미널 1: 엔진을 띄운다. Ctrl-C로 내린다
-java -jar dist/ais-engine.jar serve
-
-# 터미널 2: 떠 있는 엔진에 묻는다
-java -jar dist/ais-cli.jar list_tags '{}'
-java -jar dist/ais-cli.jar list-docs limit=5
-java -jar dist/ais-cli.jar doctor
-```
-
-떠 있는 엔진이 없을 때 `ais-cli`는 `AISURADA_SIDECAR_JAR`가 가리키는 jar나 `install`로 깐 jar를 launchd로 띄웁니다. 이미 있는 등록을 바꾸고 싶지 않으면 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 줍니다(등록한 jar가 남아 있을 때만 그대로 씁니다).
+Java 시절에 이 기기에서 `ais-cli`나 앱을 쓴 적이 있다면, vault마다 launchd에 올라간 옛 사이드카(레이블 `co.kcd.aisurada.sidecar.<키>`)가 남아 있을 수 있습니다. 앱은 새 판을 처음 열 때 한 번 정리합니다. 손으로 하려면 이렇게 합니다.
 
 ```bash
-export AISURADA_SIDECAR_JAR=$PWD/dist/ais-sidecar.jar
-java -jar dist/ais-cli.jar list_tags '{}'
+dist/ais-cli doctor          # 어느 vault를 쓰는지, 옛 사이드카 흔적, 에이전트에 등록된 MCP 서버를 보여 준다
+dist/ais-cli sweep --dry-run # 걷어 낼 것만 보여 준다
+dist/ais-cli sweep           # 옛 사이드카를 내리고 plist, 상태 파일, 깔아 둔 jar, 로그를 지운다
 ```
 
-> **launchd를 건드립니다.**
-> - `ais-cli`가 엔진을 띄울 때는 `~/Library/LaunchAgents/co.kcd.aisurada.sidecar.<키>.plist`를 쓰고 `launchctl`을 부릅니다.
-> - 엔진이 동시 상한(기본 3개)을 넘으면 가장 오래 조용한 엔진을 내립니다. 하루 한 번은 24시간 넘게 조용한 엔진도 내립니다.
-> - 레이블(`co.kcd.aisurada.sidecar.<키>`)과 실행 상태 파일은 이 저장소의 aisurada 앱과 같은 꼴입니다. 그래서 앱과 `ais-cli`는 같은 엔진을 쓰고, 앱이 깔린 기기에서는 그 앱의 엔진도 내릴 대상이 될 수 있습니다. 원본 withlog 앱은 레이블이 달라서 건드리지 않습니다.
-> - 이 저장소의 시험은 모두 임시 홈 폴더와 가짜 `launchctl`로 했습니다. 진짜 `launchctl`로는 아직 돌려 보지 않았습니다.
->
-> 등록한 엔진을 지우려면 `ais-cli doctor`로 레이블과 plist 자리를 보고, `launchctl bootout gui/$(id -u)/<레이블>` 뒤에 그 plist를 지웁니다.
+> **launchd를 건드립니다.** `sweep`은 레이블이 `co.kcd.aisurada.sidecar.`로 시작하는 항목만 `launchctl`로 내립니다. vault, 잠금 파일, 다른 프로그램의 launchd 항목은 건드리지 않습니다.
 
 `ais-cli`가 스스로 하는 명령도 있습니다.
 
 | 명령 | 하는 일 |
 |---|---|
-| `doctor` | 키, 레이블, 소켓, plist, 실행 상태, 동시 상한, 하루 청소를 진단한다. `--plist`는 쓸 plist를 보여 주고, `--prune`은 vault 폴더가 사라진 LaunchAgent를 지운다 |
-| `sweep` | 24시간 넘게 조용한 엔진을 내리고 죽은 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
-| `install` | `ais-cli.jar`와 `ais-sidecar.jar`를 `~/Library/Application Support/aisurada/bin/`에 깐다. `--cli`, `--sidecar`로 원본을 고른다 |
-| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 17개만 내놓고, `--write`를 주면 쓰기 도구까지 35개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
+| `doctor` | 어느 vault를 쓰는지, vault의 git 상태, 이 실행 파일, 에이전트에 등록된 MCP 서버, 걷어 낼 옛 사이드카 흔적을 읽기만 하며 보여 준다. `--prune`은 걷어 내기까지, `--fix`는 낡은 MCP 등록을 다시 등록하는 데까지 한다 |
+| `sweep` | 옛 사이드카를 모두 내리고 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
+| `install` | 깔 파일이 없다는 안내만 한다. 옛 jar와 사이드카가 남아 있으면 `sweep`을 권한다 |
+| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 19개만 내놓고, `--write`를 주면 쓰기 도구까지 37개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
 | `claude-mcp` | Claude Code에 위 서버를 등록한다. `status`, `add [--write]`, `remove`는 `claude mcp`를 부르고, `config [--write]`는 Claude Desktop 설정에 붙여 넣을 조각만 출력한다. 등록에는 vault를 박지 않는다 |
 | `codex-mcp`, `gemini-mcp` | Codex, Antigravity(`agy`)·Gemini CLI에 같은 서버를 같은 방식으로 등록한다(`status`, `add [--write]`, `remove`) |
 | `--help`, `--list` | 사용법과 이름 목록 |
@@ -381,19 +359,15 @@ java -jar dist/ais-cli.jar list_tags '{}'
 
 | 이름 | 쓰임 | 기본값 |
 |---|---|---|
-| `AISURADA_VAULT` | vault 폴더. 엔진(`serve`)에는 필수이고, `ais-cli`와 MCP 서버는 없으면 앱이 연 vault를 따른다 | 없음 |
-| `AISURADA_SIDECAR_SOCKET` | 소켓 자리. 102바이트 이하 | `~/Library/Caches/aisurada/ais-<해시>.sock` |
-| `AISURADA_SIDECAR_JAR` | plist에 실을 엔진 jar | `install`로 깐 jar |
-| `AISURADA_SIDECAR_KEEP_REGISTRATION` | `1`이면 엔진을 띄울 때 이미 있는 plist를 덮어쓰지 않고 그대로 쓴다(그 plist의 jar가 없으면 다시 쓴다). 개발 실행과 빌드 폴더의 앱이 자동으로 켠다 | 꺼짐 |
-| `AISURADA_SIDECAR_JAVA` | plist에 실을 `java` | `ais-cli`를 돌리는 JVM의 `java` |
-| `AISURADA_CLI_JAR` | `install`이 깔 `ais-cli.jar` 원본 | 없음 |
-| `AISURADA_READY_TIMEOUT_SECONDS` | 띄운 뒤 붙기를 기다리는 초 | 30 |
-| `AISURADA_SIDECAR_LIMIT` | 동시에 떠 있을 엔진 수 | 3 |
-| `AISURADA_SWEEP_QUIET_HOURS` | 청소가 내릴 만큼 조용한 시간 | 24 |
-| `AISURADA_IDLE_TIMEOUT_MINUTES` | serve 모드가 스스로 내려가기까지 조용한 분 | 10 |
+| `AISURADA_VAULT` | vault 폴더. 없으면 앱이 연 vault를 따른다 | 없음 |
 | `AISURADA_VAULT_AUTOCOMMIT_ENABLED` | vault 자동 커밋과 commit-vault 사용 | true |
 | `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS` | 마지막 쓰기부터 커밋까지의 유휴 초 | 300 |
-| `AISURADA_VAULT_SNAPSHOT_ENABLED` | 본문 덮기 전 옛 스냅숏 저장 | false |
+| `AISURADA_NOTES_SHARD_BY_MONTH` | 노트를 월별 폴더(`notes/<아젠다>/YYYY-MM/`)에 두는지(`true`·`on`·`yes`·`1` / `false`·`off`·`no`·`0`) | 없으면 디스크를 보고 판정 |
+| `AISURADA_LOCK_DIR` | 쓰기 잠금 파일 폴더 | `~/Library/Application Support/aisurada/locks` |
+| `AISURADA_APPROVALS_DIR` | 자원 승인 기록의 바탕 폴더(시험용) | `~/Library/Application Support/aisurada/approvals` |
+| `AISURADA_CLAUDE_BIN`, `AISURADA_CODEX_BIN`, `AISURADA_GEMINI_BIN`(또는 `AISURADA_ANTIGRAVITY_BIN`) | `claude-mcp`, `codex-mcp`, `gemini-mcp`가 부를 CLI의 자리 | 홈의 `.local/bin`, Homebrew, `/usr/local/bin`, `PATH` 차례로 찾음 |
+| `AISURADA_SQLITE_BIN` | Antigravity 대화 기록을 읽을 `sqlite3`의 자리 | `/usr/bin/sqlite3`, 없으면 `PATH` |
+| `AISURADA_TEST_NOW`, `AISURADA_TEST_RANDOM` | 시험용 시계(유닉스 밀리초)와 id 무작위 조각. 계약이 아니고 주지 않으면 아무 일도 안 한다 | 없음 |
 | `AISURADA_SESSION_ID` | 이 호출을 보낸 에이전트 세션의 id. `AISURADA_SESSION_AGENT`와 함께 줄 때만 쓴다. `bin/ais-gemini`가 넣는다 | 없음 |
 | `AISURADA_SESSION_AGENT` | 그 세션을 연 CLI 이름(`claude`, `codex`, `gemini` …). 소문자 영문으로 시작하고 32자까지 | 없음 |
 
@@ -404,34 +378,34 @@ java -jar dist/ais-cli.jar list_tags '{}'
 | 코드 | 뜻 |
 |---|---|
 | 0 | 성공. 답은 stdout에 JSON 하나와 줄바꿈 1개입니다 |
-| 1 | 예상 밖 실패. stderr에 스택 트레이스가 나옵니다 |
+| 1 | 예상 밖 실패. 인자 길이가 1 MiB를 넘는 경우가 이것입니다. stderr에 한 줄이 나옵니다 |
 | 2 | vault를 못 찾았거나 모르는 명령입니다 |
 | 3 | `AIS-…` 코드가 붙은 실패 (`AIS-404` 노트 없음, `AIS-400` 인자 오류 등). stderr에 한 줄이 나오고 stdout은 비어 있습니다 |
-| 4 | `ais-cli`만 냅니다. 엔진에 못 닿았거나, 띄우지 못했거나, 응답 프레임이 어긋났습니다 |
+| 5 | `AIS-412`. 읽었을 때의 확인 값(`f1`)이 지금 파일과 어긋나서 쓰지 않고 멈췄습니다 |
 
-serve 모드 엔진은 유휴로 내려가면 0, `SIGTERM`을 받으면 143으로 끝납니다.
+Java 시절에 `ais-cli`만 내던 종료 코드 4(엔진에 못 닿음)는 엔진 프로세스가 없어져서 사라졌습니다. `ais-cli mcp`는 표준 입력이 닫히면 종료합니다.
 
 ## 소스 구성
 
-`src/aisurada/` 아래에 패키지 11개가 있습니다.
+Cargo 작업공간 `engine-rs/`에 크레이트 둘이 있습니다. 시험과 맞대기 도구는 각 크레이트의 `tests/`, `examples/`와 `engine-rs/tools/`에 있습니다.
 
-| 패키지 | 맡은 일 |
+| 자리 | 맡은 일 |
 |---|---|
-| `cli` | 엔진 진입점, `ais-cli`와 그 명령(`doctor`, `sweep`, `install`, `mcp`, `claude-mcp`), launchctl 부르기 |
-| `config` | 설정 이름과 값 읽기 |
-| `engine` | 명령 1개를 돌려 상태, stdout, stderr로 돌려줌. 단발 모드와 serve 모드가 같이 씀 |
-| `serve` | 소켓, 잠금, 실행 상태 파일, 유휴 종료 |
-| `frame` | 소켓 위의 요청 프레임(`AIQ1`)과 응답 프레임(`AIG1`) |
-| `args` | 도구 표면의 JSON 인자와 명령 표면의 `key=value` 인자 읽기 |
-| `cmd` | 명령 실행기와 이름 목록, 하위 노트 부모 사슬 풀기 |
-| `write` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 프론트매터 YAML, 경고, 선결 조건 토큰, 편집 도장, 메타 쓰기, 하위 노트 쓰기, 카드 걷기, 폴더 지우기 |
-| `vault` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통을 읽는 부품 |
-| `text` | 다듬기, UTF-16 자르기, URI 등 글 도구 |
-| `out` | 정해진 바이트 모양의 JSON 쓰기 |
+| `crates/ais-core/src/commands/` | 명령 1개당 파일 1개. 읽기와 쓰기 명령의 본체 |
+| `crates/ais-core/src/vault/` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통을 훑어 읽는 부품과 git 이력 읽기 |
+| `crates/ais-core/src/write/` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 잠금, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 경고, 선결 조건 토큰, 편집 도장, 자동 커밋 |
+| `crates/ais-core/src/frontmatter/` | 프론트매터 YAML 읽기와 쓰기(SnakeYAML이 하던 일) |
+| `crates/ais-core/src/{task,resource,session}/` | 태스크, 스킬·에이전트 정의와 승인, 에이전트 세션 읽기 |
+| `crates/ais-core/src/engine.rs` | 이름으로 명령을 찾아 돌리는 표 |
+| `crates/ais-cli/src/` | 명령줄 진입점(`main.rs`, `lib.rs`), 인자 읽기(`parse.rs`, `map.rs`, `tool.rs`), 옛 응답 모양으로 바꾸기(`legacy.rs`), 키 차례를 맞춘 JSON 쓰기(`output.rs`) |
+| `crates/ais-cli/src/mcp.rs`, `mcp_tools.rs` | MCP 서버(`ais-cli mcp`)와 도구 목록 |
+| `crates/ais-cli/src/{register,agent_cli}.rs` | `claude-mcp`, `codex-mcp`, `gemini-mcp` 등록 |
+| `crates/ais-cli/src/{doctor,install,old_sidecar,migrate}.rs` | `doctor`, `sweep`, `install`, 옛 사이드카 걷어 내기와 첫 실행 이주 |
+| `engine-rs/tools/compat/` | Java 기준 jar를 태그에서 짓는 `build-oracle.sh`와 합성 vault를 만드는 도구들 |
 
 ## 검증 요청
 
-검증을 맡은 분은 [`docs/handoff-round2.md`](docs/handoff-round2.md)를 먼저 보세요. 단발 모드의 빌드부터 묶음 실행까지 순서가 있습니다.
+검증 절차와 시험 진입점은 [개발자 가이드](docs/developer-guide.md)에 있습니다. Java 시절의 검증 인계 문서 [`docs/handoff-round2.md`](docs/handoff-round2.md)는 기록으로 남아 있습니다.
 
 ## 라이선스
 

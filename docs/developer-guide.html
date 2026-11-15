@@ -110,10 +110,10 @@ footer.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);co
 <li><a href="#1-구성-한눈에-보기">1. 구성 한눈에 보기</a></li>
 <li><a href="#2-준비물">2. 준비물</a></li>
 <li><a href="#3-처음-시작하기">3. 처음 시작하기</a></li>
-<li><a href="#4-저장소-구조">4. 저장소 구조</a><ul><li><a href="#엔진-패키지-srcaisurada">엔진 패키지 (src/aisurada/)</a></li><li><a href="#rust-엔진-이전-engine-rs">Rust 엔진 이전 (engine-rs/)</a></li><li><a href="#호스트-모듈-native-hostsrc-taurisrc">호스트 모듈 (native-host/src-tauri/src/)</a></li><li><a href="#화면-모듈-native-hostsrc">화면 모듈 (native-host/src/)</a></li></ul></li>
-<li><a href="#5-엔진-쓰는-법">5. 엔진 쓰는 법</a><ul><li><a href="#세션-에이전트codexgemini-확장">세션 에이전트(Codex·Gemini) 확장</a></li><li><a href="#세션-목록-저장소-projects-패널은-없앴다">세션 목록 저장소 (PROJECTS 패널은 없앴다)</a></li><li><a href="#프로젝트의-저장소와-아젠다의-projectrepo">프로젝트의 저장소와 아젠다의 projectRepo</a></li><li><a href="#프로젝트-자원-스킬과-에이전트-정의-resource">프로젝트 자원: 스킬과 에이전트 정의 (resource/)</a></li><li><a href="#태스크-task">태스크 (task/)</a></li><li><a href="#알림-notificationsrs">알림 (notifications.rs)</a></li><li><a href="#러너-runner">러너 (runner/)</a></li><li><a href="#github-app-연결-githubrs">GitHub App 연결 (github.rs)</a></li><li><a href="#앱이-연-vault-current-vaultjson">앱이 연 vault (current-vault.json)</a></li><li><a href="#두-가지-모양">두 가지 모양</a></li><li><a href="#두-가지-표면">두 가지 표면</a></li><li><a href="#설정">설정</a></li><li><a href="#종료-코드">종료 코드</a></li><li><a href="#vault의-모양">vault의 모양</a></li><li><a href="#쓰기-규칙-고칠-때-지킬-것">쓰기 규칙 (고칠 때 지킬 것)</a></li><li><a href="#명령을-새로-넣는-길">명령을 새로 넣는 길</a></li><li><a href="#mcp-서버-ais-cli-mcp">MCP 서버 (ais-cli mcp)</a></li></ul></li>
-<li><a href="#6-ais-cli와-launchd-건드리기-전에">6. ais-cli와 launchd — 건드리기 전에</a></li>
-<li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#앱에-든-ais-cli">앱에 든 ais-cli</a></li><li><a href="#4부-스위치-3개">4부 스위치 3개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#글꼴과-화면-크기-typography">글꼴과 화면 크기 (typography)</a></li><li><a href="#좌측-메뉴레일의-두-탭-노트와-에이전트">좌측 메뉴(레일)의 두 탭: 노트와 에이전트</a></li><li><a href="#후속-노트-탭">후속 노트 탭</a></li><li><a href="#좌측-메뉴레일의-프로젝트아젠다-목록">좌측 메뉴(레일)의 프로젝트·아젠다 목록</a></li><li><a href="#좌측-메뉴레일-폭">좌측 메뉴(레일) 폭</a></li><li><a href="#코드-블록-문법-색-editorcodesyntaxts">코드 블록 문법 색 (editor/codeSyntax.ts)</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
+<li><a href="#4-저장소-구조">4. 저장소 구조</a><ul><li><a href="#엔진-engine-rs">엔진 (engine-rs/)</a></li><li><a href="#호스트-모듈-native-hostsrc-taurisrc">호스트 모듈 (native-host/src-tauri/src/)</a></li><li><a href="#화면-모듈-native-hostsrc">화면 모듈 (native-host/src/)</a></li></ul></li>
+<li><a href="#5-엔진-쓰는-법">5. 엔진 쓰는 법</a><ul><li><a href="#세션-에이전트codexgemini-확장">세션 에이전트(Codex·Gemini) 확장</a></li><li><a href="#세션-목록-저장소-projects-패널은-없앴다">세션 목록 저장소 (PROJECTS 패널은 없앴다)</a></li><li><a href="#프로젝트의-저장소와-아젠다의-projectrepo">프로젝트의 저장소와 아젠다의 projectRepo</a></li><li><a href="#프로젝트-자원-스킬과-에이전트-정의-resource">프로젝트 자원: 스킬과 에이전트 정의 (resource/)</a></li><li><a href="#태스크-task">태스크 (task/)</a></li><li><a href="#알림-notificationsrs">알림 (notifications.rs)</a></li><li><a href="#러너-runner">러너 (runner/)</a></li><li><a href="#github-app-연결-githubrs">GitHub App 연결 (github.rs)</a></li><li><a href="#앱이-연-vault-current-vaultjson">앱이 연 vault (current-vault.json)</a></li><li><a href="#호출-방식">호출 방식</a></li><li><a href="#두-가지-표면">두 가지 표면</a></li><li><a href="#설정">설정</a></li><li><a href="#종료-코드">종료 코드</a></li><li><a href="#vault의-모양">vault의 모양</a></li><li><a href="#쓰기-규칙-고칠-때-지킬-것">쓰기 규칙 (고칠 때 지킬 것)</a></li><li><a href="#명령을-새로-넣는-길">명령을 새로 넣는 길</a></li><li><a href="#mcp-서버-ais-cli-mcp">MCP 서버 (ais-cli mcp)</a></li></ul></li>
+<li><a href="#6-옛-사이드카와-launchd-건드리기-전에">6. 옛 사이드카와 launchd — 건드리기 전에</a></li>
+<li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#앱에-든-ais-cli">앱에 든 ais-cli</a></li><li><a href="#4부-스위치-2개">4부 스위치 2개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#글꼴과-화면-크기-typography">글꼴과 화면 크기 (typography)</a></li><li><a href="#좌측-메뉴레일의-두-탭-노트와-에이전트">좌측 메뉴(레일)의 두 탭: 노트와 에이전트</a></li><li><a href="#후속-노트-탭">후속 노트 탭</a></li><li><a href="#좌측-메뉴레일의-프로젝트아젠다-목록">좌측 메뉴(레일)의 프로젝트·아젠다 목록</a></li><li><a href="#좌측-메뉴레일-폭">좌측 메뉴(레일) 폭</a></li><li><a href="#코드-블록-문법-색-editorcodesyntaxts">코드 블록 문법 색 (editor/codeSyntax.ts)</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
 <li><a href="#8-시험">8. 시험</a><ul><li><a href="#한눈에">한눈에</a></li><li><a href="#엔진-시험-쓰기">엔진 시험 쓰기</a></li><li><a href="#받아들임-묶음-34장">받아들임 묶음 (34장)</a></li><li><a href="#화면호스트-시험">화면·호스트 시험</a></li><li><a href="#동시에-돌리면-안-되는-것">동시에 돌리면 안 되는 것</a></li></ul></li>
 <li><a href="#9-앱-손-확인">9. 앱 손 확인</a></li>
 <li><a href="#10-docs-읽는-법">10. docs/ 읽는 법</a><ul><li><a href="#옛-이름-대응표">옛 이름 대응표</a></li></ul></li>
@@ -126,126 +126,99 @@ footer.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);co
     <header class="hero">
       <div class="eyebrow">DEVELOPER GUIDE</div>
       <h1 class="title">aisurada 개발자 사용 가이드</h1>
-      <p class="lead">이 문서는 저장소를 처음 받은 개발자가 빌드하고, 돌려 보고, 시험하고, 고치는 데 필요한 것을 모았다. 2026-11-04 판(<code>main</code> 브랜치)을 기준으로 쓰고, 명령과 수치는 이 판에서 직접 확인한 것만 적었다. 읽어서만 확인한 것은 「확인 방법」을 함께 적었다.</p>
+      <p class="lead">이 문서는 저장소를 처음 받은 개발자가 빌드하고, 돌려 보고, 시험하고, 고치는 데 필요한 것을 모았다. 2026-11-15 판(<code>main</code> 브랜치, Java 엔진을 지운 뒤)을 기준으로 쓰고, 명령과 수치는 이 판에서 직접 확인한 것만 적었다. 읽어서만 확인한 것은 「확인 방법」을 함께 적었다.</p>
     </header>
 
 <aside class="callout"><p><code>docs/</code> 아래 기록은 이름을 바꾸기 전에 쓴 것이라 옛 이름이 그대로 적혀 있다. 읽다가 낯선 이름이 나오면 <a href="#10-docs-읽는-법">§10의 대응표</a>로 바꿔 읽는다.</p>
 </aside>
 <h2 id="1-구성-한눈에-보기"><a class="anchor" href="#1-구성-한눈에-보기" aria-label="이 절의 링크">#</a>1. 구성 한눈에 보기</h2>
-<div class="code"><div class="code-bar"><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>   화면(React, WKWebView)  ── Tauri IPC ──  호스트(Rust)  ── 자식 프로세스 ──  ais-cli.jar
-        3부 · 4부 화면                       2부 · 4부 모듈                         │ 유닉스 소켓
-                                                                                 ▼
-                                                              엔진(Java, ais-sidecar.jar) ── vault 폴더
-                                                              1부 · 4부 명령             (마크다운 + .aisurada/)</code></pre></div>
+<div class="code"><div class="code-bar"><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>   화면(React, WKWebView)  ── Tauri IPC ──  호스트(Rust)  ── 같은 프로세스 안에서 호출 ──  엔진(Rust, ais-core) ── vault 폴더
+        3부 · 4부 화면                       2부 · 4부 모듈                                 1부 · 4부 명령            (마크다운 + .aisurada/)
+                                                                                                  ▲
+                                              터미널·MCP 클라이언트 ── 실행 파일 ais-cli ──────────┘ (명령 1개를 처리하고 끝나는 프로세스)</code></pre></div>
 <div class="table-wrap"><table><thead><tr><th>부</th><th>무엇</th><th>어디</th><th>언어</th></tr></thead><tbody>
-<tr><td>1부</td><td>vault를 읽고 쓰는 엔진과 클라이언트 <code>ais-cli</code></td><td><code>src/aisurada/</code></td><td>Java 21 + SnakeYAML</td></tr>
+<tr><td>1부</td><td>vault를 읽고 쓰는 엔진 <code>ais-core</code>와 명령줄·MCP 서버 <code>ais-cli</code></td><td><code>engine-rs/crates/</code></td><td>Rust</td></tr>
 <tr><td>2부</td><td>Tauri 2 호스트(창, PTY, 파일, 프로세스 실행)</td><td><code>native-host/src-tauri/</code></td><td>Rust</td></tr>
 <tr><td>3부</td><td>화면(편집기, 목록, 검색, 이력, 설정, 터미널)</td><td><code>native-host/src/</code></td><td>React 19 + TypeScript</td></tr>
-<tr><td>4부</td><td>Claude 연동(묻기, 세션 화면, 레일 대화)</td><td>엔진 <code>ask</code>·<code>chat</code>·<code>session</code>, 호스트 <code>ask.rs</code> 따위, 화면 <code>plugs/claude/</code></td><td>세 언어 모두</td></tr>
+<tr><td>4부</td><td>Claude 연동(묻기, 세션 화면, 레일 대화)</td><td>엔진 <code>ask</code>·<code>chat</code>·<code>session</code> 명령, 호스트 <code>ask.rs</code> 따위, 화면 <code>plugs/claude/</code></td><td>세 언어 모두</td></tr>
 </tbody></table></div>
-<p>엔진은 색인 파일이 없다. 명령을 받을 때마다 vault 폴더를 훑는다. 화면은 엔진을 직접 부르지 않고 호스트의 <code>sidecar_call</code>로 <code>ais-cli.jar</code>를 실행하며, <code>ais-cli</code>가 소켓으로 엔진에 붙는다.</p>
+<p>엔진은 색인 파일이 없다. 명령을 받을 때마다 vault 폴더를 훑는다. 화면은 호스트의 <code>engine_call</code>(명령 객체)이나 <code>sidecar_call</code>(명령줄 문자열 목록)로 같은 프로세스 안의 Rust 엔진을 부른다. 상주 엔진 프로세스도 소켓도 없다. 터미널이나 MCP 클라이언트(Claude, Codex 따위)는 실행 파일 <code>ais-cli</code>를 부른다.</p>
+<p>예전 Java 엔진(<code>src/aisurada/</code>, SnakeYAML)은 저장소에서 지웠다. 태그 <code>java-engine-final</code>에 남아 있고, Rust 엔진과 답을 맞대는 기준(오라클)으로만 쓴다(§4).</p>
 <h2 id="2-준비물"><a class="anchor" href="#2-준비물" aria-label="이 절의 링크">#</a>2. 준비물</h2>
 <div class="table-wrap"><table><thead><tr><th>도구</th><th>버전</th><th>쓰임</th></tr></thead><tbody>
-<tr><td>JDK</td><td>21 이상</td><td>엔진, <code>ais-cli</code>, 엔진 시험 (확인한 판: OpenJDK 21.0.11)</td></tr>
+<tr><td>Rust / cargo</td><td>안정판</td><td>엔진, <code>ais-cli</code>, 호스트 (확인한 판: 1.99.1)</td></tr>
 <tr><td>Node.js</td><td>22.12 이상</td><td>화면 빌드와 시험 (확인한 판: 26.9.0)</td></tr>
 <tr><td>pnpm</td><td>10.33.4</td><td><code>package.json</code>의 <code>packageManager</code>로 고정</td></tr>
-<tr><td>Rust / cargo</td><td>안정판</td><td>호스트 (확인한 판: 1.99.1)</td></tr>
 <tr><td>Xcode 명령줄 도구</td><td></td><td>Tauri 번들, WKWebView</td></tr>
 <tr><td>git</td><td></td><td>vault 자동 커밋과 이력이 실제 git을 부른다</td></tr>
-<tr><td>python3</td><td></td><td>acceptance 하네스의 java 호출 기록기가 쓴다 (확인한 판: 3.14.2)</td></tr>
+<tr><td>JDK</td><td>21 이상</td><td>기준 jar를 지을 때만(<code>build-oracle.sh</code>, 맞대기 도구). 평소 빌드와 시험에는 필요 없다</td></tr>
 </tbody></table></div>
-<p>macOS 전용이다. launchd와 WKWebView, AppKit(받아쓰기)을 쓰기 때문이다. SnakeYAML 2.4는 처음 <code>./build.sh</code>를 돌릴 때 Maven Central에서 받아 SHA-1을 확인한다(<code>lib/</code>는 git이 무시한다).</p>
+<p>macOS 전용이고 Apple Silicon만 지원한다. launchd(옛 사이드카 정리), WKWebView, AppKit(받아쓰기)을 쓰기 때문이다. 기준 jar를 지을 때 태그의 <code>build.sh</code>가 SnakeYAML 2.4를 Maven Central에서 받아 SHA-1을 확인한다. 저장소 <code>lib/</code>에 이미 받은 jar가 있으면(<code>lib/</code>는 git이 무시한다) 그것을 복사해 쓴다.</p>
 <h2 id="3-처음-시작하기"><a class="anchor" href="#3-처음-시작하기" aria-label="이 절의 링크">#</a>3. 처음 시작하기</h2>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code># 1. 엔진과 클라이언트를 짓는다 (dist/에 jar 4개가 생긴다)
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code># 1. 엔진과 클라이언트를 짓는다 (dist/ais-cli 하나가 생긴다)
 ./build.sh
 
-# 2. 가장 작은 vault를 만든다 (임시 폴더에서 해 보자)
+# 2. 가장 작은 vault를 만든다 (임시 폴더에서 해 보자). vault는 환경 변수로 준다
 export VAULT_DIR=$(mktemp -d)/vault &amp;&amp; mkdir -p &quot;$VAULT_DIR&quot;
-java -jar dist/ais-engine.jar init-workspace name=시험 'templates=[]' --aisurada.vault=&quot;$VAULT_DIR&quot;
+AISURADA_VAULT=&quot;$VAULT_DIR&quot; dist/ais-cli init-workspace name=시험 'templates=[]'
 
 # 3. 읽기와 쓰기 (아젠다 이름이 slug가 된다. 한글 이름이면 slug도 한글이다)
-java -jar dist/ais-engine.jar create-agenda 'title=demo' --aisurada.vault=&quot;$VAULT_DIR&quot;
-java -jar dist/ais-engine.jar create-doc agenda=demo type=free title=제목 body=본문 --aisurada.vault=&quot;$VAULT_DIR&quot;
-java -jar dist/ais-engine.jar list-docs --aisurada.vault=&quot;$VAULT_DIR&quot;
-
-# 4. 엔진을 띄워 두고 클라이언트로 부른다 (터미널 둘). 변수는 export하지 말고 명령 앞에 붙인다
-AISURADA_VAULT=&quot;$VAULT_DIR&quot; AISURADA_SIDECAR_SOCKET=&quot;$HOME/aisurada-dev.sock&quot; java -jar dist/ais-engine.jar serve            # 터미널 1
-AISURADA_VAULT=&quot;$VAULT_DIR&quot; AISURADA_SIDECAR_SOCKET=&quot;$HOME/aisurada-dev.sock&quot; java -jar dist/ais-cli.jar list-docs limit=5  # 터미널 2 (VAULT_DIR을 같은 값으로 다시 준다)</code></pre></div>
-<p>4번의 <code>AISURADA_*</code> 값을 <code>export</code>하면 같은 터미널에서 띄우는 앱도 그 값을 물려받는다. 소켓 경로가 vault 하나에 고정돼서 앱이 여는 다른 vault와 어긋나고, 그 소켓에 엔진이 없으면 §7의 <code>AIS-400</code> 오류가 난다.</p>
+AISURADA_VAULT=&quot;$VAULT_DIR&quot; dist/ais-cli create-agenda 'title=demo'
+AISURADA_VAULT=&quot;$VAULT_DIR&quot; dist/ais-cli create-doc agenda=demo type=free title=제목 body=본문
+AISURADA_VAULT=&quot;$VAULT_DIR&quot; dist/ais-cli list-docs limit=5</code></pre></div>
+<p><code>AISURADA_VAULT</code>는 <code>export</code>하지 말고 명령 앞에 붙이는 편이 안전하다. <code>export</code>하면 같은 터미널에서 띄우는 앱도 그 값을 물려받아, 앱이 여는 vault 대신 이 vault를 쓴다.</p>
 <p><code>create-doc</code>은 <code>agenda=</code>, <code>type=</code>, <code>title=</code>, <code>body=</code>가 필요하다(<code>type=</code>을 빼면 <code>AIS-400</code>). 응답에는 <code>id</code>, <code>path</code>, 쓰기 전 토큰 <code>precondition</code>(<code>f1:…</code>)이 들어 있다.</p>
-<p><code>ais-cli</code>는 떠 있는 엔진이 없으면 launchd로 엔진을 띄우려고 한다. 이걸 피하려면 4번처럼 엔진을 먼저 직접 띄운다(§6). 끝나면 터미널 1에서 <code>Ctrl-C</code>로 엔진을 내리고 <code>rm &quot;$HOME/aisurada-dev.sock&quot;</code>로 소켓을 지운다.</p>
-<p>산출물 4개:</p>
-<div class="table-wrap"><table><thead><tr><th>파일</th><th>쓰임</th></tr></thead><tbody>
-<tr><td><code>dist/ais-engine.jar</code></td><td>엔진. 단발 모드와 serve 모드 (4부 켠 판)</td></tr>
-<tr><td><code>dist/ais-sidecar.jar</code></td><td><code>ais-engine.jar</code>와 같은 파일. <code>ais-cli</code>가 설치하고 띄우는 이름</td></tr>
-<tr><td><code>dist/ais-sidecar-noclaude.jar</code></td><td>4부 클래스를 안 실은 판. 4부 명령 7개는 <code>AIS-409</code>로 답한다</td></tr>
-<tr><td><code>dist/ais-cli.jar</code></td><td>클라이언트</td></tr>
-</tbody></table></div>
+<p><code>ais-cli</code>는 호출마다 엔진을 프로세스 안에서 돌리고 끝난다. 띄울 엔진도, 등록할 launchd 항목도 없다. 정리 끝낸 터미널에서 할 일은 <code>rm -r &quot;$VAULT_DIR&quot;</code>뿐이다.</p>
+<p>산출물은 <code>dist/ais-cli</code> 하나다.</p>
 <h2 id="4-저장소-구조"><a class="anchor" href="#4-저장소-구조" aria-label="이 절의 링크">#</a>4. 저장소 구조</h2>
-<div class="code"><div class="code-bar"><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>src/aisurada/          엔진과 클라이언트 (Java)
-test/aisurada/         엔진 시험 (JDK만, 외부 프레임워크 없음)
+<div class="code"><div class="code-bar"><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>engine-rs/             엔진과 명령줄 (Rust 작업공간)
+  crates/ais-core/     vault 규칙 라이브러리
+  crates/ais-cli/      실행 파일 ais-cli (명령줄, MCP 서버, 등록, 진단)
+  tools/compat/        기준 jar 짓기, 합성 vault 만들기
 fixtures/              34장 받아들임 묶음과 실행기 (node)
-engine-rs/             엔진을 Rust로 옮기는 작업 공간 (진행 중, 앱은 아직 쓰지 않는다)
 native-host/
   src/                 화면 (React)
   src-tauri/           호스트 (Rust)
   scripts/             화면·호스트 시험, acceptance 하네스
 docs/                  설명서 사본, 장별 완료 기록, 리뷰 기록 (§10)
-build.sh               jar 4개를 짓는다
-test.sh                엔진 시험 전체
+build.sh               dist/ais-cli를 짓는다
+test.sh                엔진 시험 전체 (cargo test)
 test-native.sh         화면·호스트 시험 전체</code></pre></div>
-<h3 id="엔진-패키지-srcaisurada"><a class="anchor" href="#엔진-패키지-srcaisurada" aria-label="이 절의 링크">#</a>엔진 패키지 (<code>src/aisurada/</code>)</h3>
-<div class="table-wrap"><table><thead><tr><th>패키지</th><th>맡은 일</th></tr></thead><tbody>
-<tr><td><code>cli</code></td><td>진입점(<code>Main</code>, <code>AisCliMain</code>), <code>doctor</code>·<code>sweep</code>·<code>install</code>·<code>mcp</code>·<code>claude-mcp</code>, launchctl 부르기</td></tr>
-<tr><td><code>config</code></td><td>설정 이름과 값 읽기 (<code>EngineConfig</code>)</td></tr>
-<tr><td><code>engine</code></td><td>명령 1개를 돌려 상태·stdout·stderr로 돌려줌 (<code>EngineExecutor</code>). 단발과 serve가 같이 씀</td></tr>
-<tr><td><code>serve</code></td><td>소켓, 잠금, 실행 상태 파일, 유휴 종료</td></tr>
-<tr><td><code>frame</code></td><td>소켓 위의 요청 프레임(<code>AIQ1</code>)과 응답 프레임(<code>AIG1</code>)</td></tr>
-<tr><td><code>args</code></td><td>도구 표면의 JSON 인자와 명령 표면의 <code>key=value</code> 인자 읽기</td></tr>
-<tr><td><code>cmd</code></td><td>명령 실행기(파일 51개)와 이름 목록(<code>CommandRegistry</code>)</td></tr>
-<tr><td><code>write</code></td><td>쓰기 공통 부품: 표식 확인, 원자적 쓰기, 폴더 옮기기, id, 프론트매터, 경고, 선결 조건 토큰, 편집 도장</td></tr>
-<tr><td><code>vault</code></td><td>아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통 읽기</td></tr>
-<tr><td><code>git</code></td><td>vault 자동 커밋, 이력, 스냅숏</td></tr>
-<tr><td><code>resource</code></td><td>스킬·에이전트 정의(자원) 저장과 참조 계산</td></tr>
-<tr><td><code>task</code></td><td>태스크(티켓) 모양, 저장, 상태 전이 규칙</td></tr>
-<tr><td><code>text</code></td><td>다듬기, UTF-16 자르기, URI 따위 글 도구</td></tr>
-<tr><td><code>out</code></td><td>정해진 바이트 모양의 JSON 쓰기</td></tr>
-<tr><td><code>ask</code>, <code>chat</code>, <code>session</code></td><td>4부 명령 7개 (§7의 4부 스위치 참고)</td></tr>
-</tbody></table></div>
-<h3 id="rust-엔진-이전-engine-rs"><a class="anchor" href="#rust-엔진-이전-engine-rs" aria-label="이 절의 링크">#</a>Rust 엔진 이전 (<code>engine-rs/</code>)</h3>
-<p>엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 읽기 명령 31개는 앱이 이미 이것으로 읽는다: 새로고침 길의 6개(<code>list_docs</code>, <code>list_agendas</code>, <code>list_projects</code>, <code>list_templates</code>, <code>list_trash</code>, <code>reindex</code>), 노트 하나를 여는 길의 6개(<code>get_doc</code>, <code>list_sub_notes</code>, <code>get_sub_note</code>, <code>list_comments</code>, <code>list_attachments</code>, <code>get_agenda_facts</code>), 그리고 검색·태그·템플릿 하나·판 목록의 4개(<code>search_docs</code>, <code>list_tags</code>, <code>get_template</code>, <code>history</code>), 태스크 읽기 2개(<code>get_task</code>, <code>list_tasks</code>), 스킬·에이전트 자원 읽기 7개(<code>list_resources</code>, <code>get_resource</code>, <code>usable_resources</code>, <code>list_resource_versions</code>, <code>list_resource_changes</code>, <code>get_resource_change</code>, <code>get_resource_policy</code>), 문답·대화 읽기 2개(<code>get_ask</code>, <code>list_chats</code>), 세션 기록 읽기 3개(<code>read_session</code>, <code>session_titles</code>, <code>recent_sessions</code>), 샤드 검증 1개(<code>verify_shard</code>). <code>reindex_paths</code>는 엔진에 옮겼지만 앱은 부르지 않고 <code>ais-cli</code>만 쓴다. Rust <code>ais-cli</code>는 5a(명령·도구 표면)와 5b(MCP 서버, 에이전트 등록, 옛 사이드카 정리)에서 만들었으나 앱과 에이전트에 등록된 MCP는 아직 Java <code>ais-cli</code>와 사이드카를 쓴다(번들 교체는 5c). 쓰기 이전(3단계)은 공통 기반(프로세스 간 쓰기 잠금, 원자적 쓰기, <code>f1</code> 검사, git 자동 커밋 등)과 아젠다·프로젝트·템플릿·사실층 쓰기, <code>init_workspace</code>, 노트 머리 쓰기(<code>set_favorite</code>, <code>evaluate_doc</code>, <code>link_docs</code>), 노트 만들기·본문 고치기(<code>create_doc</code>, <code>update_doc</code>), 후속 노트 쓰기(<code>create_sub_note</code>, <code>update_sub_note</code>, <code>delete_sub_note</code>), 코멘트 쓰기(<code>create_comment</code>, <code>update_comment</code>, <code>delete_comment</code>), 휴지통 쓰기(<code>delete_doc</code>, <code>restore_doc</code>, <code>purge_doc</code>, <code>empty_trash</code>)까지 26개를 만들어 쓰기 이전(3단계)을 마쳤고, 4단계(남은 명령)는 태스크 쓰기 7개(<code>create_task</code>, <code>update_task</code>, <code>transition_task</code>, <code>link_tasks</code>, <code>add_task_comment</code>, <code>delete_task</code>, <code>restore_task</code>)와 자원·승인 쓰기 8개(<code>save_resource</code>, <code>delete_resource</code>, <code>restore_resource</code>, <code>set_resource_ref</code>, <code>approve_resource_change</code>, <code>reject_resource_change</code>, <code>resolve_resource_edit</code>, <code>set_resource_policy</code>)와 문답·대화 쓰기 2개(<code>append_ask_turn</code>, <code>append_chat_turn</code>)와 노트 도구 쓰기 6개(<code>write_attachment</code>, <code>export_markdown</code>, <code>shard_notes</code>, <code>plan_day</code>, <code>check_notes</code>, <code>facts_brief</code>)를 더해 49개가 됐다. 태스크·자원 파일은 노트 머리와 달리 SnakeYAML이 쓰므로 그 방출기를 따로 옮겼다(<code>write/snake_dump.rs</code>)., 쓰기는 스위치 <code>AISURADA_ENGINE_WRITE=rust</code>로만 켜진다(기본 꺼짐). 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 <a href="rust-engine-step1-yaml.md">1단계 기록</a>, <a href="rust-engine-step2-read.md">2단계 새로고침 길 기록</a>, <a href="rust-engine-step2-open.md">2단계 노트 여는 길 기록</a>, <a href="rust-engine-step2-rest.md">2단계 검색·판 목록 기록</a>, <a href="rust-engine-step3-w0.md">3단계 W0 쓰기 공통 기반 기록</a>, <a href="rust-engine-step3-w1a.md">3단계 W1 첫 조각 기록</a>, <a href="rust-engine-step3-w2.md">3단계 W2 노트 머리 쓰기 기록</a>, <a href="rust-engine-step3-w3a.md">3단계 W3a <code>update_doc</code> 기록</a>, <a href="rust-engine-step3-w3b.md">3단계 W3b <code>create_doc</code> 기록</a>, <a href="rust-engine-step3-w3c.md">3단계 W3c 후속 노트 쓰기 기록</a>, <a href="rust-engine-step3-w4a.md">3단계 W4a 코멘트 쓰기 기록</a>, <a href="rust-engine-step3-w4b.md">3단계 W4b 휴지통 쓰기 기록</a>, <a href="rust-engine-step4-plan.md">4단계 계획</a>, <a href="rust-engine-step4a-tasks.md">4단계 4a 태스크 기록</a>, <a href="rust-engine-step4b-resources.md">4단계 4b 자원·승인 기록</a>, <a href="rust-engine-step4c-ask-chat.md">4단계 4c 문답·대화 기록</a>, <a href="rust-engine-step4d-sessions.md">4단계 4d 세션 읽기 기록</a>, <a href="rust-engine-step4e-note-tools.md">4단계 4e 노트 도구 기록</a>, <a href="rust-engine-step5-plan.md">5단계 계획</a>, <a href="rust-engine-step5a-cli.md">5단계 5a <code>ais-cli</code> 기록</a>, <a href="rust-engine-step5b-mcp.md">5단계 5b MCP·등록·정리 기록</a>, <a href="rust-engine-step5c-host.md">5단계 5c 호스트·번들 기록</a>에 있다.</p>
+<h3 id="엔진-engine-rs"><a class="anchor" href="#엔진-engine-rs" aria-label="이 절의 링크">#</a>엔진 (<code>engine-rs/</code>)</h3>
 <div class="table-wrap"><table><thead><tr><th>자리</th><th>내용</th></tr></thead><tbody>
-<tr><td><code>engine-rs/crates/ais-core/</code></td><td>vault 규칙 라이브러리: <code>frontmatter</code>(노트 머리 YAML 읽기·쓰기), <code>vault</code>(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 <code>plain_text</code>, git 실행 <code>git</code>과 노트의 판 목록 <code>history</code>, 코멘트 id 겹침 검사 <code>comment_copy</code>), <code>write</code>(쓰기 공통 기반: <code>lock</code>, <code>atomic</code>, <code>confine</code>, <code>precondition</code>, <code>marker</code>, <code>apparatus</code>, <code>autocommit</code>, <code>pipeline</code>, <code>slug</code>, <code>agenda_file</code>, <code>project_file</code>, <code>template_file</code>, <code>warnings</code>, <code>note_front</code>, <code>meta_writer</code>), <code>json</code>(Java JSON 읽개를 옮긴 것), <code>commands</code>(명령 실행기), <code>model</code>(응답 모양), <code>engine</code>(진입점 <code>Engine::call</code>)</td></tr>
-<tr><td><code>engine-rs/crates/ais-cli/</code></td><td>Rust <code>ais-cli</code>: <code>registry</code>·<code>spec_table</code>(이름과 명령 명세 표), <code>parse</code>(명령 표면)·<code>tool</code>(도구 표면) 인자 해석, <code>map</code>(엔진 호출로 바꿈), <code>legacy</code>(새 응답을 옛 모양으로 되돌림), <code>output</code>(Java와 같은 JSON 모양), <code>env</code>(vault 정하기, 세션 표식). <code>mcp</code>·<code>mcp_tools</code>(MCP 서버와 Java에서 생성한 도구 38개 표), <code>register</code>·<code>agent_cli</code>(<code>claude-mcp</code>·<code>codex-mcp</code>·<code>gemini-mcp</code>), <code>old_sidecar</code>·<code>doctor</code>·<code>install</code>(옛 사이드카 정리와 진단)</td></tr>
-<tr><td><code>engine-rs/crates/ais-cli/examples/</code></td><td><code>cli_compat</code>(Java 단발 엔진과 명령줄 단위로 맞댐), <code>mcp_compat</code>(Java MCP 서버와 JSON-RPC 대화를 맞댐)</td></tr>
-<tr><td><code>engine-rs/crates/ais-core/examples/</code></td><td><code>compat_check</code>(Java 엔진과 읽기·쓰기 맞대기), <code>snake_check</code>(SnakeYAML 방출기 맞대기), <code>ais_call</code>(명령 하나를 불러 응답 보기), <code>yaml_check</code>·<code>yaml_fuzz_cases</code>(머리 읽기·쓰기 맞대기)</td></tr>
-<tr><td><code>engine-rs/crates/ais-core/tests/</code></td><td>합성 vault로 읽기 동작을 확인하는 통합 시험(Java 없이 돈다). <code>lock_interop.rs</code>는 <code>AISURADA_JAR</code>가 있을 때만 실제 <code>ais-engine.jar</code>와 쓰기 잠금을 맞대는 시험</td></tr>
-<tr><td><code>engine-rs/tools/compat/</code></td><td>명령 명세 표 생성기 <code>gen-spec-table.sh</code>(<code>DumpSpecs.java</code>), MCP 도구 표 생성기 <code>gen-mcp-tools.sh</code>(<code>DumpMcpTools.java</code>), MCP 맞대기용 Java 구동기 <code>DriveMcp.java</code>, 합성 vault 생성기 <code>make-fixture.sh</code>, 검색 시험 노트를 덧붙이는 <code>add-search-notes.sh</code>, git 저장소와 판 이력을 만드는 <code>add-git-history.sh</code>, 코멘트 id가 겹치는 노트를 더하는 <code>add-comment-clash.sh</code></td></tr>
+<tr><td><code>engine-rs/crates/ais-core/</code></td><td>vault 규칙 라이브러리: <code>frontmatter</code>(노트 머리 YAML 읽기·쓰기), <code>vault</code>(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 <code>plain_text</code>, git 실행 <code>git</code>과 노트의 판 목록 <code>history</code>, 코멘트 id 겹침 검사 <code>comment_copy</code>), <code>write</code>(쓰기 공통 기반: <code>lock</code>, <code>atomic</code>, <code>confine</code>, <code>precondition</code>, <code>marker</code>, <code>apparatus</code>, <code>autocommit</code>, <code>pipeline</code>, <code>slug</code>, <code>agenda_file</code>, <code>project_file</code>, <code>template_file</code>, <code>warnings</code>, <code>note_front</code>, <code>meta_writer</code>, <code>snake_dump</code>), <code>task</code>(태스크), <code>resource</code>(스킬·에이전트 정의와 승인), <code>session</code>(에이전트 세션 읽기), <code>json</code>, <code>commands</code>(명령 실행기), <code>model</code>(응답 모양), <code>engine</code>(진입점 <code>Engine::call</code>)</td></tr>
+<tr><td><code>engine-rs/crates/ais-cli/</code></td><td><code>ais-cli</code>: <code>registry</code>·<code>spec_table</code>(이름과 명령 명세 표), <code>parse</code>(명령 표면)·<code>tool</code>(도구 표면) 인자 해석, <code>map</code>(엔진 호출로 바꿈), <code>legacy</code>(엔진 응답을 옛 응답 모양으로 바꿈), <code>output</code>(키를 정렬한 JSON 쓰기), <code>env</code>(vault 정하기, 세션 표식). <code>mcp</code>·<code>mcp_tools</code>(MCP 서버와 도구 표), <code>register</code>·<code>agent_cli</code>(<code>claude-mcp</code>·<code>codex-mcp</code>·<code>gemini-mcp</code>), <code>old_sidecar</code>·<code>doctor</code>·<code>install</code>·<code>migrate</code>(옛 사이드카 정리, 진단, 첫 실행 이주)</td></tr>
+<tr><td><code>engine-rs/crates/ais-cli/examples/</code></td><td><code>cli_compat</code>(기준 Java 단발 엔진과 명령줄 단위로 맞댐), <code>mcp_compat</code>(기준 Java MCP 서버와 JSON-RPC 대화를 맞댐)</td></tr>
+<tr><td><code>engine-rs/crates/ais-core/examples/</code></td><td><code>compat_check</code>(기준 Java 엔진과 읽기·쓰기 맞대기), <code>snake_check</code>(SnakeYAML 방출기 맞대기), <code>ais_call</code>(명령 하나를 불러 응답 보기), <code>yaml_check</code>·<code>yaml_fuzz_cases</code>(머리 읽기·쓰기 맞대기)</td></tr>
+<tr><td><code>engine-rs/crates/ais-core/tests/</code></td><td>합성 vault로 동작을 확인하는 통합 시험(Java 없이 돈다). <code>lock_interop.rs</code>는 <code>AISURADA_JAR</code>가 있을 때만 기준 <code>ais-engine.jar</code>와 쓰기 잠금을 맞대는 시험</td></tr>
+<tr><td><code>engine-rs/tools/compat/</code></td><td>기준 jar를 태그에서 짓는 <code>build-oracle.sh</code>, 명령 명세 표 생성기 <code>gen-spec-table.sh</code>(<code>DumpSpecs.java</code>), MCP 도구 표 생성기 <code>gen-mcp-tools.sh</code>(<code>DumpMcpTools.java</code>), MCP 맞대기용 Java 구동기 <code>DriveMcp.java</code>, 합성 vault 생성기 <code>make-fixture.sh</code>, 검색 시험 노트를 덧붙이는 <code>add-search-notes.sh</code>, git 저장소와 판 이력을 만드는 <code>add-git-history.sh</code>, 코멘트 id가 겹치는 노트를 더하는 <code>add-comment-clash.sh</code></td></tr>
 <tr><td><code>engine-rs/tools/yaml-spike/</code></td><td>머리 읽기·쓰기를 Java 기준값과 맞대는 도구(<code>YamlGroundTruth.java</code>, <code>run.sh</code>, <code>cases.txt</code>)</td></tr>
 </tbody></table></div>
-<p><strong>앱의 호출 길.</strong> 화면은 <code>workspace/engine.ts</code>의 <code>engineCall</code> 한 곳으로 엔진을 부른다. 호출 객체(<code>Call</code>, <code>data/commands.ts</code>의 <code>read.docs()</code> 따위)는 호스트의 <code>engine_commands</code>가 알린 명령이면 <code>engine_call</code>(<code>src-tauri/src/engine.rs</code>)로 앱 안의 Rust 엔진을 바로 부르고, 아니면 <code>toArgv</code>로 문자열 목록(argv)으로 풀어 명령줄 길(<code>sidecar_call</code>, <code>src-tauri/src/sidecar.rs</code>)로 간다. 문자열 목록과 러너·승인 알림(<code>call_blocking</code>)은 늘 명령줄 길이고, 이 길은 같은 프로세스 안에서 Rust <code>ais-cli</code>(<code>ais_cli::run</code>)를 부른다. 사이드카도 프로세스 띄우기도 없고, 엔진 안의 패닉은 종료 코드 1의 답으로 바꿔 앱이 죽지 않게 한다. AI 세션 표식(<code>CLAUDE_CODE_SESSION_ID</code> 따위)은 엔진에 넘기기 전에 지운다(#53). Rust 응답은 <code>engine.ts</code>의 어댑터가 기존 화면 모양으로 바꾼다. 쓰기 명령(아젠다·프로젝트의 <code>create_</code>·<code>update_</code>·<code>delete_</code>, <code>save_template</code>, <code>update_doc</code>, <code>create_doc</code>, 후속 노트·코멘트·휴지통 쓰기, 태스크·자원·승인 쓰기, 문답·대화 기록 따위와 <code>commit_vault</code>)도 기본으로 Rust 엔진이 받는다. 앱을 열 때 vault를 <code>ais_core::write::autocommit::watch</code>로 지켜봐서, 앱이 닫힌 동안 단발 <code>ais-cli</code>가 남긴 자동 커밋 대기 기록(<code>.git/aisurada-pending.json</code>)을 이어받아 커밋한다. <strong>되돌리는 스위치:</strong> 앱을 <code>AISURADA_ENGINE=java</code>로 띄우면 <code>engine_commands</code>가 빈 목록을 돌려주고 명령줄 길도 옛 Java <code>ais-cli.jar</code>로 가며, <code>AISURADA_ENGINE_WRITE=java</code>는 쓰기만 되돌린다. 스냅숏 쓰기(<code>AISURADA_VAULT_SNAPSHOT_ENABLED=true</code>, Rust 엔진은 이 기능이 없다)를 켠 사용자의 쓰기 명령도 Java로 간다. 이 되돌리는 길은 개발 실행에서만 쓸 수 있다(번들에는 Java가 없다). 시험과 브라우저의 가짜 호스트에는 <code>engineCommands</code>가 없어서 늘 명령줄 길이다. <strong>첫 실행의 이주:</strong> 정식 앱은 처음 뜰 때 한 번(<code>~/Library/Application Support/aisurada/rust-engine-migrated</code> 표시) 옛 사이드카(우리 레이블 <code>co.kcd.aisurada.sidecar.*</code>만)를 내리고 plist를 지우며, Java 시절의 jar를 가리키는 낡은 MCP 등록을 같은 모드로 다시 등록한다(<code>ais_cli::migrate</code>, 같은 일을 손으로 하려면 <code>ais-cli doctor --fix</code>). 개발 실행과 빌드 폴더의 번들은 기기 전체에 영향을 주는 이 일을 하지 않는다.</p>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo test -p ais-core)                                              # Java 없이 도는 단위·통합 시험
+<p>엔진을 Rust로 옮긴 결정과 단계는 <a href="rust-engine-step1-yaml.md">1단계 기록</a>, <a href="rust-engine-step2-read.md">2단계 새로고침 길 기록</a>, <a href="rust-engine-step2-open.md">2단계 노트 여는 길 기록</a>, <a href="rust-engine-step2-rest.md">2단계 검색·판 목록 기록</a>, <a href="rust-engine-step3-w0.md">3단계 쓰기 이전 기록(W0~W4)</a>, <a href="rust-engine-step4-plan.md">4단계 계획</a>, <a href="rust-engine-step4a-tasks.md">4단계 4a 태스크</a>, <a href="rust-engine-step4b-resources.md">4b 자원·승인</a>, <a href="rust-engine-step4c-ask-chat.md">4c 문답·대화</a>, <a href="rust-engine-step4d-sessions.md">4d 세션 읽기</a>, <a href="rust-engine-step4e-note-tools.md">4e 노트 도구</a>, <a href="rust-engine-step5-plan.md">5단계 계획</a>, <a href="rust-engine-step5a-cli.md">5a <code>ais-cli</code></a>, <a href="rust-engine-step5b-mcp.md">5b MCP·등록·정리</a>, <a href="rust-engine-step5c-host.md">5c 호스트·번들</a>, <a href="rust-engine-step5d-java-removal.md">5d Java 지우기</a>에 있다. 3단계의 나머지 기록은 <a href="rust-engine-step3-w1a.md">W1a</a>, <a href="rust-engine-step3-w2.md">W2</a>, <a href="rust-engine-step3-w3a.md">W3a</a>, <a href="rust-engine-step3-w3b.md">W3b</a>, <a href="rust-engine-step3-w3c.md">W3c</a>, <a href="rust-engine-step3-w4a.md">W4a</a>, <a href="rust-engine-step3-w4b.md">W4b</a>다.</p>
+<p><strong>앱의 호출 길.</strong> 화면은 <code>workspace/engine.ts</code>의 <code>engineCall</code> 한 곳으로 엔진을 부른다. 호출 객체(<code>Call</code>, <code>data/commands.ts</code>의 <code>read.docs()</code> 따위)는 호스트의 <code>engine_commands</code>가 알린 명령이면 <code>engine_call</code>(<code>src-tauri/src/engine.rs</code>)로 앱 안의 Rust 엔진을 바로 부르고, 아니면 <code>toArgv</code>로 문자열 목록(argv)으로 풀어 명령줄 길(<code>sidecar_call</code>, <code>src-tauri/src/sidecar.rs</code>)로 간다. 문자열 목록과 러너·승인 알림(<code>call_blocking</code>)은 늘 명령줄 길이고, 이 길은 같은 프로세스 안에서 Rust <code>ais-cli</code>(<code>ais_cli::run</code>)를 부른다. 프로세스를 띄우지 않고, 엔진 안의 패닉은 종료 코드 1의 답으로 바꿔 앱이 죽지 않게 한다. AI 세션 표식(<code>CLAUDE_CODE_SESSION_ID</code> 따위)은 엔진에 넘기기 전에 지운다(#53). Rust 응답은 <code>engine.ts</code>의 어댑터가 기존 화면 모양으로 바꾼다. 앱을 열 때 vault를 <code>ais_core::write::autocommit::watch</code>로 지켜봐서, 앱이 닫힌 동안 단발 <code>ais-cli</code>가 남긴 자동 커밋 대기 기록(<code>.git/aisurada-pending.json</code>)을 이어받아 커밋한다. 시험과 브라우저의 가짜 호스트에는 <code>engineCommands</code>가 없어서 늘 명령줄 길이다. <strong>첫 실행의 이주:</strong> 정식 앱은 처음 뜰 때 한 번(<code>~/Library/Application Support/aisurada/rust-engine-migrated</code> 표시) 옛 사이드카(우리 레이블 <code>co.kcd.aisurada.sidecar.*</code>만)를 내리고 plist를 지우며, Java 시절의 jar를 가리키는 낡은 MCP 등록을 같은 모드로 다시 등록한다(<code>ais_cli::migrate</code>, 같은 일을 손으로 하려면 <code>ais-cli doctor --fix</code>). 개발 실행과 빌드 폴더의 번들은 기기 전체에 영향을 주는 이 일을 하지 않는다.</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo test -p ais-core)                                              # 엔진 단위·통합 시험
 pnpm --dir native-host exec node --import tsx --test scripts/engine-route.test.mjs    # 화면의 라우팅과 어댑터
 cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked engine::         # 호스트 engine_call (실제 Tauri 호출 경로)</code></pre></div>
-<p>Java 엔진과 읽기 응답을 맞대려면 <code>./build.sh</code>로 <code>dist/ais-engine.jar</code>를 만든 뒤 아래를 돌린다. <code>compat_check</code>는 vault를 읽기만 하고, 응답을 새 모양으로 바꿔 견주며, 어긋남이 0이어야 한다.</p>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>engine-rs/tools/compat/make-fixture.sh &lt;빈 폴더&gt;        # 합성 vault(진짜 vault 내용 없음)
+<p><strong>기준(오라클)과 맞대기.</strong> 맞대기는 같은 입력을 기준 Java 엔진과 Rust 엔진에 넣어 응답과 폴더 바이트를 견주는 일이다. 기준 jar는 저장소에 없고 태그 <code>java-engine-final</code>에서 짓는다. 태그가 없으면 <code>git fetch origin tag java-engine-final</code>로 먼저 받는다. <code>compat_check</code>는 읽기를 견줄 때 vault를 고치지 않고, 응답을 새 모양으로 바꿔 견주며, 어긋남이 0이어야 한다.</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>ORACLE=&quot;$(bash engine-rs/tools/compat/build-oracle.sh)&quot;   # engine-rs/target/oracle/. 같은 태그 커밋이면 다시 짓지 않는다
+engine-rs/tools/compat/make-fixture.sh &lt;빈 폴더&gt;        # 합성 vault(진짜 vault 내용 없음)
 engine-rs/tools/compat/add-search-notes.sh &lt;그 폴더&gt;    # 검색 순위·서식·동점 시험 노트를 덧붙인다
 engine-rs/tools/compat/add-git-history.sh &lt;그 폴더&gt;     # git 저장소와 판 이력(`history` 시험용). 작업 트리는 그대로 돌아온다
 engine-rs/tools/compat/add-comment-clash.sh &lt;그 폴더&gt;    # 코멘트 id가 겹치는 노트(읽기는 뒤 노트를 빼고 쓰기·reindex는 실패)
-(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar &lt;합성 vault&gt; [다른 vault...])
+(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example compat_check -- &quot;$ORACLE/ais-engine.jar&quot; &lt;합성 vault&gt; [다른 vault...])
 # 쓰기 명령은 합성 vault의 사본 둘에 같은 명령열을 Java와 Rust로 돌려 응답과 폴더 전체 바이트를 견준다(vault 원본은 안 고친다)
-(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar &lt;합성 vault&gt; --write-fixture=&lt;합성 vault&gt;)
+(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example compat_check -- &quot;$ORACLE/ais-engine.jar&quot; &lt;합성 vault&gt; --write-fixture=&lt;합성 vault&gt;)
 # 자동 커밋(commit_vault)은 vault를 고치므로 git 이력이 있는 합성 vault의 사본 둘에서만 맞댄다. 진짜 vault에는 주지 않는다
-(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar &lt;합성 vault&gt; --commit-fixture=&lt;git 이력이 있는 합성 vault&gt;)
+(cd engine-rs &amp;&amp; cargo run -q -p ais-core --example compat_check -- &quot;$ORACLE/ais-engine.jar&quot; &lt;합성 vault&gt; --commit-fixture=&lt;git 이력이 있는 합성 vault&gt;)
 # SnakeYAML 방출기(태스크·자원 파일)는 진짜 SnakeYAML 2.4가 쓴 사례와 맞댄다(자세한 절차는 tools/compat/SnakeCases.java 머리말)
 (cd engine-rs &amp;&amp; cargo run -q -p ais-core --example snake_check -- &lt;SnakeCases가 쓴 사례 파일&gt;)
-AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo.toml -p ais-core --test lock_interop   # Java 쓰기가 Rust 잠금을 기다리는지</code></pre></div>
-<p>Rust <code>ais-cli</code>를 Java 단발 엔진과 명령줄 단위로 맞대려면 아래를 돌린다. 합성 vault의 사본 둘에 같은 명령줄을 돌려 종료 코드, 표준 오류, 표준 출력 JSON(키 차례는 무시), 폴더 전체 바이트를 견주며 어긋남이 0이어야 한다. 명령 명세 표(<code>spec_table.rs</code>)는 Java 엔진의 명령 목록이 바뀌었을 때 <code>engine-rs/tools/compat/gen-spec-table.sh</code>로 다시 만든다.</p>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo run -q -p ais-cli --example cli_compat -- ../dist/ais-engine.jar &lt;합성 vault&gt;)
-(cd engine-rs &amp;&amp; cargo run -q -p ais-cli --example cli_compat -- ../dist/ais-engine.jar &lt;git 이력이 있는 합성 vault&gt; --history)   # history·commit-vault까지
-(cd engine-rs &amp;&amp; cargo test -p ais-cli)                                                                                           # 단위·프로세스·등록·정리 시험
-(cd engine-rs &amp;&amp; cargo run -q -p ais-cli --example mcp_compat -- ../dist)                                                          # Java MCP 서버와 대화 맞대기(dist/에 ais-cli.jar와 ais-engine.jar)</code></pre></div>
-<p>MCP 도구 표(<code>mcp_tools.rs</code>)는 Java <code>McpTools</code>가 바뀌었을 때 <code>engine-rs/tools/compat/gen-mcp-tools.sh</code>로 다시 만든다.</p>
+AISURADA_JAR=&quot;$ORACLE/ais-engine.jar&quot; cargo test --manifest-path engine-rs/Cargo.toml -p ais-core --test lock_interop   # Java 쓰기가 Rust 잠금을 기다리는지</code></pre></div>
+<p>Rust <code>ais-cli</code>를 기준 Java 단발 엔진과 명령줄 단위로 맞대려면 아래를 돌린다. 합성 vault의 사본 둘에 같은 명령줄을 돌려 종료 코드, 표준 오류, 표준 출력 JSON(키 차례는 무시), 폴더 전체 바이트를 견주며 어긋남이 0이어야 한다. 명령 명세 표(<code>spec_table.rs</code>)는 Java 엔진을 지운 뒤로 원본이라 직접 고친다. <code>engine-rs/tools/compat/gen-spec-table.sh</code>는 기준 표를 <code>engine-rs/target/oracle-tables/</code>에 뽑으므로 현재 표와 <code>diff</code>로 견주는 데 쓴다(5d에서 둘이 같음을 확인했다).</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo run -q -p ais-cli --example cli_compat -- &quot;$ORACLE/ais-engine.jar&quot; &lt;합성 vault&gt;)
+(cd engine-rs &amp;&amp; cargo run -q -p ais-cli --example cli_compat -- &quot;$ORACLE/ais-engine.jar&quot; &lt;git 이력이 있는 합성 vault&gt; --history)   # history·commit-vault까지
+(cd engine-rs &amp;&amp; cargo test -p ais-cli)                                                                                            # 단위·프로세스·등록·정리 시험
+(cd engine-rs &amp;&amp; cargo run -q -p ais-cli --example mcp_compat -- &quot;$ORACLE&quot;)                                                        # 기준 MCP 서버와 대화 맞대기(기준 폴더에 ais-cli.jar와 ais-engine.jar)</code></pre></div>
+<p>MCP 도구 표(<code>mcp_tools.rs</code>)도 마찬가지로 직접 고치고, <code>engine-rs/tools/compat/gen-mcp-tools.sh</code>가 기준 표를 같은 자리에 뽑는다(현재 표와 같음을 확인했다).</p>
 <p>노트 머리 읽기·쓰기를 Java와 맞대려면 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.</p>
 <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>engine-rs/tools/yaml-spike/run.sh &lt;저장소 밖 폴더&gt; --vault &lt;vault 폴더&gt;     # Java 기준값. vault는 읽기만 한다
 (cd engine-rs &amp;&amp; cargo run -q -p ais-core --example yaml_check -- &lt;저장소 밖 폴더&gt;/ground-truth.jsonl)</code></pre></div>
@@ -255,6 +228,8 @@ AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo
 <h3 id="화면-모듈-native-hostsrc"><a class="anchor" href="#화면-모듈-native-hostsrc" aria-label="이 절의 링크">#</a>화면 모듈 (<code>native-host/src/</code>)</h3>
 <p><code>workspace/</code>(controller, 부팅, 저장 키, 엔진 다리), <code>data/</code>(vault 스토어, 쓰기 큐, 자기 쓰기), <code>editor/</code>(Lexical 편집기와 마크다운 왕복), <code>navigation/</code>(주소, 탭, 스크롤), <code>interaction/</code>(단축키, 링크), <code>ui/</code>(화면들, 터미널), <code>plugs/claude/</code>(4부 화면)와 <code>plugs/empty/</code>(4부 없는 판의 빈 구현). 화면 모양 CSS는 <code>src/styles.css</code>(기본 모양)와 <code>src/skin-*.css</code>(물성·격자·유리·모던)다(§7 「화면 모양」).</p>
 <h2 id="5-엔진-쓰는-법"><a class="anchor" href="#5-엔진-쓰는-법" aria-label="이 절의 링크">#</a>5. 엔진 쓰는 법</h2>
+<aside class="callout"><p>아래 기능 절의 「시험」 항목에 적힌 Java 시험 클래스(<code>AgentSessionTest</code>, <code>McpServerTest</code>, <code>ApprovalsTest</code>, <code>ResourcesTest</code>, <code>TasksTest</code>, <code>ProjectReposTest</code> 따위)는 Java 엔진과 함께 저장소에서 지웠다. 그 내용은 태그 <code>java-engine-final</code>의 <code>test/</code>에서 볼 수 있고, 같은 동작을 지키는 일은 지금 Rust 시험(<code>engine-rs/crates/*/tests/</code>)과 기준 맞대기(§4)가 맡는다.</p>
+</aside>
 <h3 id="세션-에이전트codexgemini-확장"><a class="anchor" href="#세션-에이전트codexgemini-확장" aria-label="이 절의 링크">#</a>세션 에이전트(Codex·Gemini) 확장</h3>
 <p>노트에 적는 세션 id는 원래 Claude Code 것만 있었다. 이 확장은 Codex와 Gemini CLI의 세션도 같은 자리에 적고, 노트 칩에서 터미널로 이어 열고, 두 CLI의 대화 기록을 세션 화면에서 읽게 한다. <strong>외부 설명서에 없는 확장이다.</strong> 설명서의 4.4(세션 표식), 1.7·1.10(머리말 키와 도장), 7장(<code>read-session</code>, <code>session-titles</code>)과 어긋나는 곳은 아래 표가 전부다. 이 표 밖에서는 설명서대로 동작해야 한다.</p>
 <div class="table-wrap"><table><thead><tr><th>곳</th><th>설명서</th><th>확장</th></tr></thead><tbody>
@@ -348,7 +323,7 @@ AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo
 </li>
 <li><p><strong>알림.</strong> 호스트의 <code>approvals.rs</code>가 앱이 켜져 있는 동안 30초마다(처음은 8초 뒤) 엔진에 <code>list-resource-changes decided=0</code>을 묻고, 아직 알리지 않은 대기 변경마다 알림 센터에 종류 <code>approval</code>(화면 이름 「승인」)을 쌓는다. 알림 <code>id</code>가 <code>approval-&lt;변경 id&gt;</code>라 같은 변경은 한 번만 쌓인다. 한 번에 5개까지 쌓는다. 창이 닫혀 있어도 알리는 쪽이다. 설정의 소식이 4개에서 5개(「스킬·에이전트 변경이 승인을 기다릴 때」, 기본은 앱 안·macOS 모두 켬)가 됐고, 알림 센터의 「승인하러 가기」가 스킬·에이전트 페이지(<code>/resources</code>)로 데려다 준다. 승인 안 된 직접 수정은 알리지 않고 배지와 대기함의 「직접 수정」 탭으로만 보인다.</p>
 </li>
-<li><p><strong>앱이 엔진을 부를 때 AI 세션 표식을 지운다.</strong> 앱은 엔진을 <code>ais-cli</code> 프로세스로 부르고 앱의 환경변수를 넘긴다. 앱을 AI 세션의 터미널에서 띄웠다면 <code>CLAUDE_CODE_SESSION_ID</code> 같은 표식이 환경에 남아 있어서, 엔진이 화면의 저장과 승인을 AI의 것으로 보고 승인을 거절하거나 대기에 올릴 수 있다. 그래서 <code>sidecar.rs</code>의 <code>execute</code>가 <code>AISURADA_SESSION_ID</code>, <code>AISURADA_SESSION_AGENT</code>, <code>CLAUDE_CODE_SESSION_ID</code>, <code>CODEX_SESSION_ID</code>, <code>CODEX_THREAD_ID</code>를 지운다(<code>ai_session_variables_do_not_reach_the_engine</code>). 러너의 엔진 호출도 같은 길이다. AI 프로세스(claude, 터미널의 AI CLI)는 이 길을 거치지 않는다.</p>
+<li><p><strong>앱이 엔진을 부를 때 AI 세션 표식을 지운다.</strong> 앱은 엔진을 같은 프로세스 안에서 <code>ais_cli::run</code>으로 부르고 앱의 환경변수를 넘긴다. 앱을 AI 세션의 터미널에서 띄웠다면 <code>CLAUDE_CODE_SESSION_ID</code> 같은 표식이 환경에 남아 있어서, 엔진이 화면의 저장과 승인을 AI의 것으로 보고 승인을 거절하거나 대기에 올릴 수 있다. 그래서 <code>sidecar.rs</code>의 <code>cli_env</code>가 <code>AISURADA_SESSION_ID</code>, <code>AISURADA_SESSION_AGENT</code>, <code>CLAUDE_CODE_SESSION_ID</code>, <code>CODEX_SESSION_ID</code>, <code>CODEX_THREAD_ID</code>를 지운다(<code>the_cli_environment_drops_ai_session_markers_and_names_the_vault</code>). 러너의 엔진 호출도 같은 길이다. AI 프로세스(claude, 터미널의 AI CLI)는 이 길을 거치지 않는다.</p>
 </li>
 <li><p><strong>화면 시험.</strong> <code>approvals-ui.test.mjs</code> 15건(응답 읽기, 정책 기본값, 엔진 인자, 배지·표시 글, 칸별 비교, 줄 단위 비교, 저장소와 지켜보기, 탭별 서버 렌더, 레일 배지와 페이지 배너)과 <code>notifications-ui.test.mjs</code>(소식 5개, 승인 알림의 이동). 호스트는 <code>approvals::tests</code> 2건, <code>notifications::tests</code>의 승인 소식, <code>sidecar::tests</code>의 세션 표식 삭제다. 승인 대기함은 진짜 컴포넌트를 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려서 모양을 눈으로 확인했다. <strong>실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.</strong></p>
 </li>
@@ -398,7 +373,7 @@ AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo
 <ul>
 <li><strong>연결.</strong> 종류는 <code>blocks</code>(건 쪽이 받는 쪽을 막는다), <code>relates</code>(관련, 한 번이면 양쪽에 보인다), <code>duplicates</code>(건 쪽이 받는 쪽의 중복)다. 연결은 <strong>건 쪽 파일에만</strong> 적고 반대쪽(<code>blocked-by</code>, <code>duplicated-by</code>)은 읽을 때 계산한다. 두 파일이 어긋날 일이 없다. 자기 자신에게 못 걸고, 서로 막는 순환(<code>blocks</code>의 맞은편)은 거절한다. <code>blocks</code>로 막힌 태스크는 막은 태스크가 <strong>Done</strong>이 되기 전에는 Ready For Develop → In Progress로 못 간다(Failed·Cancelled는 풀지 않는다). 지운 태스크는 막지 않고, 되살리면 다시 막는다(결정 4).</li>
 <li><strong>기록.</strong> 만들기, 상태 바뀜(<code>from</code>, <code>to</code>), 고침(바뀐 칸 이름), 연결, 댓글이 <code>activity.jsonl</code>에 시간순으로 남는다. 고치면 <code>editedAt</code>이 남고, 세션 표식이 오면 <code>editedSession</code>(과 Claude가 아닐 때 <code>editedAgent</code>)이 남는다. 완료 기준을 확인하면 확인한 시각과 쪽(<code>human</code>, <code>runner</code>)이 항목에 남고, 확인이 풀리면 기록이 지워진다.</li>
-<li><strong>쓰기 비용.</strong> 쓰기 명령은 vault 전체 쓰기 잠금과 노트 색인 맞추기(<code>NoteIndex.reconciled</code>)를 거치므로 태스크를 쓸 때마다 노트 폴더를 훑는다. 호출 한 번은 노트 17개짜리 vault에서 0.1초 안팎이었다(JVM을 띄우는 시간 포함). 노트가 아주 많은 vault의 값은 재지 않았다.</li>
+<li><strong>쓰기 비용.</strong> 쓰기 명령은 vault 전체 쓰기 잠금과 노트 색인 맞추기(<code>NoteIndex.reconciled</code>)를 거치므로 태스크를 쓸 때마다 노트 폴더를 훑는다. 호출 한 번은 노트 17개짜리 vault에서 0.1초 안팎이었다(Java 시절에 잰 값이고 JVM을 띄우는 시간을 포함한다). 노트가 아주 많은 vault의 값은 재지 않았다.</li>
 <li><strong>화면.</strong> 레일의 「태스크」(<code>/tasks</code>)가 보드와 목록이고(<code>ui/TasksPage.tsx</code>), 태스크를 열면 <code>/task/&lt;키&gt;</code>가 상세다(<code>ui/TaskDetailPage.tsx</code>). 만들기와 편집은 한 양식이다(<code>ui/TaskFormModal.tsx</code>). 엔진을 부르는 얇은 층과 순수 계산(폼 값 → 인자, 거르기, 상태별 묶기, 한 줄 풀이)은 <code>ui/tasksClient.ts</code>에 모았고, 화면은 엔진을 <code>controller.callEngine</code>으로 부른다(호스트 커맨드를 더하지 않았다). 스타일은 <code>src/tasks.css</code>(모든 화면 모양의 토큰을 따르고, 토큰이 없으면 대체값으로 물러난다)다.<ul>
 <li><strong>보드.</strong> 열 5개(Draft, Ready For Develop, In Progress, Waiting Answer, In Review)와 접어 둔 끝난 상태(Done, Failed, Cancelled)다. Draft 열 아래의 한 줄 입력은 Enter를 누르면 요약이 채워진 만들기 양식을 연다(완료 기준이 필수라서 바로 만들지 않는다). 거르기(검색, 저장소, 유형, 라벨, 막힌 것만)는 한 번에 받은 목록을 화면에서 거른다. 보드와 목록 가운데 고른 것은 <code>localStorage</code>의 <code>aisurada.tasks.view</code>에 둔다.</li>
 <li><strong>상세.</strong> Jira 이슈 화면 구조다. 가운데는 설명, 완료 기준(체크하면 <code>update-task</code>로 저장하고 확인한 시각과 쪽이 남는다), 연결된 태스크, 연결한 자원, 활동(전체·댓글·이력)이고, 오른쪽은 세부 정보와 Ready For Develop 조건이다. <strong>상태 메뉴는 엔진이 알려 준 <code>transitions</code>를 그대로 보인다.</strong> 사람이 바꿀 수 있는 곳만 나오고, 조건이 모자라거나 막혀 있으면 까닭과 함께 막혀 보인다. 화면은 이 규칙을 다시 만들지 않는다. 상태를 바꿀 때 지금 상태를 <code>from</code>으로 넘겨서, 그 사이에 다른 곳이 먼저 바꿨으면 엔진이 거절한다.</li>
@@ -407,7 +382,7 @@ AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo
 </ul>
 </li>
 <li><strong>시험.</strong> <code>TasksTest</code>(만들기와 필수 값, 거절 문구, 고치기 보호와 모르는 칸 보존, 완료 기준 확인 기록, 번호, 휴지통, 상태 전이 전부, 연결과 막힘, 활동, 목록 거르기, 손으로 망가뜨린 파일, MCP 읽기 도구와 쓰기 도구 없음, 기존 명령과의 공존)와 <code>McpServerTest</code>의 도구 개수, 화면은 <code>tasks-ui.test.mjs</code>(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 보드·목록·상세·상태 메뉴와 레일)다. 서버 렌더에는 <code>document</code>가 없어서 설명(마크다운) 영역은 그리지 않는다. 데이터가 든 보드와 상세는 진짜 엔진으로 만든 임시 vault의 응답을 서버 렌더하고 Edge headless로 그려서 모양을 눈으로 확인했다(밝은 모양과 어두운 모양). 실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.</li>
-<li><strong><code>ais-cli</code>가 넘겨 주는 이름.</strong> 앱은 엔진을 <code>ais-cli</code>를 거쳐 부르는데, <code>ais-cli</code>는 <code>AisCliMain</code>의 목록(<code>ENGINE_COMMANDS_61</code>, 태스크 9개는 <code>ENGINE_COMMANDS_TASKS</code>, 승인 명령 7개는 <code>ENGINE_COMMANDS_APPROVALS</code>)에 든 이름만 엔진으로 넘긴다. 태스크 명령이 이 목록에 빠져 있어서 실제 앱에서는 모두 「알 수 없는 이름」(종료 코드 2)으로 거절되던 결함을 러너를 만들면서 찾아 고쳤다(<code>5b38c33</code>). 엔진 시험과 화면 시험은 <code>ais-cli</code>를 거치지 않아 잡지 못했다. 이제 <code>TasksTest</code>가 엔진 명령 이름이 모두 <code>ais-cli</code>를 통과하는지 대조한다.</li>
+<li><strong><code>ais-cli</code>가 넘겨 주는 이름.</strong> <code>ais-cli</code>는 <code>engine-rs/crates/ais-cli/src/registry.rs</code>의 목록(<code>ENGINE_COMMANDS_61</code>, 태스크 9개는 <code>ENGINE_COMMANDS_TASKS</code>, 승인 명령 7개는 <code>ENGINE_COMMANDS_APPROVALS</code>)에 든 이름만 엔진으로 넘긴다. 새 명령을 넣고 이 목록에 빠뜨리면 실제 앱에서 「알 수 없는 이름」(종료 코드 2)으로 거절된다. Java 시절에 태스크 명령이 이 목록에 빠져 있던 적이 있다(<code>5b38c33</code>). 엔진 시험과 화면 시험은 <code>ais-cli</code>를 거치지 않아 이것을 잡지 못하므로, 명령을 더하면 <code>ais-cli</code>로 한 번 불러 본다.</li>
 <li><strong>아직 없는 것.</strong> 코드를 고치고 PR을 올리는 러너(4단계), 태스크 안 채팅(정의 에이전트, 3b), 질문을 위 단계 에이전트가 먼저 푸는 계층(5단계). 승인 워크플로우(이슈 #53)는 러너가 코드를 고치기 전에 필요하다. 읽기 전용 러너는 아래 「러너」에 있다.</li>
 </ul>
 <h3 id="알림-notificationsrs"><a class="anchor" href="#알림-notificationsrs" aria-label="이 절의 링크">#</a>알림 (<code>notifications.rs</code>)</h3>
@@ -482,10 +457,10 @@ AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo
 <p><strong>시험.</strong></p>
 <ul>
 <li>호스트: <code>runner::</code> 30건. 보고·질문·답·중지·실패(종료 코드, 시간 초과, <code>is_error</code>)·질문 한도·세션 소실·작업 폴더 소실·앱 닫기와 다시 켜기 이어 가기·태스크가 옮겨졌을 때의 정리·우선순위와 동시 한도·막힘, 프롬프트와 claude 인자와 MCP 설정, 파일 저장소, 실제 git으로 만든 읽기 전용 작업 폴더를 가짜 엔진·가짜 claude로 돌린다.</li>
-<li><strong>진짜로 도는 시험</strong> <code>runner::tests::real_cli_and_claude_report_end_to_end</code>(무시됨): 진짜 <code>ais-cli</code>, 격리 엔진, 진짜 <code>claude</code>(haiku)로 태스크 하나를 끝까지 돌려 In Review와 댓글을 확인한다. 토큰을 조금 쓴다. 격리 엔진을 띄우고(§3의 4번과 같다: <code>AISURADA_SIDECAR_SOCKET</code>을 주고 <code>serve</code>) <code>AISURADA_VAULT</code>, <code>AISURADA_SIDECAR_SOCKET</code>, <code>AISURADA_SIDECAR_JAR</code>, <code>E2E_HOME</code>(격리 HOME), <code>E2E_CLI_JAR</code>(<code>dist/ais-cli.jar</code>)를 주고 <code>cargo test real_cli_and_claude -- --ignored --nocapture</code>로 돌린다. 이 컴퓨터에서 작은 README 조사 하나가 10초, 약 0.007달러였다.</li>
+<li><strong>진짜로 도는 시험</strong> <code>runner::tests::real_cli_and_claude_report_end_to_end</code>(무시됨): 진짜 <code>ais-cli</code>와 진짜 <code>claude</code>(haiku)로 태스크 하나를 끝까지 돌려 In Review와 댓글을 확인한다. 토큰을 조금 쓴다. 격리 vault와 격리 HOME을 만들고 <code>AISURADA_VAULT</code>, <code>E2E_HOME</code>(격리 HOME), <code>E2E_CLI_BIN</code>(빌드한 <code>ais-cli</code> 실행 파일), 필요하면 <code>AISURADA_LOCK_DIR</code>를 주고 <code>cargo test real_cli_and_claude -- --ignored --nocapture</code>로 돌린다. 이 컴퓨터에서 작은 README 조사 하나가 10초, 약 0.007달러였다(Java 시절에 잰 값이다).</li>
 <li>화면: <code>runner-ui.test.mjs</code> 13건(저장소의 읽기·사건·호출 인자, 서버 렌더로 본 막대·「실행」 영역 각 상태·보드 카드), <code>workspace.test.mjs</code>의 종료 확인 3건. 새 화면은 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려 눈으로 확인했다.</li>
 <li><strong>확인하지 못한 것.</strong> 키체인 자격으로 진짜 GitHub 저장소를 fetch하는 길(<code>refresh_clone</code>은 시험에서 가짜로 대신했다), 번들한 앱에서 <code>claude</code> 위치 찾기, 질문→답 왕복과 동시 실행 여러 개를 진짜 <code>claude</code>로 돌리는 것(가짜 대본으로만), 120분 제한, 앱을 닫을 때 진짜 <code>claude</code> 프로세스가 멈추는 것, 실제 앱 창(WKWebView)에서 눌러 본 것.</li>
-<li><strong>한계.</strong> 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다(<code>ais-cli</code>는 호출마다 JVM을 띄운다). 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 4부의 세션 화면(<code>/session/&lt;id&gt;</code>)에 잇지 않았다.</li>
+<li><strong>한계.</strong> 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다. 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 4부의 세션 화면(<code>/session/&lt;id&gt;</code>)에 잇지 않았다.</li>
 </ul>
 <h3 id="github-app-연결-githubrs"><a class="anchor" href="#github-app-연결-githubrs" aria-label="이 절의 링크">#</a>GitHub App 연결 (<code>github.rs</code>)</h3>
 <p>프로젝트의 GitHub 저장소(앞의 「프로젝트의 저장소와 아젠다의 <code>projectRepo</code>」)를 앱이 읽고 받아 오는 호스트 쪽 바탕이다. 사용자가 GitHub에서 직접 만든 GitHub App의 <strong>App ID와 개인 키(PEM)</strong> 로 <strong>설치 토큰</strong>을 받는 방식이고, 사용자 로그인(디바이스 플로우)은 쓰지 않는다. 활동은 앱(봇) 이름으로 남는다.</p>
@@ -507,54 +482,49 @@ AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo
 <p>에이전트의 MCP 서버를 등록할 때 <code>AISURADA_VAULT</code> 경로를 박아 넣으면, 손 확인이나 옛 설정의 vault가 그대로 남아 노트가 앱과 다른 vault에 쓰인다. 그래서 등록에는 vault를 박지 않고, 앱이 연 vault를 파일에 적어 둔다.</p>
 <ul>
 <li><strong>쓰는 쪽.</strong> 호스트(<code>workspace.rs</code>의 <code>allow_workspace</code>)가 워크스페이스를 열 때마다 <code>~/Library/Application Support/aisurada/current-vault.json</code>에 <code>{&quot;vault&quot;:&quot;&lt;경로&gt;&quot;,&quot;updatedAt&quot;:&lt;ms&gt;}</code>를 적는다(임시 파일에 쓰고 이름을 바꾼다). 못 적어도 vault 열기는 막지 않는다. 호스트 시험은 진짜 HOME의 파일을 덮어쓰지 않게 이 쓰기를 건너뛴다(<code>cfg!(test)</code>).</li>
-<li><strong>읽는 쪽.</strong> <code>VaultPointer.resolve</code>가 <code>ais-cli</code>(<code>AisCliMain</code>, <code>DoctorCommand</code>, <code>SweepCommand</code>)와 MCP 서버에서 호출마다 읽는다. 환경변수가 비지 않았으면 그것이 이기고, 없으면 파일이다. 둘 다 없으면 <code>AIS-400 vault를 정하지 못했다…</code>다. 파일이 망가졌거나 절대 경로가 아니면 없는 것으로 본다.</li>
-<li><strong>엔진은 그대로다.</strong> 엔진(<code>serve</code>)은 여전히 <code>AISURADA_VAULT</code>가 필수이고 launchd 항목의 환경에 vault를 싣는다. 바뀐 것은 클라이언트가 vault를 정하는 길뿐이다.</li>
+<li><strong>읽는 쪽.</strong> <code>ais-cli</code>(<code>engine-rs/crates/ais-cli/src/env.rs</code>의 <code>resolve_vault</code>)와 MCP 서버가 호출마다 읽는다. 환경변수가 비지 않았으면 그것이 이기고, 없으면 파일이다. 둘 다 없으면 <code>AIS-400 vault를 정하지 못했다…</code>다. 파일이 망가졌거나 절대 경로가 아니면 없는 것으로 본다.</li>
+<li><strong>엔진은 그대로다.</strong> 엔진 자체(<code>ais-core</code>)는 늘 vault 경로를 인자로 받는다. 어느 vault인지 정하는 일은 <code>ais-cli</code>(<code>env.rs</code>)가 한다.</li>
 <li><strong>격리.</strong> 파일은 HOME 아래라서 가짜 HOME으로 띄운 앱(손 확인, 받아들임 점검, 번들 검증)은 자기 HOME에 적고 진짜 파일을 안 건드린다.</li>
 <li><strong>한계.</strong> 앱을 한 번도 안 열었으면 파일이 없다. 앱을 끄고 다른 vault로 <code>AISURADA_VAULT</code>를 준 <code>ais-cli</code>를 돌려도 파일은 그대로다(앱이 마지막으로 연 vault).</li>
 </ul>
-<h3 id="두-가지-모양"><a class="anchor" href="#두-가지-모양" aria-label="이 절의 링크">#</a>두 가지 모양</h3>
-<ul>
-<li><strong>단발 모드</strong>: <code>java -jar dist/ais-engine.jar &lt;명령&gt; [인자...]</code> 명령 1개를 처리하고 끝난다.</li>
-<li><strong>serve 모드</strong>: <code>java -jar dist/ais-engine.jar serve</code> vault 1개를 맡아 유닉스 소켓에서 요청을 받는다. 요청마다 vault를 다시 훑는다. 요청이 없으면 10분 뒤 스스로 내려간다.</li>
-</ul>
+<h3 id="호출-방식"><a class="anchor" href="#호출-방식" aria-label="이 절의 링크">#</a>호출 방식</h3>
+<p><code>ais-cli</code>는 명령 1개를 처리하고 끝나는 프로세스다. 엔진은 그 프로세스 안에서 돌고, 호출마다 vault를 새로 훑는다. 표준 입출력으로 오래 도는 것은 MCP 서버(<code>ais-cli mcp</code>)뿐이다. 앱은 같은 코드를 프로세스 안에서 직접 부른다(§4 「앱의 호출 길」). 예전의 serve 모드와 launchd 사이드카는 없다.</p>
 <h3 id="두-가지-표면"><a class="anchor" href="#두-가지-표면" aria-label="이 절의 링크">#</a>두 가지 표면</h3>
 <p>같은 일을 이름만 달리 부른다. 도구 표면은 밑줄 이름에 JSON 한 덩이, 명령 표면은 하이픈 이름에 <code>key=value</code>다.</p>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>java -jar dist/ais-engine.jar get_doc '{&quot;id&quot;:&quot;nddemo-00000001&quot;}'   # 도구 표면
-java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표면</code></pre></div>
-<p>도구 38개와 명령 82개는 <code>src/aisurada/cmd/CommandRegistry.java</code>에 있다. 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 <code>java -jar dist/ais-cli.jar --list</code>로 본다.</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>AISURADA_VAULT=&lt;vault&gt; dist/ais-cli get_doc '{&quot;id&quot;:&quot;nddemo-00000001&quot;}'   # 도구 표면
+AISURADA_VAULT=&lt;vault&gt; dist/ais-cli get-doc nddemo-00000001              # 명령 표면</code></pre></div>
+<p>도구 38개와 명령 82개는 <code>engine-rs/crates/ais-cli/src/registry.rs</code>에 있다(<code>ais-cli</code>가 직접 하는 8개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 <code>dist/ais-cli --list</code>로 본다.</p>
 <h3 id="설정"><a class="anchor" href="#설정" aria-label="이 절의 링크">#</a>설정</h3>
-<p>우선순위는 <strong>명령줄 <code>--키=값</code> &gt; JVM <code>-D키=값</code> &gt; 환경 변수 &gt; 기본값</strong>이다. 키는 7개이고 모르는 <code>--키</code>는 조용히 버린다.</p>
-<div class="table-wrap"><table><thead><tr><th>키</th><th>환경 변수</th><th>기본값</th></tr></thead><tbody>
-<tr><td><code>aisurada.vault</code></td><td><code>AISURADA_VAULT</code></td><td>없음(필수)</td></tr>
-<tr><td><code>aisurada.db.home</code></td><td><code>AISURADA_DB_HOME</code></td><td><code>~/Library/Application Support/aisurada/db</code></td></tr>
-<tr><td><code>aisurada.notes.shard.by.month</code></td><td><code>AISURADA_NOTES_SHARD_BY_MONTH</code></td><td>정하지 않음</td></tr>
-<tr><td><code>aisurada.idle.timeout.minutes</code></td><td><code>AISURADA_IDLE_TIMEOUT_MINUTES</code></td><td>10 (<code>dev</code> 프로필이면 0)</td></tr>
-<tr><td><code>aisurada.vault.autocommit.enabled</code></td><td><code>AISURADA_VAULT_AUTOCOMMIT_ENABLED</code></td><td>true</td></tr>
-<tr><td><code>aisurada.vault.autocommit.idle.seconds</code></td><td><code>AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS</code></td><td>300</td></tr>
-<tr><td><code>aisurada.vault.snapshot.enabled</code></td><td><code>AISURADA_VAULT_SNAPSHOT_ENABLED</code></td><td>false</td></tr>
+<p>설정은 환경 변수로만 준다. Java 시절의 명령줄 <code>--키=값</code>과 JVM <code>-D키=값</code>, 색인 폴더 <code>AISURADA_DB_HOME</code>은 없어졌다(색인이 없다).</p>
+<div class="table-wrap"><table><thead><tr><th>환경 변수</th><th>쓰임</th><th>기본값</th></tr></thead><tbody>
+<tr><td><code>AISURADA_VAULT</code></td><td>vault 폴더</td><td>없으면 앱이 연 vault(아래 「앱이 연 vault」)</td></tr>
+<tr><td><code>AISURADA_NOTES_SHARD_BY_MONTH</code></td><td>노트를 월별 폴더에 두는지</td><td>정하지 않음(디스크를 보고 판정)</td></tr>
+<tr><td><code>AISURADA_VAULT_AUTOCOMMIT_ENABLED</code></td><td>vault 자동 커밋</td><td>true</td></tr>
+<tr><td><code>AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS</code></td><td>마지막 쓰기부터 커밋까지의 유휴 초</td><td>300</td></tr>
 </tbody></table></div>
-<p>같은 키를 명령줄에 여러 번 주면 <code>=</code>가 있는 칸의 값만 쉼표로 잇는다. 불리언은 <code>true/on/yes/1</code>과 <code>false/off/no/0</code>만 받는다.</p>
-<p><code>ais-cli</code>와 호스트가 읽는 환경 변수:</p>
+<p>불리언은 <code>true/on/yes/1</code>과 <code>false/off/no/0</code>만 받는다. 본문을 덮기 전에 옛 바이트를 남기던 스냅숏 쓰기(<code>AISURADA_VAULT_SNAPSHOT_ENABLED</code>)는 Rust 이전 때 지웠다. 이미 남은 스냅숏은 <code>history</code>가 계속 읽는다.</p>
+<p>그 밖의 환경 변수:</p>
 <div class="table-wrap"><table><thead><tr><th>이름</th><th>쓰임</th></tr></thead><tbody>
-<tr><td><code>AISURADA_SIDECAR_SOCKET</code></td><td>소켓 자리. <strong>102바이트 이하</strong>여야 한다. 기본은 <code>~/Library/Caches/aisurada/ais-&lt;해시&gt;.sock</code></td></tr>
-<tr><td><code>AISURADA_SIDECAR_JAR</code></td><td>launchd plist에 실을 엔진 jar</td></tr>
-<tr><td><code>AISURADA_SIDECAR_KEEP_REGISTRATION</code></td><td><code>1</code>이면 엔진이 없어 띄울 때 이미 있는 plist를 덮어쓰지 않고 그대로 쓴다. 그 plist의 jar가 없으면 평소처럼 다시 쓴다. 개발 실행과 <code>target/…/bundle</code> 번들이 호스트와 앱 스크립트를 통해 자동으로 켠다(§7)</td></tr>
-<tr><td><code>AISURADA_SIDECAR_JAVA</code></td><td>plist에 실을 <code>java</code> (호스트는 이걸로 <code>ais-cli</code>를 도는 <code>java</code>도 고른다)</td></tr>
-<tr><td><code>AISURADA_CLI_JAR</code></td><td>호스트가 부를 <code>ais-cli.jar</code>, <code>install</code>이 깔 원본</td></tr>
-<tr><td><code>AISURADA_READY_TIMEOUT_SECONDS</code></td><td>띄운 뒤 붙기를 기다리는 초 (30)</td></tr>
-<tr><td><code>AISURADA_SIDECAR_LIMIT</code></td><td>동시에 떠 있을 엔진 수 (3)</td></tr>
-<tr><td><code>AISURADA_SWEEP_QUIET_HOURS</code></td><td>청소가 내릴 만큼 조용한 시간 (24)</td></tr>
-<tr><td><code>AISURADA_CLAUDE_BIN</code></td><td>호스트가 쓸 <code>claude</code> 실행 파일 (4부)</td></tr>
+<tr><td><code>AISURADA_LOCK_DIR</code></td><td>쓰기 잠금 파일 폴더. 기본은 <code>~/Library/Application Support/aisurada/locks</code></td></tr>
+<tr><td><code>AISURADA_APPROVALS_DIR</code></td><td>자원 승인 기록의 바탕 폴더(시험용). 기본은 <code>~/Library/Application Support/aisurada/approvals</code></td></tr>
+<tr><td><code>AISURADA_SESSION_ID</code>, <code>AISURADA_SESSION_AGENT</code></td><td>이 호출을 보낸 에이전트 세션. 둘을 함께 줄 때만 쓴다</td></tr>
+<tr><td><code>AISURADA_CLAUDE_BIN</code>, <code>AISURADA_CODEX_BIN</code>, <code>AISURADA_GEMINI_BIN</code>(또는 <code>AISURADA_ANTIGRAVITY_BIN</code>)</td><td>등록 명령(<code>claude-mcp</code> 따위)과 호스트가 부를 CLI의 자리</td></tr>
+<tr><td><code>AISURADA_CLAUDE_HOME</code>, <code>AISURADA_CODEX_HOME</code>, <code>AISURADA_GEMINI_HOME</code></td><td>세션 기록을 읽을 홈을 바꾼다(시험용)</td></tr>
+<tr><td><code>AISURADA_SQLITE_BIN</code></td><td>Antigravity 대화 기록을 읽을 <code>sqlite3</code>의 자리. 기본은 <code>/usr/bin/sqlite3</code>, 없으면 <code>PATH</code></td></tr>
+<tr><td><code>AISURADA_TEST_NOW</code>, <code>AISURADA_TEST_RANDOM</code></td><td>시험용 시계(유닉스 밀리초)와 id 무작위 조각. 주지 않으면 아무 일도 안 한다</td></tr>
+<tr><td><code>AISURADA_CLI_BIN</code></td><td>호스트 시험과 점검이 부를 <code>ais-cli</code> 실행 파일(없으면 <code>engine-rs/target/debug/ais-cli</code>)</td></tr>
+<tr><td><code>AISURADA_ENGINE_TRACE</code></td><td>손 확인용. <code>1</code>이면 앱을 띄운 터미널에 <code>[engine] 명령 ok 걸린시간ms</code>를 한 줄씩 찍어 어느 명령이 <code>engine_call</code> 길로 갔는지 보인다</td></tr>
+<tr><td><code>AISURADA_CALL_LOG</code></td><td>점검 하네스용. 앱이 엔진을 부른 호출을 이 파일에 한 줄씩 적는다(§8)</td></tr>
 </tbody></table></div>
 <h3 id="종료-코드"><a class="anchor" href="#종료-코드" aria-label="이 절의 링크">#</a>종료 코드</h3>
 <div class="table-wrap"><table><thead><tr><th>코드</th><th>뜻</th></tr></thead><tbody>
 <tr><td>0</td><td>성공. stdout에 JSON 하나와 줄바꿈 1개</td></tr>
-<tr><td>1</td><td>예상 밖 실패. stderr에 스택 트레이스. 쓰기 명령이 vault 사전 훑기에서 서면 이것도 1</td></tr>
+<tr><td>1</td><td>예상 밖 실패(인자 길이가 1 MiB를 넘는 경우 따위). 쓰기 명령이 vault 사전 훑기에서 서면 이것도 1</td></tr>
 <tr><td>2</td><td>vault를 못 찾았거나 모르는 명령</td></tr>
 <tr><td>3</td><td><code>AIS-…</code> 코드가 붙은 실패. stderr 한 줄, stdout 비어 있음</td></tr>
-<tr><td>4</td><td><code>ais-cli</code>만 낸다. 엔진에 못 닿음</td></tr>
 <tr><td>5</td><td>선결 조건 토큰(<code>f1</code>)이 어긋나 아무것도 안 씀(<code>AIS-412</code>)</td></tr>
 </tbody></table></div>
+<p>Java 시절에 <code>ais-cli</code>만 내던 4(엔진에 못 닿음)는 엔진 프로세스가 없어서 사라졌다.</p>
 <h3 id="vault의-모양"><a class="anchor" href="#vault의-모양" aria-label="이 절의 링크">#</a>vault의 모양</h3>
 <div class="code"><div class="code-bar"><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>vault/
 ├── .aisurada/
@@ -578,67 +548,61 @@ java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표�
 <li><code>update_doc</code>, 메타 쓰기 3개, <code>update_sub_note</code>는 직전에 읽은 토큰 <code>f1</code>이 지금 파일 바이트와 맞아야 쓴다. 안 왔거나 어긋나면 <code>AIS-412</code>, 종료 코드 5.</li>
 <li>편집 도장(<code>editedBy</code>, <code>editedAt</code>)은 파일 글이 실제로 달라질 때만 새로 찍는다.</li>
 <li>쓰기 명령은 일하기 전에 vault를 훑고, 노트로 못 읽는 파일이 있으면 아무것도 안 쓰고 종료 코드 1로 선다.</li>
-<li>serve는 시작·종료·유휴·15분 경과·작성자 전환 때 vault를 자동 커밋한다. <code>.git</code>이 있는 <code>main</code> 브랜치에서만 돈다. 단발 모드는 자동 커밋하지 않는다.</li>
+<li>자동 커밋은 쓸 때마다 대기 기록(<code>vault/.git/aisurada-pending.json</code>)을 남기고, 유휴 시간이 지나거나 작성자·도구 세션이 바뀌면 커밋한다. <code>.git</code>이 있는 <code>main</code> 브랜치에서만 돈다. 유휴 타이머는 앱과 MCP 서버만 돌리고(<code>ais_core::write::autocommit::watch</code>), 단발 <code>ais-cli</code>는 기록만 남기고 끝난다. 남은 기록은 다음에 도는 앱이나 MCP 서버가 이어받는다.</li>
 </ul>
 <h3 id="명령을-새로-넣는-길"><a class="anchor" href="#명령을-새로-넣는-길" aria-label="이 절의 링크">#</a>명령을 새로 넣는 길</h3>
 <ol>
-<li><code>src/aisurada/cmd/</code>에 실행기를 만든다. 쓰기 공통 부품은 <code>write/</code>에 있다.</li>
-<li><code>CommandRegistry</code>의 <code>COMMAND_NAMES</code>(도구 표면도 있으면 <code>TOOL_NAMES</code>), 쓰기면 <code>WRITE_COMMANDS</code>, 그리고 <code>USAGE_LINES</code>에 이름과 사용법을 넣는다.</li>
-<li>시험을 <code>test/aisurada/</code>에 두고 <code>test.sh</code>에 한 줄 넣는다(§8).</li>
+<li><code>engine-rs/crates/ais-core/src/commands/</code>에 실행기를 만든다. 쓰기 공통 부품은 <code>write/</code>에 있다.</li>
+<li><code>engine.rs</code>의 명령 이름 표(쓰기면 <code>WRITE_COMMANDS</code>)에 넣는다.</li>
+<li><code>engine-rs/crates/ais-cli/src/registry.rs</code>(명령 이름 목록, 도구 표면이 있으면 <code>CLI_TOOL_NAMES</code>와 사용법 줄)와 <code>spec_table.rs</code>(인자 명세)에 넣는다. 빠뜨리면 <code>ais-cli</code>가 「알 수 없는 이름」으로 거절한다.</li>
+<li>시험을 <code>engine-rs/crates/ais-core/tests/</code>나 <code>crates/ais-cli/tests/</code>에 두고 <code>bash test.sh</code>로 돌려 본다(§8).</li>
 <li>설명서 장이 있으면 그 장의 바이트 예시와 맞는지 대조하고, 받아들임 묶음에 케이스를 더할 수 있으면 더한다(§8).</li>
 </ol>
 <h3 id="mcp-서버-ais-cli-mcp"><a class="anchor" href="#mcp-서버-ais-cli-mcp" aria-label="이 절의 링크">#</a>MCP 서버 (<code>ais-cli mcp</code>)</h3>
-<p>Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다. 표준 입출력으로 한 줄에 JSON-RPC 메시지 하나씩 주고받고(<code>initialize</code>, <code>ping</code>, <code>tools/list</code>, <code>tools/call</code>), 입력이 닫히면 끝난다. 프로토콜은 <code>src/aisurada/cli/McpServer.java</code>, 도구 정의는 <code>McpTools.java</code>에 있다. 이것은 설명서 밖의 확장이다. 외부 설명서에는 MCP가 없고, 예전 Node MCP 서버는 C119에서 지웠다.</p>
-<p>연결하는 법, 도구 28개의 인자, 안전장치, 응답과 오류 예시는 <a href="mcp-guide.md"><code>mcp-guide.md</code></a>에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.</p>
+<p>Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다. 표준 입출력으로 한 줄에 JSON-RPC 메시지 하나씩 주고받고(<code>initialize</code>, <code>ping</code>, <code>tools/list</code>, <code>tools/call</code>), 입력이 닫히면 끝난다. 프로토콜은 <code>engine-rs/crates/ais-cli/src/mcp.rs</code>, 도구 정의는 <code>mcp_tools.rs</code>에 있다. 이것은 설명서 밖의 확장이다. 외부 설명서에는 MCP가 없고, 예전 Node MCP 서버는 C119에서 지웠다.</p>
+<p>연결하는 법, 도구의 인자, 안전장치, 응답과 오류 예시는 <a href="mcp-guide.md"><code>mcp-guide.md</code></a>에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.</p>
 <ul>
-<li><strong>도구.</strong> 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 <code>--write</code>를 주면 37개를 내놓는다. <code>purge_doc</code>(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 <code>CommandRegistry.WRITE_COMMANDS</code>에서 나오므로 두 곳이 어긋나지 않는다.</li>
-<li><strong>호출 길.</strong> 도구 호출은 단발 <code>ais-cli</code>와 같은 길(<code>runEnginePipeline</code>: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 <code>System.exit</code>을 부르는데, <code>AisCliMain</code>의 종료 호출은 모두 <code>exit()</code> 하나를 거친다. mcp 모드에서만 <code>exit()</code>이 프로세스를 끝내는 대신 <code>CliExit</code>을 던지고, 그 호출만 <code>isError</code>로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.</li>
-<li><strong>vault.</strong> 도구를 부를 때마다 정한다. <code>AISURADA_VAULT</code>가 있으면 그것, 없으면 앱이 지금 연 vault(아래 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.</li>
-<li><strong>스키마를 고칠 때.</strong> <code>McpTools</code>의 입력 스키마 키는 <code>ArgsParser</code>가 받는 키와 같아야 한다. <code>McpServerTest</code>가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 38개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 <code>McpTools</code>도 고친다. 안 고치면 이 시험이 선다.</li>
-<li><strong>Claude에 연결.</strong> <code>ais-cli claude-mcp status|add [--write]|remove|config</code>(<code>ClaudeMcpCommand</code>)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 <code>codex-mcp</code>, <code>gemini-mcp</code>(<code>AgentMcpCommand</code>)가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다(<code>McpRegistration</code>). CLI마다 <code>--</code> 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 java 경로 뒤) 인자 모양은 <code>AgentMcpCommandTest</code>가 가짜 CLI로 못 박고, 진짜 CLI로는 임시 HOME에서 확인했다. Claude의 설정 파일을 직접 고치지 않고 <code>claude mcp add-json --scope user</code>만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. <code>config</code>는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 <code>mcpServers</code> 조각만 출력한다. 설정 화면의 「Claude 연결」(<code>src/plugs/claude/connect.tsx</code>)은 <code>sidecar_call</code>로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(<code>plugs/empty/connect.tsx</code>). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.</li>
+<li><strong>도구.</strong> 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 <code>--write</code>를 주면 37개를 내놓는다(둘 다 <code>tools/list</code>로 직접 세어 확인했다). <code>purge_doc</code>(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 <code>mcp_tools.rs</code>의 <code>write</code> 깃발에 있다.</li>
+<li><strong>호출 길.</strong> 도구 호출은 단발 <code>ais-cli</code>와 같은 길(<code>ais_cli::run</code>)을 프로세스 하나에서 되풀이한다. 명령줄 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다. 도구를 부를 때마다 자동 커밋을 지켜본다(<code>watch</code>). 유휴 타이머가 MCP 서버 안에서 돌기 때문이다.</li>
+<li><strong>vault.</strong> 도구를 부를 때마다 정한다. <code>AISURADA_VAULT</code>가 있으면 그것, 없으면 앱이 지금 연 vault(위 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.</li>
+<li><strong>스키마를 고칠 때.</strong> <code>mcp_tools.rs</code>의 입력 스키마 키는 명령줄 인자 명세(<code>spec_table.rs</code>)가 받는 키와 같아야 한다. 도구의 인자를 바꾸면 두 표와 <code>mcp_compat</code>의 기대를 함께 맞춘다.</li>
+<li><strong>Claude에 연결.</strong> <code>ais-cli claude-mcp status|add [--write]|remove|config</code>(<code>register.rs</code>)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 <code>codex-mcp</code>, <code>gemini-mcp</code>가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다. CLI마다 <code>--</code> 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 실행 파일 경로 뒤) 인자 모양은 <code>crates/ais-cli/tests/register.rs</code>가 가짜 CLI로 못 박는다. Claude의 설정 파일을 직접 고치지 않고 <code>claude mcp add-json --scope user</code>만 부른다. 등록하는 실행 파일은 이 명령을 돌린 <code>ais-cli</code>라서, 앱에서 부르면 앱에 든 것이 등록된다. <code>config</code>는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 <code>mcpServers</code> 조각만 출력한다. 설정 화면의 「Claude 연결」(<code>src/plugs/claude/connect.tsx</code>)은 <code>sidecar_call</code>로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(<code>plugs/empty/connect.tsx</code>). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다. 이미 등록된 서버가 옛 Java jar를 가리키면 <code>doctor</code>가 낡았다고 알리고 <code>doctor --fix</code>가 같은 모드로 다시 등록한다.</li>
 </ul>
-<p>시험은 <code>bash test.sh</code>에 들어 있다. <code>McpServerTest</code>는 스키마 대조, 노출 규칙, 가짜 호출기로 프로토콜, 진짜 엔진과 진짜 <code>mcp</code> 프로세스의 왕복(읽기·쓰기·낡은 <code>f1</code> 거절·휴지통·영구 삭제 거절·vault 없는 환경에서도 서버가 사는지)을 잰다. <code>ClaudeMcpCommandTest</code>는 등록 상태를 파일에 두는 가짜 <code>claude</code>로 <code>status</code>·<code>add</code>·<code>remove</code>·<code>config</code>를 잰다.</p>
-<h2 id="6-ais-cli와-launchd-건드리기-전에"><a class="anchor" href="#6-ais-cli와-launchd-건드리기-전에" aria-label="이 절의 링크">#</a>6. <code>ais-cli</code>와 launchd — 건드리기 전에</h2>
-<p><code>ais-cli</code>는 떠 있는 엔진이 없으면 <strong><code>~/Library/LaunchAgents/co.kcd.aisurada.sidecar.&lt;키&gt;.plist</code>를 쓰고 <code>launchctl</code>을 부른다.</strong> 엔진이 동시 상한(3개)을 넘으면 가장 오래 조용한 엔진을 내리고, 하루 한 번 24시간 넘게 조용한 엔진도 내린다. 이 저장소의 시험은 모두 임시 HOME과 가짜 <code>launchctl</code>로 돌아서 진짜 launchd는 쓴 적이 없다.</p>
-<p>안전하게 돌리는 법:</p>
-<ul>
-<li>엔진을 먼저 직접 띄운다(<code>AISURADA_SIDECAR_SOCKET</code>을 짧은 경로로 주고 <code>serve</code>). 그러면 <code>ais-cli</code>가 launchd를 부르지 않고 그 소켓에 붙는다.</li>
-<li><code>java -Duser.home=&lt;격리 HOME&gt;</code>으로 띄운다. 안 그러면 4부 명령이 진짜 <code>~/.claude/projects</code>를 읽는다. (<code>$HOME</code> 환경 변수는 JVM의 <code>user.home</code>을 바꾸지 못한다.)</li>
-<li>이미 있는 등록을 덮어쓰고 싶지 않으면 <code>AISURADA_SIDECAR_KEEP_REGISTRATION=1</code>을 준다. 엔진이 없을 때 plist가 있고 그 jar가 남아 있으면 plist를 다시 쓰지 않고 그대로 띄운다. 개발 실행과 빌드 폴더 번들은 호스트가 알아서 켠다(§7).</li>
-<li><code>ais-cli doctor</code>로 키, 레이블, 소켓, plist를 진단한다. 등록한 엔진을 지우려면 <code>launchctl bootout gui/$(id -u)/&lt;레이블&gt;</code> 뒤에 그 plist를 지운다.</li>
-</ul>
+<p>시험은 <code>bash test.sh</code>에 들어 있다. <code>crates/ais-cli/tests/mcp_stdio.rs</code>는 진짜 <code>mcp</code> 프로세스와 표준 입출력으로 왕복하고, <code>tests/register.rs</code>는 가짜 에이전트 CLI로 <code>status</code>·<code>add</code>·<code>remove</code>·<code>config</code>를 잰다. 기준 Java MCP 서버와의 대화 맞대기는 <code>mcp_compat</code>(§4)다.</p>
+<h2 id="6-옛-사이드카와-launchd-건드리기-전에"><a class="anchor" href="#6-옛-사이드카와-launchd-건드리기-전에" aria-label="이 절의 링크">#</a>6. 옛 사이드카와 launchd — 건드리기 전에</h2>
+<p>Rust <code>ais-cli</code>는 launchd를 쓰지 않는다. 다만 Java 시절에 이 기기에서 <code>ais-cli</code>나 앱을 쓴 적이 있으면 vault마다 launchd에 올라간 옛 사이드카(레이블 <code>co.kcd.aisurada.sidecar.&lt;키&gt;</code>, <code>~/Library/LaunchAgents/…plist</code>)가 남아 있을 수 있다. 낡은 JVM이 계속 떠 있고 옛 엔진이 vault를 고칠 수 있으므로 걷어 낸다. 정식 앱은 새 판을 처음 열 때 한 번 하고(§4 「앱의 호출 길」), 손으로는 이렇게 한다.</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>dist/ais-cli doctor            # 어느 vault를 쓰는지, vault의 git 상태, 이 실행 파일, 에이전트에 등록된 MCP 서버, 옛 사이드카 흔적
+dist/ais-cli sweep --dry-run   # 걷어 낼 것만 보여 준다
+dist/ais-cli sweep             # 옛 사이드카를 내리고 plist, 상태 파일, 깔아 둔 jar, 로그를 지운다
+dist/ais-cli doctor --fix      # 낡은(Java jar를 가리키는) MCP 등록을 같은 모드로 다시 등록한다</code></pre></div>
+<p><code>sweep</code>은 레이블이 <code>co.kcd.aisurada.sidecar.</code>로 시작하는 항목만 내린다. vault, 잠금 파일, 다른 프로그램의 launchd 항목은 건드리지 않는다. 시험(<code>crates/ais-cli/tests/old_sidecar.rs</code>)은 임시 HOME과 가짜 <code>launchctl</code>(<code>AISURADA_LAUNCHCTL_CMD</code>)로만 돌아서 진짜 launchd는 쓴 적이 없다. 진짜 기기에서 <code>sweep</code>을 돌려 본 확인은 사용자의 손 확인(이슈 #54, #61)에 남아 있다.</p>
 <p>앱을 격리해서 띄우는 전체 순서는 <a href="beta-hand-check.md"><code>beta-hand-check.md</code></a>의 §1에 있다.</p>
 <h2 id="7-네이티브-호스트와-화면"><a class="anchor" href="#7-네이티브-호스트와-화면" aria-label="이 절의 링크">#</a>7. 네이티브 호스트와 화면</h2>
 <h3 id="개발-실행"><a class="anchor" href="#개발-실행" aria-label="이 절의 링크">#</a>개발 실행</h3>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>bash build.sh                       # 번들이 jar를 자원으로 싣는다
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo build -p ais-cli)   # 개발용 번들의 bin/ais-cli 스크립트가 찾는 실행 파일
 cd native-host
 pnpm install --frozen-lockfile      # postinstall이 @claude-plug 꾸러미를 꽂는다
 pnpm tauri dev                      # 실제 앱까지 (포트 1420, 충돌하면 실패)
 pnpm dev                            # Vite 서버만
 pnpm preview                        # 호스트 없이 번들 CSP로 화면만 본다</code></pre></div>
 <p><code>pnpm tauri dev</code>는 README에 적힌 대로 쓰는 길이고 이 문서를 쓰면서 새로 돌려 보지는 않았다. 개발 서버에 페이지가 붙어 있으면 <code>curl -X POST localhost:1420/__deeplink --data-raw &#39;aisurada://doc/&lt;id&gt;&#39;</code>로 열린 main 창을 이동할 수 있다(개발 판 전용, 번들에서는 빠진다).</p>
-<p><strong>개발 실행은 엔진 jar를 자동으로 넘기지 않는다.</strong> 번들 판은 자원 폴더의 <code>ais-sidecar.jar</code>를 <code>ais-cli</code>에 넘기지만, <code>tauri dev</code>와 <code>target/…/bundle</code> 아래 번들은 낡은 사본을 쓰지 않으려고 넘기지 않는다(<code>sidecar.rs</code>의 <code>execute</code>). 대신 jar를 직접 지정하지 않은 개발 실행과 빌드 폴더 번들은 <code>AISURADA_SIDECAR_KEEP_REGISTRATION=1</code>을 <code>ais-cli</code>에 넘긴다(호스트 <code>execute</code>, 앱 스크립트 <code>ais-cli</code>). 엔진이 없을 때 이 스위치가 켜져 있고 <code>~/Library/LaunchAgents/…plist</code>가 이미 있으며 그 plist의 jar도 남아 있으면, <code>ais-cli</code>는 plist를 다시 쓰지 않고 있는 등록 그대로 엔진을 띄운다(<code>PlistGenerator.keepsExistingRegistration</code>). 그래서 빌드 폴더의 앱을 진짜 vault로 띄워도 정식 앱이 해 둔 엔진 등록이 설치본 jar로 바뀌지 않는다. 이런 앱은 이미 등록된 엔진을 쓰므로 그 엔진이 앱보다 낡았으면 화면이 「모르는 명령이다」를 띄울 수 있다(§12). 등록이 아예 없으면(처음 쓰는 HOME 등) 예전처럼 설치본 jar로 등록하고, 설치본도 없으면 <code>AIS-400 AISURADA_SIDECAR_JAR 가 없고 …</code>로 선다. 이 규칙은 <code>PlistGeneratorTest</code>(스위치 판정), <code>sidecar.rs</code>의 <code>sidecar_export_obeys_dev_build_bundle_and_explicit_override</code>, <code>ais-cli-script.test.mjs</code>가 잰다. 진짜 launchd와 앱 창에서는 확인하지 못했다. 앱으로 워크스페이스를 만들거나 열어 보려면 앱을 띄우는 터미널에서 먼저 이렇게 한다.</p>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>unset AISURADA_VAULT AISURADA_SIDECAR_SOCKET              # §3 예시의 값이 남아 있으면 지운다
-export AISURADA_SIDECAR_JAR=&quot;$PWD/dist/ais-sidecar.jar&quot;   # 반드시 절대 경로다(plist에 그대로 실린다)</code></pre></div>
-<p>대신 한 번 <code>java -jar dist/ais-cli.jar install --cli dist/ais-cli.jar --sidecar dist/ais-sidecar.jar</code>로 <code>~/Library/Application Support/aisurada/bin/</code>에 깔아도 된다. 깐 사본은 빌드할 때마다 다시 깔아야 한다.</p>
-<p><strong>이 길은 진짜 launchd를 쓴다.</strong> vault마다 <code>~/Library/LaunchAgents/co.kcd.aisurada.sidecar.&lt;키&gt;.plist</code>가 생기고 <code>launchctl</code>에 올라간다. 이 저장소의 시험은 모두 가짜 <code>launchctl</code>이라 이 길을 자동으로 잰 적이 없다. 끝나면 <code>java -jar dist/ais-cli.jar doctor</code>로 레이블과 plist를 보고, <code>launchctl bootout gui/$(id -u)/&lt;레이블&gt;</code> 뒤에 그 plist를 지운다. launchd를 건드리지 않고 앱을 보려면 <a href="beta-hand-check.md"><code>beta-hand-check.md</code></a>의 격리 실행법을 쓴다. 이때는 엔진 하나가 vault 하나만 맡으므로 그 vault만 열 수 있다.</p>
+<p>앱은 엔진을 프로세스 안에서 직접 부르므로 엔진을 따로 띄우거나 등록할 것이 없다. 에이전트에 MCP 서버로 등록할 <code>ais-cli</code> 실행 파일은 환경 변수 <code>AISURADA_CLI_BIN</code>, 앱 번들의 <code>bin/ais-cli</code>, 저장소의 빌드 폴더(<code>engine-rs/target/{release,debug}/ais-cli</code>) 순으로 찾는다(<code>sidecar.rs</code>의 <code>cli_exe</code>). <strong>개발 실행과 <code>target/…/bundle</code> 아래 번들은 기기 전체에 영향을 주는 첫 실행 이주(옛 사이드카 정리, MCP 재등록)를 하지 않는다</strong>(<code>sidecar.rs</code>의 <code>under_build_tree</code>). 그래서 빌드 폴더의 앱을 진짜 vault로 띄워도 정식 앱이 해 둔 등록은 바뀌지 않는다. 그래도 앱은 진짜 HOME의 vault를 열 수 있으니 격리해서 띄우려면 <a href="beta-hand-check.md"><code>beta-hand-check.md</code></a>의 격리 실행법을 쓴다.</p>
 <h3 id="번들-만들기"><a class="anchor" href="#번들-만들기" aria-label="이 절의 링크">#</a>번들 만들기</h3>
 <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>cd native-host
-pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle/macos/aisurada.app</code></pre></div>
-<p><code>--debug</code>를 빼면 최적화 빌드다. <code>beforeBuildCommand</code>가 화면과 <code>build.sh</code>를 새로 돌려서 <code>dist/</code>를 지웠다 다시 만든다. <strong>설치나 launchd 등록은 하지 않는다.</strong> 단 번들은 <code>.md</code>/<code>.markdown</code>의 기본 편집기로 등록되므로(<code>fileAssociations</code>) <code>open 문서.md</code>가 이 앱을 진짜 HOME으로 띄운다.</p>
+pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle/macos/aisurada.app
+pnpm release:build                       # 정식 번들(릴리스 설정). 아래 「앱에 든 ais-cli」</code></pre></div>
+<p><code>--debug</code>를 빼면 최적화 빌드다. <code>beforeBuildCommand</code>는 화면만 새로 짓는다(<code>pnpm build</code>). Rust <code>ais-cli</code>는 개발용 번들에 지어 넣지 않는다(아래). <strong>설치나 launchd 등록은 하지 않는다.</strong> 단 번들은 <code>.md</code>/<code>.markdown</code>의 기본 편집기로 등록되므로(<code>fileAssociations</code>) <code>open 문서.md</code>가 이 앱을 진짜 HOME으로 띄운다.</p>
 <h3 id="앱에-든-ais-cli"><a class="anchor" href="#앱에-든-ais-cli" aria-label="이 절의 링크">#</a>앱에 든 <code>ais-cli</code></h3>
-<p><code>native-host/src-tauri/resources/ais-cli</code>(셸 스크립트)가 번들의 <code>Contents/Resources/bin/ais-cli</code>로 들어간다(<code>tauri.conf.json</code>의 <code>resources</code>).</p>
+<p>번들의 <code>Contents/Resources/bin/ais-cli</code>는 두 가지다.</p>
 <ul>
-<li>같은 앱의 Java(<code>Resources/runtime/bin/java</code>)로 같은 앱의 <code>ais-cli.jar</code>를 돈다. 번들 Java는 릴리스 설정(<code>tauri.release.conf.json</code>)으로 지은 번들에만 있고, 없으면 PATH의 <code>java</code>를 쓴다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다. 엔진 jar는 <code>AISURADA_SIDECAR_JAR</code>로 앱의 <code>ais-sidecar.jar</code>를 넘긴다. 단 <code>target/…/bundle</code> 아래의 개발용 빌드는 낡은 사본을 쓰지 않으려고 넘기지 않고, 대신 이미 있는 엔진 등록을 덮어쓰지 않게 <code>AISURADA_SIDECAR_KEEP_REGISTRATION=1</code>을 켠다(호스트 <code>sidecar.rs</code>의 규칙과 같다. 사용자가 jar를 정해 두었으면 그 jar를 따르고 스위치는 켜지 않는다).</li>
-<li><strong>셸 내장 기능만 쓴다.</strong> Finder나 launchd가 띄운 환경은 PATH가 비어 있다. 실제 번들 검증에서 <code>dirname</code> 때문에 서던 것을 고쳤다. 외부 명령은 절대 경로로 부르는 <code>readlink</code> 하나뿐이다.</li>
-<li>호스트는 앱이 뜰 때 이 폴더를 <code>ask.rs</code>의 <code>set_tools_dir</code>로 알려 두고, <code>claude -p</code>를 띄울 때 PATH 맨 앞에 얹는다. 그래서 앱 안에서 묻는 Claude는 사용자가 래퍼를 만들거나 Java를 깔지 않아도 <code>ais-cli</code>를 부를 수 있다. 앱 안 터미널(<code>pty_start_session</code>)의 PATH는 바꾸지 않았다. 사용자의 로그인 셸 환경을 따른다.</li>
-<li>터미널에서 쓰려면 연동 가이드 2단계의 링크 한 줄이면 된다. 예전 가이드로 만든 <code>~/.local/bin/ais-cli</code>(시스템 <code>java</code>)가 있어도 앱이 띄우는 Claude에게는 번들 것이 먼저 잡힌다.</li>
-<li>시험은 스크립트 <code>test:cli-script</code>(가짜 앱 폴더에서 진짜 셸 스크립트를 돌린다. PATH가 비었을 때, 링크로 불렀을 때, 개발용 빌드일 때 포함), PATH 얹기 <code>ask.rs</code>의 <code>bundled_tools_dir_comes_first_only_when_it_exists</code>, 실제 번들 <code>scripts/verify-release.mjs</code>(PATH 없이 스크립트로 노트를 읽고, MCP 등록 명령이 번들 Java를 가리키는지)다.</li>
-<li><strong>못 한 것.</strong> Java가 없는 Mac에서는 돌려 보지 않았다. 이 기계에는 JDK가 있다. 스크립트가 번들 Java를 절대 경로로 고르는 것(<code>sh -x</code>)과 PATH를 비운 채 도는 것까지만 확인했다.</li>
+<li><strong>개발용 번들</strong>(<code>target/…/bundle</code>): <code>native-host/src-tauri/resources/ais-cli</code>(셸 스크립트)가 들어간다(<code>tauri.conf.json</code>의 <code>resources</code>). 저장소의 빌드 폴더(<code>engine-rs/target/{release,debug}/ais-cli</code>)나 <code>AISURADA_CLI_BIN</code>으로 넘겨 주고, 없으면 종료 코드 127로 선다. PATH가 비어 있어도(Finder나 launchd가 띄운 환경) 돌아야 하므로 셸 내장 기능만 쓰고, 외부 명령은 절대 경로로 부르는 <code>readlink</code> 하나뿐이다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다.</li>
+<li><strong>정식 번들</strong>(<code>pnpm release:build</code>, 릴리스 설정 <code>tauri.release.conf.json</code>): <code>scripts/prepare-cli.mjs</code>가 <code>cargo build --release --locked -p ais-cli</code>로 지은 Rust 실행 파일을 <code>.release/bin/ais-cli</code>에 두고, 이것이 <code>bin/ais-cli</code>로 들어간다. 실행 파일 하나(약 4.5 MB)뿐이고 Java 실행 환경이나 jar는 싣지 않는다. 정식 번들은 Apple Silicon macOS에서만 짓는다.</li>
 </ul>
-<h3 id="4부-스위치-3개"><a class="anchor" href="#4부-스위치-3개" aria-label="이 절의 링크">#</a>4부 스위치 3개</h3>
+<p>호스트는 앱이 뜰 때 이 폴더를 <code>ask.rs</code>의 <code>set_tools_dir</code>로 알려 두고, <code>claude -p</code>를 띄울 때 PATH 맨 앞에 얹는다. 그래서 앱 안에서 묻는 Claude는 사용자가 래퍼를 만들지 않아도 <code>ais-cli</code>를 부를 수 있다. 앱 안 터미널(<code>pty_start_session</code>)의 PATH는 바꾸지 않았다. 사용자의 로그인 셸 환경을 따른다. 터미널에서 쓰려면 연동 가이드 2단계의 링크 한 줄이면 된다. 예전 가이드로 만든 <code>~/.local/bin/ais-cli</code>(Java <code>ais-cli.jar</code>를 돌리는 래퍼)가 있어도 앱이 띄우는 Claude에게는 번들 것이 먼저 잡힌다.</p>
+<p>시험은 스크립트 <code>test:cli-script</code>(가짜 앱 폴더에서 진짜 셸 스크립트를 돌린다. PATH가 비었을 때, 링크로 불렀을 때, 개발용 빌드일 때, 실행 파일을 못 찾을 때 포함), PATH 얹기 <code>ask.rs</code>의 <code>bundled_tools_dir_comes_first_only_when_it_exists</code>, 실제 번들 <code>scripts/verify-release.mjs</code>(번들의 Rust <code>ais-cli</code>로 노트를 만들고 읽는지, 표준 입출력 MCP가 도는지, Java가 안 들었는지)다. 번들을 검증하는 데 쓴 임시 HOME과 vault는 만든 쪽이 지운다.</p>
+<h3 id="4부-스위치-2개"><a class="anchor" href="#4부-스위치-2개" aria-label="이 절의 링크">#</a>4부 스위치 2개</h3>
 <div class="table-wrap"><table><thead><tr><th>층</th><th>켠 판(기본)</th><th>끈 판</th></tr></thead><tbody>
-<tr><td>엔진</td><td><code>ais-sidecar.jar</code> (<code>engine-build.properties</code>의 <code>part4=true</code>)</td><td><code>ais-sidecar-noclaude.jar</code> (<code>part4=false</code>, 4부 클래스를 안 실음)</td></tr>
+<tr><td>엔진</td><td>항상 켜짐. 4부 명령 7개도 <code>ais-cli</code>에 있다</td><td>없음. 옛 <code>ais-sidecar-noclaude.jar</code>는 Java와 함께 지웠다</td></tr>
 <tr><td>호스트</td><td>cargo 기능 <code>claude</code> (기본)</td><td><code>--no-default-features</code> (4부 커맨드 9개가 빠짐)</td></tr>
 <tr><td>화면</td><td><code>pnpm build</code>, <code>pnpm dev</code></td><td><code>pnpm build:noclaude</code> (<code>vite build --mode noclaude</code>)</td></tr>
 </tbody></table></div>
@@ -743,33 +707,30 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 <h2 id="8-시험"><a class="anchor" href="#8-시험" aria-label="이 절의 링크">#</a>8. 시험</h2>
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
-<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>수 분</td><td>실제 임시 vault, 실제 serve와 <code>ais-cli</code> 왕복</td></tr>
-<tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>수 분</td><td>타입 검사, 화면 빌드 2종, Node 시험 450건, <code>cargo test</code> 102건(무시 1건)</td></tr>
-<tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체</td></tr>
-<tr><td>Rust 엔진 이전</td><td><code>(cd engine-rs &amp;&amp; cargo test -p ais-core)</code></td><td>수 초</td><td>머리 읽기·쓰기 단위 시험과 합성 vault 통합 시험. Java와 맞대는 법은 §4 「Rust 엔진 이전」</td></tr>
-<tr><td>실제 창 점검</td><td><code>pnpm test:*:acceptance</code></td><td>종류당 수 분</td><td>실제 WKWebView, 앱 안의 Rust 엔진(점검 하네스는 아직 쓰지 않는 격리 Java 엔진도 띄운다), 격리 HOME</td></tr>
+<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 14초(178건)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다</td></tr>
+<tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>캐시된 상태에서 Node 시험까지 약 30초</td><td>화면 빌드, Node 시험 641건, 호스트 <code>cargo test</code>(아래 「기존 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다</td></tr>
+<tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다</td></tr>
+<tr><td>기준 맞대기</td><td>§4 「기준과 맞대기」</td><td></td><td>기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다</td></tr>
+<tr><td>실제 창 점검</td><td><code>pnpm test:*:acceptance</code></td><td>종류당 수 분</td><td>실제 WKWebView, 앱 안의 Rust 엔진, 격리 HOME. 먼저 <code>(cd engine-rs &amp;&amp; cargo build -p ais-cli)</code>로 점검이 쓸 실행 파일을 지어 둔다</td></tr>
 </tbody></table></div>
-<p>두 전체 시험 모두 맨 앞에서 <code>build.sh</code>를 돌려 <code>build/</code>와 <code>dist/</code>를 <strong>지우고 다시 만든다.</strong></p>
+<p><code>test.sh</code>는 <code>dist/</code>를 건드리지 않는다. <code>build.sh</code>는 <code>dist/ais-cli</code>를 만들고, 실제 창 점검은 <code>dist/</code>가 아니라 <code>engine-rs/target/debug/ais-cli</code>(또는 <code>AISURADA_CLI_BIN</code>)를 쓴다.</p>
+<p><strong>기존 실패.</strong> 호스트 <code>cargo test</code>에서 <code>ask::tests</code> 4개(<code>test_gemini_missing_binary_message</code>, <code>test_gemini_success_with_fake_binary</code>, <code>test_resolve_claude_with_env_var</code>, <code>test_resolve_gemini_with_env_var</code>)는 Java를 지우기 전 <code>main</code>에서도 실패한다. 병렬로 돌리면 <code>runner::tests</code> 둘과 <code>terminal::</code> 셋이 더 실패하는 일이 있고, <code>-- --test-threads=1</code>로 돌리면 통과한다. 5d에서 직렬로 돌린 결과는 154건 통과, 4건 실패(위 <code>ask::tests</code>), 5건 무시다. 바꾼 쪽의 회귀와 구분하려면 변경 전 <code>main</code>과 같은 명령으로 비교한다.</p>
 <h3 id="엔진-시험-쓰기"><a class="anchor" href="#엔진-시험-쓰기" aria-label="이 절의 링크">#</a>엔진 시험 쓰기</h3>
-<p>외부 시험 프레임워크는 없다. 시험 클래스 하나가 <code>main</code>을 가지고 <code>check(...)</code>와 <code>eq(...)</code>로 센다. 장별 시험은 <code>test/aisurada/ChapterTestSupport.java</code>를 쓴다.</p>
-<div class="code"><div class="code-bar"><span class="code-lang">java</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>try (ChapterTestSupport t = new ChapterTestSupport(&quot;chapter99&quot;)) {
-    Path v = t.vault();                       // workspace.json과 아젠다가 있는 임시 vault
-    var r = ok(v, &quot;create-doc&quot;, &quot;agenda=demo&quot;, &quot;type=free&quot;, &quot;title=제목&quot;, &quot;body=본문&quot;);
-    eq(r.get(&quot;agenda&quot;), &quot;demo&quot;, &quot;아젠다가 그대로&quot;);
-    check(r.get(&quot;precondition&quot;).toString().startsWith(&quot;f1:&quot;), &quot;쓰기 전 토큰이 따라온다&quot;);
-}</code></pre></div>
+<p>외부 시험 프레임워크 없이 Rust 기본 시험 도구(<code>cargo test</code>)를 쓴다.</p>
 <ul>
-<li>시계와 id는 JVM 속성으로 고정한다: <code>aisurada.test.now</code>(시각, 도장과 평가 시각도 따름), <code>aisurada.test.random</code>(id의 무작위 조각). 속성을 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.</li>
-<li>새 시험 클래스는 <code>test.sh</code>에 <code>java -cp dist/ais-engine.jar:build/test-classes aisurada.&lt;클래스&gt;</code> 한 줄을 더한다. 더하지 않으면 안 돈다.</li>
-<li><code>test/aisurada/cli/</code>의 시험(<code>McpServerTest</code>, <code>ClaudeMcpCommandTest</code>)은 <code>aisurada.cli</code> 패키지에 있어서 <code>AisCliMain</code>의 패키지 비공개 부분(<code>CliExit</code>, <code>Call</code>)을 직접 본다. <code>ChapterTestSupport</code>는 쓰지 않고 자체 <code>check</code>/<code>eq</code>를 가진다. 클래스 이름은 <code>aisurada.cli.&lt;클래스&gt;</code>다.</li>
-<li>임시 HOME·vault·소켓만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.</li>
+<li><strong>단위 시험</strong>은 각 파일의 <code>#[cfg(test)]</code> 모듈에 둔다.</li>
+<li><strong>통합 시험</strong>은 <code>engine-rs/crates/ais-core/tests/fixture_vault.rs</code>(합성 vault를 <code>tools/compat/make-fixture.sh</code>로 만들어 읽기 명령의 핵심 동작을 확인), <code>engine-rs/crates/ais-cli/tests/</code>의 <code>mcp_stdio.rs</code>(진짜 <code>mcp</code> 프로세스), <code>register.rs</code>(가짜 에이전트 CLI로 등록), <code>old_sidecar.rs</code>(임시 HOME과 가짜 <code>launchctl</code>로 옛 사이드카 정리)에 둔다. <code>lock_interop.rs</code>는 기준 jar(<code>AISURADA_JAR</code>)가 있을 때만 돈다.</li>
+<li>시계와 id는 환경 변수로 고정한다: <code>AISURADA_TEST_NOW</code>(시각, 도장과 평가 시각도 따름), <code>AISURADA_TEST_RANDOM</code>(id의 무작위 조각). 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.</li>
+<li>임시 HOME·vault·잠금 폴더(<code>AISURADA_LOCK_DIR</code>)만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.</li>
+<li>동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 <code>docs/rust-engine-step*.md</code>의 해당 기록에 이유를 적는다.</li>
 </ul>
 <h3 id="받아들임-묶음-34장"><a class="anchor" href="#받아들임-묶음-34장" aria-label="이 절의 링크">#</a>받아들임 묶음 (34장)</h3>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>./build.sh
-AISX_IMPL_JAVA=&quot;$(command -v java)&quot; AISX_IMPL_JAR=&quot;$PWD/dist/ais-engine.jar&quot; \
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>ORACLE=&quot;$(bash engine-rs/tools/compat/build-oracle.sh)&quot;   # 기준 jar를 태그에서 지어 둔다(§4)
+AISX_IMPL_JAVA=&quot;$(command -v java)&quot; AISX_IMPL_JAR=&quot;$ORACLE/ais-engine.jar&quot; \
   node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out &lt;빈 폴더&gt;
 node fixtures/expect/run.mjs --self-check --mutants --out &lt;빈 폴더&gt;
 node fixtures/runner-test.mjs</code></pre></div>
+<p>이 묶음은 기준 Java 엔진을 부른다. Rust <code>ais-cli</code>는 JSON 키를 정렬해서 쓰므로 키 차례까지 글자로 견주는 이 묶음과는 기대값 27건 가운데 일부(5d에서 잰 값은 11건이 완전히 같고 16건이 키 차례만 다름)가 맞지 않는다. 그래서 묶음은 기준 jar로만 돌리고, Rust와의 견줌은 키 차례를 무시하는 맞대기(§4)가 맡는다.</p>
 <p><code>--out</code>은 결과를 쓸 폴더다(저는 매번 새 임시 폴더를 줬다). 케이스를 더하거나 <code>fixtures/expect/</code>의 파일을 고치면 <code>node fixtures/build-bundle.mjs</code>로 <code>bundle.json</code>의 sha256 목록을 다시 적는다. 진짜 묶음(읽기 레인 460건)은 이 저장소에 없다.</p>
 <h3 id="화면호스트-시험"><a class="anchor" href="#화면호스트-시험" aria-label="이 절의 링크">#</a>화면·호스트 시험</h3>
 <p><code>package.json</code>의 <code>test:*</code>가 종류별 진입점이다.</p>
@@ -782,7 +743,7 @@ node fixtures/runner-test.mjs</code></pre></div>
 <tr><td>실제 창</td><td><code>test:acceptance</code>, <code>test:workspace:acceptance</code>, <code>test:navigation:acceptance</code>, <code>test:interaction:acceptance</code>, <code>test:data:acceptance</code>, <code>test:editor:acceptance</code>, <code>test:autosave:acceptance</code>, <code>test:views:acceptance</code></td><td>종류별 한 번에 하나씩. 4부를 뺀 판을 잰다</td></tr>
 <tr><td>실제 창(4부)</td><td><code>test:part4:acceptance</code>(켠 판 9건), <code>test:ask-marks:acceptance</code>(끈 판 5건)</td><td><code>test-native.sh</code>에 들어 있지 않으니 따로 돌린다</td></tr>
 </tbody></table></div>
-<p>실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·소켓·빈 <code>ZDOTDIR</code>를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 <code>Diagnostics retained: &lt;경로&gt;</code>를 찍는다. <code>AISURADA_WORKSPACE_REPORT=&lt;절대 경로&gt;.json</code>이나 <code>AISURADA_CHECK_REPORT=&lt;절대 경로&gt;.json</code>으로 결과를 JSON으로 남길 수 있다. <code>--only=&lt;사례 id&gt;</code>로 일부만 돌릴 수 있다(편집기 왕복).</p>
+<p>실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·잠금 폴더·빈 <code>ZDOTDIR</code>를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 <code>Diagnostics retained: &lt;경로&gt;</code>를 찍는다. <code>AISURADA_WORKSPACE_REPORT=&lt;절대 경로&gt;.json</code>이나 <code>AISURADA_CHECK_REPORT=&lt;절대 경로&gt;.json</code>으로 결과를 JSON으로 남길 수 있다. <code>--only=&lt;사례 id&gt;</code>로 일부만 돌릴 수 있다(편집기 왕복).</p>
 <p><strong>호출 기록(<code>AISURADA_CALL_LOG</code>).</strong> 점검은 앱이 엔진을 부른 호출을 세어 확인하는데(첫 새로고침 묶음, 본문 쓰기 횟수 따위), 호출 길이 둘(<code>sidecar_call</code> 문자열 목록, <code>engine_call</code> 호출 객체)이라 어느 길로 갔든 같은 문자열 목록(<code>toArgv</code>)으로 세야 한다. 호스트가 환경변수 <code>AISURADA_CALL_LOG</code>에 준 파일에 호출을 한 줄씩 JSON으로 적고(<code>call_log.rs</code>, 변수가 없으면 아무것도 안 한다), <code>workspace-acceptance.mjs</code>가 이것을 읽어 <code>/calls</code>로 내준다. 호출 객체의 인자는 이름 차례로 정렬돼 적히므로 점검은 인자 칸의 차례를 따지지 않는다. <code>data-checks.ts</code>와 <code>autosave-checks.ts</code>는 화면 안에서 두 길을 직접 감싸 센다.</p>
 <p><strong>4부 점검.</strong> 위 8종은 4부를 뺀 판(<code>build:noclaude</code>, <code>--no-default-features</code>)을 잰다. 4부를 켠 판은 <code>pnpm test:part4:acceptance</code>가 잰다(<code>pnpm build</code>로 4부 화면을 짓고 호스트를 기본 기능으로 띄운다). 가짜 <code>claude</code>(<code>AISURADA_CLAUDE_BIN</code>)와 격리 HOME의 가짜 전사(<code>~/.claude/projects/…/&lt;세션 id&gt;.jsonl</code>)를 쓰므로 토큰을 쓰지 않는다. 점검 코드는 <code>native-host/scripts/part4-checks.js</code>다.</p>
 <div class="table-wrap"><table><thead><tr><th>재는 것</th><th>안 재는 것</th></tr></thead><tbody>
@@ -792,7 +753,7 @@ node fixtures/runner-test.mjs</code></pre></div>
 </tbody></table></div>
 <p><code>test:ask-marks:acceptance</code>는 4부를 끈 판에서 호스트에 <code>ask_runtime</code>이 없고 노트의 문답 표식이 그대로 남는지 잰다.</p>
 <h3 id="동시에-돌리면-안-되는-것"><a class="anchor" href="#동시에-돌리면-안-되는-것" aria-label="이 절의 링크">#</a>동시에 돌리면 안 되는 것</h3>
-<p><code>build.sh</code>, <code>test.sh</code>, <code>test-native.sh</code>, <code>tauri build</code>(내부에서 <code>build.sh</code>)는 <code>build/</code>와 <code>dist/</code>를 지운다. 이 중 둘을 동시에 돌리거나, 점검이 도는 동안 다른 터미널·세션에서 하나라도 돌리면 acceptance가 <code>ais-cli.jar를 못 찾았어요</code>로 깨진다. 실제로 겪었다. 병렬로 확인할 일이 있으면 <code>git worktree add --detach &lt;경로&gt; &lt;커밋&gt;</code>으로 커밋만 떼어 놓고 거기서 돌린다. <code>cp -cR native-host/src-tauri/target &lt;경로&gt;/native-host/src-tauri/target</code>으로 cargo 산출물(약 12GB)을 APFS 복제하면 빠르다.</p>
+<p><code>build.sh</code>는 <code>dist/</code>를 지우지 않지만 <code>dist/ais-cli</code>를 덮어쓴다. <code>cargo build</code>·<code>cargo test</code>가 같은 <code>engine-rs/target/</code>을 쓰므로 같은 폴더에서 둘 이상을 동시에 돌리면 잠금을 기다리거나, 점검이 쓰는 <code>engine-rs/target/debug/ais-cli</code>가 도중에 바뀐다. 실제 창 점검이 도는 동안 같은 폴더에서 다른 터미널·세션이 빌드하지 않는다. 병렬로 확인할 일이 있으면 <code>git worktree add --detach &lt;경로&gt; &lt;커밋&gt;</code>으로 커밋만 떼어 놓고 거기서 돌린다. <code>cp -cR native-host/src-tauri/target &lt;경로&gt;/native-host/src-tauri/target</code>으로 호스트의 cargo 산출물(약 12GB)을 APFS 복제하면 빠르다. 엔진의 <code>engine-rs/target/</code>은 워크트리마다 새로 지어도 호스트보다 훨씬 작다.</p>
 <h2 id="9-앱-손-확인"><a class="anchor" href="#9-앱-손-확인" aria-label="이 절의 링크">#</a>9. 앱 손 확인</h2>
 <p>자동 시험이 못 재는 것(메뉴 클릭, 모니터 조합, 스킴·파일 연결, 한글 조합, 4부 전체 흐름)은 <a href="beta-hand-check.md"><code>beta-hand-check.md</code></a>에 점검표와 격리 실행법이 있다.</p>
 <h2 id="10-docs-읽는-법"><a class="anchor" href="#10-docs-읽는-법" aria-label="이 절의 링크">#</a>10. <code>docs/</code> 읽는 법</h2>
@@ -814,10 +775,10 @@ node fixtures/runner-test.mjs</code></pre></div>
 <tr><td><code>WITHLOG_*</code>, <code>--withlog.*</code>, <code>withlog.*</code></td><td><code>AISURADA_*</code>, <code>--aisurada.*</code>, <code>aisurada.*</code></td><td>환경 변수, 설정 키, 시험 속성</td></tr>
 <tr><td><code>withlog://</code></td><td><code>aisurada://</code></td><td>딥링크 스킴</td></tr>
 <tr><td><code>co.kcd.withlog</code></td><td><code>co.kcd.aisurada</code></td><td>번들 id, LaunchAgent 레이블 접두</td></tr>
-<tr><td><code>wl-cli</code></td><td><code>ais-cli</code></td><td>클라이언트 jar와 명령</td></tr>
-<tr><td><code>wl-engine.jar</code>, <code>wl-sidecar.jar</code>, <code>wl-sidecar-noclaude.jar</code></td><td><code>ais-engine.jar</code>, <code>ais-sidecar.jar</code>, <code>ais-sidecar-noclaude.jar</code></td><td></td></tr>
+<tr><td><code>wl-cli</code></td><td><code>ais-cli</code></td><td>클라이언트 jar와 명령(지금은 실행 파일 이름)</td></tr>
+<tr><td><code>wl-engine.jar</code>, <code>wl-sidecar.jar</code>, <code>wl-sidecar-noclaude.jar</code></td><td><code>ais-engine.jar</code>, <code>ais-sidecar.jar</code>, <code>ais-sidecar-noclaude.jar</code></td><td>지금 <code>dist/</code>에 생기는 것은 <code>ais-cli</code> 하나다. jar는 기준 jar(<code>build-oracle.sh</code>)에만 있다</td></tr>
 <tr><td><code>WL-409</code>, <code>WL-412</code> …</td><td><code>AIS-409</code>, <code>AIS-412</code> …</td><td>오류 코드</td></tr>
-<tr><td><code>WlException</code>, <code>WlCliMain</code></td><td><code>AisException</code>, <code>AisCliMain</code></td><td>자바 클래스</td></tr>
+<tr><td><code>WlException</code>, <code>WlCliMain</code></td><td><code>AisException</code>, <code>AisCliMain</code></td><td>자바 클래스(지금은 태그 <code>java-engine-final</code>에만 있다)</td></tr>
 <tr><td><code>WLQ1</code>, <code>WLG1</code></td><td><code>AIQ1</code>, <code>AIG1</code></td><td>소켓 프레임 머리. 4바이트 폭을 지키려고 <code>AI</code>로 바꿨다</td></tr>
 <tr><td><code>wlframe://</code>, <code>x-wl-*</code>, <code>wl://menu</code> 따위</td><td><code>aisframe://</code>, <code>x-ais-*</code>, <code>ais://menu</code></td><td>호스트 프로토콜, 헤더, 이벤트</td></tr>
 <tr><td><code>wl_close_tab</code> 따위</td><td><code>ais_close_tab</code></td><td>메뉴 id</td></tr>
@@ -834,18 +795,15 @@ node fixtures/runner-test.mjs</code></pre></div>
 </ul>
 <h2 id="12-자주-막히는-곳"><a class="anchor" href="#12-자주-막히는-곳" aria-label="이 절의 링크">#</a>12. 자주 막히는 곳</h2>
 <div class="table-wrap"><table><thead><tr><th>증상</th><th>원인과 처방</th></tr></thead><tbody>
-<tr><td><code>소켓 경로가 102 바이트를 넘는다</code></td><td><code>AISURADA_SIDECAR_SOCKET</code>을 <code>$HOME</code> 바로 아래 같은 짧은 경로로 준다</td></tr>
-<tr><td>화면에 <code>모르는 명령이다: …</code>(예: <code>list-resources</code>)가 뜬다</td><td>뒤에서 도는 엔진이 앱보다 낡았다. <code>launchctl print gui/$(id -u)/co.kcd.aisurada.sidecar.&lt;키&gt;</code>로 엔진이 쓰는 jar(plist의 <code>-jar</code> 다음)를 보고, 낡았으면 새 앱의 <code>ais-cli.jar install --cli … --sidecar …</code>로 <code>~/Library/Application Support/aisurada/bin/</code>에 깐 뒤 <code>launchctl kickstart -k gui/$(id -u)/&lt;레이블&gt;</code>로 다시 띄운다. 정식 앱은 뜰 때 자기 jar로 등록을 맞추지만, 개발 실행과 빌드 폴더 번들은 있는 등록을 그대로 쓴다(§7)</td></tr>
-<tr><td>앱에서 <code>워크스페이스 생성 실패 … AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다</code></td><td>개발 실행의 앱이 엔진을 띄우려는데 등록도 없고 jar도 못 찾는다(§7). 앱을 띄우는 터미널에서 <code>AISURADA_SIDECAR_JAR</code>를 절대 경로로 주고, §3 예시의 <code>AISURADA_VAULT</code>와 <code>AISURADA_SIDECAR_SOCKET</code>은 <code>unset</code>한 뒤 앱을 다시 띄운다</td></tr>
-<tr><td><code>ais-cli.jar를 못 찾았어요 … 찾아본 자리: …/dist/ais-cli.jar</code></td><td><code>./build.sh</code>를 안 돌렸거나, 다른 곳에서 <code>build.sh</code>가 <code>dist/</code>를 지우는 중이다(§8)</td></tr>
-<tr><td>앱 안에서 묻는데 Claude가 <code>ais-cli</code>를 못 찾거나 <code>java</code>가 없다고 한다</td><td>개발 실행에는 번들 스크립트도 번들 Java도 없다. 릴리스 설정으로 지은 번들(<code>tauri.release.conf.json</code>)만 둘 다 싣는다. 개발 중에는 PATH에 <code>java</code>와 <code>ais-cli</code>가 있어야 한다(§7)</td></tr>
-<tr><td>MCP 클라이언트가 <code>aisurada</code> 서버에 못 붙거나 곧 끊는다</td><td>서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊는다. mcp 모드에서 엔진 길의 출력은 호출마다 모아서 돌려주게 되어 있다(§5). 새로 출력을 더하는 코드는 <code>System.err</code>로 쓴다. 직접 보려면 <code>AISURADA_VAULT</code>를 주고 <code>java -jar dist/ais-cli.jar mcp</code>를 띄운 뒤 표준 입력에 <code>initialize</code> 요청 한 줄을 넣어 본다</td></tr>
+<tr><td>화면에 <code>모르는 명령이다: …</code>(예: <code>list-resources</code>)가 뜬다</td><td>명령이 <code>engine-rs/crates/ais-cli/src/registry.rs</code>의 목록에 없거나(§5 「명령을 새로 넣는 길」), 터미널과 에이전트에 등록된 <code>ais-cli</code>가 앱보다 낡았다. <code>dist/ais-cli doctor</code>가 보여 주는 실행 파일 자리와 MCP 등록을 확인하고 낡았으면 <code>doctor --fix</code>로 다시 등록한다</td></tr>
+<tr><td><code>ais-cli 실행 파일을 못 찾았다 …</code>(종료 코드 127)</td><td>개발용 번들의 <code>bin/ais-cli</code> 스크립트가 빌드 폴더에서 실행 파일을 못 찾았다. <code>(cd engine-rs &amp;&amp; cargo build -p ais-cli)</code>로 짓거나 <code>AISURADA_CLI_BIN</code>에 자리를 준다. 실제 창 점검 중이면 같은 폴더에서 다른 빌드가 도는 중일 수도 있다(§8)</td></tr>
+<tr><td>앱 안에서 묻는데 Claude가 <code>ais-cli</code>를 못 찾는다</td><td>개발 실행에는 앱에 든 <code>bin/ais-cli</code>가 없거나 빌드 폴더의 실행 파일을 가리키는 스크립트다. PATH에 <code>ais-cli</code>가 있거나 <code>engine-rs/target/debug/ais-cli</code>를 지어 둔다. 정식 번들(<code>pnpm release:build</code>)에는 실행 파일이 든다(§7)</td></tr>
+<tr><td>MCP 클라이언트가 <code>aisurada</code> 서버에 못 붙거나 곧 끊는다</td><td>서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊는다. mcp 모드에서 엔진 길의 출력은 호출마다 모아서 돌려주게 되어 있다(§5). 새로 출력을 더하는 코드는 <code>eprintln!</code>(표준 오류)로 쓴다. 직접 보려면 <code>AISURADA_VAULT</code>를 주고 <code>dist/ais-cli mcp</code>를 띄운 뒤 표준 입력에 <code>initialize</code> 요청 한 줄을 넣어 본다</td></tr>
 <tr><td>문서를 <code>open</code>했더니 앱이 떴다</td><td>번들이 <code>.md</code> 기본 편집기로 등록돼 있다. 에디터나 브라우저로 연다</td></tr>
-<tr><td>앱을 켰더니 진짜 launchd에 plist가 생길 것 같다</td><td>§6처럼 엔진을 먼저 띄우고 격리 HOME으로 앱을 띄운다</td></tr>
-<tr><td>4부 명령이 <code>AIS-409</code>로 선다</td><td>4부를 뺀 jar(<code>ais-sidecar-noclaude.jar</code>)를 쓰고 있다</td></tr>
+<tr><td>앱을 켰더니 진짜 기기의 launchd나 에이전트 등록이 바뀔 것 같다</td><td>정식 앱은 첫 실행에 한 번 옛 사이드카를 내리고 낡은 MCP 등록을 다시 등록한다(§4 「앱의 호출 길」). 개발 실행과 빌드 폴더 번들은 하지 않는다. 격리 HOME으로 띄우면 진짜 기기의 것을 건드리지 않는다(<a href="beta-hand-check.md"><code>beta-hand-check.md</code></a>)</td></tr>
 <tr><td><code>cargo test --locked</code>가 락 파일 때문에 선다</td><td>패키지 이름이나 의존성을 바꿨다. 한 번 <code>cargo build</code>(락 없이)로 <code>Cargo.lock</code>을 갱신해 커밋한다</td></tr>
 <tr><td>acceptance 뒤 <code>$TMPDIR/ais-p3-*</code>가 쌓인다</td><td>실패한 점검의 진단 보존이다. 원인을 본 뒤 지운다</td></tr>
-<tr><td>이름이나 문구를 바꿨더니 HTML 노트를 못 읽는다</td><td>글자 수를 숫자로 박아 둔 코드다(예: 마커 <code>&lt;!--aisurada</code>의 길이). 숫자 대신 문자열의 <code>length()</code>를 쓴다</td></tr>
+<tr><td>이름이나 문구를 바꿨더니 HTML 노트를 못 읽는다</td><td>글자 수를 숫자로 박아 둔 코드다(예: 마커 <code>&lt;!--aisurada</code>의 길이). 숫자 대신 문자열의 <code>len()</code>(바이트)이나 글자 수를 세는 함수를 쓴다</td></tr>
 <tr><td>이 셸의 <code>rm</code>이 확인을 묻는다</td><td><code>rm</code>이 <code>-i</code> 별칭이다. <code>/bin/rm -rf</code>를 쓴다</td></tr>
 <tr><td>zsh에서 <code>echo ====</code>가 <code>not found</code></td><td><code>=</code>로 시작하는 낱말을 zsh가 명령으로 푼다. 따옴표로 감싼다</td></tr>
 <tr><td>HTML 첨부 상자 안에서 외부 스크립트나 지도 타일이 안 뜬다(Leaflet 지도가 「지도를 불러오지 못했습니다」로 나온다)</td><td>상자(<code>aisframe://</code>) 응답에 붙는 고정 CSP(<code>frame.rs</code>의 <code>CSP</code>)가 허용하지 않은 곳이다. 지도(Leaflet)용으로 <code>cdnjs.cloudflare.com</code>(스크립트·스타일·그림)과 타일 서버 <code>xdworld.vworld.kr</code>·<code>server.arcgisonline.com</code>(그림)만 열어 두었다. 다른 호스트가 필요하면 <code>CSP</code>에 더하고 다시 짓는다. 와일드카드, <code>https:</code> 같은 스킴만 쓴 출처, <code>connect-src</code>는 열지 않으며 <code>frame.rs</code>의 <code>csp_tests</code>가 이를 지킨다</td></tr>
@@ -853,13 +811,13 @@ node fixtures/runner-test.mjs</code></pre></div>
 </tbody></table></div>
 <h2 id="13-지금-상태와-한계"><a class="anchor" href="#13-지금-상태와-한계" aria-label="이 절의 링크">#</a>13. 지금 상태와 한계</h2>
 <ul>
-<li>엔진 시험, 화면·호스트 시험, 34장 받아들임, 4부를 뺀 실제 창 점검 8종은 통과한다. 수치는 <code>README.md</code>와 각 완료 기록에 있다.</li>
+<li>엔진 시험(<code>bash test.sh</code> 178건), 화면 Node 시험 641건, 기준 맞대기(어긋남 0), 34장 받아들임(기준 jar로 27건 모두 맞음), 실제 창 점검 10종 248건은 통과한다(2026-11-15, 5d). 호스트 <code>cargo test</code>는 기존 실패 4건(<code>ask::tests</code>)을 뺀 나머지가 직렬로 통과한다(§8). 수치와 근거는 <a href="rust-engine-step5d-java-removal.md">5d 기록</a>에 있다.</li>
 <li>사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.</li>
 <li>MCP 서버(<code>ais-cli mcp</code>)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(<code>✔ Connected</code>), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).</li>
 <li>설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).</li>
 <li>설정의 「글꼴과 크기」는 브라우저(개발 서버, 샘플 vault)에서 다섯 모양 모두 눈으로 보았다. 실제 WKWebView 점검(<code>test:views:acceptance</code> 28건, <code>test:navigation:acceptance</code> 13건, 둘 다 4부를 뺀 판)에서 웹뷰 확대가 되는 것(<code>innerWidth</code>가 배율만큼 변함), ⌘ 단축키, 앱 글꼴 적용·오류·기본값, 열려 있는 터미널의 글꼴 변경, 150% 확대 중 터미널 화면이 칸 안에 드는 것까지 확인했다. <strong>못 본 것:</strong> 터미널과 편집기가 확대된 채로 눈에 어떻게 보이는지(글자가 또렷한지, 편집기 팝오버 위치)는 화면을 직접 보지 못했다(점검은 DOM 값과 크기만 잰다). 노트 창(<code>note-*</code>)에서 같은 권한으로 확대되는지는 점검이 없고(권한 목록이 메인과 같다는 것만 계약 시험이 잰다), 4부를 켠 판은 안 돌렸다.</li>
-<li>앱에 든 Java로 도는 <code>ais-cli</code>는 릴리스 설정의 디버그 번들에서 실제로 확인했다(<code>verify-release.mjs</code> 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.</li>
-<li>4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, 굳히기는 안 잰다. 진짜 <code>launchctl</code>로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.</li>
+<li>앱에 든 Rust <code>ais-cli</code>는 릴리스 설정의 디버그 번들에서 <code>verify-release.mjs</code>로 확인했다(8건: 번들의 실행 파일이 노트를 만들고 읽는지, 표준 입출력 MCP가 도는지, Java가 안 들었는지). Java를 번들하지 않으므로 「Java가 없는 Mac」 확인은 필요 없어졌다. 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.</li>
+<li>4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, 굳히기는 안 잰다. 진짜 launchd에서 <code>ais-cli sweep</code>을 돌려 본 확인(이슈 #54, #61의 손 확인), 서명·공증·업데이트, 원본 아이콘은 없다.</li>
 <li>물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.</li>
 <li>외부 설명서와 달라진 곳: Codex·Gemini 세션을 노트에 적고 읽는 확장이 있다(§5 「세션 에이전트 확장」). <code>mins</code> 필드를 지웠다(위 「vault의 모양」). 데일리 리포트 명령(<code>list-reports</code>, <code>get-report</code>, <code>save-report</code>)도 엔진에서 뺐다. 이 저장소의 받아들임 묶음은 <code>mins</code>를 뺀 기대값으로 고쳐 두었고, 리포트 사례 2건(<code>list_reports/all</code>, <code>get_report/missing</code>)을 덜어 27건이다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 <code>mins</code>가 없는 만큼, 그리고 리포트 사례만큼 어긋난다.</li>
 <li>설명서 원문이 제공되지 않은 부분(3부 18장, 4부 <code>ais-agent</code> 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.</li>

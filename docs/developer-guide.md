@@ -1,163 +1,134 @@
 # aisurada 개발자 사용 가이드
 
-이 문서는 저장소를 처음 받은 개발자가 빌드하고, 돌려 보고, 시험하고, 고치는 데 필요한 것을 모았다. 2026-11-04 판(`main` 브랜치)을 기준으로 쓰고, 명령과 수치는 이 판에서 직접 확인한 것만 적었다. 읽어서만 확인한 것은 「확인 방법」을 함께 적었다.
+이 문서는 저장소를 처음 받은 개발자가 빌드하고, 돌려 보고, 시험하고, 고치는 데 필요한 것을 모았다. 2026-11-15 판(`main` 브랜치, Java 엔진을 지운 뒤)을 기준으로 쓰고, 명령과 수치는 이 판에서 직접 확인한 것만 적었다. 읽어서만 확인한 것은 「확인 방법」을 함께 적었다.
 
 > `docs/` 아래 기록은 이름을 바꾸기 전에 쓴 것이라 옛 이름이 그대로 적혀 있다. 읽다가 낯선 이름이 나오면 [§10의 대응표](#10-docs-읽는-법)로 바꿔 읽는다.
 
 ## 1. 구성 한눈에 보기
 
 ```
-   화면(React, WKWebView)  ── Tauri IPC ──  호스트(Rust)  ── 자식 프로세스 ──  ais-cli.jar
-        3부 · 4부 화면                       2부 · 4부 모듈                         │ 유닉스 소켓
-                                                                                 ▼
-                                                              엔진(Java, ais-sidecar.jar) ── vault 폴더
-                                                              1부 · 4부 명령             (마크다운 + .aisurada/)
+   화면(React, WKWebView)  ── Tauri IPC ──  호스트(Rust)  ── 같은 프로세스 안에서 호출 ──  엔진(Rust, ais-core) ── vault 폴더
+        3부 · 4부 화면                       2부 · 4부 모듈                                 1부 · 4부 명령            (마크다운 + .aisurada/)
+                                                                                                  ▲
+                                              터미널·MCP 클라이언트 ── 실행 파일 ais-cli ──────────┘ (명령 1개를 처리하고 끝나는 프로세스)
 ```
 
 | 부 | 무엇 | 어디 | 언어 |
 |---|---|---|---|
-| 1부 | vault를 읽고 쓰는 엔진과 클라이언트 `ais-cli` | `src/aisurada/` | Java 21 + SnakeYAML |
+| 1부 | vault를 읽고 쓰는 엔진 `ais-core`와 명령줄·MCP 서버 `ais-cli` | `engine-rs/crates/` | Rust |
 | 2부 | Tauri 2 호스트(창, PTY, 파일, 프로세스 실행) | `native-host/src-tauri/` | Rust |
 | 3부 | 화면(편집기, 목록, 검색, 이력, 설정, 터미널) | `native-host/src/` | React 19 + TypeScript |
-| 4부 | Claude 연동(묻기, 세션 화면, 레일 대화) | 엔진 `ask`·`chat`·`session`, 호스트 `ask.rs` 따위, 화면 `plugs/claude/` | 세 언어 모두 |
+| 4부 | Claude 연동(묻기, 세션 화면, 레일 대화) | 엔진 `ask`·`chat`·`session` 명령, 호스트 `ask.rs` 따위, 화면 `plugs/claude/` | 세 언어 모두 |
 
-엔진은 색인 파일이 없다. 명령을 받을 때마다 vault 폴더를 훑는다. 화면은 엔진을 직접 부르지 않고 호스트의 `sidecar_call`로 `ais-cli.jar`를 실행하며, `ais-cli`가 소켓으로 엔진에 붙는다.
+엔진은 색인 파일이 없다. 명령을 받을 때마다 vault 폴더를 훑는다. 화면은 호스트의 `engine_call`(명령 객체)이나 `sidecar_call`(명령줄 문자열 목록)로 같은 프로세스 안의 Rust 엔진을 부른다. 상주 엔진 프로세스도 소켓도 없다. 터미널이나 MCP 클라이언트(Claude, Codex 따위)는 실행 파일 `ais-cli`를 부른다.
+
+예전 Java 엔진(`src/aisurada/`, SnakeYAML)은 저장소에서 지웠다. 태그 `java-engine-final`에 남아 있고, Rust 엔진과 답을 맞대는 기준(오라클)으로만 쓴다(§4).
 
 ## 2. 준비물
 
 | 도구 | 버전 | 쓰임 |
 |---|---|---|
-| JDK | 21 이상 | 엔진, `ais-cli`, 엔진 시험 (확인한 판: OpenJDK 21.0.11) |
+| Rust / cargo | 안정판 | 엔진, `ais-cli`, 호스트 (확인한 판: 1.99.1) |
 | Node.js | 22.12 이상 | 화면 빌드와 시험 (확인한 판: 26.9.0) |
 | pnpm | 10.33.4 | `package.json`의 `packageManager`로 고정 |
-| Rust / cargo | 안정판 | 호스트 (확인한 판: 1.99.1) |
 | Xcode 명령줄 도구 | | Tauri 번들, WKWebView |
 | git | | vault 자동 커밋과 이력이 실제 git을 부른다 |
-| python3 | | acceptance 하네스의 java 호출 기록기가 쓴다 (확인한 판: 3.14.2) |
+| JDK | 21 이상 | 기준 jar를 지을 때만(`build-oracle.sh`, 맞대기 도구). 평소 빌드와 시험에는 필요 없다 |
 
-macOS 전용이다. launchd와 WKWebView, AppKit(받아쓰기)을 쓰기 때문이다. SnakeYAML 2.4는 처음 `./build.sh`를 돌릴 때 Maven Central에서 받아 SHA-1을 확인한다(`lib/`는 git이 무시한다).
+macOS 전용이고 Apple Silicon만 지원한다. launchd(옛 사이드카 정리), WKWebView, AppKit(받아쓰기)을 쓰기 때문이다. 기준 jar를 지을 때 태그의 `build.sh`가 SnakeYAML 2.4를 Maven Central에서 받아 SHA-1을 확인한다. 저장소 `lib/`에 이미 받은 jar가 있으면(`lib/`는 git이 무시한다) 그것을 복사해 쓴다.
 
 ## 3. 처음 시작하기
 
 ```bash
-# 1. 엔진과 클라이언트를 짓는다 (dist/에 jar 4개가 생긴다)
+# 1. 엔진과 클라이언트를 짓는다 (dist/ais-cli 하나가 생긴다)
 ./build.sh
 
-# 2. 가장 작은 vault를 만든다 (임시 폴더에서 해 보자)
+# 2. 가장 작은 vault를 만든다 (임시 폴더에서 해 보자). vault는 환경 변수로 준다
 export VAULT_DIR=$(mktemp -d)/vault && mkdir -p "$VAULT_DIR"
-java -jar dist/ais-engine.jar init-workspace name=시험 'templates=[]' --aisurada.vault="$VAULT_DIR"
+AISURADA_VAULT="$VAULT_DIR" dist/ais-cli init-workspace name=시험 'templates=[]'
 
 # 3. 읽기와 쓰기 (아젠다 이름이 slug가 된다. 한글 이름이면 slug도 한글이다)
-java -jar dist/ais-engine.jar create-agenda 'title=demo' --aisurada.vault="$VAULT_DIR"
-java -jar dist/ais-engine.jar create-doc agenda=demo type=free title=제목 body=본문 --aisurada.vault="$VAULT_DIR"
-java -jar dist/ais-engine.jar list-docs --aisurada.vault="$VAULT_DIR"
-
-# 4. 엔진을 띄워 두고 클라이언트로 부른다 (터미널 둘). 변수는 export하지 말고 명령 앞에 붙인다
-AISURADA_VAULT="$VAULT_DIR" AISURADA_SIDECAR_SOCKET="$HOME/aisurada-dev.sock" java -jar dist/ais-engine.jar serve            # 터미널 1
-AISURADA_VAULT="$VAULT_DIR" AISURADA_SIDECAR_SOCKET="$HOME/aisurada-dev.sock" java -jar dist/ais-cli.jar list-docs limit=5  # 터미널 2 (VAULT_DIR을 같은 값으로 다시 준다)
+AISURADA_VAULT="$VAULT_DIR" dist/ais-cli create-agenda 'title=demo'
+AISURADA_VAULT="$VAULT_DIR" dist/ais-cli create-doc agenda=demo type=free title=제목 body=본문
+AISURADA_VAULT="$VAULT_DIR" dist/ais-cli list-docs limit=5
 ```
 
-4번의 `AISURADA_*` 값을 `export`하면 같은 터미널에서 띄우는 앱도 그 값을 물려받는다. 소켓 경로가 vault 하나에 고정돼서 앱이 여는 다른 vault와 어긋나고, 그 소켓에 엔진이 없으면 §7의 `AIS-400` 오류가 난다.
+`AISURADA_VAULT`는 `export`하지 말고 명령 앞에 붙이는 편이 안전하다. `export`하면 같은 터미널에서 띄우는 앱도 그 값을 물려받아, 앱이 여는 vault 대신 이 vault를 쓴다.
 
 `create-doc`은 `agenda=`, `type=`, `title=`, `body=`가 필요하다(`type=`을 빼면 `AIS-400`). 응답에는 `id`, `path`, 쓰기 전 토큰 `precondition`(`f1:…`)이 들어 있다.
 
-`ais-cli`는 떠 있는 엔진이 없으면 launchd로 엔진을 띄우려고 한다. 이걸 피하려면 4번처럼 엔진을 먼저 직접 띄운다(§6). 끝나면 터미널 1에서 `Ctrl-C`로 엔진을 내리고 `rm "$HOME/aisurada-dev.sock"`로 소켓을 지운다.
+`ais-cli`는 호출마다 엔진을 프로세스 안에서 돌리고 끝난다. 띄울 엔진도, 등록할 launchd 항목도 없다. 정리 끝낸 터미널에서 할 일은 `rm -r "$VAULT_DIR"`뿐이다.
 
-산출물 4개:
-
-| 파일 | 쓰임 |
-|---|---|
-| `dist/ais-engine.jar` | 엔진. 단발 모드와 serve 모드 (4부 켠 판) |
-| `dist/ais-sidecar.jar` | `ais-engine.jar`와 같은 파일. `ais-cli`가 설치하고 띄우는 이름 |
-| `dist/ais-sidecar-noclaude.jar` | 4부 클래스를 안 실은 판. 4부 명령 7개는 `AIS-409`로 답한다 |
-| `dist/ais-cli.jar` | 클라이언트 |
+산출물은 `dist/ais-cli` 하나다.
 
 ## 4. 저장소 구조
 
 ```
-src/aisurada/          엔진과 클라이언트 (Java)
-test/aisurada/         엔진 시험 (JDK만, 외부 프레임워크 없음)
+engine-rs/             엔진과 명령줄 (Rust 작업공간)
+  crates/ais-core/     vault 규칙 라이브러리
+  crates/ais-cli/      실행 파일 ais-cli (명령줄, MCP 서버, 등록, 진단)
+  tools/compat/        기준 jar 짓기, 합성 vault 만들기
 fixtures/              34장 받아들임 묶음과 실행기 (node)
-engine-rs/             엔진을 Rust로 옮기는 작업 공간 (진행 중, 앱은 아직 쓰지 않는다)
 native-host/
   src/                 화면 (React)
   src-tauri/           호스트 (Rust)
   scripts/             화면·호스트 시험, acceptance 하네스
 docs/                  설명서 사본, 장별 완료 기록, 리뷰 기록 (§10)
-build.sh               jar 4개를 짓는다
-test.sh                엔진 시험 전체
+build.sh               dist/ais-cli를 짓는다
+test.sh                엔진 시험 전체 (cargo test)
 test-native.sh         화면·호스트 시험 전체
 ```
 
-### 엔진 패키지 (`src/aisurada/`)
-
-| 패키지 | 맡은 일 |
-|---|---|
-| `cli` | 진입점(`Main`, `AisCliMain`), `doctor`·`sweep`·`install`·`mcp`·`claude-mcp`, launchctl 부르기 |
-| `config` | 설정 이름과 값 읽기 (`EngineConfig`) |
-| `engine` | 명령 1개를 돌려 상태·stdout·stderr로 돌려줌 (`EngineExecutor`). 단발과 serve가 같이 씀 |
-| `serve` | 소켓, 잠금, 실행 상태 파일, 유휴 종료 |
-| `frame` | 소켓 위의 요청 프레임(`AIQ1`)과 응답 프레임(`AIG1`) |
-| `args` | 도구 표면의 JSON 인자와 명령 표면의 `key=value` 인자 읽기 |
-| `cmd` | 명령 실행기(파일 51개)와 이름 목록(`CommandRegistry`) |
-| `write` | 쓰기 공통 부품: 표식 확인, 원자적 쓰기, 폴더 옮기기, id, 프론트매터, 경고, 선결 조건 토큰, 편집 도장 |
-| `vault` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통 읽기 |
-| `git` | vault 자동 커밋, 이력, 스냅숏 |
-| `resource` | 스킬·에이전트 정의(자원) 저장과 참조 계산 |
-| `task` | 태스크(티켓) 모양, 저장, 상태 전이 규칙 |
-| `text` | 다듬기, UTF-16 자르기, URI 따위 글 도구 |
-| `out` | 정해진 바이트 모양의 JSON 쓰기 |
-| `ask`, `chat`, `session` | 4부 명령 7개 (§7의 4부 스위치 참고) |
-
-### Rust 엔진 이전 (`engine-rs/`)
-
-엔진(Java)을 Rust로 옮기는 작업 공간이다. 같은 기능을 하는 것을 기준으로 옮기며(바이트 단위 호환이 아니다), 읽기 명령 31개는 앱이 이미 이것으로 읽는다: 새로고침 길의 6개(`list_docs`, `list_agendas`, `list_projects`, `list_templates`, `list_trash`, `reindex`), 노트 하나를 여는 길의 6개(`get_doc`, `list_sub_notes`, `get_sub_note`, `list_comments`, `list_attachments`, `get_agenda_facts`), 그리고 검색·태그·템플릿 하나·판 목록의 4개(`search_docs`, `list_tags`, `get_template`, `history`), 태스크 읽기 2개(`get_task`, `list_tasks`), 스킬·에이전트 자원 읽기 7개(`list_resources`, `get_resource`, `usable_resources`, `list_resource_versions`, `list_resource_changes`, `get_resource_change`, `get_resource_policy`), 문답·대화 읽기 2개(`get_ask`, `list_chats`), 세션 기록 읽기 3개(`read_session`, `session_titles`, `recent_sessions`), 샤드 검증 1개(`verify_shard`). `reindex_paths`는 엔진에 옮겼지만 앱은 부르지 않고 `ais-cli`만 쓴다. Rust `ais-cli`는 5a(명령·도구 표면)와 5b(MCP 서버, 에이전트 등록, 옛 사이드카 정리)에서 만들었으나 앱과 에이전트에 등록된 MCP는 아직 Java `ais-cli`와 사이드카를 쓴다(번들 교체는 5c). 쓰기 이전(3단계)은 공통 기반(프로세스 간 쓰기 잠금, 원자적 쓰기, `f1` 검사, git 자동 커밋 등)과 아젠다·프로젝트·템플릿·사실층 쓰기, `init_workspace`, 노트 머리 쓰기(`set_favorite`, `evaluate_doc`, `link_docs`), 노트 만들기·본문 고치기(`create_doc`, `update_doc`), 후속 노트 쓰기(`create_sub_note`, `update_sub_note`, `delete_sub_note`), 코멘트 쓰기(`create_comment`, `update_comment`, `delete_comment`), 휴지통 쓰기(`delete_doc`, `restore_doc`, `purge_doc`, `empty_trash`)까지 26개를 만들어 쓰기 이전(3단계)을 마쳤고, 4단계(남은 명령)는 태스크 쓰기 7개(`create_task`, `update_task`, `transition_task`, `link_tasks`, `add_task_comment`, `delete_task`, `restore_task`)와 자원·승인 쓰기 8개(`save_resource`, `delete_resource`, `restore_resource`, `set_resource_ref`, `approve_resource_change`, `reject_resource_change`, `resolve_resource_edit`, `set_resource_policy`)와 문답·대화 쓰기 2개(`append_ask_turn`, `append_chat_turn`)와 노트 도구 쓰기 6개(`write_attachment`, `export_markdown`, `shard_notes`, `plan_day`, `check_notes`, `facts_brief`)를 더해 49개가 됐다. 태스크·자원 파일은 노트 머리와 달리 SnakeYAML이 쓰므로 그 방출기를 따로 옮겼다(`write/snake_dump.rs`)., 쓰기는 스위치 `AISURADA_ENGINE_WRITE=rust`로만 켜진다(기본 꺼짐). 결정과 단계는 개발자의 vault 노트 「Rust 엔진 이전 — 결정 3: 코드 구조와 클라우드 대비」와 [1단계 기록](rust-engine-step1-yaml.md), [2단계 새로고침 길 기록](rust-engine-step2-read.md), [2단계 노트 여는 길 기록](rust-engine-step2-open.md), [2단계 검색·판 목록 기록](rust-engine-step2-rest.md), [3단계 W0 쓰기 공통 기반 기록](rust-engine-step3-w0.md), [3단계 W1 첫 조각 기록](rust-engine-step3-w1a.md), [3단계 W2 노트 머리 쓰기 기록](rust-engine-step3-w2.md), [3단계 W3a `update_doc` 기록](rust-engine-step3-w3a.md), [3단계 W3b `create_doc` 기록](rust-engine-step3-w3b.md), [3단계 W3c 후속 노트 쓰기 기록](rust-engine-step3-w3c.md), [3단계 W4a 코멘트 쓰기 기록](rust-engine-step3-w4a.md), [3단계 W4b 휴지통 쓰기 기록](rust-engine-step3-w4b.md), [4단계 계획](rust-engine-step4-plan.md), [4단계 4a 태스크 기록](rust-engine-step4a-tasks.md), [4단계 4b 자원·승인 기록](rust-engine-step4b-resources.md), [4단계 4c 문답·대화 기록](rust-engine-step4c-ask-chat.md), [4단계 4d 세션 읽기 기록](rust-engine-step4d-sessions.md), [4단계 4e 노트 도구 기록](rust-engine-step4e-note-tools.md), [5단계 계획](rust-engine-step5-plan.md), [5단계 5a `ais-cli` 기록](rust-engine-step5a-cli.md), [5단계 5b MCP·등록·정리 기록](rust-engine-step5b-mcp.md), [5단계 5c 호스트·번들 기록](rust-engine-step5c-host.md)에 있다.
+### 엔진 (`engine-rs/`)
 
 | 자리 | 내용 |
 |---|---|
-| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 `plain_text`, git 실행 `git`과 노트의 판 목록 `history`, 코멘트 id 겹침 검사 `comment_copy`), `write`(쓰기 공통 기반: `lock`, `atomic`, `confine`, `precondition`, `marker`, `apparatus`, `autocommit`, `pipeline`, `slug`, `agenda_file`, `project_file`, `template_file`, `warnings`, `note_front`, `meta_writer`), `json`(Java JSON 읽개를 옮긴 것), `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
-| `engine-rs/crates/ais-cli/` | Rust `ais-cli`: `registry`·`spec_table`(이름과 명령 명세 표), `parse`(명령 표면)·`tool`(도구 표면) 인자 해석, `map`(엔진 호출로 바꿈), `legacy`(새 응답을 옛 모양으로 되돌림), `output`(Java와 같은 JSON 모양), `env`(vault 정하기, 세션 표식). `mcp`·`mcp_tools`(MCP 서버와 Java에서 생성한 도구 38개 표), `register`·`agent_cli`(`claude-mcp`·`codex-mcp`·`gemini-mcp`), `old_sidecar`·`doctor`·`install`(옛 사이드카 정리와 진단) |
-| `engine-rs/crates/ais-cli/examples/` | `cli_compat`(Java 단발 엔진과 명령줄 단위로 맞댐), `mcp_compat`(Java MCP 서버와 JSON-RPC 대화를 맞댐) |
-| `engine-rs/crates/ais-core/examples/` | `compat_check`(Java 엔진과 읽기·쓰기 맞대기), `snake_check`(SnakeYAML 방출기 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
-| `engine-rs/crates/ais-core/tests/` | 합성 vault로 읽기 동작을 확인하는 통합 시험(Java 없이 돈다). `lock_interop.rs`는 `AISURADA_JAR`가 있을 때만 실제 `ais-engine.jar`와 쓰기 잠금을 맞대는 시험 |
-| `engine-rs/tools/compat/` | 명령 명세 표 생성기 `gen-spec-table.sh`(`DumpSpecs.java`), MCP 도구 표 생성기 `gen-mcp-tools.sh`(`DumpMcpTools.java`), MCP 맞대기용 Java 구동기 `DriveMcp.java`, 합성 vault 생성기 `make-fixture.sh`, 검색 시험 노트를 덧붙이는 `add-search-notes.sh`, git 저장소와 판 이력을 만드는 `add-git-history.sh`, 코멘트 id가 겹치는 노트를 더하는 `add-comment-clash.sh` |
+| `engine-rs/crates/ais-core/` | vault 규칙 라이브러리: `frontmatter`(노트 머리 YAML 읽기·쓰기), `vault`(아젠다·노트·후속 노트·프로젝트·템플릿·휴지통·코멘트·사실층 읽기와 훑기, 본문 글자 뽑기 `plain_text`, git 실행 `git`과 노트의 판 목록 `history`, 코멘트 id 겹침 검사 `comment_copy`), `write`(쓰기 공통 기반: `lock`, `atomic`, `confine`, `precondition`, `marker`, `apparatus`, `autocommit`, `pipeline`, `slug`, `agenda_file`, `project_file`, `template_file`, `warnings`, `note_front`, `meta_writer`, `snake_dump`), `task`(태스크), `resource`(스킬·에이전트 정의와 승인), `session`(에이전트 세션 읽기), `json`, `commands`(명령 실행기), `model`(응답 모양), `engine`(진입점 `Engine::call`) |
+| `engine-rs/crates/ais-cli/` | `ais-cli`: `registry`·`spec_table`(이름과 명령 명세 표), `parse`(명령 표면)·`tool`(도구 표면) 인자 해석, `map`(엔진 호출로 바꿈), `legacy`(엔진 응답을 옛 응답 모양으로 바꿈), `output`(키를 정렬한 JSON 쓰기), `env`(vault 정하기, 세션 표식). `mcp`·`mcp_tools`(MCP 서버와 도구 표), `register`·`agent_cli`(`claude-mcp`·`codex-mcp`·`gemini-mcp`), `old_sidecar`·`doctor`·`install`·`migrate`(옛 사이드카 정리, 진단, 첫 실행 이주) |
+| `engine-rs/crates/ais-cli/examples/` | `cli_compat`(기준 Java 단발 엔진과 명령줄 단위로 맞댐), `mcp_compat`(기준 Java MCP 서버와 JSON-RPC 대화를 맞댐) |
+| `engine-rs/crates/ais-core/examples/` | `compat_check`(기준 Java 엔진과 읽기·쓰기 맞대기), `snake_check`(SnakeYAML 방출기 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
+| `engine-rs/crates/ais-core/tests/` | 합성 vault로 동작을 확인하는 통합 시험(Java 없이 돈다). `lock_interop.rs`는 `AISURADA_JAR`가 있을 때만 기준 `ais-engine.jar`와 쓰기 잠금을 맞대는 시험 |
+| `engine-rs/tools/compat/` | 기준 jar를 태그에서 짓는 `build-oracle.sh`, 명령 명세 표 생성기 `gen-spec-table.sh`(`DumpSpecs.java`), MCP 도구 표 생성기 `gen-mcp-tools.sh`(`DumpMcpTools.java`), MCP 맞대기용 Java 구동기 `DriveMcp.java`, 합성 vault 생성기 `make-fixture.sh`, 검색 시험 노트를 덧붙이는 `add-search-notes.sh`, git 저장소와 판 이력을 만드는 `add-git-history.sh`, 코멘트 id가 겹치는 노트를 더하는 `add-comment-clash.sh` |
 | `engine-rs/tools/yaml-spike/` | 머리 읽기·쓰기를 Java 기준값과 맞대는 도구(`YamlGroundTruth.java`, `run.sh`, `cases.txt`) |
 
-**앱의 호출 길.** 화면은 `workspace/engine.ts`의 `engineCall` 한 곳으로 엔진을 부른다. 호출 객체(`Call`, `data/commands.ts`의 `read.docs()` 따위)는 호스트의 `engine_commands`가 알린 명령이면 `engine_call`(`src-tauri/src/engine.rs`)로 앱 안의 Rust 엔진을 바로 부르고, 아니면 `toArgv`로 문자열 목록(argv)으로 풀어 명령줄 길(`sidecar_call`, `src-tauri/src/sidecar.rs`)로 간다. 문자열 목록과 러너·승인 알림(`call_blocking`)은 늘 명령줄 길이고, 이 길은 같은 프로세스 안에서 Rust `ais-cli`(`ais_cli::run`)를 부른다. 사이드카도 프로세스 띄우기도 없고, 엔진 안의 패닉은 종료 코드 1의 답으로 바꿔 앱이 죽지 않게 한다. AI 세션 표식(`CLAUDE_CODE_SESSION_ID` 따위)은 엔진에 넘기기 전에 지운다(#53). Rust 응답은 `engine.ts`의 어댑터가 기존 화면 모양으로 바꾼다. 쓰기 명령(아젠다·프로젝트의 `create_`·`update_`·`delete_`, `save_template`, `update_doc`, `create_doc`, 후속 노트·코멘트·휴지통 쓰기, 태스크·자원·승인 쓰기, 문답·대화 기록 따위와 `commit_vault`)도 기본으로 Rust 엔진이 받는다. 앱을 열 때 vault를 `ais_core::write::autocommit::watch`로 지켜봐서, 앱이 닫힌 동안 단발 `ais-cli`가 남긴 자동 커밋 대기 기록(`.git/aisurada-pending.json`)을 이어받아 커밋한다. **되돌리는 스위치:** 앱을 `AISURADA_ENGINE=java`로 띄우면 `engine_commands`가 빈 목록을 돌려주고 명령줄 길도 옛 Java `ais-cli.jar`로 가며, `AISURADA_ENGINE_WRITE=java`는 쓰기만 되돌린다. 스냅숏 쓰기(`AISURADA_VAULT_SNAPSHOT_ENABLED=true`, Rust 엔진은 이 기능이 없다)를 켠 사용자의 쓰기 명령도 Java로 간다. 이 되돌리는 길은 개발 실행에서만 쓸 수 있다(번들에는 Java가 없다). 시험과 브라우저의 가짜 호스트에는 `engineCommands`가 없어서 늘 명령줄 길이다. **첫 실행의 이주:** 정식 앱은 처음 뜰 때 한 번(`~/Library/Application Support/aisurada/rust-engine-migrated` 표시) 옛 사이드카(우리 레이블 `co.kcd.aisurada.sidecar.*`만)를 내리고 plist를 지우며, Java 시절의 jar를 가리키는 낡은 MCP 등록을 같은 모드로 다시 등록한다(`ais_cli::migrate`, 같은 일을 손으로 하려면 `ais-cli doctor --fix`). 개발 실행과 빌드 폴더의 번들은 기기 전체에 영향을 주는 이 일을 하지 않는다.
+엔진을 Rust로 옮긴 결정과 단계는 [1단계 기록](rust-engine-step1-yaml.md), [2단계 새로고침 길 기록](rust-engine-step2-read.md), [2단계 노트 여는 길 기록](rust-engine-step2-open.md), [2단계 검색·판 목록 기록](rust-engine-step2-rest.md), [3단계 쓰기 이전 기록(W0~W4)](rust-engine-step3-w0.md), [4단계 계획](rust-engine-step4-plan.md), [4단계 4a 태스크](rust-engine-step4a-tasks.md), [4b 자원·승인](rust-engine-step4b-resources.md), [4c 문답·대화](rust-engine-step4c-ask-chat.md), [4d 세션 읽기](rust-engine-step4d-sessions.md), [4e 노트 도구](rust-engine-step4e-note-tools.md), [5단계 계획](rust-engine-step5-plan.md), [5a `ais-cli`](rust-engine-step5a-cli.md), [5b MCP·등록·정리](rust-engine-step5b-mcp.md), [5c 호스트·번들](rust-engine-step5c-host.md), [5d Java 지우기](rust-engine-step5d-java-removal.md)에 있다. 3단계의 나머지 기록은 [W1a](rust-engine-step3-w1a.md), [W2](rust-engine-step3-w2.md), [W3a](rust-engine-step3-w3a.md), [W3b](rust-engine-step3-w3b.md), [W3c](rust-engine-step3-w3c.md), [W4a](rust-engine-step3-w4a.md), [W4b](rust-engine-step3-w4b.md)다.
+
+**앱의 호출 길.** 화면은 `workspace/engine.ts`의 `engineCall` 한 곳으로 엔진을 부른다. 호출 객체(`Call`, `data/commands.ts`의 `read.docs()` 따위)는 호스트의 `engine_commands`가 알린 명령이면 `engine_call`(`src-tauri/src/engine.rs`)로 앱 안의 Rust 엔진을 바로 부르고, 아니면 `toArgv`로 문자열 목록(argv)으로 풀어 명령줄 길(`sidecar_call`, `src-tauri/src/sidecar.rs`)로 간다. 문자열 목록과 러너·승인 알림(`call_blocking`)은 늘 명령줄 길이고, 이 길은 같은 프로세스 안에서 Rust `ais-cli`(`ais_cli::run`)를 부른다. 프로세스를 띄우지 않고, 엔진 안의 패닉은 종료 코드 1의 답으로 바꿔 앱이 죽지 않게 한다. AI 세션 표식(`CLAUDE_CODE_SESSION_ID` 따위)은 엔진에 넘기기 전에 지운다(#53). Rust 응답은 `engine.ts`의 어댑터가 기존 화면 모양으로 바꾼다. 앱을 열 때 vault를 `ais_core::write::autocommit::watch`로 지켜봐서, 앱이 닫힌 동안 단발 `ais-cli`가 남긴 자동 커밋 대기 기록(`.git/aisurada-pending.json`)을 이어받아 커밋한다. 시험과 브라우저의 가짜 호스트에는 `engineCommands`가 없어서 늘 명령줄 길이다. **첫 실행의 이주:** 정식 앱은 처음 뜰 때 한 번(`~/Library/Application Support/aisurada/rust-engine-migrated` 표시) 옛 사이드카(우리 레이블 `co.kcd.aisurada.sidecar.*`만)를 내리고 plist를 지우며, Java 시절의 jar를 가리키는 낡은 MCP 등록을 같은 모드로 다시 등록한다(`ais_cli::migrate`, 같은 일을 손으로 하려면 `ais-cli doctor --fix`). 개발 실행과 빌드 폴더의 번들은 기기 전체에 영향을 주는 이 일을 하지 않는다.
 
 ```bash
-(cd engine-rs && cargo test -p ais-core)                                              # Java 없이 도는 단위·통합 시험
+(cd engine-rs && cargo test -p ais-core)                                              # 엔진 단위·통합 시험
 pnpm --dir native-host exec node --import tsx --test scripts/engine-route.test.mjs    # 화면의 라우팅과 어댑터
 cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked engine::         # 호스트 engine_call (실제 Tauri 호출 경로)
 ```
 
-Java 엔진과 읽기 응답을 맞대려면 `./build.sh`로 `dist/ais-engine.jar`를 만든 뒤 아래를 돌린다. `compat_check`는 vault를 읽기만 하고, 응답을 새 모양으로 바꿔 견주며, 어긋남이 0이어야 한다.
+**기준(오라클)과 맞대기.** 맞대기는 같은 입력을 기준 Java 엔진과 Rust 엔진에 넣어 응답과 폴더 바이트를 견주는 일이다. 기준 jar는 저장소에 없고 태그 `java-engine-final`에서 짓는다. 태그가 없으면 `git fetch origin tag java-engine-final`로 먼저 받는다. `compat_check`는 읽기를 견줄 때 vault를 고치지 않고, 응답을 새 모양으로 바꿔 견주며, 어긋남이 0이어야 한다.
 
 ```bash
+ORACLE="$(bash engine-rs/tools/compat/build-oracle.sh)"   # engine-rs/target/oracle/. 같은 태그 커밋이면 다시 짓지 않는다
 engine-rs/tools/compat/make-fixture.sh <빈 폴더>        # 합성 vault(진짜 vault 내용 없음)
 engine-rs/tools/compat/add-search-notes.sh <그 폴더>    # 검색 순위·서식·동점 시험 노트를 덧붙인다
 engine-rs/tools/compat/add-git-history.sh <그 폴더>     # git 저장소와 판 이력(`history` 시험용). 작업 트리는 그대로 돌아온다
 engine-rs/tools/compat/add-comment-clash.sh <그 폴더>    # 코멘트 id가 겹치는 노트(읽기는 뒤 노트를 빼고 쓰기·reindex는 실패)
-(cd engine-rs && cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar <합성 vault> [다른 vault...])
+(cd engine-rs && cargo run -q -p ais-core --example compat_check -- "$ORACLE/ais-engine.jar" <합성 vault> [다른 vault...])
 # 쓰기 명령은 합성 vault의 사본 둘에 같은 명령열을 Java와 Rust로 돌려 응답과 폴더 전체 바이트를 견준다(vault 원본은 안 고친다)
-(cd engine-rs && cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar <합성 vault> --write-fixture=<합성 vault>)
+(cd engine-rs && cargo run -q -p ais-core --example compat_check -- "$ORACLE/ais-engine.jar" <합성 vault> --write-fixture=<합성 vault>)
 # 자동 커밋(commit_vault)은 vault를 고치므로 git 이력이 있는 합성 vault의 사본 둘에서만 맞댄다. 진짜 vault에는 주지 않는다
-(cd engine-rs && cargo run -q -p ais-core --example compat_check -- ../dist/ais-engine.jar <합성 vault> --commit-fixture=<git 이력이 있는 합성 vault>)
+(cd engine-rs && cargo run -q -p ais-core --example compat_check -- "$ORACLE/ais-engine.jar" <합성 vault> --commit-fixture=<git 이력이 있는 합성 vault>)
 # SnakeYAML 방출기(태스크·자원 파일)는 진짜 SnakeYAML 2.4가 쓴 사례와 맞댄다(자세한 절차는 tools/compat/SnakeCases.java 머리말)
 (cd engine-rs && cargo run -q -p ais-core --example snake_check -- <SnakeCases가 쓴 사례 파일>)
-AISURADA_JAR=$PWD/dist/ais-engine.jar cargo test --manifest-path engine-rs/Cargo.toml -p ais-core --test lock_interop   # Java 쓰기가 Rust 잠금을 기다리는지
+AISURADA_JAR="$ORACLE/ais-engine.jar" cargo test --manifest-path engine-rs/Cargo.toml -p ais-core --test lock_interop   # Java 쓰기가 Rust 잠금을 기다리는지
 ```
 
-Rust `ais-cli`를 Java 단발 엔진과 명령줄 단위로 맞대려면 아래를 돌린다. 합성 vault의 사본 둘에 같은 명령줄을 돌려 종료 코드, 표준 오류, 표준 출력 JSON(키 차례는 무시), 폴더 전체 바이트를 견주며 어긋남이 0이어야 한다. 명령 명세 표(`spec_table.rs`)는 Java 엔진의 명령 목록이 바뀌었을 때 `engine-rs/tools/compat/gen-spec-table.sh`로 다시 만든다.
+Rust `ais-cli`를 기준 Java 단발 엔진과 명령줄 단위로 맞대려면 아래를 돌린다. 합성 vault의 사본 둘에 같은 명령줄을 돌려 종료 코드, 표준 오류, 표준 출력 JSON(키 차례는 무시), 폴더 전체 바이트를 견주며 어긋남이 0이어야 한다. 명령 명세 표(`spec_table.rs`)는 Java 엔진을 지운 뒤로 원본이라 직접 고친다. `engine-rs/tools/compat/gen-spec-table.sh`는 기준 표를 `engine-rs/target/oracle-tables/`에 뽑으므로 현재 표와 `diff`로 견주는 데 쓴다(5d에서 둘이 같음을 확인했다).
 
 ```bash
-(cd engine-rs && cargo run -q -p ais-cli --example cli_compat -- ../dist/ais-engine.jar <합성 vault>)
-(cd engine-rs && cargo run -q -p ais-cli --example cli_compat -- ../dist/ais-engine.jar <git 이력이 있는 합성 vault> --history)   # history·commit-vault까지
-(cd engine-rs && cargo test -p ais-cli)                                                                                           # 단위·프로세스·등록·정리 시험
-(cd engine-rs && cargo run -q -p ais-cli --example mcp_compat -- ../dist)                                                          # Java MCP 서버와 대화 맞대기(dist/에 ais-cli.jar와 ais-engine.jar)
+(cd engine-rs && cargo run -q -p ais-cli --example cli_compat -- "$ORACLE/ais-engine.jar" <합성 vault>)
+(cd engine-rs && cargo run -q -p ais-cli --example cli_compat -- "$ORACLE/ais-engine.jar" <git 이력이 있는 합성 vault> --history)   # history·commit-vault까지
+(cd engine-rs && cargo test -p ais-cli)                                                                                            # 단위·프로세스·등록·정리 시험
+(cd engine-rs && cargo run -q -p ais-cli --example mcp_compat -- "$ORACLE")                                                        # 기준 MCP 서버와 대화 맞대기(기준 폴더에 ais-cli.jar와 ais-engine.jar)
 ```
 
-MCP 도구 표(`mcp_tools.rs`)는 Java `McpTools`가 바뀌었을 때 `engine-rs/tools/compat/gen-mcp-tools.sh`로 다시 만든다.
+MCP 도구 표(`mcp_tools.rs`)도 마찬가지로 직접 고치고, `engine-rs/tools/compat/gen-mcp-tools.sh`가 기준 표를 같은 자리에 뽑는다(현재 표와 같음을 확인했다).
 
 노트 머리 읽기·쓰기를 Java와 맞대려면 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
 
@@ -177,6 +148,8 @@ engine-rs/tools/yaml-spike/run.sh <저장소 밖 폴더> --vault <vault 폴더> 
 `workspace/`(controller, 부팅, 저장 키, 엔진 다리), `data/`(vault 스토어, 쓰기 큐, 자기 쓰기), `editor/`(Lexical 편집기와 마크다운 왕복), `navigation/`(주소, 탭, 스크롤), `interaction/`(단축키, 링크), `ui/`(화면들, 터미널), `plugs/claude/`(4부 화면)와 `plugs/empty/`(4부 없는 판의 빈 구현). 화면 모양 CSS는 `src/styles.css`(기본 모양)와 `src/skin-*.css`(물성·격자·유리·모던)다(§7 「화면 모양」).
 
 ## 5. 엔진 쓰는 법
+
+> 아래 기능 절의 「시험」 항목에 적힌 Java 시험 클래스(`AgentSessionTest`, `McpServerTest`, `ApprovalsTest`, `ResourcesTest`, `TasksTest`, `ProjectReposTest` 따위)는 Java 엔진과 함께 저장소에서 지웠다. 그 내용은 태그 `java-engine-final`의 `test/`에서 볼 수 있고, 같은 동작을 지키는 일은 지금 Rust 시험(`engine-rs/crates/*/tests/`)과 기준 맞대기(§4)가 맡는다.
 
 ### 세션 에이전트(Codex·Gemini) 확장
 
@@ -266,7 +239,7 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
 - **한계.** 지문도 앱 폴더에 있어서 앱 폴더를 쓸 수 있는 프로세스(셸을 마음대로 쓰는 AI)는 위조할 수 있다. 그것은 이 장치가 아니라 실행 격리(작업 폴더와 도구 허용 목록)의 몫이다. 이 장치가 막는 것은 프롬프트 주입에 속아 MCP나 `ais-cli`로 고치는 AI와 파일을 실수로 직접 고친 경우다. 기본 정책은 프로젝트 자원의 내용(지침 글)을 AI가 바로 고치게 둔다. 그 지침을 쓰는 에이전트의 권한은 승인된 값이지만, 지침 자체가 바뀌는 위험은 `project=approve`로 줄인다. 앱 폴더의 승인 기록은 vault를 옮기면 따라오지 않는다(옮긴 뒤 처음 읽을 때 기준선으로 다시 받아들인다).
 - **화면.** 스킬·에이전트 페이지(`ui/ResourcesPage.tsx`) 맨 위에 「승인이 필요한 변경 N건」 배너와 「승인 대기함」 단추가 있고, 레일의 「스킬·에이전트」 메뉴에는 같은 수의 배지가 붙는다(`ui/approvalsStore.ts`가 수를 들고, 앱이 켜질 때·창이 눈에 띌 때·60초마다·승인 알림이 올 때 `list-resource-changes decided=0`으로 다시 읽는다. 엔진을 한 번 부를 때마다 자바가 뜨므로 길게 잡았다). 승인 대기함(`ui/ApprovalPanel.tsx`)은 탭 넷이다: **승인 대기**(변경마다 요약, 올린 AI 세션, 정책과 상관없이 늘 승인이 필요한 종류의 표시, 「이전 판과 비교」로 칸별 비교와 지침의 줄 단위 나란히 비교, 승인, 이유를 적는 거절), **직접 수정**(승인 안 된 직접 수정. 승인한 판과 지금 파일을 견주고 「이 내용을 승인」이나 「승인한 판으로 되돌리기」/새 파일이면 「지우기」), **지난 결정**(승인함·거절함·적용 못 함과 이유), **정책**(범위별 「바로 적용」/「승인 필요」 4개와 고정 종류 안내). 그리는 부분(`ApprovalsView`)과 엔진을 부르는 부분(`ApprovalsDialog`)을 나눠 서버 렌더로 시험한다. 비교의 계산(`fieldDiffs`, 줄 단위 최장 공통 부분열 `sideBySide`)은 `ui/approvalsClient.ts`에 있고, 줄 수의 곱이 400만을 넘으면 통째로 바뀐 것으로 본다. 승인 중 대상이 바뀌어 적용하지 못하면 엔진의 AIS-412가 「다른 곳에서 먼저 고쳤어요」로 풀려 보이고 그 변경은 「지난 결정」에 「적용 못 함」으로 남는다. 목록에서 직접 고쳐진 자원에는 「직접 고쳐짐」 표시(`approval: dirty`)가 붙는다. 프로젝트 페이지에는 아직 배너가 없다(전체 대기함은 스킬·에이전트 페이지 한 곳이다).
 - **알림.** 호스트의 `approvals.rs`가 앱이 켜져 있는 동안 30초마다(처음은 8초 뒤) 엔진에 `list-resource-changes decided=0`을 묻고, 아직 알리지 않은 대기 변경마다 알림 센터에 종류 `approval`(화면 이름 「승인」)을 쌓는다. 알림 `id`가 `approval-<변경 id>`라 같은 변경은 한 번만 쌓인다. 한 번에 5개까지 쌓는다. 창이 닫혀 있어도 알리는 쪽이다. 설정의 소식이 4개에서 5개(「스킬·에이전트 변경이 승인을 기다릴 때」, 기본은 앱 안·macOS 모두 켬)가 됐고, 알림 센터의 「승인하러 가기」가 스킬·에이전트 페이지(`/resources`)로 데려다 준다. 승인 안 된 직접 수정은 알리지 않고 배지와 대기함의 「직접 수정」 탭으로만 보인다.
-- **앱이 엔진을 부를 때 AI 세션 표식을 지운다.** 앱은 엔진을 `ais-cli` 프로세스로 부르고 앱의 환경변수를 넘긴다. 앱을 AI 세션의 터미널에서 띄웠다면 `CLAUDE_CODE_SESSION_ID` 같은 표식이 환경에 남아 있어서, 엔진이 화면의 저장과 승인을 AI의 것으로 보고 승인을 거절하거나 대기에 올릴 수 있다. 그래서 `sidecar.rs`의 `execute`가 `AISURADA_SESSION_ID`, `AISURADA_SESSION_AGENT`, `CLAUDE_CODE_SESSION_ID`, `CODEX_SESSION_ID`, `CODEX_THREAD_ID`를 지운다(`ai_session_variables_do_not_reach_the_engine`). 러너의 엔진 호출도 같은 길이다. AI 프로세스(claude, 터미널의 AI CLI)는 이 길을 거치지 않는다.
+- **앱이 엔진을 부를 때 AI 세션 표식을 지운다.** 앱은 엔진을 같은 프로세스 안에서 `ais_cli::run`으로 부르고 앱의 환경변수를 넘긴다. 앱을 AI 세션의 터미널에서 띄웠다면 `CLAUDE_CODE_SESSION_ID` 같은 표식이 환경에 남아 있어서, 엔진이 화면의 저장과 승인을 AI의 것으로 보고 승인을 거절하거나 대기에 올릴 수 있다. 그래서 `sidecar.rs`의 `cli_env`가 `AISURADA_SESSION_ID`, `AISURADA_SESSION_AGENT`, `CLAUDE_CODE_SESSION_ID`, `CODEX_SESSION_ID`, `CODEX_THREAD_ID`를 지운다(`the_cli_environment_drops_ai_session_markers_and_names_the_vault`). 러너의 엔진 호출도 같은 길이다. AI 프로세스(claude, 터미널의 AI CLI)는 이 길을 거치지 않는다.
 - **화면 시험.** `approvals-ui.test.mjs` 15건(응답 읽기, 정책 기본값, 엔진 인자, 배지·표시 글, 칸별 비교, 줄 단위 비교, 저장소와 지켜보기, 탭별 서버 렌더, 레일 배지와 페이지 배너)과 `notifications-ui.test.mjs`(소식 5개, 승인 알림의 이동). 호스트는 `approvals::tests` 2건, `notifications::tests`의 승인 소식, `sidecar::tests`의 세션 표식 삭제다. 승인 대기함은 진짜 컴포넌트를 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려서 모양을 눈으로 확인했다. **실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.**
 - **시험.** `ApprovalsTest`(통로 판별, 정책별 동작, 고정 종류, 대기 중에는 이전 판이 보임, 승인·거절·stale·중복, AI의 승인 거절, 만들기·지우기·되살리기, 직접 수정 걸러내기와 받아들이기·되돌리기, 새 파일, 참조 목록 직접 수정, 기준선, 깨진 기록장)과 `McpServerTest`(진짜 MCP 서버와 진짜 `ais-cli`로 AI의 변경이 대기하고 사람의 `ais-cli`로 승인하는 길, 세션 표식이 달린 `ais-cli`의 승인 거절).
 
@@ -313,14 +286,14 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
   Done에서는 어디로도 갈 수 없다. 그 밖의 쌍은 AIS-409다. `actor`는 믿을 수 있는 인증이 아니라 규칙을 지키게 하는 표시다(이 컴퓨터 안의 약속이다).
 - **연결.** 종류는 `blocks`(건 쪽이 받는 쪽을 막는다), `relates`(관련, 한 번이면 양쪽에 보인다), `duplicates`(건 쪽이 받는 쪽의 중복)다. 연결은 **건 쪽 파일에만** 적고 반대쪽(`blocked-by`, `duplicated-by`)은 읽을 때 계산한다. 두 파일이 어긋날 일이 없다. 자기 자신에게 못 걸고, 서로 막는 순환(`blocks`의 맞은편)은 거절한다. `blocks`로 막힌 태스크는 막은 태스크가 **Done**이 되기 전에는 Ready For Develop → In Progress로 못 간다(Failed·Cancelled는 풀지 않는다). 지운 태스크는 막지 않고, 되살리면 다시 막는다(결정 4).
 - **기록.** 만들기, 상태 바뀜(`from`, `to`), 고침(바뀐 칸 이름), 연결, 댓글이 `activity.jsonl`에 시간순으로 남는다. 고치면 `editedAt`이 남고, 세션 표식이 오면 `editedSession`(과 Claude가 아닐 때 `editedAgent`)이 남는다. 완료 기준을 확인하면 확인한 시각과 쪽(`human`, `runner`)이 항목에 남고, 확인이 풀리면 기록이 지워진다.
-- **쓰기 비용.** 쓰기 명령은 vault 전체 쓰기 잠금과 노트 색인 맞추기(`NoteIndex.reconciled`)를 거치므로 태스크를 쓸 때마다 노트 폴더를 훑는다. 호출 한 번은 노트 17개짜리 vault에서 0.1초 안팎이었다(JVM을 띄우는 시간 포함). 노트가 아주 많은 vault의 값은 재지 않았다.
+- **쓰기 비용.** 쓰기 명령은 vault 전체 쓰기 잠금과 노트 색인 맞추기(`NoteIndex.reconciled`)를 거치므로 태스크를 쓸 때마다 노트 폴더를 훑는다. 호출 한 번은 노트 17개짜리 vault에서 0.1초 안팎이었다(Java 시절에 잰 값이고 JVM을 띄우는 시간을 포함한다). 노트가 아주 많은 vault의 값은 재지 않았다.
 - **화면.** 레일의 「태스크」(`/tasks`)가 보드와 목록이고(`ui/TasksPage.tsx`), 태스크를 열면 `/task/<키>`가 상세다(`ui/TaskDetailPage.tsx`). 만들기와 편집은 한 양식이다(`ui/TaskFormModal.tsx`). 엔진을 부르는 얇은 층과 순수 계산(폼 값 → 인자, 거르기, 상태별 묶기, 한 줄 풀이)은 `ui/tasksClient.ts`에 모았고, 화면은 엔진을 `controller.callEngine`으로 부른다(호스트 커맨드를 더하지 않았다). 스타일은 `src/tasks.css`(모든 화면 모양의 토큰을 따르고, 토큰이 없으면 대체값으로 물러난다)다.
   - **보드.** 열 5개(Draft, Ready For Develop, In Progress, Waiting Answer, In Review)와 접어 둔 끝난 상태(Done, Failed, Cancelled)다. Draft 열 아래의 한 줄 입력은 Enter를 누르면 요약이 채워진 만들기 양식을 연다(완료 기준이 필수라서 바로 만들지 않는다). 거르기(검색, 저장소, 유형, 라벨, 막힌 것만)는 한 번에 받은 목록을 화면에서 거른다. 보드와 목록 가운데 고른 것은 `localStorage`의 `aisurada.tasks.view`에 둔다.
   - **상세.** Jira 이슈 화면 구조다. 가운데는 설명, 완료 기준(체크하면 `update-task`로 저장하고 확인한 시각과 쪽이 남는다), 연결된 태스크, 연결한 자원, 활동(전체·댓글·이력)이고, 오른쪽은 세부 정보와 Ready For Develop 조건이다. **상태 메뉴는 엔진이 알려 준 `transitions`를 그대로 보인다.** 사람이 바꿀 수 있는 곳만 나오고, 조건이 모자라거나 막혀 있으면 까닭과 함께 막혀 보인다. 화면은 이 규칙을 다시 만들지 않는다. 상태를 바꿀 때 지금 상태를 `from`으로 넘겨서, 그 사이에 다른 곳이 먼저 바꿨으면 엔진이 거절한다.
   - **새로 불러오기.** 창이 다시 눈에 띄면 다시 읽는다(러너나 다른 창이 바꾼 것을 따라간다).
   - **시험용 `preset`.** 두 페이지는 엔진 없이 처음 모양을 정하는 `preset` 속성을 받는다(앱은 주지 않는다). 서버 렌더 시험이 데이터가 든 보드와 상세를 그려 보는 데 쓴다.
 - **시험.** `TasksTest`(만들기와 필수 값, 거절 문구, 고치기 보호와 모르는 칸 보존, 완료 기준 확인 기록, 번호, 휴지통, 상태 전이 전부, 연결과 막힘, 활동, 목록 거르기, 손으로 망가뜨린 파일, MCP 읽기 도구와 쓰기 도구 없음, 기존 명령과의 공존)와 `McpServerTest`의 도구 개수, 화면은 `tasks-ui.test.mjs`(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 보드·목록·상세·상태 메뉴와 레일)다. 서버 렌더에는 `document`가 없어서 설명(마크다운) 영역은 그리지 않는다. 데이터가 든 보드와 상세는 진짜 엔진으로 만든 임시 vault의 응답을 서버 렌더하고 Edge headless로 그려서 모양을 눈으로 확인했다(밝은 모양과 어두운 모양). 실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.
-- **`ais-cli`가 넘겨 주는 이름.** 앱은 엔진을 `ais-cli`를 거쳐 부르는데, `ais-cli`는 `AisCliMain`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`, 승인 명령 7개는 `ENGINE_COMMANDS_APPROVALS`)에 든 이름만 엔진으로 넘긴다. 태스크 명령이 이 목록에 빠져 있어서 실제 앱에서는 모두 「알 수 없는 이름」(종료 코드 2)으로 거절되던 결함을 러너를 만들면서 찾아 고쳤다(`5b38c33`). 엔진 시험과 화면 시험은 `ais-cli`를 거치지 않아 잡지 못했다. 이제 `TasksTest`가 엔진 명령 이름이 모두 `ais-cli`를 통과하는지 대조한다.
+- **`ais-cli`가 넘겨 주는 이름.** `ais-cli`는 `engine-rs/crates/ais-cli/src/registry.rs`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`, 승인 명령 7개는 `ENGINE_COMMANDS_APPROVALS`)에 든 이름만 엔진으로 넘긴다. 새 명령을 넣고 이 목록에 빠뜨리면 실제 앱에서 「알 수 없는 이름」(종료 코드 2)으로 거절된다. Java 시절에 태스크 명령이 이 목록에 빠져 있던 적이 있다(`5b38c33`). 엔진 시험과 화면 시험은 `ais-cli`를 거치지 않아 이것을 잡지 못하므로, 명령을 더하면 `ais-cli`로 한 번 불러 본다.
 - **아직 없는 것.** 코드를 고치고 PR을 올리는 러너(4단계), 태스크 안 채팅(정의 에이전트, 3b), 질문을 위 단계 에이전트가 먼저 푸는 계층(5단계). 승인 워크플로우(이슈 #53)는 러너가 코드를 고치기 전에 필요하다. 읽기 전용 러너는 아래 「러너」에 있다.
 
 ### 알림 (`notifications.rs`)
@@ -413,10 +386,10 @@ cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 6�
 **시험.**
 
 - 호스트: `runner::` 30건. 보고·질문·답·중지·실패(종료 코드, 시간 초과, `is_error`)·질문 한도·세션 소실·작업 폴더 소실·앱 닫기와 다시 켜기 이어 가기·태스크가 옮겨졌을 때의 정리·우선순위와 동시 한도·막힘, 프롬프트와 claude 인자와 MCP 설정, 파일 저장소, 실제 git으로 만든 읽기 전용 작업 폴더를 가짜 엔진·가짜 claude로 돌린다.
-- **진짜로 도는 시험** `runner::tests::real_cli_and_claude_report_end_to_end`(무시됨): 진짜 `ais-cli`, 격리 엔진, 진짜 `claude`(haiku)로 태스크 하나를 끝까지 돌려 In Review와 댓글을 확인한다. 토큰을 조금 쓴다. 격리 엔진을 띄우고(§3의 4번과 같다: `AISURADA_SIDECAR_SOCKET`을 주고 `serve`) `AISURADA_VAULT`, `AISURADA_SIDECAR_SOCKET`, `AISURADA_SIDECAR_JAR`, `E2E_HOME`(격리 HOME), `E2E_CLI_JAR`(`dist/ais-cli.jar`)를 주고 `cargo test real_cli_and_claude -- --ignored --nocapture`로 돌린다. 이 컴퓨터에서 작은 README 조사 하나가 10초, 약 0.007달러였다.
+- **진짜로 도는 시험** `runner::tests::real_cli_and_claude_report_end_to_end`(무시됨): 진짜 `ais-cli`와 진짜 `claude`(haiku)로 태스크 하나를 끝까지 돌려 In Review와 댓글을 확인한다. 토큰을 조금 쓴다. 격리 vault와 격리 HOME을 만들고 `AISURADA_VAULT`, `E2E_HOME`(격리 HOME), `E2E_CLI_BIN`(빌드한 `ais-cli` 실행 파일), 필요하면 `AISURADA_LOCK_DIR`를 주고 `cargo test real_cli_and_claude -- --ignored --nocapture`로 돌린다. 이 컴퓨터에서 작은 README 조사 하나가 10초, 약 0.007달러였다(Java 시절에 잰 값이다).
 - 화면: `runner-ui.test.mjs` 13건(저장소의 읽기·사건·호출 인자, 서버 렌더로 본 막대·「실행」 영역 각 상태·보드 카드), `workspace.test.mjs`의 종료 확인 3건. 새 화면은 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려 눈으로 확인했다.
 - **확인하지 못한 것.** 키체인 자격으로 진짜 GitHub 저장소를 fetch하는 길(`refresh_clone`은 시험에서 가짜로 대신했다), 번들한 앱에서 `claude` 위치 찾기, 질문→답 왕복과 동시 실행 여러 개를 진짜 `claude`로 돌리는 것(가짜 대본으로만), 120분 제한, 앱을 닫을 때 진짜 `claude` 프로세스가 멈추는 것, 실제 앱 창(WKWebView)에서 눌러 본 것.
-- **한계.** 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다(`ais-cli`는 호출마다 JVM을 띄운다). 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 4부의 세션 화면(`/session/<id>`)에 잇지 않았다.
+- **한계.** 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다. 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 4부의 세션 화면(`/session/<id>`)에 잇지 않았다.
 
 ### GitHub App 연결 (`github.rs`)
 
@@ -438,67 +411,65 @@ cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 6�
 에이전트의 MCP 서버를 등록할 때 `AISURADA_VAULT` 경로를 박아 넣으면, 손 확인이나 옛 설정의 vault가 그대로 남아 노트가 앱과 다른 vault에 쓰인다. 그래서 등록에는 vault를 박지 않고, 앱이 연 vault를 파일에 적어 둔다.
 
 - **쓰는 쪽.** 호스트(`workspace.rs`의 `allow_workspace`)가 워크스페이스를 열 때마다 `~/Library/Application Support/aisurada/current-vault.json`에 `{"vault":"<경로>","updatedAt":<ms>}`를 적는다(임시 파일에 쓰고 이름을 바꾼다). 못 적어도 vault 열기는 막지 않는다. 호스트 시험은 진짜 HOME의 파일을 덮어쓰지 않게 이 쓰기를 건너뛴다(`cfg!(test)`).
-- **읽는 쪽.** `VaultPointer.resolve`가 `ais-cli`(`AisCliMain`, `DoctorCommand`, `SweepCommand`)와 MCP 서버에서 호출마다 읽는다. 환경변수가 비지 않았으면 그것이 이기고, 없으면 파일이다. 둘 다 없으면 `AIS-400 vault를 정하지 못했다…`다. 파일이 망가졌거나 절대 경로가 아니면 없는 것으로 본다.
-- **엔진은 그대로다.** 엔진(`serve`)은 여전히 `AISURADA_VAULT`가 필수이고 launchd 항목의 환경에 vault를 싣는다. 바뀐 것은 클라이언트가 vault를 정하는 길뿐이다.
+- **읽는 쪽.** `ais-cli`(`engine-rs/crates/ais-cli/src/env.rs`의 `resolve_vault`)와 MCP 서버가 호출마다 읽는다. 환경변수가 비지 않았으면 그것이 이기고, 없으면 파일이다. 둘 다 없으면 `AIS-400 vault를 정하지 못했다…`다. 파일이 망가졌거나 절대 경로가 아니면 없는 것으로 본다.
+- **엔진은 그대로다.** 엔진 자체(`ais-core`)는 늘 vault 경로를 인자로 받는다. 어느 vault인지 정하는 일은 `ais-cli`(`env.rs`)가 한다.
 - **격리.** 파일은 HOME 아래라서 가짜 HOME으로 띄운 앱(손 확인, 받아들임 점검, 번들 검증)은 자기 HOME에 적고 진짜 파일을 안 건드린다.
 - **한계.** 앱을 한 번도 안 열었으면 파일이 없다. 앱을 끄고 다른 vault로 `AISURADA_VAULT`를 준 `ais-cli`를 돌려도 파일은 그대로다(앱이 마지막으로 연 vault).
 
-### 두 가지 모양
+### 호출 방식
 
-- **단발 모드**: `java -jar dist/ais-engine.jar <명령> [인자...]` 명령 1개를 처리하고 끝난다.
-- **serve 모드**: `java -jar dist/ais-engine.jar serve` vault 1개를 맡아 유닉스 소켓에서 요청을 받는다. 요청마다 vault를 다시 훑는다. 요청이 없으면 10분 뒤 스스로 내려간다.
+`ais-cli`는 명령 1개를 처리하고 끝나는 프로세스다. 엔진은 그 프로세스 안에서 돌고, 호출마다 vault를 새로 훑는다. 표준 입출력으로 오래 도는 것은 MCP 서버(`ais-cli mcp`)뿐이다. 앱은 같은 코드를 프로세스 안에서 직접 부른다(§4 「앱의 호출 길」). 예전의 serve 모드와 launchd 사이드카는 없다.
 
 ### 두 가지 표면
 
 같은 일을 이름만 달리 부른다. 도구 표면은 밑줄 이름에 JSON 한 덩이, 명령 표면은 하이픈 이름에 `key=value`다.
 
 ```bash
-java -jar dist/ais-engine.jar get_doc '{"id":"nddemo-00000001"}'   # 도구 표면
-java -jar dist/ais-engine.jar get-doc nddemo-00000001              # 명령 표면
+AISURADA_VAULT=<vault> dist/ais-cli get_doc '{"id":"nddemo-00000001"}'   # 도구 표면
+AISURADA_VAULT=<vault> dist/ais-cli get-doc nddemo-00000001              # 명령 표면
 ```
 
-도구 38개와 명령 82개는 `src/aisurada/cmd/CommandRegistry.java`에 있다. 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `java -jar dist/ais-cli.jar --list`로 본다.
+도구 38개와 명령 82개는 `engine-rs/crates/ais-cli/src/registry.rs`에 있다(`ais-cli`가 직접 하는 8개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `dist/ais-cli --list`로 본다.
 
 ### 설정
 
-우선순위는 **명령줄 `--키=값` > JVM `-D키=값` > 환경 변수 > 기본값**이다. 키는 7개이고 모르는 `--키`는 조용히 버린다.
+설정은 환경 변수로만 준다. Java 시절의 명령줄 `--키=값`과 JVM `-D키=값`, 색인 폴더 `AISURADA_DB_HOME`은 없어졌다(색인이 없다).
 
-| 키 | 환경 변수 | 기본값 |
+| 환경 변수 | 쓰임 | 기본값 |
 |---|---|---|
-| `aisurada.vault` | `AISURADA_VAULT` | 없음(필수) |
-| `aisurada.db.home` | `AISURADA_DB_HOME` | `~/Library/Application Support/aisurada/db` |
-| `aisurada.notes.shard.by.month` | `AISURADA_NOTES_SHARD_BY_MONTH` | 정하지 않음 |
-| `aisurada.idle.timeout.minutes` | `AISURADA_IDLE_TIMEOUT_MINUTES` | 10 (`dev` 프로필이면 0) |
-| `aisurada.vault.autocommit.enabled` | `AISURADA_VAULT_AUTOCOMMIT_ENABLED` | true |
-| `aisurada.vault.autocommit.idle.seconds` | `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS` | 300 |
-| `aisurada.vault.snapshot.enabled` | `AISURADA_VAULT_SNAPSHOT_ENABLED` | false |
+| `AISURADA_VAULT` | vault 폴더 | 없으면 앱이 연 vault(아래 「앱이 연 vault」) |
+| `AISURADA_NOTES_SHARD_BY_MONTH` | 노트를 월별 폴더에 두는지 | 정하지 않음(디스크를 보고 판정) |
+| `AISURADA_VAULT_AUTOCOMMIT_ENABLED` | vault 자동 커밋 | true |
+| `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS` | 마지막 쓰기부터 커밋까지의 유휴 초 | 300 |
 
-같은 키를 명령줄에 여러 번 주면 `=`가 있는 칸의 값만 쉼표로 잇는다. 불리언은 `true/on/yes/1`과 `false/off/no/0`만 받는다.
+불리언은 `true/on/yes/1`과 `false/off/no/0`만 받는다. 본문을 덮기 전에 옛 바이트를 남기던 스냅숏 쓰기(`AISURADA_VAULT_SNAPSHOT_ENABLED`)는 Rust 이전 때 지웠다. 이미 남은 스냅숏은 `history`가 계속 읽는다.
 
-`ais-cli`와 호스트가 읽는 환경 변수:
+그 밖의 환경 변수:
 
 | 이름 | 쓰임 |
 |---|---|
-| `AISURADA_SIDECAR_SOCKET` | 소켓 자리. **102바이트 이하**여야 한다. 기본은 `~/Library/Caches/aisurada/ais-<해시>.sock` |
-| `AISURADA_SIDECAR_JAR` | launchd plist에 실을 엔진 jar |
-| `AISURADA_SIDECAR_KEEP_REGISTRATION` | `1`이면 엔진이 없어 띄울 때 이미 있는 plist를 덮어쓰지 않고 그대로 쓴다. 그 plist의 jar가 없으면 평소처럼 다시 쓴다. 개발 실행과 `target/…/bundle` 번들이 호스트와 앱 스크립트를 통해 자동으로 켠다(§7) |
-| `AISURADA_SIDECAR_JAVA` | plist에 실을 `java` (호스트는 이걸로 `ais-cli`를 도는 `java`도 고른다) |
-| `AISURADA_CLI_JAR` | 호스트가 부를 `ais-cli.jar`, `install`이 깔 원본 |
-| `AISURADA_READY_TIMEOUT_SECONDS` | 띄운 뒤 붙기를 기다리는 초 (30) |
-| `AISURADA_SIDECAR_LIMIT` | 동시에 떠 있을 엔진 수 (3) |
-| `AISURADA_SWEEP_QUIET_HOURS` | 청소가 내릴 만큼 조용한 시간 (24) |
-| `AISURADA_CLAUDE_BIN` | 호스트가 쓸 `claude` 실행 파일 (4부) |
+| `AISURADA_LOCK_DIR` | 쓰기 잠금 파일 폴더. 기본은 `~/Library/Application Support/aisurada/locks` |
+| `AISURADA_APPROVALS_DIR` | 자원 승인 기록의 바탕 폴더(시험용). 기본은 `~/Library/Application Support/aisurada/approvals` |
+| `AISURADA_SESSION_ID`, `AISURADA_SESSION_AGENT` | 이 호출을 보낸 에이전트 세션. 둘을 함께 줄 때만 쓴다 |
+| `AISURADA_CLAUDE_BIN`, `AISURADA_CODEX_BIN`, `AISURADA_GEMINI_BIN`(또는 `AISURADA_ANTIGRAVITY_BIN`) | 등록 명령(`claude-mcp` 따위)과 호스트가 부를 CLI의 자리 |
+| `AISURADA_CLAUDE_HOME`, `AISURADA_CODEX_HOME`, `AISURADA_GEMINI_HOME` | 세션 기록을 읽을 홈을 바꾼다(시험용) |
+| `AISURADA_SQLITE_BIN` | Antigravity 대화 기록을 읽을 `sqlite3`의 자리. 기본은 `/usr/bin/sqlite3`, 없으면 `PATH` |
+| `AISURADA_TEST_NOW`, `AISURADA_TEST_RANDOM` | 시험용 시계(유닉스 밀리초)와 id 무작위 조각. 주지 않으면 아무 일도 안 한다 |
+| `AISURADA_CLI_BIN` | 호스트 시험과 점검이 부를 `ais-cli` 실행 파일(없으면 `engine-rs/target/debug/ais-cli`) |
+| `AISURADA_ENGINE_TRACE` | 손 확인용. `1`이면 앱을 띄운 터미널에 `[engine] 명령 ok 걸린시간ms`를 한 줄씩 찍어 어느 명령이 `engine_call` 길로 갔는지 보인다 |
+| `AISURADA_CALL_LOG` | 점검 하네스용. 앱이 엔진을 부른 호출을 이 파일에 한 줄씩 적는다(§8) |
 
 ### 종료 코드
 
 | 코드 | 뜻 |
 |---|---|
 | 0 | 성공. stdout에 JSON 하나와 줄바꿈 1개 |
-| 1 | 예상 밖 실패. stderr에 스택 트레이스. 쓰기 명령이 vault 사전 훑기에서 서면 이것도 1 |
+| 1 | 예상 밖 실패(인자 길이가 1 MiB를 넘는 경우 따위). 쓰기 명령이 vault 사전 훑기에서 서면 이것도 1 |
 | 2 | vault를 못 찾았거나 모르는 명령 |
 | 3 | `AIS-…` 코드가 붙은 실패. stderr 한 줄, stdout 비어 있음 |
-| 4 | `ais-cli`만 낸다. 엔진에 못 닿음 |
 | 5 | 선결 조건 토큰(`f1`)이 어긋나 아무것도 안 씀(`AIS-412`) |
+
+Java 시절에 `ais-cli`만 내던 4(엔진에 못 닿음)는 엔진 프로세스가 없어서 사라졌다.
 
 ### vault의 모양
 
@@ -529,39 +500,42 @@ HTML 노트와 템플릿은 `---` 대신 `<!--aisurada` … `-->` 머리를 쓴�
 - `update_doc`, 메타 쓰기 3개, `update_sub_note`는 직전에 읽은 토큰 `f1`이 지금 파일 바이트와 맞아야 쓴다. 안 왔거나 어긋나면 `AIS-412`, 종료 코드 5.
 - 편집 도장(`editedBy`, `editedAt`)은 파일 글이 실제로 달라질 때만 새로 찍는다.
 - 쓰기 명령은 일하기 전에 vault를 훑고, 노트로 못 읽는 파일이 있으면 아무것도 안 쓰고 종료 코드 1로 선다.
-- serve는 시작·종료·유휴·15분 경과·작성자 전환 때 vault를 자동 커밋한다. `.git`이 있는 `main` 브랜치에서만 돈다. 단발 모드는 자동 커밋하지 않는다.
+- 자동 커밋은 쓸 때마다 대기 기록(`vault/.git/aisurada-pending.json`)을 남기고, 유휴 시간이 지나거나 작성자·도구 세션이 바뀌면 커밋한다. `.git`이 있는 `main` 브랜치에서만 돈다. 유휴 타이머는 앱과 MCP 서버만 돌리고(`ais_core::write::autocommit::watch`), 단발 `ais-cli`는 기록만 남기고 끝난다. 남은 기록은 다음에 도는 앱이나 MCP 서버가 이어받는다.
 
 ### 명령을 새로 넣는 길
 
-1. `src/aisurada/cmd/`에 실행기를 만든다. 쓰기 공통 부품은 `write/`에 있다.
-2. `CommandRegistry`의 `COMMAND_NAMES`(도구 표면도 있으면 `TOOL_NAMES`), 쓰기면 `WRITE_COMMANDS`, 그리고 `USAGE_LINES`에 이름과 사용법을 넣는다.
-3. 시험을 `test/aisurada/`에 두고 `test.sh`에 한 줄 넣는다(§8).
-4. 설명서 장이 있으면 그 장의 바이트 예시와 맞는지 대조하고, 받아들임 묶음에 케이스를 더할 수 있으면 더한다(§8).
+1. `engine-rs/crates/ais-core/src/commands/`에 실행기를 만든다. 쓰기 공통 부품은 `write/`에 있다.
+2. `engine.rs`의 명령 이름 표(쓰기면 `WRITE_COMMANDS`)에 넣는다.
+3. `engine-rs/crates/ais-cli/src/registry.rs`(명령 이름 목록, 도구 표면이 있으면 `CLI_TOOL_NAMES`와 사용법 줄)와 `spec_table.rs`(인자 명세)에 넣는다. 빠뜨리면 `ais-cli`가 「알 수 없는 이름」으로 거절한다.
+4. 시험을 `engine-rs/crates/ais-core/tests/`나 `crates/ais-cli/tests/`에 두고 `bash test.sh`로 돌려 본다(§8).
+5. 설명서 장이 있으면 그 장의 바이트 예시와 맞는지 대조하고, 받아들임 묶음에 케이스를 더할 수 있으면 더한다(§8).
 
 ### MCP 서버 (`ais-cli mcp`)
 
-Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다. 표준 입출력으로 한 줄에 JSON-RPC 메시지 하나씩 주고받고(`initialize`, `ping`, `tools/list`, `tools/call`), 입력이 닫히면 끝난다. 프로토콜은 `src/aisurada/cli/McpServer.java`, 도구 정의는 `McpTools.java`에 있다. 이것은 설명서 밖의 확장이다. 외부 설명서에는 MCP가 없고, 예전 Node MCP 서버는 C119에서 지웠다.
+Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다. 표준 입출력으로 한 줄에 JSON-RPC 메시지 하나씩 주고받고(`initialize`, `ping`, `tools/list`, `tools/call`), 입력이 닫히면 끝난다. 프로토콜은 `engine-rs/crates/ais-cli/src/mcp.rs`, 도구 정의는 `mcp_tools.rs`에 있다. 이것은 설명서 밖의 확장이다. 외부 설명서에는 MCP가 없고, 예전 Node MCP 서버는 C119에서 지웠다.
 
-연결하는 법, 도구 28개의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
+연결하는 법, 도구의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
 
-- **도구.** 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 37개를 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `CommandRegistry.WRITE_COMMANDS`에서 나오므로 두 곳이 어긋나지 않는다.
-- **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`runEnginePipeline`: 소켓 찾기, 엔진 띄우기, 요청 왕복)을 JVM 하나에서 되풀이한다. 이 길은 곳곳에서 `System.exit`을 부르는데, `AisCliMain`의 종료 호출은 모두 `exit()` 하나를 거친다. mcp 모드에서만 `exit()`이 프로세스를 끝내는 대신 `CliExit`을 던지고, 그 호출만 `isError`로 답한다. 이 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다.
-- **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(아래 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
-- **스키마를 고칠 때.** `McpTools`의 입력 스키마 키는 `ArgsParser`가 받는 키와 같아야 한다. `McpServerTest`가 엔진의 「모르는 키다 … 쓸 수 있는 것은 […] 뿐이다」 문구와 도구 38개를 모두 대조하고, 필수 키도 하나씩 빼 보며 잰다. 도구의 인자를 바꾸면 `McpTools`도 고친다. 안 고치면 이 시험이 선다.
-- **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`ClaudeMcpCommand`)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 `codex-mcp`, `gemini-mcp`(`AgentMcpCommand`)가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다(`McpRegistration`). CLI마다 `--` 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 java 경로 뒤) 인자 모양은 `AgentMcpCommandTest`가 가짜 CLI로 못 박고, 진짜 CLI로는 임시 HOME에서 확인했다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 Java와 jar는 이 명령을 돌린 것이라, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다.
+- **도구.** 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 37개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
+- **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`ais_cli::run`)을 프로세스 하나에서 되풀이한다. 명령줄 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다. 도구를 부를 때마다 자동 커밋을 지켜본다(`watch`). 유휴 타이머가 MCP 서버 안에서 돌기 때문이다.
+- **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(위 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
+- **스키마를 고칠 때.** `mcp_tools.rs`의 입력 스키마 키는 명령줄 인자 명세(`spec_table.rs`)가 받는 키와 같아야 한다. 도구의 인자를 바꾸면 두 표와 `mcp_compat`의 기대를 함께 맞춘다.
+- **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`register.rs`)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 `codex-mcp`, `gemini-mcp`가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다. CLI마다 `--` 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 실행 파일 경로 뒤) 인자 모양은 `crates/ais-cli/tests/register.rs`가 가짜 CLI로 못 박는다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 실행 파일은 이 명령을 돌린 `ais-cli`라서, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다. 이미 등록된 서버가 옛 Java jar를 가리키면 `doctor`가 낡았다고 알리고 `doctor --fix`가 같은 모드로 다시 등록한다.
 
-시험은 `bash test.sh`에 들어 있다. `McpServerTest`는 스키마 대조, 노출 규칙, 가짜 호출기로 프로토콜, 진짜 엔진과 진짜 `mcp` 프로세스의 왕복(읽기·쓰기·낡은 `f1` 거절·휴지통·영구 삭제 거절·vault 없는 환경에서도 서버가 사는지)을 잰다. `ClaudeMcpCommandTest`는 등록 상태를 파일에 두는 가짜 `claude`로 `status`·`add`·`remove`·`config`를 잰다.
+시험은 `bash test.sh`에 들어 있다. `crates/ais-cli/tests/mcp_stdio.rs`는 진짜 `mcp` 프로세스와 표준 입출력으로 왕복하고, `tests/register.rs`는 가짜 에이전트 CLI로 `status`·`add`·`remove`·`config`를 잰다. 기준 Java MCP 서버와의 대화 맞대기는 `mcp_compat`(§4)다.
 
-## 6. `ais-cli`와 launchd — 건드리기 전에
+## 6. 옛 사이드카와 launchd — 건드리기 전에
 
-`ais-cli`는 떠 있는 엔진이 없으면 **`~/Library/LaunchAgents/co.kcd.aisurada.sidecar.<키>.plist`를 쓰고 `launchctl`을 부른다.** 엔진이 동시 상한(3개)을 넘으면 가장 오래 조용한 엔진을 내리고, 하루 한 번 24시간 넘게 조용한 엔진도 내린다. 이 저장소의 시험은 모두 임시 HOME과 가짜 `launchctl`로 돌아서 진짜 launchd는 쓴 적이 없다.
+Rust `ais-cli`는 launchd를 쓰지 않는다. 다만 Java 시절에 이 기기에서 `ais-cli`나 앱을 쓴 적이 있으면 vault마다 launchd에 올라간 옛 사이드카(레이블 `co.kcd.aisurada.sidecar.<키>`, `~/Library/LaunchAgents/…plist`)가 남아 있을 수 있다. 낡은 JVM이 계속 떠 있고 옛 엔진이 vault를 고칠 수 있으므로 걷어 낸다. 정식 앱은 새 판을 처음 열 때 한 번 하고(§4 「앱의 호출 길」), 손으로는 이렇게 한다.
 
-안전하게 돌리는 법:
+```bash
+dist/ais-cli doctor            # 어느 vault를 쓰는지, vault의 git 상태, 이 실행 파일, 에이전트에 등록된 MCP 서버, 옛 사이드카 흔적
+dist/ais-cli sweep --dry-run   # 걷어 낼 것만 보여 준다
+dist/ais-cli sweep             # 옛 사이드카를 내리고 plist, 상태 파일, 깔아 둔 jar, 로그를 지운다
+dist/ais-cli doctor --fix      # 낡은(Java jar를 가리키는) MCP 등록을 같은 모드로 다시 등록한다
+```
 
-- 엔진을 먼저 직접 띄운다(`AISURADA_SIDECAR_SOCKET`을 짧은 경로로 주고 `serve`). 그러면 `ais-cli`가 launchd를 부르지 않고 그 소켓에 붙는다.
-- `java -Duser.home=<격리 HOME>`으로 띄운다. 안 그러면 4부 명령이 진짜 `~/.claude/projects`를 읽는다. (`$HOME` 환경 변수는 JVM의 `user.home`을 바꾸지 못한다.)
-- 이미 있는 등록을 덮어쓰고 싶지 않으면 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 준다. 엔진이 없을 때 plist가 있고 그 jar가 남아 있으면 plist를 다시 쓰지 않고 그대로 띄운다. 개발 실행과 빌드 폴더 번들은 호스트가 알아서 켠다(§7).
-- `ais-cli doctor`로 키, 레이블, 소켓, plist를 진단한다. 등록한 엔진을 지우려면 `launchctl bootout gui/$(id -u)/<레이블>` 뒤에 그 plist를 지운다.
+`sweep`은 레이블이 `co.kcd.aisurada.sidecar.`로 시작하는 항목만 내린다. vault, 잠금 파일, 다른 프로그램의 launchd 항목은 건드리지 않는다. 시험(`crates/ais-cli/tests/old_sidecar.rs`)은 임시 HOME과 가짜 `launchctl`(`AISURADA_LAUNCHCTL_CMD`)로만 돌아서 진짜 launchd는 쓴 적이 없다. 진짜 기기에서 `sweep`을 돌려 본 확인은 사용자의 손 확인(이슈 #54, #61)에 남아 있다.
 
 앱을 격리해서 띄우는 전체 순서는 [`beta-hand-check.md`](beta-hand-check.md)의 §1에 있다.
 
@@ -570,7 +544,7 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 ### 개발 실행
 
 ```bash
-bash build.sh                       # 번들이 jar를 자원으로 싣는다
+(cd engine-rs && cargo build -p ais-cli)   # 개발용 번들의 bin/ais-cli 스크립트가 찾는 실행 파일
 cd native-host
 pnpm install --frozen-lockfile      # postinstall이 @claude-plug 꾸러미를 꽂는다
 pnpm tauri dev                      # 실제 앱까지 (포트 1420, 충돌하면 실패)
@@ -580,42 +554,34 @@ pnpm preview                        # 호스트 없이 번들 CSP로 화면만 �
 
 `pnpm tauri dev`는 README에 적힌 대로 쓰는 길이고 이 문서를 쓰면서 새로 돌려 보지는 않았다. 개발 서버에 페이지가 붙어 있으면 `curl -X POST localhost:1420/__deeplink --data-raw 'aisurada://doc/<id>'`로 열린 main 창을 이동할 수 있다(개발 판 전용, 번들에서는 빠진다).
 
-**개발 실행은 엔진 jar를 자동으로 넘기지 않는다.** 번들 판은 자원 폴더의 `ais-sidecar.jar`를 `ais-cli`에 넘기지만, `tauri dev`와 `target/…/bundle` 아래 번들은 낡은 사본을 쓰지 않으려고 넘기지 않는다(`sidecar.rs`의 `execute`). 대신 jar를 직접 지정하지 않은 개발 실행과 빌드 폴더 번들은 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 `ais-cli`에 넘긴다(호스트 `execute`, 앱 스크립트 `ais-cli`). 엔진이 없을 때 이 스위치가 켜져 있고 `~/Library/LaunchAgents/…plist`가 이미 있으며 그 plist의 jar도 남아 있으면, `ais-cli`는 plist를 다시 쓰지 않고 있는 등록 그대로 엔진을 띄운다(`PlistGenerator.keepsExistingRegistration`). 그래서 빌드 폴더의 앱을 진짜 vault로 띄워도 정식 앱이 해 둔 엔진 등록이 설치본 jar로 바뀌지 않는다. 이런 앱은 이미 등록된 엔진을 쓰므로 그 엔진이 앱보다 낡았으면 화면이 「모르는 명령이다」를 띄울 수 있다(§12). 등록이 아예 없으면(처음 쓰는 HOME 등) 예전처럼 설치본 jar로 등록하고, 설치본도 없으면 `AIS-400 AISURADA_SIDECAR_JAR 가 없고 …`로 선다. 이 규칙은 `PlistGeneratorTest`(스위치 판정), `sidecar.rs`의 `sidecar_export_obeys_dev_build_bundle_and_explicit_override`, `ais-cli-script.test.mjs`가 잰다. 진짜 launchd와 앱 창에서는 확인하지 못했다. 앱으로 워크스페이스를 만들거나 열어 보려면 앱을 띄우는 터미널에서 먼저 이렇게 한다.
-
-```bash
-unset AISURADA_VAULT AISURADA_SIDECAR_SOCKET              # §3 예시의 값이 남아 있으면 지운다
-export AISURADA_SIDECAR_JAR="$PWD/dist/ais-sidecar.jar"   # 반드시 절대 경로다(plist에 그대로 실린다)
-```
-
-대신 한 번 `java -jar dist/ais-cli.jar install --cli dist/ais-cli.jar --sidecar dist/ais-sidecar.jar`로 `~/Library/Application Support/aisurada/bin/`에 깔아도 된다. 깐 사본은 빌드할 때마다 다시 깔아야 한다.
-
-**이 길은 진짜 launchd를 쓴다.** vault마다 `~/Library/LaunchAgents/co.kcd.aisurada.sidecar.<키>.plist`가 생기고 `launchctl`에 올라간다. 이 저장소의 시험은 모두 가짜 `launchctl`이라 이 길을 자동으로 잰 적이 없다. 끝나면 `java -jar dist/ais-cli.jar doctor`로 레이블과 plist를 보고, `launchctl bootout gui/$(id -u)/<레이블>` 뒤에 그 plist를 지운다. launchd를 건드리지 않고 앱을 보려면 [`beta-hand-check.md`](beta-hand-check.md)의 격리 실행법을 쓴다. 이때는 엔진 하나가 vault 하나만 맡으므로 그 vault만 열 수 있다.
+앱은 엔진을 프로세스 안에서 직접 부르므로 엔진을 따로 띄우거나 등록할 것이 없다. 에이전트에 MCP 서버로 등록할 `ais-cli` 실행 파일은 환경 변수 `AISURADA_CLI_BIN`, 앱 번들의 `bin/ais-cli`, 저장소의 빌드 폴더(`engine-rs/target/{release,debug}/ais-cli`) 순으로 찾는다(`sidecar.rs`의 `cli_exe`). **개발 실행과 `target/…/bundle` 아래 번들은 기기 전체에 영향을 주는 첫 실행 이주(옛 사이드카 정리, MCP 재등록)를 하지 않는다**(`sidecar.rs`의 `under_build_tree`). 그래서 빌드 폴더의 앱을 진짜 vault로 띄워도 정식 앱이 해 둔 등록은 바뀌지 않는다. 그래도 앱은 진짜 HOME의 vault를 열 수 있으니 격리해서 띄우려면 [`beta-hand-check.md`](beta-hand-check.md)의 격리 실행법을 쓴다.
 
 ### 번들 만들기
 
 ```bash
 cd native-host
 pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle/macos/aisurada.app
+pnpm release:build                       # 정식 번들(릴리스 설정). 아래 「앱에 든 ais-cli」
 ```
 
-`--debug`를 빼면 최적화 빌드다. `beforeBuildCommand`가 화면과 `build.sh`를 새로 돌려서 `dist/`를 지웠다 다시 만든다. **설치나 launchd 등록은 하지 않는다.** 단 번들은 `.md`/`.markdown`의 기본 편집기로 등록되므로(`fileAssociations`) `open 문서.md`가 이 앱을 진짜 HOME으로 띄운다.
+`--debug`를 빼면 최적화 빌드다. `beforeBuildCommand`는 화면만 새로 짓는다(`pnpm build`). Rust `ais-cli`는 개발용 번들에 지어 넣지 않는다(아래). **설치나 launchd 등록은 하지 않는다.** 단 번들은 `.md`/`.markdown`의 기본 편집기로 등록되므로(`fileAssociations`) `open 문서.md`가 이 앱을 진짜 HOME으로 띄운다.
 
 ### 앱에 든 `ais-cli`
 
-`native-host/src-tauri/resources/ais-cli`(셸 스크립트)가 번들의 `Contents/Resources/bin/ais-cli`로 들어간다(`tauri.conf.json`의 `resources`).
+번들의 `Contents/Resources/bin/ais-cli`는 두 가지다.
 
-- 같은 앱의 Java(`Resources/runtime/bin/java`)로 같은 앱의 `ais-cli.jar`를 돈다. 번들 Java는 릴리스 설정(`tauri.release.conf.json`)으로 지은 번들에만 있고, 없으면 PATH의 `java`를 쓴다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다. 엔진 jar는 `AISURADA_SIDECAR_JAR`로 앱의 `ais-sidecar.jar`를 넘긴다. 단 `target/…/bundle` 아래의 개발용 빌드는 낡은 사본을 쓰지 않으려고 넘기지 않고, 대신 이미 있는 엔진 등록을 덮어쓰지 않게 `AISURADA_SIDECAR_KEEP_REGISTRATION=1`을 켠다(호스트 `sidecar.rs`의 규칙과 같다. 사용자가 jar를 정해 두었으면 그 jar를 따르고 스위치는 켜지 않는다).
-- **셸 내장 기능만 쓴다.** Finder나 launchd가 띄운 환경은 PATH가 비어 있다. 실제 번들 검증에서 `dirname` 때문에 서던 것을 고쳤다. 외부 명령은 절대 경로로 부르는 `readlink` 하나뿐이다.
-- 호스트는 앱이 뜰 때 이 폴더를 `ask.rs`의 `set_tools_dir`로 알려 두고, `claude -p`를 띄울 때 PATH 맨 앞에 얹는다. 그래서 앱 안에서 묻는 Claude는 사용자가 래퍼를 만들거나 Java를 깔지 않아도 `ais-cli`를 부를 수 있다. 앱 안 터미널(`pty_start_session`)의 PATH는 바꾸지 않았다. 사용자의 로그인 셸 환경을 따른다.
-- 터미널에서 쓰려면 연동 가이드 2단계의 링크 한 줄이면 된다. 예전 가이드로 만든 `~/.local/bin/ais-cli`(시스템 `java`)가 있어도 앱이 띄우는 Claude에게는 번들 것이 먼저 잡힌다.
-- 시험은 스크립트 `test:cli-script`(가짜 앱 폴더에서 진짜 셸 스크립트를 돌린다. PATH가 비었을 때, 링크로 불렀을 때, 개발용 빌드일 때 포함), PATH 얹기 `ask.rs`의 `bundled_tools_dir_comes_first_only_when_it_exists`, 실제 번들 `scripts/verify-release.mjs`(PATH 없이 스크립트로 노트를 읽고, MCP 등록 명령이 번들 Java를 가리키는지)다.
-- **못 한 것.** Java가 없는 Mac에서는 돌려 보지 않았다. 이 기계에는 JDK가 있다. 스크립트가 번들 Java를 절대 경로로 고르는 것(`sh -x`)과 PATH를 비운 채 도는 것까지만 확인했다.
+- **개발용 번들**(`target/…/bundle`): `native-host/src-tauri/resources/ais-cli`(셸 스크립트)가 들어간다(`tauri.conf.json`의 `resources`). 저장소의 빌드 폴더(`engine-rs/target/{release,debug}/ais-cli`)나 `AISURADA_CLI_BIN`으로 넘겨 주고, 없으면 종료 코드 127로 선다. PATH가 비어 있어도(Finder나 launchd가 띄운 환경) 돌아야 하므로 셸 내장 기능만 쓰고, 외부 명령은 절대 경로로 부르는 `readlink` 하나뿐이다. 심볼릭 링크로 불러도 앱 안의 자리를 찾는다.
+- **정식 번들**(`pnpm release:build`, 릴리스 설정 `tauri.release.conf.json`): `scripts/prepare-cli.mjs`가 `cargo build --release --locked -p ais-cli`로 지은 Rust 실행 파일을 `.release/bin/ais-cli`에 두고, 이것이 `bin/ais-cli`로 들어간다. 실행 파일 하나(약 4.5 MB)뿐이고 Java 실행 환경이나 jar는 싣지 않는다. 정식 번들은 Apple Silicon macOS에서만 짓는다.
 
-### 4부 스위치 3개
+호스트는 앱이 뜰 때 이 폴더를 `ask.rs`의 `set_tools_dir`로 알려 두고, `claude -p`를 띄울 때 PATH 맨 앞에 얹는다. 그래서 앱 안에서 묻는 Claude는 사용자가 래퍼를 만들지 않아도 `ais-cli`를 부를 수 있다. 앱 안 터미널(`pty_start_session`)의 PATH는 바꾸지 않았다. 사용자의 로그인 셸 환경을 따른다. 터미널에서 쓰려면 연동 가이드 2단계의 링크 한 줄이면 된다. 예전 가이드로 만든 `~/.local/bin/ais-cli`(Java `ais-cli.jar`를 돌리는 래퍼)가 있어도 앱이 띄우는 Claude에게는 번들 것이 먼저 잡힌다.
+
+시험은 스크립트 `test:cli-script`(가짜 앱 폴더에서 진짜 셸 스크립트를 돌린다. PATH가 비었을 때, 링크로 불렀을 때, 개발용 빌드일 때, 실행 파일을 못 찾을 때 포함), PATH 얹기 `ask.rs`의 `bundled_tools_dir_comes_first_only_when_it_exists`, 실제 번들 `scripts/verify-release.mjs`(번들의 Rust `ais-cli`로 노트를 만들고 읽는지, 표준 입출력 MCP가 도는지, Java가 안 들었는지)다. 번들을 검증하는 데 쓴 임시 HOME과 vault는 만든 쪽이 지운다.
+
+### 4부 스위치 2개
 
 | 층 | 켠 판(기본) | 끈 판 |
 |---|---|---|
-| 엔진 | `ais-sidecar.jar` (`engine-build.properties`의 `part4=true`) | `ais-sidecar-noclaude.jar` (`part4=false`, 4부 클래스를 안 실음) |
+| 엔진 | 항상 켜짐. 4부 명령 7개도 `ais-cli`에 있다 | 없음. 옛 `ais-sidecar-noclaude.jar`는 Java와 함께 지웠다 |
 | 호스트 | cargo 기능 `claude` (기본) | `--no-default-features` (4부 커맨드 9개가 빠짐) |
 | 화면 | `pnpm build`, `pnpm dev` | `pnpm build:noclaude` (`vite build --mode noclaude`) |
 
@@ -742,41 +708,37 @@ pnpm tauri build --debug --bundles app   # 산출: src-tauri/target/debug/bundle
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 수 분 | 실제 임시 vault, 실제 serve와 `ais-cli` 왕복 |
-| 화면·호스트 전체 | `bash test-native.sh` | 수 분 | 타입 검사, 화면 빌드 2종, Node 시험 450건, `cargo test` 102건(무시 1건) |
-| 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체 |
-| Rust 엔진 이전 | `(cd engine-rs && cargo test -p ais-core)` | 수 초 | 머리 읽기·쓰기 단위 시험과 합성 vault 통합 시험. Java와 맞대는 법은 §4 「Rust 엔진 이전」 |
-| 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 앱 안의 Rust 엔진(점검 하네스는 아직 쓰지 않는 격리 Java 엔진도 띄운다), 격리 HOME |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 14초(178건) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다 |
+| 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「기존 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
+| 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
+| 기준 맞대기 | §4 「기준과 맞대기」 | | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다 |
+| 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 앱 안의 Rust 엔진, 격리 HOME. 먼저 `(cd engine-rs && cargo build -p ais-cli)`로 점검이 쓸 실행 파일을 지어 둔다 |
 
-두 전체 시험 모두 맨 앞에서 `build.sh`를 돌려 `build/`와 `dist/`를 **지우고 다시 만든다.**
+`test.sh`는 `dist/`를 건드리지 않는다. `build.sh`는 `dist/ais-cli`를 만들고, 실제 창 점검은 `dist/`가 아니라 `engine-rs/target/debug/ais-cli`(또는 `AISURADA_CLI_BIN`)를 쓴다.
+
+**기존 실패.** 호스트 `cargo test`에서 `ask::tests` 4개(`test_gemini_missing_binary_message`, `test_gemini_success_with_fake_binary`, `test_resolve_claude_with_env_var`, `test_resolve_gemini_with_env_var`)는 Java를 지우기 전 `main`에서도 실패한다. 병렬로 돌리면 `runner::tests` 둘과 `terminal::` 셋이 더 실패하는 일이 있고, `-- --test-threads=1`로 돌리면 통과한다. 5d에서 직렬로 돌린 결과는 154건 통과, 4건 실패(위 `ask::tests`), 5건 무시다. 바꾼 쪽의 회귀와 구분하려면 변경 전 `main`과 같은 명령으로 비교한다.
 
 ### 엔진 시험 쓰기
 
-외부 시험 프레임워크는 없다. 시험 클래스 하나가 `main`을 가지고 `check(...)`와 `eq(...)`로 센다. 장별 시험은 `test/aisurada/ChapterTestSupport.java`를 쓴다.
+외부 시험 프레임워크 없이 Rust 기본 시험 도구(`cargo test`)를 쓴다.
 
-```java
-try (ChapterTestSupport t = new ChapterTestSupport("chapter99")) {
-    Path v = t.vault();                       // workspace.json과 아젠다가 있는 임시 vault
-    var r = ok(v, "create-doc", "agenda=demo", "type=free", "title=제목", "body=본문");
-    eq(r.get("agenda"), "demo", "아젠다가 그대로");
-    check(r.get("precondition").toString().startsWith("f1:"), "쓰기 전 토큰이 따라온다");
-}
-```
-
-- 시계와 id는 JVM 속성으로 고정한다: `aisurada.test.now`(시각, 도장과 평가 시각도 따름), `aisurada.test.random`(id의 무작위 조각). 속성을 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.
-- 새 시험 클래스는 `test.sh`에 `java -cp dist/ais-engine.jar:build/test-classes aisurada.<클래스>` 한 줄을 더한다. 더하지 않으면 안 돈다.
-- `test/aisurada/cli/`의 시험(`McpServerTest`, `ClaudeMcpCommandTest`)은 `aisurada.cli` 패키지에 있어서 `AisCliMain`의 패키지 비공개 부분(`CliExit`, `Call`)을 직접 본다. `ChapterTestSupport`는 쓰지 않고 자체 `check`/`eq`를 가진다. 클래스 이름은 `aisurada.cli.<클래스>`다.
-- 임시 HOME·vault·소켓만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.
+- **단위 시험**은 각 파일의 `#[cfg(test)]` 모듈에 둔다.
+- **통합 시험**은 `engine-rs/crates/ais-core/tests/fixture_vault.rs`(합성 vault를 `tools/compat/make-fixture.sh`로 만들어 읽기 명령의 핵심 동작을 확인), `engine-rs/crates/ais-cli/tests/`의 `mcp_stdio.rs`(진짜 `mcp` 프로세스), `register.rs`(가짜 에이전트 CLI로 등록), `old_sidecar.rs`(임시 HOME과 가짜 `launchctl`로 옛 사이드카 정리)에 둔다. `lock_interop.rs`는 기준 jar(`AISURADA_JAR`)가 있을 때만 돈다.
+- 시계와 id는 환경 변수로 고정한다: `AISURADA_TEST_NOW`(시각, 도장과 평가 시각도 따름), `AISURADA_TEST_RANDOM`(id의 무작위 조각). 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.
+- 임시 HOME·vault·잠금 폴더(`AISURADA_LOCK_DIR`)만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.
+- 동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 `docs/rust-engine-step*.md`의 해당 기록에 이유를 적는다.
 
 ### 받아들임 묶음 (34장)
 
 ```bash
-./build.sh
-AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$PWD/dist/ais-engine.jar" \
+ORACLE="$(bash engine-rs/tools/compat/build-oracle.sh)"   # 기준 jar를 태그에서 지어 둔다(§4)
+AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$ORACLE/ais-engine.jar" \
   node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out <빈 폴더>
 node fixtures/expect/run.mjs --self-check --mutants --out <빈 폴더>
 node fixtures/runner-test.mjs
 ```
+
+이 묶음은 기준 Java 엔진을 부른다. Rust `ais-cli`는 JSON 키를 정렬해서 쓰므로 키 차례까지 글자로 견주는 이 묶음과는 기대값 27건 가운데 일부(5d에서 잰 값은 11건이 완전히 같고 16건이 키 차례만 다름)가 맞지 않는다. 그래서 묶음은 기준 jar로만 돌리고, Rust와의 견줌은 키 차례를 무시하는 맞대기(§4)가 맡는다.
 
 `--out`은 결과를 쓸 폴더다(저는 매번 새 임시 폴더를 줬다). 케이스를 더하거나 `fixtures/expect/`의 파일을 고치면 `node fixtures/build-bundle.mjs`로 `bundle.json`의 sha256 목록을 다시 적는다. 진짜 묶음(읽기 레인 460건)은 이 저장소에 없다.
 
@@ -794,7 +756,7 @@ node fixtures/runner-test.mjs
 | 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다 |
 | 실제 창(4부) | `test:part4:acceptance`(켠 판 9건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 
-실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·소켓·빈 `ZDOTDIR`를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 `Diagnostics retained: <경로>`를 찍는다. `AISURADA_WORKSPACE_REPORT=<절대 경로>.json`이나 `AISURADA_CHECK_REPORT=<절대 경로>.json`으로 결과를 JSON으로 남길 수 있다. `--only=<사례 id>`로 일부만 돌릴 수 있다(편집기 왕복).
+실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·잠금 폴더·빈 `ZDOTDIR`를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 `Diagnostics retained: <경로>`를 찍는다. `AISURADA_WORKSPACE_REPORT=<절대 경로>.json`이나 `AISURADA_CHECK_REPORT=<절대 경로>.json`으로 결과를 JSON으로 남길 수 있다. `--only=<사례 id>`로 일부만 돌릴 수 있다(편집기 왕복).
 
 **호출 기록(`AISURADA_CALL_LOG`).** 점검은 앱이 엔진을 부른 호출을 세어 확인하는데(첫 새로고침 묶음, 본문 쓰기 횟수 따위), 호출 길이 둘(`sidecar_call` 문자열 목록, `engine_call` 호출 객체)이라 어느 길로 갔든 같은 문자열 목록(`toArgv`)으로 세야 한다. 호스트가 환경변수 `AISURADA_CALL_LOG`에 준 파일에 호출을 한 줄씩 JSON으로 적고(`call_log.rs`, 변수가 없으면 아무것도 안 한다), `workspace-acceptance.mjs`가 이것을 읽어 `/calls`로 내준다. 호출 객체의 인자는 이름 차례로 정렬돼 적히므로 점검은 인자 칸의 차례를 따지지 않는다. `data-checks.ts`와 `autosave-checks.ts`는 화면 안에서 두 길을 직접 감싸 센다.
 
@@ -810,7 +772,7 @@ node fixtures/runner-test.mjs
 
 ### 동시에 돌리면 안 되는 것
 
-`build.sh`, `test.sh`, `test-native.sh`, `tauri build`(내부에서 `build.sh`)는 `build/`와 `dist/`를 지운다. 이 중 둘을 동시에 돌리거나, 점검이 도는 동안 다른 터미널·세션에서 하나라도 돌리면 acceptance가 `ais-cli.jar를 못 찾았어요`로 깨진다. 실제로 겪었다. 병렬로 확인할 일이 있으면 `git worktree add --detach <경로> <커밋>`으로 커밋만 떼어 놓고 거기서 돌린다. `cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target`으로 cargo 산출물(약 12GB)을 APFS 복제하면 빠르다.
+`build.sh`는 `dist/`를 지우지 않지만 `dist/ais-cli`를 덮어쓴다. `cargo build`·`cargo test`가 같은 `engine-rs/target/`을 쓰므로 같은 폴더에서 둘 이상을 동시에 돌리면 잠금을 기다리거나, 점검이 쓰는 `engine-rs/target/debug/ais-cli`가 도중에 바뀐다. 실제 창 점검이 도는 동안 같은 폴더에서 다른 터미널·세션이 빌드하지 않는다. 병렬로 확인할 일이 있으면 `git worktree add --detach <경로> <커밋>`으로 커밋만 떼어 놓고 거기서 돌린다. `cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target`으로 호스트의 cargo 산출물(약 12GB)을 APFS 복제하면 빠르다. 엔진의 `engine-rs/target/`은 워크트리마다 새로 지어도 호스트보다 훨씬 작다.
 
 ## 9. 앱 손 확인
 
@@ -842,10 +804,10 @@ node fixtures/runner-test.mjs
 | `WITHLOG_*`, `--withlog.*`, `withlog.*` | `AISURADA_*`, `--aisurada.*`, `aisurada.*` | 환경 변수, 설정 키, 시험 속성 |
 | `withlog://` | `aisurada://` | 딥링크 스킴 |
 | `co.kcd.withlog` | `co.kcd.aisurada` | 번들 id, LaunchAgent 레이블 접두 |
-| `wl-cli` | `ais-cli` | 클라이언트 jar와 명령 |
-| `wl-engine.jar`, `wl-sidecar.jar`, `wl-sidecar-noclaude.jar` | `ais-engine.jar`, `ais-sidecar.jar`, `ais-sidecar-noclaude.jar` | |
+| `wl-cli` | `ais-cli` | 클라이언트 jar와 명령(지금은 실행 파일 이름) |
+| `wl-engine.jar`, `wl-sidecar.jar`, `wl-sidecar-noclaude.jar` | `ais-engine.jar`, `ais-sidecar.jar`, `ais-sidecar-noclaude.jar` | 지금 `dist/`에 생기는 것은 `ais-cli` 하나다. jar는 기준 jar(`build-oracle.sh`)에만 있다 |
 | `WL-409`, `WL-412` … | `AIS-409`, `AIS-412` … | 오류 코드 |
-| `WlException`, `WlCliMain` | `AisException`, `AisCliMain` | 자바 클래스 |
+| `WlException`, `WlCliMain` | `AisException`, `AisCliMain` | 자바 클래스(지금은 태그 `java-engine-final`에만 있다) |
 | `WLQ1`, `WLG1` | `AIQ1`, `AIG1` | 소켓 프레임 머리. 4바이트 폭을 지키려고 `AI`로 바꿨다 |
 | `wlframe://`, `x-wl-*`, `wl://menu` 따위 | `aisframe://`, `x-ais-*`, `ais://menu` | 호스트 프로토콜, 헤더, 이벤트 |
 | `wl_close_tab` 따위 | `ais_close_tab` | 메뉴 id |
@@ -865,18 +827,15 @@ node fixtures/runner-test.mjs
 
 | 증상 | 원인과 처방 |
 |---|---|
-| `소켓 경로가 102 바이트를 넘는다` | `AISURADA_SIDECAR_SOCKET`을 `$HOME` 바로 아래 같은 짧은 경로로 준다 |
-| 화면에 `모르는 명령이다: …`(예: `list-resources`)가 뜬다 | 뒤에서 도는 엔진이 앱보다 낡았다. `launchctl print gui/$(id -u)/co.kcd.aisurada.sidecar.<키>`로 엔진이 쓰는 jar(plist의 `-jar` 다음)를 보고, 낡았으면 새 앱의 `ais-cli.jar install --cli … --sidecar …`로 `~/Library/Application Support/aisurada/bin/`에 깐 뒤 `launchctl kickstart -k gui/$(id -u)/<레이블>`로 다시 띄운다. 정식 앱은 뜰 때 자기 jar로 등록을 맞추지만, 개발 실행과 빌드 폴더 번들은 있는 등록을 그대로 쓴다(§7) |
-| 앱에서 `워크스페이스 생성 실패 … AIS-400 AISURADA_SIDECAR_JAR 가 없고 설치된 ais-sidecar.jar 도 없다` | 개발 실행의 앱이 엔진을 띄우려는데 등록도 없고 jar도 못 찾는다(§7). 앱을 띄우는 터미널에서 `AISURADA_SIDECAR_JAR`를 절대 경로로 주고, §3 예시의 `AISURADA_VAULT`와 `AISURADA_SIDECAR_SOCKET`은 `unset`한 뒤 앱을 다시 띄운다 |
-| `ais-cli.jar를 못 찾았어요 … 찾아본 자리: …/dist/ais-cli.jar` | `./build.sh`를 안 돌렸거나, 다른 곳에서 `build.sh`가 `dist/`를 지우는 중이다(§8) |
-| 앱 안에서 묻는데 Claude가 `ais-cli`를 못 찾거나 `java`가 없다고 한다 | 개발 실행에는 번들 스크립트도 번들 Java도 없다. 릴리스 설정으로 지은 번들(`tauri.release.conf.json`)만 둘 다 싣는다. 개발 중에는 PATH에 `java`와 `ais-cli`가 있어야 한다(§7) |
-| MCP 클라이언트가 `aisurada` 서버에 못 붙거나 곧 끊는다 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊는다. mcp 모드에서 엔진 길의 출력은 호출마다 모아서 돌려주게 되어 있다(§5). 새로 출력을 더하는 코드는 `System.err`로 쓴다. 직접 보려면 `AISURADA_VAULT`를 주고 `java -jar dist/ais-cli.jar mcp`를 띄운 뒤 표준 입력에 `initialize` 요청 한 줄을 넣어 본다 |
+| 화면에 `모르는 명령이다: …`(예: `list-resources`)가 뜬다 | 명령이 `engine-rs/crates/ais-cli/src/registry.rs`의 목록에 없거나(§5 「명령을 새로 넣는 길」), 터미널과 에이전트에 등록된 `ais-cli`가 앱보다 낡았다. `dist/ais-cli doctor`가 보여 주는 실행 파일 자리와 MCP 등록을 확인하고 낡았으면 `doctor --fix`로 다시 등록한다 |
+| `ais-cli 실행 파일을 못 찾았다 …`(종료 코드 127) | 개발용 번들의 `bin/ais-cli` 스크립트가 빌드 폴더에서 실행 파일을 못 찾았다. `(cd engine-rs && cargo build -p ais-cli)`로 짓거나 `AISURADA_CLI_BIN`에 자리를 준다. 실제 창 점검 중이면 같은 폴더에서 다른 빌드가 도는 중일 수도 있다(§8) |
+| 앱 안에서 묻는데 Claude가 `ais-cli`를 못 찾는다 | 개발 실행에는 앱에 든 `bin/ais-cli`가 없거나 빌드 폴더의 실행 파일을 가리키는 스크립트다. PATH에 `ais-cli`가 있거나 `engine-rs/target/debug/ais-cli`를 지어 둔다. 정식 번들(`pnpm release:build`)에는 실행 파일이 든다(§7) |
+| MCP 클라이언트가 `aisurada` 서버에 못 붙거나 곧 끊는다 | 서버의 표준 출력에 JSON-RPC가 아닌 글이 섞이면 클라이언트가 끊는다. mcp 모드에서 엔진 길의 출력은 호출마다 모아서 돌려주게 되어 있다(§5). 새로 출력을 더하는 코드는 `eprintln!`(표준 오류)로 쓴다. 직접 보려면 `AISURADA_VAULT`를 주고 `dist/ais-cli mcp`를 띄운 뒤 표준 입력에 `initialize` 요청 한 줄을 넣어 본다 |
 | 문서를 `open`했더니 앱이 떴다 | 번들이 `.md` 기본 편집기로 등록돼 있다. 에디터나 브라우저로 연다 |
-| 앱을 켰더니 진짜 launchd에 plist가 생길 것 같다 | §6처럼 엔진을 먼저 띄우고 격리 HOME으로 앱을 띄운다 |
-| 4부 명령이 `AIS-409`로 선다 | 4부를 뺀 jar(`ais-sidecar-noclaude.jar`)를 쓰고 있다 |
+| 앱을 켰더니 진짜 기기의 launchd나 에이전트 등록이 바뀔 것 같다 | 정식 앱은 첫 실행에 한 번 옛 사이드카를 내리고 낡은 MCP 등록을 다시 등록한다(§4 「앱의 호출 길」). 개발 실행과 빌드 폴더 번들은 하지 않는다. 격리 HOME으로 띄우면 진짜 기기의 것을 건드리지 않는다([`beta-hand-check.md`](beta-hand-check.md)) |
 | `cargo test --locked`가 락 파일 때문에 선다 | 패키지 이름이나 의존성을 바꿨다. 한 번 `cargo build`(락 없이)로 `Cargo.lock`을 갱신해 커밋한다 |
 | acceptance 뒤 `$TMPDIR/ais-p3-*`가 쌓인다 | 실패한 점검의 진단 보존이다. 원인을 본 뒤 지운다 |
-| 이름이나 문구를 바꿨더니 HTML 노트를 못 읽는다 | 글자 수를 숫자로 박아 둔 코드다(예: 마커 `<!--aisurada`의 길이). 숫자 대신 문자열의 `length()`를 쓴다 |
+| 이름이나 문구를 바꿨더니 HTML 노트를 못 읽는다 | 글자 수를 숫자로 박아 둔 코드다(예: 마커 `<!--aisurada`의 길이). 숫자 대신 문자열의 `len()`(바이트)이나 글자 수를 세는 함수를 쓴다 |
 | 이 셸의 `rm`이 확인을 묻는다 | `rm`이 `-i` 별칭이다. `/bin/rm -rf`를 쓴다 |
 | zsh에서 `echo ====`가 `not found` | `=`로 시작하는 낱말을 zsh가 명령으로 푼다. 따옴표로 감싼다 |
 | HTML 첨부 상자 안에서 외부 스크립트나 지도 타일이 안 뜬다(Leaflet 지도가 「지도를 불러오지 못했습니다」로 나온다) | 상자(`aisframe://`) 응답에 붙는 고정 CSP(`frame.rs`의 `CSP`)가 허용하지 않은 곳이다. 지도(Leaflet)용으로 `cdnjs.cloudflare.com`(스크립트·스타일·그림)과 타일 서버 `xdworld.vworld.kr`·`server.arcgisonline.com`(그림)만 열어 두었다. 다른 호스트가 필요하면 `CSP`에 더하고 다시 짓는다. 와일드카드, `https:` 같은 스킴만 쓴 출처, `connect-src`는 열지 않으며 `frame.rs`의 `csp_tests`가 이를 지킨다 |
@@ -884,13 +843,13 @@ node fixtures/runner-test.mjs
 
 ## 13. 지금 상태와 한계
 
-- 엔진 시험, 화면·호스트 시험, 34장 받아들임, 4부를 뺀 실제 창 점검 8종은 통과한다. 수치는 `README.md`와 각 완료 기록에 있다.
+- 엔진 시험(`bash test.sh` 178건), 화면 Node 시험 641건, 기준 맞대기(어긋남 0), 34장 받아들임(기준 jar로 27건 모두 맞음), 실제 창 점검 10종 248건은 통과한다(2026-11-15, 5d). 호스트 `cargo test`는 기존 실패 4건(`ask::tests`)을 뺀 나머지가 직렬로 통과한다(§8). 수치와 근거는 [5d 기록](rust-engine-step5d-java-removal.md)에 있다.
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
 - MCP 서버(`ais-cli mcp`)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(`✔ Connected`), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).
 - 설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).
 - 설정의 「글꼴과 크기」는 브라우저(개발 서버, 샘플 vault)에서 다섯 모양 모두 눈으로 보았다. 실제 WKWebView 점검(`test:views:acceptance` 28건, `test:navigation:acceptance` 13건, 둘 다 4부를 뺀 판)에서 웹뷰 확대가 되는 것(`innerWidth`가 배율만큼 변함), ⌘ 단축키, 앱 글꼴 적용·오류·기본값, 열려 있는 터미널의 글꼴 변경, 150% 확대 중 터미널 화면이 칸 안에 드는 것까지 확인했다. **못 본 것:** 터미널과 편집기가 확대된 채로 눈에 어떻게 보이는지(글자가 또렷한지, 편집기 팝오버 위치)는 화면을 직접 보지 못했다(점검은 DOM 값과 크기만 잰다). 노트 창(`note-*`)에서 같은 권한으로 확대되는지는 점검이 없고(권한 목록이 메인과 같다는 것만 계약 시험이 잰다), 4부를 켠 판은 안 돌렸다.
-- 앱에 든 Java로 도는 `ais-cli`는 릴리스 설정의 디버그 번들에서 실제로 확인했다(`verify-release.mjs` 10건). Java가 없는 Mac에서 설치해 본 확인, 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.
-- 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, 굳히기는 안 잰다. 진짜 `launchctl`로 돌려 본 확인, 서명·공증·업데이트, 원본 아이콘은 없다.
+- 앱에 든 Rust `ais-cli`는 릴리스 설정의 디버그 번들에서 `verify-release.mjs`로 확인했다(8건: 번들의 실행 파일이 노트를 만들고 읽는지, 표준 입출력 MCP가 도는지, Java가 안 들었는지). Java를 번들하지 않으므로 「Java가 없는 Mac」 확인은 필요 없어졌다. 서명·공증, 공개 배포용 최적화 빌드로 다시 지은 확인은 없다.
+- 4부를 켠 판의 실제 창 점검은 있지만 얕다(묻기 왕복, 세션 화면, 설정의 Claude 연결 8건). 레일 대화, 세션 입력창, 굳히기는 안 잰다. 진짜 launchd에서 `ais-cli sweep`을 돌려 본 확인(이슈 #54, #61의 손 확인), 서명·공증·업데이트, 원본 아이콘은 없다.
 - 물성 모양은 캘린더(일·주·월), 노트 읽기·편집, 설정, 빠른 검색, 시작 화면, 연결, 템플릿을 브라우저에서 눈으로 확인했다. 격자는 캘린더(일), 노트 편집, 설정을 밝게·어둡게로, 유리와 모던은 캘린더(일)를 밝게·어둡게로, 설정과 노트 편집을 밝게로 확인했다. 4부 화면(묻기 카드, 세션 화면, 레일 대화)과 이력 비교, 리포트, 휴지통은 물성 말고는 눈으로 확인하지 못했다.
 - 외부 설명서와 달라진 곳: Codex·Gemini 세션을 노트에 적고 읽는 확장이 있다(§5 「세션 에이전트 확장」). `mins` 필드를 지웠다(위 「vault의 모양」). 데일리 리포트 명령(`list-reports`, `get-report`, `save-report`)도 엔진에서 뺐다. 이 저장소의 받아들임 묶음은 `mins`를 뺀 기대값으로 고쳐 두었고, 리포트 사례 2건(`list_reports/all`, `get_report/missing`)을 덜어 27건이다. 진짜 묶음(읽기 레인 460건)을 구해 돌리면 응답에 `mins`가 없는 만큼, 그리고 리포트 사례만큼 어긋난다.
 - 설명서 원문이 제공되지 않은 부분(3부 18장, 4부 `ais-agent` 데몬, 진짜 받아들임 묶음)은 추측해서 채우지 않았다. 각 완료 기록의 「못 한 것」을 먼저 본다.
