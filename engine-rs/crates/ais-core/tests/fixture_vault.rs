@@ -3187,21 +3187,25 @@ fn appends_ask_and_chat_turns_next_to_the_note() {
     assert_eq!(error("list_chats", json!({"id": single})).code, "AIS-500");
 }
 
-#[test]
-fn reads_session_transcripts_of_every_agent() {
-    // 세션 기록은 vault 밖 홈 아래에 있다. 이 시험만 쓰는 홈을 한 번 정한다.
+/// 세션 기록 시험이 함께 쓰는 홈. 세션 홈은 환경 변수로 정해서 프로세스 전체에 걸리므로, 세션 명령을 부르는 시험들이 한 홈을 나눠 쓴다.
+fn session_home() -> &'static PathBuf {
     static HOME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    let home = HOME.get_or_init(|| {
+    HOME.get_or_init(|| {
         let home = std::env::temp_dir().join(format!("ais-session-home-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
-        // SAFETY: 이 환경 변수를 읽는 것은 세션 읽기 명령뿐이고, 이 시험만 세션 명령을 부른다.
+        // SAFETY: 이 환경 변수를 읽는 것은 세션 읽기 명령뿐이고, 세션 명령을 부르는 시험은 모두 이 홈을 쓴다.
         unsafe {
             std::env::set_var("AISURADA_CLAUDE_HOME", &home);
             std::env::set_var("AISURADA_CODEX_HOME", &home);
             std::env::set_var("AISURADA_GEMINI_HOME", &home);
         }
         home
-    });
+    })
+}
+
+#[test]
+fn reads_session_transcripts_of_every_agent() {
+    let home = session_home();
     let write = |rel: &str, text: &str| {
         let path = home.join(rel);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -3378,6 +3382,225 @@ fn reads_session_transcripts_of_every_agent() {
             .message,
         "days 는 1 부터 30 사이여야 해요: 31"
     );
+}
+
+fn pb_varint(mut value: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    loop {
+        let byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if value == 0 {
+            out.push(byte);
+            return out;
+        }
+        out.push(byte | 0x80);
+    }
+}
+
+fn pb_num(field: u32, value: u64) -> Vec<u8> {
+    let mut out = pb_varint(u64::from(field) << 3);
+    out.extend(pb_varint(value));
+    out
+}
+
+fn pb_len(field: u32, bytes: &[u8]) -> Vec<u8> {
+    let mut out = pb_varint((u64::from(field) << 3) | 2);
+    out.extend(pb_varint(bytes.len() as u64));
+    out.extend_from_slice(bytes);
+    out
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02X}")).collect()
+}
+
+/// 엔진이 Antigravity 기록을 읽을 때 쓰는 `sqlite3`의 자리(엔진과 같은 차례: 환경 변수, `/usr/bin/sqlite3`, `PATH`). 없으면 `None`이다.
+fn sqlite3_binary() -> Option<String> {
+    let custom = std::env::var("AISURADA_SQLITE_BIN").unwrap_or_default();
+    if !custom.is_empty() {
+        return Some(custom);
+    }
+    if Path::new("/usr/bin/sqlite3").is_file() {
+        return Some("/usr/bin/sqlite3".to_string());
+    }
+    Command::new("sqlite3")
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|_| "sqlite3".to_string())
+}
+
+/// 합성 Antigravity 대화 기록(SQLite)을 만든다. 단계 8개(사용자 입력, 모델 답, 빈 입력, 도구 호출 셋, 시스템 알림, 빈 단계)와
+/// 대화 메타(작업 폴더, 모델 이름, 화면 이름)를 넣는다. 같은 기록을 기준 Java 엔진도 읽어(`compat_check`) 응답이 같음을 확인했다.
+fn make_antigravity_db(sqlite: &str, path: &Path, cwd: &str) {
+    let time = |secs: u64, nanos: u64| {
+        let mut t = pb_num(1, secs);
+        t.extend(pb_num(2, nanos));
+        pb_len(1, &t)
+    };
+    let user_meta = time(1_794_700_000, 123_000_000);
+    let model_meta = time(1_794_700_005, 0);
+    let user_payload = pb_len(
+        19,
+        &pb_len(
+            2,
+            "안티그래비티에게 묻는다 https://example.com/agy 끝".as_bytes(),
+        ),
+    );
+    let model_payload = pb_len(
+        20,
+        &[
+            pb_len(1, "답한다".as_bytes()),
+            pb_len(3, "생각은 뺀다".as_bytes()),
+        ]
+        .concat(),
+    );
+    let empty_payload = pb_len(19, &pb_len(2, b"   "));
+    let tool = |name: &str, args: &str| {
+        let call = [pb_len(2, name.as_bytes()), pb_len(3, args.as_bytes())].concat();
+        [time(1_794_700_010, 1_000), pb_len(4, &call)].concat()
+    };
+    let mcp_args = r#"{"x":1,"ServerName":"srv","ToolName":"search"}"#;
+    let rows = [
+        format!(
+            "(0,14,0,NULL,X'{}',X'{}')",
+            hex(&user_meta),
+            hex(&user_payload)
+        ),
+        format!(
+            "(1,15,0,NULL,X'{}',X'{}')",
+            hex(&model_meta),
+            hex(&model_payload)
+        ),
+        format!(
+            "(2,14,5,NULL,X'{}',X'{}')",
+            hex(&user_meta),
+            hex(&empty_payload)
+        ),
+        format!(
+            "(3,132,0,NULL,X'{}',NULL)",
+            hex(&tool(
+                "run_command",
+                r#"{"CommandLine":"ls -la","description":"목록을 본다"}"#
+            ))
+        ),
+        format!(
+            "(4,132,7,NULL,X'{}',NULL)",
+            hex(&tool("view_file", r#"{"AbsolutePath":"/tmp/a.txt"}"#))
+        ),
+        format!(
+            "(5,132,0,X'01',X'{}',NULL)",
+            hex(&tool("call_mcp_tool", mcp_args))
+        ),
+        format!("(6,101,0,NULL,X'{}',NULL)", hex(&user_meta)),
+        "(7,14,0,NULL,X'',NULL)".to_string(),
+    ];
+    let trajectory = pb_len(7, format!("file://{cwd}").as_bytes());
+    let executor = pb_len(
+        10,
+        &pb_len(1, &pb_len(28, "gemini-3.8-flash-high".as_bytes())),
+    );
+    let generated = pb_len(1, &pb_len(21, "Gemini 화면 이름".as_bytes()));
+    let sql = format!(
+        "create table steps(idx integer, step_type integer, status integer, error_details blob, metadata blob, step_payload blob);\
+         create table trajectory_metadata_blob(data blob); create table executor_metadata(idx integer, data blob); create table gen_metadata(idx integer, data blob);\
+         insert into steps values {};\
+         insert into trajectory_metadata_blob values (X'{}');\
+         insert into executor_metadata values (0, X'{}');\
+         insert into gen_metadata values (0, X'{}');",
+        rows.join(","),
+        hex(&trajectory),
+        hex(&executor),
+        hex(&generated)
+    );
+    let _ = std::fs::remove_file(path);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let status = Command::new(sqlite)
+        .arg(path)
+        .arg(sql)
+        .status()
+        .expect("sqlite3를 못 돌렸다");
+    assert!(status.success(), "합성 Antigravity 기록을 못 만들었다");
+}
+
+/// Antigravity 대화는 SQLite 파일이라 시스템 `sqlite3`로 읽는다. 사용자 입력(14), 모델 답(15), 도구 호출(132)만 회차가 되고
+/// 시스템 알림(101)과 빈 단계는 건너뛴다. 기대값은 같은 기록을 기준 Java 엔진이 읽은 응답(`golden/compat.ndjson`에 녹화)과 같다.
+/// `sqlite3`가 없는 기기에서는 건너뛴다.
+#[test]
+fn reads_antigravity_conversations_through_sqlite3() {
+    let Some(sqlite) = sqlite3_binary() else {
+        eprintln!("sqlite3가 없어 Antigravity 시험을 건너뛴다");
+        return;
+    };
+    let home = session_home();
+    let agy = "44444444-aaaa-bbbb-cccc-444444444444";
+    make_antigravity_db(
+        &sqlite,
+        &home.join(format!(".gemini/antigravity-cli/conversations/{agy}.db")),
+        "/work/agy dir%20x",
+    );
+    let vault = fixture();
+    let engine = Engine::new(&vault);
+
+    let read = engine.call("read_session", json!({"id": agy})).unwrap();
+    assert_eq!(
+        (
+            read["agent"].as_str(),
+            read["client"].as_str(),
+            read["sessionId"].as_str()
+        ),
+        (Some("gemini"), Some("antigravity"), Some(agy))
+    );
+    assert_eq!(read["hasMore"], false);
+    assert_eq!(
+        read["runState"],
+        json!({"model": "gemini-3.8-flash-high", "quotaBlocked": false})
+    );
+    assert_eq!(read["source"]["lines"], 8);
+    assert_eq!(read["source"]["messages"], 5);
+    assert_eq!(read["source"]["skipped"], 0);
+    assert_eq!(read["todos"], json!([]));
+    assert_eq!(read["runningAgents"], json!([]));
+    assert_eq!(read["urls"], json!([]));
+    assert_eq!(
+        read["turns"],
+        json!([
+            {"index": 0, "who": "user", "at": "2026-11-14T23:46:40.123Z", "chars": 38, "truncated": false,
+             "text": "안티그래비티에게 묻는다 https://example.com/agy 끝"},
+            {"index": 1, "who": "assistant", "at": "2026-11-14T23:46:45Z", "chars": 3, "truncated": false,
+             "text": "답한다"},
+            {"index": 2, "who": "tool", "at": "2026-11-14T23:46:50.000001Z", "chars": 0, "truncated": false, "text": "",
+             "tool": {"name": "run_command", "arg": "목록을 본다"}},
+            {"index": 3, "who": "tool", "at": "2026-11-14T23:46:50.000001Z", "chars": 0, "truncated": false, "text": "",
+             "tool": {"name": "view_file", "arg": "/tmp/a.txt", "failed": true}},
+            {"index": 4, "who": "tool", "at": "2026-11-14T23:46:50.000001Z", "chars": 0, "truncated": false, "text": "",
+             "tool": {"name": "srv/search", "failed": true}},
+        ])
+    );
+
+    // 주소를 모아 달라고 하면 사용자 입력의 주소가 센다
+    let with_urls = engine
+        .call("read_session", json!({"id": agy, "urls": "true"}))
+        .unwrap();
+    assert_eq!(
+        with_urls["urls"],
+        json!([{"count": 1, "url": "https://example.com/agy"}])
+    );
+
+    // 제목은 첫 사용자 입력이고, 에이전트는 gemini지만 `client`로 Gemini CLI와 가린다. 없는 대화는 찾지 못했다고 답한다
+    let titles = engine
+        .call(
+            "session_titles",
+            json!({"ids": [agy, "12345678-0000-0000-0000-000000000000"]}),
+        )
+        .unwrap();
+    assert_eq!(
+        titles["sessions"][0],
+        json!({"sessionId": agy, "found": true, "agent": "gemini", "client": "antigravity",
+               "title": "안티그래비티에게 묻는다 https://example.com/agy 끝", "branch": null, "cwd": null})
+    );
+    assert_eq!(titles["sessions"][1]["found"], false);
 }
 
 #[test]

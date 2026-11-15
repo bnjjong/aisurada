@@ -305,7 +305,7 @@ printf '%s\n' \
 
 확인한 것(2026-11-05 기준):
 
-- `bash test.sh`(5d에서 178건 통과)의 `crates/ais-cli/tests/mcp_stdio.rs`(진짜 `mcp` 프로세스와 표준 입출력 왕복)와 `register.rs`(가짜 에이전트 CLI로 등록)가 통과합니다. Java 시절의 MCP 서버 시험과 등록 시험 클래스는 Java와 함께 지웠습니다.
+- `bash test.sh`(5d에서 178건 통과)의 `crates/ais-cli/tests/mcp_stdio.rs`(진짜 `mcp` 프로세스와 표준 입출력 왕복. 세션 표식이 노트 머리에 남는 것과, AI가 올린 변경이 대기하다 사람의 `ais-cli`로만 승인되는 길까지 본다)와 `register.rs`(가짜 에이전트 CLI로 등록)가 통과합니다. Java 시절의 MCP 서버 시험과 등록 시험 클래스는 Java와 함께 지웠습니다.
 - 기준 Java MCP 서버와 JSON-RPC 대화를 맞댄 `mcp_compat`이 어긋남 0으로 끝났습니다(5d, 174건).
 - 진짜 Claude Code 2.1.318을 격리 HOME에서 `add`, `--write`로 바꿔 끼우기, `✔ Connected`, `remove`까지 확인했습니다.
 - 이 문서의 도구 수(읽기 19, 쓰기 37)는 5d에서 `tools/list`를 직접 불러 세었습니다. 인자 표, §6의 응답과 오류 글, §7의 직접 시험 예시는 격리 vault에 `mcp --write` 서버를 띄워 직접 부르고 얻은 것입니다. 모델이 아니라 사람이 JSON-RPC를 손으로 보냈습니다.

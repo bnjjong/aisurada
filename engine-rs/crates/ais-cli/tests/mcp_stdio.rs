@@ -24,6 +24,16 @@ fn fixture(name: &str) -> PathBuf {
 
 /// 서버를 띄워 메시지를 한 줄씩 보내고, 입력을 닫은 뒤 (종료 코드, 답 목록)을 돌려준다.
 fn converse(vault: &Path, args: &[&str], messages: &[Value]) -> (i32, Vec<Value>) {
+    converse_with(vault, args, &[], messages)
+}
+
+/// `converse`에 서버 프로세스의 환경 변수를 더해 준다(세션 표식, 승인 기록 폴더 따위).
+fn converse_with(
+    vault: &Path,
+    args: &[&str],
+    extra_env: &[(&str, &str)],
+    messages: &[Value],
+) -> (i32, Vec<Value>) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_ais-cli"))
         .arg("mcp")
         .args(args)
@@ -32,6 +42,7 @@ fn converse(vault: &Path, args: &[&str], messages: &[Value]) -> (i32, Vec<Value>
         .env("AISURADA_LOCK_DIR", vault.join("../locks-for-mcp-test"))
         .env("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false")
         .env("HOME", vault)
+        .envs(extra_env.iter().copied())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -58,6 +69,54 @@ fn call(id: u32, name: &str, arguments: Value) -> Value {
 
 fn text(reply: &Value) -> &str {
     reply["result"]["content"][0]["text"].as_str().unwrap_or("")
+}
+
+/// 단발 `ais-cli`를 빈 환경에서 부른다. `extra_env`로만 세션 표식 따위를 준다. (종료 코드, 표준 출력, 표준 오류)
+fn run_cli(vault: &Path, extra_env: &[(&str, &str)], args: &[&str]) -> (i32, String, String) {
+    let output = Command::new(env!("CARGO_BIN_EXE_ais-cli"))
+        .args(args)
+        .env_clear()
+        .env("AISURADA_VAULT", vault)
+        .env("AISURADA_LOCK_DIR", vault.join("../locks-for-mcp-test"))
+        .env("AISURADA_VAULT_AUTOCOMMIT_ENABLED", "false")
+        .env("HOME", vault)
+        .envs(extra_env.iter().copied())
+        .output()
+        .expect("ais-cli를 못 띄웠다");
+    (
+        output.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+/// `notes/` 아래에서 머리에 `id: <id>` 줄이 있는 마크다운 파일의 글을 찾는다.
+fn note_text(vault: &Path, id: &str) -> String {
+    fn walk(dir: &Path, wanted: &str, found: &mut Option<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, wanted, found);
+            } else if path.extension().is_some_and(|ext| ext == "md")
+                && let Ok(text) = std::fs::read_to_string(&path)
+                && text.contains(wanted)
+            {
+                *found = Some(text);
+            }
+        }
+    }
+    let mut found = None;
+    walk(&vault.join("notes"), &format!("\nid: {id}\n"), &mut found);
+    found.unwrap_or_else(|| panic!("노트 {id} 파일을 못 찾았다"))
+}
+
+/// 도구 호출의 답이 오류가 아니어야 한다. 본문 글을 JSON으로 읽어 돌려준다.
+fn tool_json(reply: &Value) -> Value {
+    assert_eq!(reply["result"]["isError"], false, "{}", text(reply));
+    serde_json::from_str(text(reply)).unwrap()
 }
 
 #[test]
@@ -254,5 +313,252 @@ fn mcp_server_commits_the_record_a_single_shot_cli_left_behind() {
         "{message}"
     );
     assert!(!vault.join(".git/aisurada-pending.json").exists());
+    let _ = std::fs::remove_dir_all(&vault);
+}
+
+/// 승인 길 끝에서 끝까지: AI가 MCP 서버로 올린 변경은 대기에 머물고, 세션 표식이 달린 `ais-cli`는 승인하지 못하며,
+/// 표식 없는 `ais-cli`가 승인해야 올린 세션의 기록으로 적용된다.
+#[test]
+fn an_ai_change_waits_until_a_human_runs_the_approval() {
+    let vault = fixture("approve");
+    let approvals = vault.join("../approvals-for-mcp-test-approve");
+    let approvals_text = approvals.to_string_lossy().into_owned();
+    let approvals_env = ("AISURADA_APPROVALS_DIR", approvals_text.as_str());
+
+    // AI(세션 표식이 달린 MCP 서버)가 글로벌 스킬을 만든다. 글로벌 변경은 정책상 승인을 기다린다
+    let (code, replies) = converse_with(
+        &vault,
+        &["--write"],
+        &[
+            approvals_env,
+            ("AISURADA_SESSION_ID", "ai-sess-1"),
+            ("AISURADA_SESSION_AGENT", "codex"),
+        ],
+        &[call(
+            1,
+            "save_resource",
+            json!({"kind":"skill","scope":"global","name":"제안 스킬","description":"d","body":"본문"}),
+        )],
+    );
+    assert_eq!(code, 0);
+    let queued = tool_json(&replies[0]);
+    assert_eq!(queued["queued"], true);
+    assert_eq!(queued["status"], "pending");
+    assert_eq!(queued["reasons"][0]["category"], "global-change");
+    let change = queued["changeId"].as_str().unwrap().to_string();
+
+    // 승인 전에는 목록에 아무것도 없고, 대기 목록에는 올린 세션이 남아 있다
+    let (code, listed, _) = run_cli(
+        &vault,
+        &[approvals_env],
+        &["list-resources", "scope=global"],
+    );
+    assert_eq!(code, 0);
+    let listed: Value = serde_json::from_str(&listed).unwrap();
+    assert_eq!(listed["resources"].as_array().unwrap().len(), 0);
+    assert_eq!(listed["approvals"]["pending"], 1);
+    let (_, pending, _) = run_cli(&vault, &[approvals_env], &["get-resource-change", &change]);
+    let pending: Value = serde_json::from_str(&pending).unwrap();
+    assert_eq!(pending["status"], "pending");
+    assert_eq!(pending["proposer"]["session"], "ai-sess-1");
+    assert_eq!(pending["proposer"]["agent"], "codex");
+
+    // 세션 표식이 달린 `ais-cli`는 어느 에이전트의 것이든 승인하지 못한다(AIS-403, 종료 코드 3)
+    for markers in [
+        vec![
+            ("AISURADA_SESSION_ID", "ai-sess-2"),
+            ("AISURADA_SESSION_AGENT", "codex"),
+        ],
+        vec![("CLAUDE_CODE_SESSION_ID", "claude-sess-1")],
+        vec![("CODEX_THREAD_ID", "thread-1")],
+    ] {
+        let mut env = vec![approvals_env];
+        env.extend(markers.iter().copied());
+        let (code, stdout, stderr) = run_cli(&vault, &env, &["approve-resource-change", &change]);
+        assert_eq!(code, 3, "{markers:?}: {stderr}");
+        assert!(stderr.starts_with("AIS-403"), "{markers:?}: {stderr}");
+        assert!(stdout.is_empty());
+    }
+    let (_, still, _) = run_cli(&vault, &[approvals_env], &["get-resource-change", &change]);
+    let still: Value = serde_json::from_str(&still).unwrap();
+    assert_eq!(
+        still["status"], "pending",
+        "거절된 승인은 아무것도 바꾸지 않는다"
+    );
+
+    // 표식 없는 `ais-cli`(사람)가 승인하면 올린 세션의 기록으로 적용된다
+    let (code, approved, stderr) = run_cli(
+        &vault,
+        &[approvals_env],
+        &["approve-resource-change", &change],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    let approved: Value = serde_json::from_str(&approved).unwrap();
+    assert_eq!(approved["approved"], true);
+    assert_eq!(approved["result"]["created"], true);
+    assert_eq!(approved["result"]["editedSession"], "ai-sess-1");
+    assert_eq!(approved["result"]["editedAgent"], "codex");
+    let path = approved["result"]["path"].as_str().unwrap();
+    let file = std::fs::read_to_string(vault.join(path)).unwrap();
+    assert!(file.contains("editedSession: ai-sess-1\n"), "{file}");
+    assert!(file.contains("editedAgent: codex\n"), "{file}");
+
+    let (_, listed, _) = run_cli(
+        &vault,
+        &[approvals_env],
+        &["list-resources", "scope=global"],
+    );
+    let listed: Value = serde_json::from_str(&listed).unwrap();
+    assert_eq!(listed["resources"][0]["name"], "제안 스킬");
+    assert_eq!(listed["approvals"]["pending"], 0);
+
+    // 이미 처리한 변경은 다시 승인할 수 없다
+    let (code, _, stderr) = run_cli(
+        &vault,
+        &[approvals_env],
+        &["approve-resource-change", &change],
+    );
+    assert_eq!(code, 3);
+    assert!(stderr.starts_with("AIS-409"), "{stderr}");
+    let _ = std::fs::remove_dir_all(&vault);
+    let _ = std::fs::remove_dir_all(&approvals);
+}
+
+/// 서버 프로세스가 환경 변수로 받은 세션이 노트 머리의 `sessionId`와 `editedSessionId`에 남는다. 에이전트 이름은 claude가 아닐 때만 적힌다.
+#[test]
+fn the_server_stamps_the_session_it_was_started_under() {
+    let vault = fixture("stamp");
+    let create = |id: u32, title: &str| {
+        call(
+            id,
+            "create_doc",
+            json!({"agenda":"demo","type":"plan","title":title,"body":"# 본문\n"}),
+        )
+    };
+
+    // 래퍼가 넣는 짝: 만들 때 `sessionId`와 `sessionAgent`, 고칠 때 `editedSessionId`와 `editedSessionAgent`
+    let (code, replies) = converse_with(
+        &vault,
+        &["--write"],
+        &[
+            ("AISURADA_SESSION_ID", "sess-pinned"),
+            ("AISURADA_SESSION_AGENT", "gemini"),
+        ],
+        &[create(1, "짝으로 만든 노트")],
+    );
+    assert_eq!(code, 0);
+    let made = tool_json(&replies[0]);
+    let id = made["id"].as_str().unwrap().to_string();
+    let front = note_text(&vault, &id);
+    assert!(front.contains("sessionId: sess-pinned\n"), "{front}");
+    assert!(front.contains("sessionAgent: gemini\n"), "{front}");
+
+    let (_, replies) = converse_with(
+        &vault,
+        &["--write"],
+        &[
+            ("AISURADA_SESSION_ID", "sess-editor"),
+            ("AISURADA_SESSION_AGENT", "gemini"),
+        ],
+        &[call(
+            1,
+            "update_doc",
+            json!({"id": id, "title": "고친 제목", "f1": made["precondition"]}),
+        )],
+    );
+    tool_json(&replies[0]);
+    let front = note_text(&vault, &id);
+    assert!(front.contains("editedSessionId: sess-editor\n"), "{front}");
+    assert!(front.contains("editedSessionAgent: gemini\n"), "{front}");
+    assert!(
+        front.contains("sessionId: sess-pinned\n"),
+        "만든 세션은 그대로다"
+    );
+
+    // Claude Code의 변수만 보이면 그 세션이 적히고, claude는 에이전트 줄을 적지 않는다
+    let (_, replies) = converse_with(
+        &vault,
+        &["--write"],
+        &[("CLAUDE_CODE_SESSION_ID", "claude-sess")],
+        &[create(1, "클로드가 만든 노트")],
+    );
+    let front = note_text(&vault, tool_json(&replies[0])["id"].as_str().unwrap());
+    assert!(front.contains("sessionId: claude-sess\n"), "{front}");
+    assert!(!front.contains("sessionAgent:"), "{front}");
+
+    // 서로 다른 에이전트의 변수가 함께 보이면 어느 쪽인지 몰라 아무 세션도 적지 않는다
+    let (_, replies) = converse_with(
+        &vault,
+        &["--write"],
+        &[
+            ("CLAUDE_CODE_SESSION_ID", "claude-sess"),
+            ("CODEX_SESSION_ID", "codex-sess"),
+        ],
+        &[create(1, "모호한 노트")],
+    );
+    let front = note_text(&vault, tool_json(&replies[0])["id"].as_str().unwrap());
+    assert!(!front.contains("sessionId:"), "{front}");
+    let _ = std::fs::remove_dir_all(&vault);
+}
+
+/// Codex는 도구 호출마다 `_meta`에 세션 id를 싣는다. 클라이언트 이름이 codex일 때만 믿고, `sessionId`가 없으면 `threadId`를 쓴다.
+#[test]
+fn a_codex_client_session_in_meta_is_stamped_and_other_clients_are_not_trusted() {
+    let vault = fixture("meta");
+    let create = |id: u32, title: &str, meta: Value| {
+        let mut message = call(
+            id,
+            "create_doc",
+            json!({"agenda":"demo","type":"plan","title":title,"body":"# 본문\n"}),
+        );
+        if !meta.is_null() {
+            message["params"]["_meta"] = meta;
+        }
+        message
+    };
+    let initialize = |client: &str| json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":client}}});
+    let stamped = |reply: &Value| note_text(&vault, tool_json(reply)["id"].as_str().unwrap());
+
+    let (code, replies) = converse(
+        &vault,
+        &["--write"],
+        &[
+            initialize("codex-mcp-client"),
+            create(1, "세션 id로 만든 노트", json!({"sessionId": "sess-meta"})),
+            create(
+                2,
+                "스레드 id로 만든 노트",
+                json!({"threadId": "thread-meta"}),
+            ),
+            create(3, "표식 없이 만든 노트", Value::Null),
+        ],
+    );
+    assert_eq!(code, 0);
+    let front = stamped(&replies[1]);
+    assert!(front.contains("sessionId: sess-meta\n"), "{front}");
+    assert!(front.contains("sessionAgent: codex\n"), "{front}");
+    let front = stamped(&replies[2]);
+    assert!(front.contains("sessionId: thread-meta\n"), "{front}");
+    assert!(front.contains("sessionAgent: codex\n"), "{front}");
+    assert!(
+        !stamped(&replies[3]).contains("sessionId:"),
+        "`_meta`가 없으면 세션을 적지 않는다"
+    );
+
+    // codex가 아닌 클라이언트가 보낸 `_meta`는 믿지 않는다
+    let (_, replies) = converse(
+        &vault,
+        &["--write"],
+        &[
+            initialize("some-other-client"),
+            create(
+                1,
+                "다른 클라이언트의 노트",
+                json!({"sessionId": "sess-fake"}),
+            ),
+        ],
+    );
+    let front = stamped(&replies[1]);
+    assert!(!front.contains("sessionId:"), "{front}");
     let _ = std::fs::remove_dir_all(&vault);
 }
