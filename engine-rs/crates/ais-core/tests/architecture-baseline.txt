@@ -15,7 +15,7 @@ edge commands -> session 2
 edge commands -> task 7
 edge commands -> text 33
 edge commands -> vault 74
-edge commands -> write 97
+edge commands -> write 96
 edge engine -> commands 1
 edge engine -> error 1
 edge engine -> ports 2

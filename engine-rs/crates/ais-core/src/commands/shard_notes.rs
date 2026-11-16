@@ -432,8 +432,8 @@ fn resolve(vault: &Path, rel: &str) -> Result<PathBuf, EngineError> {
     Ok(target)
 }
 
+/// 옮기기 기준 파일(TSV)과 지금 디스크를 견준다. 읽기뿐이라 워크스페이스 표식이 없어도 돈다(Java 엔진과 같다. 표식을 요구하던 것은 어긋남이었다, 이슈 #57).
 pub fn verify_shard(vault: &Path, request: &VerifyShardRequest) -> Result<Json, EngineError> {
-    crate::write::marker::check_workspace_marker(vault)?;
     let given = text_of(&request.file)
         .map(|r| trim(&r).to_string())
         .unwrap_or_default();
