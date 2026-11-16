@@ -87,8 +87,8 @@ test-native.sh         화면·호스트 시험 전체
 | `engine-rs/crates/ais-cli/` | `ais-cli`: `registry`·`spec_table`(이름과 명령 명세 표), `parse`(명령 표면)·`tool`(도구 표면) 인자 해석, `map`(엔진 호출로 바꿈), `legacy`(엔진 응답을 옛 응답 모양으로 바꿈), `output`(키를 정렬한 JSON 쓰기), `env`(vault 정하기, 세션 표식). `mcp`·`mcp_tools`(MCP 서버와 도구 표), `register`·`agent_cli`(`claude-mcp`·`codex-mcp`·`gemini-mcp`), `old_sidecar`·`doctor`·`install`·`migrate`(옛 사이드카 정리, 진단, 첫 실행 이주) |
 | `engine-rs/crates/ais-cli/examples/` | `cli_compat`(기준 Java 단발 엔진과 명령줄 단위로 맞댐), `mcp_compat`(기준 Java MCP 서버와 JSON-RPC 대화를 맞댐) |
 | `engine-rs/crates/ais-core/examples/` | `compat_check`(기준 Java 엔진과 읽기·쓰기 맞대기), `snake_check`(SnakeYAML 방출기 맞대기), `ais_call`(명령 하나를 불러 응답 보기), `yaml_check`·`yaml_fuzz_cases`(머리 읽기·쓰기 맞대기) |
-| `engine-rs/crates/ais-core/tests/` | 합성 vault로 동작을 확인하는 통합 시험(Java 없이 돈다). `lock_interop.rs`는 `AISURADA_JAR`가 있을 때만 기준 `ais-engine.jar`와 쓰기 잠금을 맞대는 시험. 리팩토링 안전망: `architecture.rs`(모듈 사이 의존과 바깥 직접 호출을 `architecture-baseline.txt`에 박제), `serialization_golden.rs`(태스크·자원 기록장·승인 대기 변경·휴지통 목록의 파일 바이트를 `golden/serialization/`에 박제) |
-| `engine-rs/crates/ais-cli/tests/` | `ais-cli` 프로세스·등록·정리·MCP 시험. 리팩토링 안전망: `golden.rs`(기준 엔진 없이 맞대기 재생), `command_tables.rs`(명령 정보를 따로 적은 표들의 교차 검사) |
+| `engine-rs/crates/ais-core/tests/` | 합성 vault로 동작을 확인하는 통합 시험(Java 없이 돈다). `lock_interop.rs`는 `AISURADA_JAR`가 있을 때만 기준 `ais-engine.jar`와 쓰기 잠금을 맞대는 시험. `oracle_goldens.rs`는 YAML 기준값과 SnakeYAML 방출기 사례를 고정한 골든 파일(`golden/yaml-ground-truth.jsonl`, `golden/snake-cases.tsv`)을 Java 없이 견준다(§4). 리팩토링 안전망: `architecture.rs`(모듈 사이 의존과 바깥 직접 호출을 `architecture-baseline.txt`에 박제), `serialization_golden.rs`(태스크·자원 기록장·승인 대기 변경·휴지통 목록의 파일 바이트를 `golden/serialization/`에 박제) |
+| `engine-rs/crates/ais-cli/tests/` | `ais-cli` 프로세스·등록·정리·MCP 시험. 리팩토링 안전망: `golden.rs`(기준 엔진 없이 맞대기 재생), `command_tables.rs`(명령 정보를 따로 적은 표들의 이름·읽기쓰기 교차 검사), `table_contracts.rs`(MCP 도구 표와 명령 명세 표의 내용이 표를 읽는 코드와 맞는지) |
 | `engine-rs/golden/`, `engine-rs/tools/golden/` | 기준 Java 응답과 폴더 해시를 녹화한 테이프(`compat.ndjson`, `cli.ndjson`, `mcp.ndjson`)와 녹화·재생 스크립트 `run.sh` |
 | `engine-rs/tools/compat/` | 기준 jar를 태그에서 짓는 `build-oracle.sh`, 명령 명세 표 생성기 `gen-spec-table.sh`(`DumpSpecs.java`), MCP 도구 표 생성기 `gen-mcp-tools.sh`(`DumpMcpTools.java`), MCP 맞대기용 Java 구동기 `DriveMcp.java`, 합성 vault 생성기 `make-fixture.sh`, 검색 시험 노트를 덧붙이는 `add-search-notes.sh`, git 저장소와 판 이력을 만드는 `add-git-history.sh`, 코멘트 id가 겹치는 노트를 더하는 `add-comment-clash.sh` |
 | `engine-rs/tools/yaml-spike/` | 머리 읽기·쓰기를 Java 기준값과 맞대는 도구(`YamlGroundTruth.java`, `run.sh`, `cases.txt`) |
@@ -149,6 +149,23 @@ engine-rs/tools/yaml-spike/run.sh <저장소 밖 폴더> --vault <vault 폴더> 
 ```
 
 퍼징 사례는 `cargo run -q -p ais-core --example yaml_fuzz_cases -- <ground-truth.jsonl> <건수> <시드> > 사례.txt`로 만들고, `run.sh <다른 폴더> --cases 사례.txt`로 기준값을 다시 뽑아 같은 `yaml_check`에 넣는다. `yaml_check`의 「실패」 열이 0이어야 하고, 「경고」는 Rust가 Java보다 너그럽게 읽은 입력이다.
+
+**YAML 골든(JDK 없이).** 위 `yaml-spike`와 `snake_check`의 기준값 가운데 합성 사례는 파일로 고정해 두었다. `engine-rs/golden/yaml-ground-truth.jsonl`은 노트 머리 읽기·쓰기를 진짜 SnakeYAML 2.4가 처리한 결과 96건(사례는 `tools/yaml-spike/cases.txt`와 중첩 깊이 경계이고 vault 내용은 없다)이고, `engine-rs/golden/snake-cases.tsv`는 SnakeYAML의 `Yaml.dump`가 쓴 방출기 사례 2,232건(손으로 고른 498건과 시드 1의 퍼징)이다. `ais-core/tests/oracle_goldens.rs`가 `yaml_check`와 `snake_check`를 이 파일에 대고 돌려 `bash test.sh`와 CI에서 Java 없이 견준다. 2026-11-16에 확인한 결과는 `yaml_check`가 96건 가운데 95건 일치, 알려진 차이 1건(자기 자신을 가리키는 구조: Java는 순환 구조를 만들고 Rust는 머리 없음으로 본다), 실패 0이고 `snake_check`가 어긋남 0, 오류 0이다. 알고 바꾼 동작일 때만 다시 만든다(JDK 21 필요).
+
+```bash
+D=$(mktemp -d)
+engine-rs/tools/yaml-spike/run.sh "$D"                    # vault 없이 합성 사례만
+cp "$D/ground-truth.jsonl" engine-rs/golden/yaml-ground-truth.jsonl
+ORACLE=$(engine-rs/tools/compat/build-oracle.sh)
+mkdir -p "$D/snake" && javac -cp "$ORACLE/ais-engine.jar" -d "$D/snake" engine-rs/tools/compat/SnakeCases.java
+java -cp "$D/snake:$ORACLE/ais-engine.jar" SnakeCases engine-rs/golden/snake-cases.tsv 1 300
+```
+
+**기준(오라클)의 보관과 종료(2026-11-16 결정).**
+
+- **보관.** 기준은 태그 `java-engine-final`(주석 달린 태그, `origin`에 있다)이다. 태그의 커밋 `8c2d451`은 `main` 이력 안에 있어(`git merge-base --is-ancestor`로 확인) 태그가 지워져도 소스는 남고, `git tag java-engine-final 8c2d451`로 되살린다. 지은 jar는 릴리스 자산으로 붙이지 않는다. 릴리스 페이지는 Rust 앱을 받는 곳이라 사용자에게 Java 파일을 보이면 헷갈리고, jar는 태그에서 언제든 같은 커밋으로 다시 지어지기 때문이다. 2026-11-16에 빈 폴더에서 `build-oracle.sh`가 6.6초 만에 지었다(JDK 21.0.11, SnakeYAML 2.4는 Maven Central에서 받았다). 빌드가 기대는 바깥 자원은 그 `snakeyaml-2.4.jar` 하나라서, 받아 둔 파일을 `AISURADA_SNAKEYAML_JAR`로 줄 수 있다. 태그 삭제를 막는 규칙은 GitHub 저장소 설정으로 걸 수 있지만 저장소 설정을 바꾸는 일이라 하지 않았다.
+- **JDK 없이 도는 부분.** 맞대기 셋(`compat_check`, `cli_compat`, `mcp_compat`)은 골든 재생으로, YAML 기준값과 SnakeYAML 방출기는 위 YAML 골든으로 Java 없이 돈다. 모두 `bash test.sh`와 CI에 들어 있다. JDK가 있어야 도는 것은 `lock_interop`(1건), 34장 받아들임 묶음(기준 jar로만, [#66](https://github.com/bnjjong/aisurada/issues/66)), `yaml-spike`의 vault·퍼징 사례, `snake_check`용 대량 퍼징 사례를 만드는 일, 골든을 새로 쓰는 `record`다.
+- **끝내는 시점.** 다음 셋이 모두 끝나면 맞대기 도구를 지운다. ① Java 없는 첫 릴리스가 나갔다. ② 사용자 손 확인([#54](https://github.com/bnjjong/aisurada/issues/54))이 끝났다. ③ 34장 묶음이 Rust 엔진 기준으로 선다(#66). 그때 한 번에 지우는 것은 `engine-rs/tools/compat/*.java`(`DumpMcpTools`, `DumpSpecs`, `DriveMcp`, `SnakeCases`)와 `gen-mcp-tools.sh`, `gen-spec-table.sh`, `engine-rs/tools/yaml-spike/`, `build-oracle.sh`, 하네스의 Java 구동 길(`compat_check`·`cli_compat`·`mcp_compat`의 `record`와 기준 jar 인자, `lock_interop`)이다. 남기는 것은 골든 파일과 재생 시험(회귀 방패), 그리고 태그다. 지운 뒤 골든을 새로 쓸 일은 Rust가 낸 응답을 사람이 검토해 갱신한다(`serialization_golden.rs`의 `UPDATE_GOLDEN`처럼). 지금은 세 조건이 모두 안 끝났으므로 아무것도 지우지 않았다.
 
 ### 호스트 모듈 (`native-host/src-tauri/src/`)
 
@@ -530,7 +547,7 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 - **도구.** 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 37개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`ais_cli::run`)을 프로세스 하나에서 되풀이한다. 명령줄 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다. 도구를 부를 때마다 자동 커밋을 지켜본다(`watch`). 유휴 타이머가 MCP 서버 안에서 돌기 때문이다.
 - **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(위 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
-- **스키마를 고칠 때.** `mcp_tools.rs`의 입력 스키마 키는 명령줄 인자 명세(`spec_table.rs`)가 받는 키와 같아야 한다. 도구의 인자를 바꾸면 두 표와 `mcp_compat`의 기대를 함께 맞춘다.
+- **스키마를 고칠 때.** `mcp_tools.rs`의 입력 스키마 키는 도구 해석기(`tool.rs`)가 받는 키와 이름과 차례까지 같아야 하고, 필수 키는 스키마 차례대로 검사해야 하며, 읽기 전용 표시는 엔진의 쓰기 명령 목록과 맞아야 한다. 명령줄 쪽 옵션(`spec_table.rs`)은 정렬돼 있어야 하고 모두 엔진 인자로 이어져야 한다. 이 넷은 `engine-rs/crates/ais-cli/tests/table_contracts.rs`가 지킨다(2026-11-16 추가, 지금 37개 도구와 명령 명세 전체가 통과하고, 표를 일부러 어긋나게 하면 실패하는 것을 확인했다). 사용법 글과 옵션 목록의 알려진 어긋남 7건(`repos`·`projectRepo`·`query`가 사용법 글에 없는 것 따위)은 시험의 `KNOWN_USAGE_GAPS`에 적혀 있고, 사용법 글은 Java가 오류 때 찍던 글이라 고치면 `cli_compat`의 기준과 어긋난다. 도구의 인자를 바꾸면 두 표, `tool.rs`, `mcp_compat`의 기대를 함께 맞춘다.
 - **Claude에 연결.** `ais-cli claude-mcp status|add [--write]|remove|config`(`register.rs`)가 Claude Code에 서버를 등록한다. Codex와 Antigravity·Gemini CLI는 `codex-mcp`, `gemini-mcp`가 같은 방식으로 한다. 셋 다 등록에 vault를 박지 않는다. CLI마다 `--` 자리가 달라서(codex와 agy는 이름 바로 뒤, gemini는 실행 파일 경로 뒤) 인자 모양은 `crates/ais-cli/tests/register.rs`가 가짜 CLI로 못 박는다. Claude의 설정 파일을 직접 고치지 않고 `claude mcp add-json --scope user`만 부른다. 등록하는 실행 파일은 이 명령을 돌린 `ais-cli`라서, 앱에서 부르면 앱에 든 것이 등록된다. `config`는 등록하지 않고 Claude Desktop 설정에 붙여 넣을 `mcpServers` 조각만 출력한다. 설정 화면의 「Claude 연결」(`src/plugs/claude/connect.tsx`)은 `sidecar_call`로 이 명령을 부르기만 하므로 호스트 커맨드를 더하지 않았다(4부 9개 그대로). 4부를 끈 판에는 이 화면이 없다(`plugs/empty/connect.tsx`). 연결은 지금 연 워크스페이스 하나에 묶이고, 다른 워크스페이스에서 다시 연결하면 바뀐다. 이미 등록된 서버가 옛 Java jar를 가리키면 `doctor`가 낡았다고 알리고 `doctor --fix`가 같은 모드로 다시 등록한다.
 
 시험은 `bash test.sh`에 들어 있다. `crates/ais-cli/tests/mcp_stdio.rs`는 진짜 `mcp` 프로세스와 표준 입출력으로 왕복하고(읽기 전용 서버의 도구 목록, 노트 만들기와 읽기, 자동 커밋 이어받기, 세션 표식, AI 변경의 승인 길), `tests/register.rs`는 가짜 에이전트 CLI로 `status`·`add`·`remove`·`config`를 잰다. 기준 Java MCP 서버와의 대화 맞대기는 `mcp_compat`(§4)다.
@@ -721,7 +738,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(202건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4) |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(213건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
