@@ -727,7 +727,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <h2 id="8-시험"><a class="anchor" href="#8-시험" aria-label="이 절의 링크">#</a>8. 시험</h2>
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
-<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~105초(213건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4)</td></tr>
+<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~105초(214건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4)</td></tr>
 <tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>캐시된 상태에서 Node 시험까지 약 30초</td><td>화면 빌드, Node 시험 641건, 호스트 <code>cargo test</code>(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다</td></tr>
 <tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다</td></tr>
 <tr><td>기준 맞대기</td><td>§4 「기준과 맞대기」</td><td>엔진 12분(Java가 도는 만큼)</td><td>기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 <code>bash engine-rs/tools/golden/run.sh replay</code>(약 1분)다</td></tr>
@@ -746,12 +746,26 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <li>동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 <code>docs/rust-engine-step*.md</code>의 해당 기록에 이유를 적는다.</li>
 </ul>
 <h3 id="받아들임-묶음-34장"><a class="anchor" href="#받아들임-묶음-34장" aria-label="이 절의 링크">#</a>받아들임 묶음 (34장)</h3>
-<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>ORACLE=&quot;$(bash engine-rs/tools/compat/build-oracle.sh)&quot;   # 기준 jar를 태그에서 지어 둔다(§4)
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code># Rust ais-cli(지금 엔진). 어댑터는 fixtures/aisurada-rust.adapter.json
+(cd engine-rs &amp;&amp; cargo build -p ais-cli)
+AISX_IMPL_BIN=&quot;$PWD/engine-rs/target/debug/ais-cli&quot; \
+  node fixtures/expect/run.mjs --engine fixtures/aisurada-rust.adapter.json --out &lt;빈 폴더&gt;
+
+# 기준 Java 엔진(옛 엔진). 어댑터는 fixtures/aisurada.adapter.json
+ORACLE=&quot;$(bash engine-rs/tools/compat/build-oracle.sh)&quot;   # 기준 jar를 태그에서 지어 둔다(§4)
 AISX_IMPL_JAVA=&quot;$(command -v java)&quot; AISX_IMPL_JAR=&quot;$ORACLE/ais-engine.jar&quot; \
   node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out &lt;빈 폴더&gt;
+
 node fixtures/expect/run.mjs --self-check --mutants --out &lt;빈 폴더&gt;
 node fixtures/runner-test.mjs</code></pre></div>
-<p>이 묶음은 기준 Java 엔진을 부른다. Rust <code>ais-cli</code>는 JSON 키를 정렬해서 쓰므로 키 차례까지 글자로 견주는 이 묶음과는 기대값 27건 가운데 일부(5d에서 잰 값은 11건이 완전히 같고 16건이 키 차례만 다름)가 맞지 않는다. 그래서 묶음은 기준 jar로만 돌리고, Rust와의 견줌은 키 차례를 무시하는 맞대기(§4)가 맡는다.</p>
+<p><strong>Rust <code>ais-cli</code>로 도는 법(2026-11-16).</strong> Rust는 JSON 객체 키를 이름 차례로 내고 Java 엔진은 넣은 차례로 낸다. 묶음의 기대값은 설명서 원문 그대로라 키 차례까지 Java 쪽이다. 그래서 기대값을 고치지 않고, 어댑터가 <code>&quot;compare&quot;: {&quot;jsonKeyOrder&quot;: &quot;ignore&quot;}</code>로 밝히면 실행기가 키 차례만 뺀다. 이 확장은 설명서 34.5에 없는 이 저장소의 것이다. 규칙은 이렇다.</p>
+<ul>
+<li>느슨하게 보는 것은 <strong>JSON 객체의 키 차례뿐</strong>이다. 키 집합과 값, 배열의 차례는 그대로 본다. 키 차례를 빼고 맞춘 뒤에도 실제 출력의 키 차례로 기대값을 다시 찍어 바이트로 맞대므로, 들여쓰기와 글자 꼴이 다르면 여전히 <code>format</code> 어긋남이다.</li>
+<li>기대값이 JSON 값(<code>stdoutJson</code>)이든 글(<code>stdout</code>, <code>stdoutText</code>)이든 같다. 글은 JSON으로 읽힐 때만 키 차례를 뺀다. 기본값 <code>exact</code>는 설명서대로 키 차례까지 맞댄다. Java 어댑터는 그대로 <code>exact</code>다.</li>
+<li>키 차례만 달라서 맞은 케이스는 <code>report.json</code>의 <code>warnings</code>와 요약에 건수로 남는다(<code>report.json</code>의 꼴은 설명서대로 두려고 새 칸을 만들지 않았다).</li>
+<li>이 확장은 진짜 묶음(읽기 레인 460건)을 받아도 그대로 쓴다. 진짜 묶음의 기대값도 Java 엔진의 키 차례일 것이므로 기대값을 고쳐 쓰는 쪽보다 어댑터 쪽이 한 곳이라 낫다.</li>
+</ul>
+<p>2026-11-16에 Rust <code>ais-cli</code>(개발 빌드)로 돌려 27건이 모두 맞았다(키 차례만 달라 맞은 것 16건, 구현 호출 28번). 같은 날 기준 jar로도 27건이 맞았고(<code>exact</code>), 자가 점검의 변형 8가지를 모두 잡는다. <code>ais-cli/tests/acceptance_bundle.rs</code>가 이 회차를 <code>bash test.sh</code>와 CI에서 돈다(node가 없으면 건너뛴다). <code>node fixtures/runner-test.mjs</code>도 CI가 돈다(기준 jar가 없으면 그 회차만 건너뛰어 85건, 있으면 86건).</p>
 <p><code>--out</code>은 결과를 쓸 폴더다(저는 매번 새 임시 폴더를 줬다). 케이스를 더하거나 <code>fixtures/expect/</code>의 파일을 고치면 <code>node fixtures/build-bundle.mjs</code>로 <code>bundle.json</code>의 sha256 목록을 다시 적는다. 진짜 묶음(읽기 레인 460건)은 이 저장소에 없다.</p>
 <h3 id="화면호스트-시험"><a class="anchor" href="#화면호스트-시험" aria-label="이 절의 링크">#</a>화면·호스트 시험</h3>
 <p><code>package.json</code>의 <code>test:*</code>가 종류별 진입점이다.</p>

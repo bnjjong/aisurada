@@ -738,7 +738,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(213건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4) |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(214건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
@@ -763,14 +763,28 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 ### 받아들임 묶음 (34장)
 
 ```bash
+# Rust ais-cli(지금 엔진). 어댑터는 fixtures/aisurada-rust.adapter.json
+(cd engine-rs && cargo build -p ais-cli)
+AISX_IMPL_BIN="$PWD/engine-rs/target/debug/ais-cli" \
+  node fixtures/expect/run.mjs --engine fixtures/aisurada-rust.adapter.json --out <빈 폴더>
+
+# 기준 Java 엔진(옛 엔진). 어댑터는 fixtures/aisurada.adapter.json
 ORACLE="$(bash engine-rs/tools/compat/build-oracle.sh)"   # 기준 jar를 태그에서 지어 둔다(§4)
 AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$ORACLE/ais-engine.jar" \
   node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out <빈 폴더>
+
 node fixtures/expect/run.mjs --self-check --mutants --out <빈 폴더>
 node fixtures/runner-test.mjs
 ```
 
-이 묶음은 기준 Java 엔진을 부른다. Rust `ais-cli`는 JSON 키를 정렬해서 쓰므로 키 차례까지 글자로 견주는 이 묶음과는 기대값 27건 가운데 일부(5d에서 잰 값은 11건이 완전히 같고 16건이 키 차례만 다름)가 맞지 않는다. 그래서 묶음은 기준 jar로만 돌리고, Rust와의 견줌은 키 차례를 무시하는 맞대기(§4)가 맡는다.
+**Rust `ais-cli`로 도는 법(2026-11-16).** Rust는 JSON 객체 키를 이름 차례로 내고 Java 엔진은 넣은 차례로 낸다. 묶음의 기대값은 설명서 원문 그대로라 키 차례까지 Java 쪽이다. 그래서 기대값을 고치지 않고, 어댑터가 `"compare": {"jsonKeyOrder": "ignore"}`로 밝히면 실행기가 키 차례만 뺀다. 이 확장은 설명서 34.5에 없는 이 저장소의 것이다. 규칙은 이렇다.
+
+- 느슨하게 보는 것은 **JSON 객체의 키 차례뿐**이다. 키 집합과 값, 배열의 차례는 그대로 본다. 키 차례를 빼고 맞춘 뒤에도 실제 출력의 키 차례로 기대값을 다시 찍어 바이트로 맞대므로, 들여쓰기와 글자 꼴이 다르면 여전히 `format` 어긋남이다.
+- 기대값이 JSON 값(`stdoutJson`)이든 글(`stdout`, `stdoutText`)이든 같다. 글은 JSON으로 읽힐 때만 키 차례를 뺀다. 기본값 `exact`는 설명서대로 키 차례까지 맞댄다. Java 어댑터는 그대로 `exact`다.
+- 키 차례만 달라서 맞은 케이스는 `report.json`의 `warnings`와 요약에 건수로 남는다(`report.json`의 꼴은 설명서대로 두려고 새 칸을 만들지 않았다).
+- 이 확장은 진짜 묶음(읽기 레인 460건)을 받아도 그대로 쓴다. 진짜 묶음의 기대값도 Java 엔진의 키 차례일 것이므로 기대값을 고쳐 쓰는 쪽보다 어댑터 쪽이 한 곳이라 낫다.
+
+2026-11-16에 Rust `ais-cli`(개발 빌드)로 돌려 27건이 모두 맞았다(키 차례만 달라 맞은 것 16건, 구현 호출 28번). 같은 날 기준 jar로도 27건이 맞았고(`exact`), 자가 점검의 변형 8가지를 모두 잡는다. `ais-cli/tests/acceptance_bundle.rs`가 이 회차를 `bash test.sh`와 CI에서 돈다(node가 없으면 건너뛴다). `node fixtures/runner-test.mjs`도 CI가 돈다(기준 jar가 없으면 그 회차만 건너뛰어 85건, 있으면 86건).
 
 `--out`은 결과를 쓸 폴더다(저는 매번 새 임시 폴더를 줬다). 케이스를 더하거나 `fixtures/expect/`의 파일을 고치면 `node fixtures/build-bundle.mjs`로 `bundle.json`의 sha256 목록을 다시 적는다. 진짜 묶음(읽기 레인 460건)은 이 저장소에 없다.
 

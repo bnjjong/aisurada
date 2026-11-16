@@ -242,15 +242,19 @@ dist/ais-cli verify-shard
 설명서 34장의 받아들임 묶음 `fixtures/expect`를 설명서만 보고 다시 지었습니다. 실행기가 케이스마다 엔진을 셸 없이 불러 종료 코드와 stdout 바이트를 맞댑니다. node 20 이상의 내장 모듈만 씁니다.
 
 ```bash
+# Rust ais-cli(개발 빌드: cd engine-rs && cargo build -p ais-cli)
+AISX_IMPL_BIN="$PWD/engine-rs/target/debug/ais-cli" \
+  node fixtures/expect/run.mjs --engine fixtures/aisurada-rust.adapter.json --out /tmp/aisx-run-1
+# 기준 Java 엔진
 ORACLE="$(bash engine-rs/tools/compat/build-oracle.sh)"   # 태그 java-engine-final에서 지은 기준 jar
 AISX_IMPL_JAVA="$(command -v java)" AISX_IMPL_JAR="$ORACLE/ais-engine.jar" \
-  node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out /tmp/aisx-run-1
+  node fixtures/expect/run.mjs --engine fixtures/aisurada.adapter.json --out /tmp/aisx-run-2
 node fixtures/expect/run.mjs --self-check --mutants --out /tmp/aisx-self-1
 node fixtures/runner-test.mjs
 ```
 
 - 실행기는 34.1의 옵션 문법, 묶음 무결성(sha256), `--out` 겹침(장치와 inode), 거르개, 판정 9가지, `report.json`, 자가 점검과 변형 8가지를 따릅니다. 어댑터 계약은 34.5이고, 이 엔진의 어댑터 `fixtures/aisurada.adapter.json`은 묶음 밖에 둡니다.
-- 이 묶음은 기준 jar(Java 엔진)로만 돌립니다. Rust `ais-cli`는 JSON 키를 정렬해서 쓰므로 키 차례까지 글자로 견주는 이 묶음과는 맞지 않는 사례가 있습니다(5d에서 잰 값: 기대값 27건 가운데 11건은 완전히 같고 16건은 키 차례만 다름). Rust 엔진을 기준으로 묶음을 다시 세우는 일은 [#66](https://github.com/bnjjong/aisurada/issues/66)에서 다룹니다.
+- Rust `ais-cli`로도 돌립니다. Rust는 JSON 객체 키를 이름 차례로 내서(Java 엔진은 넣은 차례) 기대값 27건 가운데 16건은 키 차례만 다른데, 어댑터 `fixtures/aisurada-rust.adapter.json`이 `compare.jsonKeyOrder=ignore`를 밝히면 실행기가 키 차례만 빼고 값과 바이트 꼴은 그대로 맞댑니다(설명서에 없는 이 저장소의 확장). 2026-11-16에 27건이 모두 맞았습니다. 돌리는 법은 [개발자 가이드](docs/developer-guide.md) §8에 있습니다.
 - 진짜 묶음(읽기 레인 460건, 나무 `fixture.v1`)은 이 저장소에 없습니다. 그래서 레인에는 설명서 원문에 기대값이 글자 그대로 적힌 1부 케이스 27건만 담고, 입력 vault는 다시 짜기 개발 폴더의 픽스처 vault를 담았습니다. 진짜 묶음을 받으면 `lanes/`와 `trees/`를 바꾸고 `node fixtures/build-bundle.mjs`로 목록을 다시 적습니다.
 
 자세한 것은 [34장 완료 노트](docs/rebuild-p1-chapter34-complete.md)에 있습니다.
