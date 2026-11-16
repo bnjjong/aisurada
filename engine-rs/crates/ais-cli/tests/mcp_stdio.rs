@@ -303,6 +303,16 @@ fn mcp_server_commits_the_record_a_single_shot_cli_left_behind() {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    // 서버는 커밋한 뒤 같은 백그라운드 스레드에서 이어서 대기 기록 파일을 지운다. 서버가 살아 있는 동안 그것까지 기다린다.
+    // 커밋이 보이자마자 입력을 닫으면 서버가 끝나면서 파일을 지우기 전에 스레드가 멈출 수 있다(느린 CI 러너에서 보였다).
+    let record = vault.join(".git/aisurada-pending.json");
+    let removed = (0..50).any(|_| {
+        if !record.exists() {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        false
+    });
     drop(child.stdin.take());
     let _ = child.wait_with_output();
     assert!(committed, "MCP 서버가 남은 기록을 커밋해야 한다");
@@ -312,7 +322,7 @@ fn mcp_server_commits_the_record_a_single_shot_cli_left_behind() {
         message.contains("Aisurada-Writer: tool") && message.contains("Aisurada-Reason: idle"),
         "{message}"
     );
-    assert!(!vault.join(".git/aisurada-pending.json").exists());
+    assert!(removed, "커밋한 뒤 대기 기록 파일을 지워야 한다");
     let _ = std::fs::remove_dir_all(&vault);
 }
 
