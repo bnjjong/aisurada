@@ -17,6 +17,10 @@ const dataCheck = process.argv.includes('--data');
 const editorCheck = process.argv.includes('--editor');
 const autosaveCheck = process.argv.includes('--autosave');
 const viewsCheck = process.argv.includes('--views');
+const resourcesCheck = process.argv.includes('--resources');
+const tasksCheck = process.argv.includes('--tasks');
+// 러너와 4부는 Claude 기능을 켠 호스트가 있어야 화면 명령이 생긴다(태스크 점검은 가짜 claude도 쓴다)
+const claudeHost = part4Check || tasksCheck;
 let editorCases = editorCheck ? JSON.parse(readFileSync(join(host, 'fixtures/editor-roundtrip/cases.json'), 'utf8')) : [];
 const onlyCases = process.argv.find(arg => arg.startsWith('--only='))?.slice(7).split(',');
 if (onlyCases) editorCases = editorCases.filter(c => onlyCases.includes(c.id));
@@ -32,7 +36,7 @@ if (dataCheck || autosaveCheck) {
   dataDriver = output.find(output => output.type === 'chunk' && output.isEntry).code;
   for (const asset of output) probeAssets.set('/' + asset.fileName, asset.type === 'chunk' ? asset.code : asset.source);
 }
-assertScreenBundle(join(host, 'dist'), { part4: part4Check });
+assertScreenBundle(join(host, 'dist'), { part4: claudeHost });
 const root = realpathSync(mkdtempSync(join(tmpdir(), 'ais-p3-'))), home = join(root, 'home'), vault = join(root, 'vault');
 const mkdir = path => mkdirSync(path, { recursive: true });
 const write = (path, text) => { mkdir(resolve(path, '..')); writeFileSync(path, text); };
@@ -68,8 +72,8 @@ if (viewsCheck) {
   write(join(root, 'external/next.MARKDOWN'), '# 다음 파일\n\n상대 경로로 연 읽기 전용 파일');
   write(join(root, 'external/pic one.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6n8AAAAASUVORK5CYII=', 'base64'));
 }
-if (askMarksCheck) {
-  write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n격리된 vault의 본문이에요.\n\n| 열 | 값 |\n| --- | --- |\n| <!--aisa:akfixture-12345678-->표 문답<!--/aisa:akfixture-12345678--> | 값 |\n\n[하위](#sub:' + childId + ')\n');
+if (askMarksCheck || tasksCheck) {
+  if (askMarksCheck) write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n격리된 vault의 본문이에요.\n\n| 열 | 값 |\n| --- | --- |\n| <!--aisa:akfixture-12345678-->표 문답<!--/aisa:akfixture-12345678--> | 값 |\n\n[하위](#sub:' + childId + ')\n');
   const fakeClaude = join(root, 'fake-claude');
   // `claude mcp get|remove|add-json`는 등록 상태를 파일 하나에 두고 흉내 낸다(설정 화면의 Claude 연결 점검용).
   write(fakeClaude, [
@@ -100,7 +104,7 @@ if (part4Check) {
     { type: 'custom-title', customTitle: '점검 세션' },
   ].map(line => JSON.stringify(line)).join('\n') + '\n');
 }
-const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, today };
+const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, today };
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 // 앱이 엔진을 부르는 길은 둘이다: 문자열 목록을 받는 `sidecar_call`과 호출 객체를 받는 `engine_call`. 호스트가 두 길의 호출을 이 파일에 적고
 // (`AISURADA_CALL_LOG`), 점검은 어느 길로 갔든 같은 문자열 목록(argv)으로 센다.
@@ -112,8 +116,44 @@ if (!existsSync(cli)) throw Error('Build ais-cli first: (cd engine-rs && cargo b
 const env = { ...process.env, HOME: home, ZDOTDIR: join(root, 'zdot'), HISTFILE: join(root, 'history'),
   CARGO_HOME: process.env.CARGO_HOME || join(homedir(), '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), '.rustup'),
   AISURADA_VAULT: vault, AISURADA_LOCK_DIR: join(root, 'locks'), AISURADA_CALL_LOG: hostCallLog, AISURADA_VAULT_AUTOCOMMIT_ENABLED: autosaveCheck || viewsCheck ? 'true' : 'false' };
-if (askMarksCheck) env.AISURADA_CLAUDE_BIN = join(root, 'fake-claude');
+if (askMarksCheck || tasksCheck) env.AISURADA_CLAUDE_BIN = join(root, 'fake-claude');
+if (resourcesCheck) env.AISURADA_APPROVALS_DIR = join(root, 'approvals');
 for (const key of ['CLAUDE_CODE_SESSION_ID', 'AISURADA_ASK_RUNTIME', 'AISURADA_ASK_USE_AGENT']) delete env[key];
+// 점검 준비용 ais-cli 호출. 사람의 호출이다(AI 세션 변수는 위에서 지웠다). AI의 호출은 `ai`로 세션 변수를 준다.
+const cliRun = async (args, extra = {}) => {
+  const child = spawn(cli, args, { cwd: host, env: { ...env, ...extra } });
+  let out = '', err = ''; child.stdout.on('data', chunk => { out += chunk; }); child.stderr.on('data', chunk => { err += chunk; });
+  const code = await new Promise(resolve => child.on('exit', resolve));
+  if (code) throw Error(`${args[0]} 실패(${code}): ${err}`);
+  return out ? JSON.parse(out) : null;
+};
+const ai = { AISURADA_SESSION_ID: 'ai-session-1', AISURADA_SESSION_AGENT: 'codex' };
+if (resourcesCheck) {
+  // 스킬·에이전트와 승인: 사람이 만든 자원 셋, AI가 올린 대기 변경 둘, 승인 없이 파일을 직접 고친 자원 하나, 저장소가 있는 프로젝트 하나
+  await cliRun(['init-workspace', 'name=검증 공간', 'templates=[]']);
+  mkdir(join(root, 'repos/web'));
+  cfg.resources = {};
+  const project = await cliRun(['create-project', 'title=앱', `repos=${JSON.stringify([{ name: 'web', path: join(root, 'repos/web'), github: 'me/web' }])}`]);
+  cfg.resources.projectSlug = project.slug;
+  const skill = await cliRun(['save-resource', 'kind=skill', 'scope=global', 'name=번역 검수', 'description=번역을 검수한다', 'body=# 원래 지침']);
+  const dirty = await cliRun(['save-resource', 'kind=skill', 'scope=global', 'name=직접 고칠 스킬', 'description=원래 설명', 'body=본문']);
+  const agent = await cliRun(['save-resource', 'kind=agent', 'scope=global', 'name=리뷰어', 'description=리뷰한다', 'permission=read', 'body=지침']);
+  Object.assign(cfg.resources, { skillId: skill.id, dirtyId: dirty.id, agentId: agent.id });
+  const token = (await cliRun(['get-resource', skill.id])).precondition;
+  const edit = await cliRun(['save-resource', `id=${skill.id}`, `f1=${token}`, 'body=# AI가 고친 지침', 'description=AI가 바꾼 설명'], ai);
+  const proposal = await cliRun(['save-resource', 'kind=skill', 'scope=global', 'name=AI 제안 스킬', 'description=AI가 만들자고 한다', 'body=제안'], ai);
+  if (!edit.queued || !proposal.queued) throw Error('AI 변경이 승인 대기에 오르지 않았다');
+  Object.assign(cfg.resources, { editChangeId: edit.changeId, proposalChangeId: proposal.changeId });
+  const dirtyFile = join(vault, dirty.path);
+  writeFileSync(dirtyFile, readFileSync(dirtyFile, 'utf8').replace('description: 원래 설명', 'description: 직접 고친 설명'));
+}
+if (tasksCheck) {
+  // 태스크: 저장소가 있는 프로젝트 하나와 Draft 태스크 하나. 러너의 저장소 받기는 GitHub 앱 자격이 있어야 해서 격리 환경에서는 늘 실패한다.
+  await cliRun(['init-workspace', 'name=검증 공간', 'templates=[]']);
+  await cliRun(['create-project', 'title=앱', `repos=${JSON.stringify([{ name: 'web', github: 'me/web' }])}`]);
+  const seeded = await cliRun(['create-task', 'title=저장소 읽기 조사', 'repo=me/web', 'type=chore', 'criteria=["결론을 댓글로 남긴다"]', 'body=조사할 내용을 적어 둔 설명']);
+  cfg.tasks = { seededKey: seeded.key };
+}
 let finish, noteResult;
 const completed = new Promise(resolve => { finish = resolve; });
 const boot = `window.__AIS_FIXTURE__=${JSON.stringify(cfg)};
@@ -140,7 +180,7 @@ const server = createServer(async (req, res) => {
   }
   if (path === '/bootstrap.js' || path === '/workspace-checks.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });
-    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
+    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, resourcesCheck ? 'scripts/resources-checks.js' : tasksCheck ? 'scripts/tasks-checks.js' : askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
   }
   if (probeAssets.has(path)) { res.writeHead(200, { 'Content-Type': path.endsWith('.css') ? 'text/css' : 'text/javascript' }); res.end(probeAssets.get(path)); return; }
   if (path.startsWith('/assets/')) {
@@ -208,9 +248,9 @@ try {
   if (askMarksCheck && !part4Check) env.TAURI_CONFIG = readFileSync(override, 'utf8');
   const app = askMarksCheck && !part4Check
     ? start('cargo', ['run', '--manifest-path', join(host, 'src-tauri/Cargo.toml'), '--no-default-features', '--'])
-    : start(join(host, 'node_modules/.bin/tauri'), ['dev', '--config', override, '--no-watch', '--', ...(part4Check ? [] : ['--no-default-features'])]);
+    : start(join(host, 'node_modules/.bin/tauri'), ['dev', '--config', override, '--no-watch', '--', ...(claudeHost ? [] : ['--no-default-features'])]);
   app.on('exit', code => { if (code) finish([{ id: 'native-process', ok: false, error: `exited ${code}` }]); });
-  timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), editorCheck || autosaveCheck || viewsCheck ? 420_000 : 180_000);
+  timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck ? 420_000 : 180_000);
   results = await completed;
   if (!results.length || results.some(result => !result.ok)) throw Error('Workspace checks failed');
   if (!existsSync(join(vault, '.aisurada/workspace.json')) || existsSync(join(vault, 'notes/demo/legacy.md'))) throw Error('Workspace initialization or migration missing on disk');

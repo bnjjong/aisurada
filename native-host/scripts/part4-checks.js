@@ -11,6 +11,21 @@ async function until(predicate) {
 }
 const go = path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); };
 const post = (path, value) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
+const fillText = (element, value) => {
+  const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value').set.call(element, value);
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+};
+const pollEngine = async (argv, ok, label) => {
+  let out = '';
+  for (let n = 0; n < 200; n++) {
+    const r = await invoke('sidecar_call', { argv });
+    out = r.status === 0 ? r.stdout : `status ${r.status}: ${r.stderr}`;
+    if (ok(out)) return out;
+    await wait(50);
+  }
+  throw Error(`${label}: ${out.slice(0, 300)}`);
+};
 async function test(id, work) {
   try { await work(); results.push({ id, ok: true }); }
   catch (error) { results.push({ id, ok: false, error: String(error) }); }
@@ -96,6 +111,50 @@ try {
     assert(turns.some(turn => turn.includes('세션 점검용 첫 물음')), 'user turn missing');
     assert(turns.some(turn => turn.includes('세션 점검용 첫 답')), 'assistant turn missing');
   });
+  // 세션 화면의 입력창: 가짜 claude가 이어 쓰기에 답하면 입력칸이 비고 오류가 안 남는다. 입력창이 막히는 경우(다른 터미널이 쥔 세션 따위)는 순수 함수 시험이 본다.
+  if (cfg.part4Check) await test('enabled-session-composer-sends-through-the-host', async () => {
+    go(`/session/${cfg.sessionId}`);
+    await until(() => document.querySelector('.sess-page-turns')?.textContent.includes('세션 점검용 첫 답'));
+    await until(() => document.querySelector('textarea[aria-label="세션으로 보내기"]'));
+    assert(!document.querySelector('.sess-composer-blocked'), `입력창이 막혀 있다: ${document.querySelector('.sess-composer-blocked')?.textContent}`);
+    const box = document.querySelector('textarea[aria-label="세션으로 보내기"]');
+    const send = () => document.querySelector('.sess-composer-send');
+    assert(send().disabled, '빈 입력칸에서는 보내기가 닫혀 있다');
+    fillText(box, '이어서 한 가지만 더 물어볼게요');
+    await until(() => !send().disabled);
+    send().click();
+    // 누르면 입력칸은 곧바로 비므로 그것만으로는 성공을 모른다. 보내는 중(멈추기 단추)이 끝난 뒤에도 오류가 없어야 하고, 실패하면 글이 되돌아온다.
+    await until(() => document.querySelector('textarea[aria-label="세션으로 보내기"]')?.value === '', '누르면 입력칸이 빈다');
+    await wait(150);
+    const sendEnd = Date.now() + 25000;
+    while (Date.now() < sendEnd && document.querySelector('.sess-composer-stop')) await wait(50);
+    assert(!document.querySelector('.sess-composer-stop'), '보내기가 끝나지 않았다');
+    await wait(400);
+    assert(!document.querySelector('.sess-composer-error'), `오류가 남았다: ${document.querySelector('.sess-composer-error')?.textContent}`);
+    assert(document.querySelector('textarea[aria-label="세션으로 보내기"]').value === '', '실패했다면 글이 되돌아온다: 입력칸이 비어 있어야 한다');
+    assert(document.querySelector('.sess-composer-send') && document.querySelector('textarea[aria-label="세션으로 보내기"]'), '입력창이 다시 쓸 수 있다');
+  });
+  // 「노트로 굳히기」: 세션 대화를 읽어 노트로 만들고 그 노트로 간다. 만든 노트는 엔진에서 읽힌다.
+  if (cfg.part4Check) await test('enabled-session-pin-creates-a-note-real-engine', async () => {
+    go(`/session/${cfg.sessionId}`);
+    await until(() => document.querySelector('.sess-page-turns')?.textContent.includes('세션 점검용 첫 답'));
+    await until(() => document.querySelector('.sess-page-pin') && !document.querySelector('.sess-page-pin').disabled);
+    document.querySelector('.sess-page-pin').click();
+    await until(() => document.querySelector('.session-pin-modal .pin-hint'));
+    assert(document.querySelector('.session-pin-modal .pin-shapes')?.textContent.includes('0 건'), '비밀 모양 검사 결과가 보인다');
+    const title = document.querySelector('.session-pin-modal input[type="text"]');
+    fillText(title, '굳힌 세션 점검');
+    await wait(60);
+    const save = [...document.querySelectorAll('.session-pin-modal footer .btn-primary')].find(b => b.textContent.trim() === '굳히기');
+    assert(save && !save.disabled, '굳히기 단추');
+    save.click();
+    await until(() => location.pathname.startsWith('/doc/') && document.querySelector('.note-reading'), '굳힌 노트로 이동');
+    const id = decodeURIComponent(location.pathname.split('/')[2]);
+    const doc = JSON.parse(await pollEngine(['get-doc', id], out => out.includes('세션 점검용 첫 답'), '굳힌 노트 본문'));
+    assert(doc.title === '굳힌 세션 점검', `제목: ${doc.title}`);
+    assert(doc.body.includes('세션 점검용 첫 물음') && doc.body.includes('세션 점검용 첫 답'), '대화가 본문에 담겼다');
+    assert(Array.isArray(doc.tags) && doc.tags.includes('세션전사'), `태그: ${JSON.stringify(doc.tags)}`);
+  });
   // 설정의 「Claude 연결」: 실제 창에서 눌러 보고, 진짜 ais-cli(claude-mcp)가 가짜 claude에 등록하는 왕복을 잰다
   if (cfg.part4Check) await test('enabled-claude-connect-real-host', async () => {
     go('/');
@@ -141,6 +200,27 @@ try {
     document.querySelector('.nsrail-close').click();
     await until(() => !document.querySelector('.nsrail'));
     assert(document.querySelector('.doc-scroll').getBoundingClientRect().width >= b.width + r.width - 2, '레일을 닫아도 본문 칸이 넓어지지 않는다');
+  });
+  // 세션 레일의 대화: 노트 곁 레일에서 새 대화로 묻고, 가짜 claude의 답이 화면에 나오고 엔진(chats)에 적힌다.
+  if (cfg.part4Check) await test('enabled-rail-chat-asks-and-persists', async () => {
+    go(`/doc/${cfg.id}`);
+    await until(() => document.querySelector('.doc-meta-id-open'));
+    document.querySelector('.doc-meta-id-open').click();
+    await until(() => document.querySelector('.nsrail'));
+    await until(() => document.querySelector('textarea[aria-label="새 대화로 묻기"]'));
+    assert(document.querySelector('.rchat-empty') || document.querySelector('.rchat'), '레일 대화 구역');
+    const box = document.querySelector('textarea[aria-label="새 대화로 묻기"]');
+    fillText(box, '레일에서 묻는 말');
+    const send = () => document.querySelector('.nsrail-composer .sess-composer-send');
+    await until(() => send() && !send().disabled, '보내기가 열림');
+    send().click();
+    await until(() => document.querySelector('.nsrail .rchat-turn-pair')?.textContent.includes('fixture answer'), '답이 레일에 나옴');
+    assert(document.querySelector('.nsrail .rchat-turn-pair').textContent.includes('레일에서 묻는 말'), '내 질문도 보인다');
+    const chats = await pollEngine(['list-chats', cfg.id], out => out.includes('fixture answer'), '대화가 엔진에 적힘');
+    assert(chats.includes('레일에서 묻는 말'), '엔진의 대화 기록에 질문이 있다');
+    assert(document.querySelector('.rchat-new'), '새 대화 열기 단추');
+    document.querySelector('.nsrail-close').click();
+    await until(() => !document.querySelector('.nsrail'));
   });
   // 후속 노트: 메인 창에서는 창이 아니라 탭으로 열리고, 일반 노트와 같은 본문 칸(.doc-scroll)·레일 칸(.doc-route) 구조를 쓴다.
   // (하위 노트는 list-sub-notes가 sessionId를 주지 않아 칩의 「열기」가 없다. 그래서 레일 대신 이 구조만 잰다.)
