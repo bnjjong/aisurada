@@ -186,7 +186,7 @@ pub fn read_located(
     note_id: Option<&str>,
 ) -> Result<ReadResult, String> {
     let parsed = parse_located(located)?;
-    let bytes = std::fs::metadata(&located.file)
+    let bytes = crate::ports::fs::metadata(&located.file)
         .map_err(|e| e.to_string())?
         .len();
     let turns = parsed.turns;
@@ -351,7 +351,7 @@ pub fn reader_lines(text: &str) -> Vec<String> {
 
 /// 파일을 줄로 읽는다. UTF-8이 깨져도 대체 글자로 읽는다(D18).
 pub fn read_lines(path: &Path) -> Result<Vec<String>, String> {
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let bytes = crate::ports::fs::read(path).map_err(|e| e.to_string())?;
     Ok(reader_lines(&String::from_utf8_lossy(&bytes)))
 }
 

@@ -4,7 +4,7 @@
 //! 도구 호출이 정리되어 담기고, 예전 형식은 `user_message`, `agent_message`와 `response_item`의 함수 호출이다. 둘이 한 파일에 섞이지
 //! 않으므로 한 번 훑으면서 두 갈래를 따로 모으고, 새 형식이 있으면 그것을 쓴다.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 
 use super::{

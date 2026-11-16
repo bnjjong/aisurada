@@ -53,7 +53,7 @@ pub fn find(directories: &[PathBuf], session_id: &str) -> Option<PathBuf> {
     directories
         .iter()
         .map(|d| d.join(&file_name))
-        .find(|f| std::fs::metadata(f).map(|m| m.is_file()).unwrap_or(false))
+        .find(|f| crate::ports::fs::metadata(f).map(|m| m.is_file()).unwrap_or(false))
 }
 
 pub fn is_antigravity_file(file: &Path) -> bool {
@@ -270,7 +270,7 @@ fn generated_model(generated: &Option<Vec<Field>>) -> Option<String> {
 /// 읽기 전용으로 질의하고 줄마다 `columns`칸으로 나눠 돌려준다. 칸은 16진 글과 숫자뿐이라 `|`로 나눠도 안전하다.
 /// 평소 열기가 안 되면(쓰는 쪽이 잠갔거나 읽기 전용 폴더) 같은 파일을 immutable로 한 번 더 시도한다.
 fn query(db: &Path, sql: &str, columns: usize) -> Result<Vec<Vec<String>>, String> {
-    let absolute = std::fs::canonicalize(db).unwrap_or_else(|_| db.to_path_buf());
+    let absolute = crate::ports::fs::canonicalize(db).unwrap_or_else(|_| db.to_path_buf());
     let uri = format!("file:{}", percent_encode_path(&absolute.to_string_lossy()));
     let mut first: Option<String> = None;
     for options in ["?mode=ro", "?mode=ro&immutable=1"] {

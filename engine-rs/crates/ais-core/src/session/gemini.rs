@@ -5,7 +5,7 @@
 //! 거꾸로 찾는다.
 
 use std::collections::HashMap;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 
 use super::codex::join_text;

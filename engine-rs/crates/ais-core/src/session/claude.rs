@@ -1,8 +1,7 @@
 //! Claude Code 세션 기록(`~/.claude/projects/<프로젝트>/<세션 id>.jsonl`) 읽개. 설명서 7장의 읽기 규칙과 D18(깨진 UTF-8은 대체 글자)을 따른다.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fs;
-use std::io::{Read, Seek, SeekFrom};
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -548,21 +547,6 @@ fn decode(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-fn read_at(file: &mut fs::File, position: u64, length: usize) -> std::io::Result<Vec<u8>> {
-    file.seek(SeekFrom::Start(position))?;
-    let mut buffer = vec![0u8; length];
-    let mut filled = 0;
-    while filled < length {
-        let n = file.read(&mut buffer[filled..])?;
-        if n == 0 {
-            break;
-        }
-        filled += n;
-    }
-    buffer.truncate(filled);
-    Ok(buffer)
-}
-
 fn head_and_tail(path: &Path, size: u64) -> HeadAndTail {
     let empty = || HeadAndTail {
         head_text: String::new(),
@@ -587,17 +571,14 @@ fn head_and_tail(path: &Path, size: u64) -> HeadAndTail {
     }
     // 머리와 꼬리를 각각 읽는다. 줄은 가장자리의 불완전한 줄을 버린 바이트로 나누고,
     // 글자 대체(정규식)는 버린 가장자리 조각까지 든 창의 바이트 전체에서 찾는다(7.10)
-    let Ok(mut file) = fs::File::open(path) else {
-        return empty();
-    };
-    let Ok(head) = read_at(&mut file, 0, CHUNK_BYTES) else {
+    let Ok(head) = fs::read_range(path, 0, CHUNK_BYTES) else {
         return empty();
     };
     let valid_head = head
         .iter()
         .rposition(|b| *b == b'\n')
         .map_or(&head[..0], |i| &head[..=i]);
-    let Ok(tail) = read_at(&mut file, size - CHUNK_BYTES as u64, CHUNK_BYTES) else {
+    let Ok(tail) = fs::read_range(path, size - CHUNK_BYTES as u64, CHUNK_BYTES) else {
         return empty();
     };
     let valid_tail = match tail.iter().position(|b| *b == b'\n') {
@@ -882,8 +863,7 @@ pub fn recent_sessions(projects_dir: Option<&Path>, days: i32) -> Recent {
     // 머리 64KB에서 entrypoint가 cli인 것만 남긴다
     let mut cli: Vec<(PathBuf, i64, String)> = Vec::new();
     for (path, modified) in candidates {
-        let head = fs::File::open(&path)
-            .and_then(|mut f| read_at(&mut f, 0, CHUNK_BYTES))
+        let head = fs::read_range(&path, 0, CHUNK_BYTES)
             .map(|b| decode(&b))
             .unwrap_or_default();
         if first_match(&head, &ENTRYPOINT).as_deref() == Some("cli") {
