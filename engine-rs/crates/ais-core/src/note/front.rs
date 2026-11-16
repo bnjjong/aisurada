@@ -107,6 +107,16 @@ pub struct Editor<'a> {
 /// 저장 상한(UTF-16 글자)
 pub const MAX_FILE_UNITS: usize = 1_000_000;
 
+/// 쓸 파일 글이 저장 상한(UTF-16 단위 [`MAX_FILE_UNITS`])을 넘으면 `rel`(쓸 경로)을 붙인 오류를 낸다.
+pub fn check_size(text: &str, rel: &str) -> Result<(), EngineError> {
+    if crate::text::utf16_len(text) > MAX_FILE_UNITS {
+        return Err(EngineError::internal(format!(
+            "노트가 저장 상한을 넘어 저장하지 않았다: {rel}"
+        )));
+    }
+    Ok(())
+}
+
 /// 쓸 노트 머리의 값. 줄이 아닌 값으로 받아 두고, 옛 도장은 `meta`에서 읽는다.
 pub struct Draft<'a> {
     /// 지금 색인에 있는 노트(id, 유형, 층과 옛 편집 도장을 여기서 읽는다)

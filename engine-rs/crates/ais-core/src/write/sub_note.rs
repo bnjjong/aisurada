@@ -12,11 +12,11 @@ use regex::Regex;
 use super::atomic::write_atomic;
 use super::confine::{check_confinement, has_unusable_path_characters};
 use super::doc_place::{folder_name_from, place_folder, read_created};
-use super::meta_writer::MAX_FILE_UNITS;
 use super::note_front::NoteFront;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
-use crate::text::{cut_utf16, trim, utf16_len};
+use crate::note::front::check_size;
+use crate::text::{cut_utf16, trim};
 use crate::vault::note_file::split_text;
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, NoteRecord};
@@ -121,11 +121,7 @@ pub fn place_and_write(
     }
     check_confinement(vault, &vault.join(&canonical))?;
     let final_rel = place_folder(vault, current, &canonical)?;
-    if utf16_len(text) > MAX_FILE_UNITS {
-        return Err(EngineError::internal(format!(
-            "노트가 저장 상한을 넘어 저장하지 않았다: {final_rel}"
-        )));
-    }
+    check_size(&text, &final_rel)?;
     let name = sub
         .content_file
         .file_name()
@@ -234,12 +230,7 @@ pub fn rewrite_root(vault: &Path, root: &NoteRecord, body: &str) -> Result<Vec<u
     }
     .render();
     let text = format!("---\n{front}---\n{body}");
-    if utf16_len(&text) > MAX_FILE_UNITS {
-        return Err(EngineError::internal(format!(
-            "노트가 저장 상한을 넘어 저장하지 않았다: {}",
-            rel_of(vault, &root.content_file)
-        )));
-    }
+    check_size(&text, &rel_of(vault, &root.content_file))?;
     write_atomic(&root.content_file, text.as_bytes())?;
     Ok(text.into_bytes())
 }

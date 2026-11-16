@@ -6,9 +6,10 @@
 use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::kernel::token::compute_token;
+use crate::note::front::check_size;
 use crate::note::front::judge;
 pub use crate::note::front::{Draft, Editor, MAX_FILE_UNITS};
-use crate::text::{cut_utf16, trim, utf16_len};
+use crate::text::{cut_utf16, trim};
 use crate::vault::note_file::split_text;
 use crate::vault::note_meta::{Evaluation, Link, get};
 use crate::vault::scanner::NoteRecord;
@@ -100,11 +101,7 @@ pub fn write_meta(
         &editor_of(context),
         now_millis(),
     )?;
-    if utf16_len(&text) > MAX_FILE_UNITS {
-        return Err(EngineError::internal(format!(
-            "노트가 저장 상한을 넘어 저장하지 않았다: {rel}"
-        )));
-    }
+    check_size(&text, &rel)?;
     write_atomic(&note.content_file, text.as_bytes())?;
     Ok(MetaWritten {
         path: note.rel_path.clone(),

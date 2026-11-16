@@ -4,7 +4,7 @@ use crate::kernel::doc_type::DocType;
 use crate::kernel::link_kind::LinkKind;
 use crate::kernel::tier::Tier;
 pub use crate::note::meta::{Evaluation, Link, MetaData, parse_iso_date};
-pub(crate) use crate::note::meta::{TEMPLATE_ID, agent_for_file, get, read_agent, text};
+pub(crate) use crate::note::meta::{TEMPLATE_ID, get, read_agent, text};
 pub(crate) use crate::note::meta::{parse_time_and_offset, utc_instant};
 use std::collections::HashSet;
 

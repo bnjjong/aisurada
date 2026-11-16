@@ -472,6 +472,12 @@ fn aggregate_files_are_pure_domain_code() {
         "note/placement.rs",
         "note/slug.rs",
         "note/edit.rs",
+        "note/args.rs",
+        "note/create.rs",
+        "note/curate.rs",
+        "note/sub.rs",
+        "note/heading.rs",
+        "note/comment.rs",
     ];
     const FORBIDDEN: &[&str] = &[
         "crate::ports",

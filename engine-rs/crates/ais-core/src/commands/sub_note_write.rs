@@ -3,7 +3,6 @@
 //!
 //! 부모는 `메인 노트 id`이거나 `메인 노트 id/후속 노트 id/…` 사슬이다. 읽기 쪽과 달리 후속 노트 id 하나만으로는 부모를 가리킬 수 없다.
 
-use crate::kernel::doc_type::DocType;
 use crate::kernel::tier::Tier;
 use std::path::Path;
 
@@ -15,8 +14,9 @@ use super::doc_write::parse_tags;
 use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::kernel::token::compute_token;
-use crate::note::front::{Draft, MAX_FILE_UNITS, judge};
-use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
+use crate::note::front::{Draft, judge};
+use crate::note::sub::{NewSub, check_given_title, updated_title};
+use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim};
 use crate::vault::index::NoteIndex;
 use crate::vault::note_file::split_text;
 use crate::vault::scanner::{Format, NoteRecord};
@@ -30,7 +30,7 @@ use crate::write::sub_note::{
     SINGLE_FILE_MESSAGE, place_and_write, read_derived, remove_tree, require_markdown_folder,
     rewrite_root, rewrite_sub, root_agenda, strip_child_cards,
 };
-use crate::write::{first_heading, precondition, warnings};
+use crate::write::{precondition, warnings};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -177,38 +177,20 @@ pub fn create_sub_note(
     const USAGE: &str = "create-sub-note <부모 노트 id> title=<제목> body=<본문> [type=<유형>]";
     require_one(&request.parent, USAGE)?;
     let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
-    let title = request
-        .title
-        .as_deref()
-        .ok_or_else(|| EngineError::invalid_argument(format!("title 이 필요하다: {USAGE}")))?;
-    let body = request
-        .body
-        .as_deref()
-        .ok_or_else(|| EngineError::invalid_argument(format!("body 이 필요하다: {USAGE}")))?;
-    let raw_type = request.doc_type.as_deref().unwrap_or("free");
-    let doc_type = DocType::parse_ignore_ascii_case(raw_type)
-        .map(DocType::as_str)
-        .ok_or_else(|| {
-            EngineError::invalid_argument(format!(
-                "모르는 유형 이다: {raw_type}. 쓸 수 있는 것은 [{}] 뿐이다.",
-                DocType::NAMES_TEXT
-            ))
-        })?;
-    if is_blank(title) {
-        return Err(EngineError::invalid_argument("하위 노트 제목이 비었다"));
-    }
+    let new = NewSub::parse(
+        request.title.as_deref(),
+        request.body.as_deref(),
+        request.doc_type.as_deref(),
+        USAGE,
+    )?;
+    let (title, body) = (new.title.as_str(), new.body.as_str());
     let root = parent
         .root
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", parent.root_id)))?;
 
     let sub_id = next_sub_note_id();
     let now = local_clock(now_millis());
-    let created = format!(
-        "{}T{:02}:{:02}:00+09:00",
-        now.date.era_text(),
-        now.hour,
-        now.minute
-    );
+    let created = new.created(&now);
     let agenda = root_agenda(root);
     let container = parent.container.unwrap_or(root);
     if container.is_single_file || container.is_extension_folder {
@@ -222,33 +204,7 @@ pub fn create_sub_note(
         container.rel_path,
         folder_name_from(&now.date, now.hour, now.minute, title, &sub_id)
     );
-    let front = crate::write::note_front::NoteFront {
-        id: &sub_id,
-        agenda: &agenda,
-        doc_type,
-        title,
-        created: &created,
-        session_id: None,
-        session_agent: None,
-        tier: Tier::Reading,
-        edited_by: None,
-        edited_at: None,
-        edited_session_id: None,
-        edited_session_agent: None,
-        tags: &[],
-        favorite: false,
-        favorite_category: None,
-        template: None,
-        evaluation: None,
-        links: &[],
-    }
-    .render();
-    let text = format!("---\n{front}---\n{body}");
-    if utf16_len(&text) > MAX_FILE_UNITS {
-        return Err(EngineError::internal(format!(
-            "노트가 저장 상한을 넘어 저장하지 않았다: {folder_rel}"
-        )));
-    }
+    let text = new.render(&sub_id, &agenda, &created, &folder_rel)?;
     if has_unusable_path_characters(&folder_rel) {
         return Err(EngineError::invalid_argument(format!(
             "경로로 쓸 수 없는 값이다: {folder_rel}"
@@ -294,23 +250,11 @@ pub fn update_sub_note(
     let meta = &sub.meta;
     let new_tags = request.tags.as_ref().map(parse_tags).transpose()?;
     let given_title = request.title.as_deref();
-    if given_title.is_some_and(is_blank) {
-        return Err(EngineError::invalid_argument(format!(
-            "하위 노트 제목이 비었다: {}",
-            sub.id
-        )));
-    }
+    check_given_title(given_title, &sub.id)?;
     let given_body = request.body.as_deref();
     let token = request.f1.as_deref().map(trim).filter(|t| !t.is_empty());
 
-    let title: String = given_title
-        .map(str::to_string)
-        .or_else(|| {
-            given_body
-                .filter(|_| sub.format != Format::Json)
-                .and_then(first_heading::extract)
-        })
-        .unwrap_or_else(|| meta.title.clone());
+    let title = updated_title(given_title, given_body, sub.format, &meta.title);
     let tags: &[String] = new_tags.as_deref().unwrap_or(&meta.tags);
     let root = parent.root.ok_or_else(|| {
         EngineError::not_found(format!("SubNote not found: {}/{}", parent.root_id, sub.id))

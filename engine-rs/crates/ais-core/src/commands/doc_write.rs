@@ -1,7 +1,6 @@
 //! 노트 본문 쓰기 명령: `update_doc`(제목·본문·태그·템플릿·날짜·시각 고치기).
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 파일 글은 바이트까지 같다.
 
-use crate::kernel::java::to_json_value;
 use crate::ports::fs;
 use std::path::Path;
 
@@ -11,11 +10,11 @@ use serde_json::{Value as Json, json};
 use super::Caller;
 use super::subnote::check_writable;
 use crate::error::EngineError;
-use crate::json::{self, JsonValue};
 use crate::kernel::token::compute_token;
+pub(crate) use crate::note::args::parse_tags;
 use crate::note::edit::{EditInput, ParsedEdit};
-use crate::note::front::MAX_FILE_UNITS;
-use crate::text::{NOTE_ID, is_blank, trim, utf16_len};
+use crate::note::front::check_size;
+use crate::text::{NOTE_ID, is_blank};
 use crate::vault::note_file::split_text;
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::atomic::write_atomic;
@@ -57,48 +56,6 @@ pub(crate) fn require_note_id(id: &str, usage: &str) -> Result<(), EngineError> 
         )));
     }
     Ok(())
-}
-
-/// `tags` 인자를 읽어 다듬는다. 공백뿐인 항목은 버리고, 다듬은 뒤 줄바꿈이 있으면 거절하고, 같은 글은 처음 하나만 남긴다.
-pub(crate) fn parse_tags(raw: &Json) -> Result<Vec<String>, EngineError> {
-    let items = match raw {
-        Json::String(text) => {
-            let not_array =
-                || EngineError::invalid_argument(format!("tags 은 JSON 배열이어야 한다: {text}"));
-            match json::parse(text).map_err(|_| not_array())? {
-                JsonValue::Array(items) => items,
-                _ => return Err(not_array()),
-            }
-        }
-        Json::Array(items) => items.iter().map(to_json_value).collect(),
-        other => {
-            return Err(EngineError::invalid_argument(format!(
-                "tags 은 JSON 배열이어야 한다: {other}"
-            )));
-        }
-    };
-    let mut result: Vec<String> = Vec::new();
-    for item in items {
-        let JsonValue::Str(text) = item else {
-            return Err(EngineError::invalid_argument(format!(
-                "tags 항목이 문자열이 아니다: {}",
-                json::compact(&item)
-            )));
-        };
-        if is_blank(&text) {
-            continue;
-        }
-        let trimmed = trim(&text);
-        if trimmed.contains(['\n', '\r']) {
-            return Err(EngineError::invalid_argument(format!(
-                "태그에 줄바꿈이 있다: '{trimmed}'"
-            )));
-        }
-        if !result.iter().any(|seen| seen == trimmed) {
-            result.push(trimmed.to_string());
-        }
-    }
-    Ok(result)
 }
 
 fn rel_of(vault: &Path, path: &Path) -> String {
@@ -182,14 +139,7 @@ pub fn update_doc(
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let check_size = |rel: &str| -> Result<(), EngineError> {
-        if utf16_len(&text) > MAX_FILE_UNITS {
-            return Err(EngineError::internal(format!(
-                "노트가 저장 상한을 넘어 저장하지 않았다: {rel}"
-            )));
-        }
-        Ok(())
-    };
+    let check_text_size = |rel: &str| check_size(&text, rel);
 
     let mut warnings_found: Vec<String> = Vec::new();
     let final_rel: String;
@@ -198,12 +148,12 @@ pub fn update_doc(
         let canonical = format!("{parent}/{folder}");
         check_path(vault, &canonical)?;
         final_rel = place_folder(vault, old_rel, &canonical)?;
-        check_size(&final_rel)?;
+        check_text_size(&final_rel)?;
         write_atomic(&vault.join(&final_rel).join(&content_name), text.as_bytes())?;
     } else if note.format == Format::Html {
         // 옛 .html 단일 파일: 이름만 바꾼다. 상한, 경로, 쓰기 차례이고 같은 이름 파일은 덮는다
         final_rel = format!("{parent}/{folder}.html");
-        check_size(&final_rel)?;
+        check_text_size(&final_rel)?;
         check_path(vault, &final_rel)?;
         write_atomic(&vault.join(&final_rel), text.as_bytes())?;
         if final_rel != old_rel {
@@ -212,7 +162,7 @@ pub fn update_doc(
     } else {
         // 옛 .md, .json 단일 파일: 빈자리를 안 보고 새 폴더에 쓴 뒤 옛 파일을 지운다
         final_rel = format!("{parent}/{folder}");
-        check_size(&final_rel)?;
+        check_text_size(&final_rel)?;
         check_path(vault, &final_rel)?;
         let name = if note.format == Format::Json {
             "note.json"

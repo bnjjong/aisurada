@@ -11,7 +11,8 @@ use serde_json::{Value as Json, json};
 use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::kernel::token::compute_token;
-use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
+use crate::note::comment::{self, CommentInput, CommentOp};
+use crate::text::{is_blank, utf16_len};
 use crate::vault::comments::{Anchor, Comment, CommentsEnvelope, read_comments};
 use crate::vault::index::NoteIndex;
 use crate::vault::scanner::{Format, NoteRecord};
@@ -44,12 +45,7 @@ pub struct CommentWriteRequest {
     pub context: WriteContext,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Create,
-    Update,
-    Delete,
-}
+type Kind = CommentOp;
 
 /// 풀어 낸 코멘트 자리
 struct Target<'a> {
@@ -111,21 +107,6 @@ fn now_text() -> String {
     )
 }
 
-fn check_body(body: Option<&str>, usage: &str) -> Result<(), EngineError> {
-    let body =
-        body.ok_or_else(|| EngineError::invalid_argument(format!("body 이 필요하다: {usage}")))?;
-    if is_blank(body) {
-        return Err(EngineError::invalid_argument("코멘트 본문이 비었다."));
-    }
-    let length = utf16_len(body);
-    if length > 20_000 {
-        return Err(EngineError::invalid_argument(format!(
-            "코멘트 본문이 너무 길다({length}자). 상한은 20000자다."
-        )));
-    }
-    Ok(())
-}
-
 pub fn create_comment(
     vault: &Path,
     request: &CommentWriteRequest,
@@ -162,46 +143,20 @@ fn execute(
         Kind::Delete => DELETE_USAGE,
     };
 
-    if is_blank(&request.id) {
-        return Err(EngineError::invalid_argument(format!(
-            "인자가 하나 필요하다: {usage}"
-        )));
-    }
-    let sub_id = request.sub_id.as_deref().filter(|s| !is_blank(s));
-    if !NOTE_ID.is_match(&request.id) {
-        return Err(EngineError::invalid_argument(format!(
-            "노트 id 모양이 아니다: {}",
-            request.id
-        )));
-    }
-    if let Some(sub) = sub_id
-        && !SUB_NOTE_ID.is_match(sub)
-    {
-        return Err(EngineError::invalid_argument(format!(
-            "하위 노트 id 모양이 아니다: {sub}"
-        )));
-    }
-    let mut id = request
-        .comment_id
-        .as_deref()
-        .map(|c| trim(c).to_string())
-        .unwrap_or_default();
-    if kind != Kind::Create && id.is_empty() {
-        return Err(EngineError::invalid_argument(format!(
-            "comment_id 이 필요하다: {usage}"
-        )));
-    }
-    let body = request.body.as_deref();
-    if kind != Kind::Delete {
-        check_body(body, usage)?;
-    }
-    let quote = request.anchor_quote.as_deref();
-    if kind == Kind::Create && quote.is_some_and(|q| utf16_len(q) > 2_000) {
-        return Err(EngineError::invalid_argument(
-            "앵커 인용문이 너무 길다. 상한은 2000자다.",
-        ));
-    }
-
+    // 인자 검사(규칙은 `note::comment`)
+    let parsed = comment::parse(
+        kind,
+        CommentInput {
+            note_id: &request.id,
+            sub_id: request.sub_id.as_deref(),
+            comment_id: request.comment_id.as_deref(),
+            body: request.body.as_deref(),
+            anchor_quote: request.anchor_quote.as_deref(),
+        },
+        usage,
+    )?;
+    let (sub_id, body, quote) = (parsed.sub_id, parsed.body, parsed.quote);
+    let mut id = parsed.comment_id;
     let target = resolve(vault, &scope.index, &request.id, sub_id)?;
     check_writable(target.root, request.context.caller)?;
     let mut comments: Vec<Comment> = match read_comments(vault, &target.file) {

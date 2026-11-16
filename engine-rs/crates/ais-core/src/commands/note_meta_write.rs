@@ -1,8 +1,6 @@
 //! 노트 머리만 고치는 쓰기: `set_favorite`(즐겨찾기), `evaluate_doc`(평가), `link_docs`(연결 더하기·빼기).
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같다.
 
-use crate::kernel::java::java_double_string;
-use crate::kernel::link_kind::LinkKind;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -11,9 +9,11 @@ use serde_json::{Value, json};
 use super::Caller;
 use super::subnote::check_writable;
 use crate::error::EngineError;
-use crate::kernel::time::format_utc_millis;
-use crate::text::{NOTE_ID, cut_utf16, is_blank, trim};
-use crate::vault::note_meta::{Evaluation, Link};
+use crate::note::curate::{
+    FavoriteChange, LinkOutcome, ScoreInput, apply_link, check_link_ends, check_not_self,
+    decide_favorite, evaluation_of, parse_link_kind, parse_score,
+};
+use crate::text::{NOTE_ID, is_blank, trim};
 use crate::vault::scanner::NoteRecord;
 use crate::write::apparatus::now_millis;
 use crate::write::meta_writer::{MetaState, write_meta};
@@ -132,17 +132,11 @@ pub fn set_favorite(
     let note = find(scope, &request.id, request.context.caller)?;
     let meta = &note.meta;
 
-    let new_favorite = match (favorite, request.category.is_some()) {
-        (Some(f), _) => f,
-        (None, true) => meta.favorite,
-        (None, false) => !meta.favorite,
-    };
-    let new_category: Option<String> = match &request.category {
-        Some(raw) if is_blank(raw) => None,
-        Some(raw) => Some(trim(raw).to_string()),
-        None => meta.favorite_category.clone(),
-    };
-    let unchanged = new_favorite == meta.favorite && new_category == meta.favorite_category;
+    let FavoriteChange {
+        favorite: new_favorite,
+        category: new_category,
+        unchanged,
+    } = decide_favorite(meta, favorite, request.category.as_deref());
     let mut response = json!({"id": request.id, "favorite": new_favorite});
     if let Some(category) = &new_category {
         response["category"] = json!(category);
@@ -177,44 +171,20 @@ pub fn evaluate_doc(
     const USAGE: &str = "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]";
     require_note_id(&request.id, USAGE)?;
     let clear = bool_arg("clear", &request.clear)?.unwrap_or(false);
-    let mut score = 0.0;
-    if !clear {
-        let missing = || {
-            EngineError::invalid_argument(format!(
-                "score 를 주거나 clear=true 를 지정한다: {USAGE}"
-            ))
-        };
-        score = match &request.score {
-            None => return Err(missing()),
-            Some(NumberArg::Number(n)) => *n,
-            Some(NumberArg::Text(text)) => {
-                let trimmed = trim(text);
-                if trimmed.is_empty() {
-                    return Err(missing());
-                }
-                trimmed.parse::<f64>().map_err(|_| {
-                    EngineError::invalid_argument(format!("score 은 숫자여야 한다: {trimmed}"))
-                })?
-            }
-        };
-        if score.is_nan() || !(0.0..=100.0).contains(&score) {
-            return Err(EngineError::invalid_argument(format!(
-                "평가 점수는 0 에서 100 사이여야 한다: {}",
-                java_double_string(score)
-            )));
-        }
-    }
+    let score = if clear {
+        0.0
+    } else {
+        parse_score(
+            request.score.as_ref().map(|s| match s {
+                NumberArg::Number(n) => ScoreInput::Number(*n),
+                NumberArg::Text(text) => ScoreInput::Text(text),
+            }),
+            USAGE,
+        )?
+    };
     let token = f1_arg(&request.f1);
     let note = find(scope, &request.id, request.context.caller)?;
-    let evaluation = (!clear).then(|| Evaluation {
-        // 반올림(0.5는 올림)한 뒤 0~100으로 맞춘다
-        score: (score + 0.5).floor().clamp(0.0, 100.0) as u8,
-        note: request
-            .note
-            .as_deref()
-            .map_or_else(String::new, |n| cut_utf16(trim(n), 1000)),
-        at: format_utc_millis(now_millis()),
-    });
+    let evaluation = (!clear).then(|| evaluation_of(score, request.note.as_deref(), now_millis()));
     let meta = &note.meta;
     let written = write_meta(
         vault,
@@ -242,67 +212,18 @@ pub fn link_docs(
     scope: &WriteScope,
 ) -> Result<Value, EngineError> {
     const USAGE: &str = "link-docs <출발 노트 id> <대상 노트 id> [kind=direct|indirect|attach] [remove=true] [f1=<직전에 읽은 토큰>]";
-    if is_blank(&request.from) {
-        return Err(EngineError::invalid_argument(format!(
-            "인자가 하나 필요하다: {USAGE}"
-        )));
-    }
-    if is_blank(&request.to) {
-        return Err(EngineError::invalid_argument(format!(
-            "대상 노트 id 가 필요하다: {USAGE}"
-        )));
-    }
-    for id in [&request.from, &request.to] {
-        if !NOTE_ID.is_match(id) {
-            return Err(EngineError::invalid_argument(format!(
-                "노트 id 모양이 아니다: {id}"
-            )));
-        }
-    }
-    let mut kind = LinkKind::Direct.as_str().to_string();
-    if let Some(raw) = &request.kind
-        && !trim(raw).is_empty()
-    {
-        let lower = trim(raw).to_lowercase();
-        if LinkKind::parse(&lower).is_none() {
-            return Err(EngineError::invalid_argument(format!(
-                "모르는 관계 종류 이다: {}. 쓸 수 있는 것은 [{}] 뿐이다.",
-                trim(raw),
-                LinkKind::NAMES_TEXT
-            )));
-        }
-        kind = lower;
-    }
+    check_link_ends(&request.from, &request.to, USAGE)?;
+    let kind = parse_link_kind(request.kind.as_deref())?;
     let remove = bool_arg("remove", &request.remove)?.unwrap_or(false);
-    if request.from == request.to {
-        return Err(EngineError::invalid_argument(format!(
-            "자기 자신과는 연결할 수 없다: {}",
-            request.from
-        )));
-    }
+    check_not_self(&request.from, &request.to)?;
     let token = f1_arg(&request.f1);
     let note = find(scope, &request.from, request.context.caller)?;
-    let same = |l: &Link| l.to == request.to && l.kind.eq_ignore_ascii_case(&kind);
-    let exists = note.meta.links.iter().any(same);
-    if !remove && exists {
-        return Ok(json!({"id": request.from, "changed": false, "note": "이미 있는 연결이에요."}));
-    }
-    if remove && !exists {
-        return Ok(json!({"id": request.from, "changed": false, "note": "제거할 연결이 없어요."}));
-    }
-    let mut links: Vec<Link> = note
-        .meta
-        .links
-        .iter()
-        .filter(|l| !same(l))
-        .cloned()
-        .collect();
-    if !remove {
-        links.push(Link {
-            to: request.to.clone(),
-            kind: kind.clone(),
-        });
-    }
+    let links = match apply_link(&note.meta.links, &request.to, &kind, remove) {
+        LinkOutcome::Unchanged(why) => {
+            return Ok(json!({"id": request.from, "changed": false, "note": why}));
+        }
+        LinkOutcome::Changed(links) => links,
+    };
     let meta = &note.meta;
     let written = write_meta(
         vault,

@@ -102,6 +102,11 @@ pub fn id_tail(id: &str) -> String {
     }
 }
 
+/// `created` 글(`yyyy-MM-ddTHH:mm:00+09:00`)을 짓는다. 새 노트의 시각은 항상 한국 시각이다.
+pub fn created_text(date: &CivilDate, hour: u32, minute: u32) -> String {
+    format!("{}T{hour:02}:{minute:02}:00+09:00", date.era_text())
+}
+
 /// 노트 폴더 이름 `<날짜>-<HHmm>-<제목 slug>-<id 꼬리>`
 pub fn folder_name(date: &CivilDate, hour: u32, minute: u32, title: &str, id: &str) -> String {
     folder_name_from(date, hour, minute, title, id)
