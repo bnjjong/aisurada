@@ -10,7 +10,7 @@ import { $convertFromMarkdownString } from '@lexical/markdown';
 import { $createCodeNode } from '@lexical/code';
 import { $createTextNode } from 'lexical';
 import { relativePath, widthDashes, markerPlaceholders, calloutStyle, fenceTracker, stripMarkers, foldParagraphs, closeBlockEmphasis } from '../src/editor/grammar.ts';
-import { frameHeight, openEditorLink, FRAME_LINK, imageFileName } from '../src/editor/media.tsx';
+import { frameHeight, openEditorLink, FRAME_LINK, imageFileName, canExpandFrame, resolveFrameHeight } from '../src/editor/media.tsx';
 import { REPORT_HTML } from '../src/workspace/engine.ts';
 import { tablesOnlyJSON } from '../src/editor/tableTools.tsx';
 const cases=JSON.parse(readFileSync(new URL('../fixtures/editor-roundtrip/cases.json',import.meta.url),'utf8'));
@@ -149,4 +149,24 @@ test('표 칸 역슬래시는 \\n만 개행으로 처리하고 구두점 앞 역
   const exported = editor.getEditorState().read($exportDocument);
   assert.match(exported, /\.\.\\\\\.\.\\\\foo/);
   assert.match(exported, /a\\nb/);
+});
+
+test('HTML 프레임은 1600px 초과 시에만 펼치기를 허용하고 토글 시 전체 높이로 확장된다', () => {
+  // 1600px 이하인 경우 펼치기 버튼 불필요
+  assert.equal(canExpandFrame(null), false);
+  assert.equal(canExpandFrame(480), false);
+  assert.equal(canExpandFrame(1600), false);
+  // 1600px 초과인 경우 펼치기 가능
+  assert.equal(canExpandFrame(1601), true);
+  assert.equal(canExpandFrame(3500), true);
+
+  // 접힌 상태 (expanded: false): 캐시된 기본 상한 높이 유지
+  assert.equal(resolveFrameHeight(3500, 1600, false), 1600);
+  assert.equal(resolveFrameHeight(null, 480, false), 480);
+  assert.equal(resolveFrameHeight(800, 800, false), 800);
+
+  // 펼친 상태 (expanded: true): 내용 전체 높이로 100% 확장 (최소 160px 보장)
+  assert.equal(resolveFrameHeight(3500, 1600, true), 3500);
+  assert.equal(resolveFrameHeight(50, 160, true), 160);
+  assert.equal(resolveFrameHeight(null, 480, true), 480);
 });
