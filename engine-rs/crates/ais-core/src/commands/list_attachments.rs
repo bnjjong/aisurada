@@ -1,6 +1,6 @@
 //! `list_attachments`: 노트 또는 후속 노트의 `attach/` 폴더에 든 첨부를 이름 차례로 돌려준다.
 
-use std::fs;
+use crate::ports::fs;
 use std::sync::LazyLock;
 
 use regex::Regex;

@@ -1,6 +1,6 @@
 //! `update_agenda_facts`: 아젠다의 사실층(지금도 참인 것)을 통째로 바꾸거나 지운다. 인자 이름과 응답 필드는 Java 엔진과 같다.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};

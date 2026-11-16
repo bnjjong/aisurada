@@ -3,7 +3,7 @@
 
 use crate::kernel::ids::TRASH_ID;
 use std::collections::HashSet;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use serde::Deserialize;

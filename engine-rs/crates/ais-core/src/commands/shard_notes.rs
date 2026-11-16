@@ -2,7 +2,7 @@
 //! 현재 디스크를 대조한다). 규칙과 응답은 Java 엔진의 `ShardNotes`·`VerifyShard`와 같다.
 
 use std::collections::HashMap;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

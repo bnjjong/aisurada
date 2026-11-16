@@ -1,7 +1,7 @@
 //! 아젠다 쓰기: `create_agenda`, `update_agenda`, `delete_agenda`. 인자 이름과 응답 필드는 Java 엔진과 같다.
 
 use std::collections::HashSet;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};

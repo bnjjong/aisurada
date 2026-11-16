@@ -55,7 +55,7 @@ pub fn export_markdown(vault: &Path, scope: &WriteScope) -> Result<Json, EngineE
     }
     let dest = absolute_normalized(&vault.join(".aisurada/md-export"));
     remove_tree(&dest)?;
-    std::fs::create_dir_all(&dest)
+    crate::ports::fs::create_dir_all(&dest)
         .map_err(|_| EngineError::internal(format!("폴더를 만들지 못했다: {}", dest.display())))?;
     for (path, body) in &exports {
         let stripped = path.strip_prefix("notes/").unwrap_or(path);

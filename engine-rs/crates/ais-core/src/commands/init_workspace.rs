@@ -3,7 +3,7 @@
 //! 인자 이름, 응답 필드, 검사 순서와 오류 문구는 Java 엔진과 같다.
 
 use crate::kernel::doc_type::DocType;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 

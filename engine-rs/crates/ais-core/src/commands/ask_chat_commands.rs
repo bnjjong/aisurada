@@ -7,7 +7,7 @@
 
 use crate::kernel::time::parse_instant;
 use std::cmp::Ordering;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

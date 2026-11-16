@@ -2,7 +2,7 @@
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 파일 글은 바이트까지 같다.
 
 use crate::kernel::java::to_json_value;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use serde::Deserialize;
