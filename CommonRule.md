@@ -104,6 +104,8 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 | 엔진 (`engine-rs/`) | `bash test.sh`(= `cargo test --workspace`). 옛 Java 엔진과 맞대는 법은 `docs/developer-guide.md` §4 |
 | 받아들임 묶음 (`fixtures/`) | `docs/developer-guide.md` §8의 34장 명령(Rust `ais-cli`는 `fixtures/aisurada-rust.adapter.json`, 기준 엔진은 `build-oracle.sh`로 짓는다) |
 | 편집기, 저장, 창, 목록 같은 화면 동작 | 해당 `pnpm --dir native-host test:*:acceptance` |
+| 스킬·에이전트, 승인 대기함, 프로젝트 참조·저장소, 레일 탭 | `pnpm --dir native-host test:resources:acceptance` |
+| 태스크, 알림, 러너 | `pnpm --dir native-host test:tasks:acceptance` |
 | 4부 (묻기, 세션) | `pnpm --dir native-host test:part4:acceptance` |
 | 이름, 번들, 권한, 호스트 계약 | 위를 모두 + `pnpm --dir native-host tauri build --debug --bundles app` |
 

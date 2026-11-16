@@ -853,7 +853,8 @@ node fixtures/runner-test.mjs
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
 | 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다 |
-| 실제 창(4부) | `test:part4:acceptance`(켠 판 9건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
+| 실제 창(자원·태스크) | `test:resources:acceptance`(11건), `test:tasks:acceptance`(6건) | 스킬·에이전트, 승인 대기함, 프로젝트 참조와 저장소, 레일 탭과 태스크, 알림, 러너 실패. `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
+| 실제 창(4부) | `test:part4:acceptance`(켠 판 12건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 
 실제 창 점검은 실행마다 별도 앱 식별자와 임시 HOME·vault·잠금 폴더·빈 `ZDOTDIR`를 만들어서 쓴다. 성공하면 임시 자료를 지우고, 실패하면 `Diagnostics retained: <경로>`를 찍는다. `AISURADA_WORKSPACE_REPORT=<절대 경로>.json`이나 `AISURADA_CHECK_REPORT=<절대 경로>.json`으로 결과를 JSON으로 남길 수 있다. `--only=<사례 id>`로 일부만 돌릴 수 있다(편집기 왕복).
 
@@ -863,11 +864,20 @@ node fixtures/runner-test.mjs
 
 | 재는 것 | 안 재는 것 |
 |---|---|
-| 노트 화면이 렌더 루프 없이 뜸, 표 줄 점, 하위 노트 | 노트 옆 세션 레일과 레일 대화 |
-| **묻기 왕복**: 글 선택 → 「AI에게 묻기」 → 「묻기」 → 가짜 `claude`의 답이 「AI 문답」 칸에 붙음 → 엔진의 `ask.json`과 본문 표식까지 | 세션 입력창으로 보내기, 받아쓰기, 굳히기 |
-| 세션 화면: 전사 없음 안내와 CLI 칸, **전사가 있는 세션**의 대화(`recent-sessions`와 화면) | 실제 `claude` |
+| 노트 화면이 렌더 루프 없이 뜸, 표 줄 점, 하위 노트 | 실제 `claude`, 받아쓰기 |
+| **묻기 왕복**: 글 선택 → 「AI에게 묻기」 → 「묻기」 → 가짜 `claude`의 답이 「AI 문답」 칸에 붙음 → 엔진의 `ask.json`과 본문 표식까지 | 입력창이 막히는 경우(다른 터미널이 쥔 세션 따위, 순수 함수 시험이 본다) |
+| 세션 화면: 전사 없음 안내와 CLI 칸, **전사가 있는 세션**의 대화(`recent-sessions`와 화면) | |
+| **세션 입력창**: 보내기를 누르면 가짜 `claude`가 이어 쓰기에 답하고 보내는 중이 끝난 뒤 오류가 없다 | |
+| **노트로 굳히기**: 세션 대화를 읽어 노트로 만들고 그 노트로 간다(제목, 본문, 태그 `세션전사`를 엔진에서 읽는다) | |
+| **레일 대화**: 노트 곁 세션 레일에서 새 대화로 물으면 가짜 `claude`의 답이 레일에 나오고 엔진(`list-chats`)에 적힌다. 레일이 본문 오른쪽에 뜨는 모양 | |
 
 `test:ask-marks:acceptance`는 4부를 끈 판에서 호스트에 `ask_runtime`이 없고 노트의 문답 표식이 그대로 남는지 잰다.
+
+**스킬·에이전트와 태스크 점검([#73](https://github.com/bnjjong/aisurada/issues/73)).** 앞의 점검이 안 다루던 화면을 실제 창에서 누른다. 둘 다 `workspace-acceptance.mjs`의 모드이고, 준비 단계에서 진짜 `ais-cli`로 vault를 채운 뒤(사람의 호출은 AI 세션 변수를 지운 채로, AI의 호출은 `AISURADA_SESSION_ID`와 `AISURADA_SESSION_AGENT`를 줘서) 앱을 띄운다.
+
+- `pnpm test:resources:acceptance`(4부를 뺀 판, 점검 코드는 `scripts/resources-checks.js`, 11건): 글로벌 스킬·에이전트 목록과 승인 배너·레일 배지, 새 스킬 폼과 편집 폼(엔진에 저장되는지), **승인 대기함**(AI가 올린 변경의 이전 판 비교와 승인, 이유를 적은 거절, 승인 없이 직접 고친 파일을 받아들이기, 정책 바꾸기), 삭제·휴지통·되살리기, 프로젝트 페이지의 글로벌 스킬 참조 켜기와 끄기, 프로젝트 저장소 링크 편집(`repo-links`), 레일의 노트·에이전트 탭 전환과 마지막 화면 기억. 승인 기록장은 `AISURADA_APPROVALS_DIR`로 임시 폴더에 둔다.
+- `pnpm test:tasks:acceptance`(4부를 켠 판, `scripts/tasks-checks.js`, 6건): 태스크 보드와 Draft 열의 빠른 입력, 폼으로 만들기, 상세의 Ready For Develop 조건·상태 메뉴·댓글, 보드와 목록 보기·검색, **러너의 「지금 실행」**, 알림 센터. 러너는 저장소를 받으려면 GitHub 앱 자격이 있어야 해서 격리 환경에서는 늘 그 단계에서 실패한다. 점검은 이 실패가 태스크의 Failed 상태, 실행 기록의 「실패」와 까닭, 러너의 댓글, 알림 센터의 「실행이 실패했어요」로 화면에 나오는 데까지를 본다. 러너의 걸음은 호스트가 엔진을 직접 불러 호출 기록에 안 남으므로 엔진의 활동(`get-task`의 `by: runner`)으로 확인한다.
+- **안 재는 것:** 러너가 질문을 하거나 보고를 내는 길(저장소 받기를 지나야 한다. `runner::tests`가 가짜 호스트로 본다), GitHub 연결, 승인 알림(`approval`) 종류, 받아쓰기.
 
 ### 동시에 돌리면 안 되는 것
 

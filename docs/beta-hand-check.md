@@ -9,10 +9,10 @@
 | 엔진 `bash test.sh` | 178건 통과(2026-11-15) |
 | 화면·호스트 `bash test-native.sh` | Node 641건 통과. 호스트 `cargo test`는 직렬로 154건 통과, 기존 실패 4건(`ask::tests`), 무시 5건 |
 | 실제 WKWebView 점검(2026-11-15) | 10종 248건 통과: host 26, workspace 9, navigation 13, interaction 11, data 12, editor 116, autosave 17, views 28(여기까지 4부를 뺀 판), part4 10(4부를 켠 판), ask-marks 6(4부를 끈 판). autosave는 첫 실행에서 1건이 간헐 실패했고 재실행에서 통과했다 |
-| 스킬·에이전트 화면(글로벌 페이지, 프로젝트 페이지) | 엔진과 MCP는 시험으로 모두 확인했다. 화면은 순수 함수, 가짜 엔진, 서버 렌더 시험만 있고 **실제 창 점검은 없다** |
+| 스킬·에이전트, 승인 대기함, 프로젝트 참조와 저장소, 레일 탭, 태스크, 알림, 러너, 4부 레일 대화·세션 입력창·굳히기(2026-11-17) | 실제 창 점검을 더했다([#73](https://github.com/bnjjong/aisurada/issues/73)): `test:resources:acceptance` 12건, `test:tasks:acceptance` 7건, `test:part4:acceptance` 13건(셋 다 디스크 확인 1건 포함). 러너는 저장소 받기에 GitHub 앱 자격이 있어야 해서 실패 길만 눌러 봤다 |
 | 사람이 앱을 직접 조작한 확인 | **0건** |
 
-아래 점검은 위 마지막 두 줄을 메우는 일이다.
+아래 점검은 위 마지막 줄(사람이 직접 조작한 확인)을 메우는 일이다.
 
 ## 1. 앱을 안전하게 띄우는 법
 
