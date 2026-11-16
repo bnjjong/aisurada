@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Once;
 
 use ais_core::engine::Engine;
+use ais_core::error::ErrorKind;
 use serde_json::{Value, json};
 
 fn setup() {
@@ -80,7 +81,11 @@ fn ok(vault: &Path, command: &str, args: Value) -> Value {
 
 fn error_400(vault: &Path, command: &str, args: Value) {
     let error = Engine::new(vault).call(command, args.clone()).unwrap_err();
-    assert_eq!(error.code, "AIS-400", "{command} {args}: {error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::InvalidArgument,
+        "{command} {args}: {error:?}"
+    );
 }
 
 #[test]
@@ -279,7 +284,7 @@ fn plan_day_drafts_and_saves_the_daily_plan_like_the_java_engine() {
     let error = Engine::new(&v)
         .call("plan_day", json!({"date": "bad"}))
         .unwrap_err();
-    assert_eq!(error.code, "AIS-400");
+    assert_eq!(error.kind, ErrorKind::InvalidArgument);
     assert!(error.message.contains("워크스페이스"), "{}", error.message);
     let _ = std::fs::remove_dir_all(&v);
     let _ = std::fs::remove_dir_all(&many);

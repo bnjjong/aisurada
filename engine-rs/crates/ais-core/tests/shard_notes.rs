@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use ais_core::engine::Engine;
+use ais_core::error::ErrorKind;
 use serde_json::{Value, json};
 
 fn put(vault: &Path, relative: &str, text: &str) {
@@ -150,7 +151,7 @@ fn shard_notes_plans_applies_verifies_and_unshards_like_the_java_engine() {
     // 한 번 더 적용하면 기준 파일이 둘이라 검증이 모호하다는 오류(409)다. 파일 이름만 쓰고 경로는 무시한다
     call(&v, "shard_notes", json!({"apply": true}));
     let ambiguous = Engine::new(&v).call("verify_shard", json!({})).unwrap_err();
-    assert_eq!(ambiguous.code, "AIS-409", "{ambiguous:?}");
+    assert_eq!(ambiguous.kind, ErrorKind::Conflict, "{ambiguous:?}");
     assert!(
         ambiguous.message.contains("자리 바뀜 0"),
         "{}",
@@ -187,7 +188,7 @@ fn shard_notes_plans_applies_verifies_and_unshards_like_the_java_engine() {
     let bad = Engine::new(&v)
         .call("shard_notes", json!({"apply": "bad"}))
         .unwrap_err();
-    assert_eq!(bad.code, "AIS-400", "{bad:?}");
+    assert_eq!(bad.kind, ErrorKind::InvalidArgument, "{bad:?}");
 
     // 옮길 자리에 이미 노트가 있으면 앞의 것은 옮겨진 채 멈추고, 빈 부모 정리는 건너뛴다
     let collision = new_vault(&base, "collision");
@@ -197,7 +198,7 @@ fn shard_notes_plans_applies_verifies_and_unshards_like_the_java_engine() {
     let failure = Engine::new(&collision)
         .call("shard_notes", json!({"apply": true}))
         .unwrap_err();
-    assert_eq!(failure.code, "AIS-500", "{failure:?}");
+    assert_eq!(failure.kind, ErrorKind::Internal, "{failure:?}");
     assert!(
         failure.message.contains("옮길 자리에"),
         "{}",
@@ -222,7 +223,7 @@ fn shard_notes_plans_applies_verifies_and_unshards_like_the_java_engine() {
     let missing = Engine::new(&empty)
         .call("verify_shard", json!({}))
         .unwrap_err();
-    assert_eq!(missing.code, "AIS-404", "{missing:?}");
+    assert_eq!(missing.kind, ErrorKind::NotFound, "{missing:?}");
     // 깊이 상한과 심볼릭 링크 사유
     std::fs::create_dir_all(empty.join(format!("notes/demo/{}", "deep/".repeat(9)))).unwrap();
     std::os::unix::fs::symlink(

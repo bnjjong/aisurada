@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use ais_core::engine::Engine;
+use ais_core::error::ErrorKind;
 use serde_json::{Value, json};
 
 fn root() -> PathBuf {
@@ -220,15 +221,15 @@ fn reindex_paths_selects_notes_and_reports_diagnostics_like_the_java_engine() {
     );
     // 경로 검사가 노트 열기보다 앞선다
     let escape = error_of(&v, &["notes/demo/poison", "notes/demo/../escape"]);
-    assert_eq!(escape.code, "AIS-400", "{escape:?}");
+    assert_eq!(escape.kind, ErrorKind::InvalidArgument, "{escape:?}");
     assert!(
         escape.message.contains("기준 폴더 밖"),
         "{}",
         escape.message
     );
     assert_eq!(
-        error_of(&v, &["notes/demo/\u{0}"]).code,
-        "AIS-400",
+        error_of(&v, &["notes/demo/\u{0}"]).kind,
+        ErrorKind::InvalidArgument,
         "NUL 경로"
     );
     std::fs::remove_file(v.join("notes/demo/poison/note.md")).unwrap();

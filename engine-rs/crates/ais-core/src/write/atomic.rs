@@ -66,6 +66,7 @@ fn failed(target: &Path) -> EngineError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorKind;
     use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -101,7 +102,7 @@ mod tests {
         let dir = scratch();
         fs::create_dir_all(dir.join("occupied")).unwrap();
         let err = write_atomic(&dir.join("occupied"), b"x").unwrap_err();
-        assert_eq!(err.code, "AIS-500");
+        assert_eq!(err.kind, ErrorKind::Internal);
         assert!(
             err.message.starts_with("파일을 쓰지 못했다: "),
             "{}",

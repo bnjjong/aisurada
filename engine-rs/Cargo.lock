@@ -17,6 +17,7 @@ version = "0.0.1"
 dependencies = [
  "ais-core",
  "libc",
+ "serde",
  "serde_json",
  "sha2",
 ]

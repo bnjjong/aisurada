@@ -162,6 +162,7 @@ fn finish<T: serde::Serialize>(result: Result<T, EngineError>) -> Result<Value, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorKind;
     use std::collections::BTreeSet;
 
     /// 같은 이름이 두 줄이면 뒤 줄은 영영 불리지 않는다.
@@ -224,7 +225,7 @@ mod tests {
         let error = Engine::new(".")
             .call("no_such_command", Value::Null)
             .unwrap_err();
-        assert_eq!(error.code, "AIS-409");
+        assert_eq!(error.kind, ErrorKind::Unsupported);
         assert_eq!(error.message, "이 엔진에는 no_such_command 명령이 없다");
     }
 }

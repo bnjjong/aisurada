@@ -96,7 +96,7 @@ fn serialized_files_keep_their_exact_bytes() {
         ais_core::write::apparatus::reset_random_queue();
         engine
             .call(command, args)
-            .unwrap_or_else(|e| panic!("{command}: {} {}", e.code, e.message))
+            .unwrap_or_else(|e| panic!("{command}: {:?} {}", e.kind, e.message))
     };
 
     // 태스크: 만들기, 고치기(확인 값), 댓글, 상태 바뀜, 둘째 만들고 연결

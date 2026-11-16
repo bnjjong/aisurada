@@ -30,7 +30,9 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("{}", serde_json::to_string_pretty(&error).unwrap());
+            // 코어의 오류는 종류와 문구다(옛 `AIS-` 번호는 호출 어댑터가 붙인다)
+            let shown = serde_json::json!({"kind": error.kind.as_str(), "message": error.message});
+            eprintln!("{}", serde_json::to_string_pretty(&shown).unwrap());
             ExitCode::FAILURE
         }
     }

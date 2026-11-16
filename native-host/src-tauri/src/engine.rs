@@ -4,6 +4,7 @@
 //! 화면은 먼저 `engine_commands`로 어떤 명령을 받는지 묻고, 받는 명령만 `engine_call`로 보낸다.
 
 use crate::lifecycle::HostState;
+use ais_cli::error::IpcError;
 use ais_core::{engine::Engine, error::EngineError, kernel::actor::CallContext};
 use serde_json::Value;
 use tauri::State;
@@ -26,21 +27,26 @@ pub async fn engine_call(
     state: State<'_, HostState>,
     command: String,
     args: Option<Value>,
-) -> Result<Value, EngineError> {
+) -> Result<Value, IpcError> {
     crate::call_log::engine(&command, &args);
     let vault = state
         .vault
         .lock()
-        .map_err(|_| EngineError::internal("vault 잠금을 얻지 못했다"))?
+        .map_err(|_| IpcError::from(EngineError::internal("vault 잠금을 얻지 못했다")))?
         .clone()
-        .ok_or_else(|| EngineError::invalid_argument("vault가 아직 열리지 않았어요"))?;
+        .ok_or_else(|| {
+            IpcError::from(EngineError::invalid_argument(
+                "vault가 아직 열리지 않았어요",
+            ))
+        })?;
     let started = std::time::Instant::now();
     let traced = command.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         Engine::new(vault).call_as(&CallContext::app(), &command, args.unwrap_or(Value::Null))
     })
     .await
-    .map_err(|e| EngineError::internal(format!("엔진 호출이 끊겼어요: {e}")))?;
+    .map_err(|e| IpcError::from(EngineError::internal(format!("엔진 호출이 끊겼어요: {e}"))))?
+    .map_err(IpcError::from);
     if trace_enabled() {
         let outcome = match &result {
             Ok(_) => "ok".to_string(),
@@ -242,7 +248,7 @@ mod tests {
         let error = Engine::new("/nonexistent-vault")
             .call("no_such_command", Value::Null)
             .unwrap_err();
-        let json = serde_json::to_value(&error).unwrap();
+        let json = serde_json::to_value(IpcError::from(error)).unwrap();
         assert_eq!(json["code"], "AIS-409");
         assert_eq!(json["kind"], "unsupported");
         assert!(json["message"]

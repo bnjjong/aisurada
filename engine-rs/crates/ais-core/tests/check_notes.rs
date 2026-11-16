@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use ais_core::engine::Engine;
+use ais_core::error::ErrorKind;
 use serde_json::{Value, json};
 
 fn put(vault: &Path, relative: &str, text: &str) {
@@ -291,14 +292,14 @@ fn check_notes_finds_unanswered_comments_like_the_java_engine() {
         let error = Engine::new(&v)
             .call("check_notes", json!({"date": bad}))
             .unwrap_err();
-        assert_eq!(error.code, "AIS-400", "{bad}: {error:?}");
+        assert_eq!(error.kind, ErrorKind::InvalidArgument, "{bad}: {error:?}");
     }
     // 워크스페이스 표식이 날짜 검사보다 앞선다
     std::fs::remove_file(v.join(".aisurada/workspace.json")).unwrap();
     let error = Engine::new(&v)
         .call("check_notes", json!({"date": "bad"}))
         .unwrap_err();
-    assert_eq!(error.code, "AIS-400");
+    assert_eq!(error.kind, ErrorKind::InvalidArgument);
     assert!(error.message.contains("워크스페이스"), "{}", error.message);
 
     let _ = std::fs::remove_dir_all(&base);

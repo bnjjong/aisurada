@@ -626,6 +626,7 @@ pub fn related(scan: &Scan, task: &Task) -> Vec<Related> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorKind;
     use crate::json::compact;
 
     fn stamp(at: &str) -> Stamp {
@@ -716,7 +717,7 @@ mod tests {
             .edit(Fields::default(), None, &s, "human", none)
             .err()
             .unwrap();
-        assert_eq!(err.code, "AIS-412");
+        assert_eq!(err.kind, ErrorKind::PreconditionFailed);
         let err = cur
             .edit(Fields::default(), Some("f1:other"), &s, "human", none)
             .err()
@@ -773,7 +774,7 @@ mod tests {
         let missing = cur.edit(set("nope"), Some("f1:x"), &s, "human", |p| {
             Err(EngineError::not_found(format!("프로젝트를 못 찾았다: {p}")))
         });
-        assert_eq!(missing.err().unwrap().code, "AIS-404");
+        assert_eq!(missing.err().unwrap().kind, ErrorKind::NotFound);
     }
 
     #[test]
@@ -794,7 +795,7 @@ mod tests {
             )
             .err()
             .unwrap();
-        assert_eq!(err.code, "AIS-409");
+        assert_eq!(err.kind, ErrorKind::Conflict);
         assert!(!asked, "기대한 상태가 틀리면 막힘을 묻지 않는다");
         let ok = cur
             .transition_to(TaskStatus::Ready, "human", Some("draft"), Vec::new, &s)

@@ -135,6 +135,19 @@ impl Java {
 }
 
 /// Java 노트 줄을 새 모양으로 바꾼다. `folder`는 Java 응답에 없어서 디스크를 보고 정한다.
+/// 오류 종류에서 Java의 AIS 번호를 구한다. 이 맞대기 하네스는 Java 오류 글과 견줘야 해서 코어에만 기대 표를 따로 적었다(운영 쪽 표는 `ais-cli`의 `error` 모듈).
+fn java_number(kind: ais_core::error::ErrorKind) -> u16 {
+    use ais_core::error::ErrorKind::*;
+    match kind {
+        InvalidArgument => 400,
+        Forbidden => 403,
+        NotFound => 404,
+        PreconditionFailed => 412,
+        Unsupported | Conflict | RecordTier => 409,
+        Internal => 500,
+    }
+}
+
 fn note_row(vault: &Path, row: &Value) -> Value {
     let mut map = row.as_object().cloned().unwrap_or_default();
     for key in ["date", "time", "agendaTitle", "deepLink"] {
@@ -273,7 +286,7 @@ fn compare(
         }
         (Err(j), Err(r)) => {
             // 오류는 Java의 `AIS-코드 메시지` 글과 Rust의 코드·메시지가 같은지 본다
-            let rust_text = format!("{} {}", r.code, r.message);
+            let rust_text = format!("AIS-{} {}", java_number(r.kind), r.message);
             // Java가 예상 밖 예외로 실패하면 오류 글에 스택 추적이 붙으므로, Rust의 메시지가 그 안에 든 것도 같은 실패로 본다
             report.record(
                 label,

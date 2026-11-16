@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ais_core::engine::Engine;
+use ais_core::error::ErrorKind;
 use serde_json::{Value, json};
 
 fn fixture() -> PathBuf {
@@ -187,8 +188,8 @@ fn reads_the_synthetic_vault() {
         .call("list_docs", json!({"agenda": "없는-아젠다"}))
         .unwrap_err();
     assert_eq!(
-        (unknown.code, serde_json::to_value(unknown.kind).unwrap()),
-        ("AIS-404", json!("not_found"))
+        (unknown.kind, serde_json::to_value(unknown.kind).unwrap()),
+        (ErrorKind::NotFound, json!("not_found"))
     );
     let bad_type = engine
         .call("list_docs", json!({"type": "zzz"}))
@@ -343,8 +344,8 @@ fn opens_notes_sub_notes_comments_attachments_and_facts() {
         )
         .unwrap_err();
     assert_eq!(
-        (refused.code, serde_json::to_value(refused.kind).unwrap()),
-        ("AIS-409", json!("forbidden"))
+        (refused.kind, serde_json::to_value(refused.kind).unwrap()),
+        (ErrorKind::RecordTier, json!("forbidden"))
     );
 
     // 후속 노트: 부모 사슬로도, 후속 노트 id 하나로도 같은 결과. 바로 아래 노트만, 만든 시각 차례
@@ -390,7 +391,7 @@ fn opens_notes_sub_notes_comments_attachments_and_facts() {
             json!({"parent": format!("{parent}/snfx0003-00000013")}),
         )
         .unwrap_err();
-    assert_eq!(wrong.code, "AIS-404");
+    assert_eq!(wrong.kind, ErrorKind::NotFound);
     assert!(
         engine
             .call(
@@ -614,9 +615,9 @@ fn searches_tags_and_templates() {
             .call("search_docs", json!({"query": "e", "limit": bad}))
             .unwrap_err();
         assert_eq!(
-            (err.code, err.message.as_str()),
+            (err.kind, err.message.as_str()),
             (
-                "AIS-400",
+                ErrorKind::InvalidArgument,
                 format!("받을 건수가 범위를 벗어났다: {bad}").as_str()
             )
         );
@@ -668,8 +669,8 @@ fn searches_tags_and_templates() {
     );
     let err = engine.call("list_tags", json!({"limit": 0})).unwrap_err();
     assert_eq!(
-        (err.code, err.message.as_str()),
-        ("AIS-400", "태그 개수 상한은 1 이상이다: 0")
+        (err.kind, err.message.as_str()),
+        (ErrorKind::InvalidArgument, "태그 개수 상한은 1 이상이다: 0")
     );
 
     // 템플릿 하나: 본문까지. 모양이 틀리면 400, 없으면 404
@@ -680,14 +681,14 @@ fn searches_tags_and_templates() {
         (template["name"].as_str(), template["body"].as_str()),
         (Some("기본 계획"), Some("# 계획\n\n내용\n"))
     );
-    for (id, code) in [
-        ("a b", "AIS-400"),
-        ("../x", "AIS-400"),
-        ("zzz-none", "AIS-404"),
-        ("", "AIS-400"),
+    for (id, kind) in [
+        ("a b", ErrorKind::InvalidArgument),
+        ("../x", ErrorKind::InvalidArgument),
+        ("zzz-none", ErrorKind::NotFound),
+        ("", ErrorKind::InvalidArgument),
     ] {
         let err = engine.call("get_template", json!({"id": id})).unwrap_err();
-        assert_eq!(err.code, code, "{id:?}: {}", err.message);
+        assert_eq!(err.kind, kind, "{id:?}: {}", err.message);
     }
 }
 
@@ -805,8 +806,11 @@ fn lists_note_versions_from_git() {
     let err = |args: Value| history(args).unwrap_err();
     let out_of_range = err(json!({"id": parent, "number": 7}));
     assert_eq!(
-        (out_of_range.code, out_of_range.message.as_str()),
-        ("AIS-409", "판 번호가 범위 밖이다(1 부터 6 까지 있다): 7")
+        (out_of_range.kind, out_of_range.message.as_str()),
+        (
+            ErrorKind::Conflict,
+            "판 번호가 범위 밖이다(1 부터 6 까지 있다): 7"
+        )
     );
     assert_eq!(
         err(json!({"id": parent, "number": 0})).message,
@@ -876,7 +880,7 @@ fn reconciled_index_refuses_writes_when_comment_ids_clash() {
     let error = NoteIndex::reconciled(&vault)
         .err()
         .expect("코멘트 id가 겹친다");
-    assert_eq!(error.code, "AIS-500");
+    assert_eq!(error.kind, ErrorKind::Internal);
     assert!(
         error
             .message
@@ -918,12 +922,12 @@ fn write_foundation_checks_follow_the_java_rules() {
         let error = precondition::check(&index.vault_root, note, missing, action).unwrap_err();
         assert_eq!(
             (
-                error.code,
+                error.kind,
                 error
                     .message
                     .starts_with("선결 조건 토큰이 안 왔어요. 아무것도 쓰지 않았습니다: notes/")
             ),
-            ("AIS-412", true)
+            (ErrorKind::PreconditionFailed, true)
         );
     }
     let malformed = precondition::check(&index.vault_root, note, Some("abc"), action).unwrap_err();
@@ -955,7 +959,7 @@ fn write_foundation_checks_follow_the_java_rules() {
     std::fs::remove_file(&note.content_file).unwrap();
     let gone =
         precondition::check(&index.vault_root, note, Some(&token), "메타를 저장하지").unwrap_err();
-    assert_eq!(gone.code, "AIS-500");
+    assert_eq!(gone.kind, ErrorKind::Internal);
     assert!(
         gone.message
             .starts_with("노트 본문 파일을 못 읽어 메타를 저장하지 않았다: notes/"),
@@ -965,7 +969,7 @@ fn write_foundation_checks_follow_the_java_rules() {
 
     // 워크스페이스 표식: 합성 vault에는 없고, 만들면 통과한다
     let error = marker::check_workspace_marker(&vault).unwrap_err();
-    assert_eq!(error.code, "AIS-400");
+    assert_eq!(error.kind, ErrorKind::InvalidArgument);
     assert!(
         error
             .message
@@ -1005,7 +1009,7 @@ fn writes_agendas_through_the_write_foundation() {
     let no_marker = engine
         .call("create_agenda", json!({"title": "새"}))
         .unwrap_err();
-    assert_eq!(no_marker.code, "AIS-400");
+    assert_eq!(no_marker.kind, ErrorKind::InvalidArgument);
     assert!(
         no_marker
             .message
@@ -1275,7 +1279,12 @@ fn ai_cannot_write_to_record_tier_notes() {
     ];
     for (command, args) in refused {
         let error = ai(command, args.clone());
-        assert_eq!(error.code, "AIS-409", "{command} {args}: {}", error.message);
+        assert_eq!(
+            error.kind,
+            ErrorKind::RecordTier,
+            "{command} {args}: {}",
+            error.message
+        );
         assert!(
             error.message.starts_with(&format!(
                 "도구 표면이 고칠 수 없는 노트다(층=record): {id}."
@@ -1357,7 +1366,12 @@ fn ai_cannot_read_or_restore_record_tier_leftovers() {
     for command in ["list_comments", "list_attachments"] {
         for args in [json!({"id": id}), json!({"id": id, "subId": sub_id})] {
             let error = ai(command, args.clone()).unwrap_err();
-            assert_eq!(error.code, "AIS-409", "{command} {args}: {}", error.message);
+            assert_eq!(
+                error.kind,
+                ErrorKind::RecordTier,
+                "{command} {args}: {}",
+                error.message
+            );
             assert!(
                 error.message.starts_with(&format!(
                     "도구 표면이 읽을 수 없는 노트다(층=record): {id}."
@@ -1424,7 +1438,12 @@ fn ai_cannot_read_or_restore_record_tier_leftovers() {
     let before = snapshot(&vault);
     for note in [id.as_str(), single_record, other_record] {
         let error = ai("restore_doc", json!({"trashId": trash_of[note]})).unwrap_err();
-        assert_eq!(error.code, "AIS-409", "{note}: {}", error.message);
+        assert_eq!(
+            error.kind,
+            ErrorKind::RecordTier,
+            "{note}: {}",
+            error.message
+        );
         assert!(
             error.message.starts_with(&format!(
                 "도구 표면이 고칠 수 없는 노트다(층=record): {note}."
@@ -1730,7 +1749,10 @@ fn writes_note_meta_with_stamps_and_preconditions() {
 
     // 확인 값이 없으면 아무것도 안 쓰고 412다
     let before = text();
-    assert_eq!(error("set_favorite", json!({"id": parent})).code, "AIS-412");
+    assert_eq!(
+        error("set_favorite", json!({"id": parent})).kind,
+        ErrorKind::PreconditionFailed
+    );
     assert_eq!(text(), before);
 
     // 앱이 켜면 본문은 그대로이고 머리에 즐겨찾기와 편집 도장이 붙는다
@@ -1806,8 +1828,8 @@ fn writes_note_meta_with_stamps_and_preconditions() {
         "평가 점수는 0 에서 100 사이여야 한다: 100.4"
     );
     assert_eq!(
-        error("evaluate_doc", json!({"id": parent, "f1": token(parent)})).code,
-        "AIS-400"
+        error("evaluate_doc", json!({"id": parent, "f1": token(parent)})).kind,
+        ErrorKind::InvalidArgument
     );
     let cleared = engine
         .call(
@@ -1886,10 +1908,13 @@ fn updates_note_text_and_moves_the_note_to_its_canonical_place() {
 
     // 확인 값이 없으면 아무것도 안 쓴다
     let before = read("notes/demo/loose/note.md");
-    assert_eq!(error(json!({"id": loose, "title": "x"})).code, "AIS-412");
+    assert_eq!(
+        error(json!({"id": loose, "title": "x"})).kind,
+        ErrorKind::PreconditionFailed
+    );
     assert_eq!(read("notes/demo/loose/note.md"), before);
     // 입력 검사 순서: id → 태그 → 날짜 → 시각 → 제목
-    assert_eq!(error(json!({})).code, "AIS-400");
+    assert_eq!(error(json!({})).kind, ErrorKind::InvalidArgument);
     assert_eq!(
         error(json!({"id": "nope"})).message,
         "노트 id 모양이 아니다: nope"
@@ -2011,8 +2036,8 @@ fn updates_note_text_and_moves_the_note_to_its_canonical_place() {
 
     // JSON 노트는 본문을 못 고치고, 단일 .html 노트는 이름만 바뀌며 옛 파일이 사라진다
     assert_eq!(
-        error(json!({"id": "ndfx0006-00000006", "body": "x"})).code,
-        "AIS-500"
+        error(json!({"id": "ndfx0006-00000006", "body": "x"})).kind,
+        ErrorKind::Internal
     );
     let page = engine
         .call(
@@ -2248,8 +2273,8 @@ fn writes_sub_notes_and_strips_their_cards() {
                 json!({"parent": format!("{parent}/snfx0001-00000011"), "title": "t", "body": "b"})
             )
             .unwrap_err()
-            .code,
-        "AIS-500"
+            .kind,
+        ErrorKind::Internal
     );
 
     // 고치기: 본문만 주면 제목은 첫 헤딩을 따르고, 폴더가 정식 이름으로 옮겨진다. AI 호출은 tool 도장을 남긴다
@@ -2290,8 +2315,8 @@ fn writes_sub_notes_and_strips_their_cards() {
                 json!({"parent": parent, "id": child2, "title": "x"})
             )
             .unwrap_err()
-            .code,
-        "AIS-412"
+            .kind,
+        ErrorKind::PreconditionFailed
     );
 
     // 지우기: 부모 본문에서 그 노트의 카드 줄만 걷어내고, 그 노트와 아래를 지운다
@@ -2411,8 +2436,8 @@ fn writes_comments_and_strips_their_anchors() {
             "create_comment",
             json!({"id": parent, "body": "x", "comment_id": &new_id})
         )
-        .code,
-        "AIS-409"
+        .kind,
+        ErrorKind::Conflict
     );
     assert_eq!(
         error("create_comment", json!({"id": parent, "body": "  "})).message,
@@ -2536,7 +2561,10 @@ fn moves_notes_through_the_trash() {
             .is_file()
     );
     assert!(!vault.join("notes/demo/loose").exists());
-    assert_eq!(error("get_doc", json!({"id": loose})).code, "AIS-404");
+    assert_eq!(
+        error("get_doc", json!({"id": loose})).kind,
+        ErrorKind::NotFound
+    );
     let listed = engine.call("list_trash", Value::Null).unwrap();
     assert_eq!(listed["items"][0]["trashId"], trash_id.as_str());
     let manifest = std::fs::read_to_string(vault.join(".aisurada/trash/trash.json")).unwrap();
@@ -2593,8 +2621,8 @@ fn moves_notes_through_the_trash() {
         format!("TrashEntry not found: {trash_id}")
     );
     assert_eq!(
-        error("restore_doc", json!({"trashId": "nope"})).code,
-        "AIS-400"
+        error("restore_doc", json!({"trashId": "nope"})).kind,
+        ErrorKind::InvalidArgument
     );
     // 보관 파일이 사라진 항목은 되살릴 수 없고 목록에서도 정리된다
     assert!(
@@ -2675,8 +2703,8 @@ fn runs_the_task_lifecycle() {
 
     // 만들기: 완료 기준은 필수다. 파일은 SnakeYAML 모양이고 활동에 `created`가 남는다
     assert_eq!(
-        error("create_task", json!({"title": "t", "repo": "a/b"})).code,
-        "AIS-400"
+        error("create_task", json!({"title": "t", "repo": "a/b"})).kind,
+        ErrorKind::InvalidArgument
     );
     let created = engine
         .call(
@@ -2707,8 +2735,8 @@ fn runs_the_task_lifecycle() {
     // 고치기: 확인 값이 필요하고, 바뀐 것이 없으면 파일도 활동도 그대로다
     let token = created["precondition"].as_str().unwrap().to_string();
     assert_eq!(
-        error("update_task", json!({"id": "TSK-1", "title": "x"})).code,
-        "AIS-412"
+        error("update_task", json!({"id": "TSK-1", "title": "x"})).kind,
+        ErrorKind::PreconditionFailed
     );
     let before = read(".aisurada/tasks/TSK-1.md");
     let same = engine
@@ -2735,8 +2763,8 @@ fn runs_the_task_lifecycle() {
             "update_task",
             json!({"id": "TSK-1", "title": "x", "f1": &token})
         )
-        .code,
-        "AIS-412"
+        .kind,
+        ErrorKind::PreconditionFailed
     );
 
     // 상태: 사람과 러너가 할 수 있는 전이가 다르고, 사람이 갈 수 있는 곳은 응답에 있다
@@ -2893,7 +2921,10 @@ fn runs_the_task_lifecycle() {
             .starts_with(".aisurada/tasks/TSK-21.md: 머리말(---)로 시작하지 않는다"),
         "{all}"
     );
-    assert_eq!(error("get_task", json!({"id": "TSK-0"})).code, "AIS-400");
+    assert_eq!(
+        error("get_task", json!({"id": "TSK-0"})).kind,
+        ErrorKind::InvalidArgument
+    );
     assert_eq!(
         error("get_task", json!({"id": "TSK-99"})).message,
         "태스크를 못 찾았다: TSK-99"
@@ -3005,8 +3036,8 @@ fn queues_ai_resource_changes_until_a_human_approves() {
         ("set_resource_policy", json!({"project": "approve"})),
     ] {
         assert_eq!(
-            error(command, ai(args.clone())).code,
-            "AIS-403",
+            error(command, ai(args.clone())).kind,
+            ErrorKind::Forbidden,
             "{command}"
         );
         assert_eq!(
@@ -3015,8 +3046,8 @@ fn queues_ai_resource_changes_until_a_human_approves() {
                 by_session["session"] = json!("ai-2");
                 by_session
             })
-            .code,
-            "AIS-403",
+            .kind,
+            ErrorKind::Forbidden,
             "{command} 세션"
         );
     }
@@ -3051,8 +3082,8 @@ fn queues_ai_resource_changes_until_a_human_approves() {
         "{after}"
     );
     assert_eq!(
-        error("approve_resource_change", json!({"id": change_id})).code,
-        "AIS-409"
+        error("approve_resource_change", json!({"id": change_id})).kind,
+        ErrorKind::Conflict
     );
 
     // 글로벌 자원 만들기는 대기에 올릴 때 보여 준 ID 그대로 만들어진다
@@ -3117,8 +3148,8 @@ fn queues_ai_resource_changes_until_a_human_approves() {
         )
         .unwrap();
     assert_eq!(
-        error("approve_resource_change", json!({"id": late_id})).code,
-        "AIS-412"
+        error("approve_resource_change", json!({"id": late_id})).kind,
+        ErrorKind::PreconditionFailed
     );
     let stale = engine
         .call("get_resource_change", json!({"id": late_id}))
@@ -3262,8 +3293,8 @@ fn reads_resource_arguments_like_the_command_line() {
         Engine::new(&bare)
             .call("list_resources", json!({}))
             .unwrap_err()
-            .code,
-        "AIS-400"
+            .kind,
+        ErrorKind::InvalidArgument
     );
 }
 
@@ -3377,7 +3408,7 @@ fn appends_ask_and_chat_turns_next_to_the_note() {
         assert_eq!(error("append_ask_turn", args).message, message);
     }
     let blocked = error("append_ask_turn", with_id(turn(json!({})), single, None));
-    assert_eq!(blocked.code, "AIS-500");
+    assert_eq!(blocked.kind, ErrorKind::Internal);
     assert!(
         blocked
             .message
@@ -3386,12 +3417,12 @@ fn appends_ask_and_chat_turns_next_to_the_note() {
         blocked.message
     );
     assert_eq!(
-        error("get_ask", json!({"id": parent, "subId": " "})).code,
-        "AIS-400"
+        error("get_ask", json!({"id": parent, "subId": " "})).kind,
+        ErrorKind::InvalidArgument
     );
     assert_eq!(
-        error("get_ask", json!({"id": "ndzz0001-00000001"})).code,
-        "AIS-404"
+        error("get_ask", json!({"id": "ndzz0001-00000001"})).kind,
+        ErrorKind::NotFound
     );
 
     // 레일 대화: 만든 시각 순(읽을 수 없는 시각은 뒤), 같으면 대화 id 순. 못 읽는 파일은 이름만 알린다
@@ -3483,7 +3514,10 @@ fn appends_ask_and_chat_turns_next_to_the_note() {
         .message,
         "대화 id 모양이 아니다: a b"
     );
-    assert_eq!(error("list_chats", json!({"id": single})).code, "AIS-500");
+    assert_eq!(
+        error("list_chats", json!({"id": single})).kind,
+        ErrorKind::Internal
+    );
 }
 
 /// 세션 기록 시험이 함께 쓰는 홈. 세션 홈은 환경 변수로 정해서 프로세스 전체에 걸리므로, 세션 명령을 부르는 시험들이 한 홈을 나눠 쓴다.
@@ -4004,7 +4038,7 @@ fn runs_the_note_tool_commands() {
     let plan = engine.call("shard_notes", json!({})).unwrap();
     assert_eq!(plan["applied"], false);
     assert!(vault.join(".aisurada/migration/shard-plan.tsv").exists());
-    assert_eq!(error("verify_shard", json!({})).code, "AIS-404");
+    assert_eq!(error("verify_shard", json!({})).kind, ErrorKind::NotFound);
     assert_eq!(
         error("shard_notes", json!({"apply": "yes"})).message,
         "apply 은 true 나 false 여야 한다: yes"

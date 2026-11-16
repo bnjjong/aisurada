@@ -433,10 +433,6 @@ mod tests {
             EngineError::precondition_failed("x"),
         ] {
             assert!(goes_stale(&stale), "{stale}");
-            assert!(matches!(
-                stale.code,
-                "AIS-400" | "AIS-404" | "AIS-409" | "AIS-412"
-            ));
         }
         // 호출자에게 허락되지 않은 일과 내부 오류는 낡음이 아니다
         for kept in [EngineError::forbidden("x"), EngineError::internal("x")] {
@@ -457,7 +453,7 @@ mod tests {
         .collect();
         assert_eq!(names, ["pending", "approved", "rejected", "stale"]);
         let err = already_decided("pcmwh21ips-00090001", "approved");
-        assert_eq!(err.code, "AIS-409");
+        assert_eq!(err.kind, ErrorKind::Conflict);
         assert_eq!(
             err.message,
             "이미 처리된 변경이다(approved): pcmwh21ips-00090001"
