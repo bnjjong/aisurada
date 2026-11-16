@@ -58,4 +58,6 @@ node fixtures/expect/run.mjs --self-check [--mutants] --out <폴더> [--jobs <n>
 }
 ```
 
-`prefix`와 `suffix`의 `${이름}`(`[A-Z_][A-Z0-9_]*`)은 구현 환경에서 채운다. 어댑터는 묶음 폴더 밖에 둔다. 안에 두면 목록에 없는 파일이라 무결성 검사가 선다. `adapters/aisurada-jar.json`은 지금 엔진 jar를 부르는 보기다.
+`prefix`와 `suffix`의 `${이름}`(`[A-Z_][A-Z0-9_]*`)은 구현 환경에서 채운다. 어댑터는 묶음 폴더 밖에 둔다.
+
+선택 칸 `compare`는 이 저장소의 확장이다(설명서 34.5에 없다). 구현의 출력을 어디까지 느슨하게 맞댈지 구현이 스스로 밝힌다. 지금은 `{"jsonKeyOrder": "exact" | "ignore"}`뿐이고 기본은 `exact`(JSON 객체 키 차례까지 맞댄다)다. `ignore`는 키 차례만 다른 출력을 맞다고 본다. 키 집합, 값, 배열의 차례는 그대로 보고, 키 차례를 뺀 뒤에도 실제 출력의 키 차례로 기대값을 다시 찍어 바이트로 맞대므로 들여쓰기와 글자 꼴이 다르면 `format`이다. 키 차례만 달라 맞은 케이스는 `report.json`의 `warnings`와 요약에 건수로 남는다. 모르는 `compare` 키나 값은 종료 코드 2다. 이 저장소의 어댑터는 `fixtures/aisurada.adapter.json`(기준 Java 엔진, `exact`)과 `fixtures/aisurada-rust.adapter.json`(Rust `ais-cli`, `ignore`)이다. 안에 두면 목록에 없는 파일이라 무결성 검사가 선다. `adapters/aisurada-jar.json`은 지금 엔진 jar를 부르는 보기다.

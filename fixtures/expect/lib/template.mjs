@@ -95,7 +95,10 @@ function fillParts(parts, vars, tokenValues) {
  * 34.1의 6번 stdout 검사(JSON). 값을 키 차례와 배열 길이까지 맞대고, 수는 Object.is로 본다.
  * 맞으면 {ok:true, filled, tokens}, 안 맞으면 {ok:false, pointer, reason}이다.
  */
-export function compareJson(expected, actual, vars) {
+export function compareJson(expected, actual, vars, opts = {}) {
+  // opts.ignoreKeyOrder: 객체 키의 차례를 안 보고 키 집합과 값만 맞댄다. 채운 값(filled)은 실제 값의 키 차례로 만들어,
+  // 뒤이은 바이트 맞댐(renderJson)이 들여쓰기와 글자 꼴은 그대로 엄격하게 재도록 한다. 배열의 차례는 늘 본다.
+  const ignoreKeyOrder = opts.ignoreKeyOrder === true;
   const tokens = [];
   const fail = (pointer, reason) => ({ ok: false, pointer: pointer || '/', reason });
   const walk = (exp, act, pointer) => {
@@ -130,15 +133,20 @@ export function compareJson(expected, actual, vars) {
     if (!act || typeof act !== 'object' || Array.isArray(act)) return fail(pointer, `객체여야 한다. 실제 ${typeName(act)}`);
     const ek = Object.keys(exp);
     const ak = Object.keys(act);
-    for (let i = 0; i < Math.max(ek.length, ak.length); i++) {
-      if (ek[i] !== ak[i]) {
-        if (ek[i] === undefined) return fail(pointer, `키가 더 있다: ${ak[i]}`);
-        if (ak[i] === undefined) return fail(pointer, `키가 빠졌다: ${ek[i]}`);
-        return fail(pointer, `${i + 1}번째 키가 다르다. 기대 ${ek[i]}, 실제 ${ak[i]}`);
+    if (ignoreKeyOrder) {
+      for (const k of ek) if (!Object.hasOwn(act, k)) return fail(pointer, `키가 빠졌다: ${k}`);
+      for (const k of ak) if (!Object.hasOwn(exp, k)) return fail(pointer, `키가 더 있다: ${k}`);
+    } else {
+      for (let i = 0; i < Math.max(ek.length, ak.length); i++) {
+        if (ek[i] !== ak[i]) {
+          if (ek[i] === undefined) return fail(pointer, `키가 더 있다: ${ak[i]}`);
+          if (ak[i] === undefined) return fail(pointer, `키가 빠졌다: ${ek[i]}`);
+          return fail(pointer, `${i + 1}번째 키가 다르다. 기대 ${ek[i]}, 실제 ${ak[i]}`);
+        }
       }
     }
     const filled = {};
-    for (const k of ek) {
+    for (const k of (ignoreKeyOrder ? ak : ek)) {
       const r = walk(exp[k], act[k], `${pointer}/${escapePointer(k)}`);
       if (!r.ok) return r;
       filled[k] = r.filled;

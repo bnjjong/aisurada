@@ -416,6 +416,70 @@ console.log('\n[11] 지금 실행기와 맞춘 갈래(34장 판 확인 후속)')
   check('처음 맞는 토큰 1개짜리 JSON 에 짝이 없으면 다음 후보로 안 넘어가고 2', [r8.code, why(r8)], [2, '변형 대상을 못 골랐다: tokenShare']);
 }
 
+console.log('\n[12] 어댑터의 compare.jsonKeyOrder(이 저장소의 확장): 키 차례만 뺀다');
+{
+  const adapterWith = (name, compare) => {
+    const f = path.join(TMP, name);
+    writeJson(f, { format: 'aisx-adapter', version: 1, surface: 'engine', name: 'fake-' + name, prefix: [process.execPath, FAKE], suffix: ['--x=${AISURADA_VAULT}'], ...(compare === undefined ? {} : { compare }) });
+    return f;
+  };
+  const IGNORE = adapterWith('ignore.adapter.json', { jsonKeyOrder: 'ignore' });
+  const EXACT = adapterWith('exact.adapter.json', { jsonKeyOrder: 'exact' });
+  const probe = bad => why(runner(makeBundle('cmpbad', { 'read/t.json': lane([kase('x', ['x'], { code: 0, stdout: '' })]) }, { 'tiny.v1': TINY }), ['--engine', adapterWith('bad.adapter.json', bad), '--out', freshOut()]));
+  check('compare 가 객체가 아니면 2', probe('ignore'), '어댑터의 compare 는 객체여야 한다');
+  check('compare 에 모르는 키가 있으면 2', probe({ jsonKeyOrder: 'ignore', arrayOrder: 'ignore' }), '어댑터의 compare 에 모르는 키가 있다: arrayOrder');
+  check('jsonKeyOrder 가 exact 나 ignore 가 아니면 2', probe({ jsonKeyOrder: 'loose' }), '어댑터의 compare.jsonKeyOrder 는 "exact" 나 "ignore" 여야 한다');
+
+  const cases = [
+    kase('ord/json', ['json'], { code: 0, stdoutJson: { a: 1, b: { x: 1, y: 2 } } }),
+    kase('ord/text-expect', ['text'], { code: 0, stdout: JSON.stringify({ a: 1, b: 2 }, null, 2) + '\n' }),
+    kase('ord/template', ['template'], { code: 0, stdoutText: JSON.stringify({ p: '⟦vault⟧', q: 1 }, null, 2) + '\n' }),
+    kase('ord/value', ['value'], { code: 0, stdoutJson: { a: 1, b: 2 } }),
+    kase('ord/missing', ['missing'], { code: 0, stdoutJson: { a: 1, b: 2 } }),
+    kase('ord/extra', ['extra'], { code: 0, stdoutJson: { a: 1, b: 2 } }),
+    kase('ord/format', ['format'], { code: 0, stdoutJson: { a: 1, b: 2 } }),
+    kase('ord/array', ['array'], { code: 0, stdoutJson: { l: [1, 2] } }),
+    kase('ord/nonjson', ['nonjson'], { code: 0, stdout: 'abc\n' }),
+    kase('ord/same', ['same'], { code: 0, stdoutJson: { a: 1, b: 2 } })
+  ];
+  const copy = makeBundle('keyorder', { 'read/t.json': lane(cases) }, { 'tiny.v1': TINY });
+  const J = v => JSON.stringify(v, null, 2) + '\n';
+  const runWith = adapter => {
+    const o = freshOut();
+    const vault = path.join(o, 'read-0', 'vault');
+    const s = script([
+      [withSuffix(['reindex'], vault), { code: 0 }],
+      [withSuffix(['json'], vault), { code: 0, stdout: J({ b: { y: 2, x: 1 }, a: 1 }) }],
+      [withSuffix(['text'], vault), { code: 0, stdout: J({ b: 2, a: 1 }) }],
+      [withSuffix(['template'], vault), { code: 0, stdout: J({ q: 1, p: vault }) }],
+      [withSuffix(['value'], vault), { code: 0, stdout: J({ b: 2, a: 9 }) }],
+      [withSuffix(['missing'], vault), { code: 0, stdout: J({ b: 2 }) }],
+      [withSuffix(['extra'], vault), { code: 0, stdout: J({ b: 2, a: 1, c: 3 }) }],
+      [withSuffix(['format'], vault), { code: 0, stdout: JSON.stringify({ b: 2, a: 1 }) + '\n' }],
+      [withSuffix(['array'], vault), { code: 0, stdout: J({ l: [2, 1] }) }],
+      [withSuffix(['nonjson'], vault), { code: 0, stdout: 'abd\n' }],
+      [withSuffix(['same'], vault), { code: 0, stdout: J({ a: 1, b: 2 }) }]
+    ]);
+    const r = runner(copy, ['--engine', adapter, '--out', o], { AISX_IMPL_SCRIPT: s });
+    return { r, rep: report(o) };
+  };
+  const exact = runWith(EXACT);
+  const exactById = Object.fromEntries(exact.rep.failures.map(f => [f.id, f.check]));
+  check('exact(기본): 키 차례가 다르면 모두 stdout 어긋남이고 경고도 없다', [exactById['ord/json'], exactById['ord/text-expect'], exactById['ord/template'], exact.rep.totals.passed, exact.rep.warnings], ['stdout', 'stdout', 'stdout', 1, []]);
+
+  const ign = runWith(IGNORE);
+  const ignById = Object.fromEntries(ign.rep.failures.map(f => [f.id, f]));
+  check('ignore: 키 차례만 다른 JSON 값, 글 기대값(stdout), 자리표가 든 글 기대값은 맞다', ['ord/json', 'ord/text-expect', 'ord/template', 'ord/same'].map(id => ignById[id] ?? 'pass'), ['pass', 'pass', 'pass', 'pass']);
+  check('ignore: 값이 다르면 그 값의 자리를 알린다', ignById['ord/value'], { id: 'ord/value', check: 'stdout', detail: '/a: 수가 다르다. 기대 1, 실제 9' });
+  check('ignore: 키가 빠지거나 더 있으면 어긋난다', [ignById['ord/missing']?.detail, ignById['ord/extra']?.detail], ['/: 키가 빠졌다: a', '/: 키가 더 있다: c']);
+  check('ignore: 키 차례를 빼도 들여쓰기 같은 바이트 꼴이 다르면 format 이다', ignById['ord/format']?.check, 'format');
+  check('ignore: 배열의 차례는 늘 본다', ignById['ord/array']?.check, 'stdout');
+  check('ignore: JSON 이 아닌 글은 그대로 어긋난다', [ignById['ord/nonjson']?.check, ignById['ord/nonjson']?.detail?.includes('abc')], ['stdout', true]);
+  check('ignore: 맞은 것은 키 차례만 다른 3건과 같은 것 1건', [ign.rep.totals.passed, ign.rep.totals.failed], [4, 6]);
+  check('ignore: 키 차례만 달라 맞은 케이스는 경고로 알린다(report.json 의 꼴은 그대로)', [ign.rep.warnings, Object.keys(ign.rep)], [['키 차례만 달라 맞은 케이스 3건(어댑터의 compare.jsonKeyOrder=ignore): ord/json, ord/text-expect, ord/template'], ['engine', 'totals', 'failures', 'warnings']]);
+  check('요약에도 경고 줄이 나온다', ign.r.stderr.includes('  ⚠ 키 차례만 달라 맞은 케이스 3건'), true);
+}
+
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log(`\nRUNNER TEST SUMMARY: Passed: ${pass}, Failed: ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

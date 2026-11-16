@@ -181,7 +181,23 @@ function readAdapter(file) {
   if ('name' in doc && typeof doc.name !== 'string') throw new RunnerError('어댑터의 name 은 문자열이어야 한다');
   if (!strings(doc.prefix) || doc.prefix.length === 0) throw new RunnerError('어댑터의 prefix 는 1칸 이상의 문자열 배열이어야 한다');
   if ('suffix' in doc && !strings(doc.suffix)) throw new RunnerError('어댑터의 suffix 는 문자열 배열이어야 한다');
-  return { name: doc.name ?? path.basename(abs), prefix: doc.prefix, suffix: doc.suffix ?? [] };
+  return { name: doc.name ?? path.basename(abs), prefix: doc.prefix, suffix: doc.suffix ?? [], compare: readCompare(doc.compare) };
+}
+
+/**
+ * 어댑터의 compare(이 저장소의 확장. 설명서 34.5에는 없다). 구현의 출력에서 무엇을 느슨하게 맞댈지 구현이 스스로 밝힌다.
+ * jsonKeyOrder: "exact"(기본. 객체 키 차례까지 맞댄다) 또는 "ignore"(키 차례가 달라도 값과 바이트 꼴이 같으면 맞다).
+ */
+function readCompare(value) {
+  const compare = { jsonKeyOrder: 'exact' };
+  if (value === undefined) return compare;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new RunnerError('어댑터의 compare 는 객체여야 한다');
+  for (const [k, v] of Object.entries(value)) {
+    if (k !== 'jsonKeyOrder') throw new RunnerError(`어댑터의 compare 에 모르는 키가 있다: ${k}`);
+    if (v !== 'exact' && v !== 'ignore') throw new RunnerError('어댑터의 compare.jsonKeyOrder 는 "exact" 나 "ignore" 여야 한다');
+    compare.jsonKeyOrder = v;
+  }
+  return compare;
 }
 
 /** 칸 안의 ${이름}을 구현 환경에서 채운다. 그 꼴이 아닌 글자는 그대로 남고, 없는 이름이면 선다. */
@@ -289,7 +305,7 @@ function oneLine(text) {
 }
 
 /** 처음 걸린 검사 이름과 까닭. 다 맞으면 {pass:true, tokens}. */
-function judge(expect, r, vars) {
+function judge(expect, r, vars, compare = {}) {
   if (r.spawnError) return { check: 'spawn', detail: `구현을 못 띄웠다: ${r.spawnError}` };
   if (r.timedOut) return { check: 'timeout', detail: `${CALL_TIMEOUT_MS / 1000}초 안에 안 끝났다` };
   if (r.code !== expect.code) {
@@ -306,12 +322,19 @@ function judge(expect, r, vars) {
   } catch {
     return { check: 'utf8', detail: 'stdout 이 엄격한 UTF-8 이 아니다' };
   }
+  const ignoreOrder = compare.jsonKeyOrder === 'ignore';
   if ('stdout' in expect) {
-    return text === expect.stdout ? { pass: true, tokens: [] } : { check: 'stdout', detail: firstLineDiff(expect.stdout, text) };
+    if (text === expect.stdout) return { pass: true, tokens: [] };
+    // 어댑터가 jsonKeyOrder=ignore 라면, 글자가 다른 까닭이 JSON 객체의 키 차례뿐일 때 맞다고 본다
+    const alt = ignoreOrder ? matchIgnoringKeyOrder(parseJsonOrUndefined(expect.stdout), text, vars) : null;
+    return alt ?? { check: 'stdout', detail: firstLineDiff(expect.stdout, text) };
   }
   if ('stdoutText' in expect) {
     const c = compareText(expect.stdoutText, text, vars);
-    if (!c.ok) return { check: 'stdout', detail: c.reason };
+    if (!c.ok) {
+      const alt = ignoreOrder ? matchIgnoringKeyOrder(parseJsonOrUndefined(expect.stdoutText), text, vars) : null;
+      return alt ?? { check: 'stdout', detail: c.reason };
+    }
     const t = checkTokensWithin(c.tokens);
     return t ? { check: 'token', detail: t } : { pass: true, tokens: c.tokens };
   }
@@ -321,13 +344,44 @@ function judge(expect, r, vars) {
   } catch (e) {
     return { check: 'stdout', detail: `JSON 이 아니다: ${e.message}` };
   }
-  const c = compareJson(expect.stdoutJson, value, vars);
+  let c = compareJson(expect.stdoutJson, value, vars);
+  let reordered = false;
+  if (!c.ok && ignoreOrder) {
+    // 키 차례 때문에 어긋났을 수 있다. 키 차례를 빼고 다시 맞댄다. 이것도 어긋나면 이쪽의 까닭이 더 정확하다.
+    c = compareJson(expect.stdoutJson, value, vars, { ignoreKeyOrder: true });
+    reordered = c.ok;
+  }
   if (!c.ok) return { check: 'stdout', detail: `${c.pointer}: ${c.reason}` };
   const t = checkTokensWithin(c.tokens);
   if (t) return { check: 'token', detail: t };
   const want = renderJson(c.filled);
   if (want !== text) return { check: 'format', detail: `JSON 값은 같은데 바이트가 다르다. ${firstLineDiff(want, text)}` };
-  return { pass: true, tokens: c.tokens };
+  return reordered ? { pass: true, tokens: c.tokens, reordered } : { pass: true, tokens: c.tokens };
+}
+
+function parseJsonOrUndefined(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 글 기대값(stdout, stdoutText)이 JSON이면, 키 차례만 빼고 같은 출력을 받아들인다. 받아들일 수 없으면 null이라 원래 어긋남 그대로 알린다.
+ * 키 차례를 뺀 값이 같아도 들여쓰기와 글자 꼴이 다르면 format 이다(바이트 맞댐은 실제 키 차례로 엄격하게 한다).
+ */
+function matchIgnoringKeyOrder(expected, text, vars) {
+  if (expected === undefined) return null;
+  const value = parseJsonOrUndefined(text);
+  if (value === undefined) return null;
+  const c = compareJson(expected, value, vars, { ignoreKeyOrder: true });
+  if (!c.ok) return null;
+  const t = checkTokensWithin(c.tokens);
+  if (t) return { check: 'token', detail: t };
+  const want = renderJson(c.filled);
+  if (want !== text) return { check: 'format', detail: `키 차례를 빼면 JSON 값은 같은데 바이트가 다르다. ${firstLineDiff(want, text)}` };
+  return { pass: true, tokens: c.tokens, reordered: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +436,7 @@ async function runGroup(group, outDir, impl, jobs, totals, results, warnings) {
     const env = implEnv(dirs, impl.extraEnv ? impl.extraEnv(c) : {});
     const r = await invoke(argvFor(c.argv, env), env);
     totals.launches++;
-    let verdict = judge(c.expect, r, vars);
+    let verdict = judge(c.expect, r, vars, impl.compare);
     if (verdict.pass) {
       // 9번: 끝까지 맞은 케이스 사이에서 같은 경로의 토큰은 먼저 끝난 케이스의 값을 기준으로 맞댄다
       for (const t of verdict.tokens) {
@@ -413,18 +467,25 @@ async function runAll(files, selected, outDir, impl, jobs, quiet = false) {
     await runGroup(group, outDir, impl, jobs, totals, results, warnings);
   }
   const failures = [];
+  const reordered = [];
   for (const f of files) {
     for (const c of f.cases) {
       if (!selected.has(c.id)) continue;
       const v = results.get(c.id);
-      if (v.pass) totals.passed++;
-      else {
+      if (v.pass) {
+        totals.passed++;
+        if (v.reordered) reordered.push(c.id);
+      } else {
         totals.failed++;
         failures.push({ id: c.id, check: v.check, detail: oneLine(v.detail) });
       }
     }
   }
   totals.wallMs = Date.now() - started;
+  // 키 차례만 달라 맞은 케이스는 경고로 알린다. report.json 의 꼴(키와 차례)은 설명서대로 두려고 새 칸을 만들지 않는다.
+  if (reordered.length > 0) {
+    warnings.push(`키 차례만 달라 맞은 케이스 ${reordered.length}건(어댑터의 compare.jsonKeyOrder=ignore): ${reordered.slice(0, 3).join(', ')}${reordered.length > 3 ? ' …' : ''}`);
+  }
   const report = { engine: impl.name, totals, failures, warnings };
   const reportPath = path.join(outDir, 'report.json');
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');

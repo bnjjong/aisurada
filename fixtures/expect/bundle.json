@@ -57,11 +57,15 @@
     {
       "date": "2026-11-11",
       "change": "데일리 리포트 명령(list-reports, get-report, save-report)을 엔진에서 뺀 것(a590a66)을 따라, 레인 get_report.json(1건)과 list_reports.json(1건)을 덜어 냄. 이 두 건은 지금 엔진이 모르는 명령이라 종료 코드 2(쓰는 법)로 끝나 어긋났다. 케이스는 29건에서 27건이 됨"
+    },
+    {
+      "date": "2026-11-16",
+      "change": "실행기에 어댑터의 compare.jsonKeyOrder(exact|ignore) 확장을 더함(lib/template.mjs의 compareJson, run.mjs의 어댑터 읽기·판정·경고). Rust ais-cli가 JSON 객체 키를 이름 차례로 내서 기대값 27건 가운데 16건이 키 차례만 달랐기 때문이다. 레인과 기대값은 그대로이고, 기본값 exact는 설명서대로 키 차례까지 맞댄다. README에 어댑터의 compare 절을 더함"
     }
   ],
   "files": {
     ".gitattributes": "4a669ece67c496f5d07207f2daaf830c1e5b962e389baebd0ac068fd88be22ff",
-    "README.md": "55f7d0fc4433893055b74d1c54974032ba003a4ad7e8413a77a2174d0bace92b",
+    "README.md": "f2ed69e8210fc269ac1c2246d3182b184f0662e3866c89e949bc921028cbbce9",
     "adapters/aisurada-jar.json": "f0819304fc1c948f0d2fc611aca17f35ac63abed6a2e1a3e8a7f1c70e4a60504",
     "lanes/read/get_doc.json": "0931c0553da6b2a1b4a02f507d19acfaa8621cb97d2a7cd0e62c29cfc39a7fb0",
     "lanes/read/get_sub_note.json": "282dd825db36f936a1c6b4919e67fc710248f493b40694830bde604e5fa53c35",
@@ -71,9 +75,9 @@
     "lanes/read/list_sub_notes.json": "ffa50358f76814aae4db2567c0a3bca26e23659994f55ebeb18f6f64bfcdd0fd",
     "lanes/read/list_templates.json": "8460f10bc6c8124152c2f6499508dfda75aab5a3f38ef799b6683046485f76cd",
     "lib/bundle.mjs": "9ee66830c1bfbf0e1c43b9b29a0598c82cf4c8c057e3dc8f5b8aeee62922565e",
-    "lib/template.mjs": "48229fe00409c143461e7663613c448e8b46fc09c88c1281d01d98adec8ad4c6",
+    "lib/template.mjs": "79c51df99920ef28a2abcdbfddb1d74a8447c332e28921047776b7776b4636b5",
     "lib/tree.mjs": "7813bc8ac30e8f74c78f68e773dcfc7a45c433f3741cfc273e6eb1422c40bb76",
-    "run.mjs": "a0809e7fdb0fd2c42beb1550865f73a152c63974c5c2ab79fca6e973b4c400f9",
+    "run.mjs": "bc2f2adca7d5eebc9e43b17a15e23dc23366c837fde5af6579e20a3b7003ee0f",
     "selftest/replay-impl.mjs": "451a760b7fcc70d45893b8a3c874d251ee36a93a2e548d387825f1e06bdde0ee",
     "trees/rebuild-fixture.v1.json": "b99155bc8ff79733a8fe0f256e9d81cdf5fcb77f7d39e99e985489b4d9fb4cf0"
   }

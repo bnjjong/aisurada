@@ -1,0 +1,14 @@
+{
+  "format": "aisx-adapter",
+  "version": 1,
+  "surface": "engine",
+  "name": "aisurada-rust",
+  "note": "Rust ais-cli(engine-rs/crates/ais-cli)를 부르는 어댑터. AISX_IMPL_BIN에 실행 파일을 준다(개발 빌드 engine-rs/target/debug/ais-cli, 또는 ./build.sh가 만드는 dist/ais-cli). Rust는 JSON 객체 키를 이름 차례로 내고 Java 엔진은 넣은 차례로 내서 키 차례가 다르다. 그래서 compare.jsonKeyOrder=ignore 로 키 차례만 뺀다(값과 들여쓰기·글자 꼴은 그대로 바이트로 맞댄다). 34.5의 9번대로 묶음 폴더 밖에 둔다. vault는 환경 변수 AISURADA_VAULT 로 받으므로 suffix가 없다.",
+  "compare": {
+    "jsonKeyOrder": "ignore"
+  },
+  "prefix": [
+    "${AISX_IMPL_BIN}"
+  ],
+  "suffix": []
+}
