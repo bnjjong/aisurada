@@ -2,7 +2,7 @@
 //!
 //! DDD·헥사고날 리팩토링(`docs/refactor-ddd-hexagonal-plan.md`)의 안전망이다. 소스를 읽어 아래 둘을 센다.
 //! - 모듈 사이 참조: `ais-core/src`의 모듈(`commands`, `vault`, `write`, …)이 다른 모듈을 `crate::모듈`로 적은 횟수
-//! - 바깥 직접 호출: `fs::`(파일), `SystemTime::now`(시계), `env::var`(환경 변수), `Command::new`(프로세스), `tzset`·`localtime_r`(시간대)를
+//! - 바깥 직접 호출: `std::fs`(파일), `SystemTime::now`(시계), `env::var`(환경 변수), `Command::new`(프로세스), `tzset`·`localtime_r`(시간대)를
 //!   적은 횟수. 파일별로 센다
 //!
 //! 센 값은 `tests/architecture-baseline.txt`에 박제해 둔다. **새 참조·새 호출이 생기거나 횟수가 늘면 실패한다**(거꾸로 된 의존이 번지는 것을 막는다).
@@ -23,7 +23,7 @@ const BASELINE: &str = "tests/architecture-baseline.txt";
 
 /// 바깥 직접 호출을 세는 패턴(이름, 소스에서 찾을 글). 글이 나온 횟수를 센다.
 const PATTERNS: &[(&str, &str)] = &[
-    ("fs", "fs::"),
+    ("fs", "std::fs"),
     ("systemtime", "SystemTime::now"),
     ("env", "env::var"),
     ("process", "Command::new"),
@@ -424,4 +424,35 @@ fn write_scope_is_opened_only_by_the_dispatcher() {
         }
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// 파일 읽기·쓰기는 어댑터(`adapters/`)만 `std::fs`로 직접 한다. 나머지 코드는 저장소 포트(`ports::fs`, `ports::VaultStore`)를 거친다.
+/// `use std::fs;`, `std::fs::`, `use std::{.., fs, ..};` 꼴을 모두 잡는다. 시험 모듈과 `tests.rs`는 디스크를 그대로 만져도 된다.
+#[test]
+fn file_access_goes_through_the_store_port() {
+    let src = manifest().join("src");
+    let mut files = Vec::new();
+    rust_files(&src, &mut files);
+    let mut bad = Vec::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        if rel.starts_with("adapters/") || rel.ends_with("/tests.rs") {
+            continue;
+        }
+        let text = code_without_tests(&fs::read_to_string(&file).unwrap());
+        let grouped = text
+            .lines()
+            .any(|l| l.contains("use std::{") && l.split(|c: char| !c.is_alphanumeric() && c != '_').any(|w| w == "fs"));
+        if text.contains("std::fs") || grouped {
+            bad.push(rel);
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "std::fs를 직접 쓴다. `use crate::ports::fs;`로 저장소 포트를 거친다: {bad:?}"
+    );
 }

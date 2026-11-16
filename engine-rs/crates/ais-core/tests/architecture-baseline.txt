@@ -2,13 +2,14 @@
 # edge <부르는 모듈> -> <불리는 모듈> <횟수> / <패턴> <크레이트>/<파일> <횟수>
 edge adapters -> error 1
 edge adapters -> kernel 3
-edge adapters -> ports 7
+edge adapters -> ports 8
 edge adapters -> text 2
 edge commands -> error 35
 edge commands -> frontmatter 4
 edge commands -> json 5
 edge commands -> kernel 29
 edge commands -> model 16
+edge commands -> ports 10
 edge commands -> resource 5
 edge commands -> session 2
 edge commands -> task 6
@@ -35,32 +36,33 @@ edge resource -> error 6
 edge resource -> frontmatter 5
 edge resource -> json 4
 edge resource -> kernel 13
-edge resource -> ports 1
+edge resource -> ports 5
 edge resource -> text 5
 edge resource -> vault 1
 edge resource -> write 15
 edge session -> json 5
 edge session -> kernel 6
-edge session -> ports 3
+edge session -> ports 10
 edge session -> text 4
 edge task -> error 3
 edge task -> frontmatter 2
 edge task -> json 2
 edge task -> kernel 8
+edge task -> ports 1
 edge task -> text 2
 edge task -> vault 1
 edge task -> write 6
 edge vault -> error 5
 edge vault -> frontmatter 6
 edge vault -> kernel 16
-edge vault -> ports 3
+edge vault -> ports 15
 edge vault -> text 15
 edge write -> adapters 2
 edge write -> error 11
 edge write -> frontmatter 7
 edge write -> json 4
 edge write -> kernel 16
-edge write -> ports 6
+edge write -> ports 13
 edge write -> text 10
 edge write -> vault 19
 env cli/env.rs 2
@@ -74,50 +76,14 @@ fs cli/doctor.rs 1
 fs cli/env.rs 1
 fs cli/migrate.rs 2
 fs cli/old_sidecar.rs 4
-fs core/adapters/flock_lock.rs 9
+fs core/adapters/flock_lock.rs 1
+fs core/adapters/local_store.rs 1
 fs core/adapters/queue_ids.rs 1
-fs core/adapters/sqlite_cli.rs 2
-fs core/commands/agenda_write.rs 2
-fs core/commands/ask_chat_commands.rs 6
-fs core/commands/doc_write.rs 1
-fs core/commands/export_markdown.rs 1
-fs core/commands/facts_write.rs 1
-fs core/commands/init_workspace.rs 1
-fs core/commands/list_attachments.rs 2
-fs core/commands/resource_commands.rs 18
-fs core/commands/shard_notes.rs 7
-fs core/commands/template_write.rs 1
-fs core/commands/trash_write.rs 1
-fs core/resource/approvals.rs 8
-fs core/resource/changes.rs 4
-fs core/resource/refs.rs 3
-fs core/resource/resolver.rs 1
-fs core/resource/store.rs 19
-fs core/session/antigravity.rs 2
-fs core/session/claude.rs 18
-fs core/session/codex.rs 4
-fs core/session/gemini.rs 6
-fs core/session/mod.rs 2
-fs core/task/store.rs 13
-fs core/vault/agenda.rs 4
-fs core/vault/attach_text.rs 3
-fs core/vault/comment_copy.rs 2
-fs core/vault/comments.rs 3
-fs core/vault/facts.rs 8
-fs core/vault/file_size.rs 6
-fs core/vault/history.rs 1
-fs core/vault/index.rs 6
-fs core/vault/note_file.rs 2
-fs core/vault/project.rs 4
-fs core/vault/scanner.rs 8
-fs core/vault/template.rs 4
-fs core/vault/trash.rs 3
-fs core/write/atomic.rs 15
-fs core/write/autocommit.rs 34
-fs core/write/comments_file.rs 1
-fs core/write/doc_place.rs 2
-fs core/write/precondition.rs 2
-fs core/write/sub_note.rs 9
+fs core/adapters/sqlite_cli.rs 1
+fs core/vault/facts.rs 1
+fs core/vault/index.rs 1
+fs core/write/atomic.rs 1
+fs core/write/autocommit.rs 1
 process cli/agent_cli.rs 1
 process cli/old_sidecar.rs 1
 process core/adapters/git_cli.rs 1
