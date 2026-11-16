@@ -13,7 +13,7 @@
 
 use crate::ports::{CurrentLock, VaultLock};
 use std::collections::HashMap;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
@@ -532,7 +532,7 @@ fn is_note_path(path: &str) -> bool {
 fn read_head(path: &Path) -> Option<Vec<u8>> {
     use std::io::Read;
     let mut head = Vec::new();
-    fs::File::open(path)
+    fs::open(path)
         .ok()?
         .take(4096)
         .read_to_end(&mut head)
@@ -543,6 +543,7 @@ fn read_head(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use crate::adapters::flock_lock::FlockLock;
     use std::process::Command;
     use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};

@@ -1,7 +1,7 @@
 //! 코멘트 파일(`comments.json`, `sub-comments/<id>.json`) 쓰기와 본문의 코멘트 앵커 표시 걷어내기.
 //! 규칙은 Java 엔진의 `CommentsWriter`, `CommentAnchors`와 같다.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 

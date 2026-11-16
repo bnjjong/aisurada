@@ -2,7 +2,7 @@
 //! 규칙은 Java 엔진의 `UpdateDoc`·`CreateDoc`·`NoteMover`·`ShardLayout`과 같다.
 
 pub use crate::kernel::time::CivilDate;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 

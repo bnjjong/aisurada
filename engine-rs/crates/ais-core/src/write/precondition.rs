@@ -29,11 +29,11 @@ pub fn check(
         || EngineError::internal(format!("노트 본문 파일을 못 읽어 {action} 않았다: {rel}"));
 
     // 없음, 1,000,000바이트 초과, 엄격한 UTF-8이 아님, 입출력 오류
-    let metadata = std::fs::metadata(path).map_err(|_| unreadable())?;
+    let metadata = crate::ports::fs::metadata(path).map_err(|_| unreadable())?;
     if !metadata.is_file() || metadata.len() > MAX_NOTE_FILE_BYTES {
         return Err(unreadable());
     }
-    let bytes = std::fs::read(path).map_err(|_| unreadable())?;
+    let bytes = crate::ports::fs::read(path).map_err(|_| unreadable())?;
     if std::str::from_utf8(&bytes).is_err() {
         return Err(unreadable());
     }

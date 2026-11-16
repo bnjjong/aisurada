@@ -1,8 +1,7 @@
 //! 원자적 쓰기: 부모 폴더를 만들고, 임시 파일에 쓰고 디스크에 내린 뒤, 이름을 바꿔 한 번에 교체합니다.
 //! 중간에 죽어도 대상 파일은 옛 내용이거나 새 내용이고 반쯤 쓴 파일이 보이지 않습니다.
 
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use crate::ports::fs;
 use std::path::Path;
 
 use super::apparatus::{next_random_u64, to_base36_u64};
@@ -48,15 +47,7 @@ pub fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), EngineError> {
         )));
     };
 
-    let write = || -> std::io::Result<()> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp)?;
-        file.write_all(bytes)?;
-        file.sync_all()
-    };
-    if write().is_err() {
+    if fs::write_new(&temp, bytes).is_err() {
         let _ = fs::remove_file(&temp);
         return Err(failed(&target));
     }
@@ -75,6 +66,7 @@ fn failed(target: &Path) -> EngineError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn scratch() -> std::path::PathBuf {
