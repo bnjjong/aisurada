@@ -303,6 +303,7 @@ flowchart LR
 - **6단계 5/N 완료**(2026-11-16): [자원 쓰기 규칙](refactor-step6e-complete.md). 범위·종류·칸 인자 읽기, 종류·범위 불변, 스킬 전용 인자 거절, 프로젝트 참조 목록 계산, 변경 요약을 순수한 `resource/rules.rs`로 모았다. `PendingChange` 값 객체와 승인 흐름의 쓰기 차례는 남았다. 골든 어긋남 0, 엔진 시험 284건. **6단계를 여기서 마무리하고 7단계 시작 여부를 게이트로 묻는다.** 게이트 1(4단계 뒤)에서 5~8단계 진행 여부를 묻는다.
 - **7단계 1/N 완료**(2026-11-16): [명령 표 하나](refactor-step7a-complete.md). 두 이름 목록과 82줄 디스패처를 `engine/table.rs`의 표 한 곳으로 합쳤다. 명령 목록, 쓰기 구분, 쓰기 범위 여는 방식이 모두 이 표에서 나온다. 호출 맥락 분리(7-2), CLI·MCP·호스트 호출 길(7-3), 오류 나누기(7-4), 사용법 글 옮기기(7-5), 공개 면 줄이기(7-6)가 남았다. 골든 어긋남 0, 엔진 시험 287건.
 - **7단계 2/N 완료**(2026-11-16): [호출 맥락 분리](refactor-step7b-complete.md). `WriteContext`를 커널의 `CallContext`로 옮기고 `Engine::call_as(&CallContext, 명령, 인자)` 입구를 더했다. 명령줄 도구 표면(AI)·명령 표면(앱)·호스트 `engine_call`이 맥락을 인자 밖에서 넘긴다. 처리 함수 시그니처는 그대로이고 요청의 `caller`·`context` 칸은 남았다. 골든 어긋남 0, 엔진 시험 290건.
+- **7단계 3/N 완료**(2026-11-16): [공개 면 줄이기](refactor-step7c-complete.md). `ais-core`의 공개 항목이 1,040개에서 122개로 줄었다(rustdoc JSON으로 셈). 바깥이 쓰던 길(`engine`·`error`·`json`·`text`·`kernel::actor`·`write::autocommit`·`vault`의 읽기 다섯)만 `pub`이고 나머지는 `test-support` feature일 때만 열린다. 모듈을 닫으며 드러난 죽은 코드를 지웠다. 골든 어긋남 0, 엔진 시험 296건, 호스트 시험 158건 통과.
 
 ## 9. 근거와 한계
 
