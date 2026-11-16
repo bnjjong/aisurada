@@ -147,8 +147,10 @@ export interface WorkspaceState {
 export const asRow = (value: unknown): Row | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Row : null;
 export const asText = (value: unknown): string => typeof value === 'string' ? value : '';
-export const rows = (value: unknown, envelope?: string): Row[] => {
-  const source = Array.isArray(value) ? value : envelope ? asRow(value)?.[envelope] : null;
+/** 목록 응답에서 줄을 꺼낸다. 배열이면 그대로, 아니면 `envelope`로 준 칸 이름 가운데 배열인 첫 칸이다(Rust 엔진은 `items`, 명령줄 길은 옛 이름). */
+export const rows = (value: unknown, envelope?: string | readonly string[]): Row[] => {
+  const keys = typeof envelope === 'string' ? [envelope] : envelope ?? [];
+  const source = Array.isArray(value) ? value : keys.map(key => asRow(value)?.[key]).find(Array.isArray);
   return Array.isArray(source) ? source.map(asRow).filter((r): r is Row => r !== null) : [];
 };
 export const workspaceName = (path: string): string => path.replace(/\/+$/, '').split('/').pop() || '워크스페이스';

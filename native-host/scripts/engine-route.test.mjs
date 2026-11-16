@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { engineCall, engineReply, readWorkspace, SidecarCommandError } from '../src/workspace/engine.ts';
+import { engineCall, engineReply, isPreconditionFailure, readWorkspace, SidecarCommandError } from '../src/workspace/engine.ts';
+import { rows } from '../src/workspace/types.ts';
 import { read, write, fromArgv, toArgv } from '../src/data/commands.ts';
 
 // 가짜 호스트: 기록을 남기고, 명령마다 정해진 응답을 돌려준다.
@@ -40,17 +41,31 @@ test('문자열 목록(argv)은 Rust 엔진이 지원하는 이름이어도 늘 
   assert.deepEqual(h.calls.map(c => c.command), ['sidecar_call']);
 });
 
-test('호스트가 지원한다고 알린 명령은 Rust 엔진으로 가고, 응답을 기존 모양으로 바꾼다', async () => {
+test('호스트가 지원한다고 알린 명령은 Rust 엔진으로 가고, 응답은 바꾸지 않고 그대로 돌려준다', async () => {
+  const docsPage = page([{ id: 'n1', created: '2026-11-05T16:08:00+09:00', title: 't', folder: true }]);
   const h = host({ commands: ['list_docs', 'list_agendas'], rust: {
-    list_docs: () => page([{ id: 'n1', created: '2026-11-05T16:08:00+09:00', title: 't', folder: true }]),
+    list_docs: () => docsPage,
     list_agendas: () => page([{ id: 'ag1', slug: 'demo', title: '데모' }]),
   } });
   const docs = await engineCall(h, read.docs());
   assert.deepEqual(h.calls[0], { command: 'engine_call', args: { command: 'list_docs', args: { limit: 0, bodies: true } } });
-  // 목록은 배열로 풀리고, 빼기로 한 date·time은 created에서 다시 채운다
-  assert.deepEqual(docs, [{ id: 'n1', created: '2026-11-05T16:08:00+09:00', title: 't', folder: true, date: '2026-11-05', time: '16:08' }]);
-  assert.deepEqual(await engineCall(h, read.agendas()), [{ id: 'ag1', slug: 'demo', title: '데모' }]);
+  // 목록은 `{items, total, …}` 그대로이고 date·time을 덧붙이지 않는다. 받는 쪽이 `rows`로 읽고 created에서 스스로 채운다
+  assert.deepEqual(docs, docsPage);
+  assert.deepEqual(rows(docs, 'items'), docsPage.items);
+  assert.deepEqual(await engineCall(h, read.agendas()), page([{ id: 'ag1', slug: 'demo', title: '데모' }]));
   assert.deepEqual(h.calls.map(c => c.command), ['engine_call', 'engine_call']);
+});
+
+test('rows는 배열이면 그대로, 아니면 준 칸 이름 가운데 배열인 첫 칸에서 줄을 꺼낸다', () => {
+  const a = { id: 'a' }, b = { id: 'b' };
+  assert.deepEqual(rows([a, b], 'items'), [a, b]);
+  assert.deepEqual(rows({ items: [a], total: 1 }, 'items'), [a]);
+  assert.deepEqual(rows({ items: [a] }, ['items', 'subNotes']), [a], 'Rust 엔진 응답');
+  assert.deepEqual(rows({ parent: 'n/s', subNotes: [b] }, ['items', 'subNotes']), [b], '명령줄 길의 옛 응답');
+  assert.deepEqual(rows({ items: 'x', subNotes: [b] }, ['items', 'subNotes']), [b], '배열이 아닌 칸은 건너뛴다');
+  assert.deepEqual(rows({ items: [a] }), [], '칸 이름을 안 주면 배열만 읽는다');
+  assert.deepEqual(rows(null, 'items'), []);
+  assert.deepEqual(rows([a, 5, null], 'items'), [a], '객체가 아닌 항목은 뺀다');
 });
 
 test('호스트가 지원 목록에 안 넣은 호출 객체는 명령줄 길로 간다', async () => {
@@ -65,12 +80,12 @@ test('지원 목록을 못 받으면(오류) 명령줄 길로 간다', async () 
   assert.deepEqual(h.calls.map(c => c.command), ['sidecar_call']);
 });
 
-test('Rust 엔진의 오류는 종류와 옛 종료 코드와 글을 담은 SidecarCommandError가 된다', async () => {
+test('Rust 엔진의 오류는 종류와 글과 종료 코드 칸(종류가 있으면 3, 없으면 1)을 담은 SidecarCommandError가 된다', async () => {
   const cases = [
     [{ code: 'AIS-404', kind: 'not_found', message: '없다' }, 3, 'AIS-404 없다'],
     [{ code: 'AIS-400', kind: 'invalid_argument', message: '틀렸다' }, 3, 'AIS-400 틀렸다'],
-    [{ code: 'AIS-412', kind: 'precondition_failed', message: '바뀌었다' }, 5, 'AIS-412 바뀌었다'],
-    [{ code: 'AIS-500', kind: 'internal', message: '터졌다' }, 1, 'AIS-500 터졌다'],
+    [{ code: 'AIS-412', kind: 'precondition_failed', message: '바뀌었다' }, 3, 'AIS-412 바뀌었다'],
+    [{ code: 'AIS-500', kind: 'internal', message: '터졌다' }, 3, 'AIS-500 터졌다'],
     ['Command engine_call not found', 1, 'Command engine_call not found'],
   ];
   for (const [failure, status, stderr] of cases) {
@@ -83,6 +98,21 @@ test('Rust 엔진의 오류는 종류와 옛 종료 코드와 글을 담은 Side
       return true;
     });
   }
+});
+
+test('쓰기 충돌(AIS-412)은 Rust 길은 오류 종류로, 명령줄 길은 종료 코드 5로 알아본다', async () => {
+  const failure = async (h, request) => { try { await engineCall(h, request); } catch (error) { return error; } throw new Error('실패해야 한다'); };
+  const rustPrecondition = host({ commands: ['update_doc'], rust: { update_doc: () => { throw { code: 'AIS-412', kind: 'precondition_failed', message: '바뀌었다' }; } } });
+  assert.equal(isPreconditionFailure(await failure(rustPrecondition, write.updateDoc('n', { body: 'b' }, 'f1:x'))), true, 'Rust 길');
+  const cli = code => host({ java: { 'update-doc': () => ({ status: code, stdout: '', stderr: `AIS-4xx\n` }) } });
+  assert.equal(isPreconditionFailure(await failure(cli(5), write.updateDoc('n', { body: 'b' }, 'f1:x'))), true, '명령줄 길의 종료 코드 5');
+  assert.equal(isPreconditionFailure(await failure(cli(3), write.updateDoc('n', { body: 'b' }, 'f1:x'))), false, '다른 종료 코드');
+  const rustOther = kind => host({ commands: ['update_doc'], rust: { update_doc: () => { throw { code: 'AIS-409', kind, message: 'x' }; } } });
+  for (const kind of ['conflict', 'not_found', 'internal', 'invalid_argument']) {
+    assert.equal(isPreconditionFailure(await failure(rustOther(kind), write.updateDoc('n', { body: 'b' }, 'f1:x'))), false, `Rust 길의 ${kind}`);
+  }
+  assert.equal(isPreconditionFailure(new Error('5')), false);
+  assert.equal(isPreconditionFailure(null), false);
 });
 
 test('Java 엔진의 오류에는 kind가 없고 종료 코드와 글이 그대로 남는다', async () => {
@@ -137,11 +167,12 @@ test('노트를 여는 길: Java 경로는 예전 자리 인자(positional) 목�
     ['list-comments', 'n1'], ['list-comments', 'n1', 's1'], ['get-agenda-facts', 'ag1']]);
 });
 
-test('노트를 여는 길: Rust 응답을 옛 모양으로 바꾼다(date·time, 부른 사슬로 채운 ref와 parent)', async () => {
+test('노트를 여는 길: Rust 응답은 바꾸지 않고 그대로 온다(date·time, ref, parent를 덧붙이지 않는다)', async () => {
   const row = (id, extra = {}) => ({ id, created: '2026-11-05T16:08:00+09:00', title: id, links: [], tags: [], path: `notes/x/${id}`, folder: false, ...extra });
+  const subList = page([row('s1', { rootId: 'n1', parentId: 'n1' }), row('s2', { rootId: 'n1', parentId: 'n1' })]);
   const rust = {
     get_doc: args => ({ ...row(args.id, { body: '본문', comments: { state: 'absent' } }) }),
-    list_sub_notes: () => page([row('s1', { rootId: 'n1', parentId: 'n1' }), row('s2', { rootId: 'n1', parentId: 'n1' })]),
+    list_sub_notes: () => subList,
     get_sub_note: args => row(args.id, { rootId: 'n1', parentId: 's1', body: '후속 본문', comments: { state: 'loaded', comments: [] } }),
     list_comments: () => ({ state: 'loaded', comments: [{ id: 'cm1-a', createdAt: 'x', body: 'b' }] }),
     list_attachments: () => page([{ name: 'a.png', ref: '![a.png](attach/a.png)' }]),
@@ -150,21 +181,21 @@ test('노트를 여는 길: Rust 응답을 옛 모양으로 바꾼다(date·time
   const h = host({ commands: Object.keys(rust), rust });
 
   const doc = await engineCall(h, read.doc('n1'));
-  assert.deepEqual([doc.date, doc.time, doc.body, doc.comments.state], ['2026-11-05', '16:08', '본문', 'absent']);
+  assert.deepEqual([doc.body, doc.comments.state, 'date' in doc, 'time' in doc], ['본문', 'absent', false, false]);
   assert.deepEqual(h.calls[0].args, { command: 'get_doc', args: { id: 'n1' } });
 
   const subs = await engineCall(h, read.subNotes('n1/s1'));
-  assert.equal(subs.parent, 'n1/s1');
-  assert.deepEqual(subs.subNotes.map(r => [r.id, r.ref, r.date, r.rootId]), [['s1', 'n1/s1/s1', '2026-11-05', 'n1'], ['s2', 'n1/s1/s2', '2026-11-05', 'n1']]);
+  assert.deepEqual(subs, subList, '목록은 {items, …} 그대로');
+  assert.deepEqual(rows(subs, ['items', 'subNotes']).map(r => [r.id, r.rootId, r.parentId, 'ref' in r]), [['s1', 'n1', 'n1', false], ['s2', 'n1', 'n1', false]]);
   assert.deepEqual(h.calls[1].args, { command: 'list_sub_notes', args: { parent: 'n1/s1', bodies: true } });
 
   const sub = await engineCall(h, read.subNote('n1/s1', 's9'));
-  assert.deepEqual([sub.id, sub.parent, sub.time, sub.body, sub.comments.state], ['s9', 'n1/s1', '16:08', '후속 본문', 'loaded']);
+  assert.deepEqual([sub.id, sub.rootId, sub.parentId, sub.body, sub.comments.state, 'parent' in sub], ['s9', 'n1', 's1', '후속 본문', 'loaded', false]);
 
   assert.equal((await engineCall(h, read.comments('n1', 's1'))).comments[0].id, 'cm1-a');
   assert.deepEqual(h.calls[3].args, { command: 'list_comments', args: { id: 'n1', subId: 's1' } });
   assert.equal((await engineCall(h, read.facts('ag1'))).facts, '사실');
-  assert.deepEqual(await engineCall(h, { command: 'list_attachments', args: { id: 'n1', subId: 's1' } }), { parent: 'n1/s1', attachments: [{ name: 'a.png', ref: '![a.png](attach/a.png)' }] });
+  assert.deepEqual(await engineCall(h, { command: 'list_attachments', args: { id: 'n1', subId: 's1' } }), page([{ name: 'a.png', ref: '![a.png](attach/a.png)' }]));
 });
 
 test('노트를 여는 길: Rust 엔진이 못 찾으면 not_found 오류가 된다', async () => {

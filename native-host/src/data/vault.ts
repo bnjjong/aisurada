@@ -1,6 +1,6 @@
 import { asRow, asText, rows } from '../workspace/types.ts';
 import type { Note, Row, Workspace, WorkspaceServices } from '../workspace/types.ts';
-import { engineCall, engineRefusal, readWorkspace, SidecarCommandError } from '../workspace/engine.ts';
+import { engineCall, engineRefusal, isPreconditionFailure, readWorkspace } from '../workspace/engine.ts';
 import { cleanTags, commentId, read, toArgv, write } from './commands.ts';
 import type { Call, Fields, NewDoc } from './commands.ts';
 import { SelfWrites } from './selfWrites.ts';
@@ -217,7 +217,7 @@ export class VaultData {
       const value = await engineCall(this.services.host, read.subNotes(chain));
       if (!this.valid(generation) || this.reads.get('sub:' + parent) !== ticket) return this.memory.subNotes[parent] || [];
       const root = workspace.notes.find(note => note.id === chain.split('/')[0])!;
-      const disk = rows(value, 'subNotes').map(row => this.toNote({ ...row, agenda: root.agenda }, root.agendaId));
+      const disk = rows(value, ['items', 'subNotes']).map(row => this.toNote({ ...row, agenda: root.agenda }, root.agendaId));
       const merged = this.mergeNotes(disk, this.memory.subNotes[parent] || [], snapshot, parent).sort((a, b) => a.created < b.created ? -1 : a.created > b.created ? 1 : 0);
       this.memory = { ...this.memory, subNotes: { ...this.memory.subNotes, [parent]: merged } }; this.prune(); this.emit(); return merged;
     } catch (error) { this.services.warn('후속 노트를 읽지 못했어요', error); return this.memory.subNotes[parent] || []; }
@@ -357,7 +357,7 @@ export class VaultData {
         return { ok: true, value: response };
       } catch (error) {
         if (!this.valid(generation)) return { ok: false };
-        const clash = error instanceof SidecarCommandError && error.status === 5;
+        const clash = isPreconditionFailure(error);
         this.services.warn(label, error);
         if (bodyWrite) {
           this.setFlag('unsaved', key, true);
