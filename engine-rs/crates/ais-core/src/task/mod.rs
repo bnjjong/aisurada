@@ -1,6 +1,7 @@
 //! 태스크(티켓) 파일의 규칙: 모양(`format`), 상태 전이(`transitions`), vault에서 읽고 쓰는 곳(`store`).
 //! 외부 설명서에 없는 확장이다. 파일은 `.aisurada/tasks/TSK-14.md`(머리말 YAML + 설명)와 `TSK-14/activity.jsonl`(활동)이다.
 
+pub mod aggregate;
 pub mod format;
 pub mod store;
 pub mod transitions;

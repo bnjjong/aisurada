@@ -14,8 +14,9 @@ use serde_json::{Value as Json, json};
 
 use super::note_meta_write::BoolArg;
 use crate::error::EngineError;
+use crate::task::aggregate::{self, Fields, Scan};
 use crate::task::format::{self, java_trim};
-use crate::task::store::{self, Fields, Scan};
+use crate::task::store;
 use crate::task::transitions::{self, HUMAN};
 use crate::task::{Task, TaskStatus};
 use crate::text::{is_blank, trim};
@@ -235,7 +236,7 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
         "labels": task.labels,
         "criteriaDone": task.criteria.iter().filter(|c| c.done).count(),
         "criteriaTotal": task.criteria.len(),
-        "blockedBy": store::unfinished_blockers(scan, &task.key),
+        "blockedBy": aggregate::unfinished_blockers(scan, &task.key),
         "blocks": blocks,
         "path": task.rel_path,
     });
@@ -259,7 +260,7 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
 }
 
 fn related_rows(scan: &Scan, task: &Task) -> Vec<Json> {
-    store::related(scan, task)
+    aggregate::related(scan, task)
         .into_iter()
         .map(
             |r| json!({"type": r.kind, "key": r.key, "title": r.title, "status": r.status.label()}),
@@ -311,7 +312,7 @@ fn detail(
             .map(|c| json!({"item": c.item, "ok": c.ok, "label": c.label}))
             .collect::<Vec<_>>()
     );
-    let blockers = store::unfinished_blockers(scan, &task.key);
+    let blockers = aggregate::unfinished_blockers(scan, &task.key);
     m["transitions"] = json!(
         transitions::options(task, HUMAN, &blockers)
             .into_iter()
@@ -559,7 +560,7 @@ pub fn list_tasks(vault: &Path, request: &ListTasksRequest) -> Result<Json, Engi
             }
             _ => true,
         })
-        .filter(|t| !only_blocked || !store::unfinished_blockers(&scan, &t.key).is_empty())
+        .filter(|t| !only_blocked || !aggregate::unfinished_blockers(&scan, &t.key).is_empty())
         .collect();
     items.sort_by_key(|t| Reverse(t.number()));
     let rows: Vec<Json> = items.iter().map(|t| row(&scan, t, bodies)).collect();

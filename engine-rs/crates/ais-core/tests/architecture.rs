@@ -303,7 +303,7 @@ fn closed_set_literals_live_only_in_the_kernel() {
         if rel.starts_with("kernel/") {
             continue;
         }
-        let text = code(&fs::read_to_string(&file).unwrap());
+        let text = code_without_tests(&fs::read_to_string(&file).unwrap());
         for (pattern, allowed) in rules {
             let n = text.matches(pattern).count();
             let ok = allowed
@@ -456,5 +456,36 @@ fn file_access_goes_through_the_store_port() {
     assert!(
         bad.is_empty(),
         "std::fs를 직접 쓴다. `use crate::ports::fs;`로 저장소 포트를 거친다: {bad:?}"
+    );
+}
+
+/// 애그리거트 파일은 순수한 도메인 코드다: 파일·포트·쓰기 모듈·vault 읽기 모듈을 쓰지 않는다. 규칙은 디스크 없이 시험된다.
+/// 영역마다 애그리거트를 올릴 때마다 이 목록에 파일을 더한다.
+#[test]
+fn aggregate_files_are_pure_domain_code() {
+    const PURE: &[&str] = &["task/aggregate.rs", "task/transitions.rs"];
+    const FORBIDDEN: &[&str] = &[
+        "crate::ports",
+        "crate::write",
+        "crate::vault",
+        "crate::adapters",
+        "crate::commands",
+        "std::fs",
+        "std::env",
+        "std::process",
+    ];
+    let src = manifest().join("src");
+    let mut bad = Vec::new();
+    for rel in PURE {
+        let text = code_without_tests(&fs::read_to_string(src.join(rel)).unwrap());
+        for pattern in FORBIDDEN {
+            if text.contains(pattern) {
+                bad.push(format!("{rel}: {pattern}"));
+            }
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "순수해야 하는 도메인 파일이 바깥을 쓴다: {bad:?}"
     );
 }

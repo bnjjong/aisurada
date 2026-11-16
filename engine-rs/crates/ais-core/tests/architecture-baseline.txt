@@ -12,7 +12,7 @@ edge commands -> model 16
 edge commands -> ports 10
 edge commands -> resource 5
 edge commands -> session 2
-edge commands -> task 6
+edge commands -> task 7
 edge commands -> text 33
 edge commands -> vault 74
 edge commands -> write 97
@@ -44,14 +44,14 @@ edge session -> json 5
 edge session -> kernel 6
 edge session -> ports 10
 edge session -> text 4
-edge task -> error 3
+edge task -> error 4
 edge task -> frontmatter 2
-edge task -> json 2
-edge task -> kernel 8
+edge task -> json 4
+edge task -> kernel 10
 edge task -> ports 1
-edge task -> text 2
+edge task -> text 3
 edge task -> vault 1
-edge task -> write 6
+edge task -> write 5
 edge vault -> error 5
 edge vault -> frontmatter 6
 edge vault -> kernel 17
@@ -61,7 +61,7 @@ edge write -> adapters 2
 edge write -> error 11
 edge write -> frontmatter 7
 edge write -> json 4
-edge write -> kernel 16
+edge write -> kernel 17
 edge write -> ports 13
 edge write -> text 10
 edge write -> vault 19

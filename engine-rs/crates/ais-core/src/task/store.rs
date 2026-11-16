@@ -9,60 +9,27 @@
 //!
 //! 연결은 건 쪽 파일에만 적고 반대쪽(막혀 있음 따위)은 읽을 때 계산하므로 두 파일이 어긋날 일이 없다.
 
-use crate::kernel::task_link::TaskLinkKind;
 use crate::ports::fs;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value as Json;
 
-use super::format::{self, DEFAULT_PRIORITY, DEFAULT_TYPE, KEY, MAX_FILE_BYTES, MAX_LINKS};
-use super::transitions;
-use super::{Criterion, Link, Ref, Task, TaskStatus};
+use super::aggregate::{Fields, NewTask, Scan, TaskEvent, unfinished_blockers};
+use super::format::{self, KEY, MAX_FILE_BYTES};
+use super::{Task, TaskStatus};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
+use crate::kernel::stamp::Stamp;
 use crate::kernel::token::compute_token;
 use crate::text::compare_utf16;
 use crate::vault::project::scan_projects;
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
-use crate::write::stamp::Stamp;
 use crate::write::sub_note::remove_tree;
 
 pub const ROOT: &str = ".aisurada/tasks";
 pub const ACTIVITY_KEEP: usize = 500;
-
-/// 훑은 결과. `skipped`는 못 읽어 건너뛴 파일과 이유다.
-pub struct Scan {
-    pub items: Vec<Task>,
-    pub skipped: Vec<String>,
-}
-
-impl Scan {
-    pub fn by_key(&self, key: &str) -> Option<&Task> {
-        self.items.iter().find(|t| t.key == key)
-    }
-
-    pub fn by_id(&self, id: &str) -> Option<&Task> {
-        self.items.iter().find(|t| t.id == id)
-    }
-}
-
-/// 고칠 값. `None`은 「안 줌(그대로 둔다)」이다. `repo`, `project`, `base_branch`는 빈 글이 「지운다」이고,
-/// 목록 칸(`labels`, `criteria`, `refs`)은 빈 목록이 「비운다」다.
-#[derive(Default)]
-pub struct Fields {
-    pub title: Option<String>,
-    pub task_type: Option<String>,
-    pub priority: Option<String>,
-    pub repo: Option<String>,
-    pub project: Option<String>,
-    pub base_branch: Option<String>,
-    pub body: Option<String>,
-    pub labels: Option<Vec<String>>,
-    pub criteria: Option<Vec<Criterion>>,
-    pub refs: Option<Vec<Ref>>,
-}
 
 pub struct TrashEntry {
     pub id: String,
@@ -70,14 +37,6 @@ pub struct TrashEntry {
     pub title: String,
     pub rel_path: String,
     pub deleted_at: String,
-}
-
-/// 이 태스크에 걸린 연결 한 줄(건 쪽과 받은 쪽을 모두 담는다)
-pub struct Related {
-    pub kind: String,
-    pub key: String,
-    pub title: String,
-    pub status: TaskStatus,
 }
 
 pub fn root(vault: &Path) -> PathBuf {
@@ -203,62 +162,6 @@ pub fn find<'a>(scan: &'a Scan, reference: &str) -> Result<&'a Task, EngineError
     )))
 }
 
-/// 이 태스크를 막고 있으면서 아직 Done이 아닌 태스크 키들. 비면 막히지 않았다.
-pub fn unfinished_blockers(scan: &Scan, key: &str) -> Vec<String> {
-    scan.items
-        .iter()
-        .filter(|t| t.status != TaskStatus::Done)
-        .filter(|t| {
-            t.links
-                .iter()
-                .any(|l| l.kind == TaskLinkKind::Blocks && l.to == key)
-        })
-        .map(|t| t.key.clone())
-        .collect()
-}
-
-/// 이 태스크에 걸린 모든 연결. 이 태스크가 건 것과, 다른 태스크가 이 태스크에 건 것(반대쪽 이름)을 함께 낸다. 없는 태스크를 가리키면 뺀다.
-pub fn related(scan: &Scan, task: &Task) -> Vec<Related> {
-    let mut out: Vec<Related> = Vec::new();
-    for link in &task.links {
-        if let Some(other) = scan.by_key(&link.to) {
-            out.push(Related {
-                kind: link.kind.as_str().to_string(),
-                key: other.key.clone(),
-                title: other.title.clone(),
-                status: other.status,
-            });
-        }
-    }
-    for other in &scan.items {
-        if other.key == task.key {
-            continue;
-        }
-        for link in &other.links {
-            if link.to != task.key {
-                continue;
-            }
-            let inverse = link.kind.inverse_label();
-            if link.kind == TaskLinkKind::Relates
-                && task
-                    .links
-                    .iter()
-                    .any(|x| x.kind == TaskLinkKind::Relates && x.to == other.key)
-            {
-                continue;
-            }
-            out.push(Related {
-                kind: inverse.to_string(),
-                key: other.key.clone(),
-                title: other.title.clone(),
-                status: other.status,
-            });
-        }
-    }
-    out.sort_by(|a, b| compare_utf16(&a.kind, &b.kind).then_with(|| compare_utf16(&a.key, &b.key)));
-    out
-}
-
 // ---------------------------------------------------------------- 만들기
 
 fn require_project(vault: &Path, slug: &str) -> Result<(), EngineError> {
@@ -273,29 +176,10 @@ fn require_project(vault: &Path, slug: &str) -> Result<(), EngineError> {
     )))
 }
 
-/// 새 태스크를 Draft로 만든다. 요약(title), 저장소(repo), 완료 기준(criteria 1개 이상)이 필수다.
+/// 새 태스크를 Draft로 만든다. 요약(title), 저장소(repo), 완료 기준(criteria 1개 이상)이 필수다(규칙은 `NewTask`가 검사한다).
 pub fn create(vault: &Path, f: Fields, stamp: &Stamp, actor: &str) -> Result<Task, EngineError> {
-    let Some(title) = f.title else {
-        return Err(EngineError::invalid_argument("title 이 필요하다"));
-    };
-    let repo = match f.repo {
-        Some(r) if !r.is_empty() => r,
-        _ => {
-            return Err(EngineError::invalid_argument(
-                "repo 가 필요하다(owner/name)",
-            ));
-        }
-    };
-    let criteria = match f.criteria {
-        Some(c) if !c.is_empty() => c,
-        _ => {
-            return Err(EngineError::invalid_argument(
-                "완료 기준(criteria)을 하나 이상 써야 만들 수 있다. 일이 끝났는지 이 기준으로 확인한다",
-            ));
-        }
-    };
-    let project = f.project.filter(|p| !p.is_empty());
-    if let Some(project) = &project {
+    let new = NewTask::from_fields(f)?;
+    if let Some(project) = &new.project {
         require_project(vault, project)?;
     }
 
@@ -309,32 +193,10 @@ pub fn create(vault: &Path, f: Fields, stamp: &Stamp, actor: &str) -> Result<Tas
         }
     };
     let path = file_path(vault, &key);
-    let task = Task {
-        key: key.clone(),
-        id,
-        title,
-        task_type: f.task_type.unwrap_or_else(|| DEFAULT_TYPE.to_string()),
-        priority: f.priority.unwrap_or_else(|| DEFAULT_PRIORITY.to_string()),
-        status: TaskStatus::Draft,
-        repo: Some(repo),
-        project,
-        base_branch: f.base_branch.filter(|b| !b.is_empty()),
-        labels: f.labels.unwrap_or_default(),
-        criteria: normalize_criteria(&[], &criteria, stamp, actor),
-        links: Vec::new(),
-        refs: f.refs.unwrap_or_default(),
-        body: f.body.unwrap_or_default(),
-        extra: Vec::new(),
-        created_at: Some(stamp.at.clone()),
-        edited_at: Some(stamp.at.clone()),
-        edited_session: stamp.session.clone(),
-        edited_agent: stamp.agent.clone(),
-        rel_path: rel(vault, &path),
-        token: None,
-    };
+    let (task, event) = new.into_task(key.clone(), id, rel(vault, &path), stamp, actor);
     let bytes = format::render(&task)?;
     write_atomic(&path, &bytes)?;
-    append_activity(vault, &key, event(stamp, actor, "created", Vec::new()))?;
+    append_activity(vault, &key, &event)?;
     Ok(Task {
         token: Some(compute_token(&bytes)),
         ..task
@@ -352,8 +214,7 @@ fn next_number(vault: &Path, scan: &Scan) -> u32 {
 
 // ---------------------------------------------------------------- 고치기
 
-/// 태스크의 내용을 고친다. 직전에 읽은 `f1` 토큰이 지금 파일과 맞아야 쓴다(맞지 않으면 `AIS-412`). 실제로 달라지는 게 없으면 파일도
-/// 활동도 안 바꾸고 `None`을 돌려준다. 상태와 연결은 여기서 못 바꾼다(`transition`, `link`).
+/// 태스크의 내용을 고친다(규칙은 `Task::edit`). 달라지는 게 없으면 파일도 활동도 안 바꾸고 `None`을 돌려준다.
 pub fn update(
     vault: &Path,
     cur: &Task,
@@ -362,155 +223,24 @@ pub fn update(
     stamp: &Stamp,
     actor: &str,
 ) -> Result<Option<Task>, EngineError> {
-    let Some(f1) = f1.filter(|t| !format::java_blank(t)) else {
-        return Err(EngineError::precondition_failed(format!(
-            "f1 이 필요하다. get-task 로 읽은 precondition 을 f1= 으로 넘긴다: {}",
-            cur.rel_path
-        )));
-    };
-    if Some(format::java_trim(f1)) != cur.token.as_deref() {
-        return Err(EngineError::precondition_failed(format!(
-            "읽은 뒤에 파일이 바뀌었다. 다시 읽고 고친다: {}",
-            cur.rel_path
-        )));
-    }
-    let title = f.title.unwrap_or_else(|| cur.title.clone());
-    let task_type = f.task_type.unwrap_or_else(|| cur.task_type.clone());
-    let priority = f.priority.unwrap_or_else(|| cur.priority.clone());
-    let repo = match f.repo {
-        Some(r) => Some(r).filter(|r| !r.is_empty()),
-        None => cur.repo.clone(),
-    };
-    let project = match f.project {
-        Some(p) => Some(p).filter(|p| !p.is_empty()),
-        None => cur.project.clone(),
-    };
-    let base = match f.base_branch {
-        Some(b) => Some(b).filter(|b| !b.is_empty()),
-        None => cur.base_branch.clone(),
-    };
-    let body = f.body.unwrap_or_else(|| cur.body.clone());
-    let labels = f.labels.unwrap_or_else(|| cur.labels.clone());
-    let criteria = match &f.criteria {
-        Some(given) => normalize_criteria(&cur.criteria, given, stamp, actor),
-        None => cur.criteria.clone(),
-    };
-    let refs = f.refs.unwrap_or_else(|| cur.refs.clone());
-    if let Some(project) = &project
-        && cur.project.as_ref() != Some(project)
-    {
-        require_project(vault, project)?;
-    }
-
-    let same = Task {
-        title: title.clone(),
-        task_type: task_type.clone(),
-        priority: priority.clone(),
-        repo: repo.clone(),
-        project: project.clone(),
-        base_branch: base.clone(),
-        labels: labels.clone(),
-        criteria: criteria.clone(),
-        refs: refs.clone(),
-        body: body.clone(),
-        ..cur.clone()
-    };
-    if format::render(&same)? == format::render(cur)? {
+    let Some(changed) = cur.edit(f, f1, stamp, actor, |project| {
+        require_project(vault, project)
+    })?
+    else {
         return Ok(None);
-    }
-    let next = Task {
-        edited_at: Some(stamp.at.clone()),
-        edited_session: stamp.session.clone(),
-        edited_agent: stamp.agent.clone(),
-        token: None,
-        ..same
     };
-    let bytes = format::render(&next)?;
+    let bytes = format::render(&changed.next)?;
     write_atomic(&vault.join(&cur.rel_path), &bytes)?;
-
-    let mut changed: Vec<&str> = Vec::new();
-    if title != cur.title {
-        changed.push("title");
-    }
-    if task_type != cur.task_type {
-        changed.push("type");
-    }
-    if priority != cur.priority {
-        changed.push("priority");
-    }
-    if repo != cur.repo {
-        changed.push("repo");
-    }
-    if project != cur.project {
-        changed.push("project");
-    }
-    if base != cur.base_branch {
-        changed.push("baseBranch");
-    }
-    if body != cur.body {
-        changed.push("body");
-    }
-    if labels != cur.labels {
-        changed.push("labels");
-    }
-    if criteria != cur.criteria {
-        changed.push("criteria");
-    }
-    if refs != cur.refs {
-        changed.push("refs");
-    }
-    let fields = JsonValue::Array(
-        changed
-            .iter()
-            .map(|c| JsonValue::Str((*c).to_string()))
-            .collect(),
-    );
-    append_activity(
-        vault,
-        &cur.key,
-        event(stamp, actor, "edited", vec![("fields".to_string(), fields)]),
-    )?;
+    append_activity(vault, &cur.key, &changed.event)?;
     Ok(Some(Task {
         token: Some(compute_token(&bytes)),
-        ..next
+        ..changed.next
     }))
-}
-
-/// 완료 기준을 다듬는다. 새로 확인된 항목에는 확인한 시각과 쪽을 적고, 확인이 풀린 항목은 그 기록을 지운다. 이미 확인된 항목은 기록을 그대로 둔다.
-fn normalize_criteria(
-    old: &[Criterion],
-    given: &[Criterion],
-    stamp: &Stamp,
-    actor: &str,
-) -> Vec<Criterion> {
-    given
-        .iter()
-        .map(|c| {
-            if !c.done {
-                return Criterion {
-                    text: c.text.clone(),
-                    done: false,
-                    checked_at: None,
-                    checked_by: None,
-                };
-            }
-            if let Some(before) = old.iter().find(|o| o.done && o.text == c.text) {
-                return before.clone();
-            }
-            Criterion {
-                text: c.text.clone(),
-                done: true,
-                checked_at: Some(c.checked_at.clone().unwrap_or_else(|| stamp.at.clone())),
-                checked_by: Some(c.checked_by.clone().unwrap_or_else(|| actor.to_string())),
-            }
-        })
-        .collect()
 }
 
 // ---------------------------------------------------------------- 상태
 
-/// 상태를 바꾼다. 규칙과 조건은 `transitions`가 검사한다. `expected_from`을 주면 지금 상태가 그것과 같을 때만 바꾼다(그 사이에
-/// 러너나 다른 창이 먼저 바꿨으면 `AIS-409`).
+/// 상태를 바꾼다(규칙은 `Task::transition_to`). 막고 있는 태스크는 기대한 상태를 검사한 뒤에 vault를 다시 훑어 구한다.
 pub fn transition(
     vault: &Path,
     cur: &Task,
@@ -519,58 +249,25 @@ pub fn transition(
     expected_from: Option<&str>,
     stamp: &Stamp,
 ) -> Result<Task, EngineError> {
-    if let Some(expected) = expected_from {
-        let Some(exp) = TaskStatus::parse(expected) else {
-            return Err(EngineError::invalid_argument(format!(
-                "from 은 상태 이름이어야 한다: {expected}"
-            )));
-        };
-        if exp != cur.status {
-            return Err(EngineError::conflict(format!(
-                "상태가 이미 바뀌었다: 지금 {}, 기대한 것 {}",
-                cur.status.label(),
-                exp.label()
-            )));
-        }
-    }
-    let scan = scan(vault);
-    transitions::require(cur, to, actor, &unfinished_blockers(&scan, &cur.key))?;
-    let next = Task {
-        status: to,
-        edited_at: Some(stamp.at.clone()),
-        edited_session: stamp.session.clone(),
-        edited_agent: stamp.agent.clone(),
-        token: None,
-        ..cur.clone()
-    };
-    let bytes = format::render(&next)?;
-    write_atomic(&vault.join(&cur.rel_path), &bytes)?;
-    append_activity(
-        vault,
-        &cur.key,
-        event(
-            stamp,
-            actor,
-            "status",
-            vec![
-                (
-                    "from".to_string(),
-                    JsonValue::Str(cur.status.label().to_string()),
-                ),
-                ("to".to_string(), JsonValue::Str(to.label().to_string())),
-            ],
-        ),
+    let changed = cur.transition_to(
+        to,
+        actor,
+        expected_from,
+        || unfinished_blockers(&scan(vault), &cur.key),
+        stamp,
     )?;
+    let bytes = format::render(&changed.next)?;
+    write_atomic(&vault.join(&cur.rel_path), &bytes)?;
+    append_activity(vault, &cur.key, &changed.event)?;
     Ok(Task {
         token: Some(compute_token(&bytes)),
-        ..next
+        ..changed.next
     })
 }
 
 // ---------------------------------------------------------------- 연결
 
-/// 연결을 걸거나 푼다. 연결은 건 쪽(`from`) 파일에만 적는다. 푼다(`remove`)면 두 방향 가운데 있는 쪽을 지운다.
-/// 자기 자신에게 걸 수 없고, 막고 있음(`blocks`)은 서로를 막는 순환을 만들 수 없다. 이미 있는 연결을 다시 걸면 바뀐 게 없다.
+/// 연결을 걸거나 푼다(규칙은 `Task::link`). 파일은 연결을 적는 쪽에 쓰고, 사건은 두 태스크의 활동에 붙인다.
 /// 파일을 고쳤으면 고친 태스크를, 바뀐 게 없으면 `None`을 돌려준다.
 pub fn link(
     vault: &Path,
@@ -581,132 +278,21 @@ pub fn link(
     stamp: &Stamp,
     actor: &str,
 ) -> Result<Option<Task>, EngineError> {
-    let Some(kind) = TaskLinkKind::parse(kind) else {
-        return Err(EngineError::invalid_argument(format!(
-            "type 은 [{}] 가운데 하나여야 한다: {kind}",
-            TaskLinkKind::NAMES_TEXT
-        )));
+    let Some(change) = Task::link(from, to, kind, remove, stamp, actor)? else {
+        return Ok(None);
     };
-    if from.key == to.key {
-        return Err(EngineError::invalid_argument(format!(
-            "자기 자신에게는 연결할 수 없다: {}",
-            from.key
-        )));
-    }
-    let forward = Link {
-        kind,
-        to: to.key.clone(),
-    };
-    let backward = Link {
-        kind,
-        to: from.key.clone(),
-    };
-    let (owner, links, event_kind): (&Task, Vec<Link>, &str);
-    if remove {
-        let (chosen, target) = if from.links.contains(&forward) {
-            (from, &forward)
-        } else if to.links.contains(&backward) {
-            (to, &backward)
-        } else {
-            return Ok(None);
-        };
-        let mut list = chosen.links.clone();
-        if let Some(at) = list.iter().position(|l| l == target) {
-            list.remove(at);
-        }
-        owner = chosen;
-        links = list;
-        event_kind = "unlinked";
-    } else {
-        if from.links.contains(&forward) {
-            return Ok(None);
-        }
-        if kind == TaskLinkKind::Relates && to.links.contains(&backward) {
-            return Ok(None);
-        }
-        if kind == TaskLinkKind::Blocks
-            && to.links.contains(&Link {
-                kind: TaskLinkKind::Blocks,
-                to: from.key.clone(),
-            })
-        {
-            return Err(EngineError::invalid_argument(format!(
-                "{} 가 이미 {} 를 막고 있어 서로 막게 할 수 없다",
-                to.key, from.key
-            )));
-        }
-        if from.links.len() >= MAX_LINKS {
-            return Err(EngineError::invalid_argument(format!(
-                "연결은 태스크마다 {MAX_LINKS}개까지다"
-            )));
-        }
-        let mut list = from.links.clone();
-        list.push(forward);
-        owner = from;
-        links = list;
-        event_kind = "linked";
-    }
-    let next = Task {
-        links,
-        edited_at: Some(stamp.at.clone()),
-        edited_session: stamp.session.clone(),
-        edited_agent: stamp.agent.clone(),
-        token: None,
-        ..owner.clone()
-    };
-    let bytes = format::render(&next)?;
-    write_atomic(&vault.join(&owner.rel_path), &bytes)?;
-    for side in [from, to] {
-        let other = if side.key == from.key {
-            &to.key
-        } else {
-            &from.key
-        };
-        let direction = if side.key == owner.key { "out" } else { "in" };
-        append_activity(
-            vault,
-            &side.key,
-            event(
-                stamp,
-                actor,
-                event_kind,
-                vec![
-                    (
-                        "type".to_string(),
-                        JsonValue::Str(kind.as_str().to_string()),
-                    ),
-                    ("with".to_string(), JsonValue::Str(other.clone())),
-                    (
-                        "direction".to_string(),
-                        JsonValue::Str(direction.to_string()),
-                    ),
-                ],
-            ),
-        )?;
+    let bytes = format::render(&change.next)?;
+    write_atomic(&vault.join(&change.next.rel_path), &bytes)?;
+    for (key, event) in &change.events {
+        append_activity(vault, key, event)?;
     }
     Ok(Some(Task {
         token: Some(compute_token(&bytes)),
-        ..next
+        ..change.next
     }))
 }
 
 // ---------------------------------------------------------------- 활동
-
-fn event(stamp: &Stamp, actor: &str, kind: &str, extra: Vec<(String, JsonValue)>) -> JsonValue {
-    let mut entries = vec![
-        ("at".to_string(), JsonValue::Str(stamp.at.clone())),
-        ("kind".to_string(), JsonValue::Str(kind.to_string())),
-        ("by".to_string(), JsonValue::Str(actor.to_string())),
-    ];
-    if let Some(session) = &stamp.session {
-        entries.push(("session".to_string(), JsonValue::Str(session.clone())));
-    }
-    if let Some(agent) = &stamp.agent {
-        entries.push(("agent".to_string(), JsonValue::Str(agent.clone())));
-    }
-    entries.extend(extra);
-    JsonValue::Object(entries)
-}
 
 /// 댓글을 활동에 남기고 그 사건을 돌려준다.
 pub fn comment(
@@ -716,14 +302,9 @@ pub fn comment(
     stamp: &Stamp,
     actor: &str,
 ) -> Result<Json, EngineError> {
-    let ev = event(
-        stamp,
-        actor,
-        "comment",
-        vec![("body".to_string(), JsonValue::Str(body.to_string()))],
-    );
-    append_activity(vault, &task.key, ev.clone())?;
-    Ok(activity_json(&ev))
+    let event = task.comment(body, stamp, actor);
+    append_activity(vault, &task.key, &event)?;
+    Ok(activity_json(&event.to_json_value()))
 }
 
 /// Java `Files.readAllLines`처럼 `\n`, `\r`, `\r\n`으로 줄을 가른다.
@@ -766,7 +347,7 @@ fn read_activity_text(vault: &Path, path: &Path) -> Result<String, EngineError> 
         })
 }
 
-fn append_activity(vault: &Path, key: &str, ev: JsonValue) -> Result<(), EngineError> {
+fn append_activity(vault: &Path, key: &str, event: &TaskEvent) -> Result<(), EngineError> {
     let path = activity_path(vault, key);
     let mut lines: Vec<String> = Vec::new();
     if is_file(&path) {
@@ -777,7 +358,7 @@ fn append_activity(vault: &Path, key: &str, ev: JsonValue) -> Result<(), EngineE
             }
         }
     }
-    lines.push(json::compact(&ev));
+    lines.push(json::compact(&event.to_json_value()));
     while lines.len() > ACTIVITY_KEEP {
         lines.remove(0);
     }
