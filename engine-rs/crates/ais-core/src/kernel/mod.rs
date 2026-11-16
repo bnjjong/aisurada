@@ -8,6 +8,7 @@
 //! - `hue`: 아젠다 색 열두 가지
 //! - `ids`: id 모양(접두어별 정규식)
 //! - `java`: Java가 글·수를 다루던 규칙(`trim`, `isBlank`, `String.valueOf`, `Double.toString`)과 JSON 값 바꾸기
+//! - `stamp`: 고친 기록(누가 언제)
 //! - `link_kind`, `task_link`: 노트 연결 종류, 태스크 연결 종류
 //! - `token`: 내용 확인 값(`f1`, `precondition`, `token`)
 //! - `tier`: 노트의 층(읽기·기록)과 가시성 정책
@@ -21,6 +22,7 @@ pub mod hue;
 pub mod ids;
 pub mod java;
 pub mod link_kind;
+pub mod stamp;
 pub mod task_link;
 pub mod tier;
 pub mod time;

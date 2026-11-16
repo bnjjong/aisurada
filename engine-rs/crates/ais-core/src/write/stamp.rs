@@ -4,13 +4,7 @@ use super::apparatus::now_millis;
 use super::local_time::iso_offset_date_time;
 use super::pipeline::WriteContext;
 
-/// 누가 언제 고쳤는지의 기록. 사람이 고쳤으면 `session`은 `None`이다.
-#[derive(Clone, Debug)]
-pub struct Stamp {
-    pub at: String,
-    pub session: Option<String>,
-    pub agent: Option<String>,
-}
+pub use crate::kernel::stamp::Stamp;
 
 /// 지금의 고친 기록. AI 세션이 고쳤으면 세션 id와(claude가 아니면) CLI 이름이 남고, 사람이 고쳤으면 시각만 남는다.
 pub fn stamp_of(context: &WriteContext) -> Stamp {
