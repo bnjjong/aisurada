@@ -21,6 +21,9 @@ bash "$ENGINE/tools/compat/make-fixture.sh" "$VAULT" > /dev/null
 bash "$ENGINE/tools/compat/add-search-notes.sh" "$VAULT" > /dev/null
 bash "$ENGINE/tools/compat/add-git-history.sh" "$VAULT" > /dev/null
 
+# 시간대를 고정한다. 노트에 적히는 시각이 시간대에 따라 달라서 파일 해시(f1)까지 달라지는데, 테이프는 서울(KST) 기기에서 녹화했다.
+# 고정하지 않으면 UTC인 CI 러너에서 cli 재생이 「하네스 순서가 테이프와 다르다」로 실패한다(2026-11-16 확인). 녹화도 같은 값으로 해야 한다.
+export TZ=Asia/Seoul
 # 쓰기 잠금 파일이 실제 홈에 쌓이지 않게 시험 동안 폴더를 따로 쓴다
 export AISURADA_LOCK_DIR="$WORK/locks"
 cd "$ENGINE"

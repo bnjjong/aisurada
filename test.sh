@@ -6,4 +6,5 @@ export AISURADA_LOCK_DIR="$(mktemp -d)"
 trap 'rm -rf "$AISURADA_LOCK_DIR"' EXIT
 # 엔진(ais-core)과 명령줄(ais-cli) 시험 전체. Java와 맞대는 시험은 기준(oracle)이 필요해서 따로 돈다(docs/developer-guide.md).
 # 단, 어긋남 0이던 때의 기준 응답을 녹화해 둔 골든 재생(engine-rs/tools/golden)은 Java 없이 이 안에서 돈다(약 1분).
-cargo test --manifest-path engine-rs/Cargo.toml --workspace --locked
+# 시험 하나가 실패해도 멈추지 않고 나머지를 끝까지 돌려, 실패를 한 번에 본다(CI에서 한 번 돌려 전부 알아내려는 것).
+cargo test --manifest-path engine-rs/Cargo.toml --workspace --locked --no-fail-fast
