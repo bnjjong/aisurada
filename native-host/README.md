@@ -83,4 +83,4 @@ pnpm --dir native-host release:build
 
 이 시험판의 macOS 최소 설정은 13.0이며, Git·Claude CLI는 포함하지 않습니다(Java도 필요 없습니다). Apple 공증은 하지 않습니다. 공개 빌드는 개인 `secret-names.txt`를 포함하지 않는 견본 분류표를 사용합니다. [설치 안내와 제한 사항](../docs/releases/0.0.1.md)을 참고하세요.
 
-GitHub Actions의 **Build trial release → Run workflow**에서 기존 버전 태그를 지정하면, 기존 검사와 동일한 배포 빌드를 실행하고 GitHub Pre-release 초안을 만듭니다. 설치 확인 후 공개합니다. 이미 공개된 릴리스는 덮어쓰지 않습니다. 새 버전에서는 앱 버전 3곳과 Cargo.lock, 릴리스 본문 `docs/releases/<버전>.md`를 함께 갱신합니다.
+GitHub Actions의 **Build trial release → Run workflow**에서 기존 버전 태그를 지정하면, 기존 검사와 동일한 배포 빌드를 실행하고 GitHub Pre-release 초안을 만듭니다. 설치 확인 후 공개합니다. 이미 공개된 릴리스는 덮어쓰지 않습니다. `dry_run`을 켜면 태그 없이 지금 브랜치 머리를 빌드하고 검증만 하며 릴리스를 만들지 않습니다(태그 입력은 앱 버전과 같은 `v<버전>`). 새 버전에서는 앱 버전 3곳과 Cargo.lock, 릴리스 본문 `docs/releases/<버전>.md`를 함께 갱신합니다.

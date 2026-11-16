@@ -132,7 +132,7 @@ Rust `ais-cli`를 기준 Java 단발 엔진과 명령줄 단위로 맞대려면 
 
 MCP 도구 표(`mcp_tools.rs`)도 마찬가지로 직접 고치고, `engine-rs/tools/compat/gen-mcp-tools.sh`가 기준 표를 같은 자리에 뽑는다(현재 표와 같음을 확인했다).
 
-**골든 시험: 기준 엔진 없이 맞대기.** 위 맞대기 셋(`compat_check`, `cli_compat`, `mcp_compat`)은 태그에서 기준 엔진을 지어야(JDK 21) 돈다. 어긋남 0을 확인한 순간의 기준(Java) 응답과 폴더 파일별 해시를 테이프(`engine-rs/golden/*.ndjson`)에 녹화해 두면, 같은 하네스를 Java 없이 다시 돌려 지금 Rust 엔진이 그때와 같은 답과 같은 폴더 바이트를 내는지 볼 수 있다. 리팩토링([계획](refactor-ddd-hexagonal-plan.md))이 동작을 바꾸지 않았다는 증거로 쓴다. 하네스는 시계와 난수를 고정해 결정적이라서 호출 순서가 곧 테이프의 열쇠이고, 재생 때 호출 인자가 같은지도 확인한다. 임시 폴더 경로는 자리표시자로 적고 재생 때 지금 경로로 되돌린다(`ais-core/examples/support/tape.rs`).
+**골든 시험: 기준 엔진 없이 맞대기.** 위 맞대기 셋(`compat_check`, `cli_compat`, `mcp_compat`)은 태그에서 기준 엔진을 지어야(JDK 21) 돈다. 어긋남 0을 확인한 순간의 기준(Java) 응답과 폴더 파일별 해시를 테이프(`engine-rs/golden/*.ndjson`)에 녹화해 두면, 같은 하네스를 Java 없이 다시 돌려 지금 Rust 엔진이 그때와 같은 답과 같은 폴더 바이트를 내는지 볼 수 있다. 리팩토링([계획](refactor-ddd-hexagonal-plan.md))이 동작을 바꾸지 않았다는 증거로 쓴다. 하네스는 시계와 난수를 고정해 결정적이라서 호출 순서가 곧 테이프의 열쇠이고, `run.sh`는 시간대도 `TZ=Asia/Seoul`로 고정한다(노트에 적히는 시각이 시간대마다 달라 파일 해시가 어긋나는데 테이프를 서울 기기에서 녹화했다. UTC인 GitHub 러너에서 재생이 실패해 고쳤다). 재생 때 호출 인자가 같은지도 확인한다. 임시 폴더 경로는 자리표시자로 적고 재생 때 지금 경로로 되돌린다(`ais-core/examples/support/tape.rs`).
 
 ```bash
 engine-rs/tools/golden/run.sh replay   # Java 없이 셋을 녹화본과 견준다(`cargo test -p ais-cli --test golden`이 같은 일을 한다)
@@ -577,6 +577,8 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 `--debug`를 빼면 최적화 빌드다. `beforeBuildCommand`는 화면만 새로 짓는다(`pnpm build`). Rust `ais-cli`는 개발용 번들에 지어 넣지 않는다(아래). **설치나 launchd 등록은 하지 않는다.** 단 번들은 `.md`/`.markdown`의 기본 편집기로 등록되므로(`fileAssociations`) `open 문서.md`가 이 앱을 진짜 HOME으로 띄운다.
 
+**릴리스 워크플로**(`.github/workflows/release.yml`, Actions의 Build trial release)는 기존 버전 태그를 지정하면 시험(`test.sh`, `test-native.sh`), 번들 빌드와 검증(`pnpm release:build`), GitHub Pre-release 초안 만들기까지 한다. `dry_run`을 켜면 태그 없이 지금 브랜치 머리를 빌드하고 검증만 하며 GitHub 릴리스를 건드리지 않는다(태그 입력은 앱 버전과 같은 `v<버전>`이어야 한다). 2026-11-16에 `main`(`db3ab56`)에서 `dry_run`으로 돌려 16분에 성공했다([실행 기록](https://github.com/bnjjong/aisurada/actions/runs/43784437777)). 시험 단계(엔진, 화면, 호스트)가 통과했고, 번들 검증 10항목(Java 런타임과 JAR 없음, ARM64 서명 검증, 번들 `ais-cli`가 한글·공백 경로에서 노트를 만들고 따로 뜬 프로세스가 읽음, Claude MCP 등록이 번들 `ais-cli`를 가리킴, 표준 입출력 MCP, DMG를 꺼낸 뒤에도 통함, 복사한 앱이 격리 HOME에서 계속 떠 있음 따위)이 통과했다. DMG는 14,846,301바이트, 앱은 32,200KiB, 번들 `ais-cli`는 4,603KiB였다. **마지막 단계인 Pre-release 초안 만들기는 `dry_run`이 건너뛰어서 클라우드에서 확인하지 못했다.** 실제 태그로 처음 돌릴 때 확인한다.
+
 ### 앱에 든 `ais-cli`
 
 번들의 `Contents/Resources/bin/ais-cli`는 두 가지다.
@@ -720,14 +722,16 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
 | 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(202건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4) |
-| 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「기존 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
+| 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
 | 실제 창 점검 | `pnpm test:*:acceptance` | 종류당 수 분 | 실제 WKWebView, 앱 안의 Rust 엔진, 격리 HOME. 먼저 `(cd engine-rs && cargo build -p ais-cli)`로 점검이 쓸 실행 파일을 지어 둔다 |
 
 `test.sh`는 `dist/`를 건드리지 않는다. `build.sh`는 `dist/ais-cli`를 만들고, 실제 창 점검은 `dist/`가 아니라 `engine-rs/target/debug/ais-cli`(또는 `AISURADA_CLI_BIN`)를 쓴다.
 
-**기존 실패.** 호스트 `cargo test`에서 `ask::tests` 4개(`test_gemini_missing_binary_message`, `test_gemini_success_with_fake_binary`, `test_resolve_claude_with_env_var`, `test_resolve_gemini_with_env_var`)는 Java를 지우기 전 `main`에서도 실패한다. 병렬로 돌리면 `runner::tests` 둘과 `terminal::` 셋이 더 실패하는 일이 있고, `-- --test-threads=1`로 돌리면 통과한다. 5d에서 직렬로 돌린 결과는 154건 통과, 4건 실패(위 `ask::tests`), 5건 무시다. 바꾼 쪽의 회귀와 구분하려면 변경 전 `main`과 같은 명령으로 비교한다.
+**CI.** `main`에 푸시하거나 PR을 올리면 `.github/workflows/ci.yml`이 macOS(Apple Silicon) 러너에서 `cargo fmt --check`와 `bash test.sh`를 돈다(`engine-rs/**`, `test.sh`, 이 파일이 바뀐 때만). 공개 저장소라 표준 러너는 무료다. 2026-11-16에 처음 돌려 세 번 만에 통과했고 마지막 실행은 약 4분이었다. 그 과정에서 두 가지를 잡았다. 시간대가 UTC라서 골든 재생이 실패했고(`tools/golden/run.sh`가 이제 `TZ=Asia/Seoul`을 고정한다), `mcp_stdio`의 한 시험이 커밋을 보자마자 서버 입력을 닫아 대기 기록 파일이 안 지워진 채 끝나는 경주가 느린 러너에서 드러났다(시험 순서를 고쳤다). `test.sh`는 `--no-fail-fast`라 실패가 있어도 끝까지 돌아 실패를 한 번에 보인다. 화면·호스트 시험은 CI에 두지 않고 릴리스 워크플로(§7 「번들 만들기」)가 돈다.
+
+**호스트 시험의 옛 실패(고침).** 2026-11-16 전에는 호스트 `cargo test`에서 `ask::tests` 4개가 실패하고 병렬로 돌리면 `runner::tests`와 `terminal::` 시험까지 깨졌다. 원인은 시험 하나(`test_gemini_missing_binary_message`)였다. 이 시험은 HOME과 PATH를 바꿔 CLI를 못 찾는 상황을 만들었지만 `resolve_gemini`는 `/opt/homebrew/bin`과 `/usr/local/bin`도 보므로, `agy`가 깔린 기기에서는 실제 `agy`를 찾아 실패했다. 실패한 시험이 쥔 `ENV_LOCK`이 오염되어 같은 잠금을 쓰는 3개가 연쇄로 실패했고, HOME과 PATH를 프로세스 전체에서 바꾸는 동안 자식 프로세스를 띄우는 러너·터미널 시험이 깨졌다. 지금은 그 시험이 스레드 로컬 스위치(`GEMINI_ENV_ONLY`)로 자기 스레드의 탐색만 끄고, 잠금은 오염돼도 이어 쓴다(`env_lock`). `agy`가 깔린 기기에서 직렬 158건과 병렬 3회가 모두 통과했고(5건 무시), 스위치를 끄면 그 시험이 다시 실패한다. GitHub 러너에서도 통과했다(§7 「번들 만들기」의 드라이런).
 
 ### 엔진 시험 쓰기
 
@@ -856,7 +860,7 @@ node fixtures/runner-test.mjs
 
 ## 13. 지금 상태와 한계
 
-- 엔진 시험(`bash test.sh` 178건), 화면 Node 시험 641건, 기준 맞대기(어긋남 0), 34장 받아들임(기준 jar로 27건 모두 맞음), 실제 창 점검 10종 248건은 통과한다(2026-11-15, 5d). 호스트 `cargo test`는 기존 실패 4건(`ask::tests`)을 뺀 나머지가 직렬로 통과한다(§8). 수치와 근거는 [5d 기록](rust-engine-step5d-java-removal.md)에 있다.
+- 엔진 시험(`bash test.sh` 178건), 화면 Node 시험 641건, 기준 맞대기(어긋남 0), 34장 받아들임(기준 jar로 27건 모두 맞음), 실제 창 점검 10종 248건은 통과한다(2026-11-15, 5d). 호스트 `cargo test`의 옛 실패 4건(`ask::tests`)은 2026-11-16에 고쳤다(§8). 수치와 근거는 [5d 기록](rust-engine-step5d-java-removal.md)에 있다.
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
 - MCP 서버(`ais-cli mcp`)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(`✔ Connected`), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).
 - 설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).
