@@ -23,7 +23,7 @@ pub fn default_ports() -> Ports {
         ids: Arc::new(queue_ids::QueueIds),
         env: Arc::new(process_env::ProcessEnv),
         lock: Arc::new(flock_lock::FlockLock::default()),
-        vcs: Arc::new(git_cli::GitCli),
+        vcs: Arc::new(git_cli::GitCli::default()),
         sqlite: Arc::new(sqlite_cli::SqliteCli),
         store: Arc::new(local_store::LocalStore),
     }
