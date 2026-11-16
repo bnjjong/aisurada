@@ -4,20 +4,13 @@
 //! 인자를 풀고(`parse`), 엔진 호출로 바꾸고(`map`), Rust 엔진(`ais-core`)을 부르고, 응답을 Java와 같은 모양으로
 //! 되돌려(`legacy`) 찍는다(`output`). 종료 코드도 같다: 0 성공, 2 이름이나 vault를 못 정함, 3 AIS 오류, 5 확인 값 어긋남, 1 안쪽 실패.
 
-pub mod agent_cli;
-pub mod doctor;
-pub mod env;
 pub mod error;
-pub mod install;
 pub mod legacy;
 pub mod map;
 pub mod mcp;
 mod mcp_tools;
-pub mod migrate;
-pub mod old_sidecar;
 pub mod output;
 pub mod parse;
-pub mod register;
 pub mod registry;
 mod spec_table;
 pub mod tool;
@@ -27,34 +20,12 @@ use ais_core::engine::Engine;
 use crate::env::{Env, MISSING_VAULT_MESSAGE};
 use crate::error::CliError;
 
-/// 한 번의 호출 결과: 표준 출력·표준 오류에 쓸 글과 종료 코드
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Outcome {
-    pub stdout: String,
-    pub stderr: String,
-    pub code: i32,
-}
+/// 운영 도구(`ais-ops`)의 모듈과 호출 결과를 같은 이름으로 다시 내놓아 `ais_cli::register` 같은 경로가 그대로 통한다.
+pub use ais_ops::{Outcome, agent_cli, doctor, env, install, migrate, old_sidecar, register};
 
-impl Outcome {
-    fn out(stdout: String) -> Outcome {
-        Outcome {
-            stdout,
-            stderr: String::new(),
-            code: 0,
-        }
-    }
-
-    fn err(stderr: String, code: i32) -> Outcome {
-        Outcome {
-            stdout: String::new(),
-            stderr,
-            code,
-        }
-    }
-
-    fn from_error(error: &CliError) -> Outcome {
-        Outcome::err(format!("{}\n", error.line()), error.exit_code())
-    }
+/// 명령줄 오류를 표준 오류 글과 종료 코드로 바꾼다.
+fn outcome_from_error(error: &CliError) -> Outcome {
+    Outcome::err(format!("{}\n", error.line()), error.exit_code())
 }
 
 /// `ais-cli`를 부른다. `args`는 프로그램 이름을 뺀 명령줄이다.
@@ -140,7 +111,7 @@ fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome 
             stderr: legacy.diagnostics,
             code: 0,
         },
-        Err(error) => Outcome::from_error(&error),
+        Err(error) => outcome_from_error(&error),
     }
 }
 

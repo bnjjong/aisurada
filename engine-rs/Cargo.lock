@@ -16,6 +16,7 @@ name = "ais-cli"
 version = "0.0.1"
 dependencies = [
  "ais-core",
+ "ais-ops",
  "libc",
  "serde",
  "serde_json",
@@ -67,6 +68,14 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "ais-ops"
+version = "0.0.1"
+dependencies = [
+ "ais-core",
+ "libc",
 ]
 
 [[package]]

@@ -1,0 +1,11 @@
+[package]
+name = "ais-ops"
+description = "aisurada 운영 도구: 에이전트 등록(Claude·Codex·Gemini MCP), 진단, 첫 실행 이주, 옛 사이드카 걷어 내기, 명령줄 환경 읽기"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ais-core = { path = "../ais-core" }
+libc = "0.2"

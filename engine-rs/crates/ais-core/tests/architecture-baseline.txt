@@ -80,17 +80,12 @@ edge write -> note 12
 edge write -> ports 13
 edge write -> text 7
 edge write -> vault 17
-env cli/env.rs 2
 env infra/adapters/flock_lock.rs 2
 env infra/adapters/process_env.rs 1
 env infra/adapters/queue_ids.rs 1
 env infra/adapters/sqlite_cli.rs 2
 env infra/adapters/system_clock.rs 1
-fs cli/agent_cli.rs 1
-fs cli/doctor.rs 1
-fs cli/env.rs 1
-fs cli/migrate.rs 2
-fs cli/old_sidecar.rs 4
+env ops/env.rs 2
 fs core/vault/facts.rs 1
 fs core/vault/index.rs 1
 fs core/write/atomic.rs 1
@@ -99,13 +94,18 @@ fs infra/adapters/flock_lock.rs 1
 fs infra/adapters/local_store.rs 1
 fs infra/adapters/queue_ids.rs 1
 fs infra/adapters/sqlite_cli.rs 1
-process cli/agent_cli.rs 1
-process cli/old_sidecar.rs 1
+fs ops/agent_cli.rs 1
+fs ops/doctor.rs 1
+fs ops/env.rs 1
+fs ops/migrate.rs 2
+fs ops/old_sidecar.rs 4
 process core/write/autocommit.rs 1
 process infra/adapters/git_cli.rs 1
 process infra/adapters/sqlite_cli.rs 1
-systemtime cli/doctor.rs 1
+process ops/agent_cli.rs 1
+process ops/old_sidecar.rs 1
 systemtime core/write/autocommit.rs 1
 systemtime infra/adapters/queue_ids.rs 1
 systemtime infra/adapters/system_clock.rs 1
+systemtime ops/doctor.rs 1
 tz infra/adapters/system_clock.rs 3

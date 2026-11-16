@@ -185,9 +185,10 @@ fn measure() -> BTreeMap<String, usize> {
         }
     }
 
-    // 바깥 직접 호출: 엔진 크레이트들과 ais-cli의 src를 파일별로
+    // 바깥 직접 호출: 엔진 크레이트들과 ais-cli, ais-ops의 src를 파일별로
     let mut outside = source_crates();
     outside.push(("cli", manifest().join("../ais-cli/src")));
+    outside.push(("ops", manifest().join("../ais-ops/src")));
     for (krate, src) in outside {
         let mut files = Vec::new();
         rust_files(&src, &mut files);
