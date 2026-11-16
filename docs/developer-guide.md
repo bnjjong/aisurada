@@ -141,7 +141,7 @@ engine-rs/tools/golden/run.sh replay   # Java 없이 셋을 녹화본과 견준�
 engine-rs/tools/golden/run.sh record   # 기준 Java(JDK 21)와 어긋남 0일 때만 테이프를 새로 쓴다. 동작을 알고 바꿨을 때만 하고, 이유를 커밋 본문에 적는다
 ```
 
-`record`는 어긋남이 하나라도 있으면 테이프를 쓰지 않는다(어긋난 응답을 정답으로 굳히지 않는다). 승인 대기 변경 파일(`.aisurada/pending/*.json`)은 맞대기가 키 차례를 같게 보므로 테이프도 읽은 값을 정렬해 센다. 이 파일의 바이트 자체는 `serialization_golden.rs`가 못박는다. 시험이 의존 방향을 지키는지(`architecture.rs`)와 명령 정보를 적은 표들이 어긋나지 않는지(`command_tables.rs`)도 Java 없이 돈다. 둘 다 지금 모양을 기준으로 박제해 새 위반이 생기거나 줄어도 실패하며, 기준을 새로 쓰는 법은 각 파일 머리말에 있다.
+`record`는 어긋남이 하나라도 있으면 테이프를 쓰지 않는다(어긋난 응답을 정답으로 굳히지 않는다). **의도해서 Java와 달라진 것은 테이프를 손으로 고쳤다.** 그 항목은 `record`가 어긋남으로 보니, 기준을 다시 녹화할 일이 생기면 아래 목록을 먼저 본다. ① `cli.ndjson`의 도구 표면 `list_comments`·`list_attachments`가 기록 층 노트 셋(`ndfx0008-00000008`, `ndfx0009-00000009`, `ndsr0004-000000a4`)에 부모로 불리는 6건: Java는 빈 목록(종료 코드 0)을 답했고 지금은 AIS-409(종료 코드 3)다([#80](https://github.com/bnjjong/aisurada/issues/80), 2026-11-16). 승인 대기 변경 파일(`.aisurada/pending/*.json`)은 맞대기가 키 차례를 같게 보므로 테이프도 읽은 값을 정렬해 센다. 이 파일의 바이트 자체는 `serialization_golden.rs`가 못박는다. 시험이 의존 방향을 지키는지(`architecture.rs`)와 명령 정보를 적은 표들이 어긋나지 않는지(`command_tables.rs`)도 Java 없이 돈다. 둘 다 지금 모양을 기준으로 박제해 새 위반이 생기거나 줄어도 실패하며, 기준을 새로 쓰는 법은 각 파일 머리말에 있다.
 
 노트 머리 읽기·쓰기를 Java와 맞대려면 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
 
@@ -463,7 +463,7 @@ AISURADA_VAULT=<vault> dist/ais-cli get-doc nddemo-00000001              # 명�
 
 도구 표면의 호출자는 AI(`caller: "ai"`)로 찍혀서 앱과 다르게 다뤄지는 곳이 있다. 쓰기에서는 아래가 그렇다.
 
-- **기록 층 노트는 못 고친다.** 기록 층(`tier: record`)은 사람이 앱에서만 보는 노트다. AI는 목록·검색·열기에서 못 볼 뿐 아니라(열기는 AIS-409) 고치지도 못한다. `set_favorite`, `evaluate_doc`, `link_docs`(출발 노트), `update_doc`, `delete_doc`, 후속 노트 만들기·고치기·지우기와 `write_attachment`, 코멘트 쓰기는 노트를 찾자마자 `AIS-409 도구 표면이 고칠 수 없는 노트다(층=record)`로 서고, 인자 검사나 확인 값(`f1`) 검사보다 앞선다. 후속 노트의 층은 메인 노트를 따른다. `link_docs`의 **대상** 노트가 기록 층이어도 막지 않는다(대상 파일을 고치지 않는다). 앱 호출자에는 이 제한이 없다. 정책은 `kernel/tier.rs`의 `Tier::visible_to` 한 곳이고 읽기(`check_readable`)와 쓰기(`check_writable`)가 같이 쓴다. 시험은 `fixture_vault.rs`의 `ai_cannot_write_to_record_tier_notes`다.
+- **기록 층 노트는 못 고친다.** 기록 층(`tier: record`)은 사람이 앱에서만 보는 노트다. AI는 목록·검색·열기에서 못 볼 뿐 아니라(열기는 AIS-409) 고치지도 못한다. 코멘트·첨부 목록(`list_comments`, `list_attachments`)도 같은 AIS-409로 서고, 휴지통 목록(`list_trash`)에서는 기록 층 노트의 항목이 안 보이며 `restore_doc`은 AIS-409다(휴지통 목록 파일에는 층이 없어서 보관된 노트 머리의 `tier`를 읽어 가린다. 파일 모양은 그대로다. 앱에는 모두 보인다). `set_favorite`, `evaluate_doc`, `link_docs`(출발 노트), `update_doc`, `delete_doc`, 후속 노트 만들기·고치기·지우기와 `write_attachment`, 코멘트 쓰기는 노트를 찾자마자 `AIS-409 도구 표면이 고칠 수 없는 노트다(층=record)`로 서고, 인자 검사나 확인 값(`f1`) 검사보다 앞선다. 후속 노트의 층은 메인 노트를 따른다. `link_docs`의 **대상** 노트가 기록 층이어도 막지 않는다(대상 파일을 고치지 않는다). 앱 호출자에는 이 제한이 없다. 정책은 `kernel/tier.rs`의 `Tier::visible_to` 한 곳이고 읽기(`check_readable`)와 쓰기(`check_writable`)가 같이 쓴다. 시험은 `fixture_vault.rs`의 `ai_cannot_write_to_record_tier_notes`(쓰기)와 `ai_cannot_read_or_restore_record_tier_leftovers`(코멘트·첨부 목록, 마크다운 내보내기, 휴지통)다.
 - **코멘트·후속 노트 삭제는 `f1`을 보지 않는다.** 설명서 7장·19장이 정한 「파생 쓰기」라서 일부러 그렇다. 지운 것은 코멘트나 후속 노트이고 그 부모 본문의 토큰은 부르는 쪽이 알 길이 없어서, 요구하면 이 명령이 못 돈다. 부모 본문에서 카드나 앵커를 걷었으면 응답의 `containerBefore`·`containerAfter`(후속 노트 삭제), `bodyBefore`·`bodyAfter`(코멘트 삭제)가 그 대신이다. 앞의 값이 자기가 든 토큰과 같을 때만 뒤의 값을 이어받으면 된다.
 - **`commit_vault`는 쓰기 잠금을 잡는다.** 다른 쪽이 여러 파일을 쓰는 중에 커밋하면 쓰다 만 상태가 커밋에 들어간다. 그래서 쓰기와 같은 vault 잠금을 잡고, 쓰는 중이면 그 쓰기가 끝나기를 기다린다. 유휴 타이머의 정비 커밋은 기다리지 않고 건너뛴 뒤 5초 뒤 다시 시도한다. 시험은 `commit_vault_waits_for_the_vault_write_lock`이다.
 
@@ -746,7 +746,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(216건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4) |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~105초(219건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
