@@ -800,6 +800,7 @@ node fixtures/runner-test.mjs
 | `rebuild-p4-plan.md`, `rebuild-p3-plan.md` | 부별 구현 순서 |
 | `review-*`, `plan-*`, `prompt-*` | 초기 장 작업의 리뷰·계획·지시 기록 |
 | `handoff-round2.md` | 2026-10-24에 올린 「다시 짜기 시험」 2차 검증 인계문. Java 엔진과 `withlog` 이름 시절의 절차라 지금과 다르다. 기록이라 고치지 않는다 |
+| `release-guide.html`, `assets/release/` | 0.0.1 시험판 때(2026-11-05~07)의 그림으로 보는 배포·설치 안내. Java를 앱에 넣던 판 기준이라 기록으로 남기고, 맨 위에 기준 시점 안내만 붙였다. 공개된 0.0.1~0.0.6의 설치 안내로는 지금도 맞다 |
 | `beta-hand-check.md`, `developer-guide.md` | 지금 쓰는 안내서. 가이드의 HTML 사본은 `pnpm --dir native-host docs:guide`로 다시 만든다 |
 
 작업 규칙(커밋과 푸시, 작업 뒤 정리, 문서 갱신, 이름 규칙)은 저장소 루트의 [`CommonRule.md`](../CommonRule.md) 한 곳에서 관리한다. `CLAUDE.md`는 그 파일을 가져다 쓴다.
