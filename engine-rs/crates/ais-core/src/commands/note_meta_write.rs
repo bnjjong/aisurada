@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use super::Caller;
 use super::subnote::check_writable;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::note::curate::{
     FavoriteChange, LinkOutcome, ScoreInput, apply_link, check_link_ends, check_not_self,
     decide_favorite, evaluation_of, parse_link_kind, parse_score,
@@ -17,7 +18,7 @@ use crate::text::{NOTE_ID, is_blank, trim};
 use crate::vault::scanner::NoteRecord;
 use crate::write::apparatus::now_millis;
 use crate::write::meta_writer::{MetaState, write_meta};
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 
 /// 참/거짓 인자. 호출 객체에서는 `true`, 명령줄에서는 `"true"` 글로 온다.
 #[derive(Debug, Clone, Deserialize)]
@@ -46,7 +47,7 @@ pub struct SetFavoriteRequest {
     /// 직전에 읽은 확인 값
     pub f1: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -58,7 +59,7 @@ pub struct EvaluateDocRequest {
     pub clear: Option<BoolArg>,
     pub f1: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -70,7 +71,7 @@ pub struct LinkDocsRequest {
     pub remove: Option<BoolArg>,
     pub f1: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 fn bool_arg(name: &str, value: &Option<BoolArg>) -> Result<Option<bool>, EngineError> {

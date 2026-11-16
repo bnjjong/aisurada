@@ -151,7 +151,7 @@ fn run_tool(
     session: Option<&env::SessionSource>,
 ) -> Result<legacy::Legacy, CliError> {
     let call = tool::parse_tool(name, rest, session)?;
-    let response = Engine::new(vault).call(&call.command, call.args.clone())?;
+    let response = Engine::new(vault).call_as(&call.context, &call.command, call.args.clone())?;
     Ok(legacy::to_legacy(&call, vault, response))
 }
 
@@ -165,6 +165,6 @@ fn run_command(
         .ok_or_else(|| CliError::new(409, format!("이 판에는 {name}이 없다")))?;
     let parsed = parse::parse_command(spec, rest)?;
     let call = map::to_call(&parsed, session)?;
-    let response = Engine::new(vault).call(&call.command, call.args.clone())?;
+    let response = Engine::new(vault).call_as(&call.context, &call.command, call.args.clone())?;
     Ok(legacy::to_legacy(&call, vault, response))
 }

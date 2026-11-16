@@ -7,6 +7,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::kernel::hue::is_hue;
 use crate::model::AgendaRow;
 use crate::text::{encode_uri_component, is_blank, trim};
@@ -16,7 +17,7 @@ use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
 use crate::write::apparatus::next_id;
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::slug;
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -29,7 +30,7 @@ pub struct CreateAgendaRequest {
     pub project_repo: Option<String>,
     pub summary: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -43,7 +44,7 @@ pub struct UpdateAgendaRequest {
     pub project_repo: Option<String>,
     pub summary: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -51,7 +52,7 @@ pub struct UpdateAgendaRequest {
 pub struct DeleteAgendaRequest {
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// 만들거나 고친 아젠다: 목록의 한 줄에 딥링크를 더한 것

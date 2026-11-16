@@ -7,13 +7,14 @@ use serde_json::{Map, Value as Json, json};
 
 use super::option_text::text_of;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::kernel::time::civil_from_days;
 use crate::kernel::time::days_from_civil;
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim};
 use crate::vault::facts;
 use crate::write::apparatus::now_millis;
 use crate::write::local_time::local_clock;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -23,7 +24,7 @@ pub struct FactsBriefRequest {
     #[serde(rename = "min-new-file", alias = "minNewFile")]
     pub min_new_file: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// `LocalDate.parse`: `YYYY-MM-DD`이고 달력에 있는 날짜. 날 수로 돌려준다.

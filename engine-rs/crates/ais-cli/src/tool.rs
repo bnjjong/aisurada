@@ -1,7 +1,7 @@
 //! 도구 표면(`get_doc '{"id":"…"}'`)의 인자 해석. Java `ArgsParser.parseTool`과 같은 검증 순서와 오류 글이다.
 //!
 //! 도구는 JSON 객체 한 덩이를 받는다. 알려진 키만 받고(모르는 키가 있으면 거절), 스키마의 키 차례대로 필수 여부와 형을 본다.
-//! 도구 표면의 호출자는 AI라서 엔진 호출에 `caller: "ai"`를 싣는다(기록 층 노트가 보이지 않고, 목록은 늘 전부다).
+//! 도구 표면의 호출자는 AI라서 엔진 호출의 호출 맥락을 AI로 정한다(기록 층 노트가 보이지 않고, 목록은 늘 전부다).
 
 use serde_json::{Map, Value, json};
 
@@ -10,8 +10,9 @@ use ais_core::text::{compare_utf16, is_blank, trim, utf16_len};
 
 use crate::env::SessionSource;
 use crate::error::CliError;
-use crate::map::{EngineCall, attach_session, plain_args};
+use crate::map::{EngineCall, context_for, plain_args};
 use crate::parse::ParsedCommand;
+use ais_core::kernel::actor::Caller;
 
 /// 본문 칸의 글자 수 상한(UTF-16 코드 단위)
 const BODY_LIMIT: usize = 200_000;
@@ -261,12 +262,12 @@ pub fn parse_tool(
         return Err(fail(tool, format!("인자는 JSON 객체여야 한다: {text}")));
     };
 
-    let (command, mut args) = build(tool, &props)?;
-    args.insert("caller".into(), json!("ai"));
-    attach_session(&mut args, session);
+    let (command, args) = build(tool, &props)?;
     Ok(EngineCall {
         command,
         args: Value::Object(args),
+        // 도구 표면의 호출자는 AI다
+        context: context_for(Caller::Ai, session),
     })
 }
 
@@ -712,6 +713,7 @@ fn resource_or_task_tool(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ais_core::kernel::actor::CallContext;
 
     fn call(tool: &str, json: &str) -> Result<EngineCall, CliError> {
         parse_tool(tool, &[json.to_string()], None)
@@ -721,7 +723,29 @@ mod tests {
     fn get_doc_takes_an_id_and_marks_the_caller() {
         let call = call("get_doc", r#"{"id":"n1"}"#).unwrap();
         assert_eq!(call.command, "get_doc");
-        assert_eq!(call.args, json!({"id": "n1", "caller": "ai"}));
+        assert_eq!(call.args, json!({"id": "n1"}));
+        assert_eq!(call.context, CallContext::ai(None, None));
+    }
+
+    /// 세션 표식은 인자가 아니라 호출 맥락에 실린다. `claude`는 에이전트 줄에 적지 않는다.
+    #[test]
+    fn the_session_goes_into_the_context_not_the_arguments() {
+        let source = SessionSource {
+            agent: "codex".to_string(),
+            id: "s-1".to_string(),
+        };
+        let call = parse_tool("get_doc", &[r#"{"id":"n1"}"#.to_string()], Some(&source)).unwrap();
+        assert_eq!(call.args, json!({"id": "n1"}));
+        assert_eq!(
+            call.context,
+            CallContext::ai(Some("s-1".into()), Some("codex".into()))
+        );
+        let source = SessionSource {
+            agent: "claude".to_string(),
+            id: "s-2".to_string(),
+        };
+        let call = parse_tool("get_doc", &[r#"{"id":"n1"}"#.to_string()], Some(&source)).unwrap();
+        assert_eq!(call.context, CallContext::ai(Some("s-2".into()), None));
     }
 
     #[test]
@@ -764,17 +788,14 @@ mod tests {
         .unwrap();
         assert_eq!(
             call.args,
-            json!({"agenda": "demo", "from": "2026-01-01", "tags": ["a", "b"], "favorite": true, "caller": "ai"})
+            json!({"agenda": "demo", "from": "2026-01-01", "tags": ["a", "b"], "favorite": true})
         );
     }
 
     #[test]
     fn parent_splits_into_id_and_sub_id() {
         let call = call("list_comments", r#"{"parent":"n1/s1"}"#).unwrap();
-        assert_eq!(
-            call.args,
-            json!({"id": "n1", "subId": "s1", "caller": "ai"})
-        );
+        assert_eq!(call.args, json!({"id": "n1", "subId": "s1"}));
         assert!(call_err("list_comments", r#"{"parent":"a/b/c"}"#).contains("노트id/하위노트id"));
     }
 
@@ -792,7 +813,7 @@ mod tests {
         assert_eq!(call.command, "set_resource_ref");
         assert_eq!(
             call.args,
-            json!({"project": "p", "id": "r1", "with-skills": "true", "caller": "ai"})
+            json!({"project": "p", "id": "r1", "with-skills": "true"})
         );
     }
 

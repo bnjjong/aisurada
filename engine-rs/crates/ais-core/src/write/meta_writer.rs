@@ -5,6 +5,7 @@
 
 use crate::error::EngineError;
 use crate::frontmatter::Value;
+use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 use crate::note::front::check_size;
 use crate::note::front::judge;
@@ -15,7 +16,6 @@ use crate::vault::note_meta::{Evaluation, Link, get};
 use crate::vault::scanner::NoteRecord;
 use crate::write::apparatus::now_millis;
 use crate::write::atomic::write_atomic;
-use crate::write::pipeline::WriteContext;
 use crate::write::precondition;
 
 /// 바꾼 뒤의 메타 값
@@ -38,7 +38,7 @@ pub fn write_meta(
     note: &NoteRecord,
     provided_token: Option<&str>,
     state: &MetaState,
-    context: &WriteContext,
+    context: &CallContext,
 ) -> Result<MetaWritten, EngineError> {
     let rel = note
         .content_file
@@ -110,7 +110,7 @@ pub fn write_meta(
 }
 
 /// 쓰기 맥락에서 편집자를 뽑는다(AI 도구면 세션과 에이전트가 도장에 남는다).
-pub fn editor_of(context: &WriteContext) -> Editor<'_> {
+pub fn editor_of(context: &CallContext) -> Editor<'_> {
     Editor {
         tool: context.caller == crate::kernel::actor::Caller::Ai,
         session: context.session.as_deref(),

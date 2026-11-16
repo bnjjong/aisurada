@@ -15,6 +15,7 @@ use super::option_text::text_of;
 use super::shard_notes::bool_option;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
+use crate::kernel::actor::CallContext;
 use crate::kernel::time::days_from_civil;
 use crate::text::{compare_utf16, is_blank, trim};
 use crate::vault::comments::{CommentsEnvelope, read_comments};
@@ -22,7 +23,7 @@ use crate::vault::note_file::read_note_file;
 use crate::vault::scanner::NoteRecord;
 use crate::write::apparatus::now_millis;
 use crate::write::local_time::local_clock;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -31,7 +32,7 @@ pub struct PlanDayRequest {
     pub agenda: Option<Json>,
     pub dry_run: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -39,7 +40,7 @@ pub struct PlanDayRequest {
 pub struct CheckNotesRequest {
     pub date: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// `date=<YYYY-MM-DD>` 옵션. 없으면 오늘이다. 날 수로 돌려준다.
@@ -169,7 +170,7 @@ pub fn plan_day(
             date: Some(date_text),
             time: Some("09:00".to_string()),
             // 계획 노트에는 세션 id를 심지 않는다(29장의 고정값). 호출자는 그대로 넘기고 세션만 뺀다.
-            context: WriteContext {
+            context: CallContext {
                 session: None,
                 session_agent: None,
                 ..request.context.clone()

@@ -10,6 +10,7 @@ use serde_json::{Value as Json, json};
 use super::Caller;
 use super::subnote::check_writable;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 pub(crate) use crate::note::args::parse_tags;
 use crate::note::edit::{EditInput, ParsedEdit};
@@ -20,7 +21,7 @@ use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::atomic::write_atomic;
 use crate::write::doc_place::{check_path, folder_name, parent_folder, place_folder};
 use crate::write::meta_writer::editor_of;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::{precondition, warnings};
 
 /// `update_doc` 요청. `tags`는 호출 객체에서는 문자열 배열, 명령줄에서는 JSON 배열 글로 온다.
@@ -40,7 +41,7 @@ pub struct UpdateDocRequest {
     /// 직전에 읽은 확인 값
     pub f1: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// 노트 id가 있고 모양이 맞는지 본다.

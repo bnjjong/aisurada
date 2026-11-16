@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::agenda_write::{archive, hue_arg};
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::model::ProjectRow;
 use crate::text::{is_blank, trim};
 use crate::vault::project::{ProjectInfo, is_valid_project_id, scan_projects};
@@ -14,7 +15,7 @@ use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
 use crate::write::apparatus::next_id;
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::{project_file, slug};
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -26,7 +27,7 @@ pub struct CreateProjectRequest {
     /// 저장소 목록(JSON 배열 글)
     pub repos: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -39,7 +40,7 @@ pub struct UpdateProjectRequest {
     /// 주면 저장소 목록을 통째로 바꾼다. 빈 글이면 지운다.
     pub repos: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -47,7 +48,7 @@ pub struct UpdateProjectRequest {
 pub struct DeleteProjectRequest {
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

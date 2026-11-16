@@ -14,6 +14,7 @@ use serde_json::{Value as Json, json};
 
 use super::note_meta_write::BoolArg;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::task::aggregate::{self, Fields, Scan};
 use crate::task::format::{self, java_trim};
 use crate::task::store;
@@ -21,7 +22,6 @@ use crate::task::transitions::{self, HUMAN};
 use crate::task::{Task, TaskStatus};
 use crate::text::{is_blank, trim};
 use crate::write::marker::check_workspace_marker;
-use crate::write::pipeline::WriteContext;
 use crate::write::stamp::stamp_of;
 
 #[allow(dead_code)]
@@ -54,7 +54,7 @@ pub struct CreateTaskRequest {
     pub refs: Option<Json>,
     pub actor: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -98,7 +98,7 @@ pub struct UpdateTaskRequest {
     pub refs: Option<Json>,
     pub actor: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -110,7 +110,7 @@ pub struct TransitionTaskRequest {
     pub from: Option<String>,
     pub actor: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -125,7 +125,7 @@ pub struct LinkTasksRequest {
     pub remove: Option<BoolArg>,
     pub actor: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -135,7 +135,7 @@ pub struct AddTaskCommentRequest {
     pub body: Option<String>,
     pub actor: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -143,7 +143,7 @@ pub struct AddTaskCommentRequest {
 pub struct TaskRefRequest {
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 // ---------------------------------------------------------------- 공통

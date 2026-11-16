@@ -13,6 +13,7 @@ use super::Caller;
 use super::doc_write::parse_tags;
 use super::subnote::check_writable;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 use crate::note::front::{Draft, judge};
 use crate::note::sub::{NewSub, check_given_title, updated_title};
@@ -25,7 +26,7 @@ use crate::write::confine::{check_confinement, has_unusable_path_characters};
 use crate::write::doc_place::folder_name_from;
 use crate::write::local_time::local_clock;
 use crate::write::meta_writer::editor_of;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::sub_note::{
     SINGLE_FILE_MESSAGE, place_and_write, read_derived, remove_tree, require_markdown_folder,
     rewrite_root, rewrite_sub, root_agenda, strip_child_cards,
@@ -43,7 +44,7 @@ pub struct CreateSubNoteRequest {
     #[serde(rename = "type")]
     pub doc_type: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -57,7 +58,7 @@ pub struct UpdateSubNoteRequest {
     pub tags: Option<Json>,
     pub f1: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -66,7 +67,7 @@ pub struct DeleteSubNoteRequest {
     pub parent: String,
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// 풀어 낸 부모

@@ -116,7 +116,7 @@ macro_rules! write_unscoped {
 #[serde(default, rename_all = "camelCase")]
 struct ExportMarkdownRequest {
     #[serde(flatten)]
-    context: crate::write::pipeline::WriteContext,
+    context: crate::kernel::actor::CallContext,
 }
 
 /// 이 엔진이 처리하는 명령 전부. 차례는 앱에 알리는 목록의 차례다.

@@ -10,6 +10,7 @@ use serde_json::{Value as Json, json};
 
 use super::subnote::check_writable;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 use crate::note::comment::{self, CommentInput, CommentOp};
 use crate::text::{is_blank, utf16_len};
@@ -19,7 +20,7 @@ use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::comments_file::{strip_anchors, write_comments};
 use crate::write::local_time::local_clock;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::sub_note::{read_derived, rewrite_root, rewrite_sub};
 
 const CREATE_USAGE: &str = "create-comment <노트 id> [하위 노트 id] body=<본문> [anchor_quote=<가리킨 글>] [comment_id=<식별자. 안 주면 발급한다>]";
@@ -42,7 +43,7 @@ pub struct CommentWriteRequest {
     /// 만들 때만. 코멘트가 가리킨 본문의 글
     pub anchor_quote: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 type Kind = CommentOp;

@@ -11,6 +11,7 @@ use std::path::Path;
 
 use serde_json::{Map, Value, json};
 
+use ais_core::kernel::actor::Caller;
 use ais_core::text::{encode_uri_component, trim};
 use ais_core::vault::facts::read_facts;
 use ais_core::vault::index::NoteIndex;
@@ -215,7 +216,7 @@ fn get_doc(call: &EngineCall, vault: &str, response: Value) -> Value {
     let index = NoteIndex::fresh(Path::new(vault));
     restore_note_row(&mut map, &index);
     // 도구 표면(AI)에는 노트가 속한 아젠다의 사실층도 실어 준다
-    if call.args.get("caller").and_then(Value::as_str) == Some("ai") {
+    if call.context.caller == Caller::Ai {
         let slug = map
             .get("agenda")
             .and_then(Value::as_str)

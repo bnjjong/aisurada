@@ -7,11 +7,12 @@ use serde::{Deserialize, Serialize};
 
 use super::agenda_write::{find, require_id};
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::text::{trim, utf16_len};
 use crate::vault::facts::{EDIT_LIMIT, LIMIT, relative_path};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::absolute_normalized;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -20,7 +21,7 @@ pub struct UpdateAgendaFactsRequest {
     /// 새 사실층. 앞뒤 공백을 떼고, 비면 지운다. 없으면 오류다.
     pub facts: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

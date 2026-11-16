@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::EngineError;
 use crate::json::{self, JsonValue, append_string};
+use crate::kernel::actor::CallContext;
 use crate::kernel::time::format_utc_millis;
 use crate::text::{compare_utf16, is_blank};
 use crate::vault::agenda::is_valid_slug_segment;
 use crate::write::apparatus::now_millis;
 use crate::write::atomic::write_atomic;
-use crate::write::pipeline::WriteContext;
 use crate::write::template_file::{doc_rel_path, render_doc, render_ritual, ritual_rel_path};
 
 const MAX_TEMPLATES: usize = 64;
@@ -45,7 +45,7 @@ pub struct InitWorkspaceRequest {
     /// 심을 빌트인 템플릿 목록(JSON 배열 글)
     pub templates: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

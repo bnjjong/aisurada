@@ -24,6 +24,7 @@ use super::option_text::text_of;
 use crate::commands::Caller;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
+use crate::kernel::actor::CallContext;
 use crate::resource::aggregate::{self, Category, POLICY_KEYS, Policy, TrustState};
 use crate::resource::approvals;
 use crate::resource::format::{json_to_serde, value_to_serde};
@@ -40,7 +41,6 @@ use crate::write::apparatus::now_millis;
 use crate::write::json_out::{literal, string};
 use crate::write::local_time::iso_offset_date_time;
 use crate::write::marker::check_workspace_marker;
-use crate::write::pipeline::WriteContext;
 use crate::write::stamp::stamp_of;
 
 const GET_USAGE: &str = "get-resource <자원 id> [version=<list-resource-versions 의 판>]";
@@ -102,7 +102,7 @@ pub struct SaveResourceRequest {
     pub tools: Option<Json>,
     pub f1: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// 자원 id 하나만 받는 쓰기 명령(`delete_resource`, `restore_resource`)
@@ -111,7 +111,7 @@ pub struct SaveResourceRequest {
 pub struct ResourceIdRequest {
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -123,7 +123,7 @@ pub struct SetResourceRefRequest {
     #[serde(rename = "with-skills", alias = "withSkills")]
     pub with_skills: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -157,7 +157,7 @@ pub struct ChangeDecisionRequest {
     pub id: String,
     pub reason: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -166,7 +166,7 @@ pub struct ResolveResourceEditRequest {
     pub id: String,
     pub action: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -177,7 +177,7 @@ pub struct SetResourcePolicyRequest {
     pub refs: Option<Json>,
     pub permission: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 // ---------------------------------------------------------------- 실행 맥락
@@ -195,7 +195,7 @@ struct Run<'a> {
 }
 
 /// AI의 통로 판별: AI 세션 표식이 달렸거나 AI 도구로 불렀으면 AI다. 앱 화면은 세션 표식 없이 부른다.
-fn is_ai(context: &WriteContext) -> bool {
+fn is_ai(context: &CallContext) -> bool {
     context.caller == Caller::Ai
         || context
             .session
@@ -203,7 +203,7 @@ fn is_ai(context: &WriteContext) -> bool {
             .is_some_and(|s| !crate::task::format::java_blank(s))
 }
 
-fn run<'a>(vault: &'a Path, context: &WriteContext) -> Run<'a> {
+fn run<'a>(vault: &'a Path, context: &CallContext) -> Run<'a> {
     let ai = is_ai(context);
     Run {
         vault,

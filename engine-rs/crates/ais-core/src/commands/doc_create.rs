@@ -8,6 +8,7 @@ use serde_json::Value as Json;
 
 use super::Caller;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 use crate::note::create::{NewDocInput, ParsedNewDoc};
 use crate::note::front::check_size;
@@ -19,7 +20,7 @@ use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_confinement, has_unusable_path_characters};
 use crate::write::doc_place::{folder_name, parent_folder};
 use crate::write::local_time::local_clock;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::{agenda_file, slug, warnings};
 
 /// `create_doc` 요청. `links`와 `tags`는 호출 객체에서는 배열, 명령줄에서는 JSON 배열 글로 온다.
@@ -43,7 +44,7 @@ pub struct CreateDocRequest {
     /// `reading`(기본)이나 `record`. AI 호출에서는 받지 않는다.
     pub tier: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// 새 노트를 만든 결과. `create_doc`의 응답이고, 쓰기 범위를 이미 잡은 `plan_day`가 같은 길로 노트를 만들 때 이어받는 값이다

@@ -4,7 +4,7 @@
 //! 화면은 먼저 `engine_commands`로 어떤 명령을 받는지 묻고, 받는 명령만 `engine_call`로 보낸다.
 
 use crate::lifecycle::HostState;
-use ais_core::{engine::Engine, error::EngineError};
+use ais_core::{engine::Engine, error::EngineError, kernel::actor::CallContext};
 use serde_json::Value;
 use tauri::State;
 
@@ -37,7 +37,7 @@ pub async fn engine_call(
     let started = std::time::Instant::now();
     let traced = command.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        Engine::new(vault).call(&command, args.unwrap_or(Value::Null))
+        Engine::new(vault).call_as(&CallContext::app(), &command, args.unwrap_or(Value::Null))
     })
     .await
     .map_err(|e| EngineError::internal(format!("엔진 호출이 끊겼어요: {e}")))?;

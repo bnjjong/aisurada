@@ -18,12 +18,13 @@ use serde_json::{Map, Value as Json, json};
 use super::option_text::text_of;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
+use crate::kernel::actor::CallContext;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, compare_utf16, is_blank, trim, utf16_len};
 use crate::vault::index::NoteIndex;
 use crate::vault::scanner::NoteRecord;
 use crate::write::atomic::write_atomic;
 use crate::write::json_out::{literal, string, to_file_bytes};
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 
 const MAX_FILE_BYTES: u64 = 1_000_000;
 const MAX_QUOTE_CHARS: usize = 2_000;
@@ -69,7 +70,7 @@ pub struct AppendAskTurnRequest {
     /// 호출 객체에서는 배열, 명령줄에서는 쉼표로 이은 글
     pub images: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -94,7 +95,7 @@ pub struct AppendChatTurnRequest {
     pub elapsed_ms: Option<Json>,
     pub images: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 // ---------------------------------------------------------------- 대상 노트 찾기

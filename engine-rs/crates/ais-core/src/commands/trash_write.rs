@@ -12,6 +12,7 @@ use serde_json::{Value as Json, json};
 use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
+use crate::kernel::actor::CallContext;
 use crate::kernel::time::format_utc_millis;
 use crate::text::{NOTE_ID, cut_utf16, is_blank};
 use crate::vault::agenda::is_valid_slug_segment;
@@ -23,7 +24,7 @@ use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_confinement, check_segment, normalize};
 use crate::write::doc_place::move_path;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 use crate::write::sub_note::remove_tree;
 use crate::write::trash_file::{archive_path, entries_in_file_order, save};
 
@@ -35,7 +36,7 @@ pub struct DeleteDocRequest {
     /// 노트 id
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -44,14 +45,14 @@ pub struct TrashEntryRequest {
     /// 휴지통 항목 id(`list_trash`가 알려 준다)
     pub trash_id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EmptyTrashRequest {
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {

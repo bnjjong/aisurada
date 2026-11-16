@@ -5,6 +5,7 @@
 
 use serde_json::{Map, Value, json};
 
+use ais_core::kernel::actor::{CallContext, Caller};
 use ais_core::text::{is_blank, trim};
 
 use crate::env::{SessionSource, agent_for_file};
@@ -17,6 +18,8 @@ pub struct EngineCall {
     /// `snake_case` 명령 이름
     pub command: String,
     pub args: Value,
+    /// 호출 맥락: 누가(앱 또는 AI 도구), 어느 세션에서 보냈는지. 인자 밖에서 엔진에 넘긴다.
+    pub context: CallContext,
 }
 
 /// 자리 인자가 들어갈 인자 이름. 앞에서부터 차례로 채운다.
@@ -66,13 +69,13 @@ fn positional_names(command: &str) -> &'static [&'static str] {
     }
 }
 
-/// 세션 표식을 인자에 싣는다. 쓰기 명령이 노트에 누가 고쳤는지 적을 때 읽는다.
-pub fn attach_session(args: &mut Map<String, Value>, session: Option<&SessionSource>) {
-    if let Some(source) = session {
-        args.insert("session".into(), json!(source.id));
-        if let Some(agent) = agent_for_file(&source.agent) {
-            args.insert("sessionAgent".into(), json!(agent));
-        }
+/// 호출자와 세션 표식으로 호출 맥락을 만든다. 쓰기 명령이 노트에 누가 고쳤는지 적을 때 읽는다.
+/// 에이전트 이름은 노트에 적는 값(`claude`는 적지 않는다)일 때만 싣는다.
+pub fn context_for(caller: Caller, session: Option<&SessionSource>) -> CallContext {
+    CallContext {
+        caller,
+        session: session.map(|source| source.id.clone()),
+        session_agent: session.and_then(|source| agent_for_file(&source.agent)),
     }
 }
 
@@ -82,7 +85,7 @@ pub fn to_call(
     session: Option<&SessionSource>,
 ) -> Result<EngineCall, CliError> {
     let command = parsed.name.replace('-', "_");
-    let mut args = match parsed.name.as_str() {
+    let args = match parsed.name.as_str() {
         "list-docs" => list_docs_args(parsed)?,
         "search-docs" => search_docs_args(parsed)?,
         "list-tags" => list_tags_args(parsed)?,
@@ -101,10 +104,10 @@ pub fn to_call(
         }
         _ => plain_args(parsed),
     };
-    attach_session(&mut args, session);
     Ok(EngineCall {
         command,
         args: Value::Object(args),
+        context: context_for(Caller::App, session),
     })
 }
 
@@ -288,6 +291,29 @@ mod tests {
             &args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
         )?;
         to_call(&parsed, None)
+    }
+
+    /// 명령 표면의 호출자는 앱이다. 세션 표식은 인자가 아니라 호출 맥락에 실린다.
+    #[test]
+    fn the_command_surface_calls_as_the_app_with_the_session_in_the_context() {
+        let spec = registry::command("get-doc").unwrap();
+        let parsed = parse::parse_command(spec, &["n1".to_string()]).unwrap();
+        let plain = to_call(&parsed, None).unwrap();
+        assert_eq!(plain.context, CallContext::app());
+        let source = SessionSource {
+            agent: "gemini".to_string(),
+            id: "g-1".to_string(),
+        };
+        let with = to_call(&parsed, Some(&source)).unwrap();
+        assert_eq!(with.args, plain.args);
+        assert_eq!(
+            with.context,
+            CallContext {
+                caller: Caller::App,
+                session: Some("g-1".into()),
+                session_agent: Some("gemini".into()),
+            }
+        );
     }
 
     #[test]

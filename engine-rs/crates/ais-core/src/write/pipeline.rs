@@ -14,20 +14,9 @@ use std::sync::Arc;
 use super::autocommit::{AutoCommit, ensure_ticker};
 use super::marker::check_workspace_marker;
 use crate::error::EngineError;
-use crate::kernel::actor::Caller;
+use crate::kernel::actor::{CallContext, Caller};
 use crate::ports::LockHandle;
 use crate::vault::index::NoteIndex;
-
-/// 쓰기 요청이 누가 보냈는지. AI 도구(`tool`)와 앱은 자동 커밋에서 따로 센다.
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct WriteContext {
-    pub caller: Caller,
-    /// AI 도구가 보낸 세션 id
-    pub session: Option<String>,
-    /// 세션을 연 에이전트 이름(`codex` 따위). 없으면 claude로 본다. 노트에 적는 편집 도장이 읽는다.
-    pub session_agent: Option<String>,
-}
 
 /// 열린 쓰기 범위. 명령이 일하는 동안 쥐고 있다.
 pub struct WriteScope {
@@ -42,7 +31,7 @@ pub struct WriteScope {
 pub(crate) fn open(
     vault: &Path,
     marker_required: bool,
-    context: &WriteContext,
+    context: &CallContext,
 ) -> Result<WriteScope, EngineError> {
     let lock = acquire_lock(vault)?;
     let index = reconcile_index(vault, marker_required)?;
@@ -76,7 +65,7 @@ pub struct CommitRecord {
 }
 
 impl CommitRecord {
-    pub fn open(vault: &Path, context: &WriteContext) -> CommitRecord {
+    pub fn open(vault: &Path, context: &CallContext) -> CommitRecord {
         let auto = AutoCommit::serving(vault);
         ensure_ticker(vault);
         let tool = context.caller == Caller::Ai;

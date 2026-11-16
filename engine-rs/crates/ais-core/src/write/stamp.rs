@@ -2,12 +2,12 @@
 
 use super::apparatus::now_millis;
 use super::local_time::iso_offset_date_time;
-use super::pipeline::WriteContext;
+use crate::kernel::actor::CallContext;
 
 pub use crate::kernel::stamp::Stamp;
 
 /// 지금의 고친 기록. AI 세션이 고쳤으면 세션 id와(claude가 아니면) CLI 이름이 남고, 사람이 고쳤으면 시각만 남는다.
-pub fn stamp_of(context: &WriteContext) -> Stamp {
+pub fn stamp_of(context: &CallContext) -> Stamp {
     let session = context
         .session
         .as_deref()

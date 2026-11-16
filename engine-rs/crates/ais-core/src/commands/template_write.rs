@@ -10,11 +10,11 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::text::{is_blank, trim};
 use crate::vault::template::{Category, TemplateRecord, scan_templates};
 use crate::write::apparatus::next_id;
 use crate::write::atomic::write_atomic;
-use crate::write::pipeline::WriteContext;
 use crate::write::template_file::{doc_rel_path, render_doc, render_ritual, ritual_rel_path};
 use crate::write::warnings::detect_indented_blocks_warning;
 
@@ -35,7 +35,7 @@ pub struct SaveTemplateRequest {
     pub desc: Option<String>,
     pub body: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -46,7 +46,7 @@ pub struct SaveRitualTemplateRequest {
     pub desc: Option<String>,
     pub body: Option<String>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -54,7 +54,7 @@ pub struct SaveRitualTemplateRequest {
 pub struct DeleteDocTemplateRequest {
     pub id: String,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

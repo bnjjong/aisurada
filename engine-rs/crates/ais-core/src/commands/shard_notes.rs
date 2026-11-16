@@ -13,6 +13,7 @@ use serde_json::{Map, Value as Json, json};
 use super::option_text::text_of;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
+use crate::kernel::actor::CallContext;
 use crate::text::{compare_utf16, is_blank, trim};
 use crate::vault::file_size::{self, FileSize};
 use crate::vault::note_file::read_note_file;
@@ -25,7 +26,6 @@ use crate::write::atomic::write_atomic;
 use crate::write::confine::{absolute_normalized, check_confinement, check_segment};
 use crate::write::doc_place::move_path;
 use crate::write::local_time::local_clock;
-use crate::write::pipeline::WriteContext;
 
 static NOTE_FILE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)^.*\.(md|html|json)$").unwrap());
@@ -35,7 +35,7 @@ static NOTE_FILE: LazyLock<Regex> =
 pub struct ShardNotesRequest {
     pub apply: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

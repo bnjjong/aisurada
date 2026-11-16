@@ -12,10 +12,11 @@ use super::list_attachments::make_ref;
 use super::option_text::text_of;
 use super::subnote::check_writable;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
-use crate::write::pipeline::{WriteContext, WriteScope};
+use crate::write::pipeline::WriteScope;
 
 const USAGE: &str = "write-attachment <노트 id> [하위 노트 id] name=<파일명.확장자> content=<내용>";
 const TEXT_EXTENSIONS: [&str; 12] = [
@@ -31,7 +32,7 @@ pub struct WriteAttachmentRequest {
     pub name: Option<Json>,
     pub content: Option<Json>,
     #[serde(flatten)]
-    pub context: WriteContext,
+    pub context: CallContext,
 }
 
 /// 이름 규칙을 이 차례로 보고 처음 걸린 1개만 낸다(18.8의 9번).
