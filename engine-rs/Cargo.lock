@@ -28,6 +28,7 @@ version = "0.0.1"
 dependencies = [
  "ais-core",
  "ais-domain",
+ "ais-infra",
  "ais-kernel",
  "libc",
  "libyaml-safer",
@@ -45,6 +46,15 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "ais-infra"
+version = "0.0.1"
+dependencies = [
+ "ais-kernel",
+ "libc",
  "sha2",
 ]
 

@@ -1,0 +1,16 @@
+[package]
+name = "ais-infra"
+description = "aisurada 엔진의 인프라 크레이트: 바깥 세상(파일, 시계, 환경 변수, 잠금, git, sqlite3)의 약속(포트)과 기본 어댑터"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ais-kernel = { path = "../ais-kernel" }
+libc = "0.2"
+sha2 = "0.10"
+
+[features]
+# 시험만 쓰는 접근자(`FlockLock::in_dir` 따위)를 연다. `ais-core`의 `test-support`가 함께 켠다.
+test-support = []

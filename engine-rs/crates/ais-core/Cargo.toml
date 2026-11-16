@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 ais-kernel = { path = "../ais-kernel" }
 ais-domain = { path = "../ais-domain" }
+ais-infra = { path = "../ais-infra" }
 libc = "0.2"
 libyaml-safer = "0.3"
 regex = "1"
@@ -24,4 +25,4 @@ serde_json = { version = "1", features = ["unbounded_depth"] }
 
 [features]
 # 안쪽 모듈(`adapters`, `commands`, `ports`, `vault`의 나머지 따위)을 `pub`으로 연다. 시험과 예제만 쓴다. 운영 빌드(앱, 명령줄)에는 켜지지 않는다.
-test-support = []
+test-support = ["ais-infra/test-support"]
