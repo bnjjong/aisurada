@@ -15,6 +15,7 @@ use super::doc_write::parse_tags;
 use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::kernel::token::compute_token;
+use crate::note::front::{Draft, MAX_FILE_UNITS, judge};
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::vault::index::NoteIndex;
 use crate::vault::note_file::split_text;
@@ -23,7 +24,7 @@ use crate::write::apparatus::{next_sub_note_id, now_millis};
 use crate::write::confine::{check_confinement, has_unusable_path_characters};
 use crate::write::doc_place::folder_name_from;
 use crate::write::local_time::local_clock;
-use crate::write::meta_writer::{Draft, MAX_FILE_UNITS, judge};
+use crate::write::meta_writer::editor_of;
 use crate::write::pipeline::{WriteContext, WriteScope};
 use crate::write::sub_note::{
     SINGLE_FILE_MESSAGE, place_and_write, read_derived, remove_tree, require_markdown_folder,
@@ -360,7 +361,8 @@ pub fn update_sub_note(
         body,
         &old_body,
         &raw,
-        context,
+        &editor_of(context),
+        crate::write::apparatus::now_millis(),
     )?;
     require_markdown_folder(sub)?;
     let placed = place_and_write(vault, sub, &title, &text)?;

@@ -11,6 +11,7 @@ pub mod frontmatter;
 pub mod json;
 pub mod kernel;
 pub mod model;
+pub mod note;
 pub mod ports;
 pub mod resource;
 pub mod session;

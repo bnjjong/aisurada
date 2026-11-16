@@ -11,19 +11,16 @@ use serde_json::{Value as Json, json};
 use super::Caller;
 use super::subnote::check_writable;
 use crate::error::EngineError;
-use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
 use crate::kernel::token::compute_token;
-use crate::text::{NOTE_ID, cut_utf16, is_blank, trim, utf16_len};
+use crate::note::edit::{EditInput, ParsedEdit};
+use crate::note::front::MAX_FILE_UNITS;
+use crate::text::{NOTE_ID, is_blank, trim, utf16_len};
 use crate::vault::note_file::split_text;
-use crate::vault::note_meta::{TEMPLATE_ID, get};
 use crate::vault::scanner::{Format, NoteRecord};
 use crate::write::atomic::write_atomic;
-use crate::write::doc_place::{
-    check_path, folder_name, parent_folder, parse_date_arg, parse_time_arg, place_folder,
-    read_created,
-};
-use crate::write::meta_writer::{Draft, MAX_FILE_UNITS, judge};
+use crate::write::doc_place::{check_path, folder_name, parent_folder, place_folder};
+use crate::write::meta_writer::editor_of;
 use crate::write::pipeline::{WriteContext, WriteScope};
 use crate::write::{precondition, warnings};
 
@@ -123,28 +120,19 @@ pub fn update_doc(
     require_note_id(&request.id, USAGE)?;
     let note_id = request.id.as_str();
     let new_tags = request.tags.as_ref().map(parse_tags).transpose()?;
-    // AI 도구 호출은 날짜와 시각을 받지 않는다
-    let tool = context.caller == Caller::Ai;
-    let given_date = request
-        .date
-        .as_deref()
-        .filter(|_| !tool)
-        .map(parse_date_arg)
-        .transpose()?;
-    let given_time = request
-        .time
-        .as_deref()
-        .filter(|_| !tool)
-        .map(parse_time_arg)
-        .transpose()?;
-    let given_title = request.title.as_deref();
-    if given_title.is_some_and(is_blank) {
-        return Err(EngineError::invalid_argument(format!(
-            "노트 제목이 비었다: {note_id}"
-        )));
-    }
-    let given_body = request.body.as_deref();
-    let token = request.f1.as_deref().map(trim).filter(|t| !t.is_empty());
+    // 인자 검사: AI 도구 호출은 날짜와 시각을 받지 않고, 제목은 비면 안 된다(규칙은 `note::edit`)
+    let edit = ParsedEdit::parse(EditInput {
+        note_id,
+        title: request.title.as_deref(),
+        body: request.body.as_deref(),
+        tags: new_tags,
+        template: request.template.as_deref(),
+        date: request.date.as_deref(),
+        time: request.time.as_deref(),
+        f1: request.f1.as_deref(),
+        tool: context.caller == Caller::Ai,
+    })?;
+    let given_body = edit.given_body();
 
     let note: &NoteRecord = scope
         .index
@@ -153,50 +141,10 @@ pub fn update_doc(
     check_writable(note, context.caller)?;
     let meta = &note.meta;
 
-    // 준 칸만 갈아 끼운 다음 값. 못 고치는 값은 색인의 값이 따라온다
-    let title = given_title.unwrap_or(meta.title.as_str());
-    let tags: &[String] = new_tags.as_deref().unwrap_or(&meta.tags);
-    let template = request
-        .template
-        .as_deref()
-        .map(trim)
-        .filter(|t| TEMPLATE_ID.is_match(t))
-        .or(meta.template.as_deref());
+    // 새 제목·날짜·시각. 못 읽는 created와 JSON 노트의 본문은 파일을 읽기 전에 선다
+    let slot = edit.slot(meta, note.format, note_id)?;
 
-    // 날짜와 시각은 준 쪽만 갈아 끼우고, 오프셋은 노트의 지금 값을 지킨다
-    let current = read_created(&meta.created).ok_or_else(|| {
-        EngineError::internal(format!("created 를 읽지 못해 고치지 않았다: {note_id}"))
-    })?;
-    let (created, date, hour, minute) = if given_date.is_none() && given_time.is_none() {
-        (
-            meta.created.clone(),
-            current.date,
-            current.hour,
-            current.minute,
-        )
-    } else {
-        let date = given_date.unwrap_or(current.date);
-        let (hour, minute) = given_time.unwrap_or((current.hour, current.minute));
-        (
-            format!(
-                "{}T{hour:02}:{minute:02}:00{}",
-                date.era_text(),
-                current.offset
-            ),
-            date,
-            hour,
-            minute,
-        )
-    };
-
-    // json 노트에 본문을 주면 파일을 읽기 전에 선다
-    if note.format == Format::Json && given_body.is_some() {
-        return Err(EngineError::internal(format!(
-            "Lexical JSON 노트의 본문은 고칠 수 없다(마크다운을 editorState 로 바꾸는 일이라 사이드카에 없다): {note_id}"
-        )));
-    }
-
-    let bytes = precondition::check(vault, note, token, "고치지")?;
+    let bytes = precondition::check(vault, note, edit.token(), "고치지")?;
     let content_rel = rel_of(vault, &note.content_file);
     let content = String::from_utf8(bytes).map_err(|_| {
         EngineError::internal(format!(
@@ -211,52 +159,24 @@ pub fn update_doc(
     };
     let old_body = split.body;
 
-    // 새 자리의 아젠다 slug. 파일의 agenda가 빈 글이 아닌 문자열이면 그 글자 그대로다
+    // 새 파일 글(편집 도장 판정 포함). 지금 시각과 편집자는 여기서 정해 넘긴다
     let old_rel = note.rel_path.as_str();
-    let agenda = match get(&raw, "agenda") {
-        Some(Value::Str(s)) if !s.is_empty() => s.clone(),
-        _ => {
-            let parts: Vec<&str> = old_rel.split('/').collect();
-            if parts.len() >= 2 {
-                parts[1].to_string()
-            } else {
-                meta.agenda_slug.clone()
-            }
-        }
-    };
-    let body = given_body.unwrap_or(&old_body);
-    let session_id = match get(&raw, "sessionId") {
-        Some(Value::Str(s)) if !trim(s).is_empty() => Some(cut_utf16(trim(s), 128)),
-        _ => None,
-    };
-    let session_agent = session_id.as_ref().and(meta.session_agent.as_deref());
-
-    let text = judge(
+    let rendered = slot.render(
         note.format,
-        &Draft {
-            meta,
-            agenda: &agenda,
-            title,
-            created: &created,
-            session_id: session_id.as_deref(),
-            session_agent,
-            tier: meta.tier,
-            tags,
-            favorite: meta.favorite,
-            favorite_category: meta.favorite_category.as_deref(),
-            template,
-            evaluation: meta.evaluation.as_ref(),
-            links: &meta.links,
-        },
-        body,
-        &old_body,
+        meta,
+        old_rel,
         &raw,
-        context,
+        &old_body,
+        given_body,
+        &editor_of(context),
+        crate::write::apparatus::now_millis(),
     )?;
+    let (text, agenda, body) = (&rendered.text, &rendered.agenda, rendered.body.as_str());
+    let (title, date, hour, minute) = (slot.title.as_str(), &slot.date, slot.hour, slot.minute);
 
     // 자리 갈래: 부모 폴더와 폴더 이름
-    let parent = parent_folder(vault, &agenda, &date);
-    let folder = folder_name(&date, hour, minute, title, note_id);
+    let parent = parent_folder(vault, agenda, date);
+    let folder = folder_name(date, hour, minute, title, note_id);
     let content_name = note
         .content_file
         .file_name()

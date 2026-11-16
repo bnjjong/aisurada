@@ -3,6 +3,7 @@
 //! 후보를 먼저 모두 모은 뒤(이름 차례) 하나씩 연다. 읽기 명령은 예상 밖의 문제를 만나도 훑기를 멈추지 않고
 //! 그 노트만 이유를 적어 건너뛴다(Java 엔진은 이럴 때 뒤쪽 노트를 통째로 버렸다).
 
+pub use crate::note::meta::Format;
 use crate::ports::fs;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -35,34 +36,6 @@ pub(crate) fn is_conflict_name(name: &str) -> bool {
 /// 노트 폴더 안에서 노트로 세지 않는 예약 이름인가
 pub(crate) fn is_reserved_name(name: &str) -> bool {
     RESERVED_NAMES.contains(&name)
-}
-
-/// 본문 형식
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Format {
-    Markdown,
-    Json,
-    Html,
-}
-
-impl Format {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Format::Markdown => "markdown",
-            Format::Json => "json",
-            Format::Html => "html",
-        }
-    }
-
-    fn from_file_name(name: &str) -> Self {
-        if name.ends_with(".json") {
-            Format::Json
-        } else if name.ends_with(".html") {
-            Format::Html
-        } else {
-            Format::Markdown
-        }
-    }
 }
 
 /// 훑어서 찾은 노트(메인 또는 후속) 하나

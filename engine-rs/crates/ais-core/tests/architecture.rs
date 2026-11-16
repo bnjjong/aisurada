@@ -467,6 +467,11 @@ fn aggregate_files_are_pure_domain_code() {
         "task/aggregate.rs",
         "task/transitions.rs",
         "resource/aggregate.rs",
+        "note/meta.rs",
+        "note/front.rs",
+        "note/placement.rs",
+        "note/slug.rs",
+        "note/edit.rs",
     ];
     const FORBIDDEN: &[&str] = &[
         "crate::ports",
@@ -492,4 +497,17 @@ fn aggregate_files_are_pure_domain_code() {
         bad.is_empty(),
         "순수해야 하는 도메인 파일이 바깥을 쓴다: {bad:?}"
     );
+}
+
+/// 노트 도메인(`note`)은 바탕 모듈과 커널만 쓴다. vault·write·task·resource·commands 같은 영역을 거꾸로 쓰지 않는다.
+#[test]
+fn the_note_domain_uses_only_base_modules_and_the_kernel() {
+    const BASE: &[&str] = &["text", "json", "frontmatter", "error", "kernel", "note"];
+    let now = measure();
+    let bad: Vec<&str> = now
+        .keys()
+        .filter_map(|k| k.strip_prefix("edge note -> "))
+        .filter(|to| !BASE.contains(to))
+        .collect();
+    assert!(bad.is_empty(), "노트 도메인이 영역을 쓴다: {bad:?}");
 }

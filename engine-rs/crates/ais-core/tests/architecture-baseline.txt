@@ -5,17 +5,18 @@ edge adapters -> kernel 3
 edge adapters -> ports 8
 edge adapters -> text 2
 edge commands -> error 35
-edge commands -> frontmatter 4
+edge commands -> frontmatter 3
 edge commands -> json 5
 edge commands -> kernel 29
 edge commands -> model 16
+edge commands -> note 3
 edge commands -> ports 10
 edge commands -> resource 6
 edge commands -> session 2
 edge commands -> task 7
 edge commands -> text 33
-edge commands -> vault 74
-edge commands -> write 96
+edge commands -> vault 73
+edge commands -> write 98
 edge engine -> commands 1
 edge engine -> error 1
 edge engine -> ports 2
@@ -29,6 +30,10 @@ edge kernel -> json 1
 edge kernel -> text 4
 edge model -> kernel 2
 edge model -> vault 9
+edge note -> error 3
+edge note -> frontmatter 4
+edge note -> kernel 7
+edge note -> text 3
 edge ports -> adapters 1
 edge ports -> error 1
 edge ports -> kernel 1
@@ -54,17 +59,19 @@ edge task -> vault 1
 edge task -> write 5
 edge vault -> error 5
 edge vault -> frontmatter 6
-edge vault -> kernel 17
+edge vault -> kernel 16
+edge vault -> note 4
 edge vault -> ports 15
 edge vault -> text 15
 edge write -> adapters 2
 edge write -> error 11
-edge write -> frontmatter 7
+edge write -> frontmatter 6
 edge write -> json 4
-edge write -> kernel 17
+edge write -> kernel 14
+edge write -> note 6
 edge write -> ports 13
-edge write -> text 10
-edge write -> vault 19
+edge write -> text 9
+edge write -> vault 17
 env cli/env.rs 2
 env core/adapters/flock_lock.rs 2
 env core/adapters/process_env.rs 1
