@@ -1,0 +1,35 @@
+name: Host format
+
+# 호스트 크레이트(native-host/src-tauri)의 rustfmt 검사. 서식만 보므로 빌드하지 않고 가벼운 러너에서 돌아서 몇 초 안에 끝난다.
+# 엔진(engine-rs)의 서식은 ci.yml이 본다. 호스트 시험은 릴리스 워크플로(release.yml)가 맡는다.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'native-host/src-tauri/**'
+      - '.github/workflows/host-format.yml'
+  pull_request:
+    paths:
+      - 'native-host/src-tauri/**'
+      - '.github/workflows/host-format.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path native-host/src-tauri/Cargo.toml --all -- --check

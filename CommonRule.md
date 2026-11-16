@@ -92,7 +92,7 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 
 | 바꾼 곳 | 평소에 보는 것(빌드 확인) |
 |---------|---------------------------|
-| 화면·호스트 (`native-host/`) | `pnpm --dir native-host typecheck` |
+| 화면·호스트 (`native-host/`) | `pnpm --dir native-host typecheck`. 호스트의 Rust(`native-host/src-tauri/`)를 고쳤으면 `(cd native-host/src-tauri && cargo fmt)`도 돌려 서식을 맞춘다 |
 | 엔진 (`engine-rs/`) | `(cd engine-rs && cargo build --workspace --examples)` |
 | 문서 | 없음 |
 
