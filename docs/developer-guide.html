@@ -114,7 +114,7 @@ footer.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);co
 <li><a href="#5-엔진-쓰는-법">5. 엔진 쓰는 법</a><ul><li><a href="#세션-에이전트codexgemini-확장">세션 에이전트(Codex·Gemini) 확장</a></li><li><a href="#세션-목록-저장소-projects-패널은-없앴다">세션 목록 저장소 (PROJECTS 패널은 없앴다)</a></li><li><a href="#프로젝트의-저장소와-아젠다의-projectrepo">프로젝트의 저장소와 아젠다의 projectRepo</a></li><li><a href="#프로젝트-자원-스킬과-에이전트-정의-resource">프로젝트 자원: 스킬과 에이전트 정의 (resource/)</a></li><li><a href="#태스크-task">태스크 (task/)</a></li><li><a href="#알림-notificationsrs">알림 (notifications.rs)</a></li><li><a href="#러너-runner">러너 (runner/)</a></li><li><a href="#github-app-연결-githubrs">GitHub App 연결 (github.rs)</a></li><li><a href="#앱이-연-vault-current-vaultjson">앱이 연 vault (current-vault.json)</a></li><li><a href="#호출-방식">호출 방식</a></li><li><a href="#두-가지-표면">두 가지 표면</a></li><li><a href="#설정">설정</a></li><li><a href="#종료-코드">종료 코드</a></li><li><a href="#vault의-모양">vault의 모양</a></li><li><a href="#쓰기-규칙-고칠-때-지킬-것">쓰기 규칙 (고칠 때 지킬 것)</a></li><li><a href="#명령을-새로-넣는-길">명령을 새로 넣는 길</a></li><li><a href="#mcp-서버-ais-cli-mcp">MCP 서버 (ais-cli mcp)</a></li></ul></li>
 <li><a href="#6-옛-사이드카와-launchd-건드리기-전에">6. 옛 사이드카와 launchd — 건드리기 전에</a></li>
 <li><a href="#7-네이티브-호스트와-화면">7. 네이티브 호스트와 화면</a><ul><li><a href="#개발-실행">개발 실행</a></li><li><a href="#번들-만들기">번들 만들기</a></li><li><a href="#앱에-든-ais-cli">앱에 든 ais-cli</a></li><li><a href="#4부-스위치-2개">4부 스위치 2개</a></li><li><a href="#화면-모양-skin">화면 모양 (skin)</a></li><li><a href="#글꼴과-화면-크기-typography">글꼴과 화면 크기 (typography)</a></li><li><a href="#좌측-메뉴레일의-두-탭-노트와-에이전트">좌측 메뉴(레일)의 두 탭: 노트와 에이전트</a></li><li><a href="#후속-노트-탭">후속 노트 탭</a></li><li><a href="#좌측-메뉴레일의-프로젝트아젠다-목록">좌측 메뉴(레일)의 프로젝트·아젠다 목록</a></li><li><a href="#좌측-메뉴레일-폭">좌측 메뉴(레일) 폭</a></li><li><a href="#코드-블록-문법-색-editorcodesyntaxts">코드 블록 문법 색 (editor/codeSyntax.ts)</a></li><li><a href="#계약을-건드릴-때">계약을 건드릴 때</a></li></ul></li>
-<li><a href="#8-시험">8. 시험</a><ul><li><a href="#한눈에">한눈에</a></li><li><a href="#엔진-시험-쓰기">엔진 시험 쓰기</a></li><li><a href="#받아들임-묶음-34장">받아들임 묶음 (34장)</a></li><li><a href="#화면호스트-시험">화면·호스트 시험</a></li><li><a href="#동시에-돌리면-안-되는-것">동시에 돌리면 안 되는 것</a></li></ul></li>
+<li><a href="#8-시험">8. 시험</a><ul><li><a href="#한눈에">한눈에</a></li><li><a href="#엔진-시험-쓰기">엔진 시험 쓰기</a></li><li><a href="#성능-기준선">성능 기준선</a></li><li><a href="#받아들임-묶음-34장">받아들임 묶음 (34장)</a></li><li><a href="#화면호스트-시험">화면·호스트 시험</a></li><li><a href="#동시에-돌리면-안-되는-것">동시에 돌리면 안 되는 것</a></li></ul></li>
 <li><a href="#9-앱-손-확인">9. 앱 손 확인</a></li>
 <li><a href="#10-docs-읽는-법">10. docs/ 읽는 법</a><ul><li><a href="#옛-이름-대응표">옛 이름 대응표</a></li></ul></li>
 <li><a href="#11-커밋과-브랜치-관례">11. 커밋과 브랜치 관례</a></li>
@@ -734,7 +734,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <h2 id="8-시험"><a class="anchor" href="#8-시험" aria-label="이 절의 링크">#</a>8. 시험</h2>
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
-<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~105초(229건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4)</td></tr>
+<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~105초(246건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4)</td></tr>
 <tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>캐시된 상태에서 Node 시험까지 약 30초</td><td>화면 빌드, Node 시험 641건, 호스트 <code>cargo test</code>(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다</td></tr>
 <tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다</td></tr>
 <tr><td>기준 맞대기</td><td>§4 「기준과 맞대기」</td><td>엔진 12분(Java가 도는 만큼)</td><td>기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 <code>bash engine-rs/tools/golden/run.sh replay</code>(약 1분)다</td></tr>
@@ -750,7 +750,34 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <li><strong>통합 시험</strong>은 <code>engine-rs/crates/ais-core/tests/fixture_vault.rs</code>(합성 vault를 <code>tools/compat/make-fixture.sh</code>로 만들어 읽기 명령의 핵심 동작을 확인), <code>engine-rs/crates/ais-cli/tests/</code>의 <code>mcp_stdio.rs</code>(진짜 <code>mcp</code> 프로세스), <code>register.rs</code>(가짜 에이전트 CLI로 등록), <code>old_sidecar.rs</code>(임시 HOME과 가짜 <code>launchctl</code>로 옛 사이드카 정리)에 둔다. <code>lock_interop.rs</code>는 기준 jar(<code>AISURADA_JAR</code>)가 있을 때만 돈다.</li>
 <li>시계와 id는 환경 변수로 고정한다: <code>AISURADA_TEST_NOW</code>(시각, 도장과 평가 시각도 따름), <code>AISURADA_TEST_RANDOM</code>(id의 무작위 조각). 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.</li>
 <li>임시 HOME·vault·잠금 폴더(<code>AISURADA_LOCK_DIR</code>)만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.</li>
+<li><strong>지운 Java 시험에서 옮긴 시험</strong>은 <code>ais-core/tests/</code>의 <code>reindex_paths.rs</code>, <code>shard_notes.rs</code>, <code>check_notes.rs</code>, <code>plan_day_and_export.rs</code>와 <code>ais-cli/tests/reindex_paths_cli.rs</code>, <code>ais-cli/tests/vault_pointer.rs</code>다. 각각 시험이 하나뿐이거나 환경 변수를 한 번만 정한다(시간대, 시험용 시계, 잠금 폴더). 어느 Java 시험이 어디로 갔는지는 <a href="rust-engine-java-test-map.md"><code>rust-engine-java-test-map.md</code></a>에 있다.</li>
+<li><strong>git 실행기</strong>(<code>adapters/git_cli.rs</code>, 시험은 <code>ais-core/tests/git_cli.rs</code>)는 실행 파일과 제한 시간을 <code>GitCli::with(..)</code>로 바꿔 끼울 수 있어서, 셸 스크립트로 만든 가짜 <code>git</code>으로 시간 초과(엄격 60초, 옛 스냅숏 읽기 5초가 각각 지켜지고 프로세스가 죽는지), 실행 파일 없음, 인자·환경·표준 입력 전달, 큰 입출력의 교착을 시험한다. 엔진 수준에서 git이 없을 때 판 목록이 빈 목록이 되고 쓰기는 그대로 되는지는 <code>ais-core/tests/git_missing.rs</code>가 본다.</li>
 <li>동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 <code>docs/rust-engine-step*.md</code>의 해당 기록에 이유를 적는다.</li>
+</ul>
+<h3 id="성능-기준선"><a class="anchor" href="#성능-기준선" aria-label="이 절의 링크">#</a>성능 기준선</h3>
+<p><code>engine-rs/crates/ais-core/examples/perf_baseline.rs</code>가 합성 vault(노트 한 건 약 1.5KB, 아젠다 10개, 노트 하나에만 git 판 60개)를 노트 수별로 만들어 엔진 호출 시간과 최대 메모리를 잰다. 크기마다 자식 프로세스를 따로 띄워서 메모리가 크기별로 갈린다. 자동 커밋은 끈다. 진짜 vault는 건드리지 않는다.</p>
+<div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>(cd engine-rs &amp;&amp; cargo run --release -q -p ais-core --example perf_baseline -- 200 2000 10000)   # 크기를 안 주면 이 셋이다. 몇 분 걸린다. 꼭 --release로 잰다</code></pre></div>
+<p>2026-11-16, Apple M2, macOS arm64, release 빌드. 한 항목을 5번 재서 가운데 값이다(단위 ms). 엔진을 프로세스 안에서 부른 시간이라 앱의 IPC와 화면 그리기는 들어 있지 않다.</p>
+<div class="table-wrap"><table><thead><tr><th>항목</th><th style="text-align:right">200건</th><th style="text-align:right">2,000건</th><th style="text-align:right">10,000건</th></tr></thead><tbody>
+<tr><td><code>list_docs</code> 메타, 전부</td><td style="text-align:right">9.5</td><td style="text-align:right">83</td><td style="text-align:right">456</td></tr>
+<tr><td><code>list_docs</code> 본문 포함, 전부</td><td style="text-align:right">10.0</td><td style="text-align:right">87</td><td style="text-align:right">488</td></tr>
+<tr><td><code>search_docs</code> (많이 걸리는 말 / 한 건 / 안 걸리는 말)</td><td style="text-align:right">16 / 16 / 16</td><td style="text-align:right">154 / 155 / 153</td><td style="text-align:right">875 / 845 / 830</td></tr>
+<tr><td><code>list_tags</code></td><td style="text-align:right">8.9</td><td style="text-align:right">79</td><td style="text-align:right">439</td></tr>
+<tr><td><code>get_doc</code> 한 건</td><td style="text-align:right">8.9</td><td style="text-align:right">79</td><td style="text-align:right">428</td></tr>
+<tr><td><code>history</code> 판 60개</td><td style="text-align:right">89</td><td style="text-align:right">153</td><td style="text-align:right">195</td></tr>
+<tr><td><code>update_doc</code> (훑기와 쓰기 포함)</td><td style="text-align:right">24</td><td style="text-align:right">163</td><td style="text-align:right">889</td></tr>
+<tr><td><code>create_doc</code> (훑기와 쓰기 포함)</td><td style="text-align:right">13</td><td style="text-align:right">84</td><td style="text-align:right">432</td></tr>
+<tr><td>최대 메모리(MB, 위 항목을 모두 돌린 뒤)</td><td style="text-align:right">8</td><td style="text-align:right">22</td><td style="text-align:right">344</td></tr>
+</tbody></table></div>
+<p>읽는 법:</p>
+<ul>
+<li><strong>호출마다 vault 전체를 훑는다</strong>(색인 파일이 없다). 그래서 어느 읽기든 노트 수에 거의 비례하고(노트 한 건에 약 0.045ms), 한 건을 읽는 <code>get_doc</code>도 1만 건에서 0.43초다. 본문을 싣든 안 싣든 시간이 거의 같다(훑기가 이미 본문을 읽는다).</li>
+<li>쓰기는 읽기의 약 두 배다(<code>update_doc</code> 1만 건에서 0.89초, 읽기 0.43~0.46초).</li>
+<li><code>history</code>는 노트 수보다 git 호출 수에 좌우된다.</li>
+<li>최대 메모리는 1만 건에서 344MB다. 이 값은 「그때까지의 최대」라 항목을 지날수록 늘기만 한다.</li>
+<li>이 숫자는 릴리스 전에 같은 명령으로 다시 재서 두 배 넘게 늘었는지 보는 용도다. 자동 시험에 넣지 않았다(벽시계 시간은 공유 러너에서 흔들려서 시험이 가끔 깨진다).</li>
+<li>못 잰 것: 노트 하나가 아주 긴 경우, 첨부와 코멘트가 많은 경우, 앱을 거친 시간(IPC, JSON 변환, 화면).</li>
+<li>Java 시절 숫자는 노트 12건의 <code>list_docs</code> 본문 포함 한 번뿐이었다(Java 약 445ms, Rust 약 70ms, 첫 묶음 기록). 같은 조건의 비교는 아니다.</li>
 </ul>
 <h3 id="받아들임-묶음-34장"><a class="anchor" href="#받아들임-묶음-34장" aria-label="이 절의 링크">#</a>받아들임 묶음 (34장)</h3>
 <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code># Rust ais-cli(지금 엔진). 어댑터는 fixtures/aisurada-rust.adapter.json
@@ -808,6 +835,7 @@ node fixtures/runner-test.mjs</code></pre></div>
 <tr><td><code>review-*</code>, <code>plan-*</code>, <code>prompt-*</code></td><td>초기 장 작업의 리뷰·계획·지시 기록</td></tr>
 <tr><td><code>handoff-round2.md</code></td><td>2026-10-24에 올린 「다시 짜기 시험」 2차 검증 인계문. Java 엔진과 <code>withlog</code> 이름 시절의 절차라 지금과 다르다. 기록이라 고치지 않는다</td></tr>
 <tr><td><code>release-guide.html</code>, <code>assets/release/</code></td><td>0.0.1 시험판 때(2026-11-05<del>07)의 그림으로 보는 배포·설치 안내. Java를 앱에 넣던 판 기준이라 기록으로 남기고, 맨 위에 기준 시점 안내만 붙였다. 공개된 0.0.1</del>0.0.6의 설치 안내로는 지금도 맞다</td></tr>
+<tr><td><code>rust-engine-java-test-map.md</code></td><td>5d에서 지운 Java 시험 32개와 Rust 시험의 대조(2026-11-16, 이슈 #57). 어느 시험을 Rust로 옮겼고, 기준 엔진과 달랐던 넷은 무엇이며, 어디를 아직 못 봤는지 적었다</td></tr>
 <tr><td><code>beta-hand-check.md</code>, <code>developer-guide.md</code></td><td>지금 쓰는 안내서. 가이드의 HTML 사본은 <code>pnpm --dir native-host docs:guide</code>로 다시 만든다</td></tr>
 </tbody></table></div>
 <p>작업 규칙(커밋과 푸시, 작업 뒤 정리, 문서 갱신, 이름 규칙)은 저장소 루트의 <a href="../CommonRule.md"><code>CommonRule.md</code></a> 한 곳에서 관리한다. <code>CLAUDE.md</code>는 그 파일을 가져다 쓴다.</p>
