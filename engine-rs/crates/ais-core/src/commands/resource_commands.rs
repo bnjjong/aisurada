@@ -26,10 +26,14 @@ use crate::error::EngineError;
 use crate::json::{self, JsonValue};
 use crate::resource::aggregate::{self, Category, POLICY_KEYS, Policy, TrustState};
 use crate::resource::approvals;
-use crate::resource::format::{self, json_to_serde, value_to_serde};
+use crate::resource::format::{json_to_serde, value_to_serde};
 use crate::resource::refs;
-use crate::resource::store::{self, Fields, Stamp};
-use crate::resource::{Resource, ResourceKind, changes, resolver, tools_equal};
+use crate::resource::rules::{
+    self, RefInfo, RefsChange, Scope, change_refs, check_same_kind_and_scope, fields_of, kind_of,
+    reject_agent_only_for_skill, summarize_change,
+};
+use crate::resource::store::{self, Stamp};
+use crate::resource::{Resource, ResourceKind, changes, resolver};
 use crate::task::format::java_trim;
 use crate::text::{compare_utf16, is_blank, trim};
 use crate::write::apparatus::now_millis;
@@ -226,54 +230,12 @@ fn begin_read(vault: &Path) -> Result<(), EngineError> {
 
 // ---------------------------------------------------------------- 목록·보기
 
-struct Scope {
-    given: bool,
-    project: Option<String>,
-}
-
 fn scope_of(opts: &Opts, required: bool) -> Result<Scope, EngineError> {
-    let scope = opts.get("scope").filter(|s| !is_blank(s));
-    let project = opts.get("project").filter(|p| !is_blank(p));
-    if scope.is_some() && project.is_some() {
-        return Err(EngineError::invalid_argument(
-            "scope=global 과 project=<프로젝트 slug> 는 함께 줄 수 없다",
-        ));
-    }
-    if let Some(scope) = scope {
-        if java_trim(scope) != "global" {
-            return Err(EngineError::invalid_argument(format!(
-                "scope 는 global 이어야 한다. 프로젝트 자원은 project=<프로젝트 slug> 로 준다: {scope}"
-            )));
-        }
-        return Ok(Scope {
-            given: true,
-            project: None,
-        });
-    }
-    if let Some(project) = project {
-        return Ok(Scope {
-            given: true,
-            project: Some(java_trim(project).to_string()),
-        });
-    }
-    if required {
-        return Err(EngineError::invalid_argument(
-            "scope=global 이나 project=<프로젝트 slug> 가 필요하다",
-        ));
-    }
-    Ok(Scope {
-        given: false,
-        project: None,
-    })
-}
-
-fn kind_of(raw: Option<&str>) -> Result<ResourceKind, EngineError> {
-    raw.and_then(ResourceKind::parse).ok_or_else(|| {
-        EngineError::invalid_argument(format!(
-            "kind 는 skill 이나 agent 여야 한다: {}",
-            raw.unwrap_or("null")
-        ))
-    })
+    rules::scope_of(
+        opts.get("scope").map(String::as_str),
+        opts.get("project").map(String::as_str),
+        required,
+    )
 }
 
 fn is_true(value: Option<&String>) -> bool {
@@ -518,8 +480,8 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
     let Some(id) = id else {
         let kind = kind_of(opts.get("kind").map(String::as_str))?;
         let scope = scope_of(opts, true)?;
-        reject_agent_only_for_skill(kind, opts)?;
-        let fields = fields_of(opts)?;
+        reject_agent_only_for_skill(kind, |k| opts.contains_key(k))?;
+        let fields = fields_of(|k| opts.get(k).map(String::as_str))?;
         let plan = store::plan_create(
             vault,
             kind,
@@ -554,31 +516,15 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
         return Ok(Json::Object(m));
     };
     let live = store::find(vault, java_trim(id))?;
-    if let Some(raw) = opts.get("kind")
-        && kind_of(Some(raw))? != live.kind
-    {
-        return Err(EngineError::invalid_argument(format!(
-            "종류는 바꿀 수 없다: {}",
-            live.kind.label()
-        )));
-    }
     let scope = scope_of(opts, false)?;
-    if scope.given && scope.project != live.project {
-        return Err(EngineError::invalid_argument(format!(
-            "범위는 바꿀 수 없다: {}",
-            match &live.project {
-                None => "global".to_string(),
-                Some(p) => format!("project={p}"),
-            }
-        )));
-    }
-    reject_agent_only_for_skill(live.kind, opts)?;
+    check_same_kind_and_scope(&live, opts.get("kind").map(String::as_str), &scope)?;
+    reject_agent_only_for_skill(live.kind, |k| opts.contains_key(k))?;
     // 고칠 바탕은 승인한 판이다. 직접 고쳐진 파일의 내용은 이어받지 않는다(받아들이려면 resolve-resource-edit)
     let base = store::base_for_edit(vault, &live)?;
     let plan = store::plan_update(
         vault,
         &base,
-        &fields_of(opts)?,
+        &fields_of(|k| opts.get(k).map(String::as_str))?,
         opts.get("f1").map(String::as_str),
         &run.stamp,
     )?;
@@ -613,43 +559,6 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
     m.insert("created".into(), json!(false));
     m.insert("changed".into(), json!(true));
     Ok(Json::Object(m))
-}
-
-fn reject_agent_only_for_skill(kind: ResourceKind, opts: &Opts) -> Result<(), EngineError> {
-    if kind == ResourceKind::Skill
-        && ["permission", "skills", "repo"]
-            .iter()
-            .any(|k| opts.contains_key(*k))
-    {
-        return Err(EngineError::invalid_argument(
-            "permission, skills, repo 는 에이전트에만 쓴다",
-        ));
-    }
-    Ok(())
-}
-
-fn fields_of(opts: &Opts) -> Result<Fields, EngineError> {
-    Ok(Fields {
-        name: opts.get("name").map(|v| format::name(v)).transpose()?,
-        description: opts
-            .get("description")
-            .map(|v| format::description(v))
-            .transpose()?,
-        body: opts.get("body").map(|v| format::body(v)).transpose()?,
-        permission: opts
-            .get("permission")
-            .map(|v| format::permission(v))
-            .transpose()?,
-        skills: opts
-            .get("skills")
-            .map(|v| format::skill_ids(&Json::String(v.clone())))
-            .transpose()?,
-        repo: opts.get("repo").map(|v| trim(v).to_string()),
-        tools: opts
-            .get("tools")
-            .map(|v| format::tools(&Json::String(v.clone())))
-            .transpose()?,
-    })
 }
 
 pub fn delete_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Json, EngineError> {
@@ -746,16 +655,6 @@ pub fn set_resource_ref(
     ref_impl(&run(vault, &request.context), &project, &id, &opts)
 }
 
-fn add_ref(entries: &mut Vec<refs::Entry>, g: &Resource, added: &mut Vec<String>) {
-    if !entries.iter().any(|e| e.id == g.id) {
-        entries.push(refs::Entry {
-            id: g.id.clone(),
-            hint: g.name.clone(),
-        });
-        added.push(g.id.clone());
-    }
-}
-
 fn ref_impl(run: &Run, project: &str, id: &str, opts: &Opts) -> Result<Json, EngineError> {
     let vault = run.vault;
     let remove = is_true(opts.get("remove"));
@@ -769,43 +668,12 @@ fn ref_impl(run: &Run, project: &str, id: &str, opts: &Opts) -> Result<Json, Eng
 
     // 바탕은 승인한 참조 목록과 승인한 자원이다(직접 고쳐진 refs.md의 내용은 이어받지 않는다)
     let served = store::scan_served(vault)?;
-    let mut entries = refs::read_approved(vault, project)?;
-    let mut added: Vec<String> = Vec::new();
-    let mut removed: Vec<String> = Vec::new();
-    if remove {
-        let before = entries.len();
-        entries.retain(|e| e.id != id);
-        if entries.len() != before {
-            removed.push(id.to_string());
-        }
-    } else {
-        let Some(g) = served.by_id(id) else {
-            return Err(EngineError::not_found(format!("자원을 못 찾았다: {id}")));
-        };
-        if !g.is_global() {
-            return Err(EngineError::invalid_argument(format!(
-                "글로벌 자원만 참조한다. 프로젝트 자원은 참조하지 않아도 쓸 수 있다: {id}"
-            )));
-        }
-        add_ref(&mut entries, g, &mut added);
-        if with_skills && g.kind == ResourceKind::Agent {
-            for sid in &g.skills {
-                if let Some(s) = served.by_id(sid).filter(|s| s.is_global()) {
-                    add_ref(&mut entries, s, &mut added);
-                }
-            }
-        }
-    }
-    // 이름 힌트를 지금 이름으로 새로 적는다(ID는 그대로다)
-    let next: Vec<refs::Entry> = entries
-        .into_iter()
-        .map(|e| refs::Entry {
-            hint: served
-                .by_id(&e.id)
-                .map_or(e.hint.clone(), |r| r.name.clone()),
-            id: e.id,
-        })
-        .collect();
+    let entries = refs::read_approved(vault, project)?;
+    let RefsChange {
+        next,
+        added,
+        removed,
+    } = change_refs(entries, id, remove, with_skills, |rid| served.by_id(rid))?;
 
     let cats = aggregate::classify_refs(&added, &removed);
     if !cats.is_empty() {
@@ -904,12 +772,6 @@ pub fn usable_resources(
 }
 
 // ---------------------------------------------------------------- 승인 워크플로(#53)
-
-struct RefInfo {
-    project: String,
-    added: Vec<String>,
-    removed: Vec<String>,
-}
 
 fn strings(items: &[String]) -> JsonValue {
     JsonValue::Array(items.iter().map(string).collect())
@@ -1015,7 +877,7 @@ fn queue_if_needed(
     }
     c.push((
         "summary".into(),
-        string(summarize(command, before, after, ref_info)),
+        string(summarize_change(command, before, after, ref_info)),
     ));
     let change = JsonValue::Object(c);
     changes::write(vault, &change)?;
@@ -1105,83 +967,6 @@ fn java_text(value: &JsonValue) -> String {
         },
         other => json::compact(other),
     }
-}
-
-fn summarize(
-    command: &str,
-    before: Option<&Resource>,
-    after: Option<&Resource>,
-    ref_info: Option<&RefInfo>,
-) -> String {
-    if command == "set-resource-ref"
-        && let Some(info) = ref_info
-    {
-        let mut s = format!("프로젝트 '{}'의 글로벌 자원 참조 ", info.project);
-        if !info.added.is_empty() {
-            s.push_str(&format!("{}개 켜기", info.added.len()));
-        }
-        if !info.added.is_empty() && !info.removed.is_empty() {
-            s.push_str(", ");
-        }
-        if !info.removed.is_empty() {
-            s.push_str(&format!("{}개 끄기", info.removed.len()));
-        }
-        return s;
-    }
-    let any = after.or(before).expect("바꿀 자원이 있다");
-    let what = format!(
-        "{}{} '{}'",
-        if any.is_global() {
-            "글로벌 "
-        } else {
-            "프로젝트 "
-        },
-        if any.kind == ResourceKind::Skill {
-            "스킬"
-        } else {
-            "에이전트"
-        },
-        any.name
-    );
-    match command {
-        "delete-resource" => format!("{what} 지우기"),
-        "restore-resource" => format!("{what} 되살리기"),
-        _ => match (before, after) {
-            (Some(b), Some(a)) => format!("{what} 고치기({})", changed_fields(b, a).join(", ")),
-            _ => format!("{what} 만들기"),
-        },
-    }
-}
-
-fn changed_fields(a: &Resource, b: &Resource) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    if a.name != b.name {
-        out.push("이름".into());
-    }
-    if a.description != b.description {
-        out.push("설명".into());
-    }
-    if a.body != b.body {
-        out.push("지침".into());
-    }
-    if a.permission != b.permission {
-        let show = |p: &Option<String>| p.clone().unwrap_or_else(|| "null".to_string());
-        out.push(format!(
-            "권한 {} → {}",
-            show(&a.permission),
-            show(&b.permission)
-        ));
-    }
-    if a.skills != b.skills {
-        out.push("스킬 목록".into());
-    }
-    if a.repo != b.repo {
-        out.push("저장소".into());
-    }
-    if !tools_equal(&a.tools, &b.tools) {
-        out.push("도구 칸".into());
-    }
-    out
 }
 
 fn require_human(ai: bool, what: &str) -> Result<(), EngineError> {

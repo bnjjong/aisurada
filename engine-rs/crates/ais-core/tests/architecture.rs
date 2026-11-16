@@ -467,6 +467,7 @@ fn aggregate_files_are_pure_domain_code() {
         "task/aggregate.rs",
         "task/transitions.rs",
         "resource/aggregate.rs",
+        "resource/rules.rs",
         "note/meta.rs",
         "note/front.rs",
         "note/placement.rs",

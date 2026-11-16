@@ -7,6 +7,7 @@ pub mod changes;
 pub mod format;
 pub mod refs;
 pub mod resolver;
+pub mod rules;
 pub mod store;
 
 use crate::kernel::ids::RESOURCE_ID as ID_SHAPE;
