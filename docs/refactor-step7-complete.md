@@ -64,7 +64,7 @@ flowchart LR
 
 ## 남은 일(모두 [이슈 #77](https://github.com/bnjjong/aisurada/issues/77)에 있다)
 
-- 처리 함수가 `&CallContext`를 직접 받고 요청 타입의 `caller`·`context` 칸을 지우기(약 25곳)
+- ~~처리 함수가 `&CallContext`를 직접 받고 요청 타입의 `caller`·`context` 칸을 지우기~~ 끝냈다([후속 기록](refactor-step7e-complete.md))
 - 오류를 `DomainError`·`InfraError` 두 타입으로 가르기(처리 함수 반환 타입 수백 곳)
 - `json`·`text` 모듈의 공개 항목을 필요한 것만 남기기
 - 사용법 글을 CLI로 옮기기(결정 5와 화면 정규식 교체가 먼저)
