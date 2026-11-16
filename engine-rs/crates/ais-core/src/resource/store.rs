@@ -10,6 +10,7 @@
 //! 설명서가 정한 `notes/`와 `.aisurada/projects/` 등을 건드리지 않는 새 영역이다. 자원의 범위는 파일 위치로 정해지고,
 //! 이름을 바꿔도 `id`는 머리말 안에 있어서 참조가 끊기지 않는다.
 
+use super::aggregate::TrustState;
 use crate::ports::fs;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -236,8 +237,8 @@ fn scan_scope(
 pub struct Served {
     pub items: Vec<Resource>,
     pub skipped: Vec<String>,
-    /// id별 상태(`approved` 또는 `dirty`)
-    pub states: Vec<(String, &'static str)>,
+    /// id별 상태(`Approved` 또는 `Dirty`)
+    pub states: Vec<(String, TrustState)>,
     pub untrusted: Vec<Resource>,
 }
 
@@ -246,7 +247,7 @@ impl Served {
         self.items.iter().find(|r| r.id == id)
     }
 
-    pub fn state_of(&self, id: &str) -> Option<&'static str> {
+    pub fn state_of(&self, id: &str) -> Option<TrustState> {
         self.states.iter().find(|(k, _)| k == id).map(|(_, s)| *s)
     }
 }
@@ -256,21 +257,25 @@ pub fn scan_served(vault: &Path) -> Result<Served, EngineError> {
     let ledger = approvals::ledger(vault)?;
     let mut items: Vec<Resource> = Vec::new();
     let mut untrusted: Vec<Resource> = Vec::new();
-    let mut states: Vec<(String, &'static str)> = Vec::new();
+    let mut states: Vec<(String, TrustState)> = Vec::new();
     for r in raw.items {
-        match ledger.get(&approvals::res_key(&r.id)) {
-            None => untrusted.push(r),
-            Some(e) if Some(&e.token) == r.token.as_ref() => {
-                states.push((r.id.clone(), "approved"));
+        let entry = ledger.get(&approvals::res_key(&r.id));
+        match TrustState::judge(entry.map(|e| e.token.as_str()), r.token.as_deref()) {
+            TrustState::Untrusted => untrusted.push(r),
+            TrustState::Approved => {
+                states.push((r.id.clone(), TrustState::Approved));
                 items.push(r);
             }
-            Some(e) => match approved_copy(vault, &r, &e.token) {
-                None => untrusted.push(r),
-                Some(approved) => {
-                    states.push((r.id.clone(), "dirty"));
-                    items.push(approved);
+            TrustState::Dirty => {
+                let token = entry.map(|e| e.token.as_str()).unwrap_or_default();
+                match approved_copy(vault, &r, token) {
+                    None => untrusted.push(r),
+                    Some(approved) => {
+                        states.push((r.id.clone(), TrustState::Dirty));
+                        items.push(approved);
+                    }
                 }
-            },
+            }
         }
     }
     Ok(Served {
@@ -317,13 +322,12 @@ pub fn base_for_edit(vault: &Path, live: &Resource) -> Result<Resource, EngineEr
 }
 
 /// 승인 상태. 승인 기록이 없으면 `new`, 지문이 안 맞으면 `dirty`, 맞으면 `approved`다.
-pub fn approval_state(vault: &Path, live: &Resource) -> Result<&'static str, EngineError> {
+pub fn approval_state(vault: &Path, live: &Resource) -> Result<TrustState, EngineError> {
     let ledger = approvals::ledger(vault)?;
-    Ok(match ledger.get(&approvals::res_key(&live.id)) {
-        None => "new",
-        Some(e) if Some(&e.token) == live.token.as_ref() => "approved",
-        Some(_) => "dirty",
-    })
+    let approved = ledger
+        .get(&approvals::res_key(&live.id))
+        .map(|e| e.token.as_str());
+    Ok(TrustState::judge(approved, live.token.as_deref()))
 }
 
 /// 직접 고쳐진 파일을 승인해 둔 판으로 되돌린다. 고쳐진 내용은 이력에 남긴다. 승인해 둔 사본이 없거나 지문이 안 맞으면 `AIS-409`다.

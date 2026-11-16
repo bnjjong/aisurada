@@ -463,7 +463,11 @@ fn file_access_goes_through_the_store_port() {
 /// 영역마다 애그리거트를 올릴 때마다 이 목록에 파일을 더한다.
 #[test]
 fn aggregate_files_are_pure_domain_code() {
-    const PURE: &[&str] = &["task/aggregate.rs", "task/transitions.rs"];
+    const PURE: &[&str] = &[
+        "task/aggregate.rs",
+        "task/transitions.rs",
+        "resource/aggregate.rs",
+    ];
     const FORBIDDEN: &[&str] = &[
         "crate::ports",
         "crate::write",

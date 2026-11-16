@@ -15,6 +15,7 @@ use crate::kernel::ids::CHANGE_ID as ID_SHAPE;
 use crate::ports::fs;
 use std::path::{Path, PathBuf};
 
+use super::aggregate::ChangeStatus;
 use super::format::value_to_json;
 use super::{Resource, ResourceKind};
 use crate::error::EngineError;
@@ -27,10 +28,10 @@ use crate::write::json_out::{literal, string, to_file_bytes};
 pub const DIR: &str = ".aisurada/pending";
 pub const DECIDED_KEEP: usize = 200;
 
-pub const PENDING: &str = "pending";
-pub const APPROVED: &str = "approved";
-pub const REJECTED: &str = "rejected";
-pub const STALE: &str = "stale";
+pub const PENDING: &str = ChangeStatus::Pending.as_str();
+pub const APPROVED: &str = ChangeStatus::Approved.as_str();
+pub const REJECTED: &str = ChangeStatus::Rejected.as_str();
+pub const STALE: &str = ChangeStatus::Stale.as_str();
 
 /// 변경 하나. JSON 객체이고 칸 차례를 지킨다.
 pub type Change = JsonValue;

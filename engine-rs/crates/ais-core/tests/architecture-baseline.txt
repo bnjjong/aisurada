@@ -10,7 +10,7 @@ edge commands -> json 5
 edge commands -> kernel 29
 edge commands -> model 16
 edge commands -> ports 10
-edge commands -> resource 5
+edge commands -> resource 6
 edge commands -> session 2
 edge commands -> task 7
 edge commands -> text 33
@@ -32,7 +32,7 @@ edge model -> vault 9
 edge ports -> adapters 1
 edge ports -> error 1
 edge ports -> kernel 1
-edge resource -> error 6
+edge resource -> error 7
 edge resource -> frontmatter 5
 edge resource -> json 4
 edge resource -> kernel 13

@@ -1,6 +1,7 @@
 //! 스킬과 에이전트 정의(자원)의 규칙: 모양(`format`), 승인 기록(`approvals`), 대기 변경(`changes`), 참조 목록(`refs`),
 //! 쓸 수 있는 자원 풀기(`resolver`), vault에서 읽고 쓰는 곳(`store`). 외부 설명서에 없는 확장이다.
 
+pub mod aggregate;
 pub mod approvals;
 pub mod changes;
 pub mod format;

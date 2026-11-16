@@ -24,9 +24,10 @@ use super::option_text::text_of;
 use crate::commands::Caller;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::resource::approvals::{self, Category, POLICY_KEYS, Policy};
+use crate::resource::aggregate::{self, Category, POLICY_KEYS, Policy, TrustState};
+use crate::resource::approvals;
 use crate::resource::format::{self, json_to_serde, value_to_serde};
-use crate::resource::refs::{self, State};
+use crate::resource::refs;
 use crate::resource::store::{self, Fields, Stamp};
 use crate::resource::{Resource, ResourceKind, changes, resolver, tools_equal};
 use crate::task::format::java_trim;
@@ -408,7 +409,7 @@ pub fn list_resources(vault: &Path, request: &ListResourcesRequest) -> Result<Js
         .into_iter()
         .map(|r| {
             let mut m = row(r, bodies, false);
-            if served.state_of(&r.id) == Some("dirty") {
+            if served.state_of(&r.id) == Some(TrustState::Dirty) {
                 m.insert("approval".into(), json!("dirty"));
             }
             Json::Object(m)
@@ -451,7 +452,7 @@ pub fn get_resource(vault: &Path, request: &GetResourceRequest) -> Result<Json, 
         }
         None => row(cur, true, false),
     };
-    if store::approval_state(vault, &live)? == "dirty" {
+    if store::approval_state(vault, &live)? == TrustState::Dirty {
         m.insert("approval".into(), json!("dirty"));
     }
     // 고칠 때 넘길 토큰은 늘 지금 파일의 것이다(옛 판을 읽어도, 그 내용으로 되돌려 쓰려면 지금 파일의 토큰이 필요하다)
@@ -527,7 +528,7 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
             &run.stamp,
             run.forced_id.as_deref(),
         )?;
-        let cats = approvals::classify(None, Some(&plan.after));
+        let cats = aggregate::classify(None, Some(&plan.after));
         if let Some(queued) = queue_if_needed(
             run,
             "save-resource",
@@ -587,7 +588,7 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
         m.insert("changed".into(), json!(false));
         return Ok(Json::Object(m));
     }
-    let cats = approvals::classify(Some(&base), Some(&plan.after));
+    let cats = aggregate::classify(Some(&base), Some(&plan.after));
     if let Some(queued) = queue_if_needed(
         run,
         "save-resource",
@@ -659,7 +660,7 @@ pub fn delete_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Json
 fn delete(run: &Run, id: &str) -> Result<Json, EngineError> {
     let vault = run.vault;
     let cur = store::find(vault, id)?;
-    let cats = approvals::classify(Some(&cur), None);
+    let cats = aggregate::classify(Some(&cur), None);
     if let Some(queued) = queue_if_needed(
         run,
         "delete-resource",
@@ -701,7 +702,7 @@ pub fn restore_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Jso
 fn restore(run: &Run, id: &str) -> Result<Json, EngineError> {
     let vault = run.vault;
     let back = store::peek_trash(vault, id)?;
-    let cats = approvals::classify(None, Some(&back));
+    let cats = aggregate::classify(None, Some(&back));
     if let Some(queued) = queue_if_needed(
         run,
         "restore-resource",
@@ -806,7 +807,7 @@ fn ref_impl(run: &Run, project: &str, id: &str, opts: &Opts) -> Result<Json, Eng
         })
         .collect();
 
-    let cats = approvals::classify_refs(&added, &removed);
+    let cats = aggregate::classify_refs(&added, &removed);
     if !cats.is_empty() {
         let info = RefInfo {
             project: project.to_string(),
@@ -932,7 +933,7 @@ fn queue_if_needed(
         return Ok(None);
     }
     let vault = run.vault;
-    let decision = approvals::decide(&approvals::policy(vault)?, cats, run.ai);
+    let decision = aggregate::decide(&approvals::policy(vault)?, cats, run.ai);
     if !decision.queue {
         return Ok(None);
     }
@@ -1336,7 +1337,7 @@ fn unapproved_rows(vault: &Path) -> Result<Vec<Json>, EngineError> {
     let served = store::scan_served(vault)?;
     let raw = store::scan(vault);
     for approved in &served.items {
-        if served.state_of(&approved.id) != Some("dirty") {
+        if served.state_of(&approved.id) != Some(TrustState::Dirty) {
             continue;
         }
         let mut m = unapproved_row(approved, "dirty");
@@ -1362,7 +1363,7 @@ fn unapproved_rows(vault: &Path) -> Result<Vec<Json>, EngineError> {
     }
     for Utf16Key(project) in projects {
         let state = refs::state(vault, &project)?;
-        if state == State::Approved {
+        if state == TrustState::Approved {
             continue;
         }
         let ids = |entries: Vec<refs::Entry>| -> Vec<String> {
@@ -1371,7 +1372,7 @@ fn unapproved_rows(vault: &Path) -> Result<Vec<Json>, EngineError> {
         rows.push(json!({
             "key": approvals::refs_key(&project),
             "type": "refs",
-            "state": if state == State::Dirty { "dirty" } else { "new" },
+            "state": if state == TrustState::Dirty { "dirty" } else { "new" },
             "project": project,
             "approved": ids(refs::read_approved(vault, &project)?),
             "live": ids(refs::read(vault, &project)),
@@ -1423,7 +1424,7 @@ pub fn approve_resource_change(
     let result = match apply_change(&run, &change) {
         Ok(result) => result,
         Err(e) => {
-            if matches!(e.code, "AIS-400" | "AIS-404" | "AIS-409" | "AIS-412") {
+            if aggregate::goes_stale(&e) {
                 decide(
                     vault,
                     &mut change,
@@ -1464,12 +1465,10 @@ pub fn reject_resource_change(
 fn pending_change(vault: &Path, id: &str) -> Result<changes::Change, EngineError> {
     let change = changes::read(vault, id)?;
     if changes::get_str(&change, "status") != Some(changes::PENDING) {
-        return Err(EngineError::conflict(format!(
-            "이미 처리된 변경이다({}): {id}",
-            change
-                .get("status")
-                .map_or_else(|| "null".to_string(), java_text)
-        )));
+        let current = change
+            .get("status")
+            .map_or_else(|| "null".to_string(), java_text);
+        return Err(aggregate::already_decided(id, &current));
     }
     Ok(change)
 }
@@ -1576,14 +1575,14 @@ pub fn resolve_resource_edit(
     let out = json!({"key": key, "action": action});
     if let Some(project) = key.strip_prefix("refs:") {
         let state = refs::state(vault, project)?;
-        if state == State::Approved {
+        if state == TrustState::Approved {
             return Err(EngineError::conflict(format!(
                 "승인 안 된 변경이 없다: {key}"
             )));
         }
         if approve {
             approvals::record(vault, key, &refs::live_bytes(vault, project), "adopted")?;
-        } else if state == State::Dirty {
+        } else if state == TrustState::Dirty {
             let copy = approvals::copy(vault, key).unwrap_or_default();
             store::restore_refs_bytes(vault, project, &copy)?;
         } else {
@@ -1593,7 +1592,7 @@ pub fn resolve_resource_edit(
     }
     let live = store::find(vault, key)?;
     let state = store::approval_state(vault, &live)?;
-    if state == "approved" {
+    if state == TrustState::Approved {
         return Err(EngineError::conflict(format!(
             "승인 안 된 변경이 없다: {key}"
         )));
@@ -1605,7 +1604,7 @@ pub fn resolve_resource_edit(
             &store::live_bytes(vault, &live)?,
             "adopted",
         )?;
-    } else if state == "dirty" {
+    } else if state == TrustState::Dirty {
         store::revert_to_approved(vault, &live)?;
     } else {
         store::delete(vault, &live)?;
@@ -1618,7 +1617,7 @@ fn policy_response(vault: &Path) -> Result<Json, EngineError> {
     Ok(json!({
         "policy": approvals::policy(vault)?.to_json(),
         "defaults": Policy::defaults().to_json(),
-        "categories": approvals::categories_json(),
+        "categories": aggregate::categories_json(),
     }))
 }
 

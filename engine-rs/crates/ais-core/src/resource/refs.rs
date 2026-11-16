@@ -10,6 +10,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+use super::aggregate::TrustState;
 use super::{ResourceKind, approvals, store};
 use crate::error::EngineError;
 use crate::kernel::java::java_trim;
@@ -97,37 +98,28 @@ pub fn projects_with_refs_file(vault: &Path) -> Vec<String> {
     out
 }
 
-/// 참조 목록의 승인 상태
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum State {
-    /// 승인한 판과 같다(또는 승인 기록도 파일도 없다).
-    Approved,
-    /// 승인한 뒤에 파일이 바뀌었다. 승인해 둔 사본을 쓴다.
-    Dirty,
-    /// 승인 기록이 없는데 파일이 있다. 쓰지 않는다(빈 목록으로 본다).
-    Untrusted,
-}
-
-pub fn state(vault: &Path, project: &str) -> Result<State, EngineError> {
+pub fn state(vault: &Path, project: &str) -> Result<TrustState, EngineError> {
     let live = live_bytes(vault, project);
     let ledger = approvals::ledger(vault)?;
-    Ok(match ledger.get(&approvals::refs_key(project)) {
-        None if live.is_empty() => State::Approved,
-        None => State::Untrusted,
-        Some(e) if compute_token(&live) == e.token => State::Approved,
-        Some(_) => State::Dirty,
-    })
+    let approved = ledger
+        .get(&approvals::refs_key(project))
+        .map(|e| e.token.as_str());
+    // 승인 기록도 파일 내용도 없으면 승인한 판과 같은 것으로 본다
+    if approved.is_none() && live.is_empty() {
+        return Ok(TrustState::Approved);
+    }
+    Ok(TrustState::judge(approved, Some(&compute_token(&live))))
 }
 
 /// 승인한 판의 참조 목록. 실행과 목록이 쓰는 것은 이쪽이다. 직접 고친 파일은 승인해 둔 사본으로 읽고, 기록 없는 새 파일은 비어 있는 것으로 본다.
 pub fn read_approved(vault: &Path, project: &str) -> Result<Vec<Entry>, EngineError> {
     Ok(match state(vault, project)? {
-        State::Approved => read(vault, project),
-        State::Dirty => match approvals::copy(vault, &approvals::refs_key(project)) {
+        TrustState::Approved => read(vault, project),
+        TrustState::Dirty => match approvals::copy(vault, &approvals::refs_key(project)) {
             Some(copy) => parse(&String::from_utf8_lossy(&copy)),
             None => Vec::new(),
         },
-        State::Untrusted => Vec::new(),
+        TrustState::Untrusted => Vec::new(),
     })
 }
 
