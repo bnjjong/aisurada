@@ -119,6 +119,13 @@ pub fn resolve_claude() -> Option<PathBuf> {
     None
 }
 
+#[cfg(test)]
+thread_local! {
+    /// 시험 전용. 켜면 `resolve_gemini`가 환경 변수만 보고 홈, 설치 폴더, PATH는 보지 않는다.
+    /// 시험 기기에 실제로 깔린 CLI에 시험이 기대지 않게 하고, 그러려고 HOME과 PATH를 프로세스 전체에서 바꾸지 않아도 되게 한다.
+    static GEMINI_ENV_ONLY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 pub fn resolve_gemini() -> Option<PathBuf> {
     // 1. AISURADA_ANTIGRAVITY_BIN 또는 AISURADA_GEMINI_BIN
     if let Ok(bin) = env::var("AISURADA_ANTIGRAVITY_BIN").or_else(|_| env::var("AISURADA_GEMINI_BIN")) {
@@ -128,6 +135,11 @@ pub fn resolve_gemini() -> Option<PathBuf> {
                 return Some(p);
             }
         }
+    }
+
+    #[cfg(test)]
+    if GEMINI_ENV_ONLY.with(|only| only.get()) {
+        return None;
     }
 
     let bin_names = ["antigravity", "agy", "gemini"];
@@ -792,6 +804,11 @@ mod tests {
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+    /// 환경 변수를 만지는 시험끼리 줄 세우는 잠금. 앞선 시험이 실패해 잠금이 오염(poison)돼도 뒤 시험이 연쇄로 실패하지 않게 한다.
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     #[test]
     fn test_augmented_path_structure() {
         let p = augmented_path();
@@ -822,7 +839,7 @@ mod tests {
 
     #[test]
     fn ask_runtime_is_always_cli_even_with_flags() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         env::set_var("AISURADA_ASK_VIA_HTTP", "1");
         env::set_var("AISURADA_ASK_VIA_AGENT_SDK", "1");
         let route = ask_runtime();
@@ -903,7 +920,7 @@ mod tests {
 
     #[test]
     fn test_resolve_claude_with_env_var() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         let fake_bin = dir.path().join("fake_claude");
         File::create(&fake_bin).unwrap();
@@ -925,7 +942,7 @@ mod tests {
 
     #[test]
     fn test_fake_claude_success_stdin_and_args() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         // 스크립트: 전달받은 인자들과 표준입력을 출력
         let script = r#"#!/bin/sh
@@ -971,7 +988,7 @@ echo "STDIN: $(cat)"
 
     #[test]
     fn test_fake_claude_flag_flip_on_already_in_use() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         let count_file = dir.path().join("attempt.txt");
         // 첫 번째 시도에는 'is already in use' 에러로 실패, 두 번째 시도(--resume)에는 성공
@@ -1020,7 +1037,7 @@ fi
 
     #[test]
     fn test_fake_claude_no_record_prefix_on_resume_only() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         let script = r#"#!/bin/sh
 echo "Error: No conversation found for session" >&2
@@ -1058,7 +1075,7 @@ exit 1
 
     #[test]
     fn test_fake_claude_timeout_reaps_child() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         let pid_file = dir.path().join("pid");
         let script = format!(
@@ -1100,7 +1117,7 @@ exit 1
 
     #[test]
     fn test_fake_claude_d12_first_line_and_huge_policy_warning() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         // D12 고침: 실패 원인 첫 줄 + 450자 경고 줄
         let warning_text = "Policy warning: ".to_string() + &"W".repeat(450);
@@ -1164,7 +1181,7 @@ exit 1
 
     #[test]
     fn both_letters_on_a_resume_call_do_not_flip_to_session_id() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         let count = dir.path().join("count");
         let script = format!(
@@ -1181,7 +1198,7 @@ exit 1
 
     #[test]
     fn prefix_is_judged_on_stdout_only_when_stderr_is_blank_and_skipped_with_already_in_use() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         // 표준오류가 비어 있지 않으면 표준출력은 안 본다
         let stderr_boom = create_executable_script(
@@ -1215,7 +1232,7 @@ exit 1
 
     #[test]
     fn pipe_holder_after_claude_exit_answers_at_the_limit() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let dir = tempdir().unwrap();
         // claude 는 끝났는데 자식이 출력 파이프를 쥐고 있다. 상한에서 「상한에 끊긴 것」으로 답해야 한다
         let fake = create_executable_script(
@@ -1236,7 +1253,7 @@ exit 1
 
     #[test]
     fn test_resolve_gemini_with_env_var() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let temp = tempdir().unwrap();
         let fake = temp.path().join("antigravity");
         File::create(&fake).unwrap();
@@ -1256,11 +1273,17 @@ exit 1
 
     #[test]
     fn test_gemini_missing_binary_message() {
-        let _lock = ENV_LOCK.lock().unwrap();
-        let orig_home = env::var("HOME").ok();
-        let orig_path = env::var("PATH").ok();
-        env::set_var("HOME", "/nonexistent_home_dir_for_test");
-        env::set_var("PATH", "/nonexistent_path_dir_for_test");
+        let _lock = env_lock();
+        // HOME과 PATH를 프로세스 전체에서 바꾸면 그 사이에 자식 프로세스를 띄우는 다른 시험(러너, 터미널)이 깨진다.
+        // 대신 이 스레드에서만 환경 변수 밖의 탐색(홈, 설치 폴더, PATH)을 끈다.
+        struct EnvOnly;
+        impl Drop for EnvOnly {
+            fn drop(&mut self) {
+                GEMINI_ENV_ONLY.with(|only| only.set(false));
+            }
+        }
+        GEMINI_ENV_ONLY.with(|only| only.set(true));
+        let _env_only = EnvOnly;
         env::set_var("AISURADA_ANTIGRAVITY_BIN", "/nonexistent/antigravity-bin");
         env::remove_var("AISURADA_GEMINI_BIN");
 
@@ -1282,16 +1305,6 @@ exit 1
             persona: None,
         });
 
-        if let Some(h) = orig_home {
-            env::set_var("HOME", h);
-        } else {
-            env::remove_var("HOME");
-        }
-        if let Some(p) = orig_path {
-            env::set_var("PATH", p);
-        } else {
-            env::remove_var("PATH");
-        }
         env::remove_var("AISURADA_ANTIGRAVITY_BIN");
 
         assert!(!res.ok);
@@ -1300,7 +1313,7 @@ exit 1
 
     #[test]
     fn test_gemini_success_with_fake_binary() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = env_lock();
         let temp = tempdir().unwrap();
         let fake = temp.path().join("antigravity");
         let script = r#"#!/bin/sh
