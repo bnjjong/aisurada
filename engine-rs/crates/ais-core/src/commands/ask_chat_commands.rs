@@ -69,8 +69,6 @@ pub struct AppendAskTurnRequest {
     pub session_lines: Option<Json>,
     /// 호출 객체에서는 배열, 명령줄에서는 쉼표로 이은 글
     pub images: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -94,8 +92,6 @@ pub struct AppendChatTurnRequest {
     #[serde(rename = "elapsed-ms", alias = "elapsedMs")]
     pub elapsed_ms: Option<Json>,
     pub images: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 // ---------------------------------------------------------------- 대상 노트 찾기

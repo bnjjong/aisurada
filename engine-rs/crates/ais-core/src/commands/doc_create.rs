@@ -43,8 +43,6 @@ pub struct CreateDocRequest {
     pub template: Option<String>,
     /// `reading`(기본)이나 `record`. AI 호출에서는 받지 않는다.
     pub tier: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// 새 노트를 만든 결과. `create_doc`의 응답이고, 쓰기 범위를 이미 잡은 `plan_day`가 같은 길로 노트를 만들 때 이어받는 값이다
@@ -68,8 +66,9 @@ pub fn create_doc(
     vault: &Path,
     request: &CreateDocRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<CreatedDoc, EngineError> {
-    create_doc_in(vault, scope, request)
+    create_doc_in(vault, scope, request, context)
 }
 
 /// 이미 쓰기 범위를 잡은 명령(`plan_day`)이 같은 길로 노트를 만든다.
@@ -77,8 +76,8 @@ pub fn create_doc_in(
     vault: &Path,
     scope: &WriteScope,
     request: &CreateDocRequest,
+    context: &CallContext,
 ) -> Result<CreatedDoc, EngineError> {
-    let context = &request.context;
     let tool = context.caller == Caller::Ai;
 
     // 인자 검사(규칙은 `note::create`). 오류가 나오는 차례는 그대로다.

@@ -34,8 +34,6 @@ pub struct SaveTemplateRequest {
     pub doc_type: Option<String>,
     pub desc: Option<String>,
     pub body: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -45,16 +43,12 @@ pub struct SaveRitualTemplateRequest {
     pub name: Option<String>,
     pub desc: Option<String>,
     pub body: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DeleteDocTemplateRequest {
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

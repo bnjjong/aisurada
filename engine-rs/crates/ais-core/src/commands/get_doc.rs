@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use super::Caller;
 use super::subnote::{check_note_id, check_readable};
+use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::{DocRow, NoteRow};
 use crate::vault::comments::{CommentsEnvelope, read_comments};
@@ -13,15 +14,14 @@ use crate::vault::index::NoteIndex;
 #[serde(default, rename_all = "camelCase")]
 pub struct GetDocRequest {
     pub id: String,
-    pub caller: Caller,
 }
 
-pub fn execute(index: &NoteIndex, request: &GetDocRequest) -> Result<DocRow, EngineError> {
+pub fn execute(index: &NoteIndex, request: &GetDocRequest, context: &CallContext) -> Result<DocRow, EngineError> {
     check_note_id(&request.id, "get-doc <노트 id>")?;
     let note = index
         .note(&request.id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", request.id)))?;
-    check_readable(note, request.caller)?;
+    check_readable(note, context.caller)?;
 
     // 파일 하나로 된 노트는 코멘트 파일을 둘 폴더가 없다
     let comments = if note.is_single_file {
@@ -33,7 +33,7 @@ pub fn execute(index: &NoteIndex, request: &GetDocRequest) -> Result<DocRow, Eng
         )
     };
     Ok(DocRow {
-        note: NoteRow::from_record(note, request.caller, true, None),
+        note: NoteRow::from_record(note, context.caller, true, None),
         comments,
     })
 }

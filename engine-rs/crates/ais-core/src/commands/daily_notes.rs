@@ -31,16 +31,12 @@ pub struct PlanDayRequest {
     pub date: Option<Json>,
     pub agenda: Option<Json>,
     pub dry_run: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CheckNotesRequest {
     pub date: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// `date=<YYYY-MM-DD>` 옵션. 없으면 오늘이다. 날 수로 돌려준다.
@@ -114,6 +110,7 @@ pub fn plan_day(
     vault: &Path,
     request: &PlanDayRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     let date = date_option(&request.date)?;
     let dry_run = bool_option(&request.dry_run, "dryRun")?;
@@ -169,15 +166,15 @@ pub fn plan_day(
             body: Some(body.clone()),
             date: Some(date_text),
             time: Some("09:00".to_string()),
-            // 계획 노트에는 세션 id를 심지 않는다(29장의 고정값). 호출자는 그대로 넘기고 세션만 뺀다.
-            context: CallContext {
-                session: None,
-                session_agent: None,
-                ..request.context.clone()
-            },
             ..CreateDocRequest::default()
         };
-        let saved = create_doc_in(vault, scope, &create)?;
+        // 계획 노트에는 세션 id를 심지 않는다(29장의 고정값). 호출자는 그대로 넘기고 세션만 뺀다.
+        let plan_context = CallContext {
+            session: None,
+            session_agent: None,
+            ..context.clone()
+        };
+        let saved = create_doc_in(vault, scope, &create, &plan_context)?;
         result.insert("saved".into(), json!(true));
         result.insert("id".into(), json!(saved.id));
         result.insert("agenda".into(), json!(saved.agenda));

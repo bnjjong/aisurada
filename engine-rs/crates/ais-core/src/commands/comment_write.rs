@@ -42,8 +42,6 @@ pub struct CommentWriteRequest {
     pub comment_id: Option<String>,
     /// 만들 때만. 코멘트가 가리킨 본문의 글
     pub anchor_quote: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 type Kind = CommentOp;
@@ -112,24 +110,27 @@ pub fn create_comment(
     vault: &Path,
     request: &CommentWriteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    execute(vault, request, Kind::Create, scope)
+    execute(vault, request, Kind::Create, scope, context)
 }
 
 pub fn update_comment(
     vault: &Path,
     request: &CommentWriteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    execute(vault, request, Kind::Update, scope)
+    execute(vault, request, Kind::Update, scope, context)
 }
 
 pub fn delete_comment(
     vault: &Path,
     request: &CommentWriteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    execute(vault, request, Kind::Delete, scope)
+    execute(vault, request, Kind::Delete, scope, context)
 }
 
 fn execute(
@@ -137,6 +138,7 @@ fn execute(
     request: &CommentWriteRequest,
     kind: Kind,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     let usage = match kind {
         Kind::Create => CREATE_USAGE,
@@ -159,7 +161,7 @@ fn execute(
     let (sub_id, body, quote) = (parsed.sub_id, parsed.body, parsed.quote);
     let mut id = parsed.comment_id;
     let target = resolve(vault, &scope.index, &request.id, sub_id)?;
-    check_writable(target.root, request.context.caller)?;
+    check_writable(target.root, context.caller)?;
     let mut comments: Vec<Comment> = match read_comments(vault, &target.file) {
         CommentsEnvelope::Unreadable { reason } => {
             return Err(EngineError::conflict(format!(

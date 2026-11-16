@@ -31,8 +31,6 @@ pub struct WriteAttachmentRequest {
     pub sub_id: Option<String>,
     pub name: Option<Json>,
     pub content: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// 이름 규칙을 이 차례로 보고 처음 걸린 1개만 낸다(18.8의 9번).
@@ -70,6 +68,7 @@ pub fn write_attachment(
     vault: &Path,
     request: &WriteAttachmentRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     if is_blank(&request.id) {
         return Err(EngineError::invalid_argument(format!(
@@ -106,7 +105,7 @@ pub fn write_attachment(
         .index
         .note(root_id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {root_id}")))?;
-    check_writable(root, request.context.caller)?;
+    check_writable(root, context.caller)?;
     let owner =
         match sub_id {
             None => root,

@@ -6,24 +6,27 @@ use std::path::Path;
 use serde::Deserialize;
 
 use super::Caller;
+use crate::kernel::actor::CallContext;
 use crate::model::{Page, TrashRow};
 use crate::vault::trash::{archived_tier, scan_trash};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-pub struct ListTrashRequest {
-    pub caller: Caller,
-}
+pub struct ListTrashRequest {}
 
-pub fn execute(vault_root: &Path, request: &ListTrashRequest) -> Page<TrashRow> {
+pub fn execute(
+    vault_root: &Path,
+    _request: &ListTrashRequest,
+    context: &CallContext,
+) -> Page<TrashRow> {
     let scan = scan_trash(vault_root);
     // 앱에는 층이 상관없으므로 보관 파일을 열지 않는다
     let rows: Vec<TrashRow> = scan
         .entries
         .iter()
         .filter(|entry| {
-            request.caller == Caller::App
-                || archived_tier(vault_root, entry).visible_to(request.caller)
+            context.caller == Caller::App
+                || archived_tier(vault_root, entry).visible_to(context.caller)
         })
         .map(TrashRow::from)
         .collect();

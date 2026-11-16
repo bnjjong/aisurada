@@ -20,8 +20,6 @@ pub struct UpdateAgendaFactsRequest {
     pub id: String,
     /// 새 사실층. 앞뒤 공백을 떼고, 비면 지운다. 없으면 오류다.
     pub facts: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

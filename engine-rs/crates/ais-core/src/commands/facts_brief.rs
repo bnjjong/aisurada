@@ -23,8 +23,6 @@ pub struct FactsBriefRequest {
     pub to: Option<Json>,
     #[serde(rename = "min-new-file", alias = "minNewFile")]
     pub min_new_file: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// `LocalDate.parse`: `YYYY-MM-DD`이고 달력에 있는 날짜. 날 수로 돌려준다.

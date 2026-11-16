@@ -40,8 +40,6 @@ pub struct UpdateDocRequest {
     pub time: Option<String>,
     /// 직전에 읽은 확인 값
     pub f1: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// 노트 id가 있고 모양이 맞는지 본다.
@@ -71,9 +69,10 @@ pub fn update_doc(
     vault: &Path,
     request: &UpdateDocRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     const USAGE: &str = "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [f1=<직전에 읽은 토큰>]";
-    let context = &request.context;
+    let context = &context;
 
     require_note_id(&request.id, USAGE)?;
     let note_id = request.id.as_str();

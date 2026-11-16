@@ -44,8 +44,6 @@ pub struct InitWorkspaceRequest {
     pub name: Option<String>,
     /// 심을 빌트인 템플릿 목록(JSON 배열 글)
     pub templates: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

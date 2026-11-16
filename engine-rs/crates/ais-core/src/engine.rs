@@ -80,26 +80,28 @@ impl Engine {
     }
 
     /// 호출 맥락(누가, 어느 세션에서)을 인자 밖에서 받아 명령을 실행한다. 앱, 명령줄, MCP가 부르는 입구다.
-    /// 맥락은 입구가 정하는 값이라 인자에 같은 칸(`caller`, `session`, `sessionAgent`)이 있어도 [`CallContext`]가 이긴다.
+    /// 맥락은 입구가 정하는 값이다. 요청 타입은 맥락 칸을 갖지 않으므로 인자에 `caller` 따위가 있어도 읽지 않는다.
     pub fn call_as(
         &self,
         context: &CallContext,
         command: &str,
         args: Value,
     ) -> Result<Value, EngineError> {
-        self.call(command, with_context(args, context))
-    }
-
-    /// 이름과 인자 객체로 명령을 실행하고 응답 JSON을 돌려줍니다.
-    /// 과도기 입구: 호출 맥락을 요청의 `caller`·`session`·`sessionAgent` 칸에서 읽는다. 시험과 녹화 하네스가 쓴다. 새 호출은 [`Engine::call_as`]를 쓴다.
-    pub fn call(&self, command: &str, args: Value) -> Result<Value, EngineError> {
         let _installed = self.ports.clone().map(crate::ports::install);
         match find(command) {
-            Some(def) => (def.run)(self, args),
+            Some(def) => (def.run)(self, context, args),
             None => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {command} 명령이 없다"
             ))),
         }
+    }
+
+    /// 이름과 인자 객체로 명령을 실행하고 응답 JSON을 돌려줍니다.
+    /// 과도기 입구: 호출 맥락을 인자의 `caller`·`session`·`sessionAgent` 칸에서 읽어 [`Engine::call_as`]로 넘긴다. 시험과 녹화 하네스가 쓴다.
+    /// 새 호출은 [`Engine::call_as`]를 쓴다.
+    pub fn call(&self, command: &str, args: Value) -> Result<Value, EngineError> {
+        let context = context_from_args(command, &args)?;
+        self.call_as(&context, command, args)
     }
 
     /// 쓰기 범위를 **이 한 곳에서** 연다(잠금 → 표식·색인 맞추기 → 자동 커밋 기록). 명령은 범위를 열지 않고 열린 범위(`&WriteScope`)를 받는다.
@@ -114,24 +116,14 @@ impl Engine {
     }
 }
 
-/// 요청 인자에 호출 맥락 칸을 덮어쓴다. 맥락에 없는 값(`session`, `sessionAgent`)은 인자에 있어도 지운다. 객체가 아닌 인자는 건드리지 않아 요청 읽기가 같은 오류를 낸다.
-fn with_context(args: Value, context: &CallContext) -> Value {
-    let mut map = match args {
-        Value::Null => serde_json::Map::new(),
-        Value::Object(map) => map,
-        other => return other,
-    };
-    map.insert("caller".into(), Value::from(context.caller.as_str()));
-    for (key, value) in [
-        ("session", &context.session),
-        ("sessionAgent", &context.session_agent),
-    ] {
-        match value {
-            Some(text) => map.insert(key.into(), Value::from(text.as_str())),
-            None => map.remove(key),
-        };
+/// 과도기 입구용: 인자 객체의 `caller`·`session`·`sessionAgent` 칸을 호출 맥락으로 읽는다. 객체가 아닌 인자는 맥락이 없는 것으로 보고
+/// (요청 읽기가 같은 오류를 낸다), 칸 값이 틀리면 요청 읽기와 같은 글로 거절한다.
+fn context_from_args(command: &str, args: &Value) -> Result<CallContext, EngineError> {
+    match args {
+        Value::Object(_) => serde_json::from_value(args.clone())
+            .map_err(|e| EngineError::invalid_argument(format!("{command} 인자가 잘못됐다: {e}"))),
+        _ => Ok(CallContext::default()),
     }
-    Value::Object(map)
 }
 
 fn find(command: &str) -> Option<&'static table::Def> {
@@ -191,32 +183,36 @@ mod tests {
         assert!(!Engine::supports("no_such_command") && !Engine::is_write("no_such_command"));
     }
 
-    /// 맥락은 인자의 같은 이름 칸을 이긴다. 인자로 호출자를 속일 수 없다.
+    /// 과도기 입구는 인자의 맥락 칸을 읽고, 새 입구는 인자의 같은 이름 칸을 읽지 않는다.
     #[test]
-    fn the_call_context_overrides_the_argument_fields() {
-        let context = CallContext::ai(Some("s1".into()), Some("codex".into()));
-        let args = with_context(
-            serde_json::json!({"id": "n1", "caller": "app", "session": "x", "sessionAgent": "y"}),
-            &context,
+    fn the_legacy_entry_reads_the_context_fields_and_the_new_entry_ignores_them() {
+        let args = serde_json::json!({"id": "n1", "caller": "ai", "session": "s1", "sessionAgent": "codex"});
+        assert_eq!(
+            context_from_args("x", &args).unwrap(),
+            CallContext::ai(Some("s1".into()), Some("codex".into()))
         );
         assert_eq!(
-            args,
-            serde_json::json!({"id": "n1", "caller": "ai", "session": "s1", "sessionAgent": "codex"})
-        );
-        // 맥락에 세션이 없으면 인자의 세션도 지운다
-        let args = with_context(
-            serde_json::json!({"id": "n1", "caller": "ai", "session": "x"}),
-            &CallContext::app(),
-        );
-        assert_eq!(args, serde_json::json!({"id": "n1", "caller": "app"}));
-        // 인자가 없으면 빈 객체로 본다. 객체가 아니면 그대로 둔다
-        assert_eq!(
-            with_context(Value::Null, &CallContext::app()),
-            serde_json::json!({"caller": "app"})
+            context_from_args("x", &serde_json::json!({"id": "n1"})).unwrap(),
+            CallContext::app()
         );
         assert_eq!(
-            with_context(serde_json::json!([1]), &CallContext::app()),
-            serde_json::json!([1])
+            context_from_args("x", &Value::Null).unwrap(),
+            CallContext::app()
+        );
+        // 객체가 아닌 인자는 맥락이 없는 것으로 보고 요청 읽기가 거절한다
+        assert_eq!(
+            context_from_args("x", &serde_json::json!([1])).unwrap(),
+            CallContext::app()
+        );
+        // 칸 값이 틀리면 요청 읽기와 같은 글로 거절한다
+        let error =
+            context_from_args("get_doc", &serde_json::json!({"caller": "robot"})).unwrap_err();
+        assert!(
+            error
+                .message
+                .starts_with("get_doc 인자가 잘못됐다: unknown variant `robot`"),
+            "{}",
+            error.message
         );
     }
 

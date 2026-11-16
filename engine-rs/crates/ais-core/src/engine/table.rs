@@ -18,6 +18,7 @@ use crate::commands::{
     shard_notes, sub_note_write, task_commands, template_write, trash_write, write_attachment,
 };
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::vault::index::NoteIndex;
 
 /// 명령이 vault를 고치는가
@@ -45,17 +46,31 @@ pub(super) struct Def {
     pub(super) name: &'static str,
     pub(super) access: Access,
     pub(super) scope: Scope,
-    pub(super) run: fn(&Engine, Value) -> Result<Value, EngineError>,
+    pub(super) run: fn(&Engine, &CallContext, Value) -> Result<Value, EngineError>,
 }
 
-/// 읽기 명령 한 줄. 요청 종류를 주면 인자를 그 모양으로 읽고, 안 주면 인자를 보지 않는다.
+/// 읽기 명령 한 줄. 요청 종류를 주면 인자를 그 모양으로 읽고, 안 주면 인자를 보지 않는다. 마지막 이름을 하나 더 주면 호출 맥락(`&CallContext`)이 거기 담긴다.
 macro_rules! read {
+    ($name:literal, $req:ty, |$root:ident, $request:ident, $ctx:ident| $body:expr) => {
+        Def {
+            name: $name,
+            access: Access::Read,
+            scope: Scope::None,
+            run: |engine: &Engine, call_context: &CallContext, args: Value| {
+                let parsed: $req = parse_args($name, args)?;
+                let $request = &parsed;
+                let $ctx = call_context;
+                let $root = engine.vault_root.as_path();
+                finish($body)
+            },
+        }
+    };
     ($name:literal, $req:ty, |$root:ident, $request:ident| $body:expr) => {
         Def {
             name: $name,
             access: Access::Read,
             scope: Scope::None,
-            run: |engine: &Engine, args: Value| {
+            run: |engine: &Engine, _call_context: &CallContext, args: Value| {
                 let parsed: $req = parse_args($name, args)?;
                 let $request = &parsed;
                 let $root = engine.vault_root.as_path();
@@ -68,7 +83,7 @@ macro_rules! read {
             name: $name,
             access: Access::Read,
             scope: Scope::None,
-            run: |engine: &Engine, _args: Value| {
+            run: |engine: &Engine, _call_context: &CallContext, _args: Value| {
                 let $root = engine.vault_root.as_path();
                 finish($body)
             },
@@ -77,16 +92,32 @@ macro_rules! read {
 }
 
 /// 쓰기 명령 한 줄. 요청을 읽고, 표가 정한 방식(`$scope`)으로 범위를 열고, 처리 함수에 요청과 열린 범위를 넘긴다.
-/// 모든 쓰기 요청은 호출 맥락 칸 `context`를 가진다.
+/// 범위를 여는 데는 호출 맥락을 쓴다. 처리 함수도 맥락이 필요하면 마지막 이름을 하나 더 준다.
 macro_rules! write {
+    ($name:literal, $scope:ident, $req:ty, |$root:ident, $request:ident, $open:ident, $ctx:ident| $body:expr) => {
+        Def {
+            name: $name,
+            access: Access::Write,
+            scope: Scope::$scope,
+            run: |engine: &Engine, call_context: &CallContext, args: Value| {
+                let parsed: $req = parse_args($name, args)?;
+                let scope = engine.open_scope(Scope::$scope, call_context)?;
+                let $request = &parsed;
+                let $open = &scope;
+                let $ctx = call_context;
+                let $root = engine.vault_root.as_path();
+                finish($body)
+            },
+        }
+    };
     ($name:literal, $scope:ident, $req:ty, |$root:ident, $request:ident, $open:ident| $body:expr) => {
         Def {
             name: $name,
             access: Access::Write,
             scope: Scope::$scope,
-            run: |engine: &Engine, args: Value| {
+            run: |engine: &Engine, call_context: &CallContext, args: Value| {
                 let parsed: $req = parse_args($name, args)?;
-                let scope = engine.open_scope(Scope::$scope, &parsed.context)?;
+                let scope = engine.open_scope(Scope::$scope, call_context)?;
                 let $request = &parsed;
                 let $open = &scope;
                 let $root = engine.vault_root.as_path();
@@ -103,7 +134,7 @@ macro_rules! write_unscoped {
             name: $name,
             access: Access::Write,
             scope: Scope::None,
-            run: |engine: &Engine, _args: Value| {
+            run: |engine: &Engine, _call_context: &CallContext, _args: Value| {
                 let $root = engine.vault_root.as_path();
                 finish($body)
             },
@@ -111,32 +142,29 @@ macro_rules! write_unscoped {
     };
 }
 
-/// `export_markdown`은 인자 없이 호출 맥락만 받는다.
+/// `export_markdown`은 인자가 없다.
 #[derive(Debug, Default, serde::Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct ExportMarkdownRequest {
-    #[serde(flatten)]
-    context: crate::kernel::actor::CallContext,
-}
+#[serde(default)]
+struct ExportMarkdownRequest {}
 
 /// 이 엔진이 처리하는 명령 전부. 차례는 앱에 알리는 목록의 차례다.
 #[rustfmt::skip]
 pub(super) static TABLE: &[Def] = &[
     // ── 읽기: 목록과 조회 ──
-    read!("list_docs", list_docs::ListDocsRequest, |root, request| list_docs::execute(&NoteIndex::fresh(root), request)),
+    read!("list_docs", list_docs::ListDocsRequest, |root, request, ctx| list_docs::execute(&NoteIndex::fresh(root), request, ctx)),
     read!("list_agendas", |root| Ok(list_agendas::execute(&NoteIndex::fresh(root)))),
     read!("list_projects", |root| Ok(list_projects::execute(root))),
     read!("list_templates", list_templates::ListTemplatesRequest, |root, request| list_templates::execute(root, request)),
-    read!("list_trash", list_trash::ListTrashRequest, |root, request| Ok(list_trash::execute(root, request))),
+    read!("list_trash", list_trash::ListTrashRequest, |root, request, ctx| Ok(list_trash::execute(root, request, ctx))),
     read!("reindex", |root| reindex::execute(root)),
     read!("reindex_paths", reindex::ReindexPathsRequest, |root, request| reindex::execute_paths(root, request)),
-    read!("get_doc", get_doc::GetDocRequest, |root, request| get_doc::execute(&NoteIndex::fresh(root), request)),
-    read!("list_sub_notes", list_sub_notes::ListSubNotesRequest, |root, request| list_sub_notes::execute(&NoteIndex::fresh(root), request)),
-    read!("get_sub_note", get_sub_note::GetSubNoteRequest, |root, request| get_sub_note::execute(&NoteIndex::fresh(root), request)),
-    read!("list_comments", list_comments::ListCommentsRequest, |root, request| list_comments::execute(&NoteIndex::fresh(root), request)),
-    read!("list_attachments", list_attachments::ListAttachmentsRequest, |root, request| list_attachments::execute(&NoteIndex::fresh(root), request)),
+    read!("get_doc", get_doc::GetDocRequest, |root, request, ctx| get_doc::execute(&NoteIndex::fresh(root), request, ctx)),
+    read!("list_sub_notes", list_sub_notes::ListSubNotesRequest, |root, request, ctx| list_sub_notes::execute(&NoteIndex::fresh(root), request, ctx)),
+    read!("get_sub_note", get_sub_note::GetSubNoteRequest, |root, request, ctx| get_sub_note::execute(&NoteIndex::fresh(root), request, ctx)),
+    read!("list_comments", list_comments::ListCommentsRequest, |root, request, ctx| list_comments::execute(&NoteIndex::fresh(root), request, ctx)),
+    read!("list_attachments", list_attachments::ListAttachmentsRequest, |root, request, ctx| list_attachments::execute(&NoteIndex::fresh(root), request, ctx)),
     read!("get_agenda_facts", get_agenda_facts::GetAgendaFactsRequest, |root, request| get_agenda_facts::execute(&NoteIndex::fresh(root), request)),
-    read!("search_docs", search_docs::SearchDocsRequest, |root, request| search_docs::execute(&NoteIndex::fresh(root), request)),
+    read!("search_docs", search_docs::SearchDocsRequest, |root, request, ctx| search_docs::execute(&NoteIndex::fresh(root), request, ctx)),
     read!("list_tags", list_tags::ListTagsRequest, |root, request| list_tags::execute(&NoteIndex::fresh(root), request)),
     read!("get_template", get_template::GetTemplateRequest, |root, request| get_template::execute(&NoteIndex::fresh(root), request)),
     read!("history", history::HistoryRequest, |root, request| history::execute(root, request)),
@@ -154,29 +182,29 @@ pub(super) static TABLE: &[Def] = &[
     write!("update_agenda_facts", Standard, facts_write::UpdateAgendaFactsRequest, |root, request, scope| facts_write::update(root, request, scope)),
     write!("init_workspace", NoMarker, init_workspace::InitWorkspaceRequest, |root, request, _scope| init_workspace::execute(root, request)),
     // ── 쓰기: 노트 ──
-    write!("set_favorite", Standard, note_meta_write::SetFavoriteRequest, |root, request, scope| note_meta_write::set_favorite(root, request, scope)),
-    write!("evaluate_doc", Standard, note_meta_write::EvaluateDocRequest, |root, request, scope| note_meta_write::evaluate_doc(root, request, scope)),
-    write!("link_docs", Standard, note_meta_write::LinkDocsRequest, |root, request, scope| note_meta_write::link_docs(root, request, scope)),
-    write!("update_doc", Standard, doc_write::UpdateDocRequest, |root, request, scope| doc_write::update_doc(root, request, scope)),
-    write!("create_doc", Standard, doc_create::CreateDocRequest, |root, request, scope| doc_create::create_doc(root, request, scope)),
-    write!("create_sub_note", Standard, sub_note_write::CreateSubNoteRequest, |root, request, scope| sub_note_write::create_sub_note(root, request, scope)),
-    write!("update_sub_note", Standard, sub_note_write::UpdateSubNoteRequest, |root, request, scope| sub_note_write::update_sub_note(root, request, scope)),
-    write!("delete_sub_note", Standard, sub_note_write::DeleteSubNoteRequest, |root, request, scope| sub_note_write::delete_sub_note(root, request, scope)),
-    write!("create_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope| comment_write::create_comment(root, request, scope)),
-    write!("update_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope| comment_write::update_comment(root, request, scope)),
-    write!("delete_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope| comment_write::delete_comment(root, request, scope)),
-    write!("delete_doc", Standard, trash_write::DeleteDocRequest, |root, request, scope| trash_write::delete_doc(root, request, scope)),
-    write!("restore_doc", Standard, trash_write::TrashEntryRequest, |root, request, scope| trash_write::restore_doc(root, request, scope)),
+    write!("set_favorite", Standard, note_meta_write::SetFavoriteRequest, |root, request, scope, ctx| note_meta_write::set_favorite(root, request, scope, ctx)),
+    write!("evaluate_doc", Standard, note_meta_write::EvaluateDocRequest, |root, request, scope, ctx| note_meta_write::evaluate_doc(root, request, scope, ctx)),
+    write!("link_docs", Standard, note_meta_write::LinkDocsRequest, |root, request, scope, ctx| note_meta_write::link_docs(root, request, scope, ctx)),
+    write!("update_doc", Standard, doc_write::UpdateDocRequest, |root, request, scope, ctx| doc_write::update_doc(root, request, scope, ctx)),
+    write!("create_doc", Standard, doc_create::CreateDocRequest, |root, request, scope, ctx| doc_create::create_doc(root, request, scope, ctx)),
+    write!("create_sub_note", Standard, sub_note_write::CreateSubNoteRequest, |root, request, scope, ctx| sub_note_write::create_sub_note(root, request, scope, ctx)),
+    write!("update_sub_note", Standard, sub_note_write::UpdateSubNoteRequest, |root, request, scope, ctx| sub_note_write::update_sub_note(root, request, scope, ctx)),
+    write!("delete_sub_note", Standard, sub_note_write::DeleteSubNoteRequest, |root, request, scope, ctx| sub_note_write::delete_sub_note(root, request, scope, ctx)),
+    write!("create_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope, ctx| comment_write::create_comment(root, request, scope, ctx)),
+    write!("update_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope, ctx| comment_write::update_comment(root, request, scope, ctx)),
+    write!("delete_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope, ctx| comment_write::delete_comment(root, request, scope, ctx)),
+    write!("delete_doc", Standard, trash_write::DeleteDocRequest, |root, request, scope, ctx| trash_write::delete_doc(root, request, scope, ctx)),
+    write!("restore_doc", Standard, trash_write::TrashEntryRequest, |root, request, scope, ctx| trash_write::restore_doc(root, request, scope, ctx)),
     write!("purge_doc", Standard, trash_write::TrashEntryRequest, |root, request, _scope| trash_write::purge_doc(root, request)),
     write!("empty_trash", Standard, trash_write::EmptyTrashRequest, |root, _request, _scope| trash_write::empty_trash(root)),
     // ── 태스크 ──
     read!("get_task", task_commands::GetTaskRequest, |root, request| task_commands::get_task(root, request)),
     read!("list_tasks", task_commands::ListTasksRequest, |root, request| task_commands::list_tasks(root, request)),
-    write!("create_task", Standard, task_commands::CreateTaskRequest, |root, request, _scope| task_commands::create_task(root, request)),
-    write!("update_task", Standard, task_commands::UpdateTaskRequest, |root, request, _scope| task_commands::update_task(root, request)),
-    write!("transition_task", Standard, task_commands::TransitionTaskRequest, |root, request, _scope| task_commands::transition_task(root, request)),
-    write!("link_tasks", Standard, task_commands::LinkTasksRequest, |root, request, _scope| task_commands::link_tasks(root, request)),
-    write!("add_task_comment", Standard, task_commands::AddTaskCommentRequest, |root, request, _scope| task_commands::add_task_comment(root, request)),
+    write!("create_task", Standard, task_commands::CreateTaskRequest, |root, request, _scope, ctx| task_commands::create_task(root, request, ctx)),
+    write!("update_task", Standard, task_commands::UpdateTaskRequest, |root, request, _scope, ctx| task_commands::update_task(root, request, ctx)),
+    write!("transition_task", Standard, task_commands::TransitionTaskRequest, |root, request, _scope, ctx| task_commands::transition_task(root, request, ctx)),
+    write!("link_tasks", Standard, task_commands::LinkTasksRequest, |root, request, _scope, ctx| task_commands::link_tasks(root, request, ctx)),
+    write!("add_task_comment", Standard, task_commands::AddTaskCommentRequest, |root, request, _scope, ctx| task_commands::add_task_comment(root, request, ctx)),
     write!("delete_task", Standard, task_commands::TaskRefRequest, |root, request, _scope| task_commands::delete_task(root, request)),
     write!("restore_task", Standard, task_commands::TaskRefRequest, |root, request, _scope| task_commands::restore_task(root, request)),
     // ── 자원: 읽기 ──
@@ -188,14 +216,14 @@ pub(super) static TABLE: &[Def] = &[
     read!("get_resource_change", resource_commands::ResourceChangeRequest, |root, request| resource_commands::get_resource_change(root, request)),
     read!("get_resource_policy", |root| resource_commands::get_resource_policy(root)),
     // ── 자원: 쓰기(승인 기록장 기준선을 먼저 만든다) ──
-    write!("save_resource", WithLedger, resource_commands::SaveResourceRequest, |root, request, _scope| resource_commands::save_resource(root, request)),
-    write!("delete_resource", WithLedger, resource_commands::ResourceIdRequest, |root, request, _scope| resource_commands::delete_resource(root, request)),
-    write!("restore_resource", WithLedger, resource_commands::ResourceIdRequest, |root, request, _scope| resource_commands::restore_resource(root, request)),
-    write!("set_resource_ref", WithLedger, resource_commands::SetResourceRefRequest, |root, request, _scope| resource_commands::set_resource_ref(root, request)),
-    write!("approve_resource_change", WithLedger, resource_commands::ChangeDecisionRequest, |root, request, _scope| resource_commands::approve_resource_change(root, request)),
-    write!("reject_resource_change", WithLedger, resource_commands::ChangeDecisionRequest, |root, request, _scope| resource_commands::reject_resource_change(root, request)),
-    write!("resolve_resource_edit", WithLedger, resource_commands::ResolveResourceEditRequest, |root, request, _scope| resource_commands::resolve_resource_edit(root, request)),
-    write!("set_resource_policy", WithLedger, resource_commands::SetResourcePolicyRequest, |root, request, _scope| resource_commands::set_resource_policy(root, request)),
+    write!("save_resource", WithLedger, resource_commands::SaveResourceRequest, |root, request, _scope, ctx| resource_commands::save_resource(root, request, ctx)),
+    write!("delete_resource", WithLedger, resource_commands::ResourceIdRequest, |root, request, _scope, ctx| resource_commands::delete_resource(root, request, ctx)),
+    write!("restore_resource", WithLedger, resource_commands::ResourceIdRequest, |root, request, _scope, ctx| resource_commands::restore_resource(root, request, ctx)),
+    write!("set_resource_ref", WithLedger, resource_commands::SetResourceRefRequest, |root, request, _scope, ctx| resource_commands::set_resource_ref(root, request, ctx)),
+    write!("approve_resource_change", WithLedger, resource_commands::ChangeDecisionRequest, |root, request, _scope, ctx| resource_commands::approve_resource_change(root, request, ctx)),
+    write!("reject_resource_change", WithLedger, resource_commands::ChangeDecisionRequest, |root, request, _scope, ctx| resource_commands::reject_resource_change(root, request, ctx)),
+    write!("resolve_resource_edit", WithLedger, resource_commands::ResolveResourceEditRequest, |root, request, _scope, ctx| resource_commands::resolve_resource_edit(root, request, ctx)),
+    write!("set_resource_policy", WithLedger, resource_commands::SetResourcePolicyRequest, |root, request, _scope, ctx| resource_commands::set_resource_policy(root, request, ctx)),
     // ── 묻기·대화·세션 ──
     read!("get_ask", ask_chat_commands::NoteRefRequest, |root, request| ask_chat_commands::get_ask(root, request)),
     read!("list_chats", ask_chat_commands::NoteRefRequest, |root, request| ask_chat_commands::list_chats(root, request)),
@@ -205,11 +233,11 @@ pub(super) static TABLE: &[Def] = &[
     read!("session_titles", session_commands::SessionTitlesRequest, |_root, request| session_commands::session_titles(request)),
     read!("recent_sessions", session_commands::RecentSessionsRequest, |_root, request| session_commands::recent_sessions(request)),
     // ── 첨부·내보내기·정리·하루 계획 ──
-    write!("write_attachment", Standard, write_attachment::WriteAttachmentRequest, |root, request, scope| write_attachment::write_attachment(root, request, scope)),
+    write!("write_attachment", Standard, write_attachment::WriteAttachmentRequest, |root, request, scope, ctx| write_attachment::write_attachment(root, request, scope, ctx)),
     write!("export_markdown", Standard, ExportMarkdownRequest, |root, _request, scope| export_markdown::export_markdown(root, scope)),
     write!("shard_notes", Standard, shard_notes::ShardNotesRequest, |root, request, _scope| shard_notes::shard_notes(root, request)),
     read!("verify_shard", shard_notes::VerifyShardRequest, |root, request| shard_notes::verify_shard(root, request)),
-    write!("plan_day", Standard, daily_notes::PlanDayRequest, |root, request, scope| daily_notes::plan_day(root, request, scope)),
+    write!("plan_day", Standard, daily_notes::PlanDayRequest, |root, request, scope, ctx| daily_notes::plan_day(root, request, scope, ctx)),
     write!("check_notes", Standard, daily_notes::CheckNotesRequest, |root, request, scope| daily_notes::check_notes(root, request, scope)),
     write!("facts_brief", Standard, facts_brief::FactsBriefRequest, |root, request, scope| facts_brief::facts_brief(root, request, scope)),
 ];

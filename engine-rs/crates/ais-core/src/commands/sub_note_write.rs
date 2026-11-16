@@ -43,8 +43,6 @@ pub struct CreateSubNoteRequest {
     /// 안 주면 `free`
     #[serde(rename = "type")]
     pub doc_type: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -57,8 +55,6 @@ pub struct UpdateSubNoteRequest {
     /// 전체 교체. 호출 객체에서는 문자열 배열, 명령줄에서는 JSON 배열 글
     pub tags: Option<Json>,
     pub f1: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -66,8 +62,6 @@ pub struct UpdateSubNoteRequest {
 pub struct DeleteSubNoteRequest {
     pub parent: String,
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// 풀어 낸 부모
@@ -174,10 +168,11 @@ pub fn create_sub_note(
     vault: &Path,
     request: &CreateSubNoteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     const USAGE: &str = "create-sub-note <부모 노트 id> title=<제목> body=<본문> [type=<유형>]";
     require_one(&request.parent, USAGE)?;
-    let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
+    let parent = resolve_parent(&scope.index, &request.parent, context.caller)?;
     let new = NewSub::parse(
         request.title.as_deref(),
         request.body.as_deref(),
@@ -242,11 +237,12 @@ pub fn update_sub_note(
     vault: &Path,
     request: &UpdateSubNoteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     const USAGE: &str = "update-sub-note <부모 노트 id> <하위 노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [f1=<직전에 읽은 토큰>]";
-    let context = &request.context;
+    let context = &context;
     require_two(&request.parent, &request.id, USAGE)?;
-    let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
+    let parent = resolve_parent(&scope.index, &request.parent, context.caller)?;
     let sub = resolve_target(&parent, &request.id)?;
     let meta = &sub.meta;
     let new_tags = request.tags.as_ref().map(parse_tags).transpose()?;
@@ -339,10 +335,11 @@ pub fn delete_sub_note(
     vault: &Path,
     request: &DeleteSubNoteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     const USAGE: &str = "delete-sub-note <부모 노트 id> <하위 노트 id>";
     require_two(&request.parent, &request.id, USAGE)?;
-    let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
+    let parent = resolve_parent(&scope.index, &request.parent, context.caller)?;
     let sub = resolve_target(&parent, &request.id)?;
     let container = parent
         .container

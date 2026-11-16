@@ -29,8 +29,6 @@ pub struct CreateAgendaRequest {
     pub project: Option<String>,
     pub project_repo: Option<String>,
     pub summary: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -43,16 +41,12 @@ pub struct UpdateAgendaRequest {
     pub project: Option<String>,
     pub project_repo: Option<String>,
     pub summary: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DeleteAgendaRequest {
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// 만들거나 고친 아젠다: 목록의 한 줄에 딥링크를 더한 것

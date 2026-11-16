@@ -26,8 +26,6 @@ pub struct CreateProjectRequest {
     pub summary: Option<String>,
     /// 저장소 목록(JSON 배열 글)
     pub repos: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -39,16 +37,12 @@ pub struct UpdateProjectRequest {
     pub summary: Option<String>,
     /// 주면 저장소 목록을 통째로 바꾼다. 빈 글이면 지운다.
     pub repos: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DeleteProjectRequest {
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Serialize)]

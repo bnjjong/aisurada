@@ -3,6 +3,7 @@
 use serde::Deserialize;
 
 use super::Caller;
+use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::{NoteRow, Page};
 use crate::vault::attach_text;
@@ -21,21 +22,20 @@ pub struct ListDocsRequest {
     pub limit: Option<usize>,
     /// 본문(과 HTML 첨부 글)까지 싣는가. 기본은 메타만.
     pub bodies: bool,
-    pub caller: Caller,
 }
 
-pub fn execute(index: &NoteIndex, request: &ListDocsRequest) -> Result<Page<NoteRow>, EngineError> {
+pub fn execute(index: &NoteIndex, request: &ListDocsRequest, context: &CallContext) -> Result<Page<NoteRow>, EngineError> {
     let criteria = filter::build(&index.agendas.table, &request.filter)?;
 
     let candidates: Vec<_> = index
         .root_notes()
         // AI에게는 기록 층 노트를 보여 주지 않는다
-        .filter(|note| note.meta.tier.visible_to(request.caller))
+        .filter(|note| note.meta.tier.visible_to(context.caller))
         .filter(|note| filter::matches(note, &criteria))
         .collect();
     let total = candidates.len();
 
-    let take = match (request.caller, request.limit) {
+    let take = match (context.caller, request.limit) {
         (Caller::Ai, _) | (_, Some(0)) => total,
         (Caller::App, Some(n)) => n.min(total),
         (Caller::App, None) => DEFAULT_LIMIT.min(total),
@@ -49,7 +49,7 @@ pub fn execute(index: &NoteIndex, request: &ListDocsRequest) -> Result<Page<Note
                 .bodies
                 .then(|| attach_text::extract(&index.vault_root, note))
                 .flatten();
-            NoteRow::from_record(note, request.caller, request.bodies, attach)
+            NoteRow::from_record(note, context.caller, request.bodies, attach)
         })
         .collect();
     Ok(Page::new(items, total))

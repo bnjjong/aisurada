@@ -46,8 +46,6 @@ pub struct SetFavoriteRequest {
     pub category: Option<String>,
     /// 직전에 읽은 확인 값
     pub f1: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -58,8 +56,6 @@ pub struct EvaluateDocRequest {
     pub note: Option<String>,
     pub clear: Option<BoolArg>,
     pub f1: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -70,8 +66,6 @@ pub struct LinkDocsRequest {
     pub kind: Option<String>,
     pub remove: Option<BoolArg>,
     pub f1: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 fn bool_arg(name: &str, value: &Option<BoolArg>) -> Result<Option<bool>, EngineError> {
@@ -125,12 +119,13 @@ pub fn set_favorite(
     vault: &Path,
     request: &SetFavoriteRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Value, EngineError> {
     const USAGE: &str = "set-favorite <노트 id> [favorite=true|false. 안 주면 지금 값을 뒤집는다] [category=<라벨. 빈 값이면 지운다>] [f1=<직전에 읽은 토큰>]";
     require_note_id(&request.id, USAGE)?;
     let favorite = bool_arg("favorite", &request.favorite)?;
     let token = f1_arg(&request.f1);
-    let note = find(scope, &request.id, request.context.caller)?;
+    let note = find(scope, &request.id, context.caller)?;
     let meta = &note.meta;
 
     let FavoriteChange {
@@ -156,7 +151,7 @@ pub fn set_favorite(
             evaluation: meta.evaluation.as_ref(),
             links: &meta.links,
         },
-        &request.context,
+        &context,
     )?;
     response["changed"] = json!(true);
     response["path"] = json!(written.path);
@@ -168,6 +163,7 @@ pub fn evaluate_doc(
     vault: &Path,
     request: &EvaluateDocRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Value, EngineError> {
     const USAGE: &str = "evaluate-doc <노트 id> [score=<0~100>] [note=<평가 메모>] [clear=true] [f1=<직전에 읽은 토큰>]";
     require_note_id(&request.id, USAGE)?;
@@ -184,7 +180,7 @@ pub fn evaluate_doc(
         )?
     };
     let token = f1_arg(&request.f1);
-    let note = find(scope, &request.id, request.context.caller)?;
+    let note = find(scope, &request.id, context.caller)?;
     let evaluation = (!clear).then(|| evaluation_of(score, request.note.as_deref(), now_millis()));
     let meta = &note.meta;
     let written = write_meta(
@@ -197,7 +193,7 @@ pub fn evaluate_doc(
             evaluation: evaluation.as_ref(),
             links: &meta.links,
         },
-        &request.context,
+        &context,
     )?;
     Ok(json!({
         "id": request.id,
@@ -211,6 +207,7 @@ pub fn link_docs(
     vault: &Path,
     request: &LinkDocsRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Value, EngineError> {
     const USAGE: &str = "link-docs <출발 노트 id> <대상 노트 id> [kind=direct|indirect|attach] [remove=true] [f1=<직전에 읽은 토큰>]";
     check_link_ends(&request.from, &request.to, USAGE)?;
@@ -218,7 +215,7 @@ pub fn link_docs(
     let remove = bool_arg("remove", &request.remove)?.unwrap_or(false);
     check_not_self(&request.from, &request.to)?;
     let token = f1_arg(&request.f1);
-    let note = find(scope, &request.from, request.context.caller)?;
+    let note = find(scope, &request.from, context.caller)?;
     let links = match apply_link(&note.meta.links, &request.to, &kind, remove) {
         LinkOutcome::Unchanged(why) => {
             return Ok(json!({"id": request.from, "changed": false, "note": why}));
@@ -236,7 +233,7 @@ pub fn link_docs(
             evaluation: meta.evaluation.as_ref(),
             links: &links,
         },
-        &request.context,
+        &context,
     )?;
     let mut response = json!({
         "id": request.from,

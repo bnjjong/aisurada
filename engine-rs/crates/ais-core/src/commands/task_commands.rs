@@ -53,8 +53,6 @@ pub struct CreateTaskRequest {
     pub labels: Option<Json>,
     pub refs: Option<Json>,
     pub actor: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -97,8 +95,6 @@ pub struct UpdateTaskRequest {
     pub criteria: Option<Json>,
     pub refs: Option<Json>,
     pub actor: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -109,8 +105,6 @@ pub struct TransitionTaskRequest {
     /// 기대하는 지금 상태. 다르면 거절한다
     pub from: Option<String>,
     pub actor: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -124,8 +118,6 @@ pub struct LinkTasksRequest {
     pub link_type: Option<String>,
     pub remove: Option<BoolArg>,
     pub actor: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -134,16 +126,12 @@ pub struct AddTaskCommentRequest {
     pub id: String,
     pub body: Option<String>,
     pub actor: Option<String>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct TaskRefRequest {
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 // ---------------------------------------------------------------- 공통
@@ -338,7 +326,7 @@ fn refetch<'a>(scan: &'a Scan, task: &'a Task) -> &'a Task {
 
 // ---------------------------------------------------------------- 쓰기
 
-pub fn create_task(vault: &Path, request: &CreateTaskRequest) -> Result<Json, EngineError> {
+pub fn create_task(vault: &Path, request: &CreateTaskRequest, context: &CallContext) -> Result<Json, EngineError> {
     let fields = fields_of(
         &request.title,
         &request.task_type,
@@ -352,14 +340,14 @@ pub fn create_task(vault: &Path, request: &CreateTaskRequest) -> Result<Json, En
         &request.refs,
     )?;
     let actor = actor_of(&request.actor)?;
-    let task = store::create(vault, fields, &stamp_of(&request.context), &actor)?;
+    let task = store::create(vault, fields, &stamp_of(&context), &actor)?;
     let scan = store::scan(vault);
     let mut m = detail(vault, &scan, refetch(&scan, &task), 0)?;
     m["created"] = json!(true);
     Ok(m)
 }
 
-pub fn update_task(vault: &Path, request: &UpdateTaskRequest) -> Result<Json, EngineError> {
+pub fn update_task(vault: &Path, request: &UpdateTaskRequest, context: &CallContext) -> Result<Json, EngineError> {
     let reference = only_ref(&request.id, UPDATE_USAGE)?;
     let scan = store::scan(vault);
     let cur = store::find(&scan, reference)?;
@@ -381,7 +369,7 @@ pub fn update_task(vault: &Path, request: &UpdateTaskRequest) -> Result<Json, En
         cur,
         fields,
         request.f1.as_deref(),
-        &stamp_of(&request.context),
+        &stamp_of(&context),
         &actor,
     )?;
     let after = store::scan(vault);
@@ -391,7 +379,7 @@ pub fn update_task(vault: &Path, request: &UpdateTaskRequest) -> Result<Json, En
     Ok(m)
 }
 
-pub fn transition_task(vault: &Path, request: &TransitionTaskRequest) -> Result<Json, EngineError> {
+pub fn transition_task(vault: &Path, request: &TransitionTaskRequest, context: &CallContext) -> Result<Json, EngineError> {
     let reference = only_ref(&request.id, TRANSITION_USAGE)?;
     let scan = store::scan(vault);
     let cur = store::find(&scan, reference)?;
@@ -413,7 +401,7 @@ pub fn transition_task(vault: &Path, request: &TransitionTaskRequest) -> Result<
         to,
         &actor,
         from.as_deref(),
-        &stamp_of(&request.context),
+        &stamp_of(&context),
     )?;
     let after = store::scan(vault);
     let mut m = detail(vault, &after, refetch(&after, &next), 0)?;
@@ -421,7 +409,7 @@ pub fn transition_task(vault: &Path, request: &TransitionTaskRequest) -> Result<
     Ok(m)
 }
 
-pub fn link_tasks(vault: &Path, request: &LinkTasksRequest) -> Result<Json, EngineError> {
+pub fn link_tasks(vault: &Path, request: &LinkTasksRequest, context: &CallContext) -> Result<Json, EngineError> {
     let (Some(from_ref), Some(to_ref)) = (request.from.as_deref(), request.to.as_deref()) else {
         return Err(EngineError::invalid_argument(format!(
             "link-tasks 는 건 쪽 키와 받는 쪽 키를 받는다: {LINK_USAGE}"
@@ -444,7 +432,7 @@ pub fn link_tasks(vault: &Path, request: &LinkTasksRequest) -> Result<Json, Engi
         to,
         &kind,
         remove,
-        &stamp_of(&request.context),
+        &stamp_of(&context),
         &actor,
     )?;
     let after = store::scan(vault);
@@ -462,13 +450,14 @@ pub fn link_tasks(vault: &Path, request: &LinkTasksRequest) -> Result<Json, Engi
 pub fn add_task_comment(
     vault: &Path,
     request: &AddTaskCommentRequest,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     let reference = only_ref(&request.id, COMMENT_USAGE)?;
     let scan = store::scan(vault);
     let task = store::find(&scan, reference)?;
     let body = format::comment(request.body.as_deref().unwrap_or(""))?;
     let actor = actor_of(&request.actor)?;
-    let ev = store::comment(vault, task, &body, &stamp_of(&request.context), &actor)?;
+    let ev = store::comment(vault, task, &body, &stamp_of(&context), &actor)?;
     Ok(json!({"key": task.key, "comment": ev}))
 }
 

@@ -78,6 +78,38 @@ fn ids(page: &Value) -> Vec<String> {
         .collect()
 }
 
+/// 새 입구(`call_as`)는 호출 맥락을 인자 밖에서만 받는다. 인자의 `caller` 칸으로 호출자를 바꿀 수 없다.
+#[test]
+fn the_context_decides_who_is_calling_and_an_argument_field_cannot() {
+    use ais_core::kernel::actor::CallContext;
+    let vault = fixture();
+    let engine = Engine::new(&vault);
+    let record = "ndfx0008-00000008"; // 기록 층 노트: 앱은 읽고 AI는 못 읽는다
+    // 맥락이 AI이면 인자가 앱이라 해도 거절된다
+    let refused = engine
+        .call_as(
+            &CallContext::ai(None, None),
+            "get_doc",
+            json!({"id": record, "caller": "app"}),
+        )
+        .unwrap_err();
+    assert_eq!(refused.kind, ErrorKind::RecordTier);
+    // 맥락이 앱이면 인자가 AI라 해도 읽힌다
+    let read = engine
+        .call_as(
+            &CallContext::app(),
+            "get_doc",
+            json!({"id": record, "caller": "ai"}),
+        )
+        .unwrap();
+    assert_eq!(read["id"], record);
+    // 과도기 입구는 인자의 칸을 맥락으로 읽는다(옛 호출과 같다)
+    let legacy = engine
+        .call("get_doc", json!({"id": record, "caller": "ai"}))
+        .unwrap_err();
+    assert_eq!(legacy.kind, ErrorKind::RecordTier);
+}
+
 #[test]
 fn reads_the_synthetic_vault() {
     let vault = fixture();

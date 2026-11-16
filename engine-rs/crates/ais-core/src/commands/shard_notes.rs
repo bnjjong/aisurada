@@ -34,8 +34,6 @@ static NOTE_FILE: LazyLock<Regex> =
 #[serde(default, rename_all = "camelCase")]
 pub struct ShardNotesRequest {
     pub apply: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

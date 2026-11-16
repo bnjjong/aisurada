@@ -6,6 +6,7 @@
 use serde::Deserialize;
 
 use super::Caller;
+use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::{NoteRow, Page, SearchRow};
 use crate::text::{compare_utf16, find_region_match, is_blank, trim_search};
@@ -27,7 +28,6 @@ pub struct SearchDocsRequest {
     pub filter: DocFilter,
     /// 받을 건수(1~200). 없으면 20
     pub limit: Option<i64>,
-    pub caller: Caller,
 }
 
 struct Hit<'a> {
@@ -41,6 +41,7 @@ struct Hit<'a> {
 pub fn execute(
     index: &NoteIndex,
     request: &SearchDocsRequest,
+    context: &CallContext,
 ) -> Result<Page<SearchRow>, EngineError> {
     if is_blank(&request.query) {
         return Err(EngineError::invalid_argument(format!(
@@ -67,7 +68,7 @@ pub fn execute(
         let id_target = id_target.split('/').next().unwrap_or("");
 
         for note in index.root_notes() {
-            if !note.meta.tier.visible_to(request.caller)
+            if !note.meta.tier.visible_to(context.caller)
                 || !filter::matches(note, &criteria)
                 || trim_search(&note.meta.title).is_empty()
             {
@@ -124,7 +125,7 @@ pub fn execute(
         .into_iter()
         .take(limit)
         .map(|hit| SearchRow {
-            note: NoteRow::from_record(hit.note, request.caller, false, None),
+            note: NoteRow::from_record(hit.note, context.caller, false, None),
             matched_in: hit.matched_in,
             snippet: hit.snippet,
         })

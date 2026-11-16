@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use super::Caller;
 use super::subnote::{check_readable, resolve_container, sub_comments_file};
+use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::SubNoteRow;
 use crate::text::{SUB_NOTE_ID, is_blank};
@@ -16,10 +17,9 @@ pub struct GetSubNoteRequest {
     /// 부모 사슬. 주지 않으면 후속 노트 id만으로 찾는다.
     pub parent: Option<String>,
     pub id: String,
-    pub caller: Caller,
 }
 
-pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest) -> Result<SubNoteRow, EngineError> {
+pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallContext) -> Result<SubNoteRow, EngineError> {
     if is_blank(&request.id) {
         return Err(EngineError::invalid_argument(
             "인자가 둘 필요하다: get-sub-note <부모 노트 id> <하위 노트 id>",
@@ -62,7 +62,7 @@ pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest) -> Result<SubNote
                 .ok_or_else(|| EngineError::not_found(format!("SubNote not found: {id}")))?
         }
     };
-    check_readable(root, request.caller)?;
+    check_readable(root, context.caller)?;
 
     let comments = read_comments(&index.vault_root, &sub_comments_file(index, root, sub));
     Ok(SubNoteRow::from_record(sub, true, Some(comments)))

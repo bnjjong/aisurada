@@ -101,8 +101,6 @@ pub struct SaveResourceRequest {
     pub repo: Option<Json>,
     pub tools: Option<Json>,
     pub f1: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 /// 자원 id 하나만 받는 쓰기 명령(`delete_resource`, `restore_resource`)
@@ -110,8 +108,6 @@ pub struct SaveResourceRequest {
 #[serde(default, rename_all = "camelCase")]
 pub struct ResourceIdRequest {
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -122,8 +118,6 @@ pub struct SetResourceRefRequest {
     pub remove: Option<Json>,
     #[serde(rename = "with-skills", alias = "withSkills")]
     pub with_skills: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -156,8 +150,6 @@ pub struct ResourceChangeRequest {
 pub struct ChangeDecisionRequest {
     pub id: String,
     pub reason: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -165,8 +157,6 @@ pub struct ChangeDecisionRequest {
 pub struct ResolveResourceEditRequest {
     pub id: String,
     pub action: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -176,8 +166,6 @@ pub struct SetResourcePolicyRequest {
     pub global: Option<Json>,
     pub refs: Option<Json>,
     pub permission: Option<Json>,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 // ---------------------------------------------------------------- 실행 맥락
@@ -456,7 +444,7 @@ pub fn list_resource_versions(
 
 // ---------------------------------------------------------------- 저장·지우기
 
-pub fn save_resource(vault: &Path, request: &SaveResourceRequest) -> Result<Json, EngineError> {
+pub fn save_resource(vault: &Path, request: &SaveResourceRequest, context: &CallContext) -> Result<Json, EngineError> {
     let opts = collect(&[
         ("body", &request.body),
         ("description", &request.description),
@@ -471,7 +459,7 @@ pub fn save_resource(vault: &Path, request: &SaveResourceRequest) -> Result<Json
         ("skills", &request.skills),
         ("tools", &request.tools),
     ]);
-    save(&run(vault, &request.context), &opts)
+    save(&run(vault, &context), &opts)
 }
 
 fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
@@ -561,9 +549,9 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
     Ok(Json::Object(m))
 }
 
-pub fn delete_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Json, EngineError> {
+pub fn delete_resource(vault: &Path, request: &ResourceIdRequest, context: &CallContext) -> Result<Json, EngineError> {
     let id = only_id(&request.id, DELETE_USAGE)?;
-    delete(&run(vault, &request.context), id)
+    delete(&run(vault, &context), id)
 }
 
 fn delete(run: &Run, id: &str) -> Result<Json, EngineError> {
@@ -603,9 +591,9 @@ fn delete(run: &Run, id: &str) -> Result<Json, EngineError> {
     Ok(Json::Object(m))
 }
 
-pub fn restore_resource(vault: &Path, request: &ResourceIdRequest) -> Result<Json, EngineError> {
+pub fn restore_resource(vault: &Path, request: &ResourceIdRequest, context: &CallContext) -> Result<Json, EngineError> {
     let id = only_id(&request.id, RESTORE_USAGE)?;
-    restore(&run(vault, &request.context), id)
+    restore(&run(vault, &context), id)
 }
 
 fn restore(run: &Run, id: &str) -> Result<Json, EngineError> {
@@ -642,6 +630,7 @@ fn restore(run: &Run, id: &str) -> Result<Json, EngineError> {
 pub fn set_resource_ref(
     vault: &Path,
     request: &SetResourceRefRequest,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     let (Some(project), Some(id)) = (text_of(&request.project), text_of(&request.id)) else {
         return Err(EngineError::invalid_argument(format!(
@@ -652,7 +641,7 @@ pub fn set_resource_ref(
         ("remove", &request.remove),
         ("with-skills", &request.with_skills),
     ]);
-    ref_impl(&run(vault, &request.context), &project, &id, &opts)
+    ref_impl(&run(vault, &context), &project, &id, &opts)
 }
 
 fn ref_impl(run: &Run, project: &str, id: &str, opts: &Opts) -> Result<Json, EngineError> {
@@ -1201,8 +1190,9 @@ fn unapproved_row(r: &Resource, state: &str) -> Map<String, Json> {
 pub fn approve_resource_change(
     vault: &Path,
     request: &ChangeDecisionRequest,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    require_human(is_ai(&request.context), "승인")?;
+    require_human(is_ai(&context), "승인")?;
     let id = only_id(&request.id, APPROVE_USAGE)?;
     let mut change = pending_change(vault, id)?;
     let run = apply_run(vault, &change);
@@ -1232,8 +1222,9 @@ pub fn approve_resource_change(
 pub fn reject_resource_change(
     vault: &Path,
     request: &ChangeDecisionRequest,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    require_human(is_ai(&request.context), "거절")?;
+    require_human(is_ai(&context), "거절")?;
     let id = only_id(&request.id, REJECT_USAGE)?;
     let mut change = pending_change(vault, id)?;
     let reason = text_of(&request.reason)
@@ -1343,8 +1334,9 @@ fn apply_change(run: &Run, change: &changes::Change) -> Result<Json, EngineError
 pub fn resolve_resource_edit(
     vault: &Path,
     request: &ResolveResourceEditRequest,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    require_human(is_ai(&request.context), "승인 안 된 직접 수정의 처리")?;
+    require_human(is_ai(&context), "승인 안 된 직접 수정의 처리")?;
     let key = only_id(&request.id, RESOLVE_USAGE)?;
     let action = text_of(&request.action);
     let Some(action) = action
@@ -1414,8 +1406,9 @@ pub fn get_resource_policy(vault: &Path) -> Result<Json, EngineError> {
 pub fn set_resource_policy(
     vault: &Path,
     request: &SetResourcePolicyRequest,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
-    require_human(is_ai(&request.context), "승인 정책 변경")?;
+    require_human(is_ai(&context), "승인 정책 변경")?;
     let opts = collect(&[
         ("project", &request.project),
         ("global", &request.global),

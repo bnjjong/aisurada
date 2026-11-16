@@ -35,8 +35,6 @@ const RECOVERED_AGENDA: &str = "---\nid: ag-recovered\nslug: recovered\ntitle: �
 pub struct DeleteDocRequest {
     /// 노트 id
     pub id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -44,15 +42,11 @@ pub struct DeleteDocRequest {
 pub struct TrashEntryRequest {
     /// 휴지통 항목 id(`list_trash`가 알려 준다)
     pub trash_id: String,
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EmptyTrashRequest {
-    #[serde(flatten)]
-    pub context: CallContext,
 }
 
 fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
@@ -100,6 +94,7 @@ pub fn delete_doc(
     vault: &Path,
     request: &DeleteDocRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     require_id(&request.id, "delete-doc <노트 id>")?;
     if !NOTE_ID.is_match(&request.id) {
@@ -112,7 +107,7 @@ pub fn delete_doc(
         .index
         .note(&request.id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", request.id)))?;
-    check_writable(note, request.context.caller)?;
+    check_writable(note, context.caller)?;
     let meta = &note.meta;
 
     let trash_id = next_id("tr");
@@ -210,6 +205,7 @@ pub fn restore_doc(
     vault: &Path,
     request: &TrashEntryRequest,
     scope: &WriteScope,
+    context: &CallContext,
 ) -> Result<Json, EngineError> {
     let entry = find_entry(
         vault,
@@ -217,7 +213,7 @@ pub fn restore_doc(
         "restore-doc <휴지통 항목 id. list-trash 로 조회한다>",
     )?;
     // AI는 기록 층 노트를 되살리지 못한다(휴지통 목록에서도 안 보인다). 목록 파일을 고치기 전에 선다.
-    if !archived_tier(vault, &entry).visible_to(request.context.caller) {
+    if !archived_tier(vault, &entry).visible_to(context.caller) {
         return Err(EngineError::record_tier_write(&entry.doc_id));
     }
     let table = &scope.index.agendas.table;

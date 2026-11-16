@@ -1,5 +1,6 @@
 //! `list_attachments`: 노트 또는 후속 노트의 `attach/` 폴더에 든 첨부를 이름 차례로 돌려준다.
 
+use crate::kernel::actor::CallContext;
 use crate::ports::fs;
 use std::sync::LazyLock;
 
@@ -22,12 +23,12 @@ const IMAGE_EXTENSIONS: [&str; 8] = ["svg", "png", "jpg", "jpeg", "gif", "webp",
 pub struct ListAttachmentsRequest {
     pub id: String,
     pub sub_id: Option<String>,
-    pub caller: Caller,
 }
 
 pub fn execute(
     index: &NoteIndex,
     request: &ListAttachmentsRequest,
+    context: &CallContext,
 ) -> Result<Page<AttachmentRow>, EngineError> {
     check_note_id(&request.id, "list-attachments <노트 id> [하위 노트 id]")?;
     let sub_id = request.sub_id.as_deref().filter(|s| !is_blank(s));
@@ -41,7 +42,7 @@ pub fn execute(
     let root = index
         .note(&request.id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", request.id)))?;
-    check_readable(root, request.caller)?;
+    check_readable(root, context.caller)?;
     let owner = match sub_id {
         None => root,
         Some(sub_id) => root

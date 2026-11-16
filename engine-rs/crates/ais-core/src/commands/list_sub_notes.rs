@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use super::Caller;
 use super::subnote::{check_readable, resolve_container};
+use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::{Page, SubNoteRow};
 use crate::vault::index::NoteIndex;
@@ -14,12 +15,12 @@ pub struct ListSubNotesRequest {
     /// 부모 참조: 노트 id, 부모 사슬(`루트/자식/…`), 또는 후속 노트 id
     pub parent: String,
     pub bodies: bool,
-    pub caller: Caller,
 }
 
 pub fn execute(
     index: &NoteIndex,
     request: &ListSubNotesRequest,
+    context: &CallContext,
 ) -> Result<Page<SubNoteRow>, EngineError> {
     if crate::text::is_blank(&request.parent) {
         return Err(EngineError::invalid_argument(
@@ -32,7 +33,7 @@ pub fn execute(
     let root = container
         .root
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", container.root_id)))?;
-    check_readable(root, request.caller)?;
+    check_readable(root, context.caller)?;
 
     let mut children: Vec<_> = root
         .sub_notes
