@@ -17,12 +17,8 @@ use crate::kernel::java::java_trim;
 use crate::kernel::token::compute_token;
 use crate::write::atomic::write_atomic;
 
-/// 목록 한 줄. `hint`는 쓴 때의 이름이다.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entry {
-    pub id: String,
-    pub hint: String,
-}
+/// 목록 한 줄. `hint`는 쓴 때의 이름이다(정의는 도메인 크레이트의 `resource::Entry`).
+pub use super::Entry;
 
 // Java 정규식의 `\S`, `\s`, `.`와 같게 ASCII 공백과 줄 끝 글자만으로 가른다
 static LINE: LazyLock<Regex> = LazyLock::new(|| {

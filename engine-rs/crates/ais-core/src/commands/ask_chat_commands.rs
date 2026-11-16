@@ -18,7 +18,6 @@ use serde_json::{Map, Value as Json, json};
 use super::option_text::text_of;
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::kernel::actor::CallContext;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, compare_utf16, is_blank, trim, utf16_len};
 use crate::vault::index::NoteIndex;
 use crate::vault::scanner::NoteRecord;

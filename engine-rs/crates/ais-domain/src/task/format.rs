@@ -15,8 +15,8 @@ use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
 use crate::kernel::token::compute_token;
+use crate::snake_dump::dump_map;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, trim, utf16_len};
-use crate::write::snake_dump::dump_map;
 
 pub const MAX_FILE_BYTES: usize = 400_000;
 pub const MAX_TITLE: usize = 200;

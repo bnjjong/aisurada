@@ -10,12 +10,12 @@ use super::{Resource, ResourceKind};
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
+use crate::kernel::confine::has_unusable_path_characters;
 use crate::kernel::java::{java_blank, java_trim, value_to_string};
 use crate::kernel::token::compute_token;
+use crate::note::slug;
+use crate::snake_dump::dump_map;
 use crate::text::{is_blank, trim, utf16_len};
-use crate::write::confine::has_unusable_path_characters;
-use crate::write::slug;
-use crate::write::snake_dump::dump_map;
 
 pub const MAX_FILE_BYTES: usize = 300_000;
 pub const MAX_NAME: usize = 60;

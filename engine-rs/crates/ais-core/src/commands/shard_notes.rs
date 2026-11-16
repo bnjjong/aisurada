@@ -13,7 +13,6 @@ use serde_json::{Map, Value as Json, json};
 use super::option_text::text_of;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
-use crate::kernel::actor::CallContext;
 use crate::text::{compare_utf16, is_blank, trim};
 use crate::vault::file_size::{self, FileSize};
 use crate::vault::note_file::read_note_file;

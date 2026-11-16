@@ -12,7 +12,6 @@ use crate::model::{AttachmentRow, Page};
 use crate::text::{SUB_NOTE_ID, compare_utf16, encode_uri_component, is_blank, utf16_len};
 use crate::vault::index::NoteIndex;
 
-use super::Caller;
 use super::subnote::{check_note_id, check_readable};
 
 static HAS_EXTENSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.[A-Za-z0-9]+$").unwrap());

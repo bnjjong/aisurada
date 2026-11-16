@@ -22,15 +22,14 @@ use crate::write::json_out::{literal, string, to_file_bytes};
 /// 이 프로세스 안에서 기록을 한 번에 하나만 읽고 쓰게 한다.
 static LOCK: Mutex<()> = Mutex::new(());
 
-impl Policy {
-    fn to_value(&self) -> JsonValue {
-        JsonValue::Object(vec![
-            ("project".into(), string(&self.project)),
-            ("global".into(), string(&self.global)),
-            ("refs".into(), string(&self.refs)),
-            ("permission".into(), string(&self.permission)),
-        ])
-    }
+/// 정책을 기록장의 JSON 객체로 만든다(`Policy` 타입은 도메인 크레이트에 있어 여기서 메서드를 붙일 수 없다).
+fn policy_to_value(policy: &Policy) -> JsonValue {
+    JsonValue::Object(vec![
+        ("project".into(), string(&policy.project)),
+        ("global".into(), string(&policy.global)),
+        ("refs".into(), string(&policy.refs)),
+        ("permission".into(), string(&policy.permission)),
+    ])
 }
 
 /// 승인한 파일 하나의 기록
@@ -262,7 +261,7 @@ fn store(vault: &Path, ledger: &Ledger) -> Result<(), EngineError> {
         .collect();
     let root = JsonValue::Object(vec![
         ("version".to_string(), literal("1")),
-        ("policy".to_string(), ledger.policy.to_value()),
+        ("policy".to_string(), policy_to_value(&ledger.policy)),
         ("items".to_string(), JsonValue::Object(items)),
     ]);
     write_atomic(&ledger_file(vault)?, &to_file_bytes(&root))

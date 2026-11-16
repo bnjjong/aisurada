@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use super::agenda_write::{archive, hue_arg};
 use crate::error::EngineError;
-use crate::kernel::actor::CallContext;
 use crate::model::ProjectRow;
 use crate::text::{is_blank, trim};
 use crate::vault::project::{ProjectInfo, is_valid_project_id, scan_projects};

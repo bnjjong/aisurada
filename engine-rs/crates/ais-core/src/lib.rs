@@ -40,10 +40,12 @@ pub use ais_kernel::kernel::actor::{CallContext, Caller};
 pub use ais_kernel::text;
 
 #[cfg(feature = "test-support")]
+pub use ais_domain::note;
+#[cfg(not(feature = "test-support"))]
+pub(crate) use ais_domain::note;
+#[cfg(feature = "test-support")]
 pub use ais_kernel::{frontmatter, kernel};
 #[cfg(not(feature = "test-support"))]
 pub(crate) use ais_kernel::{frontmatter, kernel};
 
-internal_mods!(
-    adapters, commands, model, note, ports, resource, session, task,
-);
+internal_mods!(adapters, commands, model, ports, resource, session, task);

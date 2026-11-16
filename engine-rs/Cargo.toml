@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/ais-kernel", "crates/ais-core", "crates/ais-cli"]
+members = ["crates/ais-kernel", "crates/ais-domain", "crates/ais-core", "crates/ais-cli"]
 
 [workspace.package]
 version = "0.0.1"

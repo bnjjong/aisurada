@@ -20,7 +20,6 @@ use regex::Regex;
 
 use super::{Resource, ResourceKind, approvals, format, refs};
 use crate::error::EngineError;
-use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
 use crate::kernel::token::compute_token;
 use crate::text::compare_utf16;
@@ -48,17 +47,8 @@ impl Scan {
     }
 }
 
-/// 고칠 값. `None`은 「안 줌(그대로 둔다)」이다. 글 칸의 빈 값은 `repo`만 「지운다」이고, `skills`와 `tools`는 빈 목록·빈 맵이 「비운다」이다.
-#[derive(Default, Clone)]
-pub struct Fields {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub body: Option<String>,
-    pub permission: Option<String>,
-    pub skills: Option<Vec<String>>,
-    pub repo: Option<String>,
-    pub tools: Option<Vec<(String, Value)>>,
-}
+/// 고칠 값(정의는 도메인 크레이트의 `resource::Fields`).
+pub use super::Fields;
 
 /// 지운 자원 한 줄
 pub struct TrashEntry {

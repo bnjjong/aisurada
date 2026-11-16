@@ -37,7 +37,6 @@ internal_mods!(
     pipeline,
     precondition,
     project_file,
-    snake_dump,
     stamp,
     sub_note,
     template_file,
@@ -61,3 +60,7 @@ pub(crate) use crate::note::heading as first_heading;
 pub use crate::note::slug;
 #[cfg(not(feature = "test-support"))]
 pub(crate) use crate::note::slug;
+#[cfg(feature = "test-support")]
+pub use ais_kernel::snake_dump;
+#[cfg(not(feature = "test-support"))]
+pub(crate) use ais_kernel::snake_dump;

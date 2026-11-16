@@ -41,6 +41,7 @@ fn source_crates() -> Vec<(&'static str, PathBuf)> {
     vec![
         ("core", manifest().join("src")),
         ("kernel", manifest().join("../ais-kernel/src")),
+        ("domain", manifest().join("../ais-domain/src")),
     ]
 }
 

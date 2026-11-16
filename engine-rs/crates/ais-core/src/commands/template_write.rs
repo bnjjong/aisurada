@@ -10,7 +10,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::EngineError;
-use crate::kernel::actor::CallContext;
 use crate::text::{is_blank, trim};
 use crate::vault::template::{Category, TemplateRecord, scan_templates};
 use crate::write::apparatus::next_id;

@@ -1,0 +1,14 @@
+[package]
+name = "ais-domain"
+description = "aisurada 엔진의 도메인 크레이트: 노트, 태스크, 자원의 순수한 규칙(파일·시계·환경 변수를 모른다)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ais-kernel = { path = "../ais-kernel" }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

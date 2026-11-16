@@ -5,7 +5,6 @@
 
 use serde::Deserialize;
 
-use super::Caller;
 use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::{NoteRow, Page, SearchRow};

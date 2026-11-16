@@ -2,7 +2,6 @@
 
 use serde::Deserialize;
 
-use super::Caller;
 use super::subnote::{check_readable, resolve_container};
 use crate::kernel::actor::CallContext;
 use crate::error::EngineError;

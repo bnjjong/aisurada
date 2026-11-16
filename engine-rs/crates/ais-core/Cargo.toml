@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 ais-kernel = { path = "../ais-kernel" }
+ais-domain = { path = "../ais-domain" }
 libc = "0.2"
 libyaml-safer = "0.3"
 regex = "1"

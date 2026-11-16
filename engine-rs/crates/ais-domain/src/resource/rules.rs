@@ -9,9 +9,7 @@
 //! 값 타입만 쓰고 그 모듈의 파일 읽기·쓰기는 부르지 않는다. 타입을 도메인으로 옮기는 일은 크레이트를 가르는 8단계에서 본다.
 
 use super::format;
-use super::refs::Entry;
-use super::store::Fields;
-use super::{Resource, ResourceKind, tools_equal};
+use super::{Entry, Fields, Resource, ResourceKind, tools_equal};
 use crate::error::EngineError;
 use crate::kernel::java::java_trim;
 use crate::text::{is_blank, trim};

@@ -11,7 +11,7 @@ use crate::kernel::tier::Tier;
 use crate::kernel::time::{civil_from_days, days_from_civil};
 use crate::text::trim;
 
-pub(crate) static TEMPLATE_ID: LazyLock<Regex> =
+pub static TEMPLATE_ID: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z0-9._-]{1,128}$").unwrap());
 static AGENT_NAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-z][a-z0-9-]{0,31}$").unwrap());
@@ -33,7 +33,7 @@ impl Format {
         }
     }
 
-    pub(crate) fn from_file_name(name: &str) -> Self {
+    pub fn from_file_name(name: &str) -> Self {
         if name.ends_with(".json") {
             Format::Json
         } else if name.ends_with(".html") {
@@ -86,13 +86,13 @@ pub struct MetaData {
     pub evaluation: Option<Evaluation>,
 }
 
-pub(crate) fn get<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
+pub fn get<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
     map.iter()
         .find(|(k, _)| matches!(k, Value::Str(s) if s == key))
         .map(|(_, v)| v)
 }
 
-pub(crate) fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> {
+pub fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> {
     match get(map, key) {
         Some(Value::Str(s)) => Some(s),
         _ => None,
@@ -100,13 +100,13 @@ pub(crate) fn text<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> 
 }
 
 /// 파일에 적을 에이전트 이름: 소문자로 바꿔 이름 모양이면 그것, claude이거나 모양이 아니면 `None`(Java `SessionAgents.forFile`)
-pub(crate) fn agent_for_file(agent: &str) -> Option<String> {
+pub fn agent_for_file(agent: &str) -> Option<String> {
     let lower = trim(agent).to_lowercase();
     (lower != "claude" && AGENT_NAME.is_match(&lower)).then_some(lower)
 }
 
 /// 세션 에이전트 이름을 다듬습니다. claude이거나 이름 모양이 아니면 `None`(줄이 없으면 claude로 본다).
-pub(crate) fn read_agent(raw: Option<&Value>) -> Option<String> {
+pub fn read_agent(raw: Option<&Value>) -> Option<String> {
     let Some(Value::Str(agent)) = raw else {
         return None;
     };
@@ -151,7 +151,7 @@ fn days_in_month(year: i64, month: u32) -> u32 {
 }
 
 /// `HH:MM[:SS[.fraction]]` 뒤에 오프셋(`Z`, `±HH`, `±HHMM`, `±HH:MM`, `±HH:MM:SS`)이 올 수 있습니다.
-pub(crate) fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, u32, Option<i64>)> {
+pub fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, u32, Option<i64>)> {
     let b = rest.as_bytes();
     let num = |from: usize, len: usize| -> Option<u32> {
         let part = rest.get(from..from + len)?;
@@ -223,7 +223,7 @@ pub(crate) fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, u32, O
 
 /// 날짜·시각·오프셋을 UTC 순간 글(`YYYY-MM-DDTHH:MM:SS.mmmZ`)로 바꿉니다.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn utc_instant(
+pub fn utc_instant(
     year: i64,
     month: u32,
     day: u32,
