@@ -11,7 +11,7 @@
 //! 이름을 바꿔도 `id`는 머리말 안에 있어서 참조가 끊기지 않는다.
 
 use std::collections::HashSet;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

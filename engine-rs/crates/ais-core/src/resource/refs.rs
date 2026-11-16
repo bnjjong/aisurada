@@ -4,7 +4,7 @@
 //! (이름이 바뀌어도 ID가 같으면 같은 자원이다). 프로젝트 파일에 적지 않는 까닭은, 설명서가 프로젝트 파일의 줄을 정해 두었고 그 파일을 모르는
 //! 옛 빌드가 다시 쓸 때 모르는 줄을 버리기 때문이다.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

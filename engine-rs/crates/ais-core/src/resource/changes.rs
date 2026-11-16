@@ -12,7 +12,7 @@
 //! `decidedAt`, `decidedBy`, `reason`. 적용할 때는 `command`, `args`, `positional`로 같은 명령 경로를 한 번 더 지난다.
 
 use crate::kernel::ids::CHANGE_ID as ID_SHAPE;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 
 use super::format::value_to_json;

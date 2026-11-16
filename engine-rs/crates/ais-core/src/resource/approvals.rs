@@ -4,7 +4,7 @@
 //! 기록은 vault가 아니라 앱 폴더(`~/Library/Application Support/aisurada/approvals/<vault 경로 해시>/`)에 있다:
 //! `ledger.json`(정책과 항목별 지문)과 `copies/`(승인한 파일 사본). 환경 변수 `AISURADA_APPROVALS_DIR`로 바탕 폴더를 바꿀 수 있다(시험용).
 
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
