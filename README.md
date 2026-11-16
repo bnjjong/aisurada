@@ -406,8 +406,9 @@ Cargo 작업공간 `engine-rs/`에 크레이트 둘이 있습니다. 시험과 �
 | `crates/ais-core/src/engine.rs`, `engine/table.rs` | 엔진 진입점과, 이름·읽기/쓰기·쓰기 범위·요청 종류·처리 함수를 한 줄에 적은 명령 표 |
 | `crates/ais-cli/src/` | 명령줄 진입점(`main.rs`, `lib.rs`), 인자 읽기(`parse.rs`, `map.rs`, `tool.rs`), 옛 응답 모양으로 바꾸기(`legacy.rs`), 키 차례를 맞춘 JSON 쓰기(`output.rs`) |
 | `crates/ais-cli/src/mcp.rs`, `mcp_tools.rs` | MCP 서버(`ais-cli mcp`)와 도구 목록 |
-| `crates/ais-cli/src/{register,agent_cli}.rs` | `claude-mcp`, `codex-mcp`, `gemini-mcp` 등록 |
-| `crates/ais-cli/src/{doctor,install,old_sidecar,migrate}.rs` | `doctor`, `sweep`, `install`, 옛 사이드카 걷어 내기와 첫 실행 이주 |
+| `crates/ais-ops/src/{register,agent_cli}.rs` | `claude-mcp`, `codex-mcp`, `gemini-mcp` 등록 |
+| `crates/ais-ops/src/{doctor,install,old_sidecar,migrate}.rs` | `doctor`, `sweep`, `install`, 옛 사이드카 걷어 내기와 첫 실행 이주 |
+| `crates/ais-ops/src/env.rs` | 프로세스 환경(환경 변수, 홈, 현재 폴더)을 값으로 묶고 vault와 세션 표식을 정하는 규칙 |
 | `engine-rs/tools/compat/` | Java 기준 jar를 태그에서 짓는 `build-oracle.sh`와 합성 vault를 만드는 도구들 |
 
 ## 검증 요청
