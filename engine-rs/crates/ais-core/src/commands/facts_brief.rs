@@ -7,8 +7,7 @@ use serde_json::{Map, Value as Json, json};
 
 use super::option_text::text_of;
 use crate::error::EngineError;
-use crate::kernel::time::civil_from_days;
-use crate::kernel::time::days_from_civil;
+use crate::kernel::time::{civil_from_days, days_from_civil, iso_year};
 use crate::text::{compare_utf16, is_blank, is_whitespace, trim};
 use crate::vault::facts;
 use crate::write::apparatus::now_millis;
@@ -49,7 +48,7 @@ pub(crate) fn parse_iso_date(text: &str) -> Option<i64> {
 
 pub(crate) fn iso_text(days: i64) -> String {
     let (y, m, d) = civil_from_days(days);
-    format!("{y:04}-{m:02}-{d:02}")
+    format!("{}-{m:02}-{d:02}", iso_year(y))
 }
 
 fn date(raw: &Option<Json>, field: &str) -> Result<Option<i64>, EngineError> {

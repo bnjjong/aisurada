@@ -137,7 +137,8 @@ impl CivilDate {
     }
 }
 
-fn iso_year(year: i64) -> String {
+/// Java `LocalDate.toString`의 연도: 네 자리로 채우고(음수는 앞에 `-`), 9999를 넘으면 `+`를 붙인다.
+pub fn iso_year(year: i64) -> String {
     let abs = year.abs();
     if abs < 1000 {
         if year < 0 {

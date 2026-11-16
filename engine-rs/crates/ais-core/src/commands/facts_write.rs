@@ -60,6 +60,10 @@ pub fn update(
         match fs::remove_file(&file) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            // Java `Files.deleteIfExists`처럼 그 자리의 빈 폴더도 지운다(안이 있는 폴더는 지우지 못한다)
+            Err(_)
+                if fs::symlink_metadata(&file).is_ok_and(|m| m.is_dir())
+                    && fs::remove_dir(&file).is_ok() => {}
             Err(_) => {
                 return Err(EngineError::internal(format!(
                     "파일을 지우지 못했다: {}",

@@ -7,7 +7,7 @@ edge adapters -> text 2
 edge commands -> error 35
 edge commands -> frontmatter 3
 edge commands -> json 3
-edge commands -> kernel 38
+edge commands -> kernel 37
 edge commands -> model 16
 edge commands -> note 9
 edge commands -> ports 10
