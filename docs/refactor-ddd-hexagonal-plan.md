@@ -308,6 +308,7 @@ flowchart LR
 - **7단계 완료**(2026-11-16): [7단계 전체 정리](refactor-step7-complete.md). 7-1·7-2·7-4·7-6을 끝내고 7-3(MCP의 글 왕복, `legacy` 재훑기)과 7-5(`*_USAGE` 옮기기, 결정 5와 충돌)는 하지 않기로 했다. 화면·호스트 시험(`test-native.sh`), 실제 창 점검 둘(데이터, 편집기) 통과. 8단계(크레이트 분리, 선택)가 남았다.
 - **7단계 후속 완료**(2026-11-17): [처리 함수가 호출 맥락을 직접 받는다](refactor-step7e-complete.md). 요청 타입의 `caller`·`context` 칸을 모두 지우고 처리 함수 40개 안팎이 `&CallContext`를 매개변수로 받는다. 인자의 `caller`는 새 입구에서 읽히지 않는다. 골든 어긋남 0, 엔진 시험 303건.
 - **8단계 3/N 완료**(2026-11-17): 크레이트를 나누고 있다. [`ais-kernel`](refactor-step8a-complete.md)(바닥), [`ais-domain`](refactor-step8b-complete.md)(순수 도메인), [`ais-infra`](refactor-step8c-complete.md)(포트와 기본 어댑터)로 `ais-core`를 나눠 컴파일러가 의존 방향을 막는다. 계획과 다른 점: 포트와 어댑터는 서로를 가리켜 한 크레이트에 뒀고, 유스케이스 부분은 `ais-core`에 남겼다. 골든 어긋남 0, 엔진 303건, 호스트 158건.
+- **8단계 완료**(2026-11-17): [8단계 전체 정리](refactor-step8-complete.md). `ais-core`를 `ais-kernel`·`ais-domain`·`ais-infra`·`ais-ops`와 `ais-core`(유스케이스와 앞문)로 나눴다. 계획의 `ais-app` 분리는 새 보장 없이 큰 이동이라 하지 않았다. `test-native.sh`, 실제 창 점검 둘(데이터, 편집기) 통과. **0~8단계 모두 끝났다.**
 
 ## 9. 근거와 한계
 
