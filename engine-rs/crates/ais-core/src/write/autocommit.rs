@@ -19,7 +19,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
 
 use super::confine::absolute_normalized;
-use crate::text::trim;
+use crate::text::{parse_flag, trim};
 use crate::vault::git::Git;
 use crate::vault::history::{header_id, read_batch};
 
@@ -37,15 +37,15 @@ pub struct AutoCommitConfig {
 }
 
 impl AutoCommitConfig {
-    /// 환경 변수에서 읽는다(`ports::EnvSource`). 값이 틀리면 기본값을 쓴다.
+    /// 환경 변수에서 읽는다(`ports::EnvSource`). 켜기는 `true`·`on`·`yes`·`1`, 끄기는 `false`·`off`·`no`·`0`(대소문자 무시)이고,
+    /// 그 밖의 값이면 기본값을 쓴다.
     pub fn from_env() -> Self {
         let env = crate::ports::env();
-        let enabled = !matches!(
-            env.var("AISURADA_VAULT_AUTOCOMMIT_ENABLED")
-                .as_deref()
-                .map(trim),
-            Some("false")
-        );
+        let enabled = env
+            .var("AISURADA_VAULT_AUTOCOMMIT_ENABLED")
+            .as_deref()
+            .and_then(parse_flag)
+            .unwrap_or(true);
         let idle_seconds = env
             .var("AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS")
             .and_then(|v| trim(&v).parse::<i64>().ok())

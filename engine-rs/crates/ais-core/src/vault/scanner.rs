@@ -17,7 +17,7 @@ use super::note_meta::{MetaData, MetaError, parse_meta};
 use super::{Conflict, Skipped};
 use crate::error::EngineError;
 use crate::kernel::confine;
-use crate::text::{compare_utf16, is_blank, trim};
+use crate::text::{compare_utf16, is_blank, parse_flag, trim};
 
 static CONFLICT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)conflicted copy|\(conflicted\b|충돌(된)?\s*사본|conflicted version").unwrap()
@@ -367,12 +367,7 @@ pub(crate) fn is_sharded(vault: &Path) -> bool {
 /// 환경 변수로 정한 배치. 비었거나 모르는 값이면 없는 것으로 본다(Java는 모르는 값에서 시작 오류를 낸다).
 fn shard_override() -> Option<bool> {
     let raw = crate::ports::env().var("AISURADA_NOTES_SHARD_BY_MONTH")?;
-    let text = raw.trim_matches(|c: char| c <= ' ').to_ascii_lowercase();
-    match text.as_str() {
-        "true" | "on" | "yes" | "1" => Some(true),
-        "false" | "off" | "no" | "0" => Some(false),
-        _ => None,
-    }
+    parse_flag(&raw)
 }
 
 fn contains_direct_note(dir: &Path) -> bool {

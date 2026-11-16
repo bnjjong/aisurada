@@ -30,6 +30,16 @@ pub fn trim(s: &str) -> &str {
     s.trim_matches(is_whitespace)
 }
 
+/// 설정 스위치 글을 읽는다. `true`·`on`·`yes`·`1`이면 참, `false`·`off`·`no`·`0`이면 거짓이다(영문 대소문자와 앞뒤 공백은 무시).
+/// 그 밖의 글은 `None`이다(Java 엔진이 쓰던 철자 집합이다).
+pub fn parse_flag(raw: &str) -> Option<bool> {
+    match trim(raw).to_ascii_lowercase().as_str() {
+        "true" | "on" | "yes" | "1" => Some(true),
+        "false" | "off" | "no" | "0" => Some(false),
+        _ => None,
+    }
+}
+
 /// 비었거나 공백뿐인지 봅니다.
 pub fn is_blank(s: &str) -> bool {
     s.chars().all(is_whitespace)
