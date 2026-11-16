@@ -96,6 +96,17 @@ impl EngineError {
         }
     }
 
+    /// AI 호출자가 기록 층 노트를 고치려 할 때. 코드와 종류는 읽기 쪽 [`EngineError::record_tier`]와 같고 문구만 쓰기에 맞춘다.
+    pub fn record_tier_write(note_id: &str) -> Self {
+        Self {
+            code: "AIS-409",
+            kind: ErrorKind::Forbidden,
+            message: format!(
+                "도구 표면이 고칠 수 없는 노트다(층=record): {note_id}. 기계가 남긴 기록 노트는 앱에서만 고칩니다."
+            ),
+        }
+    }
+
     pub fn internal(message: impl Into<String>) -> Self {
         Self {
             code: "AIS-500",

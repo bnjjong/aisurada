@@ -10,6 +10,7 @@ use serde_json::{Value as Json, json};
 
 use super::list_attachments::make_ref;
 use super::option_text::text_of;
+use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::write::atomic::write_atomic;
@@ -104,6 +105,7 @@ pub fn write_attachment(
         .index
         .note(root_id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {root_id}")))?;
+    check_writable(root, request.context.caller)?;
     let owner =
         match sub_id {
             None => root,

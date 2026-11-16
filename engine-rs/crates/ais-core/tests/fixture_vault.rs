@@ -1147,6 +1147,138 @@ fn commit_vault_answers_with_outcome_and_blocked() {
     );
 }
 
+/// 폴더 안의 모든 파일(경로 → 바이트). `.git`은 뺀다.
+fn snapshot(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    fn walk(root: &Path, dir: &Path, out: &mut std::collections::BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.file_name().is_some_and(|n| n == ".git") {
+                continue;
+            }
+            if path.is_dir() {
+                walk(root, &path, out);
+            } else {
+                let rel = path
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                out.insert(rel, std::fs::read(&path).unwrap());
+            }
+        }
+    }
+    let mut out = std::collections::BTreeMap::new();
+    walk(root, root, &mut out);
+    out
+}
+
+#[test]
+fn ai_cannot_write_to_record_tier_notes() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let reading = "ndfx0002-00000002";
+
+    // 앱은 기록 층 노트와 그 아래 후속 노트를 만들 수 있다
+    let record = engine
+        .call(
+            "create_doc",
+            json!({"agenda": "demo", "type": "free", "title": "기록", "body": "# 기록\n", "date": "2026-12-27", "time": "00:00", "tier": "record"}),
+        )
+        .unwrap();
+    let id = record["id"].as_str().unwrap().to_string();
+    let sub = engine
+        .call(
+            "create_sub_note",
+            json!({"parent": id, "title": "후속", "body": "내용\n"}),
+        )
+        .unwrap();
+    let sub_id = sub["id"].as_str().unwrap().to_string();
+    let token = engine.call("get_doc", json!({"id": id})).unwrap()["precondition"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let ai = |command: &str, mut args: Value| {
+        args["caller"] = json!("ai");
+        engine.call(command, args).unwrap_err()
+    };
+    let before = snapshot(&vault);
+    let sub_ref = format!("{id}/{sub_id}");
+    let refused: Vec<(&str, Value)> = vec![
+        // 확인 값이 없어도 412가 아니라 층 때문에 먼저 거절된다
+        ("set_favorite", json!({"id": id})),
+        ("set_favorite", json!({"id": id, "f1": token})),
+        ("evaluate_doc", json!({"id": id, "score": 50, "f1": token})),
+        ("link_docs", json!({"from": id, "to": reading, "f1": token})),
+        (
+            "update_doc",
+            json!({"id": id, "title": "바뀜", "f1": token}),
+        ),
+        ("delete_doc", json!({"id": id})),
+        (
+            "create_sub_note",
+            json!({"parent": id, "title": "t", "body": "b"}),
+        ),
+        (
+            "create_sub_note",
+            json!({"parent": sub_ref, "title": "t", "body": "b"}),
+        ),
+        (
+            "update_sub_note",
+            json!({"parent": id, "id": sub_id, "title": "바뀜"}),
+        ),
+        ("delete_sub_note", json!({"parent": id, "id": sub_id})),
+        (
+            "write_attachment",
+            json!({"id": id, "name": "a.txt", "content": "c"}),
+        ),
+        (
+            "write_attachment",
+            json!({"id": id, "subId": sub_id, "name": "a.txt", "content": "c"}),
+        ),
+        ("create_comment", json!({"id": id, "body": "c"})),
+        (
+            "create_comment",
+            json!({"id": id, "subId": sub_id, "body": "c"}),
+        ),
+    ];
+    for (command, args) in refused {
+        let error = ai(command, args.clone());
+        assert_eq!(error.code, "AIS-409", "{command} {args}: {}", error.message);
+        assert!(
+            error.message.starts_with(&format!(
+                "도구 표면이 고칠 수 없는 노트다(층=record): {id}."
+            )),
+            "{command}: {}",
+            error.message
+        );
+    }
+    assert_eq!(snapshot(&vault), before, "거절된 쓰기가 vault를 바꿨다");
+
+    // 읽기 층 노트는 AI도 그대로 고친다
+    let reading_token = engine.call("get_doc", json!({"id": reading})).unwrap()["precondition"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let by_ai = engine
+        .call(
+            "set_favorite",
+            json!({"id": reading, "f1": reading_token, "caller": "ai"}),
+        )
+        .unwrap();
+    assert_eq!(by_ai["changed"], true);
+
+    // 앱은 기록 층 노트도 그대로 고치고 휴지통에 보낸다
+    let by_app = engine
+        .call("set_favorite", json!({"id": id, "f1": token}))
+        .unwrap();
+    assert_eq!(by_app["changed"], true);
+    let trashed = engine.call("delete_doc", json!({"id": id})).unwrap();
+    assert_eq!(trashed["id"], id.as_str());
+}
+
 #[test]
 fn writes_projects_through_the_write_foundation() {
     isolate_writes();

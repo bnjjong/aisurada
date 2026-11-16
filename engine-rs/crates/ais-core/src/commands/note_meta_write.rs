@@ -8,6 +8,8 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use super::Caller;
+use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::kernel::time::format_utc_millis;
 use crate::text::{NOTE_ID, cut_utf16, is_blank, trim};
@@ -104,11 +106,18 @@ fn require_note_id(id: &str, usage: &str) -> Result<(), EngineError> {
     Ok(())
 }
 
-fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a NoteRecord, EngineError> {
-    scope
+/// 고칠 노트를 찾는다. AI 호출자는 기록 층 노트를 고칠 수 없다.
+fn find<'a>(
+    scope: &'a WriteScope,
+    id: &str,
+    caller: Caller,
+) -> Result<&'a NoteRecord, EngineError> {
+    let note = scope
         .index
         .note(id)
-        .ok_or_else(|| EngineError::not_found(format!("Note not found: {id}")))
+        .ok_or_else(|| EngineError::not_found(format!("Note not found: {id}")))?;
+    check_writable(note, caller)?;
+    Ok(note)
 }
 
 pub fn set_favorite(
@@ -120,7 +129,7 @@ pub fn set_favorite(
     require_note_id(&request.id, USAGE)?;
     let favorite = bool_arg("favorite", &request.favorite)?;
     let token = f1_arg(&request.f1);
-    let note = find(&scope, &request.id)?;
+    let note = find(scope, &request.id, request.context.caller)?;
     let meta = &note.meta;
 
     let new_favorite = match (favorite, request.category.is_some()) {
@@ -196,7 +205,7 @@ pub fn evaluate_doc(
         }
     }
     let token = f1_arg(&request.f1);
-    let note = find(&scope, &request.id)?;
+    let note = find(scope, &request.id, request.context.caller)?;
     let evaluation = (!clear).then(|| Evaluation {
         // 반올림(0.5는 올림)한 뒤 0~100으로 맞춘다
         score: (score + 0.5).floor().clamp(0.0, 100.0) as u8,
@@ -272,7 +281,7 @@ pub fn link_docs(
         )));
     }
     let token = f1_arg(&request.f1);
-    let note = find(&scope, &request.from)?;
+    let note = find(scope, &request.from, request.context.caller)?;
     let same = |l: &Link| l.to == request.to && l.kind.eq_ignore_ascii_case(&kind);
     let exists = note.meta.links.iter().any(same);
     if !remove && exists {

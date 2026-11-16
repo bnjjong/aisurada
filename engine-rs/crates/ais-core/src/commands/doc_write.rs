@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
 use super::Caller;
+use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::json::{self, JsonValue};
@@ -149,6 +150,7 @@ pub fn update_doc(
         .index
         .note(note_id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {note_id}")))?;
+    check_writable(note, context.caller)?;
     let meta = &note.meta;
 
     // 준 칸만 갈아 끼운 다음 값. 못 고치는 값은 색인의 값이 따라온다

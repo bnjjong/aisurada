@@ -9,6 +9,7 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
+use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
 use crate::kernel::time::format_utc_millis;
@@ -110,6 +111,7 @@ pub fn delete_doc(
         .index
         .note(&request.id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", request.id)))?;
+    check_writable(note, request.context.caller)?;
     let meta = &note.meta;
 
     let trash_id = next_id("tr");

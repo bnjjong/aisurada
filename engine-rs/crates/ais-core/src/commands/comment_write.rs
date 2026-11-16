@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
+use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::kernel::token::compute_token;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
@@ -202,6 +203,7 @@ fn execute(
     }
 
     let target = resolve(vault, &scope.index, &request.id, sub_id)?;
+    check_writable(target.root, request.context.caller)?;
     let mut comments: Vec<Comment> = match read_comments(vault, &target.file) {
         CommentsEnvelope::Unreadable { reason } => {
             return Err(EngineError::conflict(format!(

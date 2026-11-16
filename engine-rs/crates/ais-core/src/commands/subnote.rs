@@ -86,6 +86,15 @@ pub fn check_readable(root: &NoteRecord, caller: Caller) -> Result<(), EngineErr
     Ok(())
 }
 
+/// AI에게는 기록 층 메인 노트를 고치게 하지도 않는다. 읽기(`check_readable`)와 같은 정책(`Tier::visible_to`)이고, 쓰기 명령은
+/// 노트를 찾자마자(인자 검사와 확인 값 검사보다 앞서) 이 검사를 한다. 후속 노트의 층은 메인 노트를 따른다.
+pub fn check_writable(root: &NoteRecord, caller: Caller) -> Result<(), EngineError> {
+    if !root.meta.tier.visible_to(caller) {
+        return Err(EngineError::record_tier_write(&root.id));
+    }
+    Ok(())
+}
+
 /// 후속 노트의 코멘트 파일 자리: 바로 위 노트의 폴더 안 `sub-comments/<후속 노트 id>.json`
 pub fn sub_comments_file(index: &NoteIndex, root: &NoteRecord, sub: &NoteRecord) -> PathBuf {
     let parent_id = sub.direct_parent_id.as_deref().unwrap_or(&root.id);

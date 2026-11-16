@@ -10,7 +10,9 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 
+use super::Caller;
 use super::doc_write::parse_tags;
+use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::kernel::token::compute_token;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
@@ -84,7 +86,11 @@ impl Parent<'_> {
     }
 }
 
-fn resolve_parent<'a>(index: &'a NoteIndex, raw: &str) -> Result<Parent<'a>, EngineError> {
+fn resolve_parent<'a>(
+    index: &'a NoteIndex,
+    raw: &str,
+    caller: Caller,
+) -> Result<Parent<'a>, EngineError> {
     let segments: Vec<&str> = raw.split('/').map(trim).filter(|s| !s.is_empty()).collect();
     if segments.is_empty() {
         return Err(EngineError::invalid_argument(format!(
@@ -98,6 +104,9 @@ fn resolve_parent<'a>(index: &'a NoteIndex, raw: &str) -> Result<Parent<'a>, Eng
         )));
     }
     let root = index.note(root_id);
+    if let Some(root) = root {
+        check_writable(root, caller)?;
+    }
     let mut container = root;
     let mut previous = root_id;
     for segment in &segments[1..] {
@@ -166,7 +175,7 @@ pub fn create_sub_note(
 ) -> Result<Json, EngineError> {
     const USAGE: &str = "create-sub-note <부모 노트 id> title=<제목> body=<본문> [type=<유형>]";
     require_one(&request.parent, USAGE)?;
-    let parent = resolve_parent(&scope.index, &request.parent)?;
+    let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
     let title = request
         .title
         .as_deref()
@@ -279,7 +288,7 @@ pub fn update_sub_note(
     const USAGE: &str = "update-sub-note <부모 노트 id> <하위 노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [f1=<직전에 읽은 토큰>]";
     let context = &request.context;
     require_two(&request.parent, &request.id, USAGE)?;
-    let parent = resolve_parent(&scope.index, &request.parent)?;
+    let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
     let sub = resolve_target(&parent, &request.id)?;
     let meta = &sub.meta;
     let new_tags = request.tags.as_ref().map(parse_tags).transpose()?;
@@ -386,7 +395,7 @@ pub fn delete_sub_note(
 ) -> Result<Json, EngineError> {
     const USAGE: &str = "delete-sub-note <부모 노트 id> <하위 노트 id>";
     require_two(&request.parent, &request.id, USAGE)?;
-    let parent = resolve_parent(&scope.index, &request.parent)?;
+    let parent = resolve_parent(&scope.index, &request.parent, request.context.caller)?;
     let sub = resolve_target(&parent, &request.id)?;
     let container = parent
         .container
