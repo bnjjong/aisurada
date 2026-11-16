@@ -5,9 +5,8 @@
 //!
 //! **바깥에 내놓는 면은 좁다.** 앱과 명령줄이 쓰는 것만 `pub`이다.
 //! - `engine`: 진입점(`Engine`, `catalog`)과 명령 표 정보
-//! - `error`: 오류 값(`EngineError`, `ErrorKind`)
-//! - `kernel::actor`: 호출 맥락(`CallContext`, `Caller`)
-//! - `json`, `text`: Java와 같은 JSON·글 규칙
+//! - `error`, `json`, `text`: 오류 값과 Java와 같은 JSON·글 규칙(모두 바닥 크레이트 `ais-kernel`에서 다시 내놓는다)
+//! - `CallContext`, `Caller`: 호출 맥락(바닥 크레이트 `ais-kernel`에서 다시 내놓는다)
 //! - `vault::{facts, git, index, template, trash}`: 명령줄이 옛 응답 모양을 만들려고 읽는 vault 읽기
 //! - `write::autocommit`: 앱과 MCP 서버가 도는 자동 커밋 감시
 //!
@@ -30,21 +29,21 @@ macro_rules! internal_mods {
 }
 
 pub mod engine;
-pub mod error;
-pub mod json;
-pub mod kernel;
-pub mod text;
 pub mod vault;
 pub mod write;
 
+// 바닥 크레이트(`ais-kernel`)의 모듈은 같은 이름으로 다시 내놓아 안쪽 코드의 `crate::text` 같은 경로가 그대로 통한다.
+pub use ais_kernel::error;
+pub use ais_kernel::json;
+/// 호출 맥락(누가, 어느 세션에서). 앱과 명령줄이 엔진을 부를 때 넘긴다.
+pub use ais_kernel::kernel::actor::{CallContext, Caller};
+pub use ais_kernel::text;
+
+#[cfg(feature = "test-support")]
+pub use ais_kernel::{frontmatter, kernel};
+#[cfg(not(feature = "test-support"))]
+pub(crate) use ais_kernel::{frontmatter, kernel};
+
 internal_mods!(
-    adapters,
-    commands,
-    frontmatter,
-    model,
-    note,
-    ports,
-    resource,
-    session,
-    task,
+    adapters, commands, model, note, ports, resource, session, task,
 );

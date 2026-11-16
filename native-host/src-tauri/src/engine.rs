@@ -5,7 +5,7 @@
 
 use crate::lifecycle::HostState;
 use ais_cli::error::IpcError;
-use ais_core::{engine::Engine, error::EngineError, kernel::actor::CallContext};
+use ais_core::{engine::Engine, error::EngineError, CallContext};
 use serde_json::Value;
 use tauri::State;
 

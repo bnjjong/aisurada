@@ -12,7 +12,7 @@ use crate::env::SessionSource;
 use crate::error::CliError;
 use crate::map::{EngineCall, context_for, plain_args};
 use crate::parse::ParsedCommand;
-use ais_core::kernel::actor::Caller;
+use ais_core::Caller;
 
 /// 본문 칸의 글자 수 상한(UTF-16 코드 단위)
 const BODY_LIMIT: usize = 200_000;
@@ -713,7 +713,7 @@ fn resource_or_task_tool(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ais_core::kernel::actor::CallContext;
+    use ais_core::CallContext;
 
     fn call(tool: &str, json: &str) -> Result<EngineCall, CliError> {
         parse_tool(tool, &[json.to_string()], None)

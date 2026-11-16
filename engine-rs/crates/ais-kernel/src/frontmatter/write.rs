@@ -226,7 +226,7 @@ pub(crate) fn dump_key(key: &str) -> String {
 }
 
 /// 문자열 값을 YAML 스칼라로 씁니다. `depth`는 들여쓰기 깊이이고 줄 폭은 `max(40, 80 - 2 * depth)`입니다.
-pub(crate) fn dump_string(s: &str, depth: usize) -> String {
+pub fn dump_string(s: &str, depth: usize) -> String {
     if s.is_empty() {
         return "''".to_string();
     }

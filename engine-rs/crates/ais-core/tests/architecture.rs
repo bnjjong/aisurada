@@ -1,7 +1,7 @@
 //! 의존 방향 시험: 모듈 사이 참조와 바깥(파일·시계·환경 변수·프로세스) 직접 호출의 지금 모양을 막아 둔다.
 //!
 //! DDD·헥사고날 리팩토링(`docs/refactor-ddd-hexagonal-plan.md`)의 안전망이다. 소스를 읽어 아래 둘을 센다.
-//! - 모듈 사이 참조: `ais-core/src`의 모듈(`commands`, `vault`, `write`, …)이 다른 모듈을 `crate::모듈`로 적은 횟수
+//! - 모듈 사이 참조: 엔진 소스(`ais-core`와 그 밑에서 나뉜 `ais-kernel` 등의 `src`)의 모듈(`commands`, `vault`, `write`, `text`, …)이 다른 모듈을 `crate::모듈`로 적은 횟수
 //! - 바깥 직접 호출: `std::fs`(파일), `SystemTime::now`(시계), `env::var`(환경 변수), `Command::new`(프로세스), `tzset`·`localtime_r`(시간대)를
 //!   적은 횟수. 파일별로 센다
 //!
@@ -33,6 +33,44 @@ const PATTERNS: &[(&str, &str)] = &[
 
 fn manifest() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+/// 엔진 소스를 이루는 크레이트들: (표시 이름, `src` 폴더). `ais-core` 밑에서 나뉘어 나간 크레이트도 한 소스 트리로 보고 규칙을 건다.
+/// 모듈 이름은 크레이트가 달라도 겹치지 않으므로(`ais-kernel`의 `text`, `ais-core`의 `vault` 따위) 모듈 사이 참조 센 값은 그대로 이어진다.
+fn source_crates() -> Vec<(&'static str, PathBuf)> {
+    vec![
+        ("core", manifest().join("src")),
+        ("kernel", manifest().join("../ais-kernel/src")),
+    ]
+}
+
+/// 엔진 소스 파일 전부와 그 크레이트 안의 상대 경로(`vault/index.rs`, `text.rs` 따위)
+fn engine_files() -> Vec<(PathBuf, String)> {
+    let mut all = Vec::new();
+    for (_, src) in source_crates() {
+        let mut files = Vec::new();
+        rust_files(&src, &mut files);
+        for file in files {
+            let rel = file
+                .strip_prefix(&src)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            all.push((file, rel));
+        }
+    }
+    all
+}
+
+/// 상대 경로로 소스 파일을 어느 크레이트에서든 찾아 읽는다.
+fn read_source(rel: &str) -> String {
+    for (_, src) in source_crates() {
+        let path = src.join(rel);
+        if path.exists() {
+            return fs::read_to_string(path).unwrap();
+        }
+    }
+    panic!("{rel}: 어느 크레이트에도 없다")
 }
 
 fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -124,24 +162,18 @@ fn push_ident(text: &str, out: &mut Vec<String>) {
 fn measure() -> BTreeMap<String, usize> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
 
-    // 모듈 사이 참조: ais-core/src 아래 첫 폴더(또는 파일)가 모듈이다
-    let core_src = manifest().join("src");
-    let mut files = Vec::new();
-    rust_files(&core_src, &mut files);
-    for file in &files {
-        let rel = file.strip_prefix(&core_src).unwrap();
+    // 모듈 사이 참조: 각 크레이트의 src 아래 첫 폴더(또는 파일)가 모듈이다
+    for (file, rel) in engine_files() {
         let module = rel
-            .components()
+            .split('/')
             .next()
             .unwrap()
-            .as_os_str()
-            .to_string_lossy()
             .trim_end_matches(".rs")
             .to_string();
         if module == "lib" {
             continue;
         }
-        let text = code(&fs::read_to_string(file).unwrap());
+        let text = code(&fs::read_to_string(&file).unwrap());
         for target in crate_targets(&text) {
             if target != module {
                 *counts
@@ -151,11 +183,10 @@ fn measure() -> BTreeMap<String, usize> {
         }
     }
 
-    // 바깥 직접 호출: ais-core와 ais-cli의 src를 파일별로
-    for (krate, src) in [
-        ("core", manifest().join("src")),
-        ("cli", manifest().join("../ais-cli/src")),
-    ] {
+    // 바깥 직접 호출: 엔진 크레이트들과 ais-cli의 src를 파일별로
+    let mut outside = source_crates();
+    outside.push(("cli", manifest().join("../ais-cli/src")));
+    for (krate, src) in outside {
         let mut files = Vec::new();
         rust_files(&src, &mut files);
         for file in files {
@@ -290,16 +321,8 @@ fn closed_set_literals_live_only_in_the_kernel() {
         // 태스크 응답의 `blocks` 칸 이름이다(연결 종류가 아니라 응답 필드)
         ("\"blocks\"", &[("commands/task_commands.rs", 1)]),
     ];
-    let src = manifest().join("src");
-    let mut files = Vec::new();
-    rust_files(&src, &mut files);
     let mut bad = Vec::new();
-    for file in files {
-        let rel = file
-            .strip_prefix(&src)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
+    for (file, rel) in engine_files() {
         if rel.starts_with("kernel/") {
             continue;
         }
@@ -342,16 +365,8 @@ fn clock_env_process_and_timezone_calls_stay_in_adapters() {
         "tzset",
         "localtime_r",
     ];
-    let src = manifest().join("src");
-    let mut files = Vec::new();
-    rust_files(&src, &mut files);
     let mut bad = Vec::new();
-    for file in files {
-        let rel = file
-            .strip_prefix(&src)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
+    for (file, rel) in engine_files() {
         // 어댑터와, 파일 전체가 시험인 `tests.rs`는 건너뛴다
         if rel.starts_with("adapters/") || rel.ends_with("/tests.rs") {
             continue;
@@ -376,16 +391,8 @@ fn clock_env_process_and_timezone_calls_stay_in_adapters() {
 #[test]
 fn adapters_depend_on_ports_only_and_only_ports_wires_them() {
     const ADAPTER_MAY_USE: &[&str] = &["ports", "kernel", "error", "text", "json", "adapters"];
-    let src = manifest().join("src");
-    let mut files = Vec::new();
-    rust_files(&src, &mut files);
     let mut bad = Vec::new();
-    for file in files {
-        let rel = file
-            .strip_prefix(&src)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
+    for (file, rel) in engine_files() {
         let text = code_without_tests(&fs::read_to_string(&file).unwrap());
         let targets = crate_targets(&text);
         if rel.starts_with("adapters/") {
@@ -405,16 +412,8 @@ fn adapters_depend_on_ports_only_and_only_ports_wires_them() {
 /// 옛 `WriteScope::begin`은 없어졌고, 새 입구 `pipeline::open`은 `engine.rs`와 `write/pipeline.rs`에만 나온다.
 #[test]
 fn write_scope_is_opened_only_by_the_dispatcher() {
-    let src = manifest().join("src");
-    let mut files = Vec::new();
-    rust_files(&src, &mut files);
     let mut bad = Vec::new();
-    for file in files {
-        let rel = file
-            .strip_prefix(&src)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
+    for (file, rel) in engine_files() {
         let text = code_without_tests(&fs::read_to_string(&file).unwrap());
         if text.contains("WriteScope::begin") {
             bad.push(format!("{rel}: 옛 WriteScope::begin이 남았다"));
@@ -430,16 +429,8 @@ fn write_scope_is_opened_only_by_the_dispatcher() {
 /// `use std::fs;`, `std::fs::`, `use std::{.., fs, ..};` 꼴을 모두 잡는다. 시험 모듈과 `tests.rs`는 디스크를 그대로 만져도 된다.
 #[test]
 fn file_access_goes_through_the_store_port() {
-    let src = manifest().join("src");
-    let mut files = Vec::new();
-    rust_files(&src, &mut files);
     let mut bad = Vec::new();
-    for file in files {
-        let rel = file
-            .strip_prefix(&src)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
+    for (file, rel) in engine_files() {
         if rel.starts_with("adapters/") || rel.ends_with("/tests.rs") {
             continue;
         }
@@ -490,10 +481,9 @@ fn aggregate_files_are_pure_domain_code() {
         "std::env",
         "std::process",
     ];
-    let src = manifest().join("src");
     let mut bad = Vec::new();
     for rel in PURE {
-        let text = code_without_tests(&fs::read_to_string(src.join(rel)).unwrap());
+        let text = code_without_tests(&read_source(rel));
         for pattern in FORBIDDEN {
             if text.contains(pattern) {
                 bad.push(format!("{rel}: {pattern}"));

@@ -11,7 +11,7 @@ use std::path::Path;
 
 use serde_json::{Map, Value, json};
 
-use ais_core::kernel::actor::Caller;
+use ais_core::Caller;
 use ais_core::text::{encode_uri_component, trim};
 use ais_core::vault::facts::read_facts;
 use ais_core::vault::index::NoteIndex;

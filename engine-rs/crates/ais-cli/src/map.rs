@@ -5,8 +5,8 @@
 
 use serde_json::{Map, Value, json};
 
-use ais_core::kernel::actor::{CallContext, Caller};
 use ais_core::text::{is_blank, trim};
+use ais_core::{CallContext, Caller};
 
 use crate::env::{SessionSource, agent_for_file};
 use crate::error::CliError;
