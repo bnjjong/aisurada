@@ -15,7 +15,11 @@ fn append(line: Value) {
         .unwrap_or(0);
     let mut line = line;
     line["start"] = json!(start);
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
         // 한 번의 쓰기로 한 줄을 통째로 적어야 여러 스레드의 호출이 줄 중간에서 섞이지 않는다
         let _ = file.write_all(format!("{line}\n").as_bytes());
     }

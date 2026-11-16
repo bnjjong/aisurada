@@ -182,7 +182,9 @@ pub fn note_windows<R: Runtime>(app: tauri::AppHandle<R>) -> Vec<String> {
 #[tauri::command]
 pub fn begin_quit<R: Runtime>(app: tauri::AppHandle<R>) {
     let state = app.state::<HostState>();
-    state.quitting.store(true, std::sync::atomic::Ordering::SeqCst);
+    state
+        .quitting
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 }
 #[tauri::command]
 pub fn close_note_windows<R: Runtime>(app: tauri::AppHandle<R>) {
@@ -197,7 +199,9 @@ pub fn close_note_windows<R: Runtime>(app: tauri::AppHandle<R>) {
 #[tauri::command]
 pub fn cancel_quit<R: Runtime>(app: tauri::AppHandle<R>) {
     let state = app.state::<HostState>();
-    state.quitting.store(false, std::sync::atomic::Ordering::SeqCst);
+    state
+        .quitting
+        .store(false, std::sync::atomic::Ordering::SeqCst);
 }
 #[tauri::command]
 pub fn destroy_current_window<R: Runtime>(window: tauri::WebviewWindow<R>) -> Result<(), String> {

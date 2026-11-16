@@ -177,10 +177,22 @@ mod csp_tests {
         assert!(CSP.ends_with("; sandbox allow-scripts"));
         assert!(!CSP.contains("connect-src"));
         for name in ["script-src ", "style-src "] {
-            assert!(directive(name).split(' ').any(|s| s == "https://cdnjs.cloudflare.com"), "{name}");
+            assert!(
+                directive(name)
+                    .split(' ')
+                    .any(|s| s == "https://cdnjs.cloudflare.com"),
+                "{name}"
+            );
         }
-        for host in ["https://cdnjs.cloudflare.com", "https://xdworld.vworld.kr", "https://server.arcgisonline.com"] {
-            assert!(directive("img-src ").split(' ').any(|s| s == host), "{host}");
+        for host in [
+            "https://cdnjs.cloudflare.com",
+            "https://xdworld.vworld.kr",
+            "https://server.arcgisonline.com",
+        ] {
+            assert!(
+                directive("img-src ").split(' ').any(|s| s == host),
+                "{host}"
+            );
         }
         for name in ["font-src ", "media-src "] {
             assert!(!directive(name).contains("https://"), "{name}");

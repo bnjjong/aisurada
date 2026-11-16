@@ -78,7 +78,10 @@ fn ipc_probe() {
     // 문답 명령도 이 엔진이 한다(옛 4부 없는 판의 AIS-409가 아니다). 인자가 없으면 인자 오류다
     let out = invoke(&main, "sidecar_call", json!({"argv":["get-ask"]})).unwrap();
     assert_eq!(out["status"], 3);
-    assert!(out["stderr"].as_str().unwrap().starts_with("AIS-400"), "{out}");
+    assert!(
+        out["stderr"].as_str().unwrap().starts_with("AIS-400"),
+        "{out}"
+    );
     let out = invoke(
         &main,
         "sidecar_call",
@@ -119,7 +122,10 @@ fn real_engine_round_trip_uses_isolated_home() {
     .unwrap();
     fs::write(vault.join("notes/demo/root/note.md"),"---\nid: ndfixture-00000001\nagenda: demo\ntitle: 시험\ntype: free\ncreated: '2026-06-16T10:00:00+09:00'\n---\n실제 엔진\n").unwrap();
     let mut env: BTreeMap<OsString, OsString> = BTreeMap::new();
-    for (key, value) in [("HOME", home.as_os_str()), ("AISURADA_VAULT", vault.as_os_str())] {
+    for (key, value) in [
+        ("HOME", home.as_os_str()),
+        ("AISURADA_VAULT", vault.as_os_str()),
+    ] {
         env.insert(key.into(), value.into());
     }
     env.insert("PATH".into(), "/usr/bin:/bin".into());

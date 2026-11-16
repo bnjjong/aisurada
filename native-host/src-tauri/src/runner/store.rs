@@ -36,7 +36,11 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { auto_pickup: false, concurrency: 3, model: "sonnet".to_string() }
+        Settings {
+            auto_pickup: false,
+            concurrency: 3,
+            model: "sonnet".to_string(),
+        }
     }
 }
 
@@ -137,7 +141,10 @@ pub struct Event {
 }
 
 pub fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 /// 무작위 UUID(v4). claude의 `--session-id`는 UUID만 받고, 실행 id도 이것으로 만든다.
@@ -152,12 +159,21 @@ pub fn new_uuid() -> String {
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
     let h: String = b.iter().map(|x| format!("{x:02x}")).collect();
-    format!("{}-{}-{}-{}-{}", &h[0..8], &h[8..12], &h[12..16], &h[16..20], &h[20..32])
+    format!(
+        "{}-{}-{}-{}-{}",
+        &h[0..8],
+        &h[8..12],
+        &h[12..16],
+        &h[16..20],
+        &h[20..32]
+    )
 }
 
 /// 앱 지원 폴더 아래의 러너 폴더. 시험은 임시 폴더를 직접 준다.
 pub fn default_root() -> PathBuf {
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
     home.join("Library/Application Support/aisurada/runs")
 }
 
@@ -188,7 +204,8 @@ pub fn load_settings(root: &Path) -> Settings {
 
 pub fn save_settings(root: &Path, settings: &Settings) -> Result<Settings, String> {
     let clean = settings.clone().clamped();
-    let bytes = serde_json::to_vec_pretty(&clean).map_err(|e| format!("설정을 글로 못 바꿨다: {e}"))?;
+    let bytes =
+        serde_json::to_vec_pretty(&clean).map_err(|e| format!("설정을 글로 못 바꿨다: {e}"))?;
     write_atomic(&settings_path(root), &bytes)?;
     Ok(clean)
 }
@@ -200,7 +217,9 @@ pub fn vault_dir(root: &Path, vault: &str) -> PathBuf {
 
 /// 태스크 키가 폴더 이름으로 안전한지(`TSK-14`). 화면이 보낸 값을 경로에 쓰기 전에 거른다.
 pub fn is_task_key(key: &str) -> bool {
-    let Some(n) = key.strip_prefix("TSK-") else { return false };
+    let Some(n) = key.strip_prefix("TSK-") else {
+        return false;
+    };
     !n.is_empty() && n.len() <= 9 && n.chars().all(|c| c.is_ascii_digit())
 }
 
@@ -212,15 +231,21 @@ pub fn save_run(root: &Path, vault: &str, rec: &RunRecord) -> Result<(), String>
     if !is_task_key(&rec.task_key) {
         return Err(format!("태스크 키가 이상하다: {}", rec.task_key));
     }
-    let bytes = serde_json::to_vec_pretty(rec).map_err(|e| format!("실행 기록을 글로 못 바꿨다: {e}"))?;
-    write_atomic(&run_dir(root, vault, &rec.task_key, &rec.run_id).join("run.json"), &bytes)
+    let bytes =
+        serde_json::to_vec_pretty(rec).map_err(|e| format!("실행 기록을 글로 못 바꿨다: {e}"))?;
+    write_atomic(
+        &run_dir(root, vault, &rec.task_key, &rec.run_id).join("run.json"),
+        &bytes,
+    )
 }
 
 pub fn load_run(root: &Path, vault: &str, key: &str, run_id: &str) -> Option<RunRecord> {
     if !is_task_key(key) || run_id.contains('/') || run_id.contains("..") {
         return None;
     }
-    fs::read(run_dir(root, vault, key, run_id).join("run.json")).ok().and_then(|b| serde_json::from_slice(&b).ok())
+    fs::read(run_dir(root, vault, key, run_id).join("run.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
 }
 
 /// 태스크 하나의 실행 기록. 최근이 앞이다. 망가진 파일은 건너뛴다.
@@ -242,10 +267,18 @@ pub fn list_runs(root: &Path, vault: &str, key: &str) -> Vec<RunRecord> {
 /// 이 vault에서 아직 끝나지 않은 실행 전부(앱을 다시 켰을 때 이어 가거나 정리할 것들).
 pub fn list_open_runs(root: &Path, vault: &str) -> Vec<RunRecord> {
     let mut out = Vec::new();
-    for task in fs::read_dir(vault_dir(root, vault)).into_iter().flatten().flatten() {
+    for task in fs::read_dir(vault_dir(root, vault))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
         let name = task.file_name().to_string_lossy().into_owned();
         if is_task_key(&name) {
-            out.extend(list_runs(root, vault, &name).into_iter().filter(|r| r.phase.is_open()));
+            out.extend(
+                list_runs(root, vault, &name)
+                    .into_iter()
+                    .filter(|r| r.phase.is_open()),
+            );
         }
     }
     out.sort_by(|a, b| a.started_at.cmp(&b.started_at));
@@ -258,8 +291,17 @@ pub fn append_event(root: &Path, vault: &str, rec: &RunRecord, step: &str, text:
     if fs::create_dir_all(&dir).is_err() {
         return;
     }
-    let line = serde_json::to_string(&Event { at: now_ms(), step: step.to_string(), text: text.to_string() }).unwrap_or_default();
-    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(dir.join("events.jsonl")) {
+    let line = serde_json::to_string(&Event {
+        at: now_ms(),
+        step: step.to_string(),
+        text: text.to_string(),
+    })
+    .unwrap_or_default();
+    if let Ok(mut f) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("events.jsonl"))
+    {
         let _ = writeln!(f, "{line}");
     }
 }
@@ -269,8 +311,12 @@ pub fn read_events(root: &Path, vault: &str, key: &str, run_id: &str) -> Vec<Eve
     if !is_task_key(key) || run_id.contains('/') || run_id.contains("..") {
         return Vec::new();
     }
-    let text = fs::read_to_string(run_dir(root, vault, key, run_id).join("events.jsonl")).unwrap_or_default();
-    let mut events: Vec<Event> = text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
+    let text = fs::read_to_string(run_dir(root, vault, key, run_id).join("events.jsonl"))
+        .unwrap_or_default();
+    let mut events: Vec<Event> = text
+        .lines()
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
     if events.len() > EVENT_TAIL {
         events.drain(..events.len() - EVENT_TAIL);
     }
@@ -282,22 +328,55 @@ mod tests {
     use super::*;
 
     fn record(key: &str, id: &str, phase: Phase, at: u64) -> RunRecord {
-        RunRecord { run_id: id.into(), task_key: key.into(), repo: "o/r".into(), phase, started_at: at, ..Default::default() }
+        RunRecord {
+            run_id: id.into(),
+            task_key: key.into(),
+            repo: "o/r".into(),
+            phase,
+            started_at: at,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn settings_default_clamp_and_survive_bad_files() {
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(load_settings(dir.path()), Settings::default());
-        assert!(!Settings::default().auto_pickup, "처음에는 스스로 집지 않는다");
-        let saved = save_settings(dir.path(), &Settings { auto_pickup: true, concurrency: 99, model: "  opus ".into() }).unwrap();
-        assert_eq!((saved.concurrency, saved.model.as_str(), saved.auto_pickup), (MAX_CONCURRENCY, "opus", true));
+        assert!(
+            !Settings::default().auto_pickup,
+            "처음에는 스스로 집지 않는다"
+        );
+        let saved = save_settings(
+            dir.path(),
+            &Settings {
+                auto_pickup: true,
+                concurrency: 99,
+                model: "  opus ".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (saved.concurrency, saved.model.as_str(), saved.auto_pickup),
+            (MAX_CONCURRENCY, "opus", true)
+        );
         assert_eq!(load_settings(dir.path()), saved);
-        assert_eq!(Settings { concurrency: 0, ..Default::default() }.clamped().concurrency, MIN_CONCURRENCY);
+        assert_eq!(
+            Settings {
+                concurrency: 0,
+                ..Default::default()
+            }
+            .clamped()
+            .concurrency,
+            MIN_CONCURRENCY
+        );
         fs::write(dir.path().join("settings.json"), "{망가짐").unwrap();
         assert_eq!(load_settings(dir.path()), Settings::default());
         // 모르는 칸이 있어도, 빠진 칸이 있어도 읽힌다
-        fs::write(dir.path().join("settings.json"), r#"{"autoPickup":true,"future":1}"#).unwrap();
+        fs::write(
+            dir.path().join("settings.json"),
+            r#"{"autoPickup":true,"future":1}"#,
+        )
+        .unwrap();
         let s = load_settings(dir.path());
         assert!(s.auto_pickup && s.concurrency == 3);
     }
@@ -308,7 +387,10 @@ mod tests {
         let b = new_uuid();
         assert_ne!(a, b);
         let parts: Vec<&str> = a.split('-').collect();
-        assert_eq!(parts.iter().map(|p| p.len()).collect::<Vec<_>>(), vec![8, 4, 4, 4, 12]);
+        assert_eq!(
+            parts.iter().map(|p| p.len()).collect::<Vec<_>>(),
+            vec![8, 4, 4, 4, 12]
+        );
         assert!(parts[2].starts_with('4'));
         assert!("89ab".contains(parts[3].chars().next().unwrap()));
     }
@@ -318,7 +400,17 @@ mod tests {
         for ok in ["TSK-1", "TSK-14", "TSK-123456789"] {
             assert!(is_task_key(ok), "{ok}");
         }
-        for bad in ["", "TSK-", "TSK-x", "tsk-1", "TSK-1/..", "../TSK-1", "TSK-1234567890", "TSK--1", "TSK-1 "] {
+        for bad in [
+            "",
+            "TSK-",
+            "TSK-x",
+            "tsk-1",
+            "TSK-1/..",
+            "../TSK-1",
+            "TSK-1234567890",
+            "TSK--1",
+            "TSK-1 ",
+        ] {
             assert!(!is_task_key(bad), "{bad}");
         }
         let dir = tempfile::tempdir().unwrap();
@@ -336,11 +428,24 @@ mod tests {
         save_run(root, "/v", &record("TSK-2", "r3", Phase::Running, 5)).unwrap();
         save_run(root, "/other", &record("TSK-1", "r9", Phase::Running, 99)).unwrap();
         let runs = list_runs(root, "/v", "TSK-1");
-        assert_eq!(runs.iter().map(|r| r.run_id.as_str()).collect::<Vec<_>>(), vec!["r2", "r1"]);
-        assert_eq!(load_run(root, "/v", "TSK-1", "r2").unwrap().phase, Phase::WaitingAnswer);
+        assert_eq!(
+            runs.iter().map(|r| r.run_id.as_str()).collect::<Vec<_>>(),
+            vec!["r2", "r1"]
+        );
+        assert_eq!(
+            load_run(root, "/v", "TSK-1", "r2").unwrap().phase,
+            Phase::WaitingAnswer
+        );
         assert!(load_run(root, "/v", "TSK-1", "없음").is_none());
-        let open: Vec<_> = list_open_runs(root, "/v").into_iter().map(|r| r.run_id).collect();
-        assert_eq!(open, vec!["r3", "r2"], "오래된 것이 앞이고, 다른 vault와 끝난 것은 빠진다");
+        let open: Vec<_> = list_open_runs(root, "/v")
+            .into_iter()
+            .map(|r| r.run_id)
+            .collect();
+        assert_eq!(
+            open,
+            vec!["r3", "r2"],
+            "오래된 것이 앞이고, 다른 vault와 끝난 것은 빠진다"
+        );
         // 망가진 기록은 건너뛴다
         fs::write(run_dir(root, "/v", "TSK-1", "r1").join("run.json"), "{").unwrap();
         assert_eq!(list_runs(root, "/v", "TSK-1").len(), 1);
@@ -359,7 +464,10 @@ mod tests {
         }
         let events = read_events(dir.path(), "/v", "TSK-3", "r1");
         assert_eq!(events.len(), EVENT_TAIL);
-        assert_eq!(events.last().unwrap().text, format!("줄 {}", EVENT_TAIL + 4));
+        assert_eq!(
+            events.last().unwrap().text,
+            format!("줄 {}", EVENT_TAIL + 4)
+        );
         assert_eq!(events[0].text, "줄 5");
     }
 }

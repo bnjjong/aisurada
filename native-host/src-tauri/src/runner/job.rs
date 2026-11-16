@@ -68,7 +68,11 @@ impl Ctx {
         let argv: Vec<String> = argv.iter().map(|s| s.to_string()).collect();
         let reply = self.host.engine(&self.vault, &argv)?;
         if reply.status != 0 {
-            let message = if reply.stderr.trim().is_empty() { reply.stdout.trim() } else { reply.stderr.trim() };
+            let message = if reply.stderr.trim().is_empty() {
+                reply.stdout.trim()
+            } else {
+                reply.stderr.trim()
+            };
             return Err(protocol::clip(message, 400));
         }
         let out = reply.stdout.trim();
@@ -93,11 +97,24 @@ impl Ctx {
     }
 
     pub fn transition(&self, key: &str, to: &str, actor: &str, from: &str) -> Result<(), String> {
-        self.call(&["transition-task", key, &format!("to={to}"), &format!("actor={actor}"), &format!("from={from}")]).map(|_| ())
+        self.call(&[
+            "transition-task",
+            key,
+            &format!("to={to}"),
+            &format!("actor={actor}"),
+            &format!("from={from}"),
+        ])
+        .map(|_| ())
     }
 
     pub fn comment(&self, key: &str, actor: &str, body: &str) -> Result<(), String> {
-        self.call(&["add-task-comment", key, &format!("body={}", protocol::clip(body, protocol::COMMENT_CHARS)), &format!("actor={actor}")]).map(|_| ())
+        self.call(&[
+            "add-task-comment",
+            key,
+            &format!("body={}", protocol::clip(body, protocol::COMMENT_CHARS)),
+            &format!("actor={actor}"),
+        ])
+        .map(|_| ())
     }
 }
 
@@ -122,12 +139,24 @@ struct Run<'a> {
 }
 
 /// 실행 하나를 끝까지 돌린다. 일꾼 스레드에서 부른다.
-pub fn execute(ctx: &Ctx, key: &str, mode: Mode, cancel: Arc<AtomicBool>, shutdown: Arc<AtomicBool>) -> Ending {
+pub fn execute(
+    ctx: &Ctx,
+    key: &str,
+    mode: Mode,
+    cancel: Arc<AtomicBool>,
+    shutdown: Arc<AtomicBool>,
+) -> Ending {
     let (rec, task, input) = match begin(ctx, key, &mode) {
         Ok(started) => started,
         Err(ending) => return ending,
     };
-    let mut run = Run { ctx, rec, task, cancel, shutdown };
+    let mut run = Run {
+        ctx,
+        rec,
+        task,
+        cancel,
+        shutdown,
+    };
     let ending = run.work(input);
     ctx.host.changed(Some(key));
     ending
@@ -135,13 +164,19 @@ pub fn execute(ctx: &Ctx, key: &str, mode: Mode, cancel: Arc<AtomicBool>, shutdo
 
 /// 받기와 집기. 실행 기록과 처음 입력을 만든다.
 fn begin(ctx: &Ctx, key: &str, mode: &Mode) -> Result<(RunRecord, TaskInfo, Input), Ending> {
-    let task = ctx.get_task(key).map_err(|e| Ending::NotPicked(format!("태스크를 읽지 못했다: {e}")))?;
+    let task = ctx
+        .get_task(key)
+        .map_err(|e| Ending::NotPicked(format!("태스크를 읽지 못했다: {e}")))?;
     match mode {
         Mode::Fresh => {
             if task.status != "ready-for-develop" {
-                return Err(Ending::NotPicked(format!("Ready For Develop가 아니다({})", task.status)));
+                return Err(Ending::NotPicked(format!(
+                    "Ready For Develop가 아니다({})",
+                    task.status
+                )));
             }
-            ctx.transition(key, "in-progress", "runner", "ready-for-develop").map_err(Ending::NotPicked)?;
+            ctx.transition(key, "in-progress", "runner", "ready-for-develop")
+                .map_err(Ending::NotPicked)?;
             let rec = RunRecord {
                 run_id: store::new_uuid(),
                 task_key: key.to_string(),
@@ -151,16 +186,26 @@ fn begin(ctx: &Ctx, key: &str, mode: &Mode) -> Result<(RunRecord, TaskInfo, Inpu
                 step: "집기".to_string(),
                 ..Default::default()
             };
-            let run = Run { ctx, rec: rec.clone(), task: task.clone(), cancel: Arc::default(), shutdown: Arc::default() };
+            let run = Run {
+                ctx,
+                rec: rec.clone(),
+                task: task.clone(),
+                cancel: Arc::default(),
+                shutdown: Arc::default(),
+            };
             run.save();
             run.event("받기", &format!("{} \"{}\"을 읽었다", key, task.title));
             run.event("집기", "Ready For Develop → In Progress");
             Ok((rec, task, Input::First))
         }
         Mode::Answer { run_id } | Mode::Recover { run_id } => {
-            let mut rec = store::load_run(&ctx.root(), &ctx.vault, key, run_id).ok_or_else(|| Ending::NotPicked("실행 기록을 찾지 못했다".into()))?;
+            let mut rec = store::load_run(&ctx.root(), &ctx.vault, key, run_id)
+                .ok_or_else(|| Ending::NotPicked("실행 기록을 찾지 못했다".into()))?;
             if rec.phase != Phase::Running {
-                return Err(Ending::NotPicked(format!("이어 갈 수 없는 단계다({:?})", rec.phase)));
+                return Err(Ending::NotPicked(format!(
+                    "이어 갈 수 없는 단계다({:?})",
+                    rec.phase
+                )));
             }
             if task.status != "in-progress" {
                 // 사람이 그 사이 태스크를 옮겼다
@@ -169,13 +214,21 @@ fn begin(ctx: &Ctx, key: &str, mode: &Mode) -> Result<(RunRecord, TaskInfo, Inpu
                 }
                 rec.phase = Phase::Abandoned;
                 rec.ended_at = Some(store::now_ms());
-                rec.error = Some(format!("태스크가 {} 로 옮겨져 이어 가지 않았다", task.status));
+                rec.error = Some(format!(
+                    "태스크가 {} 로 옮겨져 이어 가지 않았다",
+                    task.status
+                ));
                 let _ = store::save_run(&ctx.root(), &ctx.vault, &rec);
                 return Err(Ending::Abandoned);
             }
             let input = match rec.answer.take() {
-                Some(answer) => Input::Answer { question: rec.question.take().unwrap_or_default(), answer },
-                None if matches!(mode, Mode::Answer { .. }) => return Err(Ending::NotPicked("도착한 답이 없다".into())),
+                Some(answer) => Input::Answer {
+                    question: rec.question.take().unwrap_or_default(),
+                    answer,
+                },
+                None if matches!(mode, Mode::Answer { .. }) => {
+                    return Err(Ending::NotPicked("도착한 답이 없다".into()))
+                }
                 None => Input::Recover,
             };
             Ok((rec, task, input))
@@ -205,7 +258,13 @@ impl Run<'_> {
     }
 
     fn work_dir(&self) -> PathBuf {
-        store::run_dir(&self.root(), &self.ctx.vault, &self.rec.task_key, &self.rec.run_id).join("work")
+        store::run_dir(
+            &self.root(),
+            &self.ctx.vault,
+            &self.rec.task_key,
+            &self.rec.run_id,
+        )
+        .join("work")
     }
 
     /// 읽기 전용 작업 폴더를 준비한다. 이미 있으면 그대로 쓰고, 없으면(앱을 껐다 켠 뒤 사라졌거나 처음이면) 만든다.
@@ -214,7 +273,13 @@ impl Run<'_> {
         if work.join(".git").exists() {
             return Ok(work);
         }
-        self.step("받아오기", &format!("{} 저장소 사본을 최신으로 맞추고 읽기 전용 작업 폴더를 만든다", self.task.repo));
+        self.step(
+            "받아오기",
+            &format!(
+                "{} 저장소 사본을 최신으로 맞추고 읽기 전용 작업 폴더를 만든다",
+                self.task.repo
+            ),
+        );
         let clone = self.ctx.host.clone_dir(&self.task.repo)?;
         host::create_worktree(&clone, &work, self.task.base.as_deref())?;
         self.rec.workdir = Some(work.to_string_lossy().into_owned());
@@ -232,9 +297,15 @@ impl Run<'_> {
     }
 
     fn mcp_config(&self) -> Result<String, String> {
-        let reply = self.ctx.host.engine(&self.ctx.vault, &["claude-mcp".to_string(), "config".to_string()])?;
+        let reply = self.ctx.host.engine(
+            &self.ctx.vault,
+            &["claude-mcp".to_string(), "config".to_string()],
+        )?;
         if reply.status != 0 {
-            return Err(format!("MCP 설정을 만들지 못했다: {}", protocol::clip(&reply.stderr, 300)));
+            return Err(format!(
+                "MCP 설정을 만들지 못했다: {}",
+                protocol::clip(&reply.stderr, 300)
+            ));
         }
         protocol::mcp_config_for(&reply.stdout, &self.ctx.vault)
     }
@@ -265,12 +336,34 @@ impl Run<'_> {
             }
             let (prompt, resume) = match &input {
                 Input::First => (protocol::build_prompt(&self.task), false),
-                Input::Answer { question, answer } => (protocol::answer_prompt(question, answer, false), true),
+                Input::Answer { question, answer } => {
+                    (protocol::answer_prompt(question, answer, false), true)
+                }
                 Input::Recover => (protocol::recover_prompt(), true),
-                Input::ForceReport { question } => (protocol::answer_prompt(question, "(질문 한도에 닿았다. 더 답할 수 없다)", true), true),
+                Input::ForceReport { question } => (
+                    protocol::answer_prompt(
+                        question,
+                        "(질문 한도에 닿았다. 더 답할 수 없다)",
+                        true,
+                    ),
+                    true,
+                ),
             };
-            let args = protocol::claude_args(&self.rec.session_id, resume, &self.ctx.settings.model, &mcp, &work);
-            self.step("일하기", if resume { "세션을 이어서 조사한다" } else { "claude에게 조사를 맡겼다" });
+            let args = protocol::claude_args(
+                &self.rec.session_id,
+                resume,
+                &self.ctx.settings.model,
+                &mcp,
+                &work,
+            );
+            self.step(
+                "일하기",
+                if resume {
+                    "세션을 이어서 조사한다"
+                } else {
+                    "claude에게 조사를 맡겼다"
+                },
+            );
             let started = Instant::now();
             let call = ClaudeCall {
                 workdir: work.clone(),
@@ -291,7 +384,9 @@ impl Run<'_> {
                 return self.stop();
             }
             if outcome.timed_out {
-                return self.fail(&format!("일하는 시간 제한({MAX_WORK_MINUTES}분)을 넘겨 멈췄다"));
+                return self.fail(&format!(
+                    "일하는 시간 제한({MAX_WORK_MINUTES}분)을 넘겨 멈췄다"
+                ));
             }
             if outcome.exit_code != Some(0) {
                 let detail = format!("{}\n{}", outcome.stderr, outcome.stdout);
@@ -308,8 +403,18 @@ impl Run<'_> {
                 }
                 return self.fail(&format!(
                     "claude가 종료 코드 {}로 끝났다: {}",
-                    outcome.exit_code.map(|c| c.to_string()).unwrap_or_else(|| "없음".into()),
-                    protocol::clip(if outcome.stderr.trim().is_empty() { &outcome.stdout } else { &outcome.stderr }, 400)
+                    outcome
+                        .exit_code
+                        .map(|c| c.to_string())
+                        .unwrap_or_else(|| "없음".into()),
+                    protocol::clip(
+                        if outcome.stderr.trim().is_empty() {
+                            &outcome.stdout
+                        } else {
+                            &outcome.stderr
+                        },
+                        400
+                    )
                 ));
             }
             let result = match protocol::parse_claude_output(&outcome.stdout) {
@@ -321,7 +426,10 @@ impl Run<'_> {
             self.rec.output_tokens += result.output_tokens;
             self.save();
             if result.is_error {
-                return self.fail(&format!("claude가 오류를 알렸다: {}", protocol::clip(&result.text, 400)));
+                return self.fail(&format!(
+                    "claude가 오류를 알렸다: {}",
+                    protocol::clip(&result.text, 400)
+                ));
             }
             match protocol::parse_reply(&result.text) {
                 Reply::Report(text) => return self.report(&text),
@@ -349,7 +457,10 @@ impl Run<'_> {
         if let Err(e) = self.ctx.comment(&self.rec.task_key, "runner", &body) {
             return self.fail(&format!("보고를 댓글로 남기지 못했다: {e}"));
         }
-        if let Err(e) = self.ctx.transition(&self.rec.task_key, "in-review", "runner", "in-progress") {
+        if let Err(e) =
+            self.ctx
+                .transition(&self.rec.task_key, "in-review", "runner", "in-progress")
+        {
             // 보고는 남았는데 태스크가 그 사이 옮겨졌다. 실패로 덮지 않고 사람이 옮긴 것으로 본다
             self.rec.phase = Phase::Abandoned;
             self.rec.error = Some(format!("보고는 남겼지만 In Review로 옮기지 못했다: {e}"));
@@ -385,7 +496,12 @@ impl Run<'_> {
         if let Err(e) = self.ctx.comment(&self.rec.task_key, "runner", &body) {
             return self.fail(&format!("질문을 댓글로 남기지 못했다: {e}"));
         }
-        if let Err(e) = self.ctx.transition(&self.rec.task_key, "waiting-answer", "runner", "in-progress") {
+        if let Err(e) = self.ctx.transition(
+            &self.rec.task_key,
+            "waiting-answer",
+            "runner",
+            "in-progress",
+        ) {
             self.rec.phase = Phase::Abandoned;
             self.rec.error = Some(format!("Waiting Answer로 옮기지 못했다: {e}"));
             self.rec.ended_at = Some(store::now_ms());
@@ -414,7 +530,9 @@ impl Run<'_> {
     fn fail(&mut self, message: &str) -> Ending {
         self.event(&self.rec.step.clone(), &format!("실패: {message}"));
         let _ = self.ctx.comment(&self.rec.task_key, "runner", &format!("**실행이 실패했어요**\n\n{message}\n\n다시 하려면 Draft로 되돌린 뒤 Ready For Develop로 보내세요."));
-        let _ = self.ctx.transition(&self.rec.task_key, "failed", "runner", "in-progress");
+        let _ = self
+            .ctx
+            .transition(&self.rec.task_key, "failed", "runner", "in-progress");
         self.rec.phase = Phase::Failed;
         self.rec.error = Some(message.to_string());
         self.rec.ended_at = Some(store::now_ms());
@@ -441,8 +559,12 @@ impl Run<'_> {
             return Ending::Interrupted;
         }
         self.event("일하기", "사람이 중지했다");
-        let _ = self.ctx.comment(&self.rec.task_key, "human", "**실행을 중지했어요**");
-        let _ = self.ctx.transition(&self.rec.task_key, "cancelled", "human", "in-progress");
+        let _ = self
+            .ctx
+            .comment(&self.rec.task_key, "human", "**실행을 중지했어요**");
+        let _ = self
+            .ctx
+            .transition(&self.rec.task_key, "cancelled", "human", "in-progress");
         self.rec.phase = Phase::Cancelled;
         self.rec.ended_at = Some(store::now_ms());
         self.cleanup();

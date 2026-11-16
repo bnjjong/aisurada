@@ -102,7 +102,11 @@ impl Runner {
     }
 
     fn ctx(&self, vault: String) -> Ctx {
-        Ctx { host: self.host.clone(), vault, settings: store::load_settings(&self.host.root()) }
+        Ctx {
+            host: self.host.clone(),
+            vault,
+            settings: store::load_settings(&self.host.root()),
+        }
     }
 
     /// 한 번 훑는다: 처음이면 끊긴 실행을 이어 가고, 자동 집기가 켜져 있으면 집는다.
@@ -110,7 +114,9 @@ impl Runner {
         if self.shutdown.load(Ordering::SeqCst) {
             return;
         }
-        let Some(vault) = self.host.vault() else { return };
+        let Some(vault) = self.host.vault() else {
+            return;
+        };
         let ctx = self.ctx(vault.clone());
         if self.reconciled.lock().unwrap().as_deref() != Some(vault.as_str()) {
             *self.reconciled.lock().unwrap() = Some(vault.clone());
@@ -123,11 +129,14 @@ impl Runner {
 
     /// 자리가 있는 만큼 Ready For Develop 태스크를 집는다. 우선순위가 높은 것, 키가 작은(오래된) 것이 먼저다.
     fn pickup(self: &Arc<Self>, ctx: &Ctx) {
-        let slots = (ctx.settings.concurrency as usize).saturating_sub(self.active.lock().unwrap().len());
+        let slots =
+            (ctx.settings.concurrency as usize).saturating_sub(self.active.lock().unwrap().len());
         if slots == 0 {
             return;
         }
-        let Ok(list) = ctx.call(&["list-tasks", "status=ready-for-develop"]) else { return };
+        let Ok(list) = ctx.call(&["list-tasks", "status=ready-for-develop"]) else {
+            return;
+        };
         let mut rows: Vec<(u8, u64, String)> = list
             .get("tasks")
             .and_then(|t| t.as_array())
@@ -151,7 +160,13 @@ impl Runner {
             if started >= slots {
                 break;
             }
-            if self.backoff.lock().unwrap().get(&key).is_some_and(|until| *until > now) {
+            if self
+                .backoff
+                .lock()
+                .unwrap()
+                .get(&key)
+                .is_some_and(|until| *until > now)
+            {
                 continue;
             }
             if self.spawn_job(&ctx.vault, &key, Mode::Fresh) {
@@ -167,7 +182,13 @@ impl Runner {
             match rec.phase {
                 // 일하다 끊긴 실행(또는 답이 이미 기록된 실행)은 같은 세션으로 이어 간다. 태스크가 옮겨졌으면 job이 닫는다.
                 Phase::Running => {
-                    self.spawn_job(&ctx.vault, &rec.task_key.clone(), Mode::Recover { run_id: rec.run_id.clone() });
+                    self.spawn_job(
+                        &ctx.vault,
+                        &rec.task_key.clone(),
+                        Mode::Recover {
+                            run_id: rec.run_id.clone(),
+                        },
+                    );
                 }
                 // 사람의 답을 기다리는 중이면 그대로 둔다. 태스크가 그 사이 옮겨졌으면 닫는다.
                 Phase::WaitingAnswer => match ctx.get_task(&rec.task_key) {
@@ -190,7 +211,13 @@ impl Runner {
         rec.ended_at = Some(store::now_ms());
         rec.error = Some("답을 기다리던 태스크가 다른 상태로 옮겨져 이어 가지 않았다".to_string());
         let _ = store::save_run(&self.host.root(), &ctx.vault, &rec);
-        store::append_event(&self.host.root(), &ctx.vault, &rec, "정리", "태스크가 옮겨져 실행을 닫았다");
+        store::append_event(
+            &self.host.root(),
+            &ctx.vault,
+            &rec,
+            "정리",
+            "태스크가 옮겨져 실행을 닫았다",
+        );
         self.host.changed(Some(&rec.task_key));
     }
 
@@ -202,7 +229,12 @@ impl Runner {
             if active.contains_key(key) || self.shutdown.load(Ordering::SeqCst) {
                 return false;
             }
-            active.insert(key.to_string(), Active { cancel: cancel.clone() });
+            active.insert(
+                key.to_string(),
+                Active {
+                    cancel: cancel.clone(),
+                },
+            );
         }
         let me = self.clone();
         let (vault, key) = (vault.to_string(), key.to_string());
@@ -210,7 +242,10 @@ impl Runner {
             let ctx = me.ctx(vault);
             let ending = job::execute(&ctx, &key, mode, cancel, me.shutdown.clone());
             if let Ending::NotPicked(_) = ending {
-                me.backoff.lock().unwrap().insert(key.clone(), Instant::now() + BACKOFF);
+                me.backoff
+                    .lock()
+                    .unwrap()
+                    .insert(key.clone(), Instant::now() + BACKOFF);
             }
             me.active.lock().unwrap().remove(&key);
             me.host.changed(Some(&key));
@@ -225,8 +260,15 @@ impl Runner {
             settings: store::load_settings(&self.host.root()),
             claude_available: self.host.claude_available(),
             running: self.active.lock().unwrap().len(),
-            active: open.iter().filter(|r| r.phase == Phase::Running).cloned().collect(),
-            waiting: open.into_iter().filter(|r| r.phase == Phase::WaitingAnswer).collect(),
+            active: open
+                .iter()
+                .filter(|r| r.phase == Phase::Running)
+                .cloned()
+                .collect(),
+            waiting: open
+                .into_iter()
+                .filter(|r| r.phase == Phase::WaitingAnswer)
+                .collect(),
         })
     }
 
@@ -245,7 +287,10 @@ impl Runner {
             return Err(format!("태스크 키가 이상해요: {key}"));
         }
         let runs = store::list_runs(&self.host.root(), &vault, key);
-        let events = runs.first().map(|r| store::read_events(&self.host.root(), &vault, key, &r.run_id)).unwrap_or_default();
+        let events = runs
+            .first()
+            .map(|r| store::read_events(&self.host.root(), &vault, key, &r.run_id))
+            .unwrap_or_default();
         Ok(RunsOut { runs, events })
     }
 
@@ -261,22 +306,34 @@ impl Runner {
         let ctx = self.ctx(vault.clone());
         let limit = ctx.settings.concurrency as usize;
         if self.active.lock().unwrap().len() >= limit {
-            return Err(format!("동시에 돌릴 수 있는 수({limit}개)에 닿았어요. 하나가 끝난 뒤에 눌러 주세요."));
+            return Err(format!(
+                "동시에 돌릴 수 있는 수({limit}개)에 닿았어요. 하나가 끝난 뒤에 눌러 주세요."
+            ));
         }
         // 막혀 있는지는 엔진이 가장 정확히 안다: 사람 몫의 전이 목록에서 In Progress의 막힌 까닭을 읽는다
         let detail = ctx.call(&["get-task", key])?;
         let task = protocol::TaskInfo::from_json(&detail)?;
         if task.status != "ready-for-develop" {
-            return Err(format!("Ready For Develop 상태에서만 실행할 수 있어요(지금은 {})", task.status));
+            return Err(format!(
+                "Ready For Develop 상태에서만 실행할 수 있어요(지금은 {})",
+                task.status
+            ));
         }
         if let Some(blocked) = detail
             .get("transitions")
             .and_then(|t| t.as_array())
             .into_iter()
             .flatten()
-            .find(|t| t.get("to").and_then(|v| v.as_str()) == Some("in-progress") && t.get("ok").and_then(|v| v.as_bool()) == Some(false))
+            .find(|t| {
+                t.get("to").and_then(|v| v.as_str()) == Some("in-progress")
+                    && t.get("ok").and_then(|v| v.as_bool()) == Some(false)
+            })
         {
-            return Err(blocked.get("reason").and_then(|r| r.as_str()).unwrap_or("다른 태스크에 막혀 있어요").to_string());
+            return Err(blocked
+                .get("reason")
+                .and_then(|r| r.as_str())
+                .unwrap_or("다른 태스크에 막혀 있어요")
+                .to_string());
         }
         self.backoff.lock().unwrap().remove(key);
         if self.spawn_job(&vault, key, Mode::Fresh) {
@@ -343,7 +400,13 @@ impl Runner {
         store::append_event(&root, &vault, &rec, "일하기", "사람의 답이 도착했다");
         self.host.changed(Some(key));
         // 사람이 직접 누른 일이라 동시에 도는 수의 한도를 따지지 않는다
-        if self.spawn_job(&vault, key, Mode::Answer { run_id: rec.run_id.clone() }) {
+        if self.spawn_job(
+            &vault,
+            key,
+            Mode::Answer {
+                run_id: rec.run_id.clone(),
+            },
+        ) {
             Ok(())
         } else {
             Err("이 태스크는 이미 실행 중이에요".into())
@@ -387,8 +450,12 @@ pub fn shutdown_for_exit<R: Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| format!("러너 작업이 끊겼어요: {e}"))?
+async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("러너 작업이 끊겼어요: {e}"))?
 }
 
 #[tauri::command]
@@ -397,7 +464,10 @@ pub fn runner_status(state: State<'_, RunnerState>) -> Result<StatusOut, String>
 }
 
 #[tauri::command]
-pub async fn runner_settings_set(state: State<'_, RunnerState>, settings: Settings) -> Result<Settings, String> {
+pub async fn runner_settings_set(
+    state: State<'_, RunnerState>,
+    settings: Settings,
+) -> Result<Settings, String> {
     let runner = state.0.clone();
     blocking(move || runner.set_settings(settings)).await
 }
@@ -415,7 +485,11 @@ pub async fn runner_stop(state: State<'_, RunnerState>, task_key: String) -> Res
 }
 
 #[tauri::command]
-pub async fn runner_answer(state: State<'_, RunnerState>, task_key: String, text: String) -> Result<(), String> {
+pub async fn runner_answer(
+    state: State<'_, RunnerState>,
+    task_key: String,
+    text: String,
+) -> Result<(), String> {
     let runner = state.0.clone();
     blocking(move || runner.answer(&task_key, &text)).await
 }

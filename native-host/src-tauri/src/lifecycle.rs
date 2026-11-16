@@ -152,19 +152,41 @@ mod tests {
     #[test]
     fn navigation_allows_local_and_aisframe_and_blocks_spoofing() {
         use tauri::Url;
-        assert!(is_allowed_navigation(&Url::parse("aisframe://localhost/attachment/index.html").unwrap()));
-        assert!(is_allowed_navigation(&Url::parse("http://127.0.0.1:1420/").unwrap()));
-        assert!(is_allowed_navigation(&Url::parse("http://localhost:1420/").unwrap()));
-        assert!(is_allowed_navigation(&Url::parse("https://tauri.localhost/").unwrap()));
-        assert!(is_allowed_navigation(&Url::parse("tauri://localhost/").unwrap()));
-        assert!(is_allowed_navigation(&Url::parse("asset://localhost/path").unwrap()));
+        assert!(is_allowed_navigation(
+            &Url::parse("aisframe://localhost/attachment/index.html").unwrap()
+        ));
+        assert!(is_allowed_navigation(
+            &Url::parse("http://127.0.0.1:1420/").unwrap()
+        ));
+        assert!(is_allowed_navigation(
+            &Url::parse("http://localhost:1420/").unwrap()
+        ));
+        assert!(is_allowed_navigation(
+            &Url::parse("https://tauri.localhost/").unwrap()
+        ));
+        assert!(is_allowed_navigation(
+            &Url::parse("tauri://localhost/").unwrap()
+        ));
+        assert!(is_allowed_navigation(
+            &Url::parse("asset://localhost/path").unwrap()
+        ));
         assert!(is_allowed_navigation(&Url::parse("about:blank").unwrap()));
-        assert!(is_allowed_navigation(&Url::parse("data:text/html,test").unwrap()));
+        assert!(is_allowed_navigation(
+            &Url::parse("data:text/html,test").unwrap()
+        ));
 
         // 스푸핑 및 외부 URL 차단
-        assert!(!is_allowed_navigation(&Url::parse("http://localhost@evil.com/").unwrap()));
-        assert!(!is_allowed_navigation(&Url::parse("http://localhost.evil.com/").unwrap()));
-        assert!(!is_allowed_navigation(&Url::parse("https://evil.com/").unwrap()));
-        assert!(!is_allowed_navigation(&Url::parse("http://192.168.1.1/").unwrap()));
+        assert!(!is_allowed_navigation(
+            &Url::parse("http://localhost@evil.com/").unwrap()
+        ));
+        assert!(!is_allowed_navigation(
+            &Url::parse("http://localhost.evil.com/").unwrap()
+        ));
+        assert!(!is_allowed_navigation(
+            &Url::parse("https://evil.com/").unwrap()
+        ));
+        assert!(!is_allowed_navigation(
+            &Url::parse("http://192.168.1.1/").unwrap()
+        ));
     }
 }

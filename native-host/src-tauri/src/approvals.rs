@@ -35,9 +35,16 @@ pub fn items_from_reply(stdout: &str) -> Vec<NewItem> {
             if id.is_empty() {
                 return None;
             }
-            let summary = c.get("summary").and_then(|s| s.as_str()).unwrap_or("스킬·에이전트 변경");
+            let summary = c
+                .get("summary")
+                .and_then(|s| s.as_str())
+                .unwrap_or("스킬·에이전트 변경");
             let fixed = c.get("fixed").and_then(|f| f.as_bool()).unwrap_or(false);
-            let body = if fixed { format!("{summary} · 권한이나 참조를 바꾸는 변경이라 꼭 확인해야 해요") } else { summary.to_string() };
+            let body = if fixed {
+                format!("{summary} · 권한이나 참조를 바꾸는 변경이라 꼭 확인해야 해요")
+            } else {
+                summary.to_string()
+            };
             Some(NewItem {
                 kind: "approval".to_string(),
                 title: TITLE.to_string(),
@@ -50,18 +57,25 @@ pub fn items_from_reply(stdout: &str) -> Vec<NewItem> {
 }
 
 fn check<R: Runtime>(app: &AppHandle<R>) {
-    let Some(state) = app.try_state::<HostState>() else { return };
+    let Some(state) = app.try_state::<HostState>() else {
+        return;
+    };
     let vault = match state.vault.lock() {
         Ok(g) => g.clone(),
         Err(_) => None,
     };
     let Some(vault) = vault else { return };
     let argv = ["list-resource-changes".to_string(), "decided=0".to_string()];
-    let Ok(reply) = sidecar::call_blocking(app, &vault, &argv) else { return };
+    let Ok(reply) = sidecar::call_blocking(app, &vault, &argv) else {
+        return;
+    };
     if reply.status != 0 {
         return;
     }
-    for item in items_from_reply(&reply.stdout).into_iter().take(MAX_PER_TICK) {
+    for item in items_from_reply(&reply.stdout)
+        .into_iter()
+        .take(MAX_PER_TICK)
+    {
         let _ = notifications::push(app, &notifications::default_dir(), &vault, item);
     }
 }
@@ -95,17 +109,34 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].kind, "approval");
         assert_eq!(items[0].title, TITLE);
-        assert_eq!(items[0].id.as_deref(), Some("approval-pcmw1-aaaaaaaa"), "same change, same notification id");
+        assert_eq!(
+            items[0].id.as_deref(),
+            Some("approval-pcmw1-aaaaaaaa"),
+            "same change, same notification id"
+        );
         assert_eq!(items[0].body, "글로벌 스킬 '번역 검수' 고치기(설명)");
-        assert!(items[1].body.contains("꼭 확인해야 해요"), "a fixed category is called out: {}", items[1].body);
+        assert!(
+            items[1].body.contains("꼭 확인해야 해요"),
+            "a fixed category is called out: {}",
+            items[1].body
+        );
         assert!(items.iter().all(|i| i.task_key.is_none()));
     }
 
     #[test]
     fn nothing_pending_or_a_broken_reply_yields_nothing() {
-        assert!(items_from_reply(r#"{"counts":{"pending":0},"pending":[],"unapproved":[]}"#).is_empty());
+        assert!(
+            items_from_reply(r#"{"counts":{"pending":0},"pending":[],"unapproved":[]}"#).is_empty()
+        );
         assert!(items_from_reply("not json").is_empty());
-        assert!(items_from_reply(r#"{"pending":[{"summary":"id 없음"},{"id":""}]}"#).is_empty(), "rows without an id are skipped");
-        assert_eq!(items_from_reply(r#"{"pending":[{"id":"pcx-00000000"}]}"#)[0].body, "스킬·에이전트 변경", "a missing summary has a fallback");
+        assert!(
+            items_from_reply(r#"{"pending":[{"summary":"id 없음"},{"id":""}]}"#).is_empty(),
+            "rows without an id are skipped"
+        );
+        assert_eq!(
+            items_from_reply(r#"{"pending":[{"id":"pcx-00000000"}]}"#)[0].body,
+            "스킬·에이전트 변경",
+            "a missing summary has a fallback"
+        );
     }
 }

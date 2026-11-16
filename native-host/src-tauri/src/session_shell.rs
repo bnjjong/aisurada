@@ -70,7 +70,9 @@ fn resume_command(agent: Option<&str>, session_id: &str) -> Option<String> {
 fn first_command(action: &SessionAction, fell_back: bool) -> String {
     const NOTICE: &str = "원래 작업 폴더가 없어서 홈 폴더에서 이어 가요. 이어 간 대화의 파일 명령은 홈을 기준으로 돌아요.";
     match action {
-        SessionAction::Resume { session_id, agent, .. } => {
+        SessionAction::Resume {
+            session_id, agent, ..
+        } => {
             // 에이전트 이름은 pty_start_session이 먼저 걸러서 여기서는 항상 아는 이름이다
             let resume = resume_command(agent.as_deref(), session_id)
                 .unwrap_or_else(|| format!("claude --resume {}", session_id));
@@ -95,7 +97,8 @@ pub fn pty_start_session(
     session_action: SessionAction,
     on_data: Channel<String>,
 ) -> Result<Started, String> {
-    let sink = Arc::new(move |b: &[u8]| crate::ipc::send_bytes(&on_data, b).map_err(|e| e.to_string()));
+    let sink =
+        Arc::new(move |b: &[u8]| crate::ipc::send_bytes(&on_data, b).map_err(|e| e.to_string()));
 
     // 1. 이미 존재하는 셸인 경우 다시 붙음 (재접속 시 세션 검사 건너뜀)
     if state.terminals.is_alive(&key) {
@@ -117,9 +120,15 @@ pub fn pty_start_session(
     }
 
     // 2-1-1. 에이전트 검사: 아는 이름(claude, codex, gemini, antigravity)이 아니면 거절. 셸 명령에 들어가기 때문이다
-    if let SessionAction::Resume { agent, session_id, .. } = &session_action {
+    if let SessionAction::Resume {
+        agent, session_id, ..
+    } = &session_action
+    {
         if resume_command(agent.as_deref(), session_id).is_none() {
-            return Err(format!("아는 에이전트가 아니다: {}", agent.as_deref().unwrap_or("")));
+            return Err(format!(
+                "아는 에이전트가 아니다: {}",
+                agent.as_deref().unwrap_or("")
+            ));
         }
     }
 
@@ -151,13 +160,9 @@ pub fn pty_start_session(
         c.cwd(path);
     }
 
-    let fell_back = state.terminals.start_shell(
-        key,
-        size(cols, rows),
-        sink,
-        c,
-        fell_back,
-    )?;
+    let fell_back = state
+        .terminals
+        .start_shell(key, size(cols, rows), sink, c, fell_back)?;
 
     Ok(Started { fell_back })
 }
@@ -168,32 +173,66 @@ mod tests {
 
     #[test]
     fn first_command_has_spaces_around_semicolons() {
-        let resume = SessionAction::Resume { session_id: "3f2a9c4e-1b2d".into(), cwd: None, agent: None };
-        assert_eq!(first_command(&resume, false), "claude --resume 3f2a9c4e-1b2d ; exec zsh -l -i");
+        let resume = SessionAction::Resume {
+            session_id: "3f2a9c4e-1b2d".into(),
+            cwd: None,
+            agent: None,
+        };
+        assert_eq!(
+            first_command(&resume, false),
+            "claude --resume 3f2a9c4e-1b2d ; exec zsh -l -i"
+        );
         assert_eq!(
             first_command(&resume, true),
             "printf '%s\\n' '원래 작업 폴더가 없어서 홈 폴더에서 이어 가요. 이어 간 대화의 파일 명령은 홈을 기준으로 돌아요.' ; claude --resume 3f2a9c4e-1b2d ; exec zsh -l -i"
         );
-        let attach = SessionAction::Attach { session_id: "753ecd82".into() };
-        assert_eq!(first_command(&attach, false), "claude attach 753ecd82 ; exec zsh -l -i");
+        let attach = SessionAction::Attach {
+            session_id: "753ecd82".into(),
+        };
+        assert_eq!(
+            first_command(&attach, false),
+            "claude attach 753ecd82 ; exec zsh -l -i"
+        );
     }
 
     #[test]
     fn resume_picks_the_command_of_the_agent_that_opened_the_session() {
-        let codex = SessionAction::Resume { session_id: "019e-aa".into(), cwd: None, agent: Some("codex".into()) };
-        assert_eq!(first_command(&codex, false), "codex resume 019e-aa ; exec zsh -l -i");
-        let gemini = SessionAction::Resume { session_id: "b1481fa3-9be2".into(), cwd: None, agent: Some("gemini".into()) };
+        let codex = SessionAction::Resume {
+            session_id: "019e-aa".into(),
+            cwd: None,
+            agent: Some("codex".into()),
+        };
+        assert_eq!(
+            first_command(&codex, false),
+            "codex resume 019e-aa ; exec zsh -l -i"
+        );
+        let gemini = SessionAction::Resume {
+            session_id: "b1481fa3-9be2".into(),
+            cwd: None,
+            agent: Some("gemini".into()),
+        };
         assert_eq!(
             first_command(&gemini, false),
             "AISURADA_SESSION_ID=b1481fa3-9be2 AISURADA_SESSION_AGENT=gemini gemini --resume b1481fa3-9be2 ; exec zsh -l -i"
         );
-        let claude = SessionAction::Resume { session_id: "abc".into(), cwd: None, agent: Some("claude".into()) };
-        assert_eq!(first_command(&claude, false), "claude --resume abc ; exec zsh -l -i");
+        let claude = SessionAction::Resume {
+            session_id: "abc".into(),
+            cwd: None,
+            agent: Some("claude".into()),
+        };
+        assert_eq!(
+            first_command(&claude, false),
+            "claude --resume abc ; exec zsh -l -i"
+        );
     }
 
     #[test]
     fn an_antigravity_conversation_resumes_with_agy_but_is_recorded_as_gemini() {
-        let agy = SessionAction::Resume { session_id: "dbd82a5e-fed5".into(), cwd: None, agent: Some("antigravity".into()) };
+        let agy = SessionAction::Resume {
+            session_id: "dbd82a5e-fed5".into(),
+            cwd: None,
+            agent: Some("antigravity".into()),
+        };
         assert_eq!(
             first_command(&agy, false),
             "AISURADA_SESSION_ID=dbd82a5e-fed5 AISURADA_SESSION_AGENT=gemini agy --conversation dbd82a5e-fed5 ; exec zsh -l -i"
@@ -205,6 +244,9 @@ mod tests {
     fn an_unknown_agent_never_reaches_the_shell() {
         assert!(resume_command(Some("codex; rm -rf ~"), "abc").is_none());
         assert!(resume_command(Some(""), "abc").is_none());
-        assert_eq!(resume_command(None, "abc").as_deref(), Some("claude --resume abc"));
+        assert_eq!(
+            resume_command(None, "abc").as_deref(),
+            Some("claude --resume abc")
+        );
     }
 }

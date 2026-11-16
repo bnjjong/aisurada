@@ -143,9 +143,7 @@ fn attachments_decode_before_vault_check_and_support_both_windows_and_body_forms
 fn open_external_path_rejects_missing_and_executables() {
     let app = mock_builder()
         .manage(HostState::default())
-        .invoke_handler(tauri::generate_handler![
-            files::open_external_path
-        ])
+        .invoke_handler(tauri::generate_handler![files::open_external_path])
         .build(mock_context(noop_assets()))
         .unwrap();
     let main = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())

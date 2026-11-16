@@ -1,12 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-mod call_log;
-mod desktop;
-mod engine;
-#[cfg(feature = "claude")]
-pub mod ask;
 #[cfg(feature = "claude")]
 pub mod agents;
 mod approvals;
+#[cfg(feature = "claude")]
+pub mod ask;
+mod call_log;
+mod desktop;
+#[cfg(feature = "claude")]
+mod dictation;
+mod engine;
 mod environment;
 mod files;
 mod frame;
@@ -16,6 +18,7 @@ mod layout;
 mod lifecycle;
 mod markdown;
 mod menu;
+mod migration;
 mod notes;
 mod notifications;
 mod process;
@@ -23,16 +26,13 @@ mod process;
 mod runner;
 mod secrets;
 mod self_write;
-mod migration;
-mod sidecar;
-mod terminal;
-mod workspace;
 #[cfg(feature = "claude")]
 mod session_image;
 #[cfg(feature = "claude")]
-mod dictation;
-#[cfg(feature = "claude")]
 mod session_shell;
+mod sidecar;
+mod terminal;
+mod workspace;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 

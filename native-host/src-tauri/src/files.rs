@@ -57,7 +57,10 @@ pub async fn copy_dropped_attachment(
             .map_err(|e| format!("파일을 찾을 수 없어요: {path} ({e})"))?;
         let bytes = fs::read(&src_path).map_err(|e| format!("파일을 읽지 못했어요: {e}"))?;
         if bytes.len() > LIMIT {
-            return Err(format!("파일이 너무 커요: {} 바이트. 상한은 50000000 바이트예요", bytes.len()));
+            return Err(format!(
+                "파일이 너무 커요: {} 바이트. 상한은 50000000 바이트예요",
+                bytes.len()
+            ));
         }
         let ext = src_path
             .extension()
@@ -74,7 +77,13 @@ pub async fn copy_dropped_attachment(
             .unwrap_or("file");
         let clean_stem: String = orig_stem
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .take(30)
             .collect();
         let now = std::time::SystemTime::now()
@@ -85,8 +94,16 @@ pub async fn copy_dropped_attachment(
         let name = if is_image {
             format!("img-{now_b36}-{rand_8}.{ext}")
         } else {
-            let s = if clean_stem.is_empty() { "doc" } else { &clean_stem };
-            let tail = if now_b36.len() >= 4 { &now_b36[now_b36.len() - 4..] } else { &now_b36 };
+            let s = if clean_stem.is_empty() {
+                "doc"
+            } else {
+                &clean_stem
+            };
+            let tail = if now_b36.len() >= 4 {
+                &now_b36[now_b36.len() - 4..]
+            } else {
+                &now_b36
+            };
             format!("{s}-{tail}.{ext}")
         };
         let rel_path = write_attachment(&vault, &note_dir, &name, &bytes)?;
@@ -229,16 +246,13 @@ fn open_target(vault: &str, path: &str) -> Result<PathBuf, String> {
 }
 fn is_executable(path: &Path) -> bool {
     if path.is_dir() {
-        return path
-            .file_name()
-            .and_then(|v| v.to_str())
-            .is_some_and(|v| {
-                let lower = v.to_ascii_lowercase();
-                lower.ends_with(".app")
-                    || lower.ends_with(".prefpane")
-                    || lower.ends_with(".workflow")
-                    || lower.ends_with(".scptd")
-            });
+        return path.file_name().and_then(|v| v.to_str()).is_some_and(|v| {
+            let lower = v.to_ascii_lowercase();
+            lower.ends_with(".app")
+                || lower.ends_with(".prefpane")
+                || lower.ends_with(".workflow")
+                || lower.ends_with(".scptd")
+        });
     }
     if !path.is_file() {
         return false;
@@ -265,17 +279,50 @@ fn is_executable(path: &Path) -> bool {
     }
     const BLOCKED_EXTENSIONS: &[&str] = &[
         // macOS 실행/패키지/설정/프로파일/스크립트
-        "command", "tool", "terminal", "jar", "py", "pkg", "mpkg", "mobileconfig",
-        "prefpane", "workflow", "action", "scpt", "applescript", "sh", "bash", "zsh",
-        "csh", "ksh", "fish", "rb", "pl", "php",
+        "command",
+        "tool",
+        "terminal",
+        "jar",
+        "py",
+        "pkg",
+        "mpkg",
+        "mobileconfig",
+        "prefpane",
+        "workflow",
+        "action",
+        "scpt",
+        "applescript",
+        "sh",
+        "bash",
+        "zsh",
+        "csh",
+        "ksh",
+        "fish",
+        "rb",
+        "pl",
+        "php",
         // Windows/DOS 실행/스크립트
-        "exe", "bat", "cmd", "vbs", "vbe", "js", "jse", "wsf", "wsh", "ps1", "psm1", "msi",
+        "exe",
+        "bat",
+        "cmd",
+        "vbs",
+        "vbe",
+        "js",
+        "jse",
+        "wsf",
+        "wsh",
+        "ps1",
+        "psm1",
+        "msi",
         // 웹링크 및 바로가기
-        "webloc", "url", "lnk", "alias",
+        "webloc",
+        "url",
+        "lnk",
+        "alias",
     ];
-    path.extension().and_then(|v| v.to_str()).is_some_and(|v| {
-        BLOCKED_EXTENSIONS.contains(&v.to_ascii_lowercase().as_str())
-    })
+    path.extension()
+        .and_then(|v| v.to_str())
+        .is_some_and(|v| BLOCKED_EXTENSIONS.contains(&v.to_ascii_lowercase().as_str()))
 }
 
 #[cfg(test)]

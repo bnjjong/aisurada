@@ -33,13 +33,23 @@ const CLONE_TIMEOUT: Duration = Duration::from_secs(600);
 // ---------------------------------------------------------------------------
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// `2026-11-12T04:17:41Z` 꼴을 유닉스 초로 바꾼다. 다른 꼴이면 None이다. (그레고리력 날짜 → 일수 변환)
 fn parse_utc(text: &str) -> Option<u64> {
     let b = text.as_bytes();
-    if b.len() != 20 || b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' || b[19] != b'Z' {
+    if b.len() != 20
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || b[10] != b'T'
+        || b[13] != b':'
+        || b[16] != b':'
+        || b[19] != b'Z'
+    {
         return None;
     }
     let num = |from: usize, to: usize| text.get(from..to)?.parse::<i64>().ok();
@@ -70,15 +80,26 @@ fn pem_to_key_pair(pem: &str) -> Result<RsaKeyPair, String> {
     } else if pem.contains("-----BEGIN PRIVATE KEY-----") {
         ("PRIVATE KEY", true)
     } else {
-        return Err("개인 키(PEM) 모양이 아니다. GitHub App 설정에서 받은 .pem 파일이어야 한다".into());
+        return Err(
+            "개인 키(PEM) 모양이 아니다. GitHub App 설정에서 받은 .pem 파일이어야 한다".into(),
+        );
     };
     let begin = format!("-----BEGIN {label}-----");
     let end = format!("-----END {label}-----");
     let start = pem.find(&begin).ok_or("PEM 시작 줄이 없다")? + begin.len();
     let stop = pem[start..].find(&end).ok_or("PEM 끝 줄이 없다")? + start;
-    let compact: String = pem[start..stop].chars().filter(|c| !c.is_whitespace()).collect();
-    let der = STANDARD.decode(compact).map_err(|_| "PEM 본문을 읽지 못했다")?;
-    let pair = if pkcs8 { RsaKeyPair::from_pkcs8(&der) } else { RsaKeyPair::from_der(&der) };
+    let compact: String = pem[start..stop]
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let der = STANDARD
+        .decode(compact)
+        .map_err(|_| "PEM 본문을 읽지 못했다")?;
+    let pair = if pkcs8 {
+        RsaKeyPair::from_pkcs8(&der)
+    } else {
+        RsaKeyPair::from_der(&der)
+    };
     pair.map_err(|_| "RSA 개인 키로 읽지 못했다. 키가 깨졌거나 지원하지 않는 모양이다".into())
 }
 
@@ -87,13 +108,22 @@ fn app_jwt(app_id: &str, pem: &str, now: u64) -> Result<String, String> {
     let key = pem_to_key_pair(pem)?;
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256","typ":"JWT"}"#);
     let payload = URL_SAFE_NO_PAD.encode(
-        serde_json::json!({ "iat": now.saturating_sub(60), "exp": now + 540, "iss": app_id }).to_string(),
+        serde_json::json!({ "iat": now.saturating_sub(60), "exp": now + 540, "iss": app_id })
+            .to_string(),
     );
     let signing_input = format!("{header}.{payload}");
     let mut signature = vec![0u8; key.public().modulus_len()];
-    key.sign(&RSA_PKCS1_SHA256, &SystemRandom::new(), signing_input.as_bytes(), &mut signature)
-        .map_err(|_| "JWT 서명에 실패했다")?;
-    Ok(format!("{signing_input}.{}", URL_SAFE_NO_PAD.encode(signature)))
+    key.sign(
+        &RSA_PKCS1_SHA256,
+        &SystemRandom::new(),
+        signing_input.as_bytes(),
+        &mut signature,
+    )
+    .map_err(|_| "JWT 서명에 실패했다")?;
+    Ok(format!(
+        "{signing_input}.{}",
+        URL_SAFE_NO_PAD.encode(signature)
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -117,8 +147,13 @@ impl std::fmt::Display for GithubError {
             GithubError::Status { status: 401, .. } => {
                 write!(f, "GitHub가 인증을 거절했다(401). 개인 키가 이 앱의 것이 아니거나 이 컴퓨터의 시계가 어긋났다")
             }
-            GithubError::Status { status: 404, message } => write!(f, "GitHub에서 찾지 못했다(404): {message}"),
-            GithubError::Status { status, message } => write!(f, "GitHub가 거절했다({status}): {message}"),
+            GithubError::Status {
+                status: 404,
+                message,
+            } => write!(f, "GitHub에서 찾지 못했다(404): {message}"),
+            GithubError::Status { status, message } => {
+                write!(f, "GitHub가 거절했다({status}): {message}")
+            }
             GithubError::Parse(m) => write!(f, "GitHub 응답을 읽지 못했다: {m}"),
         }
     }
@@ -154,7 +189,10 @@ impl Github {
             .http_status_as_error(false)
             .user_agent("aisurada")
             .build();
-        Github { api: api.trim_end_matches('/').to_string(), agent: config.into() }
+        Github {
+            api: api.trim_end_matches('/').to_string(),
+            agent: config.into(),
+        }
     }
 
     fn request(&self, method: &str, path: &str, bearer: &str) -> Result<Value, GithubError> {
@@ -178,11 +216,18 @@ impl Github {
         };
         let mut response = result.map_err(|e| GithubError::Network(e.to_string()))?;
         let status = response.status().as_u16();
-        let text = response.body_mut().read_to_string().map_err(|e| GithubError::Network(e.to_string()))?;
+        let text = response
+            .body_mut()
+            .read_to_string()
+            .map_err(|e| GithubError::Network(e.to_string()))?;
         if !(200..300).contains(&status) {
             let message = serde_json::from_str::<Value>(&text)
                 .ok()
-                .and_then(|v| v.get("message").and_then(|m| m.as_str()).map(str::to_string))
+                .and_then(|v| {
+                    v.get("message")
+                        .and_then(|m| m.as_str())
+                        .map(str::to_string)
+                })
                 .unwrap_or_default();
             return Err(GithubError::Status { status, message });
         }
@@ -192,7 +237,15 @@ impl Github {
     /// `GET /app` — 앱 JWT가 맞는지와 앱 이름을 본다.
     fn app(&self, jwt: &str) -> Result<(String, String, String), GithubError> {
         let v = self.request("GET", "/app", jwt)?;
-        let text = |key: &str| v.get(key).map(|x| x.as_str().map(str::to_string).unwrap_or_else(|| x.to_string())).unwrap_or_default();
+        let text = |key: &str| {
+            v.get(key)
+                .map(|x| {
+                    x.as_str()
+                        .map(str::to_string)
+                        .unwrap_or_else(|| x.to_string())
+                })
+                .unwrap_or_default()
+        };
         Ok((text("id"), text("slug"), text("name")))
     }
 
@@ -200,11 +253,24 @@ impl Github {
     fn installations(&self, jwt: &str) -> Result<Vec<Installation>, GithubError> {
         let mut all = Vec::new();
         for page in 1..=MAX_PAGES {
-            let v = self.request("GET", &format!("/app/installations?per_page=100&page={page}"), jwt)?;
-            let items = v.as_array().ok_or_else(|| GithubError::Parse("설치 목록이 배열이 아니다".into()))?;
+            let v = self.request(
+                "GET",
+                &format!("/app/installations?per_page=100&page={page}"),
+                jwt,
+            )?;
+            let items = v
+                .as_array()
+                .ok_or_else(|| GithubError::Parse("설치 목록이 배열이 아니다".into()))?;
             for item in items {
-                let id = item.get("id").and_then(Value::as_u64).ok_or_else(|| GithubError::Parse("설치 id가 없다".into()))?;
-                let account = item.pointer("/account/login").and_then(Value::as_str).unwrap_or("").to_string();
+                let id = item
+                    .get("id")
+                    .and_then(Value::as_u64)
+                    .ok_or_else(|| GithubError::Parse("설치 id가 없다".into()))?;
+                let account = item
+                    .pointer("/account/login")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
                 all.push(Installation { id, account });
             }
             if items.len() < 100 {
@@ -215,26 +281,68 @@ impl Github {
     }
 
     /// `POST /app/installations/{id}/access_tokens` — 설치 토큰과 만료 시각(유닉스 초).
-    fn installation_token(&self, jwt: &str, installation_id: u64) -> Result<(String, u64), GithubError> {
-        let v = self.request("POST", &format!("/app/installations/{installation_id}/access_tokens"), jwt)?;
-        let token = v.get("token").and_then(Value::as_str).ok_or_else(|| GithubError::Parse("token이 없다".into()))?.to_string();
-        let expires = v.get("expires_at").and_then(Value::as_str).and_then(parse_utc).unwrap_or_else(|| now_secs() + 3000);
+    fn installation_token(
+        &self,
+        jwt: &str,
+        installation_id: u64,
+    ) -> Result<(String, u64), GithubError> {
+        let v = self.request(
+            "POST",
+            &format!("/app/installations/{installation_id}/access_tokens"),
+            jwt,
+        )?;
+        let token = v
+            .get("token")
+            .and_then(Value::as_str)
+            .ok_or_else(|| GithubError::Parse("token이 없다".into()))?
+            .to_string();
+        let expires = v
+            .get("expires_at")
+            .and_then(Value::as_str)
+            .and_then(parse_utc)
+            .unwrap_or_else(|| now_secs() + 3000);
         Ok((token, expires))
     }
 
     /// `GET /installation/repositories` — 설치 토큰으로 볼 수 있는 저장소. 쪽마다 100개씩 읽는다.
-    fn installation_repositories(&self, token: &str, installation_id: u64) -> Result<Vec<RepoInfo>, GithubError> {
+    fn installation_repositories(
+        &self,
+        token: &str,
+        installation_id: u64,
+    ) -> Result<Vec<RepoInfo>, GithubError> {
         let mut all = Vec::new();
         for page in 1..=MAX_PAGES {
-            let v = self.request("GET", &format!("/installation/repositories?per_page=100&page={page}"), token)?;
-            let items = v.get("repositories").and_then(Value::as_array).ok_or_else(|| GithubError::Parse("repositories가 없다".into()))?;
+            let v = self.request(
+                "GET",
+                &format!("/installation/repositories?per_page=100&page={page}"),
+                token,
+            )?;
+            let items = v
+                .get("repositories")
+                .and_then(Value::as_array)
+                .ok_or_else(|| GithubError::Parse("repositories가 없다".into()))?;
             for item in items {
                 all.push(RepoInfo {
-                    full_name: item.get("full_name").and_then(Value::as_str).unwrap_or("").to_string(),
+                    full_name: item
+                        .get("full_name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
                     id: item.get("id").and_then(Value::as_u64).unwrap_or(0),
-                    private: item.get("private").and_then(Value::as_bool).unwrap_or(false),
-                    default_branch: item.get("default_branch").and_then(Value::as_str).unwrap_or("").to_string(),
-                    html_url: item.get("html_url").and_then(Value::as_str).unwrap_or("").to_string(),
+                    private: item
+                        .get("private")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                    default_branch: item
+                        .get("default_branch")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                    html_url: item
+                        .get("html_url")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
                     installation_id,
                 });
             }
@@ -248,7 +356,9 @@ impl Github {
     /// `GET /repos/{owner}/{repo}/installation` — 그 저장소에 설치된 설치 id.
     fn repo_installation(&self, jwt: &str, owner: &str, name: &str) -> Result<u64, GithubError> {
         let v = self.request("GET", &format!("/repos/{owner}/{name}/installation"), jwt)?;
-        v.get("id").and_then(Value::as_u64).ok_or_else(|| GithubError::Parse("설치 id가 없다".into()))
+        v.get("id")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| GithubError::Parse("설치 id가 없다".into()))
     }
 }
 
@@ -273,7 +383,10 @@ pub struct KeychainStore {
 impl KeychainStore {
     /// 앱이 쓰는 키체인 항목(서비스 `co.kcd.aisurada.github-app`, 계정 `private-key`)
     pub fn app() -> Self {
-        KeychainStore { service: KEYCHAIN_SERVICE.into(), account: KEYCHAIN_ACCOUNT.into() }
+        KeychainStore {
+            service: KEYCHAIN_SERVICE.into(),
+            account: KEYCHAIN_ACCOUNT.into(),
+        }
     }
 }
 
@@ -282,7 +395,9 @@ impl SecretStore for KeychainStore {
     fn get(&self) -> Result<Option<String>, String> {
         use security_framework::passwords::get_generic_password;
         match get_generic_password(&self.service, &self.account) {
-            Ok(bytes) => String::from_utf8(bytes).map(Some).map_err(|_| "키체인의 값이 글이 아니다".to_string()),
+            Ok(bytes) => String::from_utf8(bytes)
+                .map(Some)
+                .map_err(|_| "키체인의 값이 글이 아니다".to_string()),
             // errSecItemNotFound = -25300: 아직 저장한 적이 없다
             Err(e) if e.code() == -25300 => Ok(None),
             Err(e) => Err(format!("키체인을 읽지 못했다: {e}")),
@@ -290,8 +405,12 @@ impl SecretStore for KeychainStore {
     }
 
     fn set(&self, value: &str) -> Result<(), String> {
-        security_framework::passwords::set_generic_password(&self.service, &self.account, value.as_bytes())
-            .map_err(|e| format!("키체인에 저장하지 못했다: {e}"))
+        security_framework::passwords::set_generic_password(
+            &self.service,
+            &self.account,
+            value.as_bytes(),
+        )
+        .map_err(|e| format!("키체인에 저장하지 못했다: {e}"))
     }
 
     fn delete(&self) -> Result<(), String> {
@@ -346,7 +465,13 @@ pub struct GithubService {
 impl GithubService {
     /// [dir]은 앱 지원 폴더(`~/Library/Application Support/aisurada`). 시험은 임시 폴더를 준다.
     pub fn new(dir: PathBuf, store: Box<dyn SecretStore>, api: &str, git_base: &str) -> Self {
-        GithubService { dir, store, api: api.to_string(), git_base: git_base.trim_end_matches('/').to_string(), tokens: Mutex::new(HashMap::new()) }
+        GithubService {
+            dir,
+            store,
+            api: api.to_string(),
+            git_base: git_base.trim_end_matches('/').to_string(),
+            tokens: Mutex::new(HashMap::new()),
+        }
     }
 
     /// 저장소를 받는 폴더(`<앱 지원 폴더>/repos`)
@@ -364,7 +489,13 @@ impl GithubService {
 
     pub fn status(&self) -> GithubStatus {
         let settings = self.read_settings();
-        let text = |key: &str| settings.as_ref().and_then(|s| s.get(key)).and_then(Value::as_str).map(str::to_string);
+        let text = |key: &str| {
+            settings
+                .as_ref()
+                .and_then(|s| s.get(key))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        };
         let has_key = matches!(self.store.get(), Ok(Some(_)));
         let app_id = text("appId");
         GithubStatus {
@@ -386,13 +517,20 @@ impl GithubService {
         let github = Github::new(&self.api);
         let (id, slug, name) = github.app(&jwt).map_err(|e| e.to_string())?;
         if id != app_id {
-            return Err(format!("App ID가 키와 맞지 않는다: GitHub는 이 키의 앱을 {id}번이라고 답했다"));
+            return Err(format!(
+                "App ID가 키와 맞지 않는다: GitHub는 이 키의 앱을 {id}번이라고 답했다"
+            ));
         }
         self.store.set(pem)?;
-        std::fs::create_dir_all(&self.dir).map_err(|e| format!("설정 폴더를 만들지 못했다: {e}"))?;
+        std::fs::create_dir_all(&self.dir)
+            .map_err(|e| format!("설정 폴더를 만들지 못했다: {e}"))?;
         let json = serde_json::json!({ "appId": app_id, "appSlug": slug, "appName": name });
-        std::fs::write(self.settings_path(), format!("{json}\n")).map_err(|e| format!("설정을 쓰지 못했다: {e}"))?;
-        self.tokens.lock().map_err(|_| "토큰 잠금을 얻지 못했다")?.clear();
+        std::fs::write(self.settings_path(), format!("{json}\n"))
+            .map_err(|e| format!("설정을 쓰지 못했다: {e}"))?;
+        self.tokens
+            .lock()
+            .map_err(|_| "토큰 잠금을 얻지 못했다")?
+            .clear();
         Ok(self.status())
     }
 
@@ -404,7 +542,10 @@ impl GithubService {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(format!("설정을 지우지 못했다: {e}")),
         }
-        self.tokens.lock().map_err(|_| "토큰 잠금을 얻지 못했다")?.clear();
+        self.tokens
+            .lock()
+            .map_err(|_| "토큰 잠금을 얻지 못했다")?
+            .clear();
         Ok(())
     }
 
@@ -413,13 +554,26 @@ impl GithubService {
             .read_settings()
             .and_then(|s| s.get("appId").and_then(Value::as_str).map(str::to_string))
             .ok_or("GitHub App이 연결돼 있지 않다. 설정에서 App ID와 개인 키를 먼저 연결한다")?;
-        let pem = self.store.get()?.ok_or("키체인에 개인 키가 없다. 설정에서 다시 연결한다")?;
+        let pem = self
+            .store
+            .get()?
+            .ok_or("키체인에 개인 키가 없다. 설정에서 다시 연결한다")?;
         Ok((app_id, pem))
     }
 
-    fn token_for(&self, github: &Github, jwt: &str, installation_id: u64) -> Result<String, GithubError> {
+    fn token_for(
+        &self,
+        github: &Github,
+        jwt: &str,
+        installation_id: u64,
+    ) -> Result<String, GithubError> {
         let now = now_secs();
-        if let Some((token, expires)) = self.tokens.lock().ok().and_then(|t| t.get(&installation_id).cloned()) {
+        if let Some((token, expires)) = self
+            .tokens
+            .lock()
+            .ok()
+            .and_then(|t| t.get(&installation_id).cloned())
+        {
             if expires > now + TOKEN_MARGIN_SECS {
                 return Ok(token);
             }
@@ -449,7 +603,10 @@ impl GithubService {
             }
         }
         repositories.sort_by(|a, b| a.full_name.to_lowercase().cmp(&b.full_name.to_lowercase()));
-        Ok(RepoList { repositories, errors })
+        Ok(RepoList {
+            repositories,
+            errors,
+        })
     }
 
     /// 저장소를 [root]/<소유자>/<이름>에 받는다. 이미 있으면(폴더에 `.git`이 있으면) 그대로 쓴다.
@@ -457,16 +614,31 @@ impl GithubService {
         let (owner, name) = split_full_name(full_name)?;
         let dest = root.join(&owner).join(&name);
         if dest.join(".git").exists() {
-            return Ok(CloneResult { path: dest.to_string_lossy().into_owned(), cloned: false });
+            return Ok(CloneResult {
+                path: dest.to_string_lossy().into_owned(),
+                cloned: false,
+            });
         }
-        if dest.exists() && dest.read_dir().map(|mut d| d.next().is_some()).unwrap_or(true) {
-            return Err(format!("받을 자리에 이미 다른 폴더가 있다: {}", dest.display()));
+        if dest.exists()
+            && dest
+                .read_dir()
+                .map(|mut d| d.next().is_some())
+                .unwrap_or(true)
+        {
+            return Err(format!(
+                "받을 자리에 이미 다른 폴더가 있다: {}",
+                dest.display()
+            ));
         }
         let token = self.repo_token(&owner, &name)?;
-        std::fs::create_dir_all(dest.parent().ok_or("받을 자리를 정하지 못했다")?).map_err(|e| format!("폴더를 만들지 못했다: {e}"))?;
+        std::fs::create_dir_all(dest.parent().ok_or("받을 자리를 정하지 못했다")?)
+            .map_err(|e| format!("폴더를 만들지 못했다: {e}"))?;
         let url = format!("{}/{}/{}.git", self.git_base, owner, name);
         run_git_clone(&url, &dest, &token)?;
-        Ok(CloneResult { path: dest.to_string_lossy().into_owned(), cloned: true })
+        Ok(CloneResult {
+            path: dest.to_string_lossy().into_owned(),
+            cloned: true,
+        })
     }
 
     #[cfg(feature = "claude")]
@@ -488,8 +660,11 @@ impl GithubService {
         let (app_id, pem) = self.credentials()?;
         let jwt = app_jwt(&app_id, &pem, now_secs())?;
         let github = Github::new(&self.api);
-        let installation = github.repo_installation(&jwt, owner, name).map_err(|e| e.to_string())?;
-        self.token_for(&github, &jwt, installation).map_err(|e| e.to_string())
+        let installation = github
+            .repo_installation(&jwt, owner, name)
+            .map_err(|e| e.to_string())?;
+        self.token_for(&github, &jwt, installation)
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -505,7 +680,9 @@ fn split_full_name(full_name: &str) -> Result<(String, String), String> {
         && name.len() <= 100
         && name != "."
         && name != ".."
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
     if owner_ok && name_ok {
         Ok((owner.to_string(), name.to_string()))
     } else {
@@ -521,7 +698,11 @@ pub(crate) fn git_binary() -> PathBuf {
     if let Some(custom) = std::env::var_os("AISURADA_GIT_BIN") {
         return PathBuf::from(custom);
     }
-    for candidate in ["/opt/homebrew/bin/git", "/usr/local/bin/git", "/usr/bin/git"] {
+    for candidate in [
+        "/opt/homebrew/bin/git",
+        "/usr/local/bin/git",
+        "/usr/bin/git",
+    ] {
         if Path::new(candidate).is_file() {
             return PathBuf::from(candidate);
         }
@@ -538,7 +719,10 @@ fn clone_env(token: &str) -> Vec<(String, String)> {
         ("GIT_CONFIG_KEY_0".into(), "credential.helper".into()),
         ("GIT_CONFIG_VALUE_0".into(), String::new()),
         ("GIT_CONFIG_KEY_1".into(), "http.extraheader".into()),
-        ("GIT_CONFIG_VALUE_1".into(), format!("Authorization: Basic {basic}")),
+        (
+            "GIT_CONFIG_VALUE_1".into(),
+            format!("Authorization: Basic {basic}"),
+        ),
     ]
 }
 
@@ -546,23 +730,49 @@ fn run_git_clone(url: &str, dest: &Path, token: &str) -> Result<(), String> {
     let mut command = Command::new(git_binary());
     command.args(["clone", "--quiet", url]).arg(dest);
     // 실패하면 반쯤 받은 폴더를 남기지 않는다
-    run_git_with_token(command, token, Some(dest), "저장소를 받는 데 시간이 너무 오래 걸려 멈췄다", "저장소를 받지 못했다")
+    run_git_with_token(
+        command,
+        token,
+        Some(dest),
+        "저장소를 받는 데 시간이 너무 오래 걸려 멈췄다",
+        "저장소를 받지 못했다",
+    )
 }
 
 #[cfg(feature = "claude")]
 fn run_git_fetch(repo: &Path, token: &str) -> Result<(), String> {
     let mut command = Command::new(git_binary());
-    command.arg("-C").arg(repo).args(["fetch", "--quiet", "--prune", "origin"]);
-    run_git_with_token(command, token, None, "저장소를 최신으로 맞추는 데 시간이 너무 오래 걸려 멈췄다", "저장소를 최신으로 맞추지 못했다")
+    command
+        .arg("-C")
+        .arg(repo)
+        .args(["fetch", "--quiet", "--prune", "origin"]);
+    run_git_with_token(
+        command,
+        token,
+        None,
+        "저장소를 최신으로 맞추는 데 시간이 너무 오래 걸려 멈췄다",
+        "저장소를 최신으로 맞추지 못했다",
+    )
 }
 
 /// git 명령 하나를 토큰 환경으로 돌리고 상한 시간을 지킨다. 토큰은 오류 글에서 가린다. [cleanup]은 실패했을 때 지울 폴더다.
-fn run_git_with_token(mut command: Command, token: &str, cleanup: Option<&Path>, timeout_message: &str, failure_message: &str) -> Result<(), String> {
-    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
+fn run_git_with_token(
+    mut command: Command,
+    token: &str,
+    cleanup: Option<&Path>,
+    timeout_message: &str,
+    failure_message: &str,
+) -> Result<(), String> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
     for (key, value) in clone_env(token) {
         command.env(key, value);
     }
-    let mut child = command.spawn().map_err(|e| format!("git을 실행하지 못했다: {e}"))?;
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("git을 실행하지 못했다: {e}"))?;
     let mut stderr = child.stderr.take();
     let reader = std::thread::spawn(move || {
         let mut text = String::new();
@@ -573,7 +783,10 @@ fn run_git_with_token(mut command: Command, token: &str, cleanup: Option<&Path>,
     });
     let started = Instant::now();
     let status = loop {
-        match child.try_wait().map_err(|e| format!("git 상태를 읽지 못했다: {e}"))? {
+        match child
+            .try_wait()
+            .map_err(|e| format!("git 상태를 읽지 못했다: {e}"))?
+        {
             Some(status) => break status,
             None if started.elapsed() > CLONE_TIMEOUT => {
                 let _ = child.kill();
@@ -606,13 +819,20 @@ pub struct GithubState(Arc<GithubService>);
 
 impl GithubState {
     pub fn new() -> Self {
-        let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
         let dir = home.join("Library/Application Support/aisurada");
         #[cfg(target_os = "macos")]
         let store: Box<dyn SecretStore> = Box::new(KeychainStore::app());
         #[cfg(not(target_os = "macos"))]
         let store: Box<dyn SecretStore> = Box::new(UnsupportedStore);
-        GithubState(Arc::new(GithubService::new(dir, store, DEFAULT_API, DEFAULT_GIT_BASE)))
+        GithubState(Arc::new(GithubService::new(
+            dir,
+            store,
+            DEFAULT_API,
+            DEFAULT_GIT_BASE,
+        )))
     }
 
     fn clone_root(&self) -> PathBuf {
@@ -648,8 +868,12 @@ impl SecretStore for UnsupportedStore {
     }
 }
 
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| format!("작업이 중간에 끊겼다: {e}"))?
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| format!("작업이 중간에 끊겼다: {e}"))?
 }
 
 #[tauri::command]
@@ -660,10 +884,15 @@ pub async fn github_status(state: State<'_, GithubState>) -> Result<GithubStatus
 
 /// 개인 키는 파일 경로로만 받는다. 키 내용은 이 함수 안에서만 읽고 화면으로 돌려보내지 않는다.
 #[tauri::command]
-pub async fn github_connect(state: State<'_, GithubState>, app_id: String, pem_path: String) -> Result<GithubStatus, String> {
+pub async fn github_connect(
+    state: State<'_, GithubState>,
+    app_id: String,
+    pem_path: String,
+) -> Result<GithubStatus, String> {
     let service = state.0.clone();
     blocking(move || {
-        let pem = std::fs::read_to_string(&pem_path).map_err(|e| format!("개인 키 파일을 읽지 못했다: {e}"))?;
+        let pem = std::fs::read_to_string(&pem_path)
+            .map_err(|e| format!("개인 키 파일을 읽지 못했다: {e}"))?;
         service.connect(&app_id, &pem)
     })
     .await
@@ -683,7 +912,10 @@ pub async fn github_repositories(state: State<'_, GithubState>) -> Result<RepoLi
 
 /// 앱 전용 폴더(`~/Library/Application Support/aisurada/repos/<소유자>/<이름>`)에 받는다. 이미 있으면 그대로 쓴다.
 #[tauri::command]
-pub async fn github_clone(state: State<'_, GithubState>, full_name: String) -> Result<CloneResult, String> {
+pub async fn github_clone(
+    state: State<'_, GithubState>,
+    full_name: String,
+) -> Result<CloneResult, String> {
     let service = state.0.clone();
     let root = state.clone_root();
     blocking(move || service.ensure_clone(&full_name, &root)).await
@@ -743,7 +975,10 @@ mod tests {
                     continue;
                 }
                 let mut parts = first.split_whitespace();
-                let (method, path) = (parts.next().unwrap_or("").to_string(), parts.next().unwrap_or("").to_string());
+                let (method, path) = (
+                    parts.next().unwrap_or("").to_string(),
+                    parts.next().unwrap_or("").to_string(),
+                );
                 let mut auth = String::new();
                 let mut length = 0usize;
                 loop {
@@ -761,7 +996,9 @@ mod tests {
                 }
                 let mut body = vec![0u8; length];
                 let _ = reader.read_exact(&mut body);
-                log.lock().unwrap().push((method.clone(), path.clone(), auth));
+                log.lock()
+                    .unwrap()
+                    .push((method.clone(), path.clone(), auth));
                 let (status, text) = routes
                     .iter()
                     .find(|(m, p, _, _)| *m == method && path.starts_with(p))
@@ -778,7 +1015,12 @@ mod tests {
     }
 
     fn service(fake: &FakeGithub, dir: &Path, git_base: &str) -> GithubService {
-        GithubService::new(dir.to_path_buf(), Box::new(MemoryStore::new()), &fake.base, git_base)
+        GithubService::new(
+            dir.to_path_buf(),
+            Box::new(MemoryStore::new()),
+            &fake.base,
+            git_base,
+        )
     }
 
     fn repos_json(names: &[(&str, u64)]) -> String {
@@ -786,7 +1028,11 @@ mod tests {
             .iter()
             .map(|(n, id)| format!(r#"{{"full_name":"{n}","id":{id},"private":true,"default_branch":"main","html_url":"https://github.com/{n}"}}"#))
             .collect();
-        format!(r#"{{"total_count":{},"repositories":[{}]}}"#, items.len(), items.join(","))
+        format!(
+            r#"{{"total_count":{},"repositories":[{}]}}"#,
+            items.len(),
+            items.join(",")
+        )
     }
 
     #[test]
@@ -804,32 +1050,61 @@ mod tests {
         let jwt = app_jwt("5722327", TEST_KEY, 1_700_000_000).unwrap();
         let parts: Vec<&str> = jwt.split('.').collect();
         assert_eq!(parts.len(), 3);
-        let header: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(parts[0]).unwrap()).unwrap();
+        let header: Value =
+            serde_json::from_slice(&URL_SAFE_NO_PAD.decode(parts[0]).unwrap()).unwrap();
         assert_eq!(header, serde_json::json!({"alg":"RS256","typ":"JWT"}));
-        let payload: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(parts[1]).unwrap()).unwrap();
+        let payload: Value =
+            serde_json::from_slice(&URL_SAFE_NO_PAD.decode(parts[1]).unwrap()).unwrap();
         assert_eq!(payload["iss"], "5722327");
-        assert_eq!(payload["iat"], 1_700_000_000u64 - 60, "시계가 어긋나도 되게 60초 앞당긴다");
-        assert_eq!(payload["exp"], 1_700_000_000u64 + 540, "10분을 넘기지 않는다");
+        assert_eq!(
+            payload["iat"],
+            1_700_000_000u64 - 60,
+            "시계가 어긋나도 되게 60초 앞당긴다"
+        );
+        assert_eq!(
+            payload["exp"],
+            1_700_000_000u64 + 540,
+            "10분을 넘기지 않는다"
+        );
         // 서명은 같은 키의 공개 키로 검증된다
         let key = pem_to_key_pair(TEST_KEY).unwrap();
-        let public = UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, key.public().as_ref().to_vec());
+        let public =
+            UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, key.public().as_ref().to_vec());
         let signature = URL_SAFE_NO_PAD.decode(parts[2]).unwrap();
-        public.verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &signature).unwrap();
+        public
+            .verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &signature)
+            .unwrap();
         // 깨지거나 모양이 틀린 키는 알아듣게 거절한다
         assert!(app_jwt("1", "아무 글", 0).unwrap_err().contains("PEM"));
-        assert!(app_jwt("1", "-----BEGIN RSA PRIVATE KEY-----\n!!!\n-----END RSA PRIVATE KEY-----", 0).is_err());
+        assert!(app_jwt(
+            "1",
+            "-----BEGIN RSA PRIVATE KEY-----\n!!!\n-----END RSA PRIVATE KEY-----",
+            0
+        )
+        .is_err());
     }
 
     #[test]
     fn connecting_checks_the_app_id_and_keeps_the_key_only_in_the_store() {
-        let fake = fake_github(vec![("GET", "/app", 200, r#"{"id":5722327,"slug":"my-app","name":"My App"}"#.into())]);
+        let fake = fake_github(vec![(
+            "GET",
+            "/app",
+            200,
+            r#"{"id":5722327,"slug":"my-app","name":"My App"}"#.into(),
+        )]);
         let dir = tempfile::tempdir().unwrap();
         let svc = service(&fake, dir.path(), "file:///unused");
         assert!(!svc.status().connected);
         assert!(svc.connect("abc", TEST_KEY).unwrap_err().contains("숫자"));
         let wrong = svc.connect("999", TEST_KEY).unwrap_err();
-        assert!(wrong.contains("맞지 않는다") && wrong.contains("5722327"), "{wrong}");
-        assert!(!svc.status().connected, "틀린 ID로는 아무것도 저장하지 않는다");
+        assert!(
+            wrong.contains("맞지 않는다") && wrong.contains("5722327"),
+            "{wrong}"
+        );
+        assert!(
+            !svc.status().connected,
+            "틀린 ID로는 아무것도 저장하지 않는다"
+        );
         let status = svc.connect(" 5722327 ", TEST_KEY).unwrap();
         assert_eq!(
             status,
@@ -842,9 +1117,16 @@ mod tests {
             }
         );
         let saved = std::fs::read_to_string(dir.path().join("github-app.json")).unwrap();
-        assert!(!saved.contains("PRIVATE KEY") && !saved.contains("MIIE"), "개인 키는 설정 파일에 안 쓴다: {saved}");
+        assert!(
+            !saved.contains("PRIVATE KEY") && !saved.contains("MIIE"),
+            "개인 키는 설정 파일에 안 쓴다: {saved}"
+        );
         let seen = fake.requests.lock().unwrap().clone();
-        assert!(seen.iter().all(|(_, _, auth)| auth.starts_with("Bearer ") && auth.matches('.').count() == 2), "{seen:?}");
+        assert!(
+            seen.iter()
+                .all(|(_, _, auth)| auth.starts_with("Bearer ") && auth.matches('.').count() == 2),
+            "{seen:?}"
+        );
         svc.disconnect().unwrap();
         assert!(!svc.status().connected);
         assert!(!dir.path().join("github-app.json").exists());
@@ -853,7 +1135,12 @@ mod tests {
 
     #[test]
     fn a_rejected_key_is_reported_and_not_saved() {
-        let fake = fake_github(vec![("GET", "/app", 401, r#"{"message":"A JSON web token could not be decoded"}"#.into())]);
+        let fake = fake_github(vec![(
+            "GET",
+            "/app",
+            401,
+            r#"{"message":"A JSON web token could not be decoded"}"#.into(),
+        )]);
         let dir = tempfile::tempdir().unwrap();
         let svc = service(&fake, dir.path(), "file:///unused");
         let error = svc.connect("5722327", TEST_KEY).unwrap_err();
@@ -864,53 +1151,154 @@ mod tests {
     #[test]
     fn repositories_are_gathered_across_installations_and_tokens_are_reused() {
         let fake = fake_github(vec![
-            ("GET", "/app/installations", 200, r#"[{"id":1,"account":{"login":"alice"}},{"id":2,"account":{"login":"org"}}]"#.into()),
-            ("POST", "/app/installations/1/access_tokens", 201, r#"{"token":"ghs_one","expires_at":"2099-01-01T00:00:00Z"}"#.into()),
-            ("POST", "/app/installations/2/access_tokens", 403, r#"{"message":"This installation has been suspended"}"#.into()),
-            ("GET", "/installation/repositories", 200, repos_json(&[("alice/zeta", 3), ("alice/Alpha", 1)])),
-            ("GET", "/app", 200, r#"{"id":7,"slug":"s","name":"n"}"#.into()),
+            (
+                "GET",
+                "/app/installations",
+                200,
+                r#"[{"id":1,"account":{"login":"alice"}},{"id":2,"account":{"login":"org"}}]"#
+                    .into(),
+            ),
+            (
+                "POST",
+                "/app/installations/1/access_tokens",
+                201,
+                r#"{"token":"ghs_one","expires_at":"2099-01-01T00:00:00Z"}"#.into(),
+            ),
+            (
+                "POST",
+                "/app/installations/2/access_tokens",
+                403,
+                r#"{"message":"This installation has been suspended"}"#.into(),
+            ),
+            (
+                "GET",
+                "/installation/repositories",
+                200,
+                repos_json(&[("alice/zeta", 3), ("alice/Alpha", 1)]),
+            ),
+            (
+                "GET",
+                "/app",
+                200,
+                r#"{"id":7,"slug":"s","name":"n"}"#.into(),
+            ),
         ]);
         let dir = tempfile::tempdir().unwrap();
         let svc = service(&fake, dir.path(), "file:///unused");
         assert!(svc.repositories().unwrap_err().contains("연결돼 있지 않다"));
         svc.connect("7", TEST_KEY).unwrap();
         let list = svc.repositories().unwrap();
-        let names: Vec<&str> = list.repositories.iter().map(|r| r.full_name.as_str()).collect();
-        assert_eq!(names, vec!["alice/Alpha", "alice/zeta"], "이름 차례로, 대소문자는 무시");
+        let names: Vec<&str> = list
+            .repositories
+            .iter()
+            .map(|r| r.full_name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["alice/Alpha", "alice/zeta"],
+            "이름 차례로, 대소문자는 무시"
+        );
         assert_eq!(list.repositories[0].installation_id, 1);
         assert!(list.repositories[0].private && list.repositories[0].default_branch == "main");
-        assert_eq!(list.errors.len(), 1, "정지된 설치 하나가 전체를 막지 않는다");
-        assert!(list.errors[0].contains("org") && list.errors[0].contains("suspended"), "{:?}", list.errors);
+        assert_eq!(
+            list.errors.len(),
+            1,
+            "정지된 설치 하나가 전체를 막지 않는다"
+        );
+        assert!(
+            list.errors[0].contains("org") && list.errors[0].contains("suspended"),
+            "{:?}",
+            list.errors
+        );
         let again = svc.repositories().unwrap();
         assert_eq!(again.repositories.len(), 2);
-        let token_requests = fake.requests.lock().unwrap().iter().filter(|(m, p, _)| m == "POST" && p.ends_with("/1/access_tokens")).count();
+        let token_requests = fake
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, p, _)| m == "POST" && p.ends_with("/1/access_tokens"))
+            .count();
         assert_eq!(token_requests, 1, "만료 전 토큰은 다시 받지 않는다");
-        let bearer_for_repos: Vec<String> = fake.requests.lock().unwrap().iter().filter(|(_, p, _)| p.starts_with("/installation/repositories")).map(|(_, _, a)| a.clone()).collect();
-        assert!(bearer_for_repos.iter().all(|a| a == "Bearer ghs_one"), "{bearer_for_repos:?}");
+        let bearer_for_repos: Vec<String> = fake
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, p, _)| p.starts_with("/installation/repositories"))
+            .map(|(_, _, a)| a.clone())
+            .collect();
+        assert!(
+            bearer_for_repos.iter().all(|a| a == "Bearer ghs_one"),
+            "{bearer_for_repos:?}"
+        );
     }
 
     #[test]
     fn an_expiring_token_is_replaced() {
         let fake = fake_github(vec![
-            ("GET", "/app/installations", 200, r#"[{"id":1,"account":{"login":"alice"}}]"#.into()),
-            ("POST", "/app/installations/1/access_tokens", 201, r#"{"token":"ghs_fresh","expires_at":"2099-01-01T00:00:00Z"}"#.into()),
-            ("GET", "/installation/repositories", 200, repos_json(&[("alice/a", 1)])),
-            ("GET", "/app", 200, r#"{"id":7,"slug":"s","name":"n"}"#.into()),
+            (
+                "GET",
+                "/app/installations",
+                200,
+                r#"[{"id":1,"account":{"login":"alice"}}]"#.into(),
+            ),
+            (
+                "POST",
+                "/app/installations/1/access_tokens",
+                201,
+                r#"{"token":"ghs_fresh","expires_at":"2099-01-01T00:00:00Z"}"#.into(),
+            ),
+            (
+                "GET",
+                "/installation/repositories",
+                200,
+                repos_json(&[("alice/a", 1)]),
+            ),
+            (
+                "GET",
+                "/app",
+                200,
+                r#"{"id":7,"slug":"s","name":"n"}"#.into(),
+            ),
         ]);
         let dir = tempfile::tempdir().unwrap();
         let svc = service(&fake, dir.path(), "file:///unused");
         svc.connect("7", TEST_KEY).unwrap();
-        svc.tokens.lock().unwrap().insert(1, ("ghs_old".into(), now_secs() + 100));
+        svc.tokens
+            .lock()
+            .unwrap()
+            .insert(1, ("ghs_old".into(), now_secs() + 100));
         svc.repositories().unwrap();
-        let used: Vec<String> = fake.requests.lock().unwrap().iter().filter(|(_, p, _)| p.starts_with("/installation/repositories")).map(|(_, _, a)| a.clone()).collect();
-        assert_eq!(used, vec!["Bearer ghs_fresh".to_string()], "만료까지 5분이 안 남았으면 새로 받는다");
+        let used: Vec<String> = fake
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, p, _)| p.starts_with("/installation/repositories"))
+            .map(|(_, _, a)| a.clone())
+            .collect();
+        assert_eq!(
+            used,
+            vec!["Bearer ghs_fresh".to_string()],
+            "만료까지 5분이 안 남았으면 새로 받는다"
+        );
     }
 
     #[test]
     fn full_names_are_checked_before_they_become_folders() {
-        assert_eq!(split_full_name("bnjjong/aisurada").unwrap(), ("bnjjong".into(), "aisurada".into()));
-        assert_eq!(split_full_name("a-b/x_y.z-1").unwrap(), ("a-b".into(), "x_y.z-1".into()));
-        for bad in ["", "noslash", "/x", "x/", "../x", "x/..", "x/.", "a/b/c", "-a/b", "a b/c", "a/b c", "a/é", "a/b;rm"] {
+        assert_eq!(
+            split_full_name("bnjjong/aisurada").unwrap(),
+            ("bnjjong".into(), "aisurada".into())
+        );
+        assert_eq!(
+            split_full_name("a-b/x_y.z-1").unwrap(),
+            ("a-b".into(), "x_y.z-1".into())
+        );
+        for bad in [
+            "", "noslash", "/x", "x/", "../x", "x/..", "x/.", "a/b/c", "-a/b", "a b/c", "a/b c",
+            "a/é", "a/b;rm",
+        ] {
             assert!(split_full_name(bad).is_err(), "거절해야 한다: {bad}");
         }
     }
@@ -918,19 +1306,40 @@ mod tests {
     #[test]
     fn the_clone_token_goes_in_the_environment_never_the_command_line() {
         let env = clone_env("ghs_secret");
-        let get = |k: &str| env.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone()).unwrap();
+        let get = |k: &str| {
+            env.iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.clone())
+                .unwrap()
+        };
         assert_eq!(get("GIT_TERMINAL_PROMPT"), "0");
         assert_eq!(get("GIT_CONFIG_KEY_0"), "credential.helper");
-        assert_eq!(get("GIT_CONFIG_VALUE_0"), "", "키체인 도우미가 토큰을 저장하지 못하게 비운다");
+        assert_eq!(
+            get("GIT_CONFIG_VALUE_0"),
+            "",
+            "키체인 도우미가 토큰을 저장하지 못하게 비운다"
+        );
         assert_eq!(get("GIT_CONFIG_KEY_1"), "http.extraheader");
         let header = get("GIT_CONFIG_VALUE_1");
         let basic = header.strip_prefix("Authorization: Basic ").unwrap();
-        assert_eq!(String::from_utf8(STANDARD.decode(basic).unwrap()).unwrap(), "x-access-token:ghs_secret");
+        assert_eq!(
+            String::from_utf8(STANDARD.decode(basic).unwrap()).unwrap(),
+            "x-access-token:ghs_secret"
+        );
     }
 
     fn git(dir: &Path, args: &[&str]) {
-        let status = Command::new("git").args(args).current_dir(dir).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t")
-            .env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").stdout(Stdio::null()).stderr(Stdio::null()).status().unwrap();
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap();
         assert!(status.success(), "git {args:?}");
     }
 
@@ -939,13 +1348,24 @@ mod tests {
     #[test]
     #[ignore = "실제 키체인을 쓴다"]
     fn keychain_round_trip() {
-        let store = KeychainStore { service: "co.kcd.aisurada.github-app.test".into(), account: "round-trip".into() };
+        let store = KeychainStore {
+            service: "co.kcd.aisurada.github-app.test".into(),
+            account: "round-trip".into(),
+        };
         store.delete().unwrap();
         assert_eq!(store.get().unwrap(), None, "없는 항목은 오류가 아니라 None");
         store.set("첫 값\n두 줄").unwrap();
-        assert_eq!(store.get().unwrap().as_deref(), Some("첫 값\n두 줄"), "줄바꿈이 든 PEM 같은 글도 그대로");
+        assert_eq!(
+            store.get().unwrap().as_deref(),
+            Some("첫 값\n두 줄"),
+            "줄바꿈이 든 PEM 같은 글도 그대로"
+        );
         store.set("바뀐 값").unwrap();
-        assert_eq!(store.get().unwrap().as_deref(), Some("바뀐 값"), "다시 저장하면 바뀐다");
+        assert_eq!(
+            store.get().unwrap().as_deref(),
+            Some("바뀐 값"),
+            "다시 저장하면 바뀐다"
+        );
         store.delete().unwrap();
         assert_eq!(store.get().unwrap(), None);
         store.delete().unwrap();
@@ -965,21 +1385,44 @@ mod tests {
         };
         let pem = std::fs::read_to_string(pem_file).unwrap();
         let dir = tempfile::tempdir().unwrap();
-        let svc = GithubService::new(dir.path().to_path_buf(), Box::new(MemoryStore::new()), DEFAULT_API, DEFAULT_GIT_BASE);
+        let svc = GithubService::new(
+            dir.path().to_path_buf(),
+            Box::new(MemoryStore::new()),
+            DEFAULT_API,
+            DEFAULT_GIT_BASE,
+        );
         let status = svc.connect(&app_id, &pem).unwrap();
         println!("연결: {status:?}");
         assert!(status.connected);
         let list = svc.repositories().unwrap();
-        println!("저장소: {:?} 오류: {:?}", list.repositories.iter().map(|r| (&r.full_name, r.id, r.private)).collect::<Vec<_>>(), list.errors);
-        assert!(list.repositories.iter().any(|r| r.full_name == repo), "{repo}가 목록에 있어야 한다");
+        println!(
+            "저장소: {:?} 오류: {:?}",
+            list.repositories
+                .iter()
+                .map(|r| (&r.full_name, r.id, r.private))
+                .collect::<Vec<_>>(),
+            list.errors
+        );
+        assert!(
+            list.repositories.iter().any(|r| r.full_name == repo),
+            "{repo}가 목록에 있어야 한다"
+        );
         let root = dir.path().join("repos");
         let first = svc.ensure_clone(&repo, &root).unwrap();
         println!("clone: {first:?}");
         assert!(first.cloned && Path::new(&first.path).join(".git").exists());
         let config = std::fs::read_to_string(Path::new(&first.path).join(".git/config")).unwrap();
-        println!("remote 설정에 토큰 흔적: {}", config.contains("x-access-token") || config.to_lowercase().contains("authorization") || config.contains("ghs_"));
+        println!(
+            "remote 설정에 토큰 흔적: {}",
+            config.contains("x-access-token")
+                || config.to_lowercase().contains("authorization")
+                || config.contains("ghs_")
+        );
         assert!(!config.contains("ghs_") && !config.to_lowercase().contains("authorization"));
-        assert!(!svc.ensure_clone(&repo, &root).unwrap().cloned, "두 번째는 다시 받지 않는다");
+        assert!(
+            !svc.ensure_clone(&repo, &root).unwrap().cloned,
+            "두 번째는 다시 받지 않는다"
+        );
     }
 
     #[test]
@@ -994,33 +1437,81 @@ mod tests {
         git(&work, &["commit", "-q", "-m", "init"]);
         let bare_parent = remote.path().join("owner");
         std::fs::create_dir_all(&bare_parent).unwrap();
-        git(remote.path(), &["clone", "-q", "--bare", work.to_str().unwrap(), bare_parent.join("repo.git").to_str().unwrap()]);
+        git(
+            remote.path(),
+            &[
+                "clone",
+                "-q",
+                "--bare",
+                work.to_str().unwrap(),
+                bare_parent.join("repo.git").to_str().unwrap(),
+            ],
+        );
 
         let fake = fake_github(vec![
-            ("GET", "/repos/owner/repo/installation", 200, r#"{"id":9}"#.into()),
-            ("POST", "/app/installations/9/access_tokens", 201, r#"{"token":"ghs_clone","expires_at":"2099-01-01T00:00:00Z"}"#.into()),
-            ("GET", "/app", 200, r#"{"id":7,"slug":"s","name":"n"}"#.into()),
+            (
+                "GET",
+                "/repos/owner/repo/installation",
+                200,
+                r#"{"id":9}"#.into(),
+            ),
+            (
+                "POST",
+                "/app/installations/9/access_tokens",
+                201,
+                r#"{"token":"ghs_clone","expires_at":"2099-01-01T00:00:00Z"}"#.into(),
+            ),
+            (
+                "GET",
+                "/app",
+                200,
+                r#"{"id":7,"slug":"s","name":"n"}"#.into(),
+            ),
         ]);
         let dir = tempfile::tempdir().unwrap();
-        let svc = service(&fake, dir.path(), &format!("file://{}", remote.path().display()));
+        let svc = service(
+            &fake,
+            dir.path(),
+            &format!("file://{}", remote.path().display()),
+        );
         let root = dir.path().join("repos");
-        assert!(svc.ensure_clone("owner/repo", &root).unwrap_err().contains("연결돼 있지 않다"));
+        assert!(svc
+            .ensure_clone("owner/repo", &root)
+            .unwrap_err()
+            .contains("연결돼 있지 않다"));
         svc.connect("7", TEST_KEY).unwrap();
         let first = svc.ensure_clone("owner/repo", &root).unwrap();
         assert!(first.cloned);
         assert_eq!(first.path, root.join("owner/repo").to_string_lossy());
-        assert_eq!(std::fs::read_to_string(root.join("owner/repo/README.md")).unwrap(), "hello");
+        assert_eq!(
+            std::fs::read_to_string(root.join("owner/repo/README.md")).unwrap(),
+            "hello"
+        );
         let config = std::fs::read_to_string(root.join("owner/repo/.git/config")).unwrap();
-        assert!(!config.contains("ghs_clone") && !config.to_lowercase().contains("authorization") && !config.contains("x-access-token"), "토큰이 저장소 설정에 남으면 안 된다: {config}");
+        assert!(
+            !config.contains("ghs_clone")
+                && !config.to_lowercase().contains("authorization")
+                && !config.contains("x-access-token"),
+            "토큰이 저장소 설정에 남으면 안 된다: {config}"
+        );
         let second = svc.ensure_clone("owner/repo", &root).unwrap();
         assert!(!second.cloned, "이미 있으면 다시 받지 않는다");
-        let installs = fake.requests.lock().unwrap().iter().filter(|(_, p, _)| p.starts_with("/repos/owner/repo/installation")).count();
+        let installs = fake
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, p, _)| p.starts_with("/repos/owner/repo/installation"))
+            .count();
         assert_eq!(installs, 1, "이미 있으면 GitHub를 부르지도 않는다");
         // 못 받는 저장소는 반쯤 받은 폴더를 남기지 않는다
         let missing = svc.ensure_clone("owner/ghost", &root);
         assert!(missing.is_err());
         assert!(!root.join("owner/ghost").exists());
         // 폴더 이름으로 쓸 수 없는 이름은 GitHub를 부르기 전에 거절한다
-        assert!(svc.ensure_clone("../etc/passwd", &root).unwrap_err().contains("owner/name"));
+        assert!(svc
+            .ensure_clone("../etc/passwd", &root)
+            .unwrap_err()
+            .contains("owner/name"));
     }
 }

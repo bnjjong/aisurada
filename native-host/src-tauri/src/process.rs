@@ -98,7 +98,10 @@ fn run_with_grace(
     });
     let mut streams: [Option<std::io::Result<Vec<u8>>>; 2] = [None, None];
     loop {
-        if cancel_flag.as_ref().map_or(false, |f| f.load(std::sync::atomic::Ordering::Relaxed)) {
+        if cancel_flag
+            .as_ref()
+            .map_or(false, |f| f.load(std::sync::atomic::Ordering::Relaxed))
+        {
             terminate(&mut child, grace);
             return Ok(Outcome::Cancelled);
         }

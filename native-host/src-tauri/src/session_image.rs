@@ -37,7 +37,12 @@ fn validate(session_id: &str, name: &str, length: usize) -> Result<(), String> {
     Ok(())
 }
 
-fn write_image(app_data_dir: &Path, session_id: &str, name: &str, bytes: &[u8]) -> Result<String, String> {
+fn write_image(
+    app_data_dir: &Path,
+    session_id: &str,
+    name: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
     let session_dir: PathBuf = app_data_dir.join("session-images").join(session_id);
     let target_file = session_dir.join(name);
 
@@ -70,9 +75,11 @@ pub async fn write_session_image(
         .path()
         .app_data_dir()
         .map_err(|e| format!("앱 데이터 폴더를 못 찾았어요: {e}"))?;
-    tauri::async_runtime::spawn_blocking(move || write_image(&app_data_dir, &session_id, &name, &bytes))
-        .await
-        .map_err(|e| format!("그림 쓰기가 끊겼어요: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        write_image(&app_data_dir, &session_id, &name, &bytes)
+    })
+    .await
+    .map_err(|e| format!("그림 쓰기가 끊겼어요: {e}"))?
 }
 
 #[cfg(test)]
@@ -107,8 +114,12 @@ mod tests {
     fn rejects_before_creating_the_folder_and_keeps_the_limit_boundary() {
         let id = "3f2a9c4e-1b2d-4c3e-8f40-00000000a001";
         assert!(validate(id, "a.png", 5_000_000).is_ok());
-        assert!(validate(id, "a.png", 5_000_001).unwrap_err().contains("그림이 너무 커요"));
-        assert!(validate("../x", "a.png", 1).unwrap_err().contains("UUID 꼴이 아니에요"));
+        assert!(validate(id, "a.png", 5_000_001)
+            .unwrap_err()
+            .contains("그림이 너무 커요"));
+        assert!(validate("../x", "a.png", 1)
+            .unwrap_err()
+            .contains("UUID 꼴이 아니에요"));
         let temp = tempfile::tempdir().unwrap();
         let path = write_image(temp.path(), id, "a..b.png", b"png").unwrap();
         assert!(path.ends_with("session-images/3f2a9c4e-1b2d-4c3e-8f40-00000000a001/a..b.png"));

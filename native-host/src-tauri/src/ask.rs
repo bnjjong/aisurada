@@ -128,7 +128,9 @@ thread_local! {
 
 pub fn resolve_gemini() -> Option<PathBuf> {
     // 1. AISURADA_ANTIGRAVITY_BIN 또는 AISURADA_GEMINI_BIN
-    if let Ok(bin) = env::var("AISURADA_ANTIGRAVITY_BIN").or_else(|_| env::var("AISURADA_GEMINI_BIN")) {
+    if let Ok(bin) =
+        env::var("AISURADA_ANTIGRAVITY_BIN").or_else(|_| env::var("AISURADA_GEMINI_BIN"))
+    {
         if !bin.is_empty() {
             let p = PathBuf::from(&bin);
             if is_regular_file(&p) {
@@ -400,7 +402,11 @@ fn seed_prompt(seed: &[serde_json::Value], prompt: &str) -> String {
             Some("assistant") => "### Claude",
             _ => continue,
         };
-        let content = message.get("content").and_then(|value| value.as_str()).unwrap_or("").trim();
+        let content = message
+            .get("content")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim();
         if content.is_empty() {
             continue;
         }
@@ -536,14 +542,25 @@ fn execute_gemini_ask(
             }
             let cause = format_cause(&res.stderr, &res.stdout);
             let code_str = res.exit_code.map_or("?".to_string(), |c| c.to_string());
-            let err_msg = format!("{} 가 종료 코드 {} 로 끝났다: {}", bin_name, code_str, cause);
+            let err_msg = format!(
+                "{} 가 종료 코드 {} 로 끝났다: {}",
+                bin_name, code_str, cause
+            );
             failure(err_msg, elapsed, missing_cwd)
         }
         Err(RunError::Spawn(e)) => {
             let elapsed = start_time.elapsed().as_millis() as u64;
-            failure(format!("{} 를 못 띄웠다: {}", bin_name, e), elapsed, missing_cwd)
+            failure(
+                format!("{} 를 못 띄웠다: {}", bin_name, e),
+                elapsed,
+                missing_cwd,
+            )
         }
-        Err(RunError::Io(e)) => failure(format!("{} 를 기다리던 일꾼이 끊겼다: {}", bin_name, e), 0, missing_cwd),
+        Err(RunError::Io(e)) => failure(
+            format!("{} 를 기다리던 일꾼이 끊겼다: {}", bin_name, e),
+            0,
+            missing_cwd,
+        ),
     }
 }
 
@@ -556,17 +573,16 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
         return execute_gemini_ask(args, &work_dir, missing_cwd, start_time);
     }
 
-    let claude_bin = match resolve_claude() {
-        Some(b) => b,
-        None => {
-            return failure(
+    let claude_bin =
+        match resolve_claude() {
+            Some(b) => b,
+            None => return failure(
                 "claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다."
                     .to_string(),
                 0,
                 missing_cwd,
-            )
-        }
-    };
+            ),
+        };
 
     let build_args = |is_resume: bool| -> Vec<String> {
         let mut a = vec![
@@ -806,7 +822,9 @@ mod tests {
 
     /// 환경 변수를 만지는 시험끼리 줄 세우는 잠금. 앞선 시험이 실패해 잠금이 오염(poison)돼도 뒤 시험이 연쇄로 실패하지 않게 한다.
     fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-        ENV_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     #[test]
@@ -884,7 +902,10 @@ mod tests {
     fn flip_checks_already_in_use_first() {
         assert_eq!(flip_target("Error: x is already in use"), Some(true));
         assert_eq!(flip_target("No conversation found"), Some(false));
-        assert_eq!(flip_target("No conversation found; is already in use"), Some(true));
+        assert_eq!(
+            flip_target("No conversation found; is already in use"),
+            Some(true)
+        );
         assert_eq!(flip_target("boom"), None);
     }
 
@@ -1031,7 +1052,11 @@ fi
         let resp = execute_ask(args);
         env::remove_var("AISURADA_CLAUDE_BIN");
 
-        assert!(resp.ok, "flag flip should succeed on 2nd attempt: {:?}", resp.error);
+        assert!(
+            resp.ok,
+            "flag flip should succeed on 2nd attempt: {:?}",
+            resp.error
+        );
         assert!(resp.answer.contains("--resume sess-already-in-use"));
     }
 
@@ -1108,9 +1133,15 @@ exit 1
 
         assert!(!resp.ok, "should time out");
         let err = resp.error.unwrap();
-        assert!(err.contains("1초 안에 답이 안 왔다. 터미널에서 `claude --resume sess-timeout` 로 이어 볼 수 있다."));
+        assert!(err.contains(
+            "1초 안에 답이 안 왔다. 터미널에서 `claude --resume sess-timeout` 로 이어 볼 수 있다."
+        ));
         // 5.6: the process is really ended and reaped, not only left behind
-        let pid: i32 = fs::read_to_string(&pid_file).unwrap().trim().parse().unwrap();
+        let pid: i32 = fs::read_to_string(&pid_file)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
         let gone = unsafe { libc::kill(pid, 0) } == -1;
         assert!(gone, "상한에 끊긴 claude 프로세스가 아직 산다: {pid}");
     }
@@ -1155,7 +1186,10 @@ exit 1
 
         assert!(!resp.ok);
         let err = resp.error.unwrap();
-        assert!(err.contains("Fatal: Invalid configuration detected"), "First line cause must be preserved (D12)");
+        assert!(
+            err.contains("Fatal: Invalid configuration detected"),
+            "First line cause must be preserved (D12)"
+        );
         assert!(err.contains("…"), "Tail must be truncated with ellipsis");
     }
 
@@ -1193,7 +1227,11 @@ exit 1
         let resp = execute_ask(ask_args("sess-both", true, false));
         env::remove_var("AISURADA_CLAUDE_BIN");
         assert!(!resp.ok);
-        assert_eq!(fs::read_to_string(count).unwrap().lines().count(), 1, "같은 플래그라 다시 안 건다");
+        assert_eq!(
+            fs::read_to_string(count).unwrap().lines().count(),
+            1,
+            "같은 플래그라 다시 안 건다"
+        );
     }
 
     #[test]
@@ -1208,7 +1246,10 @@ exit 1
         );
         env::set_var("AISURADA_CLAUDE_BIN", stderr_boom.to_str().unwrap());
         let resp = execute_ask(ask_args("sess-prefix", true, true));
-        assert!(!resp.error.unwrap().starts_with("이 기계에서"), "표준오류가 비지 않으면 표준출력은 안 본다");
+        assert!(
+            !resp.error.unwrap().starts_with("이 기계에서"),
+            "표준오류가 비지 않으면 표준출력은 안 본다"
+        );
         // 표준오류가 비면 표준출력을 본다
         let stdout_only = create_executable_script(
             dir.path(),
@@ -1266,8 +1307,14 @@ exit 1
     #[test]
     fn test_map_gemini_model() {
         assert_eq!(map_gemini_model("gemini-3-8-high"), "gemini-3.8-flash-high");
-        assert_eq!(map_gemini_model("gemini-3-8-medium"), "gemini-3.8-flash-medium");
-        assert_eq!(map_gemini_model("gemini-3-8-flash"), "gemini-3.8-flash-high");
+        assert_eq!(
+            map_gemini_model("gemini-3-8-medium"),
+            "gemini-3.8-flash-medium"
+        );
+        assert_eq!(
+            map_gemini_model("gemini-3-8-flash"),
+            "gemini-3.8-flash-high"
+        );
         assert_eq!(map_gemini_model("gemini-pro"), "gemini-pro");
     }
 
@@ -1308,7 +1355,10 @@ exit 1
         env::remove_var("AISURADA_ANTIGRAVITY_BIN");
 
         assert!(!res.ok);
-        assert!(res.error.unwrap().contains("antigravity 실행 파일을 못 찾았다"));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("antigravity 실행 파일을 못 찾았다"));
     }
 
     #[test]
@@ -1364,7 +1414,10 @@ exit 0
         // 물음 1이 끝난 뒤에야 물음 1의 멈춤이 닿는다. 같은 노트라 세션 id는 같지만 물음 id는 다르다.
         let _ = cancel_ask("sess-stale".into(), Some("ask-stale-1".into()));
         let flag = register_cancel("ask-stale-2");
-        assert!(!flag.load(Ordering::Relaxed), "끝난 물음의 멈춤이 다음 물음을 끊으면 안 된다");
+        assert!(
+            !flag.load(Ordering::Relaxed),
+            "끝난 물음의 멈춤이 다음 물음을 끊으면 안 된다"
+        );
         unregister_cancel("ask-stale-2");
         unregister_cancel("ask-stale-1");
     }
@@ -1382,7 +1435,10 @@ exit 0
     fn cancel_reaches_a_running_ask_by_its_own_id_only() {
         let flag = register_cancel("ask-run-1");
         let _ = cancel_ask("sess-run".into(), Some("ask-run-other".into()));
-        assert!(!flag.load(Ordering::Relaxed), "다른 물음 id의 멈춤은 닿지 않는다");
+        assert!(
+            !flag.load(Ordering::Relaxed),
+            "다른 물음 id의 멈춤은 닿지 않는다"
+        );
         let _ = cancel_ask("sess-run".into(), Some("ask-run-1".into()));
         assert!(flag.load(Ordering::Relaxed));
         unregister_cancel("ask-run-1");
@@ -1402,7 +1458,10 @@ exit 0
         let old = Instant::now()
             .checked_sub(CANCEL_REQUEST_TTL + Duration::from_secs(1))
             .expect("시계가 시험에 필요한 만큼 지나 있다");
-        CANCEL_REQUESTED.lock().unwrap().insert("ask-old".into(), old);
+        CANCEL_REQUESTED
+            .lock()
+            .unwrap()
+            .insert("ask-old".into(), old);
         let flag = register_cancel("ask-old");
         assert!(!flag.load(Ordering::Relaxed), "1분 넘은 멈춤은 쓰지 않는다");
         assert!(!CANCEL_REQUESTED.lock().unwrap().contains_key("ask-old"));

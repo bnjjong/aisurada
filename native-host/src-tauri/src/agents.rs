@@ -48,7 +48,8 @@ fn run_list_agents() -> AgentsResponse {
         Some(bin) => bin,
         None => {
             return failure(
-                "claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다.".into(),
+                "claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다."
+                    .into(),
             );
         }
     };
@@ -58,7 +59,11 @@ fn run_list_agents() -> AgentsResponse {
     cmd.arg("agents").arg("--json");
 
     // 상한은 2부 6.3의 차례(SIGTERM, 3초, SIGKILL)로 끝내고, 파이프는 둘을 함께 비운다
-    match process::run_typed(&mut cmd, None, Duration::from_secs(LIST_AGENTS_TIMEOUT_SECS)) {
+    match process::run_typed(
+        &mut cmd,
+        None,
+        Duration::from_secs(LIST_AGENTS_TIMEOUT_SECS),
+    ) {
         Ok(Outcome::Finished(output)) => {
             let elapsed_ms = start.elapsed().as_millis() as u64;
             if output.status.success() {
@@ -97,7 +102,10 @@ fn run_list_agents() -> AgentsResponse {
 /// ps -p <pids> -o pid=를 실행하여 프로세스가 살아있는 pid들을 확인합니다 (6.4).
 /// D14 결함 고침: 5초 상한 초과 시 SIGTERM/SIGKILL 정리 및 에러 반환.
 #[tauri::command]
-pub async fn alive_pids(args: Option<AlivePidsArgs>, pids: Option<Vec<u32>>) -> Result<Vec<u32>, String> {
+pub async fn alive_pids(
+    args: Option<AlivePidsArgs>,
+    pids: Option<Vec<u32>>,
+) -> Result<Vec<u32>, String> {
     let pid_list = args.map(|a| a.pids).or(pids).unwrap_or_default();
     if pid_list.is_empty() {
         return Ok(Vec::new());
@@ -145,7 +153,10 @@ pub async fn held_agent_sessions(vault: Option<String>) -> Result<Vec<String>, S
 
 /// 기본 길에서 데몬 세션 해제는 "not_live"를 반환합니다 (부록 E). 인자는 `{vault, sessionId}` 다.
 #[tauri::command]
-pub async fn release_agent_session(vault: Option<String>, session_id: Option<String>) -> Result<String, String> {
+pub async fn release_agent_session(
+    vault: Option<String>,
+    session_id: Option<String>,
+) -> Result<String, String> {
     let _ = (vault, session_id);
     Ok("not_live".into())
 }

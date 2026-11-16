@@ -245,6 +245,9 @@ mod tests {
         let json = serde_json::to_value(&error).unwrap();
         assert_eq!(json["code"], "AIS-409");
         assert_eq!(json["kind"], "unsupported");
-        assert!(json["message"].as_str().unwrap().contains("no_such_command"));
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("no_such_command"));
     }
 }

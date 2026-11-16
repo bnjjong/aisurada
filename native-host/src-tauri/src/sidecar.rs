@@ -51,7 +51,11 @@ pub async fn sidecar_call<R: Runtime>(
     }
     crate::call_log::sidecar(&argv);
     let sub = argv[0].trim().to_ascii_lowercase();
-    if sub == "install" || sub == "sweep" || sub == "--sidecar" || argv.iter().any(|a| a == "--sidecar") {
+    if sub == "install"
+        || sub == "sweep"
+        || sub == "--sidecar"
+        || argv.iter().any(|a| a == "--sidecar")
+    {
         return Err(format!("허용되지 않은 사이드카 명령이에요: {}", argv[0]));
     }
     let vault = state
@@ -62,14 +66,25 @@ pub async fn sidecar_call<R: Runtime>(
         .ok_or("vault가 아직 열리지 않았어요")?;
     let context = context(&app)?;
     // 파일을 읽고 쓰는 일이라 화면 스레드가 아닌 일꾼 스레드에서 돈다
-    tauri::async_runtime::spawn_blocking(move || execute(&context, std::env::vars_os().collect(), &vault, &argv))
-        .await
-        .map_err(|e| format!("엔진 호출이 끊겼어요: {e}"))
+    tauri::async_runtime::spawn_blocking(move || {
+        execute(&context, std::env::vars_os().collect(), &vault, &argv)
+    })
+    .await
+    .map_err(|e| format!("엔진 호출이 끊겼어요: {e}"))
 }
 /// 화면을 거치지 않고 호스트 안에서(러너와 승인 알림처럼) 엔진 명령을 한 번 부른다. `sidecar_call`과 같은 길(`ais-cli`)을 쓰므로
 /// 화면이 받는 것과 같은 응답과 같은 거절을 받는다. 호출 스레드를 막으므로 화면 스레드가 아닌 일꾼 스레드에서만 부른다.
-pub fn call_blocking<R: Runtime>(app: &tauri::AppHandle<R>, vault: &str, argv: &[String]) -> Result<Reply, String> {
-    Ok(execute(&context(app)?, std::env::vars_os().collect(), vault, argv))
+pub fn call_blocking<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    vault: &str,
+    argv: &[String],
+) -> Result<Reply, String> {
+    Ok(execute(
+        &context(app)?,
+        std::env::vars_os().collect(),
+        vault,
+        argv,
+    ))
 }
 fn env_value(env: &Environment, key: &str) -> Option<String> {
     env.get(std::ffi::OsStr::new(key))
@@ -140,13 +155,19 @@ pub(crate) fn cli_env(context: &Context, env: &Environment, vault: &str) -> ais_
 pub(crate) fn official_cli_env<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<ais_cli::env::Env> {
     let context = context(app).ok()?;
     let env: Environment = std::env::vars_os().collect();
-    let in_build_tree = context.resource.as_ref().is_some_and(|p| under_build_tree(p));
+    let in_build_tree = context
+        .resource
+        .as_ref()
+        .is_some_and(|p| under_build_tree(p));
     if !context.bundled || in_build_tree {
         return None;
     }
     let cli_env = cli_env(&context, &env, "");
     (!cli_env.exe.is_empty()
-        && context.resource.as_ref().is_some_and(|r| std::path::Path::new(&cli_env.exe).starts_with(r.canonicalize().unwrap_or_else(|_| r.clone()))))
+        && context.resource.as_ref().is_some_and(|r| {
+            std::path::Path::new(&cli_env.exe)
+                .starts_with(r.canonicalize().unwrap_or_else(|_| r.clone()))
+        }))
     .then_some(cli_env)
 }
 
@@ -154,7 +175,9 @@ pub(crate) fn official_cli_env<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<
 fn execute(context: &Context, env: Environment, vault: &str, argv: &[String]) -> Reply {
     let cli_env = cli_env(context, &env, vault);
     let argv = argv.to_vec();
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ais_cli::run(&argv, &cli_env))) {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        ais_cli::run(&argv, &cli_env)
+    })) {
         Ok(outcome) => Reply {
             status: outcome.code,
             stdout: outcome.stdout,
@@ -174,7 +197,6 @@ fn execute(context: &Context, env: Environment, vault: &str, argv: &[String]) ->
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -204,8 +226,18 @@ mod tests {
         fs::create_dir_all(&vault).unwrap();
         let c = context(temp.path(), false);
         let e = env(&[("HOME", temp.path().to_str().unwrap())]);
-        let listed = execute(&c, e.clone(), vault.to_str().unwrap(), &["list-docs".into()]);
-        assert_eq!((listed.status, listed.stdout.as_str()), (0, "[]\n"), "{}", listed.stderr);
+        let listed = execute(
+            &c,
+            e.clone(),
+            vault.to_str().unwrap(),
+            &["list-docs".into()],
+        );
+        assert_eq!(
+            (listed.status, listed.stdout.as_str()),
+            (0, "[]\n"),
+            "{}",
+            listed.stderr
+        );
         let unknown = execute(&c, e.clone(), vault.to_str().unwrap(), &["nope".into()]);
         assert_eq!(unknown.status, 2);
         assert!(unknown.stderr.starts_with("알 수 없는 이름: nope"));
@@ -230,7 +262,10 @@ mod tests {
             ("KEEP_ME", "yes"),
         ]);
         let cli = cli_env(&c, &e, "/my vault");
-        assert_eq!(cli.vars.get("AISURADA_VAULT").map(String::as_str), Some("/my vault"));
+        assert_eq!(
+            cli.vars.get("AISURADA_VAULT").map(String::as_str),
+            Some("/my vault")
+        );
         assert_eq!(cli.vars.get("KEEP_ME").map(String::as_str), Some("yes"));
         for key in AI_SESSION_ENV {
             assert!(!cli.vars.contains_key(key), "{key}는 지워야 한다");
@@ -251,12 +286,22 @@ mod tests {
         touch(&checkout.join("engine-rs/target/debug/ais-cli"));
         assert!(cli_exe(&c, &env(&[])).ends_with("engine-rs/target/debug/ais-cli"));
         touch(&checkout.join("engine-rs/target/release/ais-cli"));
-        assert!(cli_exe(&c, &env(&[])).ends_with("engine-rs/target/release/ais-cli"), "release가 먼저");
+        assert!(
+            cli_exe(&c, &env(&[])).ends_with("engine-rs/target/release/ais-cli"),
+            "release가 먼저"
+        );
         touch(&c.resource.as_ref().unwrap().join("bin/ais-cli"));
-        assert!(cli_exe(&c, &env(&[])).contains("resources/bin/ais-cli"), "번들이 먼저");
+        assert!(
+            cli_exe(&c, &env(&[])).contains("resources/bin/ais-cli"),
+            "번들이 먼저"
+        );
         let explicit = temp.path().join("custom-cli");
         touch(&explicit);
-        assert!(cli_exe(&c, &env(&[("AISURADA_CLI_BIN", explicit.to_str().unwrap())])).ends_with("custom-cli"));
+        assert!(cli_exe(
+            &c,
+            &env(&[("AISURADA_CLI_BIN", explicit.to_str().unwrap())])
+        )
+        .ends_with("custom-cli"));
     }
     #[test]
     fn build_bundle_detection_is_by_adjacent_components() {
@@ -280,7 +325,12 @@ mod tests {
         // 인자 하나에 NUL이 든 경우처럼 예상 밖 입력도 앱을 죽이지 않고 오류 답으로 돌아온다
         let temp = tempfile::tempdir().unwrap();
         let c = context(temp.path(), false);
-        let reply = execute(&c, env(&[("HOME", temp.path().to_str().unwrap())]), temp.path().to_str().unwrap(), &["get-doc".into(), "a\0b".into()]);
+        let reply = execute(
+            &c,
+            env(&[("HOME", temp.path().to_str().unwrap())]),
+            temp.path().to_str().unwrap(),
+            &["get-doc".into(), "a\0b".into()],
+        );
         assert_ne!(reply.status, 0);
     }
 }

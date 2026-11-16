@@ -78,7 +78,10 @@ impl<R: Runtime> Host for AppHost<R> {
     }
 
     fn clone_dir(&self, full_name: &str) -> Result<PathBuf, String> {
-        let state = self.app.try_state::<github::GithubState>().ok_or("GitHub 상태를 찾지 못했다")?;
+        let state = self
+            .app
+            .try_state::<github::GithubState>()
+            .ok_or("GitHub 상태를 찾지 못했다")?;
         let service = state.service();
         let root = service.clone_root();
         service.refresh_clone(full_name, &root)
@@ -88,7 +91,12 @@ impl<R: Runtime> Host for AppHost<R> {
         if full_name.contains("..") || full_name.matches('/').count() != 1 {
             return None;
         }
-        let dest = self.app.try_state::<github::GithubState>()?.service().clone_root().join(full_name);
+        let dest = self
+            .app
+            .try_state::<github::GithubState>()?
+            .service()
+            .clone_root()
+            .join(full_name);
         dest.join(".git").exists().then_some(dest)
     }
 
@@ -97,10 +105,26 @@ impl<R: Runtime> Host for AppHost<R> {
     }
 
     fn run_claude(&self, call: ClaudeCall) -> Result<ClaudeOutcome, String> {
-        let bin = ask::resolve_claude().ok_or("claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다.")?;
-        let r = ask::run_cli_process(&bin, &call.workdir, &call.vault, &call.args, &call.prompt, call.timeout.as_secs(), Some(call.cancel))
-            .map_err(|e| format!("claude 를 못 띄웠다: {}", e.into_io()))?;
-        Ok(ClaudeOutcome { exit_code: r.exit_code, timed_out: r.timed_out, cancelled: r.cancelled, stdout: r.stdout, stderr: r.stderr })
+        let bin = ask::resolve_claude().ok_or(
+            "claude 실행 파일을 못 찾았다. AISURADA_CLAUDE_BIN 으로 자리를 알려 줄 수 있다.",
+        )?;
+        let r = ask::run_cli_process(
+            &bin,
+            &call.workdir,
+            &call.vault,
+            &call.args,
+            &call.prompt,
+            call.timeout.as_secs(),
+            Some(call.cancel),
+        )
+        .map_err(|e| format!("claude 를 못 띄웠다: {}", e.into_io()))?;
+        Ok(ClaudeOutcome {
+            exit_code: r.exit_code,
+            timed_out: r.timed_out,
+            cancelled: r.cancelled,
+            stdout: r.stdout,
+            stderr: r.stderr,
+        })
     }
 
     fn notify(&self, vault: &str, item: NewItem) {
@@ -108,13 +132,14 @@ impl<R: Runtime> Host for AppHost<R> {
     }
 
     fn changed(&self, task_key: Option<&str>) {
-        let _ = self.app.emit(ipc::RUNNER, serde_json::json!({ "taskKey": task_key }));
+        let _ = self
+            .app
+            .emit(ipc::RUNNER, serde_json::json!({ "taskKey": task_key }));
     }
 
     fn root(&self) -> PathBuf {
         default_root()
     }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +157,11 @@ fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     } else {
-        Err(format!("git {} 실패: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim()))
+        Err(format!(
+            "git {} 실패: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
     }
 }
 
@@ -142,14 +171,31 @@ pub fn base_ref(clone: &Path, base: Option<&str>) -> Result<String, String> {
     if let Some(b) = base {
         candidates.push(format!("origin/{b}"));
         candidates.push(b.to_string());
-    } else if let Ok(head) = git(clone, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]) {
+    } else if let Ok(head) = git(
+        clone,
+        &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    ) {
         candidates.push(head);
     }
     if base.is_none() {
-        candidates.extend(["origin/main".to_string(), "origin/master".to_string(), "HEAD".to_string()]);
+        candidates.extend([
+            "origin/main".to_string(),
+            "origin/master".to_string(),
+            "HEAD".to_string(),
+        ]);
     }
     for c in candidates {
-        if git(clone, &["rev-parse", "--verify", "--quiet", &format!("{c}^{{commit}}")]).is_ok() {
+        if git(
+            clone,
+            &[
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                &format!("{c}^{{commit}}"),
+            ],
+        )
+        .is_ok()
+        {
             return Ok(c);
         }
     }
@@ -165,16 +211,30 @@ pub fn create_worktree(clone: &Path, work: &Path, base: Option<&str>) -> Result<
     let reference = base_ref(clone, base)?;
     remove_worktree(clone, work);
     if let Some(parent) = work.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("작업 폴더의 부모를 못 만들었다: {e}"))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("작업 폴더의 부모를 못 만들었다: {e}"))?;
     }
-    git(clone, &["worktree", "add", "--detach", "--force", &work.to_string_lossy(), &reference])?;
+    git(
+        clone,
+        &[
+            "worktree",
+            "add",
+            "--detach",
+            "--force",
+            &work.to_string_lossy(),
+            &reference,
+        ],
+    )?;
     Ok(())
 }
 
 /// 작업 폴더를 지운다. git이 아는 것은 `worktree remove`로, 남은 것은 폴더째 지우고 `prune`한다. 없어도 오류가 아니다.
 pub fn remove_worktree(clone: &Path, work: &Path) {
     if work.exists() {
-        let _ = git(clone, &["worktree", "remove", "--force", &work.to_string_lossy()]);
+        let _ = git(
+            clone,
+            &["worktree", "remove", "--force", &work.to_string_lossy()],
+        );
         if work.exists() {
             let _ = std::fs::remove_dir_all(work);
         }
@@ -190,7 +250,14 @@ mod tests {
         let ok = Command::new("git")
             .arg("-C")
             .arg(dir)
-            .args(["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"])
+            .args([
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "-c",
+                "commit.gpgsign=false",
+            ])
             .args(args)
             .status()
             .unwrap()
@@ -213,7 +280,13 @@ mod tests {
         run(&origin, &["commit", "-q", "-am", "release"]);
         run(&origin, &["checkout", "-q", "main"]);
         let clone = temp.path().join("clone");
-        let ok = Command::new("git").args(["clone", "-q"]).arg(&origin).arg(&clone).status().unwrap().success();
+        let ok = Command::new("git")
+            .args(["clone", "-q"])
+            .arg(&origin)
+            .arg(&clone)
+            .status()
+            .unwrap()
+            .success();
         assert!(ok);
         (temp, origin, clone)
     }
@@ -223,9 +296,20 @@ mod tests {
         let (temp, _origin, clone) = fixture();
         let work = temp.path().join("work/TSK-1");
         create_worktree(&clone, &work, None).unwrap();
-        assert_eq!(std::fs::read_to_string(work.join("README.md")).unwrap(), "main\n");
-        assert_eq!(git(&work, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap(), "HEAD", "분리된 HEAD");
-        assert_eq!(git(&clone, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap(), "main", "사본의 브랜치는 그대로");
+        assert_eq!(
+            std::fs::read_to_string(work.join("README.md")).unwrap(),
+            "main\n"
+        );
+        assert_eq!(
+            git(&work, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap(),
+            "HEAD",
+            "분리된 HEAD"
+        );
+        assert_eq!(
+            git(&clone, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap(),
+            "main",
+            "사본의 브랜치는 그대로"
+        );
         // 다시 만들면 지우고 새로 만든다
         std::fs::write(work.join("junk"), "x").unwrap();
         create_worktree(&clone, &work, None).unwrap();
@@ -233,13 +317,26 @@ mod tests {
         // 기준 브랜치를 주면 그 브랜치다
         let other = temp.path().join("work/TSK-2");
         create_worktree(&clone, &other, Some("release")).unwrap();
-        assert_eq!(std::fs::read_to_string(other.join("README.md")).unwrap(), "release\n");
-        assert!(create_worktree(&clone, &temp.path().join("work/TSK-3"), Some("없는-브랜치")).unwrap_err().contains("없는-브랜치"));
+        assert_eq!(
+            std::fs::read_to_string(other.join("README.md")).unwrap(),
+            "release\n"
+        );
+        assert!(
+            create_worktree(&clone, &temp.path().join("work/TSK-3"), Some("없는-브랜치"))
+                .unwrap_err()
+                .contains("없는-브랜치")
+        );
         // 지우면 폴더와 git의 기록이 모두 사라진다
         remove_worktree(&clone, &work);
         remove_worktree(&clone, &other);
         assert!(!work.exists() && !other.exists());
-        assert_eq!(git(&clone, &["worktree", "list", "--porcelain"]).unwrap().matches("worktree ").count(), 1);
+        assert_eq!(
+            git(&clone, &["worktree", "list", "--porcelain"])
+                .unwrap()
+                .matches("worktree ")
+                .count(),
+            1
+        );
         // 이미 없는 것을 지워도 오류가 아니다
         remove_worktree(&clone, &work);
     }

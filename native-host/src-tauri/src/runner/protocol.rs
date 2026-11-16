@@ -56,7 +56,12 @@ impl TaskInfo {
         if key.is_empty() {
             return Err("태스크 응답에 key가 없다".into());
         }
-        let list = |name: &str| v.get(name).and_then(Value::as_array).cloned().unwrap_or_default();
+        let list = |name: &str| {
+            v.get(name)
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        };
         Ok(TaskInfo {
             key,
             title: text(v, "title"),
@@ -64,21 +69,46 @@ impl TaskInfo {
             priority: text(v, "priority"),
             status: text(v, "status"),
             repo: text(v, "repo"),
-            base: v.get("base").and_then(Value::as_str).map(str::trim).filter(|b| !b.is_empty()).map(str::to_string),
+            base: v
+                .get("base")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|b| !b.is_empty())
+                .map(str::to_string),
             body: text(v, "body"),
             criteria: list("criteria")
                 .iter()
-                .map(|c| (text(c, "text"), c.get("done").and_then(Value::as_bool).unwrap_or(false)))
+                .map(|c| {
+                    (
+                        text(c, "text"),
+                        c.get("done").and_then(Value::as_bool).unwrap_or(false),
+                    )
+                })
                 .collect(),
-            refs: list("refs").iter().map(|r| TaskRef { kind: text(r, "kind"), target: text(r, "target"), title: text(r, "title") }).collect(),
+            refs: list("refs")
+                .iter()
+                .map(|r| TaskRef {
+                    kind: text(r, "kind"),
+                    target: text(r, "target"),
+                    title: text(r, "title"),
+                })
+                .collect(),
             links: list("links")
                 .iter()
-                .map(|l| TaskLink { kind: text(l, "type"), key: text(l, "key"), title: text(l, "title"), status: text(l, "status") })
+                .map(|l| TaskLink {
+                    kind: text(l, "type"),
+                    key: text(l, "key"),
+                    title: text(l, "title"),
+                    status: text(l, "status"),
+                })
                 .collect(),
             comments: list("activity")
                 .iter()
                 .filter(|a| a.get("kind").and_then(Value::as_str) == Some("comment"))
-                .map(|a| Comment { by: text(a, "by"), body: text(a, "body") })
+                .map(|a| Comment {
+                    by: text(a, "by"),
+                    body: text(a, "body"),
+                })
                 .collect(),
         })
     }
@@ -100,12 +130,20 @@ pub fn build_prompt(t: &TaskInfo) -> String {
     let mut p = String::new();
     p.push_str("너는 aisurada의 개발 보조 에이전트다. 지금은 **읽기 전용 분석** 단계다. 코드와 노트를 고칠 수 없다. ");
     p.push_str("아래 태스크를 조사하고, 완료 기준마다 어디까지 알아냈는지 보고하라.\n\n");
-    p.push_str(&format!("## 태스크 {} ({}, 우선순위 {})\n", t.key, or_dash(&t.kind), or_dash(&t.priority)));
+    p.push_str(&format!(
+        "## 태스크 {} ({}, 우선순위 {})\n",
+        t.key,
+        or_dash(&t.kind),
+        or_dash(&t.priority)
+    ));
     p.push_str(&format!("제목: {}\n", t.title));
     p.push_str(&format!(
         "저장소: {}{}\n",
         t.repo,
-        t.base.as_deref().map(|b| format!(" (기준 브랜치: {b})")).unwrap_or_default()
+        t.base
+            .as_deref()
+            .map(|b| format!(" (기준 브랜치: {b})"))
+            .unwrap_or_default()
     ));
     if !t.body.trim().is_empty() {
         p.push_str(&format!("\n설명:\n{}\n", t.body.trim()));
@@ -117,10 +155,20 @@ pub fn build_prompt(t: &TaskInfo) -> String {
     if !t.refs.is_empty() {
         p.push_str("\n연결한 자원:\n");
         for r in &t.refs {
-            let title = if r.title.is_empty() { String::new() } else { format!(" — {}", r.title) };
+            let title = if r.title.is_empty() {
+                String::new()
+            } else {
+                format!(" — {}", r.title)
+            };
             match r.kind.as_str() {
-                "note" => p.push_str(&format!("- 노트 {}{} (aisurada의 get_doc 도구로 읽는다)\n", r.target, title)),
-                "github" => p.push_str(&format!("- GitHub {}{} (웹에는 접근할 수 없으니 저장소 사본과 노트에서 찾는다)\n", r.target, title)),
+                "note" => p.push_str(&format!(
+                    "- 노트 {}{} (aisurada의 get_doc 도구로 읽는다)\n",
+                    r.target, title
+                )),
+                "github" => p.push_str(&format!(
+                    "- GitHub {}{} (웹에는 접근할 수 없으니 저장소 사본과 노트에서 찾는다)\n",
+                    r.target, title
+                )),
                 other => p.push_str(&format!("- {} {}{}\n", other, r.target, title)),
             }
         }
@@ -128,13 +176,23 @@ pub fn build_prompt(t: &TaskInfo) -> String {
     if !t.links.is_empty() {
         p.push_str("\n연결된 태스크:\n");
         for l in &t.links {
-            p.push_str(&format!("- {} {} \"{}\" ({})\n", link_label(&l.kind), l.key, l.title, l.status));
+            p.push_str(&format!(
+                "- {} {} \"{}\" ({})\n",
+                link_label(&l.kind),
+                l.key,
+                l.title,
+                l.status
+            ));
         }
     }
     if !t.comments.is_empty() {
         p.push_str("\n지금까지의 댓글(오래된 것이 앞):\n");
         for c in &t.comments {
-            p.push_str(&format!("- [{}] {}\n", c.by, c.body.trim().replace('\n', "\n  ")));
+            p.push_str(&format!(
+                "- [{}] {}\n",
+                c.by,
+                c.body.trim().replace('\n', "\n  ")
+            ));
         }
     }
     p.push_str(INSTRUCTIONS);
@@ -163,7 +221,11 @@ fn or_dash(s: &str) -> &str {
 
 /// 사람의 답이 왔을 때 이어 가는 호출에 줄 프롬프트.
 pub fn answer_prompt(question: &str, answer: &str, last_question: bool) -> String {
-    let mut p = format!("사람이 네 질문에 답했다.\n\n질문: {}\n답: {}\n\n이 답을 반영해서 이어 조사하라.", question.trim(), answer.trim());
+    let mut p = format!(
+        "사람이 네 질문에 답했다.\n\n질문: {}\n답: {}\n\n이 답을 반영해서 이어 조사하라.",
+        question.trim(),
+        answer.trim()
+    );
     if last_question {
         p.push_str(" 질문 한도에 닿았으니 더는 묻지 말고, 지금까지 알아낸 것으로 `[보고]`를 쓴다. 모르는 부분은 모른다고 적는다.");
     } else {
@@ -190,10 +252,18 @@ pub fn parse_reply(raw: &str) -> Reply {
     let trimmed = raw.trim();
     let bare = trimmed.trim_start_matches(|c: char| matches!(c, '*' | '#' | '>' | '`' | ' ' | '_'));
     if let Some(rest) = bare.strip_prefix(QUESTION_MARK) {
-        return Reply::Question(rest.trim_start_matches(|c: char| matches!(c, '*' | '`' | '_' | ':' | ' ')).trim().to_string());
+        return Reply::Question(
+            rest.trim_start_matches(|c: char| matches!(c, '*' | '`' | '_' | ':' | ' '))
+                .trim()
+                .to_string(),
+        );
     }
     if let Some(rest) = bare.strip_prefix(REPORT_MARK) {
-        return Reply::Report(rest.trim_start_matches(|c: char| matches!(c, '*' | '`' | '_' | ':' | ' ')).trim().to_string());
+        return Reply::Report(
+            rest.trim_start_matches(|c: char| matches!(c, '*' | '`' | '_' | ':' | ' '))
+                .trim()
+                .to_string(),
+        );
     }
     Reply::Report(trimmed.to_string())
 }
@@ -215,10 +285,11 @@ pub fn parse_claude_output(stdout: &str) -> Result<ClaudeResult, String> {
     let value: Value = serde_json::from_str(trimmed)
         .ok()
         .or_else(|| {
-            trimmed
-                .lines()
-                .rev()
-                .find_map(|l| serde_json::from_str::<Value>(l.trim()).ok().filter(|v| v.get("type").is_some() || v.get("result").is_some()))
+            trimmed.lines().rev().find_map(|l| {
+                serde_json::from_str::<Value>(l.trim())
+                    .ok()
+                    .filter(|v| v.get("type").is_some() || v.get("result").is_some())
+            })
         })
         .ok_or_else(|| format!("claude의 결과를 읽지 못했다: {}", clip(trimmed, 200)))?;
     // stream-json 모양이 섞여 배열로 오면 마지막 result를 쓴다
@@ -231,13 +302,33 @@ pub fn parse_claude_output(stdout: &str) -> Result<ClaudeResult, String> {
         v => v,
     };
     let usage = value.get("usage");
-    let n = |key: &str| usage.and_then(|u| u.get(key)).and_then(Value::as_u64).unwrap_or(0);
+    let n = |key: &str| {
+        usage
+            .and_then(|u| u.get(key))
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    };
     Ok(ClaudeResult {
-        text: value.get("result").and_then(Value::as_str).unwrap_or("").to_string(),
-        is_error: value.get("is_error").and_then(Value::as_bool).unwrap_or(false),
-        session_id: value.get("session_id").and_then(Value::as_str).map(str::to_string),
-        cost_usd: value.get("total_cost_usd").and_then(Value::as_f64).unwrap_or(0.0),
-        input_tokens: n("input_tokens") + n("cache_creation_input_tokens") + n("cache_read_input_tokens"),
+        text: value
+            .get("result")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        is_error: value
+            .get("is_error")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        session_id: value
+            .get("session_id")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        cost_usd: value
+            .get("total_cost_usd")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0),
+        input_tokens: n("input_tokens")
+            + n("cache_creation_input_tokens")
+            + n("cache_read_input_tokens"),
         output_tokens: n("output_tokens"),
     })
 }
@@ -260,8 +351,22 @@ pub fn clip(s: &str, max: usize) -> String {
 /// - 허용: 작업 폴더 안의 Read/Grep/Glob(`Read(<경로>/**)` 규칙 하나가 셋을 같은 폴더로 가둔다)과 aisurada 읽기 도구.
 ///   MCP 서버는 `--strict-mcp-config`로 이 호출이 준 것만 쓰고, 그 서버는 `mcp`(쓰기 도구 없음)로 띄운 읽기 전용이다.
 /// - 거절: 셸, 파일 쓰기, 웹, 하위 에이전트.
-pub fn claude_args(session_id: &str, resume: bool, model: &str, mcp_config: &str, workdir: &Path) -> Vec<String> {
-    let mut a: Vec<String> = vec!["-p".into(), if resume { "--resume".into() } else { "--session-id".into() }, session_id.into()];
+pub fn claude_args(
+    session_id: &str,
+    resume: bool,
+    model: &str,
+    mcp_config: &str,
+    workdir: &Path,
+) -> Vec<String> {
+    let mut a: Vec<String> = vec![
+        "-p".into(),
+        if resume {
+            "--resume".into()
+        } else {
+            "--session-id".into()
+        },
+        session_id.into(),
+    ];
     if !model.trim().is_empty() {
         a.push("--model".into());
         a.push(model.trim().into());
@@ -283,7 +388,16 @@ pub fn claude_args(session_id: &str, resume: bool, model: &str, mcp_config: &str
     a.push(format!("Read({}/**)", workdir.display()));
     a.push("mcp__aisurada".into());
     a.push("--disallowedTools".into());
-    for t in ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Task"] {
+    for t in [
+        "Bash",
+        "Edit",
+        "Write",
+        "NotebookEdit",
+        "WebFetch",
+        "WebSearch",
+        "Agent",
+        "Task",
+    ] {
         a.push(t.into());
     }
     a
@@ -292,12 +406,17 @@ pub fn claude_args(session_id: &str, resume: bool, model: &str, mcp_config: &str
 /// `claude-mcp config`가 낸 `mcpServers` 조각에 이 실행이 다루는 vault를 박고, 한 줄 JSON으로 돌려준다.
 /// 서버는 `--write` 없이 뜬 읽기 전용이어야 하므로 args에 `--write`가 있으면 거절한다.
 pub fn mcp_config_for(config_output: &str, vault: &str) -> Result<String, String> {
-    let mut v: Value = serde_json::from_str(config_output.trim()).map_err(|e| format!("MCP 설정을 읽지 못했다: {e}"))?;
+    let mut v: Value = serde_json::from_str(config_output.trim())
+        .map_err(|e| format!("MCP 설정을 읽지 못했다: {e}"))?;
     let server = v
         .get_mut("mcpServers")
         .and_then(|s| s.get_mut("aisurada"))
         .ok_or("MCP 설정에 aisurada 서버가 없다")?;
-    if server.get("args").and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.as_str() == Some("--write"))) {
+    if server
+        .get("args")
+        .and_then(Value::as_array)
+        .is_some_and(|a| a.iter().any(|x| x.as_str() == Some("--write")))
+    {
         return Err("MCP 서버가 쓰기 모드로 설정되어 있어 읽기 전용 실행에 쓸 수 없다".into());
     }
     let env = server
@@ -333,30 +452,62 @@ mod tests {
     #[test]
     fn task_info_reads_the_engine_shape() {
         let t = TaskInfo::from_json(&sample()).unwrap();
-        assert_eq!((t.key.as_str(), t.repo.as_str(), t.base.as_deref()), ("TSK-7", "bnjjong/aisurada", Some("main")));
-        assert_eq!(t.criteria, vec![("README에 빌드 방법이 있다".to_string(), false), ("시험 명령이 있다".to_string(), true)]);
+        assert_eq!(
+            (t.key.as_str(), t.repo.as_str(), t.base.as_deref()),
+            ("TSK-7", "bnjjong/aisurada", Some("main"))
+        );
+        assert_eq!(
+            t.criteria,
+            vec![
+                ("README에 빌드 방법이 있다".to_string(), false),
+                ("시험 명령이 있다".to_string(), true)
+            ]
+        );
         assert_eq!(t.refs.len(), 2);
         assert_eq!(t.links[0].kind, "blocked-by");
         assert_eq!(t.comments.len(), 2, "댓글만 뽑는다");
         assert!(TaskInfo::from_json(&json!({"title": "x"})).is_err());
         // 빈 base 는 없는 것으로 본다
-        assert_eq!(TaskInfo::from_json(&json!({"key": "TSK-1", "base": " "})).unwrap().base, None);
+        assert_eq!(
+            TaskInfo::from_json(&json!({"key": "TSK-1", "base": " "}))
+                .unwrap()
+                .base,
+            None
+        );
     }
 
     #[test]
     fn prompt_carries_the_task_and_the_rules() {
         let p = build_prompt(&TaskInfo::from_json(&sample()).unwrap());
         for needle in [
-            "TSK-7", "빌드 방법 정리", "bnjjong/aisurada (기준 브랜치: main)", "README를 읽고\n정리해 줘",
-            "- [ ] README에 빌드 방법이 있다", "- [x] 시험 명령이 있다", "노트 ndabc-1234 — 작업 계획", "GitHub bnjjong/aisurada#53",
-            "이 태스크를 막고 있음 TSK-2", "[human] 첫 줄\n  둘째 줄", "[runner] 질문입니다", "[보고]", "[질문]", "읽기 전용",
+            "TSK-7",
+            "빌드 방법 정리",
+            "bnjjong/aisurada (기준 브랜치: main)",
+            "README를 읽고\n정리해 줘",
+            "- [ ] README에 빌드 방법이 있다",
+            "- [x] 시험 명령이 있다",
+            "노트 ndabc-1234 — 작업 계획",
+            "GitHub bnjjong/aisurada#53",
+            "이 태스크를 막고 있음 TSK-2",
+            "[human] 첫 줄\n  둘째 줄",
+            "[runner] 질문입니다",
+            "[보고]",
+            "[질문]",
+            "읽기 전용",
         ] {
             assert!(p.contains(needle), "프롬프트에 '{needle}'가 없다:\n{p}");
         }
         // 댓글·자원·연결이 없으면 그 절을 만들지 않는다
-        let bare = TaskInfo::from_json(&json!({"key": "TSK-1", "title": "t", "repo": "a/b", "criteria": [{"text": "c"}]})).unwrap();
+        let bare = TaskInfo::from_json(
+            &json!({"key": "TSK-1", "title": "t", "repo": "a/b", "criteria": [{"text": "c"}]}),
+        )
+        .unwrap();
         let p = build_prompt(&bare);
-        assert!(!p.contains("연결한 자원") && !p.contains("연결된 태스크") && !p.contains("지금까지의 댓글"));
+        assert!(
+            !p.contains("연결한 자원")
+                && !p.contains("연결된 태스크")
+                && !p.contains("지금까지의 댓글")
+        );
     }
 
     #[test]
@@ -370,15 +521,27 @@ mod tests {
 
     #[test]
     fn reply_is_split_by_the_first_marker() {
-        assert_eq!(parse_reply("[보고] 결과입니다\n자세히"), Reply::Report("결과입니다\n자세히".into()));
-        assert_eq!(parse_reply("  [질문] main인가요?"), Reply::Question("main인가요?".into()));
-        assert_eq!(parse_reply("**[질문]** 어느 쪽?"), Reply::Question("어느 쪽?".into()));
+        assert_eq!(
+            parse_reply("[보고] 결과입니다\n자세히"),
+            Reply::Report("결과입니다\n자세히".into())
+        );
+        assert_eq!(
+            parse_reply("  [질문] main인가요?"),
+            Reply::Question("main인가요?".into())
+        );
+        assert_eq!(
+            parse_reply("**[질문]** 어느 쪽?"),
+            Reply::Question("어느 쪽?".into())
+        );
         assert_eq!(parse_reply("## [보고]\n내용"), Reply::Report("내용".into()));
         assert_eq!(parse_reply("[질문]: 콜론"), Reply::Question("콜론".into()));
         // 표시가 없으면 보고로 본다(말을 들었는데 일이 사라지지 않게)
         assert_eq!(parse_reply("그냥 결과"), Reply::Report("그냥 결과".into()));
         // 본문 가운데의 표시는 무시한다
-        assert_eq!(parse_reply("요약입니다. [질문] 아님"), Reply::Report("요약입니다. [질문] 아님".into()));
+        assert_eq!(
+            parse_reply("요약입니다. [질문] 아님"),
+            Reply::Report("요약입니다. [질문] 아님".into())
+        );
         assert_eq!(parse_reply(""), Reply::Report(String::new()));
     }
 
@@ -386,18 +549,25 @@ mod tests {
     fn claude_output_is_read_with_usage_and_cost() {
         let out = r#"{"type":"result","subtype":"success","is_error":false,"result":"[보고] 끝","session_id":"abc","total_cost_usd":0.0123,"usage":{"input_tokens":6,"cache_creation_input_tokens":100,"cache_read_input_tokens":50,"output_tokens":40}}"#;
         let r = parse_claude_output(out).unwrap();
-        assert_eq!((r.text.as_str(), r.is_error, r.session_id.as_deref()), ("[보고] 끝", false, Some("abc")));
+        assert_eq!(
+            (r.text.as_str(), r.is_error, r.session_id.as_deref()),
+            ("[보고] 끝", false, Some("abc"))
+        );
         assert_eq!((r.input_tokens, r.output_tokens), (156, 40));
         assert!((r.cost_usd - 0.0123).abs() < 1e-9);
         // 앞에 경고 줄이 붙어도 읽는다
         let noisy = format!("warning: x\n{out}\n");
         assert_eq!(parse_claude_output(&noisy).unwrap().text, "[보고] 끝");
         // 오류 결과
-        let err = parse_claude_output(r#"{"type":"result","is_error":true,"result":"실패"}"#).unwrap();
+        let err =
+            parse_claude_output(r#"{"type":"result","is_error":true,"result":"실패"}"#).unwrap();
         assert!(err.is_error);
         // 배열
         let arr = format!("[{{\"type\":\"system\"}},{out}]");
-        assert_eq!(parse_claude_output(&arr).unwrap().session_id.as_deref(), Some("abc"));
+        assert_eq!(
+            parse_claude_output(&arr).unwrap().session_id.as_deref(),
+            Some("abc")
+        );
         assert!(parse_claude_output("not json").is_err());
         assert!(parse_claude_output("").is_err());
     }
@@ -412,16 +582,25 @@ mod tests {
         assert!(a.windows(2).any(|p| p == ["--permission-prompts", "none"]));
         assert!(a.contains(&"--strict-mcp-config".to_string()));
         assert!(a.windows(2).any(|p| p == ["--model", "sonnet"]));
-        assert!(a.windows(2).any(|p| p == ["--allowedTools", "Read(/work/TSK-1/**)"]));
+        assert!(a
+            .windows(2)
+            .any(|p| p == ["--allowedTools", "Read(/work/TSK-1/**)"]));
         assert!(a.contains(&"mcp__aisurada".to_string()));
         for denied in ["Bash", "Edit", "Write", "WebFetch", "WebSearch"] {
             let at = a.iter().position(|x| x == "--disallowedTools").unwrap();
             assert!(a[at..].contains(&denied.to_string()), "{denied}");
         }
         // 허용 목록에는 셸·쓰기가 없다
-        let allowed: Vec<&String> = a.iter().skip_while(|x| *x != "--allowedTools").skip(1).take_while(|x| !x.starts_with("--")).collect();
+        let allowed: Vec<&String> = a
+            .iter()
+            .skip_while(|x| *x != "--allowedTools")
+            .skip(1)
+            .take_while(|x| !x.starts_with("--"))
+            .collect();
         assert_eq!(allowed.len(), 2, "{joined}");
-        assert!(!allowed.iter().any(|x| x.starts_with("Bash") || x.starts_with("Write") || x.starts_with("Edit")));
+        assert!(!allowed
+            .iter()
+            .any(|x| x.starts_with("Bash") || x.starts_with("Write") || x.starts_with("Edit")));
         // 이어 가기와 모델 생략
         let r = claude_args("sess", true, " ", "{}", w);
         assert_eq!(&r[..3], ["-p", "--resume", "sess"]);
@@ -437,7 +616,8 @@ mod tests {
         assert_eq!(server["args"], json!(["mcp"]));
         assert_eq!(server["env"]["AISURADA_VAULT"], "/my vault");
         // env 칸이 없어도 vault를 박는다
-        let no_env = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/c","args":["mcp"]}}}"#;
+        let no_env =
+            r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/c","args":["mcp"]}}}"#;
         let out: Value = serde_json::from_str(&mcp_config_for(no_env, "/v").unwrap()).unwrap();
         assert_eq!(out["mcpServers"]["aisurada"]["env"]["AISURADA_VAULT"], "/v");
         let write = r#"{"mcpServers":{"aisurada":{"type":"stdio","command":"/c","args":["mcp","--write"]}}}"#;

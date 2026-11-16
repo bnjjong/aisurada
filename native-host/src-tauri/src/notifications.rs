@@ -6,10 +6,7 @@
 //! - 앱 안 채널을 꺼도 알림은 목록(알림 센터)에 쌓인다. 끄는 것은 토스트와 배지의 소리·팝업이지 기록이 아니다.
 //! - macOS 집중 모드는 OS가 처리한다(사용자 결정). 집중 모드에서 aisurada를 허용하지 않으면 OS가 배너를 막고 알림 센터에 쌓는다.
 //!   앱이 집중 모드 상태를 읽어 토스트까지 숨기는 일은 하지 않는다.
-use crate::{
-    ipc::NOTIFICATIONS,
-    lifecycle::HostState,
-};
+use crate::{ipc::NOTIFICATIONS, lifecycle::HostState};
 use ring::digest;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -82,12 +79,18 @@ pub struct Events {
 }
 
 fn on_both() -> Channel {
-    Channel { in_app: true, macos: true }
+    Channel {
+        in_app: true,
+        macos: true,
+    }
 }
 
 /// Done은 조용히 알려도 된다(시안): 앱 안만 켜 둔다.
 fn done_default() -> Channel {
-    Channel { in_app: true, macos: false }
+    Channel {
+        in_app: true,
+        macos: false,
+    }
 }
 fn yes() -> bool {
     true
@@ -109,13 +112,23 @@ pub struct Settings {
 
 impl Default for Events {
     fn default() -> Self {
-        Events { question: on_both(), pr: on_both(), failed: on_both(), done: done_default(), approval: on_both() }
+        Events {
+            question: on_both(),
+            pr: on_both(),
+            failed: on_both(),
+            done: done_default(),
+            approval: on_both(),
+        }
     }
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { in_app: true, macos: true, events: Events::default() }
+        Settings {
+            in_app: true,
+            macos: true,
+            events: Events::default(),
+        }
     }
 }
 
@@ -134,20 +147,31 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "failed" => settings.events.failed,
         "done" => settings.events.done,
         "approval" => settings.events.approval,
-        _ => Channel { in_app: true, macos: true },
+        _ => Channel {
+            in_app: true,
+            macos: true,
+        },
     };
-    Route { toast: settings.in_app && event.in_app, banner: settings.macos && event.macos }
+    Route {
+        toast: settings.in_app && event.in_app,
+        banner: settings.macos && event.macos,
+    }
 }
 
 // ------------------------------------------------------------------ 파일
 
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 /// 앱 지원 폴더 아래의 알림 폴더. 시험은 임시 폴더를 직접 준다.
 pub fn default_dir() -> PathBuf {
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
     home.join("Library/Application Support/aisurada/notifications")
 }
 
@@ -175,7 +199,10 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 
 /// 목록을 읽는다. 없거나 망가졌으면 빈 목록이다(알림은 지워져도 큰일이 아니고, 앱이 죽으면 안 된다).
 pub fn load_items(dir: &Path, vault: &str) -> Vec<Item> {
-    fs::read(items_path(dir, vault)).ok().and_then(|b| serde_json::from_slice::<Vec<Item>>(&b).ok()).unwrap_or_default()
+    fs::read(items_path(dir, vault))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<Vec<Item>>(&b).ok())
+        .unwrap_or_default()
 }
 
 fn save_items(dir: &Path, vault: &str, items: &[Item]) -> Result<(), String> {
@@ -184,7 +211,10 @@ fn save_items(dir: &Path, vault: &str, items: &[Item]) -> Result<(), String> {
 }
 
 pub fn load_settings(dir: &Path) -> Settings {
-    fs::read(dir.join("settings.json")).ok().and_then(|b| serde_json::from_slice::<Settings>(&b).ok()).unwrap_or_default()
+    fs::read(dir.join("settings.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<Settings>(&b).ok())
+        .unwrap_or_default()
 }
 
 fn save_settings(dir: &Path, settings: &Settings) -> Result<(), String> {
@@ -217,7 +247,9 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
     let task_key = match new.task_key {
         Some(k) if !k.trim().is_empty() => {
             let k = k.trim().to_string();
-            let ok = k.strip_prefix("TSK-").is_some_and(|n| !n.is_empty() && n.len() <= 9 && n.chars().all(|c| c.is_ascii_digit()));
+            let ok = k.strip_prefix("TSK-").is_some_and(|n| {
+                !n.is_empty() && n.len() <= 9 && n.chars().all(|c| c.is_ascii_digit())
+            });
             if !ok {
                 return Err(format!("태스크 키 모양이 아니다: {k}"));
             }
@@ -235,7 +267,15 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         }
         _ => format!("n{at:x}-{seq:x}"),
     };
-    Ok(Item { id, kind: new.kind, title, body: clip(&new.body, MAX_BODY), task_key, at, read: false })
+    Ok(Item {
+        id,
+        kind: new.kind,
+        title,
+        body: clip(&new.body, MAX_BODY),
+        task_key,
+        at,
+        read: false,
+    })
 }
 
 /// 목록에 알림을 더한다. 같은 id가 이미 있으면 그대로 두고 false를 돌려준다. 새것이 앞이고 {@link MAX_ITEMS}개를 넘으면 오래된 것을 버린다.
@@ -290,7 +330,11 @@ pub fn show_banner<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) -> S
 
 #[cfg(target_os = "macos")]
 fn osascript_banner(title: &str, body: &str) -> Result<(), String> {
-    let script = format!("display notification \"{}\" with title \"{}\"", applescript_text(body), applescript_text(title));
+    let script = format!(
+        "display notification \"{}\" with title \"{}\"",
+        applescript_text(body),
+        applescript_text(title)
+    );
     let out = std::process::Command::new("/usr/bin/osascript")
         .arg("-e")
         .arg(script)
@@ -299,7 +343,10 @@ fn osascript_banner(title: &str, body: &str) -> Result<(), String> {
     if out.status.success() {
         Ok(())
     } else {
-        Err(format!("osascript가 실패했다: {}", String::from_utf8_lossy(&out.stderr).trim()))
+        Err(format!(
+            "osascript가 실패했다: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
     }
 }
 
@@ -346,11 +393,20 @@ pub struct NotifyState {
 }
 
 fn current_vault(host: &HostState) -> Result<String, String> {
-    host.vault.lock().map_err(|_| "vault 잠금을 얻지 못했다".to_string())?.clone().ok_or_else(|| "열린 vault가 없다".to_string())
+    host.vault
+        .lock()
+        .map_err(|_| "vault 잠금을 얻지 못했다".to_string())?
+        .clone()
+        .ok_or_else(|| "열린 vault가 없다".to_string())
 }
 
 /// 알림을 쌓고 설정에 따라 배너를 보내고 화면에 알린다. 3단계의 러너도 이 함수를 부른다.
-pub fn push<R: Runtime>(app: &AppHandle<R>, dir: &Path, vault: &str, new: NewItem) -> Result<PushOut, String> {
+pub fn push<R: Runtime>(
+    app: &AppHandle<R>,
+    dir: &Path,
+    vault: &str,
+    new: NewItem,
+) -> Result<PushOut, String> {
     let settings = load_settings(dir);
     let mut items = load_items(dir, vault);
     let item = build_item(new, now_ms(), items.len())?;
@@ -361,7 +417,12 @@ pub fn push<R: Runtime>(app: &AppHandle<R>, dir: &Path, vault: &str, new: NewIte
     }
     let unread_count = unread(&items);
     if !stored {
-        return Ok(PushOut { item: None, toast: false, banner: "off".to_string(), unread: unread_count });
+        return Ok(PushOut {
+            item: None,
+            toast: false,
+            banner: "off".to_string(),
+            unread: unread_count,
+        });
     }
     let banner = if r.banner {
         // 배너 본문에 태스크 키를 붙여 어느 일인지 알아보게 한다
@@ -374,20 +435,43 @@ pub fn push<R: Runtime>(app: &AppHandle<R>, dir: &Path, vault: &str, new: NewIte
     } else {
         "off".to_string()
     };
-    let _ = app.emit(NOTIFICATIONS, Changed { unread: unread_count, pushed: Some(item.clone()), toast: r.toast });
-    Ok(PushOut { item: Some(item), toast: r.toast, banner, unread: unread_count })
+    let _ = app.emit(
+        NOTIFICATIONS,
+        Changed {
+            unread: unread_count,
+            pushed: Some(item.clone()),
+            toast: r.toast,
+        },
+    );
+    Ok(PushOut {
+        item: Some(item),
+        toast: r.toast,
+        banner,
+        unread: unread_count,
+    })
 }
 
 #[tauri::command]
-pub fn notifications_list(host: State<'_, HostState>, state: State<'_, NotifyState>) -> Result<ListOut, String> {
+pub fn notifications_list(
+    host: State<'_, HostState>,
+    state: State<'_, NotifyState>,
+) -> Result<ListOut, String> {
     let vault = match current_vault(&host) {
         Ok(v) => v,
-        Err(_) => return Ok(ListOut { items: vec![], unread: 0 }),
+        Err(_) => {
+            return Ok(ListOut {
+                items: vec![],
+                unread: 0,
+            })
+        }
     };
     let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
     let items = load_items(&default_dir(), &vault);
     let unread_count = unread(&items);
-    Ok(ListOut { items, unread: unread_count })
+    Ok(ListOut {
+        items,
+        unread: unread_count,
+    })
 }
 
 #[tauri::command]
@@ -418,7 +502,14 @@ pub fn notifications_mark_read<R: Runtime>(
         save_items(&dir, &vault, &items)?;
     }
     let unread_count = unread(&items);
-    let _ = app.emit(NOTIFICATIONS, Changed { unread: unread_count, pushed: None, toast: false });
+    let _ = app.emit(
+        NOTIFICATIONS,
+        Changed {
+            unread: unread_count,
+            pushed: None,
+            toast: false,
+        },
+    );
     Ok(unread_count)
 }
 
@@ -429,7 +520,10 @@ pub fn notifications_settings_get(state: State<'_, NotifyState>) -> Result<Setti
 }
 
 #[tauri::command]
-pub fn notifications_settings_set(state: State<'_, NotifyState>, settings: Settings) -> Result<Settings, String> {
+pub fn notifications_settings_set(
+    state: State<'_, NotifyState>,
+    settings: Settings,
+) -> Result<Settings, String> {
     let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
     save_settings(&default_dir(), &settings)?;
     Ok(settings)
@@ -442,55 +536,181 @@ mod tests {
     use super::*;
 
     fn new(kind: &str, title: &str) -> NewItem {
-        NewItem { kind: kind.to_string(), title: title.to_string(), body: String::new(), task_key: None, id: None }
+        NewItem {
+            kind: kind.to_string(),
+            title: title.to_string(),
+            body: String::new(),
+            task_key: None,
+            id: None,
+        }
     }
 
     fn item(id: &str, read: bool) -> Item {
-        Item { id: id.to_string(), kind: "test".to_string(), title: id.to_string(), body: String::new(), task_key: None, at: 1, read }
+        Item {
+            id: id.to_string(),
+            kind: "test".to_string(),
+            title: id.to_string(),
+            body: String::new(),
+            task_key: None,
+            at: 1,
+            read,
+        }
     }
 
     #[test]
     fn defaults_keep_done_quiet_and_everything_else_on() {
         let s = Settings::default();
         assert!(s.in_app && s.macos);
-        assert_eq!(s.events.question, Channel { in_app: true, macos: true });
-        assert_eq!(s.events.pr, Channel { in_app: true, macos: true });
-        assert_eq!(s.events.failed, Channel { in_app: true, macos: true });
-        assert_eq!(s.events.done, Channel { in_app: true, macos: false }, "Done is quiet: in-app only");
-        assert_eq!(s.events.approval, Channel { in_app: true, macos: true }, "a change waiting for approval blocks the AI, so it is loud");
+        assert_eq!(
+            s.events.question,
+            Channel {
+                in_app: true,
+                macos: true
+            }
+        );
+        assert_eq!(
+            s.events.pr,
+            Channel {
+                in_app: true,
+                macos: true
+            }
+        );
+        assert_eq!(
+            s.events.failed,
+            Channel {
+                in_app: true,
+                macos: true
+            }
+        );
+        assert_eq!(
+            s.events.done,
+            Channel {
+                in_app: true,
+                macos: false
+            },
+            "Done is quiet: in-app only"
+        );
+        assert_eq!(
+            s.events.approval,
+            Channel {
+                in_app: true,
+                macos: true
+            },
+            "a change waiting for approval blocks the AI, so it is loud"
+        );
     }
 
     #[test]
     fn route_follows_the_channel_switch_and_the_event_switch() {
         let mut s = Settings::default();
-        assert_eq!(route(&s, "question"), Route { toast: true, banner: true });
-        assert_eq!(route(&s, "done"), Route { toast: true, banner: false });
-        assert_eq!(route(&s, "approval"), Route { toast: true, banner: true });
+        assert_eq!(
+            route(&s, "question"),
+            Route {
+                toast: true,
+                banner: true
+            }
+        );
+        assert_eq!(
+            route(&s, "done"),
+            Route {
+                toast: true,
+                banner: false
+            }
+        );
+        assert_eq!(
+            route(&s, "approval"),
+            Route {
+                toast: true,
+                banner: true
+            }
+        );
         s.in_app = false;
-        assert_eq!(route(&s, "question"), Route { toast: false, banner: true }, "channel off beats event on");
+        assert_eq!(
+            route(&s, "question"),
+            Route {
+                toast: false,
+                banner: true
+            },
+            "channel off beats event on"
+        );
         s.macos = false;
-        assert_eq!(route(&s, "question"), Route { toast: false, banner: false });
+        assert_eq!(
+            route(&s, "question"),
+            Route {
+                toast: false,
+                banner: false
+            }
+        );
         let mut t = Settings::default();
-        t.events.pr = Channel { in_app: false, macos: true };
-        assert_eq!(route(&t, "pr"), Route { toast: false, banner: true });
-        assert_eq!(route(&Settings::default(), "test"), Route { toast: true, banner: true }, "a test follows the channel switches only");
+        t.events.pr = Channel {
+            in_app: false,
+            macos: true,
+        };
+        assert_eq!(
+            route(&t, "pr"),
+            Route {
+                toast: false,
+                banner: true
+            }
+        );
+        assert_eq!(
+            route(&Settings::default(), "test"),
+            Route {
+                toast: true,
+                banner: true
+            },
+            "a test follows the channel switches only"
+        );
         t.in_app = false;
-        assert_eq!(route(&t, "test"), Route { toast: false, banner: true });
+        assert_eq!(
+            route(&t, "test"),
+            Route {
+                toast: false,
+                banner: true
+            }
+        );
     }
 
     #[test]
     fn settings_fill_missing_fields_and_ignore_a_broken_file() {
-        let partial: Settings = serde_json::from_str(r#"{"macos":false,"events":{"pr":{"inApp":false,"macos":false}}}"#).unwrap();
+        let partial: Settings = serde_json::from_str(
+            r#"{"macos":false,"events":{"pr":{"inApp":false,"macos":false}}}"#,
+        )
+        .unwrap();
         assert!(partial.in_app, "a missing channel switch is on");
         assert!(!partial.macos);
-        assert_eq!(partial.events.pr, Channel { in_app: false, macos: false });
-        assert_eq!(partial.events.done, Channel { in_app: true, macos: false }, "a missing event keeps its own default");
-        assert_eq!(partial.events.approval, Channel { in_app: true, macos: true }, "an older settings file has no approval event: it is on");
+        assert_eq!(
+            partial.events.pr,
+            Channel {
+                in_app: false,
+                macos: false
+            }
+        );
+        assert_eq!(
+            partial.events.done,
+            Channel {
+                in_app: true,
+                macos: false
+            },
+            "a missing event keeps its own default"
+        );
+        assert_eq!(
+            partial.events.approval,
+            Channel {
+                in_app: true,
+                macos: true
+            },
+            "an older settings file has no approval event: it is on"
+        );
         let empty: Settings = serde_json::from_str("{}").unwrap();
         assert_eq!(empty, Settings::default());
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("settings.json"), b"{not json").unwrap();
-        assert_eq!(load_settings(dir.path()), Settings::default(), "a broken settings file means the defaults");
+        assert_eq!(
+            load_settings(dir.path()),
+            Settings::default(),
+            "a broken settings file means the defaults"
+        );
         assert_eq!(load_settings(&dir.path().join("none")), Settings::default());
     }
 
@@ -499,30 +719,64 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut s = Settings::default();
         s.in_app = false;
-        s.events.question = Channel { in_app: false, macos: true };
+        s.events.question = Channel {
+            in_app: false,
+            macos: true,
+        };
         save_settings(dir.path(), &s).unwrap();
         assert_eq!(load_settings(dir.path()), s);
         let text = fs::read_to_string(dir.path().join("settings.json")).unwrap();
-        assert!(text.contains("\"inApp\":false") && text.contains("\"events\""), "camelCase keys: {text}");
+        assert!(
+            text.contains("\"inApp\":false") && text.contains("\"events\""),
+            "camelCase keys: {text}"
+        );
     }
 
     #[test]
     fn build_item_checks_kind_title_key_and_id_and_clips_long_text() {
         assert!(build_item(new("question", "질문"), 10, 0).is_ok());
         for bad in ["", "unknown", "QUESTION"] {
-            assert!(build_item(new(bad, "x"), 10, 0).unwrap_err().contains("종류"), "kind {bad}");
+            assert!(
+                build_item(new(bad, "x"), 10, 0)
+                    .unwrap_err()
+                    .contains("종류"),
+                "kind {bad}"
+            );
         }
-        assert!(build_item(new("test", "   "), 10, 0).unwrap_err().contains("제목"));
+        assert!(build_item(new("test", "   "), 10, 0)
+            .unwrap_err()
+            .contains("제목"));
         let mut n = new("question", "질문");
         n.task_key = Some("TSK-14".to_string());
-        assert_eq!(build_item(n.clone(), 10, 0).unwrap().task_key.as_deref(), Some("TSK-14"));
+        assert_eq!(
+            build_item(n.clone(), 10, 0).unwrap().task_key.as_deref(),
+            Some("TSK-14")
+        );
         for bad in ["TSK-", "TSK-x", "tsk-1", "../etc", "TSK-1234567890"] {
             n.task_key = Some(bad.to_string());
-            assert!(build_item(n.clone(), 10, 0).unwrap_err().contains("태스크 키"), "key {bad}");
+            assert!(
+                build_item(n.clone(), 10, 0)
+                    .unwrap_err()
+                    .contains("태스크 키"),
+                "key {bad}"
+            );
         }
         n.task_key = Some("  ".to_string());
-        assert_eq!(build_item(n.clone(), 10, 0).unwrap().task_key, None, "a blank key is no key");
-        let long = build_item(NewItem { body: "가".repeat(500), title: "나".repeat(300), ..new("test", "x") }, 10, 0).unwrap();
+        assert_eq!(
+            build_item(n.clone(), 10, 0).unwrap().task_key,
+            None,
+            "a blank key is no key"
+        );
+        let long = build_item(
+            NewItem {
+                body: "가".repeat(500),
+                title: "나".repeat(300),
+                ..new("test", "x")
+            },
+            10,
+            0,
+        )
+        .unwrap();
         assert_eq!(long.title.chars().count(), MAX_TITLE);
         assert!(long.title.ends_with('…'));
         assert_eq!(long.body.chars().count(), MAX_BODY);
@@ -531,9 +785,15 @@ mod tests {
         assert!(!generated.read);
         let mut idn = new("test", "x");
         idn.id = Some("task-TSK-1-waiting".to_string());
-        assert_eq!(build_item(idn.clone(), 1, 0).unwrap().id, "task-TSK-1-waiting");
+        assert_eq!(
+            build_item(idn.clone(), 1, 0).unwrap().id,
+            "task-TSK-1-waiting"
+        );
         idn.id = Some("a\nb".to_string());
-        assert!(build_item(idn, 1, 0).is_err(), "a control character in an id is refused");
+        assert!(
+            build_item(idn, 1, 0).is_err(),
+            "a control character in an id is refused"
+        );
     }
 
     #[test]
@@ -541,8 +801,14 @@ mod tests {
         let mut items = vec![];
         assert!(push_item(&mut items, item("a", false)));
         assert!(push_item(&mut items, item("b", false)));
-        assert_eq!(items.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(), ["b", "a"]);
-        assert!(!push_item(&mut items, item("a", false)), "the same id is not stored twice");
+        assert_eq!(
+            items.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        assert!(
+            !push_item(&mut items, item("a", false)),
+            "the same id is not stored twice"
+        );
         assert_eq!(items.len(), 2);
         let mut many = vec![];
         for i in 0..(MAX_ITEMS + 5) {
@@ -557,9 +823,16 @@ mod tests {
     fn mark_read_changes_only_what_is_asked_and_counts_unread() {
         let mut items = vec![item("a", false), item("b", false), item("c", true)];
         assert_eq!(unread(&items), 2);
-        assert_eq!(mark_read(&mut items, Some(&["b".to_string(), "zzz".to_string()])), 1);
+        assert_eq!(
+            mark_read(&mut items, Some(&["b".to_string(), "zzz".to_string()])),
+            1
+        );
         assert_eq!(unread(&items), 1);
-        assert_eq!(mark_read(&mut items, Some(&["b".to_string()])), 0, "already read");
+        assert_eq!(
+            mark_read(&mut items, Some(&["b".to_string()])),
+            0,
+            "already read"
+        );
         assert_eq!(mark_read(&mut items, None), 1, "all");
         assert_eq!(unread(&items), 0);
     }
@@ -576,11 +849,17 @@ mod tests {
         push_item(&mut items, item("x", false));
         save_items(dir.path(), a, &items).unwrap();
         assert_eq!(load_items(dir.path(), a), items);
-        assert!(load_items(dir.path(), b).is_empty(), "another vault has its own list");
+        assert!(
+            load_items(dir.path(), b).is_empty(),
+            "another vault has its own list"
+        );
         fs::write(items_path(dir.path(), b), b"[{\"bad\":").unwrap();
         assert!(load_items(dir.path(), b).is_empty());
         // 원자적 쓰기는 임시 파일을 남기지 않는다
-        let names: Vec<String> = fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        let names: Vec<String> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
         assert!(names.iter().all(|n| !n.contains("tmp-")), "{names:?}");
     }
 
@@ -600,18 +879,36 @@ mod tests {
             .plugin(tauri_plugin_notification::init())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .unwrap();
-        let out = show_banner(app.handle(), "aisurada 시험", "알림 시험이에요. 이 배너는 사라져도 돼요.");
+        let out = show_banner(
+            app.handle(),
+            "aisurada 시험",
+            "알림 시험이에요. 이 배너는 사라져도 돼요.",
+        );
         println!("banner result: {out}");
         assert!(out == "sent" || out == "sent-fallback", "{out}");
     }
 
     #[test]
     fn item_json_uses_camel_case_and_reads_back() {
-        let i = Item { id: "a".into(), kind: "question".into(), title: "t".into(), body: "b".into(), task_key: Some("TSK-1".into()), at: 5, read: false };
+        let i = Item {
+            id: "a".into(),
+            kind: "question".into(),
+            title: "t".into(),
+            body: "b".into(),
+            task_key: Some("TSK-1".into()),
+            at: 5,
+            read: false,
+        };
         let text = serde_json::to_string(&i).unwrap();
-        assert!(text.contains("\"taskKey\":\"TSK-1\"") && text.contains("\"at\":5"), "{text}");
+        assert!(
+            text.contains("\"taskKey\":\"TSK-1\"") && text.contains("\"at\":5"),
+            "{text}"
+        );
         assert_eq!(serde_json::from_str::<Item>(&text).unwrap(), i);
-        let old: Item = serde_json::from_str(r#"{"id":"a","kind":"test","title":"t","body":"","at":1,"read":true}"#).unwrap();
+        let old: Item = serde_json::from_str(
+            r#"{"id":"a","kind":"test","title":"t","body":"","at":1,"read":true}"#,
+        )
+        .unwrap();
         assert_eq!(old.task_key, None, "taskKey may be missing");
     }
 }

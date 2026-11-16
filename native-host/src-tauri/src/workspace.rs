@@ -75,7 +75,10 @@ pub(crate) fn write_vault_pointer(home: &Path, vault: &str) -> std::io::Result<(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    let json = format!("{}\n", serde_json::json!({ "vault": vault, "updatedAt": millis }));
+    let json = format!(
+        "{}\n",
+        serde_json::json!({ "vault": vault, "updatedAt": millis })
+    );
     let temp = dir.join("current-vault.json.tmp");
     std::fs::write(&temp, json)?;
     std::fs::rename(&temp, dir.join("current-vault.json"))
@@ -191,15 +194,20 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         write_vault_pointer(home.path(), "/Users/me/df-ai/df-ai").unwrap();
         let first: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(pointer_file(home.path())).unwrap()).unwrap();
+            serde_json::from_str(&std::fs::read_to_string(pointer_file(home.path())).unwrap())
+                .unwrap();
         assert_eq!(first["vault"], "/Users/me/df-ai/df-ai");
         assert!(first["updatedAt"].as_u64().unwrap() > 0);
 
         // 다른 vault를 열면 같은 파일이 새 값으로 바뀌고, 임시 파일은 남지 않는다
         write_vault_pointer(home.path(), "/Users/me/other vault").unwrap();
         let second: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(pointer_file(home.path())).unwrap()).unwrap();
-        assert_eq!(second["vault"], "/Users/me/other vault", "경로의 공백도 그대로 간다");
+            serde_json::from_str(&std::fs::read_to_string(pointer_file(home.path())).unwrap())
+                .unwrap();
+        assert_eq!(
+            second["vault"], "/Users/me/other vault",
+            "경로의 공백도 그대로 간다"
+        );
         let leftovers: Vec<_> = std::fs::read_dir(pointer_file(home.path()).parent().unwrap())
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
