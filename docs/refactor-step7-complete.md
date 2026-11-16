@@ -53,7 +53,7 @@ flowchart LR
 | 계획의 끝 기준 | 실제 |
 | --- | --- |
 | 명령 하나를 더할 때 고칠 곳이 8~12곳에서 2곳(표 한 줄 + 처리 함수)으로 | 엔진 안은 2곳이다. 명령줄·MCP에 내놓는 명령은 그쪽 표(`registry.rs`, `spec_table.rs`, `mcp_tools.rs`)에 한 줄씩이 더 든다. 이 표들은 명령줄 사용법 글과 MCP 입력 스키마라서 엔진 표에 합치지 않았다 |
-| `pub` 항목이 약 795개에서 약 30개로 | rustdoc JSON으로 센 값이 1,040개에서 122개다. `json`·`text` 모듈과 `vault`의 읽기 다섯 모듈이 남아 목표 30개에는 못 미친다 |
+| `pub` 항목이 약 795개에서 약 30개로 | rustdoc JSON으로 센 값이 1,040개에서 122개다. `vault`의 읽기 다섯 모듈(약 32개, `legacy.rs`가 씀)과 `text`·`json`·`engine` 같은 쓰이는 길이 남아 목표 30개에는 못 미친다 |
 | CLI·MCP 골든 차이 0 | 0 |
 | 호스트 계약(IPC) 골든 차이 0 | IPC 응답을 녹화한 테이프는 따로 없다. 호스트의 시험(`engine_call` 경로, 오류 `{code, kind, message}`의 글자와 칸 차례)이 같은 모양을 본다. 호스트 `cargo test` 158건이 통과한다 |
 
@@ -66,6 +66,6 @@ flowchart LR
 
 - ~~처리 함수가 `&CallContext`를 직접 받고 요청 타입의 `caller`·`context` 칸을 지우기~~ 끝냈다([후속 기록](refactor-step7e-complete.md))
 - 오류를 `DomainError`·`InfraError` 두 타입으로 가르기(처리 함수 반환 타입 수백 곳)
-- `json`·`text` 모듈의 공개 항목을 필요한 것만 남기기
+- `vault`의 읽기 다섯 모듈 닫기(`legacy.rs`의 재훑기를 코어 질의 함수로 바꾸는 일과 함께). `json`·`text`는 각각 7개와 14개이고 대부분 `ais-cli`가 써서 줄일 것이 거의 없다
 - 사용법 글을 CLI로 옮기기(결정 5와 화면 정규식 교체가 먼저)
 - 8단계 크레이트 분리(선택)

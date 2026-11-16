@@ -50,5 +50,5 @@ flowchart LR
 ## 남은 것
 
 - **`vault::{facts, git, index, template, trash}`가 아직 `pub`이다.** `ais-cli`의 `legacy.rs`가 옛 응답 모양을 만들려고 vault를 다시 훑는 5곳이 쓴다. 이 길은 7-3(`legacy` 재훑기 제거)에서 코어의 질의 함수로 바꾸면 닫을 수 있다.
-- **`json`·`text`는 모듈째 `pub`이다.** Java와 같은 JSON·글 규칙이라 항목이 많다. 필요한 것만 남기는 일은 쓰는 곳이 `ais-cli`에 모여 있어 어렵지 않지만, 이번 범위는 아니다.
-- **계획서의 목표 「약 30개」에는 못 미친다.** 122개 가운데 `json`·`text`·`engine`·`error`가 대부분이다. 위 둘을 줄이면 계획의 숫자에 가까워진다.
+- **`json`·`text`는 모듈째 `pub`이다.** 항목은 각각 7개와 14개뿐이고 대부분 `ais-cli`가 쓴다(`parse`, `compact`, `JsonValue`, `trim`, `is_blank`, `encode_uri_component`). 줄일 것이 거의 없어 그대로 둔다.
+- **계획서의 목표 「약 30개」에는 못 미친다.** 122개를 모듈별로 세면 `vault`의 읽기 다섯 모듈이 약 32개로 가장 크고, `text` 14, `write::autocommit` 등 9, `json` 7, `engine` 7 순이다(나머지는 `kernel`, `error` 같은 작은 모듈과 메서드). 가장 큰 `vault` 다섯은 `ais-cli`의 `legacy.rs`가 옛 응답 모양을 만들려고 쓰는 길이라 7-3의 몫이다.
