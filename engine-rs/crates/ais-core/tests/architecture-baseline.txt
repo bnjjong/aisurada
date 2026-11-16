@@ -54,7 +54,7 @@ edge task -> vault 1
 edge task -> write 6
 edge vault -> error 5
 edge vault -> frontmatter 6
-edge vault -> kernel 16
+edge vault -> kernel 17
 edge vault -> ports 15
 edge vault -> text 15
 edge write -> adapters 2

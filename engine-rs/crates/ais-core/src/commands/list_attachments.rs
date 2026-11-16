@@ -11,7 +11,8 @@ use crate::model::{AttachmentRow, Page};
 use crate::text::{SUB_NOTE_ID, compare_utf16, encode_uri_component, is_blank, utf16_len};
 use crate::vault::index::NoteIndex;
 
-use super::subnote::check_note_id;
+use super::Caller;
+use super::subnote::{check_note_id, check_readable};
 
 static HAS_EXTENSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.[A-Za-z0-9]+$").unwrap());
 const IMAGE_EXTENSIONS: [&str; 8] = ["svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp"];
@@ -21,6 +22,7 @@ const IMAGE_EXTENSIONS: [&str; 8] = ["svg", "png", "jpg", "jpeg", "gif", "webp",
 pub struct ListAttachmentsRequest {
     pub id: String,
     pub sub_id: Option<String>,
+    pub caller: Caller,
 }
 
 pub fn execute(
@@ -39,6 +41,7 @@ pub fn execute(
     let root = index
         .note(&request.id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", request.id)))?;
+    check_readable(root, request.caller)?;
     let owner = match sub_id {
         None => root,
         Some(sub_id) => root

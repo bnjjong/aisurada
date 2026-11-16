@@ -18,7 +18,7 @@ use crate::vault::agenda::is_valid_slug_segment;
 use crate::vault::note_file::read_note_file;
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, is_sharded};
-use crate::vault::trash::TrashRecord;
+use crate::vault::trash::{TrashRecord, archived_tier};
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_confinement, check_segment, normalize};
@@ -215,6 +215,10 @@ pub fn restore_doc(
         &request.trash_id,
         "restore-doc <휴지통 항목 id. list-trash 로 조회한다>",
     )?;
+    // AI는 기록 층 노트를 되살리지 못한다(휴지통 목록에서도 안 보인다). 목록 파일을 고치기 전에 선다.
+    if !archived_tier(vault, &entry).visible_to(request.context.caller) {
+        return Err(EngineError::record_tier_write(&entry.doc_id));
+    }
     let table = &scope.index.agendas.table;
 
     let mut slug = entry.agenda_slug.clone();

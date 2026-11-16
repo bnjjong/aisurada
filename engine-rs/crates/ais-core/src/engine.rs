@@ -303,7 +303,10 @@ impl Engine {
                 let request: list_templates::ListTemplatesRequest = parse_args(command, args)?;
                 to_json(list_templates::execute(&self.vault_root, &request)?)
             }
-            "list_trash" => to_json(list_trash::execute(&self.vault_root)),
+            "list_trash" => {
+                let request: list_trash::ListTrashRequest = parse_args(command, args)?;
+                to_json(list_trash::execute(&self.vault_root, &request))
+            }
             "reindex" => to_json(reindex::execute(&self.vault_root)?),
             "reindex_paths" => {
                 let request: reindex::ReindexPathsRequest = parse_args(command, args)?;

@@ -6,8 +6,13 @@ use crate::kernel::ids::TRASH_ID;
 use crate::ports::fs;
 use std::path::Path;
 
-use super::note_meta::parse_created;
+use super::note_file::read_note_file;
+use super::note_meta::{parse_created, text};
 use crate::frontmatter::{self, Value};
+use crate::kernel::{
+    confine::{absolute_normalized, check_confinement, check_segment, normalize},
+    tier::Tier,
+};
 use crate::text::{NOTE_ID, trim};
 
 const MANIFEST: &str = ".aisurada/trash/trash.json";
@@ -59,6 +64,36 @@ fn field<'a>(map: &'a [(Value, Value)], key: &str) -> &'a str {
         Some((_, Value::Str(s))) => trim(s),
         _ => "",
     }
+}
+
+/// 휴지통에 보관된 노트의 층. 목록 파일에는 층이 없어서(바이트를 Java와 같게 둔 파일이다) 보관된 노트 머리의 `tier`를 읽는다.
+/// 되살렸을 때 색인이 매길 층과 같은 규칙이다. 보관 파일이 없거나 못 읽거나 머리·`tier` 칸이 없으면 읽기 층으로 본다
+/// (그런 항목은 되살리기도 못 하거나, 되살려도 읽기 층으로 보인다).
+pub fn archived_tier(vault_root: &Path, entry: &TrashRecord) -> Tier {
+    let base = absolute_normalized(&vault_root.join(".aisurada/trash/files"));
+    if check_segment(&base, &entry.file).is_err() {
+        return Tier::Reading;
+    }
+    let target = normalize(&base.join(&entry.file));
+    if check_confinement(&base, &target).is_err() {
+        return Tier::Reading;
+    }
+    // 단일 파일 노트는 보관물이 파일 하나이고, 폴더 노트는 폴더 안의 `note.<확장자>`다
+    let content = if fs::metadata(&target).map(|m| m.is_file()).unwrap_or(false) {
+        target
+    } else {
+        let extension = if entry.format == "markdown" {
+            "md"
+        } else {
+            entry.format
+        };
+        target.join(format!("note.{extension}"))
+    };
+    read_note_file(&content)
+        .ok()
+        .and_then(|parsed| parsed.frontmatter)
+        .and_then(|map| text(&map, "tier").map(|raw| Tier::from_front(trim(raw))))
+        .unwrap_or(Tier::Reading)
 }
 
 pub fn scan_trash(vault_root: &Path) -> TrashScan {

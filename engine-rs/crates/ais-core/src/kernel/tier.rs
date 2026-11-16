@@ -4,7 +4,7 @@
 //! 보이지 않는다. 이 규칙은 한때 아홉 곳에 세 가지 표기로 흩어져 있었다(`== "record"`, `!= "reading"`, `eq_ignore_ascii_case("record")`).
 //! 파일 머리에서 읽을 때 층이 정확히 `reading` 또는 `record` 둘 중 하나로 정규화되므로(`from_front`) 세 표기는 같은 뜻이었고, 이제 이 타입이 정본이다.
 //!
-//! 읽기만이 아니라 쓰기도 같은 정책을 따른다. AI 호출자는 기록 층 노트를 고치지 못하고(`commands::subnote::check_writable`, 이슈 #74), 앱은 둘 다 고친다.
+//! 읽기만이 아니라 쓰기와 휴지통도 같은 정책을 따른다. AI 호출자는 기록 층 노트를 고치지 못하고(`commands::subnote::check_writable`, 이슈 #74), 휴지통에서는 보관된 노트의 층을 읽어 가린다(`vault::trash::archived_tier`, 이슈 #80). 앱은 모두 한다.
 
 use super::actor::Caller;
 

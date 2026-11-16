@@ -1163,7 +1163,8 @@ fn snapshot(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();
-                out.insert(rel, std::fs::read(&path).unwrap());
+                // 합성 vault에는 가리키는 곳이 없는 링크가 있어서 못 읽으면 빈 바이트로 본다
+                out.insert(rel, std::fs::read(&path).unwrap_or_default());
             }
         }
     }
@@ -1305,6 +1306,144 @@ fn ai_cannot_write_to_record_tier_notes() {
     assert_eq!(by_app["changed"], true);
     let trashed = engine.call("delete_doc", json!({"id": id})).unwrap();
     assert_eq!(trashed["id"], id.as_str());
+}
+
+#[test]
+fn ai_cannot_read_or_restore_record_tier_leftovers() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let reading = "ndfx0002-00000002"; // 읽기 층 폴더 노트(대조군)
+    let loose = "ndfx0003-00000003"; // 읽기 층(휴지통 대조군)
+    let single_record = "ndfx0009-00000009"; // 기록 층, 단일 파일 노트
+    let other_record = "ndfx0008-00000008"; // 기록 층
+
+    // 앱이 기록 층 폴더 노트에 후속 노트, 코멘트, 첨부를 달고, 읽기 층 노트에도 코멘트와 첨부를 단다
+    let secret = "비밀본문";
+    let record = engine
+        .call(
+            "create_doc",
+            json!({"agenda": "demo", "type": "free", "title": "기록", "body": format!("# 기록\n{secret}\n"), "date": "2026-12-27", "time": "00:00", "tier": "record"}),
+        )
+        .unwrap();
+    let id = record["id"].as_str().unwrap().to_string();
+    let sub = engine
+        .call(
+            "create_sub_note",
+            json!({"parent": id, "title": "후속", "body": "내용\n"}),
+        )
+        .unwrap();
+    let sub_id = sub["id"].as_str().unwrap().to_string();
+    for owner in [
+        json!({"id": id}),
+        json!({"id": id, "subId": sub_id}),
+        json!({"id": reading}),
+    ] {
+        let mut comment = owner.clone();
+        comment["body"] = json!("코멘트");
+        engine.call("create_comment", comment).unwrap();
+        let mut attachment = owner.clone();
+        attachment["name"] = json!("a.txt");
+        attachment["content"] = json!("첨부");
+        engine.call("write_attachment", attachment).unwrap();
+    }
+
+    // 코멘트와 첨부 목록: AI에게는 기록 층 노트가 안 열린다. 앱과 읽기 층 노트는 그대로다
+    let ai = |command: &str, mut args: Value| {
+        args["caller"] = json!("ai");
+        engine.call(command, args)
+    };
+    for command in ["list_comments", "list_attachments"] {
+        for args in [json!({"id": id}), json!({"id": id, "subId": sub_id})] {
+            let error = ai(command, args.clone()).unwrap_err();
+            assert_eq!(error.code, "AIS-409", "{command} {args}: {}", error.message);
+            assert!(
+                error.message.starts_with(&format!(
+                    "도구 표면이 읽을 수 없는 노트다(층=record): {id}."
+                )),
+                "{command}: {}",
+                error.message
+            );
+            assert!(engine.call(command, args).is_ok(), "{command}: 앱은 읽는다");
+        }
+        assert!(
+            ai(command, json!({"id": reading})).is_ok(),
+            "{command}: 읽기 층 노트는 AI도 읽는다"
+        );
+    }
+
+    // 마크다운 내보내기는 AI가 불러도 기록 층 본문을 안 내보낸다
+    ai("export_markdown", json!({})).unwrap();
+    let exported: String = snapshot(&vault.join(".aisurada/md-export"))
+        .values()
+        .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+        .collect();
+    assert!(exported.contains("내용 한 줄."), "읽기 층 노트는 내보낸다");
+    assert!(!exported.contains(secret), "기록 층 본문이 내보내졌다");
+
+    // 휴지통: 앱이 기록 층 노트 셋(폴더 노트 둘, 단일 파일 노트 하나)과 읽기 층 노트 하나를 보낸다
+    let mut trash_of = std::collections::BTreeMap::new();
+    for note in [id.as_str(), single_record, other_record, loose] {
+        let sent = engine.call("delete_doc", json!({"id": note})).unwrap();
+        trash_of.insert(
+            note.to_string(),
+            sent["trashId"].as_str().unwrap().to_string(),
+        );
+    }
+    let doc_ids = |page: &Value| -> Vec<String> {
+        let mut found: Vec<String> = page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["docId"].as_str().unwrap().to_string())
+            .collect();
+        found.sort();
+        found
+    };
+    // 합성 vault에 원래 있던 휴지통 항목 넷도 읽기 층이라 AI에게 그대로 보인다
+    let records = [id.as_str(), single_record, other_record];
+    let app_ids = doc_ids(&engine.call("list_trash", Value::Null).unwrap());
+    for note in records.iter().copied().chain([loose]) {
+        assert!(
+            app_ids.iter().any(|d| d == note),
+            "앱에는 모두 보인다: {note}"
+        );
+    }
+    let by_ai = ai("list_trash", json!({})).unwrap();
+    let expected: Vec<String> = app_ids
+        .iter()
+        .filter(|d| !records.contains(&d.as_str()))
+        .cloned()
+        .collect();
+    assert_eq!(doc_ids(&by_ai), expected, "{by_ai}");
+    assert!(expected.iter().any(|d| d == loose));
+    assert_eq!(by_ai["total"].as_u64(), Some(expected.len() as u64));
+
+    // AI는 기록 층 노트를 되살리지 못하고, 거절은 휴지통 목록과 보관물을 건드리지 않는다
+    let before = snapshot(&vault);
+    for note in [id.as_str(), single_record, other_record] {
+        let error = ai("restore_doc", json!({"trashId": trash_of[note]})).unwrap_err();
+        assert_eq!(error.code, "AIS-409", "{note}: {}", error.message);
+        assert!(
+            error.message.starts_with(&format!(
+                "도구 표면이 고칠 수 없는 노트다(층=record): {note}."
+            )),
+            "{note}: {}",
+            error.message
+        );
+    }
+    assert_eq!(snapshot(&vault), before, "거절된 되살리기가 vault를 바꿨다");
+
+    // 읽기 층 노트는 AI도 되살리고, 앱은 기록 층 노트도 되살린다
+    let restored = ai("restore_doc", json!({"trashId": trash_of[loose]})).unwrap();
+    assert_eq!(restored["restored"], true);
+    for note in [id.as_str(), single_record] {
+        let restored = engine
+            .call("restore_doc", json!({"trashId": trash_of[note]}))
+            .unwrap();
+        assert_eq!(restored["restored"], true, "{note}");
+    }
 }
 
 #[test]

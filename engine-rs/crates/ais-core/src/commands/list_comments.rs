@@ -2,7 +2,8 @@
 
 use serde::Deserialize;
 
-use super::subnote::{check_note_id, sub_comments_file};
+use super::Caller;
+use super::subnote::{check_note_id, check_readable, sub_comments_file};
 use crate::error::EngineError;
 use crate::text::{SUB_NOTE_ID, is_blank};
 use crate::vault::comments::{CommentsEnvelope, read_comments};
@@ -15,6 +16,7 @@ pub struct ListCommentsRequest {
     pub id: String,
     /// 후속 노트 id. 주면 그 후속 노트의 코멘트를 읽는다.
     pub sub_id: Option<String>,
+    pub caller: Caller,
 }
 
 pub fn execute(
@@ -33,6 +35,7 @@ pub fn execute(
     let root = index
         .note(&request.id)
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", request.id)))?;
+    check_readable(root, request.caller)?;
 
     let file = match sub_id {
         None => index.vault_root.join(&root.rel_path).join("comments.json"),
