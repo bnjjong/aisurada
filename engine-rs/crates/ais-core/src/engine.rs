@@ -61,6 +61,7 @@ impl Engine {
 
     /// 시계, 난수, 환경 변수, 잠금, git, sqlite3를 바꿔 끼운 약속 묶음으로 일하는 엔진(시험과 다른 저장소 구현을 위한 자리).
     /// 명령을 부르는 동안만 이 묶음이 현재 스레드에 걸린다. 엔진이 새로 만든 스레드는 기본 어댑터를 쓴다.
+    #[cfg(feature = "test-support")]
     pub fn with_ports(vault_root: impl AsRef<Path>, ports: Ports) -> Self {
         Engine {
             vault_root: vault_root.as_ref().to_path_buf(),

@@ -49,10 +49,6 @@ pub fn new_id() -> String {
     next_id("pc")
 }
 
-pub fn get<'a>(change: &'a Change, key: &str) -> Option<&'a JsonValue> {
-    change.get(key)
-}
-
 pub fn get_str<'a>(change: &'a Change, key: &str) -> Option<&'a str> {
     match change.get(key) {
         Some(JsonValue::Str(s)) => Some(s),

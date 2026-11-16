@@ -179,7 +179,8 @@ pub struct FlockLock {
 }
 
 impl FlockLock {
-    /// 잠금 폴더를 못 박는다(시험과 자동 커밋 정비가 쓴다).
+    /// 잠금 폴더를 못 박는다(시험이 쓴다).
+    #[cfg(feature = "test-support")]
     pub fn in_dir(dir: impl Into<PathBuf>) -> Self {
         FlockLock {
             dir: Some(dir.into()),

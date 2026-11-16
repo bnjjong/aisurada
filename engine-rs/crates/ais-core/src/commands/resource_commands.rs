@@ -1157,7 +1157,7 @@ fn unapproved_rows(vault: &Path) -> Result<Vec<Json>, EngineError> {
         rows.push(json!({
             "key": approvals::refs_key(&project),
             "type": "refs",
-            "state": if state == TrustState::Dirty { "dirty" } else { "new" },
+            "state": state.label(),
             "project": project,
             "approved": ids(refs::read_approved(vault, &project)?),
             "live": ids(refs::read(vault, &project)),

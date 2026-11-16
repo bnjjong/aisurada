@@ -16,14 +16,6 @@
 //! - `confine`: 경로 조각 검사와 기준 폴더 가두기
 
 pub mod actor;
-pub mod confine;
-pub mod doc_type;
-pub mod hue;
-pub mod ids;
-pub mod java;
-pub mod link_kind;
-pub mod stamp;
-pub mod task_link;
-pub mod tier;
-pub mod time;
-pub mod token;
+internal_mods!(
+    confine, doc_type, hue, ids, java, link_kind, stamp, task_link, tier, time, token,
+);

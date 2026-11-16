@@ -15,5 +15,11 @@ serde_json = "1"
 sha2 = "0.10"
 
 [dev-dependencies]
+# 자기 자신을 `test-support`로 다시 끌어와 통합 시험과 예제가 안쪽 모듈을 쓰게 한다
+ais-core = { path = ".", features = ["test-support"] }
 # 깊이 시험 사례(중첩 50층 안팎)를 읽으려면 JSON 재귀 한도를 풀어야 한다
 serde_json = { version = "1", features = ["unbounded_depth"] }
+
+[features]
+# 안쪽 모듈(`adapters`, `commands`, `ports`, `vault`의 나머지 따위)을 `pub`으로 연다. 시험과 예제만 쓴다. 운영 빌드(앱, 명령줄)에는 켜지지 않는다.
+test-support = []

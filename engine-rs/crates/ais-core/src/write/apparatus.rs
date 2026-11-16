@@ -13,7 +13,8 @@ pub fn now_millis() -> i64 {
     ports::clock().now_millis()
 }
 
-/// 시험 난수 목록을 환경 변수에서 다시 읽는다.
+/// 시험 난수 목록을 환경 변수에서 다시 읽는다(시험과 맞대기 하네스만 쓴다).
+#[cfg(feature = "test-support")]
 pub fn reset_random_queue() {
     ports::ids().reset();
 }

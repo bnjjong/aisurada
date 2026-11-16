@@ -24,26 +24,40 @@
 //! - [`comments_file`]: 코멘트 파일 쓰기와 앵커 표시 걷어내기
 //! - [`sub_note`]: 후속 노트 쓰기의 공통 부품(파일 글, 폴더 옮기기, 하위 페이지 카드 걷어내기, 폴더 지우기)
 
-pub mod agenda_file;
-pub mod apparatus;
-pub mod atomic;
+internal_mods!(
+    agenda_file,
+    apparatus,
+    atomic,
+    comments_file,
+    doc_place,
+    json_out,
+    local_time,
+    marker,
+    meta_writer,
+    pipeline,
+    precondition,
+    project_file,
+    snake_dump,
+    stamp,
+    sub_note,
+    template_file,
+    trash_file,
+    warnings,
+);
 pub mod autocommit;
-pub mod comments_file;
+#[cfg(feature = "test-support")]
 pub use crate::kernel::confine;
-pub mod doc_place;
-pub mod json_out;
-pub mod local_time;
-pub mod marker;
-pub mod meta_writer;
+#[cfg(not(feature = "test-support"))]
+pub(crate) use crate::kernel::confine;
+#[cfg(feature = "test-support")]
 pub use crate::note::front as note_front;
-pub mod pipeline;
-pub mod precondition;
-pub mod project_file;
+#[cfg(not(feature = "test-support"))]
+pub(crate) use crate::note::front as note_front;
+#[cfg(feature = "test-support")]
 pub use crate::note::heading as first_heading;
+#[cfg(not(feature = "test-support"))]
+pub(crate) use crate::note::heading as first_heading;
+#[cfg(feature = "test-support")]
 pub use crate::note::slug;
-pub mod snake_dump;
-pub mod stamp;
-pub mod sub_note;
-pub mod template_file;
-pub mod trash_file;
-pub mod warnings;
+#[cfg(not(feature = "test-support"))]
+pub(crate) use crate::note::slug;

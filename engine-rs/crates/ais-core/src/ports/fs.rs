@@ -23,11 +23,6 @@ pub fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
     super::store().read(path.as_ref())
 }
 
-pub fn read_to_string(path: impl AsRef<Path>) -> io::Result<String> {
-    let bytes = read(path)?;
-    String::from_utf8(bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-}
-
 /// 처음부터 흘려 읽는 입구(`std::fs::File::open`의 읽기 쪽)
 pub fn open(path: impl AsRef<Path>) -> io::Result<Box<dyn Read + Send>> {
     super::store().open_read(path.as_ref())

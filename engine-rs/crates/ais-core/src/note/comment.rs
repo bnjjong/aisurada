@@ -29,7 +29,6 @@ pub struct CommentInput<'a> {
 /// 검사를 마친 코멘트 쓰기 인자
 #[derive(Debug)]
 pub struct ParsedComment<'a> {
-    pub note_id: &'a str,
     /// 비어 있지 않은 후속 노트 id
     pub sub_id: Option<&'a str>,
     /// 다듬은 코멘트 식별자. 만들 때만 비어 있을 수 있다(발급한다)
@@ -86,7 +85,6 @@ pub fn parse<'a>(
         ));
     }
     Ok(ParsedComment {
-        note_id: input.note_id,
         sub_id,
         comment_id,
         body: input.body,

@@ -1,20 +1,22 @@
 //! vault(노트 폴더) 읽기: 아젠다, 노트, 후속 노트를 훑어 색인을 만들고 조건으로 거릅니다.
 
-pub mod agenda;
-pub mod attach_text;
-pub mod comment_copy;
-pub mod comments;
+internal_mods!(
+    agenda,
+    attach_text,
+    comment_copy,
+    comments,
+    file_size,
+    filter,
+    history,
+    note_file,
+    note_meta,
+    plain_text,
+    project,
+    scanner,
+);
 pub mod facts;
-pub mod file_size;
-pub mod filter;
 pub mod git;
-pub mod history;
 pub mod index;
-pub mod note_file;
-pub mod note_meta;
-pub mod plain_text;
-pub mod project;
-pub mod scanner;
 pub mod template;
 pub mod trash;
 

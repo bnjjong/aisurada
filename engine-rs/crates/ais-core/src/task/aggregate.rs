@@ -103,10 +103,6 @@ impl TaskEvent {
         }
     }
 
-    pub fn kind(&self) -> &EventKind {
-        &self.kind
-    }
-
     /// 활동 파일에 붙는 모양. 칸 차례는 `at`, `kind`, `by`, (`session`, `agent`), 사건마다 다른 칸이다.
     pub fn to_json_value(&self) -> JsonValue {
         let name = match &self.kind {

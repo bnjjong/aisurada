@@ -6,6 +6,9 @@
 //!
 //! 도메인 코드는 약속을 직접 꺼내지 않고 `std::fs`와 같은 모양의 함수 모음 [`crate::ports::fs`]를 쓴다.
 
+// 반환 타입은 `std::fs`의 모양을 따르므로 운영 코드가 아직 안 쓰는 접근자(`is_symlink`, `file_type` 따위)가 있다. 메모리 저장소 시험이 쓴다.
+#![cfg_attr(not(feature = "test-support"), allow(dead_code))]
+
 use std::ffi::OsString;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};

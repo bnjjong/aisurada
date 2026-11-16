@@ -35,6 +35,7 @@ pub trait IdSource: Send + Sync {
     /// 64비트 난수
     fn next_random_u64(&self) -> u64;
     /// 시험용 난수 목록을 다시 읽는다. 목록이 없는 구현은 아무것도 하지 않는다.
+    #[cfg_attr(not(feature = "test-support"), allow(dead_code))]
     fn reset(&self) {}
 }
 
