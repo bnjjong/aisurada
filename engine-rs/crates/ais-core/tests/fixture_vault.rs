@@ -1173,6 +1173,34 @@ fn snapshot(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
 }
 
 #[test]
+fn commit_vault_waits_for_the_vault_write_lock() {
+    isolate_writes();
+    let vault = fixture();
+    // 다른 쪽이 쓰는 중인 것처럼 vault 쓰기 잠금을 쥔다
+    let held = ais_core::ports::lock().acquire(&vault).unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let path = vault.clone();
+    let worker = std::thread::spawn(move || {
+        let _ = sender.send(Engine::new(&path).call("commit_vault", json!({})));
+    });
+    // 잠금을 쥐고 있는 동안은 커밋이 끝나지 않는다(쓰다 만 파일을 커밋하지 않는다)
+    assert!(
+        receiver
+            .recv_timeout(std::time::Duration::from_millis(400))
+            .is_err(),
+        "잠금을 쥔 채로 commit_vault가 끝났다"
+    );
+    drop(held);
+    // 놓으면 이어서 커밋하고 답한다
+    let result = receiver
+        .recv_timeout(std::time::Duration::from_secs(20))
+        .expect("잠금을 놓았는데도 commit_vault가 끝나지 않았다")
+        .unwrap();
+    assert_eq!(result["outcome"], "disabled");
+    worker.join().unwrap();
+}
+
+#[test]
 fn ai_cannot_write_to_record_tier_notes() {
     isolate_writes();
     let vault = fixture();

@@ -4,7 +4,7 @@ edge adapters -> error 1
 edge adapters -> kernel 3
 edge adapters -> ports 7
 edge adapters -> text 2
-edge commands -> error 34
+edge commands -> error 35
 edge commands -> frontmatter 4
 edge commands -> json 5
 edge commands -> kernel 29

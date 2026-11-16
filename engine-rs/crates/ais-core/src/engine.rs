@@ -758,7 +758,7 @@ impl Engine {
                 false,
                 |request, scope| doc_write::update_doc(&self.vault_root, request, scope),
             ),
-            "commit_vault" => to_json(commit_vault::execute(&self.vault_root)),
+            "commit_vault" => commit_vault::execute(&self.vault_root).and_then(to_json),
             other => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {other} 명령이 없다"
             ))),

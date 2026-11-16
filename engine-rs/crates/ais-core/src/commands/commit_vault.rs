@@ -4,7 +4,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::write::autocommit::AutoCommit;
+use crate::error::EngineError;
+use crate::write::{autocommit::AutoCommit, pipeline::acquire_lock};
 
 #[derive(Debug, Serialize)]
 pub struct CommitVaultResponse {
@@ -15,10 +16,13 @@ pub struct CommitVaultResponse {
     pub blocked: Option<&'static str>,
 }
 
-pub fn execute(vault: &Path) -> CommitVaultResponse {
+/// 쓰기와 같은 vault 잠금을 잡고 커밋한다. 다른 쪽이 여러 파일을 쓰는 중에 커밋하면 쓰다 만 상태가 커밋에 들어가므로, 쓰는 중이면
+/// 그 쓰기가 끝나기를 기다린다. 유휴 타이머의 정비 커밋은 같은 이유로 잠금을 잡되 기다리지 않고 건너뛴다.
+pub fn execute(vault: &Path) -> Result<CommitVaultResponse, EngineError> {
+    let _lock = acquire_lock(vault)?;
     let result = AutoCommit::serving(vault).commit("restore");
-    CommitVaultResponse {
+    Ok(CommitVaultResponse {
         outcome: result.outcome,
         blocked: result.blocked,
-    }
+    })
 }
