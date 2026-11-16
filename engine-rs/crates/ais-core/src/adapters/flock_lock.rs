@@ -1,13 +1,14 @@
 //! vault별 쓰기 잠금. 두 겹이다.
 //!
 //! 1. **프로세스 안:** 같은 vault에 쓰려는 스레드를 도착한 차례(FIFO)로 한 줄에 세운다.
-//! 2. **프로세스 사이:** vault 밖에 둔 잠금 파일에 운영체제 파일 잠금(`flock`)을 건다. 앱(Rust)과 Java 사이드카처럼
-//!    따로 도는 프로세스가 같은 vault에 동시에 쓰지 않게 한다. Java 엔진의 쓰기 파이프라인도 같은 파일을 잡는다.
+//! 2. **프로세스 사이:** vault 밖에 둔 잠금 파일에 운영체제 파일 잠금(`flock`)을 건다. 앱과 `ais-cli`(명령줄, MCP 서버)처럼
+//!    따로 도는 프로세스가 같은 vault에 동시에 쓰지 않게 한다. 지운 Java 엔진의 쓰기 파이프라인도 같은 파일을 잡았다.
 //!
 //! `ports::VaultLock`의 기본 어댑터(`FlockLock`)다. 잠금 폴더는 환경 변수 `AISURADA_LOCK_DIR`(없으면 홈의 앱 지원 폴더)이거나 만들 때 준 폴더다.
 //!
 //! 잠금 파일은 vault 내용이 아니므로 vault 밖(사용자 홈의 앱 지원 폴더)에 두고, 이름은 vault 실제 경로의 SHA-256이다.
-//! macOS에서는 Java `FileChannel.lock`(fcntl)과 `flock`이 서로를 막는 것을 확인했다.
+//! 지우지 않는 까닭과 치우는 법은 개발자 가이드의 「쓰기 잠금과 잠금 파일」, 여러 프로세스의 경합 시험은 `ais-cli/tests/write_contention.rs`다.
+//! macOS에서는 Java `FileChannel.lock`(fcntl)과 `flock`이 서로를 막는 것을 확인했다(`tests/lock_interop.rs`, 기준 jar가 있을 때만 돈다).
 
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions, TryLockError};
