@@ -1,6 +1,6 @@
 //! 노트의 `attach/` 폴더에 든 HTML 첨부에서 글만 뽑아 한 줄로 잇습니다(검색과 본문 미리보기용).
 
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 

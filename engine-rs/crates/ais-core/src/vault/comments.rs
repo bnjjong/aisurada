@@ -1,6 +1,6 @@
 //! 노트와 후속 노트의 코멘트 파일(`comments.json`, `sub-comments/<id>.json`) 읽기.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 

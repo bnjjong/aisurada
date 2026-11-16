@@ -1,7 +1,7 @@
 //! 노트 본문 파일 읽기: 울타리로 머리와 본문을 가르고, 파일 전체의 SHA-256으로 고치기 전 확인 값(`f1:…`)을 만듭니다.
 
 use crate::kernel::token::compute_token;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use crate::frontmatter::{self, Value};

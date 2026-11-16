@@ -6,7 +6,7 @@
 
 use crate::kernel::ids::COMMENT_ID;
 use std::collections::HashSet;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use super::note_meta::{get, parse_created};

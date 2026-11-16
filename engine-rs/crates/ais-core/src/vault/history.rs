@@ -4,7 +4,7 @@
 //! 저장소가 없는 vault는 판이 하나도 없습니다.
 
 use std::collections::HashSet;
-use std::fs::File;
+use crate::ports::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -197,7 +197,7 @@ impl VaultHistory {
 
     /// 작업 트리의 파일 머리 4096바이트에서 읽은 id가 같은가
     fn header_matches(&self, path: &str, id: &str) -> bool {
-        let Ok(file) = File::open(self.vault.join(path)) else {
+        let Ok(file) = fs::open(self.vault.join(path)) else {
             return false;
         };
         let mut head = Vec::new();

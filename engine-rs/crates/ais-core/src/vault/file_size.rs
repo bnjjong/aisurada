@@ -1,6 +1,6 @@
 //! 폴더나 파일의 파일 수와 바이트 합(28장). 폴더 링크는 내려가지 않고 파일 링크는 대상 크기로 센다.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

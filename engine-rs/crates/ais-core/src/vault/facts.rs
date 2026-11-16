@@ -1,6 +1,6 @@
 //! 아젠다 사실층(`.aisurada/facts/<slug>.md`) 읽기. 아젠다에 대해 지금도 참인 것을 짧게 적어 두는 파일이다.
 
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use crate::text::{cut_utf16, trim, utf16_len};
@@ -74,6 +74,7 @@ fn read(vault_root: &Path, agenda_slug: &str, limit: usize) -> Facts {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn reads_trims_and_limits() {

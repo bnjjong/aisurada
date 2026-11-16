@@ -4,7 +4,7 @@
 //! 그 노트만 이유를 적어 건너뛴다(Java 엔진은 이럴 때 뒤쪽 노트를 통째로 버렸다).
 
 use std::collections::HashSet;
-use std::fs;
+use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

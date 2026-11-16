@@ -3,7 +3,7 @@
 use crate::kernel::doc_type::DocType;
 use crate::kernel::ids::AGENDA_ID;
 use crate::kernel::ids::TRASH_ID;
-use std::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use super::note_meta::parse_created;
