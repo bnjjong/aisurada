@@ -481,7 +481,7 @@ AISURADA_VAULT=<vault> dist/ais-cli get-doc nddemo-00000001              # 명�
 |---|---|---|
 | `AISURADA_VAULT` | vault 폴더 | 없으면 앱이 연 vault(아래 「앱이 연 vault」) |
 | `AISURADA_NOTES_SHARD_BY_MONTH` | 노트를 월별 폴더에 두는지 | 정하지 않음(디스크를 보고 판정) |
-| `AISURADA_VAULT_AUTOCOMMIT_ENABLED` | vault 자동 커밋 | true |
+| `AISURADA_VAULT_AUTOCOMMIT_ENABLED` | vault 자동 커밋(`true`·`on`·`yes`·`1` / `false`·`off`·`no`·`0`, 대소문자 무시. 모르는 값이면 기본값). 월별 폴더 설정과 같은 철자 집합이다 | true |
 | `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS` | 마지막 쓰기부터 커밋까지의 유휴 초 | 300 |
 
 불리언은 `true/on/yes/1`과 `false/off/no/0`만 받는다. 본문을 덮기 전에 옛 바이트를 남기던 스냅숏 쓰기(`AISURADA_VAULT_SNAPSHOT_ENABLED`)는 Rust 이전 때 지웠다. 이미 남은 스냅숏은 `history`가 계속 읽는다.
@@ -752,7 +752,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~125초(296건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4) |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~125초(299건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
@@ -769,12 +769,12 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 외부 시험 프레임워크 없이 Rust 기본 시험 도구(`cargo test`)를 쓴다.
 
 - **단위 시험**은 각 파일의 `#[cfg(test)]` 모듈에 둔다.
-- **통합 시험**은 `engine-rs/crates/ais-core/tests/fixture_vault.rs`(합성 vault를 `tools/compat/make-fixture.sh`로 만들어 읽기 명령의 핵심 동작을 확인), `engine-rs/crates/ais-cli/tests/`의 `mcp_stdio.rs`(진짜 `mcp` 프로세스), `register.rs`(가짜 에이전트 CLI로 등록), `old_sidecar.rs`(임시 HOME과 가짜 `launchctl`로 옛 사이드카 정리), `write_contention.rs`(프로세스 여럿이 같은 노트를 동시에 쓰는 경합)에 둔다. `lock_interop.rs`는 기준 jar(`AISURADA_JAR`)가 있을 때만 돈다.
+- **통합 시험**은 `engine-rs/crates/ais-core/tests/fixture_vault.rs`(합성 vault를 `tools/compat/make-fixture.sh`로 만들어 읽기 명령의 핵심 동작을 확인), `engine-rs/crates/ais-cli/tests/`의 `mcp_stdio.rs`(진짜 `mcp` 프로세스), `register.rs`(가짜 에이전트 CLI로 등록), `old_sidecar.rs`(임시 HOME과 가짜 `launchctl`로 옛 사이드카 정리), `write_contention.rs`(프로세스 여럿이 같은 노트를 동시에 쓰는 경합), `hand_edited_comments.rs`(손으로 고쳐 엄격한 JSON이 아닌 코멘트 파일을 덮어쓰지 않는지)에 둔다. 환경 변수 철자 시험은 `ais-core/tests/settings_flags.rs`다. `lock_interop.rs`는 기준 jar(`AISURADA_JAR`)가 있을 때만 돈다.
 - 시계와 id는 환경 변수로 고정한다: `AISURADA_TEST_NOW`(시각, 도장과 평가 시각도 따름), `AISURADA_TEST_RANDOM`(id의 무작위 조각). 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.
 - 임시 HOME·vault·잠금 폴더(`AISURADA_LOCK_DIR`)만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.
 - **지운 Java 시험에서 옮긴 시험**은 `ais-core/tests/`의 `reindex_paths.rs`, `shard_notes.rs`, `check_notes.rs`, `plan_day_and_export.rs`와 `ais-cli/tests/reindex_paths_cli.rs`, `ais-cli/tests/vault_pointer.rs`다. 각각 시험이 하나뿐이거나 환경 변수를 한 번만 정한다(시간대, 시험용 시계, 잠금 폴더). 어느 Java 시험이 어디로 갔는지는 [`rust-engine-java-test-map.md`](rust-engine-java-test-map.md)에 있다.
 - **git 실행기**(`adapters/git_cli.rs`, 시험은 `ais-core/tests/git_cli.rs`)는 실행 파일과 제한 시간을 `GitCli::with(..)`로 바꿔 끼울 수 있어서, 셸 스크립트로 만든 가짜 `git`으로 시간 초과(엄격 60초, 옛 스냅숏 읽기 5초가 각각 지켜지고 프로세스가 죽는지), 실행 파일 없음, 인자·환경·표준 입력 전달, 큰 입출력의 교착을 시험한다. 엔진 수준에서 git이 없을 때 판 목록이 빈 목록이 되고 쓰기는 그대로 되는지는 `ais-core/tests/git_missing.rs`가 본다.
-- 동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 `docs/rust-engine-step*.md`의 해당 기록에 이유를 적는다.
+- 동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 `docs/rust-engine-step*.md`의 해당 기록에 이유를 적고, 확정한 판정은 [`rust-engine-java-differences.md`](rust-engine-java-differences.md)에 모은다.
 
 ### 성능 기준선
 

@@ -531,7 +531,7 @@ AISURADA_VAULT=&lt;vault&gt; dist/ais-cli get-doc nddemo-00000001              #
 <div class="table-wrap"><table><thead><tr><th>환경 변수</th><th>쓰임</th><th>기본값</th></tr></thead><tbody>
 <tr><td><code>AISURADA_VAULT</code></td><td>vault 폴더</td><td>없으면 앱이 연 vault(아래 「앱이 연 vault」)</td></tr>
 <tr><td><code>AISURADA_NOTES_SHARD_BY_MONTH</code></td><td>노트를 월별 폴더에 두는지</td><td>정하지 않음(디스크를 보고 판정)</td></tr>
-<tr><td><code>AISURADA_VAULT_AUTOCOMMIT_ENABLED</code></td><td>vault 자동 커밋</td><td>true</td></tr>
+<tr><td><code>AISURADA_VAULT_AUTOCOMMIT_ENABLED</code></td><td>vault 자동 커밋(<code>true</code>·<code>on</code>·<code>yes</code>·<code>1</code> / <code>false</code>·<code>off</code>·<code>no</code>·<code>0</code>, 대소문자 무시. 모르는 값이면 기본값). 월별 폴더 설정과 같은 철자 집합이다</td><td>true</td></tr>
 <tr><td><code>AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS</code></td><td>마지막 쓰기부터 커밋까지의 유휴 초</td><td>300</td></tr>
 </tbody></table></div>
 <p>불리언은 <code>true/on/yes/1</code>과 <code>false/off/no/0</code>만 받는다. 본문을 덮기 전에 옛 바이트를 남기던 스냅숏 쓰기(<code>AISURADA_VAULT_SNAPSHOT_ENABLED</code>)는 Rust 이전 때 지웠다. 이미 남은 스냅숏은 <code>history</code>가 계속 읽는다.</p>
@@ -740,7 +740,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <h2 id="8-시험"><a class="anchor" href="#8-시험" aria-label="이 절의 링크">#</a>8. 시험</h2>
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
-<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~125초(296건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4)</td></tr>
+<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~125초(299건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4)</td></tr>
 <tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>캐시된 상태에서 Node 시험까지 약 30초</td><td>화면 빌드, Node 시험 641건, 호스트 <code>cargo test</code>(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다</td></tr>
 <tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다</td></tr>
 <tr><td>기준 맞대기</td><td>§4 「기준과 맞대기」</td><td>엔진 12분(Java가 도는 만큼)</td><td>기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 <code>bash engine-rs/tools/golden/run.sh replay</code>(약 1분)다</td></tr>
@@ -753,12 +753,12 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <p>외부 시험 프레임워크 없이 Rust 기본 시험 도구(<code>cargo test</code>)를 쓴다.</p>
 <ul>
 <li><strong>단위 시험</strong>은 각 파일의 <code>#[cfg(test)]</code> 모듈에 둔다.</li>
-<li><strong>통합 시험</strong>은 <code>engine-rs/crates/ais-core/tests/fixture_vault.rs</code>(합성 vault를 <code>tools/compat/make-fixture.sh</code>로 만들어 읽기 명령의 핵심 동작을 확인), <code>engine-rs/crates/ais-cli/tests/</code>의 <code>mcp_stdio.rs</code>(진짜 <code>mcp</code> 프로세스), <code>register.rs</code>(가짜 에이전트 CLI로 등록), <code>old_sidecar.rs</code>(임시 HOME과 가짜 <code>launchctl</code>로 옛 사이드카 정리), <code>write_contention.rs</code>(프로세스 여럿이 같은 노트를 동시에 쓰는 경합)에 둔다. <code>lock_interop.rs</code>는 기준 jar(<code>AISURADA_JAR</code>)가 있을 때만 돈다.</li>
+<li><strong>통합 시험</strong>은 <code>engine-rs/crates/ais-core/tests/fixture_vault.rs</code>(합성 vault를 <code>tools/compat/make-fixture.sh</code>로 만들어 읽기 명령의 핵심 동작을 확인), <code>engine-rs/crates/ais-cli/tests/</code>의 <code>mcp_stdio.rs</code>(진짜 <code>mcp</code> 프로세스), <code>register.rs</code>(가짜 에이전트 CLI로 등록), <code>old_sidecar.rs</code>(임시 HOME과 가짜 <code>launchctl</code>로 옛 사이드카 정리), <code>write_contention.rs</code>(프로세스 여럿이 같은 노트를 동시에 쓰는 경합), <code>hand_edited_comments.rs</code>(손으로 고쳐 엄격한 JSON이 아닌 코멘트 파일을 덮어쓰지 않는지)에 둔다. 환경 변수 철자 시험은 <code>ais-core/tests/settings_flags.rs</code>다. <code>lock_interop.rs</code>는 기준 jar(<code>AISURADA_JAR</code>)가 있을 때만 돈다.</li>
 <li>시계와 id는 환경 변수로 고정한다: <code>AISURADA_TEST_NOW</code>(시각, 도장과 평가 시각도 따름), <code>AISURADA_TEST_RANDOM</code>(id의 무작위 조각). 안 주면 아무 일도 안 한다. 계약이 아니라 시험용이다.</li>
 <li>임시 HOME·vault·잠금 폴더(<code>AISURADA_LOCK_DIR</code>)만 만들고 지운다. 사용자의 HOME이나 vault를 건드리는 시험을 쓰지 않는다.</li>
 <li><strong>지운 Java 시험에서 옮긴 시험</strong>은 <code>ais-core/tests/</code>의 <code>reindex_paths.rs</code>, <code>shard_notes.rs</code>, <code>check_notes.rs</code>, <code>plan_day_and_export.rs</code>와 <code>ais-cli/tests/reindex_paths_cli.rs</code>, <code>ais-cli/tests/vault_pointer.rs</code>다. 각각 시험이 하나뿐이거나 환경 변수를 한 번만 정한다(시간대, 시험용 시계, 잠금 폴더). 어느 Java 시험이 어디로 갔는지는 <a href="rust-engine-java-test-map.md"><code>rust-engine-java-test-map.md</code></a>에 있다.</li>
 <li><strong>git 실행기</strong>(<code>adapters/git_cli.rs</code>, 시험은 <code>ais-core/tests/git_cli.rs</code>)는 실행 파일과 제한 시간을 <code>GitCli::with(..)</code>로 바꿔 끼울 수 있어서, 셸 스크립트로 만든 가짜 <code>git</code>으로 시간 초과(엄격 60초, 옛 스냅숏 읽기 5초가 각각 지켜지고 프로세스가 죽는지), 실행 파일 없음, 인자·환경·표준 입력 전달, 큰 입출력의 교착을 시험한다. 엔진 수준에서 git이 없을 때 판 목록이 빈 목록이 되고 쓰기는 그대로 되는지는 <code>ais-core/tests/git_missing.rs</code>가 본다.</li>
-<li>동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 <code>docs/rust-engine-step*.md</code>의 해당 기록에 이유를 적는다.</li>
+<li>동작을 바꿨으면 시험과 함께 기준 맞대기(§4)도 돌려 어긋남이 0인지 본다. 기준과 일부러 다르게 만든 동작은 <code>docs/rust-engine-step*.md</code>의 해당 기록에 이유를 적고, 확정한 판정은 <a href="rust-engine-java-differences.md"><code>rust-engine-java-differences.md</code></a>에 모은다.</li>
 </ul>
 <h3 id="성능-기준선"><a class="anchor" href="#성능-기준선" aria-label="이 절의 링크">#</a>성능 기준선</h3>
 <p><code>engine-rs/crates/ais-core/examples/perf_baseline.rs</code>가 합성 vault(노트 한 건 약 1.5KB, 아젠다 10개, 노트 하나에만 git 판 60개)를 노트 수별로 만들어 엔진 호출 시간과 최대 메모리를 잰다. 크기마다 자식 프로세스를 따로 띄워서 메모리가 크기별로 갈린다. 자동 커밋은 끈다. 진짜 vault는 건드리지 않는다.</p>
