@@ -8,6 +8,11 @@ on:
         required: true
         default: v0.0.1
         type: string
+      dry_run:
+        description: Build and verify the current branch head without a tag and without touching GitHub releases (tag must still equal v<app version>)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -22,17 +27,20 @@ jobs:
     timeout-minutes: 45
     env:
       AISURADA_RELEASE_TAG: ${{ inputs.tag }}
+      AISURADA_DRY_RUN: ${{ inputs.dry_run }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.dry_run && github.sha || inputs.tag }}
           fetch-depth: 0
       - name: Check tag and architecture
         shell: bash
         run: |
           [[ "$AISURADA_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$(uname -m)" = arm64
-          test "$(git rev-parse "refs/tags/$AISURADA_RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
+          if [ "$AISURADA_DRY_RUN" != true ]; then
+            test "$(git rev-parse "refs/tags/$AISURADA_RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
+          fi
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
@@ -48,7 +56,15 @@ jobs:
           bash test-native.sh
       - name: Build and verify trial DMG
         run: pnpm --dir native-host release:build
+      - name: Show dry-run artifacts
+        if: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          ls -l native-host/.release/artifacts
+          cat native-host/.release/artifacts/SHA256SUMS
+          cat native-host/.release/artifacts/validation.json
       - name: Prepare GitHub pre-release draft
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

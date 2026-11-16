@@ -1,0 +1,39 @@
+name: CI
+
+# 엔진(engine-rs)의 서식과 시험을 푸시와 PR에서 자동으로 돈다. 화면·호스트 시험은 릴리스 워크플로(release.yml)가 맡는다.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'engine-rs/**'
+      - 'test.sh'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'engine-rs/**'
+      - 'test.sh'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    # 엔진은 macOS 도구(launchctl 흉내, /usr/bin/sqlite3)와 경로를 가정하므로 macOS에서 돈다.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path engine-rs/Cargo.toml --all -- --check
+      - name: Test engine
+        run: bash test.sh
