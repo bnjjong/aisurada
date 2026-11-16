@@ -304,6 +304,7 @@ flowchart LR
 - **7단계 1/N 완료**(2026-11-16): [명령 표 하나](refactor-step7a-complete.md). 두 이름 목록과 82줄 디스패처를 `engine/table.rs`의 표 한 곳으로 합쳤다. 명령 목록, 쓰기 구분, 쓰기 범위 여는 방식이 모두 이 표에서 나온다. 호출 맥락 분리(7-2), CLI·MCP·호스트 호출 길(7-3), 오류 나누기(7-4), 사용법 글 옮기기(7-5), 공개 면 줄이기(7-6)가 남았다. 골든 어긋남 0, 엔진 시험 287건.
 - **7단계 2/N 완료**(2026-11-16): [호출 맥락 분리](refactor-step7b-complete.md). `WriteContext`를 커널의 `CallContext`로 옮기고 `Engine::call_as(&CallContext, 명령, 인자)` 입구를 더했다. 명령줄 도구 표면(AI)·명령 표면(앱)·호스트 `engine_call`이 맥락을 인자 밖에서 넘긴다. 처리 함수 시그니처는 그대로이고 요청의 `caller`·`context` 칸은 남았다. 골든 어긋남 0, 엔진 시험 290건.
 - **7단계 3/N 완료**(2026-11-16): [공개 면 줄이기](refactor-step7c-complete.md). `ais-core`의 공개 항목이 1,040개에서 122개로 줄었다(rustdoc JSON으로 셈). 바깥이 쓰던 길(`engine`·`error`·`json`·`text`·`kernel::actor`·`write::autocommit`·`vault`의 읽기 다섯)만 `pub`이고 나머지는 `test-support` feature일 때만 열린다. 모듈을 닫으며 드러난 죽은 코드를 지웠다. 골든 어긋남 0, 엔진 시험 296건, 호스트 시험 158건 통과.
+- **7단계 4/N 완료**(2026-11-16): [오류 번호를 어댑터로](refactor-step7d-complete.md). 코어의 `EngineError`가 `code` 문자열 칸을 버리고 종류와 문구만 가진다. 기록 층 거절은 종류 `RecordTier`(응답 글자는 `forbidden` 그대로)가 됐다. Java 번호(`AIS-409` 따위)와 종료 코드는 `ais-cli`의 `error` 모듈 표(`aisurada_number`)가 붙이고, 앱 IPC는 `IpcError`(`{code, kind, message}`)를 돌려준다. 문구와 응답 JSON은 바이트까지 그대로다. `DomainError`·`InfraError`를 별개 타입으로 가르는 일은 미뤘다. 골든 어긋남 0, 엔진 시험 299건, 호스트 시험 158건.
 
 ## 9. 근거와 한계
 
