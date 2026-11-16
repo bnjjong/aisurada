@@ -9,6 +9,9 @@
 //! 명령 함수마다 맥락(`&Ctx`)을 넘기는 방식은 호출부가 백 곳이 넘어서 택하지 않았고, 호출자 맥락을 요청 밖으로 빼는 7단계(`CallContext`)에서 다시 본다.
 //! 스레드를 새로 만들어 일을 시키는 코드(자동 커밋의 주기 스레드)는 걸린 묶음을 물려받지 않고 기본 어댑터를 쓴다.
 
+pub mod fs;
+pub mod store;
+
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::path::Path;
@@ -117,6 +120,8 @@ pub trait SqliteReader: Send + Sync {
     fn query(&self, uri: &str, sql: &str) -> Result<String, String>;
 }
 
+pub use store::VaultStore;
+
 /// 약속 묶음. `Engine`이 들고 명령을 부르는 동안 현재 스레드에 건다.
 #[derive(Clone)]
 pub struct Ports {
@@ -126,6 +131,7 @@ pub struct Ports {
     pub lock: Arc<dyn VaultLock>,
     pub vcs: Arc<dyn VersionControl>,
     pub sqlite: Arc<dyn SqliteReader>,
+    pub store: Arc<dyn VaultStore>,
 }
 
 static DEFAULT: LazyLock<Arc<Ports>> = LazyLock::new(|| Arc::new(crate::adapters::default_ports()));
@@ -163,6 +169,10 @@ pub fn vcs() -> Arc<dyn VersionControl> {
 
 pub fn sqlite() -> Arc<dyn SqliteReader> {
     current().sqlite.clone()
+}
+
+pub fn store() -> Arc<dyn VaultStore> {
+    current().store.clone()
 }
 
 /// 약속 묶음을 현재 스레드에 건 동안 살아 있다. 놓으면(drop) 앞에 걸려 있던 묶음으로 돌아간다.

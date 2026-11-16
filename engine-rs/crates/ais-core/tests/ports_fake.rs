@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use ais_core::adapters::flock_lock::FlockLock;
+use ais_core::adapters::local_store::LocalStore;
 use ais_core::engine::Engine;
 use ais_core::kernel::time::CivilDate;
 use ais_core::kernel::time::{LocalClock, civil_from_days};
@@ -127,6 +128,7 @@ fn an_engine_with_fake_ports_works_without_any_environment_variable() {
         lock: Arc::new(FlockLock::in_dir(root.join("locks"))),
         vcs: vcs.clone(),
         sqlite: Arc::new(NoSqlite),
+        store: Arc::new(LocalStore),
     };
     let engine = Engine::with_ports(&vault, ports);
 

@@ -6,6 +6,7 @@
 
 pub mod flock_lock;
 pub mod git_cli;
+pub mod local_store;
 pub mod process_env;
 pub mod queue_ids;
 pub mod sqlite_cli;
@@ -24,5 +25,6 @@ pub fn default_ports() -> Ports {
         lock: Arc::new(flock_lock::FlockLock::default()),
         vcs: Arc::new(git_cli::GitCli),
         sqlite: Arc::new(sqlite_cli::SqliteCli),
+        store: Arc::new(local_store::LocalStore),
     }
 }
