@@ -1,16 +1,18 @@
 name: CI
 
-# 엔진(engine-rs)의 서식과 시험을 푸시와 PR에서 자동으로 돈다. 화면·호스트 시험은 릴리스 워크플로(release.yml)가 맡는다.
+# 엔진(engine-rs)의 서식과 시험, 34장 받아들임 묶음의 실행기 시험을 푸시와 PR에서 자동으로 돈다. 화면·호스트 시험은 릴리스 워크플로(release.yml)가 맡는다.
 on:
   push:
     branches: [main]
     paths:
       - 'engine-rs/**'
+      - 'fixtures/**'
       - 'test.sh'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'engine-rs/**'
+      - 'fixtures/**'
       - 'test.sh'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
@@ -29,11 +31,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
       - name: Set up Rust
         run: |
           rustup toolchain install stable --profile minimal --component rustfmt
           rustup default stable
       - name: Check formatting
         run: cargo fmt --manifest-path engine-rs/Cargo.toml --all -- --check
+      # bash test.sh 안의 34장 받아들임 시험(ais-cli/tests/acceptance_bundle.rs)이 node 로 실행기를 부른다
       - name: Test engine
         run: bash test.sh
+      - name: Test acceptance runner
+        run: node fixtures/runner-test.mjs
