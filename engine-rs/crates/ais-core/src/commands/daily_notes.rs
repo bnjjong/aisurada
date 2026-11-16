@@ -168,7 +168,12 @@ pub fn plan_day(
             body: Some(body.clone()),
             date: Some(date_text),
             time: Some("09:00".to_string()),
-            context: request.context.clone(),
+            // 계획 노트에는 세션 id를 심지 않는다(29장의 고정값). 호출자는 그대로 넘기고 세션만 뺀다.
+            context: WriteContext {
+                session: None,
+                session_agent: None,
+                ..request.context.clone()
+            },
             ..CreateDocRequest::default()
         };
         let saved = create_doc_in(vault, scope, &create)?;
