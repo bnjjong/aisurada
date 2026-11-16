@@ -10,7 +10,7 @@ use tauri::State;
 
 /// 알릴 명령 목록(읽기와 쓰기 모두)
 fn commands() -> Vec<&'static str> {
-    ais_core::engine::COMMANDS.to_vec()
+    ais_core::engine::catalog().map(|c| c.name).collect()
 }
 
 /// Rust 엔진이 처리하는 명령 이름. 화면은 이 명령을 `engine_call`로 보내고, 나머지는 명령줄 길(`sidecar_call`)로 보낸다.

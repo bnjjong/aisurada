@@ -18,7 +18,7 @@ use ais_cli::mcp::McpServer;
 use ais_cli::parse::ParsedCommand;
 use ais_cli::registry;
 use ais_cli::tool::parse_tool;
-use ais_core::engine::WRITE_COMMANDS;
+use ais_core::engine::catalog;
 use ais_core::json::{self, JsonValue};
 
 /// 도구 하나를 `tools/list`에서 읽은 것. 키 차례를 지키려고 `ais_core::json`으로 읽는다.
@@ -181,7 +181,7 @@ fn required_keys_are_checked_in_schema_order() {
 
 #[test]
 fn read_only_tools_are_exactly_the_commands_the_engine_does_not_write() {
-    let writes: BTreeSet<&str> = WRITE_COMMANDS.iter().copied().collect();
+    let writes: BTreeSet<&str> = catalog().filter(|c| c.is_write()).map(|c| c.name).collect();
     let read_mode: BTreeSet<String> = tools_list(false).into_iter().map(|t| t.name).collect();
     let mut diffs = Vec::new();
     for tool in tools_list(true) {

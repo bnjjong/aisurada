@@ -1,7 +1,7 @@
 //! 명령 목록 교차 시험: 같은 명령 정보를 따로 적은 곳들이 서로 어긋나지 않는지 본다.
 //!
-//! 명령 정보는 지금 여러 곳에 흩어져 있다(DDD·헥사고날 리팩토링 계획 7단계가 표 하나로 합친다).
-//! - 엔진: `ais_core::engine::{COMMANDS, WRITE_COMMANDS}`(밑줄 이름, 읽기·쓰기 구분)
+//! 명령 정보는 엔진 표 하나와, 그것을 바깥 길에 내놓는 표들에 나뉘어 있다.
+//! - 엔진: `ais_core::engine::catalog()`(밑줄 이름, 읽기·쓰기 구분. 명령 표 한 곳에서 나온다)
 //! - 명령줄: `ais_cli::registry`의 `ENGINE_COMMANDS_*`(하이픈 이름)와 명세 표 `spec_table.rs`(쓰기 깃발, 도구 이름)
 //! - MCP 서버: `tools/list`가 내놓는 도구 이름(`mcp_tools.rs`)과 `registry::CLI_TOOL_NAMES`
 //! - 화면: `native-host/src/data/commands.ts`의 `POSITIONAL`(자리 인자를 받는 명령)
@@ -15,7 +15,7 @@ use std::path::Path;
 
 use ais_cli::mcp::McpServer;
 use ais_cli::registry;
-use ais_core::engine::{COMMANDS, WRITE_COMMANDS};
+use ais_core::engine::catalog;
 use serde_json::Value;
 
 /// 지금 있는 어긋남(없애면 목록에서도 지운다)
@@ -23,7 +23,7 @@ const KNOWN: &[&str] = &[
     // 의도한 차이: `purge_doc`는 되돌릴 수 없는 삭제라 MCP 서버가 모델에게 절대 내놓지 않는다(`mcp.rs`의 `NEVER_EXPOSED`)
     "CLI_TOOL_NAMES에는 있고 MCP 쓰기 모드 도구에는 없다: purge_doc",
     // 어긋남: 명령줄 명세 표(`spec_table.rs`)는 `commit-vault`를 `write: false`로 적었는데 엔진은 vault를 고치는 쓰기 명령으로 본다
-    // (`engine.rs`의 `WRITE_COMMANDS`). 표는 Java 엔진의 `CommandRegistry`에서 그대로 옮긴 값이다. 어느 쪽이 맞는지는 이슈 #75에서 정한다.
+    // (엔진 명령 표의 쓰기 구분). 표는 Java 엔진의 `CommandRegistry`에서 그대로 옮긴 값이다. 어느 쪽이 맞는지는 이슈 #75에서 정한다.
     "읽기/쓰기가 다르다: commit_vault (명령줄 write=false, 엔진 쓰기 목록=true)",
 ];
 
@@ -82,13 +82,11 @@ fn screen_positional_names() -> BTreeSet<String> {
 
 fn differences() -> Vec<String> {
     let mut diffs: Vec<String> = Vec::new();
-    let engine: BTreeSet<String> = COMMANDS.iter().map(|c| c.to_string()).collect();
-    let engine_write: BTreeSet<String> = WRITE_COMMANDS.iter().map(|c| c.to_string()).collect();
-
-    // 엔진 안: 쓰기 목록은 전체 목록의 부분이다
-    for name in engine_write.difference(&engine) {
-        diffs.push(format!("WRITE_COMMANDS에만 있다(COMMANDS에 없다): {name}"));
-    }
+    let engine: BTreeSet<String> = catalog().map(|c| c.name.to_string()).collect();
+    let engine_write: BTreeSet<String> = catalog()
+        .filter(|c| c.is_write())
+        .map(|c| c.name.to_string())
+        .collect();
 
     // 명령줄 표 ↔ 엔진: 명령줄이 엔진으로 보내는 이름은 엔진이 알아야 하고, 엔진 명령은 명령줄이 알아야 한다
     let cli: BTreeSet<String> = registry::ENGINE_COMMANDS_61

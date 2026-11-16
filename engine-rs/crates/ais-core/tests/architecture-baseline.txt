@@ -18,7 +18,7 @@ edge commands -> text 33
 edge commands -> vault 70
 edge commands -> write 95
 edge engine -> commands 1
-edge engine -> error 1
+edge engine -> error 2
 edge engine -> ports 2
 edge engine -> resource 1
 edge engine -> vault 1

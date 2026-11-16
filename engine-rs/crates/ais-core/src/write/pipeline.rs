@@ -29,17 +29,6 @@ pub struct WriteContext {
     pub session_agent: Option<String>,
 }
 
-/// 요청에서 [`WriteContext`]를 꺼낸다. 디스패처가 명령 함수를 부르기 전에 범위를 열려면 요청 종류를 몰라도 이것을 읽을 수 있어야 한다.
-pub trait HasWriteContext {
-    fn write_context(&self) -> &WriteContext;
-}
-
-impl HasWriteContext for WriteContext {
-    fn write_context(&self) -> &WriteContext {
-        self
-    }
-}
-
 /// 열린 쓰기 범위. 명령이 일하는 동안 쥐고 있다.
 pub struct WriteScope {
     /// 쓰기용으로 맞춘 색인
