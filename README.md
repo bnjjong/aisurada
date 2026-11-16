@@ -12,7 +12,7 @@ aisurada vault를 읽어 JSON으로 답하고 새 노트를 쓰는 엔진(`ais-c
 
 ## 하는 일
 
-vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 엔진의 쓰기 목록(`WRITE_COMMANDS`)으로 50개입니다. 그 가운데 설명서가 정한 31개는 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`, 24장의 템플릿 쓰기 3개, 25~30장의 회고·휴지통·내보내기·샤드·플랜 쓰기 8개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다. 나머지 19개는 확장과 4부 쪽입니다. 태스크 쓰기 7개, 자원 쓰기 4개와 승인 쓰기 4개, 문답·대화를 잇는 `append-ask-turn`·`append-chat-turn`, `facts-brief`, `commit-vault`입니다(아래 「프로젝트 자원」, 「태스크」).
+vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들지 않습니다. vault에 쓰는 명령은 엔진 명령 표(`engine/table.rs`)에서 쓰기로 적힌 50개입니다. 그 가운데 설명서가 정한 31개는 19장의 코멘트 쓰기 3개, 20장의 아젠다 쓰기 3개, 21장의 프로젝트 쓰기 3개, 22장의 사실층 쓰기 1개, 23장의 `init-workspace`, 24장의 템플릿 쓰기 3개, 25~30장의 회고·휴지통·내보내기·샤드·플랜 쓰기 8개를 포함합니다. 기본 노트 쓰기는 새 노트를 만드는 `create_doc`, 노트의 제목과 본문을 고치고 정식 자리로 옮기는 `update_doc`, 노트 메타를 고치는 `set_favorite`, `evaluate_doc`, `link_docs`, 노트나 하위 노트에 글 첨부를 쓰는 `write_attachment`, 그리고 하위 노트를 만들고 고치고 지우는 `create_sub_note`, `update_sub_note`, `delete_sub_note`입니다. 나머지 19개는 확장과 4부 쪽입니다. 태스크 쓰기 7개, 자원 쓰기 4개와 승인 쓰기 4개, 문답·대화를 잇는 `append-ask-turn`·`append-chat-turn`, `facts-brief`, `commit-vault`입니다(아래 「프로젝트 자원」, 「태스크」).
 
 `ais-cli`는 명령 1개를 처리하고 끝나는 단발 실행 파일입니다. 호출마다 vault를 새로 훑어서 답하므로 상주 프로세스가 없고, 떠 있는 동안 바뀐 파일도 다음 호출에 보입니다. 표준 입출력으로 오래 도는 것은 MCP 서버로 서는 `ais-cli mcp`뿐입니다. 데스크톱 앱은 같은 코드를 프로세스 안에서 직접 부릅니다.
 
@@ -401,7 +401,7 @@ Cargo 작업공간 `engine-rs/`에 크레이트 둘이 있습니다. 시험과 �
 | `crates/ais-core/src/write/` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 잠금, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 경고, 선결 조건 토큰, 편집 도장, 자동 커밋 |
 | `crates/ais-core/src/frontmatter/` | 프론트매터 YAML 읽기와 쓰기(SnakeYAML이 하던 일) |
 | `crates/ais-core/src/{task,resource,session}/` | 태스크, 스킬·에이전트 정의와 승인, 에이전트 세션 읽기 |
-| `crates/ais-core/src/engine.rs` | 이름으로 명령을 찾아 돌리는 표 |
+| `crates/ais-core/src/engine.rs`, `engine/table.rs` | 엔진 진입점과, 이름·읽기/쓰기·쓰기 범위·요청 종류·처리 함수를 한 줄에 적은 명령 표 |
 | `crates/ais-cli/src/` | 명령줄 진입점(`main.rs`, `lib.rs`), 인자 읽기(`parse.rs`, `map.rs`, `tool.rs`), 옛 응답 모양으로 바꾸기(`legacy.rs`), 키 차례를 맞춘 JSON 쓰기(`output.rs`) |
 | `crates/ais-cli/src/mcp.rs`, `mcp_tools.rs` | MCP 서버(`ais-cli mcp`)와 도구 목록 |
 | `crates/ais-cli/src/{register,agent_cli}.rs` | `claude-mcp`, `codex-mcp`, `gemini-mcp` 등록 |

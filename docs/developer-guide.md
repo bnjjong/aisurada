@@ -323,7 +323,7 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
   - **새로 불러오기.** 창이 다시 눈에 띄면 다시 읽는다(러너나 다른 창이 바꾼 것을 따라간다).
   - **시험용 `preset`.** 두 페이지는 엔진 없이 처음 모양을 정하는 `preset` 속성을 받는다(앱은 주지 않는다). 서버 렌더 시험이 데이터가 든 보드와 상세를 그려 보는 데 쓴다.
 - **시험.** 엔진은 `fixture_vault.rs`의 `runs_the_task_lifecycle`이 본다. 만들기(완료 기준이 필수, 파일은 SnakeYAML 모양, 활동에 `created`), 고치기(확인 값이 필요하고 바뀐 것이 없으면 파일도 활동도 그대로), 상태(사람과 러너가 갈 수 있는 전이가 다르고 사람이 갈 곳은 응답에 있음), AI 세션이 고치면 세션과(claude가 아니면) 에이전트 이름이 파일과 활동에 남음, 연결과 막힘(막은 태스크가 Done이 되기 전에는 시작하지 못함), 휴지통(활동까지 옮기고 번호를 다시 쓰지 않으며 되살리면 같은 키로 돌아옴), 손으로 쓴 파일(모르는 칸이 고친 뒤에도 남고 못 읽는 파일은 건너뛴다고 알림)이다. `TSK-n.md`와 `activity.jsonl`의 바이트는 `serialization_golden.rs`가 못박는다. 응답과 폴더 바이트는 `compat_check.rs`의 태스크 절(만들기, 읽기, 고치기, 상태, 연결, 댓글, 휴지통)이 기준 Java 엔진과 맞대고, 그 녹화본을 `golden.rs`가 다시 돌린다. MCP 도구 목록(`tools/list`)은 `mcp_compat`가 기준 Java 서버와 맞대고, 명령 목록 표들이 서로 어긋나지 않는지는 `command_tables.rs`가 본다. 화면은 `tasks-ui.test.mjs`(순수 함수, 가짜 엔진으로 본 호출 인자, 서버 렌더로 본 보드·목록·상세·상태 메뉴와 레일)다. 서버 렌더에는 `document`가 없어서 설명(마크다운) 영역은 그리지 않는다. 데이터가 든 보드와 상세는 진짜 엔진으로 만든 임시 vault의 응답을 서버 렌더하고 Edge headless로 그려서 모양을 눈으로 확인했다(밝은 모양과 어두운 모양). 실제 앱 창(WKWebView)에서 눌러 본 확인은 없다.
-- **`ais-cli`가 넘겨 주는 이름.** `ais-cli`는 `engine-rs/crates/ais-cli/src/registry.rs`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`, 승인 명령 7개는 `ENGINE_COMMANDS_APPROVALS`)에 든 이름만 엔진으로 넘긴다. 새 명령을 넣고 이 목록에 빠뜨리면 실제 앱에서 「알 수 없는 이름」(종료 코드 2)으로 거절된다. Java 시절에 태스크 명령이 이 목록에 빠져 있던 적이 있다(`5b38c33`). 지금은 `crates/ais-cli/tests/command_tables.rs`가 엔진의 명령 목록(`ais_core::engine::COMMANDS`)에 있고 이 목록에 없는 이름을 잡아 실패한다.
+- **`ais-cli`가 넘겨 주는 이름.** `ais-cli`는 `engine-rs/crates/ais-cli/src/registry.rs`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`, 승인 명령 7개는 `ENGINE_COMMANDS_APPROVALS`)에 든 이름만 엔진으로 넘긴다. 새 명령을 넣고 이 목록에 빠뜨리면 실제 앱에서 「알 수 없는 이름」(종료 코드 2)으로 거절된다. Java 시절에 태스크 명령이 이 목록에 빠져 있던 적이 있다(`5b38c33`). 지금은 `crates/ais-cli/tests/command_tables.rs`가 엔진의 명령 목록(`ais_core::engine::catalog()`)에 있고 이 목록에 없는 이름을 잡아 실패한다.
 - **아직 없는 것.** 코드를 고치고 PR을 올리는 러너(4단계), 태스크 안 채팅(정의 에이전트, 3b), 질문을 위 단계 에이전트가 먼저 푸는 계층(5단계). 승인 워크플로우(이슈 #53)는 러너가 코드를 고치기 전에 필요하다. 읽기 전용 러너는 아래 「러너」에 있다.
 
 ### 알림 (`notifications.rs`)
@@ -541,7 +541,7 @@ HTML 노트와 템플릿은 `---` 대신 `<!--aisurada` … `-->` 머리를 쓴�
 ### 명령을 새로 넣는 길
 
 1. `engine-rs/crates/ais-core/src/commands/`에 실행기를 만든다. 쓰기 공통 부품은 `write/`에 있다.
-2. `engine.rs`의 명령 이름 표(쓰기면 `WRITE_COMMANDS`)에 넣는다.
+2. `engine/table.rs`의 명령 표에 한 줄을 더한다. `read!`(읽기)나 `write!`(쓰기, 범위를 여는 방식 `Standard`·`WithLedger`·`NoMarker`)로 이름, 요청 종류, 처리 함수를 적는다. 명령 목록, 쓰기 구분, 디스패처가 모두 이 표에서 나오므로 다른 목록은 없다(`ais_core::engine::catalog()`가 앱과 시험에 내놓는다).
 3. `engine-rs/crates/ais-cli/src/registry.rs`(명령 이름 목록, 도구 표면이 있으면 `CLI_TOOL_NAMES`와 사용법 줄)와 `spec_table.rs`(인자 명세)에 넣는다. 빠뜨리면 `ais-cli`가 「알 수 없는 이름」으로 거절한다.
 4. 시험을 `engine-rs/crates/ais-core/tests/`나 `crates/ais-cli/tests/`에 두고 `bash test.sh`로 돌려 본다(§8).
 5. 설명서 장이 있으면 그 장의 바이트 예시와 맞는지 대조하고, 받아들임 묶음에 케이스를 더할 수 있으면 더한다(§8).
@@ -746,7 +746,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 | 하는 일 | 명령 | 걸리는 시간 | 뭘 재나 |
 |---|---|---|---|
-| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~125초(284건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4) |
+| 엔진 전체 | `bash test.sh` | 컴파일이 캐시된 상태에서 약 70~125초(287건, 이 가운데 골든 재생이 약 1분) | `cargo test --workspace --locked`. 엔진과 `ais-cli`의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 `launchctl`과 가짜 에이전트 CLI, 진짜 `ais-cli mcp` 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 13건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위·파일 접근 규칙 8, 명령 표 교차, 가짜 포트, 메모리 저장소)이 들어 있다(§4) |
 | 화면·호스트 전체 | `bash test-native.sh` | 캐시된 상태에서 Node 시험까지 약 30초 | 화면 빌드, Node 시험 641건, 호스트 `cargo test`(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다 |
 | 받아들임 묶음 | 아래 | 수 초 | 설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다 |
 | 기준 맞대기 | §4 「기준과 맞대기」 | 엔진 12분(Java가 도는 만큼) | 기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 `bash engine-rs/tools/golden/run.sh replay`(약 1분)다 |
