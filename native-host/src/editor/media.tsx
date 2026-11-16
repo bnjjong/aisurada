@@ -15,6 +15,12 @@ export function frameHeight(url: string, value?: number): number {
   }
   return heights.get(url) || 480;
 }
+export function canExpandFrame(contentHeight: number | null): boolean {
+  return (contentHeight ?? 0) > 1600;
+}
+export function resolveFrameHeight(contentHeight: number | null, cachedHeight: number, expanded: boolean): number {
+  return expanded && contentHeight ? Math.max(160, contentHeight) : cachedHeight;
+}
 export async function openEditorLink(url: string, features: EditorFeatures, heading?: (slug: string) => boolean) {
   if (url.startsWith('#sub:')) { features.openChild?.(url.slice(5)); return; }
   if (url.startsWith('#doc:')) {
@@ -150,12 +156,18 @@ function HTMLFrame({ path, label }: { path: string; label: string }) {
   const features = useContext(EditorContext), frame = useRef<HTMLIFrameElement>(null);
   const url = 'aisframe://localhost' + `${features.noteDirectory}/${path}`.split('/').map(encodeURIComponent).join('/');
   const [height, setHeight] = useState(() => frameHeight(url));
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const lastInput = useRef(0), lastOpen = useRef(0);
   useEffect(() => {
     const input = (event: Event) => { if (event.isTrusted) lastInput.current = Date.now(); };
     const message = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || !event.data || typeof event.data !== 'object') return;
-      if (typeof event.data.aisframeHeight === 'number' && Number.isFinite(event.data.aisframeHeight)) setHeight(frameHeight(url, event.data.aisframeHeight));
+      if (typeof event.data.aisframeHeight === 'number' && Number.isFinite(event.data.aisframeHeight)) {
+        const raw = Math.ceil(event.data.aisframeHeight);
+        setContentHeight(raw);
+        setHeight(frameHeight(url, raw));
+      }
       // 8.7: only http:, https:, mailto: and tel: open, after trimming; anything else is dropped.
       const link = typeof event.data.aisframeOpen === 'string' ? event.data.aisframeOpen.trim() : null, now = Date.now();
       if (typeof link === 'string' && link.length <= 8192 && FRAME_LINK.test(link) && document.activeElement === frame.current
@@ -166,10 +178,21 @@ function HTMLFrame({ path, label }: { path: string; label: string }) {
     addEventListener('pointerdown', input, true); addEventListener('keydown', input, true); addEventListener('message', message);
     return () => { removeEventListener('pointerdown', input, true); removeEventListener('keydown', input, true); removeEventListener('message', message); };
   }, [url, features]);
+  const canExpand = canExpandFrame(contentHeight);
+  const currentHeight = resolveFrameHeight(contentHeight, height, expanded);
   return <span className="ais-html-frame"><span className="ais-html-frame-header"><strong>{label || path}</strong>
     <span className="ais-html-frame-actions">
       <button className="ais-html-frame-ask" data-rel={path} data-label={label} hidden>AI에게 묻기</button>
+      {canExpand && (
+        <button
+          className="ais-html-frame-expand"
+          onClick={() => setExpanded(prev => !prev)}
+          title={expanded ? '기본 크기로 접기' : '전체 내용 펼치기'}
+        >
+          {expanded ? '접기' : '전체 펼치기'}
+        </button>
+      )}
       <button className="ais-html-frame-open" onClick={() => void openEditorLink(path, features)}>브라우저로 열기</button>
     </span></span>
-    <iframe ref={frame} src={url} title={label || path} sandbox="allow-scripts" referrerPolicy="no-referrer" loading="lazy" className="ais-html-frame-view" style={{ height }} /></span>;
+    <iframe ref={frame} src={url} title={label || path} sandbox="allow-scripts" referrerPolicy="no-referrer" loading="lazy" className="ais-html-frame-view" style={{ height: currentHeight }} /></span>;
 }
