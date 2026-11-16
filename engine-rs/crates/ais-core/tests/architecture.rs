@@ -444,9 +444,11 @@ fn file_access_goes_through_the_store_port() {
             continue;
         }
         let text = code_without_tests(&fs::read_to_string(&file).unwrap());
-        let grouped = text
-            .lines()
-            .any(|l| l.contains("use std::{") && l.split(|c: char| !c.is_alphanumeric() && c != '_').any(|w| w == "fs"));
+        let grouped = text.lines().any(|l| {
+            l.contains("use std::{")
+                && l.split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .any(|w| w == "fs")
+        });
         if text.contains("std::fs") || grouped {
             bad.push(rel);
         }

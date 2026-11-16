@@ -11,9 +11,9 @@
 //! 커밋 메시지 모양(`Aisurada-Writer`, `Aisurada-Reason`, `Aisurada-Session`, `Aisurada-Notes` 꼬리 줄)은 판 목록이 읽으므로
 //! 바꾸지 않는다.
 
+use crate::ports::fs;
 use crate::ports::{CurrentLock, VaultLock};
 use std::collections::HashMap;
-use crate::ports::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
@@ -543,8 +543,8 @@ fn read_head(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use crate::adapters::flock_lock::FlockLock;
+    use std::fs;
     use std::process::Command;
     use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
     use std::time::{Duration, SystemTime};

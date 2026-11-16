@@ -10,8 +10,8 @@
 //! 설명서가 정한 `notes/`와 `.aisurada/projects/` 등을 건드리지 않는 새 영역이다. 자원의 범위는 파일 위치로 정해지고,
 //! 이름을 바꿔도 `id`는 머리말 안에 있어서 참조가 끊기지 않는다.
 
-use std::collections::HashSet;
 use crate::ports::fs;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

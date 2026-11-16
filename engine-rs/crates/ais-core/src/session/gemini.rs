@@ -4,8 +4,8 @@
 //! `$rewindTo`(그 메시지부터 되감기)가 끼어든다. 기록 파일에는 작업 폴더가 없어서, 프로젝트 폴더 이름을 `~/.gemini/projects.json`으로
 //! 거꾸로 찾는다.
 
-use std::collections::HashMap;
 use crate::ports::fs;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::codex::join_text;

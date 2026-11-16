@@ -50,10 +50,11 @@ pub fn find(directories: &[PathBuf], session_id: &str) -> Option<PathBuf> {
         return None;
     }
     let file_name = format!("{}.db", session_id.to_lowercase());
-    directories
-        .iter()
-        .map(|d| d.join(&file_name))
-        .find(|f| crate::ports::fs::metadata(f).map(|m| m.is_file()).unwrap_or(false))
+    directories.iter().map(|d| d.join(&file_name)).find(|f| {
+        crate::ports::fs::metadata(f)
+            .map(|m| m.is_file())
+            .unwrap_or(false)
+    })
 }
 
 pub fn is_antigravity_file(file: &Path) -> bool {

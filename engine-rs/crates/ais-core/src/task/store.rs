@@ -10,8 +10,8 @@
 //! 연결은 건 쪽 파일에만 적고 반대쪽(막혀 있음 따위)은 읽을 때 계산하므로 두 파일이 어긋날 일이 없다.
 
 use crate::kernel::task_link::TaskLinkKind;
-use std::collections::HashSet;
 use crate::ports::fs;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value as Json;

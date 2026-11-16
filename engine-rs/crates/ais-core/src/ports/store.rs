@@ -98,7 +98,10 @@ impl DirEntry {
     }
 
     pub fn file_name(&self) -> OsString {
-        self.path.file_name().map(OsString::from).unwrap_or_default()
+        self.path
+            .file_name()
+            .map(OsString::from)
+            .unwrap_or_default()
     }
 
     pub fn file_type(&self) -> io::Result<FileType> {

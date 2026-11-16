@@ -2,8 +2,8 @@
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 목록 파일은 바이트까지 같다.
 
 use crate::kernel::ids::TRASH_ID;
-use std::collections::HashSet;
 use crate::ports::fs;
+use std::collections::HashSet;
 use std::path::Path;
 
 use serde::Deserialize;

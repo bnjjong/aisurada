@@ -1,7 +1,7 @@
 //! 프로젝트(아젠다를 묶는 단위) 읽기. `.aisurada/projects/*.md`의 머리를 아젠다와 같은 한 줄짜리 `키: 값` 읽개로 읽습니다.
 
-use std::collections::{HashMap, HashSet};
 use crate::ports::fs;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::LazyLock;
 

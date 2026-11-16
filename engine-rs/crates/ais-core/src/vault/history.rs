@@ -3,8 +3,8 @@
 //! 판은 vault의 git 저장소(`main` 브랜치)에서 찾습니다. git이 실패하면 그 걸음은 빈 결과로 보고 다음으로 넘어갑니다.
 //! 저장소가 없는 vault는 판이 하나도 없습니다.
 
-use std::collections::HashSet;
 use crate::ports::fs;
+use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;

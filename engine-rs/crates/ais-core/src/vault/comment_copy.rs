@@ -5,8 +5,8 @@
 //! 쓰기 명령은 일을 하지 않고 실패한다. 이 검사는 코멘트 읽기(`comments.rs`)와 별개의 규칙을 쓴다.
 
 use crate::kernel::ids::COMMENT_ID;
-use std::collections::HashSet;
 use crate::ports::fs;
+use std::collections::HashSet;
 use std::path::Path;
 
 use super::note_meta::{get, parse_created};

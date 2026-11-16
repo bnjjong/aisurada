@@ -59,9 +59,7 @@ impl VaultStore for LocalStore {
 
     fn read_dir(&self, path: &Path) -> io::Result<Vec<io::Result<DirEntry>>> {
         Ok(fs::read_dir(path)?
-            .map(|entry| {
-                entry.map(|e| DirEntry::new(e.path(), e.file_type().ok().map(kind)))
-            })
+            .map(|entry| entry.map(|e| DirEntry::new(e.path(), e.file_type().ok().map(kind))))
             .collect())
     }
 

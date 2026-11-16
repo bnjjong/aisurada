@@ -1,8 +1,8 @@
 //! 28장: `shard_notes`(색인에 들지 못한 노트까지 디스크에서 모아 계획하고 원자적으로 옮긴다)와 `verify_shard`(이동 전 매핑의 수와
 //! 현재 디스크를 대조한다). 규칙과 응답은 Java 엔진의 `ShardNotes`·`VerifyShard`와 같다.
 
-use std::collections::HashMap;
 use crate::ports::fs;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 

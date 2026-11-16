@@ -57,7 +57,12 @@ impl VaultStore for MemStore {
     }
 
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        self.files.lock().unwrap().get(path).cloned().ok_or_else(not_found)
+        self.files
+            .lock()
+            .unwrap()
+            .get(path)
+            .cloned()
+            .ok_or_else(not_found)
     }
 
     fn open_read(&self, path: &Path) -> io::Result<Box<dyn Read + Send>> {
@@ -88,7 +93,11 @@ impl VaultStore for MemStore {
             .map(|(child, is_dir)| {
                 Ok(DirEntry::new(
                     child,
-                    Some(if is_dir { FileType::Dir } else { FileType::File }),
+                    Some(if is_dir {
+                        FileType::Dir
+                    } else {
+                        FileType::File
+                    }),
                 ))
             })
             .collect())
@@ -108,7 +117,12 @@ impl VaultStore for MemStore {
     }
 
     fn remove_file(&self, path: &Path) -> io::Result<()> {
-        self.files.lock().unwrap().remove(path).map(|_| ()).ok_or_else(not_found)
+        self.files
+            .lock()
+            .unwrap()
+            .remove(path)
+            .map(|_| ())
+            .ok_or_else(not_found)
     }
 
     fn remove_dir(&self, _: &Path) -> io::Result<()> {
@@ -116,13 +130,20 @@ impl VaultStore for MemStore {
     }
 
     fn remove_dir_all(&self, path: &Path) -> io::Result<()> {
-        self.files.lock().unwrap().retain(|f, _| !f.starts_with(path));
+        self.files
+            .lock()
+            .unwrap()
+            .retain(|f, _| !f.starts_with(path));
         Ok(())
     }
 
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
         let mut files = self.files.lock().unwrap();
-        let moved: Vec<PathBuf> = files.keys().filter(|f| f.starts_with(from)).cloned().collect();
+        let moved: Vec<PathBuf> = files
+            .keys()
+            .filter(|f| f.starts_with(from))
+            .cloned()
+            .collect();
         if moved.is_empty() {
             return Err(not_found());
         }
