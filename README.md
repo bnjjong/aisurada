@@ -399,7 +399,7 @@ Cargo 작업공간 `engine-rs/`에 크레이트 둘이 있습니다. 시험과 �
 | `crates/ais-core/src/commands/` | 명령 1개당 파일 1개. 읽기와 쓰기 명령의 본체 |
 | `crates/ais-core/src/vault/` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통을 훑어 읽는 부품과 git 이력 읽기 |
 | `crates/ais-core/src/write/` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 잠금, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 경고, 선결 조건 토큰, 편집 도장, 자동 커밋 |
-| `crates/ais-core/src/frontmatter/` | 프론트매터 YAML 읽기와 쓰기(SnakeYAML이 하던 일) |
+| `crates/ais-kernel/` | 바닥 크레이트. 글·JSON 규칙(`text`, `json`), 오류 값(`error`), 프론트매터 YAML 읽기와 쓰기(`frontmatter`, SnakeYAML이 하던 일), 공용 커널(`kernel`). 다른 영역을 모르고 파일·시계에 손대지 않는다 |
 | `crates/ais-core/src/{task,resource,session}/` | 태스크, 스킬·에이전트 정의와 승인, 에이전트 세션 읽기 |
 | `crates/ais-core/src/engine.rs`, `engine/table.rs` | 엔진 진입점과, 이름·읽기/쓰기·쓰기 범위·요청 종류·처리 함수를 한 줄에 적은 명령 표 |
 | `crates/ais-cli/src/` | 명령줄 진입점(`main.rs`, `lib.rs`), 인자 읽기(`parse.rs`, `map.rs`, `tool.rs`), 옛 응답 모양으로 바꾸기(`legacy.rs`), 키 차례를 맞춘 JSON 쓰기(`output.rs`) |
