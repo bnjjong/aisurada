@@ -514,6 +514,12 @@ java -cp &quot;$D/snake:$ORACLE/ais-engine.jar&quot; SnakeCases engine-rs/golden
 <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>AISURADA_VAULT=&lt;vault&gt; dist/ais-cli get_doc '{&quot;id&quot;:&quot;nddemo-00000001&quot;}'   # 도구 표면
 AISURADA_VAULT=&lt;vault&gt; dist/ais-cli get-doc nddemo-00000001              # 명령 표면</code></pre></div>
 <p>도구 38개와 명령 82개는 <code>engine-rs/crates/ais-cli/src/registry.rs</code>에 있다(<code>ais-cli</code>가 직접 하는 8개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 <code>dist/ais-cli --list</code>로 본다.</p>
+<p>도구 표면의 호출자는 AI(<code>caller: &quot;ai&quot;</code>)로 찍혀서 앱과 다르게 다뤄지는 곳이 있다. 쓰기에서는 아래가 그렇다.</p>
+<ul>
+<li><strong>기록 층 노트는 못 고친다.</strong> 기록 층(<code>tier: record</code>)은 사람이 앱에서만 보는 노트다. AI는 목록·검색·열기에서 못 볼 뿐 아니라(열기는 AIS-409) 고치지도 못한다. <code>set_favorite</code>, <code>evaluate_doc</code>, <code>link_docs</code>(출발 노트), <code>update_doc</code>, <code>delete_doc</code>, 후속 노트 만들기·고치기·지우기와 <code>write_attachment</code>, 코멘트 쓰기는 노트를 찾자마자 <code>AIS-409 도구 표면이 고칠 수 없는 노트다(층=record)</code>로 서고, 인자 검사나 확인 값(<code>f1</code>) 검사보다 앞선다. 후속 노트의 층은 메인 노트를 따른다. <code>link_docs</code>의 <strong>대상</strong> 노트가 기록 층이어도 막지 않는다(대상 파일을 고치지 않는다). 앱 호출자에는 이 제한이 없다. 정책은 <code>kernel/tier.rs</code>의 <code>Tier::visible_to</code> 한 곳이고 읽기(<code>check_readable</code>)와 쓰기(<code>check_writable</code>)가 같이 쓴다. 시험은 <code>fixture_vault.rs</code>의 <code>ai_cannot_write_to_record_tier_notes</code>다.</li>
+<li><strong>코멘트·후속 노트 삭제는 <code>f1</code>을 보지 않는다.</strong> 설명서 7장·19장이 정한 「파생 쓰기」라서 일부러 그렇다. 지운 것은 코멘트나 후속 노트이고 그 부모 본문의 토큰은 부르는 쪽이 알 길이 없어서, 요구하면 이 명령이 못 돈다. 부모 본문에서 카드나 앵커를 걷었으면 응답의 <code>containerBefore</code>·<code>containerAfter</code>(후속 노트 삭제), <code>bodyBefore</code>·<code>bodyAfter</code>(코멘트 삭제)가 그 대신이다. 앞의 값이 자기가 든 토큰과 같을 때만 뒤의 값을 이어받으면 된다.</li>
+<li><strong><code>commit_vault</code>는 쓰기 잠금을 잡는다.</strong> 다른 쪽이 여러 파일을 쓰는 중에 커밋하면 쓰다 만 상태가 커밋에 들어간다. 그래서 쓰기와 같은 vault 잠금을 잡고, 쓰는 중이면 그 쓰기가 끝나기를 기다린다. 유휴 타이머의 정비 커밋은 기다리지 않고 건너뛴 뒤 5초 뒤 다시 시도한다. 시험은 <code>commit_vault_waits_for_the_vault_write_lock</code>이다.</li>
+</ul>
 <h3 id="설정"><a class="anchor" href="#설정" aria-label="이 절의 링크">#</a>설정</h3>
 <p>설정은 환경 변수로만 준다. Java 시절의 명령줄 <code>--키=값</code>과 JVM <code>-D키=값</code>, 색인 폴더 <code>AISURADA_DB_HOME</code>은 없어졌다(색인이 없다).</p>
 <div class="table-wrap"><table><thead><tr><th>환경 변수</th><th>쓰임</th><th>기본값</th></tr></thead><tbody>
@@ -728,7 +734,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <h2 id="8-시험"><a class="anchor" href="#8-시험" aria-label="이 절의 링크">#</a>8. 시험</h2>
 <h3 id="한눈에"><a class="anchor" href="#한눈에" aria-label="이 절의 링크">#</a>한눈에</h3>
 <div class="table-wrap"><table><thead><tr><th>하는 일</th><th>명령</th><th>걸리는 시간</th><th>뭘 재나</th></tr></thead><tbody>
-<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~105초(214건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4)</td></tr>
+<tr><td>엔진 전체</td><td><code>bash test.sh</code></td><td>컴파일이 캐시된 상태에서 약 70~105초(216건, 이 가운데 골든 재생이 약 1분)</td><td><code>cargo test --workspace --locked</code>. 엔진과 <code>ais-cli</code>의 단위·통합 시험(임시 vault, 임시 HOME, 가짜 <code>launchctl</code>과 가짜 에이전트 CLI, 진짜 <code>ais-cli mcp</code> 프로세스). 잠금 폴더는 임시로 따로 쓴다. 리팩토링 안전망 11건(골든 재생, 직렬화 골든, 의존 방향·닫힌 집합·어댑터·쓰기 범위 규칙 7, 명령 표 교차, 가짜 포트)이 들어 있다(§4)</td></tr>
 <tr><td>화면·호스트 전체</td><td><code>bash test-native.sh</code></td><td>캐시된 상태에서 Node 시험까지 약 30초</td><td>화면 빌드, Node 시험 641건, 호스트 <code>cargo test</code>(아래 「호스트 시험의 옛 실패」). 호스트 시험이 실패하면 이 스크립트도 실패로 끝난다</td></tr>
 <tr><td>받아들임 묶음</td><td>아래</td><td>수 초</td><td>설명서 원문 기대값 27건과 실행기 자체. 기준 jar가 필요하다</td></tr>
 <tr><td>기준 맞대기</td><td>§4 「기준과 맞대기」</td><td>엔진 12분(Java가 도는 만큼)</td><td>기준 Java 엔진과 같은 입력의 응답·폴더 바이트·MCP 대화를 견준다. 어긋남이 0이어야 한다. 같은 하네스를 Java 없이 녹화본과 견주는 골든 재생은 <code>bash engine-rs/tools/golden/run.sh replay</code>(약 1분)다</td></tr>
