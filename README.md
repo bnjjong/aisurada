@@ -400,6 +400,7 @@ Cargo 작업공간 `engine-rs/`에 크레이트 둘이 있습니다. 시험과 �
 | `crates/ais-core/src/vault/` | 아젠다, 프로젝트, 노트, 템플릿, 회고, 휴지통을 훑어 읽는 부품과 git 이력 읽기 |
 | `crates/ais-core/src/write/` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 잠금, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 경고, 선결 조건 토큰, 편집 도장, 자동 커밋 |
 | `crates/ais-kernel/` | 바닥 크레이트. 글·JSON 규칙(`text`, `json`), 오류 값(`error`), 프론트매터 YAML 읽기와 쓰기(`frontmatter`, SnakeYAML이 하던 일), YAML 방출기(`snake_dump`), 공용 커널(`kernel`). 다른 영역을 모르고 파일·시계에 손대지 않는다 |
+| `crates/ais-infra/` | 인프라 크레이트. 바깥 세상(시계, 난수, 환경 변수, 잠금, git, sqlite3, vault 저장소)의 약속 `ports`와 기본 구현 `adapters`. `ais-kernel`만 의존한다 |
 | `crates/ais-domain/` | 도메인 크레이트. 노트(`note`), 태스크의 모양·상태 전이·집합체(`task::{format, transitions, aggregate}`), 자원의 모양·승인 규칙·인자와 참조 규칙(`resource::{format, aggregate, rules}`). `ais-kernel`만 의존해서 포트·어댑터·vault 읽기와 쓰기를 쓰면 컴파일이 안 된다 |
 | `crates/ais-core/src/{task,resource,session}/` | 태스크, 스킬·에이전트 정의와 승인, 에이전트 세션 읽기 |
 | `crates/ais-core/src/engine.rs`, `engine/table.rs` | 엔진 진입점과, 이름·읽기/쓰기·쓰기 범위·요청 종류·처리 함수를 한 줄에 적은 명령 표 |
