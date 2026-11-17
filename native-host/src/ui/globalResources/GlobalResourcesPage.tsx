@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { WorkspaceController } from '../../workspace/controller.ts';
 import { Confirm } from '../Modal.tsx';
 import { Page } from '../OtherPages.tsx';
@@ -13,16 +13,32 @@ import {
   saveGlobalResourceItem,
   saveGlobalSkill,
   saveProcessAgent,
+  syncGlobalResources,
   useGlobalResources,
 } from './globalResourcesStore.ts';
 import type { GlobalResourceItem, GlobalSkill, ProcessAgent } from './types.ts';
 
 type ActiveTab = 'agents' | 'skills' | 'resources';
 
-export function GlobalResourcesPage({ controller: _controller }: { controller: WorkspaceController }) {
+export function GlobalResourcesPage({ controller }: { controller: WorkspaceController }) {
   const data = useGlobalResources();
   const [activeTab, setActiveTab] = useState<ActiveTab>('agents');
   const [search, setSearch] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // 페이지 진입 시 디스크 엔진과 자동 동기화 및 10대 에이전트 자동 시딩
+  useEffect(() => {
+    let unmounted = false;
+    setIsSyncing(true);
+    syncGlobalResources(controller.callEngine)
+      .catch((err) => console.error('글로벌 리소스 동기화 실패:', err))
+      .finally(() => {
+        if (!unmounted) setIsSyncing(false);
+      });
+    return () => {
+      unmounted = true;
+    };
+  }, [controller.callEngine]);
 
   // 모달 상태
   const [editingAgent, setEditingAgent] = useState<ProcessAgent | null>(null);
@@ -44,16 +60,47 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
   // 초기화 확인 모달
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
-    if (deletingItem.type === 'agent') {
-      deleteProcessAgent(deletingItem.id);
-    } else if (deletingItem.type === 'skill') {
-      deleteGlobalSkill(deletingItem.id);
-    } else if (deletingItem.type === 'resource') {
-      deleteGlobalResourceItem(deletingItem.id);
+    try {
+      if (deletingItem.type === 'agent') {
+        await deleteProcessAgent(deletingItem.id, controller.callEngine);
+      } else if (deletingItem.type === 'skill') {
+        await deleteGlobalSkill(deletingItem.id, controller.callEngine);
+      } else if (deletingItem.type === 'resource') {
+        deleteGlobalResourceItem(deletingItem.id);
+      }
+    } catch (err) {
+      console.error('삭제 처리 실패:', err);
+    } finally {
+      setDeletingItem(null);
     }
-    setDeletingItem(null);
+  };
+
+  const handleSaveAgent = async (agent: ProcessAgent) => {
+    try {
+      await saveProcessAgent(agent, controller.callEngine);
+    } catch (err) {
+      console.error('에이전트 저장 실패:', err);
+    }
+  };
+
+  const handleSaveSkill = async (skill: GlobalSkill) => {
+    try {
+      await saveGlobalSkill(skill, controller.callEngine);
+    } catch (err) {
+      console.error('스킬 저장 실패:', err);
+    }
+  };
+
+  const handleResetToDefault = async () => {
+    try {
+      await resetGlobalResourcesToDefault(controller.callEngine);
+    } catch (err) {
+      console.error('기본값 초기화 실패:', err);
+    } finally {
+      setConfirmReset(false);
+    }
   };
 
   // 필터링
@@ -62,7 +109,9 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
     (a) =>
       a.name.toLowerCase().includes(lowerSearch) ||
       a.role.toLowerCase().includes(lowerSearch) ||
-      a.description.toLowerCase().includes(lowerSearch)
+      a.description.toLowerCase().includes(lowerSearch) ||
+      a.engine.toLowerCase().includes(lowerSearch) ||
+      a.model.toLowerCase().includes(lowerSearch)
   );
   const filteredSkills = data.skills.filter(
     (s) =>
@@ -81,7 +130,7 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
     <Page title="글로벌 리소스 정의" className="res-page">
       <p className="res-intro">
         공통 개발 프로세스 에이전트, 글로벌 스킬, 외부 연동 리소스를 등록하고 관리해요.
-        외부 시스템과 <b>직접 연동하지 않고</b> 정의와 설정값을 관리하며 로컬에 안전하게 영속화돼요.
+        디스크(<code>.aisurada/resources/global/</code>)에 파일로 저장되어 <b>데스크톱 앱과 MCP 도구 양쪽에서 모두 조회·편집·삭제</b>할 수 있어요.
       </p>
 
       {/* 상단 탭 전환 & 툴바 */}
@@ -135,6 +184,7 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
           >
             기본값 초기화
           </button>
+          {isSyncing && <span style={{ fontSize: '12px', color: 'var(--muted)' }}>동기화 중...</span>}
         </div>
       </div>
 
@@ -145,7 +195,7 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
             <div>
               <h2>공통 개발 프로세스 에이전트</h2>
               <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                오케스트레이터를 비롯한 10대 핵심 전문 에이전트의 역할과 지침을 관리합니다.
+                오케스트레이터를 비롯한 10대 핵심 전문 에이전트의 역할, AI 엔진(Gemini/Claude/Codex) 및 세부 모델을 관리합니다.
               </span>
             </div>
             <button
@@ -166,17 +216,32 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
             <ul className="res-list">
               {filteredAgents.map((agent) => {
                 const assignedSkillNames = agent.skills
-                  .map((sId) => data.skills.find((s) => s.id === sId)?.name)
+                  .map((sId) => data.skills.find((s) => s.id === sId)?.name || sId)
                   .filter(Boolean);
                 const assignedResourceNames = agent.resources
-                  .map((rId) => data.resources.find((r) => r.id === rId)?.name)
+                  .map((rId) => data.resources.find((r) => r.id === rId)?.name || rId)
                   .filter(Boolean);
+
+                const engineLabel =
+                  agent.engine === 'gemini' ? 'Gemini' : agent.engine === 'claude' ? 'Claude' : 'Codex';
 
                 return (
                   <li key={agent.id} className="res-item" style={{ opacity: agent.enabled ? 1 : 0.65 }}>
                     <div className="res-main">
-                      <p className="res-title">
+                      <p className="res-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <strong className="res-name">{agent.name}</strong>
+                        <span
+                          className={`res-badge ${
+                            agent.engine === 'gemini'
+                              ? 'res-badge-ref'
+                              : agent.engine === 'claude'
+                              ? 'res-badge-own'
+                              : 'res-badge-off'
+                          }`}
+                          style={{ fontSize: '11px', padding: '2px 8px' }}
+                        >
+                          엔진: {engineLabel}
+                        </span>
                         <span className="res-kind">모델: {agent.model}</span>
                         {!agent.enabled && <span className="res-kind" style={{ color: 'var(--err)' }}>비활성</span>}
                       </p>
@@ -188,6 +253,9 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
                         )}
                         {assignedResourceNames.length > 0 && (
                           <span>연동: {assignedResourceNames.join(', ')}</span>
+                        )}
+                        {agent.path && (
+                          <span style={{ fontSize: '11px', color: 'var(--muted)' }}>파일: {agent.path}</span>
                         )}
                       </div>
                     </div>
@@ -253,20 +321,18 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
                   <div className="res-main">
                     <p className="res-title">
                       <strong className="res-name">{skill.name}</strong>
-                      <span className="res-kind">Skill</span>
-                      {skill.tags.map((tag) => (
-                        <span key={tag} className="res-badge res-badge-off">
-                          #{tag}
-                        </span>
-                      ))}
                     </p>
                     {skill.description && <p className="res-desc">{skill.description}</p>}
-                    {skill.body && (
-                      <p className="res-meta" style={{ fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'pre-line' }}>
-                        {skill.body.slice(0, 120)}
-                        {skill.body.length > 120 ? '...' : ''}
-                      </p>
-                    )}
+                    <div className="res-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                      {skill.tags.map((t) => (
+                        <span key={t} className="res-badge res-badge-off" style={{ fontSize: '11px' }}>
+                          #{t}
+                        </span>
+                      ))}
+                      {skill.path && (
+                        <span style={{ fontSize: '11px', color: 'var(--muted)' }}>파일: {skill.path}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="res-actions">
                     <button
@@ -298,14 +364,14 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
         </section>
       )}
 
-      {/* ---------------- 3. 글로벌 리소스 탭 ---------------- */}
+      {/* ---------------- 3. 글로벌 리소스 연동 탭 ---------------- */}
       {activeTab === 'resources' && (
         <section className="res-section" aria-label="글로벌 리소스">
           <header className="res-section-head">
             <div>
-              <h2>글로벌 리소스 (인프라 / 도구 연동)</h2>
+              <h2>글로벌 리소스 연동 (Jira, GitHub, DB 등 Mock/실제)</h2>
               <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                Jira(Mock), Aisurada Task, GitHub, Database, Grafana(Mock) 등 외부 도구 설정을 정의합니다.
+                에이전트가 작업 시 참조할 외부 인프라 및 시스템 연동 정보를 설정합니다.
               </span>
             </div>
             <button
@@ -316,7 +382,7 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
                 setIsNewResource(true);
               }}
             >
-              새 글로벌 리소스 추가
+              새 리소스 연동 추가
             </button>
           </header>
 
@@ -329,37 +395,23 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
                   <div className="res-main">
                     <p className="res-title">
                       <strong className="res-name">{res.name}</strong>
-                      <span className="res-kind" style={{ textTransform: 'uppercase' }}>
-                        {res.type}
-                      </span>
-                      {res.isMock && (
-                        <span className="res-badge" style={{ background: 'var(--soft)', color: 'var(--ink)' }}>
-                          Mock (가상)
-                        </span>
-                      )}
+                      <span className="res-kind">타입: {res.type}</span>
+                      {res.isMock && <span className="res-badge res-badge-off">Mock</span>}
                       <span
-                        className="res-badge"
-                        style={{
-                          background:
-                            res.status === 'active'
-                              ? 'var(--ok-bg)'
-                              : res.status === 'mocking'
-                              ? 'var(--warn-bg, #fff3cd)'
-                              : 'var(--err-bg, #f8d7da)',
-                          color:
-                            res.status === 'active'
-                              ? 'var(--ok)'
-                              : res.status === 'mocking'
-                              ? 'var(--warn, #856404)'
-                              : 'var(--err, #721c24)',
-                        }}
+                        className={`res-badge ${
+                          res.status === 'active'
+                            ? 'res-badge-ref'
+                            : res.status === 'mocking'
+                            ? 'res-badge-off'
+                            : 'res-badge-own'
+                        }`}
                       >
-                        {res.status}
+                        {res.status === 'active' ? '연동 중' : res.status === 'mocking' ? '모의 연동' : '비활성'}
                       </span>
                     </p>
                     {res.description && <p className="res-desc">{res.description}</p>}
-                    <div className="res-meta" style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
-                      {res.endpoint && <span>엔드포인트: {res.endpoint}</span>}
+                    <div className="res-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                      <span>엔드포인트: {res.endpoint}</span>
                       <span>인증: {res.authType}</span>
                     </div>
                   </div>
@@ -371,7 +423,7 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
                         setIsNewResource(false);
                       }}
                     >
-                      편집
+                      설정 편집
                     </button>
                     <button
                       type="button"
@@ -393,13 +445,13 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
         </section>
       )}
 
-      {/* 모달 창들 */}
+      {/* 모달들 */}
       {(isNewAgent || editingAgent) && (
         <ProcessAgentModal
           agent={editingAgent}
           skills={data.skills}
           resources={data.resources}
-          onSave={(agent) => saveProcessAgent(agent)}
+          onSave={handleSaveAgent}
           onClose={() => {
             setEditingAgent(null);
             setIsNewAgent(false);
@@ -410,7 +462,7 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
       {(isNewSkill || editingSkill) && (
         <GlobalSkillModal
           skill={editingSkill}
-          onSave={(skill) => saveGlobalSkill(skill)}
+          onSave={handleSaveSkill}
           onClose={() => {
             setEditingSkill(null);
             setIsNewSkill(false);
@@ -421,7 +473,11 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
       {(isNewResource || editingResource) && (
         <GlobalResourceModal
           resource={editingResource}
-          onSave={(item) => saveGlobalResourceItem(item)}
+          onSave={(item) => {
+            saveGlobalResourceItem(item);
+            setEditingResource(null);
+            setIsNewResource(false);
+          }}
           onClose={() => {
             setEditingResource(null);
             setIsNewResource(false);
@@ -432,25 +488,22 @@ export function GlobalResourcesPage({ controller: _controller }: { controller: W
       {/* 삭제 확인 모달 */}
       {deletingItem && (
         <Confirm
-          title={`${deletingItem.name} 항목을 삭제할까요?`}
-          description="삭제하면 목록에서 즉시 제거되며 로컬 스토리지에 반영됩니다."
-          label="삭제하기"
-          close={() => setDeletingItem(null)}
+          title="삭제 확인"
+          description={`'${deletingItem.name}' 항목을 정말 삭제하시겠습니까? 디스크 및 휴지통에서 삭제됩니다.`}
+          label="삭제"
           accept={handleConfirmDelete}
+          close={() => setDeletingItem(null)}
         />
       )}
 
       {/* 기본값 초기화 모달 */}
       {confirmReset && (
         <Confirm
-          title="기본 데이터로 초기화할까요?"
-          description="현재 등록된 내용이 10대 프로세스 에이전트 및 기본 글로벌 리소스(Jira mock, Aisurada task, GitHub, Database, Grafana mock 등)의 기본 사양으로 재설정됩니다."
-          label="기본값 복원"
+          title="기본값 초기화"
+          description="글로벌 리소스를 초기 상태로 되돌리시겠습니까? 기존 등록된 에이전트와 설정이 기본값으로 재설정됩니다."
+          label="초기화"
+          accept={handleResetToDefault}
           close={() => setConfirmReset(false)}
-          accept={() => {
-            resetGlobalResourcesToDefault();
-            setConfirmReset(false);
-          }}
         />
       )}
     </Page>

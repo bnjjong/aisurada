@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal } from '../Modal.tsx';
-import type { GlobalResourceItem, GlobalSkill, ProcessAgent } from './types.ts';
+import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent } from './types.ts';
+import { AI_ENGINES, MODEL_PRESETS } from './types.ts';
 
 interface Props {
   agent?: ProcessAgent | null;
@@ -16,12 +17,27 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [name, setName] = useState(agent?.name || '');
   const [role, setRole] = useState(agent?.role || '');
   const [description, setDescription] = useState(agent?.description || '');
-  const [model, setModel] = useState(agent?.model || 'inherit');
   const [enabled, setEnabled] = useState(agent?.enabled ?? true);
+  
+  // AI 엔진 및 모델 세분화
+  const initialEngine: AIEngine = agent?.engine || 'gemini';
+  const [engine, setEngine] = useState<AIEngine>(initialEngine);
+  const initialModel = agent?.model || MODEL_PRESETS[initialEngine][0];
+  const isPreset = MODEL_PRESETS[initialEngine].includes(initialModel);
+  const [selectedModel, setSelectedModel] = useState(isPreset ? initialModel : 'custom');
+  const [customModelInput, setCustomModelInput] = useState(isPreset ? '' : initialModel);
+
   const [selectedSkills, setSelectedSkills] = useState<string[]>(agent?.skills || []);
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
   const [prompt, setPrompt] = useState(agent?.prompt || '');
   const [error, setError] = useState('');
+
+  const handleEngineChange = (newEngine: AIEngine) => {
+    setEngine(newEngine);
+    const defaultModel = MODEL_PRESETS[newEngine][0];
+    setSelectedModel(defaultModel);
+    setCustomModelInput('');
+  };
 
   const toggleSkill = (id: string) => {
     setSelectedSkills((prev) =>
@@ -41,18 +57,22 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
       setError('에이전트 이름을 입력해 주세요.');
       return;
     }
+    const finalModel = selectedModel === 'custom' ? (customModelInput.trim() || 'inherit') : selectedModel;
+
     const updated: ProcessAgent = {
       id: agent?.id || `proc-${Date.now()}`,
       key: agent?.key || name.trim().toLowerCase().replace(/\s+/g, '-'),
       name: name.trim(),
       role: role.trim(),
       description: description.trim(),
-      model,
+      engine,
+      model: finalModel,
       enabled,
       skills: selectedSkills,
       resources: selectedResources,
       prompt: prompt.trim(),
       order: agent?.order ?? 99,
+      f1: agent?.f1,
     };
     onSave(updated);
     onClose();
@@ -73,7 +93,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예: 티겟 에이전트"
+            placeholder="예: 티켓 에이전트"
             required
           />
         </label>
@@ -98,6 +118,54 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
           />
         </label>
 
+        {/* AI 엔진 및 세부 모델 설정 */}
+        <div style={{ display: 'grid', gap: '8px', padding: '12px', background: 'var(--surface-sunken, #f8f9fa)', borderRadius: '8px', border: '1px solid var(--border-subtle, #e5e7eb)' }}>
+          <strong style={{ fontSize: '13px' }}>AI 실행 엔진 및 모델</strong>
+          
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {AI_ENGINES.map((eng) => (
+              <button
+                key={eng.id}
+                type="button"
+                className={`res-badge ${engine === eng.id ? 'res-badge-ref' : 'res-badge-off'}`}
+                style={{ padding: '6px 14px', cursor: 'pointer', fontSize: '13px' }}
+                onClick={() => handleEngineChange(eng.id)}
+              >
+                {engine === eng.id ? '● ' : '○ '} {eng.label} <small style={{ opacity: 0.7 }}>({eng.company})</small>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+              <span>세부 모델:</span>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                style={{ minWidth: '180px', padding: '4px 8px' }}
+              >
+                {MODEL_PRESETS[engine].map((m) => (
+                  <option key={m} value={m}>
+                    {m === 'inherit' ? '기본 모델 (inherit)' : m}
+                  </option>
+                ))}
+                <option value="custom">직접 입력...</option>
+              </select>
+            </label>
+
+            {selectedModel === 'custom' && (
+              <input
+                type="text"
+                value={customModelInput}
+                onChange={(e) => setCustomModelInput(e.target.value)}
+                placeholder="예: claude-3-7-sonnet-20250219"
+                style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
+                required
+              />
+            )}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
             <input
@@ -106,15 +174,6 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
               onChange={(e) => setEnabled(e.target.checked)}
             />
             <span>활성화 (프로세스 참여)</span>
-          </label>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>모델:</span>
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="inherit">기본 모델 (inherit)</option>
-              <option value="pro">Pro 모델 (복잡한 추론/오케스트레이션)</option>
-              <option value="flash">Flash 모델 (빠른 단일 태스크)</option>
-            </select>
           </label>
         </div>
 

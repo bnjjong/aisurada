@@ -1,52 +1,29 @@
 import { useSyncExternalStore } from 'react';
+import type { EngineCall, ResourceRow } from '../resourcesClient.ts';
+import { deleteResource, getResource, listResources, saveResource } from '../resourcesClient.ts';
 import type { GlobalResourceItem, GlobalResourcesData, GlobalSkill, ProcessAgent } from './types.ts';
-import { DEFAULT_GLOBAL_RESOURCES, DEFAULT_GLOBAL_SKILLS, DEFAULT_PROCESS_AGENTS } from './types.ts';
+import {
+  DEFAULT_GLOBAL_RESOURCES,
+  DEFAULT_GLOBAL_SKILLS,
+  DEFAULT_PROCESS_AGENTS,
+  globalSkillToSaveInput,
+  processAgentToSaveInput,
+  resourceRowToGlobalSkill,
+  resourceRowToProcessAgent,
+} from './types.ts';
 
-const STORAGE_KEY = 'aisurada.globalResources.v1';
+const INFRAS_STORAGE_KEY = 'aisurada.globalInfras.v1';
 
 const listeners = new Set<() => void>();
 
-function getInitialData(): GlobalResourcesData {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return {
-      agents: DEFAULT_PROCESS_AGENTS,
-      skills: DEFAULT_GLOBAL_SKILLS,
-      resources: DEFAULT_GLOBAL_RESOURCES,
-      version: 1,
-    };
-  }
+let storeState: GlobalResourcesData = {
+  agents: DEFAULT_PROCESS_AGENTS,
+  skills: DEFAULT_GLOBAL_SKILLS,
+  resources: DEFAULT_GLOBAL_RESOURCES,
+  version: 1,
+};
 
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const initial: GlobalResourcesData = {
-        agents: DEFAULT_PROCESS_AGENTS,
-        skills: DEFAULT_GLOBAL_SKILLS,
-        resources: DEFAULT_GLOBAL_RESOURCES,
-        version: 1,
-      };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-      return initial;
-    }
-    const parsed = JSON.parse(raw) as Partial<GlobalResourcesData>;
-    return {
-      agents: Array.isArray(parsed.agents) && parsed.agents.length > 0 ? parsed.agents : DEFAULT_PROCESS_AGENTS,
-      skills: Array.isArray(parsed.skills) ? parsed.skills : DEFAULT_GLOBAL_SKILLS,
-      resources: Array.isArray(parsed.resources) ? parsed.resources : DEFAULT_GLOBAL_RESOURCES,
-      version: parsed.version || 1,
-    };
-  } catch (err) {
-    console.error('글로벌 리소스 데이터를 불러오지 못했습니다:', err);
-    return {
-      agents: DEFAULT_PROCESS_AGENTS,
-      skills: DEFAULT_GLOBAL_SKILLS,
-      resources: DEFAULT_GLOBAL_RESOURCES,
-      version: 1,
-    };
-  }
-}
-
-let storeState: GlobalResourcesData = getInitialData();
+let initializingPromise: Promise<void> | null = null;
 
 function emitChange() {
   for (const listener of listeners) {
@@ -54,16 +31,31 @@ function emitChange() {
   }
 }
 
-function persist(next: GlobalResourcesData) {
-  storeState = next;
+function loadInfrasFromStorage(): GlobalResourceItem[] {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return DEFAULT_GLOBAL_RESOURCES;
+  }
+  try {
+    const raw = window.localStorage.getItem(INFRAS_STORAGE_KEY);
+    if (!raw) {
+      window.localStorage.setItem(INFRAS_STORAGE_KEY, JSON.stringify(DEFAULT_GLOBAL_RESOURCES));
+      return DEFAULT_GLOBAL_RESOURCES;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_GLOBAL_RESOURCES;
+  } catch {
+    return DEFAULT_GLOBAL_RESOURCES;
+  }
+}
+
+function saveInfrasToStorage(infras: GlobalResourceItem[]): void {
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(INFRAS_STORAGE_KEY, JSON.stringify(infras));
     } catch (err) {
-      console.error('글로벌 리소스를 저장하지 못했습니다:', err);
+      console.error('인프라 리소스 저장 실패:', err);
     }
   }
-  emitChange();
 }
 
 export function getGlobalResourcesSnapshot(): GlobalResourcesData {
@@ -81,68 +73,157 @@ export function useGlobalResources(): GlobalResourcesData {
   return useSyncExternalStore(subscribeGlobalResources, getGlobalResourcesSnapshot, getGlobalResourcesSnapshot);
 }
 
-// --------------------------- 에이전트 조작 ---------------------------
-export function saveProcessAgent(agent: ProcessAgent): void {
-  const current = getGlobalResourcesSnapshot();
-  const exists = current.agents.some((a) => a.id === agent.id);
-  const nextAgents = exists
-    ? current.agents.map((a) => (a.id === agent.id ? agent : a))
-    : [...current.agents, agent];
-  persist({ ...current, agents: nextAgents });
+/** 엔진에서 글로벌 자원들을 로드하고, 없을 경우 10대 프로세스 에이전트를 자동 시딩합니다 */
+export async function syncGlobalResources(call: EngineCall): Promise<void> {
+  if (initializingPromise) {
+    return initializingPromise;
+  }
+
+  initializingPromise = (async () => {
+    try {
+      const { resources: globalRows } = await listResources(call, { global: true });
+      const agentRows = globalRows.filter((r: ResourceRow) => r.kind === 'agent');
+      const skillRows = globalRows.filter((r: ResourceRow) => r.kind === 'skill');
+
+      // 1. 글로벌 스킬 자동 시딩 (없는 경우)
+      if (skillRows.length === 0) {
+        for (const defaultSkill of DEFAULT_GLOBAL_SKILLS) {
+          try {
+            await saveResource(call, globalSkillToSaveInput(defaultSkill));
+          } catch (err) {
+            console.warn(`기본 스킬 시딩 건너뜀 (${defaultSkill.name}):`, err);
+          }
+        }
+      }
+
+      // 2. 프로세스 에이전트 자동 시딩 (엔진에 글로벌 에이전트가 하나도 없을 때)
+      if (agentRows.length === 0) {
+        const { resources: refreshedSkills } = await listResources(call, { global: true, kind: 'skill' });
+        const skillIdMap = new Map<string, string>();
+        for (const s of refreshedSkills) {
+          skillIdMap.set(s.name, s.id);
+        }
+
+        for (const defaultAgent of DEFAULT_PROCESS_AGENTS) {
+          try {
+            const mappedSkills = defaultAgent.skills
+              .map((sId) => {
+                const sName = sId.replace(/^gskill-/, '');
+                return skillIdMap.get(sName) || sId;
+              })
+              .filter((id) => id.startsWith('sk'));
+
+            const agentInput = processAgentToSaveInput({
+              ...defaultAgent,
+              skills: mappedSkills,
+            });
+            await saveResource(call, agentInput);
+          } catch (err) {
+            console.warn(`기본 프로세스 에이전트 시딩 건너뜀 (${defaultAgent.name}):`, err);
+          }
+        }
+      }
+
+      // 3. 최신 엔진 목록 다시 조회하여 상세 데이터(body 및 precondition) 채우기
+      const { resources: refreshedGlobal } = await listResources(call, { global: true });
+      const refreshedAgentRows = refreshedGlobal.filter((r: ResourceRow) => r.kind === 'agent');
+      const refreshedSkillRows = refreshedGlobal.filter((r: ResourceRow) => r.kind === 'skill');
+
+      const detailedAgents: ProcessAgent[] = await Promise.all(
+        refreshedAgentRows.map(async (row: ResourceRow, idx: number) => {
+          try {
+            const detail = await getResource(call, row.id);
+            return resourceRowToProcessAgent(detail, idx);
+          } catch {
+            return resourceRowToProcessAgent(row, idx);
+          }
+        })
+      );
+
+      const detailedSkills: GlobalSkill[] = await Promise.all(
+        refreshedSkillRows.map(async (row: ResourceRow) => {
+          try {
+            const detail = await getResource(call, row.id);
+            return resourceRowToGlobalSkill(detail);
+          } catch {
+            return resourceRowToGlobalSkill(row);
+          }
+        })
+      );
+
+      const infras = loadInfrasFromStorage();
+
+      storeState = {
+        agents: detailedAgents.sort((a, b) => a.order - b.order),
+        skills: detailedSkills,
+        resources: infras,
+        version: 1,
+      };
+      emitChange();
+    } catch (err) {
+      console.error('글로벌 리소스 동기화 중 오류 발생:', err);
+    } finally {
+      initializingPromise = null;
+    }
+  })();
+
+  return initializingPromise;
 }
 
-export function deleteProcessAgent(agentId: string): void {
-  const current = getGlobalResourcesSnapshot();
-  persist({ ...current, agents: current.agents.filter((a) => a.id !== agentId) });
+// --------------------------- 에이전트 조작 (엔진 연동) ---------------------------
+
+export async function saveProcessAgent(agent: ProcessAgent, call: EngineCall): Promise<void> {
+  const input = processAgentToSaveInput(agent);
+  await saveResource(call, input);
+  await syncGlobalResources(call);
 }
 
-// --------------------------- 스킬 조작 ---------------------------
-export function saveGlobalSkill(skill: GlobalSkill): void {
-  const current = getGlobalResourcesSnapshot();
-  const exists = current.skills.some((s) => s.id === skill.id);
-  const updatedSkill: GlobalSkill = {
-    ...skill,
-    updatedAt: new Date().toISOString(),
-    createdAt: skill.createdAt || new Date().toISOString(),
-  };
-  const nextSkills = exists
-    ? current.skills.map((s) => (s.id === skill.id ? updatedSkill : s))
-    : [...current.skills, updatedSkill];
-  persist({ ...current, skills: nextSkills });
+export async function deleteProcessAgent(agentId: string, call: EngineCall): Promise<void> {
+  await deleteResource(call, agentId);
+  await syncGlobalResources(call);
 }
 
-export function deleteGlobalSkill(skillId: string): void {
-  const current = getGlobalResourcesSnapshot();
-  persist({ ...current, skills: current.skills.filter((s) => s.id !== skillId) });
+// --------------------------- 스킬 조작 (엔진 연동) ---------------------------
+
+export async function saveGlobalSkill(skill: GlobalSkill, call: EngineCall): Promise<void> {
+  const input = globalSkillToSaveInput(skill);
+  await saveResource(call, input);
+  await syncGlobalResources(call);
 }
 
-// --------------------------- 리소스 조작 ---------------------------
+export async function deleteGlobalSkill(skillId: string, call: EngineCall): Promise<void> {
+  await deleteResource(call, skillId);
+  await syncGlobalResources(call);
+}
+
+// --------------------------- 인프라 조작 ---------------------------
+
 export function saveGlobalResourceItem(item: GlobalResourceItem): void {
   const current = getGlobalResourcesSnapshot();
   const exists = current.resources.some((r) => r.id === item.id);
-  const updatedItem: GlobalResourceItem = {
-    ...item,
-    updatedAt: new Date().toISOString(),
-    createdAt: item.createdAt || new Date().toISOString(),
-  };
-  const nextResources = exists
-    ? current.resources.map((r) => (r.id === item.id ? updatedItem : r))
-    : [...current.resources, updatedItem];
-  persist({ ...current, resources: nextResources });
+  const next = exists
+    ? current.resources.map((r) => (r.id === item.id ? item : r))
+    : [...current.resources, item];
+  saveInfrasToStorage(next);
+  storeState = { ...current, resources: next };
+  emitChange();
 }
 
-export function deleteGlobalResourceItem(resourceId: string): void {
+export function deleteGlobalResourceItem(itemId: string): void {
   const current = getGlobalResourcesSnapshot();
-  persist({ ...current, resources: current.resources.filter((r) => r.id !== resourceId) });
+  const next = current.resources.filter((r) => r.id !== itemId);
+  saveInfrasToStorage(next);
+  storeState = { ...current, resources: next };
+  emitChange();
 }
 
-// --------------------------- 초기화 ---------------------------
-export function resetGlobalResourcesToDefault(): void {
-  const initial: GlobalResourcesData = {
-    agents: DEFAULT_PROCESS_AGENTS,
-    skills: DEFAULT_GLOBAL_SKILLS,
-    resources: DEFAULT_GLOBAL_RESOURCES,
-    version: 1,
-  };
-  persist(initial);
+export async function resetGlobalResourcesToDefault(call: EngineCall): Promise<void> {
+  const current = getGlobalResourcesSnapshot();
+  for (const a of current.agents) {
+    try {
+      await deleteResource(call, a.id);
+    } catch {}
+  }
+  saveInfrasToStorage(DEFAULT_GLOBAL_RESOURCES);
+  await syncGlobalResources(call);
 }
