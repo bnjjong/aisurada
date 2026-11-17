@@ -787,8 +787,30 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <li><code>history</code>는 노트 수보다 git 호출 수에 좌우된다.</li>
 <li>최대 메모리는 1만 건에서 344MB다. 이 값은 「그때까지의 최대」라 항목을 지날수록 늘기만 한다.</li>
 <li>이 숫자는 릴리스 전에 같은 명령으로 다시 재서 두 배 넘게 늘었는지 보는 용도다. 자동 시험에 넣지 않았다(벽시계 시간은 공유 러너에서 흔들려서 시험이 가끔 깨진다).</li>
-<li>못 잰 것: 노트 하나가 아주 긴 경우, 첨부와 코멘트가 많은 경우, 앱을 거친 시간(IPC, JSON 변환, 화면).</li>
+<li>못 잰 것: 노트 하나가 아주 긴 경우, 첨부와 코멘트가 많은 경우. 앱을 거친 시간(IPC, JSON 변환, 화면)은 바로 아래 「앱을 거친 시간」에서 잰다.</li>
 <li>Java 시절 숫자는 노트 12건의 <code>list_docs</code> 본문 포함 한 번뿐이었다(Java 약 445ms, Rust 약 70ms, 첫 묶음 기록). 같은 조건의 비교는 아니다.</li>
+</ul>
+<h4 id="앱을-거친-시간이슈-59httpsgithubcombnjjongaisuradaissues59"><a class="anchor" href="#앱을-거친-시간이슈-59httpsgithubcombnjjongaisuradaissues59" aria-label="이 절의 링크">#</a>앱을 거친 시간(이슈 <a href="https://github.com/bnjjong/aisurada/issues/59">#59</a>)</h4>
+<p><code>pnpm --dir native-host perf:app</code>이 위와 같은 합성 vault(한 건 약 1.5KB, 아젠다 10개, 월별 폴더, 노트 수는 환경 변수 <code>AIS_PERF_NOTES</code>, 기본 2,000)를 만들고 <strong>릴리스 호스트</strong>를 실제 WKWebView로 띄워서, 앱이 노트를 읽는 시간을 잰다. 통과나 실패를 따지지 않고 숫자를 찍는다(점검 코드는 <code>native-host/scripts/perf-checks.js</code>, 모드는 <code>workspace-acceptance.mjs</code>의 <code>--perf</code>). 릴리스 호스트를 처음 지을 때는 수 분이 더 걸린다. <strong>창을 앞에 둔 채</strong> 돌린다. 창이 가려지면(<code>visibility</code>가 <code>hidden</code>) WebKit이 타이머와 화면 갱신을 늦춰서 값이 수십 배로 부풀고(처음 잰 「첫 검색 285초」가 이것이었다), 마지막 단계가 실패로 알린다.</p>
+<p>2026-11-17, Apple M2, release 호스트, 가운데 값(ms). 호출은 5번(<code>init-workspace</code>는 3번), 10,000건은 서로 5% 안에 맞은 두 번의 값이다.</p>
+<div class="table-wrap"><table><thead><tr><th>항목</th><th style="text-align:right">200건</th><th style="text-align:right">2,000건</th><th style="text-align:right">10,000건</th></tr></thead><tbody>
+<tr><td><strong>앱 열기</strong>(웹뷰 시작부터 목록이 뜰 때까지)</td><td style="text-align:right">518</td><td style="text-align:right">2,113</td><td style="text-align:right">9,585</td></tr>
+<tr><td>└ 화면의 옛 노트 이관 훑기(<code>migrateLegacy</code>)</td><td style="text-align:right">약 210</td><td style="text-align:right">약 1,610</td><td style="text-align:right">약 7,680</td></tr>
+<tr><td>└ 엔진 읽기 두 묶음(새로고침 한 번과 같다)</td><td style="text-align:right">약 30</td><td style="text-align:right">약 260</td><td style="text-align:right">약 1,310</td></tr>
+<tr><td><code>list_docs</code> 본문 포함, 한 번</td><td style="text-align:right">11</td><td style="text-align:right">92</td><td style="text-align:right">504</td></tr>
+<tr><td><code>list_docs</code> 메타만, 한 번</td><td style="text-align:right">9</td><td style="text-align:right">83</td><td style="text-align:right">437</td></tr>
+<tr><td>응답 크기, 본문 포함 / 메타만(KB)</td><td style="text-align:right">191 / 59</td><td style="text-align:right">1,913 / 592</td><td style="text-align:right">9,581 / 2,971</td></tr>
+<tr><td><code>search_docs</code>(엔진 검색)</td><td style="text-align:right">17</td><td style="text-align:right">158~165</td><td style="text-align:right">864</td></tr>
+<tr><td><code>get_doc</code> 한 건</td><td style="text-align:right">9</td><td style="text-align:right">81</td><td style="text-align:right">416</td></tr>
+<tr><td>화면의 빠른 검색, 첫 글자 입력 / 그 뒤</td><td style="text-align:right">3 / 2</td><td style="text-align:right">17 / 3</td><td style="text-align:right">66 / 12</td></tr>
+<tr><td>호스트 메모리(열 때 → 읽은 뒤, MB)</td><td style="text-align:right">132 → 139</td><td style="text-align:right">153 → 163</td><td style="text-align:right">약 220<del>230 → 320</del>450</td></tr>
+</tbody></table></div>
+<p>읽는 법:</p>
+<ul>
+<li><strong>본문을 싣는 값은 작다.</strong> 10,000건에서 <code>list_docs</code>는 본문을 싣든 안 싣든 504ms와 437ms(15% 차이)이고, 응답은 9.6MB와 3.0MB다. 새로고침 한 번은 1.3초쯤이고 그 가운데 본문 때문인 몫은 0.1초 안팎이다(엔진이 호출마다 vault를 훑으며 본문을 이미 읽기 때문이다).</li>
+<li><strong>앱 열기는 엔진이 아니라 화면이 느리다.</strong> 열 때 <code>init-workspace</code>와 그 다음 호출 사이의 간격이 노트 한 건에 약 0.8ms로 늘어난다(10,000건에서 7.7초, 열기의 80%). 화면의 <code>migrateLegacy</code>가 옛 평면 노트를 찾으려고 노트 폴더마다 호스트에 IPC를 한 번씩 보내기 때문이다. 엔진의 훑기(한 건에 약 0.045ms)보다 열여덟 배 느리고, 옛 노트가 하나도 없어도 앱을 열 때마다 돈다(이 비용은 <a href="https://github.com/bnjjong/aisurada/issues/109">#109</a>로 올렸다).</li>
+<li><strong>화면 검색이 엔진 검색보다 빠르다.</strong> 화면은 읽어 둔 노트를 직접 뒤져서 10,000건에서도 글자 하나에 12ms(첫 입력은 노트마다 본문을 평문으로 만들어 두느라 66ms)이고, 엔진의 <code>search_docs</code>는 같은 크기에서 864ms다. 검색을 엔진으로 옮기면 입력마다 이만큼 느려진다.</li>
+<li>못 잰 것: 웹뷰 안의 JS 메모리(웹뷰는 다른 프로세스라 호스트 메모리에 안 들어 있고, WebKit에는 <code>performance.memory</code>가 없다). 메모리 값은 실행마다 흔들린다.</li>
 </ul>
 <h3 id="받아들임-묶음-34장"><a class="anchor" href="#받아들임-묶음-34장" aria-label="이 절의 링크">#</a>받아들임 묶음 (34장)</h3>
 <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code># Rust ais-cli(지금 엔진). 어댑터는 fixtures/aisurada-rust.adapter.json
