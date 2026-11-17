@@ -16,11 +16,11 @@ test('AI_ENGINES and MODEL_PRESETS cover claude, codex and gemini', () => {
   assert.deepEqual(engineIds.sort(), ['claude', 'codex', 'gemini'].sort());
 
   assert.ok(MODEL_PRESETS.claude.includes('claude-sonnet-5.5'));
-  assert.ok(MODEL_PRESETS.claude.includes('claude-3-7-sonnet'));
-  assert.ok(MODEL_PRESETS.codex.includes('gpt-6'));
-  assert.ok(MODEL_PRESETS.codex.includes('o3-mini'));
+  assert.ok(MODEL_PRESETS.claude.includes('claude-fable-5.2'));
+  assert.ok(MODEL_PRESETS.codex.includes('gpt-6.1-sol'));
+  assert.ok(MODEL_PRESETS.codex.includes('gpt-6-astra'));
   assert.ok(MODEL_PRESETS.gemini.includes('gemini-3.8-flash'));
-  assert.ok(MODEL_PRESETS.gemini.includes('gemini-3-pro'));
+  assert.ok(MODEL_PRESETS.gemini.includes('gemini-4-carbon'));
 });
 
 test('DEFAULT_PROCESS_AGENTS contains 10 agents with valid engines and models', () => {
