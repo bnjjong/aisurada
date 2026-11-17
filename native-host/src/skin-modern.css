@@ -160,7 +160,7 @@
 :root[data-skin="modern"] .workspace-option.selected { border-color: var(--accent); background: var(--accent-soft); }
 :root[data-skin="modern"] .tl-block { border: 1px solid var(--line); border-radius: 8px; background: var(--accent-soft); }
 :root[data-skin="modern"] :is(.ui-modal, .note-preview, .subnote-page, .cmdk-panel) { border: 0; border-radius: 14px; box-shadow: var(--sh-2); }
-:root[data-skin="modern"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc) {
+:root[data-skin="modern"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc, .task-menu) {
   border: 0; border-radius: 12px; box-shadow: var(--sh-2);
 }
 :root[data-skin="modern"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: rgba(11, 18, 32, .4); }

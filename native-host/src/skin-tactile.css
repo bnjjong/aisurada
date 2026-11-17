@@ -260,7 +260,7 @@
 :root[data-skin="tactile"] .cmdk-item { border-radius: 16px; }
 :root[data-skin="tactile"] .cmdk-item[aria-selected="true"] { background: var(--accent-soft); }
 :root[data-skin="tactile"] .cmdk-item mark { background: var(--accent-soft); color: var(--accent-text); border-radius: 4px; }
-:root[data-skin="tactile"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard) {
+:root[data-skin="tactile"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .task-menu) {
   border: 0; border-radius: 20px; box-shadow: var(--sh-2);
 }
 :root[data-skin="tactile"] .sel-bar { border-radius: 999px; padding: 4px; }

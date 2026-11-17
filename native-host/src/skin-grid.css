@@ -143,7 +143,7 @@
 /* ───────── 떠 있는 것은 먹선으로 둘러싼다 ───────── */
 :root[data-skin="grid"] :is(
   .ui-modal, .note-preview, .subnote-page, .cmdk-panel, .sel-bar, .comment-compose-popover, .slash-menu, .note-picker,
-  .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc
+  .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc, .task-menu
 ) { border-color: var(--strong); }
 :root[data-skin="grid"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: rgba(10, 22, 51, .45); }
 :root[data-skin="grid"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) { border-bottom-color: var(--strong); }

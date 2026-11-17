@@ -254,9 +254,16 @@
   border: 1px solid var(--rim); border-radius: 28px; background: var(--glass-solid); box-shadow: var(--sh-float);
   -webkit-backdrop-filter: blur(36px) saturate(1.7); backdrop-filter: blur(36px) saturate(1.7);
 }
-:root[data-skin="glass"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc) {
+:root[data-skin="glass"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc, .task-menu) {
   border: 1px solid var(--rim); border-radius: 20px; background: var(--glass-solid); box-shadow: var(--sh-float);
   -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6);
+}
+:root[data-skin="glass"] .task-menu {
+  background: rgba(255, 255, 255, .96);
+  box-shadow: var(--sh-float);
+}
+:root[data-skin="glass"][data-theme="dark"] .task-menu {
+  background: rgba(18, 26, 54, .96);
 }
 :root[data-skin="glass"] .sel-bar { border-radius: 16px; }
 :root[data-skin="glass"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
