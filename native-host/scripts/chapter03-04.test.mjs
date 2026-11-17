@@ -269,3 +269,16 @@ test('second review: the sending window suppresses its own Claude file events', 
   assert.deepEqual(claudeSelfWrites.external(['/fixture/notes/a/ask.json', '/fixture/notes/b/note.md']), ['/fixture/notes/b/note.md']);
   claudeSelfWrites.clear();
 });
+
+test('Chapter 4: ask hovercard isolates scroll and overscroll behavior from the outer document', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.ask-hovercard-body\s*\{[^}]*overscroll-behavior:\s*contain;/, 'ask hovercard body isolates overscroll');
+  assert.match(css, /\.ask-hovercard\s*\{[^}]*overscroll-behavior:\s*contain;/, 'ask hovercard box isolates overscroll');
+  assert.match(css, /html,\s*body\s*\{[^}]*overscroll-behavior:\s*none;/, 'root prevents overscroll bounce');
+
+  const cardCode = readFileSync(new URL('../src/plugs/claude/askHoverCard.tsx', import.meta.url), 'utf8');
+  assert.match(cardCode, /previousFocus\.current\.focus\(\{\s*preventScroll:\s*true\s*\}\)/, 'closing hovercard preserves scroll position');
+  const popoverCode = readFileSync(new URL('../src/plugs/claude/askPopover.tsx', import.meta.url), 'utf8');
+  assert.match(popoverCode, /previousFocus\.current\.focus\(\{\s*preventScroll:\s*true\s*\}\)/, 'closing popover preserves scroll position');
+});

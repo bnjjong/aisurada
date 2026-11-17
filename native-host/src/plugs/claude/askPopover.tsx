@@ -35,8 +35,8 @@ export function AskComposePopover({ state, onSubmit, onCancel }: AskComposePopov
 
   const cancelAndRestore = () => {
     onCancel();
-    if (previousFocus.current?.isConnected) {
-      previousFocus.current.focus();
+    if (previousFocus.current?.isConnected && previousFocus.current !== document.body) {
+      previousFocus.current.focus({ preventScroll: true });
     }
   };
 
