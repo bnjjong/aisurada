@@ -70,8 +70,8 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
 
   const handleClose = useCallback(() => {
     onClose?.();
-    if (previousFocus.current?.isConnected) {
-      previousFocus.current.focus();
+    if (previousFocus.current?.isConnected && previousFocus.current !== document.body) {
+      previousFocus.current.focus({ preventScroll: true });
     }
   }, [onClose]);
 
@@ -154,6 +154,7 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
         maxHeight: Math.min(size.height ? 1600 : 400, typeof window !== 'undefined' ? window.innerHeight - 100 : 400),
         boxSizing: 'border-box',
         overflow: 'hidden',
+        overscrollBehavior: 'contain',
       }}
       onMouseEnter={cancelClose}
       // Any press inside the card pins it; a focus that lands in its box does the same.
@@ -188,7 +189,7 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       {turns.length === 0 && !record ? (
         <div className="ask-hovercard-empty">이 기기에 그 문답이 없어요. 밑줄만 남아 있어요.</div>
       ) : (
-        <div className="ask-hovercard-body" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+        <div className="ask-hovercard-body" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {turns.map((turn) => (
             <AskTurnView key={turn.id} turn={turn} fold={false} />
           ))}

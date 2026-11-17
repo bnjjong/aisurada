@@ -41,7 +41,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 280px; }
+html, body { margin: 0; min-width: 280px; overscroll-behavior: none; }
 h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); line-height: 1.45; letter-spacing: -1.5px; font-weight: 600; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -400,7 +400,7 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .lex-image:has(> .ais-html-frame),
 .lex-image:has(> .lex-image-frame.is-svg:not(.has-fixed-width)) { display: block; width: 100%; }
 .lex-toolbar { order: -1; display: flex; gap: 4px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }.lex-toolbar button { padding: 4px 9px; border: 0; font-size: 12px; color: var(--muted); }.lex-toolbar select { padding: 4px; font-size: 12px; width: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; }
-.sel-bar,.comment-compose-popover,.slash-menu,.note-picker,.comment-card,.lex-table-menu { position: absolute; z-index: 20; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 30px #0003; white-space: normal; line-height: 1.5; }
+.sel-bar,.comment-compose-popover,.slash-menu,.note-picker,.comment-card,.lex-table-menu { position: absolute; z-index: 20; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 30px #0003; white-space: normal; line-height: 1.5; overscroll-behavior: contain; }
 .sel-bar { display: flex; padding: 4px; gap: 2px; }.sel-bar button { border: 0; padding: 5px 9px; font-size: 12px; }:root:root .sel-bar [aria-pressed="true"] { background: var(--soft); }.comment-add-btn { color: var(--accent); }
 .comment-compose-popover { width: min(330px,90vw); padding: 14px; }.comment-compose-popover blockquote { margin: 0 0 10px; border-left: 2px solid var(--line); padding-left: 10px; max-height: 80px; overflow: auto; color: var(--muted); font-size: 12px; }.comment-compose-popover textarea { width: 100%; min-height: 90px; resize: vertical; padding: 9px; font: inherit; font-size: 13px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; }.comment-compose-popover > div { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }.link-popover-btn { padding: 5px 12px; font-size: 12px; }.link-popover-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .slash-menu,.note-picker { width: min(320px,85vw); padding: 6px; max-height: 330px; overflow: auto; }.slash-menu input,.note-picker input { font-size: 12px; padding: 9px; margin-bottom: 5px; }.slash-item,.note-picker-item { display: flex; justify-content: space-between; width: 100%; text-align: left; padding: 10px; border: 0; font-size: 13px; }.slash-item[aria-selected="true"],.note-picker-item[aria-selected="true"] { background: var(--soft); }.note-picker-item small { color: var(--muted); font-size: 10px; }
@@ -848,8 +848,8 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ask-abandoned-cmd { font-family: var(--font-mono); font-size: 11px; background: var(--surface); padding: 2px 6px; border-radius: 4px; }
 .ask-abandoned-x { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: var(--muted); margin-left: auto; }
 
-.ask-hovercard { position: relative; z-index: 50; display: flex; flex-direction: column; width: 360px; max-height: 400px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 12px; font-size: 12px; box-sizing: border-box; }
-.ask-hovercard-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.ask-hovercard { position: relative; z-index: 50; display: flex; flex-direction: column; width: 360px; max-height: 400px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 12px; font-size: 12px; box-sizing: border-box; overscroll-behavior: contain; }
+.ask-hovercard-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .ask-card-resizer { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; cursor: nwse-resize; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); z-index: 10; pointer-events: auto; }
 .ask-hovercard.is-pinned { box-shadow: 0 4px 24px rgba(0,0,0,0.25); border-color: var(--accent); }
 .ask-hovercard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

@@ -417,7 +417,11 @@ export function EditorAskPlugins(props?: {
   // Update card position on scroll or resize so it tracks the mark accurately (C5)
   useEffect(() => {
     if (!card) return;
-    const updateCardPos = () => {
+    const updateCardPos = (event?: Event) => {
+      // 팝업 카드 내부의 스크롤은 마크의 위치를 바꾸지 않으므로 위치 갱신을 건너뛴다.
+      if (event?.target instanceof Element && event.target.closest('.ask-card-anchor, .ask-hovercard, .comment-card')) {
+        return;
+      }
       const root = anchor.current?.closest('.lex-editor');
       if (!root) return;
       const marks = [...root.querySelectorAll<HTMLElement>('[data-ask-id]')].filter((el) => el.dataset.askId === card.id && !el.closest('td,th'));
