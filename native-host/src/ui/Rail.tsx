@@ -448,6 +448,116 @@ export function Rail({
         <p className="rail-hint">
           공통 개발 프로세스 에이전트, 글로벌 스킬, 인프라 연동 리소스를 설정합니다.
         </p>
+
+        <div className="rail-global-summary" style={{ margin: "10px 0 16px" }}>
+          <header>
+            <h3>공통 자원 관리</h3>
+          </header>
+          <ul className="rail-global-list">
+            <li><span>프로세스 에이전트</span><strong>10개</strong></li>
+            <li><span>글로벌 스킬</span><strong>3개</strong></li>
+            <li><span>연동 인프라 (Mock)</span><strong>5개</strong></li>
+          </ul>
+        </div>
+
+        <header style={{ marginTop: "16px" }}>
+          <h2>프로젝트 리소스</h2>
+        </header>
+        {ws.projects.length === 0 ? (
+          <p className="rail-hint">프로젝트를 만들면 프로젝트별 에이전트와 스킬이 여기에 나와요.</p>
+        ) : (
+          <div className="rail-project-resources-list">
+            {ws.projects.map((p) => {
+              const slug = asText(p.slug);
+              const name = asText(p.title);
+              const pCounts = resourceCounts[slug] ?? { skills: 0, agents: 0 };
+              const isActive = route.kind === "project" && route.slug === slug;
+              return (
+                <div key={asText(p.id) || slug} className="rail-group" style={{ marginBottom: "10px" }}>
+                  <header>
+                    <button
+                      type="button"
+                      className="rail-group-toggle"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => controller.navigate(projectAddress(slug))}
+                    >
+                      <Icon name="folder" size={16} />
+                      <span className="rail-group-name" style={{ color: isActive ? "var(--accent)" : undefined }}>
+                        {name}
+                      </span>
+                    </button>
+                    <span className="rail-acts">
+                      <button
+                        title={`${name}에 추가`}
+                        aria-label={`${name}에 추가`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectMenuAnchor({ element: e.currentTarget, slug, name });
+                        }}
+                      >
+                        <Icon name="plus" />
+                      </button>
+                    </span>
+                  </header>
+                  <div className="rail-kids" style={{ marginTop: "4px" }}>
+                    <div className="rail-agenda rail-sub-resource">
+                      <span className="agenda-dot sub-resource-icon" aria-hidden="true">
+                        <Icon name="bot" size={13} />
+                      </span>
+                      <button
+                        type="button"
+                        className="agenda-name"
+                        onClick={() => controller.navigate(projectAddress(slug))}
+                        title={`${name} 프로젝트 에이전트 보기`}
+                      >
+                        <span>에이전트</span>
+                        <small>{pCounts.agents}</small>
+                      </button>
+                      <button
+                        type="button"
+                        className="sub-resource-add-btn"
+                        title={`${name}에 새 에이전트 등록`}
+                        aria-label={`${name}에 새 에이전트 등록`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResForm({ kind: "agent", project: slug });
+                        }}
+                      >
+                        +등록
+                      </button>
+                    </div>
+                    <div className="rail-agenda rail-sub-resource">
+                      <span className="agenda-dot sub-resource-icon" aria-hidden="true">
+                        <Icon name="zap" size={13} />
+                      </span>
+                      <button
+                        type="button"
+                        className="agenda-name"
+                        onClick={() => controller.navigate(projectAddress(slug))}
+                        title={`${name} 프로젝트 스킬 보기`}
+                      >
+                        <span>스킬</span>
+                        <small>{pCounts.skills}</small>
+                      </button>
+                      <button
+                        type="button"
+                        className="sub-resource-add-btn"
+                        title={`${name}에 새 스킬 등록`}
+                        aria-label={`${name}에 새 스킬 등록`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResForm({ kind: "skill", project: slug });
+                        }}
+                      >
+                        +등록
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
       ) : (
       <section data-rail-section="agendas" className="agenda-summary">
@@ -500,18 +610,6 @@ export function Rail({
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
       </section>
-      )}
-      {tab === "global" && (
-        <div className="rail-global-summary">
-          <header>
-            <h3>공통 자원 관리</h3>
-          </header>
-          <ul className="rail-global-list">
-            <li><span>프로세스 에이전트</span><strong>10개</strong></li>
-            <li><span>글로벌 스킬</span><strong>3개</strong></li>
-            <li><span>연동 인프라 (Mock)</span><strong>5개</strong></li>
-          </ul>
-        </div>
       )}
       <button
         className="rail-back"
