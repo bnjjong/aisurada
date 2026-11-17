@@ -182,9 +182,6 @@ export function Rail({
   return (
     <aside className="workspace-rail intellij-rail">
       <div className="rail-activity-bar" aria-label="도구 막대">
-        <div className="brand" role="img" aria-label="aisurada">
-          <LiveBrandMark />
-        </div>
         <div className="rail-tabs" role="tablist" aria-label="레일 구역" data-rail-section="tabs">
           {RAIL_TABS.map((id) => {
             const selected = id === tab;
@@ -215,7 +212,6 @@ export function Rail({
           })}
         </div>
         <div className="rail-activity-bottom">
-          <NotificationBell controller={controller} />
           <button
             type="button"
             className="rail-activity-btn"
@@ -250,12 +246,34 @@ export function Rail({
         </div>
       </div>
       <div className="rail-panel" id="rail-panel" role="tabpanel" aria-labelledby={`rail-tab-${tab}`}>
-        <div className="rail-panel-head">
-          <div className="rail-panel-title" title={ws.path || ws.name}>
-            <strong>{ws.name}</strong>
-            {ws.sample && <span className="sample-badge" style={{ marginLeft: "6px" }}>샘플</span>}
+        <div className="rail-companion-card">
+          <div className="rail-companion-top">
+            <div className="rail-companion-avatar" role="img" aria-label="aisurada">
+              <LiveBrandMark />
+            </div>
+            <div className="rail-companion-meta">
+              <div className="rail-companion-name" title={ws.path || ws.name}>
+                <strong>{ws.name}</strong>
+                {ws.sample && <span className="sample-badge">샘플</span>}
+              </div>
+              {ws.path && <span className="rail-companion-sub" title={ws.path}>{ws.path}</span>}
+            </div>
+            <div className="rail-companion-bell">
+              <NotificationBell controller={controller} />
+            </div>
           </div>
-          {ws.path && <span className="rail-panel-sub" title={ws.path}>{ws.path}</span>}
+          <div className="rail-companion-speech" role="status" aria-live="polite">
+            <div className="rail-companion-bubble">
+              <span className="rail-companion-bubble-tail" aria-hidden="true" />
+              <p className="rail-companion-msg">
+                {waitingAnswers > 0
+                  ? `💬 답변 대기 태스크가 ${waitingAnswers}건 있어요.`
+                  : approvalBadge
+                    ? `⚠️ 승인이 필요한 변경이 ${approvalBadge}건 있어요.`
+                    : "⚡️ 오늘 어떤 작업을 진행할까요?"}
+              </p>
+            </div>
+          </div>
         </div>
         <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : tab === "agents" ? "에이전트 메뉴" : "글로벌 리소스 메뉴"}>
         {NAV_ITEMS[tab].map(([path, label]) => (

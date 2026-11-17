@@ -2020,14 +2020,6 @@ body.col-resizing {
   background: color-mix(in srgb, var(--soft) 60%, var(--surface) 40%);
   user-select: none;
 }
-.rail-activity-bar .brand {
-  padding: 0 0 12px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
 .rail-activity-bar .rail-tabs {
   display: flex;
   flex-direction: column;
@@ -2125,33 +2117,133 @@ body.col-resizing {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 14px;
+  padding: 14px 12px;
   overflow-y: auto;
   background: var(--soft);
 }
-.rail-panel-head {
+/* 아수라다 컴패니언 헤더 카드 */
+.rail-companion-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   margin-bottom: 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 85%, var(--accent) 5%);
+  border: 1px solid color-mix(in srgb, var(--line) 85%, var(--accent) 15%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  position: relative;
 }
-.rail-panel-title {
+.rail-companion-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.rail-companion-avatar {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: visible;
+}
+.rail-companion-avatar .brand-mark {
+  --bs: 56px;
+  width: 56px;
+  height: 56px;
+}
+.rail-companion-meta {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rail-companion-name {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rail-panel-sub {
-  font-size: 11px;
+.rail-companion-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-companion-sub {
+  font-size: 10.5px;
   color: var(--muted);
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.rail-companion-bell {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.rail-companion-bell .rail-bell {
+  position: static;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.rail-companion-bell .rail-bell:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.rail-companion-speech {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.rail-companion-bubble {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent) 25%);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+.rail-companion-bubble-tail {
+  position: absolute;
+  top: -5px;
+  left: 24px;
+  width: 8px;
+  height: 8px;
+  background: var(--surface);
+  border-top: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent) 25%);
+  border-left: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent) 25%);
+  transform: rotate(45deg);
+}
+.rail-companion-msg {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  font-weight: 500;
+  word-break: keep-all;
 }
 .rail-global-summary {
   margin-top: 14px;
