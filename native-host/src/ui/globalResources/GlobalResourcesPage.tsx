@@ -226,7 +226,15 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                   agent.engine === 'gemini' ? 'Gemini' : agent.engine === 'claude' ? 'Claude' : 'Codex';
 
                 return (
-                  <li key={agent.id} className="res-item" style={{ opacity: agent.enabled ? 1 : 0.65 }}>
+                  <li
+                    key={agent.id}
+                    className="res-item res-item-clickable"
+                    style={{ opacity: agent.enabled ? 1 : 0.65 }}
+                    onClick={() => {
+                      setEditingAgent(agent);
+                      setIsNewAgent(false);
+                    }}
+                  >
                     <div className="res-main">
                       <p className="res-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <strong className="res-name">{agent.name}</strong>
@@ -262,7 +270,8 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                     <div className="res-actions">
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setEditingAgent(agent);
                           setIsNewAgent(false);
                         }}
@@ -271,13 +280,14 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setDeletingItem({
                             type: 'agent',
                             id: agent.id,
                             name: agent.name,
-                          })
-                        }
+                          });
+                        }}
                       >
                         삭제
                       </button>
@@ -317,7 +327,14 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
           ) : (
             <ul className="res-list">
               {filteredSkills.map((skill) => (
-                <li key={skill.id} className="res-item">
+                <li
+                  key={skill.id}
+                  className="res-item res-item-clickable"
+                  onClick={() => {
+                    setEditingSkill(skill);
+                    setIsNewSkill(false);
+                  }}
+                >
                   <div className="res-main">
                     <p className="res-title">
                       <strong className="res-name">{skill.name}</strong>
@@ -337,7 +354,8 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                   <div className="res-actions">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEditingSkill(skill);
                         setIsNewSkill(false);
                       }}
@@ -346,13 +364,14 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setDeletingItem({
                           type: 'skill',
                           id: skill.id,
                           name: skill.name,
-                        })
-                      }
+                        });
+                      }}
                     >
                       삭제
                     </button>
@@ -391,7 +410,14 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
           ) : (
             <ul className="res-list">
               {filteredResources.map((res) => (
-                <li key={res.id} className="res-item">
+                <li
+                  key={res.id}
+                  className="res-item res-item-clickable"
+                  onClick={() => {
+                    setEditingResource(res);
+                    setIsNewResource(false);
+                  }}
+                >
                   <div className="res-main">
                     <p className="res-title">
                       <strong className="res-name">{res.name}</strong>
@@ -418,7 +444,8 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                   <div className="res-actions">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEditingResource(res);
                         setIsNewResource(false);
                       }}
@@ -427,13 +454,14 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setDeletingItem({
                           type: 'resource',
                           id: res.id,
                           name: res.name,
-                        })
-                      }
+                        });
+                      }}
                     >
                       삭제
                     </button>
