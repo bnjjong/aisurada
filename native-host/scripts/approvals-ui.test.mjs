@@ -303,7 +303,8 @@ test('the engine rows carry the dirty mark to the list, the rail shows the badge
   assert.doesNotMatch(renderToStaticMarkup(React.createElement(Rail, { controller, state })), /nav-badge/, 'no badge while nothing waits');
   setApprovalCounts({ pending: 2, unapproved: 1 });
   const rail = renderToStaticMarkup(React.createElement(Rail, { controller, state })).replace(/<!-- -->/g, '');
-  assert.match(rail, /class="nav-item active">스킬·에이전트<span class="nav-badge" role="img" aria-label="승인이 필요한 변경 3개">3<\/span>/);
+  assert.match(rail, /⚠️ 승인이 필요한 변경이 3건 있어요\./);
+  assert.match(rail, /role="img" aria-label="내 차례 3건">3<\/span>/);
   const page = renderToStaticMarkup(React.createElement(ResourcesPage, { controller })).replace(/<!-- -->/g, '');
   assert.match(page, /승인이 필요한 변경이 3건 있어요\./);
   assert.match(page, />승인 대기함 열기<\/button>/);

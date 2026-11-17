@@ -252,7 +252,7 @@ const state = (route) => ({
 
 test('the rail has the bell with the unread count in its name', () => {
   reset();
-  assert.match(renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') })), /class="rail-top"[\s\S]*aria-label="알림"/);
+  assert.match(renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') })), /class="rail-companion-bell"[\s\S]*aria-label="알림"/);
   applyChanged({ unread: 3, pushed: raw({ id: 'a' }), toast: false });
   const html = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') }));
   assert.match(html, /aria-label="알림 3개"/);
