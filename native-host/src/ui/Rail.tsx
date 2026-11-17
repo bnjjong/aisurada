@@ -232,13 +232,15 @@ export function Rail({
             {!isNone && (
               <>
                 <div className="rail-agenda rail-sub-resource">
+                  <span className="agenda-dot sub-resource-icon" aria-hidden="true">
+                    <Icon name="bot" size={13} />
+                  </span>
                   <button
                     type="button"
                     className="agenda-name"
                     onClick={() => controller.navigate(projectAddress(slug))}
                     title={`${name} 프로젝트 에이전트 보기`}
                   >
-                    <Icon name="bot" size={13} />
                     <span>에이전트</span>
                     <small>{pCounts.agents}</small>
                   </button>
@@ -247,19 +249,24 @@ export function Rail({
                     className="sub-resource-add-btn"
                     title={`${name}에 새 에이전트 등록`}
                     aria-label={`${name}에 새 에이전트 등록`}
-                    onClick={() => setResForm({ kind: "agent", project: slug })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setResForm({ kind: "agent", project: slug });
+                    }}
                   >
                     +등록
                   </button>
                 </div>
                 <div className="rail-agenda rail-sub-resource">
+                  <span className="agenda-dot sub-resource-icon" aria-hidden="true">
+                    <Icon name="zap" size={13} />
+                  </span>
                   <button
                     type="button"
                     className="agenda-name"
                     onClick={() => controller.navigate(projectAddress(slug))}
                     title={`${name} 프로젝트 스킬 보기`}
                   >
-                    <Icon name="zap" size={13} />
                     <span>스킬</span>
                     <small>{pCounts.skills}</small>
                   </button>
@@ -268,7 +275,10 @@ export function Rail({
                     className="sub-resource-add-btn"
                     title={`${name}에 새 스킬 등록`}
                     aria-label={`${name}에 새 스킬 등록`}
-                    onClick={() => setResForm({ kind: "skill", project: slug })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setResForm({ kind: "skill", project: slug });
+                    }}
                   >
                     +등록
                   </button>
