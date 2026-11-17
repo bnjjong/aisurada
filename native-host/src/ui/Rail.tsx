@@ -232,7 +232,7 @@ export function Rail({
             aria-label="설정"
             onClick={() => controller.settings(true)}
           >
-            <Icon name="settings" size={16} />
+            <Icon name="settings" size={20} />
           </button>
           <button
             className={`iconbtn icon-btn ${route.kind === "guide" ? "active" : ""}`}

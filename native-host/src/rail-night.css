@@ -179,3 +179,27 @@
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
+:root[data-skin] .workspace-rail.intellij-rail .rail-tab {
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0 !important;
+  gap: 0 !important;
+  width: 36px !important;
+  height: 36px !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+:root[data-skin] .workspace-rail.intellij-rail .rail-tab .rail-tab-icon {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  pointer-events: none !important;
+}
