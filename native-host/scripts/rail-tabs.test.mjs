@@ -78,7 +78,7 @@ test('the agents tab shows tasks, skills and agents, the runner line and one row
   const html = rail('/tasks');
   assert.match(html, /role="tab"[^>]*aria-selected="true"[^>]*>에이전트/);
   assert.match(html, /role="tab"[^>]*aria-selected="false"[^>]*>노트/);
-  assert.deepEqual(navLabels(html), ['태스크', '스킬·에이전트']);
+  assert.deepEqual(navLabels(html), ['태스크']);
   assert.match(html, /class="nav-item active">태스크/);
   assert.match(html, />러너 · 쉬는 중</);
   assert.match(html, /data-rail-section="resources"/);
@@ -96,7 +96,7 @@ test('the guide stays in the footer for both tabs and keeps whichever tab was on
   const onGuide = rail('/guide');
   assert.match(onGuide, /aria-selected="true"[^>]*>에이전트/, 'the guide opened from the agents tab leaves that tab on');
   assert.match(onGuide, /class="iconbtn icon-btn active" title="연동 가이드" aria-label="연동 가이드" aria-current="page"/);
-  assert.deepEqual(navLabels(onGuide), ['태스크', '스킬·에이전트']);
+  assert.deepEqual(navLabels(onGuide), ['태스크']);
 });
 
 test('the agents tab badge adds waiting questions and waiting approvals, and shows on the notes tab too', () => {
@@ -108,6 +108,5 @@ test('the agents tab badge adds waiting questions and waiting approvals, and sho
   const agents = rail('/tasks');
   assert.match(agents, /<span class="rail-tab-badge" role="img" aria-label="내 차례 3건">3<\/span>/);
   assert.match(agents, /class="nav-item active">태스크<span class="nav-badge" role="img" aria-label="사람의 답을 기다리는 태스크 1개">1<\/span>/);
-  assert.match(agents, /class="nav-item ">스킬·에이전트<span class="nav-badge" role="img" aria-label="승인이 필요한 변경 2개">2<\/span>/);
   assert.match(agents, /러너 · 답 기다림 1/);
 });

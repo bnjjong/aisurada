@@ -29,7 +29,6 @@ const NAV_ITEMS: Record<RailTab, ReadonlyArray<readonly [string, string]>> = {
   ],
   agents: [
     ["tasks", "태스크"],
-    ["resources", "스킬·에이전트"],
   ],
   global: [
     ["global-resources", "글로벌 리소스 정의"],
