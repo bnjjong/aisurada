@@ -16,6 +16,7 @@ import { Preview } from "../ui/Preview.tsx";
 import { Calendar, AgendaPage } from "../ui/CalendarAgenda.tsx";
 import { NotesPage } from "../ui/NotesPage.tsx";
 import { ResourcesPage } from "../ui/ResourcesPage.tsx";
+import { GlobalResourcesPage } from "../ui/globalResources/GlobalResourcesPage.tsx";
 import { ProjectPage } from "../ui/ProjectPage.tsx";
 import { TasksPage } from "../ui/TasksPage.tsx";
 import { TaskDetailPage } from "../ui/TaskDetailPage.tsx";
@@ -219,6 +220,8 @@ function RouteContent({
       return <Guide />;
     case "resources":
       return <ResourcesPage controller={controller} />;
+    case "global-resources":
+      return <GlobalResourcesPage controller={controller} />;
     case "tasks":
       return <TasksPage state={state} controller={controller} />;
     case "task":

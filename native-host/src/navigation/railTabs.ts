@@ -4,12 +4,12 @@
 import { parseRoute } from './routes.ts';
 import type { ScreenRoute } from './routes.ts';
 
-export type RailTab = 'notes' | 'agents';
+export type RailTab = 'notes' | 'agents' | 'global';
 
-export const RAIL_TABS: readonly RailTab[] = ['notes', 'agents'];
+export const RAIL_TABS: readonly RailTab[] = ['notes', 'agents', 'global'];
 
 /** 탭을 처음 누를 때 여는 화면. */
-export const RAIL_TAB_HOME: Readonly<Record<RailTab, string>> = { notes: '/notes', agents: '/tasks' };
+export const RAIL_TAB_HOME: Readonly<Record<RailTab, string>> = { notes: '/notes', agents: '/tasks', global: '/global-resources' };
 
 /** 이 화면이 속한 탭. 어느 쪽에도 속하지 않으면(문서·파일 창은 레일이 없다) null이다. */
 export function railTabOf(route: ScreenRoute): RailTab | null {
@@ -28,6 +28,8 @@ export function railTabOf(route: ScreenRoute): RailTab | null {
     case 'resources':
     case 'project':
       return 'agents';
+    case 'global-resources':
+      return 'global';
     default:
       return null;
   }

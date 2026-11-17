@@ -15,7 +15,7 @@ import { parseRoute, projectAddress } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
 
-const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트" };
+const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트", global: "글로벌 리소스" };
 /** 탭마다 보이는 메뉴(주소 조각, 글). 연동 가이드는 두 탭 공통이라 아래 줄에 있다 */
 const NAV_ITEMS: Record<RailTab, ReadonlyArray<readonly [string, string]>> = {
   notes: [
@@ -29,6 +29,9 @@ const NAV_ITEMS: Record<RailTab, ReadonlyArray<readonly [string, string]>> = {
   agents: [
     ["tasks", "태스크"],
     ["resources", "스킬·에이전트"],
+  ],
+  global: [
+    ["global-resources", "글로벌 리소스 정의"],
   ],
 };
 /** 숫자를 배지 글로. 0이면 빈 글, 99를 넘으면 99+ */
@@ -201,7 +204,7 @@ export function Rail({
               aria-selected={selected}
               aria-controls="rail-panel"
               className={`rail-tab ${selected ? "active" : ""}`}
-              title={`${TAB_LABELS[id]} (${id === "notes" ? "⌥1" : "⌥2"})`}
+              title={`${TAB_LABELS[id]} (${id === "notes" ? "⌥1" : id === "agents" ? "⌥2" : "⌥3"})`}
               onClick={() => {
                 // 이미 그 탭의 화면이면 그대로 두고, 아니면 그 탭에서 마지막으로 보던 화면으로 간다
                 const to = railTabTarget(id, state.route);
@@ -215,7 +218,7 @@ export function Rail({
         })}
       </div>
       <div className="rail-panel" id="rail-panel" role="tabpanel" aria-labelledby={`rail-tab-${tab}`}>
-      <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : "에이전트 메뉴"}>
+      <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : tab === "agents" ? "에이전트 메뉴" : "글로벌 리소스 메뉴"}>
         {NAV_ITEMS[tab].map(([path, label]) => (
           <button
             className={`nav-item ${(path === "tasks" ? state.route.startsWith("/task") : state.route.startsWith("/" + path)) ? "active" : ""}`}
@@ -268,6 +271,15 @@ export function Rail({
             </div>
           );
         })}
+      </section>
+      ) : tab === "global" ? (
+      <section data-rail-section="global-resources" className="agenda-summary rail-resources">
+        <header>
+          <h2>공통 리소스 관리</h2>
+        </header>
+        <p className="rail-hint">
+          공통 개발 프로세스 에이전트, 글로벌 스킬, 인프라 연동 리소스를 설정합니다.
+        </p>
       </section>
       ) : (
       <section data-rail-section="agendas" className="agenda-summary">

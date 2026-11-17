@@ -2,7 +2,7 @@ import type { Agenda, Workspace } from '../workspace/types.ts';
 
 export type CalendarMode = 'day' | 'week' | 'month';
 export interface CalendarView { mode: CalendarMode; date: string; week: string; }
-type PlainPage = 'favorites' | 'connections' | 'review' | 'trash' | 'guide' | 'resources' | 'tasks';
+type PlainPage = 'favorites' | 'connections' | 'review' | 'trash' | 'guide' | 'resources' | 'tasks' | 'global-resources';
 export type ScreenRoute =
   | { kind: 'root' | 'unknown' }
   | { kind: 'launcher'; create: boolean }
@@ -39,7 +39,7 @@ export function parseRoute(address: string): ScreenRoute {
       const parts = path.slice('/sub/'.length).split('/').filter(Boolean).map(decodeURIComponent);
       return parts.length >= 2 ? { kind: 'sub', root: parts[0], ids: parts.slice(1) } : { kind: 'unknown' };
     }
-    const plain = ['favorites', 'connections', 'review', 'trash', 'guide', 'resources', 'tasks'] as const;
+    const plain = ['favorites', 'connections', 'review', 'trash', 'guide', 'resources', 'tasks', 'global-resources'] as const;
     const page = plain.find(kind => path === `/${kind}`);
     if (page) return { kind: page };
     const segment = /^\/(doc|agenda|session|terminal|project|task)\/([^/]+)$/.exec(path);
