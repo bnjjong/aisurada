@@ -154,6 +154,53 @@
 .task-chip button { padding: 0 6px; border: 0; background: transparent; box-shadow: none; }
 .task-link-form { width: 440px; }
 
+/* 인라인 편집 스타일 */
+.task-editable { cursor: pointer; border-radius: 8px; transition: background .15s, outline .15s; }
+.task-title.task-editable { padding: 2px 6px; margin: -2px -6px; }
+.task-title.task-editable:hover { background: var(--soft); }
+.task-title.task-editable:hover::after { content: " ✎"; font-size: 14px; font-weight: normal; color: var(--muted); margin-left: 8px; vertical-align: middle; }
+.task-inline-edit-icon { display: inline-flex; align-items: center; font-size: 14px; color: var(--muted); opacity: 0.4; transition: opacity .15s, color .15s; }
+.task-editable:hover .task-inline-edit-icon,
+.task-clickable:hover .task-inline-edit-icon { opacity: 1; color: var(--accent); }
+
+.task-inline-title-form { display: flex; width: 100%; margin-bottom: 8px; }
+.task-inline-title-input { font-size: 24px; font-weight: 700; width: 100%; padding: 4px 10px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--text); outline: none; }
+
+.task-inline-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; font-weight: 500; border-radius: 6px; border: 1px solid var(--line); background: var(--soft); color: var(--text); cursor: pointer; vertical-align: middle; }
+.task-inline-btn:hover { background: var(--accent-soft, var(--soft)); border-color: var(--accent); }
+
+.task-body-preview.task-editable { padding: 8px 12px; margin: -8px -12px; border-radius: 10px; }
+.task-body-preview.task-editable:hover { background: var(--soft); }
+
+.task-inline-body-form { display: grid; gap: 8px; margin-top: 8px; }
+.task-inline-textarea { width: 100%; min-height: 130px; padding: 10px 12px; font-size: 13px; line-height: 1.6; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--text); resize: vertical; outline: none; }
+.task-inline-actions { display: flex; align-items: center; gap: 8px; }
+.task-btn-primary { background: var(--accent); color: var(--accent-contrast, #fff); border: none; padding: 6px 14px; font-size: 12px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.task-btn-primary:hover { opacity: .9; }
+.task-hint-keys { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+/* 세부 정보 사이드바 인라인 스타일 */
+.task-inline-picker { position: relative; display: inline-block; }
+.task-inline-pill-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: var(--soft); border: 1px solid var(--line); color: var(--text); cursor: pointer; transition: background .15s, border-color .15s; }
+.task-inline-pill-btn:hover { background: var(--accent-soft, var(--soft)); border-color: var(--accent); }
+.task-inline-caret { font-size: 10px; opacity: 0.6; margin-left: 2px; }
+
+.task-popover-sm { min-width: 140px; padding: 6px; }
+.task-menu-item-row { display: flex; align-items: center; gap: 8px; flex-direction: row; font-size: 12px; padding: 6px 10px; border-radius: 8px; }
+.task-menu-item-row.is-active { font-weight: 600; background: var(--accent-soft, var(--soft)); }
+
+.task-inline-editable-row { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; max-width: 100%; }
+.task-inline-icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 5px; border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; line-height: 1; opacity: 0.6; transition: opacity .15s, background .15s, color .15s; }
+.task-inline-icon-btn:hover { opacity: 1; color: var(--text); background: var(--soft); }
+
+.task-inline-field-form { display: flex; align-items: center; width: 100%; max-width: 240px; }
+.task-inline-input { width: 100%; padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--text); outline: none; }
+
+.task-clickable { cursor: pointer; }
+.task-clickable:hover { text-decoration: underline; }
+.task-default-branch { color: var(--muted); font-style: italic; }
+.task-muted-text { color: var(--muted); }
+
 @media (max-width: 900px) {
   .task-cols { grid-template-columns: minmax(0, 1fr); }
   .task-board { grid-template-columns: repeat(5, 230px); }

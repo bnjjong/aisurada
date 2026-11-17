@@ -16,10 +16,10 @@ import type { RunnerPanelPreset } from "./RunnerPanel.tsx";
 import { useRunner } from "./runnerStore.ts";
 import { editedLine } from "./resourcesClient.ts";
 import {
-  LINK_CHOICES, activityText, activityWho, addComment, checkedLine, deleteTask, explainError, getTask, githubUrl, linkCandidates, linkTasks, listTasks,
-  priorityLabel, relationLabel, repoChoices, statusTitle, timeLabel, toggleCriterion, transitionTask, typeLabel,
+  LINK_CHOICES, activityText, activityWho, addComment, checkedLine, deleteTask, explainError, formFromTask, getTask, githubUrl, linkCandidates, linkTasks, listTasks,
+  priorityLabel, relationLabel, repoChoices, statusTitle, timeLabel, toggleCriterion, transitionTask, typeLabel, updateTask,
 } from "./tasksClient.ts";
-import type { ActivityEvent, RelationType, TaskDetail, TaskRow, TaskStatus } from "./tasksClient.ts";
+import type { ActivityEvent, RelationType, RepoChoice, TaskDetail, TaskForm, TaskPriority, TaskRow, TaskStatus, TaskType } from "./tasksClient.ts";
 
 type ActivityTab = "all" | "comments" | "history";
 
@@ -53,6 +53,10 @@ export function TaskDetailPage({
   const [tab, setTab] = useState<ActivityTab>(preset?.tab ?? "all");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState("");
+  const [editingBody, setEditingBody] = useState(false);
+  const [tempBody, setTempBody] = useState("");
   const runnerVersion = useRunner().version;
 
   const reload = useCallback(async () => {
@@ -126,6 +130,12 @@ export function TaskDetailPage({
   const shown = task.activity.filter((e) => (tab === "all" ? true : tab === "comments" ? e.kind === "comment" : e.kind !== "comment")).slice().reverse();
   const edited = editedLine(task);
 
+  const saveField = async (patch: Partial<TaskForm>) => {
+    if (!task) return;
+    const form = { ...formFromTask(task), ...patch };
+    await run(() => updateTask(call, task, form));
+  };
+
   return (
     <section className="page-scroll task-page task-detail">
       <div className="route-page task-page">
@@ -137,7 +147,42 @@ export function TaskDetailPage({
           <TypeMark type={task.type} />
           <strong>{task.key}</strong>
         </nav>
-        <h1 className="task-title">{task.title}</h1>
+        {editingTitle ? (
+          <form
+            className="task-inline-title-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const t = tempTitle.trim();
+              if (t && t !== task.title) void saveField({ title: t });
+              setEditingTitle(false);
+            }}
+          >
+            <input
+              ref={(el) => el?.focus()}
+              className="task-inline-title-input"
+              value={tempTitle}
+              onChange={(e) => setTempTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditingTitle(false);
+              }}
+              onBlur={() => {
+                const t = tempTitle.trim();
+                if (t && t !== task.title) void saveField({ title: t });
+                setEditingTitle(false);
+              }}
+              disabled={busy}
+            />
+          </form>
+        ) : (
+          <h1
+            className="task-title task-editable"
+            onClick={() => {
+              setTempTitle(task.title);
+              setEditingTitle(true);
+            }}
+            title="클릭하여 제목 수정"
+          >{task.title}</h1>
+        )}
         <div className="task-actions">
           <StatusMenu task={task} busy={busy} defaultOpen={preset?.menuOpen} onPick={(to) => void run(() => transitionTask(call, task, to))} />
           <button type="button" onClick={() => setEditing(true)}>
@@ -154,8 +199,79 @@ export function TaskDetailPage({
             <RunnerPanel task={task} controller={controller} preset={preset?.runner} />
 
             <section className="task-sec" aria-label="설명">
-              <h2>설명</h2>
-              {task.body.trim() ? <ReadMarkdown body={task.body} external /> : <p className="task-empty">설명이 없어요. 「편집」에서 적을 수 있어요.</p>}
+              <h2>
+                설명
+                {!editingBody && (
+                  <button
+                    type="button"
+                    className="task-inline-btn"
+                    onClick={() => {
+                      setTempBody(task.body);
+                      setEditingBody(true);
+                    }}
+                  >
+                    <Icon name="edit" /> 편집
+                  </button>
+                )}
+              </h2>
+              {editingBody ? (
+                <div className="task-inline-body-form">
+                  <textarea
+                    ref={(el) => el?.focus()}
+                    className="task-inline-textarea"
+                    value={tempBody}
+                    onChange={(e) => setTempBody(e.target.value)}
+                    placeholder="태스크 설명(마크다운)…"
+                    rows={6}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                        e.preventDefault();
+                        if (tempBody !== task.body) void saveField({ body: tempBody });
+                        setEditingBody(false);
+                      } else if (e.key === "Escape") {
+                        setEditingBody(false);
+                      }
+                    }}
+                    disabled={busy}
+                  />
+                  <div className="task-inline-actions">
+                    <button
+                      type="button"
+                      className="task-btn-primary"
+                      onClick={() => {
+                        if (tempBody !== task.body) void saveField({ body: tempBody });
+                        setEditingBody(false);
+                      }}
+                      disabled={busy}
+                    >
+                      저장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingBody(false)}
+                      disabled={busy}
+                    >
+                      취소
+                    </button>
+                    <small className="task-hint-keys">⌘+Enter로 저장, Esc로 취소</small>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="task-body-preview task-editable"
+                  onClick={() => {
+                    setTempBody(task.body);
+                    setEditingBody(true);
+                  }}
+                  title="클릭하여 설명 편집"
+                >
+                  {task.body.trim() ? (
+                    <ReadMarkdown body={task.body} external />
+                  ) : (
+                    <p className="task-empty task-clickable">설명이 없어요. 클릭하여 적을 수 있어요.</p>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="task-sec" aria-label="완료 기준">
@@ -281,18 +397,33 @@ export function TaskDetailPage({
               <dl className="task-dl">
                 <dt>상태</dt>
                 <dd>
-                  <StatusPill status={task.status} />
+                  <StatusMenu task={task} busy={busy} onPick={(to) => void run(() => transitionTask(call, task, to))} />
                 </dd>
                 <dt>유형</dt>
                 <dd>
-                  <TypeMark type={task.type} /> {typeLabel(task.type)}
+                  <InlineTypeSelect
+                    type={task.type}
+                    busy={busy}
+                    onChange={(t) => void saveField({ type: t })}
+                  />
                 </dd>
                 <dt>우선순위</dt>
                 <dd>
-                  <PriorityMark priority={task.priority} /> {priorityLabel(task.priority)}
+                  <InlinePrioritySelect
+                    priority={task.priority}
+                    busy={busy}
+                    onChange={(p) => void saveField({ priority: p })}
+                  />
                 </dd>
                 <dt>저장소</dt>
-                <dd>{task.repo ? <a href={`https://github.com/${task.repo}`} target="_blank" rel="noreferrer">{task.repo}</a> : "—"}</dd>
+                <dd>
+                  <InlineRepoEdit
+                    repo={task.repo}
+                    repos={repos}
+                    busy={busy}
+                    onChange={(p) => void saveField(p)}
+                  />
+                </dd>
                 {task.project && (
                   <>
                     <dt>프로젝트</dt>
@@ -304,18 +435,20 @@ export function TaskDetailPage({
                   </>
                 )}
                 <dt>기준 브랜치</dt>
-                <dd>{task.baseBranch ? <code>{task.baseBranch}</code> : "저장소 기본"}</dd>
+                <dd>
+                  <InlineBaseBranchEdit
+                    baseBranch={task.baseBranch}
+                    busy={busy}
+                    onChange={(b) => void saveField({ base: b })}
+                  />
+                </dd>
                 <dt>라벨</dt>
                 <dd>
-                  {task.labels.length ? (
-                    <ul className="task-labels">
-                      {task.labels.map((l) => (
-                        <li key={l}>{l}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    "—"
-                  )}
+                  <InlineLabelsEdit
+                    labels={task.labels}
+                    busy={busy}
+                    onChange={(l) => void saveField({ labelsText: l })}
+                  />
                 </dd>
                 <dt>만든 때</dt>
                 <dd>{task.createdAt ? timeLabel(task.createdAt) : "—"}</dd>
@@ -509,5 +642,329 @@ function LinkModal({ call, task, close, done }: { call: Parameters<typeof getTas
         </footer>
       </form>
     </Modal>
+  );
+}
+
+/** 세부 정보 사이드바: 인라인 유형(Type) 선택 */
+function InlineTypeSelect({ type, busy, onChange }: { type: TaskType; busy: boolean; onChange: (t: TaskType) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
+  const choices: TaskType[] = ["feature", "bug", "chore"];
+  return (
+    <div className="task-inline-picker" ref={box}>
+      <button
+        type="button"
+        className="task-inline-pill-btn"
+        disabled={busy}
+        onClick={() => setOpen((o) => !o)}
+        title="클릭하여 유형 변경"
+      >
+        <TypeMark type={type} /> <span>{typeLabel(type)}</span>
+        <span className="task-inline-caret" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className="task-menu task-popover-sm" role="menu" aria-label="유형 변경">
+          {choices.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="menuitem"
+              className={`task-menu-item task-menu-item-row ${c === type ? "is-active" : ""}`}
+              onClick={() => {
+                setOpen(false);
+                if (c !== type) onChange(c);
+              }}
+            >
+              <TypeMark type={c} /> <span>{typeLabel(c)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 세부 정보 사이드바: 인라인 우선순위(Priority) 선택 */
+function InlinePrioritySelect({ priority, busy, onChange }: { priority: TaskPriority; busy: boolean; onChange: (p: TaskPriority) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
+  const choices: TaskPriority[] = ["high", "medium", "low"];
+  return (
+    <div className="task-inline-picker" ref={box}>
+      <button
+        type="button"
+        className="task-inline-pill-btn"
+        disabled={busy}
+        onClick={() => setOpen((o) => !o)}
+        title="클릭하여 우선순위 변경"
+      >
+        <PriorityMark priority={priority} /> <span>{priorityLabel(priority)}</span>
+        <span className="task-inline-caret" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className="task-menu task-popover-sm" role="menu" aria-label="우선순위 변경">
+          {choices.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="menuitem"
+              className={`task-menu-item task-menu-item-row ${c === priority ? "is-active" : ""}`}
+              onClick={() => {
+                setOpen(false);
+                if (c !== priority) onChange(c);
+              }}
+            >
+              <PriorityMark priority={c} /> <span>{priorityLabel(c)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 세부 정보 사이드바: 인라인 저장소(Repo) 편집 */
+function InlineRepoEdit({
+  repo,
+  repos,
+  busy,
+  onChange,
+}: {
+  repo?: string | null;
+  repos: RepoChoice[];
+  busy: boolean;
+  onChange: (patch: { repo: string; project: string }) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(repo ?? "");
+
+  const submit = () => {
+    const trimmed = val.trim();
+    if (trimmed !== (repo ?? "")) {
+      const choice = repos.find((r) => r.repo === trimmed);
+      onChange({ repo: trimmed, project: choice?.project ?? "" });
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <form
+        className="task-inline-field-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <input
+          ref={(el) => el?.focus()}
+          className="task-inline-input"
+          list="inline-repo-list"
+          value={val}
+          placeholder="owner/repo"
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setEditing(false);
+          }}
+          onBlur={submit}
+          disabled={busy}
+        />
+        <datalist id="inline-repo-list">
+          {repos.map((r) => (
+            <option key={r.repo} value={r.repo}>
+              {r.label}
+            </option>
+          ))}
+        </datalist>
+      </form>
+    );
+  }
+
+  return (
+    <div className="task-inline-editable-row">
+      {repo ? (
+        <a href={`https://github.com/${repo}`} target="_blank" rel="noreferrer">
+          {repo}
+        </a>
+      ) : (
+        <span className="task-muted-text">—</span>
+      )}
+      <button
+        type="button"
+        className="task-inline-icon-btn"
+        title="저장소 변경"
+        disabled={busy}
+        onClick={() => {
+          setVal(repo ?? "");
+          setEditing(true);
+        }}
+      >
+        <Icon name="edit" />
+      </button>
+    </div>
+  );
+}
+
+/** 세부 정보 사이드바: 인라인 기준 브랜치(Base Branch) 편집 */
+function InlineBaseBranchEdit({
+  baseBranch,
+  busy,
+  onChange,
+}: {
+  baseBranch?: string | null;
+  busy: boolean;
+  onChange: (b: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(baseBranch ?? "");
+
+  const submit = () => {
+    const trimmed = val.trim();
+    if (trimmed !== (baseBranch ?? "")) {
+      onChange(trimmed);
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <form
+        className="task-inline-field-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <input
+          ref={(el) => el?.focus()}
+          className="task-inline-input"
+          value={val}
+          placeholder="저장소 기본 (예: main)"
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setEditing(false);
+          }}
+          onBlur={submit}
+          disabled={busy}
+        />
+      </form>
+    );
+  }
+
+  return (
+    <div
+      className="task-inline-editable-row task-clickable"
+      title="클릭하여 기준 브랜치 변경 (비우면 저장소 기본)"
+      onClick={() => {
+        setVal(baseBranch ?? "");
+        setEditing(true);
+      }}
+    >
+      {baseBranch ? (
+        <code>{baseBranch}</code>
+      ) : (
+        <span className="task-default-branch" title="GitHub 저장소의 기본 브랜치(main/master)를 사용해요">
+          저장소 기본
+        </span>
+      )}
+      <span className="task-inline-edit-icon" aria-hidden="true">
+        <Icon name="edit" />
+      </span>
+    </div>
+  );
+}
+
+/** 세부 정보 사이드바: 인라인 라벨(Labels) 편집 */
+function InlineLabelsEdit({ labels, busy, onChange }: { labels: string[]; busy: boolean; onChange: (labelsText: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(labels.join(", "));
+
+  const submit = () => {
+    const trimmed = val.trim();
+    if (trimmed !== labels.join(", ")) {
+      onChange(trimmed);
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <form
+        className="task-inline-field-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <input
+          ref={(el) => el?.focus()}
+          className="task-inline-input"
+          value={val}
+          placeholder="라벨 (쉼표 구분)"
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setEditing(false);
+          }}
+          onBlur={submit}
+          disabled={busy}
+        />
+      </form>
+    );
+  }
+
+  return (
+    <div
+      className="task-inline-editable-row task-clickable"
+      title="클릭하여 라벨 변경"
+      onClick={() => {
+        setVal(labels.join(", "));
+        setEditing(true);
+      }}
+    >
+      {labels.length > 0 ? (
+        <ul className="task-labels">
+          {labels.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+      ) : (
+        <span className="task-muted-text">—</span>
+      )}
+      <span className="task-inline-edit-icon" aria-hidden="true">
+        <Icon name="edit" />
+      </span>
+    </div>
   );
 }
