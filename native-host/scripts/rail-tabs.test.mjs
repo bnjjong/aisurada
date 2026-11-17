@@ -74,20 +74,21 @@ test('the notes tab shows the six note menus and the project tree, and no agent 
   assert.doesNotMatch(html, /러너 ·/, 'the runner line is only on the agents tab');
 });
 
-test('the agents tab shows tasks, skills and agents, the runner line and one row per project', () => {
+test('the agents tab shows tasks, the runner line, and the global resources tab shows project resources', () => {
   const html = rail('/tasks');
   assert.match(html, /role="tab"[^>]*aria-selected="true"[^>]*>에이전트/);
   assert.match(html, /role="tab"[^>]*aria-selected="false"[^>]*>노트/);
   assert.deepEqual(navLabels(html), ['태스크']);
   assert.match(html, /class="nav-item active">태스크/);
   assert.match(html, />러너 · 쉬는 중</);
-  assert.match(html, /data-rail-section="resources"/);
-  assert.match(html, /aria-label="앱 프로젝트 페이지 열기"/);
   assert.doesNotMatch(html, /data-rail-section="agendas"/, 'the note tree stays on the notes tab');
   resetRunner({ supported: false });
   assert.doesNotMatch(rail('/tasks'), /러너 ·/, 'a build without the runner has no runner line');
-  const empty = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: { ...state('/resources'), workspace: { ...workspace(), projects: [] } } }));
-  assert.match(empty, /프로젝트를 만들면/);
+
+  const globalHtml = rail('/global-resources');
+  assert.match(globalHtml, /data-rail-section="global-resources"/);
+  assert.match(globalHtml, /공통 리소스 관리/);
+  assert.match(globalHtml, /프로젝트 리소스/);
 });
 
 test('the guide stays in the footer for both tabs and keeps whichever tab was on', () => {
