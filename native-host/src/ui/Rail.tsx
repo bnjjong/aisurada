@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState, Agenda } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
@@ -14,6 +14,10 @@ import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute, projectAddress } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
+import { ResourceFormModal } from "./ResourceFormModal.tsx";
+import { listResources, selectableSkills } from "./resourcesClient.ts";
+import type { ResourceKind, ResourceRow } from "./resourcesClient.ts";
+import { parseRepos } from "./repoLinks.ts";
 
 const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트", global: "글로벌 리소스" };
 const TAB_ICONS: Record<RailTab, "note" | "bot" | "globe"> = { notes: "note", agents: "bot", global: "globe" };
@@ -64,6 +68,42 @@ export function Rail({
     sorted = agendaOrder(ws.agendas, ws.notes);
   const route = parseRoute(state.route);
   const activeAgendaId = route.kind === "agenda" ? route.id : null;
+
+  // 프로젝트별 에이전트/스킬 등록 모달 상태
+  const [resForm, setResForm] = useState<{ kind: ResourceKind; project: string } | null>(null);
+  // 프로젝트 헤더 + 버튼 액션 메뉴 상태
+  const [projectMenuAnchor, setProjectMenuAnchor] = useState<{ element: HTMLElement; slug: string; name: string } | null>(null);
+  // 프로젝트별 리소스 개수 및 전체 스킬 목록
+  const [resourceCounts, setResourceCounts] = useState<Record<string, { skills: number; agents: number }>>({});
+  const [allSkills, setAllSkills] = useState<ResourceRow[]>([]);
+
+  const loadResourceCounts = useCallback(async () => {
+    try {
+      const list = await listResources(controller.callEngine);
+      const counts: Record<string, { skills: number; agents: number }> = {};
+      const skills: ResourceRow[] = [];
+      for (const r of list.resources) {
+        if (r.kind === "skill") skills.push(r);
+        if (r.project) {
+          if (!counts[r.project]) counts[r.project] = { skills: 0, agents: 0 };
+          if (r.kind === "skill") counts[r.project].skills += 1;
+          else if (r.kind === "agent") counts[r.project].agents += 1;
+        }
+      }
+      setResourceCounts(counts);
+      setAllSkills(skills);
+    } catch {
+      // 무시
+    }
+  }, [controller.callEngine]);
+
+  useEffect(() => {
+    void loadResourceCounts();
+    const onFocus = () => void loadResourceCounts();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadResourceCounts]);
+
   const group = (
     name: string,
     slug: string,
@@ -72,6 +112,7 @@ export function Rail({
   ) => {
     const isNone = slug === LOOSE_GROUP_KEY || slug === "" || slug === "__none__";
     const collapsed = railGroupCollapsed(state.prefs.collapsedProjects, ws.projects.length, slug);
+    const pCounts = resourceCounts[slug] ?? { skills: 0, agents: 0 };
     return (
       <section key={slug || LOOSE_GROUP_KEY} className="rail-group">
         {ws.projects.length > 0 && (
@@ -99,26 +140,41 @@ export function Rail({
             >
               <Icon name="chevron" size={12} />
               <Icon name={isNone ? "folderDashed" : "folder"} size={16} />
-              <span className="rail-group-name">{name}</span>
+              <span
+                className="rail-group-name"
+                onClick={(e) => {
+                  if (!isNone) {
+                    e.stopPropagation();
+                    controller.navigate(projectAddress(slug));
+                  }
+                }}
+                title={isNone ? undefined : `${name} 프로젝트 페이지 열기`}
+              >
+                {name}
+              </span>
               <small className="rail-group-count">{agendas.length}</small>
             </button>
             {id && (
               <span className="rail-acts">
                 <button
-                  title="프로젝트 편집"
-                  aria-label={`${name} 프로젝트 편집`}
-                  onClick={() => controller.form({ kind: "project", id })}
-                >
-                  <Icon name="edit" />
-                </button>
-                <button
-                  title="이 프로젝트에 아젠다 추가"
-                  aria-label={`${name}에 아젠다 추가`}
-                  onClick={() =>
-                    controller.form({ kind: "agenda", project: slug })
-                  }
+                  title={`${name}에 추가`}
+                  aria-label={`${name}에 추가`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProjectMenuAnchor({ element: e.currentTarget, slug, name });
+                  }}
                 >
                   <Icon name="plus" />
+                </button>
+                <button
+                  title="프로젝트 편집"
+                  aria-label={`${name} 프로젝트 편집`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    controller.form({ kind: "project", id });
+                  }}
+                >
+                  <Icon name="edit" />
                 </button>
               </span>
             )}
@@ -173,6 +229,52 @@ export function Rail({
               </div>
             );
           })}
+            {!isNone && (
+              <>
+                <div className="rail-agenda rail-sub-resource">
+                  <button
+                    type="button"
+                    className="agenda-name"
+                    onClick={() => controller.navigate(projectAddress(slug))}
+                    title={`${name} 프로젝트 에이전트 보기`}
+                  >
+                    <Icon name="bot" size={13} />
+                    <span>에이전트</span>
+                    <small>{pCounts.agents}</small>
+                  </button>
+                  <button
+                    type="button"
+                    className="sub-resource-add-btn"
+                    title={`${name}에 새 에이전트 등록`}
+                    aria-label={`${name}에 새 에이전트 등록`}
+                    onClick={() => setResForm({ kind: "agent", project: slug })}
+                  >
+                    +등록
+                  </button>
+                </div>
+                <div className="rail-agenda rail-sub-resource">
+                  <button
+                    type="button"
+                    className="agenda-name"
+                    onClick={() => controller.navigate(projectAddress(slug))}
+                    title={`${name} 프로젝트 스킬 보기`}
+                  >
+                    <Icon name="zap" size={13} />
+                    <span>스킬</span>
+                    <small>{pCounts.skills}</small>
+                  </button>
+                  <button
+                    type="button"
+                    className="sub-resource-add-btn"
+                    title={`${name}에 새 스킬 등록`}
+                    aria-label={`${name}에 새 스킬 등록`}
+                    onClick={() => setResForm({ kind: "skill", project: slug })}
+                  >
+                    +등록
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </section>
@@ -407,6 +509,74 @@ export function Rail({
       >
         시작 화면
       </button>
+      {projectMenuAnchor && (
+        <ActionMenu
+          label={`${projectMenuAnchor.name} 추가 메뉴`}
+          anchor={{ current: projectMenuAnchor.element }}
+          onClose={() => setProjectMenuAnchor(null)}
+          items={[
+            {
+              key: "agenda",
+              label: "새 아젠다 추가",
+              icon: "dotPlus",
+              onSelect: () => {
+                const slug = projectMenuAnchor.slug;
+                setProjectMenuAnchor(null);
+                controller.form({ kind: "agenda", project: slug });
+              },
+            },
+            {
+              key: "agent",
+              label: "새 에이전트 등록 (이 프로젝트용)",
+              icon: "bot",
+              onSelect: () => {
+                const slug = projectMenuAnchor.slug;
+                setProjectMenuAnchor(null);
+                setResForm({ kind: "agent", project: slug });
+              },
+            },
+            {
+              key: "skill",
+              label: "새 스킬 등록 (이 프로젝트용)",
+              icon: "zap",
+              onSelect: () => {
+                const slug = projectMenuAnchor.slug;
+                setProjectMenuAnchor(null);
+                setResForm({ kind: "skill", project: slug });
+              },
+            },
+            "separator",
+            {
+              key: "project-page",
+              label: "프로젝트 페이지 열기",
+              icon: "popout",
+              onSelect: () => {
+                const slug = projectMenuAnchor.slug;
+                setProjectMenuAnchor(null);
+                controller.navigate(projectAddress(slug));
+              },
+            },
+          ]}
+        />
+      )}
+      {resForm && (
+        <ResourceFormModal
+          call={controller.callEngine}
+          kind={resForm.kind}
+          project={resForm.project}
+          skillChoices={selectableSkills({
+            project: resForm.project,
+            globals: allSkills.filter((s) => s.scope === "global"),
+            projectSkills: allSkills.filter((s) => s.project === resForm.project),
+          })}
+          repoNames={parseRepos(ws.projects.find((p) => p.slug === resForm.project || p.id === resForm.project)?.repos).map((r) => r.name)}
+          close={() => setResForm(null)}
+          saved={() => {
+            setResForm(null);
+            void loadResourceCounts();
+          }}
+        />
+      )}
       </div>
     </aside>
   );

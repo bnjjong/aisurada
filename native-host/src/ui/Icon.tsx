@@ -155,6 +155,9 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M6 2.5v11" />
     </>
   ),
+  zap: (
+    <polygon points="9 1.5 3.5 8.5 7.5 8.5 7 14.5 12.5 7.5 8.5 7.5 9 1.5" />
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

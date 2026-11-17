@@ -490,9 +490,14 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .rail-agenda button.agenda-edit { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }
 .rail-agenda button.agenda-edit { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); opacity: 0; transition: opacity 0.12s; }
 .rail-group header:hover .rail-acts, .rail-group header:focus-within .rail-acts,
-.rail-agenda:hover button.agenda-edit, .rail-agenda:focus-within button.agenda-edit { opacity: 1; }
+.rail-agenda:hover button.agenda-edit, .rail-agenda:focus-within button.agenda-edit,
+.rail-agenda:hover button.sub-resource-add-btn, .rail-agenda:focus-within button.sub-resource-add-btn { opacity: 1; }
 .rail-group header:hover .rail-group-count, .rail-group header:focus-within .rail-group-count,
 .rail-agenda:hover small, .rail-agenda:focus-within small { opacity: 0; }
+.rail-agenda.rail-sub-resource .agenda-name { display: flex; align-items: center; gap: 6px; }
+.rail-agenda.rail-sub-resource .agenda-name > svg { flex: none; opacity: 0.75; }
+.rail-agenda button.sub-resource-add-btn { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); opacity: 0; transition: opacity 0.12s; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.15); color: var(--accent); cursor: pointer; }
+.rail-agenda button.sub-resource-add-btn:hover { background: var(--accent); color: #fff; }
 /* 아젠다 줄의 오른쪽 끝을 프로젝트 줄(오른쪽 여백 10px)과 맞춰야 두 줄의 개수가 한 열에 선다. 스킨마다 줄 안쪽 여백이 달라 :root를 겹쳐 맞춘다. */
 :root:root .rail-kids .rail-agenda { padding-right: 10px; }
 .rail-kids .rail-agenda button.agenda-name { padding-right: 0; }

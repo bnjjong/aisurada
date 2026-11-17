@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>현재 개발 상태 기반: 프로젝트별 에이전트·스킬 등록 UI 개선안</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #131b2c;
+      --card-border: #1e293b;
+      --text: #e2e8f0;
+      --text-muted: #8492a6;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --green: #10b981;
+      --purple: #a855f7;
+      --amber: #f59e0b;
+      --red: #ef4444;
+
+      /* 앱 실제 사이드바 색상 */
+      --rail-bg: #0a1120;
+      --activity-bg: #070d18;
+      --activity-border: #152238;
+      --panel-bg: #0c1527;
+      --item-hover: rgba(255, 255, 255, 0.05);
+      --item-active: #1e2d4a;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      padding: 32px 20px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    header.doc-header {
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+    h1 { font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .lead { font-size: 15px; color: var(--text-muted); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .tag-current { background: #334155; color: #cbd5e1; }
+    .tag-recommend { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid var(--green); }
+
+    /* ==========================================================================
+       실제 앱 화면 1:1 재현 컴포넌트 (IntelliJ Activity Bar + Rail Panel)
+       ========================================================================== */
+    .app-sidebar-mock {
+      display: flex;
+      width: 100%;
+      height: 620px;
+      background: var(--rail-bg);
+      border: 1px solid #1e2d47;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      font-size: 13px;
+    }
+
+    /* 1. 세로 액티비티 바 (48px) */
+    .mock-activity-bar {
+      width: 48px;
+      background: var(--activity-bg);
+      border-right: 1px solid var(--activity-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0;
+      gap: 12px;
+    }
+    .mock-act-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.15s;
+    }
+    .mock-act-btn.active {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1.5px solid #3b82f6;
+      color: #60a5fa;
+    }
+
+    /* 2. 레일 패널 */
+    .mock-rail-panel {
+      flex: 1;
+      background: var(--panel-bg);
+      padding: 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* 아수라다 컴패니언 카드 */
+    .companion-card {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.3), rgba(15, 23, 42, 0.6));
+      border: 1px solid #1e3a8a;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .companion-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .asurada-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #000;
+      border: 2px solid #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+      position: relative;
+    }
+    .asurada-avatar::before, .asurada-avatar::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 12px;
+      background: #ef4444;
+      border-radius: 2px;
+    }
+    .asurada-avatar::before { left: -7px; }
+    .asurada-avatar::after { right: -7px; }
+    .asurada-face {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 1px solid #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+    .asurada-eye {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+    .ws-info {
+      flex: 1;
+    }
+    .ws-title { font-weight: 700; color: #fff; font-size: 13px; }
+    .ws-path { font-size: 11px; color: #64748b; font-family: monospace; }
+    .ws-bell { color: #94a3b8; font-size: 14px; cursor: pointer; }
+
+    .companion-bubble {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* 네비 메뉴 */
+    .mock-nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .mock-nav-item {
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .mock-nav-item.active {
+      background: #1e293b;
+      color: #fff;
+      font-weight: 600;
+      border: 1px solid #334155;
+    }
+
+    /* 프로젝트 섹션 */
+    .mock-projects-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-top: 1px solid #1e293b;
+      padding-top: 12px;
+    }
+    .proj-section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .proj-section-head .plus-btn {
+      cursor: pointer;
+      font-size: 15px;
+      color: #94a3b8;
+    }
+
+    .proj-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 8px;
+    }
+    .proj-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .proj-group-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .proj-acts {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .act-btn {
+      font-size: 11px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: #1e293b;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .proj-tree {
+      margin-left: 10px;
+      padding-left: 8px;
+      border-left: 1.5px solid #263345;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 4px;
+    }
+    .tree-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+    .tree-item-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot-agenda {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* 새로 추가되는 에이전트/스킬 전용 행 스타일 */
+    .tree-item-resource {
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px dashed transparent;
+      transition: all 0.15s;
+    }
+    .tree-item-resource:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .res-badge-add {
+      font-size: 10.5px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* 팝업 메뉴 목업 */
+    .popup-menu-mock {
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      padding: 4px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+      margin: 4px 0 6px 14px;
+    }
+    .popup-item {
+      padding: 5px 8px;
+      font-size: 11.5px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .popup-item:hover, .popup-item.selected {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .diff-point {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    .diff-point h4 { color: #34d399; margin-bottom: 4px; font-size: 13.5px; }
+
+    .explain-banner {
+      background: #1e293b;
+      border-left: 4px solid #3b82f6;
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="doc-header">
+    <h1>현재 화면 기준: 프로젝트별 에이전트·스킬 등록 UI 개선안</h1>
+    <p class="lead">사용자께서 올려주신 최신 실제 앱 화면(IntelliJ 세로 Activity Bar + Companion Card)을 1:1로 반영하여, 프로젝트 하위에 에이전트와 스킬을 직관적으로 등록할 수 있도록 설계한 비교안입니다.</p>
+  </header>
+
+  <div class="explain-banner">
+    <strong>💡 현재 화면에서 확인되는 핵심 구조</strong><br>
+    - <strong>좌측 3개 세로 아이콘:</strong> [1] 문서(노트) · [2] 로봇(에이전트) · [3] 지구본(글로벌 리소스)<br>
+    - <strong>현재 문제점:</strong> 노트 화면의 <code>📁 aisurada</code> 프로젝트 폴더 아래에는 오직 <code>🟢 aisurada 개발</code>(아젠다)만 있고, <strong>이 프로젝트 전용 에이전트와 스킬을 등록하거나 확인할 수 있는 경로가 완전히 누락</strong>되어 있습니다.
+  </div>
+
+  <div class="grid-2">
+
+    <!-- 1. 현재 화면 상태 -->
+    <div class="card">
+      <div class="card-title">
+        <span>현재 실제 상태 (캡처 화면 그대로)</span>
+        <span class="tag tag-current">현재 화면</span>
+      </div>
+
+      <div class="app-sidebar-mock">
+        <!-- 1. 좌측 액티비티 바 -->
+        <div class="mock-activity-bar">
+          <div class="mock-act-btn active" title="노트">📄</div>
+          <div class="mock-act-btn" title="에이전트">🤖</div>
+          <div class="mock-act-btn" title="글로벌 리소스">🌐</div>
+        </div>
+
+        <!-- 2. 우측 레일 패널 -->
+        <div class="mock-rail-panel">
+          <!-- 아수라다 카드 -->
+          <div class="companion-card">
+            <div class="companion-top">
+              <div class="asurada-avatar">
+                <div class="asurada-face">
+                  <span class="asurada-eye"></span>
+                  <span class="asurada-eye"></span>
+                </div>
+              </div>
+              <div class="ws-info">
+                <div class="ws-title">df-ai</div>
+                <div class="ws-path">/Users/df/df-ai/...</div>
+              </div>
+              <div class="ws-bell">🔔</div>
+            </div>
+            <div class="companion-bubble">
+              <span>⚡️ 오늘 어떤 작업을 진행할까요?</span>
+            </div>
+          </div>
+
+          <!-- 네비 메뉴 -->
+          <div class="mock-nav-list">
+            <div class="mock-nav-item">전체 노트</div>
+            <div class="mock-nav-item active">캘린더</div>
+            <div class="mock-nav-item">즐겨찾기</div>
+            <div class="mock-nav-item">연결</div>
+            <div class="mock-nav-item">템플릿</div>
+            <div class="mock-nav-item"><span>휴지통</span><span>4</span></div>
+          </div>
+
+          <!-- 프로젝트 트리 (현재 상태) -->
+          <div class="mock-projects-section">
+            <div class="proj-section-head">
+              <span>프로젝트</span>
+              <span class="plus-btn">+</span>
+            </div>
+
+            <!-- aisurada 프로젝트 -->
+            <div class="proj-group">
+              <div class="proj-group-head">
+                <div class="proj-group-left">
+                  <span>∨</span>
+                  <span>📁</span>
+                  <span>aisurada</span>
+                </div>
+                <span>1</span>
+              </div>
+              <div class="proj-tree">
+                <!-- 아젠다만 달랑 있음 -->
+                <div class="tree-item">
+                  <div class="tree-item-left">
+                    <span class="dot-agenda" style="background:#84cc16;"></span>
+                    <span>aisurada 개발</span>
+                  </div>
+                  <span style="color:#64748b;">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 미분류 프로젝트 -->
+            <div class="proj-group">
+              <div class="proj-group-head">
+                <div class="proj-group-left">
+                  <span>∨</span>
+                  <span>📁</span>
+                  <span>미분류</span>
+                </div>
+                <span>9</span>
+              </div>
+              <div class="proj-tree">
+                <div class="tree-item">
+                  <div class="tree-item-left">
+                    <span class="dot-agenda" style="background:#f87171;"></span>
+                    <span>AI 개발 철학</span>
+                  </div>
+                  <span style="color:#64748b;">12</span>
+                </div>
+                <div class="tree-item">
+                  <div class="tree-item-left">
+                    <span class="dot-agenda" style="background:#38bdf8;"></span>
+                    <span>맥 초기 설정</span>
+                  </div>
+                  <span style="color:#64748b;">4</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size:12px; color:var(--text-muted); margin-top:12px;">
+        ⚠️ <strong>문제:</strong> <code>aisurada</code> 폴더 아래에 오직 아젠다(aisurada 개발)만 나열되어 있어서, 이 프로젝트에 속한 에이전트와 스킬을 어디서도 등록하거나 확인할 수 없음.
+      </p>
+    </div>
+
+    <!-- 2. 개선안: 프로젝트 하위 에이전트/스킬 직접 노출 및 등록 -->
+    <div class="card" style="border: 2px solid var(--green);">
+      <div class="card-title">
+        <span>개선안: 프로젝트 하위 등록 기능 통합</span>
+        <span class="tag tag-recommend">적극 추천</span>
+      </div>
+
+      <div class="app-sidebar-mock">
+        <!-- 1. 좌측 액티비티 바 -->
+        <div class="mock-activity-bar">
+          <div class="mock-act-btn active" title="노트">📄</div>
+          <div class="mock-act-btn" title="에이전트">🤖</div>
+          <div class="mock-act-btn" title="글로벌 리소스">🌐</div>
+        </div>
+
+        <!-- 2. 우측 레일 패널 -->
+        <div class="mock-rail-panel">
+          <!-- 아수라다 카드 -->
+          <div class="companion-card">
+            <div class="companion-top">
+              <div class="asurada-avatar">
+                <div class="asurada-face">
+                  <span class="asurada-eye"></span>
+                  <span class="asurada-eye"></span>
+                </div>
+              </div>
+              <div class="ws-info">
+                <div class="ws-title">df-ai</div>
+                <div class="ws-path">/Users/df/df-ai/...</div>
+              </div>
+              <div class="ws-bell">🔔</div>
+            </div>
+            <div class="companion-bubble">
+              <span>⚡️ 오늘 어떤 작업을 진행할까요?</span>
+            </div>
+          </div>
+
+          <!-- 네비 메뉴 -->
+          <div class="mock-nav-list">
+            <div class="mock-nav-item">전체 노트</div>
+            <div class="mock-nav-item active">캘린더</div>
+            <div class="mock-nav-item">즐겨찾기</div>
+            <div class="mock-nav-item">연결</div>
+            <div class="mock-nav-item">템플릿</div>
+            <div class="mock-nav-item"><span>휴지통</span><span>4</span></div>
+          </div>
+
+          <!-- 프로젝트 트리 (개선된 형태) -->
+          <div class="mock-projects-section">
+            <div class="proj-section-head">
+              <span>프로젝트</span>
+              <span class="plus-btn" title="새 프로젝트 만들기">+</span>
+            </div>
+
+            <!-- aisurada 프로젝트 -->
+            <div class="proj-group">
+              <div class="proj-group-head" style="background: rgba(59, 130, 246, 0.08);">
+                <div class="proj-group-left">
+                  <span>∨</span>
+                  <span>📁</span>
+                  <span style="color:#60a5fa; cursor:pointer;" title="클릭 시 프로젝트 종합 관리 페이지 열기">aisurada</span>
+                </div>
+                <div class="proj-acts">
+                  <!-- 프로젝트 헤더의 + 버튼 -->
+                  <span class="act-btn" style="background:#2563eb; color:#fff;" title="이 프로젝트에 추가">+</span>
+                  <span class="act-btn" title="프로젝트 편집">✎</span>
+                </div>
+              </div>
+
+              <!-- +를 눌렀을 때 뜨는 등록 메뉴 (시각화) -->
+              <div class="popup-menu-mock">
+                <div class="popup-item">🟢 새 아젠다 추가</div>
+                <div class="popup-item selected">🤖 새 에이전트 등록 (이 프로젝트용)</div>
+                <div class="popup-item">⚡️ 새 스킬 등록 (이 프로젝트용)</div>
+                <div class="popup-item" style="border-top:1px solid #334155; margin-top:2px;">↗ 프로젝트 페이지 열기</div>
+              </div>
+
+              <!-- 프로젝트 하위 트리: 아젠다 + 에이전트 + 스킬 -->
+              <div class="proj-tree">
+                <!-- 1. 아젠다 -->
+                <div class="tree-item">
+                  <div class="tree-item-left">
+                    <span class="dot-agenda" style="background:#84cc16;"></span>
+                    <span>aisurada 개발</span>
+                  </div>
+                  <span style="color:#64748b;">0</span>
+                </div>
+
+                <!-- 2. 프로젝트 에이전트 (새로 추가됨) -->
+                <div class="tree-item-resource" style="background: rgba(168, 85, 247, 0.1);">
+                  <div class="tree-item-left">
+                    <span>🤖</span>
+                    <span style="color:#c084fc; font-weight:600;">에이전트</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; color:#c084fc;">1</span>
+                    <span class="res-badge-add" style="background:rgba(168, 85, 247, 0.2); color:#e9d5ff;" title="이 프로젝트에 새 에이전트 바로 등록">+등록</span>
+                  </div>
+                </div>
+
+                <!-- 3. 프로젝트 스킬 (새로 추가됨) -->
+                <div class="tree-item-resource" style="background: rgba(245, 158, 11, 0.1);">
+                  <div class="tree-item-left">
+                    <span>⚡️</span>
+                    <span style="color:#fbbf24; font-weight:600;">스킬</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; color:#fbbf24;">2</span>
+                    <span class="res-badge-add" style="background:rgba(245, 158, 11, 0.2); color:#fef3c7;" title="이 프로젝트에 새 스킬 바로 등록">+등록</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 미분류 프로젝트 -->
+            <div class="proj-group">
+              <div class="proj-group-head">
+                <div class="proj-group-left">
+                  <span>∨</span>
+                  <span>📁</span>
+                  <span>미분류</span>
+                </div>
+                <span>9</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="diff-point">
+        <h4>✨ 개선 핵심 3가지</h4>
+        <ol style="padding-left: 18px; line-height: 1.7;">
+          <li><strong>트리 하위 직관성:</strong> <code>📁 aisurada</code> 아래에 아젠다뿐 아니라 <code>🤖 에이전트</code>, <code>⚡️ 스킬</code> 항목과 개수가 바로 보임.</li>
+          <li><strong>원클릭 즉시 등록:</strong> 각 항목 옆 <code>+등록</code> 버튼 또는 프로젝트 헤더 <code>+</code> 메뉴를 누르면 해당 프로젝트 전용 등록 모달이 바로 뜸.</li>
+          <li><strong>프로젝트 종합 페이지 이동:</strong> <code>aisurada</code> 프로젝트 이름을 클릭하면 프로젝트 전용 상세 관리 페이지(참조 켜기/끄기, 목록 전체 관리)로 바로 이동.</li>
+        </ol>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
