@@ -10,10 +10,45 @@ export const AI_ENGINES: readonly { id: AIEngine; label: string; company: string
   { id: 'codex', label: 'Codex', company: 'OpenAI' },
 ];
 
+export interface ModelInfo {
+  id: string;
+  label: string;
+}
+
+export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
+  gemini: [
+    { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro (최신 플래그십)' },
+    { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash (고속/최신)' },
+    { id: 'gemini-2.0-flash-thinking', label: 'gemini-2.0-flash-thinking (심층 추론)' },
+    { id: 'gemini-2.0-flash', label: 'gemini-2.0-flash (초고속 범용)' },
+    { id: 'gemini-2.0-pro', label: 'gemini-2.0-pro (차세대 플래그십)' },
+    { id: 'gemini-1.5-pro', label: 'gemini-1.5-pro (안정 버전)' },
+    { id: 'gemini-1.5-flash', label: 'gemini-1.5-flash (경량 버전)' },
+    { id: 'inherit', label: 'inherit (기본 모델 상속)' },
+  ],
+  claude: [
+    { id: 'claude-3-7-sonnet', label: 'claude-3-7-sonnet (최신 하이브리드 추론)' },
+    { id: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet (코딩 최적화)' },
+    { id: 'claude-3-5-haiku', label: 'claude-3-5-haiku (초고속/경량)' },
+    { id: 'claude-3-opus', label: 'claude-3-opus (심층 문맥 이해)' },
+    { id: 'inherit', label: 'inherit (기본 모델 상속)' },
+  ],
+  codex: [
+    { id: 'o3-mini', label: 'o3-mini (최신 코딩/수학 추론)' },
+    { id: 'o3', label: 'o3 (차세대 고성능 추론)' },
+    { id: 'o1', label: 'o1 (플래그십 추론)' },
+    { id: 'o1-mini', label: 'o1-mini (경량 추론)' },
+    { id: 'gpt-4.5-preview', label: 'gpt-4.5-preview (최신 지식/창의성)' },
+    { id: 'gpt-4o', label: 'gpt-4o (옴니 플래그십)' },
+    { id: 'gpt-4o-mini', label: 'gpt-4o-mini (고속 경량)' },
+    { id: 'inherit', label: 'inherit (기본 모델 상속)' },
+  ],
+};
+
 export const MODEL_PRESETS: Record<AIEngine, string[]> = {
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-pro', 'inherit'],
-  claude: ['claude-3-7-sonnet', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-3-opus', 'inherit'],
-  codex: ['o3-mini', 'o1', 'gpt-4o', 'gpt-4o-mini', 'inherit'],
+  gemini: ENGINE_MODELS.gemini.map((m) => m.id),
+  claude: ENGINE_MODELS.claude.map((m) => m.id),
+  codex: ENGINE_MODELS.codex.map((m) => m.id),
 };
 
 export interface ProcessAgent {

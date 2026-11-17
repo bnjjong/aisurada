@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal } from '../Modal.tsx';
 import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent } from './types.ts';
-import { AI_ENGINES, MODEL_PRESETS } from './types.ts';
+import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS } from './types.ts';
 
 interface Props {
   agent?: ProcessAgent | null;
@@ -142,11 +142,11 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                style={{ minWidth: '180px', padding: '4px 8px' }}
+                style={{ minWidth: '220px', padding: '4px 8px' }}
               >
-                {MODEL_PRESETS[engine].map((m) => (
-                  <option key={m} value={m}>
-                    {m === 'inherit' ? '기본 모델 (inherit)' : m}
+                {ENGINE_MODELS[engine].map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
                   </option>
                 ))}
                 <option value="custom">직접 입력...</option>
