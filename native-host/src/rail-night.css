@@ -147,3 +147,35 @@
   --rail-glow: rgba(127, 163, 255, .30); --rail-base: linear-gradient(180deg, rgba(18, 26, 54, .80) 0%, rgba(6, 11, 24, .92) 100%);
   --rail-star-a: #e9eef8; --rail-star-b: rgba(233, 238, 248, .7); --rail-star-c: rgba(233, 238, 248, .5); --rail-link: var(--accent);
 }
+
+/* ───────── 인텔리J 스타일 레일 (intellij-rail) ─────────
+ * 상하좌우 마진·패딩 완전 제거, 둥근 모서리 해제(직각 밀착), 세로 스크롤바 숨김
+ * 뒤쪽 밤하늘 배경을 가리는 하얗게 뿌연 틴트를 걷어내고 실제 깊은 색상을 그대로 살린다.
+ */
+:root[data-skin] .workspace-screen.has-intellij-rail,
+:root[data-skin] .workspace-screen:has(.intellij-rail) {
+  padding: 0 !important;
+  gap: 0 !important;
+  --screen-pad: 0px !important;
+}
+:root[data-skin] .workspace-rail.intellij-rail {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-right: 1px solid var(--rail-edge, var(--line)) !important;
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+:root[data-skin] .workspace-rail.intellij-rail::-webkit-scrollbar,
+:root[data-skin] .workspace-rail.intellij-rail *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+:root[data-skin] .workspace-rail.intellij-rail .rail-panel {
+  background: transparent !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}

@@ -95,7 +95,7 @@ export function WorkspaceShell({ controller, state }: Props) {
         dismiss={() => controller.data.dismissFailures()}
       />
       <div
-        className={`workspace-screen ${rail ? "" : "without-rail"}`}
+        className={`workspace-screen ${rail ? "has-intellij-rail" : "without-rail"}`}
         style={rail ? ({ "--rail-width": `${railWidth}px` } as CSSProperties) : undefined}
       >
         {rail && <Rail controller={controller} state={state} />}

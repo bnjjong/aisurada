@@ -2001,12 +2001,27 @@ body.col-resizing {
 }
 
 /* ───────── IntelliJ 스타일 좌측 액티비티 바 (Activity Bar) + 패널 ───────── */
+.workspace-screen.has-intellij-rail {
+  padding: 0;
+  gap: 0;
+  --screen-pad: 0px;
+}
 .workspace-rail.intellij-rail {
   padding: 0;
   display: flex;
   flex-direction: row;
   overflow: hidden;
   height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.workspace-rail.intellij-rail::-webkit-scrollbar,
+.workspace-rail.intellij-rail *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 .rail-activity-bar {
   width: 48px;
@@ -2016,8 +2031,8 @@ body.col-resizing {
   flex-direction: column;
   align-items: center;
   padding: 12px 0 16px;
-  border-right: 1px solid var(--line);
-  background: color-mix(in srgb, var(--soft) 60%, var(--surface) 40%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.22);
   user-select: none;
 }
 .rail-activity-bar .rail-tabs {
@@ -2048,13 +2063,13 @@ body.col-resizing {
   transition: all 0.12s ease;
 }
 .rail-activity-bar .rail-tabs .rail-tab:hover {
-  background: var(--hover);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--ink);
 }
 .rail-activity-bar .rail-tabs .rail-tab.active {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.14);
   color: var(--accent);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 .rail-activity-bar .rail-tab .rail-tab-icon {
   display: flex;
@@ -2085,7 +2100,7 @@ body.col-resizing {
   align-items: center;
   width: 100%;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 .rail-activity-btn,
 .rail-activity-bottom .iconbtn {
@@ -2104,12 +2119,12 @@ body.col-resizing {
 }
 .rail-activity-btn:hover,
 .rail-activity-bottom .iconbtn:hover {
-  background: var(--hover);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--ink);
 }
 .rail-activity-btn.active,
 .rail-activity-bottom .iconbtn.active {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.14);
   color: var(--accent);
 }
 .workspace-rail.intellij-rail .rail-panel {
@@ -2119,7 +2134,14 @@ body.col-resizing {
   flex-direction: column;
   padding: 14px 12px;
   overflow-y: auto;
-  background: var(--soft);
+  background: transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.workspace-rail.intellij-rail .rail-panel::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 /* 아수라다 컴패니언 헤더 카드 */
 .rail-companion-card {
@@ -2129,9 +2151,9 @@ body.col-resizing {
   margin-bottom: 14px;
   padding: 12px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 85%, var(--accent) 5%);
-  border: 1px solid color-mix(in srgb, var(--line) 85%, var(--accent) 15%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   position: relative;
 }
 .rail-companion-top {
@@ -2210,7 +2232,7 @@ body.col-resizing {
   transition: all 0.12s ease;
 }
 .rail-companion-bell .rail-bell:hover {
-  background: var(--hover);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--ink);
 }
 .rail-companion-speech {
@@ -2220,11 +2242,11 @@ body.col-resizing {
 }
 .rail-companion-bubble {
   position: relative;
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent) 25%);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 .rail-companion-bubble-tail {
   position: absolute;
@@ -2232,9 +2254,9 @@ body.col-resizing {
   left: 24px;
   width: 8px;
   height: 8px;
-  background: var(--surface);
-  border-top: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent) 25%);
-  border-left: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent) 25%);
+  background: rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
   transform: rotate(45deg);
 }
 .rail-companion-msg {
@@ -2249,8 +2271,8 @@ body.col-resizing {
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 12px;
 }
 .rail-global-summary header h3 {
