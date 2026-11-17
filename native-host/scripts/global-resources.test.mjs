@@ -15,12 +15,12 @@ test('AI_ENGINES and MODEL_PRESETS cover claude, codex and gemini', () => {
   const engineIds = AI_ENGINES.map((e) => e.id);
   assert.deepEqual(engineIds.sort(), ['claude', 'codex', 'gemini'].sort());
 
-  assert.ok(MODEL_PRESETS.claude.includes('claude-sonnet-4'));
+  assert.ok(MODEL_PRESETS.claude.includes('claude-sonnet-5.5'));
   assert.ok(MODEL_PRESETS.claude.includes('claude-3-7-sonnet'));
-  assert.ok(MODEL_PRESETS.codex.includes('gpt-5'));
+  assert.ok(MODEL_PRESETS.codex.includes('gpt-6'));
   assert.ok(MODEL_PRESETS.codex.includes('o3-mini'));
+  assert.ok(MODEL_PRESETS.gemini.includes('gemini-3.8-flash'));
   assert.ok(MODEL_PRESETS.gemini.includes('gemini-3-pro'));
-  assert.ok(MODEL_PRESETS.gemini.includes('gemini-2.5-pro'));
 });
 
 test('DEFAULT_PROCESS_AGENTS contains 10 agents with valid engines and models', () => {
@@ -45,9 +45,9 @@ test('processAgentToSaveInput produces an engine-compatible SaveInput with tools
 
   const tools = JSON.parse(saveInput.tools);
   assert.equal(tools.aisurada.engine, 'gemini');
-  assert.equal(tools.aisurada.model, 'gemini-2.5-pro');
+  assert.equal(tools.aisurada.model, agent.model);
   assert.equal(tools.aisurada.role, agent.role);
-  assert.equal(tools.gemini.model, 'gemini-2.5-pro');
+  assert.equal(tools.gemini.model, agent.model);
   assert.ok(tools.claude.model);
   assert.ok(tools.codex.model);
 });

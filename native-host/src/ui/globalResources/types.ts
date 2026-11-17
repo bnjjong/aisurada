@@ -17,30 +17,31 @@ export interface ModelInfo {
 
 export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
   gemini: [
-    { id: 'gemini-3-pro', label: 'gemini-3-pro (Gemini 3세대 최신 플래그십, 심층 복합 추론)' },
+    { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash (2026.09 최신 플래그십 워크호스, 에이전트 코딩 특화)' },
+    { id: 'gemini-3.8-live', label: 'gemini-3.8-live (2026.09 실시간 다중 모달/확장 추론)' },
+    { id: 'gemini-3-pro', label: 'gemini-3-pro (Gemini 3세대 심층 복합 추론 플래그십)' },
     { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro (안정 플래그십, Thinking 추론 내장)' },
     { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash (초고속 하이브리드 추론)' },
     { id: 'gemini-2.0-flash', label: 'gemini-2.0-flash (초고속 멀티모달 GA)' },
-    { id: 'gemini-2.0-flash-lite', label: 'gemini-2.0-flash-lite (초경량 고효율 GA)' },
-    { id: 'gemini-1.5-pro', label: 'gemini-1.5-pro (2M 대용량 컨텍스트 안정판)' },
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   claude: [
-    { id: 'claude-opus-4', label: 'claude-opus-4 (Claude 4 세대 최고 지능 플래그십)' },
+    { id: 'claude-sonnet-5.5', label: 'claude-sonnet-5.5 (2026 최신 코딩·에이전트 플래그십)' },
+    { id: 'claude-opus-5.5', label: 'claude-opus-5.5 (2026 최신 최고 지능 아키텍처 플래그십)' },
+    { id: 'claude-sonnet-4.5', label: 'claude-sonnet-4.5 (검증된 고성능 코딩 표준)' },
     { id: 'claude-sonnet-4', label: 'claude-sonnet-4 (Claude 4 세대 코딩·에이전트 표준)' },
     { id: 'claude-3-7-sonnet', label: 'claude-3-7-sonnet (최초 하이브리드 추론, Claude Code 기본)' },
-    { id: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet (검증된 실무 코딩 표준)' },
-    { id: 'claude-3-5-haiku', label: 'claude-3-5-haiku (초고속 경량 응답)' },
+    { id: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet (검증된 실무 코딩 레거시)' },
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   codex: [
-    { id: 'gpt-5', label: 'gpt-5 (차세대 통합 추론·에이전트 플래그십)' },
+    { id: 'gpt-6', label: 'gpt-6 (2026 최신 차세대 플래그십 Astra)' },
     { id: 'gpt-5-codex', label: 'gpt-5-codex (엔지니어링·코딩 특화 에이전트)' },
+    { id: 'gpt-5', label: 'gpt-5 (통합 추론·에이전트 플래그십)' },
     { id: 'o3', label: 'o3 (심층 수학·과학·코딩 플래그십 추론)' },
     { id: 'o3-mini', label: 'o3-mini (고효율 STEM·코딩 추론)' },
     { id: 'gpt-4.5', label: 'gpt-4.5 (대규모 지식 직관 맥락 Orion)' },
     { id: 'gpt-4o', label: 'gpt-4o (옴니 멀티모달 표준)' },
-    { id: 'gpt-4o-mini', label: 'gpt-4o-mini (고속 경량)' },
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
 };
@@ -114,7 +115,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
 각 작업 단계별로 전문 에이전트(티켓, 개발, QA, PR 리뷰&머지, 클린업, 리포트 등)를 지휘하며 프로세스 준수 여부를 확인하고 단계 전환을 통제합니다.`,
     enabled: true,
     engine: 'gemini',
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3.8-flash',
     order: 1,
   },
   {
@@ -129,7 +130,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
 요구사항을 바탕으로 중복 없는 표준 형식의 작업 항목을 생성하고 진행 상황을 투명하게 기록합니다.`,
     enabled: true,
     engine: 'claude',
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-5.5',
     order: 2,
   },
   {
@@ -159,7 +160,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
 프로젝트의 코딩 컨벤션과 구조를 준수하며 결함 없는 고품질 코드를 작성합니다.`,
     enabled: true,
     engine: 'claude',
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-5.5',
     order: 4,
   },
   {
@@ -174,7 +175,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
 다양한 엣지 케이스와 오류 시나리오를 검증하고 테스트 커버리지를 보장합니다.`,
     enabled: true,
     engine: 'gemini',
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3.8-flash',
     order: 5,
   },
   {
@@ -189,7 +190,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
 Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견을 제시합니다.`,
     enabled: true,
     engine: 'claude',
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-5.5',
     order: 6,
   },
   {
@@ -204,7 +205,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
 재현 경로와 영향도를 명확히 기술한 이슈를 등록합니다.`,
     enabled: true,
     engine: 'claude',
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-5.5',
     order: 7,
   },
   {
@@ -219,7 +220,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
 미커밋 변경이나 보관할 파일이 없는지 확인하고 이번 세션이 생성한 격리 자원만 선별 정리합니다.`,
     enabled: true,
     engine: 'codex',
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     order: 8,
   },
   {
@@ -234,7 +235,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
 사용자가 한눈에 이해할 수 있도록 결론 우선의 명확한 요약 보고서를 작성합니다.`,
     enabled: true,
     engine: 'gemini',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     order: 9,
   },
   {
@@ -249,7 +250,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
 프로젝트 공통 규칙의 체크리스트가 누락 없이 이행되었는지 엄격하게 최종 점검합니다.`,
     enabled: true,
     engine: 'gemini',
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3.8-flash',
     order: 10,
   },
 ];
