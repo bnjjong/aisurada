@@ -269,9 +269,16 @@ pub const TOOLS: &[McpTool] = &[
     },
     McpTool {
         name: "get_task",
-        description: "태스크 1건을 설명, 완료 기준, 연결한 자원, 연결된 태스크, Ready For Develop 조건, 활동과 함께 읽는다. 태스크를 만들고 고치는 것은 사람과 러너가 한다.",
+        description: "태스크 1건을 설명, 완료 기준, 연결한 자원, 연결된 태스크, Ready For Develop 조건, 활동과 함께 읽는다.",
         input_schema: "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"description\":\"태스크 키(TSK-14) 또는 id(tk…)\"},\"activity\":{\"type\":\"integer\",\"minimum\":1,\"description\":\"최근 활동 개수. 안 주면 100\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
         write: false,
+        destructive: false,
+    },
+    McpTool {
+        name: "create_task",
+        description: "새 태스크(티켓) 1건을 만든다. repo(owner/name), title, criteria(완료 기준 목록 1개 이상)는 필수다. status는 draft로 시작한다. 응답에 key(TSK-1), id, precondition(f1)이 들어 있다.",
+        input_schema: "{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\",\"description\":\"태스크 요약 제목\"},\"repo\":{\"type\":\"string\",\"description\":\"저장소(owner/name)\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"완료 기준 목록. 1개 이상 필수\"},\"type\":{\"type\":\"string\",\"enum\":[\"feature\",\"bug\",\"chore\"],\"description\":\"태스크 유형. 기본 feature\"},\"priority\":{\"type\":\"string\",\"enum\":[\"high\",\"medium\",\"low\"],\"description\":\"우선순위. 기본 medium\"},\"project\":{\"type\":\"string\",\"description\":\"프로젝트 slug\"},\"base\":{\"type\":\"string\",\"description\":\"기준 브랜치. 예: main\"},\"body\":{\"type\":\"string\",\"description\":\"상세 설명(마크다운)\"},\"labels\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"라벨 목록\"}},\"required\":[\"title\",\"repo\",\"criteria\"],\"additionalProperties\":false}",
+        write: true,
         destructive: false,
     },
 ];

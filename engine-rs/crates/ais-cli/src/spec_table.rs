@@ -657,7 +657,7 @@ pub const SPECS: &[Spec] = &[
     },
     Spec {
         name: "create-task",
-        tool: None,
+        tool: Some("create_task"),
         write: true,
         part4: false,
         usage: "create-task title=<요약> repo=<owner/name> criteria=<완료 기준 JSON 배열. 하나 이상. 예: [\"…\",{\"text\":\"…\"}]> [type=feature|bug|chore] [priority=high|medium|low] [project=<프로젝트 slug>] [base=<기준 브랜치>] [body=<설명>] [labels=<JSON 배열>] [refs=<연결한 자원 JSON 배열. 예: [{\"kind\":\"note\",\"target\":\"nd…\"},{\"kind\":\"github\",\"target\":\"owner/name#53\"}]>] [actor=human|runner]",

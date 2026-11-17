@@ -72,6 +72,7 @@ pub const CLI_TOOL_NAMES: &[&str] = &[
     "get_resource_change",
     "list_tasks",
     "get_task",
+    "create_task",
 ];
 
 /// `--list`가 도구 이름 옆에 적는 한 줄 설명
@@ -117,6 +118,7 @@ pub fn tool_description(name: &str) -> &'static str {
         "get_resource_change" => "승인 대기 변경 1건을 이전 판과 새 판과 함께 낸다",
         "list_tasks" => "태스크(티켓) 목록을 상태, 유형, 저장소, 라벨로 거른다",
         "get_task" => "태스크 1건을 설명, 완료 기준, 연결, 활동과 함께 낸다",
+        "create_task" => "새 태스크(티켓) 1건을 만든다",
         _ => "",
     }
 }

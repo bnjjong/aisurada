@@ -647,9 +647,34 @@ fn resource_or_task_tool(
             &TASK_BOOLS,
         ),
         "get_task" => (&["id", "activity"], &TASK_BOOLS),
+        "create_task" => (
+            &[
+                "title", "repo", "criteria", "type", "priority", "project", "base", "body",
+                "labels", "refs",
+            ],
+            &TASK_BOOLS,
+        ),
         _ => return Err(CliError::new(400, format!("미지원 도구: {tool}"))),
     };
     validate_keys(tool, props, keys)?;
+
+    if tool == "create_task" {
+        required_string(tool, props, "title")?;
+        required_string(tool, props, "repo")?;
+        match get(props, "criteria") {
+            None => return Err(fail(tool, "criteria 가 필요하다.")),
+            Some(JsonValue::Array(a)) if a.is_empty() => {
+                return Err(fail(tool, "criteria 는 1개 이상이어야 한다."))
+            }
+            Some(JsonValue::Array(_)) => {}
+            Some(other) => {
+                return Err(fail(
+                    tool,
+                    format!("criteria 는 배열이어야 한다: {}", json::compact(other)),
+                ))
+            }
+        }
+    }
 
     let mut options: Vec<(String, String)> = Vec::new();
     for key in keys {
@@ -677,6 +702,8 @@ fn resource_or_task_tool(
             }
         } else if (*key == "skills" && matches!(value, JsonValue::Array(_)))
             || (*key == "tools" && matches!(value, JsonValue::Object(_)))
+            || ((*key == "criteria" || *key == "labels" || *key == "refs")
+                && matches!(value, JsonValue::Array(_)))
         {
             json::compact(value)
         } else {
@@ -820,5 +847,33 @@ mod tests {
     #[test]
     fn unknown_tool_is_unsupported() {
         assert_eq!(call_err("nope_tool", "{}"), "미지원 도구: nope_tool");
+    }
+
+    #[test]
+    fn create_task_parses_fields_and_serializes_arrays() {
+        let call = call(
+            "create_task",
+            r#"{"title":"태스크1","repo":"user/repo","criteria":["기준1","기준2"],"labels":["bug"],"type":"bug"}"#,
+        )
+        .unwrap();
+        assert_eq!(call.command, "create_task");
+        assert_eq!(
+            call.args,
+            json!({
+                "title": "태스크1",
+                "repo": "user/repo",
+                "criteria": "[\"기준1\",\"기준2\"]",
+                "labels": "[\"bug\"]",
+                "type": "bug",
+            })
+        );
+    }
+
+    #[test]
+    fn create_task_validates_required_fields() {
+        assert!(call_err("create_task", r#"{"repo":"user/repo","criteria":["c1"]}"#).contains("title"));
+        assert!(call_err("create_task", r#"{"title":"t","criteria":["c1"]}"#).contains("repo"));
+        assert!(call_err("create_task", r#"{"title":"t","repo":"r"}"#).contains("criteria 가 필요하다"));
+        assert!(call_err("create_task", r#"{"title":"t","repo":"r","criteria":[]}"#).contains("1개 이상"));
     }
 }
