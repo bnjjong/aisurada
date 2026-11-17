@@ -119,6 +119,42 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M3 12l3.5-3.5 2.5 2.5 2-2 2.5 2.5" />
     </>
   ),
+  note: (
+    <>
+      <path d="M3.5 2.5h6l3 3v8a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z" />
+      <path d="M9.5 2.5v3h3" />
+    </>
+  ),
+  bot: (
+    <>
+      <rect x="2.5" y="4.5" width="11" height="8.5" rx="2" />
+      <path d="M8 2v2.5M5.5 8h.01M10.5 8h.01M5.5 10.5h5" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M2 8h12M8 2a9 9 0 0 1 2.5 6 9 9 0 0 1-2.5 6 9 9 0 0 1-2.5-6A9 9 0 0 1 8 2z" />
+    </>
+  ),
+  settings: (
+    <>
+      <circle cx="8" cy="8" r="2.5" />
+      <path d="M8 1.5v1.5M8 13v1.5M1.5 8h1.5M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M2.5 3.5a1.5 1.5 0 0 1 1.5-1.5h4v11h-4a1.5 1.5 0 0 0-1.5 1.5z" />
+      <path d="M13.5 3.5a1.5 1.5 0 0 0-1.5-1.5h-4v11h4a1.5 1.5 0 0 1 1.5 1.5z" />
+    </>
+  ),
+  panelLeft: (
+    <>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <path d="M6 2.5v11" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

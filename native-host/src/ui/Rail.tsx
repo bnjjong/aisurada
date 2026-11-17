@@ -16,6 +16,7 @@ import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../nav
 import type { RailTab } from "../navigation/railTabs.ts";
 
 const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트", global: "글로벌 리소스" };
+const TAB_ICONS: Record<RailTab, "note" | "bot" | "globe"> = { notes: "note", agents: "bot", global: "globe" };
 /** 탭마다 보이는 메뉴(주소 조각, 글). 연동 가이드는 두 탭 공통이라 아래 줄에 있다 */
 const NAV_ITEMS: Record<RailTab, ReadonlyArray<readonly [string, string]>> = {
   notes: [
@@ -179,46 +180,84 @@ export function Rail({
     );
   };
   return (
-    <aside className="workspace-rail">
-      <div className="rail-top">
+    <aside className="workspace-rail intellij-rail">
+      <div className="rail-activity-bar" aria-label="도구 막대">
         <div className="brand" role="img" aria-label="aisurada">
           <LiveBrandMark />
         </div>
-        <NotificationBell controller={controller} />
-      </div>
-      <div className="workspace-identity" title={ws.path || ws.name}>
-        <strong>{ws.name}</strong>
-        {ws.sample && <span className="sample-badge">샘플</span>}
-        {ws.path && <span className="workspace-path" title={ws.path}>{ws.path}</span>}
-      </div>
-      <div className="rail-tabs" role="tablist" aria-label="레일 구역" data-rail-section="tabs">
-        {RAIL_TABS.map((id) => {
-          const selected = id === tab;
-          const badge = id === "agents" ? mineBadge : "";
-          return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              id={`rail-tab-${id}`}
-              aria-selected={selected}
-              aria-controls="rail-panel"
-              className={`rail-tab ${selected ? "active" : ""}`}
-              title={`${TAB_LABELS[id]} (${id === "notes" ? "⌥1" : id === "agents" ? "⌥2" : "⌥3"})`}
-              onClick={() => {
-                // 이미 그 탭의 화면이면 그대로 두고, 아니면 그 탭에서 마지막으로 보던 화면으로 간다
-                const to = railTabTarget(id, state.route);
-                if (to) controller.navigate(to);
-              }}
-            >
-              {TAB_LABELS[id]}
-              {badge && <span className="rail-tab-badge" role="img" aria-label={`내 차례 ${badge}건`}>{badge}</span>}
-            </button>
-          );
-        })}
+        <div className="rail-tabs" role="tablist" aria-label="레일 구역" data-rail-section="tabs">
+          {RAIL_TABS.map((id) => {
+            const selected = id === tab;
+            const badge = id === "agents" ? mineBadge : "";
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`rail-tab-${id}`}
+                aria-selected={selected}
+                aria-controls="rail-panel"
+                className={`rail-tab ${selected ? "active" : ""}`}
+                title={`${TAB_LABELS[id]} (${id === "notes" ? "⌥1" : id === "agents" ? "⌥2" : "⌥3"})`}
+                onClick={() => {
+                  // 이미 그 탭의 화면이면 그대로 두고, 아니면 그 탭에서 마지막으로 보던 화면으로 간다
+                  const to = railTabTarget(id, state.route);
+                  if (to) controller.navigate(to);
+                }}
+              >
+                {TAB_LABELS[id]}
+                <span className="rail-tab-icon">
+                  <Icon name={TAB_ICONS[id]} size={18} />
+                </span>
+                {badge && <span className="rail-tab-badge" role="img" aria-label={`내 차례 ${badge}건`}>{badge}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="rail-activity-bottom">
+          <NotificationBell controller={controller} />
+          <button
+            type="button"
+            className="rail-activity-btn"
+            title="테마 전환"
+            aria-label="테마 전환"
+            onClick={() =>
+              controller.preference({
+                theme: state.theme === "dark" ? "light" : "dark",
+              })
+            }
+          >
+            ◐
+          </button>
+          <button
+            type="button"
+            className="rail-activity-btn"
+            title="설정"
+            aria-label="설정"
+            onClick={() => controller.settings(true)}
+          >
+            <Icon name="settings" size={16} />
+          </button>
+          <button
+            className={`iconbtn icon-btn ${route.kind === "guide" ? "active" : ""}`}
+            title="연동 가이드"
+            aria-label="연동 가이드"
+            aria-current={route.kind === "guide" ? "page" : undefined}
+            onClick={() => controller.navigate("/guide")}
+          >
+            ?
+          </button>
+        </div>
       </div>
       <div className="rail-panel" id="rail-panel" role="tabpanel" aria-labelledby={`rail-tab-${tab}`}>
-      <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : tab === "agents" ? "에이전트 메뉴" : "글로벌 리소스 메뉴"}>
+        <div className="rail-panel-head">
+          <div className="rail-panel-title" title={ws.path || ws.name}>
+            <strong>{ws.name}</strong>
+            {ws.sample && <span className="sample-badge" style={{ marginLeft: "6px" }}>샘플</span>}
+          </div>
+          {ws.path && <span className="rail-panel-sub" title={ws.path}>{ws.path}</span>}
+        </div>
+        <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : tab === "agents" ? "에이전트 메뉴" : "글로벌 리소스 메뉴"}>
         {NAV_ITEMS[tab].map(([path, label]) => (
           <button
             className={`nav-item ${(path === "tasks" ? state.route.startsWith("/task") : state.route.startsWith("/" + path)) ? "active" : ""}`}
@@ -333,45 +372,25 @@ export function Rail({
         )}
       </section>
       )}
+      {tab === "global" && (
+        <div className="rail-global-summary">
+          <header>
+            <h3>공통 자원 관리</h3>
+          </header>
+          <ul className="rail-global-list">
+            <li><span>프로세스 에이전트</span><strong>10개</strong></li>
+            <li><span>글로벌 스킬</span><strong>3개</strong></li>
+            <li><span>연동 인프라 (Mock)</span><strong>5개</strong></li>
+          </ul>
+        </div>
+      )}
+      <button
+        className="rail-back"
+        onClick={() => void controller.launcher()}
+      >
+        시작 화면
+      </button>
       </div>
-      <footer className="rail-footer">
-        <button
-          className="iconbtn icon-btn"
-          title="테마 전환"
-          aria-label="테마 전환"
-          onClick={() =>
-            controller.preference({
-              theme: state.theme === "dark" ? "light" : "dark",
-            })
-          }
-        >
-          ◐
-        </button>
-        <button
-          className="iconbtn icon-btn"
-          title="설정"
-          aria-label="설정"
-          onClick={() => controller.settings(true)}
-        >
-          ⚙
-        </button>
-        {/* 연동 가이드는 두 탭이 같이 쓰므로 탭 메뉴가 아니라 이 줄에 둔다 */}
-        <button
-          className={`iconbtn icon-btn ${route.kind === "guide" ? "active" : ""}`}
-          title="연동 가이드"
-          aria-label="연동 가이드"
-          aria-current={route.kind === "guide" ? "page" : undefined}
-          onClick={() => controller.navigate("/guide")}
-        >
-          ?
-        </button>
-        <button
-          className="rail-back"
-          onClick={() => void controller.launcher()}
-        >
-          시작 화면
-        </button>
-      </footer>
     </aside>
   );
 }
