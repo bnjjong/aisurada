@@ -216,7 +216,7 @@
 
 /* ───────── 탭 줄 · 레일 ───────── */
 :root[data-skin="glass"] .tab-bar {
-  align-items: stretch; margin: 12px 12px 0; padding: 4px; gap: 4px; min-height: 0; border: 1px solid var(--rim); border-radius: 16px;
+  align-items: stretch; margin: 2px 12px 0; padding: 4px; gap: 4px; min-height: 0; border: 1px solid var(--rim); border-radius: 16px;
   background: var(--soft); box-shadow: var(--sh-1); scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
   mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);

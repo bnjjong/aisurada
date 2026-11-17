@@ -183,7 +183,7 @@
 /* 탭 줄: 오목한 쟁반 안에 탭마다 알약 하나. 안 고른 탭도 옅은 면을 가져서 경계가 보이고,
    고른 탭은 볼록하게 뜬다. × 는 알약 안쪽 글자 바로 옆에 붙는다. 스크롤바는 숨기고 스크롤은 그대로 된다. */
 :root[data-skin="tactile"] .tab-bar {
-  align-items: stretch; margin: 8px 8px 0; padding: 4px; gap: 3px; min-height: 0; border: 0; border-radius: 999px;
+  align-items: stretch; margin: 2px 8px 0; padding: 4px; gap: 3px; min-height: 0; border: 0; border-radius: 999px;
   background: var(--sunken); box-shadow: var(--in); scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
   mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);

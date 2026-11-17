@@ -203,3 +203,6 @@
   height: 18px !important;
   pointer-events: none !important;
 }
+:root[data-skin] .tab-bar {
+  margin-top: 2px !important;
+}
