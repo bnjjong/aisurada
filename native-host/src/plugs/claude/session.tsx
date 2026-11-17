@@ -734,12 +734,48 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
 
   // 8.4: once the conversation is read the column goes to the bottom, once per session; not while the user is scrolled up.
   const scrolled = useRef<string>('');
+  const isAtBottomRef = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    if (!body.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = body.current;
+    isAtBottomRef.current = scrollHeight - clientHeight - scrollTop <= 60;
+  }, []);
+
+  const scrollToBottom = useCallback((force = false) => {
+    if (!body.current) return;
+    if (force || isAtBottomRef.current) {
+      body.current.scrollTop = body.current.scrollHeight;
+      requestAnimationFrame(() => {
+        if (body.current && (force || isAtBottomRef.current)) {
+          body.current.scrollTop = body.current.scrollHeight;
+        }
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (read.view && scrolled.current !== sessionId && body.current) {
       body.current.scrollTop = body.current.scrollHeight;
       scrolled.current = sessionId;
+      isAtBottomRef.current = true;
     }
   }, [read.view, sessionId]);
+
+  // 프롬프트 입력 시 / "답을 기다리는 중" 상태 진입 시 즉시 맨 아래로 스크롤한다
+  useEffect(() => {
+    if (running) {
+      isAtBottomRef.current = true;
+      scrollToBottom(true);
+      const timer = setTimeout(() => scrollToBottom(true), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [running, scrollToBottom]);
+
+  // 터미널 응답(signal)이나 대화 턴 수가 바뀔 때 바닥 근처면 자동으로 따라 내려간다
+  useEffect(() => {
+    scrollToBottom(false);
+  }, [read.view?.turns.length, signal, turns.length, scrollToBottom]);
 
   const startResize = (event: React.MouseEvent) => {
     dragging.current = true;
@@ -778,6 +814,8 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
     const askSessionId = await railChatSessionId(chatId);
     const askId = randomUuid(); // this one question's own id, for the stop button
     setRunning({ chatId, sessionId: askSessionId, askId, startedAt: Date.now(), images: files.length, previews, question, timeoutSeconds }); // 7
+    isAtBottomRef.current = true;
+    requestAnimationFrame(() => scrollToBottom(true));
     setLastSent(chatId);
     setNewChat(false);
     setNotice(null);
@@ -824,9 +862,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
       await appendTurns(vault, { noteId, subId, chatId, sessionId }, active, [turn], setChats);
     } finally {
       setRunning(null); // 14
-      requestAnimationFrame(() => {
-        if (body.current) body.current.scrollTop = body.current.scrollHeight;
-      });
+      scrollToBottom(true);
     }
   };
 
@@ -856,7 +892,7 @@ export function NoteSessionRail({ sessionId, onClose, chat }: NoteSessionRailPro
           </div>
         </header>
 
-        <div className="nsrail-body" ref={body}>
+        <div className="nsrail-body" ref={body} onScroll={handleScroll}>
           <section className="nsrail-session-section">
             <TranscriptBody read={read} />
           </section>
