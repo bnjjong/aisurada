@@ -42,7 +42,8 @@
     "test:part4:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --part4",
     "test:ask-marks:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --ask-marks",
     "test:resources:acceptance": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --resources",
-    "test:tasks:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --tasks"
+    "test:tasks:acceptance": "pnpm build && node scripts/workspace-acceptance.mjs --tasks",
+    "perf:app": "pnpm build:noclaude && node scripts/workspace-acceptance.mjs --perf"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.2",

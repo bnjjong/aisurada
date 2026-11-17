@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Exercise the built React application in an isolated, actual macOS WKWebView.
 import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve, extname } from 'node:path';
@@ -19,6 +19,9 @@ const autosaveCheck = process.argv.includes('--autosave');
 const viewsCheck = process.argv.includes('--views');
 const resourcesCheck = process.argv.includes('--resources');
 const tasksCheck = process.argv.includes('--tasks');
+// 노트가 많을 때 앱이 노트를 읽어 오는 시간(이슈 #59). 점검이라기보다 재는 일이라 통과·실패 대신 숫자를 찍는다.
+const perfCheck = process.argv.includes('--perf');
+const perfNotes = Number(process.env.AIS_PERF_NOTES || 2000);
 // 러너와 4부는 Claude 기능을 켠 호스트가 있어야 화면 명령이 생긴다(태스크 점검은 가짜 claude도 쓴다)
 const claudeHost = part4Check || tasksCheck;
 let editorCases = editorCheck ? JSON.parse(readFileSync(join(host, 'fixtures/editor-roundtrip/cases.json'), 'utf8')) : [];
@@ -104,7 +107,7 @@ if (part4Check) {
     { type: 'custom-title', customTitle: '점검 세션' },
   ].map(line => JSON.stringify(line)).join('\n') + '\n');
 }
-const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, today };
+const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck || perfCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, perfCheck, perf: { notes: perfNotes }, today };
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 // 앱이 엔진을 부르는 길은 둘이다: 문자열 목록을 받는 `sidecar_call`과 호출 객체를 받는 `engine_call`. 호스트가 두 길의 호출을 이 파일에 적고
 // (`AISURADA_CALL_LOG`), 점검은 어느 길로 갔든 같은 문자열 목록(argv)으로 센다.
@@ -147,6 +150,20 @@ if (resourcesCheck) {
   const dirtyFile = join(vault, dirty.path);
   writeFileSync(dirtyFile, readFileSync(dirtyFile, 'utf8').replace('description: 원래 설명', 'description: 직접 고친 설명'));
 }
+if (perfCheck) {
+  // 합성 노트 N건(엔진 기준선 `perf_baseline`과 같은 모양: 한 건 약 1.5KB, 아젠다 10개, 월별 폴더). 진짜 vault 내용은 없다.
+  const sentences = ['오늘은 배포 파이프라인의 성능을 다시 살펴보고 병목이 어디인지 정리했다.', '회의에서 나온 결정 사항은 아래 목록과 같고 각자 맡은 일을 이번 주 안에 끝내기로 했다.', '코드 리뷰에서 지적받은 부분을 고치고 시험을 다시 돌려 통과하는 것을 확인했다.', '다음 단계로 넘어가기 전에 위험 요소를 적어 두고 되돌리는 방법도 같이 남겼다.', '사용자가 보낸 의견을 읽고 화면의 문구와 순서를 손보기로 했다.', '데이터가 늘어났을 때 목록과 검색이 얼마나 느려지는지는 아직 재 보지 않았다.', '참고한 문서와 링크는 맨 아래에 모았고 나중에 다시 찾기 쉽게 이름을 붙였다.', '오래 걸리는 작업은 쪼개서 하루 단위로 확인할 수 있게 계획을 세웠다.'];
+  await cliRun(['init-workspace', 'name=검증 공간', 'templates=[]']);
+  for (let a = 0; a < 10; a++) write(join(vault, `.aisurada/agendas/a${a}.md`), `---\nid: agperf${a}-${a.toString(16).padStart(8, '0')}\nslug: a${a}\ntitle: 아젠다 ${a}\n---\n# 아젠다 ${a}\n`);
+  for (let i = 0; i < perfNotes; i++) {
+    let body = `# 기록 ${i}\n\n`;
+    for (let k = 0; k < 6; k++) { body += sentences[(i + k) % sentences.length] + ' '; if (k % 2 === 1) body += '\n\n'; }
+    if (i % 7 === 0) body += '\n성능 점검 항목을 따로 적는다.\n';
+    if (i === Math.floor(perfNotes / 2)) { body += '\n이 노트에만 희귀어가 들어 있다.\n'; cfg.perfTarget = `ndperf${i}-${i.toString(16).padStart(8, '0')}`; }
+    const month = String(1 + i % 12).padStart(2, '0'), day = String(1 + i % 28).padStart(2, '0');
+    write(join(vault, `notes/a${i % 10}/2026-${month}/n${i}/note.md`), `---\nid: ndperf${i}-${i.toString(16).padStart(8, '0')}\nagenda: a${i % 10}\ntype: free\ntitle: 기록 ${i}\ncreated: '2026-${month}-${day}T09:30:00+09:00'\ntags: [tag${i % 20}, 공통]\n---\n${body}`);
+  }
+}
 if (tasksCheck) {
   // 태스크: 저장소가 있는 프로젝트 하나와 Draft 태스크 하나. 러너의 저장소 받기는 GitHub 앱 자격이 있어야 해서 격리 환경에서는 늘 실패한다.
   await cliRun(['init-workspace', 'name=검증 공간', 'templates=[]']);
@@ -168,8 +185,13 @@ const server = createServer(async (req, res) => {
     const value = JSON.parse(body);
     if (path === '/result') finish(value);
     if (path === '/note-result') noteResult = value;
-    if (path === '/progress') console.log(`${value.ok ? 'PASS' : 'FAIL'} ${value.id}${value.error ? ' ' + value.error : ''}`);
+    if (path === '/progress') console.log(`${value.ok ? 'PASS' : 'FAIL'} ${value.id}${value.error ? ' ' + value.error : ''}${value.detail ? ' ' + JSON.stringify(value.detail) : ''}`);
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); return;
+  }
+  if (path === '/rss') {
+    // 호스트 프로세스(엔진이 안에서 돈다)의 상주 메모리. 화면을 그리는 웹뷰는 다른 프로세스라 여기 안 들어 있다.
+    const ps = spawnSync('ps', ['-axo', 'rss=,command=']).stdout.toString().split('\n').filter(line => /target\/(release|debug)\/aisurada-host/.test(line));
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ hostMb: ps.reduce((sum, line) => sum + Number(line.trim().split(/\s+/)[0]), 0) / 1024 })); return;
   }
   if (path === '/note-result') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(noteResult || null)); return; }
   if (path === '/editor-cases') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(editorCases)); return; }
@@ -180,7 +202,7 @@ const server = createServer(async (req, res) => {
   }
   if (path === '/bootstrap.js' || path === '/workspace-checks.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });
-    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, resourcesCheck ? 'scripts/resources-checks.js' : tasksCheck ? 'scripts/tasks-checks.js' : askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
+    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, perfCheck ? 'scripts/perf-checks.js' : resourcesCheck ? 'scripts/resources-checks.js' : tasksCheck ? 'scripts/tasks-checks.js' : askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
   }
   if (probeAssets.has(path)) { res.writeHead(200, { 'Content-Type': path.endsWith('.css') ? 'text/css' : 'text/javascript' }); res.end(probeAssets.get(path)); return; }
   if (path.startsWith('/assets/')) {
@@ -248,9 +270,9 @@ try {
   if (askMarksCheck && !part4Check) env.TAURI_CONFIG = readFileSync(override, 'utf8');
   const app = askMarksCheck && !part4Check
     ? start('cargo', ['run', '--manifest-path', join(host, 'src-tauri/Cargo.toml'), '--no-default-features', '--'])
-    : start(join(host, 'node_modules/.bin/tauri'), ['dev', '--config', override, '--no-watch', '--', ...(claudeHost ? [] : ['--no-default-features'])]);
+    : start(join(host, 'node_modules/.bin/tauri'), ['dev', ...(perfCheck ? ['--release'] : []), '--config', override, '--no-watch', '--', ...(claudeHost ? [] : ['--no-default-features'])]);
   app.on('exit', code => { if (code) finish([{ id: 'native-process', ok: false, error: `exited ${code}` }]); });
-  timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck ? 420_000 : 180_000);
+  timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), perfCheck ? 1_800_000 : editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck ? 420_000 : 180_000);
   results = await completed;
   if (!results.length || results.some(result => !result.ok)) throw Error('Workspace checks failed');
   if (!existsSync(join(vault, '.aisurada/workspace.json')) || existsSync(join(vault, 'notes/demo/legacy.md'))) throw Error('Workspace initialization or migration missing on disk');
