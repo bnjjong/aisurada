@@ -17,9 +17,11 @@ import { useRunner } from "./runnerStore.ts";
 import { editedLine } from "./resourcesClient.ts";
 import {
   LINK_CHOICES, activityText, activityWho, addComment, checkedLine, deleteTask, explainError, formFromTask, getTask, githubUrl, linkCandidates, linkTasks, listTasks,
-  priorityLabel, relationLabel, repoChoices, statusTitle, timeLabel, toggleCriterion, transitionTask, typeLabel, updateTask,
+  parseRefInput, priorityLabel, relationLabel, repoChoices, statusTitle, timeLabel, toggleCriterion, transitionTask, typeLabel, updateTask,
 } from "./tasksClient.ts";
 import type { ActivityEvent, RelationType, RepoChoice, TaskDetail, TaskForm, TaskPriority, TaskRow, TaskStatus, TaskType } from "./tasksClient.ts";
+import { listGithubRepos, useGithub } from "./githubStore.ts";
+import type { GithubRepo } from "./githubStore.ts";
 
 type ActivityTab = "all" | "comments" | "history";
 
@@ -57,6 +59,22 @@ export function TaskDetailPage({
   const [tempTitle, setTempTitle] = useState("");
   const [editingBody, setEditingBody] = useState(false);
   const [tempBody, setTempBody] = useState("");
+  const [addingRef, setAddingRef] = useState(false);
+  const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [refInput, setRefInput] = useState("");
+  const [refError, setRefError] = useState("");
+  const github = useGithub();
+  const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
+
+  useEffect(() => {
+    if (github.status?.connected) {
+      listGithubRepos(controller.callHost).then(
+        (list) => setGithubRepos(list.repositories),
+        () => {}
+      );
+    }
+  }, [github.status?.connected, controller]);
+
   const runnerVersion = useRunner().version;
 
   const reload = useCallback(async () => {
@@ -129,6 +147,11 @@ export function TaskDetailPage({
   const noteTitle = (id: string) => ws.notes.find((n) => n.id === id)?.title;
   const shown = task.activity.filter((e) => (tab === "all" ? true : tab === "comments" ? e.kind === "comment" : e.kind !== "comment")).slice().reverse();
   const edited = editedLine(task);
+
+  const defaultBranch = task.repo ? (githubRepos.find((r) => r.fullName === task.repo)?.defaultBranch || "main") : "main";
+  const branchChoices = ["main", "develop", "master"];
+  if (defaultBranch && !branchChoices.includes(defaultBranch)) branchChoices.unshift(defaultBranch);
+  if (task.baseBranch && !branchChoices.includes(task.baseBranch)) branchChoices.push(task.baseBranch);
 
   const saveField = async (patch: Partial<TaskForm>) => {
     if (!task) return;
@@ -324,9 +347,19 @@ export function TaskDetailPage({
             <section className="task-sec" aria-label="연결한 자원">
               <h2>
                 연결한 자원 <span className="task-count">{task.refs.length}</span>
+                <button type="button" onClick={() => setAddingRef((v) => !v)}>
+                  <Icon name={addingRef ? "close" : "plus"} /> {addingRef ? "닫기" : "자원 추가"}
+                </button>
               </h2>
               {task.refs.length === 0 ? (
-                <p className="task-empty">연결한 노트나 GitHub 글이 없어요. 「편집」에서 더할 수 있어요.</p>
+                <p className="task-empty">
+                  연결한 노트나 GitHub 글이 없어요.{" "}
+                  {!addingRef && (
+                    <button type="button" className="task-inline-link-btn" onClick={() => setAddingRef(true)}>
+                      여기서 바로 추가할 수 있어요.
+                    </button>
+                  )}
+                </p>
               ) : (
                 <ul className="task-links">
                   {task.refs.map((r) => (
@@ -341,9 +374,94 @@ export function TaskDetailPage({
                           {r.target.replace("https://github.com/", "")}
                         </a>
                       )}
+                      <button
+                        type="button"
+                        aria-label={`${r.title || r.target} 연결 풀기`}
+                        disabled={busy}
+                        onClick={() => void saveField({ refs: task.refs.filter((x) => x !== r) })}
+                      >
+                        ×
+                      </button>
                     </li>
                   ))}
                 </ul>
+              )}
+              {addingRef && (
+                <div className="task-ref-inline-box">
+                  <div className="task-ref-add">
+                    <select aria-label="노트 고르기" value={selectedNoteId} onChange={(e) => setSelectedNoteId(e.target.value)} disabled={busy}>
+                      <option value="">노트에서 고르기</option>
+                      {notes.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.title || n.id}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={busy || !selectedNoteId}
+                      onClick={() => {
+                        const n = notes.find((x) => x.id === selectedNoteId);
+                        if (!n) return;
+                        const nextRefs = [...task.refs];
+                        if (!nextRefs.some((r) => r.kind === "note" && r.target === n.id)) {
+                          nextRefs.push({ kind: "note", target: n.id, title: n.title });
+                          void saveField({ refs: nextRefs });
+                        }
+                        setSelectedNoteId("");
+                      }}
+                    >
+                      노트 연결
+                    </button>
+                  </div>
+                  <div className="task-ref-add">
+                    <input
+                      aria-label="GitHub 이슈나 PR"
+                      placeholder="GitHub 이슈·PR 주소 또는 owner/name#53"
+                      value={refInput}
+                      onChange={(e) => setRefInput(e.target.value)}
+                      disabled={busy}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const parsed = parseRefInput(refInput);
+                          if (!parsed) {
+                            setRefError("GitHub 이슈·PR 주소나 owner/name#번호를 적어 주세요.");
+                            return;
+                          }
+                          setRefError("");
+                          const nextRefs = [...task.refs];
+                          if (!nextRefs.some((r) => r.kind === parsed.kind && r.target === parsed.target)) {
+                            nextRefs.push(parsed);
+                            void saveField({ refs: nextRefs });
+                          }
+                          setRefInput("");
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || !refInput.trim()}
+                      onClick={() => {
+                        const parsed = parseRefInput(refInput);
+                        if (!parsed) {
+                          setRefError("GitHub 이슈·PR 주소나 owner/name#번호를 적어 주세요.");
+                          return;
+                        }
+                        setRefError("");
+                        const nextRefs = [...task.refs];
+                        if (!nextRefs.some((r) => r.kind === parsed.kind && r.target === parsed.target)) {
+                          nextRefs.push(parsed);
+                          void saveField({ refs: nextRefs });
+                        }
+                        setRefInput("");
+                      }}
+                    >
+                      GitHub 연결
+                    </button>
+                  </div>
+                  {refError && <p role="alert" className="task-error-text">{refError}</p>}
+                </div>
               )}
             </section>
 
@@ -438,6 +556,8 @@ export function TaskDetailPage({
                 <dd>
                   <InlineBaseBranchEdit
                     baseBranch={task.baseBranch}
+                    defaultBranch={defaultBranch}
+                    branchChoices={branchChoices}
                     busy={busy}
                     onChange={(b) => void saveField({ base: b })}
                   />
@@ -840,18 +960,23 @@ function InlineRepoEdit({
 /** 세부 정보 사이드바: 인라인 기준 브랜치(Base Branch) 편집 */
 function InlineBaseBranchEdit({
   baseBranch,
+  defaultBranch = "main",
+  branchChoices = ["main", "develop", "master"],
   busy,
   onChange,
 }: {
   baseBranch?: string | null;
+  defaultBranch?: string;
+  branchChoices?: string[];
   busy: boolean;
   onChange: (b: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(baseBranch ?? "");
 
-  const submit = () => {
-    const trimmed = val.trim();
+  const submit = (overrideVal?: string) => {
+    const target = overrideVal !== undefined ? overrideVal : val;
+    const trimmed = target.trim();
     if (trimmed !== (baseBranch ?? "")) {
       onChange(trimmed);
     }
@@ -860,26 +985,74 @@ function InlineBaseBranchEdit({
 
   if (editing) {
     return (
-      <form
-        className="task-inline-field-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <input
-          ref={(el) => el?.focus()}
-          className="task-inline-input"
-          value={val}
-          placeholder="저장소 기본 (예: main)"
-          onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setEditing(false);
+      <div className="task-inline-branch-edit-wrap">
+        <form
+          className="task-inline-field-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
           }}
-          onBlur={submit}
-          disabled={busy}
-        />
-      </form>
+        >
+          <input
+            ref={(el) => el?.focus()}
+            className="task-inline-input"
+            list="inline-base-branch-list"
+            value={val}
+            placeholder={`저장소 기본 (${defaultBranch})`}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditing(false);
+            }}
+            disabled={busy}
+          />
+          <datalist id="inline-base-branch-list">
+            {branchChoices.map((b) => (
+              <option key={b} value={b}>
+                {b === defaultBranch ? `${b} (저장소 기본)` : b}
+              </option>
+            ))}
+          </datalist>
+          <div className="task-inline-mini-actions">
+            <button type="submit" className="task-btn-primary task-btn-xs" disabled={busy}>
+              저장
+            </button>
+            <button type="button" className="task-btn-xs" onClick={() => setEditing(false)} disabled={busy}>
+              취소
+            </button>
+          </div>
+        </form>
+        <div className="task-inline-branch-chips">
+          <span className="task-inline-chip-label">추천:</span>
+          {branchChoices.map((b) => (
+            <button
+              key={b}
+              type="button"
+              className={`task-inline-branch-chip ${val === b ? "is-selected" : ""}`}
+              disabled={busy}
+              onClick={() => {
+                setVal(b);
+                submit(b);
+              }}
+            >
+              {b}
+            </button>
+          ))}
+          {val && (
+            <button
+              type="button"
+              className="task-inline-branch-chip task-chip-reset"
+              disabled={busy}
+              onClick={() => {
+                setVal("");
+                submit("");
+              }}
+              title="저장소 기본 브랜치로 초기화"
+            >
+              기본으로
+            </button>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -895,8 +1068,9 @@ function InlineBaseBranchEdit({
       {baseBranch ? (
         <code>{baseBranch}</code>
       ) : (
-        <span className="task-default-branch" title="GitHub 저장소의 기본 브랜치(main/master)를 사용해요">
-          저장소 기본
+        <span className="task-default-branch-display">
+          <code>{defaultBranch}</code>
+          <small className="task-default-badge">저장소 기본</small>
         </span>
       )}
       <span className="task-inline-edit-icon" aria-hidden="true">

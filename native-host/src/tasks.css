@@ -199,7 +199,32 @@
 .task-clickable { cursor: pointer; }
 .task-clickable:hover { text-decoration: underline; }
 .task-default-branch { color: var(--muted); font-style: italic; }
+.task-default-branch-display { display: inline-flex; align-items: center; gap: 6px; }
+.task-default-badge { font-size: 10px; color: var(--muted); background: var(--soft); padding: 1px 5px; border-radius: 4px; font-style: normal; border: 1px solid var(--line); }
 .task-muted-text { color: var(--muted); }
+
+/* 브랜치 편집 및 추천 칩 */
+.task-inline-branch-edit-wrap { display: grid; gap: 6px; width: 100%; }
+.task-inline-mini-actions { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; flex-shrink: 0; }
+.task-btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--line); background: var(--soft); color: var(--text); cursor: pointer; }
+.task-btn-xs:hover { background: var(--accent-soft, var(--soft)); }
+.task-inline-branch-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 11px; }
+.task-inline-chip-label { color: var(--muted); font-size: 11px; margin-right: 2px; }
+.task-inline-branch-chip { padding: 2px 7px; border-radius: 999px; font-size: 11px; background: var(--soft); border: 1px solid var(--line); color: var(--text); cursor: pointer; transition: all .15s; }
+.task-inline-branch-chip:hover { background: var(--accent-soft, var(--soft)); border-color: var(--accent); }
+.task-inline-branch-chip.is-selected { background: var(--accent); color: var(--accent-contrast, #fff); border-color: var(--accent); font-weight: 600; }
+.task-inline-branch-chip.task-chip-reset { color: var(--muted); border-style: dashed; }
+.task-inline-branch-chip.task-chip-reset:hover { color: var(--text); }
+
+/* 자원 인라인 추가 박스 */
+.task-ref-inline-box { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); }
+.task-ref-inline-box .task-ref-add { display: flex; gap: 8px; }
+.task-ref-inline-box .task-ref-add select,
+.task-ref-inline-box .task-ref-add input { flex: 1; min-width: 0; padding: 6px 10px; font-size: 13px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.task-ref-inline-box .task-ref-add button { padding: 6px 12px; font-size: 12px; font-weight: 500; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; white-space: nowrap; }
+.task-ref-inline-box .task-ref-add button:hover:not(:disabled) { background: var(--accent-soft, var(--soft)); border-color: var(--accent); }
+.task-inline-link-btn { background: transparent; border: none; color: var(--accent-text, var(--accent)); cursor: pointer; padding: 0; text-decoration: underline; font-size: inherit; font-family: inherit; }
+.task-error-text { font-size: 11px; color: var(--danger, #e53e3e); margin: 0; }
 
 @media (max-width: 900px) {
   .task-cols { grid-template-columns: minmax(0, 1fr); }
