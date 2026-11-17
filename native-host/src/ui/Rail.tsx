@@ -11,7 +11,7 @@ import { badgeText, badgeTotal } from "./approvalsClient.ts";
 import { useApprovalCounts } from "./approvalsStore.ts";
 import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
 import { useSessionBadge } from "@claude-plug/session";
-import { parseRoute, projectAddress } from "../navigation/routes.ts";
+import { parseRoute } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
@@ -143,12 +143,12 @@ export function Rail({
               <span
                 className="rail-group-name"
                 onClick={(e) => {
-                  if (!isNone) {
+                  if (!isNone && agendas.length > 0) {
                     e.stopPropagation();
-                    controller.navigate(projectAddress(slug));
+                    controller.navigate("/agenda/" + encodeURIComponent(agendas[0].id));
                   }
                 }}
-                title={isNone ? undefined : `${name} 프로젝트 페이지 열기`}
+                title={isNone ? undefined : agendas.length > 0 ? `${name} 아젠다 보기` : undefined}
               >
                 {name}
               </span>
@@ -238,8 +238,8 @@ export function Rail({
                   <button
                     type="button"
                     className="agenda-name"
-                    onClick={() => controller.navigate(projectAddress(slug))}
-                    title={`${name} 프로젝트 에이전트 보기`}
+                    onClick={() => setResForm({ kind: "agent", project: slug })}
+                    title={`${name}에 새 에이전트 등록`}
                   >
                     <span>에이전트</span>
                     <small>{pCounts.agents}</small>
@@ -264,8 +264,8 @@ export function Rail({
                   <button
                     type="button"
                     className="agenda-name"
-                    onClick={() => controller.navigate(projectAddress(slug))}
-                    title={`${name} 프로젝트 스킬 보기`}
+                    onClick={() => setResForm({ kind: "skill", project: slug })}
+                    title={`${name}에 새 스킬 등록`}
                   >
                     <span>스킬</span>
                     <small>{pCounts.skills}</small>
@@ -411,36 +411,7 @@ export function Rail({
           러너 · {runnerSummary(runner)}
         </button>
       )}
-      {tab === "agents" ? (
-      <section data-rail-section="resources" className="agenda-summary rail-resources">
-        <header>
-          <h2>프로젝트 자원</h2>
-        </header>
-        {ws.projects.length === 0 && (
-          <p className="rail-hint">프로젝트를 만들면 프로젝트별 스킬·에이전트가 여기에 나와요.</p>
-        )}
-        {ws.projects.map((p) => {
-          const slug = asText(p.slug),
-            name = asText(p.title),
-            isActive = route.kind === "project" && route.slug === slug;
-          return (
-            <div className={`rail-agenda ${isActive ? "active" : ""}`} key={asText(p.id) || slug}>
-              <button
-                type="button"
-                className="agenda-name"
-                title="프로젝트 페이지(스킬·에이전트)"
-                aria-label={`${name} 프로젝트 페이지 열기`}
-                aria-current={isActive ? "page" : undefined}
-                onClick={() => controller.navigate(projectAddress(slug))}
-              >
-                <Icon name="folder" size={16} />
-                {name}
-              </button>
-            </div>
-          );
-        })}
-      </section>
-      ) : tab === "global" ? (
+      {tab === "global" ? (
       <section data-rail-section="global-resources" className="agenda-summary rail-resources">
         <header>
           <h2>공통 리소스 관리</h2>
@@ -471,18 +442,23 @@ export function Rail({
               const slug = asText(p.slug);
               const name = asText(p.title);
               const pCounts = resourceCounts[slug] ?? { skills: 0, agents: 0 };
-              const isActive = route.kind === "project" && route.slug === slug;
+              const projectAgendas = ws.agendas.filter((a) => a.project === slug);
               return (
                 <div key={asText(p.id) || slug} className="rail-group" style={{ marginBottom: "10px" }}>
                   <header>
                     <button
                       type="button"
                       className="rail-group-toggle"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => controller.navigate(projectAddress(slug))}
+                      style={{ cursor: projectAgendas.length > 0 ? "pointer" : "default" }}
+                      onClick={() => {
+                        if (projectAgendas.length > 0) {
+                          controller.navigate("/agenda/" + encodeURIComponent(projectAgendas[0].id));
+                        }
+                      }}
+                      title={projectAgendas.length > 0 ? `${name} 아젠다 보기` : undefined}
                     >
                       <Icon name="folder" size={16} />
-                      <span className="rail-group-name" style={{ color: isActive ? "var(--accent)" : undefined }}>
+                      <span className="rail-group-name">
                         {name}
                       </span>
                     </button>
@@ -507,8 +483,8 @@ export function Rail({
                       <button
                         type="button"
                         className="agenda-name"
-                        onClick={() => controller.navigate(projectAddress(slug))}
-                        title={`${name} 프로젝트 에이전트 보기`}
+                        onClick={() => setResForm({ kind: "agent", project: slug })}
+                        title={`${name}에 새 에이전트 등록`}
                       >
                         <span>에이전트</span>
                         <small>{pCounts.agents}</small>
@@ -533,8 +509,8 @@ export function Rail({
                       <button
                         type="button"
                         className="agenda-name"
-                        onClick={() => controller.navigate(projectAddress(slug))}
-                        title={`${name} 프로젝트 스킬 보기`}
+                        onClick={() => setResForm({ kind: "skill", project: slug })}
+                        title={`${name}에 새 스킬 등록`}
                       >
                         <span>스킬</span>
                         <small>{pCounts.skills}</small>
@@ -559,7 +535,7 @@ export function Rail({
           </div>
         )}
       </section>
-      ) : (
+      ) : tab === "notes" ? (
       <section data-rail-section="agendas" className="agenda-summary">
         <header>
           <h2>{ws.projects.length > 0 ? "프로젝트" : "아젠다"}</h2>
@@ -610,7 +586,7 @@ export function Rail({
           sorted.filter((a) => !ws.projects.some((p) => p.slug === a.project)),
         )}
       </section>
-      )}
+      ) : null}
       <button
         className="rail-back"
         onClick={() => void controller.launcher()}
@@ -651,17 +627,6 @@ export function Rail({
                 const slug = projectMenuAnchor.slug;
                 setProjectMenuAnchor(null);
                 setResForm({ kind: "skill", project: slug });
-              },
-            },
-            "separator",
-            {
-              key: "project-page",
-              label: "프로젝트 페이지 열기",
-              icon: "popout",
-              onSelect: () => {
-                const slug = projectMenuAnchor.slug;
-                setProjectMenuAnchor(null);
-                controller.navigate(projectAddress(slug));
               },
             },
           ]}
