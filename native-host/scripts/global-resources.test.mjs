@@ -15,9 +15,11 @@ test('AI_ENGINES and MODEL_PRESETS cover claude, codex and gemini', () => {
   const engineIds = AI_ENGINES.map((e) => e.id);
   assert.deepEqual(engineIds.sort(), ['claude', 'codex', 'gemini'].sort());
 
+  assert.ok(MODEL_PRESETS.claude.includes('claude-sonnet-4'));
   assert.ok(MODEL_PRESETS.claude.includes('claude-3-7-sonnet'));
+  assert.ok(MODEL_PRESETS.codex.includes('gpt-5'));
   assert.ok(MODEL_PRESETS.codex.includes('o3-mini'));
-  assert.ok(MODEL_PRESETS.codex.includes('gpt-4o'));
+  assert.ok(MODEL_PRESETS.gemini.includes('gemini-3-pro'));
   assert.ok(MODEL_PRESETS.gemini.includes('gemini-2.5-pro'));
 });
 
@@ -72,7 +74,7 @@ test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to Process
   assert.equal(reconstructed.id, 'ap-ticket-99');
   assert.equal(reconstructed.name, agent.name);
   assert.equal(reconstructed.engine, 'claude');
-  assert.equal(reconstructed.model, 'claude-3-7-sonnet');
+  assert.equal(reconstructed.model, agent.model);
   assert.equal(reconstructed.role, agent.role);
   assert.equal(reconstructed.f1, 'f1:test-token');
   assert.equal(reconstructed.path, '.aisurada/resources/global/agents/티켓-에이전트.md');
