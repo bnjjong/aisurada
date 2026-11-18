@@ -176,6 +176,19 @@ pub fn session_from_env(env: &Env) -> Option<SessionSource> {
             id: codex,
         });
     }
+    let mut gemini = get("ANTIGRAVITY_CONVERSATION_ID");
+    if gemini.is_empty() {
+        gemini = get("GEMINI_SESSION_ID");
+    }
+    if gemini.is_empty() {
+        gemini = get("AGY_CONVERSATION_ID");
+    }
+    if !gemini.is_empty() {
+        found.push(SessionSource {
+            agent: "gemini".to_string(),
+            id: gemini,
+        });
+    }
     if found.len() == 1 { found.pop() } else { None }
 }
 
@@ -227,10 +240,31 @@ mod tests {
             None
         );
         assert_eq!(
+            session_from_env(&env(&[
+                ("ANTIGRAVITY_CONVERSATION_ID", "ag-1"),
+                ("CODEX_THREAD_ID", "x")
+            ])),
+            None
+        );
+        assert_eq!(
             session_from_env(&env(&[("CODEX_THREAD_ID", "x")])),
             Some(SessionSource {
                 agent: "codex".into(),
                 id: "x".into()
+            })
+        );
+        assert_eq!(
+            session_from_env(&env(&[("ANTIGRAVITY_CONVERSATION_ID", "ag-1")])),
+            Some(SessionSource {
+                agent: "gemini".into(),
+                id: "ag-1".into()
+            })
+        );
+        assert_eq!(
+            session_from_env(&env(&[("GEMINI_SESSION_ID", "gm-1")])),
+            Some(SessionSource {
+                agent: "gemini".into(),
+                id: "gm-1".into()
             })
         );
     }
