@@ -364,6 +364,9 @@ test('the notices say why the old version shows and where to approve', () => {
   const edit = html(React.createElement(EditPendingNotice, { noun: '에이전트', field: '지침', onOpen() {} }));
   assert.match(edit, /이 에이전트에는 승인을 기다리는 변경이 있어요\./);
   assert.match(edit, /보이는 지침은 승인해 둔 옛 판이에요\. 이 상태로 저장하면 대기 중인 새 지침을 덮어써요\./);
+  const skillEdit = html(React.createElement(EditPendingNotice, { noun: '스킬', field: '본문', onOpen() {} }));
+  assert.match(skillEdit, /이 스킬에는 승인을 기다리는 변경이 있어요\./);
+  assert.match(skillEdit, /보이는 본문은 승인해 둔 옛 판이에요\. 이 상태로 저장하면 대기 중인 새 본문을 덮어써요\./);
 });
 
 test('reverting to the approved version first says what disappears', () => {

@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { EditPendingNotice } from '../ApprovalNotices.tsx';
+import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
 import type { GlobalSkill } from './types.ts';
+import { skillFromForm } from './types.ts';
 
 interface Props {
   skill?: GlobalSkill | null;
@@ -11,6 +14,12 @@ interface Props {
 
 export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
   const isEdit = !!skill;
+  // 승인을 기다리는 변경이 있으면 이 창의 값은 승인해 둔 옛 판이다. 모르고 저장하면 대기 중인 새 판을 덮어쓴다
+  const awaitingApproval = isEdit && skill?.approval === 'dirty';
+  const openApprovals = () => {
+    onClose();
+    openApprovalsDialog();
+  };
   const [name, setName] = useState(skill?.name || '');
   const [description, setDescription] = useState(skill?.description || '');
   const [tagsText, setTagsText] = useState(skill?.tags.join(', ') || '');
@@ -23,20 +32,8 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
       setError('스킬 이름을 입력해 주세요.');
       return;
     }
-    const tags = tagsText
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    const updated: GlobalSkill = {
-      id: skill?.id || `gskill-${Date.now()}`,
-      name: name.trim(),
-      description: description.trim(),
-      body: body.trim(),
-      tags,
-      createdAt: skill?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // 고치는 스킬은 쓰기 전 토큰(f1)을 이어받아야 엔진이 저장을 받는다
+    const updated = skillFromForm(skill, { name, description, tagsText, body });
     onSave(updated);
     onClose();
   };
@@ -49,6 +46,7 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
     >
       <form onSubmit={handleSubmit} className="res-form" style={{ display: 'grid', gap: '16px' }}>
         {error && <div className="res-error">{error}</div>}
+        {awaitingApproval && <EditPendingNotice noun="스킬" field="본문" onOpen={openApprovals} />}
 
         <label style={{ display: 'grid', gap: '6px' }}>
           <strong>스킬 이름</strong>
@@ -97,8 +95,13 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
           <button type="button" onClick={onClose}>
             취소
           </button>
-          <button type="submit" className="button-primary">
-            {isEdit ? '수정 내용 저장' : '등록'}
+          {awaitingApproval && (
+            <button type="button" className="button-primary" onClick={openApprovals}>
+              승인 대기함에서 보기
+            </button>
+          )}
+          <button type="submit" className={awaitingApproval ? 'apv-overwrite' : 'button-primary'}>
+            {awaitingApproval ? '덮어쓰고 저장' : isEdit ? '수정 내용 저장' : '등록'}
           </button>
         </div>
       </form>

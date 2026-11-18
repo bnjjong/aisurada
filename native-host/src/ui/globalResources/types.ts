@@ -558,6 +558,31 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
   };
 }
 
+/**
+ * 스킬 편집창에 적은 값으로 스킬을 만든다. 고치는 경우 기존 스킬의 쓰기 전 토큰(`f1`)과 파일 위치를 이어받는다.
+ * 토큰이 없으면 엔진이 기존 스킬의 저장을 거절하므로(AIS-412), 이어받지 않으면 고친 내용이 저장되지 않는다.
+ */
+export function skillFromForm(
+  existing: GlobalSkill | null | undefined,
+  form: { name: string; description: string; tagsText: string; body: string },
+  now: string = new Date().toISOString(),
+): GlobalSkill {
+  return {
+    id: existing?.id || `gskill-${Date.now()}`,
+    name: form.name.trim(),
+    description: form.description.trim(),
+    body: form.body.trim(),
+    tags: form.tagsText
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    f1: existing?.f1,
+    path: existing?.path,
+  };
+}
+
 export function globalSkillToSaveInput(skill: GlobalSkill): SaveInput {
   const input: SaveInput = {
     kind: 'skill',

@@ -10,6 +10,7 @@ import {
   resourceRowToProcessAgent,
   globalSkillToSaveInput,
   resourceRowToGlobalSkill,
+  skillFromForm,
 } from '../src/ui/globalResources/types.ts';
 
 test('AI_ENGINES, MODEL_PRESETS and REASONING_EFFORTS cover claude, codex and gemini', () => {
@@ -165,4 +166,35 @@ test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
   assert.equal(reconstructed.id, 'sk-ai-commit-01');
   assert.equal(reconstructed.name, skill.name);
   assert.equal(reconstructed.f1, 'f1:skill-token');
+});
+
+test('skillFromForm carries the write token and path of an edited skill; a new skill has none', () => {
+  const now = '2026-11-18T01:00:00.000Z';
+  const existing = {
+    id: 'sk1-aaaaaaaa', name: 'ai-sync', description: '옛 설명', body: '옛 본문', tags: ['x'],
+    createdAt: '2026-11-17T00:00:00.000Z', updatedAt: '2026-11-17T00:00:00.000Z',
+    f1: 'f1:abc', path: '.aisurada/resources/global/skills/ai-sync/SKILL.md',
+  };
+  const edited = skillFromForm(existing, { name: ' ai-sync ', description: ' 새 설명 ', tagsText: 'git, , commit ', body: ' 새 본문 ' }, now);
+  assert.equal(edited.id, 'sk1-aaaaaaaa');
+  assert.equal(edited.name, 'ai-sync');
+  assert.equal(edited.description, '새 설명');
+  assert.equal(edited.body, '새 본문');
+  assert.deepEqual(edited.tags, ['git', 'commit']);
+  assert.equal(edited.createdAt, existing.createdAt);
+  assert.equal(edited.updatedAt, now);
+  assert.equal(edited.f1, 'f1:abc', 'the write token is carried over');
+  assert.equal(edited.path, existing.path);
+  // 엔진은 기존 스킬을 고칠 때 id와 f1이 둘 다 있어야 받는다
+  const input = globalSkillToSaveInput(edited);
+  assert.equal(input.id, 'sk1-aaaaaaaa');
+  assert.equal(input.f1, 'f1:abc');
+
+  const fresh = skillFromForm(null, { name: '새 스킬', description: '설명', tagsText: '', body: '' }, now);
+  assert.ok(fresh.id.startsWith('gskill-'));
+  assert.equal(fresh.f1, undefined);
+  assert.equal(fresh.createdAt, now);
+  const freshInput = globalSkillToSaveInput(fresh);
+  assert.equal(freshInput.id, undefined, 'a new skill is created without an id');
+  assert.equal('f1' in freshInput, false);
 });
