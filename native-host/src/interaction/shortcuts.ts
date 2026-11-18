@@ -30,11 +30,11 @@ export function zoomShortcutFor(event: KeyInput): 1 | -1 | 0 | null {
 
 export function shortcutFor(event: KeyInput, _mac: boolean, native: boolean): Shortcut | null {
   if (event.defaultPrevented) return null;
-  // Option(Alt) + 1: 노트 탭, Option(Alt) + 2: 에이전트 탭, Option(Alt) + 3: 글로벌 리소스 탭
+  // Option(Alt) + 1: 노트 탭, Option(Alt) + 2: 글로벌 리소스 탭, Option(Alt) + 3: 에이전트 탭
   if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
     if (event.code === 'Digit1' || event.code === 'Numpad1' || event.key === '1') return { kind: 'railTab', tab: 'notes' };
-    if (event.code === 'Digit2' || event.code === 'Numpad2' || event.key === '2') return { kind: 'railTab', tab: 'agents' };
-    if (event.code === 'Digit3' || event.code === 'Numpad3' || event.key === '3') return { kind: 'railTab', tab: 'global' };
+    if (event.code === 'Digit2' || event.code === 'Numpad2' || event.key === '2') return { kind: 'railTab', tab: 'global' };
+    if (event.code === 'Digit3' || event.code === 'Numpad3' || event.key === '3') return { kind: 'railTab', tab: 'agents' };
   }
   // 4.3: the modifier is Cmd or Ctrl, whatever the operating system. Ctrl+K and Ctrl+2 work on macOS too.
   if (event.altKey || !(event.metaKey || event.ctrlKey)) return null;

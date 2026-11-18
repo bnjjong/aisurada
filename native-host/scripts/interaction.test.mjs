@@ -86,23 +86,28 @@ test('shortcuts use physical codes for digits and brackets and ignore Alt, Shift
   assert.equal(shortcutFor(key({key:'w'}),true,true),null); assert.deepEqual(shortcutFor(key({key:'w'}),true,false),{kind:'close'});
 });
 
-test('Option+1 and Option+2 switch rail tabs between notes and agents', async t => {
+test('Option+1, Option+2, Option+3 switch rail tabs', async t => {
   assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit1', key: '¡' }), true, true), { kind: 'railTab', tab: 'notes' });
-  assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit2', key: '™' }), true, true), { kind: 'railTab', tab: 'agents' });
+  assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit2', key: '™' }), true, true), { kind: 'railTab', tab: 'global' });
+  assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit3', key: '£' }), true, true), { kind: 'railTab', tab: 'agents' });
   assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Numpad1', key: '1' }), true, true), { kind: 'railTab', tab: 'notes' });
-  assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Numpad2', key: '2' }), true, true), { kind: 'railTab', tab: 'agents' });
+  assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Numpad2', key: '2' }), true, true), { kind: 'railTab', tab: 'global' });
+  assert.deepEqual(shortcutFor(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Numpad3', key: '3' }), true, true), { kind: 'railTab', tab: 'agents' });
   // Shift나 Cmd/Ctrl과 함께 누르면 railTab이 아니다
   assert.equal(shortcutFor(key({ altKey: true, shiftKey: true, code: 'Digit1' }), true, true), null);
   assert.equal(shortcutFor(key({ altKey: true, metaKey: true, code: 'Digit1' }), true, true), null);
 
   const h = await fixture(t);
   h.controller.navigate('/calendar');
-  // Option + 2 누르면 에이전트 탭의 첫 화면(/tasks)으로 전환된다
+  // Option + 2 누르면 글로벌 리소스 탭의 첫 화면(/global-resources)으로 전환된다
   assert.equal(h.controller.handleKey(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit2', key: '2' })), true);
-  assert.equal(h.controller.getSnapshot().route, '/tasks');
+  assert.equal(h.controller.getSnapshot().route, '/global-resources');
   // Option + 1 누르면 직전 노트 화면(/calendar)으로 돌아온다
   assert.equal(h.controller.handleKey(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit1', key: '1' })), true);
   assert.equal(h.controller.getSnapshot().route, '/calendar');
+  // Option + 3 누르면 에이전트 탭의 첫 화면(/tasks)으로 전환된다
+  assert.equal(h.controller.handleKey(key({ altKey: true, metaKey: false, ctrlKey: false, code: 'Digit3', key: '3' })), true);
+  assert.equal(h.controller.getSnapshot().route, '/tasks');
 });
 
 test('new-workspace menu retains the vault and launcher ignores terminal, close and search shortcuts', async t => {
