@@ -95,6 +95,15 @@ export function effortInfosFor(engine: AIEngine, model: string): EffortInfo[] {
 }
 
 /**
+ * 1순위와 2순위가 쓰지 않는 나머지 엔진. 3순위는 이 엔진만 쓸 수 있다(같은 공급자는 토큰이 함께 바닥나기 때문이다).
+ * 2순위가 없거나 1순위와 같으면 정할 수 없어 `undefined`다.
+ */
+export function remainingEngine(first: AIEngine, second: AIEngine | undefined): AIEngine | undefined {
+  if (!second || second === first) return undefined;
+  return AI_ENGINES.find((e) => e.id !== first && e.id !== second)?.id;
+}
+
+/**
  * 이 계정이 실제로 쓸 수 있는 모델만 둔다(Claude Pro, ChatGPT Plus, Google AI Pro, 2026-11-18 확인). 목록에 없는 모델은 「직접 입력」으로 쓴다.
  * - claude: Claude Code 모델 카탈로그(`~/.claude/cache/model-catalog/*-cc.json`)에 있는 모델
  * - codex: Codex CLI가 이 계정에 알려 준 모델(`~/.codex/models_cache.json`에서 visibility가 list인 것). 순서는 CLI의 우선순위다
@@ -148,9 +157,14 @@ export interface ProcessAgent {
   engine: AIEngine;
   model: string;
   effort?: ReasoningEffort;
+  /** 2순위(폴백). 1순위의 토큰이 소진되면 쓴다. 편집창에서는 늘 정하지만, 옛 파일에는 없을 수 있다. */
   fallbackEngine?: AIEngine;
   fallbackModel?: string;
   fallbackEffort?: ReasoningEffort;
+  /** 3순위(선택). 1순위와 2순위가 모두 소진되면 쓰며, 둘이 쓰지 않는 나머지 엔진이다({@link remainingEngine}). */
+  thirdEngine?: AIEngine;
+  thirdModel?: string;
+  thirdEffort?: ReasoningEffort;
   order: number;
   f1?: string;
   path?: string;
@@ -492,41 +506,35 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
 
 // --------------------------- 엔진 변환 헬퍼 ---------------------------
 
+/** 1순위부터 차례로 쓰는 모델 사슬. 순위마다 엔진이 다르다. 3순위는 2순위가 있을 때만 뜻이 있다. */
+function agentTiers(agent: ProcessAgent): { engine: AIEngine; model: string; effort?: ReasoningEffort }[] {
+  const tiers: { engine: AIEngine; model: string; effort?: ReasoningEffort }[] = [
+    { engine: agent.engine, model: agent.model, effort: agent.effort },
+  ];
+  if (agent.fallbackEngine) {
+    tiers.push({ engine: agent.fallbackEngine, model: agent.fallbackModel || MODEL_PRESETS[agent.fallbackEngine][0], effort: agent.fallbackEffort });
+    if (agent.thirdEngine) {
+      tiers.push({ engine: agent.thirdEngine, model: agent.thirdModel || MODEL_PRESETS[agent.thirdEngine][0], effort: agent.thirdEffort });
+    }
+  }
+  return tiers;
+}
+
 export function processAgentToSaveInput(agent: ProcessAgent): SaveInput {
-  const effort = agent.effort && agent.effort !== 'default' ? agent.effort : undefined;
-  const fallbackEffort = agent.fallbackEffort && agent.fallbackEffort !== 'default' ? agent.fallbackEffort : undefined;
+  const tiers = agentTiers(agent);
+  // 엔진마다 도구 칸에는 그 엔진이 맡은 순위의 모델과 강도를 적는다. 맡은 순위가 없으면 그 엔진의 기본 모델이다
+  const toolFor = (engine: AIEngine) => {
+    const tier = tiers.find((t) => t.engine === engine);
+    return {
+      model: tier ? tier.model : MODEL_PRESETS[engine][0],
+      ...(tier && tier.effort && tier.effort !== 'default' ? { effort: tier.effort } : {}),
+    };
+  };
 
   const toolsObj: Record<string, unknown> = {
-    claude: {
-      model:
-        agent.engine === 'claude'
-          ? agent.model
-          : agent.fallbackEngine === 'claude'
-          ? (agent.fallbackModel || MODEL_PRESETS.claude[0])
-          : MODEL_PRESETS.claude[0],
-      ...(agent.engine === 'claude' && effort ? { effort } : {}),
-      ...(agent.fallbackEngine === 'claude' && fallbackEffort ? { effort: fallbackEffort } : {}),
-    },
-    codex: {
-      model:
-        agent.engine === 'codex'
-          ? agent.model
-          : agent.fallbackEngine === 'codex'
-          ? (agent.fallbackModel || MODEL_PRESETS.codex[0])
-          : MODEL_PRESETS.codex[0],
-      ...(agent.engine === 'codex' && effort ? { effort } : {}),
-      ...(agent.fallbackEngine === 'codex' && fallbackEffort ? { effort: fallbackEffort } : {}),
-    },
-    gemini: {
-      model:
-        agent.engine === 'gemini'
-          ? agent.model
-          : agent.fallbackEngine === 'gemini'
-          ? (agent.fallbackModel || MODEL_PRESETS.gemini[0])
-          : MODEL_PRESETS.gemini[0],
-      ...(agent.engine === 'gemini' && effort ? { effort } : {}),
-      ...(agent.fallbackEngine === 'gemini' && fallbackEffort ? { effort: fallbackEffort } : {}),
-    },
+    claude: toolFor('claude'),
+    codex: toolFor('codex'),
+    gemini: toolFor('gemini'),
     aisurada: {
       key: agent.key,
       role: agent.role,
@@ -536,6 +544,9 @@ export function processAgentToSaveInput(agent: ProcessAgent): SaveInput {
       fallbackEngine: agent.fallbackEngine || null,
       fallbackModel: agent.fallbackModel || null,
       fallbackEffort: agent.fallbackEffort || 'default',
+      thirdEngine: agent.fallbackEngine && agent.thirdEngine ? agent.thirdEngine : null,
+      thirdModel: agent.fallbackEngine && agent.thirdEngine ? agent.thirdModel || null : null,
+      thirdEffort: agent.fallbackEngine && agent.thirdEngine ? agent.thirdEffort || 'default' : 'default',
       resources: agent.resources,
       order: agent.order,
       enabled: agent.enabled,
@@ -598,6 +609,23 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
     ? clampEffort(fallbackEngine, fallbackModel as string, rawFallbackEffort)
     : undefined;
 
+  // 3순위(선택)는 2순위가 있어야 하고, 1순위·2순위가 쓰지 않는 나머지 엔진만 쓸 수 있다. 어긋난 값은 버린다
+  const thirdEngine: AIEngine | undefined =
+    fallbackEngine && aisuradaMeta.thirdEngine === remainingEngine(engine, fallbackEngine)
+      ? remainingEngine(engine, fallbackEngine)
+      : undefined;
+
+  const thirdModel: string | undefined = thirdEngine
+    ? (typeof aisuradaMeta.thirdModel === 'string' && aisuradaMeta.thirdModel.trim().length > 0
+        ? aisuradaMeta.thirdModel.trim()
+        : tools[thirdEngine]?.model || MODEL_PRESETS[thirdEngine][0])
+    : undefined;
+
+  const rawThirdEffort = aisuradaMeta.thirdEffort || (thirdEngine ? tools[thirdEngine]?.effort : undefined);
+  const thirdEffort: ReasoningEffort | undefined = thirdEngine
+    ? clampEffort(thirdEngine, thirdModel as string, rawThirdEffort)
+    : undefined;
+
   return {
     id: row.id,
     key,
@@ -614,6 +642,9 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
     fallbackEngine,
     fallbackModel,
     fallbackEffort,
+    thirdEngine,
+    thirdModel,
+    thirdEffort,
     order,
     f1: row.precondition,
     path: row.path,

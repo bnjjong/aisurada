@@ -281,6 +281,23 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                               : ''})
                           </span>
                         )}
+                        {agent.thirdEngine && agent.thirdModel && (
+                          <span
+                            className="res-badge res-badge-off"
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderStyle: 'dashed',
+                              color: 'var(--ink)',
+                            }}
+                            title="1순위와 2순위가 모두 소진되면 자동 전환되는 3순위 대체 모델"
+                          >
+                            3순위:{' '}
+                            {agent.thirdEngine === 'gemini' ? 'Gemini' : agent.thirdEngine === 'claude' ? 'Claude' : 'Codex'}{' '}
+                            ({agent.thirdModel}
+                            {agent.thirdEffort && agent.thirdEffort !== 'default' ? ` · ${agent.thirdEffort}` : ''})
+                          </span>
+                        )}
                         {!agent.enabled && <span className="res-kind" style={{ color: 'var(--err)' }}>비활성</span>}
                         {agent.approval === 'dirty' && <PendingChip />}
                       </p>

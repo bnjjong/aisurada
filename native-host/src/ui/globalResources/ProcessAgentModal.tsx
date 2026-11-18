@@ -5,7 +5,7 @@ import { EditPendingNotice } from '../ApprovalNotices.tsx';
 import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
 import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent, ReasoningEffort } from './types.ts';
-import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS, clampEffort, effortInfosFor } from './types.ts';
+import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS, clampEffort, effortInfosFor, remainingEngine } from './types.ts';
 
 interface Props {
   agent?: ProcessAgent | null;
@@ -13,6 +13,74 @@ interface Props {
   resources: GlobalResourceItem[];
   onSave: (agent: ProcessAgent) => void;
   onClose: () => void;
+}
+
+/** 2순위·3순위 카드가 같이 쓰는 한 줄: 세부 모델, 추론 강도, 직접 입력 칸. 강도는 그 모델이 지원하는 값만 보인다. */
+function TierModelRow({
+  tier,
+  engine,
+  selectedModel,
+  onSelectModel,
+  customInput,
+  onCustomInput,
+  resolvedModel,
+  effort,
+  onEffort,
+  placeholder,
+}: {
+  tier: '2순위' | '3순위';
+  engine: AIEngine;
+  selectedModel: string;
+  onSelectModel: (id: string) => void;
+  customInput: string;
+  onCustomInput: (value: string) => void;
+  resolvedModel: string;
+  effort: ReasoningEffort;
+  onEffort: (effort: ReasoningEffort) => void;
+  placeholder: string;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+        <span>{tier} 세부 모델:</span>
+        <select value={selectedModel} onChange={(e) => onSelectModel(e.target.value)} style={{ minWidth: '220px', padding: '4px 8px' }}>
+          {ENGINE_MODELS[engine].map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+          <option value="custom">직접 입력...</option>
+        </select>
+      </label>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+        <span>{tier} 추론 강도 (Effort):</span>
+        <select
+          value={effort}
+          onChange={(e) => onEffort(e.target.value as ReasoningEffort)}
+          style={{ minWidth: '150px', padding: '4px 8px' }}
+          title={`${tier} 대체 모델이 지원하는 Thinking / Reasoning 추론 강도 (Effort)`}
+        >
+          {effortInfosFor(engine, resolvedModel).map((eff) => (
+            <option key={eff.id} value={eff.id}>
+              {eff.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {selectedModel === 'custom' && (
+        <input
+          type="text"
+          value={customInput}
+          onChange={(e) => onCustomInput(e.target.value)}
+          placeholder={placeholder}
+          style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
+          required
+        />
+      )}
+    </div>
+  );
 }
 
 export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }: Props) {
@@ -37,10 +105,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [customModelInput, setCustomModelInput] = useState(isPreset ? '' : initialModel);
   const [effort, setEffort] = useState<ReasoningEffort>(agent?.effort || 'default');
 
-  // 2순위 (토큰 소진 대비 폴백) AI 엔진 및 모델
-  const [useFallback, setUseFallback] = useState<boolean>(
-    agent ? (agent.fallbackEngine != null && agent.fallbackEngine !== initialEngine) : true
-  );
+  // 2순위 (토큰 소진 대비 폴백) AI 엔진 및 모델. 2순위는 늘 정한다(옛 파일에 없으면 기본값으로 채운다)
   const initialFallbackEngine: AIEngine =
     agent?.fallbackEngine && agent.fallbackEngine !== initialEngine
       ? agent.fallbackEngine
@@ -53,6 +118,15 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [selectedFallbackModel, setSelectedFallbackModel] = useState(isFallbackPreset ? initialFallbackModel : 'custom');
   const [customFallbackModelInput, setCustomFallbackModelInput] = useState(isFallbackPreset ? '' : initialFallbackModel);
   const [fallbackEffort, setFallbackEffort] = useState<ReasoningEffort>(agent?.fallbackEffort || 'default');
+
+  // 3순위 (선택). 1순위와 2순위가 모두 소진됐을 때 쓰고, 엔진은 둘이 쓰지 않는 나머지 하나로 정해진다
+  const initialThirdEngine: AIEngine = remainingEngine(initialEngine, initialFallbackEngine) ?? AI_ENGINES[0].id;
+  const [useThird, setUseThird] = useState<boolean>(!!agent?.thirdEngine && agent.thirdEngine === initialThirdEngine);
+  const initialThirdModel = (agent?.thirdEngine === initialThirdEngine && agent?.thirdModel) || MODEL_PRESETS[initialThirdEngine][0];
+  const isThirdPreset = MODEL_PRESETS[initialThirdEngine].includes(initialThirdModel);
+  const [selectedThirdModel, setSelectedThirdModel] = useState(isThirdPreset ? initialThirdModel : 'custom');
+  const [customThirdModelInput, setCustomThirdModelInput] = useState(isThirdPreset ? '' : initialThirdModel);
+  const [thirdEffort, setThirdEffort] = useState<ReasoningEffort>(agent?.thirdEffort || 'default');
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>(agent?.skills || []);
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
@@ -67,6 +141,19 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const resolvedFallbackModel = selectedFallbackModel === 'custom' ? customFallbackModelInput.trim() || 'inherit' : selectedFallbackModel;
   const shownEffort = clampEffort(engine, resolvedModel, effort);
   const shownFallbackEffort = clampEffort(fallbackEngine, resolvedFallbackModel, fallbackEffort);
+  // 3순위 엔진은 1순위·2순위가 쓰지 않는 나머지 엔진 하나다
+  const thirdEngine: AIEngine = remainingEngine(engine, fallbackEngine) ?? AI_ENGINES[0].id;
+  const resolvedThirdModel = selectedThirdModel === 'custom' ? customThirdModelInput.trim() || 'inherit' : selectedThirdModel;
+  const shownThirdEffort = clampEffort(thirdEngine, resolvedThirdModel, thirdEffort);
+
+  // 1순위나 2순위 엔진이 바뀌면 3순위가 쓸 수 있는 엔진(나머지 하나)도 바뀐다. 달라지면 그 엔진의 기본 모델로 돌린다
+  const syncThird = (nextEngine: AIEngine, nextFallback: AIEngine) => {
+    const nextThird = remainingEngine(nextEngine, nextFallback) ?? AI_ENGINES[0].id;
+    if (nextThird !== thirdEngine) {
+      setSelectedThirdModel(MODEL_PRESETS[nextThird][0]);
+      setCustomThirdModelInput('');
+    }
+  };
 
   const handleEngineChange = (newEngine: AIEngine) => {
     setEngine(newEngine);
@@ -75,13 +162,15 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
     setCustomModelInput('');
 
     // 1순위 엔진과 2순위 엔진이 같아지면 2순위 엔진을 남은 엔진 중 다른 하나로 자동 변경
+    let nextFallback = fallbackEngine;
     if (fallbackEngine === newEngine) {
       const remainingEngines = AI_ENGINES.filter((e) => e.id !== newEngine);
-      const nextFallback = remainingEngines[0].id;
+      nextFallback = remainingEngines[0].id;
       setFallbackEngine(nextFallback);
       setSelectedFallbackModel(MODEL_PRESETS[nextFallback][0]);
       setCustomFallbackModelInput('');
     }
+    syncThird(newEngine, nextFallback);
   };
 
   const handleFallbackEngineChange = (newFallback: AIEngine) => {
@@ -90,6 +179,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
     const defaultModel = MODEL_PRESETS[newFallback][0];
     setSelectedFallbackModel(defaultModel);
     setCustomFallbackModelInput('');
+    syncThird(engine, newFallback);
   };
 
   const toggleSkill = (id: string) => {
@@ -113,6 +203,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
     const finalModel = selectedModel === 'custom' ? (customModelInput.trim() || 'inherit') : selectedModel;
     const finalFallbackModel =
       selectedFallbackModel === 'custom' ? (customFallbackModelInput.trim() || 'inherit') : selectedFallbackModel;
+    const finalThirdModel = selectedThirdModel === 'custom' ? (customThirdModelInput.trim() || 'inherit') : selectedThirdModel;
 
     const updated: ProcessAgent = {
       id: agent?.id || `proc-${Date.now()}`,
@@ -123,9 +214,13 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
       engine,
       model: finalModel,
       effort: clampEffort(engine, finalModel, effort),
-      fallbackEngine: useFallback && fallbackEngine !== engine ? fallbackEngine : undefined,
-      fallbackModel: useFallback && fallbackEngine !== engine ? finalFallbackModel : undefined,
-      fallbackEffort: useFallback && fallbackEngine !== engine ? clampEffort(fallbackEngine, finalFallbackModel, fallbackEffort) : undefined,
+      // 2순위는 늘 저장하고(1순위와 같은 엔진은 고를 수 없다), 3순위는 켠 경우에만 저장한다
+      fallbackEngine,
+      fallbackModel: finalFallbackModel,
+      fallbackEffort: clampEffort(fallbackEngine, finalFallbackModel, fallbackEffort),
+      thirdEngine: useThird ? thirdEngine : undefined,
+      thirdModel: useThird ? finalThirdModel : undefined,
+      thirdEffort: useThird ? clampEffort(thirdEngine, finalThirdModel, thirdEffort) : undefined,
       enabled,
       skills: selectedSkills,
       resources: selectedResources,
@@ -191,7 +286,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong style={{ fontSize: '13px' }}>AI 실행 엔진 및 모델</strong>
-            <span style={{ fontSize: '11px', color: 'var(--muted)' }}>토큰 부족 시 2순위 모델로 자동 대체</span>
+            <span style={{ fontSize: '11px', color: 'var(--muted)' }}>토큰 부족 시 2순위, 3순위 모델 순서로 자동 대체</span>
           </div>
 
           {/* 1순위 모델 카드 */}
@@ -282,16 +377,94 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
             </div>
           </div>
 
-          {/* 2순위 (폴백) 모델 카드 */}
+          {/* 2순위 (폴백) 모델 카드: 늘 정한다 */}
           <div
             style={{
               display: 'grid',
               gap: '8px',
               padding: '10px 12px',
-              background: useFallback ? 'var(--surface, #ffffff)' : 'transparent',
+              background: 'var(--surface, #ffffff)',
               borderRadius: '6px',
-              border: useFallback ? '1px dashed var(--accent, #2563eb)' : '1px dashed var(--line, #e2e8f0)',
-              opacity: useFallback ? 1 : 0.7,
+              border: '1px dashed var(--accent, #2563eb)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  background: 'var(--warning, #d97706)',
+                  color: '#ffffff',
+                }}
+              >
+                2순위
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>토큰 고갈 대비 대체 모델 (폴백)</span>
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>필수</span>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)' }}>
+              1순위 엔진의 토큰이 소진되었을 때 즉시 투입됩니다. 동일 공급자의 동시 토큰 고갈을 방지하기 위해 <b>1순위와 같은 엔진은 선택할 수 없습니다.</b>
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {AI_ENGINES.map((eng) => {
+                const isFirstChoice = eng.id === engine;
+                const isSelected = fallbackEngine === eng.id;
+                return (
+                  <button
+                    key={eng.id}
+                    type="button"
+                    disabled={isFirstChoice}
+                    className={`res-badge ${isSelected ? 'res-badge-ref' : 'res-badge-off'}`}
+                    style={{
+                      padding: '6px 14px',
+                      cursor: isFirstChoice ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      opacity: isFirstChoice ? 0.35 : 1,
+                      textDecoration: isFirstChoice ? 'line-through' : 'none',
+                    }}
+                    onClick={() => handleFallbackEngineChange(eng.id)}
+                    title={isFirstChoice ? `${eng.label}는 1순위로 선택되어 2순위로 중복 선택할 수 없습니다.` : undefined}
+                  >
+                    {isFirstChoice ? '✕ ' : isSelected ? '● ' : '○ '}
+                    {eng.label}
+                    {isFirstChoice ? (
+                      <small style={{ color: 'var(--err, #dc2626)', marginLeft: '4px' }}>(선택 불가)</small>
+                    ) : (
+                      <small style={{ opacity: 0.7 }}> ({eng.company})</small>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <TierModelRow
+              tier="2순위"
+              engine={fallbackEngine}
+              selectedModel={selectedFallbackModel}
+              onSelectModel={setSelectedFallbackModel}
+              customInput={customFallbackModelInput}
+              onCustomInput={setCustomFallbackModelInput}
+              resolvedModel={resolvedFallbackModel}
+              effort={shownFallbackEffort}
+              onEffort={setFallbackEffort}
+              placeholder="예: gemini-3.8-flash"
+            />
+          </div>
+
+          {/* 3순위 모델 카드: 선택. 1순위와 2순위가 모두 소진됐을 때만 쓴다 */}
+          <div
+            style={{
+              display: 'grid',
+              gap: '8px',
+              padding: '10px 12px',
+              background: useThird ? 'var(--surface, #ffffff)' : 'transparent',
+              borderRadius: '6px',
+              border: useThird ? '1px dashed var(--accent, #2563eb)' : '1px dashed var(--line, #e2e8f0)',
+              opacity: useThird ? 1 : 0.7,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -302,53 +475,49 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
                     fontWeight: 600,
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    background: useFallback ? 'var(--warning, #d97706)' : 'var(--muted, #94a3b8)',
+                    background: useThird ? 'var(--warning, #d97706)' : 'var(--muted, #94a3b8)',
                     color: '#ffffff',
                   }}
                 >
-                  2순위
+                  3순위
                 </span>
-                <span style={{ fontSize: '13px', fontWeight: 600 }}>토큰 고갈 대비 대체 모델 (폴백)</span>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>마지막 대체 모델</span>
+                <span style={{ fontSize: '11px', color: 'var(--muted)' }}>선택</span>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={useFallback}
-                  onChange={(e) => setUseFallback(e.target.checked)}
-                />
-                <span>2순위 대체 모델 사용</span>
+                <input type="checkbox" checked={useThird} onChange={(e) => setUseThird(e.target.checked)} />
+                <span>3순위 대체 모델 사용</span>
               </label>
             </div>
 
-            {useFallback && (
+            {useThird && (
               <>
                 <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)' }}>
-                  1순위 엔진의 토큰이 소진되었을 때 즉시 투입됩니다. 동일 공급자의 동시 토큰 고갈을 방지하기 위해 <b>1순위와 같은 엔진은 선택할 수 없습니다.</b>
+                  1순위와 2순위가 모두 소진되었을 때 투입됩니다. 이미 쓰는 두 엔진은 선택할 수 없어서 <b>남은 엔진 하나로 정해집니다.</b>
                 </p>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {AI_ENGINES.map((eng) => {
-                    const isFirstChoice = eng.id === engine;
-                    const isSelected = fallbackEngine === eng.id;
+                    const usedBy = eng.id === engine ? '1순위' : eng.id === fallbackEngine ? '2순위' : null;
+                    const isSelected = eng.id === thirdEngine;
                     return (
                       <button
                         key={eng.id}
                         type="button"
-                        disabled={isFirstChoice}
+                        disabled={usedBy !== null}
                         className={`res-badge ${isSelected ? 'res-badge-ref' : 'res-badge-off'}`}
                         style={{
                           padding: '6px 14px',
-                          cursor: isFirstChoice ? 'not-allowed' : 'pointer',
+                          cursor: usedBy ? 'not-allowed' : 'default',
                           fontSize: '13px',
-                          opacity: isFirstChoice ? 0.35 : 1,
-                          textDecoration: isFirstChoice ? 'line-through' : 'none',
+                          opacity: usedBy ? 0.35 : 1,
+                          textDecoration: usedBy ? 'line-through' : 'none',
                         }}
-                        onClick={() => handleFallbackEngineChange(eng.id)}
-                        title={isFirstChoice ? `${eng.label}는 1순위로 선택되어 2순위로 중복 선택할 수 없습니다.` : undefined}
+                        title={usedBy ? `${eng.label}는 ${usedBy}로 선택되어 3순위로 중복 선택할 수 없습니다.` : undefined}
                       >
-                        {isFirstChoice ? '✕ ' : isSelected ? '● ' : '○ '}
+                        {usedBy ? '✕ ' : '● '}
                         {eng.label}
-                        {isFirstChoice ? (
+                        {usedBy ? (
                           <small style={{ color: 'var(--err, #dc2626)', marginLeft: '4px' }}>(선택 불가)</small>
                         ) : (
                           <small style={{ opacity: 0.7 }}> ({eng.company})</small>
@@ -358,50 +527,18 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
                   })}
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span>2순위 세부 모델:</span>
-                    <select
-                      value={selectedFallbackModel}
-                      onChange={(e) => setSelectedFallbackModel(e.target.value)}
-                      style={{ minWidth: '220px', padding: '4px 8px' }}
-                    >
-                      {ENGINE_MODELS[fallbackEngine].map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label}
-                        </option>
-                      ))}
-                      <option value="custom">직접 입력...</option>
-                    </select>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span>2순위 추론 강도 (Effort):</span>
-                    <select
-                      value={shownFallbackEffort}
-                      onChange={(e) => setFallbackEffort(e.target.value as ReasoningEffort)}
-                      style={{ minWidth: '150px', padding: '4px 8px' }}
-                      title="2순위 대체 모델이 지원하는 Thinking / Reasoning 추론 강도 (Effort)"
-                    >
-                      {effortInfosFor(fallbackEngine, resolvedFallbackModel).map((eff) => (
-                        <option key={eff.id} value={eff.id}>
-                          {eff.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {selectedFallbackModel === 'custom' && (
-                    <input
-                      type="text"
-                      value={customFallbackModelInput}
-                      onChange={(e) => setCustomFallbackModelInput(e.target.value)}
-                      placeholder="예: gemini-3.8-flash"
-                      style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
-                      required
-                    />
-                  )}
-                </div>
+                <TierModelRow
+                  tier="3순위"
+                  engine={thirdEngine}
+                  selectedModel={selectedThirdModel}
+                  onSelectModel={setSelectedThirdModel}
+                  customInput={customThirdModelInput}
+                  onCustomInput={setCustomThirdModelInput}
+                  resolvedModel={resolvedThirdModel}
+                  effort={shownThirdEffort}
+                  onEffort={setThirdEffort}
+                  placeholder="예: gpt-6.2-sol"
+                />
               </>
             )}
           </div>

@@ -16,6 +16,7 @@ import {
   clampEffort,
   effortInfosFor,
   effortsForModel,
+  remainingEngine,
 } from '../src/ui/globalResources/types.ts';
 
 test('AI_ENGINES, MODEL_PRESETS and REASONING_EFFORTS cover claude, codex and gemini', () => {
@@ -237,6 +238,84 @@ test('every seeded agent uses efforts its models support', () => {
   }
 });
 
+// ---------------------------------------------------------------- 2순위는 필수, 3순위는 선택
+
+test('remainingEngine gives the one engine that neither the 1st nor the 2nd tier uses', () => {
+  assert.equal(remainingEngine('gemini', 'claude'), 'codex');
+  assert.equal(remainingEngine('claude', 'gemini'), 'codex');
+  assert.equal(remainingEngine('codex', 'gemini'), 'claude');
+  assert.equal(remainingEngine('codex', 'claude'), 'gemini');
+  assert.equal(remainingEngine('gemini', undefined), undefined, 'no 2nd tier, no 3rd tier');
+  assert.equal(remainingEngine('gemini', 'gemini'), undefined, 'the 2nd tier cannot repeat the 1st');
+});
+
+const threeTierAgent = () => ({
+  ...DEFAULT_PROCESS_AGENTS[0],
+  engine: 'gemini', model: 'gemini-3.8-flash', effort: 'medium',
+  fallbackEngine: 'claude', fallbackModel: 'claude-opus-5.5', fallbackEffort: 'xhigh',
+  thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra',
+});
+
+test('processAgentToSaveInput writes all three tiers, one model per engine', () => {
+  const tools = JSON.parse(processAgentToSaveInput(threeTierAgent()).tools);
+  assert.deepEqual(tools.gemini, { model: 'gemini-3.8-flash', effort: 'medium' });
+  assert.deepEqual(tools.claude, { model: 'claude-opus-5.5', effort: 'xhigh' });
+  assert.deepEqual(tools.codex, { model: 'gpt-6.2-sol', effort: 'ultra' });
+  assert.equal(tools.aisurada.thirdEngine, 'codex');
+  assert.equal(tools.aisurada.thirdModel, 'gpt-6.2-sol');
+  assert.equal(tools.aisurada.thirdEffort, 'ultra');
+});
+
+test('without a 3rd tier the engine left over keeps its default model and the 3rd fields are empty', () => {
+  const two = { ...threeTierAgent(), thirdEngine: undefined, thirdModel: undefined, thirdEffort: undefined };
+  const tools = JSON.parse(processAgentToSaveInput(two).tools);
+  assert.deepEqual(tools.codex, { model: MODEL_PRESETS.codex[0] }, 'no effort for a tier that is not used');
+  assert.equal(tools.aisurada.thirdEngine, null);
+  assert.equal(tools.aisurada.thirdModel, null);
+  assert.equal(tools.aisurada.thirdEffort, 'default');
+});
+
+test('a 3rd tier without a 2nd tier is not written', () => {
+  const orphan = { ...threeTierAgent(), fallbackEngine: undefined, fallbackModel: undefined, fallbackEffort: undefined };
+  const tools = JSON.parse(processAgentToSaveInput(orphan).tools);
+  assert.equal(tools.aisurada.thirdEngine, null);
+  assert.deepEqual(tools.codex, { model: MODEL_PRESETS.codex[0] });
+});
+
+test('resourceRowToProcessAgent reads the 3rd tier back and drops one that breaks the rules', () => {
+  const row = (aisurada) => ({ id: 'ap-3', kind: 'agent', scope: 'global', name: '3순위 시험', description: 'd', body: 'b', permission: 'edit', skills: [], tools: { aisurada } });
+  const base = { engine: 'gemini', model: 'gemini-3.8-flash', fallbackEngine: 'claude', fallbackModel: 'claude-sonnet-5.5' };
+
+  const ok = resourceRowToProcessAgent(row({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra' }), 0);
+  assert.equal(ok.thirdEngine, 'codex');
+  assert.equal(ok.thirdModel, 'gpt-6.2-sol');
+  assert.equal(ok.thirdEffort, 'ultra');
+
+  // 같은 공급자(1순위·2순위와 같은 엔진)나 알 수 없는 엔진, 2순위가 없는 3순위는 버린다
+  for (const thirdEngine of ['gemini', 'claude', 'nope']) {
+    assert.equal(resourceRowToProcessAgent(row({ ...base, thirdEngine, thirdModel: 'x' }), 0).thirdEngine, undefined, `${thirdEngine} is dropped`);
+  }
+  const noSecond = resourceRowToProcessAgent(row({ engine: 'gemini', model: 'gemini-3.8-flash', thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol' }), 0);
+  assert.equal(noSecond.thirdEngine, undefined);
+  assert.equal(noSecond.thirdModel, undefined);
+  assert.equal(noSecond.thirdEffort, undefined);
+
+  // 없는 모델 이름은 그 엔진의 기본 모델로, 쓸 수 없는 강도는 default로
+  const noModel = resourceRowToProcessAgent(row({ ...base, thirdEngine: 'codex' }), 0);
+  assert.equal(noModel.thirdModel, MODEL_PRESETS.codex[0]);
+  const luna = resourceRowToProcessAgent(row({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6-luna', thirdEffort: 'ultra' }), 0);
+  assert.equal(luna.thirdEffort, 'default', 'ultra is not offered for GPT-6-Luna');
+});
+
+test('a three-tier agent survives a save and a read unchanged', () => {
+  const agent = threeTierAgent();
+  const input = processAgentToSaveInput(agent);
+  const back = resourceRowToProcessAgent({ id: 'ap-rt', kind: 'agent', scope: 'global', name: input.name, description: input.description, body: input.body, permission: 'edit', skills: input.skills, tools: JSON.parse(input.tools) }, 0);
+  for (const key of ['engine', 'model', 'effort', 'fallbackEngine', 'fallbackModel', 'fallbackEffort', 'thirdEngine', 'thirdModel', 'thirdEffort']) {
+    assert.equal(back[key], agent[key], key);
+  }
+});
+
 test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
   const skill = DEFAULT_GLOBAL_SKILLS[0];
   const saveInput = globalSkillToSaveInput(skill);
@@ -292,4 +371,39 @@ test('skillFromForm carries the write token and path of an edited skill; a new s
   const freshInput = globalSkillToSaveInput(fresh);
   assert.equal(freshInput.id, undefined, 'a new skill is created without an id');
   assert.equal('f1' in freshInput, false);
+});
+
+test('the agent modal always asks for a 2nd tier and offers an optional 3rd tier', async () => {
+  // 모달은 포털로 그려서 서버 렌더가 못 그린다. 이 시험에서만 포털을 자식 그대로 내고, 모듈을 다 불러온 뒤에 빈 document를 둔다
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const React = require('react');
+  const reactDom = require('react-dom');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const originalPortal = reactDom.createPortal;
+  reactDom.createPortal = (children) => children;
+  try {
+    const { ProcessAgentModal } = await import('../src/ui/globalResources/ProcessAgentModal.tsx');
+    globalThis.document = { body: {} };
+    const render = (agent) => renderToStaticMarkup(React.createElement(ProcessAgentModal, { agent, skills: [], resources: [], onSave() {}, onClose() {} })).replace(/<!-- -->/g, '');
+    const count = (html, re) => (html.match(re) || []).length;
+    const base = DEFAULT_PROCESS_AGENTS[0]; // Gemini 1순위, Claude 2순위
+
+    for (const [label, agent] of [['2순위만 있는 에이전트', { ...base, thirdEngine: undefined }], ['2순위가 없는 옛 에이전트', { ...base, fallbackEngine: undefined, fallbackModel: undefined, fallbackEffort: undefined }], ['새로 등록', null]]) {
+      const html = render(agent);
+      assert.equal(count(html, />2순위</g), 1, `${label}: 2순위 카드가 있다`);
+      assert.equal(count(html, /2순위 대체 모델 사용/g), 0, `${label}: 2순위를 끄는 체크박스는 없다`);
+      assert.equal(count(html, /3순위 대체 모델 사용/g), 1, `${label}: 3순위는 체크박스로 켠다`);
+      assert.equal(count(html, /남은 엔진 하나로 정해집니다/g), 0, `${label}: 3순위는 꺼져 있다`);
+    }
+
+    const three = render({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra' });
+    assert.equal(count(three, /남은 엔진 하나로 정해집니다/g), 1, '켜 둔 3순위는 본문이 보인다');
+    assert.equal(count(three, /3순위 세부 모델/g), 1);
+    assert.equal(count(three, /3순위 추론 강도/g), 1);
+    assert.equal(count(three, /\(선택 불가\)/g), 3, '2순위 카드의 1순위 한 칸과 3순위 카드의 1순위·2순위 두 칸');
+  } finally {
+    reactDom.createPortal = originalPortal;
+    delete globalThis.document;
+  }
 });
