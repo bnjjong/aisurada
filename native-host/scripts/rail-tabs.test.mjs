@@ -81,9 +81,18 @@ test('the agents tab shows tasks, the runner line, and the global resources tab 
   assert.deepEqual(navLabels(html), ['태스크']);
   assert.match(html, /class="nav-item active">태스크/);
   assert.match(html, />러너 · 쉬는 중</);
+  assert.match(html, /aria-label="최근 실행"[\s\S]*아직 러너가 돌린 실행이 없어요/, '「최근 실행」 explains itself while it is empty');
+  assert.ok(html.indexOf('러너 · 쉬는 중') < html.indexOf('aria-label="최근 실행"'), '「최근 실행」 sits under the runner line');
+  assert.doesNotMatch(rail('/calendar'), /최근 실행/, 'the notes tab has no recent runs');
   assert.doesNotMatch(html, /data-rail-section="agendas"/, 'the note tree stays on the notes tab');
+  // 열린 태스크의 줄은 눌린 색으로 남는다
+  resetRunner({ recent: [{ ...run('TSK-1'), sessionId: 's1' }, { ...run('TSK-2'), sessionId: 's2' }] });
+  const open = rail('/task/TSK-2');
+  assert.match(open, /class="rr t-wait is-open"[\s\S]*?<b>TSK-2<\/b>/);
+  assert.equal((open.match(/is-open/g) ?? []).length, 1, 'only the open task is marked');
   resetRunner({ supported: false });
   assert.doesNotMatch(rail('/tasks'), /러너 ·/, 'a build without the runner has no runner line');
+  assert.doesNotMatch(rail('/tasks'), /최근 실행/, 'a build without the runner has no recent runs');
 
   const globalHtml = rail('/global-resources');
   assert.match(globalHtml, /data-rail-section="global-resources"/);

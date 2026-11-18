@@ -450,6 +450,28 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .rail-runner.is-wait i { background: var(--warn); }
 .rail-runner.is-warn i { background: var(--err); }
 @media (prefers-reduced-motion: reduce) { .rail-runner.is-busy i { animation: none; } }
+/* 레일 「에이전트」 탭의 「최근 실행」: 러너 줄 아래. 색은 레일 바탕(밤하늘)에서 다시 정의되는 --ink --muted --line --soft와 상태색을 쓴다 */
+.workspace-rail .rail-runs { margin-top: 14px; padding: 0 4px; }
+.workspace-rail .rail-runs > header { display: flex; justify-content: space-between; align-items: center; padding: 0 12px 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+.workspace-rail .rail-runs > header small { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; box-shadow: 0 0 0 1px var(--line); }
+.workspace-rail .rail-runs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.workspace-rail .rr { display: flex; align-items: center; }
+.workspace-rail .rr button.rr-btn { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; gap: 9px; align-items: flex-start; padding: 7px 10px; border-radius: 12px; cursor: pointer; color: var(--ink); }
+.workspace-rail .rr button.rr-btn:hover, .workspace-rail .rr.is-open button.rr-btn { background: var(--soft); }
+.workspace-rail .rr.is-open button.rr-btn { box-shadow: inset 0 0 0 1px var(--line); }
+.workspace-rail .rr button.rr-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rr-dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--muted); }
+.rr.t-busy .rr-dot { background: var(--accent); }
+.rr.t-wait .rr-dot { background: var(--warn); }
+.rr.t-ok .rr-dot { background: var(--ok); }
+.rr.t-err .rr-dot { background: #ff7b72; }
+.rr.no-chat button.rr-btn { opacity: .62; }
+.rr-text { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.rr-l1 { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.rr-l1 b { flex: none; font-weight: 700; color: var(--muted); font-size: 11.5px; }
+.rr-t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rr-l2 { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rr-empty { margin: 0; padding: 8px 12px; font-size: 12px; line-height: 1.55; color: var(--muted); border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
 .rail-resources .rail-agenda .agenda-name { gap: 8px; justify-content: flex-start; font-size: 14px; font-weight: 600; }
 .rail-resources .rail-agenda .agenda-name > svg { flex: none; opacity: .7; }
 .rail-hint { padding: 6px; font-size: 12px; line-height: 1.5; color: var(--muted); }
@@ -1101,6 +1123,9 @@ code.is-symbol { font-weight: 700; }
   .sess-page-title { flex-basis: 100%; margin-bottom: 4px; }
 }
 .sess-page-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+/* 러너가 연 세션에서 그 태스크 상세로 돌아가는 칩(제목 앞) */
+.sess-from-task { margin-right: 12px; padding: 3px 11px; border: 0; border-radius: 999px; background: transparent; font-size: 12px; font-weight: 600; color: var(--muted); box-shadow: 0 0 0 1px var(--line); vertical-align: middle; cursor: pointer; }
+.sess-from-task:hover { color: var(--ink); }
 
 .sess-page-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .open-cli, .sess-page-resume, .sess-page-pin, .prev-toggle { font-size: 12px; padding: 4px 10px; cursor: pointer; color: var(--ink); }

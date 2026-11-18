@@ -285,6 +285,30 @@ pub fn list_open_runs(root: &Path, vault: &str) -> Vec<RunRecord> {
     out
 }
 
+/// 이 vault의 모든 태스크를 가로지른 최근 실행(레일의 「최근 실행」과 세션 화면의 러너 세션 찾기가 쓴다).
+/// 끝나지 않은 실행(일하는 중, 답을 기다림)이 앞이고, 그다음은 시작이 늦은 순이다. `limit`건만 남긴다.
+pub fn list_recent_runs(root: &Path, vault: &str, limit: usize) -> Vec<RunRecord> {
+    let mut out = Vec::new();
+    for task in fs::read_dir(vault_dir(root, vault))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let name = task.file_name().to_string_lossy().into_owned();
+        if is_task_key(&name) {
+            out.extend(list_runs(root, vault, &name));
+        }
+    }
+    out.sort_by(|a, b| {
+        b.phase
+            .is_open()
+            .cmp(&a.phase.is_open())
+            .then(b.started_at.cmp(&a.started_at))
+    });
+    out.truncate(limit);
+    out
+}
+
 /// 이벤트를 한 줄 덧붙인다. 쓰지 못해도 실행을 멈추지 않는다(기록은 보조다).
 pub fn append_event(root: &Path, vault: &str, rec: &RunRecord, step: &str, text: &str) {
     let dir = run_dir(root, vault, &rec.task_key, &rec.run_id);

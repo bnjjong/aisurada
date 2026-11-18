@@ -61,6 +61,7 @@ export const fileAddress = (path: string) => `/file?path=${encodeURIComponent(pa
 export const agendaAddress = (id: string) => `/agenda/${encodeURIComponent(id)}`;
 export const projectAddress = (slug: string) => `/project/${encodeURIComponent(slug)}`;
 export const taskAddress = (key: string) => `/task/${encodeURIComponent(key)}`;
+export const sessionAddress = (id: string) => `/session/${encodeURIComponent(id)}`;
 export const notesAddress = (open: string[] = []) =>
   '/notes' + (open.length ? '?open=' + open.map(encodeURIComponent).join(',') : '');
 export const subAddress = (root: string, ids: string[]) => '/sub/' + [root, ...ids].map(encodeURIComponent).join('/');

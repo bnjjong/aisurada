@@ -130,14 +130,17 @@ export function todoBarText(todos: Array<{ status: string }>): string {
 // 10.1: is the composer open
 // --------------------------------------------------------------------------
 
-export type ComposerBlock = 'live-terminal' | 'live-background' | 'no-record' | 'other-agent';
+export type ComposerBlock = 'live-terminal' | 'live-background' | 'no-record' | 'other-agent' | 'runner';
 
 /**
  * 10.1: a row that is alive and not held by an agent closes it (a background row by `live-background`, any other by
  * `live-terminal`); otherwise a read that finished with `file` null closes it as `no-record`; otherwise it is open.
  * Not knowing a thing opens it: no row, no pid, a list that could not be read, a conversation still being read.
+ * A session the runner opened (`runnerTask` names its task) is only read here: the runner resumes the same session, so a person
+ * talking into it would tangle the conversation. The answer goes through the task's 「실행」 area instead.
  */
-export function composerBlock(row: Pick<ClaudeSession, 'processAlive' | 'heldByAgent' | 'kind'> | undefined, read: { done: boolean; file: string | null | undefined; agent?: string }): ComposerBlock | null {
+export function composerBlock(row: Pick<ClaudeSession, 'processAlive' | 'heldByAgent' | 'kind'> | undefined, read: { done: boolean; file: string | null | undefined; agent?: string; runnerTask?: string | null }): ComposerBlock | null {
+  if (read.runnerTask) return 'runner';
   // A session another CLI opened is only read here; sending resumes it with Claude's command, which would start a different conversation.
   if (read.agent && read.agent !== 'claude') return 'other-agent';
   if (row && row.processAlive === true && row.heldByAgent !== true) return row.kind === 'background' ? 'live-background' : 'live-terminal';
@@ -150,6 +153,7 @@ export const COMPOSER_BLOCK_TEXT: Record<ComposerBlock, string> = {
   'live-background': '이 세션은 백그라운드에서 돌고 있어요. 도는 동안에는 claude 가 이어 쓰기를 거절해서 입력창을 닫아 뒀어요. 끝나면 여기서 이어 쓸 수 있어요.',
   'no-record': '이 기계에 이 세션의 대화 기록이 없어서 이어 쓸 수 없어요.',
   'other-agent': '이 세션은 Claude가 아닌 다른 CLI(Codex, Gemini)가 연 것이라 여기서는 읽기만 돼요. 이어 쓰려면 터미널에서 이어 가기 명령을 쓰세요.',
+  runner: '이 대화는 러너가 태스크를 조사하며 연 거예요. 러너가 같은 세션을 이어 쓰기 때문에 여기서는 읽기만 돼요. 질문에 답하려면 위의 「← 태스크로」를 눌러 「실행」 영역에서 답해 주세요.',
 };
 
 /** The names the screen shows for the CLI that opened a session. A missing or unknown name is Claude Code. */

@@ -8,7 +8,7 @@
 //!   tick(15초) ─ 열린 vault? ─ 처음이면 reconcile(끊긴 실행 이어 가기)
 //!       │
 //!       └ 자동 집기가 켜져 있으면 list-tasks status=ready-for-develop → 자리가 있는 만큼 job::execute (일꾼 스레드)
-//!   화면 명령: runner_run(지금 실행) · runner_stop · runner_answer · runner_settings_set · runner_status · runner_runs
+//!   화면 명령: runner_run(지금 실행) · runner_stop · runner_answer · runner_settings_set · runner_status · runner_runs · runner_recent_runs
 //! ```
 pub mod host;
 pub mod job;
@@ -38,6 +38,8 @@ pub const POLL_INTERVAL: Duration = Duration::from_secs(15);
 const BACKOFF: Duration = Duration::from_secs(60);
 /// 앱을 닫을 때 일하던 실행이 멈추기를 기다리는 시간(자식 프로세스 종료 유예 3초 + 여유).
 pub const SHUTDOWN_WAIT: Duration = Duration::from_secs(8);
+/// `runner_recent_runs`가 한 번에 돌려주는 최대 건수. 레일은 5건을 읽고, 세션 화면의 러너 세션 찾기가 많이 읽는다.
+const RECENT_RUNS_MAX: usize = 500;
 
 struct Active {
     cancel: Arc<AtomicBool>,
@@ -294,6 +296,16 @@ impl Runner {
         Ok(RunsOut { runs, events })
     }
 
+    /// 모든 태스크를 가로지른 최근 실행(끝나지 않은 것이 앞). 레일은 5건, 세션 화면의 러너 세션 찾기는 더 많이 읽는다.
+    pub fn recent_runs(&self, limit: usize) -> Result<Vec<RunRecord>, String> {
+        let vault = self.host.vault().ok_or("vault가 아직 열리지 않았어요")?;
+        Ok(store::list_recent_runs(
+            &self.host.root(),
+            &vault,
+            limit.clamp(1, RECENT_RUNS_MAX),
+        ))
+    }
+
     /// 「지금 실행」: 자동 집기가 꺼져 있어도 이 태스크를 지금 집는다. 집을 수 없으면 까닭을 돌려준다.
     pub fn run_now(self: &Arc<Self>, key: &str) -> Result<(), String> {
         let vault = self.host.vault().ok_or("vault가 아직 열리지 않았어요")?;
@@ -497,4 +509,12 @@ pub async fn runner_answer(
 #[tauri::command]
 pub fn runner_runs(state: State<'_, RunnerState>, task_key: String) -> Result<RunsOut, String> {
     state.0.runs(&task_key)
+}
+
+#[tauri::command]
+pub fn runner_recent_runs(
+    state: State<'_, RunnerState>,
+    limit: Option<usize>,
+) -> Result<Vec<RunRecord>, String> {
+    state.0.recent_runs(limit.unwrap_or(5))
 }

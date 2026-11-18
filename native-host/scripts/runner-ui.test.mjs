@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  DEFAULT_RUNNER_SETTINGS, STEPS, activeRunOf, answerTask, formatCost, formatDuration, formatTokens, getRunnerSnapshot, isMissingCommand, loadRuns, refreshRunner,
-  resetRunner, runTask, runnerChanged, runnerSummary, saveRunnerSettings, stepIndex, stopTask, toEvents, toRun, toRuns, toSettings, waitingRunOf,
+  DEFAULT_RUNNER_SETTINGS, RECENT_RUNS, STEPS, activeRunOf, answerTask, formatCost, formatDuration, formatTokens, getRunnerSnapshot, isMissingCommand, loadRecentRuns, loadRuns,
+  refreshRunner, resetRunner, runSubline, runTask, runTip, runTone, runnerChanged, runnerSummary, saveRunnerSettings, sinceKo, stepIndex, stopTask, taskOfSession, toEvents, toRun, toRuns,
+  toSettings, waitingRunOf,
 } from '../src/ui/runnerStore.ts';
+import { RailRuns } from '../src/ui/RailRuns.tsx';
 import { RunnerBar } from '../src/ui/RunnerBar.tsx';
 import { RunnerPanel, clock } from '../src/ui/RunnerPanel.tsx';
 import { TasksPage } from '../src/ui/TasksPage.tsx';
@@ -110,7 +112,9 @@ test('runnerChanged raises the version so the task pages reload, then re-reads t
   await runnerChanged(host.call);
   assert.equal(getRunnerSnapshot().version, before + 1);
   assert.equal(getRunnerSnapshot().running, 2);
-  assert.deepEqual(host.calls.map((c) => c[0]), ['runner_status']);
+  // 상태를 읽을 때 레일의 「최근 실행」도 함께 읽는다(5건)
+  assert.deepEqual(host.calls.map((c) => c[0]), ['runner_status', 'runner_recent_runs']);
+  assert.deepEqual(host.calls[1], ['runner_recent_runs', { limit: RECENT_RUNS }]);
 });
 
 test('actions send the right host commands and keep the error text when they fail', async () => {
@@ -120,7 +124,7 @@ test('actions send the right host commands and keep the error text when they fai
   assert.equal(await stopTask(host.call, 'TSK-1'), true);
   assert.equal(await answerTask(host.call, 'TSK-1', 'main 으로'), true);
   assert.equal(await saveRunnerSettings(host.call, { autoPickup: true, concurrency: 2, model: 'sonnet' }), true);
-  const sent = host.calls.filter((c) => c[0] !== 'runner_status');
+  const sent = host.calls.filter((c) => c[0] !== 'runner_status' && c[0] !== 'runner_recent_runs');
   assert.deepEqual(sent, [
     ['runner_run', { taskKey: 'TSK-1' }],
     ['runner_stop', { taskKey: 'TSK-1' }],
@@ -258,4 +262,90 @@ test('the detail page and the board embed the runner pieces', () => {
   assert.match(board, /러너 · 받아오기/);
   assert.match(board, /■ 중지/);
   assert.match(board, /러너가 집어 claude에게 맡겨요/);
+});
+
+test('refreshRunner also reads the recent runs for the rail and keeps the old list when that read fails', async () => {
+  resetRunner();
+  const a = run({ runId: 'a', taskKey: 'TSK-2', phase: 'done', endedAt: 2_000_000 });
+  await refreshRunner(fakeHost({ runner_status: status(), runner_recent_runs: [a, 5, null] }).call);
+  assert.deepEqual(getRunnerSnapshot().recent.map((r) => r.runId), ['a'], 'rows that are not records are dropped');
+  // 못 읽으면(오류, 배열이 아닌 답) 이전 목록을 그대로 둔다. 러너 상태 읽기는 성공으로 친다
+  await refreshRunner(fakeHost({ runner_status: status({ running: 1 }), runner_recent_runs: new Error('x') }).call);
+  assert.equal(getRunnerSnapshot().running, 1);
+  assert.deepEqual(getRunnerSnapshot().recent.map((r) => r.runId), ['a']);
+  await refreshRunner(fakeHost({ runner_status: status(), runner_recent_runs: 7 }).call);
+  assert.deepEqual(getRunnerSnapshot().recent.map((r) => r.runId), ['a']);
+  assert.equal(getRunnerSnapshot().error, '');
+});
+
+test('loadRecentRuns asks for the limit and taskOfSession finds the task whose run opened a session', async () => {
+  const host = fakeHost({ runner_recent_runs: [run({ runId: 'x', taskKey: 'TSK-3', sessionId: 'sess-3' }), run({ runId: 'y', taskKey: 'TSK-4', sessionId: '' })] });
+  assert.equal((await loadRecentRuns(host.call, 7)).length, 2);
+  assert.deepEqual(host.calls[0], ['runner_recent_runs', { limit: 7 }]);
+  assert.equal(await taskOfSession(host.call, 'sess-3'), 'TSK-3');
+  assert.equal(await taskOfSession(host.call, 'other'), null);
+  assert.equal(await taskOfSession(host.call, ''), null, 'an empty session id never matches a run that has no session yet');
+  assert.equal(await loadRecentRuns(fakeHost({ runner_recent_runs: new Error('x') }).call, 5), null);
+  assert.equal(await loadRecentRuns(fakeHost({ runner_recent_runs: {} }).call, 5), null);
+});
+
+test('rail row helpers: time words, tone, subline and the hover tip', () => {
+  const NOW = 100 * 86_400_000;
+  assert.deepEqual(
+    [20e3, 3 * 60e3, 3600e3, 26 * 3600e3, 2 * 86_400e3, 65 * 86_400e3].map((ago) => sinceKo(NOW - ago, NOW)),
+    ['방금', '3분 전', '1시간 전', '어제', '2일 전', '2달 전'],
+  );
+  const r = (extra) => run({ phase: 'done', endedAt: NOW - 3600e3, costUsd: 0.03, ...extra });
+  assert.deepEqual(
+    ['running', 'waiting-answer', 'done', 'failed', 'cancelled', 'abandoned'].map((phase) => runTone(r({ phase }))),
+    ['busy', 'wait', 'ok', 'err', 'off', 'off'],
+  );
+  // 아랫줄: 「상태 · 때 · 비용 · 대화 없음」. 끝나지 않은 실행에는 비용을 적지 않는다
+  assert.equal(runSubline(r({ phase: 'running', endedAt: null, startedAt: NOW - 3 * 60e3 }), NOW), '일하는 중 · 3분째');
+  assert.equal(runSubline(r({ phase: 'running', endedAt: null, startedAt: NOW - 20e3 }), NOW), '일하는 중 · 방금 시작');
+  assert.equal(runSubline(r({ phase: 'waiting-answer', endedAt: null, startedAt: NOW - 14 * 60e3 }), NOW), '답을 기다림 · 14분 전');
+  assert.equal(runSubline(r({}), NOW), '보고함 · 1시간 전 · 0.03달러');
+  assert.equal(runSubline(r({ phase: 'failed', costUsd: 0, sessionId: '', endedAt: NOW - 26 * 3600e3 }), NOW), '실패 · 어제 · 대화 없음');
+  // 마우스를 올리면: 걸음, 질문, 보고 앞부분, 실패 까닭
+  assert.equal(runTip(r({ phase: 'running', step: '일하기' })), '일하는 중 · 일하기 걸음 (5/7)');
+  assert.equal(runTip(r({ phase: 'running', step: '모르는걸음' })), '일하는 중 · 모르는걸음 걸음');
+  assert.equal(runTip(r({ phase: 'waiting-answer', question: '어느 브랜치?' })), '러너의 질문: 어느 브랜치?');
+  assert.equal(runTip(r({ summary: '세션 만료가 원인' })), '보고 앞부분: 세션 만료가 원인');
+  assert.equal(runTip(r({})), '보고함');
+  assert.equal(runTip(r({ phase: 'failed', error: '저장소를 받지 못했어요' })), '실패 까닭: 저장소를 받지 못했어요');
+  assert.equal(runTip(r({ phase: 'failed' })), '실패 까닭: 알 수 없어요');
+  assert.equal(runTip(r({ phase: 'cancelled' })), '사람이 중지했어요');
+  assert.match(runTip(r({ phase: 'abandoned' })), /^태스크를 손으로/);
+});
+
+test('the panel offers 「대화 보기」 on a past run only when it has a session', () => {
+  const html = panel(detail({ status: 'in-review' }), { snapshot: snapshot(), runs: [
+    run({ runId: 'a', phase: 'done', sessionId: 'abc', endedAt: 2_000_000 }),
+    run({ runId: 'b', phase: 'failed', sessionId: '', error: '저장소를 받지 못했어요', startedAt: 500_000, endedAt: 600_000 }),
+  ] });
+  assert.equal((html.match(/대화 보기 ›/g) ?? []).length, 1, 'a run without a session has no chat to open');
+  assert.match(html, /class="runner-chat" title="이 실행의 대화를 읽기 전용으로 열어요">대화 보기 ›/);
+});
+
+test('the rail lists the recent runs with tone, subline, tip and the open task marked; the empty state explains itself', () => {
+  const NOW = 100 * 86_400_000;
+  const rail = (taskKey) => renderToStaticMarkup(React.createElement(RailRuns, { controller: fakeController(), taskKey, now: NOW }));
+  resetRunner({ recent: [
+    run({ runId: 'a', taskKey: 'TSK-14', phase: 'running', startedAt: NOW - 3 * 60e3 }),
+    run({ runId: 'b', taskKey: 'TSK-12', phase: 'waiting-answer', startedAt: NOW - 14 * 60e3, question: 'main인가요?' }),
+    run({ runId: 'c', taskKey: 'TSK-9', phase: 'failed', sessionId: '', endedAt: NOW - 26 * 3600e3, error: '저장소를 받지 못했어요', costUsd: 0 }),
+  ] });
+  const html = rail('TSK-12');
+  assert.match(html, /aria-label="최근 실행"/);
+  assert.match(html, /<small>3<\/small>/);
+  assert.match(html, /class="rr t-busy"[\s\S]*?<b>TSK-14<\/b>[\s\S]*?일하는 중 · 3분째/);
+  assert.match(html, /class="rr t-wait is-open"/, 'the row of the task that is open is marked');
+  assert.match(html, /title="러너의 질문: main인가요\?"/);
+  assert.match(html, /class="rr t-err no-chat"/, 'a run without a session is dimmed');
+  assert.match(html, /실패 · 어제 · 대화 없음/);
+  assert.doesNotMatch(rail(undefined), /is-open/);
+  resetRunner({ recent: [] });
+  assert.match(rail(undefined), /아직 러너가 돌린 실행이 없어요/);
+  assert.match(rail(undefined), /<small>0<\/small>/);
+  resetRunner();
 });

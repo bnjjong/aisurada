@@ -200,7 +200,7 @@ java -cp "$D/snake:$ORACLE/ais-engine.jar" SnakeCases engine-rs/golden/snake-cas
 - **기록 형식.** Codex는 `event_msg`의 `item_completed`(새 형식)가 있으면 그것만, 없으면 `user_message`/`agent_message`(예전 형식)를 읽는다(`session/codex.rs`). Gemini는 `chats/session-*.jsonl`의 `user`/`gemini` 줄에서 환경 설명 줄을 빼고 `toolCalls`를 풀며 `$rewindTo`를 지킨다. 작업 폴더는 `~/.gemini/projects.json`을 거꾸로 찾는다(`session/gemini.rs`). Antigravity(`agy`)는 대화 하나가 `<대화 id>.db`(SQLite)이고, `steps` 표의 단계 내용이 protobuf라서 `session/protobuf.rs`가 필요한 필드만 읽는다(`session/antigravity.rs`). 사용자 입력(`step_type` 14), 모델 답(15), 도구 호출(132)만 회차로 만들고, 시스템 알림(101)·이어쓰기 요약(23)·API 오류(17)와, 오래된 단계라 내용이 비워진 단계는 건너뛴다. 엔진에 SQLite 라이브러리가 없어서 시스템 `sqlite3`(`/usr/bin/sqlite3`, 다른 곳이면 `AISURADA_SQLITE_BIN`)를 `-readonly`로 부르고, 열리지 않으면 `immutable=1`로 한 번 더 연다. 도구 결과는 가져오지 않고 단계마다 앞부분만 SQL로 잘라 받는다. 홈 폴더는 시험용으로 환경 변수 `AISURADA_CODEX_HOME`, `AISURADA_GEMINI_HOME`(Claude는 `AISURADA_CLAUDE_HOME`)으로 바꿀 수 있고, `sqlite3` 자리는 `AISURADA_SQLITE_BIN`으로 바꾼다(아래 「설정」의 표).
 - **래퍼.** Gemini CLI는 셸 도구와 MCP 서버에 세션 id를 주지 않는다. `bin/ais-gemini`가 실행 전에 UUID를 만들어 `--session-id`로 넘기고 같은 값을 변수로 내보낸다. Codex는 셸 도구에 `CODEX_SESSION_ID`/`CODEX_THREAD_ID`를 주고 MCP 호출 요청에 `_meta`를 실어서 래퍼가 필요 없지만, Claude 셸에서 띄우면 `CLAUDE_CODE_SESSION_ID`가 남아 어느 쪽인지 가릴 수 없다. `bin/ais-codex`가 그것을 지운다.
 - **화면.** 칩은 세션을 연 CLI의 이름(`Claude Code`, `Codex`, `Gemini CLI`)을 늘 보인다. Claude는 파일에 `sessionAgent` 줄이 없어도 「Claude Code」로 보인다. 전체 노트 목록, 아젠다 페이지(`AgendaPage`)의 노트 목록, 캘린더 주 보기의 목록 모드(날짜 열·아젠다 레인)의 각 줄에도 같은 규칙으로 출처 아이콘이 붙는다(`AgentMark.tsx`의 `noteAgents`, 줄에 그리는 것은 `AgentMarks`). 만든 세션이 있으면 그 CLI, 고친 세션이 다른 CLI면 아이콘이 하나 더, 같은 CLI면 하나로 합친다. 세션 기록이 없는 노트에는 아이콘이 없다. Claude는 주황 불꽃, Gemini는 별, Codex와 모르는 CLI는 터미널 모양이고, 마우스를 올리면 「Gemini CLI가 작성」처럼 CLI와 역할이 보인다. 주·일 시간표 블록과 월 보기 칸, 아젠다 페이지의 히스토리 목록은 칸이 좁거나 줄 모양이 달라 붙이지 않았다. 한 줄 말줄임 칩(`mchip`)에서는 긴 제목에 잘리지 않게 아이콘을 글자 앞에 둔다. 네이티브 앱에서는 "터미널" 단추로 `/terminal/<세션 id>`를 연다. 터미널 계획(`terminal.ts`)은 `session-titles`가 알려 준 `agent`로 호스트에 `agent`를 넘기고, 호스트(`session_shell.rs`)는 `claude --resume`, `codex resume`, `gemini --resume` 가운데 고른다. Antigravity 대화는 노트에 Gemini와 같은 `gemini`로 적히지만 `gemini --resume`은 Gemini CLI의 세션(`~/.gemini/tmp/<프로젝트>/chats`)만 찾아서 "Invalid session identifier"로 실패한다. 그래서 엔진이 Antigravity 기록에만 `session-titles`와 `read-session` 응답에 `client: "antigravity"`를 더 붙이고(`session/mod.rs`의 `CLIENT_ANTIGRAVITY`), 터미널 계획은 `launchNameOf`로 `client`가 있으면 그것을 `agent`로 넘기며, 호스트는 `agy --conversation <대화 id>`로 연다. 세션 변수의 에이전트는 노트와 맞게 계속 `gemini`다. 이어 열기는 항상 세션의 작업 폴더(`session-titles`의 `cwd`)에서 하고, 그 폴더가 없으면 홈에서 열면서 알린다. 모르는 이름은 셸 앞에서 거절한다.
-- **한계.** 세션 목록(프로젝트별 화면, `recent-sessions`)에는 Codex·Gemini 세션이 나오지 않는다. 노트 칩으로 들어간 세션 화면은 읽기 전용이고 입력창을 닫는다. Codex·Gemini·Antigravity 기록에서는 `author=`(작성 세션 대화를 묻기에 첨부)와 하위 에이전트·할 일 표시가 없다. Antigravity 기록은 `sqlite3`가 없으면 읽지 못한 것으로 보고한다(`session-titles`는 `found: false`). 노트 머리를 쓰는 쪽(`write/note_front.rs`)이 정해진 필드만 쓰는 구조라서, `sessionAgent`를 모르는 옛 빌드가 노트를 다시 쓰면 그 줄이 지워질 수 있다(옛 빌드로 직접 확인하지는 않았다).
+- **한계.** 세션 목록(프로젝트별 화면, `recent-sessions`)에는 Codex·Gemini 세션이 나오지 않는다. 노트 칩으로 들어간 세션 화면은 읽기 전용이고 입력창을 닫는다. 러너가 연 세션도 입력창을 닫고 「← 태스크로」 칩을 보인다(러너 절의 「최근 실행과 대화 보기」). Codex·Gemini·Antigravity 기록에서는 `author=`(작성 세션 대화를 묻기에 첨부)와 하위 에이전트·할 일 표시가 없다. Antigravity 기록은 `sqlite3`가 없으면 읽지 못한 것으로 보고한다(`session-titles`는 `found: false`). 노트 머리를 쓰는 쪽(`write/note_front.rs`)이 정해진 필드만 쓰는 구조라서, `sessionAgent`를 모르는 옛 빌드가 노트를 다시 쓰면 그 줄이 지워질 수 있다(옛 빌드로 직접 확인하지는 않았다).
 - **시험.** 엔진은 `fixture_vault.rs`의 `reads_session_transcripts_of_every_agent`가 합성 홈 아래에 Claude, Codex(새 형식과 예전 형식), Gemini(되감기와 주입된 줄 제외) 기록을 지어 `read-session`, `session-titles`, `recent-sessions`를 부르고, 없는 세션의 빈 응답과 인자 오류까지 본다. Antigravity 기록은 `reads_antigravity_conversations_through_sqlite3`가 본다(시험이 시스템 `sqlite3`로 진짜 모양의 SQLite와 protobuf를 지어 읽고, 기대값은 기준 Java 엔진이 같은 기록을 읽은 응답이다. `sqlite3`가 없으면 건너뛴다). protobuf 읽기는 `session/protobuf.rs`의 단위 시험이 본다. 환경 변수로 세션을 정하는 규칙(`AISURADA_SESSION_ID`와 `AISURADA_SESSION_AGENT` 짝이 먼저, 에이전트 고유 변수가 둘 이상이면 기록하지 않음, claude는 파일에 적지 않음)은 `ais-cli/src/env.rs`의 단위 시험 4개가, 노트 머리에 남는 `sessionAgent`·`editedSessionAgent` 줄은 `fixture_vault.rs`의 쓰기 시험들(`writes_note_meta_with_stamps_and_preconditions` 따위)과 `serialization_golden.rs`가 본다. MCP 서버가 세션을 노트 머리에 남기는 것은 `crates/ais-cli/tests/mcp_stdio.rs`가 서버 프로세스 끝에서 끝까지 본다. `the_server_stamps_the_session_it_was_started_under`(환경 변수의 `AISURADA_SESSION_ID`·`AISURADA_SESSION_AGENT` 짝은 `sessionId`와 `sessionAgent`, 고칠 때는 `editedSessionId`와 `editedSessionAgent`, `CLAUDE_CODE_SESSION_ID`만 있으면 에이전트 줄 없이 세션만, 서로 다른 에이전트의 변수가 함께 보이면 아무것도 적지 않음)와 `a_codex_client_session_in_meta_is_stamped_and_other_clients_are_not_trusted`(Codex 클라이언트의 `_meta.sessionId`, 없으면 `threadId`, `_meta`가 없으면 없음, 다른 클라이언트의 `_meta`는 믿지 않음)다. 같은 세션 출처 판정은 `mcp_compat`가 기준 Java 서버와도 맞대고, `compat_check`와 함께 그 녹화본을 `crates/ais-cli/tests/golden.rs`가 Java 없이 다시 돌린다. 화면은 `chapter10.test.mjs`와 `agent-session-chip.test.mjs`다(목록 아이콘의 판정 `noteAgents`도 뒤쪽 시험이 함께 본다). 목록 아이콘의 모양은 가짜 목록 줄과 칩을 Edge headless로 그려 보았고, 실제 앱 창의 전체 노트·아젠다·캘린더 화면에서는 확인하지 않았다. 실제 Codex·Gemini 기록은 읽기 전용으로 엔진 명령에 먹여 확인했다. 실제 Antigravity 기록(1MB~72MB, 2236회차)은 Java 엔진 시절에 읽기 전용으로 직접 읽어 보았다(그 뒤 설치한 앱의 엔진 명령 `session-titles`, `read-session`으로도 읽기 전용으로 읽어 보았다). 실제 앱 창에서는 Antigravity 칩의 「터미널」 단추로 대화가 이어 열리는 것만 손으로 확인했고(2026-11-13), 나머지 칩 동작은 앱 창에서 확인하지 않았다.
 
 ### 세션 목록 저장소 (PROJECTS 패널은 없앴다)
@@ -351,13 +351,13 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
 
 | 파일 | 맡은 일 |
 |---|---|
-| `runner/mod.rs` | 언제 누구를 돌릴지: 15초마다 훑기, 동시 실행 수, 「지금 실행」·중지·답하기, 앱을 껐다 켰을 때 이어 가기, 앱을 닫을 때 멈추기, 화면 명령 6개 |
+| `runner/mod.rs` | 언제 누구를 돌릴지: 15초마다 훑기, 동시 실행 수, 「지금 실행」·중지·답하기, 앱을 껐다 켰을 때 이어 가기, 앱을 닫을 때 멈추기, 화면 명령 7개 |
 | `runner/job.rs` | 실행 하나(일곱 걸음)와 보고·질문·실패·중지의 끝맺음 |
 | `runner/protocol.rs` | 태스크를 프롬프트로, claude의 마지막 답을 `[보고]`와 `[질문]`으로, claude를 읽기 전용으로 띄우는 인자, MCP 설정 |
-| `runner/store.rs` | 설정과 실행 기록 파일 |
+| `runner/store.rs` | 설정과 실행 기록 파일(태스크 하나의 목록, 모든 태스크를 가로지른 최근 실행 목록) |
 | `runner/host.rs` | 엔진(`ais-cli`)·claude·GitHub 저장소 사본·알림을 감싼 trait `Host`(시험은 가짜를 끼운다)와 읽기 전용 작업 폴더 |
 
-cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 6개가 없고(`Command … not found`) 화면은 러너 막대와 「실행」 영역을 그리지 않는다.
+cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 7개가 없고(`Command … not found`) 화면은 러너 막대와 「실행」 영역을 그리지 않는다.
 
 **일곱 걸음.** 걸음 이름은 실행 기록의 `step`과 화면의 단계 표시가 같이 쓴다.
 
@@ -401,7 +401,7 @@ cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 6�
 | `<vault 해시>/<TSK-n>/<실행 id>/run.json` | 실행 기록: 단계(`running`·`waiting-answer`·`done`·`failed`·`cancelled`·`abandoned`), 걸음, claude 부른 횟수, 질문 수, 일한 시간, 토큰, 비용, 보고 요약, 오류, 세션 id |
 | 같은 폴더의 `events.jsonl` | 걸음별 진행 기록(화면에는 마지막 80줄) |
 
-**명령 6개와 사건.** 열린 vault가 없으면 모두 거절한다.
+**명령 7개와 사건.** 열린 vault가 없으면 모두 거절한다.
 
 | 명령 | 하는 일 |
 |---|---|
@@ -411,20 +411,23 @@ cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 6�
 | `runner_stop` | 일하는 중이면 claude를 멈추고 Cancelled로, 답을 기다리는 중이면 바로 Cancelled로 |
 | `runner_answer` | 답을 댓글로 남기고 In Progress로 옮긴 뒤 같은 세션을 잇는다(한도와 무관하게 사람이 누른 일이다) |
 | `runner_runs` | 태스크 하나의 실행 기록과 가장 최근 실행의 진행 기록 |
+| `runner_recent_runs` | 모든 태스크를 가로지른 최근 실행. 끝나지 않은 실행(일하는 중, 답을 기다림)이 앞이고 그다음은 시작이 늦은 순이다. `limit`(기본 5)은 1~500으로 바로잡는다. 레일의 「최근 실행」(5건)과 세션 화면의 러너 세션 찾기(500건)가 쓴다 |
 
 러너가 태스크를 집거나 질문하거나 끝내면 사건 `ais://runner`(`{taskKey}`)를 보낸다. 화면(`ui/runnerStore.ts`)은 이때 상태를 다시 읽고 `version`을 올려서 태스크 목록과 상세가 다시 읽도록 한다.
 
 **화면.** 태스크 페이지 위의 막대(`ui/RunnerBar.tsx`: 러너 상태 알약, 「Ready가 되면 스스로 집기」, 동시 실행 수), 보드 카드의 「▶ 지금 실행」·「■ 중지」·「러너 · 걸음」 표시, 상세의 「실행」 영역(`ui/RunnerPanel.tsx`: 러너의 질문과 답 칸, 일곱 걸음 표시와 걸린 시간, 지난 실행의 결과·시간·토큰·비용·진행 기록)이다. 「실행」은 활동 탭이 아니라 상세 위쪽의 따로 둔 영역이다.
 
+**최근 실행과 대화 보기.** 레일 「에이전트」 탭의 러너 줄 아래에 「최근 실행」 5건이 있다(`ui/RailRuns.tsx`, 아래 레일 절). 줄을 누르면 그 태스크의 상세로 간다. 그 실행의 claude 대화는 「실행」 영역의 지난 실행 줄 끝 「대화 보기 ›」로 연다. 세션 id가 아직 없는 실행(저장소 받기에서 멈춤)에는 이 단추가 없다. 단추는 세션 화면(`/session/<id>`)을 읽기 전용으로 연다: 세션 화면은 `runnerStore.ts`의 `useRunnerTaskOfSession`으로 이 세션이 러너가 연 것인지 찾고(레일이 읽어 둔 최근 실행에서 먼저, 없으면 `runner_recent_runs`를 500건까지 불러), 맞으면 입력창을 닫고(`composerBlock`의 `runner`) 제목 앞에 「← 태스크로」 칩을 보인다. 러너가 같은 세션을 `--resume`으로 이어 쓰기 때문에 사람이 말을 걸면 대화가 엉키는 것을 막으려는 것이다. 답은 태스크 「실행」 영역에서 한다.
+
 **알림.** 보고는 종류 `pr`(화면 이름 「리뷰」, 설정의 「리뷰할 일이 생겼을 때」)로, 질문은 `question`, 실패는 `failed`로 쌓는다. `id`는 `run-<실행 id>-done`·`-q<번호>`·`-failed`라 같은 일을 두 번 알리지 않는다. 사람이 직접 중지한 것과 앱을 닫아 끊긴 것은 알리지 않는다.
 
 **시험.**
 
-- 호스트: `runner::` 30건. 보고·질문·답·중지·실패(종료 코드, 시간 초과, `is_error`)·질문 한도·세션 소실·작업 폴더 소실·앱 닫기와 다시 켜기 이어 가기·태스크가 옮겨졌을 때의 정리·우선순위와 동시 한도·막힘, 프롬프트와 claude 인자와 MCP 설정, 파일 저장소, 실제 git으로 만든 읽기 전용 작업 폴더를 가짜 엔진·가짜 claude로 돌린다.
+- 호스트: `runner::` 31건(실제 claude로 도는 1건은 무시됨). 모든 태스크를 가로지른 최근 실행의 순서(끝나지 않은 것이 앞)와 건수 바로잡기, 보고·질문·답·중지·실패(종료 코드, 시간 초과, `is_error`)·질문 한도·세션 소실·작업 폴더 소실·앱 닫기와 다시 켜기 이어 가기·태스크가 옮겨졌을 때의 정리·우선순위와 동시 한도·막힘, 프롬프트와 claude 인자와 MCP 설정, 파일 저장소, 실제 git으로 만든 읽기 전용 작업 폴더를 가짜 엔진·가짜 claude로 돌린다.
 - **진짜로 도는 시험** `runner::tests::real_cli_and_claude_report_end_to_end`(무시됨): 진짜 `ais-cli`와 진짜 `claude`(haiku)로 태스크 하나를 끝까지 돌려 In Review와 댓글을 확인한다. 토큰을 조금 쓴다. 격리 vault와 격리 HOME을 만들고 `AISURADA_VAULT`, `E2E_HOME`(격리 HOME), `E2E_CLI_BIN`(빌드한 `ais-cli` 실행 파일), 필요하면 `AISURADA_LOCK_DIR`를 주고 `cargo test real_cli_and_claude -- --ignored --nocapture`로 돌린다. 이 컴퓨터에서 작은 README 조사 하나가 10초, 약 0.007달러였다(Java 시절에 잰 값이다).
-- 화면: `runner-ui.test.mjs` 13건(저장소의 읽기·사건·호출 인자, 서버 렌더로 본 막대·「실행」 영역 각 상태·보드 카드), `workspace.test.mjs`의 종료 확인 3건. 새 화면은 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려 눈으로 확인했다.
-- **확인하지 못한 것.** 키체인 자격으로 진짜 GitHub 저장소를 fetch하는 길(`refresh_clone`은 시험에서 가짜로 대신했다), 번들한 앱에서 `claude` 위치 찾기, 질문→답 왕복과 동시 실행 여러 개를 진짜 `claude`로 돌리는 것(가짜 대본으로만), 120분 제한, 앱을 닫을 때 진짜 `claude` 프로세스가 멈추는 것, 실제 앱 창(WKWebView)에서 눌러 본 것.
-- **한계.** 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다. 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 4부의 세션 화면(`/session/<id>`)에 잇지 않았다.
+- 화면: `runner-ui.test.mjs` 18건(저장소의 읽기·사건·호출 인자, 최근 실행 읽기와 실패해도 이전 목록 유지, 러너 세션 찾기, 줄의 때·색·아랫줄·말풍선 도우미, 서버 렌더로 본 막대·「실행」 영역 각 상태와 「대화 보기」·보드 카드·레일 「최근 실행」), `chapter10.test.mjs`의 입력창 닫기 판단(러너 세션), `workspace.test.mjs`의 종료 확인 3건. 새 화면은 서버 렌더하고 Edge headless로 밝은 모양과 어두운 모양에서 그려 눈으로 확인했다.
+- **확인하지 못한 것.** 키체인 자격으로 진짜 GitHub 저장소를 fetch하는 길(`refresh_clone`은 시험에서 가짜로 대신했다), 번들한 앱에서 `claude` 위치 찾기, 질문→답 왕복과 동시 실행 여러 개를 진짜 `claude`로 돌리는 것(가짜 대본으로만), 120분 제한, 앱을 닫을 때 진짜 `claude` 프로세스가 멈추는 것, 실제 앱 창(WKWebView)에서 눌러 본 것. 레일 「최근 실행」과 「대화 보기」도 서버 렌더와 시험으로만 봤다: 이 컴퓨터에는 러너 실행 기록이 아직 없어서(앱 지원 폴더에 `runs`가 없다), 실제 실행이 남긴 기록과 대화 파일(`~/.claude/projects`)로 눌러 열어 보지는 못했다.
+- **한계.** 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다. 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 세션 화면(`/session/<id>`)에서 읽기 전용으로 열린다(위 「최근 실행과 대화 보기」). 다만 노트 옆 세션 레일(`NoteSessionRail`)은 러너 세션에도 입력을 닫지 않는다. 진행 중인 실행의 대화를 실시간으로 따라 보는 것이 되는지는 확인하지 못했다.
 
 ### GitHub App 연결 (`github.rs`)
 
@@ -685,9 +688,10 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 - **탭을 누르면 그 탭에서 마지막으로 보던 화면으로 간다.** 처음 누르면 각 탭의 첫 화면(`/notes`, `/tasks`)이다. 이미 그 탭의 화면이면 아무것도 하지 않는다. 기억은 모듈 변수에 두므로 앱을 켜 둔 동안만 가고 저장하지 않는다(`rememberRailTab`, `railTabTarget`).
 - **에이전트 탭 이름 옆 배지는 「내 차례」의 합**이다: 러너가 답을 기다리는 태스크 수(`runnerStore`의 `waiting`)와 승인이 필요한 변경 수(`approvalsStore`)를 더한다. 노트 탭을 보고 있어도 보인다. 태스크 메뉴에는 답 대기 수, 스킬·에이전트 메뉴에는 승인 수가 따로 붙는다.
 - **러너 한 줄**(「러너 · 쉬는 중」 따위)은 에이전트 탭에만 있고 누르면 태스크 화면으로 간다. 러너가 없는 빌드(`supported` false)에서는 숨긴다. 색 단계는 태스크 화면의 러너 막대와 같은 `runnerTone`을 쓴다.
+- **「최근 실행」**(`ui/RailRuns.tsx`)은 러너 줄 바로 아래에 같은 조건(에이전트 탭, `supported`)으로만 보인다. 러너가 태스크마다 claude를 돌린 실행 5건을 끝나지 않은 것 먼저, 그다음 최신순으로 늘어놓는다. 줄의 윗줄은 태스크 키와 제목, 아랫줄은 「상태 · 때 · 비용 · 대화 없음」(`runnerStore.ts`의 `runSubline`)이고, 점 색은 상태(진행·답 기다림·보고함·실패·그 밖)다. 실행 기록에는 태스크 제목이 없어서 제목은 태스크 목록(`listTasks`)에서 키로 맞춰 오고, 못 읽으면 키만 보인다. 마우스를 올리면 걸음·질문·보고 앞부분·실패 까닭이 설명으로 뜬다(`runTip`). 줄을 누르면 그 태스크 상세로 가고, 열려 있는 태스크의 줄은 눌린 색으로 남는다. 세션이 없는 실행은 흐리게 보인다. 목록은 러너 사건(`ais://runner`)마다 `refreshRunner`가 상태와 함께 새로 읽는다(`runner_recent_runs`, 못 읽으면 이전 목록을 둔다). 비었을 때는 안내 문구를 보인다. 시안은 디자인 캔버스가 아니라 Figma 파일의 「에이전트 수행 이력 시안 v2」다.
 - **프로젝트 자원** 줄은 프로젝트마다 하나이고 누르면 프로젝트 페이지(`/project/<slug>`)다. 예전에 노트 탭 프로젝트 머리에 있던 「프로젝트 페이지」 단추는 여기로 옮겼다. 줄은 아젠다 줄(`.rail-agenda`)을 그대로 써서 모든 모양(skin)에서 같은 활성 표시를 갖는다. 프로젝트별 자원 개수는 아직 안 보인다(시안에는 있다).
 - 탭 줄의 색은 레일 바탕(스킨마다 밤하늘 위에 `--ink`가 다시 정의된다)에서 읽히도록 `--ink`를 섞어 만들었다(`color-mix`). 그래서 시안의 물성 알약과 모양이 조금 다르다. 선택자를 `.workspace-rail .rail-tabs …`부터 걸어 스킨의 일반 버튼 규칙보다 앞서게 했다.
-- 시험은 `scripts/rail-tabs.test.mjs` 7건(주소→탭 표, 기억과 누름 규칙, 노트·에이전트 탭의 메뉴와 줄, 연동 가이드, 배지 합)이고 `tasks-ui`, `resources-ui`가 새 위치를 본다. `views-checks.js`의 메뉴 순서는 노트 탭 여섯 개로 고쳤지만 실제 창에서 돌려 보지는 않았다. 실제 앱 창에서 탭을 눌러 본 확인은 없다.
+- 시험은 `scripts/rail-tabs.test.mjs` 7건(주소→탭 표, 기억과 누름 규칙, 노트·에이전트 탭의 메뉴와 줄, 연동 가이드, 배지 합, 「최근 실행」의 위치와 열린 태스크 표시)이고 `tasks-ui`, `resources-ui`가 새 위치를 본다. `views-checks.js`의 메뉴 순서는 노트 탭 여섯 개로 고쳤지만 실제 창에서 돌려 보지는 않았다. 실제 앱 창에서 탭을 눌러 본 확인은 없다.
 
 ### 후속 노트 탭
 
@@ -747,7 +751,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 ### 계약을 건드릴 때
 
-호스트 커맨드(2부 44개, cargo 기능 `claude` 아래 16개: 4부 10개와 러너 6개)와 이벤트 6개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`, `ais://notifications`, `ais://runner`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.
+호스트 커맨드(2부 44개, cargo 기능 `claude` 아래 17개: 4부 10개와 러너 7개)와 이벤트 6개(`ais://menu`, `ais://navigate`, `ais://note-windows`, `ais://self-write`, `ais://notifications`, `ais://runner`), 번들 식별자, 권한 파일(`src-tauri/capabilities/main.json`·`note.json`)은 시험이 글자까지 잰다(`scripts/contracts.test.mjs`). 커맨드를 더하거나 권한을 바꾸면 이 시험과 `capabilities/`를 함께 고친다. `main`과 `note-*` 창의 권한은 일부러 다르다.
 
 **설명서와 일부러 다르게 둔 것.** `create_workspace_dir({parent, name})`는 설명서대로라면 저장 위치(`parent`)가 없을 때 실패해야 하지만, 지금은 이름 검사를 모두 통과한 뒤 저장 위치를 만든다(`mkdir -p`). 새 워크스페이스 화면에서 없는 폴더를 적으면 「저장 위치를 찾을 수 없어요」로 막히던 것을 2026-11-04에 바꿨다. 저장 위치가 파일이면 여전히 실패하고, 잘못된 이름은 저장 위치를 만들기 전에 거절한다(`workspace.rs`의 `create_dir_makes_a_missing_parent_after_validating_the_name`).
 

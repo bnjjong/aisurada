@@ -8,6 +8,8 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { Icon } from '../../ui/Icon.tsx';
 import { Modal } from '../../ui/Modal.tsx';
 import { agendaOrder, HUE_COLORS } from '../../ui/model.ts';
+import { useRunnerTaskOfSession } from '../../ui/runnerStore.ts';
+import { taskAddress } from '../../navigation/routes.ts';
 import { AskContext } from './askContext.ts';
 import { askClaudeBridge, tauriAskHost } from './askHost.ts';
 import { AskImageStrip, useAskImages } from './askPickers.tsx';
@@ -298,6 +300,7 @@ export function SessionComposer({
   sessionLoaded,
   transcriptFile,
   agent,
+  runnerTask,
   vault,
   timeoutSeconds,
 }: {
@@ -307,6 +310,8 @@ export function SessionComposer({
   transcriptFile: string | null | undefined;
   /** The CLI that opened the session (`claude` when the engine named none). */
   agent?: string;
+  /** The task key when the runner opened this session (the box closes: the runner resumes the same session). */
+  runnerTask?: string | null;
   vault: string;
   timeoutSeconds: () => number;
   /** Kept for the callers that still pass them. */
@@ -317,7 +322,7 @@ export function SessionComposer({
   const composer = useComposer(sessionId);
   const pictures = useAskImages({ hasNoteFolder: true, http: false });
   const input = useRef<HTMLTextAreaElement>(null);
-  const block: ComposerBlock | null = composerBlock(sessionItem, { done: sessionLoaded, file: transcriptFile, agent });
+  const block: ComposerBlock | null = composerBlock(sessionItem, { done: sessionLoaded, file: transcriptFile, agent, runnerTask });
 
   // The picture strip lives in the store so it follows the session, not the box (10.2).
   useEffect(() => {
@@ -1106,6 +1111,8 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
   const sessionItem = useMemo(() => rows.find((row) => row.sessionId === sessionId), [rows, sessionId]);
   // 9.2: the list is read once when it has never been read.
   useSessionListSync(vault || undefined);
+  // The task key when the runner opened this session: the box closes and a chip leads back to the task.
+  const runnerTask = useRunnerTaskOfSession(controller?.callHost, sessionId);
 
   // 9.2: the conversation is read again only when the answer signal of this session changes.
   const [manualSignal, setManualSignal] = useState(0);
@@ -1224,6 +1231,9 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
         <header className="sess-page-header">
           <div className="sess-page-head-row">
             <h1 className="sess-page-title">
+              {runnerTask && (
+                <button type="button" className="sess-from-task" title={`${runnerTask} 태스크 상세로 돌아가요`} onClick={() => controller?.navigate?.(taskAddress(runnerTask))}>← 태스크로</button>
+              )}
               {sessionItem?.status === 'running' && <span className="sess-run" />}
               {sessionTitle(sessionItem)}
             </h1>
@@ -1254,7 +1264,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
               <button type="button" className="prev-toggle" onClick={toggleRail}>{railVisible ? '레일 접기' : '레일 펴기'}</button>
             </div>
           </div>
-          <div className="sess-page-meta">{meta}</div>
+          <div className="sess-page-meta">{runnerTask && <span className="sess-page-kind">러너 실행 · {runnerTask}</span>}{meta}</div>
           {sessionItem?.cwd && <div className="sess-page-cwd">{sessionItem.cwd}</div>}
           <RunStateLine runState={view?.runState ?? null} />
         </header>
@@ -1309,6 +1319,7 @@ export function SessionRoute({ sessionId: rawSessionId, controller, state }: Ses
             sessionLoaded={!read.loading && !read.error}
             transcriptFile={view?.file}
             agent={view?.agent}
+            runnerTask={runnerTask}
             vault={vault}
             timeoutSeconds={() => Number(state?.prefs?.askTimeoutSeconds) || 3600}
           />

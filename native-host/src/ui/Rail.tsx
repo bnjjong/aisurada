@@ -10,6 +10,7 @@ import { NotificationBell } from "./NotificationCenter.tsx";
 import { badgeText, badgeTotal } from "./approvalsClient.ts";
 import { useApprovalCounts } from "./approvalsStore.ts";
 import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
+import { RailRuns } from "./RailRuns.tsx";
 import { useSessionBadge } from "@claude-plug/session";
 import { parseRoute } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
@@ -420,6 +421,7 @@ export function Rail({
           러너 · {runnerSummary(runner)}
         </button>
       )}
+      {tab === "agents" && runner.supported && <RailRuns controller={controller} taskKey={route.kind === "task" ? route.key : undefined} />}
       {tab === "global" ? (
       <section data-rail-section="global-resources" className="agenda-summary rail-resources">
         <header>

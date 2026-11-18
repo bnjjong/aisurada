@@ -15,6 +15,12 @@ test('a session another CLI opened is read here, resumed there, and never sent t
   assert.equal(composerBlock(undefined, { done: true, file: '/x', agent: 'claude' }), null, 'a claude session keeps its box');
   assert.equal(composerBlock({ processAlive: true, kind: 'interactive' }, { done: true, file: '/x', agent: 'gemini' }), 'other-agent', 'the agent decides before the live row');
   assert.match(COMPOSER_BLOCK_TEXT['other-agent'], /읽기만/);
+  // 러너가 연 세션은 읽기만 된다: 러너가 같은 세션을 이어 쓰므로 사람이 말을 걸면 대화가 엉킨다
+  assert.equal(composerBlock(undefined, { done: true, file: '/x', runnerTask: 'TSK-12' }), 'runner');
+  assert.equal(composerBlock({ processAlive: true, kind: 'background' }, { done: false, file: undefined, runnerTask: 'TSK-12' }), 'runner', 'the runner decides before the live row');
+  assert.equal(composerBlock(undefined, { done: true, file: '/x', runnerTask: null }), null, 'no task, the box stays');
+  assert.match(COMPOSER_BLOCK_TEXT.runner, /읽기만/);
+  assert.match(COMPOSER_BLOCK_TEXT.runner, /← 태스크로/);
   assert.equal(resumeCommand('codex', ID), `codex resume ${ID}`);
   assert.equal(resumeCommand('gemini', ID), `gemini --resume ${ID}`);
   assert.equal(resumeCommand('claude', ID), `claude --resume ${ID}`);

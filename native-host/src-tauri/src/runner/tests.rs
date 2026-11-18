@@ -872,6 +872,42 @@ fn status_lists_active_and_waiting_runs() {
     assert!(runner.runs("nope").is_err());
 }
 
+#[test]
+fn recent_runs_put_open_runs_first_then_newest_and_honor_the_limit() {
+    let env = env_with(&[("TSK-1", "ready-for-develop", "medium")], vec![]);
+    let make = |key: &str, id: &str, phase: Phase, started_at: u64| store::RunRecord {
+        run_id: id.into(),
+        task_key: key.into(),
+        phase,
+        started_at,
+        ..Default::default()
+    };
+    for r in [
+        make("TSK-1", "a", Phase::Done, 100),
+        make("TSK-1", "b", Phase::Done, 300),
+        make("TSK-2", "c", Phase::Running, 50),
+        make("TSK-3", "d", Phase::WaitingAnswer, 60),
+        make("TSK-2", "e", Phase::Failed, 200),
+    ] {
+        store::save_run(&env.fake.root, VAULT, &r).unwrap();
+    }
+    let runner = env.runner();
+    let ids = |limit: usize| -> Vec<String> {
+        runner
+            .recent_runs(limit)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.run_id)
+            .collect()
+    };
+    // 끝나지 않은 실행이 앞(시작이 늦은 순: d, c), 그다음 끝난 실행(시작이 늦은 순: b, e, a)
+    assert_eq!(ids(10), ["d", "c", "b", "e", "a"]);
+    assert_eq!(ids(3), ["d", "c", "b"]);
+    // 0건을 달라고 해도 1건은 돌려주고, 너무 크게 달라고 해도 있는 만큼만 준다
+    assert_eq!(ids(0), ["d"]);
+    assert_eq!(ids(100_000).len(), 5);
+}
+
 // ---------------------------------------------------------------------------
 // 실제 ais-cli·격리 엔진·claude로 끝까지 도는 시험(손으로만 돌린다)
 // ---------------------------------------------------------------------------

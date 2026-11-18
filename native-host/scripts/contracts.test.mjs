@@ -57,7 +57,7 @@ test('Part 4 host modules and commands sit behind the claude feature', () => {
   };
   for (const name of ['ask', 'agents', 'session_image', 'dictation', 'session_shell', 'runner']) gated(new RegExp(`^(pub )?mod ${name};`));
   for (const command of ['ask::ask_claude', 'ask::ask_runtime', 'agents::list_claude_agents', 'agents::alive_pids', 'agents::held_agent_sessions', 'agents::release_agent_session', 'session_image::write_session_image', 'dictation::start_dictation', 'session_shell::pty_start_session',
-    'runner::runner_status', 'runner::runner_settings_set', 'runner::runner_run', 'runner::runner_stop', 'runner::runner_answer', 'runner::runner_runs']) {
+    'runner::runner_status', 'runner::runner_settings_set', 'runner::runner_run', 'runner::runner_stop', 'runner::runner_answer', 'runner::runner_runs', 'runner::runner_recent_runs']) {
     gated(new RegExp(`^\\s*${command},?$`));
   }
 });

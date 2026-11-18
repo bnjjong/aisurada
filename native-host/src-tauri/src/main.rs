@@ -126,6 +126,8 @@ fn main() {
             #[cfg(feature = "claude")]
             runner::runner_runs,
             #[cfg(feature = "claude")]
+            runner::runner_recent_runs,
+            #[cfg(feature = "claude")]
             agents::list_claude_agents,
             #[cfg(feature = "claude")]
             agents::alive_pids,

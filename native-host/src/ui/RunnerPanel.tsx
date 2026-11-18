@@ -5,21 +5,13 @@
 // - 지난 실행들: 결과, 걸린 시간, 토큰, 진행 기록
 import { useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
-import type { RunEvent, RunPhase, RunRecord } from "./runnerStore.ts";
+import { sessionAddress } from "../navigation/routes.ts";
+import type { RunEvent, RunRecord } from "./runnerStore.ts";
 import {
-  STEPS, activeRunOf, answerTask, formatCost, formatDuration, formatTokens, loadRuns, runTask, stepIndex, stopTask, useRunner, waitingRunOf,
+  PHASE_LABEL, STEPS, activeRunOf, answerTask, formatCost, formatDuration, formatTokens, loadRuns, runTask, stepIndex, stopTask, useRunner, waitingRunOf,
 } from "./runnerStore.ts";
 import type { RunnerSnapshot } from "./runnerStore.ts";
 import type { TaskDetail } from "./tasksClient.ts";
-
-const PHASE_LABEL: Record<RunPhase, string> = {
-  running: "일하는 중",
-  "waiting-answer": "답을 기다림",
-  done: "보고함",
-  failed: "실패",
-  cancelled: "중지함",
-  abandoned: "이어 가지 않음",
-};
 
 /** 시험과 눈으로 보는 확인에서 호스트 없이 처음 모양을 정할 때 쓴다(앱은 주지 않는다). */
 export interface RunnerPanelPreset {
@@ -174,6 +166,12 @@ export function RunnerPanel({ task, controller, preset }: { task: TaskDetail; co
                   <span className="task-hint">
                     {formatDuration(r.workedSecs)} · 질문 {r.questions}개 · 토큰 {formatTokens(r.inputTokens)}/{formatTokens(r.outputTokens)} · {formatCost(r.costUsd)}
                   </span>
+                  {/* 그 실행의 claude 대화를 읽기 전용으로 연다. 세션이 아직 안 만들어진 실행(저장소 받기에서 멈춤)에는 없다 */}
+                  {r.sessionId && (
+                    <button type="button" className="runner-chat" title="이 실행의 대화를 읽기 전용으로 열어요" onClick={() => controller.navigate(sessionAddress(r.sessionId))}>
+                      대화 보기 ›
+                    </button>
+                  )}
                 </div>
                 {r.summary && <p className="runner-summary">{r.summary}</p>}
                 {r.error && <p className="runner-fail">{r.error}</p>}
