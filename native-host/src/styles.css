@@ -568,7 +568,109 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .doc-id-chip, .doc-context-chips { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 11px; margin: 10px 0; }
 .doc-id-chip code, .session-chip code { overflow-wrap: anywhere; }
 .doc-id-chip button, .doc-context-chips button { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 5px 10px; border-radius: 6px; }
-.doc-context-chips .doc-agenda-chip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; background: var(--soft); color: var(--ink); font-size: 11px; font-weight: 500; }
+.doc-context-chips .doc-agenda-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--agenda-color, var(--accent)) 30%, var(--line));
+  border-radius: 8px;
+  padding: 3px 10px 3px 8px;
+  background: color-mix(in srgb, var(--agenda-color, var(--accent)) 9%, var(--surface));
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+.doc-context-chips .doc-agenda-chip .agenda-dot {
+  display: inline-block;
+  line-height: 1;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.doc-context-chips .doc-agenda-chip .doc-agenda-prefix {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--agenda-color, var(--accent)) 12%, transparent);
+  border-radius: 4px;
+  letter-spacing: -0.2px;
+}
+.doc-context-chips .doc-agenda-chip .doc-agenda-project {
+  color: var(--muted);
+  font-weight: 500;
+}
+.doc-context-chips .doc-agenda-chip .doc-agenda-sep {
+  color: var(--line);
+  margin: 0 1px;
+  font-weight: 400;
+}
+.doc-context-chips .doc-agenda-chip .doc-agenda-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+.doc-context-chips button.doc-agenda-chip.is-clickable {
+  cursor: pointer;
+}
+.doc-context-chips button.doc-agenda-chip.is-clickable:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--agenda-color, var(--accent)) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--agenda-color, var(--accent)) 55%, var(--line));
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--agenda-color, var(--accent)) 16%, transparent);
+  transform: translateY(-1px);
+}
+.doc-context-chips .doc-template-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 9px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+.doc-context-chips .doc-template-prefix {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 1px 4px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-radius: 4px;
+}
+.doc-context-chips .doc-template-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+.doc-context-chips button.doc-template-chip.is-clickable {
+  cursor: pointer;
+}
+.doc-context-chips button.doc-template-chip.is-clickable:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--muted);
+  transform: translateY(-1px);
+}
+.doc-context-chips .doc-parent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 9px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  transition: all 0.15s ease;
+}
+.doc-context-chips .doc-parent-chip:hover:not(:disabled) {
+  background: var(--soft);
+  color: var(--ink);
+  border-color: var(--ink);
+}
 .doc-id-chip button svg, .doc-context-chips button svg { display: block; flex-shrink: 0; }
 .session-chip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; }
 .doc-eval-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 18; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(360px, calc(100vw - 40px)); box-shadow: 0 12px 45px #0002; font-size: 13px; }

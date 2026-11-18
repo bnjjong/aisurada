@@ -12,6 +12,7 @@ import { History } from "./History.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
 import {
   TYPE_NAMES,
+  HUE_COLORS,
   displayTitle,
   tags,
   tagCandidates,
@@ -297,18 +298,49 @@ export function NoteMeta({
           ))}
           {!parent &&
             agenda &&
-            (mode === "preview" ? (
-              <span className="doc-agenda-chip">{agenda.title}</span>
-            ) : (
-              <button onClick={() => go(controller, agendaAddress(agenda.id))}>
-                {project ? asText(project.title) + " / " : ""}
-                {agenda.title}
-              </button>
-            ))}
+            (() => {
+              const hueColor = HUE_COLORS[asText(agenda.hue)] || "var(--accent, #5f8fbd)";
+              const content = (
+                <>
+                  <span className="agenda-dot" style={{ color: hueColor }} aria-hidden="true">
+                    ●
+                  </span>
+                  <span className="doc-agenda-prefix">아젠다</span>
+                  {project && (
+                    <>
+                      <span className="doc-agenda-project">{asText(project.title)}</span>
+                      <span className="doc-agenda-sep">/</span>
+                    </>
+                  )}
+                  <span className="doc-agenda-title">{agenda.title}</span>
+                </>
+              );
+              return mode === "preview" ? (
+                <span
+                  className="doc-agenda-chip"
+                  style={{ "--agenda-color": hueColor } as React.CSSProperties}
+                >
+                  {content}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="doc-agenda-chip is-clickable"
+                  style={{ "--agenda-color": hueColor } as React.CSSProperties}
+                  title={`${agenda.title} 아젠다로 이동`}
+                  onClick={() => go(controller, agendaAddress(agenda.id))}
+                >
+                  {content}
+                </button>
+              );
+            })()}
           {!!note.template &&
             !parent &&
             (template ? (
               <button
+                type="button"
+                className="doc-template-chip is-clickable"
+                title={`${asText(template.name)} 템플릿 보기`}
                 onClick={() =>
                   go(
                     controller,
@@ -316,10 +348,14 @@ export function NoteMeta({
                   )
                 }
               >
-                {asText(template.name)}
+                <span className="doc-template-prefix">템플릿</span>
+                <span className="doc-template-title">{asText(template.name)}</span>
               </button>
             ) : (
-              <span>알 수 없음 ({asText(note.template)})</span>
+              <span className="doc-template-chip">
+                <span className="doc-template-prefix">템플릿</span>
+                <span className="doc-template-title">{asText(note.template)}</span>
+              </span>
             ))}
           <NoteSessionChips
             note={live}
