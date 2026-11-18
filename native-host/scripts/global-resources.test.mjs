@@ -26,8 +26,8 @@ test('AI_ENGINES, MODEL_PRESETS and REASONING_EFFORTS cover claude, codex and ge
   assert.ok(MODEL_PRESETS.claude.includes('claude-fable-5.2'));
   assert.ok(MODEL_PRESETS.codex.includes('gpt-6.1-sol'));
   assert.ok(MODEL_PRESETS.codex.includes('gpt-6-astra'));
+  assert.ok(MODEL_PRESETS.codex.includes('gpt-6.2-sol'));
   assert.ok(MODEL_PRESETS.gemini.includes('gemini-3.8-flash'));
-  assert.ok(MODEL_PRESETS.gemini.includes('gemini-4-carbon'));
 
   const effortIds = REASONING_EFFORTS.map((e) => e.id);
   assert.ok(effortIds.includes('default'));
@@ -152,13 +152,37 @@ test('Gemini 2.5 Pro is no longer offered', () => {
   assert.ok(!ENGINE_MODELS.gemini.some((m) => /2\.5/.test(m.id) || /2\.5/.test(m.label)));
 });
 
+test('only the models this account can use are offered', () => {
+  // Codex(ChatGPT Plus): Codex CLI가 알려 준 목록(models_cache.json에서 visibility가 list인 것) 그대로, CLI의 우선순위 순서
+  assert.deepEqual(MODEL_PRESETS.codex, [
+    'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'inherit',
+  ]);
+  for (const hidden of ['gpt-oss-120b', 'gpt-reserve', 'codex-auto-review']) assert.ok(!MODEL_PRESETS.codex.includes(hidden), `${hidden} is not offered`);
+  // Gemini(Google AI Pro): 쓰는 것이 확인된 모델만
+  assert.deepEqual(MODEL_PRESETS.gemini, ['gemini-3.8-flash', 'inherit']);
+  // Claude(Pro): Claude Code 카탈로그의 모델. 모델별 강도 표가 있어야 한다
+  assert.deepEqual(MODEL_PRESETS.claude, ['claude-sonnet-5.5', 'claude-opus-5.5', 'claude-fable-5.2', 'claude-haiku-5.5', 'claude-sonnet-4.6', 'claude-opus-4.6', 'inherit']);
+  // 새로 목록에 넣은 Claude·Codex·Gemini 모델은 모델별 강도 표도 같이 채워야 한다(엔진 기본으로 두면 안 맞을 수 있다)
+  for (const models of Object.values(ENGINE_MODELS)) {
+    for (const m of models) if (m.id !== 'inherit') assert.ok(MODEL_EFFORTS[m.id], `${m.id} has its own effort row`);
+  }
+});
+
+test('every seeded agent uses models this account can use', () => {
+  for (const agent of DEFAULT_PROCESS_AGENTS) {
+    assert.ok(MODEL_PRESETS[agent.engine].includes(agent.model), `${agent.name}: ${agent.model} is offered for ${agent.engine}`);
+    if (agent.fallbackEngine) assert.ok(MODEL_PRESETS[agent.fallbackEngine].includes(agent.fallbackModel), `${agent.name}: ${agent.fallbackModel} is offered for ${agent.fallbackEngine}`);
+  }
+});
+
 test('effortsForModel lists only what the model supports, with default first', () => {
   // Gemini 3.8 Flash는 low/medium/high 셋뿐이다(Gemini CLI 모델 화면)
   assert.deepEqual(effortsForModel('gemini', 'gemini-3.8-flash'), ['default', 'low', 'medium', 'high']);
   // Codex는 CLI의 모델 목록이 알려 주는 값 그대로다: ultra는 일부 모델에만 있다
   assert.deepEqual(effortsForModel('codex', 'gpt-6.1-sol'), ['default', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
   assert.deepEqual(effortsForModel('codex', 'gpt-6-luna'), ['default', 'low', 'medium', 'high', 'xhigh', 'max']);
-  assert.deepEqual(effortsForModel('codex', 'gpt-oss-120b'), ['default', 'low', 'medium', 'high']);
+  assert.deepEqual(effortsForModel('codex', 'gpt-6.2-astra'), ['default', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
+  assert.deepEqual(effortsForModel('codex', 'gpt-5.6-luna'), ['default', 'low', 'medium', 'high', 'xhigh', 'max']);
   // Claude: xhigh는 5.x 모델에만 있고 4.6 모델은 high에서 max로 간다
   assert.deepEqual(effortsForModel('claude', 'claude-sonnet-5.5'), ['default', 'low', 'medium', 'high', 'xhigh', 'max']);
   assert.deepEqual(effortsForModel('claude', 'claude-opus-4.6'), ['default', 'low', 'medium', 'high', 'max']);

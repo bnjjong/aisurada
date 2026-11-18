@@ -49,29 +49,32 @@ export const ENGINE_EFFORTS: Record<AIEngine, readonly SetEffort[]> = {
 };
 
 const CODEX_FULL: readonly SetEffort[] = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+const CODEX_NO_ULTRA: readonly SetEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
  * 모델마다 고를 수 있는 추론 강도(default 제외). 모델이 지원하지 않는 값을 보내면 CLI가 거절하므로 표에 있는 값만 보여 준다.
- * 근거가 다르니 항목마다 적는다. 표에 없는 모델은 {@link ENGINE_EFFORTS}를 쓴다.
+ * 근거는 각 CLI가 이 계정에 알려 준 값이다(2026-11-18 확인). 표에 없는 모델은 {@link ENGINE_EFFORTS}를 쓴다.
  */
 export const MODEL_EFFORTS: Record<string, readonly SetEffort[]> = {
-  // Codex — Codex CLI가 모델마다 알려 주는 값(`~/.codex/models_cache.json`의 supported_reasoning_levels, 2026-11-18)
-  'gpt-6.1-sol': CODEX_FULL,
+  // Codex(ChatGPT Plus) — `~/.codex/models_cache.json`의 supported_reasoning_levels
+  'gpt-6.2-sol': CODEX_FULL,
+  'gpt-6.2-astra': CODEX_FULL,
   'gpt-6.1-terra': CODEX_FULL,
+  'gpt-6.1-sol': CODEX_FULL,
   'gpt-6-astra': CODEX_FULL,
   'gpt-6-sol': CODEX_FULL,
   'gpt-5.6-sol': CODEX_FULL,
-  'gpt-6-luna': ['low', 'medium', 'high', 'xhigh', 'max'],
-  // gpt-oss는 캐시에 없다. OpenAI가 밝힌 세 단계
-  'gpt-oss-120b': ['low', 'medium', 'high'],
-  // Claude — Claude Code 변경 기록 기준: xhigh는 Opus 4.7부터 있고 5.x 모델에서 쓰이며, 4.6 모델은 high로 대체된다
+  'gpt-5.6-terra': CODEX_FULL,
+  'gpt-6-luna': CODEX_NO_ULTRA,
+  'gpt-5.6-luna': CODEX_NO_ULTRA,
+  // Claude(Pro) — Claude Code 모델 카탈로그(`~/.claude/cache/model-catalog/*-cc.json`)의 runtime.effort_levels
   'claude-sonnet-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-fable-5.2': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-haiku-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-sonnet-4.6': ['low', 'medium', 'high', 'max'],
   'claude-opus-4.6': ['low', 'medium', 'high', 'max'],
-  // Gemini — Gemini CLI 모델 화면(사용자 확인). 다른 Gemini 모델은 확인한 표가 없어 Gemini 기본 세 단계를 쓴다
+  // Gemini(Google AI Pro) — Gemini CLI 모델 화면(사용자 확인)
   'gemini-3.8-flash': ['low', 'medium', 'high'],
 };
 
@@ -91,13 +94,15 @@ export function effortInfosFor(engine: AIEngine, model: string): EffortInfo[] {
   return effortsForModel(engine, model).map((id) => REASONING_EFFORTS.find((e) => e.id === id)!);
 }
 
+/**
+ * 이 계정이 실제로 쓸 수 있는 모델만 둔다(Claude Pro, ChatGPT Plus, Google AI Pro, 2026-11-18 확인). 목록에 없는 모델은 「직접 입력」으로 쓴다.
+ * - claude: Claude Code 모델 카탈로그(`~/.claude/cache/model-catalog/*-cc.json`)에 있는 모델
+ * - codex: Codex CLI가 이 계정에 알려 준 모델(`~/.codex/models_cache.json`에서 visibility가 list인 것). 순서는 CLI의 우선순위다
+ * - gemini: Gemini CLI는 계정의 모델 목록을 서버에서 받아 오고 로컬에 저장하지 않는다. 쓰는 것이 확인된 모델만 둔다
+ */
 export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
   gemini: [
     { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (current, 코딩·에이전트 워크호스)' },
-    { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon (차세대 플래그십)' },
-    { id: 'gemini-4-argon', label: 'Gemini 4 Argon (차세대 고성능 미드레인지)' },
-    { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen (차세대 초경량)' },
-    { id: 'gemini-3-pro', label: 'Gemini 3 Pro (복합 심층 추론)' },
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   claude: [
@@ -110,13 +115,16 @@ export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   codex: [
-    { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol (current, 최신 코딩·일상 업무 워크호스)' },
-    { id: 'gpt-6-astra', label: 'GPT-6-Astra (Frontier intelligence, 최고 난도 작업)' },
-    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra (Codex 전문 모델)' },
-    { id: 'gpt-6-sol', label: 'GPT-6-Sol (이전 세대 워크호스 모델)' },
-    { id: 'gpt-6-luna', label: 'GPT-6-Luna (경량·저비용 간편 작업)' },
-    { id: 'gpt-oss-120b', label: 'GPT-OSS 120B (Medium 오픈소스 추론)' },
-    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol (구세대 워크호스)' },
+    { id: 'gpt-6.2-sol', label: 'GPT-6.2-Sol (current, 코딩·일상 업무의 빠른 기본 모델)' },
+    { id: 'gpt-6.2-astra', label: 'GPT-6.2-Astra (가장 강력, 복잡한 코딩·전문 업무)' },
+    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra (시각 이해·컴퓨터 사용에 강한 효율 모델)' },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol (이전 세대, 코딩·일상 업무)' },
+    { id: 'gpt-6-astra', label: 'GPT-6-Astra (이전 세대, 복잡한 코딩·전문 업무)' },
+    { id: 'gpt-6-sol', label: 'GPT-6-Sol (구세대, 코딩·일상 업무)' },
+    { id: 'gpt-6-luna', label: 'GPT-6-Luna (빠르고 저렴, 쉬운 작업)' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol (구세대, 코딩·일상 업무)' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra (구세대, 균형 잡힌 에이전트 코딩)' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna (구세대, 빠른 간단 작업)' },
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
 };
@@ -369,7 +377,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
 프로젝트 공통 규칙의 체크리스트가 누락 없이 이행되었는지 엄격하게 최종 점검합니다.`,
     enabled: true,
     engine: 'gemini',
-    model: 'gemini-4-carbon',
+    model: 'gemini-3.8-flash', // 쓸 수 있는 Gemini 모델
     effort: 'high', // Gemini는 low/medium/high뿐이라 가장 높은 단계다
     fallbackEngine: 'claude',
     fallbackModel: 'claude-opus-5.5',
