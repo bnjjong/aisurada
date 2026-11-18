@@ -13,7 +13,6 @@ import {
   deleteGlobalResourceItem,
   deleteGlobalSkill,
   deleteProcessAgent,
-  resetGlobalResourcesToDefault,
   saveGlobalResourceItem,
   saveGlobalSkill,
   saveProcessAgent,
@@ -63,9 +62,6 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
     name: string;
   } | null>(null);
 
-  // 초기화 확인 모달
-  const [confirmReset, setConfirmReset] = useState(false);
-
   const handleConfirmDelete = async () => {
     if (!deletingItem) return;
     try {
@@ -89,16 +85,6 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
 
   const handleSaveSkill = async (skill: GlobalSkill) => {
     await saveGlobalSkill(skill, controller.callEngine);
-  };
-
-  const handleResetToDefault = async () => {
-    try {
-      await resetGlobalResourcesToDefault(controller.callEngine);
-    } catch (err) {
-      console.error('기본값 초기화 실패:', err);
-    } finally {
-      setConfirmReset(false);
-    }
   };
 
   // 필터링
@@ -175,14 +161,6 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
             placeholder="이름 또는 설명 검색..."
             style={{ padding: '6px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--line)' }}
           />
-          <button
-            type="button"
-            onClick={() => setConfirmReset(true)}
-            title="기본 10대 에이전트 및 샘플 리소스로 초기화"
-            style={{ padding: '6px 10px', fontSize: '12px' }}
-          >
-            기본값 초기화
-          </button>
           {isSyncing && <span style={{ fontSize: '12px', color: 'var(--muted)' }}>동기화 중...</span>}
         </div>
       </div>
@@ -567,16 +545,6 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
         />
       )}
 
-      {/* 기본값 초기화 모달 */}
-      {confirmReset && (
-        <Confirm
-          title="기본값 초기화"
-          description="글로벌 리소스를 초기 상태로 되돌리시겠습니까? 기존 등록된 에이전트와 설정이 기본값으로 재설정됩니다."
-          label="초기화"
-          accept={handleResetToDefault}
-          close={() => setConfirmReset(false)}
-        />
-      )}
     </Page>
   );
 }

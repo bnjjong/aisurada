@@ -363,14 +363,3 @@ export function deleteGlobalResourceItem(itemId: string): void {
   storeState = { ...current, resources: next };
   emitChange();
 }
-
-export async function resetGlobalResourcesToDefault(call: EngineCall): Promise<void> {
-  const current = getGlobalResourcesSnapshot();
-  for (const a of current.agents) {
-    try {
-      await deleteResource(call, a.id);
-    } catch {}
-  }
-  saveInfrasToStorage(DEFAULT_GLOBAL_RESOURCES);
-  await syncGlobalResources(call);
-}
