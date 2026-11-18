@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "./Icon.tsx";
 import { addLayer, topLayer } from "./layers.ts";
 export function Modal({
   title,
@@ -107,11 +108,13 @@ export function Modal({
             <div className="ui-modal-controls">{headerActions}</div>
           ) : (
             <button
+              type="button"
+              className={`modal-ctrl-btn modal-ctrl-close ${className.includes("nhist") ? "nhist-close" : ""}`.trim()}
+              title="닫기"
               aria-label={`${title} 닫기`}
-              className={className.includes("nhist") ? "nhist-close" : undefined}
               onClick={close}
             >
-              {className.includes("nhist") ? "이력 닫기" : "닫기"}
+              <Icon name="close" />
             </button>
           )}
         </header>
