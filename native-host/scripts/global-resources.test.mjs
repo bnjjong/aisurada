@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   AI_ENGINES,
   MODEL_PRESETS,
+  REASONING_EFFORTS,
   DEFAULT_PROCESS_AGENTS,
   DEFAULT_GLOBAL_SKILLS,
   processAgentToSaveInput,
@@ -11,7 +12,7 @@ import {
   resourceRowToGlobalSkill,
 } from '../src/ui/globalResources/types.ts';
 
-test('AI_ENGINES and MODEL_PRESETS cover claude, codex and gemini', () => {
+test('AI_ENGINES, MODEL_PRESETS and REASONING_EFFORTS cover claude, codex and gemini', () => {
   const engineIds = AI_ENGINES.map((e) => e.id);
   assert.deepEqual(engineIds.sort(), ['claude', 'codex', 'gemini'].sort());
 
@@ -21,6 +22,14 @@ test('AI_ENGINES and MODEL_PRESETS cover claude, codex and gemini', () => {
   assert.ok(MODEL_PRESETS.codex.includes('gpt-6-astra'));
   assert.ok(MODEL_PRESETS.gemini.includes('gemini-3.8-flash'));
   assert.ok(MODEL_PRESETS.gemini.includes('gemini-4-carbon'));
+
+  const effortIds = REASONING_EFFORTS.map((e) => e.id);
+  assert.ok(effortIds.includes('default'));
+  assert.ok(effortIds.includes('low'));
+  assert.ok(effortIds.includes('medium'));
+  assert.ok(effortIds.includes('high'));
+  assert.ok(effortIds.includes('xhigh'));
+  assert.ok(effortIds.includes('max'));
 });
 
 test('DEFAULT_PROCESS_AGENTS contains 10 agents with valid engines and models', () => {
@@ -30,11 +39,13 @@ test('DEFAULT_PROCESS_AGENTS contains 10 agents with valid engines and models', 
     assert.ok(agent.model.length > 0, `agent ${agent.name} has model`);
     assert.ok(agent.name.length > 0);
     assert.ok(agent.role.length > 0);
+    assert.ok(agent.effort, `agent ${agent.name} has effort`);
     // 2순위 폴백 엔진은 1순위와 달라야 함
     if (agent.fallbackEngine) {
       assert.ok(['claude', 'codex', 'gemini'].includes(agent.fallbackEngine));
       assert.notEqual(agent.fallbackEngine, agent.engine, 'fallbackEngine must differ from primary engine');
       assert.ok(agent.fallbackModel && agent.fallbackModel.length > 0);
+      assert.ok(agent.fallbackEffort, `agent ${agent.name} has fallbackEffort`);
     }
   }
 });
@@ -52,21 +63,27 @@ test('processAgentToSaveInput produces an engine-compatible SaveInput with tools
   const tools = JSON.parse(saveInput.tools);
   assert.equal(tools.aisurada.engine, 'gemini');
   assert.equal(tools.aisurada.model, agent.model);
+  assert.equal(tools.aisurada.effort, agent.effort);
   assert.equal(tools.aisurada.role, agent.role);
   assert.equal(tools.aisurada.fallbackEngine, agent.fallbackEngine);
   assert.equal(tools.aisurada.fallbackModel, agent.fallbackModel);
+  assert.equal(tools.aisurada.fallbackEffort, agent.fallbackEffort);
   assert.equal(tools.gemini.model, agent.model);
+  assert.equal(tools.gemini.effort, agent.effort);
   assert.ok(tools.claude.model);
+  assert.equal(tools.claude.effort, agent.fallbackEffort);
   assert.ok(tools.codex.model);
 });
 
-test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to ProcessAgent with 2nd priority fallback', () => {
+test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to ProcessAgent with 2nd priority fallback and efforts', () => {
   const customAgent = {
     ...DEFAULT_PROCESS_AGENTS[1], // ticket agent (1순위 claude)
     engine: 'claude',
-    model: 'claude-sonnet-5.5-xhigh',
+    model: 'claude-sonnet-5.5',
+    effort: 'xhigh',
     fallbackEngine: 'gemini',
-    fallbackModel: 'gemini-3.8-flash-high',
+    fallbackModel: 'gemini-3.8-flash',
+    fallbackEffort: 'high',
   };
   const saveInput = processAgentToSaveInput(customAgent);
 
@@ -88,9 +105,11 @@ test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to Process
   assert.equal(reconstructed.id, 'ap-ticket-99');
   assert.equal(reconstructed.name, customAgent.name);
   assert.equal(reconstructed.engine, 'claude');
-  assert.equal(reconstructed.model, 'claude-sonnet-5.5-xhigh');
+  assert.equal(reconstructed.model, 'claude-sonnet-5.5');
+  assert.equal(reconstructed.effort, 'xhigh');
   assert.equal(reconstructed.fallbackEngine, 'gemini');
-  assert.equal(reconstructed.fallbackModel, 'gemini-3.8-flash-high');
+  assert.equal(reconstructed.fallbackModel, 'gemini-3.8-flash');
+  assert.equal(reconstructed.fallbackEffort, 'high');
   assert.equal(reconstructed.role, customAgent.role);
   assert.equal(reconstructed.f1, 'f1:test-token');
   assert.equal(reconstructed.path, '.aisurada/resources/global/agents/티켓-에이전트.md');

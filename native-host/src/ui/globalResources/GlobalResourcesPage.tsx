@@ -248,7 +248,8 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                           }`}
                           style={{ fontSize: '11px', padding: '2px 8px' }}
                         >
-                          1순위: {engineLabel} ({agent.model})
+                          1순위: {engineLabel} ({agent.model}
+                          {agent.effort && agent.effort !== 'default' ? ` · ${agent.effort}` : ''})
                         </span>
                         {agent.fallbackEngine && agent.fallbackModel && (
                           <span
@@ -267,7 +268,10 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                               : agent.fallbackEngine === 'claude'
                               ? 'Claude'
                               : 'Codex'}{' '}
-                            ({agent.fallbackModel})
+                            ({agent.fallbackModel}
+                            {agent.fallbackEffort && agent.fallbackEffort !== 'default'
+                              ? ` · ${agent.fallbackEffort}`
+                              : ''})
                           </span>
                         )}
                         {!agent.enabled && <span className="res-kind" style={{ color: 'var(--err)' }}>비활성</span>}

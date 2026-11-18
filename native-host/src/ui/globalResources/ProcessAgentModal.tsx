@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal } from '../Modal.tsx';
-import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent } from './types.ts';
-import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS } from './types.ts';
+import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent, ReasoningEffort } from './types.ts';
+import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS, REASONING_EFFORTS } from './types.ts';
 
 interface Props {
   agent?: ProcessAgent | null;
@@ -26,6 +26,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const isPreset = MODEL_PRESETS[initialEngine].includes(initialModel);
   const [selectedModel, setSelectedModel] = useState(isPreset ? initialModel : 'custom');
   const [customModelInput, setCustomModelInput] = useState(isPreset ? '' : initialModel);
+  const [effort, setEffort] = useState<ReasoningEffort>(agent?.effort || 'default');
 
   // 2순위 (토큰 소진 대비 폴백) AI 엔진 및 모델
   const [useFallback, setUseFallback] = useState<boolean>(
@@ -42,6 +43,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const isFallbackPreset = MODEL_PRESETS[initialFallbackEngine].includes(initialFallbackModel);
   const [selectedFallbackModel, setSelectedFallbackModel] = useState(isFallbackPreset ? initialFallbackModel : 'custom');
   const [customFallbackModelInput, setCustomFallbackModelInput] = useState(isFallbackPreset ? '' : initialFallbackModel);
+  const [fallbackEffort, setFallbackEffort] = useState<ReasoningEffort>(agent?.fallbackEffort || 'default');
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>(agent?.skills || []);
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
@@ -102,8 +104,10 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
       description: description.trim(),
       engine,
       model: finalModel,
+      effort,
       fallbackEngine: useFallback && fallbackEngine !== engine ? fallbackEngine : undefined,
       fallbackModel: useFallback && fallbackEngine !== engine ? finalFallbackModel : undefined,
+      fallbackEffort: useFallback && fallbackEngine !== engine ? fallbackEffort : undefined,
       enabled,
       skills: selectedSkills,
       resources: selectedResources,
@@ -213,7 +217,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                 <span>세부 모델:</span>
                 <select
@@ -230,12 +234,28 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
                 </select>
               </label>
 
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                <span>추론 강도 (Effort):</span>
+                <select
+                  value={effort}
+                  onChange={(e) => setEffort(e.target.value as ReasoningEffort)}
+                  style={{ minWidth: '150px', padding: '4px 8px' }}
+                  title="Thinking / Reasoning 추론 강도 (Effort)"
+                >
+                  {REASONING_EFFORTS.map((eff) => (
+                    <option key={eff.id} value={eff.id}>
+                      {eff.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               {selectedModel === 'custom' && (
                 <input
                   type="text"
                   value={customModelInput}
                   onChange={(e) => setCustomModelInput(e.target.value)}
-                  placeholder="예: claude-sonnet-5.5-xhigh"
+                  placeholder="예: claude-sonnet-5.5"
                   style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
                   required
                 />
@@ -319,7 +339,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
                   })}
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                     <span>2순위 세부 모델:</span>
                     <select
@@ -336,12 +356,28 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
                     </select>
                   </label>
 
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span>2순위 추론 강도 (Effort):</span>
+                    <select
+                      value={fallbackEffort}
+                      onChange={(e) => setFallbackEffort(e.target.value as ReasoningEffort)}
+                      style={{ minWidth: '150px', padding: '4px 8px' }}
+                      title="2순위 대체 모델의 Thinking / Reasoning 추론 강도 (Effort)"
+                    >
+                      {REASONING_EFFORTS.map((eff) => (
+                        <option key={eff.id} value={eff.id}>
+                          {eff.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
                   {selectedFallbackModel === 'custom' && (
                     <input
                       type="text"
                       value={customFallbackModelInput}
                       onChange={(e) => setCustomFallbackModelInput(e.target.value)}
-                      placeholder="예: gemini-3.8-flash-high"
+                      placeholder="예: gemini-3.8-flash"
                       style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
                       required
                     />
