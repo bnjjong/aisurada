@@ -128,7 +128,12 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [customThirdModelInput, setCustomThirdModelInput] = useState(isThirdPreset ? '' : initialThirdModel);
   const [thirdEffort, setThirdEffort] = useState<ReasoningEffort>(agent?.thirdEffort || 'default');
 
-  const [selectedSkills, setSelectedSkills] = useState<string[]>(agent?.skills || []);
+  // 유효한 글로벌 스킬 목록으로 초기화 (삭제되거나 존재하지 않는 스킬 ID 자동 제외)
+  const availableSkillIds = new Set(skills.map((s) => s.id));
+  const initialSkills = skills.length > 0
+    ? (agent?.skills || []).filter((id) => availableSkillIds.has(id))
+    : (agent?.skills || []);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(initialSkills);
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
   const [prompt, setPrompt] = useState(agent?.prompt || '');
   const [promptViewMode, setPromptViewMode] = useState<'editor' | 'raw'>('editor');
@@ -226,7 +231,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
         thirdModel: useThird ? finalThirdModel : undefined,
         thirdEffort: useThird ? clampEffort(thirdEngine, finalThirdModel, thirdEffort) : undefined,
         enabled,
-        skills: selectedSkills,
+        skills: skills.length > 0 ? selectedSkills.filter((id) => availableSkillIds.has(id)) : selectedSkills,
         resources: selectedResources,
         prompt: prompt.trim(),
         order: agent?.order ?? 99,

@@ -93,9 +93,10 @@ export async function syncGlobalResources(call: EngineCall, force = false): Prom
       const agentRows = globalRows.filter((r: ResourceRow) => r.kind === 'agent');
       const skillRows = globalRows.filter((r: ResourceRow) => r.kind === 'skill');
 
-      // 1. 글로벌 스킬 자동 시딩 (없는 경우)
-      if (skillRows.length === 0) {
-        for (const defaultSkill of DEFAULT_GLOBAL_SKILLS) {
+      // 1. 글로벌 기본 스킬 자동 시딩 (누락된 기본 스킬 각각 보충)
+      const existingSkillNames = new Set(skillRows.map((r: ResourceRow) => r.name));
+      for (const defaultSkill of DEFAULT_GLOBAL_SKILLS) {
+        if (!existingSkillNames.has(defaultSkill.name)) {
           try {
             await saveResource(call, globalSkillToSaveInput(defaultSkill));
           } catch (err) {
@@ -220,10 +221,18 @@ export async function saveProcessAgent(agent: ProcessAgent, call: EngineCall): P
     }
   }
 
+  // 유효한 글로벌 스킬만 유지 (엔진 validate_agent_links 오류 방지: 삭제되거나 존재하지 않는 스킬 ID 제거)
+  let validSkills = agent.skills || [];
+  if (storeState.skills.length > 0) {
+    const activeSkillIds = new Set(storeState.skills.map((s) => s.id));
+    validSkills = validSkills.filter((sId) => activeSkillIds.has(sId));
+  }
+
   const agentToSave: ProcessAgent = {
     ...agent,
     id: targetId,
     f1,
+    skills: validSkills,
   };
 
   const input = processAgentToSaveInput(agentToSave);

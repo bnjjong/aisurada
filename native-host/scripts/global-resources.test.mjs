@@ -459,17 +459,19 @@ test('saveProcessAgent inherits real id and f1 when called with proc- mock agent
   assert.ok(found);
   assert.equal(found.id, 'ap-real-123');
 
-  // 2. proc- id로 넘겨도 실 id와 f1을 계승하여 저장하고 스토어 즉시 업데이트
+  // 2. proc- id로 넘겨도 실 id와 f1을 계승하며, 삭제/부존재 스킬 ID는 자동 제외하고 저장
   const mockAgent = {
     ...found,
     id: 'proc-commit-push',
     f1: undefined,
     model: 'gemini-2.5-pro',
+    skills: ['sk-real-1', 'sk-trashed-ghost-id'],
   };
   await saveProcessAgent(mockAgent, mockCall);
 
   assert.equal(savedAgentInput.id, 'ap-real-123', 'mock proc- id was resolved to real engine id');
   assert.equal(savedAgentInput.f1, 'f1:orig', 'missing f1 was resolved to real token');
+  assert.equal(savedAgentInput.skills, JSON.stringify(['sk-real-1']), 'invalid or trashed skills are pruned before engine save');
   const snapshotAfter = getGlobalResourcesSnapshot();
   const updated = snapshotAfter.agents.find((a) => a.id === 'ap-real-123');
   assert.equal(updated.model, 'gemini-2.5-pro', 'store immediately reflects updated model');
