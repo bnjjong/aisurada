@@ -19,13 +19,29 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [description, setDescription] = useState(agent?.description || '');
   const [enabled, setEnabled] = useState(agent?.enabled ?? true);
   
-  // AI 엔진 및 모델 세분화
+  // 1순위 AI 엔진 및 모델
   const initialEngine: AIEngine = agent?.engine || 'gemini';
   const [engine, setEngine] = useState<AIEngine>(initialEngine);
   const initialModel = agent?.model || MODEL_PRESETS[initialEngine][0];
   const isPreset = MODEL_PRESETS[initialEngine].includes(initialModel);
   const [selectedModel, setSelectedModel] = useState(isPreset ? initialModel : 'custom');
   const [customModelInput, setCustomModelInput] = useState(isPreset ? '' : initialModel);
+
+  // 2순위 (토큰 소진 대비 폴백) AI 엔진 및 모델
+  const [useFallback, setUseFallback] = useState<boolean>(
+    agent ? (agent.fallbackEngine != null && agent.fallbackEngine !== initialEngine) : true
+  );
+  const initialFallbackEngine: AIEngine =
+    agent?.fallbackEngine && agent.fallbackEngine !== initialEngine
+      ? agent.fallbackEngine
+      : initialEngine === 'claude'
+      ? 'gemini'
+      : 'claude';
+  const [fallbackEngine, setFallbackEngine] = useState<AIEngine>(initialFallbackEngine);
+  const initialFallbackModel = agent?.fallbackModel || MODEL_PRESETS[initialFallbackEngine][0];
+  const isFallbackPreset = MODEL_PRESETS[initialFallbackEngine].includes(initialFallbackModel);
+  const [selectedFallbackModel, setSelectedFallbackModel] = useState(isFallbackPreset ? initialFallbackModel : 'custom');
+  const [customFallbackModelInput, setCustomFallbackModelInput] = useState(isFallbackPreset ? '' : initialFallbackModel);
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>(agent?.skills || []);
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
@@ -37,6 +53,23 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
     const defaultModel = MODEL_PRESETS[newEngine][0];
     setSelectedModel(defaultModel);
     setCustomModelInput('');
+
+    // 1순위 엔진과 2순위 엔진이 같아지면 2순위 엔진을 남은 엔진 중 다른 하나로 자동 변경
+    if (fallbackEngine === newEngine) {
+      const remainingEngines = AI_ENGINES.filter((e) => e.id !== newEngine);
+      const nextFallback = remainingEngines[0].id;
+      setFallbackEngine(nextFallback);
+      setSelectedFallbackModel(MODEL_PRESETS[nextFallback][0]);
+      setCustomFallbackModelInput('');
+    }
+  };
+
+  const handleFallbackEngineChange = (newFallback: AIEngine) => {
+    if (newFallback === engine) return; // 1순위와 동일한 엔진은 선택 불가
+    setFallbackEngine(newFallback);
+    const defaultModel = MODEL_PRESETS[newFallback][0];
+    setSelectedFallbackModel(defaultModel);
+    setCustomFallbackModelInput('');
   };
 
   const toggleSkill = (id: string) => {
@@ -58,6 +91,8 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
       return;
     }
     const finalModel = selectedModel === 'custom' ? (customModelInput.trim() || 'inherit') : selectedModel;
+    const finalFallbackModel =
+      selectedFallbackModel === 'custom' ? (customFallbackModelInput.trim() || 'inherit') : selectedFallbackModel;
 
     const updated: ProcessAgent = {
       id: agent?.id || `proc-${Date.now()}`,
@@ -67,6 +102,8 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
       description: description.trim(),
       engine,
       model: finalModel,
+      fallbackEngine: useFallback && fallbackEngine !== engine ? fallbackEngine : undefined,
+      fallbackModel: useFallback && fallbackEngine !== engine ? finalFallbackModel : undefined,
       enabled,
       skills: selectedSkills,
       resources: selectedResources,
@@ -118,50 +155,199 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
           />
         </label>
 
-        {/* AI 엔진 및 세부 모델 설정 */}
-        <div style={{ display: 'grid', gap: '8px', padding: '12px', background: 'var(--surface-sunken, #f8f9fa)', borderRadius: '8px', border: '1px solid var(--border-subtle, #e5e7eb)' }}>
-          <strong style={{ fontSize: '13px' }}>AI 실행 엔진 및 모델</strong>
-          
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {AI_ENGINES.map((eng) => (
-              <button
-                key={eng.id}
-                type="button"
-                className={`res-badge ${engine === eng.id ? 'res-badge-ref' : 'res-badge-off'}`}
-                style={{ padding: '6px 14px', cursor: 'pointer', fontSize: '13px' }}
-                onClick={() => handleEngineChange(eng.id)}
-              >
-                {engine === eng.id ? '● ' : '○ '} {eng.label} <small style={{ opacity: 0.7 }}>({eng.company})</small>
-              </button>
-            ))}
+        {/* AI 엔진 및 세부 모델 설정 (1순위 & 2순위 폴백) */}
+        <div
+          style={{
+            display: 'grid',
+            gap: '12px',
+            padding: '14px',
+            background: 'var(--surface-sunken, #f8f9fa)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-subtle, #e5e7eb)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ fontSize: '13px' }}>AI 실행 엔진 및 모델</strong>
+            <span style={{ fontSize: '11px', color: 'var(--muted)' }}>토큰 부족 시 2순위 모델로 자동 대체</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-              <span>세부 모델:</span>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                style={{ minWidth: '220px', padding: '4px 8px' }}
+          {/* 1순위 모델 카드 */}
+          <div
+            style={{
+              display: 'grid',
+              gap: '8px',
+              padding: '10px 12px',
+              background: 'var(--surface, #ffffff)',
+              borderRadius: '6px',
+              border: '1px solid var(--line, #e2e8f0)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  background: 'var(--accent, #2563eb)',
+                  color: '#ffffff',
+                }}
               >
-                {ENGINE_MODELS[engine].map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-                <option value="custom">직접 입력...</option>
-              </select>
-            </label>
+                1순위
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>기본 실행 엔진</span>
+            </div>
 
-            {selectedModel === 'custom' && (
-              <input
-                type="text"
-                value={customModelInput}
-                onChange={(e) => setCustomModelInput(e.target.value)}
-                placeholder="예: claude-3-7-sonnet-20250219"
-                style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
-                required
-              />
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {AI_ENGINES.map((eng) => (
+                <button
+                  key={eng.id}
+                  type="button"
+                  className={`res-badge ${engine === eng.id ? 'res-badge-ref' : 'res-badge-off'}`}
+                  style={{ padding: '6px 14px', cursor: 'pointer', fontSize: '13px' }}
+                  onClick={() => handleEngineChange(eng.id)}
+                >
+                  {engine === eng.id ? '● ' : '○ '} {eng.label}{' '}
+                  <small style={{ opacity: 0.7 }}>({eng.company})</small>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                <span>세부 모델:</span>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  style={{ minWidth: '220px', padding: '4px 8px' }}
+                >
+                  {ENGINE_MODELS[engine].map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                  <option value="custom">직접 입력...</option>
+                </select>
+              </label>
+
+              {selectedModel === 'custom' && (
+                <input
+                  type="text"
+                  value={customModelInput}
+                  onChange={(e) => setCustomModelInput(e.target.value)}
+                  placeholder="예: claude-sonnet-5.5-xhigh"
+                  style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
+                  required
+                />
+              )}
+            </div>
+          </div>
+
+          {/* 2순위 (폴백) 모델 카드 */}
+          <div
+            style={{
+              display: 'grid',
+              gap: '8px',
+              padding: '10px 12px',
+              background: useFallback ? 'var(--surface, #ffffff)' : 'transparent',
+              borderRadius: '6px',
+              border: useFallback ? '1px dashed var(--accent, #2563eb)' : '1px dashed var(--line, #e2e8f0)',
+              opacity: useFallback ? 1 : 0.7,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: useFallback ? 'var(--warning, #d97706)' : 'var(--muted, #94a3b8)',
+                    color: '#ffffff',
+                  }}
+                >
+                  2순위
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>토큰 고갈 대비 대체 모델 (폴백)</span>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={useFallback}
+                  onChange={(e) => setUseFallback(e.target.checked)}
+                />
+                <span>2순위 대체 모델 사용</span>
+              </label>
+            </div>
+
+            {useFallback && (
+              <>
+                <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted)' }}>
+                  1순위 엔진의 토큰이 소진되었을 때 즉시 투입됩니다. 동일 공급자의 동시 토큰 고갈을 방지하기 위해 <b>1순위와 같은 엔진은 선택할 수 없습니다.</b>
+                </p>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {AI_ENGINES.map((eng) => {
+                    const isFirstChoice = eng.id === engine;
+                    const isSelected = fallbackEngine === eng.id;
+                    return (
+                      <button
+                        key={eng.id}
+                        type="button"
+                        disabled={isFirstChoice}
+                        className={`res-badge ${isSelected ? 'res-badge-ref' : 'res-badge-off'}`}
+                        style={{
+                          padding: '6px 14px',
+                          cursor: isFirstChoice ? 'not-allowed' : 'pointer',
+                          fontSize: '13px',
+                          opacity: isFirstChoice ? 0.35 : 1,
+                          textDecoration: isFirstChoice ? 'line-through' : 'none',
+                        }}
+                        onClick={() => handleFallbackEngineChange(eng.id)}
+                        title={isFirstChoice ? `${eng.label}는 1순위로 선택되어 2순위로 중복 선택할 수 없습니다.` : undefined}
+                      >
+                        {isFirstChoice ? '✕ ' : isSelected ? '● ' : '○ '}
+                        {eng.label}
+                        {isFirstChoice ? (
+                          <small style={{ color: 'var(--err, #dc2626)', marginLeft: '4px' }}>(선택 불가)</small>
+                        ) : (
+                          <small style={{ opacity: 0.7 }}> ({eng.company})</small>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span>2순위 세부 모델:</span>
+                    <select
+                      value={selectedFallbackModel}
+                      onChange={(e) => setSelectedFallbackModel(e.target.value)}
+                      style={{ minWidth: '220px', padding: '4px 8px' }}
+                    >
+                      {ENGINE_MODELS[fallbackEngine].map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                      <option value="custom">직접 입력...</option>
+                    </select>
+                  </label>
+
+                  {selectedFallbackModel === 'custom' && (
+                    <input
+                      type="text"
+                      value={customFallbackModelInput}
+                      onChange={(e) => setCustomFallbackModelInput(e.target.value)}
+                      placeholder="예: gemini-3.8-flash-high"
+                      style={{ flex: 1, minWidth: '200px', padding: '4px 8px' }}
+                      required
+                    />
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>

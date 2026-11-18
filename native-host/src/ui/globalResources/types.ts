@@ -17,6 +17,7 @@ export interface ModelInfo {
 
 export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
   gemini: [
+    { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash High (Thinking High, 워크호스)' },
     { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (current, 코딩·에이전트 워크호스)' },
     { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon (차세대 플래그십)' },
     { id: 'gemini-4-argon', label: 'Gemini 4 Argon (차세대 고성능 미드레인지)' },
@@ -26,6 +27,7 @@ export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   claude: [
+    { id: 'claude-sonnet-5.5-xhigh', label: 'Sonnet 5.5 xhigh (Thinking xhigh, 심층 추론 최고 성능)' },
     { id: 'claude-sonnet-5.5', label: 'Sonnet 5.5 (권장, 코딩·에이전트 최고 효율 표준)' },
     { id: 'claude-opus-5.5', label: 'Opus 5.5 (복합 고난도 작업 및 종합 지능)' },
     { id: 'claude-fable-5.2', label: 'Fable 5.2 (For your toughest challenges, 심층 한계 극복)' },
@@ -35,6 +37,7 @@ export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   codex: [
+    { id: 'gpt-6.1-sol-high', label: 'GPT-6.1-Sol High (Thinking High, 코딩 워크호스)' },
     { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol (current, 최신 코딩·일상 업무 워크호스)' },
     { id: 'gpt-6-astra', label: 'GPT-6-Astra (Frontier intelligence, 최고 난도 작업)' },
     { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra (Codex 전문 모델)' },
@@ -64,6 +67,8 @@ export interface ProcessAgent {
   enabled: boolean;
   engine: AIEngine;
   model: string;
+  fallbackEngine?: AIEngine;
+  fallbackModel?: string;
   order: number;
   f1?: string;
   path?: string;
@@ -116,6 +121,8 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     enabled: true,
     engine: 'gemini',
     model: 'gemini-3.8-flash',
+    fallbackEngine: 'claude',
+    fallbackModel: 'claude-sonnet-5.5',
     order: 1,
   },
   {
@@ -131,6 +138,8 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     enabled: true,
     engine: 'claude',
     model: 'claude-sonnet-5.5',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash',
     order: 2,
   },
   {
@@ -146,6 +155,8 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     enabled: true,
     engine: 'codex',
     model: 'gpt-6.1-sol',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash',
     order: 3,
   },
   {
@@ -161,6 +172,8 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     enabled: true,
     engine: 'claude',
     model: 'claude-sonnet-5.5',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash',
     order: 4,
   },
   {
@@ -176,6 +189,8 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     enabled: true,
     engine: 'gemini',
     model: 'gemini-3.8-flash',
+    fallbackEngine: 'claude',
+    fallbackModel: 'claude-sonnet-5.5',
     order: 5,
   },
   {
@@ -191,6 +206,8 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     enabled: true,
     engine: 'claude',
     model: 'claude-sonnet-5.5',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash',
     order: 6,
   },
   {
@@ -206,6 +223,8 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     enabled: true,
     engine: 'claude',
     model: 'claude-fable-5.2',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash',
     order: 7,
   },
   {
@@ -221,6 +240,8 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     enabled: true,
     engine: 'codex',
     model: 'gpt-6-luna',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash',
     order: 8,
   },
   {
@@ -236,6 +257,8 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     enabled: true,
     engine: 'gemini',
     model: 'gemini-3.8-flash',
+    fallbackEngine: 'claude',
+    fallbackModel: 'claude-sonnet-5.5',
     order: 9,
   },
   {
@@ -251,6 +274,8 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     enabled: true,
     engine: 'gemini',
     model: 'gemini-4-carbon',
+    fallbackEngine: 'claude',
+    fallbackModel: 'claude-opus-5.5',
     order: 10,
   },
 ];
@@ -363,14 +388,37 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
 
 export function processAgentToSaveInput(agent: ProcessAgent): SaveInput {
   const toolsObj: Record<string, unknown> = {
-    claude: { model: agent.engine === 'claude' ? agent.model : MODEL_PRESETS.claude[0] },
-    codex: { model: agent.engine === 'codex' ? agent.model : MODEL_PRESETS.codex[0] },
-    gemini: { model: agent.engine === 'gemini' ? agent.model : MODEL_PRESETS.gemini[0] },
+    claude: {
+      model:
+        agent.engine === 'claude'
+          ? agent.model
+          : agent.fallbackEngine === 'claude'
+          ? (agent.fallbackModel || MODEL_PRESETS.claude[0])
+          : MODEL_PRESETS.claude[0],
+    },
+    codex: {
+      model:
+        agent.engine === 'codex'
+          ? agent.model
+          : agent.fallbackEngine === 'codex'
+          ? (agent.fallbackModel || MODEL_PRESETS.codex[0])
+          : MODEL_PRESETS.codex[0],
+    },
+    gemini: {
+      model:
+        agent.engine === 'gemini'
+          ? agent.model
+          : agent.fallbackEngine === 'gemini'
+          ? (agent.fallbackModel || MODEL_PRESETS.gemini[0])
+          : MODEL_PRESETS.gemini[0],
+    },
     aisurada: {
       key: agent.key,
       role: agent.role,
       engine: agent.engine,
       model: agent.model,
+      fallbackEngine: agent.fallbackEngine || null,
+      fallbackModel: agent.fallbackModel || null,
       resources: agent.resources,
       order: agent.order,
       enabled: agent.enabled,
@@ -412,6 +460,18 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
   const order: number = typeof aisuradaMeta.order === 'number' ? aisuradaMeta.order : index + 1;
   const enabled: boolean = aisuradaMeta.enabled !== false;
 
+  const rawFallbackEngine = aisuradaMeta.fallbackEngine;
+  const fallbackEngine: AIEngine | undefined =
+    ['gemini', 'claude', 'codex'].includes(rawFallbackEngine) && rawFallbackEngine !== engine
+      ? (rawFallbackEngine as AIEngine)
+      : undefined;
+
+  const fallbackModel: string | undefined = fallbackEngine
+    ? (typeof aisuradaMeta.fallbackModel === 'string' && aisuradaMeta.fallbackModel.trim().length > 0
+        ? aisuradaMeta.fallbackModel.trim()
+        : tools[fallbackEngine]?.model || MODEL_PRESETS[fallbackEngine][0])
+    : undefined;
+
   return {
     id: row.id,
     key,
@@ -424,6 +484,8 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
     enabled,
     engine,
     model,
+    fallbackEngine,
+    fallbackModel,
     order,
     f1: row.precondition,
     path: row.path,

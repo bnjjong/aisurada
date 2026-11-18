@@ -248,9 +248,28 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                           }`}
                           style={{ fontSize: '11px', padding: '2px 8px' }}
                         >
-                          엔진: {engineLabel}
+                          1순위: {engineLabel} ({agent.model})
                         </span>
-                        <span className="res-kind">모델: {agent.model}</span>
+                        {agent.fallbackEngine && agent.fallbackModel && (
+                          <span
+                            className="res-badge res-badge-off"
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderStyle: 'dashed',
+                              color: 'var(--ink)',
+                            }}
+                            title="1순위 토큰 소진 시 자동 전환되는 2순위 대체 모델"
+                          >
+                            2순위(폴백):{' '}
+                            {agent.fallbackEngine === 'gemini'
+                              ? 'Gemini'
+                              : agent.fallbackEngine === 'claude'
+                              ? 'Claude'
+                              : 'Codex'}{' '}
+                            ({agent.fallbackModel})
+                          </span>
+                        )}
                         {!agent.enabled && <span className="res-kind" style={{ color: 'var(--err)' }}>비활성</span>}
                       </p>
                       {agent.role && <p className="res-desc" style={{ fontWeight: 500, color: 'var(--ink)' }}>{agent.role}</p>}

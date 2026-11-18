@@ -30,6 +30,12 @@ test('DEFAULT_PROCESS_AGENTS contains 10 agents with valid engines and models', 
     assert.ok(agent.model.length > 0, `agent ${agent.name} has model`);
     assert.ok(agent.name.length > 0);
     assert.ok(agent.role.length > 0);
+    // 2순위 폴백 엔진은 1순위와 달라야 함
+    if (agent.fallbackEngine) {
+      assert.ok(['claude', 'codex', 'gemini'].includes(agent.fallbackEngine));
+      assert.notEqual(agent.fallbackEngine, agent.engine, 'fallbackEngine must differ from primary engine');
+      assert.ok(agent.fallbackModel && agent.fallbackModel.length > 0);
+    }
   }
 });
 
@@ -47,14 +53,22 @@ test('processAgentToSaveInput produces an engine-compatible SaveInput with tools
   assert.equal(tools.aisurada.engine, 'gemini');
   assert.equal(tools.aisurada.model, agent.model);
   assert.equal(tools.aisurada.role, agent.role);
+  assert.equal(tools.aisurada.fallbackEngine, agent.fallbackEngine);
+  assert.equal(tools.aisurada.fallbackModel, agent.fallbackModel);
   assert.equal(tools.gemini.model, agent.model);
   assert.ok(tools.claude.model);
   assert.ok(tools.codex.model);
 });
 
-test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to ProcessAgent', () => {
-  const agent = DEFAULT_PROCESS_AGENTS[1]; // ticket agent (claude)
-  const saveInput = processAgentToSaveInput(agent);
+test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to ProcessAgent with 2nd priority fallback', () => {
+  const customAgent = {
+    ...DEFAULT_PROCESS_AGENTS[1], // ticket agent (1순위 claude)
+    engine: 'claude',
+    model: 'claude-sonnet-5.5-xhigh',
+    fallbackEngine: 'gemini',
+    fallbackModel: 'gemini-3.8-flash-high',
+  };
+  const saveInput = processAgentToSaveInput(customAgent);
 
   const fakeRow = {
     id: 'ap-ticket-99',
@@ -72,12 +86,40 @@ test('resourceRowToProcessAgent roundtrips an engine ResourceRow back to Process
 
   const reconstructed = resourceRowToProcessAgent(fakeRow, 1);
   assert.equal(reconstructed.id, 'ap-ticket-99');
-  assert.equal(reconstructed.name, agent.name);
+  assert.equal(reconstructed.name, customAgent.name);
   assert.equal(reconstructed.engine, 'claude');
-  assert.equal(reconstructed.model, agent.model);
-  assert.equal(reconstructed.role, agent.role);
+  assert.equal(reconstructed.model, 'claude-sonnet-5.5-xhigh');
+  assert.equal(reconstructed.fallbackEngine, 'gemini');
+  assert.equal(reconstructed.fallbackModel, 'gemini-3.8-flash-high');
+  assert.equal(reconstructed.role, customAgent.role);
   assert.equal(reconstructed.f1, 'f1:test-token');
   assert.equal(reconstructed.path, '.aisurada/resources/global/agents/티켓-에이전트.md');
+});
+
+test('resourceRowToProcessAgent disallows fallbackEngine when identical to primary engine', () => {
+  const invalidFakeRow = {
+    id: 'ap-dup-engine',
+    kind: 'agent',
+    scope: 'global',
+    name: '중복 엔진 에이전트',
+    description: '동일 엔진 테스트',
+    body: '테스트',
+    permission: 'edit',
+    skills: [],
+    tools: {
+      aisurada: {
+        engine: 'claude',
+        model: 'claude-sonnet-5.5',
+        fallbackEngine: 'claude', // 1순위와 동일 -> 무효화되어야 함
+        fallbackModel: 'claude-opus-5.5',
+      },
+    },
+  };
+
+  const parsed = resourceRowToProcessAgent(invalidFakeRow, 0);
+  assert.equal(parsed.engine, 'claude');
+  assert.equal(parsed.fallbackEngine, undefined, 'identical fallbackEngine must be dropped');
+  assert.equal(parsed.fallbackModel, undefined);
 });
 
 test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
