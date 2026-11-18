@@ -78,6 +78,13 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   close: <path d="M4 4l8 8M12 4l-8 8" />,
+  maximize: <rect x="2.5" y="2.5" width="11" height="11" rx="1.5" />,
+  restore: (
+    <>
+      <path d="M5.5 3.5V2.5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1" />
+      <rect x="2.5" y="5.5" width="8" height="8" rx="1.2" />
+    </>
+  ),
   check: <path d="M3.5 8.5l3 3 6-7" />,
   copy: (
     <>

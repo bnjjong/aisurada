@@ -5,7 +5,7 @@
 .apv-banner strong { font-weight: 700; }
 .apv-banner button { padding: 6px 12px; font-size: 12px; white-space: nowrap; }
 
-.apv-modal { max-width: 860px; }
+.apv-modal { width: min(1040px, 100%); max-width: calc(100vw - 32px); }
 .apv-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
 .apv-tabs [role="tab"] { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 13px; }
 .apv-tabs [role="tab"][aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); font-weight: 700; }

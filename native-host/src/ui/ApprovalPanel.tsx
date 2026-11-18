@@ -404,7 +404,16 @@ export function ApprovalsDialog({ call, names, close, onChanged }: { call: Engin
   };
 
   return (
-    <Modal title="승인 대기함" close={close} wide className="apv-modal">
+    <Modal
+      title="승인 대기함"
+      close={close}
+      wide
+      resizable
+      storageKey="aisurada.approvalsModalSize"
+      defaultWidth={1040}
+      defaultHeight={740}
+      className="apv-modal"
+    >
       {overview === null ? (
         <p className="apv-empty" role="status">{error || "불러오는 중이에요…"}</p>
       ) : (
