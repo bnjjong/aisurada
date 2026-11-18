@@ -4,7 +4,7 @@ import { EditPendingNotice } from '../ApprovalNotices.tsx';
 import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
 import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent, ReasoningEffort } from './types.ts';
-import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS, REASONING_EFFORTS } from './types.ts';
+import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS, clampEffort, effortInfosFor } from './types.ts';
 
 interface Props {
   agent?: ProcessAgent | null;
@@ -57,6 +57,13 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
   const [prompt, setPrompt] = useState(agent?.prompt || '');
   const [error, setError] = useState('');
+
+  // 모델마다 고를 수 있는 추론 강도가 달라서, 지금 고른 모델에서 쓸 수 있는 값만 보여 준다.
+  // 쓸 수 없는 값이 남아 있으면(모델을 바꾼 경우) default로 보이고 그대로 저장된다
+  const resolvedModel = selectedModel === 'custom' ? customModelInput.trim() || 'inherit' : selectedModel;
+  const resolvedFallbackModel = selectedFallbackModel === 'custom' ? customFallbackModelInput.trim() || 'inherit' : selectedFallbackModel;
+  const shownEffort = clampEffort(engine, resolvedModel, effort);
+  const shownFallbackEffort = clampEffort(fallbackEngine, resolvedFallbackModel, fallbackEffort);
 
   const handleEngineChange = (newEngine: AIEngine) => {
     setEngine(newEngine);
@@ -112,10 +119,10 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
       description: description.trim(),
       engine,
       model: finalModel,
-      effort,
+      effort: clampEffort(engine, finalModel, effort),
       fallbackEngine: useFallback && fallbackEngine !== engine ? fallbackEngine : undefined,
       fallbackModel: useFallback && fallbackEngine !== engine ? finalFallbackModel : undefined,
-      fallbackEffort: useFallback && fallbackEngine !== engine ? fallbackEffort : undefined,
+      fallbackEffort: useFallback && fallbackEngine !== engine ? clampEffort(fallbackEngine, finalFallbackModel, fallbackEffort) : undefined,
       enabled,
       skills: selectedSkills,
       resources: selectedResources,
@@ -246,12 +253,12 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                 <span>추론 강도 (Effort):</span>
                 <select
-                  value={effort}
+                  value={shownEffort}
                   onChange={(e) => setEffort(e.target.value as ReasoningEffort)}
                   style={{ minWidth: '150px', padding: '4px 8px' }}
-                  title="Thinking / Reasoning 추론 강도 (Effort)"
+                  title="이 모델이 지원하는 Thinking / Reasoning 추론 강도 (Effort)"
                 >
-                  {REASONING_EFFORTS.map((eff) => (
+                  {effortInfosFor(engine, resolvedModel).map((eff) => (
                     <option key={eff.id} value={eff.id}>
                       {eff.label}
                     </option>
@@ -368,12 +375,12 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                     <span>2순위 추론 강도 (Effort):</span>
                     <select
-                      value={fallbackEffort}
+                      value={shownFallbackEffort}
                       onChange={(e) => setFallbackEffort(e.target.value as ReasoningEffort)}
                       style={{ minWidth: '150px', padding: '4px 8px' }}
-                      title="2순위 대체 모델의 Thinking / Reasoning 추론 강도 (Effort)"
+                      title="2순위 대체 모델이 지원하는 Thinking / Reasoning 추론 강도 (Effort)"
                     >
-                      {REASONING_EFFORTS.map((eff) => (
+                      {effortInfosFor(fallbackEngine, resolvedFallbackModel).map((eff) => (
                         <option key={eff.id} value={eff.id}>
                           {eff.label}
                         </option>

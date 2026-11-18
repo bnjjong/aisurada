@@ -11,6 +11,11 @@ import {
   globalSkillToSaveInput,
   resourceRowToGlobalSkill,
   skillFromForm,
+  ENGINE_MODELS,
+  MODEL_EFFORTS,
+  clampEffort,
+  effortInfosFor,
+  effortsForModel,
 } from '../src/ui/globalResources/types.ts';
 
 test('AI_ENGINES, MODEL_PRESETS and REASONING_EFFORTS cover claude, codex and gemini', () => {
@@ -140,6 +145,72 @@ test('resourceRowToProcessAgent disallows fallbackEngine when identical to prima
   assert.equal(parsed.engine, 'claude');
   assert.equal(parsed.fallbackEngine, undefined, 'identical fallbackEngine must be dropped');
   assert.equal(parsed.fallbackModel, undefined);
+});
+
+test('Gemini 2.5 Pro is no longer offered', () => {
+  assert.ok(!MODEL_PRESETS.gemini.includes('gemini-2.5-pro'));
+  assert.ok(!ENGINE_MODELS.gemini.some((m) => /2\.5/.test(m.id) || /2\.5/.test(m.label)));
+});
+
+test('effortsForModel lists only what the model supports, with default first', () => {
+  // Gemini 3.8 Flash는 low/medium/high 셋뿐이다(Gemini CLI 모델 화면)
+  assert.deepEqual(effortsForModel('gemini', 'gemini-3.8-flash'), ['default', 'low', 'medium', 'high']);
+  // Codex는 CLI의 모델 목록이 알려 주는 값 그대로다: ultra는 일부 모델에만 있다
+  assert.deepEqual(effortsForModel('codex', 'gpt-6.1-sol'), ['default', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
+  assert.deepEqual(effortsForModel('codex', 'gpt-6-luna'), ['default', 'low', 'medium', 'high', 'xhigh', 'max']);
+  assert.deepEqual(effortsForModel('codex', 'gpt-oss-120b'), ['default', 'low', 'medium', 'high']);
+  // Claude: xhigh는 5.x 모델에만 있고 4.6 모델은 high에서 max로 간다
+  assert.deepEqual(effortsForModel('claude', 'claude-sonnet-5.5'), ['default', 'low', 'medium', 'high', 'xhigh', 'max']);
+  assert.deepEqual(effortsForModel('claude', 'claude-opus-4.6'), ['default', 'low', 'medium', 'high', 'max']);
+  // 상속한 모델은 어떤 모델인지 몰라서 강도를 정할 수 없다
+  for (const engine of ['gemini', 'claude', 'codex']) assert.deepEqual(effortsForModel(engine, 'inherit'), ['default']);
+  // 표에 없는 모델(직접 입력)은 그 엔진이 받는 값을 쓴다
+  assert.deepEqual(effortsForModel('gemini', 'my-own-model'), ['default', 'low', 'medium', 'high']);
+  assert.deepEqual(effortsForModel('claude', 'my-own-model'), ['default', 'low', 'medium', 'high', 'xhigh', 'max']);
+});
+
+test('every preset model offers default plus known, non-repeating efforts', () => {
+  const known = new Set(REASONING_EFFORTS.map((e) => e.id));
+  for (const [engine, models] of Object.entries(ENGINE_MODELS)) {
+    for (const m of models) {
+      const list = effortsForModel(engine, m.id);
+      assert.equal(list[0], 'default', `${m.id} starts with default`);
+      assert.equal(new Set(list).size, list.length, `${m.id} has no repeats`);
+      assert.ok(list.every((id) => known.has(id)), `${m.id} only lists known efforts`);
+      assert.deepEqual(effortInfosFor(engine, m.id).map((e) => e.id), list, `${m.id} labels match`);
+    }
+  }
+  for (const id of Object.keys(MODEL_EFFORTS)) {
+    assert.ok(Object.values(ENGINE_MODELS).some((ms) => ms.some((m) => m.id === id)), `${id} is a preset model`);
+  }
+});
+
+test('clampEffort turns a value the model does not support into default', () => {
+  assert.equal(clampEffort('gemini', 'gemini-3.8-flash', 'high'), 'high');
+  assert.equal(clampEffort('gemini', 'gemini-3.8-flash', 'xhigh'), 'default');
+  assert.equal(clampEffort('codex', 'gpt-6.1-sol', 'ultra'), 'ultra');
+  assert.equal(clampEffort('codex', 'gpt-6-luna', 'ultra'), 'default');
+  assert.equal(clampEffort('claude', 'claude-opus-4.6', 'xhigh'), 'default');
+  assert.equal(clampEffort('claude', 'claude-sonnet-5.5', 'bogus'), 'default');
+  assert.equal(clampEffort('claude', 'claude-sonnet-5.5', undefined), 'default');
+});
+
+test('resourceRowToProcessAgent drops a saved effort that its model cannot use, and keeps one it can', () => {
+  const row = (aisurada) => ({ id: 'ap-x', kind: 'agent', scope: 'global', name: '강도 시험', description: 'd', body: 'b', permission: 'edit', skills: [], tools: { aisurada } });
+  const flash = resourceRowToProcessAgent(row({ engine: 'gemini', model: 'gemini-3.8-flash', effort: 'xhigh', fallbackEngine: 'codex', fallbackModel: 'gpt-6.1-sol', fallbackEffort: 'ultra' }), 0);
+  assert.equal(flash.effort, 'default', 'xhigh is not offered for Gemini 3.8 Flash');
+  assert.equal(flash.fallbackEffort, 'ultra', 'ultra is offered for GPT-6.1-Sol');
+  const luna = resourceRowToProcessAgent(row({ engine: 'codex', model: 'gpt-6-luna', effort: 'ultra' }), 0);
+  assert.equal(luna.effort, 'default');
+});
+
+test('every seeded agent uses efforts its models support', () => {
+  for (const agent of DEFAULT_PROCESS_AGENTS) {
+    assert.equal(clampEffort(agent.engine, agent.model, agent.effort), agent.effort, `${agent.name} effort ${agent.effort} on ${agent.model}`);
+    if (agent.fallbackEngine) {
+      assert.equal(clampEffort(agent.fallbackEngine, agent.fallbackModel, agent.fallbackEffort), agent.fallbackEffort, `${agent.name} fallback effort ${agent.fallbackEffort} on ${agent.fallbackModel}`);
+    }
+  }
 });
 
 test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {

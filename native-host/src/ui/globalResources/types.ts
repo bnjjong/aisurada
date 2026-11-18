@@ -15,7 +15,7 @@ export interface ModelInfo {
   label: string;
 }
 
-export type ReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type ReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 
 export interface EffortInfo {
   id: ReasoningEffort;
@@ -29,9 +29,67 @@ export const REASONING_EFFORTS: readonly EffortInfo[] = [
   { id: 'high', label: 'high (심층 추론)' },
   { id: 'xhigh', label: 'xhigh (최고 강도 추론)' },
   { id: 'max', label: 'max (최대 한계 추론)' },
+  { id: 'ultra', label: 'ultra (최대 추론 + 작업 자동 위임)' },
 ] as const;
 
 export const DEFAULT_EFFORT: ReasoningEffort = 'default';
+
+type SetEffort = Exclude<ReasoningEffort, 'default'>;
+
+/**
+ * 엔진마다 모델을 가리지 않고 쓸 수 있는 추론 강도(default 제외). 직접 입력한 모델처럼 아래 표에 없는 모델에 쓴다.
+ * - claude: `claude --effort`가 받는 값(low, medium, high, xhigh, max)
+ * - codex: Codex CLI의 모델 목록(`~/.codex/models_cache.json`)에 나오는 값의 합집합
+ * - gemini: Gemini CLI 모델 화면에 나오는 세 단계(low, medium, high)
+ */
+export const ENGINE_EFFORTS: Record<AIEngine, readonly SetEffort[]> = {
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
+  codex: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+  gemini: ['low', 'medium', 'high'],
+};
+
+const CODEX_FULL: readonly SetEffort[] = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+
+/**
+ * 모델마다 고를 수 있는 추론 강도(default 제외). 모델이 지원하지 않는 값을 보내면 CLI가 거절하므로 표에 있는 값만 보여 준다.
+ * 근거가 다르니 항목마다 적는다. 표에 없는 모델은 {@link ENGINE_EFFORTS}를 쓴다.
+ */
+export const MODEL_EFFORTS: Record<string, readonly SetEffort[]> = {
+  // Codex — Codex CLI가 모델마다 알려 주는 값(`~/.codex/models_cache.json`의 supported_reasoning_levels, 2026-11-18)
+  'gpt-6.1-sol': CODEX_FULL,
+  'gpt-6.1-terra': CODEX_FULL,
+  'gpt-6-astra': CODEX_FULL,
+  'gpt-6-sol': CODEX_FULL,
+  'gpt-5.6-sol': CODEX_FULL,
+  'gpt-6-luna': ['low', 'medium', 'high', 'xhigh', 'max'],
+  // gpt-oss는 캐시에 없다. OpenAI가 밝힌 세 단계
+  'gpt-oss-120b': ['low', 'medium', 'high'],
+  // Claude — Claude Code 변경 기록 기준: xhigh는 Opus 4.7부터 있고 5.x 모델에서 쓰이며, 4.6 모델은 high로 대체된다
+  'claude-sonnet-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-opus-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-fable-5.2': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-haiku-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-sonnet-4.6': ['low', 'medium', 'high', 'max'],
+  'claude-opus-4.6': ['low', 'medium', 'high', 'max'],
+  // Gemini — Gemini CLI 모델 화면(사용자 확인). 다른 Gemini 모델은 확인한 표가 없어 Gemini 기본 세 단계를 쓴다
+  'gemini-3.8-flash': ['low', 'medium', 'high'],
+};
+
+/** 이 모델에서 고를 수 있는 강도 목록. default는 늘 맨 앞에 있고, 상속(`inherit`)한 모델은 강도를 정할 수 없어 default뿐이다. */
+export function effortsForModel(engine: AIEngine, model: string): ReasoningEffort[] {
+  if (model === 'inherit') return ['default'];
+  return ['default', ...(MODEL_EFFORTS[model] ?? ENGINE_EFFORTS[engine])];
+}
+
+/** 저장돼 있거나 골라 둔 강도가 이 모델에서 쓸 수 있는 값이면 그대로, 아니면 default로 돌린다. */
+export function clampEffort(engine: AIEngine, model: string, effort: unknown): ReasoningEffort {
+  return effortsForModel(engine, model).find((e) => e === effort) ?? 'default';
+}
+
+/** 화면의 선택 목록에 그릴 강도들(글 포함). */
+export function effortInfosFor(engine: AIEngine, model: string): EffortInfo[] {
+  return effortsForModel(engine, model).map((id) => REASONING_EFFORTS.find((e) => e.id === id)!);
+}
 
 export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
   gemini: [
@@ -40,7 +98,6 @@ export const ENGINE_MODELS: Record<AIEngine, ModelInfo[]> = {
     { id: 'gemini-4-argon', label: 'Gemini 4 Argon (차세대 고성능 미드레인지)' },
     { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen (차세대 초경량)' },
     { id: 'gemini-3-pro', label: 'Gemini 3 Pro (복합 심층 추론)' },
-    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Thinking 내장 안정판)' },
     { id: 'inherit', label: 'inherit (기본 모델 상속)' },
   ],
   claude: [
@@ -313,7 +370,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     enabled: true,
     engine: 'gemini',
     model: 'gemini-4-carbon',
-    effort: 'max',
+    effort: 'high', // Gemini는 low/medium/high뿐이라 가장 높은 단계다
     fallbackEngine: 'claude',
     fallbackModel: 'claude-opus-5.5',
     fallbackEffort: 'max',
@@ -512,11 +569,9 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
   const order: number = typeof aisuradaMeta.order === 'number' ? aisuradaMeta.order : index + 1;
   const enabled: boolean = aisuradaMeta.enabled !== false;
 
-  const VALID_EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+  // 저장된 강도가 이 모델에서 쓸 수 없는 값이면(모델을 바꿨거나 낡은 값) default로 돌려서 화면과 저장이 어긋나지 않게 한다
   const rawEffort = aisuradaMeta.effort || tools[engine]?.effort;
-  const effort: ReasoningEffort = VALID_EFFORTS.includes(rawEffort)
-    ? (rawEffort as ReasoningEffort)
-    : 'default';
+  const effort: ReasoningEffort = clampEffort(engine, model, rawEffort);
 
   const rawFallbackEngine = aisuradaMeta.fallbackEngine;
   const fallbackEngine: AIEngine | undefined =
@@ -532,7 +587,7 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
 
   const rawFallbackEffort = aisuradaMeta.fallbackEffort || (fallbackEngine ? tools[fallbackEngine]?.effort : undefined);
   const fallbackEffort: ReasoningEffort | undefined = fallbackEngine
-    ? (VALID_EFFORTS.includes(rawFallbackEffort) ? (rawFallbackEffort as ReasoningEffort) : 'default')
+    ? clampEffort(fallbackEngine, fallbackModel as string, rawFallbackEffort)
     : undefined;
 
   return {
