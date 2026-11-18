@@ -11,6 +11,7 @@ import './skin-grid.css';
 import './skin-glass.css';
 import './skin-modern.css';
 import './rail-night.css';
+import './engine-picker.css';
 import { readSkin } from './workspace/storage.ts';
 import { applyTypographyVars, readTypography } from './workspace/typography.ts';
 

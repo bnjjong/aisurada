@@ -1,0 +1,130 @@
+/* 에이전트 편집 창의 「AI 실행 엔진 및 모델」 영역(ui/globalResources/EnginePicker.tsx).
+   색과 그림자는 스킨 토큰을 쓰고, 스킨에 없는 토큰은 fallback으로 받는다. 칸 모양(알약·각진 모서리)은 스킨마다 아래에서 맞춘다.
+   스킨 CSS보다 뒤에 불러와서 같은 우선순위일 때 이 파일이 이긴다. */
+
+.eng {
+  --eng-dash: color-mix(in srgb, var(--muted) 38%, transparent);
+  --eng-off: color-mix(in srgb, var(--muted) 30%, transparent);
+  --eng-warn: var(--warning, #d97706);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.eng-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.eng-head h4 { margin: 0; display: flex; align-items: center; gap: 9px; font-size: 14px; }
+.eng-head-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft, var(--surface)); color: var(--accent); }
+.eng-hint { font-size: 11px; color: var(--muted); }
+
+/* ---- 로고 ---- */
+.eng-logo { display: inline-grid; place-items: center; flex: none; box-shadow: inset 0 0 0 1px rgba(128, 138, 160, 0.22); }
+.eng-logo-claude { background: rgba(217, 119, 87, 0.14); }
+.eng-logo-gemini { background: rgba(120, 110, 230, 0.12); }
+.eng-logo-codex { background: #111a33; color: #ffffff; }
+
+/* ---- 추론 강도 막대 ---- */
+.eng-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; flex: none; }
+.eng-meter i { display: block; width: 3px; border-radius: 1.5px; background: var(--eng-off); }
+.eng-meter i.on { background: var(--accent); }
+.eng-meter.is-ultra i.on { background: var(--eng-warn); }
+.eng-meter.is-default i { background: transparent; border: 1px dashed var(--eng-dash); }
+
+/* ---- 실행 순서 요약 줄 ---- */
+.eng-chain { display: flex; flex-wrap: wrap; align-items: center; row-gap: 8px; padding: 10px 14px; background: var(--surface); border-radius: 14px; box-shadow: var(--sh-1, none); border: 1px solid var(--line); }
+.eng-chain-item { display: flex; align-items: center; gap: 8px; }
+.eng-chain-item:not(:first-child) { flex: 1 1 240px; padding-left: 8px; }
+.eng-ch { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 7px; border-radius: 12px; background: var(--soft); font-size: 12.5px; white-space: nowrap; }
+.eng-n { width: 18px; height: 18px; border-radius: 50%; font: 700 10.5px/18px sans-serif; text-align: center; font-style: normal; color: #ffffff; background: var(--eng-warn); }
+.eng-ch[data-step="1"] .eng-n { background: var(--accent); color: var(--accent-ink, #ffffff); }
+.eng-ch[data-step="3"] .eng-n { background: var(--warning-deep, #c2410c); }
+.eng-ep { display: inline-flex; align-items: center; gap: 5px; padding-left: 8px; border-left: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+.eng-ch-off { background: transparent; border: 1px dashed var(--eng-dash); color: var(--muted); padding-right: 14px; }
+.eng-ch-off .eng-n { background: var(--ink-3, var(--muted)); }
+.eng-ar { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 60px; color: var(--ink-3, var(--muted)); }
+.eng-ar-line { flex: 1; height: 0; border-top: 1.5px dashed var(--eng-dash); }
+.eng-ar small { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---- 순위 타임라인과 카드 ---- */
+.eng-tiers { display: grid; }
+.eng-tier { --tc: var(--accent); display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 14px; }
+.eng-tier[data-card="2"] { --tc: var(--eng-warn); }
+.eng-tier[data-card="3"] { --tc: var(--warning-deep, #c2410c); }
+.eng-tier.is-off { --tc: var(--ink-3, var(--muted)); }
+.eng-rail { display: flex; flex-direction: column; align-items: center; }
+.eng-dot { width: 28px; height: 28px; flex: none; border-radius: 50%; background: var(--tc); color: #ffffff; font: 700 13px/28px sans-serif; text-align: center; box-shadow: 0 2px 6px rgba(10, 22, 51, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.eng-tier[data-card="1"] .eng-dot { color: var(--accent-ink, #ffffff); }
+.eng-ln { flex: 1; width: 0; margin-top: 2px; border-left: 2px solid var(--line); }
+.eng-gap { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 14px; height: 30px; align-items: center; }
+.eng-gap-rail { height: 100%; width: 0; justify-self: center; border-left: 2px dashed var(--eng-dash); }
+.eng-gap-txt { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.eng-card { display: grid; gap: 12px; min-width: 0; padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--tc); border-radius: 14px; box-shadow: var(--sh-1, none); }
+.eng-tier.is-off .eng-card { gap: 8px; background: transparent; border: 1.5px dashed var(--eng-dash); box-shadow: none; }
+.eng-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.eng-ttl { display: flex; align-items: center; gap: 8px; }
+.eng-ttl b { font-size: 14px; }
+.eng-tier.is-off .eng-ttl b { color: var(--muted); }
+.eng-tag { padding: 2px 8px; border-radius: 99px; background: var(--soft); font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.eng-desc { margin: -4px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--muted); }
+.eng-desc b { color: var(--ink); }
+
+/* ---- 엔진 타일 ---- */
+.eng-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.eng-tile { position: relative; display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--sh-1, none); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+div.eng-tile { cursor: default; }
+.eng-tile:hover:not(:disabled):not(.is-on):not([aria-disabled="true"]) { border-color: var(--eng-dash); }
+.eng-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eng-tile-nm { display: grid; line-height: 1.25; }
+.eng-tile-nm b { font-size: 14px; }
+.eng-tile-nm small { font-size: 11px; color: var(--muted); }
+.eng-radio { margin-left: auto; display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink-3, var(--muted)); color: var(--accent-ink, #ffffff); }
+.eng-tile.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent), var(--sh-1, none); }
+.eng-tile.is-on .eng-radio { background: var(--accent); border-color: var(--accent); }
+.eng-tile.is-used { background: var(--soft); border: 1.5px dashed var(--eng-dash); box-shadow: none; cursor: not-allowed; }
+.eng-tile.is-used .eng-logo { opacity: 0.45; filter: grayscale(0.6); }
+.eng-tile.is-used .eng-tile-nm { opacity: 0.55; }
+.eng-used-tag { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; background: var(--eng-off); font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+
+/* ---- 세부 모델·추론 강도 ---- */
+.eng-mrow { display: flex; flex-wrap: wrap; gap: 14px; }
+.eng-fld { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.eng-fld-model { flex: 1 1 320px; }
+.eng-fld-effort { flex: 1 1 240px; max-width: 340px; }
+.eng-fld > label { display: grid; gap: 6px; font-size: inherit; }
+.eng-lab { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.eng-sel { position: relative; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 9px; border-radius: 999px; background: var(--sunken, var(--soft)); box-shadow: var(--in, inset 0 0 0 1px var(--line)); font-size: 13px; color: var(--ink); }
+.eng-sel:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eng-fld-effort .eng-sel { padding-left: 14px; }
+.eng-sel-txt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; overflow: hidden; white-space: nowrap; }
+.eng-sel-txt b { font-weight: 700; }
+.eng-sel-txt em { overflow: hidden; text-overflow: ellipsis; font-style: normal; font-size: 11.5px; color: var(--muted); }
+.eng-sel > svg { flex: none; color: var(--muted); }
+/* 값을 바꾸는 진짜 select. 보이지 않게 칸 전체를 덮는다. */
+:root:root .eng-sel > select.eng-native { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; border-radius: inherit; background: transparent; box-shadow: none; opacity: 0; cursor: pointer; }
+.eng-custom { height: 36px; padding: 0 14px; font-size: 13px; }
+
+/* ---- 3순위 스위치와 미리보기 ---- */
+.eng-switch { position: relative; display: inline-flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.eng-switch input { position: absolute; right: 0; width: 38px; height: 22px; margin: 0; opacity: 0; cursor: pointer; }
+.eng-sw { position: relative; display: inline-block; flex: none; width: 38px; height: 22px; border-radius: 99px; background: var(--eng-off); box-shadow: var(--in, inset 0 0 0 1px var(--line)); transition: background 0.15s; }
+.eng-sw i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(10, 22, 51, 0.35); transition: left 0.15s; }
+.eng-switch input:checked + .eng-sw { background: var(--accent); }
+.eng-switch input:checked + .eng-sw i { left: 18px; }
+.eng-switch input:focus-visible + .eng-sw { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eng-preview { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--soft); font-size: 12px; line-height: 1.5; color: var(--muted); }
+.eng-preview .eng-logo { opacity: 0.6; }
+.eng-preview b { color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .eng-sw, .eng-sw i { transition: none; }
+}
+
+/* ---- 스킨별 칸 모양 ---- */
+:root[data-skin="grid"] .eng-sel { border: 1px solid var(--strong); border-radius: 2px; background: var(--surface); box-shadow: none; }
+:root[data-skin="grid"] :is(.eng, .eng-chain, .eng-card, .eng-tile, .eng-preview) { border-radius: 2px; }
+:root[data-skin="glass"] .eng-sel { border: 1px solid var(--field-line); border-radius: 12px; background: var(--field); box-shadow: inset 0 1px 2px rgba(10, 22, 51, 0.07); }
+:root[data-skin="modern"] .eng-sel { border: 1px solid var(--strong); border-radius: 8px; background: var(--surface); box-shadow: var(--sh-1); }
+:root[data-skin="modern"] :is(.eng-card, .eng-tile) { border-radius: 10px; }
+:root[data-skin="classic"] .eng-sel { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: none; }

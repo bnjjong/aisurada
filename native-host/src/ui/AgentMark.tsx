@@ -72,19 +72,23 @@ const CLAUDE_RAYS = Array.from({ length: 8 }, (_, i) => {
   return `M${point(inner)}L${point(outer)}`;
 }).join("");
 
-function AgentGlyph({ agent }: { agent: string }) {
+/**
+ * 엔진 로고. 노트 목록의 출처 아이콘(12px)과 엔진 고르는 타일(그보다 큼)이 같은 모양을 쓰도록
+ * 크기만 [size]로 받는다. 모양은 viewBox 안에서 그려서 크기와 무관하다.
+ */
+export function AgentGlyph({ agent, size = 12 }: { agent: string; size?: number }) {
   // useId는 :r1: 꼴이라 url(#...)에 쓰기 좋게 글자와 숫자만 남긴다.
   const gradient = `agent-mark-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   if (agent === "claude") {
     return (
-      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width={size} height={size} fill="none" aria-hidden="true">
         <path d={CLAUDE_RAYS} stroke="#d97757" strokeWidth="1.9" strokeLinecap="round" />
       </svg>
     );
   }
   if (agent === "gemini") {
     return (
-      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden="true">
         <defs>
           <linearGradient id={gradient} x1="2" y1="14" x2="14" y2="2" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#4285f4" />
@@ -103,8 +107,8 @@ function AgentGlyph({ agent }: { agent: string }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      width="12"
-      height="12"
+      width={size}
+      height={size}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"

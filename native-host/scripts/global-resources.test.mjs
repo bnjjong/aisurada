@@ -391,17 +391,36 @@ test('the agent modal always asks for a 2nd tier and offers an optional 3rd tier
 
     for (const [label, agent] of [['2순위만 있는 에이전트', { ...base, thirdEngine: undefined }], ['2순위가 없는 옛 에이전트', { ...base, fallbackEngine: undefined, fallbackModel: undefined, fallbackEffort: undefined }], ['새로 등록', null]]) {
       const html = render(agent);
-      assert.equal(count(html, />2순위</g), 1, `${label}: 2순위 카드가 있다`);
-      assert.equal(count(html, /2순위 대체 모델 사용/g), 0, `${label}: 2순위를 끄는 체크박스는 없다`);
-      assert.equal(count(html, /3순위 대체 모델 사용/g), 1, `${label}: 3순위는 체크박스로 켠다`);
+      assert.equal(count(html, /data-card="1"/g), 1, `${label}: 1순위 카드가 있다`);
+      assert.equal(count(html, /data-card="2"/g), 1, `${label}: 2순위 카드가 있다`);
+      assert.equal(count(html, /data-card="3"/g), 1, `${label}: 3순위 카드는 꺼져 있어도 자리가 있다`);
+      assert.equal(count(html, /2순위 대체 모델 사용/g), 0, `${label}: 2순위를 끄는 스위치는 없다`);
+      assert.equal(count(html, /3순위 대체 모델 사용/g), 1, `${label}: 3순위는 스위치로 켠다`);
+      assert.equal(count(html, /role="switch"/g), 1, `${label}: 스위치는 하나다`);
       assert.equal(count(html, /남은 엔진 하나로 정해집니다/g), 0, `${label}: 3순위는 꺼져 있다`);
+      assert.equal(count(html, /3순위 세부 모델/g), 0, `${label}: 꺼진 3순위는 모델 칸을 안 그린다`);
+      assert.equal(count(html, /class="eng-preview"/g), 1, `${label}: 꺼진 3순위는 켜면 정해질 엔진을 미리 보여 준다`);
+      assert.equal(count(html, /3순위 없음/g), 1, `${label}: 실행 순서 요약은 3순위 없음을 보인다`);
     }
+
+    // 1순위 Gemini, 2순위 Claude이면 2순위 카드에서 Gemini 타일은 1순위가 쓰는 칸이라 못 고른다
+    const two = render({ ...base, thirdEngine: undefined });
+    assert.equal(count(two, /data-used-by="1순위"/g), 1, '2순위 카드의 1순위 한 칸');
+    assert.equal(count(two, /<button[^>]*disabled=""[^>]*data-used-by="1순위"|<button[^>]*data-used-by="1순위"[^>]*disabled=""/g), 1, '못 고르는 타일은 비활성 단추다');
+    assert.equal(count(two, /aria-label="1순위 세부 모델"/g), 1);
+    assert.equal(count(two, /aria-label="2순위 세부 모델"/g), 1);
+    assert.equal(count(two, /aria-label="1순위 추론 강도 \(Effort\)"/g), 1);
 
     const three = render({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra' });
     assert.equal(count(three, /남은 엔진 하나로 정해집니다/g), 1, '켜 둔 3순위는 본문이 보인다');
     assert.equal(count(three, /3순위 세부 모델/g), 1);
     assert.equal(count(three, /3순위 추론 강도/g), 1);
-    assert.equal(count(three, /\(선택 불가\)/g), 3, '2순위 카드의 1순위 한 칸과 3순위 카드의 1순위·2순위 두 칸');
+    assert.equal(count(three, /class="eng-preview"/g), 0, '켜 둔 3순위는 미리보기 대신 본문이다');
+    assert.equal(count(three, /3순위 없음/g), 0);
+    assert.equal(count(three, /data-used-by=/g), 3, '2순위 카드의 1순위 한 칸과 3순위 카드의 1순위·2순위 두 칸');
+    assert.equal(count(three, /data-used-by="2순위"/g), 1, '3순위 카드에서 2순위가 쓰는 칸');
+    assert.equal(count(three, /<div[^>]*aria-disabled="true"[^>]*data-engine=/g), 3, '3순위 타일은 고르는 칸이 아니라 정해진 값을 보여 주는 칸이다');
+    assert.equal(count(three, /class="eng-meter is-ultra"/g) >= 2, true, 'ultra는 요약 줄과 강도 칸에서 다른 막대로 보인다');
   } finally {
     reactDom.createPortal = originalPortal;
     delete globalThis.document;
