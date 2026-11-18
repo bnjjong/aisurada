@@ -11,7 +11,7 @@ interface Props {
   agent?: ProcessAgent | null;
   skills: GlobalSkill[];
   resources: GlobalResourceItem[];
-  onSave: (agent: ProcessAgent) => void;
+  onSave: (agent: ProcessAgent) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -134,6 +134,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [promptViewMode, setPromptViewMode] = useState<'editor' | 'raw'>('editor');
   const [promptEditorKey, setPromptEditorKey] = useState(0);
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // 모델마다 고를 수 있는 추론 강도가 달라서, 지금 고른 모델에서 쓸 수 있는 값만 보여 준다.
   // 쓸 수 없는 값이 남아 있으면(모델을 바꾼 경우) default로 보이고 그대로 저장된다
@@ -194,42 +195,51 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
     );
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('에이전트 이름을 입력해 주세요.');
       return;
     }
-    const finalModel = selectedModel === 'custom' ? (customModelInput.trim() || 'inherit') : selectedModel;
-    const finalFallbackModel =
-      selectedFallbackModel === 'custom' ? (customFallbackModelInput.trim() || 'inherit') : selectedFallbackModel;
-    const finalThirdModel = selectedThirdModel === 'custom' ? (customThirdModelInput.trim() || 'inherit') : selectedThirdModel;
+    setError('');
+    setIsSaving(true);
+    try {
+      const finalModel = selectedModel === 'custom' ? (customModelInput.trim() || 'inherit') : selectedModel;
+      const finalFallbackModel =
+        selectedFallbackModel === 'custom' ? (customFallbackModelInput.trim() || 'inherit') : selectedFallbackModel;
+      const finalThirdModel = selectedThirdModel === 'custom' ? (customThirdModelInput.trim() || 'inherit') : selectedThirdModel;
 
-    const updated: ProcessAgent = {
-      id: agent?.id || `proc-${Date.now()}`,
-      key: agent?.key || name.trim().toLowerCase().replace(/\s+/g, '-'),
-      name: name.trim(),
-      role: role.trim(),
-      description: description.trim(),
-      engine,
-      model: finalModel,
-      effort: clampEffort(engine, finalModel, effort),
-      // 2순위는 늘 저장하고(1순위와 같은 엔진은 고를 수 없다), 3순위는 켠 경우에만 저장한다
-      fallbackEngine,
-      fallbackModel: finalFallbackModel,
-      fallbackEffort: clampEffort(fallbackEngine, finalFallbackModel, fallbackEffort),
-      thirdEngine: useThird ? thirdEngine : undefined,
-      thirdModel: useThird ? finalThirdModel : undefined,
-      thirdEffort: useThird ? clampEffort(thirdEngine, finalThirdModel, thirdEffort) : undefined,
-      enabled,
-      skills: selectedSkills,
-      resources: selectedResources,
-      prompt: prompt.trim(),
-      order: agent?.order ?? 99,
-      f1: agent?.f1,
-    };
-    onSave(updated);
-    onClose();
+      const updated: ProcessAgent = {
+        id: agent?.id || `proc-${Date.now()}`,
+        key: agent?.key || name.trim().toLowerCase().replace(/\s+/g, '-'),
+        name: name.trim(),
+        role: role.trim(),
+        description: description.trim(),
+        engine,
+        model: finalModel,
+        effort: clampEffort(engine, finalModel, effort),
+        // 2순위는 늘 저장하고(1순위와 같은 엔진은 고를 수 없다), 3순위는 켠 경우에만 저장한다
+        fallbackEngine,
+        fallbackModel: finalFallbackModel,
+        fallbackEffort: clampEffort(fallbackEngine, finalFallbackModel, fallbackEffort),
+        thirdEngine: useThird ? thirdEngine : undefined,
+        thirdModel: useThird ? finalThirdModel : undefined,
+        thirdEffort: useThird ? clampEffort(thirdEngine, finalThirdModel, thirdEffort) : undefined,
+        enabled,
+        skills: selectedSkills,
+        resources: selectedResources,
+        prompt: prompt.trim(),
+        order: agent?.order ?? 99,
+        f1: agent?.f1,
+      };
+      await onSave(updated);
+      onClose();
+    } catch (err: any) {
+      console.error('에이전트 저장 오류:', err);
+      setError(err?.message || '저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -651,16 +661,20 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
         </div>
 
         <div className="page-actions" style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={isSaving}>
             취소
           </button>
           {awaitingApproval && (
-            <button type="button" className="button-primary" onClick={openApprovals}>
+            <button type="button" className="button-primary" onClick={openApprovals} disabled={isSaving}>
               승인 대기함에서 보기
             </button>
           )}
-          <button type="submit" className={awaitingApproval ? 'apv-overwrite' : 'button-primary'}>
-            {awaitingApproval ? '덮어쓰고 저장' : isEdit ? '수정 내용 저장' : '등록'}
+          <button
+            type="submit"
+            className={awaitingApproval ? 'apv-overwrite' : 'button-primary'}
+            disabled={isSaving}
+          >
+            {isSaving ? '저장 중...' : awaitingApproval ? '덮어쓰고 저장' : isEdit ? '수정 내용 저장' : '등록'}
           </button>
         </div>
       </form>

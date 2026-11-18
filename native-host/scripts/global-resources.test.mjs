@@ -407,3 +407,70 @@ test('the agent modal always asks for a 2nd tier and offers an optional 3rd tier
     delete globalThis.document;
   }
 });
+
+test('saveProcessAgent inherits real id and f1 when called with proc- mock agent, and updates store', async () => {
+  const { saveProcessAgent, getGlobalResourcesSnapshot, syncGlobalResources } = await import(
+    '../src/ui/globalResources/globalResourcesStore.ts'
+  );
+  const rows = [
+    {
+      id: 'ap-real-123',
+      kind: 'agent',
+      scope: 'global',
+      name: '커밋 푸시 에이전트',
+      description: '푸시한다',
+      precondition: 'f1:orig',
+      path: '.aisurada/resources/global/agents/a.md',
+      tools: { aisurada: { key: 'commit-push', engine: 'gemini', model: 'gemini-3.8-flash', order: 1 } },
+    },
+    {
+      id: 'sk-real-1',
+      kind: 'skill',
+      scope: 'global',
+      name: 'ai-commit',
+      description: '커밋',
+      path: '.aisurada/resources/global/skills/a.md',
+      tools: {},
+    },
+  ];
+  let savedAgentInput = null;
+  const mockCall = async (call) => {
+    const cmd = call.command;
+    if (cmd === 'list_resources') return { resources: rows, skipped: [] };
+    if (cmd === 'get_resource') return rows.find((r) => r.id === call.args?.id) || rows[0];
+    if (cmd === 'save_resource') {
+      if (call.args?.kind === 'agent') {
+        savedAgentInput = call.args;
+        rows[0] = {
+          ...rows[0],
+          precondition: 'f1:updated',
+          tools: JSON.parse(call.args.tools || '{}'),
+        };
+      }
+      return rows[0];
+    }
+    return {};
+  };
+
+  // 1. 초기 동기화
+  await syncGlobalResources(mockCall, true);
+  const snapshotBefore = getGlobalResourcesSnapshot();
+  const found = snapshotBefore.agents.find((a) => a.name === '커밋 푸시 에이전트');
+  assert.ok(found);
+  assert.equal(found.id, 'ap-real-123');
+
+  // 2. proc- id로 넘겨도 실 id와 f1을 계승하여 저장하고 스토어 즉시 업데이트
+  const mockAgent = {
+    ...found,
+    id: 'proc-commit-push',
+    f1: undefined,
+    model: 'gemini-2.5-pro',
+  };
+  await saveProcessAgent(mockAgent, mockCall);
+
+  assert.equal(savedAgentInput.id, 'ap-real-123', 'mock proc- id was resolved to real engine id');
+  assert.equal(savedAgentInput.f1, 'f1:orig', 'missing f1 was resolved to real token');
+  const snapshotAfter = getGlobalResourcesSnapshot();
+  const updated = snapshotAfter.agents.find((a) => a.id === 'ap-real-123');
+  assert.equal(updated.model, 'gemini-2.5-pro', 'store immediately reflects updated model');
+});

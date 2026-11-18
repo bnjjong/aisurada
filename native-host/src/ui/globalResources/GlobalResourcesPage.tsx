@@ -84,19 +84,11 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
   };
 
   const handleSaveAgent = async (agent: ProcessAgent) => {
-    try {
-      await saveProcessAgent(agent, controller.callEngine);
-    } catch (err) {
-      console.error('에이전트 저장 실패:', err);
-    }
+    await saveProcessAgent(agent, controller.callEngine);
   };
 
   const handleSaveSkill = async (skill: GlobalSkill) => {
-    try {
-      await saveGlobalSkill(skill, controller.callEngine);
-    } catch (err) {
-      console.error('스킬 저장 실패:', err);
-    }
+    await saveGlobalSkill(skill, controller.callEngine);
   };
 
   const handleResetToDefault = async () => {

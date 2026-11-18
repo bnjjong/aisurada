@@ -9,7 +9,7 @@ import { skillFromForm } from './types.ts';
 
 interface Props {
   skill?: GlobalSkill | null;
-  onSave: (skill: GlobalSkill) => void;
+  onSave: (skill: GlobalSkill) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -28,17 +28,27 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
   const [bodyViewMode, setBodyViewMode] = useState<'editor' | 'raw'>('editor');
   const [bodyEditorKey, setBodyEditorKey] = useState(0);
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('스킬 이름을 입력해 주세요.');
       return;
     }
-    // 고치는 스킬은 쓰기 전 토큰(f1)을 이어받아야 엔진이 저장을 받는다
-    const updated = skillFromForm(skill, { name, description, tagsText, body });
-    onSave(updated);
-    onClose();
+    setError('');
+    setIsSaving(true);
+    try {
+      // 고치는 스킬은 쓰기 전 토큰(f1)을 이어받아야 엔진이 저장을 받는다
+      const updated = skillFromForm(skill, { name, description, tagsText, body });
+      await onSave(updated);
+      onClose();
+    } catch (err: any) {
+      console.error('스킬 저장 오류:', err);
+      setError(err?.message || '저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -131,16 +141,20 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
         </div>
 
         <div className="page-actions" style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={isSaving}>
             취소
           </button>
           {awaitingApproval && (
-            <button type="button" className="button-primary" onClick={openApprovals}>
+            <button type="button" className="button-primary" onClick={openApprovals} disabled={isSaving}>
               승인 대기함에서 보기
             </button>
           )}
-          <button type="submit" className={awaitingApproval ? 'apv-overwrite' : 'button-primary'}>
-            {awaitingApproval ? '덮어쓰고 저장' : isEdit ? '수정 내용 저장' : '등록'}
+          <button
+            type="submit"
+            className={awaitingApproval ? 'apv-overwrite' : 'button-primary'}
+            disabled={isSaving}
+          >
+            {isSaving ? '저장 중...' : awaitingApproval ? '덮어쓰고 저장' : isEdit ? '수정 내용 저장' : '등록'}
           </button>
         </div>
       </form>

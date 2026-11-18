@@ -23,7 +23,8 @@ let storeState: GlobalResourcesData = {
   version: 1,
 };
 
-let initializingPromise: Promise<void> | null = null;
+let activeSyncPromise: Promise<void> | null = null;
+let needsAnotherSync = false;
 
 function emitChange() {
   for (const listener of listeners) {
@@ -74,12 +75,19 @@ export function useGlobalResources(): GlobalResourcesData {
 }
 
 /** 엔진에서 글로벌 자원들을 로드하고, 없을 경우 10대 프로세스 에이전트를 자동 시딩합니다 */
-export async function syncGlobalResources(call: EngineCall): Promise<void> {
-  if (initializingPromise) {
-    return initializingPromise;
+export async function syncGlobalResources(call: EngineCall, force = false): Promise<void> {
+  if (activeSyncPromise) {
+    if (force) {
+      needsAnotherSync = true;
+    }
+    await activeSyncPromise;
+    if (!needsAnotherSync) {
+      return;
+    }
   }
 
-  initializingPromise = (async () => {
+  needsAnotherSync = false;
+  const runSync = async () => {
     try {
       const { resources: globalRows } = await listResources(call, { global: true });
       const agentRows = globalRows.filter((r: ResourceRow) => r.kind === 'agent');
@@ -163,37 +171,167 @@ export async function syncGlobalResources(call: EngineCall): Promise<void> {
     } catch (err) {
       console.error('글로벌 리소스 동기화 중 오류 발생:', err);
     } finally {
-      initializingPromise = null;
+      activeSyncPromise = null;
     }
-  })();
+  };
 
-  return initializingPromise;
+  activeSyncPromise = runSync();
+  await activeSyncPromise;
+
+  if (needsAnotherSync) {
+    needsAnotherSync = false;
+    return syncGlobalResources(call, false);
+  }
 }
 
 // --------------------------- 에이전트 조작 (엔진 연동) ---------------------------
 
 export async function saveProcessAgent(agent: ProcessAgent, call: EngineCall): Promise<void> {
-  const input = processAgentToSaveInput(agent);
-  await saveResource(call, input);
-  await syncGlobalResources(call);
+  let targetId = agent.id;
+  let f1 = agent.f1;
+
+  // mock/시딩 id(proc-)인 경우 이미 디스크/스토어에 존재하는 동일 이름/키의 에이전트가 있는지 찾아 실 id와 f1 계승
+  if (targetId.startsWith('proc-')) {
+    const existing = storeState.agents.find(
+      (a) => !a.id.startsWith('proc-') && (a.name === agent.name || a.key === agent.key)
+    );
+    if (existing) {
+      targetId = existing.id;
+      f1 = existing.f1;
+    } else {
+      try {
+        const { resources } = await listResources(call, { global: true, kind: 'agent' });
+        const matched = resources.find((r) => r.name === agent.name);
+        if (matched) {
+          targetId = matched.id;
+          f1 = matched.precondition;
+        }
+      } catch {}
+    }
+  }
+
+  // 실 id가 있으나 f1(precondition 토큰)이 비어있는 경우 getResource로 최신 토큰 확보
+  if (targetId && !targetId.startsWith('proc-') && !f1) {
+    try {
+      const fresh = await getResource(call, targetId);
+      f1 = fresh.precondition;
+    } catch (err) {
+      console.warn(`에이전트(${targetId}) 최신 토큰 조회 실패:`, err);
+    }
+  }
+
+  const agentToSave: ProcessAgent = {
+    ...agent,
+    id: targetId,
+    f1,
+  };
+
+  const input = processAgentToSaveInput(agentToSave);
+  const savedRow = await saveResource(call, input);
+
+  // 저장 성공 시 즉각 storeState 반영 (UI 낙관적 즉시 업데이트)
+  const updatedAgent: ProcessAgent = {
+    ...agentToSave,
+    id: savedRow.id || targetId,
+    f1: savedRow.precondition || f1,
+  };
+
+  const exists = storeState.agents.some((a) => a.id === updatedAgent.id || a.key === updatedAgent.key);
+  const nextAgents = exists
+    ? storeState.agents.map((a) => (a.id === updatedAgent.id || a.key === updatedAgent.key ? updatedAgent : a))
+    : [...storeState.agents, updatedAgent];
+
+  storeState = {
+    ...storeState,
+    agents: nextAgents.sort((a, b) => a.order - b.order),
+  };
+  emitChange();
+
+  // 최신 디스크 상태 전체 재동기화 강제 실행
+  await syncGlobalResources(call, true);
 }
 
 export async function deleteProcessAgent(agentId: string, call: EngineCall): Promise<void> {
   await deleteResource(call, agentId);
-  await syncGlobalResources(call);
+  storeState = {
+    ...storeState,
+    agents: storeState.agents.filter((a) => a.id !== agentId),
+  };
+  emitChange();
+  await syncGlobalResources(call, true);
 }
 
 // --------------------------- 스킬 조작 (엔진 연동) ---------------------------
 
 export async function saveGlobalSkill(skill: GlobalSkill, call: EngineCall): Promise<void> {
-  const input = globalSkillToSaveInput(skill);
-  await saveResource(call, input);
-  await syncGlobalResources(call);
+  let targetId = skill.id;
+  let f1 = skill.f1;
+
+  if (targetId.startsWith('gskill-')) {
+    const existing = storeState.skills.find(
+      (s) => !s.id.startsWith('gskill-') && s.name === skill.name
+    );
+    if (existing) {
+      targetId = existing.id;
+      f1 = existing.f1;
+    } else {
+      try {
+        const { resources } = await listResources(call, { global: true, kind: 'skill' });
+        const matched = resources.find((r) => r.name === skill.name);
+        if (matched) {
+          targetId = matched.id;
+          f1 = matched.precondition;
+        }
+      } catch {}
+    }
+  }
+
+  if (targetId && !targetId.startsWith('gskill-') && !f1) {
+    try {
+      const fresh = await getResource(call, targetId);
+      f1 = fresh.precondition;
+    } catch (err) {
+      console.warn(`스킬(${targetId}) 최신 토큰 조회 실패:`, err);
+    }
+  }
+
+  const skillToSave: GlobalSkill = {
+    ...skill,
+    id: targetId,
+    f1,
+  };
+
+  const input = globalSkillToSaveInput(skillToSave);
+  const savedRow = await saveResource(call, input);
+
+  const updatedSkill: GlobalSkill = {
+    ...skillToSave,
+    id: savedRow.id || targetId,
+    f1: savedRow.precondition || f1,
+  };
+
+  const exists = storeState.skills.some((s) => s.id === updatedSkill.id || s.name === updatedSkill.name);
+  const nextSkills = exists
+    ? storeState.skills.map((s) => (s.id === updatedSkill.id || s.name === updatedSkill.name ? updatedSkill : s))
+    : [...storeState.skills, updatedSkill];
+
+  storeState = {
+    ...storeState,
+    skills: nextSkills,
+  };
+  emitChange();
+
+  await syncGlobalResources(call, true);
 }
 
 export async function deleteGlobalSkill(skillId: string, call: EngineCall): Promise<void> {
   await deleteResource(call, skillId);
-  await syncGlobalResources(call);
+  storeState = {
+    ...storeState,
+    skills: storeState.skills.filter((s) => s.id !== skillId),
+  };
+  emitChange();
+  await syncGlobalResources(call, true);
 }
 
 // --------------------------- 인프라 조작 ---------------------------
