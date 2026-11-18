@@ -385,12 +385,12 @@ test('the agent modal always asks for a 2nd tier and offers an optional 3rd tier
   try {
     const { ProcessAgentModal } = await import('../src/ui/globalResources/ProcessAgentModal.tsx');
     globalThis.document = { body: {} };
-    const render = (agent) => renderToStaticMarkup(React.createElement(ProcessAgentModal, { agent, skills: [], resources: [], onSave() {}, onClose() {} })).replace(/<!-- -->/g, '');
+    const render = (agent, extra = {}) => renderToStaticMarkup(React.createElement(ProcessAgentModal, { agent, skills: [], resources: [], onSave() {}, onClose() {}, ...extra })).replace(/<!-- -->/g, '');
     const count = (html, re) => (html.match(re) || []).length;
     const base = DEFAULT_PROCESS_AGENTS[0]; // Gemini 1순위, Claude 2순위
 
     for (const [label, agent] of [['2순위만 있는 에이전트', { ...base, thirdEngine: undefined }], ['2순위가 없는 옛 에이전트', { ...base, fallbackEngine: undefined, fallbackModel: undefined, fallbackEffort: undefined }], ['새로 등록', null]]) {
-      const html = render(agent);
+      const html = render(agent, { defaultEngineOpen: true });
       assert.equal(count(html, /data-card="1"/g), 1, `${label}: 1순위 카드가 있다`);
       assert.equal(count(html, /data-card="2"/g), 1, `${label}: 2순위 카드가 있다`);
       assert.equal(count(html, /data-card="3"/g), 1, `${label}: 3순위 카드는 꺼져 있어도 자리가 있다`);
@@ -404,14 +404,33 @@ test('the agent modal always asks for a 2nd tier and offers an optional 3rd tier
     }
 
     // 1순위 Gemini, 2순위 Claude이면 2순위 카드에서 Gemini 타일은 1순위가 쓰는 칸이라 못 고른다
-    const two = render({ ...base, thirdEngine: undefined });
+    const two = render({ ...base, thirdEngine: undefined }, { defaultEngineOpen: true });
     assert.equal(count(two, /data-used-by="1순위"/g), 1, '2순위 카드의 1순위 한 칸');
     assert.equal(count(two, /<button[^>]*disabled=""[^>]*data-used-by="1순위"|<button[^>]*data-used-by="1순위"[^>]*disabled=""/g), 1, '못 고르는 타일은 비활성 단추다');
     assert.equal(count(two, /aria-label="1순위 세부 모델"/g), 1);
     assert.equal(count(two, /aria-label="2순위 세부 모델"/g), 1);
     assert.equal(count(two, /aria-label="1순위 추론 강도 \(Effort\)"/g), 1);
 
-    const three = render({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra' });
+    // 고칠 때는 요약 줄만 보이고 설정 상세는 접혀 있다. 새로 만들 때는 펼쳐서 연다
+    const closed = render({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra' });
+    assert.equal(count(closed, /aria-expanded="false"/g), 1, '고칠 때는 접혀 있다');
+    assert.equal(count(closed, /설정 펼치기/g), 1);
+    assert.equal(count(closed, /class="eng-chain"/g), 1, '접혀도 실행 순서 요약 줄은 보인다');
+    assert.equal(count(closed, /data-step=/g), 3, '요약 줄에 세 순위가 다 있다');
+    for (const hidden of [/data-card=/g, /role="radiogroup"/g, /eng-native/g, /role="switch"/g]) {
+      assert.equal(count(closed, hidden), 0, `접히면 설정 상세는 그리지 않는다: ${hidden.source}`);
+    }
+    const created = render(null);
+    assert.equal(count(created, /aria-expanded="true"/g), 1, '새로 만들 때는 펼쳐서 연다');
+    assert.equal(count(created, /설정 접기/g), 1);
+    assert.equal(count(created, /data-card=/g), 3);
+    const forcedClosed = render(base, { defaultEngineOpen: false });
+    assert.equal(count(forcedClosed, /aria-expanded="false"/g), 1);
+    const opened = render(base, { defaultEngineOpen: true });
+    assert.equal(count(opened, /aria-expanded="true"/g), 1);
+    assert.equal(count(opened, /aria-controls="[^"]+"/g), 1, '접는 단추가 펼치는 영역을 가리킨다');
+
+    const three = render({ ...base, thirdEngine: 'codex', thirdModel: 'gpt-6.2-sol', thirdEffort: 'ultra' }, { defaultEngineOpen: true });
     assert.equal(count(three, /남은 엔진 하나로 정해집니다/g), 1, '켜 둔 3순위는 본문이 보인다');
     assert.equal(count(three, /3순위 세부 모델/g), 1);
     assert.equal(count(three, /3순위 추론 강도/g), 1);

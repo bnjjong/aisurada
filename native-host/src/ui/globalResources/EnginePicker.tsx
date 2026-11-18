@@ -82,6 +82,35 @@ export function SparkIcon() {
   );
 }
 
+/** 순위별 설정 상세를 접고 펴는 단추. [locked]이면 접을 수 없다(채워야 하는 칸이 펼쳐져 있어야 해서). */
+export function EngineFold({
+  open,
+  locked,
+  controls,
+  onToggle,
+}: {
+  open: boolean;
+  locked: boolean;
+  /** 접고 펴는 영역의 id */
+  controls: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="eng-fold"
+      aria-expanded={open}
+      aria-controls={controls}
+      disabled={locked}
+      title={locked ? '직접 입력한 모델 이름을 채우면 접을 수 있습니다' : undefined}
+      onClick={onToggle}
+    >
+      {open ? '설정 접기' : '설정 펼치기'}
+      <ChevronIcon />
+    </button>
+  );
+}
+
 /** 엔진 로고를 둥근 네모 타일에 담는다. 모양은 노트 목록의 출처 아이콘(AgentMark)과 같다. */
 export function EngineLogo({ engine, size = 22 }: { engine: AIEngine; size?: number }) {
   return (

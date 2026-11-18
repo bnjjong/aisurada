@@ -18,6 +18,15 @@
 .eng-head h4 { margin: 0; display: flex; align-items: center; gap: 9px; font-size: 14px; }
 .eng-head-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft, var(--surface)); color: var(--accent); }
 .eng-hint { font-size: 11px; color: var(--muted); }
+.eng-head-end { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ---- 설정 접기·펴기 단추 ---- */
+.eng-fold { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.eng-fold:hover:not(:disabled) { border-color: var(--eng-dash); }
+.eng-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eng-fold:disabled { opacity: 0.5; cursor: not-allowed; }
+.eng-fold svg { color: var(--muted); transition: transform 0.15s; }
+.eng-fold[aria-expanded="true"] svg { transform: rotate(180deg); }
 
 /* ---- 로고 ---- */
 .eng-logo { display: inline-grid; place-items: center; flex: none; box-shadow: inset 0 0 0 1px rgba(128, 138, 160, 0.22); }
@@ -118,7 +127,7 @@ div.eng-tile { cursor: default; }
 .eng-preview b { color: var(--ink); }
 
 @media (prefers-reduced-motion: reduce) {
-  .eng-sw, .eng-sw i { transition: none; }
+  .eng-sw, .eng-sw i, .eng-fold svg { transition: none; }
 }
 
 /* ---- 스킨별 칸 모양 ---- */

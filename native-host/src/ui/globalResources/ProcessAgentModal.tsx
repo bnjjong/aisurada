@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Editor } from '../../editor/Editor.tsx';
 import { EditPendingNotice } from '../ApprovalNotices.tsx';
 import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
-import { EngineTiles, FallbackChain, ModelEffortRow, SparkIcon, ThirdPreview, TierCard, TierSwitch } from './EnginePicker.tsx';
+import { EngineFold, EngineTiles, FallbackChain, ModelEffortRow, SparkIcon, ThirdPreview, TierCard, TierSwitch } from './EnginePicker.tsx';
 import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent, ReasoningEffort } from './types.ts';
 import { AI_ENGINES, MODEL_PRESETS, clampEffort, remainingEngine } from './types.ts';
 
@@ -14,9 +14,11 @@ interface Props {
   resources: GlobalResourceItem[];
   onSave: (agent: ProcessAgent) => Promise<void> | void;
   onClose: () => void;
+  /** 엔진·모델 설정 상세를 처음부터 펼쳐 둘지. 안 주면 새로 만들 때만 펼친다(고칠 때는 요약 줄만 보인다) */
+  defaultEngineOpen?: boolean;
 }
 
-export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }: Props) {
+export function ProcessAgentModal({ agent, skills, resources, onSave, onClose, defaultEngineOpen }: Props) {
   const isEdit = !!agent;
   // 승인을 기다리는 변경이 있으면 이 창의 값은 승인해 둔 옛 판이다. 모르고 저장하면 대기 중인 새 판을 덮어쓴다
   const awaitingApproval = isEdit && agent?.approval === 'dirty';
@@ -84,6 +86,16 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const thirdEngine: AIEngine = remainingEngine(engine, fallbackEngine) ?? AI_ENGINES[0].id;
   const resolvedThirdModel = selectedThirdModel === 'custom' ? customThirdModelInput.trim() || 'inherit' : selectedThirdModel;
   const shownThirdEffort = clampEffort(thirdEngine, resolvedThirdModel, thirdEffort);
+
+  // 설정 상세는 접을 수 있다. 접으면 맨 위 요약 줄만 보인다.
+  // 「직접 입력」을 골랐는데 모델 이름이 비어 있으면 그 칸(필수)을 보여야 해서 접혀 있어도 펼친다
+  const engineBodyId = useId();
+  const [engineOpen, setEngineOpen] = useState(defaultEngineOpen ?? !isEdit);
+  const customModelMissing =
+    (selectedModel === 'custom' && !customModelInput.trim()) ||
+    (selectedFallbackModel === 'custom' && !customFallbackModelInput.trim()) ||
+    (useThird && selectedThirdModel === 'custom' && !customThirdModelInput.trim());
+  const showEngineBody = engineOpen || customModelMissing;
 
   // 1순위나 2순위 엔진이 바뀌면 3순위가 쓸 수 있는 엔진(나머지 하나)도 바뀐다. 달라지면 그 엔진의 기본 모델로 돌린다
   const syncThird = (nextEngine: AIEngine, nextFallback: AIEngine) => {
@@ -230,7 +242,15 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
               </span>
               AI 실행 엔진 및 모델
             </h4>
-            <span className="eng-hint">토큰 부족 시 2순위, 3순위 모델 순서로 자동 대체</span>
+            <span className="eng-head-end">
+              <span className="eng-hint">토큰 부족 시 2순위, 3순위 모델 순서로 자동 대체</span>
+              <EngineFold
+                open={showEngineBody}
+                locked={customModelMissing}
+                controls={engineBodyId}
+                onToggle={() => setEngineOpen(!engineOpen)}
+              />
+            </span>
           </div>
 
           <FallbackChain
@@ -242,97 +262,99 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
             ]}
           />
 
-          <div className="eng-tiers">
-            <TierCard tier={1} title="기본 실행 엔진" tag="필수">
-              <EngineTiles tier={1} selected={engine} usedBy={() => null} onSelect={handleEngineChange} />
-              <ModelEffortRow
-                tier={1}
-                engine={engine}
-                selectedModel={selectedModel}
-                onSelectModel={setSelectedModel}
-                customInput={customModelInput}
-                onCustomInput={setCustomModelInput}
-                resolvedModel={resolvedModel}
-                effort={shownEffort}
-                onEffort={setEffort}
-                placeholder="예: claude-sonnet-5.5"
-              />
-            </TierCard>
+          {showEngineBody && (
+            <div className="eng-tiers" id={engineBodyId}>
+              <TierCard tier={1} title="기본 실행 엔진" tag="필수">
+                <EngineTiles tier={1} selected={engine} usedBy={() => null} onSelect={handleEngineChange} />
+                <ModelEffortRow
+                  tier={1}
+                  engine={engine}
+                  selectedModel={selectedModel}
+                  onSelectModel={setSelectedModel}
+                  customInput={customModelInput}
+                  onCustomInput={setCustomModelInput}
+                  resolvedModel={resolvedModel}
+                  effort={shownEffort}
+                  onEffort={setEffort}
+                  placeholder="예: claude-sonnet-5.5"
+                />
+              </TierCard>
 
-            {/* 2순위 (폴백) 모델 카드: 늘 정한다 */}
-            <TierCard
-              tier={2}
-              title="토큰 고갈 대비 대체 모델 (폴백)"
-              tag="필수"
-              desc={
-                <>
-                  1순위 엔진의 토큰이 소진되었을 때 즉시 투입됩니다. 동일 공급자의 동시 토큰 고갈을 방지하기 위해{' '}
-                  <b>1순위와 같은 엔진은 선택할 수 없습니다.</b>
-                </>
-              }
-            >
-              <EngineTiles
+              {/* 2순위 (폴백) 모델 카드: 늘 정한다 */}
+              <TierCard
                 tier={2}
-                selected={fallbackEngine}
-                usedBy={(id) => (id === engine ? 1 : null)}
-                onSelect={handleFallbackEngineChange}
-              />
-              <ModelEffortRow
-                tier={2}
-                engine={fallbackEngine}
-                selectedModel={selectedFallbackModel}
-                onSelectModel={setSelectedFallbackModel}
-                customInput={customFallbackModelInput}
-                onCustomInput={setCustomFallbackModelInput}
-                resolvedModel={resolvedFallbackModel}
-                effort={shownFallbackEffort}
-                onEffort={setFallbackEffort}
-                placeholder="예: gemini-3.8-flash"
-              />
-            </TierCard>
-
-            {/* 3순위 모델 카드: 선택. 1순위와 2순위가 모두 소진됐을 때만 쓴다 */}
-            <TierCard
-              tier={3}
-              last
-              off={!useThird}
-              title="마지막 대체 모델"
-              tag="선택"
-              head={<TierSwitch checked={useThird} onChange={setUseThird} />}
-              desc={
-                useThird ? (
+                title="토큰 고갈 대비 대체 모델 (폴백)"
+                tag="필수"
+                desc={
                   <>
-                    1순위와 2순위가 모두 소진되었을 때 투입됩니다. 이미 쓰는 두 엔진은 선택할 수 없어서{' '}
-                    <b>남은 엔진 하나로 정해집니다.</b>
+                    1순위 엔진의 토큰이 소진되었을 때 즉시 투입됩니다. 동일 공급자의 동시 토큰 고갈을 방지하기 위해{' '}
+                    <b>1순위와 같은 엔진은 선택할 수 없습니다.</b>
                   </>
-                ) : undefined
-              }
-            >
-              {useThird ? (
-                <>
-                  <EngineTiles
-                    tier={3}
-                    selected={thirdEngine}
-                    usedBy={(id) => (id === engine ? 1 : id === fallbackEngine ? 2 : null)}
-                  />
-                  <ModelEffortRow
-                    tier={3}
-                    engine={thirdEngine}
-                    selectedModel={selectedThirdModel}
-                    onSelectModel={setSelectedThirdModel}
-                    customInput={customThirdModelInput}
-                    onCustomInput={setCustomThirdModelInput}
-                    resolvedModel={resolvedThirdModel}
-                    effort={shownThirdEffort}
-                    onEffort={setThirdEffort}
-                    placeholder="예: gpt-6.2-sol"
-                  />
-                </>
-              ) : (
-                <ThirdPreview engine={thirdEngine} />
-              )}
-            </TierCard>
-          </div>
+                }
+              >
+                <EngineTiles
+                  tier={2}
+                  selected={fallbackEngine}
+                  usedBy={(id) => (id === engine ? 1 : null)}
+                  onSelect={handleFallbackEngineChange}
+                />
+                <ModelEffortRow
+                  tier={2}
+                  engine={fallbackEngine}
+                  selectedModel={selectedFallbackModel}
+                  onSelectModel={setSelectedFallbackModel}
+                  customInput={customFallbackModelInput}
+                  onCustomInput={setCustomFallbackModelInput}
+                  resolvedModel={resolvedFallbackModel}
+                  effort={shownFallbackEffort}
+                  onEffort={setFallbackEffort}
+                  placeholder="예: gemini-3.8-flash"
+                />
+              </TierCard>
+
+              {/* 3순위 모델 카드: 선택. 1순위와 2순위가 모두 소진됐을 때만 쓴다 */}
+              <TierCard
+                tier={3}
+                last
+                off={!useThird}
+                title="마지막 대체 모델"
+                tag="선택"
+                head={<TierSwitch checked={useThird} onChange={setUseThird} />}
+                desc={
+                  useThird ? (
+                    <>
+                      1순위와 2순위가 모두 소진되었을 때 투입됩니다. 이미 쓰는 두 엔진은 선택할 수 없어서{' '}
+                      <b>남은 엔진 하나로 정해집니다.</b>
+                    </>
+                  ) : undefined
+                }
+              >
+                {useThird ? (
+                  <>
+                    <EngineTiles
+                      tier={3}
+                      selected={thirdEngine}
+                      usedBy={(id) => (id === engine ? 1 : id === fallbackEngine ? 2 : null)}
+                    />
+                    <ModelEffortRow
+                      tier={3}
+                      engine={thirdEngine}
+                      selectedModel={selectedThirdModel}
+                      onSelectModel={setSelectedThirdModel}
+                      customInput={customThirdModelInput}
+                      onCustomInput={setCustomThirdModelInput}
+                      resolvedModel={resolvedThirdModel}
+                      effort={shownThirdEffort}
+                      onEffort={setThirdEffort}
+                      placeholder="예: gpt-6.2-sol"
+                    />
+                  </>
+                ) : (
+                  <ThirdPreview engine={thirdEngine} />
+                )}
+              </TierCard>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
