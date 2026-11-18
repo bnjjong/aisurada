@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import type { WorkspaceController } from '../../workspace/controller.ts';
 import { Confirm } from '../Modal.tsx';
 import { Page } from '../OtherPages.tsx';
+import { ApprovalBanner, PendingChip, PendingNote } from '../ApprovalNotices.tsx';
+import { badgeTotal } from '../approvalsClient.ts';
+import { openApprovalsDialog } from '../approvalsDialogStore.ts';
+import { useApprovalCounts } from '../approvalsStore.ts';
 import { GlobalResourceModal } from './GlobalResourceModal.tsx';
 import { GlobalSkillModal } from './GlobalSkillModal.tsx';
 import { ProcessAgentModal } from './ProcessAgentModal.tsx';
@@ -22,6 +26,8 @@ type ActiveTab = 'agents' | 'skills' | 'resources';
 
 export function GlobalResourcesPage({ controller }: { controller: WorkspaceController }) {
   const data = useGlobalResources();
+  // 승인을 기다리는 변경의 수. 맨 위 배너와 카드의 안내가 승인 대기함으로 이어 준다
+  const pendingApprovals = badgeTotal(useApprovalCounts());
   const [activeTab, setActiveTab] = useState<ActiveTab>('agents');
   const [search, setSearch] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -132,6 +138,7 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
         공통 개발 프로세스 에이전트, 글로벌 스킬, 외부 연동 리소스를 등록하고 관리해요.
         디스크(<code>.aisurada/resources/global/</code>)에 파일로 저장되어 <b>데스크톱 앱과 MCP 도구 양쪽에서 모두 조회·편집·삭제</b>할 수 있어요.
       </p>
+      <ApprovalBanner count={pendingApprovals} onOpen={openApprovalsDialog} />
 
       {/* 상단 탭 전환 & 툴바 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -275,9 +282,11 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                           </span>
                         )}
                         {!agent.enabled && <span className="res-kind" style={{ color: 'var(--err)' }}>비활성</span>}
+                        {agent.approval === 'dirty' && <PendingChip />}
                       </p>
                       {agent.role && <p className="res-desc" style={{ fontWeight: 500, color: 'var(--ink)' }}>{agent.role}</p>}
                       {agent.description && <p className="res-desc">{agent.description}</p>}
+                      {agent.approval === 'dirty' && <PendingNote onOpen={openApprovalsDialog} />}
                       <div className="res-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
                         {assignedSkillNames.length > 0 && (
                           <span>스킬: {assignedSkillNames.join(', ')}</span>
@@ -361,8 +370,10 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                   <div className="res-main">
                     <p className="res-title">
                       <strong className="res-name">{skill.name}</strong>
+                      {skill.approval === 'dirty' && <PendingChip />}
                     </p>
                     {skill.description && <p className="res-desc">{skill.description}</p>}
+                    {skill.approval === 'dirty' && <PendingNote onOpen={openApprovalsDialog} />}
                     <div className="res-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
                       {skill.tags.map((t) => (
                         <span key={t} className="res-badge res-badge-off" style={{ fontSize: '11px' }}>

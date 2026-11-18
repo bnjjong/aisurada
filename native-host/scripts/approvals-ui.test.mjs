@@ -9,7 +9,11 @@ import {
 import {
   POLL_MS, getApprovalsSnapshot, refreshApprovalCounts, resetApprovalsStore, setApprovalCounts, startApprovalsWatch,
 } from '../src/ui/approvalsStore.ts';
-import { ApprovalsView, Compare } from '../src/ui/ApprovalPanel.tsx';
+import { ApprovalsView, Compare, revertWarning } from '../src/ui/ApprovalPanel.tsx';
+import { ApprovalBanner, EditPendingNotice, PendingChip, PendingNote } from '../src/ui/ApprovalNotices.tsx';
+import { closeApprovalsDialog, isApprovalsDialogOpen, openApprovalsDialog, subscribeApprovalsDialog } from '../src/ui/approvalsDialogStore.ts';
+import { GlobalResourcesPage } from '../src/ui/globalResources/GlobalResourcesPage.tsx';
+import { syncGlobalResources } from '../src/ui/globalResources/globalResourcesStore.ts';
 import { ResourcesPage } from '../src/ui/ResourcesPage.tsx';
 import { Rail } from '../src/ui/Rail.tsx';
 import { toResource } from '../src/ui/resourcesClient.ts';
@@ -313,4 +317,87 @@ test('the engine rows carry the dirty mark to the list, the rail shows the badge
   const quiet = renderToStaticMarkup(React.createElement(ResourcesPage, { controller }));
   assert.doesNotMatch(quiet, /apv-banner/, 'no banner while nothing waits');
   assert.match(quiet, />승인 대기함<\/button>/, 'the button is always there');
+});
+
+// ---------------------------------------------------------------- 승인 대기함으로 가는 입구들
+
+const entryFixtures = () => ({
+  controller: { navigate() {}, form() {}, filterAgendas() {}, preference() {}, settings() {}, launcher() {}, callEngine: async () => ({}), isNative: () => true },
+  state: { workspace: { path: '/vault', name: 'v', sample: false, today: '2026-11-18', notes: [], templates: [], trash: [], skipped: [], conflicts: [], noteReadFailed: false, agendas: [], projects: [] }, prefs: { collapsedProjects: [] }, hiddenAgendas: [], theme: 'light', route: '/global-resources' },
+});
+const html = (el) => renderToStaticMarkup(el).replace(/<!-- -->/g, '');
+
+test('the rail bubble becomes a button that opens the approvals dialog while changes wait', () => {
+  const { controller, state } = entryFixtures();
+  resetApprovalsStore();
+  assert.doesNotMatch(html(React.createElement(Rail, { controller, state })), /rail-companion-action/, 'plain text while nothing waits');
+  setApprovalCounts({ pending: 0, unapproved: 3 });
+  const rail = html(React.createElement(Rail, { controller, state }));
+  assert.match(rail, /<button type="button" class="rail-companion-action" title="승인 대기함 열기">⚠️ 승인이 필요한 변경이 3건 있어요\. <span>열기 ›<\/span><\/button>/);
+  resetApprovalsStore();
+});
+
+test('the approvals dialog has one open state that every entry shares', () => {
+  closeApprovalsDialog();
+  let calls = 0;
+  const off = subscribeApprovalsDialog(() => calls++);
+  openApprovalsDialog();
+  openApprovalsDialog();
+  assert.equal(isApprovalsDialogOpen(), true);
+  assert.equal(calls, 1, 'opening twice tells the listeners once');
+  closeApprovalsDialog();
+  closeApprovalsDialog();
+  assert.equal(isApprovalsDialogOpen(), false);
+  assert.equal(calls, 2);
+  off();
+});
+
+test('the notices say why the old version shows and where to approve', () => {
+  assert.equal(html(React.createElement(ApprovalBanner, { count: 0, onOpen() {} })), '', 'no banner while nothing waits');
+  const banner = html(React.createElement(ApprovalBanner, { count: 3, onOpen() {} }));
+  assert.match(banner, /승인이 필요한 변경이 3건 있어요\./);
+  assert.match(banner, />승인 대기함 열기<\/button>/);
+  assert.match(html(React.createElement(PendingChip)), />직접 고쳐짐</);
+  const note = html(React.createElement(PendingNote, { onOpen() {} }));
+  assert.match(note, /지금 보이는 것은 승인해 둔 옛 판이에요\./);
+  assert.match(note, />승인 대기함에서 보기 ›<\/button>/);
+  const edit = html(React.createElement(EditPendingNotice, { noun: '에이전트', field: '지침', onOpen() {} }));
+  assert.match(edit, /이 에이전트에는 승인을 기다리는 변경이 있어요\./);
+  assert.match(edit, /보이는 지침은 승인해 둔 옛 판이에요\. 이 상태로 저장하면 대기 중인 새 지침을 덮어써요\./);
+});
+
+test('reverting to the approved version first says what disappears', () => {
+  assert.match(revertWarning({ live: { body: '가'.repeat(6383) } }), /지금 지침 6,383자/);
+  assert.match(revertWarning({ live: { body: '가'.repeat(6383) } }), /정말 되돌릴까요\?$/);
+  assert.doesNotMatch(revertWarning({ live: {} }), /지침 .*자/, 'no size when the body is unknown');
+  assert.doesNotMatch(revertWarning({ live: ['a'] }), /지침 .*자/, 'a reference list has no body');
+});
+
+test('the global resources page shows the banner and marks the agent whose file was edited directly', async () => {
+  const { controller } = entryFixtures();
+  const agent = {
+    id: 'apx-aaaaaaaa', kind: 'agent', scope: 'global', name: '커밋 푸시 에이전트', description: '푸시한다', permission: 'edit', skills: [], body: '옛 지침',
+    tools: { aisurada: { key: 'commit-push', engine: 'gemini', model: 'gemini-3.8-flash', order: 1, enabled: true, resources: [] } },
+    precondition: 'f1:aa', path: '.aisurada/resources/global/agents/a.md', approval: 'dirty',
+  };
+  const clean = { ...agent, id: 'apy-bbbbbbbb', name: '티켓 에이전트', approval: undefined, path: '.aisurada/resources/global/agents/b.md' };
+  const skill = { id: 'skx-cccccccc', kind: 'skill', scope: 'global', name: '스킬', description: '스킬이다', body: '본문', precondition: 'f1:cc', path: '.aisurada/resources/global/skills/s.md' };
+  const rows = [agent, clean, skill];
+  const { call } = fakeEngine({ 'list-resources': () => ({ resources: rows, skipped: [] }), 'get-resource': (argv) => rows.find((r) => r.id === argv[1]) });
+  await syncGlobalResources(call);
+
+  resetApprovalsStore();
+  const quiet = html(React.createElement(GlobalResourcesPage, { controller }));
+  assert.doesNotMatch(quiet, /apv-banner/, 'no banner while nothing waits');
+  setApprovalCounts({ pending: 0, unapproved: 2 });
+  const page = html(React.createElement(GlobalResourcesPage, { controller }));
+  assert.match(page, /승인이 필요한 변경이 2건 있어요\./);
+  assert.match(page, />승인 대기함 열기<\/button>/);
+  const cards = page.split('<li ').slice(1);
+  const marked = cards.find((c) => c.includes('커밋 푸시 에이전트'));
+  const plain = cards.find((c) => c.includes('티켓 에이전트'));
+  assert.match(marked, /직접 고쳐짐/);
+  assert.match(marked, /지금 보이는 것은 승인해 둔 옛 판이에요\./);
+  assert.doesNotMatch(plain, /직접 고쳐짐/, 'only the edited card is marked');
+  resetApprovalsStore();
 });

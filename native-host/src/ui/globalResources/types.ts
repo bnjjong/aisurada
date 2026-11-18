@@ -89,6 +89,8 @@ export interface ProcessAgent {
   order: number;
   f1?: string;
   path?: string;
+  /** `dirty`면 승인한 뒤에 파일이 직접 고쳐진 것이다. 이 경우 화면의 값은 승인해 둔 옛 판이다. */
+  approval?: 'dirty';
 }
 
 export interface GlobalSkill {
@@ -101,6 +103,8 @@ export interface GlobalSkill {
   updatedAt: string;
   f1?: string;
   path?: string;
+  /** `dirty`면 승인한 뒤에 파일이 직접 고쳐진 것이다. 이 경우 화면의 값은 승인해 둔 옛 판이다. */
+  approval?: 'dirty';
 }
 
 export interface GlobalResourceItem {
@@ -550,6 +554,7 @@ export function resourceRowToProcessAgent(row: ResourceRow, index = 0): ProcessA
     order,
     f1: row.precondition,
     path: row.path,
+    approval: row.approval,
   };
 }
 
@@ -581,5 +586,6 @@ export function resourceRowToGlobalSkill(row: ResourceRow): GlobalSkill {
     updatedAt: row.editedAt || new Date().toISOString(),
     f1: row.precondition,
     path: row.path,
+    approval: row.approval,
   };
 }

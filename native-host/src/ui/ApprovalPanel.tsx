@@ -207,7 +207,19 @@ function UnapprovedCompare({ item, names }: { item: Unapproved; names: Record<st
   return <Compare before={approved} after={live} note={item.state === "new" ? "새 파일의 내용이에요." : undefined} />;
 }
 
+/**
+ * 「승인한 판으로 되돌리기」를 누르기 전에 보이는 확인 글. 누르면 지금 파일의 내용(AI가 고친 새 지침)이 사라지므로,
+ * 무엇이 사라지는지(지침 글자 수)를 먼저 알려서 새 지침을 모르고 잃는 일을 막는다.
+ */
+export function revertWarning(u: Unapproved): string {
+  const live = Array.isArray(u.live) ? undefined : u.live;
+  const size = typeof live?.body === "string" && live.body.length > 0 ? ` (지금 지침 ${live.body.length.toLocaleString("ko-KR")}자)` : "";
+  return `지금 파일의 내용이 사라지고 승인해 둔 판으로 돌아가요${size}. 정말 되돌릴까요?`;
+}
+
 function DirectTab(p: ViewProps) {
+  // 되돌리기 확인을 펼친 항목의 키. 한 번에 하나만 펼친다
+  const [confirming, setConfirming] = useState<string | null>(null);
   const list = p.overview.unapproved;
   if (list.length === 0) return <p className="apv-empty">승인 안 된 직접 수정이 없어요.</p>;
   return (
@@ -224,11 +236,32 @@ function DirectTab(p: ViewProps) {
             </header>
             <p className="apv-meta">{STATE_TEXT[u.state]}</p>
             {isOpen && <UnapprovedCompare item={u} names={p.names} />}
-            <div className="apv-actions">
-              <button type="button" aria-expanded={isOpen} onClick={() => p.onToggle(u.key)}>{isOpen ? "비교 접기" : "비교"}</button>
-              <button type="button" disabled={working} onClick={() => p.onResolve(u.key, "revert")}>{u.state === "dirty" ? "승인한 판으로 되돌리기" : "지우기(휴지통으로)"}</button>
-              <button type="button" className="button-primary" disabled={working} onClick={() => p.onResolve(u.key, "approve")}>이 내용을 승인</button>
-            </div>
+            {confirming === u.key ? (
+              <div className="apv-confirm" role="alert">
+                <p>{revertWarning(u)}</p>
+                <div className="apv-actions">
+                  <button type="button" onClick={() => setConfirming(null)}>취소</button>
+                  <button
+                    type="button"
+                    className="apv-danger"
+                    disabled={working}
+                    onClick={() => {
+                      setConfirming(null);
+                      p.onResolve(u.key, "revert");
+                    }}
+                  >
+                    승인한 판으로 되돌리기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="apv-actions">
+                <button type="button" aria-expanded={isOpen} onClick={() => p.onToggle(u.key)}>{isOpen ? "비교 접기" : "비교"}</button>
+                {/* 새 지침이 사라지는 되돌리기는 한 번 더 묻는다. 새 파일을 지우는 것은 휴지통으로 가서 되살릴 수 있으니 바로 한다 */}
+                <button type="button" disabled={working} onClick={() => (u.state === "dirty" ? setConfirming(u.key) : p.onResolve(u.key, "revert"))}>{u.state === "dirty" ? "승인한 판으로 되돌리기" : "지우기(휴지통으로)"}</button>
+                <button type="button" className="button-primary" disabled={working} onClick={() => p.onResolve(u.key, "approve")}>이 내용을 승인</button>
+              </div>
+            )}
           </li>
         );
       })}

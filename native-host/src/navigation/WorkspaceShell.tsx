@@ -10,6 +10,7 @@ import { TabBar } from "./TabBar.tsx";
 import { InteractionOverlays } from "../interaction/Overlays.tsx";
 import { VaultBanner } from "../data/VaultBanner.tsx";
 import { Rail } from "../ui/Rail.tsx";
+import { ApprovalsHost } from "../ui/ApprovalsHost.tsx";
 import { agendaOrder, clampRailWidth } from "../ui/model.ts";
 import { RailResizer } from "../ui/RailResizer.tsx";
 import { Preview } from "../ui/Preview.tsx";
@@ -152,6 +153,8 @@ export function WorkspaceShell({ controller, state }: Props) {
         <Preview key={state.preview} controller={controller} state={state} />
       )}
       <InteractionOverlays controller={controller} state={state} />
+      {/* 레일 말풍선·글로벌 리소스 화면·편집창 어디서든 같은 승인 대기함을 연다 */}
+      <ApprovalsHost controller={controller} />
     </div>
   );
 }

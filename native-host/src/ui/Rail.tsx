@@ -19,6 +19,7 @@ import { listResources, selectableSkills } from "./resourcesClient.ts";
 import type { ResourceKind, ResourceRow } from "./resourcesClient.ts";
 import { parseRepos } from "./repoLinks.ts";
 import { useGlobalResources } from "./globalResources/globalResourcesStore.ts";
+import { openApprovalsDialog } from "./approvalsDialogStore.ts";
 
 const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트", global: "글로벌 리소스" };
 const TAB_ICONS: Record<RailTab, "note" | "bot" | "globe"> = { notes: "note", agents: "bot", global: "globe" };
@@ -380,11 +381,16 @@ export function Rail({
             <div className="rail-companion-bubble">
               <span className="rail-companion-bubble-tail" aria-hidden="true" />
               <p className="rail-companion-msg">
-                {waitingAnswers > 0
-                  ? `💬 답변 대기 태스크가 ${waitingAnswers}건 있어요.`
-                  : approvalBadge
-                    ? `⚠️ 승인이 필요한 변경이 ${approvalBadge}건 있어요.`
-                    : "⚡️ 오늘 어떤 작업을 진행할까요?"}
+                {waitingAnswers > 0 ? (
+                  `💬 답변 대기 태스크가 ${waitingAnswers}건 있어요.`
+                ) : approvalBadge ? (
+                  // 승인을 기다리는 변경은 글로만 알리지 않고, 누르면 승인 대기함이 열리게 한다
+                  <button type="button" className="rail-companion-action" title="승인 대기함 열기" onClick={openApprovalsDialog}>
+                    {`⚠️ 승인이 필요한 변경이 ${approvalBadge}건 있어요.`} <span>열기 ›</span>
+                  </button>
+                ) : (
+                  "⚡️ 오늘 어떤 작업을 진행할까요?"
+                )}
               </p>
             </div>
           </div>

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { EditPendingNotice } from '../ApprovalNotices.tsx';
+import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
 import type { AIEngine, GlobalResourceItem, GlobalSkill, ProcessAgent, ReasoningEffort } from './types.ts';
 import { AI_ENGINES, ENGINE_MODELS, MODEL_PRESETS, REASONING_EFFORTS } from './types.ts';
@@ -14,6 +16,12 @@ interface Props {
 
 export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }: Props) {
   const isEdit = !!agent;
+  // 승인을 기다리는 변경이 있으면 이 창의 값은 승인해 둔 옛 판이다. 모르고 저장하면 대기 중인 새 판을 덮어쓴다
+  const awaitingApproval = isEdit && agent?.approval === 'dirty';
+  const openApprovals = () => {
+    onClose();
+    openApprovalsDialog();
+  };
   const [name, setName] = useState(agent?.name || '');
   const [role, setRole] = useState(agent?.role || '');
   const [description, setDescription] = useState(agent?.description || '');
@@ -127,6 +135,7 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
     >
       <form onSubmit={handleSubmit} className="res-form" style={{ display: 'grid', gap: '16px' }}>
         {error && <div className="res-error">{error}</div>}
+        {awaitingApproval && <EditPendingNotice noun="에이전트" field="지침" onOpen={openApprovals} />}
 
         <label style={{ display: 'grid', gap: '6px' }}>
           <strong>에이전트 이름</strong>
@@ -462,8 +471,13 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
           <button type="button" onClick={onClose}>
             취소
           </button>
-          <button type="submit" className="button-primary">
-            {isEdit ? '수정 내용 저장' : '등록'}
+          {awaitingApproval && (
+            <button type="button" className="button-primary" onClick={openApprovals}>
+              승인 대기함에서 보기
+            </button>
+          )}
+          <button type="submit" className={awaitingApproval ? 'apv-overwrite' : 'button-primary'}>
+            {awaitingApproval ? '덮어쓰고 저장' : isEdit ? '수정 내용 저장' : '등록'}
           </button>
         </div>
       </form>
