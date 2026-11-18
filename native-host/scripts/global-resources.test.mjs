@@ -324,7 +324,7 @@ test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
   assert.equal(saveInput.name, skill.name);
 
   const fakeRow = {
-    id: 'sk-ai-commit-01',
+    id: 'sk-proj-mgr-01',
     kind: 'skill',
     scope: 'global',
     name: saveInput.name,
@@ -332,12 +332,12 @@ test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
     body: saveInput.body,
     skills: [],
     tools: {},
-    path: '.aisurada/resources/global/skills/ai-commit/SKILL.md',
+    path: '.aisurada/resources/global/skills/project-manager/SKILL.md',
     precondition: 'f1:skill-token',
   };
 
   const reconstructed = resourceRowToGlobalSkill(fakeRow);
-  assert.equal(reconstructed.id, 'sk-ai-commit-01');
+  assert.equal(reconstructed.id, 'sk-proj-mgr-01');
   assert.equal(reconstructed.name, skill.name);
   assert.equal(reconstructed.f1, 'f1:skill-token');
 });
@@ -427,8 +427,8 @@ test('saveProcessAgent inherits real id and f1 when called with proc- mock agent
       id: 'sk-real-1',
       kind: 'skill',
       scope: 'global',
-      name: 'ai-commit',
-      description: '커밋',
+      name: 'project-manager',
+      description: '프로젝트 관리',
       path: '.aisurada/resources/global/skills/a.md',
       tools: {},
     },

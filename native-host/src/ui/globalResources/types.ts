@@ -214,7 +214,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     name: '공통 개발 프로세스 오케스트레이터',
     role: '전체 개발 프로세스 라이프사이클 총괄 조율',
     description: '요구사항 확정부터 브랜치 관리, 검사, PR 발행 및 작업 자원 정리까지 개발 프로세스 7단계를 순차적으로 통제하고 관리합니다.',
-    skills: ['gskill-ai-sync', 'gskill-project-manager'],
+    skills: ['gskill-project-manager'],
     resources: ['gres-jira', 'gres-github', 'gres-task'],
     prompt: `당신은 공통 개발 프로세스 총괄 오케스트레이터입니다.
 각 작업 단계별로 전문 에이전트(티켓, 개발, QA, PR 리뷰&머지, 클린업, 리포트 등)를 지휘하며 프로세스 준수 여부를 확인하고 단계 전환을 통제합니다.`,
@@ -252,7 +252,7 @@ export const DEFAULT_PROCESS_AGENTS: ProcessAgent[] = [
     name: '커밋 푸시 에이전트',
     role: '규격 커밋 메시지 작성 및 원격 저장소 푸시',
     description: '변경사항을 분석하여 표준 커밋 메시지(type(scope): subject [ID])를 생성하고 최신 기준 브랜치 위에 원격 push합니다.',
-    skills: ['gskill-ai-commit'],
+    skills: [],
     resources: ['gres-github'],
     prompt: `당신은 커밋과 푸시를 전담하는 에이전트입니다.
 반드시 변경된 파일만을 대상으로 논리적 단위 커밋을 생성하며, 규격 포맷을 철저히 지킵니다.`,
@@ -385,7 +385,7 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
     name: '최종 검수 에이전트',
     role: '프로세스 준수 여부 및 최종 무결성 검수',
     description: '빌드 성공 여부, 문서 최신화, 토큰 누출 방지 및 공통 규칙 체크리스트를 최종 검수합니다.',
-    skills: ['gskill-ai-sync'],
+    skills: [],
     resources: ['gres-jira', 'gres-github'],
     prompt: `당신은 최종 검수 에이전트입니다.
 프로젝트 공통 규칙의 체크리스트가 누락 없이 이행되었는지 엄격하게 최종 점검합니다.`,
@@ -401,29 +401,6 @@ Summary, Evidence, Merge Danger 3요소를 꼼꼼히 점검하고 리뷰 의견�
 ];
 
 export const DEFAULT_GLOBAL_SKILLS: GlobalSkill[] = [
-  {
-    id: 'gskill-ai-commit',
-    name: 'ai-commit',
-    description: '규격 커밋 메시지를 생성하고 원격 저장소에 안전하게 푸시합니다.',
-    body: `# ai-commit 스킬
-형식: type(scope): subject [Jira-ID]
-1. 변경 파일 확인
-2. 빌드 및 타입 검사
-3. 규격 커밋 생성 및 push`,
-    tags: ['git', 'commit', 'automation'],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'gskill-ai-sync',
-    name: 'ai-sync',
-    description: '공유 AI 리소스(규칙, 컨벤션, 스킬, 가이드)를 동기화합니다.',
-    body: `# ai-sync 스킬
-공통 지침 및 컨벤션을 최신 상태로 동기화하고 변경사항을 적용합니다.`,
-    tags: ['rules', 'sync', 'governance'],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
   {
     id: 'gskill-project-manager',
     name: 'project-manager',

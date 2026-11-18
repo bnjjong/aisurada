@@ -67,7 +67,7 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예: ai-commit"
+            placeholder="예: project-manager"
             required
           />
         </label>
