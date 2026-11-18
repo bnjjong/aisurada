@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Editor } from '../../editor/Editor.tsx';
 import { EditPendingNotice } from '../ApprovalNotices.tsx';
 import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
@@ -24,6 +25,8 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
   const [description, setDescription] = useState(skill?.description || '');
   const [tagsText, setTagsText] = useState(skill?.tags.join(', ') || '');
   const [body, setBody] = useState(skill?.body || '');
+  const [bodyViewMode, setBodyViewMode] = useState<'editor' | 'raw'>('editor');
+  const [bodyEditorKey, setBodyEditorKey] = useState(0);
   const [error, setError] = useState('');
 
   const handleSubmit = (e: FormEvent) => {
@@ -80,16 +83,52 @@ export function GlobalSkillModal({ skill, onSave, onClose }: Props) {
           />
         </label>
 
-        <label style={{ display: 'grid', gap: '6px' }}>
-          <strong>스킬 지침 본문 (SKILL.md)</strong>
-          <textarea
-            rows={8}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="# 스킬 실행 가이드&#10;구체적인 절차와 행동 지침을 마크다운으로 작성해 주세요."
-            className="res-body"
-          />
-        </label>
+        <div style={{ display: 'grid', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong>스킬 지침 본문 (SKILL.md)</strong>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                type="button"
+                className={`res-badge ${bodyViewMode === 'editor' ? 'res-badge-ref' : 'res-badge-off'}`}
+                style={{ fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}
+                onClick={() => {
+                  if (bodyViewMode !== 'editor') {
+                    setBodyEditorKey((k) => k + 1);
+                    setBodyViewMode('editor');
+                  }
+                }}
+              >
+                노트 서식
+              </button>
+              <button
+                type="button"
+                className={`res-badge ${bodyViewMode === 'raw' ? 'res-badge-ref' : 'res-badge-off'}`}
+                style={{ fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}
+                onClick={() => setBodyViewMode('raw')}
+              >
+                마크다운 원문
+              </button>
+            </div>
+          </div>
+          {bodyViewMode === 'editor' ? (
+            <div className="res-prompt-editor">
+              <Editor
+                key={`${skill?.id || 'new'}-${bodyEditorKey}`}
+                body={body}
+                onChange={(text) => setBody(text)}
+                label="스킬 지침 본문"
+              />
+            </div>
+          ) : (
+            <textarea
+              rows={8}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="# 스킬 실행 가이드&#10;구체적인 절차와 행동 지침을 마크다운으로 작성해 주세요."
+              className="res-body"
+            />
+          )}
+        </div>
 
         <div className="page-actions" style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button type="button" onClick={onClose}>

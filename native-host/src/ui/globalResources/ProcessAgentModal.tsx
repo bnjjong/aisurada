@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Editor } from '../../editor/Editor.tsx';
 import { EditPendingNotice } from '../ApprovalNotices.tsx';
 import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { Modal } from '../Modal.tsx';
@@ -56,6 +57,8 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
   const [selectedSkills, setSelectedSkills] = useState<string[]>(agent?.skills || []);
   const [selectedResources, setSelectedResources] = useState<string[]>(agent?.resources || []);
   const [prompt, setPrompt] = useState(agent?.prompt || '');
+  const [promptViewMode, setPromptViewMode] = useState<'editor' | 'raw'>('editor');
+  const [promptEditorKey, setPromptEditorKey] = useState(0);
   const [error, setError] = useState('');
 
   // 모델마다 고를 수 있는 추론 강도가 달라서, 지금 고른 모델에서 쓸 수 있는 값만 보여 준다.
@@ -463,16 +466,52 @@ export function ProcessAgentModal({ agent, skills, resources, onSave, onClose }:
           )}
         </div>
 
-        <label style={{ display: 'grid', gap: '6px' }}>
-          <strong>지침 및 시스템 프롬프트</strong>
-          <textarea
-            rows={5}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="에이전트 실행 시 주입할 기본 지침과 행동 원칙을 작성해 주세요."
-            className="res-body"
-          />
-        </label>
+        <div style={{ display: 'grid', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong>지침 및 시스템 프롬프트</strong>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                type="button"
+                className={`res-badge ${promptViewMode === 'editor' ? 'res-badge-ref' : 'res-badge-off'}`}
+                style={{ fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}
+                onClick={() => {
+                  if (promptViewMode !== 'editor') {
+                    setPromptEditorKey((k) => k + 1);
+                    setPromptViewMode('editor');
+                  }
+                }}
+              >
+                노트 서식
+              </button>
+              <button
+                type="button"
+                className={`res-badge ${promptViewMode === 'raw' ? 'res-badge-ref' : 'res-badge-off'}`}
+                style={{ fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}
+                onClick={() => setPromptViewMode('raw')}
+              >
+                마크다운 원문
+              </button>
+            </div>
+          </div>
+          {promptViewMode === 'editor' ? (
+            <div className="res-prompt-editor">
+              <Editor
+                key={`${agent?.id || 'new'}-${promptEditorKey}`}
+                body={prompt}
+                onChange={(text) => setPrompt(text)}
+                label="지침 및 시스템 프롬프트"
+              />
+            </div>
+          ) : (
+            <textarea
+              rows={8}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="에이전트 실행 시 주입할 기본 지침과 행동 원칙을 작성해 주세요."
+              className="res-body"
+            />
+          )}
+        </div>
 
         <div className="page-actions" style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button type="button" onClick={onClose}>
