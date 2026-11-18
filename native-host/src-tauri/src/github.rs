@@ -496,10 +496,13 @@ impl GithubService {
                 .and_then(Value::as_str)
                 .map(str::to_string)
         };
-        let has_key = matches!(self.store.get(), Ok(Some(_)));
+        // 화면 진입 시마다 키체인을 열면 macOS 보안 확인 대화상자가 반복해서 뜨므로,
+        // 단순 연결 상태 확인은 설정 파일(github-app.json)의 appId 유무로 판단한다.
+        // 실제 개인 키는 토큰 발급 등 API 호출 시 credentials()에서 필요할 때만 키체인에서 읽는다.
         let app_id = text("appId");
+        let connected = app_id.as_deref().map_or(false, |id| !id.trim().is_empty());
         GithubStatus {
-            connected: has_key && app_id.is_some(),
+            connected,
             app_id,
             app_name: text("appName"),
             app_slug: text("appSlug"),
