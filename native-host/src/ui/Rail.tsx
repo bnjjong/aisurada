@@ -18,6 +18,7 @@ import { ResourceFormModal } from "./ResourceFormModal.tsx";
 import { listResources, selectableSkills } from "./resourcesClient.ts";
 import type { ResourceKind, ResourceRow } from "./resourcesClient.ts";
 import { parseRepos } from "./repoLinks.ts";
+import { useGlobalResources } from "./globalResources/globalResourcesStore.ts";
 
 const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트", global: "글로벌 리소스" };
 const TAB_ICONS: Record<RailTab, "note" | "bot" | "globe"> = { notes: "note", agents: "bot", global: "globe" };
@@ -49,6 +50,8 @@ export function Rail({
   state: WorkspaceState;
 }) {
   useSessionBadge();
+  // 글로벌 리소스 화면이 엔진에서 읽어 둔 개수. 글로벌 탭의 요약에 쓴다(화면에 들어가기 전에는 기본 시드 값이다)
+  const globalResources = useGlobalResources();
   // 승인이 필요한 스킬·에이전트 변경의 수(#53). 스킬·에이전트 메뉴에 배지로 붙는다
   const approvalCounts = useApprovalCounts();
   const approvalBadge = badgeText(approvalCounts);
@@ -425,9 +428,9 @@ export function Rail({
             <h3>공통 자원 관리</h3>
           </header>
           <ul className="rail-global-list">
-            <li><span>프로세스 에이전트</span><strong>10개</strong></li>
-            <li><span>글로벌 스킬</span><strong>3개</strong></li>
-            <li><span>연동 인프라 (Mock)</span><strong>5개</strong></li>
+            <li><span>프로세스 에이전트</span><strong>{globalResources.agents.length}개</strong></li>
+            <li><span>글로벌 스킬</span><strong>{globalResources.skills.length}개</strong></li>
+            <li><span>연동 인프라 (Mock)</span><strong>{globalResources.resources.length}개</strong></li>
           </ul>
         </div>
 
