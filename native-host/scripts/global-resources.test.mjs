@@ -544,3 +544,19 @@ test('a resizable modal keeps its grip in its own bottom bar, apart from the scr
     else delete globalThis.document;
   }
 });
+
+test('effortLevel fills the whole meter at the highest effort a model supports', async () => {
+  const { effortLevel } = await import('../src/ui/globalResources/EnginePicker.tsx');
+  // Gemini 3.8 Flash는 low·medium·high뿐이라 high가 꽉 찬 5칸이고 아래 단계는 고르게 펼쳐진다
+  assert.deepEqual(['low', 'medium', 'high'].map((e) => effortLevel('gemini', 'gemini-3.8-flash', e)), [1, 3, 5]);
+  // 5단계 이상인 모델은 강도마다 정해진 칸 수를 그대로 쓴다
+  assert.deepEqual(['low', 'medium', 'high', 'xhigh', 'max'].map((e) => effortLevel('claude', 'claude-sonnet-5.5', e)), [1, 2, 3, 4, 5]);
+  assert.deepEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map((e) => effortLevel('codex', 'gpt-6.2-sol', e)), [1, 2, 3, 4, 5, 5]);
+  // 4단계 모델도 가장 높은 강도(max)가 꽉 찬다
+  assert.equal(effortLevel('claude', 'claude-sonnet-4.6', 'max'), 5);
+  // default와 상속한 모델은 강도를 모르므로 채우지 않는다
+  assert.equal(effortLevel('gemini', 'gemini-3.8-flash', 'default'), 0);
+  assert.equal(effortLevel('claude', 'inherit', 'default'), 0);
+  // 표에 없는 모델은 엔진 기본 단계를 따른다(gemini는 세 단계)
+  assert.equal(effortLevel('gemini', 'gemini-custom-x', 'high'), 5);
+});

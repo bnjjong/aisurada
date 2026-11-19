@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { AgentGlyph } from '../AgentMark.tsx';
 import type { AIEngine, ReasoningEffort } from './types.ts';
-import { AI_ENGINES, ENGINE_MODELS, effortInfosFor } from './types.ts';
+import { AI_ENGINES, ENGINE_MODELS, effortInfosFor, effortsForModel } from './types.ts';
 
 /**
  * 에이전트 편집 창의 「AI 실행 엔진 및 모델」 영역을 이루는 부품들(모양은 engine-picker.css).
@@ -130,8 +130,32 @@ export function EngineLogo({ engine, size = 22, bare = false }: { engine: AIEngi
 /** 추론 강도 막대 눈금: low 1칸에서 max 5칸까지. default는 점선, ultra는 5칸에 다른 빛깔. */
 const EFFORT_LEVEL: Record<ReasoningEffort, number> = { default: 0, low: 1, medium: 2, high: 3, xhigh: 4, max: 5, ultra: 5 };
 
-export function EffortMeter({ effort, compact = false }: { effort: ReasoningEffort; compact?: boolean }) {
-  const level = EFFORT_LEVEL[effort] ?? 0;
+/**
+ * 막대에 채울 칸 수. 모델이 지원하는 강도가 5단계 미만이면(예: Gemini는 low·medium·high뿐)
+ * 그 모델의 가장 높은 강도가 꽉 찬 5칸이 되도록 고르게 펼친다(low 1칸, medium 3칸, high 5칸).
+ * 5단계 이상이면 강도마다 정해진 칸 수를 그대로 쓴다. default나 이 모델이 모르는 값은 정해진 칸 수다.
+ */
+export function effortLevel(engine: AIEngine, model: string, effort: ReasoningEffort): number {
+  const steps: ReasoningEffort[] = effortsForModel(engine, model).filter((e) => e !== 'default');
+  const at = steps.indexOf(effort);
+  if (at < 0 || steps.length >= 5) return EFFORT_LEVEL[effort] ?? 0;
+  if (steps.length === 1) return 5;
+  return Math.round(1 + (at * 4) / (steps.length - 1));
+}
+
+/** [engine]와 [model]을 함께 주면 그 모델의 지원 단계에 맞춰 칸 수를 정하고, 안 주면 강도마다 정해진 칸 수를 쓴다. */
+export function EffortMeter({
+  effort,
+  engine,
+  model,
+  compact = false,
+}: {
+  effort: ReasoningEffort;
+  engine?: AIEngine;
+  model?: string;
+  compact?: boolean;
+}) {
+  const level = engine && model ? effortLevel(engine, model, effort) : (EFFORT_LEVEL[effort] ?? 0);
   return (
     <span
       className={`eng-meter${level === 0 ? ' is-default' : ''}${effort === 'ultra' ? ' is-ultra' : ''}${compact ? ' is-compact' : ''}`}
@@ -279,7 +303,7 @@ export function ModelEffortRow({
         <label>
           <span className="eng-lab">추론 강도 (Effort)</span>
           <span className="eng-sel">
-            <EffortMeter effort={currentEffort.id} />
+            <EffortMeter effort={currentEffort.id} engine={engine} model={resolvedModel} />
             <span className="eng-sel-txt">
               <b>{effortText.name}</b>
               {effortText.desc && <em>{effortText.desc}</em>}
@@ -414,7 +438,7 @@ export function FallbackChain({ steps, thirdOff, compact = false }: { steps: Cha
               <EngineLogo engine={step.engine} size={compact ? 15 : 20} bare />
               <b>{modelName(step.engine, step.model)}</b>
               <span className="eng-ep">
-                <EffortMeter effort={step.effort} compact={compact} />
+                <EffortMeter effort={step.effort} engine={step.engine} model={step.model} compact={compact} />
                 {step.effort}
               </span>
             </span>
