@@ -13,6 +13,7 @@ import { ResourcesPage } from '../src/ui/ResourcesPage.tsx';
 import { ProjectPage } from '../src/ui/ProjectPage.tsx';
 import { toArgv } from '../src/data/commands.ts';
 import { Rail } from '../src/ui/Rail.tsx';
+import { ProjectResourceRows, rowsByProject, expandKey, EMPTY_PROJECT_ROWS } from '../src/ui/RailProjectResources.tsx';
 
 const raw = (extra = {}) => ({ id: 'skmwd7nzi4-05049130', kind: 'skill', scope: 'global', name: '번역 검수', description: '번역을 검수한다', path: '.aisurada/resources/global/skills/번역-검수/SKILL.md', ...extra });
 const res = (extra = {}) => toResource(raw(extra));
@@ -232,4 +233,36 @@ test('the global tab links to the global page and to each project resource, and 
   const notes = renderToStaticMarkup(React.createElement(Rail, { controller: fakeController(), state: state('/calendar') }));
   assert.doesNotMatch(notes, /글로벌 리소스 정의/);
   assert.doesNotMatch(notes, /스킬·에이전트</);
+});
+
+test('rowsByProject splits project agents and skills by slug and leaves global resources out', () => {
+  const rows = rowsByProject([
+    res(),
+    agent({ id: 'ap1', scope: 'project', project: '앱', name: '앱 개발' }),
+    res({ id: 'sk1', scope: 'project', project: '앱', name: '앱 스킬' }),
+    agent({ id: 'ap2', scope: 'project', project: '웹', name: '웹 개발' }),
+  ]);
+  assert.deepEqual(Object.keys(rows).sort(), ['앱', '웹']);
+  assert.deepEqual(rows['앱'].agents.map((r) => r.name), ['앱 개발']);
+  assert.deepEqual(rows['앱'].skills.map((r) => r.name), ['앱 스킬']);
+  assert.deepEqual(rows['웹'].skills, []);
+});
+
+test('a rail resource row with items folds out to their names, and an empty row still opens the create form', () => {
+  const noop = () => {};
+  const rows = { agents: [agent({ id: 'ap1', scope: 'project', project: '앱', name: '앱 개발 에이전트', description: '앱을 고친다' })], skills: [] };
+  const props = { slug: '앱', name: '앱', rows, toggle: noop, create: noop, edit: noop };
+  const closed = renderToStaticMarkup(React.createElement(ProjectResourceRows, { ...props, expanded: new Set() })).replace(/<!-- -->/g, '');
+  assert.match(closed, /aria-expanded="false"[^>]*title="앱의 에이전트 목록 보기"/);
+  assert.doesNotMatch(closed, /앱 개발 에이전트/, 'names stay hidden until the row is opened');
+  assert.match(closed, /title="앱에 새 스킬 등록"/, 'a row with nothing in it opens the create form');
+  assert.match(closed, /<small>1<\/small>/);
+  const open = renderToStaticMarkup(React.createElement(ProjectResourceRows, { ...props, expanded: new Set([expandKey('앱', 'agent')]) })).replace(/<!-- -->/g, '');
+  assert.match(open, /aria-expanded="true"[^>]*title="앱의 에이전트 접기"/);
+  assert.match(open, /<ul class="rail-sub-resource-list" aria-label="앱의 에이전트">/);
+  assert.match(open, /title="앱 개발 에이전트 — 앱을 고친다"><span>앱 개발 에이전트<\/span>/);
+  assert.equal((open.match(/>\+등록</g) || []).length, 2, 'both rows keep their create button');
+  const empty = renderToStaticMarkup(React.createElement(ProjectResourceRows, { ...props, rows: EMPTY_PROJECT_ROWS, expanded: new Set([expandKey('앱', 'agent')]) }));
+  assert.doesNotMatch(empty, /rail-sub-resource-list/, 'an empty row never folds out');
+  assert.doesNotMatch(empty, /aria-expanded/);
 });

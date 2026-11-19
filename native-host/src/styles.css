@@ -521,6 +521,15 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .rail-agenda.rail-sub-resource button.agenda-name { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: center; }
 .rail-agenda button.sub-resource-add-btn { width: auto !important; position: absolute; top: 50%; right: 2px; transform: translateY(-50%); opacity: 0; pointer-events: none; transition: opacity 0.12s; font-size: 11px; font-weight: 600; padding: 2px 7px !important; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.4); background: #182438; color: var(--accent); cursor: pointer; white-space: nowrap; line-height: 1.4; z-index: 2; }
 .rail-agenda button.sub-resource-add-btn:hover { background: var(--accent); color: #fff; }
+/* 개수가 있는 에이전트·스킬 줄은 눌러서 이름 목록을 펼친다(RailProjectResources.tsx). 화살표는 프로젝트 줄처럼 펼치면 아래를 본다. */
+.rail-agenda.rail-sub-resource .sub-resource-label { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.rail-agenda.rail-sub-resource .sub-resource-chevron { display: inline-flex; color: var(--muted); transition: transform 0.12s; }
+.rail-agenda.rail-sub-resource button[aria-expanded="true"] .sub-resource-chevron { transform: rotate(90deg); }
+/* 펼친 이름 목록은 줄 아이콘(18px)과 간격 다음의 글자 열에 맞춰 들인다. 글로벌 탭의 굵은 줄 글씨(.rail-resources)를 이기도록 :root를 겹친다. */
+.rail-sub-resource-list { list-style: none; margin: 0 0 2px; padding: 0 0 0 18px; }
+:root:root .rail-agenda.rail-sub-resource-item button.agenda-name { padding: 6px 5px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.rail-agenda.rail-sub-resource-item button.agenda-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root:root .rail-agenda.rail-sub-resource-item:hover button.agenda-name { color: var(--ink); }
 /* 아젠다 줄의 오른쪽 끝을 프로젝트 줄(오른쪽 여백 10px)과 맞춰야 두 줄의 개수가 한 열에 선다. 스킨마다 줄 안쪽 여백이 달라 :root를 겹쳐 맞춘다. */
 :root:root .rail-kids .rail-agenda { padding-right: 10px; }
 .rail-kids .rail-agenda button.agenda-name { padding-right: 0; }

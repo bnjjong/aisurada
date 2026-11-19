@@ -16,11 +16,13 @@ import { parseRoute } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
-import { listResources, selectableSkills } from "./resourcesClient.ts";
+import { explainError, getResource, listResources, selectableSkills } from "./resourcesClient.ts";
 import type { ResourceKind, ResourceRow } from "./resourcesClient.ts";
 import { parseRepos } from "./repoLinks.ts";
 import { useGlobalResources } from "./globalResources/globalResourcesStore.ts";
 import { openApprovalsDialog } from "./approvalsDialogStore.ts";
+import { EMPTY_PROJECT_ROWS, ProjectResourceRows, rowsByProject } from "./RailProjectResources.tsx";
+import type { ProjectRows } from "./RailProjectResources.tsx";
 
 const TAB_LABELS: Record<RailTab, string> = { notes: "노트", agents: "에이전트", global: "글로벌 리소스" };
 const TAB_ICONS: Record<RailTab, "note" | "bot" | "globe"> = { notes: "note", agents: "bot", global: "globe" };
@@ -75,39 +77,65 @@ export function Rail({
   const activeAgendaId = route.kind === "agenda" ? route.id : null;
 
   // 프로젝트별 에이전트/스킬 등록 모달 상태
-  const [resForm, setResForm] = useState<{ kind: ResourceKind; project: string } | null>(null);
+  const [resForm, setResForm] = useState<{ kind: ResourceKind; project: string; existing?: ResourceRow } | null>(null);
   // 프로젝트 헤더 + 버튼 액션 메뉴 상태
   const [projectMenuAnchor, setProjectMenuAnchor] = useState<{ element: HTMLElement; slug: string; name: string } | null>(null);
-  // 프로젝트별 리소스 개수 및 전체 스킬 목록
-  const [resourceCounts, setResourceCounts] = useState<Record<string, { skills: number; agents: number }>>({});
+  // 프로젝트별 에이전트·스킬(이름 목록과 개수)과 편집 창이 고를 전체 스킬 목록
+  const [projectRows, setProjectRows] = useState<Record<string, ProjectRows>>({});
   const [allSkills, setAllSkills] = useState<ResourceRow[]>([]);
+  // 레일에서 펼친 에이전트·스킬 줄(`slug/kind`)과, 자원을 열다 난 오류(프로젝트 하나에만 보인다)
+  const [expandedRes, setExpandedRes] = useState<ReadonlySet<string>>(() => new Set());
+  const [resError, setResError] = useState<{ slug: string; text: string } | null>(null);
 
-  const loadResourceCounts = useCallback(async () => {
+  const loadProjectResources = useCallback(async () => {
     try {
       const list = await listResources(controller.callEngine);
-      const counts: Record<string, { skills: number; agents: number }> = {};
-      const skills: ResourceRow[] = [];
-      for (const r of list.resources) {
-        if (r.kind === "skill") skills.push(r);
-        if (r.project) {
-          if (!counts[r.project]) counts[r.project] = { skills: 0, agents: 0 };
-          if (r.kind === "skill") counts[r.project].skills += 1;
-          else if (r.kind === "agent") counts[r.project].agents += 1;
-        }
-      }
-      setResourceCounts(counts);
-      setAllSkills(skills);
+      setProjectRows(rowsByProject(list.resources));
+      setAllSkills(list.resources.filter((r) => r.kind === "skill"));
     } catch {
       // 무시
     }
   }, [controller.callEngine]);
 
+  // 처음 뜰 때와 승인 대기 수가 바뀔 때(승인·거절로 자원이 바뀌었을 수 있다) 다시 읽는다
   useEffect(() => {
-    void loadResourceCounts();
-    const onFocus = () => void loadResourceCounts();
+    void loadProjectResources();
+  }, [loadProjectResources, approvalCounts.pending, approvalCounts.unapproved]);
+  // 창이 다시 눈에 띌 때도 읽는다(다른 창이나 AI가 고쳤을 수 있다)
+  useEffect(() => {
+    const onFocus = () => void loadProjectResources();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [loadResourceCounts]);
+  }, [loadProjectResources]);
+
+  const toggleRes = (key: string) =>
+    setExpandedRes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  // 목록의 행에는 본문과 쓰기 전 토큰이 없어서 편집 창을 열기 전에 한 건을 다시 읽는다
+  const editRes = async (slug: string, row: ResourceRow) => {
+    try {
+      setResError(null);
+      setResForm({ kind: row.kind, project: slug, existing: await getResource(controller.callEngine, row.id) });
+    } catch (e) {
+      setResError({ slug, text: explainError(e) });
+    }
+  };
+  const resourceRows = (slug: string, name: string) => (
+    <ProjectResourceRows
+      slug={slug}
+      name={name}
+      rows={projectRows[slug] ?? EMPTY_PROJECT_ROWS}
+      expanded={expandedRes}
+      error={resError?.slug === slug ? resError.text : undefined}
+      toggle={toggleRes}
+      create={(kind) => setResForm({ kind, project: slug })}
+      edit={(row) => void editRes(slug, row)}
+    />
+  );
 
   const group = (
     name: string,
@@ -117,7 +145,6 @@ export function Rail({
   ) => {
     const isNone = slug === LOOSE_GROUP_KEY || slug === "" || slug === "__none__";
     const collapsed = railGroupCollapsed(state.prefs.collapsedProjects, ws.projects.length, slug);
-    const pCounts = resourceCounts[slug] ?? { skills: 0, agents: 0 };
     return (
       <section key={slug || LOOSE_GROUP_KEY} className="rail-group">
         {ws.projects.length > 0 && (
@@ -234,62 +261,7 @@ export function Rail({
               </div>
             );
           })}
-            {!isNone && (
-              <>
-                <div className="rail-agenda rail-sub-resource">
-                  <span className="agenda-dot sub-resource-icon" aria-hidden="true">
-                    <Icon name="bot" size={13} />
-                  </span>
-                  <button
-                    type="button"
-                    className="agenda-name"
-                    onClick={() => setResForm({ kind: "agent", project: slug })}
-                    title={`${name}에 새 에이전트 등록`}
-                  >
-                    <span>에이전트</span>
-                    <small>{pCounts.agents}</small>
-                  </button>
-                  <button
-                    type="button"
-                    className="sub-resource-add-btn"
-                    title={`${name}에 새 에이전트 등록`}
-                    aria-label={`${name}에 새 에이전트 등록`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setResForm({ kind: "agent", project: slug });
-                    }}
-                  >
-                    +등록
-                  </button>
-                </div>
-                <div className="rail-agenda rail-sub-resource">
-                  <span className="agenda-dot sub-resource-icon" aria-hidden="true">
-                    <Icon name="zap" size={13} />
-                  </span>
-                  <button
-                    type="button"
-                    className="agenda-name"
-                    onClick={() => setResForm({ kind: "skill", project: slug })}
-                    title={`${name}에 새 스킬 등록`}
-                  >
-                    <span>스킬</span>
-                    <small>{pCounts.skills}</small>
-                  </button>
-                  <button
-                    type="button"
-                    className="sub-resource-add-btn"
-                    title={`${name}에 새 스킬 등록`}
-                    aria-label={`${name}에 새 스킬 등록`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setResForm({ kind: "skill", project: slug });
-                    }}
-                  >
-                    +등록
-                  </button>
-                </div>
-              </>
-            )}
+            {!isNone && resourceRows(slug, name)}
           </div>
         )}
       </section>
@@ -452,7 +424,6 @@ export function Rail({
             {ws.projects.map((p) => {
               const slug = asText(p.slug);
               const name = asText(p.title);
-              const pCounts = resourceCounts[slug] ?? { skills: 0, agents: 0 };
               const projectAgendas = ws.agendas.filter((a) => a.project === slug);
               return (
                 <div key={asText(p.id) || slug} className="rail-group" style={{ marginBottom: "10px" }}>
@@ -487,58 +458,7 @@ export function Rail({
                     </span>
                   </header>
                   <div className="rail-kids" style={{ marginTop: "4px" }}>
-                    <div className="rail-agenda rail-sub-resource">
-                      <span className="agenda-dot sub-resource-icon" aria-hidden="true">
-                        <Icon name="bot" size={13} />
-                      </span>
-                      <button
-                        type="button"
-                        className="agenda-name"
-                        onClick={() => setResForm({ kind: "agent", project: slug })}
-                        title={`${name}에 새 에이전트 등록`}
-                      >
-                        <span>에이전트</span>
-                        <small>{pCounts.agents}</small>
-                      </button>
-                      <button
-                        type="button"
-                        className="sub-resource-add-btn"
-                        title={`${name}에 새 에이전트 등록`}
-                        aria-label={`${name}에 새 에이전트 등록`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setResForm({ kind: "agent", project: slug });
-                        }}
-                      >
-                        +등록
-                      </button>
-                    </div>
-                    <div className="rail-agenda rail-sub-resource">
-                      <span className="agenda-dot sub-resource-icon" aria-hidden="true">
-                        <Icon name="zap" size={13} />
-                      </span>
-                      <button
-                        type="button"
-                        className="agenda-name"
-                        onClick={() => setResForm({ kind: "skill", project: slug })}
-                        title={`${name}에 새 스킬 등록`}
-                      >
-                        <span>스킬</span>
-                        <small>{pCounts.skills}</small>
-                      </button>
-                      <button
-                        type="button"
-                        className="sub-resource-add-btn"
-                        title={`${name}에 새 스킬 등록`}
-                        aria-label={`${name}에 새 스킬 등록`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setResForm({ kind: "skill", project: slug });
-                        }}
-                      >
-                        +등록
-                      </button>
-                    </div>
+                    {resourceRows(slug, name)}
                   </div>
                 </div>
               );
@@ -654,10 +574,11 @@ export function Rail({
             projectSkills: allSkills.filter((s) => s.project === resForm.project),
           })}
           repoNames={parseRepos(ws.projects.find((p) => p.slug === resForm.project || p.id === resForm.project)?.repos).map((r) => r.name)}
+          existing={resForm.existing}
           close={() => setResForm(null)}
           saved={() => {
             setResForm(null);
-            void loadResourceCounts();
+            void loadProjectResources();
           }}
         />
       )}
