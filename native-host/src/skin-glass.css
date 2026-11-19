@@ -267,18 +267,21 @@
 }
 :root[data-skin="glass"] .sel-bar { border-radius: 16px; }
 :root[data-skin="glass"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-:root[data-skin="glass"] .ui-modal > header { padding: 20px 24px 12px; }
 /* 제목 줄은 스크롤하는 내용 위에 붙어 있는데 바탕이 반투명(--surface)이라 지나가는 내용이 글자 뒤로 비쳤다.
-   모달 본문과 비슷한 불투명 바탕(--glass-body)에 같은 반투명 색을 얹어 모양은 그대로 두고 비침만 막는다.
+   투명 그라디언트 대신 모달 본문과 일치하는 완전 불투명 색(--glass-modal-header)을 주어 비침을 완벽히 차단한다.
    아래쪽 14px은 같은 바탕이 서서히 사라지게 해서 내용이 줄 끝에서 뚝 잘려 보이지 않게 한다. */
-:root[data-skin="glass"] { --glass-body: #eaecf0; }
-:root[data-skin="glass"][data-theme="dark"] { --glass-body: #0f162d; }
-@media (prefers-color-scheme: dark) { :root[data-skin="glass"]:not([data-theme="light"]):not([data-theme="dark"]) { --glass-body: #0f162d; } }
-:root[data-skin="glass"] .ui-modal > header { background: linear-gradient(var(--surface), var(--surface)), var(--glass-body); }
-:root[data-skin="glass"] .ui-modal > header::after {
+:root[data-skin="glass"] { --glass-body: #eaecf0; --glass-modal-header: #f9fafa; }
+:root[data-skin="glass"][data-theme="dark"] { --glass-body: #0f162d; --glass-modal-header: #171f37; }
+@media (prefers-color-scheme: dark) { :root[data-skin="glass"]:not([data-theme="light"]):not([data-theme="dark"]) { --glass-body: #0f162d; --glass-modal-header: #171f37; } }
+:root[data-skin="glass"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) {
+  padding: 20px 24px 12px;
+  background: var(--glass-modal-header);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+:root[data-skin="glass"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header)::after {
   content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
-  background: linear-gradient(var(--surface), var(--surface)), var(--glass-body);
-  -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent);
+  background: linear-gradient(var(--glass-modal-header), transparent);
 }
 :root[data-skin="glass"] .cmdk-input { border-bottom-color: var(--line); background: transparent; box-shadow: none; }
 :root[data-skin="glass"] .cmdk-item { border-radius: 14px; }
