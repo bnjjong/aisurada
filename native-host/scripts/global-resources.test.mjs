@@ -514,3 +514,33 @@ test('saveProcessAgent inherits real id and f1 when called with proc- mock agent
   const updated = snapshotAfter.agents.find((a) => a.id === 'ap-real-123');
   assert.equal(updated.model, 'gemini-2.5-pro', 'store immediately reflects updated model');
 });
+
+test('a resizable modal keeps its grip in its own bottom bar, apart from the scrolling body', async () => {
+  // 모달은 포털로 그려서 서버 렌더가 못 그린다. 이 시험에서만 포털을 자식 그대로 내고, 모듈을 불러온 뒤에 빈 document를 둔다
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const React = require('react');
+  const reactDom = require('react-dom');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const originalPortal = reactDom.createPortal;
+  const hadDocument = 'document' in globalThis;
+  const originalDocument = globalThis.document;
+  reactDom.createPortal = (children) => children;
+  try {
+    const { Modal } = await import('../src/ui/Modal.tsx');
+    globalThis.document = { body: {} };
+    const draw = (props) => renderToStaticMarkup(React.createElement(Modal, { title: '창', close() {}, ...props }, React.createElement('p', null, '내용'))).replace(/<!-- -->/g, '');
+    const resizable = draw({ resizable: true, defaultWidth: 600, defaultHeight: 400 });
+    assert.match(resizable, /<div class="ui-modal-body"><p>내용<\/p><\/div>/, '내용은 스크롤 영역 안에 있다');
+    assert.ok(resizable.indexOf('ui-modal-gripbar') > resizable.indexOf('ui-modal-body'), '손잡이 띠는 스크롤 영역 뒤에 따로 있다');
+    assert.match(resizable, /<div class="ui-modal-gripbar"><span class="preview-grip"/, '손잡이는 띠 안에 있다');
+    assert.equal((resizable.match(/class="preview-grip"/g) || []).length, 1);
+    const plain = draw({});
+    assert.doesNotMatch(plain, /ui-modal-body|ui-modal-gripbar|preview-grip/, '크기를 못 바꾸는 모달은 그대로다');
+    assert.match(plain, /<p>내용<\/p>/);
+  } finally {
+    reactDom.createPortal = originalPortal;
+    if (hadDocument) globalThis.document = originalDocument;
+    else delete globalThis.document;
+  }
+});

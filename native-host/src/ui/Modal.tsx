@@ -218,18 +218,21 @@ export function Modal({
             </div>
           )}
         </header>
-        {children}
+        {/* 크기를 조절하는 모달은 스크롤 영역(ui-modal-body)과 손잡이 띠(ui-modal-gripbar)를 나눠서, 손잡이가 내용 위에 겹치거나 스크롤을 따라 올라오지 않게 한다 */}
+        {resizable ? <div className="ui-modal-body">{children}</div> : children}
         {resizable && !full && (
-          <span
-            className="preview-grip"
-            title="끌어서 크기 조절"
-            aria-hidden="true"
-            onPointerDown={startResize}
-          >
-            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-              <path d="M10.5 3.5L3.5 10.5M10.5 7.5L7.5 10.5" />
-            </svg>
-          </span>
+          <div className="ui-modal-gripbar">
+            <span
+              className="preview-grip"
+              title="끌어서 크기 조절"
+              aria-hidden="true"
+              onPointerDown={startResize}
+            >
+              <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                <path d="M10.5 3.5L3.5 10.5M10.5 7.5L7.5 10.5" />
+              </svg>
+            </span>
+          </div>
         )}
       </section>
     </div>,

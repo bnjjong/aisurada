@@ -914,7 +914,15 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ui-modal { width: min(640px, 100%); max-height: 90vh; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 80px #0003; overflow: auto; outline: none; }
 .ui-modal > header { position: sticky; top: 0; background: var(--surface); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 18px 24px; border-bottom: 1px solid var(--line); border-top-left-radius: inherit; border-top-right-radius: inherit; }.ui-modal > header h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.5px; }.ui-modal > header button { font-size: 11px; padding: 6px 10px; }.ui-modal > p { padding: 0 24px; line-height: 1.8; font-size: 13px; }
 .ui-modal > footer, .ui-modal form > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 24px; border-top: 1px solid var(--line); }.ui-modal footer button { font-size: 12px; }.ui-modal-wide .ui-modal { width: min(1120px, 100%); }
-.ui-modal-resizable { position: relative; --grip-inset: 8px; }
+.ui-modal-resizable { position: relative; --grip-inset: 4px; --grip-bar: 28px; display: flex; flex-direction: column; overflow: hidden; }
+/* 크기를 조절하는 모달: 바깥 틀은 스크롤하지 않고 안쪽 .ui-modal-body만 스크롤한다. 오른쪽 아래 손잡이는 내용 위에 얹지 않고
+   전용 하단 띠(.ui-modal-gripbar)에 둔다. 예전에는 손잡이가 스크롤하는 내용에 붙어 있어서 「승인」 같은 단추 위에 겹치고,
+   아래로 스크롤하면 모서리를 떠나 내용 중간으로 올라왔다. 둥근 모서리가 큰 스킨은 띠를 조금 더 높이고 손잡이를 안쪽으로 들인다. */
+.ui-modal-resizable > header { position: static; flex: none; }
+.ui-modal-resizable > .ui-modal-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.ui-modal-resizable > .ui-modal-gripbar { flex: none; display: flex; align-items: center; justify-content: flex-end; height: var(--grip-bar); padding-right: var(--grip-inset); border-top: 1px solid var(--line); }
+.ui-modal-resizable > .ui-modal-gripbar .preview-grip { position: static; }
+:root[data-skin="tactile"] .ui-modal-resizable, :root[data-skin="glass"] .ui-modal-resizable { --grip-inset: 12px; --grip-bar: 34px; }
 .ui-modal-full { width: calc(100vw - 32px) !important; height: calc(100vh - 32px) !important; max-width: none !important; max-height: none !important; }
 .ui-modal-full .preview-grip { display: none; }
 .ui-modal form { padding: 24px; }.ui-modal form > footer { padding: 18px 0 0; margin-top: 24px; }.ui-modal label { font-size: 12px; }.ndf form > label, .template-editor > label { display: grid; gap: 8px; margin-bottom: 18px; }.ndf input, .ndf select, .template-editor input, .template-editor select { padding: 9px 11px; font-size: 13px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }.form-grid label { display: grid; gap: 8px; }.ndf .lex-editor { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 24px 0; }.ndf .lex-content { min-height: 140px; padding-bottom: 20px; }

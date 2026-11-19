@@ -411,7 +411,7 @@ export function ApprovalsDialog({ call, names, close, onChanged }: { call: Engin
       resizable
       storageKey="aisurada.approvalsModalSize"
       defaultWidth={1040}
-      defaultHeight={740}
+      defaultHeight={774}
       className="apv-modal"
     >
       {overview === null ? (

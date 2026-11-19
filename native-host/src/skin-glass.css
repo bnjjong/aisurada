@@ -283,6 +283,7 @@
   content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
   background: linear-gradient(var(--glass-modal-header), transparent);
 }
+:root[data-skin="glass"] .ui-modal-resizable > header::after { display: none; } /* 이 모달은 제목 줄 밑으로 내용이 스크롤되지 않는다 */
 :root[data-skin="glass"] .cmdk-input { border-bottom-color: var(--line); background: transparent; box-shadow: none; }
 :root[data-skin="glass"] .cmdk-item { border-radius: 14px; }
 :root[data-skin="glass"] .cmdk-item[aria-selected="true"], :root[data-skin="glass"] :is(.slash-item, .note-picker-item)[aria-selected="true"] { background: var(--accent-soft); }
