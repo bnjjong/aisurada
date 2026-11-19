@@ -6,6 +6,7 @@ import { ApprovalBanner, PendingChip, PendingNote } from '../ApprovalNotices.tsx
 import { badgeTotal } from '../approvalsClient.ts';
 import { openApprovalsDialog } from '../approvalsDialogStore.ts';
 import { useApprovalCounts } from '../approvalsStore.ts';
+import { FallbackChain, type ChainStep } from './EnginePicker.tsx';
 import { GlobalResourceModal } from './GlobalResourceModal.tsx';
 import { GlobalSkillModal } from './GlobalSkillModal.tsx';
 import { ProcessAgentModal } from './ProcessAgentModal.tsx';
@@ -22,6 +23,18 @@ import {
 import type { GlobalResourceItem, GlobalSkill, ProcessAgent } from './types.ts';
 
 type ActiveTab = 'agents' | 'skills' | 'resources';
+
+/** 목록 카드에 그릴 모델 사슬. 2순위·3순위는 엔진과 모델이 모두 정해진 경우에만 넣는다. */
+function agentChainSteps(agent: ProcessAgent): ChainStep[] {
+  const steps: ChainStep[] = [{ engine: agent.engine, model: agent.model, effort: agent.effort || 'default' }];
+  if (agent.fallbackEngine && agent.fallbackModel) {
+    steps.push({ engine: agent.fallbackEngine, model: agent.fallbackModel, effort: agent.fallbackEffort || 'default' });
+  }
+  if (agent.thirdEngine && agent.thirdModel) {
+    steps.push({ engine: agent.thirdEngine, model: agent.thirdModel, effort: agent.thirdEffort || 'default' });
+  }
+  return steps;
+}
 
 export function GlobalResourcesPage({ controller }: { controller: WorkspaceController }) {
   const data = useGlobalResources();
@@ -199,9 +212,6 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                   .map((rId) => data.resources.find((r) => r.id === rId)?.name || rId)
                   .filter(Boolean);
 
-                const engineLabel =
-                  agent.engine === 'gemini' ? 'Gemini' : agent.engine === 'claude' ? 'Claude' : 'Codex';
-
                 return (
                   <li
                     key={agent.id}
@@ -215,62 +225,10 @@ export function GlobalResourcesPage({ controller }: { controller: WorkspaceContr
                     <div className="res-main">
                       <p className="res-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <strong className="res-name">{agent.name}</strong>
-                        <span
-                          className={`res-badge ${
-                            agent.engine === 'gemini'
-                              ? 'res-badge-ref'
-                              : agent.engine === 'claude'
-                              ? 'res-badge-own'
-                              : 'res-badge-off'
-                          }`}
-                          style={{ fontSize: '11px', padding: '2px 8px' }}
-                        >
-                          1순위: {engineLabel} ({agent.model}
-                          {agent.effort && agent.effort !== 'default' ? ` · ${agent.effort}` : ''})
-                        </span>
-                        {agent.fallbackEngine && agent.fallbackModel && (
-                          <span
-                            className="res-badge res-badge-off"
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderStyle: 'dashed',
-                              color: 'var(--ink)',
-                            }}
-                            title="1순위 토큰 소진 시 자동 전환되는 2순위 대체 모델"
-                          >
-                            2순위(폴백):{' '}
-                            {agent.fallbackEngine === 'gemini'
-                              ? 'Gemini'
-                              : agent.fallbackEngine === 'claude'
-                              ? 'Claude'
-                              : 'Codex'}{' '}
-                            ({agent.fallbackModel}
-                            {agent.fallbackEffort && agent.fallbackEffort !== 'default'
-                              ? ` · ${agent.fallbackEffort}`
-                              : ''})
-                          </span>
-                        )}
-                        {agent.thirdEngine && agent.thirdModel && (
-                          <span
-                            className="res-badge res-badge-off"
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderStyle: 'dashed',
-                              color: 'var(--ink)',
-                            }}
-                            title="1순위와 2순위가 모두 소진되면 자동 전환되는 3순위 대체 모델"
-                          >
-                            3순위:{' '}
-                            {agent.thirdEngine === 'gemini' ? 'Gemini' : agent.thirdEngine === 'claude' ? 'Claude' : 'Codex'}{' '}
-                            ({agent.thirdModel}
-                            {agent.thirdEffort && agent.thirdEffort !== 'default' ? ` · ${agent.thirdEffort}` : ''})
-                          </span>
-                        )}
                         {!agent.enabled && <span className="res-kind" style={{ color: 'var(--err)' }}>비활성</span>}
                         {agent.approval === 'dirty' && <PendingChip />}
                       </p>
+                      <FallbackChain compact thirdOff={false} steps={agentChainSteps(agent)} />
                       {agent.role && <p className="res-desc" style={{ fontWeight: 500, color: 'var(--ink)' }}>{agent.role}</p>}
                       {agent.description && <p className="res-desc">{agent.description}</p>}
                       {agent.approval === 'dirty' && <PendingNote onOpen={openApprovalsDialog} />}

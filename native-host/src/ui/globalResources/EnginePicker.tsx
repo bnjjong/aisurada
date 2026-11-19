@@ -127,12 +127,15 @@ export function EngineLogo({ engine, size = 22 }: { engine: AIEngine; size?: num
 /** 추론 강도 막대 눈금: low 1칸에서 max 5칸까지. default는 점선, ultra는 5칸에 다른 빛깔. */
 const EFFORT_LEVEL: Record<ReasoningEffort, number> = { default: 0, low: 1, medium: 2, high: 3, xhigh: 4, max: 5, ultra: 5 };
 
-export function EffortMeter({ effort }: { effort: ReasoningEffort }) {
+export function EffortMeter({ effort, compact = false }: { effort: ReasoningEffort; compact?: boolean }) {
   const level = EFFORT_LEVEL[effort] ?? 0;
   return (
-    <span className={`eng-meter${level === 0 ? ' is-default' : ''}${effort === 'ultra' ? ' is-ultra' : ''}`} aria-hidden="true">
+    <span
+      className={`eng-meter${level === 0 ? ' is-default' : ''}${effort === 'ultra' ? ' is-ultra' : ''}${compact ? ' is-compact' : ''}`}
+      aria-hidden="true"
+    >
       {[1, 2, 3, 4, 5].map((i) => (
-        <i key={i} className={i <= level ? 'on' : undefined} style={{ height: 4 + i * 2 }} />
+        <i key={i} className={i <= level ? 'on' : undefined} style={{ height: compact ? 3 + i * 1.6 : 4 + i * 2 }} />
       ))}
     </span>
   );
@@ -381,10 +384,13 @@ export interface ChainStep {
   effort: ReasoningEffort;
 }
 
-/** 맨 위의 실행 순서 요약. 어느 AI가 어떤 모델·강도로 어떤 순서로 이어받는지 한 줄에 보인다. */
-export function FallbackChain({ steps, thirdOff }: { steps: ChainStep[]; thirdOff: boolean }) {
+/**
+ * 실행 순서 요약. 어느 AI가 어떤 모델·강도로 어떤 순서로 이어받는지 한 줄에 보인다.
+ * [compact]이면 편집 창 맨 위와 같은 그림을 상자와 안내 글 없이 작게 그려, 에이전트 목록 카드에 넣을 수 있다.
+ */
+export function FallbackChain({ steps, thirdOff, compact = false }: { steps: ChainStep[]; thirdOff: boolean; compact?: boolean }) {
   return (
-    <div className="eng-chain" role="group" aria-label="실행 순서 요약">
+    <div className={`eng-chain${compact ? ' is-compact' : ''}`} role="group" aria-label="실행 순서 요약">
       {steps.map((step, i) => {
         const tier = (i + 1) as Tier;
         return (
@@ -392,20 +398,20 @@ export function FallbackChain({ steps, thirdOff }: { steps: ChainStep[]; thirdOf
             {i > 0 && (
               <span className="eng-ar" aria-hidden="true">
                 <span className="eng-ar-line" />
-                <small>토큰 소진 시</small>
+                {!compact && <small>토큰 소진 시</small>}
                 <ArrowIcon />
               </span>
             )}
             <span
               className="eng-ch"
               data-step={tier}
-              title={`${tier}순위 · ${engineLabel(step.engine)} ${modelName(step.engine, step.model)} · 추론 강도 ${step.effort}`}
+              title={`${tier}순위 · ${engineLabel(step.engine)} ${modelName(step.engine, step.model)} · 추론 강도 ${step.effort}${i > 0 ? ` (앞 순위의 토큰이 소진되면 전환)` : ''}`}
             >
               <i className="eng-n">{tier}</i>
-              <EngineLogo engine={step.engine} size={22} />
+              <EngineLogo engine={step.engine} size={compact ? 16 : 22} />
               <b>{modelName(step.engine, step.model)}</b>
               <span className="eng-ep">
-                <EffortMeter effort={step.effort} />
+                <EffortMeter effort={step.effort} compact={compact} />
                 {step.effort}
               </span>
             </span>

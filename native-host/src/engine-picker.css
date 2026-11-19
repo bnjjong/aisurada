@@ -2,10 +2,14 @@
    색과 그림자는 스킨 토큰을 쓰고, 스킨에 없는 토큰은 fallback으로 받는다. 칸 모양(알약·각진 모서리)은 스킨마다 아래에서 맞춘다.
    스킨 CSS보다 뒤에 불러와서 같은 우선순위일 때 이 파일이 이긴다. */
 
-.eng {
+/* 색 토큰은 편집 창 영역(.eng)과, 목록 카드에 따로 놓이는 순서 요약(.eng-chain)이 함께 쓴다 */
+.eng, .eng-chain {
   --eng-dash: color-mix(in srgb, var(--muted) 38%, transparent);
   --eng-off: color-mix(in srgb, var(--muted) 30%, transparent);
   --eng-warn: var(--warning, #d97706);
+}
+
+.eng {
   display: grid;
   gap: 14px;
   padding: 18px;
@@ -55,6 +59,18 @@
 .eng-ar { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 60px; color: var(--ink-3, var(--muted)); }
 .eng-ar-line { flex: 1; height: 0; border-top: 1.5px dashed var(--eng-dash); }
 .eng-ar small { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+
+/* 목록 카드용 작은 순서 요약: 상자·안내 글을 빼고 칩과 화살표만 남긴다 */
+.eng-chain.is-compact { flex-wrap: wrap; row-gap: 4px; margin: 6px 0 4px; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.eng-chain.is-compact .eng-chain-item { gap: 6px; }
+.eng-chain.is-compact .eng-chain-item:not(:first-child) { flex: none; padding-left: 6px; }
+.eng-chain.is-compact .eng-ch { gap: 6px; padding: 3px 10px 3px 4px; border-radius: 9px; font-size: 11.5px; }
+.eng-chain.is-compact .eng-n { width: 15px; height: 15px; font: 700 9px/15px sans-serif; }
+.eng-chain.is-compact .eng-ep { gap: 4px; padding-left: 6px; font-size: 10.5px; }
+.eng-chain.is-compact .eng-ar { flex: none; min-width: 0; gap: 2px; }
+.eng-chain.is-compact .eng-ar-line { flex: none; width: 14px; }
+.eng-meter.is-compact { height: 11px; gap: 1.5px; }
+.eng-meter.is-compact i { width: 2.5px; border-radius: 1px; }
 
 /* ---- 순위 타임라인과 카드 ---- */
 .eng-tiers { display: grid; }
