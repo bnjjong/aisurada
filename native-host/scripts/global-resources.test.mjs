@@ -560,3 +560,11 @@ test('effortLevel fills the whole meter at the highest effort a model supports',
   // 표에 없는 모델은 엔진 기본 단계를 따른다(gemini는 세 단계)
   assert.equal(effortLevel('gemini', 'gemini-custom-x', 'high'), 5);
 });
+
+test('compact fallback chain keeps all chips on a single line', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const css = readFileSync(fileURLToPath(new URL('../src/engine-picker.css', import.meta.url)), 'utf8');
+  assert.match(css, /\.eng-chain\.is-compact\s*\{[^}]*flex-wrap:\s*nowrap/);
+  assert.match(css, /\.eng-chain\.is-compact\s*\{[^}]*overflow-x:\s*auto/);
+});

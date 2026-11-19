@@ -62,16 +62,29 @@
 .eng-ar-line { flex: 1; height: 0; border-top: 1.5px dashed var(--eng-dash); }
 .eng-ar small { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 
-/* 목록 카드용 작은 순서 요약: 상자·안내 글을 빼고 칩과 화살표만 남긴다 */
-.eng-chain.is-compact { flex-wrap: wrap; row-gap: 4px; margin: 6px 0 4px; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
-.eng-chain.is-compact .eng-chain-item { gap: 6px; }
-.eng-chain.is-compact .eng-chain-item:not(:first-child) { flex: none; padding-left: 6px; }
-.eng-chain.is-compact .eng-ch { gap: 6px; padding: 3px 10px 3px 4px; border-radius: 9px; font-size: 11.5px; }
-.eng-chain.is-compact .eng-n { width: 15px; height: 15px; font: 700 9px/15px sans-serif; }
-.eng-chain.is-compact .eng-ep { gap: 4px; padding-left: 6px; font-size: 10.5px; }
-.eng-chain.is-compact .eng-ar { flex: none; min-width: 0; gap: 2px; }
-.eng-chain.is-compact .eng-ar-line { flex: none; width: 14px; }
-.eng-meter.is-compact { height: 11px; gap: 1.5px; }
+/* 목록 카드용 작은 순서 요약: 상자·안내 글을 빼고 칩과 화살표만 남긴다 (한 줄 유지) */
+.eng-chain.is-compact {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  margin: 6px 0 4px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.eng-chain.is-compact::-webkit-scrollbar { display: none; }
+.eng-chain.is-compact .eng-chain-item { flex: none; gap: 4px; }
+.eng-chain.is-compact .eng-chain-item:not(:first-child) { flex: none; padding-left: 4px; }
+.eng-chain.is-compact .eng-ch { gap: 5px; padding: 2.5px 7px 2.5px 3.5px; border-radius: 8px; font-size: 11px; white-space: nowrap; }
+.eng-chain.is-compact .eng-n { width: 14px; height: 14px; font: 700 8.5px/14px sans-serif; }
+.eng-chain.is-compact .eng-ep { gap: 3px; padding-left: 5px; font-size: 10px; }
+.eng-chain.is-compact .eng-ar { flex: none; min-width: 0; gap: 1px; }
+.eng-chain.is-compact .eng-ar-line { flex: none; width: 8px; }
+.eng-meter.is-compact { height: 10px; gap: 1.5px; }
 .eng-meter.is-compact i { width: 2.5px; border-radius: 1px; }
 
 /* ---- 순위 타임라인과 카드 ---- */
