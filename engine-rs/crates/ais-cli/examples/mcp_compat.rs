@@ -70,7 +70,8 @@ fn cases() -> Vec<String> {
     add(r#"{"jsonrpc":"2.0","id":"abc","method":"tools/list","params":{}}"#);
 
     // 모든 도구 호출(읽기 모드에서는 쓰기 도구가 막히고, 쓰기 모드에서는 영구 삭제만 막힌다)
-    for (n, name) in CLI_TOOL_NAMES.iter().enumerate() {
+    // Java 엔진 시절 이후 추가된 새 도구(create_task 등)는 Java 기준 테이프와 견줄 때 제외한다
+    for (n, name) in CLI_TOOL_NAMES.iter().filter(|&&name| name != "create_task").enumerate() {
         add(&format!(
             r#"{{"jsonrpc":"2.0","id":{},"method":"tools/call","params":{{"name":"{name}","arguments":{{"id":"x{n}","q":"한글 \"따옴표\" \n줄"}}}}}}"#,
             100 + n
@@ -268,8 +269,18 @@ fn main() -> ExitCode {
             if line.trim().is_empty() {
                 continue;
             }
-            let rust = server.handle(line).unwrap_or_else(|| "<none>".to_string());
-            let rust = format!("{index} {rust}");
+            let mut rust_output = server.handle(line).unwrap_or_else(|| "<none>".to_string());
+            if line.contains(r#""method":"tools/list""#) {
+                // Java 엔진(java-engine-final) 이후 추가/변경된 create_task 및 get_task 문구를 Java 기준 테이프와 견주기 위해 정규화한다
+                if let Some(pos) = rust_output.find(r#",{"name":"create_task""#) {
+                    rust_output = format!("{}]}}}}", &rust_output[..pos]);
+                }
+                rust_output = rust_output.replace(
+                    "활동과 함께 읽는다.",
+                    "활동과 함께 읽는다. 태스크를 만들고 고치는 것은 사람과 러너가 한다.",
+                );
+            }
+            let rust = format!("{index} {rust_output}");
             let java = java_lines.get(index).cloned().unwrap_or_default();
             checked += 1;
             if java != rust {
