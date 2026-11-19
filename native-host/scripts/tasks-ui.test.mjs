@@ -312,7 +312,7 @@ test('the board with data: five columns with counts, blocked note, shelf pills, 
 test('the detail with data: sections, criteria checkboxes, details, readiness and an open status menu with disabled reasons', () => {
   const d = detail({ body: '' });
   const html = renderToStaticMarkup(React.createElement(TaskDetailPage, { taskKey: 'TSK-14', state: state('/task/TSK-14'), controller: fakeController(), preset: { task: d, menuOpen: true } }));
-  assert.match(html, /<h1 class="task-title">프로젝트를 지울 때 자원 폴더도 정리하기<\/h1>/);
+  assert.match(html, /<h1 class="task-title[^"]*"[^>]*>프로젝트를 지울 때 자원 폴더도 정리하기<\/h1>/);
   for (const section of ['설명', '완료 기준', '연결된 태스크', '연결한 자원', '활동', '세부 정보']) assert.match(html, new RegExp(`aria-label="${section}"`));
   assert.equal((html.match(/type="checkbox"/g) ?? []).length, 2, 'one checkbox per criterion');
   assert.match(html, /checked=""/, 'the checked criterion is checked');
