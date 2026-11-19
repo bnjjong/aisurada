@@ -103,7 +103,26 @@ export function AgentGlyph({ agent, size = 12 }: { agent: string; size?: number 
       </svg>
     );
   }
-  // Codex와 모르는 CLI는 상표 대신 터미널 프롬프트 모양을 글자색으로 그린다.
+  if (agent === "codex") {
+    // Codex는 구름 윤곽 안에 터미널 프롬프트(>_)를 넣은 모양이다. 글자색으로 그려 어느 바탕에서도 읽힌다.
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+        <path d="M8.5 11.3l3 2.5-3 2.5M13.5 16.3h3" />
+      </svg>
+    );
+  }
+  // 모르는 CLI는 상표 대신 터미널 프롬프트 모양을 글자색으로 그린다.
   return (
     <svg
       viewBox="0 0 16 16"
@@ -122,7 +141,7 @@ export function AgentGlyph({ agent, size = 12 }: { agent: string; size?: number 
   );
 }
 
-/** 목록 줄에 붙이는 작은 출처 아이콘. Claude와 Gemini는 고유 모양과 색이고, 그 밖의 CLI는 터미널 모양이다. */
+/** 목록 줄에 붙이는 작은 출처 아이콘. Claude와 Gemini는 고유 모양과 색, Codex는 구름 프롬프트 모양이고, 그 밖의 CLI는 터미널 모양이다. */
 export function AgentMark({ info }: { info: NoteAgent }) {
   const title = noteAgentTitle(info);
   const known = info.agent === "claude" || info.agent === "gemini";
