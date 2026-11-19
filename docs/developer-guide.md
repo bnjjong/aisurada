@@ -731,6 +731,21 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 - 설정 값이 있어도 화면에 안 이어진 것이 남아 있다. `detailListWidth`와 `docWidth`는 저장·보정만 되고 읽는 화면이 없다(아젠다 목록은 320px 고정). `railWidth`와 `noteRailWidth`(노트 옆 세션 레일)는 이어져 있다.
 - 시험은 `scripts/chapters14-17.test.mjs`의 「레일 폭」(범위와 보정)과 `scripts/views-checks.js`의 `rail-resize-drag-keyboard-reset-and-persist`(끌기·범위·키보드·더블클릭·저장)다.
 
+### 모달 창의 크기
+
+공용 모달(`ui/Modal.tsx`)은 기본으로 크기를 바꿀 수 있다(`resizable`의 기본값이 켜짐). 편집 창, 설정, 이력, 승인 대기함처럼 내용이 긴 창이 모두 해당한다.
+
+| 동작 | 결과 |
+|---|---|
+| 오른쪽 아래 손잡이 끌기 | 가운데를 기준으로 너비와 높이가 같이 늘고 준다. 가장 작게는 480×300px(처음 크기가 이보다 작은 창은 처음 크기), 가장 크게는 창보다 32px 작은 크기다 |
+| 손잡이 두 번 누르기 | 기억한 크기를 버리고 처음 크기로 |
+| 제목 줄의 전체 화면 단추 | 창을 가득 채우고, 다시 누르면 되돌린다. 제목 줄 단추를 직접 채운 창(`headerActions`)에도 그 앞에 붙는다 |
+
+- 끈 크기는 localStorage에 창 종류마다 기억한다. 열쇠는 `modalSizeKey`가 클래스 이름(없으면 제목)으로 짓는다(`aisurada.modalSize.<클래스>`). 제목에는 태스크 키처럼 바뀌는 글이 들 수 있어서 클래스를 먼저 쓴다. 클래스가 `ndf` 하나뿐인 새 노트 창과 아젠다·프로젝트 창은 `storageKey`로 따로 정했고, 승인 대기함은 원래 열쇠(`aisurada.approvalsModalSize`)를 그대로 쓴다. 누르기만 하고 끌지 않으면 기억하지 않는다.
+- 크기를 바꾸는 창은 제목 줄, 스크롤하는 본문(`.ui-modal-body`), 손잡이 띠(`.ui-modal-gripbar`) 셋으로 나뉜다. 본문 바로 아래의 `<p>`와 `<footer>`는 예전처럼 모달 바로 아래에 있을 때와 같은 여백을 받는다.
+- 끈 창: 확인 창(`Confirm`), 아젠다 삭제 실패 알림, 노트 창 닫기 경고는 작아서 `resizable={false}`다. 노트 미리 보기(`Preview.tsx`)는 본문 틀에 자기 손잡이와 전체 화면이 있어서 끈다.
+- 시험은 `scripts/global-resources.test.mjs`의 「a resizable modal keeps its grip…」(기본으로 켜짐, 끈 창, 직접 채운 제목 줄 앞의 전체 화면 단추, `modalSizeKey`)다. 실제 앱 창에서 끌어 본 확인은 없다.
+
 ### 코드 블록 문법 색 (`editor/codeSyntax.ts`)
 
 코드 블록의 언어별 색을 입히는 곳은 한 모듈이다. 문법을 토큰(키워드, 문자열, 주석 같은 조각)으로 나누는 일은 Prism이 하고, 편집기와 읽기 화면이 같은 모듈과 같은 CSS를 쓴다.
