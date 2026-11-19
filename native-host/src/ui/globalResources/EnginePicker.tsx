@@ -111,15 +111,18 @@ export function EngineFold({
   );
 }
 
-/** 엔진 로고를 둥근 네모 타일에 담는다. 모양은 노트 목록의 출처 아이콘(AgentMark)과 같다. */
-export function EngineLogo({ engine, size = 22 }: { engine: AIEngine; size?: number }) {
+/**
+ * 엔진 로고를 둥근 네모 타일에 담는다. 모양은 노트 목록의 출처 아이콘(AgentMark)과 같다.
+ * [bare]이면 타일 없이 아이콘만 [size] 안에 가득 그린다(순서 요약처럼 좁은 줄에서 쓴다).
+ */
+export function EngineLogo({ engine, size = 22, bare = false }: { engine: AIEngine; size?: number; bare?: boolean }) {
   return (
     <span
-      className={`eng-logo eng-logo-${engine}`}
+      className={`eng-logo eng-logo-${engine}${bare ? ' eng-logo-bare' : ''}`}
       style={{ width: size, height: size, borderRadius: Math.round(size * 0.28) }}
       aria-hidden="true"
     >
-      <AgentGlyph agent={engine} size={Math.round(size * 0.58)} />
+      <AgentGlyph agent={engine} size={bare ? size : Math.round(size * 0.58)} />
     </span>
   );
 }
@@ -408,7 +411,7 @@ export function FallbackChain({ steps, thirdOff, compact = false }: { steps: Cha
               title={`${tier}순위 · ${engineLabel(step.engine)} ${modelName(step.engine, step.model)} · 추론 강도 ${step.effort}${i > 0 ? ` (앞 순위의 토큰이 소진되면 전환)` : ''}`}
             >
               <i className="eng-n">{tier}</i>
-              <EngineLogo engine={step.engine} size={compact ? 16 : 22} />
+              <EngineLogo engine={step.engine} size={compact ? 15 : 20} bare />
               <b>{modelName(step.engine, step.model)}</b>
               <span className="eng-ep">
                 <EffortMeter effort={step.effort} compact={compact} />
