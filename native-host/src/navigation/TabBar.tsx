@@ -109,6 +109,11 @@ export function TabBar({ controller, state }: { controller: WorkspaceController;
     } else if ((event.key === 'Delete' || event.key === 'Backspace') && id !== null) {
       event.preventDefault(); controller.closeTab(id);
       requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
+    } else if (id === active && (event.key === 'PageUp' || event.key === 'PageDown')) {
+      // 이 키의 기본 스크롤을 본문에서 처리하도록 포커스를 넘긴다.
+      const button = event.currentTarget;
+      const panelId = button.getAttribute('aria-controls');
+      if (panelId) button.ownerDocument.getElementById(panelId)?.querySelector<HTMLElement>('.doc-scroll')?.focus({ preventScroll: true });
     }
   };
   const pointerDown = (event: PointerEvent<HTMLDivElement>, id: string) => {

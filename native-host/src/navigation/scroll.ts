@@ -28,12 +28,13 @@ export function rememberNoteScroll(surface: ScrollSurface, id: string, memory: N
   };
   const release: EventListener = () => { holding = false; if (frame !== undefined) clock.cancel(frame); };
   const scrolled: EventListener = () => { if (!holding) memory.set(id, surface.scrollTop); };
+  const interactionEvents = ['wheel', 'pointerdown', 'keydown', 'focus'];
   surface.addEventListener('scroll', scrolled, { passive: true });
-  for (const type of ['wheel', 'pointerdown', 'keydown']) surface.addEventListener(type, release, { passive: true });
+  for (const type of interactionEvents) surface.addEventListener(type, release, { passive: true });
   restore();
   return () => {
     if (frame !== undefined) clock.cancel(frame);
     surface.removeEventListener('scroll', scrolled);
-    for (const type of ['wheel', 'pointerdown', 'keydown']) surface.removeEventListener(type, release);
+    for (const type of interactionEvents) surface.removeEventListener(type, release);
   };
 }

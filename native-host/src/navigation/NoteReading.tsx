@@ -238,9 +238,16 @@ export function NoteScreen({
   void noteRailNow;
   const surface = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (!surface.current) return;
+    const element = surface.current;
+    if (!element) return;
+    const focused = element.ownerDocument.activeElement;
+    // 탭 표시줄을 화살표로 탐색 중이거나 대화 상자를 사용 중이면 그곳의 포커스를 유지한다.
+    if (controller.context.kind === "main"
+      && !focused?.closest('[role="tablist"] [role="tab"][aria-selected="true"], [aria-modal="true"]')) {
+      element.focus({ preventScroll: true });
+    }
     return rememberNoteScroll(
-      surface.current,
+      element,
       note.id,
       controller.scrollMemory,
       {
