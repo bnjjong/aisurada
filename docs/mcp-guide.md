@@ -96,7 +96,7 @@ ais-cli gemini-mcp remove
 
 ## 3. 쓸 수 있는 기능
 
-도구는 37개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 19개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
+도구는 38개이고(영구 삭제 `purge_doc`는 내놓지 않습니다), 이름은 엔진의 도구 이름과 같습니다. 기본은 읽기 도구 19개만 보입니다. 읽기 도구(R)는 어느 모드에서나 보이고, 쓰기 도구(W)는 `--write`일 때만 보입니다. `!`는 있던 내용을 지우거나 덮어쓸 수 있는 도구입니다. 인자의 `*`는 필수입니다.
 
 ### 노트 찾고 읽기
 
@@ -181,12 +181,13 @@ ais-cli gemini-mcp remove
 
 ### 태스크(티켓)
 
-외부 설명서에 없는 확장입니다. 태스크는 사람이 적어 둔 일이고, 나중에 러너가 집어 에이전트에게 맡깁니다. **읽기 도구만 있습니다.** 태스크를 만들고 상태를 바꾸는 일은 사람(화면)과 러너만 하므로, `--write`를 줘도 쓰기 도구는 열리지 않습니다. 상태 이름은 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled`입니다.
+외부 설명서에 없는 확장입니다. 태스크는 사람이 적어 둔 일이고, 나중에 러너가 집어 에이전트에게 맡깁니다. **읽기 도구 둘과 쓰기 도구 하나(`create_task`)가 있습니다.** 태스크를 Draft로 만드는 일만 열려 있고(`--write`일 때만 보입니다), 상태를 바꾸거나 고치거나 지우는 일은 사람(화면)과 러너만 합니다. 상태 이름은 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled`입니다.
 
 | 도구 | 모드 | 하는 일 | 인자 |
 |------|:----:|---------|------|
 | `list_tasks` | R | 태스크 목록을 키가 큰(새) 것부터 냅니다. `blocked`가 true면 다른 태스크에 막힌 것만, `trash`가 true면 휴지통 목록입니다 | `status`, `type`, `repo`, `label`, `q`, `blocked`, `bodies`, `trash` |
 | `get_task` | R | 태스크 1건을 설명, 완료 기준, 연결한 자원, 연결된 태스크(막고 있음·막혀 있음·관련·중복), Ready For Develop 조건, 활동과 함께 읽습니다 | `id*`(키 `TSK-14` 또는 `tk…`), `activity`(최근 개수, 기본 100) |
+| `create_task` | W | 새 태스크(티켓) 1건을 Draft로 만듭니다. 응답에 `key`(`TSK-1`), `id`, `precondition`이 들어 있습니다 | `title*`, `repo*`(`owner/name`), `criteria*`(완료 기준 목록, 1개 이상), `type`(`feature`, `bug`, `chore`), `priority`(`high`, `medium`, `low`), `project`, `base`, `body`, `labels` |
 
 ### 내보내기
 

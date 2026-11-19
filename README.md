@@ -130,7 +130,7 @@ dist/ais-cli transition-task TSK-1 to=ready-for-develop
 dist/ais-cli link-tasks TSK-1 TSK-2 type=blocks
 ```
 
-- 명령 9개: `create-task`, `get-task`, `list-tasks`, `update-task`, `transition-task`, `link-tasks`, `add-task-comment`, `delete-task`, `restore-task`. MCP에는 읽기 도구 `list_tasks`, `get_task`만 열립니다. 상태를 바꾸는 일은 사람(화면)과 러너만 합니다.
+- 명령 9개: `create-task`, `get-task`, `list-tasks`, `update-task`, `transition-task`, `link-tasks`, `add-task-comment`, `delete-task`, `restore-task`. MCP에는 읽기 도구 `list_tasks`, `get_task`와 쓰기 도구 `create_task`(Draft 만들기, `--write`일 때만)가 열립니다. 상태를 바꾸는 일은 사람(화면)과 러너만 합니다.
 - 상태는 `draft`, `ready-for-develop`, `in-progress`, `waiting-answer`, `in-review`, `done`, `failed`, `cancelled` 8개이고, 누가 어떤 조건에서 바꾸는지는 `transition-task`가 한 곳에서 검사합니다.
 - 파일은 `.aisurada/tasks/` 아래에만 있어서 노트와 기존 명령을 건드리지 않습니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「태스크」에 있습니다.
 
@@ -355,7 +355,7 @@ dist/ais-cli sweep           # 옛 사이드카를 내리고 plist, 상태 파�
 | `doctor` | 어느 vault를 쓰는지, vault의 git 상태, 이 실행 파일, 에이전트에 등록된 MCP 서버, 걷어 낼 옛 사이드카 흔적을 읽기만 하며 보여 준다. `--prune`은 걷어 내기까지, `--fix`는 낡은 MCP 등록을 다시 등록하는 데까지 한다 |
 | `sweep` | 옛 사이드카를 모두 내리고 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
 | `install` | 깔 파일이 없다는 안내만 한다. 옛 jar와 사이드카가 남아 있으면 `sweep`을 권한다 |
-| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 19개만 내놓고, `--write`를 주면 쓰기 도구까지 37개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
+| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 19개만 내놓고, `--write`를 주면 쓰기 도구까지 38개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
 | `claude-mcp` | Claude Code에 위 서버를 등록한다. `status`, `add [--write]`, `remove`는 `claude mcp`를 부르고, `config [--write]`는 Claude Desktop 설정에 붙여 넣을 조각만 출력한다. 등록에는 vault를 박지 않는다 |
 | `codex-mcp`, `gemini-mcp` | Codex, Antigravity(`agy`)·Gemini CLI에 같은 서버를 같은 방식으로 등록한다(`status`, `add [--write]`, `remove`) |
 | `--help`, `--list` | 사용법과 이름 목록 |

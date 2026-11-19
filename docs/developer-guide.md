@@ -290,7 +290,7 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
 - **키와 ID.** 키 `TSK-<번호>`는 엔진이 매기고 만든 뒤 바뀌지 않는다. 지운 번호(휴지통에 있는 것 포함)를 다시 쓰지 않는다. ID는 `tk…`(노트 `nd…`, 스킬 `sk…`와 같은 형식)이고 파일 안에 있다. 접두 `TSK`는 엔진 오류 코드(`AIS-…`)와 겹치지 않게 골랐다.
 - **파일 모양.** `---` 머리말(YAML)과 설명 본문이다. 머리말은 스킬·에이전트 자원처럼 SnakeYAML로 읽고 쓰므로 `criteria`, `links`, `refs`를 들여쓴 목록으로 적는다(줄 읽개로 읽는 프로젝트·아젠다 파일과 다르다). 모르는 머리말 칸은 지우지 않고 보존한다(시험으로 고정). `key`, `id`, `title`, `type`, `priority`, `status`, `repo`, `project`, `baseBranch`, `labels`, `criteria`, `links`, `refs`, `createdAt`, `editedAt`, `editedSession`, `editedAgent` 순서로 쓴다. 유형은 `feature`·`bug`·`chore`, 우선순위는 `high`·`medium`·`low`다.
 - **완료 기준은 필수다.** `create-task`는 `criteria`가 비면 AIS-400으로 거절한다. 일이 끝났는지 이 기준으로 확인하기 때문이다(사용자 결정, 2026-11-13). `repo`(`owner/name`)와 `title`도 필수다.
-- **명령 9개.** MCP에는 읽기 도구 `list_tasks`, `get_task`만 열린다. 상태를 바꾸는 일은 사람과 러너만 한다.
+- **명령 9개.** MCP에는 읽기 도구 `list_tasks`, `get_task`와 쓰기 도구 `create_task`(Draft 만들기)가 열린다. `create_task`는 서버를 `--write`로 띄웠을 때만 보인다. 상태를 바꾸는 일은 사람과 러너만 한다.
 
 | 명령 | 하는 일 |
 |---|---|
@@ -467,7 +467,7 @@ AISURADA_VAULT=<vault> dist/ais-cli get_doc '{"id":"nddemo-00000001"}'   # 도�
 AISURADA_VAULT=<vault> dist/ais-cli get-doc nddemo-00000001              # 명령 표면
 ```
 
-도구 38개와 명령 82개는 `engine-rs/crates/ais-cli/src/registry.rs`에 있다(`ais-cli`가 직접 하는 8개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `dist/ais-cli --list`로 본다.
+도구 39개와 명령 82개는 `engine-rs/crates/ais-cli/src/registry.rs`에 있다(`ais-cli`가 직접 하는 8개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `dist/ais-cli --list`로 본다.
 
 도구 표면의 호출자는 AI(`caller: "ai"`)로 찍혀서 앱과 다르게 다뤄지는 곳이 있다. 쓰기에서는 아래가 그렇다.
 
@@ -566,7 +566,7 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 연결하는 법, 도구의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
 
-- **도구.** 이름은 엔진 도구 38개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 37개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
+- **도구.** 이름은 엔진 도구 39개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 38개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`ais_cli::run`)을 프로세스 하나에서 되풀이한다. 명령줄 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다. 도구를 부를 때마다 자동 커밋을 지켜본다(`watch`). 유휴 타이머가 MCP 서버 안에서 돌기 때문이다.
 - **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(위 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
 - **스키마를 고칠 때.** `mcp_tools.rs`의 입력 스키마 키는 도구 해석기(`tool.rs`)가 받는 키와 이름과 차례까지 같아야 하고, 필수 키는 스키마 차례대로 검사해야 하며, 읽기 전용 표시는 엔진의 쓰기 명령 목록과 맞아야 한다. 명령줄 쪽 옵션(`spec_table.rs`)은 정렬돼 있어야 하고 모두 엔진 인자로 이어져야 한다. 이 넷은 `engine-rs/crates/ais-cli/tests/table_contracts.rs`가 지킨다(2026-11-16 추가, 지금 37개 도구와 명령 명세 전체가 통과하고, 표를 일부러 어긋나게 하면 실패하는 것을 확인했다). 사용법 글과 옵션 목록의 알려진 어긋남 7건(`repos`·`projectRepo`·`query`가 사용법 글에 없는 것 따위)은 시험의 `KNOWN_USAGE_GAPS`에 적혀 있고, 사용법 글은 Java가 오류 때 찍던 글이라 고치면 `cli_compat`의 기준과 어긋난다. 도구의 인자를 바꾸면 두 표, `tool.rs`, `mcp_compat`의 기대를 함께 맞춘다.
