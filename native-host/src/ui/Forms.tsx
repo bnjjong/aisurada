@@ -112,7 +112,7 @@ function NewNote({
       (!t.format || t.format === "markdown"),
   );
   return (
-    <Modal title="새 노트" close={handleClose} className="ndf">
+    <Modal title="새 노트" close={handleClose} className="ndf" storageKey="aisurada.modalSize.new-note">
       {!ws.agendas.length ? (
         <>
           <p>먼저 아젠다를 하나 만들어 주세요</p>
@@ -332,6 +332,7 @@ function EntityForm({
       title={modalTitle}
       close={handleClose}
       className="ndf"
+      storageKey={`aisurada.modalSize.${kind}-form`}
       // 노트 창과 같은 아이콘 닫기 단추. 접근성 이름은 기본 닫기 단추와 같게 둔다.
       headerActions={
         <button

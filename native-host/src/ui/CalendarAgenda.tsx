@@ -830,7 +830,7 @@ export function AgendaPage({
         />
       )}
       {error && (
-        <Modal title="아젠다를 지우지 못했어요" close={() => setError("")}>
+        <Modal title="아젠다를 지우지 못했어요" close={() => setError("")} resizable={false}>
           <p>{error}</p>
         </Modal>
       )}

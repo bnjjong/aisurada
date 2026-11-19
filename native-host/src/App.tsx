@@ -139,6 +139,7 @@ function WorkspaceApp() {
         <Modal
           title="창을 닫으면 사라지는 것이 있어요"
           close={() => controller.dismissNoteCloseDialog()}
+          resizable={false}
         >
           <ul className="note-window-dialog-list">
             {state.noteCloseDialog.reasons.map((r, i) => <li key={i}>{r}</li>)}

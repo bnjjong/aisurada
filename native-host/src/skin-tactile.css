@@ -254,7 +254,7 @@
 :root[data-skin="tactile"] :is(.ui-modal-backdrop, .note-preview-overlay, .cmdk-overlay, .subnote-overlay) { background: rgba(10, 22, 51, .38); }
 :root[data-skin="tactile"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) { border-bottom: 0; padding: 20px 24px 8px; }
 :root[data-skin="tactile"] .ui-modal > header h2 { font-size: 17px; font-weight: 700; }
-:root[data-skin="tactile"] :is(.ui-modal > footer, .ui-modal form > footer) { border-top: 0; }
+:root[data-skin="tactile"] :is(.ui-modal > footer, .ui-modal-body > footer, .ui-modal form > footer) { border-top: 0; }
 :root[data-skin="tactile"] .cmdk-input { width: calc(100% - 24px); margin: 12px; padding: 13px 20px; border: 0; border-radius: 999px; background: var(--sunken); box-shadow: var(--in); }
 :root[data-skin="tactile"] .cmdk-results { padding: 4px 8px 8px; }
 :root[data-skin="tactile"] .cmdk-item { border-radius: 16px; }

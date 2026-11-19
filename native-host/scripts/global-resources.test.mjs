@@ -527,7 +527,9 @@ test('a resizable modal keeps its grip in its own bottom bar, apart from the scr
   const originalDocument = globalThis.document;
   reactDom.createPortal = (children) => children;
   try {
-    const { Modal } = await import('../src/ui/Modal.tsx');
+    const { Modal, modalSizeKey } = await import('../src/ui/Modal.tsx');
+    assert.equal(modalSizeKey('res-form ndf', '프로젝트 에이전트 편집'), 'aisurada.modalSize.ndf.res-form', '클래스 차례와 상관없이 같은 열쇠');
+    assert.equal(modalSizeKey('', '사실층 차이'), 'aisurada.modalSize.사실층 차이', '클래스가 없으면 제목');
     globalThis.document = { body: {} };
     const draw = (props) => renderToStaticMarkup(React.createElement(Modal, { title: '창', close() {}, ...props }, React.createElement('p', null, '내용'))).replace(/<!-- -->/g, '');
     const resizable = draw({ resizable: true, defaultWidth: 600, defaultHeight: 400 });
@@ -535,9 +537,19 @@ test('a resizable modal keeps its grip in its own bottom bar, apart from the scr
     assert.ok(resizable.indexOf('ui-modal-gripbar') > resizable.indexOf('ui-modal-body'), '손잡이 띠는 스크롤 영역 뒤에 따로 있다');
     assert.match(resizable, /<div class="ui-modal-gripbar"><span class="preview-grip"/, '손잡이는 띠 안에 있다');
     assert.equal((resizable.match(/class="preview-grip"/g) || []).length, 1);
-    const plain = draw({});
+    const plain = draw({ resizable: false });
     assert.doesNotMatch(plain, /ui-modal-body|ui-modal-gripbar|preview-grip/, '크기를 못 바꾸는 모달은 그대로다');
+    assert.doesNotMatch(plain, /전체 화면/);
     assert.match(plain, /<p>내용<\/p>/);
+    // 따로 정하지 않은 모달도 크기를 바꿀 수 있다: 손잡이와 전체 화면 단추가 있다
+    const byDefault = draw({ className: 'ndf res-form' });
+    assert.match(byDefault, /ui-modal-resizable/);
+    assert.match(byDefault, /aria-label="전체 화면"/);
+    assert.match(byDefault, /class="preview-grip"/);
+    // 제목 줄을 직접 채운 모달에도 전체 화면 단추가 그 앞에 붙는다
+    const custom = draw({ headerActions: React.createElement('button', { 'aria-label': '내 닫기' }) });
+    assert.ok(custom.indexOf('aria-label="전체 화면"') < custom.indexOf('aria-label="내 닫기"'), '전체 화면 단추가 직접 채운 단추 앞에 있다');
+    assert.doesNotMatch(custom, /aria-label="창 닫기"/, '기본 닫기 단추는 직접 채운 단추로 바뀐다');
   } finally {
     reactDom.createPortal = originalPortal;
     if (hadDocument) globalThis.document = originalDocument;

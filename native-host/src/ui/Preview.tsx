@@ -199,6 +199,8 @@ export function Preview({
       className={`note-preview docmodal ${full ? "preview-full" : ""}`}
       wide={full}
       headerActions={headerActions}
+      // 미리 보기는 본문 틀(.preview-resize)에 자기 손잡이와 전체 화면이 있다
+      resizable={false}
     >
       <div
         ref={box}
