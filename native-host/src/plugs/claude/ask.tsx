@@ -1,6 +1,6 @@
 // Implementation of @claude-plug/ask for Part 4 Claude-enabled builds.
 // Adheres to Chapters 2, 3, 4 of aisurada Part 4 Claude integration specifications.
-import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Note } from '../../workspace/types.ts';
 import { AskComposePopover } from './askPopover.tsx';
@@ -236,6 +236,7 @@ export function EditorAskPlugins(props?: {
   /** Opens the question box for an HTML box (4.8). */
   onOpenCompose?: (quote: string, rect: { left: number; top: number }, markId?: string) => void;
 }): React.JSX.Element | null {
+  const { cardSize } = useContext(AskContext);
   const docId = props?.docId ?? '';
   const anchor = useRef<HTMLSpanElement>(null);
   const [card, setCard] = useState<CardAt | null>(null);
@@ -271,7 +272,7 @@ export function EditorAskPlugins(props?: {
       if (!rect) return null;
       const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
       const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-      const cardWidth = 360;
+      const cardWidth = cardSize?.width ?? 360;
       const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
       const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
       const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
@@ -374,7 +375,7 @@ export function EditorAskPlugins(props?: {
       const rect = header.getBoundingClientRect();
       const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
       const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-      const cardWidth = 360;
+      const cardWidth = cardSize?.width ?? 360;
       const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
       const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
       const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
@@ -405,7 +406,7 @@ export function EditorAskPlugins(props?: {
       if (rect) {
         const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-        const cardWidth = 360;
+        const cardWidth = cardSize?.width ?? 360;
         const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
         const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
         const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;
@@ -438,7 +439,7 @@ export function EditorAskPlugins(props?: {
       }
       const vh = window.innerHeight;
       const vw = window.innerWidth;
-      const cardWidth = 360;
+      const cardWidth = cardSize?.width ?? 360;
       const left = Math.max(8, Math.min(rect.left, vw - cardWidth - 8));
       const shouldFlip = rect.bottom + 280 > vh && rect.top > 200;
       const top = shouldFlip ? Math.max(8, rect.top - 6) : rect.bottom + 6;

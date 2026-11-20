@@ -119,7 +119,7 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
   merged.noteRailWidth = clampInt(stateRow.noteRailWidth, 392, 960, 392);
   merged.previewWidth = clampInt(stateRow.previewWidth, 480, 1600, 720);
   merged.previewHeight = clampNullableInt(stateRow.previewHeight, 320, 2400);
-  merged.askCardWidth = clampInt(stateRow.askCardWidth, 280, 720, 360);
+  merged.askCardWidth = clampInt(stateRow.askCardWidth, 280, 2400, 360);
   merged.askCardHeight = clampNullableInt(stateRow.askCardHeight, 160, 1600);
   merged.composeWidth = clampInt(stateRow.composeWidth, 240, 720, 280);
   merged.composeInputHeight = clampNullableInt(stateRow.composeInputHeight, 80, 1200);

@@ -28,18 +28,20 @@ export const CARD_CLOSE_DELAY_MS = 180;
 export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned = false }: AskHoverCardProps) {
   const context = useContext(AskContext);
   const [size, setSize] = useState(() => {
+    const maxW = typeof window !== 'undefined' ? Math.max(720, Math.floor(window.innerWidth * 0.8)) : 720;
     const initial = context.cardSize ?? { width: 360, height: null };
     const maxH = typeof window !== 'undefined' ? window.innerHeight - 100 : 800;
     return {
-      width: initial.width,
+      width: Math.min(initial.width, maxW),
       height: initial.height ? Math.min(initial.height, maxH) : null,
     };
   });
   useEffect(() => {
     if (context.cardSize) {
+      const maxW = typeof window !== 'undefined' ? Math.max(720, Math.floor(window.innerWidth * 0.8)) : 720;
       const maxH = typeof window !== 'undefined' ? window.innerHeight - 100 : 800;
       setSize({
-        width: context.cardSize.width,
+        width: Math.min(context.cardSize.width, maxW),
         height: context.cardSize.height ? Math.min(context.cardSize.height, maxH) : null,
       });
     }
@@ -120,12 +122,23 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
     pin();
     stopResize.current?.();
     const rect = card.current!.getBoundingClientRect();
+    const parentAnchor = card.current?.closest<HTMLElement>('.ask-card-anchor');
+    const initialLeft = parentAnchor ? (parseFloat(parentAnchor.style.left) || rect.left) : rect.left;
     const x = event.clientX, y = event.clientY;
     let width = rect.width, height = rect.height;
     const move = (next: PointerEvent) => {
       const maxH = typeof window !== 'undefined' ? window.innerHeight - 100 : 800;
-      width = Math.max(280, Math.min(720, rect.width + next.clientX - x));
+      const maxW = typeof window !== 'undefined' ? Math.max(720, Math.floor(window.innerWidth * 0.8)) : 720;
+      width = Math.max(280, Math.min(maxW, rect.width + next.clientX - x));
       height = Math.max(160, Math.min(maxH, rect.height + next.clientY - y));
+      if (parentAnchor && typeof window !== 'undefined') {
+        const maxLeft = window.innerWidth - width - 8;
+        if (initialLeft > maxLeft) {
+          parentAnchor.style.left = `${Math.max(8, maxLeft)}px`;
+        } else {
+          parentAnchor.style.left = `${initialLeft}px`;
+        }
+      }
       setSize({ width, height });
     };
     const stop = () => {

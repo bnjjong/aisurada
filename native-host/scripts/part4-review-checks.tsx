@@ -131,7 +131,8 @@ await test('hover-card-pinned-draft-resize', async () => {
   grip!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0 }));
   document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2000, clientY: 2000 }));
   document.dispatchEvent(new PointerEvent('pointerup'));
-  assert(savedSize[0] === 720 && savedSize[1] === 1600, `resize bounds were not saved: ${savedSize}`);
+  const expectedMaxW = typeof window !== 'undefined' ? Math.max(720, Math.floor(window.innerWidth * 0.8)) : 720;
+  assert(savedSize[0] === expectedMaxW && savedSize[1] === 1600, `resize bounds were not saved: ${savedSize}`);
 });
 
 await test('busy-mark-decoration-settles', async () => {
