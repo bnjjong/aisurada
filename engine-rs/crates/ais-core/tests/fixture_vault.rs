@@ -4076,3 +4076,92 @@ fn runs_the_note_tool_commands() {
         "apply 은 true 나 false 여야 한다: yes"
     );
 }
+
+/// 본문·하위 노트 모두 같은 결정 묶음에 대한 사람의 확인을 보존한다.
+#[test]
+fn human_decision_confirmation_survives_tool_followups_and_reopens_for_new_questions() {
+    use ais_core::kernel::actor::CallContext;
+
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let app = CallContext::app();
+    let ai = CallContext::ai(None, None);
+    let root = "ndfx0002-00000002";
+    let child = "snfx0002-00000012";
+    let open = "> [!decision] 어디에 쓸까?\n> 답: 노트\n\n> [!decided] 완료\n> - [ ] 답 다 했음\n";
+    let checked = open.replace("[ ]", "[x]");
+
+    for sub in [None, Some(child)] {
+        let args = json!({"id":root, "subId":sub});
+        let save = |editor: &CallContext, body: &str| {
+            let read = engine.call("list_decisions", args.clone()).unwrap();
+            let mut fields =
+                json!({"id":sub.unwrap_or(root), "body":body, "f1":read["precondition"]});
+            let command = if sub.is_some() {
+                fields["parent"] = json!(root);
+                "update_sub_note"
+            } else {
+                "update_doc"
+            };
+            engine.call_as(editor, command, fields).unwrap()
+        };
+        let check = |finished: bool| {
+            let row = engine.call("list_decisions", args.clone()).unwrap();
+            assert_eq!(row["finished"], finished);
+            assert_eq!(row["waiting"], !finished);
+            let pending = engine.call("pending_decisions", json!({})).unwrap();
+            assert_eq!(
+                pending["notes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|n| n["id"] == root && n["subId"].as_str() == sub),
+                !finished
+            );
+        };
+
+        save(&ai, &checked);
+        check(false);
+        save(&app, &format!("{checked}\n메모\n"));
+        check(false);
+        save(&app, open);
+        let saved = save(&app, &checked);
+        check(true);
+        // 이전 버전으로 사람이 완료한 노트에는 마지막 편집 도장만 남아 있다.
+        let path = vault.join(saved["path"].as_str().unwrap()).join("note.md");
+        let old_format = std::fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .filter(|line| !line.starts_with("decisionConfirmation:"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(path, old_format).unwrap();
+        check(true);
+        let result = format!("{checked}\n## 결과\n답에 따라 기록했다.\n");
+        save(&ai, &result);
+        check(true);
+        save(&ai, &format!("{result}\n후속 설명\n"));
+        check(true);
+        let changed = format!("{result}\n> [!decision] 언제 쓸까?\n> 답:\n");
+        save(&ai, &changed);
+        check(false);
+        save(&app, open);
+        check(false);
+        save(&app, &checked);
+        check(true);
+        save(&ai, open);
+        check(false);
+
+        let implicit = "> [!decision] 언제 쓸까?\n> 답:";
+        save(&ai, implicit);
+        check(false);
+        let answered = format!("{implicit} 오늘\n");
+        save(&app, &answered);
+        check(true);
+        save(&ai, &format!("{answered}\n결과를 남겼다.\n"));
+        check(true);
+    }
+    std::fs::remove_dir_all(vault).unwrap();
+}

@@ -74,6 +74,8 @@ pub struct MetaData {
     pub session_agent: Option<String>,
     /// `reading` 또는 `record`
     pub tier: Tier,
+    /// 사람이 확인한 결정 내용의 지문. 확인 전이면 pending, 옛 노트면 None이다.
+    pub decision_confirmation: Option<String>,
     pub edited_by: Option<String>,
     pub edited_at: Option<String>,
     pub edited_session_id: Option<String>,

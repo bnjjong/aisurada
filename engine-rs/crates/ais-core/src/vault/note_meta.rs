@@ -221,6 +221,7 @@ pub fn parse_meta(
         session_id,
         session_agent,
         tier,
+        decision_confirmation: text(map, "decisionConfirmation").map(str::to_owned),
         edited_by,
         edited_at,
         edited_session_id,

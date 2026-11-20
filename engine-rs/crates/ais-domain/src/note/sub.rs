@@ -73,6 +73,7 @@ impl NewSub {
             session_id: None,
             session_agent: None,
             tier: Tier::Reading,
+            decision_confirmation: None,
             edited_by: None,
             edited_at: None,
             edited_session_id: None,

@@ -25,9 +25,11 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde::Serialize;
 
-static BLOCK_START: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^ {0,3}> ?\[!(decision|decided)\][ \t]*(.*)$").unwrap()
-});
+use super::meta::MetaData;
+use crate::kernel::token::compute_token;
+
+static BLOCK_START: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^ {0,3}> ?\[!(decision|decided)\][ \t]*(.*)$").unwrap());
 static QUOTE_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^ {0,3}>(?: ?)(.*)$").unwrap());
 static OPTION_LINE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s*[-*+]\s+\[([ xX/\-])\]\s*(.*)$").unwrap());
@@ -100,9 +102,23 @@ impl DecisionSheet {
         }
     }
 
-    /// 결정이 있고 아직 끝나지 않아 사람의 답을 기다리는가
+    /// 편집 도장만 있는 옛 노트가 사람의 답을 기다리는가.
     pub fn waiting(&self, edited_by_human: bool) -> bool {
         !self.decisions.is_empty() && !self.finished(edited_by_human)
+    }
+
+    fn confirmation_token(&self) -> String {
+        // 알림 지문과 달리 선택지와 답까지 묶어 이전 확인을 다른 결정에 쓰지 않게 한다.
+        compute_token(&serde_json::to_vec(self).expect("결정 블록은 JSON으로 표현할 수 있다"))
+    }
+
+    /// 옛 노트는 당시의 편집 도장으로, 새 노트는 이번 결정에 남긴 확인 값으로 판정한다.
+    pub fn confirmed(&self, meta: &MetaData) -> bool {
+        match meta.decision_confirmation.as_deref() {
+            None => self.finished(edited_by_human(meta.edited_by.as_deref())),
+            Some("pending") => false,
+            Some(token) => self.finished(true) && token == self.confirmation_token(),
+        }
     }
 
     /// 묻는 결정들의 지문. 같은 묶음을 두 번 알리지 않으려고 알림 id에 붙인다. 번호와 질문만 보고 답은 보지 않는다.
@@ -129,6 +145,43 @@ impl DecisionSheet {
 /// 마지막 저장이 사람(앱)인가. 노트 머리의 `editedBy`가 `app`일 때다. 도장이 없으면(만든 뒤 고친 적 없음) 사람으로 보지 않는다.
 pub fn edited_by_human(edited_by: Option<&str>) -> bool {
     edited_by == Some("app")
+}
+
+/// 대부분의 노트에는 결정이 없어 본문을 줄별로 해석할 필요가 없다.
+pub fn mentions_decision(body: &str) -> bool {
+    body.as_bytes()
+        .windows(b"[!decision".len())
+        .any(|w| w.eq_ignore_ascii_case(b"[!decision"))
+}
+
+/// 질문과 답이 같으면 기존 확인을 보존한다. 사람은 결정 블록을 편집해 답을 확정한다.
+pub fn confirmation_after_edit(
+    meta: &MetaData,
+    old_body: &str,
+    body: &str,
+    tool: bool,
+) -> Option<String> {
+    if !mentions_decision(body) {
+        return None;
+    }
+    let current = parse(body);
+    if current.decisions.is_empty() {
+        return None;
+    }
+    let old = parse(old_body);
+    let confirmed = if current == old {
+        old.confirmed(meta)
+    } else {
+        // 이전 묶음의 완료 체크를 남기고 새 질문을 추가한 경우 다시 확인을 기다린다.
+        let stale_check =
+            current.done_checked && old.done_checked && current.signature() != old.signature();
+        !tool && !stale_check && current.finished(true)
+    };
+    Some(if confirmed {
+        current.confirmation_token()
+    } else {
+        "pending".to_owned()
+    })
 }
 
 /// 본문에서 결정 블록과 「답 다 했음」 블록을 뽑는다.

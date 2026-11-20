@@ -88,7 +88,7 @@ pub fn list(
 
 fn row(root: &NoteRecord, sub: Option<&NoteRecord>, sheet: &DecisionSheet) -> DecisionsRow {
     let owner = sub.unwrap_or(root);
-    let human = decision::edited_by_human(owner.meta.edited_by.as_deref());
+    let finished = sheet.confirmed(&owner.meta);
     DecisionsRow {
         id: root.id.clone(),
         sub_id: sub.map(|s| s.id.clone()),
@@ -98,8 +98,8 @@ fn row(root: &NoteRecord, sub: Option<&NoteRecord>, sheet: &DecisionSheet) -> De
         total: sheet.decisions.len(),
         done_block: sheet.done_block,
         done_checked: sheet.done_checked,
-        finished: sheet.finished(human),
-        waiting: sheet.waiting(human),
+        finished,
+        waiting: !sheet.decisions.is_empty() && !finished,
         edited_by: owner.meta.edited_by.clone(),
         edited_at: owner.meta.edited_at.clone(),
         signature: sheet.signature(),
@@ -145,12 +145,11 @@ pub fn pending(index: &NoteIndex, context: &CallContext) -> PendingDecisionsRow 
         for (owner, sub) in
             std::iter::once((root, None)).chain(root.sub_notes.iter().map(|s| (s, Some(s))))
         {
-            if !mentions_decision(&owner.body) {
+            if !decision::mentions_decision(&owner.body) {
                 continue;
             }
             let sheet = decision::parse(&owner.body);
-            let human = decision::edited_by_human(owner.meta.edited_by.as_deref());
-            if !sheet.waiting(human) {
+            if sheet.decisions.is_empty() || sheet.confirmed(&owner.meta) {
                 continue;
             }
             notes.push(PendingNote {
@@ -168,11 +167,4 @@ pub fn pending(index: &NoteIndex, context: &CallContext) -> PendingDecisionsRow 
         count: notes.len(),
         notes,
     }
-}
-
-/// 결정 블록이 있을 수도 있는 본문인가(대소문자 무시). 대부분의 노트를 해석 없이 건너뛰려는 거름이다.
-fn mentions_decision(body: &str) -> bool {
-    body.as_bytes()
-        .windows(10)
-        .any(|w| w.eq_ignore_ascii_case(b"[!decision"))
 }
