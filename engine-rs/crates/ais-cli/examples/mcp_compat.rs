@@ -71,7 +71,11 @@ fn cases() -> Vec<String> {
 
     // 모든 도구 호출(읽기 모드에서는 쓰기 도구가 막히고, 쓰기 모드에서는 영구 삭제만 막힌다)
     // Java 엔진 시절 이후 추가된 새 도구(create_task, list_decisions)는 Java 기준 테이프와 견줄 때 제외한다
-    for (n, name) in CLI_TOOL_NAMES.iter().filter(|&&name| name != "create_task" && name != "list_decisions").enumerate() {
+    for (n, name) in CLI_TOOL_NAMES
+        .iter()
+        .filter(|&&name| name != "create_task" && name != "list_decisions")
+        .enumerate()
+    {
         add(&format!(
             r#"{{"jsonrpc":"2.0","id":{},"method":"tools/call","params":{{"name":"{name}","arguments":{{"id":"x{n}","q":"한글 \"따옴표\" \n줄"}}}}}}"#,
             100 + n
@@ -270,6 +274,15 @@ fn main() -> ExitCode {
                 continue;
             }
             let mut rust_output = server.handle(line).unwrap_or_else(|| "<none>".to_string());
+            if line.contains(r#""method":"initialize""#) {
+                // Java 이후 붙인 결정 블록 안내(안내문 끝)를 잘라 Java 기준 테이프와 견준다
+                let mark = ais_cli::mcp::DECISION_GUIDE_MARK.replace('\n', "\\n");
+                if let (Some(start), Some(end)) =
+                    (rust_output.find(&mark), rust_output.rfind("\"}}"))
+                {
+                    rust_output = format!("{}{}", &rust_output[..start], &rust_output[end..]);
+                }
+            }
             if line.contains(r#""method":"tools/list""#) {
                 // Java 엔진(java-engine-final) 이후 추가/변경된 create_task·list_decisions(목록 끝)와 get_task 문구를 Java 기준 테이프와 견주기 위해 정규화한다
                 if let Some(pos) = rust_output.find(r#",{"name":"create_task""#) {

@@ -28,6 +28,66 @@ const INTERNAL_ERROR: i32 = -32603;
 
 const INSTRUCTIONS: &str = "aisurada vault의 노트를 읽고 쓰는 도구들이다. 기존 노트를 고치는 도구(update_doc, set_favorite, evaluate_doc, link_docs, update_sub_note)는 f1이 꼭 필요하다. 고치기 전에 get_doc으로 읽어 precondition 값을 얻어 f1으로 넘긴다. 방금 create_doc이나 update_doc을 했다면 그 응답의 precondition을 쓴다. 그 사이 다른 곳에서 고쳐졌으면 덮어쓰지 않고 멈춘다. id는 list_docs나 search_docs가 준 값을 그대로 쓴다.";
 
+/// 결정 블록 안내의 머리. Java에 없던 확장이라 기본 안내문 뒤에 붙이고, Java 기준 녹화본과 견줄 때는 이 머리부터 잘라 낸다.
+pub const DECISION_GUIDE_MARK: &str = "\n\n[결정 블록]";
+
+/// 결정 블록 안내. 사람이 골라야 할 것을 노트에 쓰고, 사람이 노트에서 답하면 이어 가는 법이다(2026-11-20 사용자와 정한 형식).
+/// `exe`는 이 서버를 띄운 `ais-cli`의 경로이고, `client`는 `initialize`의 `clientInfo.name`이다. 접속한 CLI에 맞는
+/// 기다리는 법만 싣고, 모르는 클라이언트에는 셋을 모두 싣는다.
+fn decision_guide(client: Option<&str>, exe: &str) -> String {
+    let cli = shell_word(exe);
+    let claude = "- Claude Code: Bash 도구의 run_in_background로 건다. 명령이 끝나면 세션이 다시 불리므로 그동안 턴을 끝내도 된다.";
+    let gemini = "- Gemini CLI: 셸 도구에 is_background=true로 건다. 사용자가 settings.json에 tools.shell.backgroundCompletionBehavior=\"inject\"와 experimental.modelSteering=true를 켜 두었으면 끝날 때 대화로 돌아온다. 켜져 있지 않으면 사람에게 「답을 다 하면 말해 달라」고 한다.";
+    let codex = "- Codex: 쉬는 세션을 깨우지 못하므로 턴을 끝내지 말고 이 명령을 직접 실행해 끝날 때까지 기다린다. 백그라운드 터미널이 되면 write_stdin으로 다시 기다린다.";
+    let name = client.unwrap_or("").to_ascii_lowercase();
+    let how = if name.contains("claude") {
+        claude.to_string()
+    } else if name.contains("gemini") {
+        gemini.to_string()
+    } else if name.contains("codex") {
+        codex.to_string()
+    } else {
+        [claude, gemini, codex].join("\n")
+    };
+    format!(
+        "{DECISION_GUIDE_MARK} 사람이 골라야 할 것(정할 것)을 노트에 쓸 때는 결정 블록으로 쓰고, 사람이 노트에서 답하게 한다.\n\
+결정마다 블록 하나:\n\
+> [!decision] 결정 1 · 질문\n\
+> - [ ] 가(추천): 설명\n\
+> - [ ] 나: 설명\n\
+>\n\
+> 답:\n\
+제목은 `1.`처럼 숫자와 점으로 시작하지 않는다(편집기가 번호 목록으로 바꾼다). `답:` 줄과 체크는 비워 둔다.\n\
+모든 결정 뒤에 한 번:\n\
+> [!decision-done] 답을 다 적었으면 체크하세요\n\
+> - [ ] 답 다 했음\n\
+노트를 쓴 뒤 셸에서 `{cli} wait-decisions <노트 id>[/<하위 노트 id>]`로 답을 기다린다. 사람이 「답 다 했음」을 체크해 저장하면 답을 JSON으로 내고 0으로 끝난다. 2시간이 지나면 종료 코드 6이니, 아직 답이 없다고 사람에게 알리고 멈춘다.\n\
+결과의 decisions[].choice(고른 선택지)와 answer(답 줄)를 읽고 이어 간다. 답이 없는 결정(answered=false)은 추천안으로 채우지 말고, 그 결정에 기대지 않는 일만 한 뒤 다시 묻는다. 다음 묶음을 물을 때는 「답 다 했음」 체크를 풀어 둔다.\n\
+기다리는 법:\n{how}"
+    )
+}
+
+/// 셸에 그대로 붙일 수 있게 경로를 감싼다. 공백이나 특수 문자가 없으면 그대로 둔다.
+fn shell_word(path: &str) -> String {
+    if !path.is_empty()
+        && path
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "/._-+".contains(c))
+    {
+        path.to_string()
+    } else {
+        format!("'{}'", path.replace('\'', r"'\''"))
+    }
+}
+
+/// `initialize`가 돌려주는 안내문: 기본 안내문 뒤에 결정 블록 안내를 붙인다.
+fn instructions(client: Option<&str>) -> String {
+    let exe = std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "ais-cli".to_string());
+    format!("{INSTRUCTIONS}{}", decision_guide(client, &exe))
+}
+
 /// MCP 클라이언트에 내놓는 도구 하나의 정의
 #[derive(Debug)]
 pub struct McpTool {
@@ -165,7 +225,7 @@ impl<'a> McpServer<'a> {
             quote(version),
             quote(SERVER_NAME),
             quote(SERVER_VERSION),
-            quote(INSTRUCTIONS)
+            quote(&instructions(self.client_name.as_deref()))
         )
     }
 
