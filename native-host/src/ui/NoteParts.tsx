@@ -5,6 +5,8 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { EditorHandle } from "../editor/Editor.tsx";
 import { Confirm } from "./Modal.tsx";
 import { ActionMenu } from "./ActionMenu.tsx";
+import { AgendaPicker } from "./AgendaPicker.tsx";
+import { showMoveUndo } from "./MoveUndo.tsx";
 import type { ActionMenuItem } from "./ActionMenu.tsx";
 import { Icon } from "./Icon.tsx";
 import { sessionAgentId, sessionAgentLabel } from "./AgentMark.tsx";
@@ -66,17 +68,39 @@ export function NoteMeta({
     [copiedId, setCopiedId] = useState(false),
     [copiedItem, setCopiedItem] = useState<string | null>(null),
     [moveError, setMoveError] = useState(""),
+    [picking, setPicking] = useState(false),
     moreButton = useRef<HTMLButtonElement>(null),
-    closeMenu = useCallback(() => setMenuOpen(false), []);
+    agendaButton = useRef<HTMLButtonElement>(null),
+    closeMenu = useCallback(() => setMenuOpen(false), []),
+    closePicker = useCallback(() => setPicking(false), []);
   const live = controller.data.note({ id: note.id, parent }) || note,
     key = parent ? parent + ":" + note.id : note.id,
-    agenda = state.workspace?.agendas.find((a) => a.id === note.agendaId),
+    // 옮긴 직후에도 맞는 칩을 그리도록 메모리의 노트(live)가 가리키는 아젠다를 쓴다
+    agenda = state.workspace?.agendas.find((a) => a.id === (live.agendaId || note.agendaId)),
     template = state.workspace?.templates.find((t) => t.id === note.template),
     project = state.workspace?.projects.find((p) => p.slug === agenda?.project),
     chain = parent
       ? controller.data.chain(parent)?.split("/").concat(note.id).join("/") ||
         note.id
       : note.id;
+  // 다른 아젠다로 옮긴다(TSK-2). 확인 창 없이 바로 옮기고, 앱 아래 알림의 「되돌리기」로 원래 아젠다로 되돌린다(결정 5-가).
+  // 되돌리기는 노트만 옮기고, 옮기며 새로 만든 아젠다는 남긴다.
+  const moveTo = async (agendaId: string) => {
+    setPicking(false);
+    const from = live.agendaId || note.agendaId;
+    if (!from || from === agendaId) return;
+    const result = await controller.data.moveNote(note.id, agendaId);
+    const target = controller.getSnapshot().workspace?.agendas.find((a) => a.id === agendaId);
+    if (result.ok && target)
+      showMoveUndo({ noteId: note.id, title: target.title, undo: () => controller.data.moveNote(note.id, from) });
+  };
+  // 목록에 없는 이름이면 아젠다를 먼저 만들고 옮긴다(결정 4-나). 엔진의 update_doc 은 아젠다를 만들지 않는다
+  const createAndMove = async (title: string) => {
+    setPicking(false);
+    const created = await controller.data.saveEntity("agenda", { title });
+    const id = asText(created.value?.id);
+    if (created.ok && id) await moveTo(id);
+  };
   // 후속 노트 탭에는 옛 후속 노트 창의 이동 경로가 없다. 대신 상위 노트들로 돌아가는 칩을 둔다.
   const ancestors = parent && mode === "tab" ? ancestorLinks(controller, parent) : [];
   const remove = async () => {
@@ -325,12 +349,18 @@ export function NoteMeta({
               ) : (
                 <button
                   type="button"
+                  ref={agendaButton}
                   className="doc-agenda-chip is-clickable"
                   style={{ "--agenda-color": hueColor } as React.CSSProperties}
-                  title={`${agenda.title} 아젠다로 이동`}
-                  onClick={() => go(controller, agendaAddress(agenda.id))}
+                  title="아젠다 바꾸기"
+                  aria-haspopup="dialog"
+                  aria-expanded={picking}
+                  onClick={() => setPicking(!picking)}
                 >
                   {content}
+                  <span className="doc-agenda-caret" aria-hidden="true">
+                    <Icon name="chevron" size={10} />
+                  </span>
                 </button>
               );
             })()}
@@ -373,6 +403,21 @@ export function NoteMeta({
             } : undefined}
           />
         </div>
+      )}
+      {picking && agenda && (
+        <AgendaPicker
+          anchor={agendaButton}
+          agendas={state.workspace?.agendas || []}
+          projects={state.workspace?.projects || []}
+          currentId={agenda.id}
+          onPick={(id) => void moveTo(id)}
+          onCreate={(title) => void createAndMove(title)}
+          onOpenAgenda={() => {
+            setPicking(false);
+            go(controller, agendaAddress(agenda.id));
+          }}
+          onClose={closePicker}
+        />
       )}
       {menuOpen && (
         <ActionMenu

@@ -103,6 +103,12 @@ const PATHS: Record<string, ReactNode> = {
   ),
   arrowUp: <path d="M8 13V3M4 7l4-4 4 4" />,
   chevron: <path d="M6 4l4 4-4 4" />,
+  search: (
+    <>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
+    </>
+  ),
   folder: (
     <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" />
   ),

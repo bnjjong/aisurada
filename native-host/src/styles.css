@@ -2495,3 +2495,41 @@ body.col-resizing {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* ───────── 노트 아젠다 바꾸기(TSK-2) ─────────
+   칩 끝의 ▾는 누르면 고르기 메뉴가 열린다는 표시다. 메뉴는 .act-menu(더 보기 메뉴)의 상자와 항목 모양을 그대로 쓰고,
+   찾기 칸·묶음 이름·새 아젠다 줄만 더한다. 되돌리기 알림은 앱 아래 가운데에 잠깐 뜨는 알약 모양이다. */
+.doc-context-chips .doc-agenda-chip .doc-agenda-caret {
+  display: inline-flex;
+  margin-left: 2px;
+  padding-left: 6px;
+  border-left: 1px solid color-mix(in srgb, var(--agenda-color, var(--accent)) 30%, var(--line));
+  color: var(--muted);
+}
+.doc-context-chips .doc-agenda-chip .doc-agenda-caret svg { transform: rotate(90deg); }
+.doc-context-chips .doc-agenda-chip[aria-expanded="true"] .doc-agenda-caret svg { transform: rotate(-90deg); }
+.agenda-picker { display: flex; flex-direction: column; width: 280px; overflow: hidden; }
+.agenda-picker-title { padding: 6px 10px 4px; font-size: 11px; font-weight: 650; color: var(--muted); }
+.agenda-picker-search { display: flex; align-items: center; gap: 7px; margin: 2px 2px 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: var(--muted); }
+.agenda-picker-search input { flex: 1 1 auto; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; box-shadow: none; color: var(--ink); font: inherit; font-size: 12px; }
+.agenda-picker-search:focus-within { border-color: var(--accent); }
+/* 포커스 표시는 바깥 칸이 맡는다. 물성 모양의 입력 칸 테두리(input:focus-visible)가 안쪽에 한 겹 더 그려지지 않게 끈다 */
+:root .agenda-picker .agenda-picker-search input:focus-visible { outline: none; }
+.agenda-picker-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.agenda-picker-group-title { padding: 6px 10px 2px; font-size: 10px; font-weight: 650; letter-spacing: .2px; color: var(--muted); }
+.agenda-picker .agenda-picker-dot { flex: none; width: 14px; font-size: 9px; text-align: center; }
+.agenda-picker .agenda-picker-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-picker .agenda-picker-item.is-current:disabled { opacity: 1; cursor: default; background: transparent; color: var(--ink); }
+.agenda-picker .agenda-picker-item small { display: inline-flex; align-items: center; gap: 3px; font-family: inherit; }
+.agenda-picker .agenda-picker-create { color: var(--accent); font-weight: 600; }
+.agenda-picker .agenda-picker-create svg { color: var(--accent); }
+.agenda-picker-empty { margin: 0; padding: 8px 10px 4px; font-size: 12px; color: var(--muted); }
+:root[data-skin="tactile"] .agenda-picker-search { border-color: transparent; background: var(--sunken); box-shadow: var(--in); }
+:root[data-skin="tactile"] .agenda-picker-search:focus-within { box-shadow: var(--in), 0 0 0 2px var(--accent); }
+:root[data-skin="tactile"] .agenda-picker .agenda-picker-create { color: var(--accent-text); }
+.move-undo { position: fixed; z-index: 75; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 8px 10px 8px 16px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 12px; white-space: nowrap; box-shadow: var(--sh-3, 0 12px 32px rgba(0, 0, 0, .25)); }
+.move-undo-text { overflow: hidden; text-overflow: ellipsis; }
+.move-undo button { display: inline-flex; align-items: center; padding: 2px 4px; border: 0; background: transparent; box-shadow: none; color: inherit; font-size: 12px; cursor: pointer; }
+.move-undo .move-undo-action { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.move-undo .move-undo-close { opacity: .7; }
+.move-undo button:hover { background: transparent; opacity: 1; }
