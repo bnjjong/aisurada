@@ -17,8 +17,8 @@ pub const TOOLS: &[McpTool] = &[
     },
     McpTool {
         name: "update_doc",
-        description: "노트의 제목, 본문, 태그를 고친다. 준 칸만 바뀐다. 본문을 주면 통째로 바뀌므로 먼저 get_doc으로 읽고 고친 전체를 보낸다.",
-        input_schema: "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"description\":\"고칠 노트의 id\"},\"body\":{\"type\":\"string\",\"description\":\"새 본문 전체\"},\"title\":{\"type\":\"string\",\"description\":\"새 제목\"},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"새 태그 목록(통째로 바뀐다)\"},\"template\":{\"type\":\"string\",\"description\":\"템플릿 이름\"},\"f1\":{\"type\":\"string\",\"description\":\"기존 노트를 고칠 때 꼭 필요한 쓰기 전 토큰. 직전에 get_doc으로 읽은 노트의 precondition 값(f1:…)을 그대로 넣는다. 방금 create_doc이나 update_doc을 했다면 그 응답의 precondition을 쓴다. 안 주면 AIS-412로 거절되고, 그 사이 다른 곳에서 고쳐진 노트도 덮어쓰지 않고 멈춘다.\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
+        description: "노트의 제목, 본문, 태그를 고치거나 다른 아젠다로 옮긴다. 준 칸만 바뀐다. 본문을 주면 통째로 바뀌므로 먼저 get_doc으로 읽고 고친 전체를 보낸다.",
+        input_schema: "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"description\":\"고칠 노트의 id\"},\"body\":{\"type\":\"string\",\"description\":\"새 본문 전체\"},\"title\":{\"type\":\"string\",\"description\":\"새 제목\"},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"새 태그 목록(통째로 바뀐다)\"},\"template\":{\"type\":\"string\",\"description\":\"템플릿 이름\"},\"agenda\":{\"type\":\"string\",\"description\":\"옮길 아젠다의 slug나 이름. 이미 있는 아젠다만 받고 새로 만들지 않는다(없으면 거절). list_docs나 get_doc 응답의 agenda 값을 쓴다. 첨부와 후속 노트도 함께 옮겨진다\"},\"f1\":{\"type\":\"string\",\"description\":\"기존 노트를 고칠 때 꼭 필요한 쓰기 전 토큰. 직전에 get_doc으로 읽은 노트의 precondition 값(f1:…)을 그대로 넣는다. 방금 create_doc이나 update_doc을 했다면 그 응답의 precondition을 쓴다. 안 주면 AIS-412로 거절되고, 그 사이 다른 곳에서 고쳐진 노트도 덮어쓰지 않고 멈춘다.\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
         write: true,
         destructive: true,
     },

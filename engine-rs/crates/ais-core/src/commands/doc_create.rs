@@ -156,23 +156,27 @@ pub fn create_doc_in(
     })
 }
 
+/// 이미 있는 아젠다를 찾은 결과
+pub(crate) enum AgendaMatch {
+    /// 찾은 아젠다의 slug
+    Found(String),
+    /// 없다. 새로 만든다면 쓸 slug(이름을 slug로 만든 값)
+    Missing(String),
+}
+
 /// slug가 같은 아젠다, 없으면 이름이 같은(대소문자 무시) 아젠다, 없으면 이름을 slug로 만든 것과 같은 아젠다를 찾는다.
-/// 어느 것도 없으면 아젠다 파일을 새로 만든다(저장소·프로젝트 없음, 요약 비움). `(slug, 새로 만들었는가)`
-fn lookup_or_create_agenda(
-    vault: &Path,
-    scope: &WriteScope,
-    key: &str,
-) -> Result<(String, bool), EngineError> {
+/// 이름을 slug로 만든 값이 경로로 쓸 수 없으면 거절한다. `create_doc`과 `update_doc`(옮기기)이 같은 차례로 찾는다.
+pub(crate) fn find_agenda(scope: &WriteScope, key: &str) -> Result<AgendaMatch, EngineError> {
     let table = &scope.index.agendas.table;
     if let Some(found) = table.by_slug(key) {
-        return Ok((found.slug.clone(), false));
+        return Ok(AgendaMatch::Found(found.slug.clone()));
     }
     let lower = key.to_lowercase();
     if let Some((slug, _)) = table
         .slug_title_pairs()
         .find(|(_, title)| title.to_lowercase() == lower)
     {
-        return Ok((slug.to_string(), false));
+        return Ok(AgendaMatch::Found(slug.to_string()));
     }
     let slug_key = slug::build(key, 50);
     if has_unusable_path_characters(&format!("{slug_key}.md")) {
@@ -180,9 +184,23 @@ fn lookup_or_create_agenda(
             "경로로 쓸 수 없는 값이다: {slug_key}.md"
         )));
     }
-    if let Some(found) = table.by_slug(&slug_key) {
-        return Ok((found.slug.clone(), false));
+    match table.by_slug(&slug_key) {
+        Some(found) => Ok(AgendaMatch::Found(found.slug.clone())),
+        None => Ok(AgendaMatch::Missing(slug_key)),
     }
+}
+
+/// [`find_agenda`]로 찾고, 없으면 아젠다 파일을 새로 만든다(저장소·프로젝트 없음, 요약 비움). `(slug, 새로 만들었는가)`
+fn lookup_or_create_agenda(
+    vault: &Path,
+    scope: &WriteScope,
+    key: &str,
+) -> Result<(String, bool), EngineError> {
+    let slug_key = match find_agenda(scope, key)? {
+        AgendaMatch::Found(slug) => return Ok((slug, false)),
+        AgendaMatch::Missing(slug_key) => slug_key,
+    };
+    let table = &scope.index.agendas.table;
     let info = AgendaInfo {
         id: next_id("ag"),
         slug: slug_key.clone(),

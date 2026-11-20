@@ -1,8 +1,9 @@
-//! `update_doc`의 규칙: 노트 한 건의 제목·본문·태그·템플릿·날짜·시각을 고칠 때 지켜야 할 조건과 새 글·새 자리 계산.
+//! `update_doc`의 규칙: 노트 한 건의 제목·본문·태그·템플릿·날짜·시각·아젠다를 고칠 때 지켜야 할 조건과 새 글·새 자리 계산.
 //! 파일을 읽고 쓰지 않는다. 읽은 파일의 내용(`raw` 머리 맵과 옛 본문)과 지금 시각, 편집자를 **인자로 받는다**.
 //!
 //! 세 걸음이다. 각 걸음은 파일 읽기나 색인 조회 사이에 끼어 있어서(오류가 나오는 차례를 지키려고) 따로 부른다.
-//! 1. [`ParsedEdit::parse`]: 인자 검사. AI 도구 호출은 날짜와 시각을 받지 않고, 제목은 비면 안 된다.
+//! 1. [`ParsedEdit::parse`]: 인자 검사. AI 도구 호출은 날짜와 시각을 받지 않고, 제목과 옮길 아젠다는 비면 안 된다.
+//!    아젠다는 AI 호출도 받는다. 그 아젠다가 있는지는 색인을 아는 호출한 쪽이 보고 [`Slot::move_to`]로 넘긴다.
 //! 2. [`ParsedEdit::slot`]: 고칠 수 있는지와 새 `created`·날짜·시각. `created`를 못 읽으면, JSON 노트에 본문을 주면 거절한다.
 //! 3. [`Slot::render`]: 읽은 파일의 머리와 옛 본문으로 새 파일 글 전체를 짓는다(편집 도장 판정 포함).
 
@@ -23,6 +24,7 @@ pub struct ParsedEdit {
     template: Option<String>,
     date: Option<CivilDate>,
     time: Option<(u32, u32)>,
+    agenda: Option<String>,
     token: Option<String>,
 }
 
@@ -36,6 +38,8 @@ pub struct EditInput<'a> {
     pub template: Option<&'a str>,
     pub date: Option<&'a str>,
     pub time: Option<&'a str>,
+    /// 옮길 아젠다(slug나 이름). 이미 있는 아젠다만 받으며, 이 규칙은 아젠다를 새로 만들지 않는다.
+    pub agenda: Option<&'a str>,
     /// 직전에 읽은 확인 값(`f1`)
     pub f1: Option<&'a str>,
     /// AI 도구 호출인가
@@ -43,8 +47,8 @@ pub struct EditInput<'a> {
 }
 
 impl ParsedEdit {
-    /// 날짜(`date`)와 시각(`time`) 인자를 읽고(AI 도구 호출은 무시한다), 제목이 비었는지 보고, 확인 값을 다듬는다.
-    /// 오류가 나오는 차례: 날짜 → 시각 → 제목.
+    /// 날짜(`date`)와 시각(`time`) 인자를 읽고(AI 도구 호출은 무시한다), 제목과 옮길 아젠다가 비었는지 보고, 확인 값을 다듬는다.
+    /// 오류가 나오는 차례: 날짜 → 시각 → 제목 → 아젠다.
     pub fn parse(input: EditInput) -> Result<ParsedEdit, EngineError> {
         let date = input
             .date
@@ -62,6 +66,12 @@ impl ParsedEdit {
                 input.note_id
             )));
         }
+        if input.agenda.is_some_and(is_blank) {
+            return Err(EngineError::invalid_argument(format!(
+                "옮길 아젠다가 비었다: {}",
+                input.note_id
+            )));
+        }
         Ok(ParsedEdit {
             title: input.title.map(str::to_string),
             body: input.body.map(str::to_string),
@@ -69,6 +79,7 @@ impl ParsedEdit {
             template: input.template.map(|t| trim(t).to_string()),
             date,
             time,
+            agenda: input.agenda.map(|a| trim(a).to_string()),
             token: input
                 .f1
                 .map(trim)
@@ -85,6 +96,11 @@ impl ParsedEdit {
     /// 새로 준 본문
     pub fn given_body(&self) -> Option<&str> {
         self.body.as_deref()
+    }
+
+    /// 옮길 아젠다로 준 값(다듬은 slug나 이름). 안 줬으면 `None`
+    pub fn agenda_key(&self) -> Option<&str> {
+        self.agenda.as_deref()
     }
 
     /// 준 칸만 갈아 끼운 다음 값과 새 `created`·날짜·시각. 못 고치는 값은 색인의 값이 따라온다.
@@ -139,6 +155,7 @@ impl ParsedEdit {
             title,
             tags,
             template,
+            agenda: None,
             created,
             date,
             hour,
@@ -147,12 +164,14 @@ impl ParsedEdit {
     }
 }
 
-/// 새 제목·태그·템플릿과 새 `created`·날짜·시각(자리를 정하는 값)
+/// 새 제목·태그·템플릿·아젠다와 새 `created`·날짜·시각(자리를 정하는 값)
 #[derive(Debug, Clone)]
 pub struct Slot {
     pub title: String,
     tags: Vec<String>,
     template: Option<String>,
+    /// 옮길 아젠다의 slug. `None`이면 파일의 아젠다를 그대로 쓴다
+    agenda: Option<String>,
     pub created: String,
     pub date: CivilDate,
     pub hour: u32,
@@ -163,13 +182,18 @@ pub struct Slot {
 pub struct Rendered {
     /// 쓸 파일 글 전체(머리 + 본문)
     pub text: String,
-    /// 새 자리의 아젠다 slug. 파일의 `agenda`가 빈 글이 아닌 문자열이면 그 글자 그대로다
+    /// 새 자리의 아젠다 slug. 옮기라고 했으면 그 아젠다, 아니면 파일의 `agenda`가 빈 글이 아닌 문자열일 때 그 글자 그대로다
     pub agenda: String,
     /// 쓸 본문(새로 줬으면 그것, 아니면 옛 본문)
     pub body: String,
 }
 
 impl Slot {
+    /// 노트를 `slug` 아젠다로 옮기게 한다. `slug`는 호출한 쪽이 이미 있는 아젠다에서 찾은 값이다.
+    pub fn move_to(&mut self, slug: &str) {
+        self.agenda = Some(slug.to_string());
+    }
+
     /// 읽은 파일의 머리(`raw`)와 옛 본문으로 새 파일 글을 짓는다. 편집 도장은 `judge`가 정하고, 시각과 편집자는 인자다.
     #[allow(clippy::too_many_arguments)]
     pub fn render(
@@ -183,9 +207,10 @@ impl Slot {
         editor: &Editor,
         now_millis: i64,
     ) -> Result<Rendered, EngineError> {
-        // 새 자리의 아젠다 slug. 파일의 agenda가 빈 글이 아닌 문자열이면 그 글자 그대로다
-        let agenda = match get(raw, "agenda") {
-            Some(Value::Str(s)) if !s.is_empty() => s.clone(),
+        // 새 자리의 아젠다 slug. 옮기라고 했으면 그 아젠다, 아니면 파일의 agenda가 빈 글이 아닌 문자열일 때 그 글자 그대로다
+        let agenda = match (&self.agenda, get(raw, "agenda")) {
+            (Some(target), _) => target.clone(),
+            (None, Some(Value::Str(s))) if !s.is_empty() => s.clone(),
             _ => {
                 let parts: Vec<&str> = old_rel.split('/').collect();
                 if parts.len() >= 2 {
@@ -270,6 +295,7 @@ mod tests {
             template: None,
             date: None,
             time: None,
+            agenda: None,
             f1: None,
             tool: false,
         }
@@ -309,6 +335,31 @@ mod tests {
             ..input()
         };
         assert_eq!(err(blank), "노트 제목이 비었다: ndzz0001-0000aaaa");
+        // 제목이 비었으면 아젠다보다 제목 오류가 먼저다
+        let blank_both = EditInput {
+            title: Some(" "),
+            agenda: Some(" "),
+            ..input()
+        };
+        assert_eq!(err(blank_both), "노트 제목이 비었다: ndzz0001-0000aaaa");
+        let blank_agenda = EditInput {
+            agenda: Some("  "),
+            ..input()
+        };
+        assert_eq!(err(blank_agenda), "옮길 아젠다가 비었다: ndzz0001-0000aaaa");
+    }
+
+    #[test]
+    fn an_ai_tool_can_move_the_note_to_another_agenda() {
+        // 날짜·시각과 달리 아젠다는 AI 호출에서도 받는다(사용자 결정 2026-11-20). 값은 앞뒤 공백을 다듬는다
+        let parsed = ParsedEdit::parse(EditInput {
+            agenda: Some(" 다른 아젠다 "),
+            tool: true,
+            ..input()
+        })
+        .unwrap();
+        assert_eq!(parsed.agenda_key(), Some("다른 아젠다"));
+        assert_eq!(ParsedEdit::parse(input()).unwrap().agenda_key(), None);
     }
 
     #[test]
@@ -493,5 +544,29 @@ mod tests {
             )
             .unwrap();
         assert_eq!(r.agenda, "pathagenda");
+    }
+
+    #[test]
+    fn moving_overrides_the_agenda_from_the_file_and_the_path() {
+        let m = meta();
+        let mut slot = ParsedEdit::parse(input())
+            .unwrap()
+            .slot(&m, Format::Markdown, "x")
+            .unwrap();
+        slot.move_to("homeserver");
+        let r = slot
+            .render(
+                Format::Markdown,
+                &m,
+                "notes/demo/x",
+                &raw(&[("agenda", "demo")]),
+                "b",
+                None,
+                &APP,
+                NOW,
+            )
+            .unwrap();
+        assert_eq!(r.agenda, "homeserver");
+        assert!(r.text.contains("\nagenda: homeserver\n"), "{}", r.text);
     }
 }

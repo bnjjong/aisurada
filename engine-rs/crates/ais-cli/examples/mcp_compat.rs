@@ -290,6 +290,10 @@ fn main() -> ExitCode {
                 } else if let Some(pos) = rust_output.find(r#",{"name":"list_decisions""#) {
                     rust_output = format!("{}]}}}}", &rust_output[..pos]);
                 }
+                // TSK-2(2026-11-20)로 update_doc 에 더한 agenda 인자와 설명 문구를 빼고 견준다
+                rust_output = rust_output
+                    .replace("태그를 고치거나 다른 아젠다로 옮긴다.", "태그를 고친다.")
+                    .replace(UPDATE_DOC_AGENDA_PROPERTY, "");
                 rust_output = rust_output.replace(
                     "활동과 함께 읽는다.",
                     "활동과 함께 읽는다. 태스크를 만들고 고치는 것은 사람과 러너가 한다.",
@@ -337,6 +341,9 @@ fn main() -> ExitCode {
         ExitCode::from(1)
     }
 }
+
+/// TSK-2로 `update_doc` 도구의 입력 스키마에 더한 `agenda` 칸(`mcp_tools.rs`와 글자까지 같아야 한다)
+const UPDATE_DOC_AGENDA_PROPERTY: &str = r#""agenda":{"type":"string","description":"옮길 아젠다의 slug나 이름. 이미 있는 아젠다만 받고 새로 만들지 않는다(없으면 거절). list_docs나 get_doc 응답의 agenda 값을 쓴다. 첨부와 후속 노트도 함께 옮겨진다"},"#;
 
 fn clip(text: &str) -> String {
     let mut out: String = text.chars().take(220).collect();

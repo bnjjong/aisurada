@@ -271,6 +271,10 @@ fn clip(text: &str) -> String {
     s
 }
 
+/// TSK-2로 `update-doc` 사용법에 더한 조각(`doc_write.rs`의 USAGE와 글자까지 같아야 한다)
+const UPDATE_DOC_AGENDA_USAGE: &str =
+    " [agenda=<옮길 아젠다의 slug 또는 이름. 이미 있는 아젠다만>]";
+
 fn compare(
     report: &mut Report,
     vault: &Path,
@@ -285,8 +289,10 @@ fn compare(
             report.record(label, want == r, || first_diff(&want, &r, "$"));
         }
         (Err(j), Err(r)) => {
-            // 오류는 Java의 `AIS-코드 메시지` 글과 Rust의 코드·메시지가 같은지 본다
-            let rust_text = format!("AIS-{} {}", java_number(r.kind), r.message);
+            // 오류는 Java의 `AIS-코드 메시지` 글과 Rust의 코드·메시지가 같은지 본다.
+            // TSK-2(2026-11-20)로 update-doc 사용법에 더한 agenda 인자는 빼고 견준다
+            let rust_text = format!("AIS-{} {}", java_number(r.kind), r.message)
+                .replace(UPDATE_DOC_AGENDA_USAGE, "");
             // Java가 예상 밖 예외로 실패하면 오류 글에 스택 추적이 붙으므로, Rust의 메시지가 그 안에 든 것도 같은 실패로 본다
             report.record(
                 label,

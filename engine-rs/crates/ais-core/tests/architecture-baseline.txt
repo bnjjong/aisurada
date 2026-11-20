@@ -5,7 +5,7 @@ edge adapters -> kernel 3
 edge adapters -> ports 8
 edge adapters -> text 2
 edge commands -> error 36
-edge commands -> frontmatter 3
+edge commands -> frontmatter 4
 edge commands -> json 3
 edge commands -> kernel 38
 edge commands -> model 16
@@ -34,7 +34,7 @@ edge model -> vault 9
 edge note -> error 8
 edge note -> frontmatter 4
 edge note -> json 1
-edge note -> kernel 20
+edge note -> kernel 21
 edge note -> text 10
 edge ports -> adapters 1
 edge ports -> error 1

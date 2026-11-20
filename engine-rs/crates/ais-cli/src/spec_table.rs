@@ -309,8 +309,8 @@ pub const SPECS: &[Spec] = &[
         tool: Some("update_doc"),
         write: true,
         part4: false,
-        usage: "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [f1=<직전에 읽은 토큰>]",
-        allowed: &["body", "date", "f1", "tags", "template", "time", "title"],
+        usage: "update-doc <노트 id> [title=<제목>] [body=<본문>] [tags=<JSON 배열. 전체 교체>] [template=<템플릿 id>] [date=<YYYY-MM-DD>] [time=<HH:MM>] [agenda=<옮길 아젠다의 slug 또는 이름. 이미 있는 아젠다만>] [f1=<직전에 읽은 토큰>]",
+        allowed: &["agenda", "body", "date", "f1", "tags", "template", "time", "title"],
         max: Some(1),
     },
     Spec {

@@ -1922,6 +1922,125 @@ fn writes_note_meta_with_stamps_and_preconditions() {
 }
 
 #[test]
+fn moves_a_note_to_another_existing_agenda_with_its_folder() {
+    // TSK-2: update_doc 의 agenda 인자. 이미 있는 아젠다만 받고(slug나 이름), 폴더째 옮기며 후속 노트 머리도 맞춘다
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let parent = "ndfx0002-00000002";
+    let old_rel = "notes/demo/2026-11/parent";
+    let token = |id: &str| {
+        engine.call("get_doc", json!({"id": id})).unwrap()["precondition"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let read = |rel: &str| std::fs::read_to_string(vault.join(rel)).unwrap();
+    // 머리에 agenda 줄이 있는 후속 노트를 엔진으로 하나 만든다(합성 vault의 후속 노트는 agenda 줄이 없다)
+    let sub = engine
+        .call(
+            "create_sub_note",
+            json!({"parent": parent, "title": "옮길 후속", "body": "# 옮길 후속\n본문\n"}),
+        )
+        .unwrap();
+    let sub_inside = sub["path"]
+        .as_str()
+        .unwrap()
+        .strip_prefix(&format!("{old_rel}/"))
+        .unwrap()
+        .to_string();
+    assert!(read(&format!("{old_rel}/{sub_inside}/note.md")).contains("\nagenda: demo\n"));
+    let subs_before = engine
+        .call("list_sub_notes", json!({"parent": parent}))
+        .unwrap();
+
+    // 빈 값, 없는 아젠다, 확인 값 없음은 아무것도 쓰지 않는다
+    let error = |args: Value| engine.call("update_doc", args).unwrap_err();
+    assert_eq!(
+        error(json!({"id": parent, "agenda": " ", "f1": token(parent)})).message,
+        format!("옮길 아젠다가 비었다: {parent}")
+    );
+    let missing = error(json!({"id": parent, "agenda": "없는 아젠다", "f1": token(parent)}));
+    assert_eq!(missing.kind, ErrorKind::NotFound);
+    assert!(
+        missing.message.starts_with(
+            "아젠다가 없어 옮기지 않았다: 없는 아젠다. update_doc 은 아젠다를 새로 만들지 않는다"
+        ),
+        "{}",
+        missing.message
+    );
+    assert!(!vault.join(".aisurada/agendas/없는-아젠다.md").exists());
+    assert_eq!(
+        error(json!({"id": parent, "agenda": "기록"})).kind,
+        ErrorKind::PreconditionFailed
+    );
+    assert!(vault.join(old_rel).is_dir());
+
+    // slug로 옮기면 폴더째(첨부·후속 노트까지) 새 아젠다 폴더로 가고, 머리와 후속 노트 머리가 바뀐다
+    let moved = engine
+        .call(
+            "update_doc",
+            json!({"id": parent, "agenda": "기록", "f1": token(parent)}),
+        )
+        .unwrap();
+    assert_eq!(moved["agenda"], "기록");
+    assert_eq!(moved["renamed"], true);
+    let new_rel = moved["path"].as_str().unwrap().to_string();
+    assert!(new_rel.starts_with("notes/기록/"), "{new_rel}");
+    assert!(!vault.join(old_rel).exists());
+    assert!(vault.join(&new_rel).join("attach").is_dir());
+    assert!(vault.join(&new_rel).join("sub/child1.md").is_file());
+    let head = read(&format!("{new_rel}/note.md"));
+    assert!(
+        head.contains(&format!("id: {parent}\nagenda: 기록\n")),
+        "{head}"
+    );
+    let sub_text = read(&format!("{new_rel}/{sub_inside}/note.md"));
+    assert!(sub_text.contains("\nagenda: 기록\n"), "{sub_text}");
+    assert!(sub_text.ends_with("# 옮길 후속\n본문\n"), "{sub_text}");
+    // id·후속 노트 목록은 그대로이고, 노트는 새 아젠다에서 읽힌다
+    let doc = engine.call("get_doc", json!({"id": parent})).unwrap();
+    assert_eq!(doc["agenda"], "기록");
+    assert_eq!(doc["precondition"], moved["precondition"]);
+    let subs_after = engine
+        .call("list_sub_notes", json!({"parent": parent}))
+        .unwrap();
+    assert_eq!(ids(&subs_after), ids(&subs_before));
+
+    // 이름(대소문자 무시)으로도 찾는다. 원래 아젠다로 되돌린다
+    let back = engine
+        .call(
+            "update_doc",
+            json!({"id": parent, "agenda": "데모 아젠다", "f1": token(parent)}),
+        )
+        .unwrap();
+    assert_eq!(back["agenda"], "demo");
+    assert!(
+        back["path"]
+            .as_str()
+            .unwrap()
+            .starts_with("notes/demo/2026-11/")
+    );
+    assert!(
+        read(&format!(
+            "{}/{sub_inside}/note.md",
+            back["path"].as_str().unwrap()
+        ))
+        .contains("\nagenda: demo\n")
+    );
+
+    // AI 도구 호출도 옮길 수 있다(사용자 결정 2026-11-20). 날짜·시각과 다르다
+    let by_ai = engine
+        .call(
+            "update_doc",
+            json!({"id": parent, "agenda": "기록", "f1": token(parent), "caller": "ai"}),
+        )
+        .unwrap();
+    assert_eq!(by_ai["agenda"], "기록");
+}
+
+#[test]
 fn updates_note_text_and_moves_the_note_to_its_canonical_place() {
     isolate_writes();
     let vault = fixture();

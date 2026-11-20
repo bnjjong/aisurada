@@ -461,7 +461,7 @@ fn build(tool: &str, props: &Props) -> Result<(String, Map<String, Value>), CliE
             validate_keys(
                 tool,
                 props,
-                &["id", "body", "title", "tags", "template", "f1"],
+                &["id", "body", "title", "tags", "template", "agenda", "f1"],
             )?;
             args.insert("id".into(), json!(required_string(tool, props, "id")?));
             if let Some(body) = optional_string(tool, props, "body")? {
@@ -470,6 +470,7 @@ fn build(tool: &str, props: &Props) -> Result<(String, Map<String, Value>), CliE
             put(&mut args, "title", optional_string(tool, props, "title")?);
             put(&mut args, "tags", string_array(tool, props, "tags")?);
             put(&mut args, "template", template_value(tool, props)?);
+            put(&mut args, "agenda", optional_string(tool, props, "agenda")?);
             put(&mut args, "f1", optional_string(tool, props, "f1")?);
         }
         "set_favorite" => {
