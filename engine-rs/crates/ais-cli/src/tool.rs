@@ -665,14 +665,14 @@ fn resource_or_task_tool(
         match get(props, "criteria") {
             None => return Err(fail(tool, "criteria 가 필요하다.")),
             Some(JsonValue::Array(a)) if a.is_empty() => {
-                return Err(fail(tool, "criteria 는 1개 이상이어야 한다."))
+                return Err(fail(tool, "criteria 는 1개 이상이어야 한다."));
             }
             Some(JsonValue::Array(_)) => {}
             Some(other) => {
                 return Err(fail(
                     tool,
                     format!("criteria 는 배열이어야 한다: {}", json::compact(other)),
-                ))
+                ));
             }
         }
     }
@@ -872,9 +872,16 @@ mod tests {
 
     #[test]
     fn create_task_validates_required_fields() {
-        assert!(call_err("create_task", r#"{"repo":"user/repo","criteria":["c1"]}"#).contains("title"));
+        assert!(
+            call_err("create_task", r#"{"repo":"user/repo","criteria":["c1"]}"#).contains("title")
+        );
         assert!(call_err("create_task", r#"{"title":"t","criteria":["c1"]}"#).contains("repo"));
-        assert!(call_err("create_task", r#"{"title":"t","repo":"r"}"#).contains("criteria 가 필요하다"));
-        assert!(call_err("create_task", r#"{"title":"t","repo":"r","criteria":[]}"#).contains("1개 이상"));
+        assert!(
+            call_err("create_task", r#"{"title":"t","repo":"r"}"#).contains("criteria 가 필요하다")
+        );
+        assert!(
+            call_err("create_task", r#"{"title":"t","repo":"r","criteria":[]}"#)
+                .contains("1개 이상")
+        );
     }
 }
