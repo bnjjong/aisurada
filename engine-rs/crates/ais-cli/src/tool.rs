@@ -292,18 +292,9 @@ fn put(args: &mut Map<String, Value>, key: &str, value: Option<impl Into<Value>>
     }
 }
 
-/// 노트 필터 칸 여덟 개(`agenda, date, dateFrom, dateTo, type, tag, favorite, favoriteCategory`)를 스키마 차례로 검사해 담는다.
+/// 노트 필터 칸를 스키마 차례로 검사해 담는다.
 fn filter_fields(tool: &str, props: &Props, args: &mut Map<String, Value>) -> Result<(), CliError> {
-    for key in [
-        "agenda",
-        "date",
-        "dateFrom",
-        "dateTo",
-        "type",
-        "tag",
-        "favorite",
-        "favoriteCategory",
-    ] {
+    for key in FILTER_KEYS {
         let Some(value) = get(props, key) else {
             continue;
         };
@@ -327,7 +318,8 @@ fn filter_fields(tool: &str, props: &Props, args: &mut Map<String, Value>) -> Re
     Ok(())
 }
 
-const FILTER_KEYS: [&str; 8] = [
+const FILTER_KEYS: [&str; 9] = [
+    "subAgendaId",
     "agenda",
     "date",
     "dateFrom",
@@ -441,7 +433,16 @@ fn build(tool: &str, props: &Props) -> Result<(String, Map<String, Value>), CliE
                 tool,
                 props,
                 &[
-                    "agenda", "type", "title", "body", "date", "time", "format", "links", "tags",
+                    "subAgendaIds",
+                    "agenda",
+                    "type",
+                    "title",
+                    "body",
+                    "date",
+                    "time",
+                    "format",
+                    "links",
+                    "tags",
                     "template",
                 ],
             )?;
@@ -456,12 +457,26 @@ fn build(tool: &str, props: &Props) -> Result<(String, Map<String, Value>), CliE
             put(&mut args, "links", link_array(tool, props)?);
             put(&mut args, "tags", string_array(tool, props, "tags")?);
             put(&mut args, "template", template_value(tool, props)?);
+            put(
+                &mut args,
+                "subAgendaIds",
+                string_array(tool, props, "subAgendaIds")?,
+            );
         }
         "update_doc" => {
             validate_keys(
                 tool,
                 props,
-                &["id", "body", "title", "tags", "template", "agenda", "f1"],
+                &[
+                    "id",
+                    "body",
+                    "title",
+                    "tags",
+                    "template",
+                    "subAgendaIds",
+                    "agenda",
+                    "f1",
+                ],
             )?;
             args.insert("id".into(), json!(required_string(tool, props, "id")?));
             if let Some(body) = optional_string(tool, props, "body")? {
@@ -470,6 +485,11 @@ fn build(tool: &str, props: &Props) -> Result<(String, Map<String, Value>), CliE
             put(&mut args, "title", optional_string(tool, props, "title")?);
             put(&mut args, "tags", string_array(tool, props, "tags")?);
             put(&mut args, "template", template_value(tool, props)?);
+            put(
+                &mut args,
+                "subAgendaIds",
+                string_array(tool, props, "subAgendaIds")?,
+            );
             put(&mut args, "agenda", optional_string(tool, props, "agenda")?);
             put(&mut args, "f1", optional_string(tool, props, "f1")?);
         }

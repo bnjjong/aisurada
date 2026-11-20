@@ -4,7 +4,7 @@ edge adapters -> error 1
 edge adapters -> kernel 3
 edge adapters -> ports 8
 edge adapters -> text 2
-edge commands -> error 36
+edge commands -> error 37
 edge commands -> frontmatter 4
 edge commands -> json 3
 edge commands -> kernel 38
@@ -14,9 +14,9 @@ edge commands -> ports 10
 edge commands -> resource 7
 edge commands -> session 2
 edge commands -> task 7
-edge commands -> text 34
-edge commands -> vault 72
-edge commands -> write 90
+edge commands -> text 35
+edge commands -> vault 76
+edge commands -> write 93
 edge engine -> commands 1
 edge engine -> error 3
 edge engine -> kernel 2
@@ -30,7 +30,7 @@ edge kernel -> frontmatter 1
 edge kernel -> json 1
 edge kernel -> text 4
 edge model -> kernel 2
-edge model -> vault 9
+edge model -> vault 10
 edge note -> error 8
 edge note -> frontmatter 4
 edge note -> json 1
@@ -65,12 +65,12 @@ edge task -> snake_dump 1
 edge task -> text 3
 edge task -> vault 1
 edge task -> write 4
-edge vault -> error 5
+edge vault -> error 6
 edge vault -> frontmatter 6
-edge vault -> kernel 16
+edge vault -> kernel 17
 edge vault -> note 4
-edge vault -> ports 15
-edge vault -> text 15
+edge vault -> ports 17
+edge vault -> text 16
 edge write -> adapters 2
 edge write -> error 12
 edge write -> frontmatter 5
