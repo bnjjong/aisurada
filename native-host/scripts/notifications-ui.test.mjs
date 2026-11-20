@@ -18,7 +18,7 @@ const reset = () => resetNotificationsStore();
 
 test('toItem reads a host row, fills defaults and refuses a row with the wrong shape', () => {
   const i = item();
-  assert.deepEqual(i, { id: 'n1', kind: 'question', title: '질문이 도착했어요', body: '폴더 이름은?', taskKey: 'TSK-14', at: NOW, read: false });
+  assert.deepEqual(i, { id: 'n1', kind: 'question', title: '질문이 도착했어요', body: '폴더 이름은?', taskKey: 'TSK-14', noteRef: null, at: NOW, read: false });
   assert.equal(item({ taskKey: undefined }).taskKey, null);
   assert.equal(item({ taskKey: '' }).taskKey, null);
   assert.equal(item({ body: undefined }).body, '');
@@ -223,7 +223,7 @@ test('the toast stack shows the title, the task key, and one action with a close
   assert.equal(renderToStaticMarkup(React.createElement(ToastStack, { toasts: [], onDismiss: noop, onOpen: noop })).includes('ntf-toast"'), false);
 });
 
-test('the settings section: three channels, the table of five news, the focus-mode note, and the test button', () => {
+test('the settings section: three channels, the table of six news, the focus-mode note, and the test button', () => {
   const view = (extra = {}) => renderToStaticMarkup(React.createElement(NotificationSettingsView, { settings: DEFAULT_SETTINGS, native: true, banner: '', error: '', onChange: noop, onTest: noop, ...extra }));
   const html = view();
   assert.match(html, /aria-label="앱 안 알림"/);
@@ -232,7 +232,7 @@ test('the settings section: three channels, the table of five news, the focus-mo
   assert.match(html, /준비 중이에요/);
   assert.match(html, /집중 모드에서 aisurada를 허용하지 않으면/);
   for (const e of EVENT_KINDS) assert.match(html, new RegExp(`aria-label="${e.label} · 앱 안"`));
-  assert.equal((html.match(/class="ntf-switch"/g) ?? []).length, 3 + 10, 'three channels and five news in two channels');
+  assert.equal((html.match(/class="ntf-switch"/g) ?? []).length, 3 + 12, 'three channels and six news in two channels');
   assert.doesNotMatch(html, /set-switch/, 'not the class the settings acceptance test counts');
   assert.match(html, /시험 알림 보내기/);
   const doneMacos = /aria-label="Done으로 바뀌었을 때 · macOS"[^>]*>/.exec(html)[0];

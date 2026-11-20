@@ -287,6 +287,8 @@ fn main() -> ExitCode {
                 // Java 엔진(java-engine-final) 이후 추가/변경된 create_task·list_decisions(목록 끝)와 get_task 문구를 Java 기준 테이프와 견주기 위해 정규화한다
                 if let Some(pos) = rust_output.find(r#",{"name":"create_task""#) {
                     rust_output = format!("{}]}}}}", &rust_output[..pos]);
+                } else if let Some(pos) = rust_output.find(r#",{"name":"list_decisions""#) {
+                    rust_output = format!("{}]}}}}", &rust_output[..pos]);
                 }
                 rust_output = rust_output.replace(
                     "활동과 함께 읽는다.",
