@@ -3,6 +3,7 @@
 //! Java `ais-cli`는 사이드카 프로세스에 요청을 보내고 엔진이 해석·실행·출력까지 했다. 여기서는 같은 프로세스 안에서
 //! 인자를 풀고(`parse`), 엔진 호출로 바꾸고(`map`), Rust 엔진(`ais-core`)을 부르고, 응답을 Java와 같은 모양으로
 //! 되돌려(`legacy`) 찍는다(`output`). 종료 코드도 같다: 0 성공, 2 이름이나 vault를 못 정함, 3 AIS 오류, 5 확인 값 어긋남, 1 안쪽 실패.
+//! Java에 없던 `wait-decisions`는 기다리는 한도가 지나면 6으로 끝난다.
 
 pub mod error;
 pub mod legacy;
@@ -14,6 +15,7 @@ pub mod parse;
 pub mod registry;
 mod spec_table;
 pub mod tool;
+pub mod wait;
 
 use ais_core::engine::Engine;
 
@@ -51,6 +53,7 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
         "claude-mcp" => return register::claude_mcp(&args[1..], env),
         "codex-mcp" => return register::agent_mcp(register::Kind::Codex, &args[1..], env),
         "gemini-mcp" => return register::agent_mcp(register::Kind::Gemini, &args[1..], env),
+        "wait-decisions" => return wait::run(&args[1..], env),
         _ => {}
     }
     if first == "mcp" {

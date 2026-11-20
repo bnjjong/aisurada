@@ -8,6 +8,7 @@
 //! - `slug`: 제목에서 폴더·파일 이름 만들기
 //! - `placement`: 노트를 놓을 자리 정책(날짜·시각 인자, 폴더 이름, 월별 배치 여부는 입력으로)
 //! - `comment`: 코멘트 쓰기의 인자 규칙
+//! - `decision`: 결정 블록(AI가 쓴 「정할 것」과 사람의 답) 읽기
 //! - `create`: `create_doc`의 규칙(인자 검사, 날짜·시각 배정, 파일 글)
 //! - `curate`: 머리만 고치는 쓰기(즐겨찾기·평가·연결)의 규칙
 //! - `edit`: `update_doc`의 규칙(`ParsedEdit`): 인자 검사, 고칠 수 있는지 확인, 새 글과 새 자리 계산
@@ -19,6 +20,7 @@ pub mod args;
 pub mod comment;
 pub mod create;
 pub mod curate;
+pub mod decision;
 pub mod edit;
 pub mod front;
 pub mod heading;

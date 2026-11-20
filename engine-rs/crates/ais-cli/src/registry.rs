@@ -32,7 +32,7 @@ pub fn tool(name: &str) -> Option<&'static Spec> {
     SPECS.iter().find(|spec| spec.tool == Some(name))
 }
 
-/// `ais-cli`가 도구로 받는 이름 38개
+/// `ais-cli`가 도구로 받는 이름 40개
 pub const CLI_TOOL_NAMES: &[&str] = &[
     "create_doc",
     "update_doc",
@@ -73,6 +73,7 @@ pub const CLI_TOOL_NAMES: &[&str] = &[
     "list_tasks",
     "get_task",
     "create_task",
+    "list_decisions",
 ];
 
 /// `--list`가 도구 이름 옆에 적는 한 줄 설명
@@ -119,6 +120,7 @@ pub fn tool_description(name: &str) -> &'static str {
         "list_tasks" => "태스크(티켓) 목록을 상태, 유형, 저장소, 라벨로 거른다",
         "get_task" => "태스크 1건을 설명, 완료 기준, 연결, 활동과 함께 낸다",
         "create_task" => "새 태스크(티켓) 1건을 만든다",
+        "list_decisions" => "노트의 결정 블록(정할 것)과 사람이 남긴 답을 낸다",
         _ => "",
     }
 }
@@ -133,6 +135,7 @@ pub const DIRECT_COMMANDS: &[&str] = &[
     "claude-mcp",
     "codex-mcp",
     "gemini-mcp",
+    "wait-decisions",
 ];
 
 /// 앱이 쓰는 사이드카 고유 명령 61개
@@ -229,12 +232,16 @@ pub const ENGINE_COMMANDS_APPROVALS: &[&str] = &[
     "set-resource-policy",
 ];
 
-/// 사이드카 고유 명령 전부(앱 61 + 태스크 9 + 승인 7)를 쉼표로 이은 글
+/// 결정 블록 명령 2개. AI가 노트에 쓴 「정할 것」과 사람의 답을 읽는다. 기다리기(`wait-decisions`)는 `ais-cli`가 직접 한다.
+pub const ENGINE_COMMANDS_DECISIONS: &[&str] = &["list-decisions", "pending-decisions"];
+
+/// 사이드카 고유 명령 전부(앱 61 + 태스크 9 + 승인 7 + 결정 2)를 쉼표로 이은 글
 fn engine_command_list() -> String {
     [
         ENGINE_COMMANDS_61.join(", "),
         ENGINE_COMMANDS_TASKS.join(", "),
         ENGINE_COMMANDS_APPROVALS.join(", "),
+        ENGINE_COMMANDS_DECISIONS.join(", "),
     ]
     .join(", ")
 }
@@ -249,6 +256,7 @@ pub fn is_engine_command(name: &str) -> bool {
     ENGINE_COMMANDS_61.contains(&name)
         || ENGINE_COMMANDS_TASKS.contains(&name)
         || ENGINE_COMMANDS_APPROVALS.contains(&name)
+        || ENGINE_COMMANDS_DECISIONS.contains(&name)
 }
 
 /// `--list`가 찍는 글

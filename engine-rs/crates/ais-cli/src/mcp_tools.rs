@@ -281,4 +281,11 @@ pub const TOOLS: &[McpTool] = &[
         write: true,
         destructive: false,
     },
+    McpTool {
+        name: "list_decisions",
+        description: "노트의 결정 블록(사람에게 고르게 한 「정할 것」)과 사람이 남긴 답을 낸다. 결정마다 선택지, 체크한 것, `답:` 줄, 고른 것(choice)이 있다. finished가 true면 사람이 「답 다 했음」을 체크해 저장한 것이다. 답을 기다릴 때는 이 도구를 되풀이해 부르지 말고 셸에서 `ais-cli wait-decisions`를 쓴다(서버 안내문 참고).",
+        input_schema: "{\"type\":\"object\",\"properties\":{\"parent\":{\"type\":\"string\",\"description\":\"노트 id, 또는 하위 노트면 `노트id/하위노트id`\"}},\"required\":[\"parent\"],\"additionalProperties\":false}",
+        write: false,
+        destructive: false,
+    },
 ];

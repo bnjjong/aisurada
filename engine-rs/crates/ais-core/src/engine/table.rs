@@ -10,10 +10,10 @@ use serde_json::Value;
 
 use super::{Engine, finish, parse_args};
 use crate::commands::{
-    agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, doc_create,
-    doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc, get_sub_note,
-    get_template, history, init_workspace, list_agendas, list_attachments, list_comments,
-    list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
+    agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, decisions,
+    doc_create, doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc,
+    get_sub_note, get_template, history, init_workspace, list_agendas, list_attachments,
+    list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
     note_meta_write, project_write, reindex, resource_commands, search_docs, session_commands,
     shard_notes, sub_note_write, task_commands, template_write, trash_write, write_attachment,
 };
@@ -163,6 +163,8 @@ pub(super) static TABLE: &[Def] = &[
     read!("get_sub_note", get_sub_note::GetSubNoteRequest, |root, request, ctx| get_sub_note::execute(&NoteIndex::fresh(root), request, ctx)),
     read!("list_comments", list_comments::ListCommentsRequest, |root, request, ctx| list_comments::execute(&NoteIndex::fresh(root), request, ctx)),
     read!("list_attachments", list_attachments::ListAttachmentsRequest, |root, request, ctx| list_attachments::execute(&NoteIndex::fresh(root), request, ctx)),
+    read!("list_decisions", decisions::ListDecisionsRequest, |root, request, ctx| decisions::list(&NoteIndex::fresh(root), request, ctx)),
+    read!("pending_decisions", decisions::PendingDecisionsRequest, |root, _request, ctx| Ok::<_, EngineError>(decisions::pending(&NoteIndex::fresh(root), ctx))),
     read!("get_agenda_facts", get_agenda_facts::GetAgendaFactsRequest, |root, request| get_agenda_facts::execute(&NoteIndex::fresh(root), request)),
     read!("search_docs", search_docs::SearchDocsRequest, |root, request, ctx| search_docs::execute(&NoteIndex::fresh(root), request, ctx)),
     read!("list_tags", list_tags::ListTagsRequest, |root, request| list_tags::execute(&NoteIndex::fresh(root), request)),

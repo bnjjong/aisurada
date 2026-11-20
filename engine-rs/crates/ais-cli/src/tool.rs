@@ -352,7 +352,7 @@ fn build(tool: &str, props: &Props) -> Result<(String, Map<String, Value>), CliE
             args.insert("parent".into(), json!(parent));
             args.insert("id".into(), json!(id));
         }
-        "list_attachments" | "list_comments" => {
+        "list_attachments" | "list_comments" | "list_decisions" => {
             validate_keys(tool, props, &["parent"])?;
             let parent = required_string(tool, props, "parent")?;
             let segments = parent_segments(tool, &parent)?;

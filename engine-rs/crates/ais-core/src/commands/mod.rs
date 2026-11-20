@@ -5,6 +5,7 @@ pub mod ask_chat_commands;
 pub mod comment_write;
 pub mod commit_vault;
 pub mod daily_notes;
+pub mod decisions;
 pub mod doc_create;
 pub mod doc_write;
 pub mod export_markdown;

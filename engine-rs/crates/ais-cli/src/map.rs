@@ -56,9 +56,9 @@ fn positional_names(command: &str) -> &'static [&'static str] {
         | "read-session" => &["id"],
         "list-sub-notes" | "create-sub-note" => &["parent"],
         "get-sub-note" | "update-sub-note" | "delete-sub-note" => &["parent", "id"],
-        "list-comments" | "list-attachments" | "create-comment" | "update-comment"
-        | "delete-comment" | "write-attachment" | "get-ask" | "append-ask-turn" | "list-chats"
-        | "append-chat-turn" => &["id", "subId"],
+        "list-comments" | "list-decisions" | "list-attachments" | "create-comment"
+        | "update-comment" | "delete-comment" | "write-attachment" | "get-ask"
+        | "append-ask-turn" | "list-chats" | "append-chat-turn" => &["id", "subId"],
         "history" => &["id", "number"],
         "link-docs" | "link-tasks" => &["from", "to"],
         "restore-doc" | "purge-doc" => &["trashId"],
