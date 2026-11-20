@@ -271,7 +271,8 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .note-preview > header button { font-size: 12px; }
 .ui-modal-controls { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .ui-modal-controls .modal-ctrl-btn,
-.ui-modal > header .modal-ctrl-btn {
+.ui-modal > header .modal-ctrl-btn,
+.ask-hovercard .modal-ctrl-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -287,13 +288,15 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
   line-height: 1;
 }
 .ui-modal-controls .modal-ctrl-btn:hover,
-.ui-modal > header .modal-ctrl-btn:hover {
+.ui-modal > header .modal-ctrl-btn:hover,
+.ask-hovercard .modal-ctrl-btn:hover {
   background: var(--soft);
   color: var(--ink);
   border-color: var(--line);
 }
 .ui-modal-controls .modal-ctrl-btn.modal-ctrl-close:hover,
-.ui-modal > header .modal-ctrl-btn.modal-ctrl-close:hover {
+.ui-modal > header .modal-ctrl-btn.modal-ctrl-close:hover,
+.ask-hovercard .modal-ctrl-btn.modal-ctrl-close:hover {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.25);
@@ -1019,7 +1022,8 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ask-hovercard.is-pinned { box-shadow: 0 4px 24px rgba(0,0,0,0.25); border-color: var(--accent); }
 .ask-hovercard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ask-hovercard-title { font-weight: 600; font-size: 12px; }
-.ask-hovercard-pin-btn, .ask-hovercard-close-btn { border: 0; background: transparent; cursor: pointer; padding: 2px 4px; }
+.ask-hovercard-pin-btn { border: 0; background: transparent; cursor: pointer; padding: 2px 4px; }
+.ask-hovercard-close-btn { position: absolute; top: 6px; right: 6px; z-index: 11; }
 .ask-hovercard-hint { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: right; }
 .ask-hovercard-followup { display: flex; gap: 4px; margin-top: 8px; }
 .ask-hovercard-followup input { flex: 1; font-size: 11px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); }

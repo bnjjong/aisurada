@@ -7,6 +7,7 @@ import { turnsForUnderline } from './askText.ts';
 import type { AskThread } from './askText.ts';
 import { AskContext } from './askContext.ts';
 import { useAskState } from './state.ts';
+import { Icon } from '../../ui/Icon.tsx';
 
 export interface AskHoverCardProps {
   /** The store key of the note: the note id, or the sub note id. */
@@ -177,13 +178,12 @@ export function AskHoverCard({ docId, turnId, onFollowUp, onClose, onPin, pinned
       {isPinned && (
         <button
           type="button"
-          className="ask-hovercard-close-btn"
+          className="modal-ctrl-btn modal-ctrl-close ask-hovercard-close-btn"
           aria-label="문답 카드 닫기"
           title="닫기"
           onClick={handleClose}
-          style={{ position: 'absolute', top: 4, right: 4, zIndex: 11, fontSize: 13, color: 'var(--muted)', background: 'transparent', border: 0, cursor: 'pointer' }}
         >
-          ✕
+          <Icon name="close" />
         </button>
       )}
       {turns.length === 0 && !record ? (
