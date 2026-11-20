@@ -50,6 +50,7 @@ import { MermaidLayer } from "./mermaid.tsx";
 import { headingSlug } from "./grammar.ts";
 import { openEditorLink } from "./media.tsx";
 import { codeHighlightTheme, registerCodeSyntax } from "./codeSyntax.ts";
+import { registerDecisionBlocks } from "./decisionBlocks.ts";
 
 /** [element]가 든 노트의 위쪽 고정 패널(.doc-meta-bar)이 스크롤 영역 위에서 차지하는 높이(px). 패널이 없으면 0. */
 function stickyBarHeight(element: HTMLElement): number {
@@ -333,6 +334,7 @@ function EditorBridge(props: EditorProps) {
     });
     const root = editor.getRootElement();
     if (!root) return;
+    const decisions = registerDecisionBlocks(editor);
     const start = () => {
       composing.current = true;
     };
@@ -516,6 +518,7 @@ function EditorBridge(props: EditorProps) {
       cancelAnimationFrame(initialFrame);
       cancelAnimationFrame(secondFrame);
       tasks();
+      decisions();
       remove();
       keys();
       root.removeEventListener("compositionstart", start);
