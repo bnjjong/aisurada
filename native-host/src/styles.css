@@ -178,6 +178,9 @@ body.is-resizing { cursor: col-resize; user-select: none; -webkit-user-select: n
 .doc-route { display: flex; flex-direction: row; height: 100%; min-height: 0; overflow: hidden; }
 .doc-route > .doc-scroll { flex: 1; min-width: 0; }
 .note-window { height: 100vh; overflow: hidden; }
+/* 노트 팝업창(메인 창이 아니라 노트 하나를 따로 띄운 창)은 가장자리에 주황 테두리를 둘러 메인 창과 구분한다.
+   macOS 제목 표시줄은 웹 화면 밖이라 테두리는 그 아래 본문 둘레에 그려진다. 맨 위에 얹되 누름은 막지 않는다. */
+.note-window::after { content: ""; position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; border: 3px solid var(--note-window-frame, #f08a24); border-top-width: 2px; border-radius: 0 0 10px 10px; }
 .route-page { max-width: 1000px; padding: 48px clamp(24px, 6vw, 80px); margin: 0 auto; }
 .route-page h1 { font-size: 30px; }
 .tab-bar { display: flex; align-items: stretch; flex-shrink: 0; min-height: 46px; overflow-x: auto; overflow-y: hidden; background: var(--soft); border-bottom: 1px solid var(--line); scrollbar-width: thin; }
