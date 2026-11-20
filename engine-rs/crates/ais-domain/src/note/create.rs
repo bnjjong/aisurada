@@ -170,6 +170,7 @@ impl ParsedNewDoc {
             session_id,
             session_agent: session_agent.as_deref(),
             tier: self.tier,
+            decision_confirmation: None,
             edited_by: None,
             edited_at: None,
             edited_session_id: None,

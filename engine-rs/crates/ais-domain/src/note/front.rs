@@ -17,6 +17,7 @@ pub struct NoteFront<'a> {
     pub session_id: Option<&'a str>,
     pub session_agent: Option<&'a str>,
     pub tier: Tier,
+    pub decision_confirmation: Option<&'a str>,
     pub edited_by: Option<&'a str>,
     pub edited_at: Option<&'a str>,
     pub edited_session_id: Option<&'a str>,
@@ -45,6 +46,9 @@ impl NoteFront<'_> {
             if let Some(agent) = self.session_agent {
                 line("sessionAgent", agent);
             }
+        }
+        if let Some(confirmation) = self.decision_confirmation {
+            line("decisionConfirmation", confirmation);
         }
         if self.tier.is_record() {
             out.push_str(&format!("tier: {}\n", Tier::Record.as_str()));
@@ -154,7 +158,8 @@ pub fn judge(
     let front = |edited_by: Option<&str>,
                  edited_at: Option<&str>,
                  edited_session: Option<&str>,
-                 edited_agent: Option<&str>| {
+                 edited_agent: Option<&str>,
+                 decision_confirmation: Option<&str>| {
         NoteFront {
             id: &meta.id,
             agenda: draft.agenda,
@@ -164,6 +169,7 @@ pub fn judge(
             session_id: draft.session_id,
             session_agent: draft.session_agent,
             tier: draft.tier,
+            decision_confirmation,
             edited_by,
             edited_at,
             edited_session_id: edited_session,
@@ -188,7 +194,8 @@ pub fn judge(
             meta.edited_by.as_deref(),
             meta.edited_at.as_deref(),
             meta.edited_session_id.as_deref(),
-            meta.edited_session_agent.as_deref()
+            meta.edited_session_agent.as_deref(),
+            meta.decision_confirmation.as_deref()
         )
     );
     let dumped = dump_general_map(raw).map_err(|e| EngineError::invalid_argument(e.0))?;
@@ -197,6 +204,7 @@ pub fn judge(
         return Ok(form_a);
     }
     let tool = editor.tool;
+    let confirmation = super::decision::confirmation_after_edit(meta, old_body, body, tool);
     let edited_at = kst_minute(now_millis);
     let edited_session = if tool { editor.session } else { None };
     let edited_agent = edited_session.and(editor.session_agent.and_then(agent_for_file));
@@ -206,7 +214,8 @@ pub fn judge(
             Some(if tool { "tool" } else { "app" }),
             Some(&edited_at),
             edited_session,
-            edited_agent.as_deref()
+            edited_agent.as_deref(),
+            confirmation.as_deref()
         )
     ))
 }
