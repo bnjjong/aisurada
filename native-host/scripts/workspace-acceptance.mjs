@@ -107,7 +107,8 @@ if (part4Check) {
     { type: 'custom-title', customTitle: '점검 세션' },
   ].map(line => JSON.stringify(line)).join('\n') + '\n');
 }
-const cfg = { part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck || perfCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, perfCheck, perf: { notes: perfNotes }, today };
+// `--only=<점검 이름,…>`: 편집기 점검은 그 사례만, 화면 점검(--views)은 그 점검만 돌린다(앞 점검이 깨졌을 때 한 점검을 따로 보려고)
+const cfg = { only: viewsCheck ? onlyCases : undefined, part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck || perfCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, perfCheck, perf: { notes: perfNotes }, today };
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 // 앱이 엔진을 부르는 길은 둘이다: 문자열 목록을 받는 `sidecar_call`과 호출 객체를 받는 `engine_call`. 호스트가 두 길의 호출을 이 파일에 적고
 // (`AISURADA_CALL_LOG`), 점검은 어느 길로 갔든 같은 문자열 목록(argv)으로 센다.

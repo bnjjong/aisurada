@@ -463,6 +463,17 @@ AI가 사람이 골라야 할 것(「정할 것」)을 노트에 결정 블록�
 - **확인한 것.** 엔진 규칙의 단위 시험 7개(`note::decision`)와 `wait` 2개, 합성 vault로 끝에서 끝까지(AI가 쓴 직후 기다림 1건, AI가 직접 한 체크는 안 끝남, 백그라운드로 건 `wait-decisions`가 사람이 앱 길로 답하고 체크해 저장한 뒤 1.0초 안에 0으로 끝남과 `답:  나. 다만 …`에서 `choice` = 나, 한도 6, 블록 없음 3, 후속 노트, 읽기 전용 MCP 서버의 도구 20개와 `list_decisions` 호출), happy-dom 위에 진짜 편집기를 띄운 하나만 고르기·열 때 그대로 둠·`[!question]`은 그대로·답 줄로 답함·`[!decided]` 표시, 같은 DOM에 `styles.css`를 입혀 Edge headless로 본 모양, 호스트 단위 시험(`decisions` 3, `notifications` 10). 전체 시험 묶음은 돌리지 않았다(평소 작업 규칙).
 - **확인 못 한 것과 한계.** 새 편집기 모양·배지·알림을 실제 앱 창(WKWebView)에서 누르고 본 것(손 확인 점검표 [`beta-hand-check.md`](beta-hand-check.md) 4-6, `run.sh --decisions`), 진짜 Gemini CLI·Codex 세션이 노트의 답으로 이어 가는 것, macOS 배너. 알림의 노트 참조와 `pending-decisions`는 메인 노트와 그 바로 아래 후속 노트까지만 주소를 만든다(더 깊은 후속 노트는 탭 주소의 사슬이 모자라다). 배지 수는 노트를 매번 훑어 세므로(결정 4-가) 노트가 아주 많아지면 시간을 재서 다시 본다.
 
+### 노트 아젠다 옮기기 (`update_doc`의 `agenda`, TSK-2)
+
+노트를 만든 뒤에도 다른 아젠다로 옮길 수 있다. **외부 설명서에 없는 확장이다.** 결정은 2026-11-20에 사용자와 정했다(태스크 TSK-2, vault의 결정 노트 「TSK-2 노트 아젠다 바꾸기 — 정할 것 5개(시안)」). 괄호의 「결정 N-가」는 그때의 번호다.
+
+- **엔진(`commands/doc_write.rs`, 규칙은 `ais-domain/src/note/edit.rs`).** 새 명령을 만들지 않고 `update_doc`에 선택 인자 `agenda=<slug 또는 이름>`을 더했다(결정 2-가). 찾는 차례는 `create_doc`과 같다(slug → 이름(대소문자 무시) → 이름을 slug로 만든 값, `doc_create.rs`의 `find_agenda`). **없으면 만들지 않고** 아무것도 안 쓴 채 `AIS-404 아젠다가 없어 옮기지 않았다: …`로 선다(사용자 결정: AI가 오타 이름으로 아젠다를 새로 만드는 일을 막는다). 빈 값은 `AIS-400 옮길 아젠다가 비었다`이고, 검사 차례는 날짜 → 시각 → 제목 → 아젠다다. 아젠다 확인은 확인 값(`f1`) 검사 뒤에 한다. 찾으면 `Slot::move_to`로 새 자리를 정하고, 날짜를 바꿀 때와 같은 길(`parent_folder`·`place_folder`)로 폴더째 옮긴다. 그래서 첨부·후속 노트·문답·코멘트가 함께 간다. 옮겼으면 응답에 `agenda`(새 slug)가 붙는다. 안 주면 지금과 바이트까지 같다.
+- **후속 노트 머리.** 후속 노트도 머리에 `agenda:`를 따로 적는다. 색인은 후속 노트의 아젠다를 폴더 자리로 읽어서 이 줄이 낡아도 목록은 그대로지만, 파일을 직접 읽는 쪽을 위해 옮긴 뒤 그 줄만 새 slug로 바꾼다(`retag_sub_notes`, 다른 바이트와 편집 도장은 그대로). 폴더 옮기기가 이미 끝났으므로 한 파일을 못 고쳐도 되돌리지 않고 `warning`에 적는다. 후속 노트 파일이 바뀌므로 그 확인 값도 달라진다.
+- **MCP.** `update_doc` 도구 스키마와 허용 키(`tool.rs`)에 `agenda`를 열었다(결정 3-나). AI 호출도 날짜·시각과 달리 아젠다는 받는다. Java 기준 녹화본과 견주는 `mcp_compat`은 이 칸과 설명 문구를, `compat_check`는 `update-doc` 사용법에 더한 조각을 빼고 견준다.
+- **화면(`ui/NoteParts.tsx`, `ui/AgendaPicker.tsx`, `ui/MoveUndo.tsx`, `data/vault.ts`의 `moveNote`).** 노트 머리의 아젠다 칩을 누르면 고르기 메뉴가 열린다(칩 끝의 ▾, 결정 1-나). 메뉴는 찾기 칸, 프로젝트별 묶음과 「미분류」, 지금 아젠다(「지금」), 맨 아래 「… 화면으로 가기」(예전에 칩을 누르면 하던 일)다. 다른 아젠다를 누르면 확인 없이 바로 옮기고(결정 5-가), 앱 아래 가운데에 「「…」로 옮겼어요 · 되돌리기」 알림을 8초 띄운다. 아젠다 화면에서 옮기면 노트가 목록에서 빠지며 노트 머리도 사라지므로 알림은 앱 맨 위(`App.tsx`)에서 그린다. 찾은 이름과 같은 아젠다가 없으면 「새 아젠다 「…」 만들고 옮기기」 줄이 생기고, 누르면 앱이 `create_agenda`로 먼저 만든 뒤 옮긴다(결정 4-나, 엔진은 아젠다를 만들지 않으므로 두 번 부른다). 「되돌리기」는 노트만 원래 아젠다로 옮기고 새로 만든 아젠다는 남긴다. `moveNote`는 쓰던 글을 먼저 저장하고(`settled`) 옮긴 뒤, 이미 읽어 둔 후속 노트 목록을 다시 읽는다. 미리보기의 칩은 지금처럼 누를 수 없다.
+- **확인한 것.** 엔진 단위 시험 3개(`note::edit` 2개, `doc_write`의 머리 줄 바꾸기 1개), 합성 vault 통합 시험 `moves_a_note_to_another_existing_agenda_with_its_folder`(빈 값·없는 아젠다·확인 값 없음은 안 씀, slug와 이름으로 옮기기, 첨부·후속 노트 폴더, 후속 노트 머리, 후속 노트 목록, AI 호출), 명세 표 계약(`table_contracts`, `command_tables`)과 `ais-cli` 단위 시험, 의존 방향 시험(`commands -> frontmatter`가 3→4로 늘어 기준을 새로 썼다. 같은 때 `note -> kernel` 20→21도 반영했는데, 이것은 이 작업 전인 PR #113(`e6e6409`)이 늘리고 기준을 안 고친 것이다), 골든 재생(세 하네스 모두 어긋남 0건), 진짜 `ais-cli mcp --write`로 임시 vault에서 없는 아젠다 거절과 옮기기, 실제 창 점검 1건(`node scripts/workspace-acceptance.mjs --views --only=agenda-chip-picker-moves-the-note-folder-and-undo`: 칩 → 메뉴 → 새 아젠다 만들고 옮기기 → 디스크의 폴더와 후속 노트 머리 → 되돌리기 → 새 아젠다는 남음 → 「화면으로 가기」). 같은 점검을 잠시 멈춰 세운 창을 캡처해 어두운 물성 모양의 메뉴·칩·알림을 눈으로 봤다.
+- **확인 못 한 것과 한계.** 노트 창(따로 띄운 창)에서 옮기기, 밝은 테마와 다른 화면 모양(skin)의 모양. 후속 노트를 편집 중일 때 뿌리 노트를 옮기면, 저장하지 않은 글이 남은 그 후속 노트는 옛 확인 값을 지녀 다음 저장에서 충돌로 멈출 수 있다(글은 잃지 않는다). 여러 노트를 한 번에 옮기기와 후속 노트만 따로 옮기기는 없다.
+
 ### GitHub App 연결 (`github.rs`)
 
 프로젝트의 GitHub 저장소(앞의 「프로젝트의 저장소와 아젠다의 `projectRepo`」)를 앱이 읽고 받아 오는 호스트 쪽 바탕이다. 사용자가 GitHub에서 직접 만든 GitHub App의 **App ID와 개인 키(PEM)** 로 **설치 토큰**을 받는 방식이고, 사용자 로그인(디바이스 플로우)은 쓰지 않는다. 활동은 앱(봇) 이름으로 남는다.
@@ -933,7 +944,7 @@ node fixtures/runner-test.mjs
 | 글꼴과 크기 | `scripts/typography.test.mjs` | 설정의 「글꼴과 크기」(위 §7 「글꼴과 화면 크기」). `test-native.sh`가 부른다 |
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
-| 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다 |
+| 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다. 편집기와 화면 점검은 `node scripts/workspace-acceptance.mjs --views --only=<점검 이름,…>`처럼 고른 것만 돌릴 수 있다(화면은 `pnpm build:noclaude`를 먼저 한다) |
 | 실제 창(자원·태스크) | `test:resources:acceptance`(11건), `test:tasks:acceptance`(6건) | 스킬·에이전트, 승인 대기함, 프로젝트 참조와 저장소, 레일 탭과 태스크, 알림, 러너 실패. `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 | 실제 창(4부) | `test:part4:acceptance`(켠 판 12건), `test:ask-marks:acceptance`(끈 판 5건) | `test-native.sh`에 들어 있지 않으니 따로 돌린다 |
 
@@ -1038,6 +1049,7 @@ node fixtures/runner-test.mjs
 
 - 엔진 시험(`bash test.sh` 178건), 화면 Node 시험 641건, 기준 맞대기(어긋남 0), 34장 받아들임(기준 jar로 27건 모두 맞음), 실제 창 점검 10종 248건은 통과한다(2026-11-15, 5d). 호스트 `cargo test`의 옛 실패 4건(`ask::tests`)은 2026-11-16에 고쳤다(§8). 수치와 근거는 [5d 기록](rust-engine-step5d-java-removal.md)에 있다.
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
+- 실제 창 화면 점검 묶음(`test:views:acceptance`)은 2026-11-20에 첫 점검 `rail-eight-order-settings-three-local-switches`에서 선다. 레일 개편 뒤 설정 단추가 `rail-activity-btn`이 되었는데 점검은 아직 `button.iconbtn[title="설정"]`을 찾는다(이 묶음은 첫 실패에서 멈추므로 뒤의 점검은 돌지 않는다). 아젠다 옮기기 점검은 `--only`로 따로 돌려 통과했다. 묶음 전체를 지금 화면에 맞추는 일은 따로 남았다.
 - MCP 서버(`ais-cli mcp`)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(`✔ Connected`), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).
 - 설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).
 - 설정의 「글꼴과 크기」는 브라우저(개발 서버, 샘플 vault)에서 다섯 모양 모두 눈으로 보았다. 실제 WKWebView 점검(`test:views:acceptance` 28건, `test:navigation:acceptance` 13건, 둘 다 4부를 뺀 판)에서 웹뷰 확대가 되는 것(`innerWidth`가 배율만큼 변함), ⌘ 단축키, 앱 글꼴 적용·오류·기본값, 열려 있는 터미널의 글꼴 변경, 150% 확대 중 터미널 화면이 칸 안에 드는 것까지 확인했다. **못 본 것:** 터미널과 편집기가 확대된 채로 눈에 어떻게 보이는지(글자가 또렷한지, 편집기 팝오버 위치)는 화면을 직접 보지 못했다(점검은 DOM 값과 크기만 잰다). 노트 창(`note-*`)에서 같은 권한으로 확대되는지는 점검이 없고(권한 목록이 메인과 같다는 것만 계약 시험이 잰다), 4부를 켠 판은 안 돌렸다.

@@ -107,6 +107,8 @@ const clean = async () =>
   );
 const results = [];
 async function test(id, work) {
+  // --only 로 고른 점검만 돌린다
+  if (cfg.only && !cfg.only.includes(id)) return;
   try {
     await work();
     results.push({ id, ok: true });
@@ -932,6 +934,47 @@ if (location.pathname.startsWith("/note-window/")) {
       // The app ships its own ais-cli, so the guide must not send people to a system Java.
       assert(!/\bjava\b/.test(step2) && !step2.includes("install --cli"), "guide step 2 still needs a system Java");
       assert(!$(".set-ask-timeout"), "AI control visible");
+    });
+    // TSK-2: 노트 머리의 아젠다 칩으로 다른 아젠다로 옮긴다. 옮기면 뿌리 노트의 폴더 이름이 정식 이름으로 바뀌므로,
+    // 그 폴더 경로에 기대는 앞의 점검들이 끝난 뒤에 둔다.
+    await test("agenda-chip-picker-moves-the-note-folder-and-undo", async () => {
+      await open();
+      const chip = () => $(".doc-meta-bar .doc-agenda-chip");
+      await until(() => chip()?.textContent.includes("검증 아젠다"), "agenda chip");
+      chip().click();
+      await until(() => $(".agenda-picker"), "agenda picker");
+      const picker = $(".agenda-picker");
+      assert($(".agenda-picker-item.is-current", picker)?.textContent.includes("검증 아젠다"), "current agenda row");
+      assert(button("검증 아젠다 화면으로 가기", picker), "open-agenda row");
+      // 목록에 없는 이름은 앱이 아젠다를 먼저 만들고 옮긴다(결정 4-나). 확인 창은 없다(결정 5-가)
+      fill($(".agenda-picker-search input", picker), "옮길 곳");
+      await until(() => $(".agenda-picker-create"), "create row");
+      assert($(".agenda-picker-create").textContent.includes("새 아젠다 「옮길 곳」 만들고 옮기기"), "create row label");
+      $(".agenda-picker-create").click();
+      let moved;
+      await until(async () => {
+        moved = await engine(["get-doc", cfg.id]);
+        return moved.agenda !== "demo";
+      }, "moved on disk");
+      assert(moved.agenda === "옮길-곳", "agenda slug " + moved.agenda);
+      assert(String(moved.path).startsWith("notes/옮길-곳/"), "path " + moved.path);
+      await until(() => chip()?.textContent.includes("옮길 곳"), "chip shows the new agenda");
+      // 후속 노트는 폴더째 따라가고, 그 머리의 agenda 줄도 새 아젠다로 바뀐다
+      const folder = String(moved.path).replace(/\/note\.md$/, "");
+      const child = await invoke("read_external_md", { path: `${cfg.raw}/${folder}/sub/child/note.md` });
+      assert(/\nagenda: 옮길-곳\n/.test(child), "child head " + child.slice(0, 160));
+      // 앱 아래 알림의 되돌리기는 노트만 원래 아젠다로 옮기고, 새로 만든 아젠다는 남긴다
+      await until(() => $(".move-undo")?.textContent.includes("「옮길 곳」로 옮겼어요"), "undo toast");
+      click("되돌리기", $(".move-undo"));
+      await until(async () => (await engine(["get-doc", cfg.id])).agenda === "demo", "undo on disk");
+      await until(() => chip()?.textContent.includes("검증 아젠다"), "chip back");
+      assert(!$(".move-undo"), "undo toast left after undo");
+      assert((await engine(["list-agendas"])).some((a) => a.slug === "옮길-곳"), "created agenda kept");
+      // 칩을 누르면 아젠다 화면으로 가던 동작은 메뉴 맨 아래 항목으로 옮겼다(결정 1-나)
+      chip().click();
+      await until(() => $(".agenda-picker"), "picker again");
+      click("검증 아젠다 화면으로 가기", $(".agenda-picker"));
+      await until(() => location.pathname.startsWith("/agenda/") && !$(".agenda-picker"), "agenda screen");
     });
     // Last on purpose: a selection left in the template editor disturbs later navigation.
     await test("C57-template-editor-selection-offers-no-comment", async () => {
