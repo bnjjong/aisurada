@@ -2537,3 +2537,24 @@ body.col-resizing {
 .move-undo .move-undo-action { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .move-undo .move-undo-close { opacity: .7; }
 .move-undo button:hover { background: transparent; opacity: 1; }
+
+.sub-agenda-filters, .sub-agenda-chips, .sub-agenda-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sub-agenda-filters { margin: 10px 0; }
+.sub-agenda-filters button, .sub-agenda-picker > summary { padding: 4px 8px; font-size: 12px; }
+.sub-agenda-filters button[aria-pressed="true"] { color: var(--ink); background: var(--soft); border-color: var(--accent); }
+.sub-agenda-filters small { color: var(--muted); }
+.sub-agenda-chips { min-width: 0; }
+.sub-agenda-chips .tag-chip button { margin-left: 4px; border: 0; background: transparent; box-shadow: none; }
+.sub-agenda-picker > summary { cursor: pointer; }
+.sub-agenda-picker[open] { flex-basis: 100%; }
+.sub-agenda-choices { margin: 6px 0; padding: 6px 10px; min-width: 0; border: 1px solid var(--line); }
+.sub-agenda-choices label { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.sub-agenda-choices input[type="checkbox"] { margin: 0; }
+.sub-agenda-choices input[placeholder] { width: 100%; margin-bottom: 4px; }
+.sub-agenda-choices small { color: var(--muted); }
+.sub-agenda-management { display: grid; gap: 8px; margin-bottom: 16px; }
+.sub-agenda-line > span { flex: 1; overflow-wrap: anywhere; }
+.agenda-picker-option { display: flex; align-items: center; }
+.agenda-picker-option .agenda-picker-item { flex: 1; min-width: 0; }
+.agenda-picker-choose-sub { flex: none; margin-right: 4px; font-size: 11px; }
+.agenda-picker-assignment { padding: 8px; overflow: auto; }

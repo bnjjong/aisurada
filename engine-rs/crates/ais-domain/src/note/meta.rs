@@ -81,6 +81,7 @@ pub struct MetaData {
     pub edited_session_id: Option<String>,
     pub edited_session_agent: Option<String>,
     pub tags: Vec<String>,
+    pub sub_agenda_ids: Vec<String>,
     pub links: Vec<Link>,
     pub favorite: bool,
     pub favorite_category: Option<String>,

@@ -80,6 +80,7 @@ impl NewSub {
             edited_session_agent: None,
             tags: &[],
             favorite: false,
+            sub_agenda_ids: &[],
             favorite_category: None,
             template: None,
             evaluation: None,

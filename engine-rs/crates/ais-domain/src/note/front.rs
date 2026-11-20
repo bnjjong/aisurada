@@ -23,6 +23,7 @@ pub struct NoteFront<'a> {
     pub edited_session_id: Option<&'a str>,
     pub edited_session_agent: Option<&'a str>,
     pub tags: &'a [String],
+    pub sub_agenda_ids: &'a [String],
     pub favorite: bool,
     pub favorite_category: Option<&'a str>,
     pub template: Option<&'a str>,
@@ -70,6 +71,12 @@ impl NoteFront<'_> {
             out.push_str("tags:\n");
             for tag in self.tags {
                 out.push_str(&format!("  - {}\n", dump_string(tag, 2)));
+            }
+        }
+        if !self.sub_agenda_ids.is_empty() {
+            out.push_str("subAgendaIds:\n");
+            for id in self.sub_agenda_ids {
+                out.push_str(&format!("  - {}\n", dump_string(id, 2)));
             }
         }
         if self.favorite {
@@ -133,6 +140,7 @@ pub struct Draft<'a> {
     /// 머리에 적을 층(`record`일 때만 줄이 생긴다). 후속 노트는 층을 안 적는 값을 준다
     pub tier: Tier,
     pub tags: &'a [String],
+    pub sub_agenda_ids: &'a [String],
     pub favorite: bool,
     pub favorite_category: Option<&'a str>,
     pub template: Option<&'a str>,
@@ -175,6 +183,7 @@ pub fn judge(
             edited_session_id: edited_session,
             edited_session_agent: edited_agent,
             tags: draft.tags,
+            sub_agenda_ids: draft.sub_agenda_ids,
             favorite: draft.favorite,
             favorite_category: draft.favorite_category,
             template: draft.template,

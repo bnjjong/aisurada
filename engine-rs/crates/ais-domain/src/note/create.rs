@@ -40,6 +40,7 @@ pub struct NewDocInput<'a> {
 /// 검사를 마친 새 노트의 재료
 #[derive(Debug, Clone)]
 pub struct ParsedNewDoc {
+    pub sub_agenda_ids: Vec<String>,
     /// 다듬은 아젠다 slug 또는 이름(비지 않았다)
     pub agenda_key: String,
     pub doc_type: &'static str,
@@ -118,6 +119,7 @@ impl ParsedNewDoc {
             return Err(EngineError::invalid_argument("아젠다 이름이 비었다"));
         }
         Ok(ParsedNewDoc {
+            sub_agenda_ids: Vec::new(),
             agenda_key: agenda_key.to_string(),
             doc_type,
             title: raw_title.to_string(),
@@ -176,6 +178,7 @@ impl ParsedNewDoc {
             edited_session_id: None,
             edited_session_agent: None,
             tags: &self.tags,
+            sub_agenda_ids: &self.sub_agenda_ids,
             favorite: false,
             favorite_category: None,
             template: self.template.as_deref(),

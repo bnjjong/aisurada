@@ -188,6 +188,7 @@ mod tests {
             edited_session_id: None,
             edited_session_agent: None,
             tags: Vec::new(),
+            sub_agenda_ids: Vec::new(),
             links: Vec::new(),
             favorite,
             favorite_category: category.map(str::to_string),

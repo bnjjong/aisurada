@@ -7,6 +7,7 @@ import { Editor } from "../editor/Editor.tsx";
 import { TYPES, TYPE_NAMES, agendaRepoField } from "./model.ts";
 import { Icon } from "./Icon.tsx";
 import { RepoListEditor } from "./RepoListEditor.tsx";
+import { SubAgendaChoices } from "./SubAgendas.tsx";
 import { cloneRepo, cloneSummary } from "./githubStore.ts";
 import {
   cleanRepos,
@@ -63,6 +64,7 @@ export function Forms({
       state={state}
       controller={controller}
       agenda={form.agenda}
+      subAgendaId={form.subAgendaId}
     />
   ) : (
     <EntityForm
@@ -79,14 +81,17 @@ function NewNote({
   state,
   controller,
   agenda: initial,
+  subAgendaId,
 }: {
   state: WorkspaceState;
   controller: WorkspaceController;
   agenda?: string;
+  subAgendaId?: string;
 }) {
   const ws = state.workspace!,
     now = new Date();
   const [agenda, setAgenda] = useState(initial || ws.agendas[0]?.id || ""),
+    [subAgendaIds, setSubAgendaIds] = useState<string[]>(subAgendaId ? [subAgendaId] : []),
     [type, setType] = useState("plan"),
     [template, setTemplate] = useState(""),
     [title, setTitle] = useState(""),
@@ -105,6 +110,8 @@ function NewNote({
     if (isDirty) setConfirmDiscard(true);
     else controller.form(null);
   };
+  const activeSubAgendas = (ws.agendas.find((item) => item.id === agenda)?.subAgendas ?? [])
+    .filter((item) => !item.archived);
   const choices = ws.templates.filter(
     (t) =>
       t.category !== "ritual" &&
@@ -133,6 +140,7 @@ function NewNote({
               body: bodyRef.current.replace(/\[제목\]/g, title.trim()),
               date,
               time,
+              subAgendaIds: subAgendaIds.length ? subAgendaIds : undefined,
               tags: tags
                 .split(",")
                 .map((t) => t.trim())
@@ -157,7 +165,7 @@ function NewNote({
               <select
                 aria-label="아젠다"
                 value={agenda}
-                onChange={(e) => setAgenda(e.target.value)}
+                onChange={(e) => { setAgenda(e.target.value); setSubAgendaIds([]); }}
               >
                 {ws.agendas.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -251,6 +259,9 @@ function NewNote({
               />
             </label>
           </div>
+          {!!activeSubAgendas.length && (
+            <SubAgendaChoices items={activeSubAgendas} selected={subAgendaIds} onChange={setSubAgendaIds} />
+          )}
           {error && <p role="alert">{error}</p>}
           <footer className="ndf-foot">
             <button type="button" onClick={handleClose}>

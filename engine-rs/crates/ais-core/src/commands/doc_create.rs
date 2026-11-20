@@ -15,6 +15,7 @@ use crate::note::front::check_size;
 use crate::text::encode_uri_component;
 use crate::vault::agenda::AgendaInfo;
 use crate::vault::scanner::NoteRecord;
+use crate::vault::sub_agenda;
 use crate::write::apparatus::{next_id, next_note_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_confinement, has_unusable_path_characters};
@@ -40,6 +41,7 @@ pub struct CreateDocRequest {
     pub format: Option<String>,
     pub links: Option<Json>,
     pub tags: Option<Json>,
+    pub sub_agenda_ids: Option<Json>,
     pub template: Option<String>,
     /// `reading`(기본)이나 `record`. AI 호출에서는 받지 않는다.
     pub tier: Option<String>,
@@ -81,7 +83,7 @@ pub fn create_doc_in(
     let tool = context.caller == Caller::Ai;
 
     // 인자 검사(규칙은 `note::create`). 오류가 나오는 차례는 그대로다.
-    let parsed = ParsedNewDoc::parse(NewDocInput {
+    let mut parsed = ParsedNewDoc::parse(NewDocInput {
         agenda: request.agenda.as_deref(),
         doc_type: request.doc_type.as_deref(),
         title: request.title.as_deref(),
@@ -95,6 +97,18 @@ pub fn create_doc_in(
         tier: request.tier.as_deref(),
         tool,
     })?;
+    if let Some(raw) = &request.sub_agenda_ids {
+        let ids = sub_agenda::parse_ids(raw)?;
+        if !ids.is_empty() {
+            let AgendaMatch::Found(slug) = find_agenda(scope, &parsed.agenda_key)? else {
+                return Err(EngineError::invalid_argument(
+                    "서브 아젠다를 붙일 아젠다가 없다",
+                ));
+            };
+            sub_agenda::validate(&ids, scope.index.sub_agendas(&slug), &[], false)?;
+        }
+        parsed.sub_agenda_ids = ids;
+    }
     let (raw_title, raw_body) = (parsed.title.as_str(), parsed.body.as_str());
 
     let (agenda_slug, agenda_created) = lookup_or_create_agenda(vault, scope, &parsed.agenda_key)?;

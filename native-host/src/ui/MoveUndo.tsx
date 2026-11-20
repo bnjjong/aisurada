@@ -6,6 +6,7 @@ export interface MoveUndo {
   noteId: string;
   /** 옮겨 간 아젠다 이름(알림 글에 쓴다) */
   title: string;
+  removedSubAgendas?: number;
   undo(): Promise<unknown>;
 }
 
@@ -48,7 +49,10 @@ export function MoveUndoToast() {
   if (!move) return null;
   return (
     <div className="move-undo" role="status" aria-live="polite" data-note-id={move.noteId}>
-      <span className="move-undo-text">「{move.title}」로 옮겼어요</span>
+      <span className="move-undo-text">
+        「{move.title}」로 옮겼어요
+        {!!move.removedSubAgendas && ` · 이전 분류 ${move.removedSubAgendas}개 제외`}
+      </span>
       <button
         type="button"
         className="move-undo-action"

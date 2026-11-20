@@ -3,8 +3,8 @@
 use serde::Deserialize;
 
 use super::Caller;
-use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::model::{NoteRow, Page};
 use crate::vault::attach_text;
 use crate::vault::filter::{self, DocFilter};
@@ -24,8 +24,12 @@ pub struct ListDocsRequest {
     pub bodies: bool,
 }
 
-pub fn execute(index: &NoteIndex, request: &ListDocsRequest, context: &CallContext) -> Result<Page<NoteRow>, EngineError> {
-    let criteria = filter::build(&index.agendas.table, &request.filter)?;
+pub fn execute(
+    index: &NoteIndex,
+    request: &ListDocsRequest,
+    context: &CallContext,
+) -> Result<Page<NoteRow>, EngineError> {
+    let criteria = filter::build(index, &request.filter)?;
 
     let candidates: Vec<_> = index
         .root_notes()

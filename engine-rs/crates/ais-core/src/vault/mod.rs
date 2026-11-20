@@ -13,6 +13,7 @@ internal_mods!(
     plain_text,
     project,
     scanner,
+    sub_agenda,
 );
 pub mod facts;
 pub mod git;

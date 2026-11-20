@@ -241,6 +241,15 @@ impl Harness {
             .replace(&a_path, &b_path)
         };
         let java_err = swap(&java.stderr);
+        // Java 이후 목록 조건에 추가한 서브 아젠다 옵션은 옛 오류 설명에서 빠진다.
+        let rust_err = match args.first().map(String::as_str) {
+            Some("list-docs") => rust
+                .stderr
+                .replace(", subAgendaId", "")
+                .replace("[subAgendaId=<분류 ID>] ", ""),
+            Some("list_docs") => rust.stderr.replace("subAgendaId, ", ""),
+            _ => rust.stderr.clone(),
+        };
         let java_out = swap(&java.stdout);
         if java.code == 0 {
             self.report.succeeded += 1;
@@ -267,17 +276,13 @@ impl Harness {
         });
         // 안쪽 실패(종료 코드 1)는 Java가 스택 추적을 붙이고, 휴지통 경고는 Java 로거가 시각을 붙여 찍으므로(Rust는 이 경고를 내지 않는다) 글을 견주지 않는다
         if java.code != 1 && !java_err.contains("aisurada.cmd.TrashCommands") {
-            self.record(
-                format!("{label} 오류 글"),
-                java_err == rust.stderr,
-                || {
-                    format!(
-                        "Java: {}\n    Rust: {}",
-                        clip(&java_err),
-                        clip(&rust.stderr)
-                    )
-                },
-            );
+            self.record(format!("{label} 오류 글"), java_err == rust_err, || {
+                format!(
+                    "Java: {}\n    Rust: {}",
+                    clip(&java_err),
+                    clip(&rust.stderr)
+                )
+            });
         }
         let parsed = (
             serde_json::from_str::<Value>(&java_out),

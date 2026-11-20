@@ -154,6 +154,7 @@ impl ParsedEdit {
         Ok(Slot {
             title,
             tags,
+            sub_agenda_ids: meta.sub_agenda_ids.clone(),
             template,
             agenda: None,
             created,
@@ -169,6 +170,7 @@ impl ParsedEdit {
 pub struct Slot {
     pub title: String,
     tags: Vec<String>,
+    pub sub_agenda_ids: Vec<String>,
     template: Option<String>,
     /// 옮길 아젠다의 slug. `None`이면 파일의 아젠다를 그대로 쓴다
     agenda: Option<String>,
@@ -237,6 +239,7 @@ impl Slot {
                 session_agent,
                 tier: meta.tier,
                 tags: &self.tags,
+                sub_agenda_ids: &self.sub_agenda_ids,
                 favorite: meta.favorite,
                 favorite_category: meta.favorite_category.as_deref(),
                 template: self.template.as_deref(),
@@ -278,6 +281,7 @@ mod tests {
             edited_session_id: None,
             edited_session_agent: None,
             tags: vec!["a".into()],
+            sub_agenda_ids: Vec::new(),
             links: Vec::new(),
             favorite: false,
             favorite_category: None,

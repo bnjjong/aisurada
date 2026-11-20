@@ -8,5 +8,13 @@ pub fn execute(index: &NoteIndex) -> Page<AgendaRow> {
     let mut agendas: Vec<_> = index.agendas.table.infos().collect();
     agendas.sort_by(|a, b| compare_utf16(&a.slug, &b.slug));
     let total = agendas.len();
-    Page::new(agendas.into_iter().map(AgendaRow::from).collect(), total)
+    let items = agendas
+        .into_iter()
+        .map(|agenda| {
+            let mut row = AgendaRow::from(agenda);
+            row.sub_agendas = index.sub_agendas(&agenda.slug).to_vec();
+            row
+        })
+        .collect();
+    Page::new(items, total)
 }

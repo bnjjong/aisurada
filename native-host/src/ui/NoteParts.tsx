@@ -7,6 +7,7 @@ import { Confirm } from "./Modal.tsx";
 import { ActionMenu } from "./ActionMenu.tsx";
 import { AgendaPicker } from "./AgendaPicker.tsx";
 import { showMoveUndo } from "./MoveUndo.tsx";
+import { NoteSubAgendas } from "./SubAgendas.tsx";
 import type { ActionMenuItem } from "./ActionMenu.tsx";
 import { Icon } from "./Icon.tsx";
 import { sessionAgentId, sessionAgentLabel } from "./AgentMark.tsx";
@@ -85,14 +86,19 @@ export function NoteMeta({
       : note.id;
   // 다른 아젠다로 옮긴다(TSK-2). 확인 창 없이 바로 옮기고, 앱 아래 알림의 「되돌리기」로 원래 아젠다로 되돌린다(결정 5-가).
   // 되돌리기는 노트만 옮기고, 옮기며 새로 만든 아젠다는 남긴다.
-  const moveTo = async (agendaId: string) => {
+  const moveTo = async (agendaId: string, subAgendaIds: string[] = []) => {
     setPicking(false);
     const from = live.agendaId || note.agendaId;
     if (!from || from === agendaId) return;
-    const result = await controller.data.moveNote(note.id, agendaId);
+    const previous = controller.data.note({ id: note.id })?.subAgendaIds ?? [];
+    const result = await controller.data.moveNote(note.id, agendaId, subAgendaIds);
     const target = controller.getSnapshot().workspace?.agendas.find((a) => a.id === agendaId);
-    if (result.ok && target)
-      showMoveUndo({ noteId: note.id, title: target.title, undo: () => controller.data.moveNote(note.id, from) });
+    if (result.ok && target) {
+      showMoveUndo({
+        noteId: note.id, title: target.title, removedSubAgendas: previous.length,
+        undo: () => controller.data.moveNote(note.id, from, previous, previous.length > 0),
+      });
+    }
   };
   // 목록에 없는 이름이면 아젠다를 먼저 만들고 옮긴다(결정 4-나). 엔진의 update_doc 은 아젠다를 만들지 않는다
   const createAndMove = async (title: string) => {
@@ -364,6 +370,10 @@ export function NoteMeta({
                 </button>
               );
             })()}
+          {!parent && agenda && (
+            <NoteSubAgendas key={agenda.id} note={live} agenda={agenda}
+              controller={controller} readOnly={mode === "preview"} />
+          )}
           {!!note.template &&
             !parent &&
             (template ? (
@@ -410,7 +420,7 @@ export function NoteMeta({
           agendas={state.workspace?.agendas || []}
           projects={state.workspace?.projects || []}
           currentId={agenda.id}
-          onPick={(id) => void moveTo(id)}
+          onPick={(id, ids) => void moveTo(id, ids)}
           onCreate={(title) => void createAndMove(title)}
           onOpenAgenda={() => {
             setPicking(false);

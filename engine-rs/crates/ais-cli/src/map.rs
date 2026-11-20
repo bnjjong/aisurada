@@ -165,7 +165,15 @@ fn limit_number(parsed: &ParsedCommand) -> Result<Option<i32>, CliError> {
 
 /// 노트 필터 옵션(`agenda`, `type`, `tag`, `favorite`, `favoriteCategory`, `date`, `from`, `to`)을 엔진 인자로 옮긴다.
 fn filter_args(parsed: &ParsedCommand, args: &mut Map<String, Value>) -> Result<(), CliError> {
-    for key in ["agenda", "type", "favoriteCategory", "date", "from", "to"] {
+    for key in [
+        "agenda",
+        "type",
+        "favoriteCategory",
+        "subAgendaId",
+        "date",
+        "from",
+        "to",
+    ] {
         if let Some(value) = parsed.option(key) {
             args.insert(key.into(), json!(value));
         }

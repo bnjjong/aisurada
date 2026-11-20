@@ -85,13 +85,15 @@ export interface WorkspaceServices {
 }
 
 export type Row = Record<string, unknown>;
-export interface Agenda extends Row { id: string; slug: string; title: string; }
+export interface SubAgenda { id: string; title: string; archived: boolean; }
+export interface Agenda extends Row { id: string; slug: string; title: string; subAgendas?: SubAgenda[]; }
 export interface Note extends Row {
   id: string;
   title: string;
   body: string;
   agenda: string;
   agendaId: string;
+  subAgendaIds?: string[];
   format: string;
   created: string;
   date: string;
@@ -119,7 +121,7 @@ export type Skin = 'tactile' | 'grid' | 'glass' | 'modern' | 'classic';
 export interface WorkspaceState {
   prefs: import('../ui/model.ts').Preferences;
   settingsOpen: boolean;
-  form: { kind: 'note' | 'agenda' | 'project'; id?: string; agenda?: string; project?: string } | null;
+  form: { kind: 'note' | 'agenda' | 'project'; id?: string; agenda?: string; subAgendaId?: string; project?: string } | null;
   hiddenAgendas: string[];
   previewOpened: Note | null;
   booting: boolean;

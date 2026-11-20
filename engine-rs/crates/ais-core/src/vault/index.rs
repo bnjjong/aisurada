@@ -3,15 +3,19 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use super::Skipped;
 use super::agenda::{AgendaScan, AgendaTable, scan_agendas};
 use super::comment_copy;
 use super::scanner::{NoteRecord, NoteScan, scan_note_paths, scan_notes};
+use super::sub_agenda::{self, SubAgenda};
 use crate::error::EngineError;
+use crate::ports::fs;
 
 pub struct NoteIndex {
     pub vault_root: PathBuf,
     pub agendas: AgendaScan,
     pub scan: NoteScan,
+    pub(crate) sub_agendas: HashMap<String, Vec<SubAgenda>>,
     /// `scan.notes`를 만든 시각 차례(같으면 경로 차례)로 늘어놓은 번호
     order: Vec<usize>,
     /// 메인 노트 id → `scan.notes`의 번호
@@ -60,6 +64,36 @@ impl NoteIndex {
             std::path::absolute(vault_root).unwrap_or_else(|_| vault_root.to_path_buf());
         let mut agendas = scan_agendas(&vault_root);
         let mut scan = scan_with(&vault_root, &agendas.table);
+        let mut sub_agendas = HashMap::new();
+        if fs::metadata(vault_root.join(sub_agenda::DIR)).is_ok() {
+            for agenda in agendas.table.infos() {
+                match sub_agenda::read(&vault_root, &agenda.id) {
+                    Ok(items) if !items.is_empty() => {
+                        sub_agendas.insert(agenda.slug.clone(), items);
+                    }
+                    Ok(_) => {}
+                    Err(error) => scan.skipped.push(Skipped {
+                        kind: "subAgenda",
+                        path: format!("{}/{}.json", sub_agenda::DIR, agenda.id),
+                        reason: error.message,
+                    }),
+                }
+            }
+        }
+        for note in &scan.notes {
+            for id in &note.meta.sub_agenda_ids {
+                if !sub_agendas
+                    .get(&note.meta.agenda_slug)
+                    .is_some_and(|items| items.iter().any(|item| &item.id == id))
+                {
+                    scan.skipped.push(Skipped {
+                        kind: "subAgenda",
+                        path: note.rel_path.clone(),
+                        reason: format!("이 아젠다에서 서브 아젠다 ID를 찾지 못했다: {id}"),
+                    });
+                }
+            }
+        }
         let mut fatal = agendas.fatal.take();
         // 코멘트 id가 겹치는 노트부터 뒤는 읽기 목록에서 뺀다
         if let Some((at, error)) = comment_copy::first_failure(&vault_root, &scan.notes) {
@@ -80,11 +114,19 @@ impl NoteIndex {
                 vault_root,
                 agendas,
                 scan,
+                sub_agendas,
                 order,
                 by_id,
             },
             fatal,
         )
+    }
+
+    pub(crate) fn sub_agendas(&self, slug: &str) -> &[SubAgenda] {
+        self.sub_agendas
+            .get(slug)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
     }
 
     /// id로 메인 노트를 찾습니다.
