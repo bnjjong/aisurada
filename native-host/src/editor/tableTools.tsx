@@ -41,6 +41,18 @@ export function TableTools(props: EditorProps) {
   const cancelRowClose = () => { if (rowCloseTimer.current) clearTimeout(rowCloseTimer.current); rowCloseTimer.current = null; };
   const closeRowSoon = () => { cancelRowClose(); if (!rowPinned.current) rowCloseTimer.current = setTimeout(() => { setRowCard(null); rowCloseTimer.current = null; }, 180); };
   useEffect(() => () => cancelRowClose(), []);
+  // 코멘트만 있는 줄의 카드는 점을 눌러 고정하면 닫을 길이 없었다. 본문 코멘트 카드처럼 바깥을 누르거나 Esc로 닫는다.
+  // 문답 카드(AskHoverCard)가 함께 뜬 줄은 그 카드의 고정·닫기 규칙을 따르므로 건드리지 않는다.
+  const closeRowCard = () => { cancelRowClose(); rowPinned.current = false; setRowCard(null); };
+  const commentOnlyCard = !!rowCard && dots.some(dot => dot.key === rowCard && !dot.asks.length);
+  useEffect(() => {
+    if (!commentOnlyCard) return;
+    const outside = (event: PointerEvent) => { if (!(event.target as Element | null)?.closest?.('.lex-rownote-dot')) closeRowCard(); };
+    const keys = (event: KeyboardEvent) => { if (event.key === 'Escape') closeRowCard(); };
+    document.addEventListener('pointerdown', outside);
+    window.addEventListener('keydown', keys);
+    return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('keydown', keys); };
+  }, [commentOnlyCard]);
   const fixedWidths = useRef(new Map<string, number>());
   const scaled = useRef(new Set<string>());
   const stopResize = useRef<(() => void) | null>(null);
@@ -308,6 +320,8 @@ export function TableTools(props: EditorProps) {
           <button
             aria-label={dot.ids.length ? '이 줄의 코멘트' : '이 줄의 문답'}
             onClick={() => {
+              // 고정된 코멘트 카드의 점을 다시 누르면 닫는다
+              if (rowPinned.current && rowCard === dot.key && !dot.asks.length) { closeRowCard(); return; }
               cancelRowClose();
               rowPinned.current = true;
               setRowCard(dot.key);
