@@ -5,8 +5,8 @@
 
 use serde::Deserialize;
 
-use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
+use crate::kernel::actor::CallContext;
 use crate::model::{NoteRow, Page, SearchRow};
 use crate::text::{compare_utf16, find_region_match, is_blank, trim_search};
 use crate::vault::attach_text;
@@ -47,7 +47,7 @@ pub fn execute(
             "검색어가 필요하다: {USAGE}"
         )));
     }
-    let criteria = filter::build(&index.agendas.table, &request.filter)?;
+    let criteria = filter::build(index, &request.filter)?;
     let limit = match request.limit {
         None => DEFAULT_LIMIT,
         Some(n) if !(1..=200).contains(&n) => {

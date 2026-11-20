@@ -5,6 +5,7 @@ import type { Agenda, Row } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { HUE_COLORS } from "./model.ts";
 import { Icon } from "./Icon.tsx";
+import { SubAgendaChoices } from "./SubAgendas.tsx";
 
 /** 고르기 목록의 한 묶음(프로젝트 하나, 또는 미분류) */
 interface Group {
@@ -61,7 +62,7 @@ export function AgendaPicker({
   agendas: Agenda[];
   projects: Row[];
   currentId: string;
-  onPick(agendaId: string): void;
+  onPick(agendaId: string, subAgendaIds?: string[]): void;
   onCreate(title: string): void;
   onOpenAgenda(): void;
   onClose(): void;
@@ -69,8 +70,12 @@ export function AgendaPicker({
   const box = useRef<HTMLDivElement>(null),
     input = useRef<HTMLInputElement>(null),
     [query, setQuery] = useState(""),
+    [destinationId, setDestinationId] = useState<string>(),
+    [selected, setSelected] = useState<string[]>([]),
     [place, setPlace] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const current = agendas.find((a) => a.id === currentId);
+  const destination = agendas.find((a) => a.id === destinationId);
+  const choices = (destination?.subAgendas ?? []).filter((item) => !item.archived);
   const groups = useMemo(() => groupAgendas(matchAgendas(agendas, query), projects), [agendas, projects, query]);
   const creatable = canCreateAgenda(agendas, query);
 
@@ -141,6 +146,19 @@ export function AgendaPicker({
       style={place ? { top: place.top, left: place.left, maxHeight: place.maxHeight } : { visibility: "hidden" }}
     >
       <div className="agenda-picker-title">아젠다 바꾸기</div>
+      {destination ? (
+        <div className="agenda-picker-assignment">
+          <strong>{destination.title}</strong>
+          <SubAgendaChoices items={choices} selected={selected} onChange={setSelected} />
+          <div className="sub-agenda-line">
+            <button type="button" onClick={() => setDestinationId(undefined)}>뒤로</button>
+            <button type="button" className="button-primary"
+              onClick={() => onPick(destination.id, selected.filter((id) => choices.some((item) => item.id === id)))}>
+              이 아젠다로 옮기기
+            </button>
+          </div>
+        </div>
+      ) : <>
       <label className="agenda-picker-search">
         <Icon name="search" size={12} />
         <input
@@ -165,8 +183,8 @@ export function AgendaPicker({
             {group.agendas.map((agenda) => {
               const isCurrent = agenda.id === currentId;
               return (
+                <div className="agenda-picker-option" key={agenda.id}>
                 <button
-                  key={agenda.id}
                   type="button"
                   role="menuitem"
                   className={`act-item agenda-picker-item${isCurrent ? " is-current" : ""}`}
@@ -188,6 +206,14 @@ export function AgendaPicker({
                     </small>
                   )}
                 </button>
+                {!isCurrent && agenda.subAgendas?.some((item) => !item.archived) && (
+                  <button type="button" role="menuitem" className="agenda-picker-choose-sub"
+                    aria-label={`${agenda.title} 분류 선택 후 이동`}
+                    onClick={() => { setSelected([]); setDestinationId(agenda.id); }}>
+                    분류 선택
+                  </button>
+                )}
+                </div>
               );
             })}
           </div>
@@ -214,6 +240,7 @@ export function AgendaPicker({
           </button>
         </>
       )}
+      </>}
     </div>,
     document.body,
   );

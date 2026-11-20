@@ -18,6 +18,7 @@ import { DiffTable } from "./History.tsx";
 import { AgendaRepoLabel } from "./AgendaRepoLabel.tsx";
 import { AgentMarks } from "./AgentMark.tsx";
 import { DecisionMark } from "./DecisionMark.tsx";
+import { ManageSubAgendas } from "./SubAgendas.tsx";
 export const addDays = (date: string, n: number) => {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
@@ -522,6 +523,8 @@ export function AgendaPage({
       ws.agendas.find((a) => a.id === id) ||
       ws.agendas.find((a) => a.slug === id),
     [deleting, setDeleting] = useState(false),
+    [managing, setManaging] = useState(false),
+    [subFilter, setSubFilter] = useState({ agendaId: "", id: "all" }),
     [error, setError] = useState(""),
     [widths, setWidths] = useState<Record<string, number>>({});
   const selected = ws.notes.filter(
@@ -554,10 +557,21 @@ export function AgendaPage({
         </button>
       </section>
     );
-  const notes = visibleNotes(
+  const allNotes = visibleNotes(
       ws.notes.filter((n) => n.agendaId === agenda.id),
       state.prefs.showRecordTier ?? (state.prefs as any).showRecords ?? false,
     ),
+    subAgendas = agenda.subAgendas ?? [],
+    activeSubAgendas = subAgendas.filter((item) => !item.archived),
+    activeFilter = subFilter.agendaId === agenda.id &&
+      (subFilter.id === "unassigned" || activeSubAgendas.some((item) => item.id === subFilter.id))
+      ? subFilter.id
+      : "all",
+    knownSubAgendas = new Set(subAgendas.map((item) => item.id)),
+    unassigned = (n: Note) => !n.subAgendaIds?.some((id) => knownSubAgendas.has(id)),
+    notes = activeFilter === "all" ? allNotes : activeFilter === "unassigned"
+      ? allNotes.filter(unassigned)
+      : allNotes.filter((n) => n.subAgendaIds?.includes(activeFilter)),
     newestFirst = state.prefs.docSortDir === "desc" || Boolean((state.prefs as any).agendaDesc),
     sortMode: "structure" | "time" =
       (state.prefs.docSortMode || (state.prefs as any).agendaSort) === "time"
@@ -642,7 +656,10 @@ export function AgendaPage({
             className="ico-btn ag-add button-primary"
             aria-label="새 노트"
             data-tip="새 노트"
-            onClick={() => controller.form({ kind: "note", agenda: agenda.id })}
+            onClick={() => controller.form({
+              kind: "note", agenda: agenda.id,
+              subAgendaId: activeSubAgendas.find((item) => item.id === activeFilter)?.id,
+            })}
           >
             <Icon name="plus" />
           </button>
@@ -651,6 +668,25 @@ export function AgendaPage({
           <AgendaRepoLabel agenda={agenda} projects={ws.projects} />
         </p>
         <p>{asText(agenda.summary)}</p>
+        <div className="sub-agenda-filters" role="group" aria-label="서브 아젠다 필터">
+          {[
+            { id: "all", title: "전체", count: allNotes.length },
+            { id: "unassigned", title: "미분류", count: allNotes.filter(unassigned).length },
+            ...activeSubAgendas.map((item) => ({
+              id: item.id, title: item.title,
+              count: allNotes.filter((note) => note.subAgendaIds?.includes(item.id)).length,
+            })),
+          ].map((item) => (
+            <button type="button" key={item.id} aria-pressed={activeFilter === item.id}
+              onClick={() => setSubFilter({ agendaId: agenda.id, id: item.id })}>
+              {item.title} <small>{item.count}</small>
+            </button>
+          ))}
+          <button type="button" onClick={() => setManaging(true)}>서브 아젠다 관리</button>
+        </div>
+        {managing && (
+          <ManageSubAgendas key={agenda.id} agenda={agenda} controller={controller} close={() => setManaging(false)} />
+        )}
         <div className="agenda-sort">
           <div className="ag-seg" role="group" aria-label="아젠다 정렬">
             {(

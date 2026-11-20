@@ -15,7 +15,8 @@ use crate::commands::{
     get_sub_note, get_template, history, init_workspace, list_agendas, list_attachments,
     list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
     note_meta_write, project_write, reindex, resource_commands, search_docs, session_commands,
-    shard_notes, sub_note_write, task_commands, template_write, trash_write, write_attachment,
+    shard_notes, sub_agenda_write, sub_note_write, task_commands, template_write, trash_write,
+    write_attachment,
 };
 use crate::error::EngineError;
 use crate::kernel::actor::CallContext;
@@ -175,6 +176,8 @@ pub(super) static TABLE: &[Def] = &[
     write!("create_agenda", Standard, agenda_write::CreateAgendaRequest, |root, request, scope| agenda_write::create(root, request, scope)),
     write!("update_agenda", Standard, agenda_write::UpdateAgendaRequest, |root, request, scope| agenda_write::update(root, request, scope)),
     write!("delete_agenda", Standard, agenda_write::DeleteAgendaRequest, |root, request, scope| agenda_write::delete(root, request, scope)),
+    write!("create_sub_agenda", Standard, sub_agenda_write::CreateRequest, |root, request, scope| sub_agenda_write::create(root, request, scope)),
+    write!("update_sub_agenda", Standard, sub_agenda_write::UpdateRequest, |root, request, scope| sub_agenda_write::update(root, request, scope)),
     write!("create_project", Standard, project_write::CreateProjectRequest, |root, request, _scope| project_write::create(root, request)),
     write!("update_project", Standard, project_write::UpdateProjectRequest, |root, request, _scope| project_write::update(root, request)),
     write!("delete_project", Standard, project_write::DeleteProjectRequest, |root, request, scope| project_write::delete(root, request, scope)),

@@ -34,6 +34,7 @@ pub mod resource_commands;
 pub mod search_docs;
 pub mod session_commands;
 pub mod shard_notes;
+pub mod sub_agenda_write;
 pub mod sub_note_write;
 mod subnote;
 pub mod task_commands;

@@ -5,6 +5,7 @@ use crate::kernel::actor::Caller;
 use crate::vault::agenda::AgendaInfo;
 use crate::vault::note_meta::{Evaluation, Link};
 use crate::vault::scanner::NoteRecord;
+use crate::vault::sub_agenda::SubAgenda;
 
 /// 목록 응답
 #[derive(Debug, Serialize)]
@@ -96,6 +97,8 @@ pub struct NoteRow {
     pub attach_text: Option<String>,
     pub links: Vec<LinkRow>,
     pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sub_agenda_ids: Vec<String>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub favorite: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -151,6 +154,7 @@ impl NoteRow {
             attach_text: attach_text.filter(|t| !t.is_empty()),
             links: meta.links.iter().map(LinkRow::from).collect(),
             tags: meta.tags.clone(),
+            sub_agenda_ids: meta.sub_agenda_ids.clone(),
             favorite: meta.favorite,
             favorite_category: meta.favorite_category.clone(),
             template: meta.template.clone(),
@@ -176,6 +180,8 @@ pub struct AgendaRow {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_repo: Option<String>,
     pub summary: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sub_agendas: Vec<SubAgenda>,
 }
 
 impl From<&AgendaInfo> for AgendaRow {
@@ -189,6 +195,7 @@ impl From<&AgendaInfo> for AgendaRow {
             project: a.project.clone(),
             project_repo: a.project_repo.clone(),
             summary: a.summary.clone(),
+            sub_agendas: Vec::new(),
         }
     }
 }

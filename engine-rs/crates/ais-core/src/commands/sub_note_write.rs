@@ -294,6 +294,7 @@ pub fn update_sub_note(
             tier: Tier::Reading,
             tags,
             favorite: false,
+            sub_agenda_ids: &[],
             favorite_category: None,
             template: None,
             evaluation: None,

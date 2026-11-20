@@ -1,5 +1,5 @@
 import { asRow, asText, rows } from '../workspace/types.ts';
-import type { Note, Row, Workspace, WorkspaceServices } from '../workspace/types.ts';
+import type { Note, Row, SubAgenda, Workspace, WorkspaceServices } from '../workspace/types.ts';
 import { engineCall, engineRefusal, isPreconditionFailure, readWorkspace } from '../workspace/engine.ts';
 import { cleanTags, commentId, read, toArgv, write } from './commands.ts';
 import type { Call, Fields, NewDoc } from './commands.ts';
@@ -402,14 +402,17 @@ export class VaultData {
    * 실패하면 원래 아젠다로 되돌린다. 엔진은 아젠다를 새로 만들지 않으므로 새 아젠다는 [saveEntity]로 먼저 만든 뒤 부른다.
    * 옮기면 후속 노트 파일의 머리도 바뀌어 그 확인 값(f1)이 달라지므로, 이미 읽어 둔 후속 노트 목록을 다시 읽는다.
    */
-  async moveNote(id: string, agendaId: string): Promise<WriteResult> {
+  async moveNote(id: string, agendaId: string, subAgendaIds: string[] = [], restoring = false): Promise<WriteResult> {
     const ref = { id }, note = this.note(ref), agenda = this.workspace()?.agendas.find(item => item.id === agendaId);
     if (!note || !agenda) return { ok: false };
     if (note.agendaId === agendaId) return { ok: true };
     // 쓰던 글이 먼저 저장되게 한다. 그 글이 옛 확인 값으로 옮긴 뒤에 저장되면 충돌로 멈춘다
     await this.settled();
-    const result = await this.mutate(ref, { agenda: agenda.slug, agendaId },
-      current => write.updateDoc(id, { agenda: agenda.slug }, asText(current.precondition)),
+    const assignments = this.note(ref)?.subAgendaIds?.length || subAgendaIds.length
+      ? { subAgendaIds }
+      : {};
+    const result = await this.mutate(ref, { agenda: agenda.slug, agendaId, ...assignments },
+      current => write.updateDoc(id, { agenda: agenda.slug, ...assignments, restoreSubAgendas: restoring || undefined }, asText(current.precondition)),
       `아젠다 옮기기: ${note.title || '제목 없음'}`, false);
     if (result.ok) {
       const loaded = Object.keys(this.memory.subNotes).filter(parent => this.chain(parent)?.split('/')[0] === id);
@@ -575,7 +578,11 @@ export class VaultData {
     });
     if (!this.valid(generation)) return result;
     if (!result.ok) { const current = this.workspace()!; this.emit({ ...current, trash: [...current.trash.slice(0, index), item, ...current.trash.slice(index)] }); }
-    else if (action === 'restore') await this.reconcile();
+    else if (action === 'restore') {
+      await this.reconcile();
+      const warning = asText(result.value?.warning);
+      if (warning && this.valid(generation)) this.failure(warning);
+    }
     return result;
   }
   async emptyTrash(): Promise<WriteResult> {
@@ -590,6 +597,26 @@ export class VaultData {
     if (!result.ok) this.emit({ ...this.workspace()!, trash: original });
     else if (rows(result.value?.failed).length) { this.failure(`휴지통 비우기: ${rows(result.value?.failed).length}개를 못 지웠어요`); await this.reconcile(); }
     return result;
+  }
+  async saveSubAgenda(agendaId: string, fields: { title?: string; archived?: boolean }, id?: string): Promise<WriteResult> {
+    const workspace = this.workspace();
+    if (!workspace?.agendas.some(agenda => agenda.id === agendaId)) return { ok: false };
+    const call = id ? write.updateSubAgenda(agendaId, id, fields) : write.createSubAgenda(agendaId, fields);
+    return this.perform(call, '서브 아젠다 저장', response => {
+      const current = this.workspace()!;
+      this.emit({ ...current, agendas: current.agendas.map(agenda => {
+        if (agenda.id !== agendaId) return agenda;
+        const items = agenda.subAgendas ?? [];
+        const previous = items.find(item => item.id === id);
+        const item: SubAgenda = {
+          id: asText(response.id) || id || this.services.uuid(),
+          title: asText(response.title) || fields.title || previous?.title || '',
+          archived: typeof response.archived === 'boolean' ? response.archived : fields.archived ?? previous?.archived ?? false,
+        };
+        return { ...agenda, subAgendas: id ? items.map(old => old.id === id ? item : old) : [...items, item] };
+      }) });
+      this.markOwn(`.aisurada/sub-agendas/${agendaId}.json`);
+    });
   }
   async saveEntity(kind: 'agenda' | 'project', input: Fields, id?: string): Promise<WriteResult> {
     const workspace = this.workspace(); if (!workspace) return { ok: false };

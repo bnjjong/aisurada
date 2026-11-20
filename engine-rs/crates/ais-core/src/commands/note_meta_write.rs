@@ -68,7 +68,7 @@ pub struct LinkDocsRequest {
     pub f1: Option<String>,
 }
 
-fn bool_arg(name: &str, value: &Option<BoolArg>) -> Result<Option<bool>, EngineError> {
+pub(crate) fn bool_arg(name: &str, value: &Option<BoolArg>) -> Result<Option<bool>, EngineError> {
     match value {
         None => Ok(None),
         Some(BoolArg::Bool(b)) => Ok(Some(*b)),

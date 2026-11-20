@@ -15,6 +15,7 @@ use crate::text::{compare_utf16, trim};
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DocFilter {
+    pub sub_agenda_id: Option<String>,
     /// 아젠다 slug나 이름
     pub agenda: Option<String>,
     #[serde(rename = "type")]
@@ -33,6 +34,7 @@ pub struct DocFilter {
 /// 검사를 마친 조건
 #[derive(Debug, Default)]
 pub struct Criteria {
+    sub_agenda: Option<(String, HashSet<String>)>,
     agenda_slug: Option<String>,
     doc_type: Option<&'static str>,
     tags: Vec<String>,
@@ -47,8 +49,18 @@ fn non_empty(value: &Option<String>) -> Option<&str> {
 }
 
 /// 조건을 정해진 차례(아젠다, 유형, 태그, 즐겨찾기 라벨, 날짜)로 검사해 만듭니다.
-pub fn build(agendas: &AgendaTable, filter: &DocFilter) -> Result<Criteria, EngineError> {
+pub fn build(index: &super::index::NoteIndex, filter: &DocFilter) -> Result<Criteria, EngineError> {
+    let agendas = &index.agendas.table;
     let mut criteria = Criteria::default();
+    if let Some(id) = non_empty(&filter.sub_agenda_id) {
+        let owners = index
+            .sub_agendas
+            .iter()
+            .filter(|(_, items)| items.iter().any(|item| item.id == id))
+            .map(|(slug, _)| slug.clone())
+            .collect();
+        criteria.sub_agenda = Some((id.to_string(), owners));
+    }
 
     if let Some(input) = non_empty(&filter.agenda) {
         criteria.agenda_slug = Some(resolve_agenda(agendas, input)?);
@@ -140,6 +152,11 @@ fn resolve_agenda(agendas: &AgendaTable, input: &str) -> Result<String, EngineEr
 
 /// 노트가 조건을 모두 만족하는지 봅니다.
 pub fn matches(note: &NoteRecord, criteria: &Criteria) -> bool {
+    if let Some((id, owners)) = &criteria.sub_agenda
+        && (!owners.contains(&note.meta.agenda_slug) || !note.meta.sub_agenda_ids.contains(id))
+    {
+        return false;
+    }
     let meta = &note.meta;
     if criteria
         .agenda_slug

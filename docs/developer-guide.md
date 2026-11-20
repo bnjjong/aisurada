@@ -483,6 +483,17 @@ AI가 사람이 골라야 할 것(「정할 것」)을 노트에 결정 블록�
 - **확인한 것.** 엔진 단위 시험 3개(`note::edit` 2개, `doc_write`의 머리 줄 바꾸기 1개), 합성 vault 통합 시험 `moves_a_note_to_another_existing_agenda_with_its_folder`(빈 값·없는 아젠다·확인 값 없음은 안 씀, slug와 이름으로 옮기기, 첨부·후속 노트 폴더, 후속 노트 머리, 후속 노트 목록, AI 호출), 명세 표 계약(`table_contracts`, `command_tables`)과 `ais-cli` 단위 시험, 의존 방향 시험(`commands -> frontmatter`가 3→4로 늘어 기준을 새로 썼다. 같은 때 `note -> kernel` 20→21도 반영했는데, 이것은 이 작업 전인 PR #113(`e6e6409`)이 늘리고 기준을 안 고친 것이다), 골든 재생(세 하네스 모두 어긋남 0건), 진짜 `ais-cli mcp --write`로 임시 vault에서 없는 아젠다 거절과 옮기기, 실제 창 점검 1건(`node scripts/workspace-acceptance.mjs --views --only=agenda-chip-picker-moves-the-note-folder-and-undo`: 칩 → 메뉴 → 새 아젠다 만들고 옮기기 → 디스크의 폴더와 후속 노트 머리 → 되돌리기 → 새 아젠다는 남음 → 「화면으로 가기」). 같은 점검을 잠시 멈춰 세운 창을 캡처해 어두운 물성 모양의 메뉴·칩·알림을 눈으로 봤다.
 - **확인 못 한 것과 한계.** 노트 창(따로 띄운 창)에서 옮기기, 밝은 테마와 다른 화면 모양(skin)의 모양. 후속 노트를 편집 중일 때 뿌리 노트를 옮기면, 저장하지 않은 글이 남은 그 후속 노트는 옛 확인 값을 지녀 다음 저장에서 충돌로 멈출 수 있다(글은 잃지 않는다). 여러 노트를 한 번에 옮기기와 후속 노트만 따로 옮기기는 없다.
 
+
+### 서브 아젠다
+
+서브 아젠다는 메인 노트에 여러 개 붙일 수 있는 아젠다 내부 분류입니다. `.aisurada/sub-agendas/<아젠다 ID>.json`에는 고정 ID, 이름, 보관 여부를 둡니다. 메인 노트는 파일 머리의 `subAgendaIds`로 분류를 참조합니다. 분류가 없는 기존 노트는 빈 목록으로 읽습니다.
+
+- `create-sub-agenda agendaId=<아젠다 ID> title=<이름>`으로 분류를 추가합니다. 아젠다별 목록은 `list-agendas`의 `subAgendas`에 나옵니다.
+- `update-sub-agenda agendaId=<아젠다 ID> id=<분류 ID>`에 `title=<이름>` 또는 `archived=true|false`를 더해 분류를 고칩니다. 같은 아젠다 안에서는 이름이 고유합니다.
+- `create_doc`과 `update_doc`의 `subAgendaIds`는 전체 선택 목록입니다. 수정에서 생략하면 같은 아젠다의 기존 연결을 보존하고, 빈 배열을 보내면 지웁니다. 다른 아젠다로 옮길 때는 목적지 ID만 받을 수 있습니다.
+- 아젠다 화면의 필터와 노트 머리의 선택기는 같은 목록을 사용합니다. 아젠다 이동을 되돌릴 때는 직전 아젠다와 분류를 함께 복원합니다.
+- `list_docs`와 `search_docs`는 `subAgendaId` 조건을 받습니다. `reindex`는 파일을 직접 편집해 잘못된 ID가 들어온 경우를 `subAgenda` 진단으로 돌려줍니다.
+
 ### GitHub App 연결 (`github.rs`)
 
 프로젝트의 GitHub 저장소(앞의 「프로젝트의 저장소와 아젠다의 `projectRepo`」)를 앱이 읽고 받아 오는 호스트 쪽 바탕이다. 사용자가 GitHub에서 직접 만든 GitHub App의 **App ID와 개인 키(PEM)** 로 **설치 토큰**을 받는 방식이고, 사용자 로그인(디바이스 플로우)은 쓰지 않는다. 활동은 앱(봇) 이름으로 남는다.

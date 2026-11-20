@@ -46,8 +46,7 @@ pub struct TrashEntryRequest {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-pub struct EmptyTrashRequest {
-}
+pub struct EmptyTrashRequest {}
 
 fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
     if is_blank(id) {
@@ -273,20 +272,36 @@ pub fn restore_doc(
         target = normalize(&vault.join(&parent).join(&name));
         check_confinement(vault, &target)?;
     }
-    if slug != entry.agenda_slug {
-        rewrite_agenda(&source, entry.format, &slug)?;
+    let agenda_changed = slug != entry.agenda_slug
+        || !entry.agenda_id.is_empty()
+            && table
+                .by_slug(&slug)
+                .is_some_and(|agenda| agenda.id != entry.agenda_id);
+    let mut removed_sub_agendas = false;
+    if agenda_changed {
+        removed_sub_agendas =
+            rewrite_agenda(&source, entry.format, &slug, scope.index.sub_agendas(&slug))?;
     }
     move_path(&source, &target)?;
     save(vault, &others())?;
-    Ok(json!({
+    let mut response = json!({
         "trashId": entry.trash_id,
         "restored": true,
         "path": rel_of(vault, &target),
-    }))
+    });
+    if removed_sub_agendas {
+        response["warning"] = json!("복원한 아젠다에 없는 서브 아젠다를 제외했다");
+    }
+    Ok(response)
 }
 
 /// 되살릴 보관물의 머리에 적힌 아젠다를 `slug`로 바꾼다. 못 읽거나 머리가 없으면 그대로 둔다.
-fn rewrite_agenda(source: &Path, format: &str, slug: &str) -> Result<(), EngineError> {
+fn rewrite_agenda(
+    source: &Path,
+    format: &str,
+    slug: &str,
+    sub_agendas: &[crate::vault::sub_agenda::SubAgenda],
+) -> Result<bool, EngineError> {
     let extension = if format == "markdown" { "md" } else { format };
     let name = source
         .file_name()
@@ -301,10 +316,10 @@ fn rewrite_agenda(source: &Path, format: &str, slug: &str) -> Result<(), EngineE
         source.join(format!("note.{extension}"))
     };
     let Ok(parsed) = read_note_file(&content) else {
-        return Ok(());
+        return Ok(false);
     };
     let Some(mut meta) = parsed.frontmatter else {
-        return Ok(());
+        return Ok(false);
     };
     match meta
         .iter_mut()
@@ -316,6 +331,22 @@ fn rewrite_agenda(source: &Path, format: &str, slug: &str) -> Result<(), EngineE
             Value::Str(slug.to_string()),
         )),
     }
+    let mut removed_sub_agendas = false;
+    meta.retain_mut(|(key, value)| {
+        if !matches!(key, Value::Str(key) if key == "subAgendaIds") {
+            return true;
+        }
+        let Value::List(ids) = value else {
+            removed_sub_agendas = true;
+            return false;
+        };
+        let before = ids.len();
+        ids.retain(
+            |id| matches!(id, Value::Str(id) if sub_agendas.iter().any(|item| &item.id == id)),
+        );
+        removed_sub_agendas |= ids.len() != before;
+        !ids.is_empty()
+    });
     let dumped = dump_general_map(&meta).map_err(|e| EngineError::invalid_argument(e.0))?;
     let (open, close) = if format == "html" {
         ("<!--aisurada\n", "-->\n")
@@ -323,7 +354,8 @@ fn rewrite_agenda(source: &Path, format: &str, slug: &str) -> Result<(), EngineE
         ("---\n", "---\n")
     };
     let text = format!("{open}{dumped}{close}{}", parsed.body);
-    write_atomic(&content, text.as_bytes())
+    write_atomic(&content, text.as_bytes())?;
+    Ok(removed_sub_agendas)
 }
 
 /// 휴지통 항목을 영구 삭제한다(보관물과 목록의 항목).

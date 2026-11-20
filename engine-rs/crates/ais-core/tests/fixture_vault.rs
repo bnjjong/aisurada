@@ -4284,3 +4284,102 @@ fn human_decision_confirmation_survives_tool_followups_and_reopens_for_new_quest
     }
     std::fs::remove_dir_all(vault).unwrap();
 }
+
+#[test]
+fn sub_agendas_survive_note_rewrites_and_moves() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let call = |name, args| engine.call(name, args).unwrap();
+    let source = call("create_agenda", json!({"title": "분류 출발"}));
+    let target = call("create_agenda", json!({"title": "분류 도착"}));
+    let first = call(
+        "create_sub_agenda",
+        json!({"agendaId": source["id"], "title": "편집기"}),
+    );
+    let second = call(
+        "create_sub_agenda",
+        json!({"agendaId": source["id"], "title": "저장"}),
+    );
+    let destination = call(
+        "create_sub_agenda",
+        json!({"agendaId": target["id"], "title": "서버"}),
+    );
+    let original_ids = json!([first["id"], second["id"]]);
+    let note = call(
+        "create_doc",
+        json!({
+            "agenda": source["slug"], "type": "free", "title": "검증 노트", "body": "본문",
+            "subAgendaIds": [first["id"], second["id"], first["id"]]
+        }),
+    );
+    let id = &note["id"];
+    let read = || call("get_doc", json!({"id": id}));
+    assert_eq!(read()["subAgendaIds"], original_ids);
+    assert_eq!(
+        call("list_docs", json!({"subAgendaId": first["id"]}))["items"][0]["id"],
+        *id
+    );
+
+    call(
+        "set_favorite",
+        json!({"id": id, "favorite": true, "f1": read()["precondition"]}),
+    );
+    let child = call(
+        "create_sub_note",
+        json!({"parent": id, "title": "하위 노트", "body": "본문"}),
+    );
+    let card = format!("본문\n\n[카드](#sub:{})\n", child["id"].as_str().unwrap());
+    call(
+        "update_doc",
+        json!({"id": id, "body": card, "f1": read()["precondition"]}),
+    );
+    assert_eq!(
+        call("delete_sub_note", json!({"parent": id, "id": child["id"]}))["cardRemoved"],
+        true
+    );
+    assert_eq!(read()["subAgendaIds"], original_ids);
+
+    call(
+        "update_sub_agenda",
+        json!({
+            "agendaId": source["id"], "id": first["id"], "title": "편집 화면", "archived": true
+        }),
+    );
+    let before = read();
+    assert_eq!(engine.call("update_doc", json!({
+        "id": id, "agenda": target["slug"], "subAgendaIds": original_ids, "f1": before["precondition"]
+    })).unwrap_err().kind, ErrorKind::InvalidArgument);
+    assert_eq!(read()["path"], before["path"]);
+    let moved = call(
+        "update_doc",
+        json!({
+            "id": id, "agenda": target["slug"], "subAgendaIds": [destination["id"]],
+            "f1": before["precondition"]
+        }),
+    );
+    assert_eq!(moved["removedSubAgendaIds"], original_ids);
+    assert_eq!(read()["subAgendaIds"], json!([destination["id"]]));
+
+    call(
+        "update_doc",
+        json!({
+            "id": id, "agenda": source["slug"], "subAgendaIds": original_ids,
+            "restoreSubAgendas": true, "f1": moved["precondition"]
+        }),
+    );
+    assert_eq!(read()["subAgendaIds"], original_ids);
+    let trash = call("delete_doc", json!({"id": id}));
+    call("delete_agenda", json!({"id": source["id"]}));
+    let restored = call("restore_doc", json!({"trashId": trash["trashId"]}));
+    assert!(
+        restored["warning"]
+            .as_str()
+            .unwrap()
+            .contains("서브 아젠다")
+    );
+    assert_eq!(read()["agenda"], "recovered");
+    assert!(read().get("subAgendaIds").is_none());
+    std::fs::remove_dir_all(vault).unwrap();
+}

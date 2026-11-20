@@ -88,13 +88,13 @@ export const read = {
 
 export interface NewDoc {
   agenda: string; type: string; title: string; body: string; date: string; time: string;
-  tags: string[]; template?: string; tier?: string;
+  tags: string[]; subAgendaIds?: string[]; template?: string; tier?: string;
 }
 export const write = {
   init: (name: string): Call => ({ command: 'init_workspace', args: { name, templates: '[]' } }),
   createDoc: (doc: NewDoc): Call => ({ command: 'create_doc', args: { agenda: doc.agenda, type: doc.type, title: doc.title,
     body: doc.body, date: doc.date, time: doc.time, format: 'markdown', tags: doc.tags,
-    template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined } }),
+    subAgendaIds: doc.subAgendaIds, template: doc.template, tier: doc.tier === 'record' ? 'record' : undefined } }),
   updateDoc: (id: string, fields: Fields, token?: string): Call => ({ command: 'update_doc', args: { id, ...fields, f1: token || undefined } }),
   favorite: (id: string, fields: Fields, token?: string): Call => ({ command: 'set_favorite', args: { id, ...fields, f1: token || undefined } }),
   evaluate: (id: string, fields: Fields, token?: string): Call => ({ command: 'evaluate_doc', args: { id, ...fields, f1: token || undefined } }),
@@ -113,6 +113,8 @@ export const write = {
   restore: (id: string): Call => ({ command: 'restore_doc', args: { trashId: id } }),
   purge: (id: string): Call => ({ command: 'purge_doc', args: { trashId: id } }),
   emptyTrash: (): Call => ({ command: 'empty_trash' }),
+  createSubAgenda: (agendaId: string, fields: Fields): Call => ({ command: 'create_sub_agenda', args: { agendaId, ...fields } }),
+  updateSubAgenda: (agendaId: string, id: string, fields: Fields): Call => ({ command: 'update_sub_agenda', args: { agendaId, id, ...fields } }),
   createAgenda: (fields: Fields): Call => ({ command: 'create_agenda', args: fields }),
   updateAgenda: (id: string, fields: Fields): Call => ({ command: 'update_agenda', args: { id, ...fields } }),
   deleteAgenda: (id: string): Call => ({ command: 'delete_agenda', args: { id } }),

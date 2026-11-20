@@ -132,6 +132,19 @@ pub fn parse_meta(
         tags.retain(|t| !t.contains('\n') && !t.contains('\r'));
     }
 
+    let mut sub_agenda_ids = Vec::new();
+    if !is_sub_note && let Some(Value::List(items)) = get(map, "subAgendaIds") {
+        let mut seen = HashSet::new();
+        for item in items {
+            if let Value::Str(id) = item
+                && !is_blank(id)
+                && seen.insert(id.as_str())
+            {
+                sub_agenda_ids.push(id.clone());
+            }
+        }
+    }
+
     // 11. links
     let mut links: Vec<Link> = Vec::new();
     if let Some(Value::List(items)) = get(map, "links") {
@@ -227,6 +240,7 @@ pub fn parse_meta(
         edited_session_id,
         edited_session_agent,
         tags,
+        sub_agenda_ids,
         links,
         favorite,
         favorite_category,

@@ -90,6 +90,7 @@ pub fn write_meta(
             tier: meta.tier,
             tags: &meta.tags,
             favorite: state.favorite,
+            sub_agenda_ids: &meta.sub_agenda_ids,
             favorite_category: state.favorite_category,
             template: meta.template.as_deref(),
             evaluation: state.evaluation,

@@ -235,13 +235,16 @@ pub const ENGINE_COMMANDS_APPROVALS: &[&str] = &[
 /// 결정 블록 명령 2개. AI가 노트에 쓴 「정할 것」과 사람의 답을 읽는다. 기다리기(`wait-decisions`)는 `ais-cli`가 직접 한다.
 pub const ENGINE_COMMANDS_DECISIONS: &[&str] = &["list-decisions", "pending-decisions"];
 
-/// 사이드카 고유 명령 전부(앱 61 + 태스크 9 + 승인 7 + 결정 2)를 쉼표로 이은 글
+pub const ENGINE_COMMANDS_SUB_AGENDAS: &[&str] = &["create-sub-agenda", "update-sub-agenda"];
+
+/// 사이드카 고유 명령 전부를 쉼표로 이은 글
 fn engine_command_list() -> String {
     [
         ENGINE_COMMANDS_61.join(", "),
         ENGINE_COMMANDS_TASKS.join(", "),
         ENGINE_COMMANDS_APPROVALS.join(", "),
         ENGINE_COMMANDS_DECISIONS.join(", "),
+        ENGINE_COMMANDS_SUB_AGENDAS.join(", "),
     ]
     .join(", ")
 }
@@ -257,6 +260,7 @@ pub fn is_engine_command(name: &str) -> bool {
         || ENGINE_COMMANDS_TASKS.contains(&name)
         || ENGINE_COMMANDS_APPROVALS.contains(&name)
         || ENGINE_COMMANDS_DECISIONS.contains(&name)
+        || ENGINE_COMMANDS_SUB_AGENDAS.contains(&name)
 }
 
 /// `--list`가 찍는 글
@@ -341,6 +345,7 @@ mod tests {
             .iter()
             .chain(ENGINE_COMMANDS_TASKS)
             .chain(ENGINE_COMMANDS_APPROVALS)
+            .chain(ENGINE_COMMANDS_SUB_AGENDAS)
         {
             assert!(command(name).is_some(), "명령 {name}의 명세가 없다");
         }

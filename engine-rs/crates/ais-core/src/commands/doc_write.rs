@@ -10,6 +10,7 @@ use serde_json::{Value as Json, json};
 
 use super::Caller;
 use super::doc_create::{AgendaMatch, find_agenda};
+use super::note_meta_write::{BoolArg, bool_arg};
 use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::frontmatter::dump_string;
@@ -21,8 +22,9 @@ use crate::note::front::check_size;
 use crate::text::{NOTE_ID, is_blank};
 use crate::vault::note_file::{split_fence, split_text};
 use crate::vault::scanner::{Format, NoteRecord};
+use crate::vault::sub_agenda;
 use crate::write::atomic::write_atomic;
-use crate::write::doc_place::{check_path, folder_name, parent_folder, place_folder};
+use crate::write::doc_place::{check_path, folder_name, move_path, parent_folder, place_folder};
 use crate::write::meta_writer::editor_of;
 use crate::write::pipeline::WriteScope;
 use crate::write::{precondition, warnings};
@@ -36,6 +38,9 @@ pub struct UpdateDocRequest {
     pub body: Option<String>,
     /// 전체 교체
     pub tags: Option<Json>,
+    pub sub_agenda_ids: Option<Json>,
+    /// 아젠다 이동을 되돌릴 때 이전에 쓰던 보관 분류도 복원한다.
+    pub restore_sub_agendas: Option<BoolArg>,
     pub template: Option<String>,
     /// `YYYY-MM-DD`. AI 호출에서는 받지 않는다.
     pub date: Option<String>,
@@ -124,6 +129,34 @@ pub fn update_doc(
             }
         },
     };
+    let agenda_changed = moved_to
+        .as_ref()
+        .is_some_and(|slug| slug != &meta.agenda_slug);
+    let restoring_move =
+        bool_arg("restoreSubAgendas", &request.restore_sub_agendas)?.unwrap_or(false);
+    if restoring_move && (!agenda_changed || context.caller != Caller::App) {
+        return Err(EngineError::invalid_argument(
+            "아젠다 이동을 되돌릴 때만 분류를 복원할 수 있다",
+        ));
+    }
+    if let Some(raw) = &request.sub_agenda_ids {
+        let ids = sub_agenda::parse_ids(raw)?;
+        let slug = moved_to.as_deref().unwrap_or(&meta.agenda_slug);
+        let previous = if agenda_changed {
+            &[]
+        } else {
+            meta.sub_agenda_ids.as_slice()
+        };
+        sub_agenda::validate(
+            &ids,
+            scope.index.sub_agendas(slug),
+            previous,
+            restoring_move,
+        )?;
+        slot.sub_agenda_ids = ids;
+    } else if agenda_changed {
+        slot.sub_agenda_ids.clear();
+    }
     let content_rel = rel_of(vault, &note.content_file);
     let content = String::from_utf8(bytes).map_err(|_| {
         EngineError::internal(format!(
@@ -169,9 +202,27 @@ pub fn update_doc(
         // 폴더 노트: 경로 검사, 빈자리 고르기, 옮기기 뒤에 상한을 보고 쓴다
         let canonical = format!("{parent}/{folder}");
         check_path(vault, &canonical)?;
+        if agenda_changed {
+            check_text_size(&canonical)?;
+        }
         final_rel = place_folder(vault, old_rel, &canonical)?;
-        check_text_size(&final_rel)?;
-        write_atomic(&vault.join(&final_rel).join(&content_name), text.as_bytes())?;
+        if !agenda_changed {
+            check_text_size(&final_rel)?;
+        }
+        if let Err(error) =
+            write_atomic(&vault.join(&final_rel).join(&content_name), text.as_bytes())
+        {
+            if agenda_changed
+                && final_rel != old_rel
+                && let Err(rollback) = move_path(&vault.join(&final_rel), &vault.join(old_rel))
+            {
+                return Err(EngineError::internal(format!(
+                    "{}. 노트 폴더를 원래 자리로 돌리지 못했다: {}",
+                    error.message, rollback.message
+                )));
+            }
+            return Err(error);
+        }
     } else if note.format == Format::Html {
         // 옛 .html 단일 파일: 이름만 바꾼다. 상한, 경로, 쓰기 차례이고 같은 이름 파일은 덮는다
         final_rel = format!("{parent}/{folder}.html");
@@ -230,6 +281,12 @@ pub fn update_doc(
     });
     if let Some(slug) = &moved_to {
         response["agenda"] = json!(slug);
+    }
+    if request.sub_agenda_ids.is_some() || agenda_changed && !meta.sub_agenda_ids.is_empty() {
+        response["subAgendaIds"] = json!(slot.sub_agenda_ids);
+    }
+    if agenda_changed && !meta.sub_agenda_ids.is_empty() {
+        response["removedSubAgendaIds"] = json!(meta.sub_agenda_ids);
     }
     if !warnings_found.is_empty() {
         response["warning"] = json!(warnings_found.join("\n"));
@@ -317,7 +374,10 @@ mod tests {
             Some("<!--aisurada\nid: sn1\nagenda: home\n-->\n<p>x</p>")
         );
         // 들여쓴 줄(다른 키의 값)은 아젠다 줄이 아니다. 머리가 없으면 손대지 않는다
-        assert_eq!(replace_agenda_line("---\nmeta:\n  agenda: x\n---\n", "agenda: y"), None);
+        assert_eq!(
+            replace_agenda_line("---\nmeta:\n  agenda: x\n---\n", "agenda: y"),
+            None
+        );
         assert_eq!(replace_agenda_line("agenda: x\n", "agenda: y"), None);
     }
 }
