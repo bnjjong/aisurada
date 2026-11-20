@@ -688,6 +688,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 <tr><td>격자</td><td><code>src/skin-grid.css</code>. 반경 2px, 그림자 없음, 네이비 먹선 상자. 켜짐·선택은 네이비로 채우고 빨강은 포커스·현재 위치·눌림에만 쓴다. 「모든 요소 반경 2px·그림자 없음」을 한 줄(<code>:root[data-skin=&quot;grid&quot;] *</code>)로 덮고 원이 필요한 몇 곳만 되돌린다</td></tr>
 <tr><td>유리</td><td><code>src/skin-glass.css</code>. 반투명 흰 면(<code>--surface</code>)에 흐림(<code>backdrop-filter</code>)을 건 패널, 배경에는 블루·시안·레드의 빛번짐(<code>:root</code>의 <code>radial-gradient</code>). 컨트롤 반경 12px, 패널 24px, 강조는 블루 유리구슬. 글자 색은 불투명하게 둬서 대비를 지킨다. <code>--surface</code>가 반투명이라 이 값을 불투명한 바탕으로 쓰는 새 요소는 <code>--glass-solid</code>를 쓴다</td></tr>
 <tr><td>모던</td><td><code>src/skin-modern.css</code>. 1px 옅은 선, 곡률 8px(떠 있는 것은 12~14px), 검정에 가까운 네이비와 회색, 블루 하나는 포커스·선택에만. 그림자는 평소 1px과 떠 있는 것 두 가지뿐이고 탭은 아래 줄로 현재 위치를 말한다</td></tr>
+<tr><td>노트 팝업창 테두리</td><td>노트를 따로 띄운 창(<code>main.note-window</code>)은 본문 둘레에 주황 테두리(기본 <code>#f08a24</code>, 바꾸려면 <code>--note-window-frame</code>)를 둘러 메인 창과 구분한다(<code>styles.css</code>의 <code>.note-window::after</code>). 모든 모양에서 같고, 맨 위에 얹되 누름은 막지 않는다. macOS 제목 표시줄은 웹 화면 밖이라 그 아래 본문에만 그려진다</td></tr>
 </tbody></table></div>
 <p><strong>지킬 것.</strong></p>
 <ul>
