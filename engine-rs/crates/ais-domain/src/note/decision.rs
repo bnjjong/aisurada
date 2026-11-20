@@ -10,7 +10,7 @@
 //! >
 //! > 답:
 //!
-//! > [!decision-done] 답을 다 적었으면 체크하세요
+//! > [!decided] 답을 다 적었으면 체크하세요
 //! > - [ ] 답 다 했음
 //! ```
 //!
@@ -26,7 +26,7 @@ use regex::Regex;
 use serde::Serialize;
 
 static BLOCK_START: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^ {0,3}> ?\[!(decision|decision-done)\][ \t]*(.*)$").unwrap()
+    Regex::new(r"(?i)^ {0,3}> ?\[!(decision|decided)\][ \t]*(.*)$").unwrap()
 });
 static QUOTE_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^ {0,3}>(?: ?)(.*)$").unwrap());
 static OPTION_LINE: LazyLock<Regex> =
@@ -75,7 +75,7 @@ pub struct Decision {
 #[serde(rename_all = "camelCase")]
 pub struct DecisionSheet {
     pub decisions: Vec<Decision>,
-    /// 「답 다 했음」 블록(`[!decision-done]`)이 있는가
+    /// 「답 다 했음」 블록(`[!decided]`)이 있는가
     pub done_block: bool,
     /// 그 블록에서 체크한 것이 있는가
     pub done_checked: bool,
@@ -172,7 +172,7 @@ pub fn parse(body: &str) -> DecisionSheet {
             inner.push(quoted.get(1).map_or("", |m| m.as_str()));
             i += 1;
         }
-        if kind == "decision-done" {
+        if kind == "decided" {
             sheet.done_block = true;
             if inner
                 .iter()
@@ -303,7 +303,7 @@ fn leading_label(answer: &str, options: &[DecisionOption]) -> Option<String> {
 mod tests {
     use super::*;
 
-    const ASKED: &str = "# 노트\n\n## 정할 것\n\n> [!decision] 결정 1 · 명령을 실행해도 되나?\n> - [ ] 가(추천): 읽기만 한다.\n> - [ ] 나: 안 바꾸는 명령만.\n>\n> 답:\n\n> [!decision] 결정 2 · 판정 칸은?\n> - [ ] **가(추천):** 넷.\n> - [ ] 나: 셋.\n>\n> 답:\n\n> [!decision-done] 답을 다 적었으면 체크하세요\n> - [ ] 답 다 했음\n";
+    const ASKED: &str = "# 노트\n\n## 정할 것\n\n> [!decision] 결정 1 · 명령을 실행해도 되나?\n> - [ ] 가(추천): 읽기만 한다.\n> - [ ] 나: 안 바꾸는 명령만.\n>\n> 답:\n\n> [!decision] 결정 2 · 판정 칸은?\n> - [ ] **가(추천):** 넷.\n> - [ ] 나: 셋.\n>\n> 답:\n\n> [!decided] 답을 다 적었으면 체크하세요\n> - [ ] 답 다 했음\n";
 
     #[test]
     fn reads_questions_options_and_the_done_block() {
@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn fenced_examples_and_other_callouts_are_not_decisions() {
-        let body = "```markdown\n> [!decision] 보기\n> 답:\n> [!decision-done] 보기\n> - [ ] 답 다 했음\n```\n\n> [!question] 결정 1 · 옛 형식\n> 답: 가\n";
+        let body = "```markdown\n> [!decision] 보기\n> 답:\n> [!decided] 보기\n> - [ ] 답 다 했음\n```\n\n> [!question] 결정 1 · 옛 형식\n> 답: 가\n";
         assert_eq!(parse(body), DecisionSheet::default());
     }
 
