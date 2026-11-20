@@ -70,7 +70,8 @@ impl TaskInfo {
             status: text(v, "status"),
             repo: text(v, "repo"),
             base: v
-                .get("base")
+                .get("baseBranch")
+                .or_else(|| v.get("base"))
                 .and_then(Value::as_str)
                 .map(str::trim)
                 .filter(|b| !b.is_empty())
@@ -130,6 +131,13 @@ pub fn build_prompt(t: &TaskInfo) -> String {
     let mut p = String::new();
     p.push_str("너는 aisurada의 개발 보조 에이전트다. 지금은 **읽기 전용 분석** 단계다. 코드와 노트를 고칠 수 없다. ");
     p.push_str("아래 태스크를 조사하고, 완료 기준마다 어디까지 알아냈는지 보고하라.\n\n");
+    p.push_str(&task_description(t));
+    p.push_str(INSTRUCTIONS);
+    p
+}
+
+pub fn task_description(t: &TaskInfo) -> String {
+    let mut p = String::new();
     p.push_str(&format!(
         "## 태스크 {} ({}, 우선순위 {})\n",
         t.key,
@@ -195,7 +203,6 @@ pub fn build_prompt(t: &TaskInfo) -> String {
             ));
         }
     }
-    p.push_str(INSTRUCTIONS);
     p
 }
 

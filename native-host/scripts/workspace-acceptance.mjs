@@ -170,6 +170,10 @@ if (tasksCheck) {
   await cliRun(['init-workspace', 'name=검증 공간', 'templates=[]']);
   await cliRun(['create-project', 'title=앱', `repos=${JSON.stringify([{ name: 'web', github: 'me/web' }])}`]);
   const seeded = await cliRun(['create-task', 'title=저장소 읽기 조사', 'repo=me/web', 'type=chore', 'criteria=["결론을 댓글로 남긴다"]', 'body=조사할 내용을 적어 둔 설명']);
+  for (const key of ['orchestrator', 'dev', 'qa', 'pr-review-merge']) {
+    const tools = JSON.stringify({ aisurada: { key, engine: 'claude', model: 'sonnet', enabled: true } });
+    await cliRun(['save-resource', 'kind=agent', 'scope=global', `name=${key}`, 'description=실행 점검용', 'permission=edit', 'body=실행 점검용 지침', `tools=${tools}`]);
+  }
   cfg.tasks = { seededKey: seeded.key };
 }
 let finish, noteResult;

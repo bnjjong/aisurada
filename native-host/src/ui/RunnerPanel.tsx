@@ -1,8 +1,9 @@
 // 태스크 상세의 「실행」 영역: 러너가 이 태스크로 하는 일을 보여 주고, 사람이 할 일(지금 실행, 중지, 질문에 답하기)을 둔다.
 // - Ready For Develop: 「지금 실행」
 // - 일하는 중: 일곱 걸음 중 어디인지, 걸린 시간, 「중지」
-// - Waiting Answer: 러너의 질문과 답 칸. 답하면 같은 claude 세션으로 이어 조사한다
+// - Waiting Answer: 러너의 질문과 답 칸. 답하면 이전 실행을 이어 간다
 // - 지난 실행들: 결과, 걸린 시간, 토큰, 진행 기록
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { sessionAddress } from "../navigation/routes.ts";
@@ -108,7 +109,7 @@ export function RunnerPanel({ task, controller, preset }: { task: TaskDetail; co
               <button type="submit" className="button-primary" disabled={busy || !answer.trim()}>
                 답하기
               </button>
-              <span className="task-hint">답하면 같은 세션으로 이어서 조사해요.</span>
+              <span className="task-hint">답하면 진행하던 작업을 이어가요.</span>
               <span className="task-spacer" />
               <button type="button" className="task-danger" disabled={busy} onClick={() => void act(() => stopTask(host, task.key))}>
                 중지
@@ -133,7 +134,7 @@ export function RunnerPanel({ task, controller, preset }: { task: TaskDetail; co
           <div className="runner-row">
             <span>
               <strong>{active.step || "시작"}</strong> 걸음 · {formatDuration(Math.max(0, tick - active.startedAt) / 1000)}째
-              {active.turns > 0 ? ` · claude ${active.turns}번 부름` : ""}
+              {active.turns > 0 ? ` · 모델 ${active.turns}번 호출` : ""}
             </span>
             <span className="task-spacer" />
             <button type="button" className="task-danger" disabled={busy} onClick={() => void act(() => stopTask(host, task.key))}>
@@ -145,11 +146,11 @@ export function RunnerPanel({ task, controller, preset }: { task: TaskDetail; co
 
       {canRun && !active && (
         <div className="runner-row">
-          <button type="button" className="button-primary" disabled={busy || !snap.claudeAvailable} onClick={() => void act(() => runTask(host, task.key))}>
+          <button type="button" className="button-primary" disabled={busy} onClick={() => void act(() => runTask(host, task.key))}>
             지금 실행
           </button>
           <span className="task-hint">
-            {snap.settings.autoPickup ? "자동으로 집기가 켜져 있어서 곧 집어요. 급하면 눌러요." : "자동으로 집기가 꺼져 있어요. 누르면 지금 읽기 전용으로 조사를 시작해요."}
+            공통 개발 프로세스 오케스트레이터가 개발·검사·리뷰를 진행하고 PR을 열어요.
           </span>
         </div>
       )}
@@ -161,11 +162,19 @@ export function RunnerPanel({ task, controller, preset }: { task: TaskDetail; co
             {runs.map((r, i) => (
               <li key={r.runId}>
                 <div className="runner-row">
-                  <span className={`runner-phase runner-phase-${r.phase}`}>{PHASE_LABEL[r.phase]}</span>
+                  <span className={`runner-phase runner-phase-${r.phase}`}>{r.pullRequest && r.phase === "done" ? "PR 열림" : PHASE_LABEL[r.phase]}</span>
                   <span className="task-hint">{clock(r.startedAt)}</span>
                   <span className="task-hint">
-                    {formatDuration(r.workedSecs)} · 질문 {r.questions}개 · 토큰 {formatTokens(r.inputTokens)}/{formatTokens(r.outputTokens)} · {formatCost(r.costUsd)}
+                    {formatDuration(r.workedSecs)} · 질문 {r.questions}개
+                    {!r.orchestrated && ` · 토큰 ${formatTokens(r.inputTokens)}/${formatTokens(r.outputTokens)} · ${formatCost(r.costUsd)}`}
                   </span>
+                  {r.pullRequest && /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(r.pullRequest) && (
+                    <button type="button" className="runner-chat" onClick={() => {
+                      if (r.pullRequest) void openUrl(r.pullRequest).catch(() => {});
+                    }}>
+                      PR 열기 ›
+                    </button>
+                  )}
                   {/* 그 실행의 claude 대화를 읽기 전용으로 연다. 세션이 아직 안 만들어진 실행(저장소 받기에서 멈춤)에는 없다 */}
                   {r.sessionId && (
                     <button type="button" className="runner-chat" title="이 실행의 대화를 읽기 전용으로 열어요" onClick={() => controller.navigate(sessionAddress(r.sessionId))}>

@@ -77,6 +77,8 @@ impl Phase {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct RunRecord {
+    pub orchestrated: bool,
+    pub pull_request: Option<String>,
     pub run_id: String,
     pub task_key: String,
     pub repo: String,
@@ -109,6 +111,8 @@ pub struct RunRecord {
 impl Default for RunRecord {
     fn default() -> Self {
         RunRecord {
+            orchestrated: false,
+            pull_request: None,
             run_id: String::new(),
             task_key: String::new(),
             repo: String::new(),
@@ -181,7 +185,7 @@ fn settings_path(root: &Path) -> PathBuf {
     root.join("settings.json")
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("러너 폴더를 못 만들었다: {e}"))?;
     }

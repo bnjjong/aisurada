@@ -15,7 +15,7 @@ export function RunnerBar({ call, preset }: { call: HostCall; preset?: RunnerSna
         <i aria-hidden="true" />
         러너 · {runnerSummary(s)}
       </span>
-      <label className="task-check" title="Ready For Develop가 된 태스크를 러너가 스스로 집어요. 끄면 태스크의 「지금 실행」을 눌렀을 때만 돌아요.">
+      <label className="task-check" title="Ready For Develop 상태의 태스크를 자동으로 읽기 전용 조사해요.">
         <input type="checkbox" checked={s.settings.autoPickup} onChange={(e) => change({ autoPickup: e.target.checked })} />
         Ready가 되면 스스로 집기
       </label>
@@ -34,7 +34,7 @@ export function RunnerBar({ call, preset }: { call: HostCall; preset?: RunnerSna
         </select>
       </label>
       {s.error && <span role="alert" className="runner-error">{s.error}</span>}
-      {!s.claudeAvailable && <span className="task-hint">claude 실행 파일을 찾으면 러너가 일해요(AISURADA_CLAUDE_BIN으로 알려 줄 수도 있어요).</span>}
+      {s.settings.autoPickup && !s.claudeAvailable && <span className="task-hint">자동 조사에 쓸 Claude 실행 파일을 찾지 못했어요.</span>}
     </div>
   );
 }

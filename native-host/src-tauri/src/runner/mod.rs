@@ -1,8 +1,5 @@
-//! 태스크 시스템 3단계: 읽기 전용 러너.
-//!
-//! Ready For Develop인 태스크를 집어 claude에게 저장소를 읽게 하고(`job`), 보고나 질문을 태스크에 남긴다.
-//! 이 모듈은 「누구를 언제 돌릴지」를 맡는다: 주기적으로 집을 태스크를 찾고, 동시에 도는 수를 지키고,
-//! 앱을 다시 켰을 때 끊긴 실행을 이어 가고, 앱을 닫을 때 일하던 실행을 멈춘다. 코드를 고치고 PR을 올리는 일은 4단계다.
+//! 태스크 실행을 시작하고 상태와 동시 실행 수를 관리한다.
+//! 수동 실행은 글로벌 오케스트레이터가 개발을 맡기고, 자동 집기는 Claude에 읽기 전용 조사를 맡긴다.
 //!
 //! ```text
 //!   tick(15초) ─ 열린 vault? ─ 처음이면 reconcile(끊긴 실행 이어 가기)
@@ -13,9 +10,11 @@
 pub mod host;
 pub mod job;
 pub mod protocol;
+mod providers;
 pub mod store;
 #[cfg(test)]
 mod tests;
+mod verification;
 
 use host::{AppHost, Host};
 use job::{Ctx, Ending, Mode};
@@ -42,6 +41,7 @@ pub const SHUTDOWN_WAIT: Duration = Duration::from_secs(8);
 const RECENT_RUNS_MAX: usize = 500;
 
 struct Active {
+    vault: String,
     cancel: Arc<AtomicBool>,
 }
 
@@ -206,7 +206,7 @@ impl Runner {
 
     /// 답을 기다리던 실행의 태스크가 옮겨졌다(취소 등). 작업 폴더를 지우고 기록을 닫는다.
     fn abandon_waiting(&self, ctx: &Ctx, mut rec: RunRecord) {
-        if let Some(dir) = rec.workdir.take() {
+        if let Some(dir) = rec.workdir.take_if(|_| !rec.orchestrated) {
             ctx.discard_workspace(&rec.repo, &dir);
         }
         rec.phase = Phase::Abandoned;
@@ -228,12 +228,17 @@ impl Runner {
         let cancel = Arc::new(AtomicBool::new(false));
         {
             let mut active = self.active.lock().unwrap();
-            if active.contains_key(key) || self.shutdown.load(Ordering::SeqCst) {
+            if active.contains_key(key)
+                || self.shutdown.load(Ordering::SeqCst)
+                || (matches!(mode, Mode::Fresh | Mode::Manual)
+                    && active.len() >= store::load_settings(&self.host.root()).concurrency as usize)
+            {
                 return false;
             }
             active.insert(
                 key.to_string(),
                 Active {
+                    vault: vault.to_owned(),
                     cancel: cancel.clone(),
                 },
             );
@@ -312,9 +317,7 @@ impl Runner {
         if !store::is_task_key(key) {
             return Err(format!("태스크 키가 이상해요: {key}"));
         }
-        if !self.host.claude_available() {
-            return Err("claude 실행 파일을 못 찾았어요. 설정에서 Claude 연결을 확인하거나 AISURADA_CLAUDE_BIN 으로 알려 주세요.".into());
-        }
+
         let ctx = self.ctx(vault.clone());
         let limit = ctx.settings.concurrency as usize;
         if self.active.lock().unwrap().len() >= limit {
@@ -348,10 +351,10 @@ impl Runner {
                 .to_string());
         }
         self.backoff.lock().unwrap().remove(key);
-        if self.spawn_job(&vault, key, Mode::Fresh) {
+        if self.spawn_job(&vault, key, Mode::Manual) {
             Ok(())
         } else {
-            Err("이 태스크는 이미 실행 중이에요".into())
+            Err("태스크가 이미 실행 중이거나 동시 실행 한도에 닿았어요".into())
         }
     }
 
@@ -361,7 +364,13 @@ impl Runner {
         if !store::is_task_key(key) {
             return Err(format!("태스크 키가 이상해요: {key}"));
         }
-        if let Some(active) = self.active.lock().unwrap().get(key) {
+        if let Some(active) = self
+            .active
+            .lock()
+            .unwrap()
+            .get(key)
+            .filter(|active| active.vault == vault)
+        {
             active.cancel.store(true, Ordering::SeqCst);
             return Ok(());
         }
@@ -373,7 +382,7 @@ impl Runner {
         let ctx = self.ctx(vault.clone());
         ctx.comment(key, "human", "**실행을 중지했어요**")?;
         ctx.transition(key, "cancelled", "human", "waiting-answer")?;
-        if let Some(dir) = rec.workdir.take() {
+        if let Some(dir) = rec.workdir.take_if(|_| !rec.orchestrated) {
             ctx.discard_workspace(&rec.repo, &dir);
         }
         rec.phase = Phase::Cancelled;

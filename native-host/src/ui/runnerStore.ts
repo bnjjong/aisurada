@@ -11,6 +11,8 @@ export type RunPhase = "running" | "waiting-answer" | "done" | "failed" | "cance
 export interface RunRecord {
   runId: string;
   taskKey: string;
+  orchestrated: boolean;
+  pullRequest: string | null;
   repo: string;
   sessionId: string;
   phase: RunPhase;
@@ -104,6 +106,8 @@ export function toRun(v: unknown): RunRecord | null {
   return {
     runId: v.runId,
     taskKey: v.taskKey,
+    orchestrated: v.orchestrated === true,
+    pullRequest: maybeStr(v.pullRequest),
     repo: str(v.repo),
     sessionId: str(v.sessionId),
     phase,
@@ -341,7 +345,7 @@ export function runSubline(r: RunRecord, now: number): string {
     : sinceKo(r.phase === "waiting-answer" ? r.startedAt : (r.endedAt ?? r.startedAt), now);
   const parts = [PHASE_LABEL[r.phase], when];
   if (r.endedAt !== null && r.costUsd > 0) parts.push(formatCost(r.costUsd));
-  if (!r.sessionId) parts.push("대화 없음");
+  if (!r.sessionId && !r.orchestrated) parts.push("대화 없음");
   return parts.join(" · ");
 }
 
@@ -367,11 +371,11 @@ export function runTip(r: RunRecord): string {
 
 /** 러너 표시의 색 단계. 막대와 레일의 러너 표시가 같이 쓴다. */
 export const runnerTone = (s: RunnerSnapshot): "is-warn" | "is-busy" | "is-wait" | "is-idle" =>
-  !s.claudeAvailable ? "is-warn" : s.active.length > 0 ? "is-busy" : s.waiting.length ? "is-wait" : "is-idle";
+  s.active.length > 0 ? "is-busy" : s.waiting.length ? "is-wait" : s.settings.autoPickup && !s.claudeAvailable ? "is-warn" : "is-idle";
 
 /** 막대의 한 줄 요약. */
 export function runnerSummary(s: RunnerSnapshot): string {
-  if (!s.claudeAvailable) return "claude를 못 찾았어요";
+  if (s.settings.autoPickup && !s.claudeAvailable && !s.active.length && !s.waiting.length) return "자동 조사에 Claude가 필요해요";
   const parts: string[] = [];
   if (s.active.length) parts.push(`일하는 중 ${s.active.length}`);
   if (s.waiting.length) parts.push(`답 기다림 ${s.waiting.length}`);

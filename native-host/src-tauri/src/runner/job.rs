@@ -6,6 +6,8 @@
 //!   Waiting Answer로 보낸 채 사람의 답을 기다린다. 답이 오면 같은 세션을 `--resume`으로 이어 간다.
 //! - 태스크의 상태는 모두 엔진의 `transition-task`로만 바꾼다(규칙 검사를 엔진 한 곳에 둔다).
 //! - 앱을 닫아 끊기면 기록을 `running`으로 남겨 두고, 다시 켜면 이어 간다(결정 7-나).
+mod orchestrate;
+
 use super::{
     host::{self, ClaudeCall, Host},
     protocol::{self, Reply, TaskInfo},
@@ -27,10 +29,15 @@ use std::{
 pub enum Mode {
     /// Ready For Develop인 태스크를 새로 집는다.
     Fresh,
+    Manual,
     /// 사람의 답이 왔다. 기록에 답이 들어 있다.
-    Answer { run_id: String },
+    Answer {
+        run_id: String,
+    },
     /// 앱을 껐다 켜서 끊긴 실행을 이어 간다.
-    Recover { run_id: String },
+    Recover {
+        run_id: String,
+    },
 }
 
 /// 실행이 어떻게 끝났는지.
@@ -157,7 +164,11 @@ pub fn execute(
         cancel,
         shutdown,
     };
-    let ending = run.work(input);
+    let ending = if run.rec.orchestrated {
+        run.orchestrate()
+    } else {
+        run.work(input)
+    };
     ctx.host.changed(Some(key));
     ending
 }
@@ -168,7 +179,7 @@ fn begin(ctx: &Ctx, key: &str, mode: &Mode) -> Result<(RunRecord, TaskInfo, Inpu
         .get_task(key)
         .map_err(|e| Ending::NotPicked(format!("태스크를 읽지 못했다: {e}")))?;
     match mode {
-        Mode::Fresh => {
+        Mode::Fresh | Mode::Manual => {
             if task.status != "ready-for-develop" {
                 return Err(Ending::NotPicked(format!(
                     "Ready For Develop가 아니다({})",
@@ -181,7 +192,12 @@ fn begin(ctx: &Ctx, key: &str, mode: &Mode) -> Result<(RunRecord, TaskInfo, Inpu
                 run_id: store::new_uuid(),
                 task_key: key.to_string(),
                 repo: task.repo.clone(),
-                session_id: store::new_uuid(),
+                orchestrated: matches!(mode, Mode::Manual),
+                session_id: if matches!(mode, Mode::Manual) {
+                    String::new()
+                } else {
+                    store::new_uuid()
+                },
                 started_at: store::now_ms(),
                 step: "집기".to_string(),
                 ..Default::default()
@@ -209,7 +225,7 @@ fn begin(ctx: &Ctx, key: &str, mode: &Mode) -> Result<(RunRecord, TaskInfo, Inpu
             }
             if task.status != "in-progress" {
                 // 사람이 그 사이 태스크를 옮겼다
-                if let Some(dir) = rec.workdir.take() {
+                if let Some(dir) = rec.workdir.take_if(|_| !rec.orchestrated) {
                     ctx.discard_workspace(&rec.repo, &dir);
                 }
                 rec.phase = Phase::Abandoned;
@@ -453,7 +469,12 @@ impl Run<'_> {
     /// 내보내기(보고): 보고를 댓글로 남기고 In Review로 보낸다.
     fn report(&mut self, text: &str) -> Ending {
         self.step("내보내기", "보고를 댓글로 남기고 In Review로 보낸다");
-        let body = format!("**분석 보고**\n\n{}", text.trim());
+        let label = if self.rec.orchestrated {
+            "개발 결과"
+        } else {
+            "분석 보고"
+        };
+        let body = format!("**{label}**\n\n{}", text.trim());
         if let Err(e) = self.ctx.comment(&self.rec.task_key, "runner", &body) {
             return self.fail(&format!("보고를 댓글로 남기지 못했다: {e}"));
         }
@@ -481,7 +502,7 @@ impl Run<'_> {
             NewItem {
                 kind: "pr".into(),
                 title: "리뷰할 일이 생겼어요".into(),
-                body: format!("{} — 분석 보고가 올라왔어요", self.task.title),
+                body: format!("{} — {label}가 올라왔어요", self.task.title),
                 task_key: Some(self.rec.task_key.clone()),
                 note_ref: None,
                 id: Some(format!("run-{}-done", self.rec.run_id)),
@@ -538,7 +559,9 @@ impl Run<'_> {
         self.rec.phase = Phase::Failed;
         self.rec.error = Some(message.to_string());
         self.rec.ended_at = Some(store::now_ms());
-        self.cleanup();
+        if !self.rec.orchestrated {
+            self.cleanup();
+        }
         self.save();
         self.ctx.host.notify(
             &self.ctx.vault,

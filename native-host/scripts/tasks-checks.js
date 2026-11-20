@@ -51,7 +51,7 @@ try {
     assert(card(T.seededKey).textContent.includes('저장소 읽기 조사'), '카드 제목');
     assert(card(T.seededKey).querySelector('.task-progress')?.textContent.trim() === '0/1', '완료 기준 0/1');
     assert(document.querySelector('.task-board'), '보드');
-    // 러너 줄: 가짜 claude가 있어 실행할 수 있다고 알린다
+    // 러너 줄: Ready 태스크를 개발 실행할 수 있다고 알린다
     assert(byText('.task-page', '러너') || document.querySelector('.runner-bar'), '러너 줄');
   });
 
@@ -117,7 +117,7 @@ try {
   await test('runner-run-fails-visibly-and-leaves-a-record', async () => {
     await until(() => card(created)?.querySelector('.task-run'), '지금 실행 단추');
     const run = card(created).querySelector('.task-run');
-    assert(!run.disabled, '가짜 claude가 있어 실행할 수 있다');
+    assert(!run.disabled, 'Ready 태스크를 개발 실행할 수 있다');
     run.click();
     // 저장소를 받지 못해 실패로 끝난다: 태스크는 Failed로 가고 실행 기록과 러너의 댓글이 남는다
     navigate(`/task/${encodeURIComponent(created)}`);
