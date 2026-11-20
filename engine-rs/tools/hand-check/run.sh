@@ -2,8 +2,9 @@
 # 앱을 격리 환경에서 띄워 손으로 확인한다. 진짜 HOME, launchd, 진짜 vault를 건드리지 않는다.
 # 점검표는 docs/rust-engine-hand-check.md에 있다.
 #
-# 사용: engine-rs/tools/hand-check/run.sh [--git]
+# 사용: engine-rs/tools/hand-check/run.sh [--git] [--decisions]
 #   --git          합성 vault에 git 저장소와 노트 판 이력을 만든다(편집 이력 창, 자동 커밋 확인용).
+#   --decisions    AI 세션 표식으로 결정 블록 노트 하나를 만들고, 답을 기다리는 명령을 알려 준다(결정 블록 확인용).
 # 환경 변수 HC_DIR로 폴더를 바꿀 수 있다(기본 ~/ais-rust-check).
 #
 # 앞에 할 것(저장소 루트에서). **식별자를 바꿔 빌드해야 한다.** 번들 식별자가 설치된 진짜 앱과 같으면 가짜 HOME으로 띄워도
@@ -14,9 +15,11 @@
 set -euo pipefail
 
 GIT=0
+DECISIONS=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --git) GIT=1; shift ;;
+        --decisions) DECISIONS=1; shift ;;
         *) echo "모르는 인자: $1" >&2; exit 2 ;;
     esac
 done
@@ -52,10 +55,49 @@ if (( GIT )); then
     bash "$REPO/engine-rs/tools/compat/add-git-history.sh" "$HC_DIR/vault" > /dev/null
 fi
 
+if (( DECISIONS )); then
+    # AI가 쓴 노트처럼 세션 표식을 붙여 만든다. 답은 앱(사람)에서 해야 기다리기가 끝난다.
+    DECISION_BODY="$(cat <<'BODY'
+# 결정 블록 손 확인
+
+앱에서 답하고 맨 끝 「답 다 했음」을 체크한다.
+
+> [!decision] 결정 1 · 시험용 질문 하나
+> - [ ] 가(추천): 첫째 선택지
+> - [ ] 나: 둘째 선택지
+>
+> 답:
+
+> [!decision] 결정 2 · 시험용 질문 둘
+> - [ ] 가: 셋째 선택지
+> - [ ] 나(추천): 넷째 선택지
+> - [ ] 다: 다섯째 선택지
+>
+> 답:
+
+> [!question] 결정 블록이 아닌 보통 콜아웃(여러 개 체크 가능)
+> - [ ] 하나
+> - [ ] 둘
+
+> [!decided] 답을 다 적었으면 체크하세요
+> - [ ] 답 다 했음
+BODY
+)"
+    DECISION_REQUEST="$(DECISION_BODY="$DECISION_BODY" python3 -I -c 'import json, os; print(json.dumps({"agenda": "demo", "type": "free", "title": "결정 블록 손 확인", "body": os.environ["DECISION_BODY"]}, ensure_ascii=False))')"
+    DECISION_ID="$(env -u CODEX_SESSION_ID -u CODEX_THREAD_ID -u AISURADA_SESSION_ID -u AISURADA_SESSION_AGENT \
+        CLAUDE_CODE_SESSION_ID=hand-check-ai HOME="$HC_DIR/home" AISURADA_VAULT="$HC_DIR/vault" AISURADA_LOCK_DIR="$HC_DIR/locks" \
+        "$CLI" create_doc "$DECISION_REQUEST" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
+fi
+
 export AISURADA_VAULT="$HC_DIR/vault" AISURADA_LOCK_DIR="$HC_DIR/locks"
 ENV=(HOME="$HC_DIR/home" AISURADA_CLI_BIN="$CLI" AISURADA_CLAUDE_BIN="$HC_DIR/fake-claude" AISURADA_ENGINE_TRACE=1)
 
 echo "번들 식별자: $BUNDLE_ID"
 echo "vault: $HC_DIR/vault   <- 앱의 「폴더 열기」에 이 경로를 넣는다(처음에는 아무 작업 공간도 열려 있지 않다)"
+if (( DECISIONS )); then
+    echo "결정 블록 노트: 아젠다 demo의 「결정 블록 손 확인」($DECISION_ID)"
+    echo "  다른 터미널에서 이것을 돌려 두면 「답 다 했음」을 체크했을 때 끝난다:"
+    echo "  HOME=$HC_DIR/home AISURADA_VAULT=$HC_DIR/vault AISURADA_LOCK_DIR=$HC_DIR/locks $CLI wait-decisions $DECISION_ID timeout=1800"
+fi
 echo "앱을 띄운다. 터미널에 [engine] 줄이 찍히면 그 명령이 호출 객체 길(engine_call)로 간 것이다. 끝내려면 Ctrl-C."
 env "${ENV[@]}" "$APP"
