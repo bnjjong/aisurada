@@ -75,6 +75,24 @@ export function EditorTools(props: EditorProps) {
     if (!box) return { x: 0, y: 0 };
     return { x: Math.max(8, Math.min(rect.left - box.left, box.width - 260)), y: Math.max(0, rect.top - box.top - 42) };
   };
+  // 선택이 화면에서 차지하는 사각형. 팝업을 어디에 붙일지 정하는 기준이다.
+  // 표 줄 선택(TableSelection)은 명령이 editor.update 안에서 실행돼 DOM 선택이 아직 이전 캐럿에 머물고,
+  // update가 끝나면 Lexical이 DOM 선택을 지우기도 하므로 window.getSelection()을 믿지 않는다. 선택된 줄(tr)을 직접 잰다.
+  const selectionRect = (selected: BaseSelection): DOMRect | null => {
+    if ($isTableSelection(selected)) {
+      const rows = new Set<Element>();
+      for (const cell of tableRowCells(selected)) {
+        const row = editor.getElementByKey(cell.getKey())?.closest('tr');
+        if (row) rows.add(row);
+      }
+      const rects = [...rows].map(row => row.getBoundingClientRect());
+      if (!rects.length) return null;
+      const left = Math.min(...rects.map(rect => rect.left)), top = Math.min(...rects.map(rect => rect.top));
+      return new DOMRect(left, top, Math.max(...rects.map(rect => rect.right)) - left, Math.max(...rects.map(rect => rect.bottom)) - top);
+    }
+    const dom = window.getSelection();
+    return dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : null;
+  };
   const menuCoords = (rect: DOMRect, menuHeight = 240) => {
     const box = outer()?.getBoundingClientRect();
     if (!box) return { x: 0, y: 0 };
@@ -359,15 +377,7 @@ export function EditorTools(props: EditorProps) {
       selection.current = selected.clone();
       const quote = $isTableSelection(selected) ? tableRowCells(selected).map(cell => cell.getTextContent()).join('\t') + '\n' : selected.getTextContent();
       const box = outer()?.getBoundingClientRect();
-      let targetRect: DOMRect | null = null;
-      if ($isTableSelection(selected)) {
-        const cells = tableRowCells(selected);
-        const first = cells[0] && editor.getElementByKey(cells[0].getKey());
-        targetRect = first?.closest('tr')?.getBoundingClientRect() ?? first?.getBoundingClientRect() ?? null;
-      } else if ($isRangeSelection(selected)) {
-        const dom = window.getSelection();
-        targetRect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : null;
-      }
+      const targetRect = $isTableSelection(selected) || $isRangeSelection(selected) ? selectionRect(selected) : null;
       const rect = targetRect || currentRoot.getBoundingClientRect();
       const x = box ? Math.max(8, Math.min(rect.left - box.left, box.width - 340)) : 8;
       const spaceBelow = box ? box.height - (rect.bottom - box.top) : 0;
@@ -392,8 +402,7 @@ export function EditorTools(props: EditorProps) {
         ? tableRowCells(selected).reduce((lines, cell, index, cells) => lines + cell.getTextContent()
             + (index === cells.length - 1 || cell.getParent()?.getKey() !== cells[index + 1]?.getParent()?.getKey() ? '\n' : '\t'), '')
         : selected.getTextContent();
-      const dom = window.getSelection();
-      const rect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : currentRoot.getBoundingClientRect();
+      const rect = selectionRect(selected) ?? currentRoot.getBoundingClientRect();
       const left = Math.round(rect.left);
       const top = Math.round(rect.bottom + 6);
       latest.current.onOpenAskCompose?.(quote, { left, top }, (turnId: string) => wrapAskSelection(turnId, target));
