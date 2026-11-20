@@ -2,6 +2,7 @@
 use super::{
     host::{ClaudeCall, ClaudeOutcome, Host},
     job::{self, Ctx, Ending, Mode},
+    providers::Tier,
     store::{self, Phase, Settings},
     Runner,
 };
@@ -52,6 +53,7 @@ struct Fake {
     changed: AtomicUsize,
     claude_ok: AtomicBool,
     order: Mutex<Vec<String>>,
+    published: Mutex<Vec<crate::github::TaskPullRequest>>,
 }
 
 const RULES: [(&str, &str, &[&str]); 11] = [
@@ -97,6 +99,13 @@ impl Host for Fake {
     fn engine(&self, _vault: &str, argv: &[String]) -> Result<Reply, String> {
         let mut tasks = self.tasks.lock().unwrap();
         match argv[0].as_str() {
+            "list-resources" => ok(
+                json!({"resources": (["orchestrator", "dev", "qa", "pr-review-merge"].map(|key| json!({
+                    "kind": "agent", "body": format!("저장된 지침: {key}"), "permission":"edit",
+                    "tools": {"aisurada": {"key":key, "enabled":true, "engine":"claude", "model":"configured-primary", "effort":"high",
+                                           "fallbackEngine":"codex", "fallbackModel":"configured-secondary", "fallbackEffort":"xhigh"}}
+                })))}),
+            ),
             "claude-mcp" => ok(
                 json!({"mcpServers": {"aisurada": {"type": "stdio", "command": "/app/bin/ais-cli", "args": ["mcp"], "env": {}}}}),
             ),
@@ -259,6 +268,55 @@ impl Host for Fake {
         })
     }
 
+    fn ask_agent(
+        &self,
+        tier: &Tier,
+        prompt: &str,
+        cancel: Arc<AtomicBool>,
+        _timeout: Duration,
+    ) -> Result<String, String> {
+        self.calls.lock().unwrap().push((
+            vec![tier.engine.clone(), tier.model.clone(), tier.effort.clone()],
+            prompt.into(),
+        ));
+        let script = self.script.lock().unwrap().pop_front().ok_or_else(|| {
+            format!(
+                "개발 대본이 모자라다: {}",
+                prompt
+                    .split("이 역할의 최근 관찰:")
+                    .last()
+                    .unwrap_or_default()
+            )
+        })?;
+        match script {
+            Script::Say(text) => Ok(text.into()),
+            Script::Exit(_, message) | Script::IsError(message) => Err(message.into()),
+            Script::Timeout => Err("시간 초과".into()),
+            Script::WaitForCancel => {
+                let until = Instant::now() + Duration::from_secs(5);
+                while !cancel.load(Ordering::SeqCst) && Instant::now() < until {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err("중지".into())
+            }
+        }
+    }
+
+    fn publish(
+        &self,
+        work: &Path,
+        request: &crate::github::TaskPullRequest,
+    ) -> Result<String, String> {
+        assert_eq!(
+            super::host::git(work, &["show", &format!("{}:README.md", request.commit)])?,
+            "updated"
+        );
+        assert_eq!(request.base, "main");
+        assert!(request.branch.starts_with("aisurada/TSK-1-"));
+        self.published.lock().unwrap().push(request.clone());
+        Ok("https://github.com/o/r/pull/1".into())
+    }
+
     fn notify(&self, _vault: &str, item: NewItem) {
         self.notes.lock().unwrap().push(item);
     }
@@ -337,6 +395,7 @@ fn env_with(tasks: &[(&str, &str, &str)], script: Vec<Script>) -> Env {
         changed: AtomicUsize::new(0),
         claude_ok: AtomicBool::new(true),
         order: Mutex::new(vec![]),
+        published: Mutex::new(vec![]),
     });
     Env { _temp: temp, fake }
 }
@@ -597,6 +656,52 @@ fn a_human_stop_cancels_the_task() {
 }
 
 #[test]
+fn manual_run_uses_agent_tiers_and_publishes_only_the_reviewed_tree() {
+    let env = env_with(
+        &[("TSK-1", "ready-for-develop", "medium")],
+        vec![
+            Script::Exit(1, "1순위 모델을 쓸 수 없다"),
+            Script::Say(r#"{"action":"delegate","role":"dev","task":"README 갱신"}"#),
+            Script::Say(
+                r#"{"action":"patch","patch":"diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-hello\n+updated\n"}"#,
+            ),
+            Script::Say(r#"{"action":"result","ok":true,"evidence":"README 갱신"}"#),
+            Script::Say(r#"{"action":"publish","title":"너무 일찍 요청","body":"검사 전"}"#),
+            Script::Say(r#"{"action":"delegate","role":"qa","task":"갱신 확인"}"#),
+            Script::Say(r#"{"action":"check","command":"test \"$(cat README.md)\" = updated"}"#),
+            Script::Say(r#"{"action":"result","ok":true,"evidence":"README 검사 통과"}"#),
+            Script::Say(
+                r#"{"action":"delegate","role":"pr-review-merge","task":"README 변경 검토"}"#,
+            ),
+            Script::Say(r#"{"action":"result","ok":true,"evidence":"README 한 줄 변경"}"#),
+            Script::Say(
+                r#"{"action":"publish","title":"Update README","body":"README 한 줄을 갱신했다."}"#,
+            ),
+        ],
+    );
+    let runner = env.runner();
+    runner.run_now("TSK-1").unwrap();
+    wait_idle(&runner);
+    let record = env.runs("TSK-1").remove(0);
+    assert_eq!(record.phase, Phase::Done, "{:?}", record.error);
+    assert_eq!(
+        record.pull_request.as_deref(),
+        Some("https://github.com/o/r/pull/1")
+    );
+    assert_eq!(env.status("TSK-1"), "in-review");
+    assert!(env
+        .comments("TSK-1")
+        .iter()
+        .any(|(_, body)| body.contains("https://github.com/o/r/pull/1")));
+    assert_eq!(env.worktrees(), 1);
+    let calls = env.fake.calls.lock().unwrap();
+    assert_eq!(calls[0].0, ["claude", "configured-primary", "high"]);
+    assert_eq!(calls[1].0, ["codex", "configured-secondary", "xhigh"]);
+    assert!(calls[2].1.contains("저장된 지침: dev"));
+    assert_eq!(env.fake.published.lock().unwrap().len(), 1);
+}
+
+#[test]
 fn stopping_a_run_that_waits_for_an_answer_cancels_it_directly() {
     let env = env_with(
         &[("TSK-1", "ready-for-develop", "medium")],
@@ -614,7 +719,10 @@ fn stopping_a_run_that_waits_for_an_answer_cancels_it_directly() {
 fn closing_the_app_keeps_the_run_and_the_next_launch_resumes_it() {
     let env = env_with(
         &[("TSK-1", "ready-for-develop", "medium")],
-        vec![Script::WaitForCancel, Script::Say("[보고] 이어서 마쳤다.")],
+        vec![
+            Script::WaitForCancel,
+            Script::Say(r#"{"action":"finish","summary":"이어서 마쳤다."}"#),
+        ],
     );
     let runner = env.runner();
     runner.run_now("TSK-1").unwrap();
@@ -644,7 +752,7 @@ fn closing_the_app_keeps_the_run_and_the_next_launch_resumes_it() {
         (r.run_id.as_str(), Phase::Done, 2)
     );
     let calls = env.fake.calls.lock().unwrap();
-    assert!(calls[1].0.contains(&"--resume".to_string()) && calls[1].1.contains("끊겼다"));
+    assert!(calls[1].1.contains("저장된 지침: orchestrator"));
 }
 
 #[test]
@@ -809,7 +917,12 @@ fn pickup_does_nothing_without_claude() {
     runner.tick();
     wait_idle(&runner);
     assert_eq!(env.status("TSK-1"), "ready-for-develop");
-    assert!(runner.run_now("TSK-1").unwrap_err().contains("claude"));
+    env.fake.script.lock().unwrap().push_back(Script::Say(
+        r#"{"action":"finish","summary":"변경할 내용이 없다."}"#,
+    ));
+    runner.run_now("TSK-1").unwrap();
+    wait_idle(&runner);
+    assert_eq!(env.status("TSK-1"), "in-review");
 }
 
 #[test]
@@ -847,6 +960,7 @@ fn run_now_explains_why_it_cannot_run() {
     runner.active.lock().unwrap().insert(
         "TSK-8".into(),
         super::Active {
+            vault: VAULT.into(),
             cancel: Arc::default(),
         },
     );

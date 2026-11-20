@@ -196,6 +196,16 @@ impl Github {
     }
 
     fn request(&self, method: &str, path: &str, bearer: &str) -> Result<Value, GithubError> {
+        self.request_body(method, path, bearer, "{}")
+    }
+
+    fn request_body(
+        &self,
+        method: &str,
+        path: &str,
+        bearer: &str,
+        body: &str,
+    ) -> Result<Value, GithubError> {
         let url = format!("{}{}", self.api, path);
         let bearer = format!("Bearer {bearer}");
         let result = match method {
@@ -205,7 +215,8 @@ impl Github {
                 .header("Authorization", &bearer)
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
-                .send("{}"),
+                .content_type("application/json")
+                .send(body),
             _ => self
                 .agent
                 .get(&url)
@@ -453,6 +464,17 @@ pub struct CloneResult {
     pub cloned: bool,
 }
 
+#[cfg(feature = "claude")]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TaskPullRequest {
+    pub repo: String,
+    pub branch: String,
+    pub base: String,
+    pub commit: String,
+    pub title: String,
+    pub body: String,
+}
+
 pub struct GithubService {
     dir: PathBuf,
     store: Box<dyn SecretStore>,
@@ -656,6 +678,74 @@ impl GithubService {
             run_git_fetch(&dest, &token)?;
         }
         Ok(dest)
+    }
+
+    #[cfg(feature = "claude")]
+    pub fn publish_task(&self, work: &Path, request: &TaskPullRequest) -> Result<String, String> {
+        let (owner, name) = split_full_name(&request.repo)?;
+        let token = self.repo_token(&owner, &name)?;
+        let github = Github::new(&self.api);
+        let path = format!("/repos/{owner}/{name}/pulls");
+        let query = format!("{path}?state=all&head={owner}:{}", request.branch);
+        let find = || -> Result<Option<String>, String> {
+            let found = github
+                .request("GET", &query, &token)
+                .map_err(|e| e.to_string())?;
+            for pr in found.as_array().ok_or("PR 목록을 읽지 못했다")? {
+                if pr
+                    .pointer("/head/repo/full_name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|n| n.eq_ignore_ascii_case(&request.repo))
+                    && pr.pointer("/head/ref").and_then(Value::as_str) == Some(&request.branch)
+                {
+                    if pr.pointer("/head/sha").and_then(Value::as_str) != Some(&request.commit)
+                        || pr.pointer("/base/ref").and_then(Value::as_str) != Some(&request.base)
+                    {
+                        return Err(
+                            "같은 작업 브랜치의 PR이 다른 커밋이나 기준 브랜치를 가리킨다".into(),
+                        );
+                    }
+                    return pr
+                        .get("html_url")
+                        .and_then(Value::as_str)
+                        .map(|s| Some(s.into()))
+                        .ok_or("PR 주소가 없다".into());
+                }
+            }
+            Ok(None)
+        };
+        if let Some(url) = find()? {
+            return Ok(url);
+        }
+        let url = format!("{}/{owner}/{name}.git", self.git_base);
+        let mut git = Command::new(git_binary());
+        git.arg("-C").arg(work).args([
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "http.followRedirects=false",
+            "push",
+            "--no-verify",
+            "--",
+            &url,
+            &format!("{}:refs/heads/{}", request.commit, request.branch),
+        ]);
+        run_git_with_token(
+            git,
+            &token,
+            None,
+            "작업 브랜치 푸시 시간이 초과됐다",
+            "작업 브랜치를 푸시하지 못했다",
+        )?;
+        let body = serde_json::json!({"title":request.title, "body":request.body, "base":request.base, "head":request.branch}).to_string();
+        match github.request_body("POST", &path, &token, &body) {
+            Ok(pr) => pr
+                .get("html_url")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .ok_or("PR 주소가 없다".into()),
+            Err(e) => find()?.ok_or_else(|| e.to_string()),
+        }
     }
 
     /// 그 저장소에 설치된 GitHub 앱의 설치 토큰.

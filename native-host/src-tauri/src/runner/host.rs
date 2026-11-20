@@ -1,6 +1,9 @@
 //! 러너가 바깥과 만나는 자리. 엔진(`ais-cli`), claude, GitHub 저장소 사본, 알림, 화면 사건을 한 trait 뒤에 둔다.
 //! 실제 앱은 [AppHost]를 쓰고, 시험은 가짜를 끼워서 프로세스를 띄우지 않고 흐름만 확인한다.
-use super::store::default_root;
+use super::{
+    providers::{self, Tier},
+    store::default_root,
+};
 use crate::{
     ask, github, ipc,
     notifications::{self, NewItem},
@@ -47,6 +50,18 @@ pub trait Host: Send + Sync + 'static {
     fn claude_available(&self) -> bool;
     /// claude를 한 번 띄워 끝나기를 기다린다.
     fn run_claude(&self, call: ClaudeCall) -> Result<ClaudeOutcome, String>;
+    fn ask_agent(
+        &self,
+        tier: &Tier,
+        prompt: &str,
+        cancel: Arc<AtomicBool>,
+        timeout: Duration,
+    ) -> Result<String, String> {
+        providers::call(tier, prompt, cancel, timeout)
+    }
+    fn publish(&self, _work: &Path, _request: &github::TaskPullRequest) -> Result<String, String> {
+        Err("GitHub 게시를 사용할 수 없다".into())
+    }
     /// 알림 센터에 알린다(설정에 따라 배너와 토스트도 뜬다).
     fn notify(&self, vault: &str, item: NewItem);
     /// 화면에 「러너 상태가 바뀌었다」고 알린다. 화면은 태스크와 실행 기록을 다시 읽는다.
@@ -127,6 +142,13 @@ impl<R: Runtime> Host for AppHost<R> {
         })
     }
 
+    fn publish(&self, work: &Path, request: &github::TaskPullRequest) -> Result<String, String> {
+        self.app
+            .state::<github::GithubState>()
+            .service()
+            .publish_task(work, request)
+    }
+
     fn notify(&self, vault: &str, item: NewItem) {
         let _ = notifications::push(&self.app, &notifications::default_dir(), vault, item);
     }
@@ -146,8 +168,14 @@ impl<R: Runtime> Host for AppHost<R> {
 // 읽기 전용 작업 폴더
 // ---------------------------------------------------------------------------
 
-fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
+pub(super) fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
     let out = Command::new(github::git_binary())
+        .args([
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=false",
+        ])
         .arg("-C")
         .arg(repo)
         .args(args)

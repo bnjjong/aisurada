@@ -146,7 +146,7 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
         </span>
       )}
       {runner.supported && t.status === "ready-for-develop" && t.blockedBy.length === 0 && !activeRunOf(runner, t.key) && (
-        <button type="button" className="task-run" disabled={!runner.claudeAvailable} onClick={() => void runTask(host, t.key)}>
+        <button type="button" className="task-run" title="오케스트레이터가 개발하고 PR을 열어요" onClick={() => void runTask(host, t.key)}>
           ▶ 지금 실행
         </button>
       )}
@@ -234,7 +234,7 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
   return (
     <Page title="태스크" className="task-page">
       <p className="task-intro">
-        일을 티켓으로 적어 두면 러너가 집어 claude에게 맡겨요. 지금 러너는 저장소와 노트를 읽기만 하고, 조사 결과를 댓글로 남기거나 사람에게만 풀 수 있는 질문을 해요. 코드를 고치고 PR을 올리는 일은 아직 없어요. 완료 기준은 만들 때 꼭 적어요.
+        완료 기준을 적고 「지금 실행」을 누르면 오케스트레이터가 개발부터 PR 작성까지 진행해요. 자동으로 집은 태스크는 Claude가 읽기 전용으로 조사해요.
       </p>
       <RunnerBar call={host} preset={preset?.runner} />
       <div className="task-toolbar">

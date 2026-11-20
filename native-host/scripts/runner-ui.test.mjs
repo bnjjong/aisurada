@@ -165,9 +165,9 @@ test('the runner bar shows the state, the auto-pickup switch and the concurrency
   assert.match(busy, /checked=""/);
   assert.match(busy, /<option value="2" selected="">2개/);
 
-  const noClaude = renderToStaticMarkup(React.createElement(RunnerBar, { call: async () => {}, preset: snapshot({ claudeAvailable: false }) }));
+  const noClaude = renderToStaticMarkup(React.createElement(RunnerBar, { call: async () => {}, preset: snapshot({ claudeAvailable: false, settings: { autoPickup: true, concurrency: 3, model: 'sonnet' } }) }));
   assert.match(noClaude, /runner-pill is-warn/);
-  assert.match(noClaude, /AISURADA_CLAUDE_BIN/);
+  assert.match(noClaude, /자동 조사에 쓸 Claude/);
 
   const withError = renderToStaticMarkup(React.createElement(RunnerBar, { call: async () => {}, preset: snapshot({ error: '동시에 돌릴 수 있는 수에 닿았어요' }) }));
   assert.match(withError, /role="alert"[^>]*>동시에 돌릴 수 있는 수에 닿았어요/);
@@ -184,15 +184,15 @@ const detail = (extra = {}) => toDetail(detailRaw(extra));
 const fakeController = (call = async () => ({})) => ({ navigate() {}, callEngine: async () => ({}), callHost: call, isNative: () => true });
 const panel = (task, preset) => renderToStaticMarkup(React.createElement(RunnerPanel, { task, controller: fakeController(), preset }));
 
-test('the panel offers 「지금 실행」 for a Ready task and explains the auto-pickup setting', () => {
+test('the panel offers development from 「지금 실행」 without requiring Claude', () => {
   const off = panel(detail(), { snapshot: snapshot(), runs: [] });
   assert.match(off, /aria-label="실행"/);
   assert.match(off, /<button type="button" class="button-primary">지금 실행<\/button>/);
-  assert.match(off, /자동으로 집기가 꺼져 있어요/);
+  assert.match(off, /오케스트레이터가 개발·검사·리뷰를 진행하고 PR을 열어요/);
   const on = panel(detail(), { snapshot: snapshot({ settings: { autoPickup: true, concurrency: 3, model: 'sonnet' } }), runs: [] });
-  assert.match(on, /곧 집어요/);
+  assert.match(on, /진행하고 PR을 열어요/);
   const noClaude = panel(detail(), { snapshot: snapshot({ claudeAvailable: false }), runs: [] });
-  assert.match(noClaude, /disabled=""[^>]*>지금 실행/);
+  assert.doesNotMatch(noClaude, /disabled=""[^>]*>지금 실행/);
   // 다른 상태이고 실행도 없으면 영역 자체를 그리지 않는다
   assert.equal(panel(detail({ status: 'draft' }), { snapshot: snapshot(), runs: [] }), '');
   assert.equal(panel(detail(), { snapshot: snapshot({ supported: false }), runs: [] }), '');
@@ -205,7 +205,7 @@ test('the panel shows the seven steps with the current one, the elapsed time, an
   assert.match(html, /class="is-current" aria-current="step">일하기</);
   assert.doesNotMatch(html, /class="is-done"[^>]*>정리</);
   assert.match(html, /3분 12초째/);
-  assert.match(html, /claude 2번 부름/);
+  assert.match(html, /모델 2번 호출/);
   assert.match(html, />중지<\/button>/);
   assert.doesNotMatch(html, /지금 실행/);
 });
@@ -217,7 +217,7 @@ test('the panel shows the runner question with an answer box when the task waits
   assert.match(html, /<blockquote>어느 브랜치를 기준으로 볼까요\?<\/blockquote>/);
   assert.match(html, /aria-label="질문에 대한 답"/);
   assert.match(html, /disabled=""[^>]*>답하기/, 'an empty answer cannot be sent');
-  assert.match(html, /같은 세션으로 이어서 조사해요/);
+  assert.match(html, /진행하던 작업을 이어가요/);
   assert.match(html, />중지<\/button>/);
 });
 
@@ -261,7 +261,7 @@ test('the detail page and the board embed the runner pieces', () => {
   assert.equal((board.match(/▶ 지금 실행/g) ?? []).length, 1, 'a blocked task has no run button');
   assert.match(board, /러너 · 받아오기/);
   assert.match(board, /■ 중지/);
-  assert.match(board, /러너가 집어 claude에게 맡겨요/);
+  assert.match(board, /자동으로 집은 태스크는 Claude가 읽기 전용으로 조사해요/);
 });
 
 test('refreshRunner also reads the recent runs for the rail and keeps the old list when that read fails', async () => {
