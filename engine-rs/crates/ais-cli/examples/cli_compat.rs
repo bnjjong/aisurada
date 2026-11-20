@@ -242,12 +242,13 @@ impl Harness {
         };
         let java_err = swap(&java.stderr);
         // Java 이후 목록 조건에 추가한 서브 아젠다 옵션은 옛 오류 설명에서 빠진다.
-        let rust_err = if args.first().is_some_and(|command| command == "list-docs") {
-            rust.stderr
+        let rust_err = match args.first().map(String::as_str) {
+            Some("list-docs") => rust
+                .stderr
                 .replace(", subAgendaId", "")
-                .replace("[subAgendaId=<분류 ID>] ", "")
-        } else {
-            rust.stderr.clone()
+                .replace("[subAgendaId=<분류 ID>] ", ""),
+            Some("list_docs") => rust.stderr.replace("subAgendaId, ", ""),
+            _ => rust.stderr.clone(),
         };
         let java_out = swap(&java.stdout);
         if java.code == 0 {
