@@ -176,7 +176,7 @@ java -cp "$D/snake:$ORACLE/ais-engine.jar" SnakeCases engine-rs/golden/snake-cas
 
 ### 호스트 모듈 (`native-host/src-tauri/src/`)
 
-`workspace.rs`(vault 허용·만들기), `github.rs`(GitHub App 연결, 아래 「GitHub App 연결」), `sidecar.rs`(`sidecar_call`), `files.rs`(그림 첨부 쓰기, 기본 앱 열기), `markdown.rs`(외부 마크다운), `notes.rs`(노트 창), `terminal.rs`(PTY), `secrets.rs`(비밀 가림), `menu.rs`, `layout.rs`(창 자리), `frame.rs`(`aisframe://`), `self_write.rs`, `process.rs`(자식 실행과 시간 상한), `ipc.rs`(이벤트 이름). `notifications.rs`(알림, 아래 「알림」), `approvals.rs`(승인 대기 알림, 아래 「승인 워크플로」). 4부는 `ask.rs`, `agents.rs`, `session_image.rs`, `dictation.rs`, `session_shell.rs`이고, 읽기 전용 러너 `runner/`(아래 「러너」)도 같이 cargo 기능 `claude` 아래에 있다.
+`workspace.rs`(vault 허용·만들기), `github.rs`(GitHub App 연결, 아래 「GitHub App 연결」), `sidecar.rs`(`sidecar_call`), `files.rs`(그림 첨부 쓰기, 기본 앱 열기), `markdown.rs`(외부 마크다운), `notes.rs`(노트 창), `terminal.rs`(PTY), `secrets.rs`(비밀 가림), `menu.rs`, `layout.rs`(창 자리), `frame.rs`(`aisframe://`), `self_write.rs`, `process.rs`(자식 실행과 시간 상한), `ipc.rs`(이벤트 이름). `notifications.rs`(알림, 아래 「알림」), `approvals.rs`(승인 대기 알림, 아래 「승인 워크플로」), `decisions.rs`(답을 기다리는 결정 블록 알림, 「결정 블록」). 4부는 `ask.rs`, `agents.rs`, `session_image.rs`, `dictation.rs`, `session_shell.rs`이고, 읽기 전용 러너 `runner/`(아래 「러너」)도 같이 cargo 기능 `claude` 아래에 있다.
 
 ### 화면 모듈 (`native-host/src/`)
 
@@ -429,6 +429,40 @@ cargo 기능 `claude` 아래에 있다. 이 기능이 없는 판에는 명령 7�
 - **확인하지 못한 것.** 키체인 자격으로 진짜 GitHub 저장소를 fetch하는 길(`refresh_clone`은 시험에서 가짜로 대신했다), 번들한 앱에서 `claude` 위치 찾기, 질문→답 왕복과 동시 실행 여러 개를 진짜 `claude`로 돌리는 것(가짜 대본으로만), 120분 제한, 앱을 닫을 때 진짜 `claude` 프로세스가 멈추는 것, 실제 앱 창(WKWebView)에서 눌러 본 것. 레일 「최근 실행」과 「대화 보기」도 서버 렌더와 시험으로만 봤다: 이 컴퓨터에는 러너 실행 기록이 아직 없어서(앱 지원 폴더에 `runs`가 없다), 실제 실행이 남긴 기록과 대화 파일(`~/.claude/projects`)로 눌러 열어 보지는 못했다.
 - **한계.** 코드를 고치지 못하고 PR도 없다(4단계). 질문은 위 단계 에이전트가 먼저 풀지 않고 바로 사람에게 간다(5단계). 훑는 주기는 15초라서 Ready로 보낸 뒤 집기까지 그만큼 걸릴 수 있다. 태스크 안 채팅(정의 에이전트)은 만들지 않았다(3b). 러너의 claude 세션은 세션 화면(`/session/<id>`)에서 읽기 전용으로 열린다(위 「최근 실행과 대화 보기」). 다만 노트 옆 세션 레일(`NoteSessionRail`)은 러너 세션에도 입력을 닫지 않는다. 진행 중인 실행의 대화를 실시간으로 따라 보는 것이 되는지는 확인하지 못했다.
 
+### 결정 블록 (`note::decision`, `wait-decisions`)
+
+AI가 사람이 골라야 할 것(「정할 것」)을 노트에 결정 블록으로 쓰고, 사람이 편집기에서 답하면 AI가 바로 알아채 다음 일로 넘어가게 한다. **외부 설명서에 없는 확장이다.** 요구와 결정은 2026-11-20에 사용자와 정했다. 아래 괄호의 「결정 N-가」는 그때의 결정 번호다.
+
+```markdown
+> [!decision] 결정 1 · 명령을 실행해도 되나?
+> - [ ] 가(추천): 읽기만 한다.
+> - [ ] 나: 안 바꾸는 명령만 돌린다.
+>
+> 답:
+
+> [!decided] 답을 다 적었으면 체크하세요
+> - [ ] 답 다 했음
+```
+
+- **형식과 규칙(`ais-domain/src/note/decision.rs`).** 결정마다 `[!decision]` 블록 하나, 모든 결정 뒤에 `[!decided]` 블록 하나다. 제목 `결정 N · 질문`의 N이 번호이고 없으면 차례다. 선택지는 체크리스트이고 쌍점 앞이 이름(`가`), 이름에 `추천`이 있으면 추천이다(굵게 써도 읽는다). `답:` 줄과 그 뒤의 줄이 답이다. 고른 것(`choice`)은 답 줄의 첫 낱말이 선택지 이름이면 그것, 아니면 체크가 하나뿐일 때 그것이다(답 줄이 체크보다 앞선다). 답 줄에 글이 있거나 체크가 있으면 답한 것(`answered`)이다. 코드 펜스 안의 블록과 `[!question]` 같은 다른 콜아웃은 세지 않는다. 제목을 `1.`처럼 숫자와 점으로 시작하면 편집기가 번호 목록으로 바꾸므로 피한다.
+- **끝났는지(`finished`).** 마지막 저장이 사람(노트 머리 `editedBy: app`)이고 `[!decided]`를 체크했을 때다. 그 블록이 없으면 모든 결정에 답이 차야 한다. AI가 쓴 체크(`editedBy: tool`)는 세지 않는다. 일부만 답하고 넘길 수 있다(결정 1-다). 지문(`signature`)은 번호와 질문만 본 FNV-1a 값이라, 같은 묶음은 같고 질문이 바뀌면 달라진다.
+- **이름이 `decided`인 까닭.** 처음에는 `decision-done`이었는데 편집기·검색 미리보기·본문 글 뽑기·엔진 경고의 콜아웃 문법이 종류 이름에 하이픈을 받지 않아 인용문으로 읽혔다. 문법을 넓히는 대신 영문자만 쓰는 이름으로 바꿨다.
+- **명령.** `list-decisions <노트 id> [하위 노트 id]`(MCP 읽기 도구 `list_decisions`, 인자 `parent`는 `노트id` 또는 `노트id/하위노트id`)와 `pending-decisions`(앱 전용, vault 전체에서 기다리는 노트와 후속 노트, 본문에 `[!decision`이 없는 노트는 해석하지 않는다)는 엔진 명령(`commands/decisions.rs`)이고 읽기만 한다. `ais-cli`의 이름 목록은 `ENGINE_COMMANDS_DECISIONS`다.
+- **기다리기(`ais-cli wait-decisions`, `crates/ais-cli/src/wait.rs`).** `wait-decisions <노트 id>[/<하위 노트 id>] [timeout=<초>] [interval=<초>]`가 `interval`(기본 5초, 1~300)마다 `list-decisions`를 다시 불러, `finished`가 되면 답을 JSON(`result: "done"`, `waitedSeconds`)으로 내고 0으로 끝난다. `timeout`(기본 7200초, 1~86400)이 지나면 `result: "timeout"`과 종료 코드 6이다. 결정 블록이 없는 노트는 AIS-400(종료 코드 3), 없는 노트는 AIS-404다. **MCP 도구가 아니라 명령인 까닭**은 MCP 호출에 클라이언트의 시간 제한이 있어서 몇십 분을 붙잡지 못하기 때문이다. 엔진 명령이 아니라 `doctor`처럼 `ais-cli`가 직접 하는 명령이다.
+- **AI에게 알리는 법(MCP 안내문, `mcp.rs`의 `decision_guide`).** `initialize`의 `instructions` 끝에 형식, `wait-decisions`를 거는 법(명령 경로는 서버를 띄운 `ais-cli`의 경로로 채운다), 답이 없는 결정은 추천안으로 채우지 말고 다시 물을 것을 붙인다. 접속한 클라이언트의 `clientInfo.name`에 맞는 기다리는 법만 싣고, 모르는 클라이언트에는 셋을 모두 싣는다. 안내 머리는 `DECISION_GUIDE_MARK`(`[결정 블록]`)이고, Java 기준 녹화본과 견주는 `mcp_compat`은 이 머리부터 잘라 낸다(새 도구 `list_decisions`도 `create_task`처럼 목록 끝에 두고 뺀다).
+
+| CLI | 쉬는 세션을 깨우나 | 기다리는 법 | 확인한 정도 |
+|---|---|---|---|
+| Claude Code 2.1.329 | 된다 | Bash 도구의 `run_in_background`로 건다. 명령이 끝나면 세션이 다시 불린다 | 도구 설명에 적힌 동작. 합성 vault로 엔진 쪽은 끝까지 돌렸고 노트로 세션을 깨우는 것까지는 안 봤다 |
+| Gemini CLI 0.68.0 | 사용자가 설정 둘을 켜면 된다 | 셸 도구에 `is_background: true`. `~/.gemini/settings.json`의 `tools.shell.backgroundCompletionBehavior: "inject"`(끝난 출력을 대화에 다시 넣음)와 `experimental.modelSteering: true`(쉬는 중에도 새 질문으로 보냄). 둘 다 기본은 꺼짐이고 켜는 것은 사용자 몫이다(결정 7-가) | 설치된 묶음의 코드를 읽어 확인했고 실제로 돌리지 않았다 |
+| Codex 0.170.0 | 안 된다 | 턴을 연 채 이 명령을 직접 실행해 기다린다. 오래 걸리면 백그라운드 터미널이 되고 `write_stdin`으로 다시 기다린다(결정 8-가) | 실행 파일 안의 글자로 확인했고 실제로 돌리지 않았다 |
+| Antigravity(`agy`) | 확인 못 함 | 모르는 클라이언트로 보고 셋을 모두 싣는다 | 확인 못 함 |
+
+- **편집기(`editor/decisionBlocks.ts`).** 문서 글은 바꾸지 않고 그리는 DOM에 표시만 붙인다: 블록 머리 오른쪽의 「답 기다림」/「답함」(`data-decision-label`), `[!decided]`의 「체크하면 AI가 이어 가요」, 추천 선택지 강조(`lex-decision-recommended`), 고른 선택지는 취소선 대신 굵게, 빈 답 줄은 「여기에 답을 적으세요」 입력 칸 모양(`lex-decision-answer is-empty`). **하나만 고르기**만 문서를 고친다: 결정 블록에서 체크를 켜면 같은 목록의 다른 체크를 푼다(변이 리스너). 노트를 열 때(`ais:import`)와 되돌리기(`historic`)에서는 고치지 않고, 앞 고침과 합쳐(`history-merge`) 되돌리기 한 번에 같이 돌아간다.
+- **앱의 알림.** 레일 「내 차례」 배지와 말풍선(「AI가 답을 기다리는 노트가 N건 있어요. 열기 ›」가 첫 노트를 연다), 노트 목록·캘린더 목록 줄의 「답 기다림」(`ui/DecisionMark.tsx`)은 `ui/decisionsStore.ts`가 든다(앱이 켜질 때, 창이 눈에 띌 때, 15초마다, 결정 알림이 올 때 `pending-decisions`를 다시 읽는다. 메인 창만). 호스트의 `decisions.rs`는 30초마다(처음은 12초 뒤) 묻고 묶음마다 알림 종류 `decision`(화면 이름 「정할 것」)을 쌓는다. 알림 `id`는 `decision-<노트 참조>-<지문>`이라 같은 묶음은 한 번만, 새 묶음은 다시 알린다. 알림에는 열 노트(`noteRef`: `노트id` 또는 `노트id/하위노트id`)가 실리고 「답하러 가기」가 그 노트나 후속 노트 탭(`/sub/…`)을 연다. 설정의 소식이 6개가 됐다(「AI가 노트에서 답을 기다릴 때」, 기본은 앱 안·macOS 모두 켬, 결정 5-나).
+- **확인한 것.** 엔진 규칙의 단위 시험 7개(`note::decision`)와 `wait` 2개, 합성 vault로 끝에서 끝까지(AI가 쓴 직후 기다림 1건, AI가 직접 한 체크는 안 끝남, 백그라운드로 건 `wait-decisions`가 사람이 앱 길로 답하고 체크해 저장한 뒤 1.0초 안에 0으로 끝남과 `답:  나. 다만 …`에서 `choice` = 나, 한도 6, 블록 없음 3, 후속 노트, 읽기 전용 MCP 서버의 도구 20개와 `list_decisions` 호출), happy-dom 위에 진짜 편집기를 띄운 하나만 고르기·열 때 그대로 둠·`[!question]`은 그대로·답 줄로 답함·`[!decided]` 표시, 같은 DOM에 `styles.css`를 입혀 Edge headless로 본 모양, 호스트 단위 시험(`decisions` 3, `notifications` 10). 전체 시험 묶음은 돌리지 않았다(평소 작업 규칙).
+- **확인 못 한 것과 한계.** 실제 앱 창(WKWebView)에서 누르고 본 것, 진짜 Claude Code·Gemini CLI·Codex 세션이 노트의 답으로 이어 가는 것, macOS 배너. 알림의 노트 참조와 `pending-decisions`는 메인 노트와 그 바로 아래 후속 노트까지만 주소를 만든다(더 깊은 후속 노트는 탭 주소의 사슬이 모자라다). 배지 수는 노트를 매번 훑어 세므로(결정 4-가) 노트가 아주 많아지면 시간을 재서 다시 본다.
+
 ### GitHub App 연결 (`github.rs`)
 
 프로젝트의 GitHub 저장소(앞의 「프로젝트의 저장소와 아젠다의 `projectRepo`」)를 앱이 읽고 받아 오는 호스트 쪽 바탕이다. 사용자가 GitHub에서 직접 만든 GitHub App의 **App ID와 개인 키(PEM)** 로 **설치 토큰**을 받는 방식이고, 사용자 로그인(디바이스 플로우)은 쓰지 않는다. 활동은 앱(봇) 이름으로 남는다.
@@ -467,7 +501,7 @@ AISURADA_VAULT=<vault> dist/ais-cli get_doc '{"id":"nddemo-00000001"}'   # 도�
 AISURADA_VAULT=<vault> dist/ais-cli get-doc nddemo-00000001              # 명령 표면
 ```
 
-도구 39개와 명령 82개는 `engine-rs/crates/ais-cli/src/registry.rs`에 있다(`ais-cli`가 직접 하는 8개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `dist/ais-cli --list`로 본다.
+도구 40개와 명령 84개는 `engine-rs/crates/ais-cli/src/registry.rs`에 있다(`ais-cli`가 직접 하는 9개는 따로다). 도구는 모두 명령에 짝이 있지만, 아젠다·프로젝트·사실층·4부 따위는 명령 표면에만 있다. 이름 목록은 `dist/ais-cli --list`로 본다.
 
 도구 표면의 호출자는 AI(`caller: "ai"`)로 찍혀서 앱과 다르게 다뤄지는 곳이 있다. 쓰기에서는 아래가 그렇다.
 
@@ -518,6 +552,7 @@ AISURADA_VAULT=<vault> dist/ais-cli get-doc nddemo-00000001              # 명�
 | 2 | vault를 못 찾았거나 모르는 명령 |
 | 3 | `AIS-…` 코드가 붙은 실패. stderr 한 줄, stdout 비어 있음 |
 | 5 | 선결 조건 토큰(`f1`)이 어긋나 아무것도 안 씀(`AIS-412`) |
+| 6 | `wait-decisions`의 한도가 지나 사람의 답 없이 끝남. stdout에 그때까지의 결정과 `result: "timeout"` |
 
 Java 시절에 `ais-cli`만 내던 4(엔진에 못 닿음)는 엔진 프로세스가 없어서 사라졌다.
 
@@ -566,7 +601,7 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 연결하는 법, 도구의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
 
-- **도구.** 이름은 엔진 도구 39개와 같다. 기본은 읽기 19개만 내놓고 `--write`를 주면 38개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
+- **도구.** 이름은 엔진 도구 40개와 같다. 기본은 읽기 20개만 내놓고 `--write`를 주면 39개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다, 2026-11-20). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`ais_cli::run`)을 프로세스 하나에서 되풀이한다. 명령줄 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다. 도구를 부를 때마다 자동 커밋을 지켜본다(`watch`). 유휴 타이머가 MCP 서버 안에서 돌기 때문이다.
 - **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(위 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
 - **스키마를 고칠 때.** `mcp_tools.rs`의 입력 스키마 키는 도구 해석기(`tool.rs`)가 받는 키와 이름과 차례까지 같아야 하고, 필수 키는 스키마 차례대로 검사해야 하며, 읽기 전용 표시는 엔진의 쓰기 명령 목록과 맞아야 한다. 명령줄 쪽 옵션(`spec_table.rs`)은 정렬돼 있어야 하고 모두 엔진 인자로 이어져야 한다. 이 넷은 `engine-rs/crates/ais-cli/tests/table_contracts.rs`가 지킨다(2026-11-16 추가, 지금 37개 도구와 명령 명세 전체가 통과하고, 표를 일부러 어긋나게 하면 실패하는 것을 확인했다). 사용법 글과 옵션 목록의 알려진 어긋남 7건(`repos`·`projectRepo`·`query`가 사용법 글에 없는 것 따위)은 시험의 `KNOWN_USAGE_GAPS`에 적혀 있고, 사용법 글은 Java가 오류 때 찍던 글이라 고치면 `cli_compat`의 기준과 어긋난다. 도구의 인자를 바꾸면 두 표, `tool.rs`, `mcp_compat`의 기대를 함께 맞춘다.
@@ -686,7 +721,7 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 - **어느 탭이 켜질지는 화면 주소가 정한다**(`navigation/railTabs.ts`의 `railTabOf`). 노트 탭은 `/notes` `/agenda/…` `/calendar` `/favorites` `/connections` `/templates` `/trash` `/review`, 에이전트 탭은 `/tasks` `/task/…` `/resources` `/project/…`다. 연동 가이드·세션·터미널처럼 어느 쪽도 아닌 화면에서는 직전에 켜 둔 탭을 그대로 둔다. 그래서 알림의 「승인하러 가기」처럼 주소로 들어와도 맞는 탭이 켜지고 탭과 본문이 어긋나지 않는다.
 - **탭을 누르면 그 탭에서 마지막으로 보던 화면으로 간다.** 처음 누르면 각 탭의 첫 화면(`/notes`, `/tasks`)이다. 이미 그 탭의 화면이면 아무것도 하지 않는다. 기억은 모듈 변수에 두므로 앱을 켜 둔 동안만 가고 저장하지 않는다(`rememberRailTab`, `railTabTarget`).
-- **에이전트 탭 이름 옆 배지는 「내 차례」의 합**이다: 러너가 답을 기다리는 태스크 수(`runnerStore`의 `waiting`)와 승인이 필요한 변경 수(`approvalsStore`)를 더한다. 노트 탭을 보고 있어도 보인다. 태스크 메뉴에는 답 대기 수, 스킬·에이전트 메뉴에는 승인 수가 따로 붙는다.
+- **에이전트 탭 이름 옆 배지는 「내 차례」의 합**이다: 러너가 답을 기다리는 태스크 수(`runnerStore`의 `waiting`), AI가 답을 기다리는 노트 수(`decisionsStore`, 「결정 블록」), 승인이 필요한 변경 수(`approvalsStore`)를 더한다. 노트 탭을 보고 있어도 보인다. 태스크 메뉴에는 답 대기 수, 스킬·에이전트 메뉴에는 승인 수가 따로 붙는다.
 - **러너 한 줄**(「러너 · 쉬는 중」 따위)은 에이전트 탭에만 있고 누르면 태스크 화면으로 간다. 러너가 없는 빌드(`supported` false)에서는 숨긴다. 색 단계는 태스크 화면의 러너 막대와 같은 `runnerTone`을 쓴다.
 - **「최근 실행」**(`ui/RailRuns.tsx`)은 러너 줄 바로 아래에 같은 조건(에이전트 탭, `supported`)으로만 보인다. 러너가 태스크마다 claude를 돌린 실행 5건을 끝나지 않은 것 먼저, 그다음 최신순으로 늘어놓는다. 줄의 윗줄은 태스크 키와 제목, 아랫줄은 「상태 · 때 · 비용 · 대화 없음」(`runnerStore.ts`의 `runSubline`)이고, 점 색은 상태(진행·답 기다림·보고함·실패·그 밖)다. 실행 기록에는 태스크 제목이 없어서 제목은 태스크 목록(`listTasks`)에서 키로 맞춰 오고, 못 읽으면 키만 보인다. 마우스를 올리면 걸음·질문·보고 앞부분·실패 까닭이 설명으로 뜬다(`runTip`). 줄을 누르면 그 태스크 상세로 가고, 열려 있는 태스크의 줄은 눌린 색으로 남는다. 세션이 없는 실행은 흐리게 보인다. 목록은 러너 사건(`ais://runner`)마다 `refreshRunner`가 상태와 함께 새로 읽는다(`runner_recent_runs`, 못 읽으면 이전 목록을 둔다). 비었을 때는 안내 문구를 보인다. 시안은 디자인 캔버스가 아니라 Figma 파일의 「에이전트 수행 이력 시안 v2」다.
 - **프로젝트의 에이전트·스킬 줄**(`ui/RailProjectResources.tsx`)은 글로벌 탭의 「프로젝트 리소스」와 노트 탭의 프로젝트 묶음 아래에 프로젝트마다 둘씩 있다. 오른쪽 숫자는 그 프로젝트 자원의 수(승인된 판)다. 수가 있으면 줄을 눌러 이름 목록을 펼치고 접는다(화살표가 아래를 본다). 펼침 상태는 두 탭이 같이 쓰고 앱을 켜 둔 동안만 기억한다. 이름을 누르면 `get-resource`로 한 건을 다시 읽어 편집 창(`ResourceFormModal`)을 연다(목록 행에는 본문과 쓰기 전 토큰이 없다). 수가 0이면 줄을 눌러도 등록 창이 열린다. 마우스를 올리면 숫자 자리에 「+등록」이 나오고, 이것은 늘 새로 만든다. 목록은 `list-resources` 한 번으로 모든 프로젝트 몫을 읽어 나누고(`rowsByProject`), 처음 뜰 때, 창이 다시 눈에 띌 때, 편집 창에서 저장한 뒤, 승인 대기 수(`approvalsStore`)가 바뀔 때(승인·거절 직후) 다시 읽는다. 줄은 아젠다 줄(`.rail-agenda`)을 그대로 써서 모든 모양(skin)에서 같은 모양이다. 지우기·되살리기와 참조 관리는 레일에 없고 프로젝트 페이지(`/project/<slug>`)에만 있다. 레일에서 프로젝트 페이지로 가는 길은 없다(태스크 상세의 프로젝트 링크로 간다).

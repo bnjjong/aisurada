@@ -153,6 +153,27 @@ dist/ais-cli link-tasks TSK-1 TSK-2 type=blocks
 - macOS 집중 모드는 macOS가 처리합니다. 집중 모드에서 aisurada를 허용하지 않으면 배너가 막히고 알림 센터에 쌓입니다.
 - 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「알림」에 있습니다.
 
+## 결정 블록 (확장)
+
+외부 설명서에 없는 확장입니다. AI가 사람이 골라야 할 것(「정할 것」)을 노트에 결정 블록으로 쓰면, 사람이 편집기에서 체크하거나 `답:` 줄에 답하고, AI는 그 답을 읽고 다음 일로 넘어갑니다. 채팅으로 `1 - 가`처럼 답하지 않아도 됩니다.
+
+```markdown
+> [!decision] 결정 1 · 명령을 실행해도 되나?
+> - [ ] 가(추천): 읽기만 한다.
+> - [ ] 나: 안 바꾸는 명령만 돌린다.
+>
+> 답:
+
+> [!decided] 답을 다 적었으면 체크하세요
+> - [ ] 답 다 했음
+```
+
+- `list_decisions`(도구) / `list-decisions <노트 id> [하위 노트 id]`(명령)가 결정마다 선택지, 체크한 것, 답 줄, 고른 것(`choice`, 답 줄이 체크보다 앞섬), 끝났는지(`finished`)를 냅니다. `pending-decisions`는 vault 전체에서 답을 기다리는 노트를 냅니다(앱의 배지와 알림이 씁니다).
+- `wait-decisions`(아래 표)는 사람이 「답 다 했음」을 체크해 저장할 때까지 기다립니다. AI가 쓴 체크(`editedBy: tool`)는 세지 않습니다.
+- MCP 서버의 안내문이 결정 블록 형식과 기다리는 법을 알려 줍니다. Claude Code는 백그라운드로 건 `wait-decisions`가 끝나면 세션이 다시 불립니다. Gemini CLI는 `~/.gemini/settings.json`에 `tools.shell.backgroundCompletionBehavior: "inject"`와 `experimental.modelSteering: true`를 **사용자가 켜야** 같은 동작을 합니다(둘 다 기본은 꺼짐). Codex는 쉬는 세션을 깨우지 못해 턴을 연 채 기다립니다.
+- 앱의 편집기는 결정 블록에 「답 기다림」/「답함」 표시를 붙이고 한 블록에서 하나만 고르게 합니다. 레일의 「내 차례」 배지, 노트 목록의 「답 기다림」 표시, 알림 센터와 macOS 배너(설정의 「AI가 노트에서 답을 기다릴 때」)로도 알립니다.
+- 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「결정 블록」에 있습니다.
+
 ## 22장 사실층
 
 명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.aisurada/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
@@ -355,9 +376,10 @@ dist/ais-cli sweep           # 옛 사이드카를 내리고 plist, 상태 파�
 | `doctor` | 어느 vault를 쓰는지, vault의 git 상태, 이 실행 파일, 에이전트에 등록된 MCP 서버, 걷어 낼 옛 사이드카 흔적을 읽기만 하며 보여 준다. `--prune`은 걷어 내기까지, `--fix`는 낡은 MCP 등록을 다시 등록하는 데까지 한다 |
 | `sweep` | 옛 사이드카를 모두 내리고 흔적을 지운다. `--dry-run`은 보여 주기만 한다 |
 | `install` | 깔 파일이 없다는 안내만 한다. 옛 jar와 사이드카가 남아 있으면 `sweep`을 권한다 |
-| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 19개만 내놓고, `--write`를 주면 쓰기 도구까지 38개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
+| `mcp` | Claude 같은 MCP 클라이언트가 노트를 도구로 쓰도록 MCP 서버로 선다(표준 입출력). 기본은 읽기 도구 20개만 내놓고, `--write`를 주면 쓰기 도구까지 39개를 내놓는다. 영구 삭제(`purge_doc`)는 내놓지 않는다. vault는 `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(`~/Library/Application Support/aisurada/current-vault.json`)를 호출마다 따른다. 도구 목록과 쓰는 법은 [MCP 가이드](docs/mcp-guide.md) |
 | `claude-mcp` | Claude Code에 위 서버를 등록한다. `status`, `add [--write]`, `remove`는 `claude mcp`를 부르고, `config [--write]`는 Claude Desktop 설정에 붙여 넣을 조각만 출력한다. 등록에는 vault를 박지 않는다 |
 | `codex-mcp`, `gemini-mcp` | Codex, Antigravity(`agy`)·Gemini CLI에 같은 서버를 같은 방식으로 등록한다(`status`, `add [--write]`, `remove`) |
+| `wait-decisions <노트 id>[/<하위 노트 id>] [timeout=<초>] [interval=<초>]` | 노트의 결정 블록에 사람이 답을 끝낼 때까지 기다린다. 몇 초(기본 5)마다 확인하다가 사람이 「답 다 했음」을 체크해 저장하면 답을 JSON(`result: "done"`)으로 내고 0으로 끝난다. 한도(기본 7200초)가 지나면 `result: "timeout"`과 종료 코드 6. 결정 블록이 없는 노트는 `AIS-400`(종료 코드 3) |
 | `--help`, `--list` | 사용법과 이름 목록 |
 
 ### 환경 변수
@@ -387,6 +409,7 @@ dist/ais-cli sweep           # 옛 사이드카를 내리고 plist, 상태 파�
 | 2 | vault를 못 찾았거나 모르는 명령입니다 |
 | 3 | `AIS-…` 코드가 붙은 실패 (`AIS-404` 노트 없음, `AIS-400` 인자 오류 등). stderr에 한 줄이 나오고 stdout은 비어 있습니다 |
 | 5 | `AIS-412`. 읽었을 때의 확인 값(`f1`)이 지금 파일과 어긋나서 쓰지 않고 멈췄습니다 |
+| 6 | `wait-decisions`의 한도가 지나 사람의 답 없이 끝났습니다. stdout에는 그때까지의 결정과 `result: "timeout"`이 있습니다 |
 
 Java 시절에 `ais-cli`만 내던 종료 코드 4(엔진에 못 닿음)는 엔진 프로세스가 없어져서 사라졌습니다. `ais-cli mcp`는 표준 입력이 닫히면 종료합니다.
 
