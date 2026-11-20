@@ -50,6 +50,7 @@ pub fn items_from_reply(stdout: &str) -> Vec<NewItem> {
                 title: TITLE.to_string(),
                 body,
                 task_key: None,
+                note_ref: None,
                 id: Some(format!("approval-{id}")),
             })
         })

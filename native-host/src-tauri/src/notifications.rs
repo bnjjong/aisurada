@@ -18,7 +18,9 @@ use std::{
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
-pub const KINDS: [&str; 6] = ["question", "pr", "failed", "done", "approval", "test"];
+pub const KINDS: [&str; 7] = [
+    "question", "pr", "failed", "done", "approval", "decision", "test",
+];
 /// 목록에 두는 알림의 수. 넘으면 오래된 것부터 버린다.
 pub const MAX_ITEMS: usize = 200;
 const MAX_TITLE: usize = 120;
@@ -35,6 +37,9 @@ pub struct Item {
     /// 눌렀을 때 열 태스크 키(`TSK-14`). 없으면 null
     #[serde(default)]
     pub task_key: Option<String>,
+    /// 눌렀을 때 열 노트(`노트id` 또는 `노트id/하위노트id`). 결정 블록 알림이 쓴다. 없으면 null
+    #[serde(default)]
+    pub note_ref: Option<String>,
     /// 만든 시각(유닉스 밀리초)
     pub at: u64,
     pub read: bool,
@@ -50,6 +55,8 @@ pub struct NewItem {
     pub body: String,
     #[serde(default)]
     pub task_key: Option<String>,
+    #[serde(default)]
+    pub note_ref: Option<String>,
     #[serde(default)]
     pub id: Option<String>,
 }
@@ -76,6 +83,9 @@ pub struct Events {
     /// 스킬·에이전트 변경이 승인을 기다릴 때(#53). 승인이 늦으면 AI의 일이 막히니 둘 다 켜 둔다.
     #[serde(default = "on_both")]
     pub approval: Channel,
+    /// AI가 노트에 쓴 「정할 것」(결정 블록)이 사람의 답을 기다릴 때. 답이 늦으면 AI가 멈춰 있으니 둘 다 켜 둔다(결정 5-나).
+    #[serde(default = "on_both")]
+    pub decision: Channel,
 }
 
 fn on_both() -> Channel {
@@ -118,6 +128,7 @@ impl Default for Events {
             failed: on_both(),
             done: done_default(),
             approval: on_both(),
+            decision: on_both(),
         }
     }
 }
@@ -147,6 +158,7 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "failed" => settings.events.failed,
         "done" => settings.events.done,
         "approval" => settings.events.approval,
+        "decision" => settings.events.decision,
         _ => Channel {
             in_app: true,
             macos: true,
@@ -257,6 +269,22 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         }
         _ => None,
     };
+    let note_ref = match new.note_ref {
+        Some(r) if !r.trim().is_empty() => {
+            let r = r.trim().to_string();
+            let parts: Vec<&str> = r.split('/').collect();
+            let ok = r.len() <= 80
+                && parts.len() <= 2
+                && parts.iter().all(|p| {
+                    !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+                });
+            if !ok {
+                return Err(format!("노트 참조 모양이 아니다: {r}"));
+            }
+            Some(r)
+        }
+        _ => None,
+    };
     let id = match new.id {
         Some(id) if !id.trim().is_empty() => {
             let id = id.trim().to_string();
@@ -273,6 +301,7 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         title,
         body: clip(&new.body, MAX_BODY),
         task_key,
+        note_ref,
         at,
         read: false,
     })
@@ -541,6 +570,7 @@ mod tests {
             title: title.to_string(),
             body: String::new(),
             task_key: None,
+            note_ref: None,
             id: None,
         }
     }
@@ -552,6 +582,7 @@ mod tests {
             title: id.to_string(),
             body: String::new(),
             task_key: None,
+            note_ref: None,
             at: 1,
             read,
         }
@@ -896,6 +927,7 @@ mod tests {
             title: "t".into(),
             body: "b".into(),
             task_key: Some("TSK-1".into()),
+            note_ref: None,
             at: 5,
             read: false,
         };

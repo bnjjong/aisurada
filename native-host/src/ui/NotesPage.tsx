@@ -7,6 +7,7 @@ import { notesAddress } from "../navigation/routes.ts";
 import { NoteReading } from "../navigation/NoteReading.tsx";
 import { Icon } from "./Icon.tsx";
 import { AgentMarks } from "./AgentMark.tsx";
+import { DecisionMark } from "./DecisionMark.tsx";
 
 export function NotesPage({
   state,
@@ -103,6 +104,7 @@ export function NotesPage({
             {Boolean(n.format && n.format !== "markdown") &&
               String(n.format).toUpperCase()}
             <AgentMarks note={n} />
+            <DecisionMark noteId={n.id} />
           </small>
         </button>
         <button

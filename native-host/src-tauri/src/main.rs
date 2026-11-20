@@ -5,6 +5,7 @@ mod approvals;
 #[cfg(feature = "claude")]
 pub mod ask;
 mod call_log;
+mod decisions;
 mod desktop;
 #[cfg(feature = "claude")]
 mod dictation;
@@ -151,6 +152,7 @@ fn main() {
             #[cfg(feature = "claude")]
             runner::install(app.handle());
             approvals::install(app.handle());
+            decisions::install(app.handle());
             migration::install(app.handle());
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;

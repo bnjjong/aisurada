@@ -9,6 +9,7 @@ import { Icon } from "./Icon.tsx";
 import { NotificationBell } from "./NotificationCenter.tsx";
 import { badgeText, badgeTotal } from "./approvalsClient.ts";
 import { useApprovalCounts } from "./approvalsStore.ts";
+import { decisionAddress, usePendingDecisions } from "./decisionsStore.ts";
 import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
 import { RailRuns } from "./RailRuns.tsx";
 import { useSessionBadge } from "@claude-plug/session";
@@ -62,8 +63,10 @@ export function Rail({
   // 러너가 사람의 답을 기다리는 태스크의 수. 태스크 메뉴에 배지로 붙는다
   const runner = useRunner();
   const waitingAnswers = runner.waiting.length;
-  // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
-  const mineBadge = countText(waitingAnswers + badgeTotal(approvalCounts));
+  // AI가 노트에 쓴 「정할 것」 가운데 사람의 답을 기다리는 노트(후속 노트 포함)
+  const decisions = usePendingDecisions();
+  // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 답을 기다리는 노트 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
+  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts));
   // 켜질 탭은 화면 주소가 정한다. 주소가 탭을 정하지 않는 화면이면 직전에 켜 둔 탭이다
   const tab = activeRailTab(state.route);
   useEffect(() => rememberRailTab(state.route), [state.route]);
@@ -356,6 +359,11 @@ export function Rail({
               <p className="rail-companion-msg">
                 {waitingAnswers > 0 ? (
                   `💬 답변 대기 태스크가 ${waitingAnswers}건 있어요.`
+                ) : decisions.length > 0 ? (
+                  // 답을 기다리는 노트는 누르면 첫 노트를 연다
+                  <button type="button" className="rail-companion-action" title={`${decisions[0].title} 열기`} onClick={() => controller.navigate(decisionAddress(decisions[0]))}>
+                    {`📝 AI가 답을 기다리는 노트가 ${decisions.length}건 있어요.`} <span>열기 ›</span>
+                  </button>
                 ) : approvalBadge ? (
                   // 승인을 기다리는 변경은 글로만 알리지 않고, 누르면 승인 대기함이 열리게 한다
                   <button type="button" className="rail-companion-action" title="승인 대기함 열기" onClick={openApprovalsDialog}>

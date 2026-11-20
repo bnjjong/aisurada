@@ -18,6 +18,7 @@ import { formatRelativeTime } from './ui/dates.ts';
 import { refreshGithub } from './ui/githubStore.ts';
 import { applyChanged, refreshNotifications, toItem } from './ui/notificationsStore.ts';
 import { refreshApprovalCounts, resetApprovalsStore, startApprovalsWatch } from './ui/approvalsStore.ts';
+import { refreshDecisions, resetDecisionsStore, startDecisionsWatch } from './ui/decisionsStore.ts';
 import { refreshRunner, runnerChanged } from './ui/runnerStore.ts';
 import { NotificationToasts } from './ui/NotificationCenter.tsx';
 
@@ -87,6 +88,8 @@ function WorkspaceApp() {
       applyChanged(event, context.kind === 'main');
       // 승인을 기다리는 변경이 알려지면 레일의 배지도 바로 맞춘다(#53)
       if (toItem(event.pushed)?.kind === 'approval') void refreshApprovalCounts(controller.callEngine);
+      // AI가 노트에서 답을 기다린다는 알림이 오면 레일 배지와 노트 목록 표시도 바로 맞춘다
+      if (toItem(event.pushed)?.kind === 'decision') void refreshDecisions(controller.callEngine);
     })?.then(fn => { if (gone) fn(); else unlisten = fn; });
     return () => { gone = true; unlisten?.(); };
   }, [controller]);
@@ -106,6 +109,12 @@ function WorkspaceApp() {
     resetApprovalsStore();
     if (context.kind !== 'main' || !vaultPath || sample) return;
     return startApprovalsWatch(controller.callEngine, window);
+  }, [controller, vaultPath, sample]);
+  // AI가 노트에 쓴 「정할 것」 가운데 답을 기다리는 노트: 레일 배지와 노트 목록 표시가 쓴다. 승인 수와 같은 방식으로 메인 창만 맡는다.
+  useEffect(() => {
+    resetDecisionsStore();
+    if (context.kind !== 'main' || !vaultPath || sample) return;
+    return startDecisionsWatch(controller.callEngine, window);
   }, [controller, vaultPath, sample]);
   if (state.booting) return <main className="status-screen" role="status"><Brand state="thinking" />
     <p className="ais-bootsplash-msg">{context.kind === 'note' ? '노트를 여는 중…' : '워크스페이스를 여는 중…'}</p></main>;

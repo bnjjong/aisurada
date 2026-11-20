@@ -1848,6 +1848,8 @@ code.is-symbol { font-weight: 700; }
 .agent-mark { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; line-height: 0; }
 .agent-mark + .agent-mark { margin-left: 3px; }
 .agent-mark svg { display: block; }
+/* 노트 목록 줄의 「답 기다림」: AI가 이 노트에 쓴 「정할 것」이 사람의 답을 기다린다(ui/DecisionMark.tsx). */
+.decision-mark { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-size: 10.5px; font-weight: 600; line-height: 16px; white-space: nowrap; }
 .agent-mark[data-agent="other"] { color: var(--muted); }
 /* 한 줄 말줄임 칩(캘린더 주 보기 목록)에서는 글자 앞에 붙여 긴 제목에도 잘리지 않게 한다 */
 .mchip .agent-mark { margin: 0 4px 0 0; }

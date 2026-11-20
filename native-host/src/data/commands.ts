@@ -13,7 +13,7 @@ export interface Call { command: string; args?: Fields; }
 /** 명령줄이 `key=value`가 아니라 자리(positional)로 받는 인자: 호출 객체의 인자 이름을 그 차례로 앞에 둔다. */
 const POSITIONAL: Record<string, string[]> = {
   get_doc: ['id'], list_sub_notes: ['parent'], get_sub_note: ['parent', 'id'],
-  list_comments: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
+  list_comments: ['id', 'subId'], list_decisions: ['id', 'subId'], list_attachments: ['id', 'subId'], get_agenda_facts: ['id'], history: ['id', 'number'],
   update_agenda: ['id'], delete_agenda: ['id'], update_project: ['id'], delete_project: ['id'],
   save_ritual_template: ['id'], delete_doc_template: ['id'], update_agenda_facts: ['id'],
   set_favorite: ['id'], evaluate_doc: ['id'], link_docs: ['from', 'to'], update_doc: ['id'],
