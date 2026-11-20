@@ -143,7 +143,6 @@ export function NoteEditor({
         quote,
       );
       if (result.ok) {
-        setActiveComment(id + "|" + Date.now());
         await data.loadComments({ id: note.id, parent });
       }
     },

@@ -358,7 +358,25 @@ export function EditorTools(props: EditorProps) {
       }
       selection.current = selected.clone();
       const quote = $isTableSelection(selected) ? tableRowCells(selected).map(cell => cell.getTextContent()).join('\t') + '\n' : selected.getTextContent();
-      const rect = currentRoot.getBoundingClientRect(); setCompose({ quote, ...coords(rect), y: 70 }); return true;
+      const box = outer()?.getBoundingClientRect();
+      let targetRect: DOMRect | null = null;
+      if ($isTableSelection(selected)) {
+        const cells = tableRowCells(selected);
+        const first = cells[0] && editor.getElementByKey(cells[0].getKey());
+        targetRect = first?.closest('tr')?.getBoundingClientRect() ?? first?.getBoundingClientRect() ?? null;
+      } else if ($isRangeSelection(selected)) {
+        const dom = window.getSelection();
+        targetRect = dom?.rangeCount ? dom.getRangeAt(0).getBoundingClientRect() : null;
+      }
+      const rect = targetRect || currentRoot.getBoundingClientRect();
+      const x = box ? Math.max(8, Math.min(rect.left - box.left, box.width - 340)) : 8;
+      const spaceBelow = box ? box.height - (rect.bottom - box.top) : 0;
+      const y = box
+        ? (spaceBelow < 220 && (rect.top - box.top) > 220
+            ? Math.max(0, Math.round(rect.top - box.top - 200))
+            : Math.max(0, Math.round(rect.bottom - box.top + 8)))
+        : 70;
+      setCompose({ quote, x, y }); return true;
     }, COMMAND_PRIORITY_HIGH);
     const askCommand = editor.registerCommand(OPEN_ASK_COMMAND, () => {
       const currentRoot = editor.getRootElement();
@@ -466,7 +484,7 @@ export function EditorTools(props: EditorProps) {
     {compose && <div className="comment-compose-popover comment-compose" style={{ left: compose.x, top: compose.y }} onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeCompose(); }
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); event.stopPropagation(); submitComment(); }
-    }}><blockquote>{compose.quote}</blockquote><textarea className="comment-input" aria-label="코멘트 내용" autoFocus value={comment} onChange={event => setComment(event.target.value)} />
+    }}><blockquote>{compose.quote}</blockquote><textarea className="comment-input" aria-label="코멘트 내용" ref={input => input?.focus({ preventScroll: true })} value={comment} onChange={event => setComment(event.target.value)} />
       <div><button className="link-popover-btn" onClick={closeCompose}>취소</button><button className="link-popover-btn primary" disabled={!comment.trim()} onClick={submitComment}>추가</button></div></div>}
     {menu && <div className={menu.kind === 'note' ? 'note-picker' : 'slash-menu'} style={{ left: menu.x, top: menu.y }}>
       <input aria-label={menu.kind === 'note' ? '노트 링크 검색' : '블록 검색'} ref={input => input?.focus({ preventScroll: true })} value={menu.query}
