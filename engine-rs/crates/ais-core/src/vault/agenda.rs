@@ -316,7 +316,14 @@ pub(super) fn parse_line_reader(text: &str) -> HashMap<String, String> {
         if key.is_empty() {
             continue;
         }
-        let mut value = trim(&line[colon + 1..]).to_string();
+        let raw_value = trim(&line[colon + 1..]);
+        if matches!(key, "createdAt" | "editedAt")
+            && matches!(raw_value.split(" #").next(), Some("" | "~" | "null" | "Null" | "NULL"))
+        {
+            result.remove(key);
+            continue;
+        }
+        let mut value = raw_value.to_string();
         if value.chars().count() >= 2 {
             if value.starts_with('\'') && value.ends_with('\'') {
                 value = value[1..value.len() - 1].replace("''", "'");

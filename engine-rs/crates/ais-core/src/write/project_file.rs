@@ -20,7 +20,7 @@ pub fn archived_rel_path(slug: &str, id: &str) -> String {
 }
 
 /// 프로젝트 파일 전체 내용: 머리(`id`, `slug`, `title`, `hue`와 저장소가 있으면 `repos: <한 줄 JSON>`)와 요약 본문
-pub fn render(info: &ProjectInfo) -> Vec<u8> {
+pub fn render(info: &ProjectInfo, created_at: &str, edited_at: &str) -> Vec<u8> {
     let mut out = String::from("---\n");
     let mut line =
         |key: &str, value: &str| out.push_str(&format!("{key}: {}\n", dump_string(value, 1)));
@@ -28,12 +28,8 @@ pub fn render(info: &ProjectInfo) -> Vec<u8> {
     line("slug", &info.slug);
     line("title", &info.title);
     line("hue", &info.hue);
-    if let Some(at) = &info.created_at {
-        line("createdAt", at);
-    }
-    if let Some(at) = &info.edited_at {
-        line("editedAt", at);
-    }
+    line("createdAt", created_at);
+    line("editedAt", edited_at);
     let repos = repos_json(&info.repos);
     if !repos.is_empty() {
         out.push_str(&format!("repos: {repos}\n"));

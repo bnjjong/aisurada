@@ -1,5 +1,4 @@
-//! 노트 머리(YAML) 만들기와 편집 도장 판정(`judge`). 줄 차례와 따옴표 규칙은 Java 엔진의 `FrontmatterWriter.buildFullNoteFrontmatter`와 같아서,
-//! 건드리지 않은 부분의 글자가 바뀌지 않는다.
+//! 노트 머리(YAML) 만들기와 편집 도장 판정(`judge`). 저장할 때 생성·수정 시각을 함께 쓴다.
 
 use super::meta::{Evaluation, Format, Link, MetaData, agent_for_file};
 use crate::error::EngineError;
@@ -14,13 +13,13 @@ pub struct NoteFront<'a> {
     pub doc_type: &'a str,
     pub title: &'a str,
     pub created: &'a str,
-    pub created_at: Option<&'a str>,
+    pub created_at: &'a str,
     pub session_id: Option<&'a str>,
     pub session_agent: Option<&'a str>,
     pub tier: Tier,
     pub decision_confirmation: Option<&'a str>,
     pub edited_by: Option<&'a str>,
-    pub edited_at: Option<&'a str>,
+    pub edited_at: &'a str,
     pub edited_session_id: Option<&'a str>,
     pub edited_session_agent: Option<&'a str>,
     pub tags: &'a [String],
@@ -80,6 +79,11 @@ pub fn extra_front(raw: &[(Value, Value)]) -> String {
 impl NoteFront<'_> {
     /// 머리 줄들(여닫는 울타리는 뺀다). 마지막 줄도 줄바꿈으로 끝난다.
     pub fn render(&self) -> String {
+        self.render_with_times(true, true)
+    }
+
+    // 예전 파일과 편집 여부를 비교할 때만 머리에 없던 시각을 뺀다.
+    fn render_with_times(&self, has_created_at: bool, has_edited_at: bool) -> String {
         let mut out = String::new();
         let mut line =
             |key: &str, value: &str| out.push_str(&format!("{key}: {}\n", dump_string(value, 1)));
@@ -88,8 +92,8 @@ impl NoteFront<'_> {
         line("type", &self.doc_type.to_lowercase());
         line("title", self.title);
         line("created", self.created);
-        if let Some(at) = self.created_at {
-            line("createdAt", at);
+        if has_created_at {
+            line("createdAt", self.created_at);
         }
         if let Some(session) = self.session_id {
             line("sessionId", session);
@@ -103,20 +107,20 @@ impl NoteFront<'_> {
         if self.tier.is_record() {
             out.push_str(&format!("tier: {}\n", Tier::Record.as_str()));
         }
-        if let (Some(by), Some(at)) = (self.edited_by, self.edited_at) {
+        if let (Some(by), true) = (self.edited_by, has_edited_at) {
             let mut line = |key: &str, value: &str| {
                 out.push_str(&format!("{key}: {}\n", dump_string(value, 1)))
             };
             line("editedBy", by);
-            line("editedAt", at);
+            line("editedAt", self.edited_at);
             if let Some(session) = self.edited_session_id {
                 line("editedSessionId", session);
                 if let Some(agent) = self.edited_session_agent {
                     line("editedSessionAgent", agent);
                 }
             }
-        } else if let Some(at) = self.edited_at {
-            out.push_str(&format!("editedAt: {}\n", dump_string(at, 1)));
+        } else if has_edited_at {
+            out.push_str(&format!("editedAt: {}\n", dump_string(self.edited_at, 1)));
         }
         if !self.tags.is_empty() {
             out.push_str("tags:\n");
@@ -170,7 +174,7 @@ pub struct Editor<'a> {
 /// 저장 상한(UTF-16 글자)
 pub const MAX_FILE_UNITS: usize = 1_000_000;
 
-/// 쓸 파일 글이 저장 상한(UTF-16 단위 [`MAX_FILE_UNITS`])을 넘으면 `rel`(쓸 경로)을 붙인 오류를 낸다.
+/// 쓸 파일 글이 저장 상한을 넘으면 `rel`(쓸 경로)을 붙인 오류를 낸다.
 pub fn check_size(text: &str, rel: &str) -> Result<(), EngineError> {
     if crate::text::utf16_len(text) > MAX_FILE_UNITS {
         return Err(EngineError::internal(format!(
@@ -217,76 +221,66 @@ pub fn judge(
     let meta = draft.meta;
     // 엔진이 모르는 머리 칸은 그대로 이어 쓴다. 맨 끝에 붙으므로 모르는 칸이 가운데 있던 노트는 처음 한 번 순서가 바뀌고, 그 쓰기는 편집 도장이 찍힌다
     let extra = extra_front(raw);
-    let front = |edited_by: Option<&str>,
-                 edited_at: Option<&str>,
-                 edited_session: Option<&str>,
-                 edited_agent: Option<&str>,
-                 decision_confirmation: Option<&str>| {
-        NoteFront {
-            id: &meta.id,
-            agenda: draft.agenda,
-            doc_type: &meta.doc_type,
-            title: draft.title,
-            created: draft.created,
-            created_at: meta.created_at.as_deref(),
-            session_id: draft.session_id,
-            session_agent: draft.session_agent,
-            tier: draft.tier,
-            decision_confirmation,
-            edited_by,
-            edited_at,
-            edited_session_id: edited_session,
-            edited_session_agent: edited_agent,
-            tags: draft.tags,
-            sub_agenda_ids: draft.sub_agenda_ids,
-            favorite: draft.favorite,
-            favorite_category: draft.favorite_category,
-            template: draft.template,
-            evaluation: draft.evaluation,
-            links: draft.links,
-            extra: &extra,
-        }
-        .render()
+    let now = format_utc_millis(now_millis);
+    let mut front = NoteFront {
+        id: &meta.id,
+        agenda: draft.agenda,
+        doc_type: &meta.doc_type,
+        title: draft.title,
+        created: draft.created,
+        created_at: meta.created_at.as_deref().unwrap_or(&now),
+        session_id: draft.session_id,
+        session_agent: draft.session_agent,
+        tier: draft.tier,
+        decision_confirmation: meta.decision_confirmation.as_deref(),
+        edited_by: meta.edited_by.as_deref(),
+        edited_at: meta.edited_at.as_deref().unwrap_or(&now),
+        edited_session_id: meta.edited_session_id.as_deref(),
+        edited_session_agent: meta.edited_session_agent.as_deref(),
+        tags: draft.tags,
+        sub_agenda_ids: draft.sub_agenda_ids,
+        favorite: draft.favorite,
+        favorite_category: draft.favorite_category,
+        template: draft.template,
+        evaluation: draft.evaluation,
+        links: draft.links,
+        extra: &extra,
     };
     let (open, close) = if format == Format::Html {
         ("<!--aisurada\n", "-->\n")
     } else {
         ("---\n", "---\n")
     };
-    let form_a = format!(
-        "{open}{}{close}{body}",
-        front(
-            meta.edited_by.as_deref(),
-            meta.edited_at.as_deref(),
-            meta.edited_session_id.as_deref(),
-            meta.edited_session_agent.as_deref(),
-            meta.decision_confirmation.as_deref()
-        )
-    );
-    let dumped = dump_general_map(raw).map_err(|e| EngineError::invalid_argument(e.0))?;
-    let form_b = format!("{open}{dumped}{close}{old_body}");
-    if form_a == form_b {
-        return Ok(form_a);
+    let without_missing_times =
+        front.render_with_times(meta.created_at.is_some(), meta.edited_at.is_some());
+    // 누락을 채운 것만으로 기존 수정 시각이 바뀌지 않게 비교한다.
+    let mut original = raw.to_vec();
+    original.retain(|(key, _)| {
+        !matches!(key, Value::Str(name)
+            if (name == "createdAt" && meta.created_at.is_none())
+                || (name == "editedAt" && meta.edited_at.is_none()))
+    });
+    let original = dump_general_map(&original).map_err(|e| EngineError::invalid_argument(e.0))?;
+    if without_missing_times != original || body != old_body {
+        let tool = editor.tool;
+        let confirmation = super::decision::confirmation_after_edit(meta, old_body, body, tool);
+        let edited_session = if tool { editor.session } else { None };
+        let edited_agent = edited_session.and(editor.session_agent.and_then(agent_for_file));
+        let legacy_at;
+        let edited_at = if meta.created_at.is_some() {
+            &now
+        } else {
+            legacy_at = kst_minute(now_millis);
+            &legacy_at
+        };
+        front.decision_confirmation = confirmation.as_deref();
+        front.edited_by = Some(if tool { "tool" } else { "app" });
+        front.edited_at = edited_at;
+        front.edited_session_id = edited_session;
+        front.edited_session_agent = edited_agent.as_deref();
+        return Ok(format!("{open}{}{close}{body}", front.render()));
     }
-    let tool = editor.tool;
-    let confirmation = super::decision::confirmation_after_edit(meta, old_body, body, tool);
-    let edited_at = if meta.created_at.is_some() {
-        format_utc_millis(now_millis)
-    } else {
-        kst_minute(now_millis)
-    };
-    let edited_session = if tool { editor.session } else { None };
-    let edited_agent = edited_session.and(editor.session_agent.and_then(agent_for_file));
-    Ok(format!(
-        "{open}{}{close}{body}",
-        front(
-            Some(if tool { "tool" } else { "app" }),
-            Some(&edited_at),
-            edited_session,
-            edited_agent.as_deref(),
-            confirmation.as_deref()
-        )
-    ))
+    Ok(format!("{open}{}{close}{body}", front.render()))
 }
 
 /// 한국 시각(+09:00)으로 분까지 적은 글 `yyyy-MM-ddTHH:mm:00+09:00`
@@ -340,13 +334,13 @@ mod tests {
             doc_type: "free",
             title: "제목",
             created: "2026-11-12T09:00:00+09:00",
-            created_at: Some("2026-11-12T00:00:00.000Z"),
+            created_at: "2026-11-12T00:00:00.000Z",
             session_id: Some("s1"),
             session_agent: Some("codex"),
             tier: Tier::Record,
             decision_confirmation: Some("c"),
             edited_by: Some("app"),
-            edited_at: Some("2026-11-12T09:00:00+09:00"),
+            edited_at: "2026-11-12T09:00:00+09:00",
             edited_session_id: Some("s2"),
             edited_session_agent: Some("gemini"),
             tags: &["t".to_string()],

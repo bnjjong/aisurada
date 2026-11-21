@@ -103,7 +103,7 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
     let info = ProjectInfo {
         id,
         created_at: Some(at.clone()),
-        edited_at: Some(at),
+        edited_at: Some(at.clone()),
         slug,
         title: title.to_string(),
         hue,
@@ -112,7 +112,7 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
     };
     write_atomic(
         &vault.join(project_file::rel_path(&info.slug)),
-        &project_file::render(&info),
+        &project_file::render(&info, &at, &at),
     )?;
     Ok(ProjectRow::from(&info))
 }
@@ -144,12 +144,21 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
         summary,
         repos,
     };
-    if info != current {
-        info.edited_at = Some(format_utc_millis(now_millis()));
+    let changed = info != current;
+    if changed || info.created_at.is_none() || info.edited_at.is_none() {
+        let at = format_utc_millis(now_millis());
+        let created_at = info.created_at.take().unwrap_or_else(|| at.clone());
+        let edited_at = if changed {
+            at
+        } else {
+            info.edited_at.take().unwrap_or(at)
+        };
         write_atomic(
             &vault.join(project_file::rel_path(&info.slug)),
-            &project_file::render(&info),
+            &project_file::render(&info, &created_at, &edited_at),
         )?;
+        info.created_at = Some(created_at);
+        info.edited_at = Some(edited_at);
     }
     Ok(ProjectRow::from(&info))
 }

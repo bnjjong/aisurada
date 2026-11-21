@@ -39,7 +39,7 @@ pub fn least_used_hue<'a>(used: impl IntoIterator<Item = &'a str>) -> &'static s
 }
 
 /// 아젠다 파일 전체 내용: 머리(`id`, `slug`, `title`, `hue`와 있는 것만 `repo`, `project`, `projectRepo`)와 요약 본문
-pub fn render(info: &AgendaInfo) -> Vec<u8> {
+pub fn render(info: &AgendaInfo, created_at: &str, edited_at: &str) -> Vec<u8> {
     let mut out = String::from("---\n");
     let mut line =
         |key: &str, value: &str| out.push_str(&format!("{key}: {}\n", dump_string(value, 1)));
@@ -47,12 +47,8 @@ pub fn render(info: &AgendaInfo) -> Vec<u8> {
     line("slug", &info.slug);
     line("title", &info.title);
     line("hue", &info.hue);
-    if let Some(at) = &info.created_at {
-        line("createdAt", at);
-    }
-    if let Some(at) = &info.edited_at {
-        line("editedAt", at);
-    }
+    line("createdAt", created_at);
+    line("editedAt", edited_at);
     if let Some(repo) = &info.repo {
         line("repo", repo);
     }
