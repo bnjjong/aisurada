@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useLexicalNodeSelection } from '@lexical/react/useLexicalNodeSelection';
@@ -7,6 +7,7 @@ import { EditorContext } from './context.ts';
 import type { EditorFeatures } from './context.ts';
 import { relativePath } from './grammar.ts';
 import { drawioAttachmentName, OPEN_DRAWIO_COMMAND } from './drawio.tsx';
+import { DrawioView } from './drawio-view.tsx';
 
 const heights = new Map<string, number>();
 export function frameHeight(url: string, value?: number): number {
@@ -87,14 +88,21 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
   const [editable, setEditable] = useState(() => editor.isEditable());
   const [live, setLive] = useState<number | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const frame = useRef<HTMLSpanElement>(null), image = useRef<HTMLImageElement>(null);
+  const viewButton = useRef<HTMLButtonElement>(null), restoreViewFocus = useRef(false);
   useEffect(() => editor.registerEditableListener(setEditable), [editor]);
+  useLayoutEffect(() => {
+    if (viewing || !restoreViewFocus.current) return;
+    restoreViewFocus.current = false;
+    viewButton.current?.focus({ preventScroll: true });
+  }, [viewing]);
   // 에디터의 기본 클릭 처리(리치텍스트)는 클릭 때 노드 선택을 지운다. 그보다 먼저 이 이미지를 눌렀는지 보고 선택한다.
   useEffect(() => editor.registerCommand(CLICK_COMMAND, (event: MouseEvent) => {
     const target = event.target as Element | null;
     if (!editable || !target || !frame.current?.contains(target)) return false;
     // 도구줄과 손잡이에서 난 클릭(끌기를 놓을 때 포함)도 여기서 끝낸다. 넘기면 기본 처리가 이미지 선택을 지운다.
-    if (target.closest('.lex-image-bar, .lex-image-grip')) return true;
+    if (target.closest('.lex-image-bar, .lex-image-grip, .drawio-preview-open, .drawio-view')) return true;
     if (event.shiftKey) setSelected(!selected); else { clearSelected(); setSelected(true); }
     return true;
   }, COMMAND_PRIORITY_LOW), [editor, editable, selected, setSelected, clearSelected]);
@@ -127,6 +135,11 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
   const hasFixedWidth = shown > 0;
   const fileName = imageFileName(source);
   const isGeneratedName = /^img-[a-z0-9]+-[a-z0-9]+\.[a-z0-9]+$/i.test(fileName);
+  if (viewing) return <span className="drawio-view-frame" ref={frame}>
+    <DrawioView src={url} alt={alt} onClose={() => setViewing(false)} />
+  </span>;
+  const caption = fileName && !isGeneratedName &&
+    <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{drawio && alt ? alt : fileName}</span>;
   return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`} style={shown ? { width: shown } : undefined}>
     <span className="lex-image-media">
       {loadFailed ? (
@@ -152,7 +165,17 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
         </span>
       </>}
     </span>
-    {fileName && !isGeneratedName && <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{drawio && alt ? alt : fileName}</span>}
+    {drawio && !loadFailed ? <span className="drawio-preview-caption">
+      {caption}
+      <button ref={viewButton} className="drawio-preview-open" type="button"
+        aria-label={alt ? `${alt} 자세히 보기` : '다이어그램 자세히 보기'}
+        onClick={event => {
+          event.stopPropagation();
+          clearSelected();
+          restoreViewFocus.current = true;
+          setViewing(true);
+        }}>자세히 보기</button>
+    </span> : caption}
   </span>;
 }
 export const FRAME_LINK = /^(?:https?|mailto|tel):/i;
