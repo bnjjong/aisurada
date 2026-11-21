@@ -5292,7 +5292,7 @@ fn res_ai_queue(h: &mut WriteHarness, label: &str, command: &str, mut args: Valu
 }
 
 /// 자원 명령 맞대기: 만들기·고치기·참조·휴지통·승인 기록·직접 고친 파일·대기 변경의 승인/거절. 자원 파일은 진짜 SnakeYAML이 쓴 바이트와 견준다.
-fn compare_resource_commands(h: &mut WriteHarness) {
+fn compare_resource_commands(h: &mut WriteHarness) -> String {
     // SAFETY: 단일 스레드이고, Java 단발 프로세스는 부모의 환경을 물려받는다.
     unsafe {
         env::set_var("TZ", "Asia/Seoul");
@@ -6994,6 +6994,32 @@ fn compare_resource_commands(h: &mut WriteHarness) {
         json!({"id": reason_change}),
         None,
     );
+    s1
+}
+
+/// 자원 고치기에서 종류와 범위가 **함께** 틀린 입력의 오류 차례(종류 → 범위, 이슈 #83). 한 번에 하나만 틀린 사례로는 순서를 못 본다.
+/// 하네스의 id와 시각은 단계 번호에서 나오므로, 앞 사례의 기록이 밀리지 않게 쓰기 단계의 맨 끝에서 부른다.
+fn compare_resource_edit_error_order(h: &mut WriteHarness, skill: &str) {
+    for (label, kind, scope_key, scope_val) in [
+        ("종류 바꿈과 범위 문법 틀림", "agent", "scope", "weird"),
+        ("종류 모름과 범위 문법 틀림", "bogus", "scope", "weird"),
+        ("종류 바꿈과 범위 바꿈", "agent", "project", "alpha"),
+        ("종류 같고 범위 문법 틀림", "skill", "scope", "weird"),
+    ] {
+        res_step(
+            h,
+            &format!("고치기 {label}"),
+            "save_resource",
+            &[
+                "save-resource",
+                &format!("id={skill}"),
+                &format!("kind={kind}"),
+                &format!("{scope_key}={scope_val}"),
+            ],
+            json!({"id": skill, "kind": kind, scope_key: scope_val}),
+            Some(skill),
+        );
+    }
 }
 
 /// 문답·레일 대화 명령 한 단계. `java`는 `ais-cli` 인자 목록(자리 인자 포함)이고 `rust`는 같은 뜻의 호출 객체다.
@@ -8902,7 +8928,8 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
         return;
     }
     if env::var("HARNESS_ONLY").as_deref() == Ok("resources") {
-        compare_resource_commands(&mut h);
+        let skill = compare_resource_commands(&mut h);
+        compare_resource_edit_error_order(&mut h, &skill);
         println!(
             "  (자원 단계만: 쓰기 단계 {}개 가운데 Java가 성공으로 답한 것 {}개)",
             h.step, h.succeeded
@@ -10032,10 +10059,11 @@ fn compare_writes(report: &mut Report, java: &Java, fixture: &Path) {
     compare_comment_writes(&mut h);
     compare_trash_writes(&mut h);
     compare_task_commands(&mut h);
-    compare_resource_commands(&mut h);
+    let skill = compare_resource_commands(&mut h);
     compare_ask_chat_commands(&mut h);
     compare_session_commands(&mut h);
     compare_note_tools(&mut h);
+    compare_resource_edit_error_order(&mut h, &skill);
 
     // ---- init_workspace: 빈 폴더 쌍에서(폴더 이름을 같게 두려고 부모를 다르게 한다) ----
     let pair = |n: u32| -> (PathBuf, PathBuf) {

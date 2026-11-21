@@ -1497,6 +1497,105 @@ fn ai_cannot_read_or_restore_record_tier_leftovers() {
     }
 }
 
+/// 이슈 #82: AI는 기록 층 노트의 보관물을 되살리지 못하듯 영구 삭제도, 휴지통 비우기로 지우지도 못한다.
+#[test]
+fn ai_cannot_purge_or_empty_record_tier_leftovers() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let record_a = "ndfx0009-00000009"; // 기록 층, 단일 파일 노트
+    let record_b = "ndfx0008-00000008"; // 기록 층
+    let reading = "ndfx0003-00000003"; // 읽기 층(대조군)
+    let ai = |command: &str, mut args: Value| {
+        args["caller"] = json!("ai");
+        engine.call(command, args)
+    };
+    let mut trash_of = std::collections::BTreeMap::new();
+    for note in [record_a, record_b, reading] {
+        let sent = engine.call("delete_doc", json!({"id": note})).unwrap();
+        trash_of.insert(
+            note.to_string(),
+            (
+                sent["trashId"].as_str().unwrap().to_string(),
+                vault
+                    .join(".aisurada/trash/files")
+                    .join(sent["file"].as_str().unwrap()),
+            ),
+        );
+    }
+
+    // 영구 삭제: 기록 층 보관물은 거절하고, 거절은 vault를 바꾸지 않는다
+    let before = snapshot(&vault);
+    for note in [record_a, record_b] {
+        let (trash_id, archive) = &trash_of[note];
+        let error = ai("purge_doc", json!({"trashId": trash_id})).unwrap_err();
+        assert_eq!(
+            error.kind,
+            ErrorKind::RecordTier,
+            "{note}: {}",
+            error.message
+        );
+        assert!(
+            error.message.starts_with(&format!(
+                "도구 표면이 고칠 수 없는 노트다(층=record): {note}."
+            )),
+            "{note}: {}",
+            error.message
+        );
+        assert!(archive.exists(), "{note}: 보관물이 지워졌다");
+    }
+    assert_eq!(
+        snapshot(&vault),
+        before,
+        "거절된 영구 삭제가 vault를 바꿨다"
+    );
+
+    // 읽기 층 보관물은 AI도 영구 삭제한다
+    let (reading_id, reading_archive) = &trash_of[reading];
+    let purged = ai("purge_doc", json!({"trashId": reading_id})).unwrap();
+    assert_eq!(purged["purged"], true);
+    assert!(!reading_archive.exists());
+
+    // 비우기: AI는 자기에게 보이는 항목만 비우고 기록 층 보관물은 목록에 그대로 둔다
+    let by_ai = ai("empty_trash", json!({})).unwrap();
+    assert_eq!(by_ai["failed"], json!([]), "{by_ai}");
+    let remaining: Vec<String> = engine.call("list_trash", Value::Null).unwrap()["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["docId"].as_str().unwrap().to_string())
+        .collect();
+    let mut expected = vec![record_a.to_string(), record_b.to_string()];
+    expected.sort();
+    let mut remaining_sorted = remaining.clone();
+    remaining_sorted.sort();
+    assert_eq!(remaining_sorted, expected, "기록 층 항목만 남아야 한다");
+    for note in [record_a, record_b] {
+        assert!(
+            trash_of[note].1.exists(),
+            "{note}: 비우기가 보관물을 지웠다"
+        );
+    }
+
+    // 앱은 기록 층 보관물도 영구 삭제하고 비운다
+    let (trash_id, archive) = &trash_of[record_a];
+    assert_eq!(
+        engine
+            .call("purge_doc", json!({"trashId": trash_id}))
+            .unwrap()["purged"],
+        true
+    );
+    assert!(!archive.exists());
+    let emptied = engine.call("empty_trash", Value::Null).unwrap();
+    assert_eq!(emptied["purged"], 1, "{emptied}");
+    assert!(!trash_of[record_b].1.exists());
+    assert_eq!(
+        std::fs::read_to_string(vault.join(".aisurada/trash/trash.json")).unwrap(),
+        "[]\n"
+    );
+}
+
 #[test]
 fn writes_projects_through_the_write_foundation() {
     isolate_writes();
@@ -3419,6 +3518,40 @@ fn reads_resource_arguments_like_the_command_line() {
         .message,
         "description 이 필요하다"
     );
+    // 고칠 때 종류와 범위가 함께 틀리면 종류 오류가 먼저다(범위 글을 해석하기 전에 종류를 본다, 이슈 #83)
+    let skill_id = skill["id"].as_str().unwrap();
+    for (extra, expected) in [
+        (
+            json!({"kind": "agent", "scope": "weird"}),
+            "종류는 바꿀 수 없다: skill",
+        ),
+        (
+            json!({"kind": "agent", "project": "alpha"}),
+            "종류는 바꿀 수 없다: skill",
+        ),
+        (
+            json!({"kind": "bogus", "scope": "weird"}),
+            "kind 는 skill 이나 agent 여야 한다: bogus",
+        ),
+        (
+            json!({"kind": "skill", "scope": "weird"}),
+            "scope 는 global 이어야 한다. 프로젝트 자원은 project=<프로젝트 slug> 로 준다: weird",
+        ),
+        (
+            json!({"scope": "global", "project": "alpha"}),
+            "scope=global 과 project=<프로젝트 slug> 는 함께 줄 수 없다",
+        ),
+    ] {
+        let mut args = json!({"id": skill_id, "description": "고침"});
+        for (key, value) in extra.as_object().unwrap() {
+            args[key] = value.clone();
+        }
+        assert_eq!(
+            error("save_resource", args.clone()).message,
+            expected,
+            "{args}"
+        );
+    }
     assert_eq!(
         error("save_resource", json!({"scope": "global"})).message,
         "kind 는 skill 이나 agent 여야 한다: null"
