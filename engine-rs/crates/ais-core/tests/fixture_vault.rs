@@ -4741,3 +4741,174 @@ fn symlinks_cannot_carry_reads_and_writes_outside_the_vault() {
     let _ = std::fs::remove_dir_all(&outside);
     let _ = std::fs::remove_file(&alias);
 }
+
+/// 엔진이 모르는 머리 칸(새 버전이 더한 칸, 손으로 적은 칸)을 노트를 다시 쓸 때 잃지 않는지 본다.
+/// 옛 엔진 프로세스가 `subAgendaIds`를 지우던 사고를 막는다.
+#[test]
+fn rewrites_keep_header_keys_the_engine_does_not_know() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let call = |name, args| engine.call(name, args).unwrap();
+    let agenda = call("create_agenda", json!({"title": "보존 시험"}));
+    let sub = call(
+        "create_sub_agenda",
+        json!({"agendaId": agenda["id"], "title": "분류"}),
+    );
+    let note = call(
+        "create_doc",
+        json!({"agenda": agenda["slug"], "type": "free", "title": "보존 노트", "body": "본문",
+               "subAgendaIds": [sub["id"]]}),
+    );
+    let id = note["id"].clone();
+    let read = || call("get_doc", json!({"id": id}));
+    let content = |path: &Value| vault.join(path.as_str().unwrap()).join("note.md");
+
+    // 모르는 칸을 손으로 적는다: 글 칸은 가운데(제목 뒤), 목록과 맵은 맨 끝
+    let file = content(&read()["path"]);
+    let text = std::fs::read_to_string(&file).unwrap();
+    let marked = text
+        .replacen(
+            "\ntype: free\n",
+            "\ntype: free\nfutureField: 미래에 생길 칸\n",
+            1,
+        )
+        .replacen(
+            "\n---\n",
+            "\nlabels:\n  - 하나\n  - 둘\nextraMap:\n  k: v\n---\n",
+            1,
+        );
+    assert!(marked.contains("futureField: 미래에 생길 칸\n"), "{marked}");
+    std::fs::write(&file, marked).unwrap();
+
+    let keep = |step: &str| {
+        let doc = read();
+        let header = std::fs::read_to_string(content(&doc["path"])).unwrap();
+        for needle in [
+            "futureField: 미래에 생길 칸\n",
+            "labels:\n  - 하나\n  - 둘\n",
+            "extraMap:\n  k: v\n",
+        ] {
+            assert!(
+                header.contains(needle),
+                "{step} 뒤에 모르는 칸이 사라졌다({needle:?}):\n{header}"
+            );
+        }
+        assert_eq!(
+            doc["subAgendaIds"],
+            json!([sub["id"]]),
+            "{step} 뒤에 서브 아젠다가 바뀌었다"
+        );
+    };
+    keep("손으로 적은 직후");
+
+    let f1 = || read()["precondition"].clone();
+    for (label, args) in [
+        ("본문", json!({"body": "새 본문"})),
+        ("제목(폴더 이름이 바뀐다)", json!({"title": "바뀐 제목"})),
+        ("태그", json!({"tags": ["가", "나"]})),
+        ("날짜", json!({"date": "2026-01-02"})),
+    ] {
+        let mut args = args;
+        args["id"] = id.clone();
+        args["f1"] = f1();
+        call("update_doc", args);
+        keep(label);
+    }
+    call(
+        "set_favorite",
+        json!({"id": id, "favorite": true, "f1": f1()}),
+    );
+    keep("즐겨찾기");
+    call("evaluate_doc", json!({"id": id, "score": 70, "f1": f1()}));
+    keep("평가");
+
+    // AI가 고쳐도 같다
+    call(
+        "update_doc",
+        json!({"id": id, "body": "AI 본문", "f1": f1(), "caller": "ai", "session": "ai-1", "sessionAgent": "codex"}),
+    );
+    keep("AI 수정");
+
+    // 후속 노트: 만들고 카드를 본문에 넣었다 지우면 메인 노트 머리를 다시 쓴다(rewrite_root)
+    let child = call(
+        "create_sub_note",
+        json!({"parent": id, "title": "하위", "body": "본문"}),
+    );
+    let card = format!("본문\n\n[카드](#sub:{})\n", child["id"].as_str().unwrap());
+    call("update_doc", json!({"id": id, "body": card, "f1": f1()}));
+    call("delete_sub_note", json!({"parent": id, "id": child["id"]}));
+    keep("후속 노트 카드 정리");
+
+    // 후속 노트 머리의 모르는 칸도 후속 노트를 고칠 때 남는다(judge), 그 아래 후속 노트를 지울 때도 남는다(rewrite_sub)
+    let child = call(
+        "create_sub_note",
+        json!({"parent": id, "title": "상위 후속", "body": "본문"}),
+    );
+    let grand = call(
+        "create_sub_note",
+        json!({"parent": format!("{}/{}", id.as_str().unwrap(), child["id"].as_str().unwrap()),
+               "title": "손자", "body": "본문"}),
+    );
+    let child_file = vault.join(child["path"].as_str().unwrap()).join("note.md");
+    let child_text = std::fs::read_to_string(&child_file).unwrap();
+    std::fs::write(
+        &child_file,
+        child_text.replacen("\n---\n", "\nchildKey: 후속 칸\n---\n", 1),
+    )
+    .unwrap();
+    let parent = format!("{}", id.as_str().unwrap());
+    let fresh = call("get_sub_note", json!({"parent": parent, "id": child["id"]}));
+    call(
+        "update_sub_note",
+        json!({"parent": parent, "id": child["id"], "body": "후속 새 본문", "f1": fresh["precondition"]}),
+    );
+    let after = std::fs::read_to_string(
+        vault
+            .join(
+                call("get_sub_note", json!({"parent": parent, "id": child["id"]}))["path"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .join("note.md"),
+    )
+    .unwrap();
+    assert!(
+        after.contains("childKey: 후속 칸\n"),
+        "후속 노트 수정 뒤에 모르는 칸이 사라졌다:\n{after}"
+    );
+    // 손자 후속 노트를 지우면 그 위 후속 노트를 다시 쓴다(rewrite_sub). 거기서도 모르는 칸이 남는다
+    let child_path =
+        call("get_sub_note", json!({"parent": parent, "id": child["id"]}))["path"].clone();
+    let child_chain = format!("{}/{}", id.as_str().unwrap(), child["id"].as_str().unwrap());
+    let card = format!(
+        "후속 본문\n\n[카드](#sub:{})\n",
+        grand["id"].as_str().unwrap()
+    );
+    let fresh = call("get_sub_note", json!({"parent": parent, "id": child["id"]}));
+    call(
+        "update_sub_note",
+        json!({"parent": parent, "id": child["id"], "body": card, "f1": fresh["precondition"]}),
+    );
+    call(
+        "delete_sub_note",
+        json!({"parent": child_chain, "id": grand["id"]}),
+    );
+    let after = std::fs::read_to_string(
+        vault
+            .join(
+                call("get_sub_note", json!({"parent": parent, "id": child["id"]}))["path"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .join("note.md"),
+    )
+    .unwrap();
+    assert!(
+        after.contains("childKey: 후속 칸\n"),
+        "후속 노트 카드 정리 뒤에 모르는 칸이 사라졌다:\n{after}"
+    );
+    let _ = child_path;
+    std::fs::remove_dir_all(vault).unwrap();
+}
