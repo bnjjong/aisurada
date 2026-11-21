@@ -524,7 +524,6 @@ export function AgendaPage({
       ws.agendas.find((a) => a.slug === id),
     [deleting, setDeleting] = useState(false),
     [managing, setManaging] = useState(false),
-    [subFilter, setSubFilter] = useState({ agendaId: "", id: "all" }),
     [error, setError] = useState(""),
     [widths, setWidths] = useState<Record<string, number>>({});
   const selected = ws.notes.filter(
@@ -563,9 +562,9 @@ export function AgendaPage({
     ),
     subAgendas = agenda.subAgendas ?? [],
     activeSubAgendas = subAgendas.filter((item) => !item.archived),
-    activeFilter = subFilter.agendaId === agenda.id &&
-      (subFilter.id === "unassigned" || activeSubAgendas.some((item) => item.id === subFilter.id))
-      ? subFilter.id
+    subFilter = state.subAgendaFilters.get(agenda.id) ?? "all",
+    activeFilter = subFilter === "unassigned" || activeSubAgendas.some((item) => item.id === subFilter)
+      ? subFilter
       : "all",
     knownSubAgendas = new Set(subAgendas.map((item) => item.id)),
     unassigned = (n: Note) => !n.subAgendaIds?.some((id) => knownSubAgendas.has(id)),
@@ -678,7 +677,7 @@ export function AgendaPage({
             })),
           ].map((item) => (
             <button type="button" key={item.id} aria-pressed={activeFilter === item.id}
-              onClick={() => setSubFilter({ agendaId: agenda.id, id: item.id })}>
+              onClick={() => controller.selectSubAgendaFilter(agenda.id, item.id)}>
               {item.title} <small>{item.count}</small>
             </button>
           ))}

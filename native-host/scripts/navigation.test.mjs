@@ -199,6 +199,30 @@ test('controller follows external popstate routes and replacement guards preserv
   h.controller.locationChanged('/doc/missing'); assert.equal(h.controller.getSnapshot().route, '/doc/a');
 });
 
+test('내 기록으로 돌아오면 같은 아젠다에서 고른 서브 아젠다 필터를 유지한다', async t => {
+  const { controller } = await controllerFixture(t);
+  const [first, second] = controller.getSnapshot().workspace.agendas;
+  const agendaRoute = agendaAddress(first.id);
+
+  controller.navigate(agendaRoute);
+  controller.selectSubAgendaFilter(first.id, 'design');
+  controller.selectTab('a');
+  assert.equal(controller.getSnapshot().route, '/doc/a');
+  controller.selectTab(null);
+  assert.equal(controller.getSnapshot().route, agendaRoute);
+  assert.equal(controller.getSnapshot().subAgendaFilters.get(first.id), 'design');
+
+  controller.navigate(agendaAddress(second.id));
+  assert.equal(controller.getSnapshot().subAgendaFilters.get(second.id), undefined);
+  controller.selectSubAgendaFilter(second.id, 'unassigned');
+  controller.navigate(agendaRoute);
+  assert.equal(controller.getSnapshot().subAgendaFilters.get(first.id), 'design');
+  assert.equal(controller.getSnapshot().subAgendaFilters.get(second.id), 'unassigned');
+
+  await controller.sample();
+  assert.equal(controller.getSnapshot().subAgendaFilters.size, 0);
+});
+
 test('moving a note to a native window closes its tab and keeps browser location synchronized', async t => {
   const h = await controllerFixture(t); h.controller.navigate('/doc/a'); h.controller.setNoteWindows(['a']);
   assert.equal(h.controller.getSnapshot().route, '/doc/b'); assert.equal(h.locations.at(-1).path, '/doc/b');
