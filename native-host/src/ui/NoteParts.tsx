@@ -345,14 +345,7 @@ export function NoteMeta({
                   <span className="doc-agenda-title">{agenda.title}</span>
                 </>
               );
-              return mode === "preview" ? (
-                <span
-                  className="doc-agenda-chip"
-                  style={{ "--agenda-color": hueColor } as React.CSSProperties}
-                >
-                  {content}
-                </span>
-              ) : (
+              return (
                 <button
                   type="button"
                   ref={agendaButton}
@@ -372,7 +365,7 @@ export function NoteMeta({
             })()}
           {!parent && agenda && (
             <NoteSubAgendas key={agenda.id} note={live} agenda={agenda}
-              controller={controller} readOnly={mode === "preview"} />
+              controller={controller} />
           )}
           {!!note.template &&
             !parent &&
@@ -424,6 +417,7 @@ export function NoteMeta({
           onCreate={(title) => void createAndMove(title)}
           onOpenAgenda={() => {
             setPicking(false);
+            if (mode === "preview") controller.showPreview(null);
             go(controller, agendaAddress(agenda.id));
           }}
           onClose={closePicker}

@@ -20,7 +20,7 @@ export function Preview({
   if (!note) return null;
   const captured =
       state.previewOpened?.id === note.id ? state.previewOpened : note,
-    agenda = state.workspace?.agendas.find((a) => a.id === captured.agendaId),
+    agenda = state.workspace?.agendas.find((a) => a.id === note.agendaId),
     pw = Number(state.prefs.previewWidth) || 720,
     ph = typeof state.prefs.previewHeight === "number" ? state.prefs.previewHeight : null;
   // 팝업 오른쪽 아래 모서리의 손잡이를 끌어 노트 영역 크기를 바꾼다.

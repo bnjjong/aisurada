@@ -32,9 +32,7 @@ export function NoteReading({
   closeLabel?: string;
 }) {
   const live = controller?.data.note({ id: note.id, parent }) || note;
-  const noteDir = controller?.getSnapshot().workspace?.path && note.path
-    ? `${controller.getSnapshot().workspace!.path}/${note.path}`
-    : undefined;
+  const noteDir = noteDirOf(controller, live);
   const draftGetter = useRef<() => string>(() => live.body);
   const [composeState, setComposeState] = useState<(AskComposeState & { wrapMark?: (turnId: string) => void }) | null>(null);
 

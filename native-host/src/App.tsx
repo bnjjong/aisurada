@@ -144,6 +144,7 @@ function WorkspaceApp() {
         </div>
       )}
       {preview && <Preview key={preview.id} controller={controller} state={state} />}
+      {state.workspace && <MoveUndoToast />}
       <InteractionOverlays controller={controller} state={state} />
       {state.noteCloseDialog && (
         <Modal
