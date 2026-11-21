@@ -21,8 +21,10 @@ use regex::Regex;
 use super::{Resource, ResourceKind, approvals, format, refs};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
+use crate::kernel::confine::check_confinement;
 use crate::kernel::token::compute_token;
 use crate::text::compare_utf16;
+use crate::vault::agenda::is_valid_slug_segment;
 use crate::vault::project::{ProjectInfo, scan_projects};
 use crate::write::apparatus::{instant_text, next_id, now_millis, to_base36};
 use crate::write::atomic::write_atomic;
@@ -132,13 +134,17 @@ pub fn is_dir(path: &Path) -> bool {
 
 /// 자원 파일의 폴더·파일 이름(slug). 스킬은 폴더 이름, 에이전트는 파일 이름이다.
 pub fn slug_of(r: &Resource) -> String {
-    let rel = &r.rel_path;
-    if r.kind == ResourceKind::Skill {
+    slug_from_rel(r.kind, &r.rel_path)
+}
+
+fn slug_from_rel(kind: ResourceKind, rel: &str) -> String {
+    if kind == ResourceKind::Skill {
         let parent = &rel[..rel.rfind('/').unwrap_or(0)];
         return parent[parent.rfind('/').map_or(0, |i| i + 1)..].to_string();
     }
     let file = &rel[rel.rfind('/').map_or(0, |i| i + 1)..];
-    file[..file.len().saturating_sub(3)].to_string()
+    // 휴지통 메타처럼 믿을 수 없는 글도 받으므로 바이트 위치로 자르지 않는다(글자 중간을 자르면 멈춘다)
+    file.strip_suffix(".md").unwrap_or(file).to_string()
 }
 
 // ---------------------------------------------------------------- 읽기
@@ -722,15 +728,51 @@ pub fn delete(vault: &Path, r: &Resource) -> Result<(), EngineError> {
     write_atomic(&trash.join("meta.json"), meta.as_bytes())
 }
 
+/// 휴지통 폴더. `id`가 자원 id 모양(`sk…-xxxxxxxx`, `ap…-xxxxxxxx`)이 아니면 `AIS-400`이다.
+/// `..`나 `/`가 든 값이 휴지통 밖 폴더를 가리키지 못하게 하려고 폴더를 잇기 전에 막는다.
+fn trash_dir(vault: &Path, id: &str) -> Result<PathBuf, EngineError> {
+    if !ResourceKind::is_id(id) {
+        return Err(EngineError::invalid_argument(format!(
+            "자원 id 모양이 아니다: {id}"
+        )));
+    }
+    Ok(root(vault).join(".trash").join(id))
+}
+
+/// 휴지통 메타의 `relPath`를 믿지 않고, 종류·프로젝트·이름 조각으로 되살릴 자리를 다시 계산한다.
+/// 메타가 알려 준 값과 다시 계산한 값이 한 글자라도 다르거나 자원 폴더 밖이면 `AIS-400`이다.
+fn restore_target(vault: &Path, e: &TrashEntry) -> Result<PathBuf, EngineError> {
+    let outside = || {
+        EngineError::invalid_argument(format!(
+            "휴지통 메타의 경로가 자원 폴더 밖을 가리킨다: {}",
+            e.rel_path
+        ))
+    };
+    if e.project.as_deref().is_some_and(|p| !is_valid_slug_segment(p)) {
+        return Err(outside());
+    }
+    let slug = slug_from_rel(e.kind, &e.rel_path);
+    if !is_valid_slug_segment(&slug) {
+        return Err(outside());
+    }
+    let target = entry_path(vault, e.kind, e.project.as_deref(), &slug);
+    if rel(vault, &target) != e.rel_path {
+        return Err(outside());
+    }
+    check_confinement(&root(vault), &target)?;
+    Ok(target)
+}
+
 /// 휴지통의 자원을 되살린다. 제자리에 같은 이름이 이미 있으면 `AIS-409`다.
+/// `id`가 자원 id 모양이 아니거나 메타의 `relPath`가 자원 폴더 밖이면 파일을 하나도 만들지 않고 `AIS-400`이다.
 pub fn restore(vault: &Path, id: &str) -> Result<Resource, EngineError> {
-    let trash = root(vault).join(".trash").join(id);
+    let trash = trash_dir(vault, id)?;
     let Some(e) = read_trash_entry(&trash) else {
         return Err(EngineError::not_found(format!(
             "휴지통에서 못 찾았다: {id}"
         )));
     };
-    let target = vault.join(&e.rel_path);
+    let target = restore_target(vault, &e)?;
     let destination = if e.kind == ResourceKind::Skill {
         target
             .parent()
@@ -762,7 +804,7 @@ pub fn restore(vault: &Path, id: &str) -> Result<Resource, EngineError> {
 
 /// 휴지통에 있는 자원의 내용을 읽는다(되살리기 전에 무엇이 돌아오는지 보려고). 없으면 `AIS-404`다.
 pub fn peek_trash(vault: &Path, id: &str) -> Result<Resource, EngineError> {
-    let trash = root(vault).join(".trash").join(id);
+    let trash = trash_dir(vault, id)?;
     let Some(e) = read_trash_entry(&trash) else {
         return Err(EngineError::not_found(format!(
             "휴지통에서 못 찾았다: {id}"

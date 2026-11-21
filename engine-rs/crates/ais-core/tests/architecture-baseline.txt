@@ -42,12 +42,12 @@ edge ports -> kernel 1
 edge resource -> error 8
 edge resource -> frontmatter 4
 edge resource -> json 4
-edge resource -> kernel 15
+edge resource -> kernel 16
 edge resource -> note 1
 edge resource -> ports 5
 edge resource -> snake_dump 1
 edge resource -> text 6
-edge resource -> vault 1
+edge resource -> vault 2
 edge resource -> write 12
 edge session -> json 5
 edge session -> kernel 6
