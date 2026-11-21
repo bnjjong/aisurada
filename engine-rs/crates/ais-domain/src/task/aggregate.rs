@@ -416,6 +416,7 @@ impl Task {
     }
 
     /// `from`이 `to`에 연결을 걸거나 푼다. 연결은 건 쪽 파일에만 적는다. 푼다(`remove`)면 두 방향 가운데 있는 쪽을 지운다.
+    /// 새 연결은 `blocks`와 `relates`를 받는다. 기존 `duplicates`는 해제할 수 있다.
     /// 자기 자신에게 걸 수 없고, 막고 있음(`blocks`)은 서로를 막는 순환을 만들 수 없다. 이미 있는 연결을 다시 걸면 바뀐 게 없다(`None`).
     pub fn link(
         from: &Task,
@@ -462,6 +463,11 @@ impl Task {
             links = list;
             unlinked = true;
         } else {
+            if kind == TaskLinkKind::Duplicates {
+                return Err(EngineError::invalid_argument(
+                    "중복 연결은 새로 등록할 수 없다",
+                ));
+            }
             if from.links.contains(&forward) {
                 return Ok(None);
             }
@@ -880,6 +886,35 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn stored_duplicate_links_can_be_read_and_removed() {
+        let stamp = stamp("2026-11-16T12:00:00+09:00");
+        let (mut duplicate, original) = (task("TSK-1"), task("TSK-2"));
+        duplicate.id = "tkfx0001-00000001".into();
+        assert!(Task::link(&duplicate, &original, "duplicates", false, &stamp, "human").is_err());
+
+        duplicate.links.push(Link {
+            kind: TaskLinkKind::Duplicates,
+            to: original.key.clone(),
+        });
+        let bytes = format::render(&duplicate).unwrap();
+        let stored = format::parse(&bytes, &duplicate.rel_path).unwrap();
+        let scan = Scan {
+            items: vec![stored, original],
+            skipped: Vec::new(),
+        };
+        let duplicate = scan.by_key("TSK-1").unwrap();
+        let original = scan.by_key("TSK-2").unwrap();
+        assert_eq!(related(&scan, duplicate)[0].kind, "duplicates");
+        assert_eq!(related(&scan, original)[0].kind, "duplicated-by");
+
+        let change = Task::link(original, duplicate, "duplicates", true, &stamp, "human")
+            .unwrap()
+            .unwrap();
+        assert_eq!(change.next.key, duplicate.key);
+        assert!(change.next.links.is_empty());
     }
 
     #[test]

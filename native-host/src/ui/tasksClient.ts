@@ -539,7 +539,6 @@ export const LINK_CHOICES: readonly { id: RelationType; label: string }[] = [
   { id: "blocks", label: "이 태스크가 막고 있음" },
   { id: "blocked-by", label: "이 태스크가 막혀 있음" },
   { id: "relates", label: "관련" },
-  { id: "duplicates", label: "이 태스크가 중복" },
 ];
 
 /** 이 태스크에 연결할 수 있는 다른 태스크. 자기 자신과 이미 연결된 것은 뺀다. */
