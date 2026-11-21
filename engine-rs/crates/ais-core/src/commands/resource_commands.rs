@@ -30,7 +30,7 @@ use crate::resource::approvals;
 use crate::resource::format::{json_to_serde, value_to_serde};
 use crate::resource::refs;
 use crate::resource::rules::{
-    self, RefInfo, RefsChange, Scope, change_refs, check_same_kind_and_scope, fields_of, kind_of,
+    self, RefInfo, RefsChange, Scope, change_refs, check_same_kind, check_same_scope, fields_of, kind_of,
     reject_agent_only_for_skill, summarize_change,
 };
 use crate::resource::store::{self, Stamp};
@@ -504,8 +504,10 @@ fn save(run: &Run, opts: &Opts) -> Result<Json, EngineError> {
         return Ok(Json::Object(m));
     };
     let live = store::find(vault, java_trim(id))?;
+    // 오류 차례는 종류 → 범위다. 범위 인자를 해석하기 전에 종류를 먼저 본다(둘 다 틀리면 종류 오류가 나온다).
+    check_same_kind(&live, opts.get("kind").map(String::as_str))?;
     let scope = scope_of(opts, false)?;
-    check_same_kind_and_scope(&live, opts.get("kind").map(String::as_str), &scope)?;
+    check_same_scope(&live, &scope)?;
     reject_agent_only_for_skill(live.kind, |k| opts.contains_key(k))?;
     // 고칠 바탕은 승인한 판이다. 직접 고쳐진 파일의 내용은 이어받지 않는다(받아들이려면 resolve-resource-edit)
     let base = store::base_for_edit(vault, &live)?;

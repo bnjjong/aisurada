@@ -32,12 +32,13 @@ flowchart LR
 | 범위 읽기: `scope=global`이거나 `project=<slug>`이고 둘을 함께 줄 수 없다, 만들 때는 필수 | `scope_of` | `scope_of`(옵션 맵을 읽던 것) |
 | 종류 읽기: `skill`이나 `agent` | `kind_of` | `kind_of` |
 | 스킬은 `permission`·`skills`·`repo`를 쓰지 않는다 | `reject_agent_only_for_skill` | 같은 이름 |
-| 고칠 때 종류와 범위가 지금 자원과 같아야 한다(종류가 먼저 걸린다) | `check_same_kind_and_scope` | `save` 안의 두 검사 |
+| 고칠 때 종류와 범위가 지금 자원과 같아야 한다(종류가 먼저 걸린다) | `check_same_kind`, `check_same_scope` | `save` 안의 두 검사(**고침**: 처음에는 한 함수 `check_same_kind_and_scope`였다, 아래 「정정」) |
 | 칸 인자를 검사해 고칠 값 묶음(`Fields`)으로 | `fields_of` | 같은 이름 |
 | 프로젝트 참조 목록 계산: 글로벌 자원 더하기·빼기, 에이전트의 글로벌 스킬 함께 켜기, 이름 힌트를 지금 이름으로 갱신 | `change_refs` | `ref_impl` 안의 계산과 `add_ref` |
 | 변경을 사람이 읽는 한 줄로 요약(승인 대기 목록에 보인다) | `summarize_change`, `changed_fields` | 같은 이름 |
 
 - **`change_refs`는 저장소를 모른다.** 승인한 참조 목록과 「id로 자원을 찾는 함수」를 받아 새 목록, 켠 id, 끈 id를 돌려준다. 명령이 저장소에서 읽은 자원(`Served`)을 클로저로 넘긴다. 에이전트가 가진 스킬을 함께 켜는 규칙, 프로젝트 자원은 참조하지 않는다는 규칙, 이미 있는 항목은 다시 더하지 않는 규칙이 디스크 없이 시험된다.
+- **정정(2026-11-18, [이슈 #83](https://github.com/bnjjong/aisurada/issues/83)): 고치기의 오류 차례는 6e에서 한때 달라져 있었다.** 이 기록은 「종류 → 범위」라고 적었지만 코드는 범위 글을 먼저 해석(`scope_of`)한 뒤 종류를 봤다. 종류와 범위가 **둘 다** 틀린 입력(`kind=agent scope=weird`)에서 Java와 오류 글이 달랐다(둘 다 `AIS-400`이라 번호는 같았다). 그때 골든은 오류를 한 번에 하나씩만 넣어서 못 잡았다. 규칙 함수를 `check_same_kind`와 `check_same_scope`로 나누고 명령이 `종류 → scope_of → 범위` 순으로 부르게 고쳤다. 골든에 두 값이 함께 틀린 사례 넷을 더해 기준 Java와 맞댔다.
 - **오류가 나오는 차례는 그대로다.** 만들기는 종류 → 범위 → 스킬 전용 인자 → 칸 검사 순이고, 고치기는 저장소에서 자원 찾기 → 종류 → 범위 → 스킬 전용 인자 → 승인한 바탕 읽기 → 칸 검사 순이다. 저장소를 읽는 걸음 사이에 규칙 함수를 한 걸음씩 불러서 지킨다.
 - **새 옆 의존을 만들지 않았다.** 처음에 `java_trim`을 `task::format`에서 받아 `resource → task` 의존이 생겨 구조 시험이 잡았다. 원본인 `kernel::java`에서 받도록 고쳐 새 의존 없이 끝났다.
 

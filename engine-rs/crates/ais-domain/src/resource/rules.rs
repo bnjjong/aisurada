@@ -87,13 +87,9 @@ pub fn reject_agent_only_for_skill(
     Ok(())
 }
 
-/// 고칠 때 종류와 범위가 지금 자원과 같은지 본다. 종류를 주었는데 다르면, 범위를 주었는데 다르면 거절한다.
-/// 오류가 나오는 차례: 종류 → 범위.
-pub fn check_same_kind_and_scope(
-    live: &Resource,
-    given_kind: Option<&str>,
-    scope: &Scope,
-) -> Result<(), EngineError> {
+/// 고칠 때 종류가 지금 자원과 같은지 본다. 종류를 주었는데 다르면 거절한다.
+/// 범위를 해석하기 전에 불러야 한다: 종류와 범위가 둘 다 틀리면 종류 오류가 먼저 나온다(오류 차례: 종류 → 범위).
+pub fn check_same_kind(live: &Resource, given_kind: Option<&str>) -> Result<(), EngineError> {
     if let Some(raw) = given_kind
         && kind_of(Some(raw))? != live.kind
     {
@@ -102,6 +98,11 @@ pub fn check_same_kind_and_scope(
             live.kind.label()
         )));
     }
+    Ok(())
+}
+
+/// 고칠 때 범위가 지금 자원과 같은지 본다. 범위를 주었는데 다르면 거절한다. 종류 검사([`check_same_kind`]) 뒤에 부른다.
+pub fn check_same_scope(live: &Resource, scope: &Scope) -> Result<(), EngineError> {
     if scope.given && scope.project != live.project {
         return Err(EngineError::invalid_argument(format!(
             "범위는 바꿀 수 없다: {}",
@@ -396,12 +397,11 @@ mod tests {
             given: false,
             project: None,
         };
-        assert!(check_same_kind_and_scope(&live, Some("skill"), &same).is_ok());
+        assert!(check_same_kind(&live, Some("skill")).is_ok());
+        assert!(check_same_kind(&live, None).is_ok());
+        assert!(check_same_scope(&live, &same).is_ok());
         assert_eq!(
-            check_same_kind_and_scope(&live, Some("agent"), &same)
-                .err()
-                .unwrap()
-                .message,
+            check_same_kind(&live, Some("agent")).err().unwrap().message,
             "종류는 바꿀 수 없다: skill"
         );
         let other = Scope {
@@ -409,10 +409,7 @@ mod tests {
             project: None,
         };
         assert_eq!(
-            check_same_kind_and_scope(&live, None, &other)
-                .err()
-                .unwrap()
-                .message,
+            check_same_scope(&live, &other).err().unwrap().message,
             "범위는 바꿀 수 없다: project=p1"
         );
         let global = res("sk2", "s", None, &[]);
@@ -421,19 +418,11 @@ mod tests {
             project: Some("p1".into()),
         };
         assert_eq!(
-            check_same_kind_and_scope(&global, None, &to_project)
+            check_same_scope(&global, &to_project)
                 .err()
                 .unwrap()
                 .message,
             "범위는 바꿀 수 없다: global"
-        );
-        // 종류가 먼저 걸린다
-        assert!(
-            check_same_kind_and_scope(&live, Some("agent"), &other)
-                .err()
-                .unwrap()
-                .message
-                .starts_with("종류는")
         );
     }
 
