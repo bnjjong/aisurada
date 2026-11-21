@@ -6,6 +6,8 @@
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
+use crate::error::EngineError;
+
 pub use super::store::{DirEntry, FileType, Metadata};
 
 /// `read_dir`의 결과. 항목을 모두 읽은 뒤의 반복자다.
@@ -63,4 +65,16 @@ pub fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
 
 pub fn canonicalize(path: impl AsRef<Path>) -> io::Result<PathBuf> {
     super::store().canonicalize(path.as_ref())
+}
+
+/// 이어 붙인 경로가 기준 폴더 안인지 본다. 글자 검사에 더해 심볼릭 링크를 푼 실제 경로로도 견주므로,
+/// 기준 폴더 안의 링크가 바깥을 가리키면 그 아래 경로는 거절한다(`AIS-400`).
+/// 쓰기·지우기·읽기 앞에서 `kernel::confine::check_confinement` 대신 이것을 부른다.
+pub fn check_confinement(base: &Path, target: &Path) -> Result<(), EngineError> {
+    crate::kernel::confine::check_real_confinement(
+        base,
+        target,
+        &|path| canonicalize(path),
+        &|path| symlink_metadata(path).is_ok(),
+    )
 }

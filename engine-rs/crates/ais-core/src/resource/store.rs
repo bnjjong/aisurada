@@ -21,7 +21,7 @@ use regex::Regex;
 use super::{Resource, ResourceKind, approvals, format, refs};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::kernel::confine::check_confinement;
+use crate::ports::fs::check_confinement;
 use crate::kernel::token::compute_token;
 use crate::text::compare_utf16;
 use crate::vault::agenda::is_valid_slug_segment;
@@ -760,6 +760,8 @@ fn restore_target(vault: &Path, e: &TrashEntry) -> Result<PathBuf, EngineError> 
         return Err(outside());
     }
     check_confinement(&root(vault), &target)?;
+    // 자원 폴더가 통째로 vault 밖을 가리키는 링크여도 거기로 되살리지 않는다
+    check_confinement(vault, &target)?;
     Ok(target)
 }
 

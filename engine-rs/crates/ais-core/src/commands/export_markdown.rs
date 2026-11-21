@@ -11,7 +11,8 @@ use crate::error::EngineError;
 use crate::text::is_blank;
 use crate::vault::scanner::Format;
 use crate::write::atomic::write_atomic;
-use crate::write::confine::{absolute_normalized, check_confinement, check_segment, normalize};
+use crate::write::confine::{absolute_normalized, check_segment, normalize};
+use crate::ports::fs::check_confinement;
 use crate::write::pipeline::WriteScope;
 use crate::write::sub_note::{read_derived, remove_tree};
 

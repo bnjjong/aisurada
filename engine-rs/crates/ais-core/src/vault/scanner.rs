@@ -237,7 +237,7 @@ impl Collector {
         confine::check_segment(&self.vault, agenda)?;
         let mut current = confine::normalize(&self.vault.join("notes").join(agenda));
         // 두 번째 조각의 기준만 vault다. `notes/..`은 vault 자신이라 통과한다.
-        confine::check_confinement(&self.vault, &current)?;
+        fs::check_confinement(&self.vault, &current)?;
         if !is_dir(&current) {
             return Ok(());
         }
@@ -245,7 +245,7 @@ impl Collector {
         for piece in &pieces[2..] {
             confine::check_segment(&current, piece)?;
             let next = confine::normalize(&current.join(piece));
-            confine::check_confinement(&current, &next)?;
+            fs::check_confinement(&current, &next)?;
             if fs::metadata(&next).is_err() {
                 return Ok(());
             }

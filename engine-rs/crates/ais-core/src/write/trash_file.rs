@@ -4,7 +4,8 @@
 use std::path::{Path, PathBuf};
 
 use super::atomic::write_atomic;
-use super::confine::{absolute_normalized, check_confinement, check_segment, normalize};
+use super::confine::{absolute_normalized, check_segment, normalize};
+use crate::ports::fs::check_confinement;
 use super::json_out::{literal, string, to_file_bytes};
 use super::sub_note::remove_tree;
 use crate::error::EngineError;
@@ -20,6 +21,8 @@ pub fn archive_path(vault: &Path, file: &str) -> Result<PathBuf, EngineError> {
     check_segment(&base, file)?;
     let target = normalize(&base.join(file));
     check_confinement(&base, &target)?;
+    // 보관 폴더(`files`) 자체가 vault 밖을 가리키는 링크여도 거기로 옮기거나 지우지 않는다
+    check_confinement(vault, &target)?;
     Ok(target)
 }
 

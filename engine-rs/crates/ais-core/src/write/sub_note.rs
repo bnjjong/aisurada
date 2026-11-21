@@ -10,7 +10,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::atomic::write_atomic;
-use super::confine::{check_confinement, has_unusable_path_characters};
+use super::confine::has_unusable_path_characters;
+use crate::ports::fs::check_confinement;
 use super::doc_place::{folder_name_from, place_folder, read_created};
 use super::note_front::NoteFront;
 use crate::error::EngineError;

@@ -11,7 +11,8 @@ pub use crate::note::placement::{
 use crate::ports::fs;
 use std::path::Path;
 
-use super::confine::{absolute_normalized, check_confinement, has_unusable_path_characters};
+use super::confine::{absolute_normalized, has_unusable_path_characters};
+use crate::ports::fs::check_confinement;
 use crate::error::EngineError;
 use crate::vault::scanner::is_sharded;
 

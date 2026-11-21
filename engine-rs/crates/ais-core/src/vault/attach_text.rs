@@ -1,6 +1,6 @@
 //! 노트의 `attach/` 폴더에 든 HTML 첨부에서 글만 뽑아 한 줄로 잇습니다(검색과 본문 미리보기용).
 
-use crate::ports::fs;
+use crate::ports::fs::{self, check_confinement};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -38,7 +38,11 @@ pub fn extract(vault_root: &Path, note: &NoteRecord) -> Option<String> {
     let mut texts: Vec<String> = Vec::new();
     for name in names {
         let file = attach_dir.join(&name);
-        // 심볼릭 링크는 따라간다. 일반 파일이 아니거나 너무 크면 건너뛴다
+        // vault 안을 가리키는 심볼릭 링크는 따라가지만, 밖을 가리키는 링크(`~/.ssh/…` 따위)는 읽지 않고 건너뛴다.
+        // 일반 파일이 아니거나 너무 크면 건너뛴다
+        if check_confinement(vault_root, &file).is_err() {
+            continue;
+        }
         let Ok(meta) = fs::metadata(&file) else {
             continue;
         };

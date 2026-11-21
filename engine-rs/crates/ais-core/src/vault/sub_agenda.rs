@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
 
 use crate::error::EngineError;
-use crate::kernel::confine::check_confinement;
+use crate::ports::fs::check_confinement;
 use crate::ports::fs;
 use crate::text::trim;
 

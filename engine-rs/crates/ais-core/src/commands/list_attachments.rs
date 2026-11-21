@@ -1,7 +1,7 @@
 //! `list_attachments`: 노트 또는 후속 노트의 `attach/` 폴더에 든 첨부를 이름 차례로 돌려준다.
 
 use crate::kernel::actor::CallContext;
-use crate::ports::fs;
+use crate::ports::fs::{self, check_confinement};
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -68,6 +68,8 @@ pub fn execute(
                 .filter(|(name, path)| {
                     is_valid_attachment_name(name)
                         && fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+                        // vault 밖을 가리키는 링크는 읽을 수 없으니 목록에도 내지 않는다
+                        && check_confinement(&index.vault_root, path).is_ok()
                 })
                 .map(|(name, _)| name)
                 .collect();

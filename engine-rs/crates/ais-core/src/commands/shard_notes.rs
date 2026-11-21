@@ -22,7 +22,8 @@ use crate::vault::scanner::{
 };
 use crate::write::apparatus::now_millis;
 use crate::write::atomic::write_atomic;
-use crate::write::confine::{absolute_normalized, check_confinement, check_segment};
+use crate::write::confine::{absolute_normalized, check_segment};
+use crate::ports::fs::check_confinement;
 use crate::write::doc_place::move_path;
 use crate::write::local_time::local_clock;
 

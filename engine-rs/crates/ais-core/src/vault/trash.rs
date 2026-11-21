@@ -3,14 +3,14 @@
 use crate::kernel::doc_type::DocType;
 use crate::kernel::ids::AGENDA_ID;
 use crate::kernel::ids::TRASH_ID;
-use crate::ports::fs;
+use crate::ports::fs::{self, check_confinement};
 use std::path::Path;
 
 use super::note_file::read_note_file;
 use super::note_meta::{parse_created, text};
 use crate::frontmatter::{self, Value};
 use crate::kernel::{
-    confine::{absolute_normalized, check_confinement, check_segment, normalize},
+    confine::{absolute_normalized, check_segment, normalize},
     tier::Tier,
 };
 use crate::text::{NOTE_ID, trim};
@@ -75,7 +75,8 @@ pub fn archived_tier(vault_root: &Path, entry: &TrashRecord) -> Tier {
         return Tier::Reading;
     }
     let target = normalize(&base.join(&entry.file));
-    if check_confinement(&base, &target).is_err() {
+    if check_confinement(&base, &target).is_err() || check_confinement(vault_root, &target).is_err()
+    {
         return Tier::Reading;
     }
     // 단일 파일 노트는 보관물이 파일 하나이고, 폴더 노트는 폴더 안의 `note.<확장자>`다

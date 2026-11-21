@@ -15,6 +15,7 @@ use crate::error::EngineError;
 use crate::kernel::actor::CallContext;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim, utf16_len};
 use crate::write::atomic::write_atomic;
+use crate::ports::fs::check_confinement;
 use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::WriteScope;
 
@@ -126,6 +127,8 @@ pub fn write_attachment(
         )));
     }
     let rel_path = format!("{owner_rel}/attach/{name}");
+    // `attach`가 vault 밖을 가리키는 링크면 거기에 쓰지 않는다
+    check_confinement(vault, &vault.join(&rel_path))?;
     write_atomic(&vault.join(&rel_path), content.as_bytes())?;
     let parent = match sub_id {
         Some(sub) => format!("{root_id}/{sub}"),
