@@ -54,6 +54,8 @@ footer (선택: BREAKING CHANGE, 해결됨/관련 이슈)
 - **type**: `feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
 - **scope**: 바뀐 모듈. 엔진과 문서는 `aisurada`, 호스트와 화면은 `native-host`.
 - **subject**: 영어, 소문자 동사원형, 50자 이내, 마침표 없음.
+  `type(scope): ` 접두와 `[Jira-ID]`는 세지 않고 subject 글자만 센다. 50자를 넘기기 쉬우니 커밋하기 전에 센다(예: 파이프로 `awk '{print length}'`).
+- **CI, 빌드, 의존성 설정**(`.github/workflows/`, `Cargo.toml` 따위)은 type을 `chore`로 쓴다. 목록에 없는 `ci`, `build`, `perf` 같은 type은 쓰지 않는다.
 - **Jira-ID**: 대괄호 필수. 발급받지 않았으면 `[Empty]`.
 - 깨지는 변경(이름, 형식, 프로토콜)은 `BREAKING CHANGE:` 푸터에 적는다.
 

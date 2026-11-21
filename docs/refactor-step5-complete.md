@@ -61,3 +61,15 @@ flowchart LR
 ## 다음
 
 6단계(규칙을 애그리거트로): [계획](refactor-ddd-hexagonal-plan.md) §4. 태스크 → 자원 → 노트 순이다. 이 단계에서 미룬 컨텍스트별 저장소, `Stored<T>`, `NoteIndex` 나누기, 그리고 2단계에서 미룬 id 새 타입·`Created`, 3단계에서 미룬 `judge`의 시각 인자를 함께 한다. **게이트 2는 6단계 뒤**다.
+
+## 후속(2026-11-18): 미뤘던 일이 어떻게 됐나
+
+이 기록이 「6단계」나 「7단계」에서 한다고 적은 일의 실제 결과다. 위 본문은 그날의 상태라 고치지 않았다.
+
+| 이 기록에서 미룬 것 | 결과 |
+| --- | --- |
+| 컨텍스트별 저장소 `trait`(`AgendaRepository`, `TaskRepository` 등) | **하지 않았다.** 6a가 같은 판단으로 만들지 않았고([6a 기록](refactor-step6a-complete.md)), 8단계 뒤에도 없다. 남은 일은 [이슈 #77](https://github.com/bnjjong/aisurada/issues/77)에 있다 |
+| 저장 봉투 `Stored<T>`, `NoteIndex` 세 갈래 나누기 | 하지 않았다(6c, 6d, 8단계 기록이 모두 남은 일로 적었다) |
+| `ais-cli/src/legacy.rs`의 `NoteIndex::fresh` 재훑기 5곳(7단계) | **하지 않았다.** 7-3으로 검토했으나 한도·오류 글이 달라질 위험이 이득보다 커서 접었다([7단계 기록](refactor-step7-complete.md)) |
+| `vault_root` 비공개 | 하지 않았다 |
+
