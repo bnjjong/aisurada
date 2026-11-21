@@ -62,6 +62,7 @@ impl NewSub {
         sub_id: &str,
         agenda: &str,
         created: &str,
+        at: &str,
         rel: &str,
     ) -> Result<String, EngineError> {
         let front = NoteFront {
@@ -70,12 +71,13 @@ impl NewSub {
             doc_type: self.doc_type,
             title: &self.title,
             created,
+            created_at: Some(at),
             session_id: None,
             session_agent: None,
             tier: Tier::Reading,
             decision_confirmation: None,
             edited_by: None,
-            edited_at: None,
+            edited_at: Some(at),
             edited_session_id: None,
             edited_session_agent: None,
             tags: &[],
@@ -170,7 +172,13 @@ mod tests {
         let created = sub.created(&now);
         assert_eq!(created, "2026-11-15T08:05:00+09:00");
         let text = sub
-            .render("nd0001-sub00001", "demo", &created, "notes/x/sub/y")
+            .render(
+                "nd0001-sub00001",
+                "demo",
+                &created,
+                "2026-11-15T00:00:00.000Z",
+                "notes/x/sub/y",
+            )
             .unwrap();
         assert!(text.starts_with("---\nid: nd0001-sub00001\n"), "{text}");
         assert!(text.ends_with("---\n본문\n"));
@@ -182,7 +190,13 @@ mod tests {
         let huge = "가".repeat(1_000_001);
         let sub = NewSub::parse(Some("t"), Some(&huge), None, USAGE).unwrap();
         let e = sub
-            .render("x", "demo", "2026-11-15T08:05:00+09:00", "notes/x/sub/y")
+            .render(
+                "x",
+                "demo",
+                "2026-11-15T08:05:00+09:00",
+                "2026-11-15T00:00:00.000Z",
+                "notes/x/sub/y",
+            )
             .err()
             .unwrap();
         assert_eq!(

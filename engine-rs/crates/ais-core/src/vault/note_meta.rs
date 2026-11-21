@@ -97,22 +97,14 @@ pub fn parse_meta(
     }
 
     // 9. 도장
-    let (mut edited_by, mut edited_at, mut edited_session_id, mut edited_session_agent) =
-        (None, None, None, None);
-    if let (Some(by), Some(at)) = (text(map, "editedBy"), text(map, "editedAt")) {
-        let (by, at) = (trim(by), trim(at));
-        if !by.is_empty() && !at.is_empty() {
-            edited_by = Some(by.to_string());
-            edited_at = Some(at.to_string());
-            if let Some(raw) = text(map, "editedSessionId") {
-                let sid = trim(raw);
-                if !sid.is_empty() {
-                    edited_session_id = Some(sid.to_string());
-                    edited_session_agent = read_agent(get(map, "editedSessionAgent"));
-                }
-            }
-        }
-    }
+    let timestamp = |key| text(map, key).map(trim).filter(|s| !s.is_empty());
+    let created_at = timestamp("createdAt").map(str::to_owned);
+    let edited_at = timestamp("editedAt");
+    let edited_by = edited_at.and(timestamp("editedBy"));
+    let edited_session_id = edited_by.and(timestamp("editedSessionId"));
+    let edited_session_agent =
+        edited_session_id.and_then(|_| read_agent(get(map, "editedSessionAgent")));
+    let edited_at = edited_at.filter(|_| created_at.is_some() || edited_by.is_some());
 
     // 10. tags: 다듬고, 겹침 없이 50개까지 모은 뒤 줄바꿈이 든 것을 뺀다
     let mut tags: Vec<String> = Vec::new();
@@ -229,15 +221,16 @@ pub fn parse_meta(
         doc_type,
         title,
         created: created.formatted,
+        created_at,
         date: created.date,
         time: created.time,
         session_id,
         session_agent,
         tier,
         decision_confirmation: text(map, "decisionConfirmation").map(str::to_owned),
-        edited_by,
-        edited_at,
-        edited_session_id,
+        edited_by: edited_by.map(str::to_owned),
+        edited_at: edited_at.map(str::to_owned),
+        edited_session_id: edited_session_id.map(str::to_owned),
         edited_session_agent,
         tags,
         sub_agenda_ids,

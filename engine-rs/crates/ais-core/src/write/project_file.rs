@@ -28,6 +28,12 @@ pub fn render(info: &ProjectInfo) -> Vec<u8> {
     line("slug", &info.slug);
     line("title", &info.title);
     line("hue", &info.hue);
+    if let Some(at) = &info.created_at {
+        line("createdAt", at);
+    }
+    if let Some(at) = &info.edited_at {
+        line("editedAt", at);
+    }
     let repos = repos_json(&info.repos);
     if !repos.is_empty() {
         out.push_str(&format!("repos: {repos}\n"));

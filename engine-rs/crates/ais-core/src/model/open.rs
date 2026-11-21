@@ -28,6 +28,8 @@ pub struct SubNoteRow {
     pub title: String,
     pub created: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub edited_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub edited_at: Option<String>,
@@ -67,8 +69,9 @@ impl SubNoteRow {
             doc_type: meta.doc_type.clone(),
             title: meta.title.clone(),
             created: meta.created.clone(),
+            created_at: meta.created_at.clone(),
             edited_by: stamped.then(|| meta.edited_by.clone()).flatten(),
-            edited_at: stamped.then(|| meta.edited_at.clone()).flatten(),
+            edited_at: (!hidden).then(|| meta.edited_at.clone()).flatten(),
             edited_session_id: show_session
                 .then(|| meta.edited_session_id.clone())
                 .flatten(),

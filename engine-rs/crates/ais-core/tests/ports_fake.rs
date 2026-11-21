@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use ais_core::adapters::flock_lock::FlockLock;
@@ -23,11 +23,11 @@ use serde_json::json;
 /// 2026-11-14T23:46:40Z
 const FIXED_NOW: i64 = 1_794_700_000_000;
 
-struct FixedClock;
+struct TestClock(AtomicI64);
 
-impl Clock for FixedClock {
+impl Clock for TestClock {
     fn now_millis(&self) -> i64 {
-        FIXED_NOW
+        self.0.load(Ordering::SeqCst)
     }
 
     /// 가짜 시간대: UTC
@@ -121,8 +121,9 @@ fn an_engine_with_fake_ports_works_without_any_environment_variable() {
         ),
     ]));
     let vcs = Arc::new(CountingVcs(Mutex::new(0)));
+    let clock = Arc::new(TestClock(AtomicI64::new(FIXED_NOW)));
     let ports = Ports {
-        clock: Arc::new(FixedClock),
+        clock: clock.clone(),
         ids: Arc::new(CountingIds(AtomicU64::new(0))),
         env: Arc::new(env),
         lock: Arc::new(FlockLock::in_dir(root.join("locks"))),
@@ -151,6 +152,84 @@ fn an_engine_with_fake_ports_works_without_any_environment_variable() {
             .contains("2026-11-14-2346-"),
         "{created}"
     );
+    let note_id = &created["id"];
+    let sub = engine
+        .call(
+            "create_sub_note",
+            json!({"parent": note_id, "title": "하위 노트", "body": "# 하위 노트\n"}),
+        )
+        .unwrap();
+    let sub_id = &sub["id"];
+    let project = engine
+        .call("create_project", json!({"title": "새 프로젝트"}))
+        .unwrap();
+    let agenda = engine
+        .call("create_agenda", json!({"title": "새 아젠다"}))
+        .unwrap();
+    let note = engine.call("get_doc", json!({"id": note_id})).unwrap();
+    let sub = engine
+        .call("get_sub_note", json!({"parent": note_id, "id": sub_id}))
+        .unwrap();
+    let initial = "2026-11-14T23:46:40.000Z";
+    for record in [&project, &agenda, &note, &sub] {
+        assert_eq!(record["createdAt"], initial, "{record}");
+        assert_eq!(record["editedAt"], initial, "{record}");
+    }
+    let legacy = engine
+        .call("get_doc", json!({"id": "ndfx0005-00000005"}))
+        .unwrap();
+    assert!(legacy.get("createdAt").is_none());
+
+    clock.0.store(FIXED_NOW + 1234, Ordering::SeqCst);
+    let project = engine
+        .call(
+            "update_project",
+            json!({"id": project["id"], "title": "프로젝트 변경"}),
+        )
+        .unwrap();
+    let agenda = engine
+        .call(
+            "update_agenda",
+            json!({"id": agenda["id"], "title": "아젠다 변경"}),
+        )
+        .unwrap();
+    engine
+        .call(
+            "update_doc",
+            json!({"id": note_id, "body": "본문 변경", "f1": note["precondition"]}),
+        )
+        .unwrap();
+    engine.call("update_sub_note",
+        json!({"parent": note_id, "id": sub_id, "body": "하위 본문 변경", "f1": sub["precondition"]})).unwrap();
+    let note = engine.call("get_doc", json!({"id": note_id})).unwrap();
+    let sub = engine
+        .call("get_sub_note", json!({"parent": note_id, "id": sub_id}))
+        .unwrap();
+    let modified = "2026-11-14T23:46:41.234Z";
+    for record in [&project, &agenda, &note, &sub] {
+        assert_eq!(record["createdAt"], initial, "{record}");
+        assert_eq!(record["editedAt"], modified, "{record}");
+    }
+
+    clock.0.store(FIXED_NOW + 5000, Ordering::SeqCst);
+    for (command, record) in [("update_project", project), ("update_agenda", agenda)] {
+        let same = engine
+            .call(
+                command,
+                json!({"id": record["id"], "title": record["title"]}),
+            )
+            .unwrap();
+        assert_eq!(same["editedAt"], modified, "{same}");
+    }
+    engine
+        .call(
+            "update_doc",
+            json!({"id": note_id, "body": note["body"], "f1": note["precondition"]}),
+        )
+        .unwrap();
+    let same = engine.call("get_doc", json!({"id": note_id})).unwrap();
+    assert_eq!(same["editedAt"], modified, "{same}");
+
     // 잠금 파일은 환경 변수(`AISURADA_LOCK_DIR`)가 아니라 약속에 준 폴더에 생겼다
     let locks = std::fs::read_dir(root.join("locks")).expect("가짜 잠금 폴더");
     assert!(

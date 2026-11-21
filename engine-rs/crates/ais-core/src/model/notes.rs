@@ -73,6 +73,8 @@ pub struct NoteRow {
     pub title: String,
     pub created: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_agent: Option<String>,
@@ -133,6 +135,7 @@ impl NoteRow {
             doc_type: meta.doc_type.clone(),
             title: meta.title.clone(),
             created: meta.created.clone(),
+            created_at: meta.created_at.clone(),
             session_id: meta.session_id.clone(),
             session_agent: meta.session_agent.clone(),
             tier,
@@ -174,6 +177,10 @@ pub struct AgendaRow {
     pub title: String,
     pub hue: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edited_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub repo: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
@@ -191,6 +198,8 @@ impl From<&AgendaInfo> for AgendaRow {
             slug: a.slug.clone(),
             title: a.title.clone(),
             hue: a.hue.clone(),
+            created_at: a.created_at.clone(),
+            edited_at: a.edited_at.clone(),
             repo: a.repo.clone(),
             project: a.project.clone(),
             project_repo: a.project_repo.clone(),

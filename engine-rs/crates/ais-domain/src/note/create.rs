@@ -158,6 +158,7 @@ impl ParsedNewDoc {
         note_id: &str,
         agenda_slug: &str,
         created: &str,
+        at: &str,
         session: Option<&str>,
         session_agent: Option<&str>,
     ) -> String {
@@ -169,12 +170,13 @@ impl ParsedNewDoc {
             doc_type: self.doc_type,
             title: &self.title,
             created,
+            created_at: Some(at),
             session_id,
             session_agent: session_agent.as_deref(),
             tier: self.tier,
             decision_confirmation: None,
             edited_by: None,
-            edited_at: None,
+            edited_at: Some(at),
             edited_session_id: None,
             edited_session_agent: None,
             tags: &self.tags,
@@ -352,6 +354,7 @@ mod tests {
             "ndzz0001-0000aaaa",
             "demo",
             "2026-11-15T08:46:00+09:00",
+            "2026-11-15T00:00:00.000Z",
             Some("s-1"),
             Some("Codex"),
         );
@@ -363,6 +366,7 @@ mod tests {
             "ndzz0001-0000aaaa",
             "demo",
             "2026-11-15T08:46:00+09:00",
+            "2026-11-15T00:00:00.000Z",
             Some("s-1"),
             Some("Codex"),
         );

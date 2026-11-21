@@ -13,7 +13,8 @@ use crate::text::{encode_uri_component, is_blank, trim};
 use crate::vault::agenda::{AgendaInfo, is_valid_agenda_id, is_valid_slug_segment};
 use crate::vault::project::scan_projects;
 use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
-use crate::write::apparatus::next_id;
+use crate::kernel::time::format_utc_millis;
+use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::WriteScope;
@@ -196,8 +197,11 @@ pub fn create(
             "경로로 쓸 수 없는 값이다: {file_name}"
         )));
     }
+    let at = format_utc_millis(now_millis());
     let info = AgendaInfo {
         id,
+        created_at: Some(at.clone()),
+        edited_at: Some(at),
         slug,
         title: title.to_string(),
         hue,
@@ -252,8 +256,10 @@ pub fn update(
         .summary
         .clone()
         .unwrap_or_else(|| current.summary.clone());
-    let info = AgendaInfo {
+    let mut info = AgendaInfo {
         id: request.id.clone(),
+        created_at: current.created_at.clone(),
+        edited_at: current.edited_at.clone(),
         slug: current.slug.clone(),
         title,
         hue,
@@ -262,10 +268,13 @@ pub fn update(
         project_repo,
         summary,
     };
-    write_atomic(
-        &vault.join(agenda_file::rel_path(&info.slug)),
-        &agenda_file::render(&info),
-    )?;
+    if info != *current {
+        info.edited_at = Some(format_utc_millis(now_millis()));
+        write_atomic(
+            &vault.join(agenda_file::rel_path(&info.slug)),
+            &agenda_file::render(&info),
+        )?;
+    }
     Ok(response(&info, &scope.index.vault_root))
 }
 

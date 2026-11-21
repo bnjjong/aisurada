@@ -15,11 +15,12 @@ use crate::frontmatter::{Value, dump_general_map};
 use crate::kernel::actor::{CallContext, Caller};
 use crate::kernel::time::format_utc_millis;
 use crate::text::{NOTE_ID, cut_utf16, is_blank};
-use crate::vault::agenda::is_valid_slug_segment;
+use crate::vault::agenda::{AgendaInfo, is_valid_slug_segment};
 use crate::vault::note_file::read_note_file;
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, is_sharded};
 use crate::vault::trash::{TrashRecord, archived_tier};
+use crate::write::agenda_file;
 use crate::write::apparatus::{next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::{check_segment, normalize};
@@ -29,7 +30,7 @@ use crate::write::pipeline::WriteScope;
 use crate::write::sub_note::remove_tree;
 use crate::write::trash_file::{archive_path, entries_in_file_order, save};
 
-const RECOVERED_AGENDA: &str = "---\nid: ag-recovered\nslug: recovered\ntitle: 복구함\nhue: blue\n---\n복구함\n\n삭제됐다가 복구된 노트 중, 원래 아젠다가 사라진 것들이 모이는 곳이에요.";
+const RECOVERED_AGENDA_SUMMARY: &str = "복구함\n\n삭제됐다가 복구된 노트 중, 원래 아젠다가 사라진 것들이 모이는 곳이에요.";
 
 /// 이 호출자가 휴지통 항목을 건드려도 되는가. AI는 기록 층 노트의 보관물을 되살리지도 지우지도 못한다(이슈 #80, #82).
 /// 앱에는 층이 상관없으므로 보관 파일을 열지 않는다.
@@ -228,9 +229,22 @@ pub fn restore_doc(
     if !is_valid_slug_segment(&slug) || !table.has_slug(&slug) {
         slug = "recovered".to_string();
         if !table.has_slug(&slug) {
+            let at = format_utc_millis(now_millis());
+            let recovered = AgendaInfo {
+                id: "ag-recovered".into(),
+                slug: slug.clone(),
+                title: "복구함".into(),
+                hue: "blue".into(),
+                created_at: Some(at.clone()),
+                edited_at: Some(at),
+                repo: None,
+                project: None,
+                project_repo: None,
+                summary: RECOVERED_AGENDA_SUMMARY.into(),
+            };
             write_atomic(
-                &vault.join(".aisurada/agendas/recovered.md"),
-                RECOVERED_AGENDA.as_bytes(),
+                &vault.join(agenda_file::rel_path(&slug)),
+                &agenda_file::render(&recovered),
             )?;
         }
     }

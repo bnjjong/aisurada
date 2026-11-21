@@ -21,6 +21,7 @@ use crate::text::{NOTE_ID, SUB_NOTE_ID, is_blank, trim};
 use crate::vault::index::NoteIndex;
 use crate::vault::note_file::split_text;
 use crate::vault::scanner::{Format, NoteRecord};
+use crate::kernel::time::format_utc_millis;
 use crate::write::apparatus::{next_sub_note_id, now_millis};
 use crate::write::confine::has_unusable_path_characters;
 use crate::ports::fs::check_confinement;
@@ -186,7 +187,8 @@ pub fn create_sub_note(
         .ok_or_else(|| EngineError::not_found(format!("Note not found: {}", parent.root_id)))?;
 
     let sub_id = next_sub_note_id();
-    let now = local_clock(now_millis());
+    let millis = now_millis();
+    let now = local_clock(millis);
     let created = new.created(&now);
     let agenda = root_agenda(root);
     let container = parent.container.unwrap_or(root);
@@ -201,7 +203,13 @@ pub fn create_sub_note(
         container.rel_path,
         folder_name_from(&now.date, now.hour, now.minute, title, &sub_id)
     );
-    let text = new.render(&sub_id, &agenda, &created, &folder_rel)?;
+    let text = new.render(
+        &sub_id,
+        &agenda,
+        &created,
+        &format_utc_millis(millis),
+        &folder_rel,
+    )?;
     if has_unusable_path_characters(&folder_rel) {
         return Err(EngineError::invalid_argument(format!(
             "경로로 쓸 수 없는 값이다: {folder_rel}"

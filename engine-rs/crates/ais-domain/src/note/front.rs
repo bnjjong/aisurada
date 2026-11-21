@@ -6,7 +6,7 @@ use crate::error::EngineError;
 use crate::frontmatter::dump_string;
 use crate::frontmatter::{Value, dump_general_map};
 use crate::kernel::tier::Tier;
-use crate::kernel::time::civil_from_days;
+use crate::kernel::time::{civil_from_days, format_utc_millis};
 
 pub struct NoteFront<'a> {
     pub id: &'a str,
@@ -14,6 +14,7 @@ pub struct NoteFront<'a> {
     pub doc_type: &'a str,
     pub title: &'a str,
     pub created: &'a str,
+    pub created_at: Option<&'a str>,
     pub session_id: Option<&'a str>,
     pub session_agent: Option<&'a str>,
     pub tier: Tier,
@@ -34,12 +35,13 @@ pub struct NoteFront<'a> {
 }
 
 /// 이 엔진이 머리에 직접 쓰는 칸. 이 밖의 칸은 모르는 칸이라 다시 쓸 때 그대로 둔다.
-pub const KNOWN_KEYS: [&str; 19] = [
+pub const KNOWN_KEYS: [&str; 20] = [
     "id",
     "agenda",
     "type",
     "title",
     "created",
+    "createdAt",
     "sessionId",
     "sessionAgent",
     "decisionConfirmation",
@@ -86,6 +88,9 @@ impl NoteFront<'_> {
         line("type", &self.doc_type.to_lowercase());
         line("title", self.title);
         line("created", self.created);
+        if let Some(at) = self.created_at {
+            line("createdAt", at);
+        }
         if let Some(session) = self.session_id {
             line("sessionId", session);
             if let Some(agent) = self.session_agent {
@@ -110,6 +115,8 @@ impl NoteFront<'_> {
                     line("editedSessionAgent", agent);
                 }
             }
+        } else if let Some(at) = self.edited_at {
+            out.push_str(&format!("editedAt: {}\n", dump_string(at, 1)));
         }
         if !self.tags.is_empty() {
             out.push_str("tags:\n");
@@ -221,6 +228,7 @@ pub fn judge(
             doc_type: &meta.doc_type,
             title: draft.title,
             created: draft.created,
+            created_at: meta.created_at.as_deref(),
             session_id: draft.session_id,
             session_agent: draft.session_agent,
             tier: draft.tier,
@@ -262,7 +270,11 @@ pub fn judge(
     }
     let tool = editor.tool;
     let confirmation = super::decision::confirmation_after_edit(meta, old_body, body, tool);
-    let edited_at = kst_minute(now_millis);
+    let edited_at = if meta.created_at.is_some() {
+        format_utc_millis(now_millis)
+    } else {
+        kst_minute(now_millis)
+    };
     let edited_session = if tool { editor.session } else { None };
     let edited_agent = edited_session.and(editor.session_agent.and_then(agent_for_file));
     Ok(format!(
@@ -328,6 +340,7 @@ mod tests {
             doc_type: "free",
             title: "제목",
             created: "2026-11-12T09:00:00+09:00",
+            created_at: Some("2026-11-12T00:00:00.000Z"),
             session_id: Some("s1"),
             session_agent: Some("codex"),
             tier: Tier::Record,

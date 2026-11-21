@@ -36,6 +36,10 @@ pub struct ProjectRow {
     pub slug: String,
     pub title: String,
     pub hue: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "createdAt")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "editedAt")]
+    pub edited_at: Option<String>,
     pub summary: String,
     /// 저장소가 있을 때만 싣는다
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -49,6 +53,8 @@ impl From<&ProjectInfo> for ProjectRow {
             slug: p.slug.clone(),
             title: p.title.clone(),
             hue: p.hue.clone(),
+            created_at: p.created_at.clone(),
+            edited_at: p.edited_at.clone(),
             summary: p.summary.clone(),
             repos: p.repos.iter().map(RepoRow::from).collect(),
         }
