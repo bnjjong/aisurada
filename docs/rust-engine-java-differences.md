@@ -49,10 +49,13 @@
 | [#74](https://github.com/bnjjong/aisurada/issues/74) | **`commit_vault`가 쓰기 잠금을 잡는다** | 잠금 없이 `AutoCommit`을 불러, 다른 쪽이 여러 파일을 쓰는 중에 커밋하면 쓰다 만 상태가 커밋에 들어갈 수 있었다(유휴 타이머의 정비 커밋은 잠금을 잡았다) | 쓰기와 같은 vault 잠금(`flock`)을 잡고, 쓰는 중이면 그 쓰기가 끝나기를 기다린다(`commands/commit_vault.rs`) |
 | [#94](https://github.com/bnjjong/aisurada/issues/94) | **자원 복원(`restore_resource`)이 휴지통 `id`와 메타의 경로를 믿지 않는다** | 옮긴 Rust 코드가 `id`로 휴지통 폴더를, 메타의 `relPath`로 복원 자리를 그대로 이어 붙여 `../`로 vault 밖에 파일과 폴더를 만들 수 있었다(Java 쪽은 이번에 확인하지 않았다) | `id`가 자원 id 모양이 아니면 `AIS-400`이다. 복원 자리는 종류·프로젝트·이름 조각으로 다시 계산해 메타 값과 다르거나 자원 폴더 밖이면 파일을 만들기 전에 `AIS-400`이다(`resource/store.rs`의 `trash_dir`, `restore_target`) |
 | [#95](https://github.com/bnjjong/aisurada/issues/95), [#96](https://github.com/bnjjong/aisurada/issues/96) | **경로 가둠과 첨부 읽기가 심볼릭 링크를 푼다** | 가둠 검사(`check_confinement`)가 `toAbsolutePath().normalize()`처럼 글자만 정리해 링크를 따라가지 않았다. vault 안 링크가 바깥을 가리키면 그 아래 쓰기·옮기기·지우기가 바깥으로 번졌고, 첨부 글 읽기도 링크를 그대로 따라가 바깥 파일의 글이 `attachText`에 실렸다 | `ports::fs::check_confinement`가 링크를 푼 실제 경로로도 기준 폴더 안인지 본다. 바깥이거나 끊어진 링크면 `AIS-400`이고 파일은 하나도 바뀌지 않는다. 첨부 쓰기도 같은 검사를 거치고, 첨부 글 읽기와 첨부 목록은 바깥을 가리키는 링크를 건너뛴다. **vault 안 폴더를 바깥으로 링크해 둔 vault는 그 폴더 아래 쓰기·지우기가 거절된다** |
+| [#92](https://github.com/bnjjong/aisurada/issues/92) | **자동 커밋의 `git`이 `.git/config`의 `core.fsmonitor`를 돌리지 않는다** | 받은 vault의 `.git/config`가 `core.fsmonitor`에 명령을 적어 두면, 자동 커밋이 부르는 `git status`·`git add -A`가 그 명령을 사용자 권한으로 실행했다(Java 쪽은 이번에 확인하지 않았다) | `Strict` 실행에 `-c core.fsmonitor=false`를 붙인다(`ais-infra`의 `adapters/git_cli.rs`). 진짜 `git`으로 악성 설정을 만들어, 붙이지 않으면 명령이 돌고 붙이면 안 도는 것을 시험으로 고정했다(`ais-core/tests/git_cli.rs`) |
 
 **잠금에 시간 제한이 없다는 점은 차이가 아니라 같은 성질이다.** Java의 `FileChannel.lock()`도 Rust의 `flock`도 잠금을 얻을 때까지 무한정 기다린다. 다른 프로세스가 쥔 채 멈추면(죽은 프로세스의 잠금은 운영체제가 풀어 주므로 살아서 멈춘 경우다) 쓰기가 끝없이 기다리고, 시간 초과 오류는 없다. 기다리지 않는 길은 자동 커밋의 정비 커밋(`try_acquire`)뿐이다. 시간 제한을 두려면 새 동작이므로 따로 정한다([개발자 가이드](developer-guide.md)의 「쓰기 잠금과 잠금 파일」).
 
 **아직 막지 못한 곳.** 자원·태스크 저장소(`.aisurada/resources`, `.aisurada/tasks` 따위)와 승인 대기함처럼 vault 상대 경로를 직접 만들어 쓰는 곳에는 링크 검사가 아직 없다. `.aisurada` 아래 폴더가 바깥을 가리키는 링크이면 거기로 쓸 수 있다. 저장소 어댑터에서 쓰기 전체를 막는 방안은 따로 정한다.
+
+**git 쪽에서 아직 막지 못한 곳.** 이번에는 `Strict` 실행만 막았다. `Legacy` 실행(옛 스냅숏 참조 읽기)은 환경과 설정을 그대로 물려받아 막지 않았고, `.gitattributes`가 가리키는 `filter`·`textconv` 명령도 막지 않았다.
 
 ## 4. 이번에 바꾼 것과 시험
 
