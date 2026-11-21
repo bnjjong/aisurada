@@ -16,7 +16,7 @@ use super::doc_place::{folder_name_from, place_folder, read_created};
 use super::note_front::NoteFront;
 use crate::error::EngineError;
 use crate::frontmatter::Value;
-use crate::note::front::check_size;
+use crate::note::front::{check_size, extra_front};
 use crate::text::{cut_utf16, trim};
 use crate::vault::note_file::split_text;
 use crate::vault::note_meta::get;
@@ -73,6 +73,7 @@ pub fn file_text(
     title: &str,
     tags: &[String],
     body: &str,
+    extra: &str,
 ) -> String {
     let meta = &sub.meta;
     let front = NoteFront {
@@ -96,6 +97,7 @@ pub fn file_text(
         template: None,
         evaluation: None,
         links: &meta.links,
+        extra,
     }
     .render();
     format!("---\n{front}---\n{body}")
@@ -232,6 +234,7 @@ pub fn rewrite_root(vault: &Path, root: &NoteRecord, body: &str) -> Result<Vec<u
         template: meta.template.as_deref(),
         evaluation: meta.evaluation.as_ref(),
         links: &meta.links,
+        extra: &extra_front(&raw),
     }
     .render();
     let text = format!("---\n{front}---\n{body}");
@@ -247,13 +250,14 @@ pub fn rewrite_sub(
     container: &NoteRecord,
     body: &str,
 ) -> Result<Placed, EngineError> {
-    reopen(vault, &container.content_file, "하위 노트 본문을 저장하지")?;
+    let raw = reopen(vault, &container.content_file, "하위 노트 본문을 저장하지")?;
     let text = file_text(
         container,
         &root_agenda(root),
         &container.meta.title,
         &container.meta.tags,
         body,
+        &extra_front(&raw),
     );
     require_markdown_folder(container)?;
     place_and_write(vault, container, &container.meta.title, &text)

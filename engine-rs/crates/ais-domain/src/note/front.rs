@@ -29,6 +29,50 @@ pub struct NoteFront<'a> {
     pub template: Option<&'a str>,
     pub evaluation: Option<&'a Evaluation>,
     pub links: &'a [Link],
+    /// 엔진이 모르는 머리 칸을 [`extra_front`]로 미리 글로 만든 것. 머리 맨 끝에 그대로 붙는다. 없으면 빈 글이다.
+    pub extra: &'a str,
+}
+
+/// 이 엔진이 머리에 직접 쓰는 칸. 이 밖의 칸은 모르는 칸이라 다시 쓸 때 그대로 둔다.
+pub const KNOWN_KEYS: [&str; 19] = [
+    "id",
+    "agenda",
+    "type",
+    "title",
+    "created",
+    "sessionId",
+    "sessionAgent",
+    "decisionConfirmation",
+    "tier",
+    "editedBy",
+    "editedAt",
+    "editedSessionId",
+    "editedSessionAgent",
+    "tags",
+    "subAgendaIds",
+    "favorite",
+    "favoriteCategory",
+    "template",
+    "evaluation",
+];
+
+/// 읽은 머리 `raw`에서 엔진이 모르는 칸만 골라 읽은 차례 그대로 YAML 글로 만든다(`links`도 아는 칸이라 뺀다).
+///
+/// 새 버전이 더한 칸(옛 프로세스가 노트를 다시 쓰면 지우던 것)이나 사람이 손으로 적어 둔 칸을 다시 쓸 때 잃지 않으려는 것이다.
+/// 쓸 수 없는 값(실수, 아주 큰 정수 따위)이 든 칸은 [`judge`]가 먼저 거절하므로 여기서는 건너뛴다.
+pub fn extra_front(raw: &[(Value, Value)]) -> String {
+    let unknown: Vec<(Value, Value)> = raw
+        .iter()
+        .filter(|(key, _)| match key {
+            Value::Str(name) => !KNOWN_KEYS.contains(&name.as_str()) && name != "links",
+            _ => false,
+        })
+        .cloned()
+        .collect();
+    if unknown.is_empty() {
+        return String::new();
+    }
+    dump_general_map(&unknown).unwrap_or_default()
 }
 
 impl NoteFront<'_> {
@@ -104,6 +148,7 @@ impl NoteFront<'_> {
                 ));
             }
         }
+        out.push_str(self.extra);
         out
     }
 }
@@ -163,6 +208,8 @@ pub fn judge(
     now_millis: i64,
 ) -> Result<String, EngineError> {
     let meta = draft.meta;
+    // 엔진이 모르는 머리 칸은 그대로 이어 쓴다. 맨 끝에 붙으므로 모르는 칸이 가운데 있던 노트는 처음 한 번 순서가 바뀌고, 그 쓰기는 편집 도장이 찍힌다
+    let extra = extra_front(raw);
     let front = |edited_by: Option<&str>,
                  edited_at: Option<&str>,
                  edited_session: Option<&str>,
@@ -189,6 +236,7 @@ pub fn judge(
             template: draft.template,
             evaluation: draft.evaluation,
             links: draft.links,
+            extra: &extra,
         }
         .render()
     };
@@ -244,6 +292,81 @@ pub fn kst_minute(millis: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pair(key: &str, value: Value) -> (Value, Value) {
+        (Value::Str(key.to_string()), value)
+    }
+
+    #[test]
+    fn keeps_only_unknown_header_keys_in_the_order_they_were_read() {
+        let raw = vec![
+            pair("id", Value::Str("ndzz".into())),
+            pair("futureField", Value::Str("미래".into())),
+            pair("subAgendaIds", Value::List(vec![Value::Str("sa1".into())])),
+            pair("links", Value::List(Vec::new())),
+            pair(
+                "labels",
+                Value::List(vec![Value::Str("하나".into()), Value::Str("둘".into())]),
+            ),
+            pair("flag", Value::Bool(true)),
+        ];
+        // 아는 칸(`subAgendaIds`, `links` 포함)은 빠지고 모르는 칸만 읽은 차례 그대로 남는다
+        assert_eq!(
+            extra_front(&raw),
+            "futureField: 미래\nlabels:\n  - 하나\n  - 둘\nflag: true\n"
+        );
+        assert_eq!(extra_front(&[]), "");
+        assert_eq!(extra_front(&raw[..1]), "");
+    }
+
+    #[test]
+    fn every_key_the_renderer_writes_is_a_known_key() {
+        // 렌더러가 쓰는 칸이 `KNOWN_KEYS`에 없으면 다시 쓸 때 같은 칸이 두 번 적힌다
+        let draft = NoteFront {
+            id: "ndzz0001-0000aaaa",
+            agenda: "demo",
+            doc_type: "free",
+            title: "제목",
+            created: "2026-11-12T09:00:00+09:00",
+            session_id: Some("s1"),
+            session_agent: Some("codex"),
+            tier: Tier::Record,
+            decision_confirmation: Some("c"),
+            edited_by: Some("app"),
+            edited_at: Some("2026-11-12T09:00:00+09:00"),
+            edited_session_id: Some("s2"),
+            edited_session_agent: Some("gemini"),
+            tags: &["t".to_string()],
+            sub_agenda_ids: &["sa1".to_string()],
+            favorite: true,
+            favorite_category: Some("보관"),
+            template: Some("tpl"),
+            evaluation: Some(&Evaluation {
+                score: 3,
+                note: "n".into(),
+                at: "2026-11-12T09:00:00+09:00".into(),
+            }),
+            links: &[Link {
+                to: "ndzz0002-0000bbbb".into(),
+                kind: "direct".into(),
+            }],
+            extra: "",
+        }
+        .render();
+        for line in draft.lines().filter(|l| !l.starts_with(' ')) {
+            let key = line.split(':').next().unwrap();
+            assert!(
+                KNOWN_KEYS.contains(&key) || key == "links",
+                "알려지지 않은 칸을 쓴다: {key}"
+            );
+        }
+        for key in KNOWN_KEYS {
+            assert!(
+                draft.lines().any(|l| l.starts_with(&format!("{key}:"))),
+                "{key} 칸을 쓰는 입력이 시험에 없다"
+            );
+        }
+    }
 
     #[test]
     fn formats_korean_standard_time_to_the_minute() {

@@ -184,6 +184,7 @@ impl ParsedNewDoc {
             template: self.template.as_deref(),
             evaluation: None,
             links: &self.links,
+            extra: "",
         }
         .render();
         format!("---\n{front}---\n{}", self.body)

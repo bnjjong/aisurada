@@ -85,6 +85,7 @@ impl NewSub {
             template: None,
             evaluation: None,
             links: &[],
+            extra: "",
         }
         .render();
         let text = format!("---\n{front}---\n{}", self.body);
