@@ -289,6 +289,7 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
   `TSK-14.md`(태스크), `TSK-14/activity.jsonl`(활동, 한 줄에 사건 하나, 최근 500줄까지), `.trash/<id>/`(지운 태스크). 실행 기록(러너가 만드는 로그)은 vault가 아니라 앱 폴더에 둔다(결정 3).
 - **키와 ID.** 키 `TSK-<번호>`는 엔진이 매기고 만든 뒤 바뀌지 않는다. 지운 번호(휴지통에 있는 것 포함)를 다시 쓰지 않는다. ID는 `tk…`(노트 `nd…`, 스킬 `sk…`와 같은 형식)이고 파일 안에 있다. 접두 `TSK`는 엔진 오류 코드(`AIS-…`)와 겹치지 않게 골랐다.
 - **파일 모양.** `---` 머리말(YAML)과 설명 본문이다. 머리말은 스킬·에이전트 자원처럼 SnakeYAML로 읽고 쓰므로 `criteria`, `links`, `refs`를 들여쓴 목록으로 적는다(줄 읽개로 읽는 프로젝트·아젠다 파일과 다르다). 모르는 머리말 칸은 지우지 않고 보존한다(시험으로 고정). `key`, `id`, `title`, `type`, `priority`, `status`, `repo`, `project`, `baseBranch`, `labels`, `criteria`, `links`, `refs`, `createdAt`, `editedAt`, `editedSession`, `editedAgent` 순서로 쓴다. 유형은 `feature`·`bug`·`chore`, 우선순위는 `high`·`medium`·`low`다.
+- 태스크 파일의 `createdAt`과 `editedAt`에는 비어 있지 않은 일시 문자열이 필요하다. 새 태스크는 두 필드에 같은 생성 시각을 쓰고, 내용·상태·연결을 저장할 때는 `editedAt`을 갱신한다. 일시가 빠진 파일은 `list-tasks`의 `skipped`에 이유가 표시되며, 파일과 키는 보존된다.
 - **완료 기준은 필수다.** `create-task`는 `criteria`가 비면 AIS-400으로 거절한다. 일이 끝났는지 이 기준으로 확인하기 때문이다(사용자 결정, 2026-11-13). `repo`(`owner/name`)와 `title`도 필수다.
 - **명령 9개.** MCP에는 읽기 도구 `list_tasks`, `get_task`와 쓰기 도구 `create_task`(Draft 만들기)가 열린다. `create_task`는 서버를 `--write`로 띄웠을 때만 보인다. 상태를 바꾸는 일은 사람과 러너만 한다.
 

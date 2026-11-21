@@ -228,8 +228,8 @@ impl NewTask {
             refs: self.refs.unwrap_or_default(),
             body: self.body.unwrap_or_default(),
             extra: Vec::new(),
-            created_at: Some(stamp.at.clone()),
-            edited_at: Some(stamp.at.clone()),
+            created_at: stamp.at.clone(),
+            edited_at: stamp.at.clone(),
             edited_session: stamp.session.clone(),
             edited_agent: stamp.agent.clone(),
             rel_path,
@@ -323,7 +323,7 @@ impl Task {
             return Ok(None);
         }
         let next = Task {
-            edited_at: Some(stamp.at.clone()),
+            edited_at: stamp.at.clone(),
             edited_session: stamp.session.clone(),
             edited_agent: stamp.agent.clone(),
             token: None,
@@ -396,7 +396,7 @@ impl Task {
         transitions::require(cur, to, actor, &blockers())?;
         let next = Task {
             status: to,
-            edited_at: Some(stamp.at.clone()),
+            edited_at: stamp.at.clone(),
             edited_session: stamp.session.clone(),
             edited_agent: stamp.agent.clone(),
             token: None,
@@ -498,7 +498,7 @@ impl Task {
         }
         let next = Task {
             links,
-            edited_at: Some(stamp.at.clone()),
+            edited_at: stamp.at.clone(),
             edited_session: stamp.session.clone(),
             edited_agent: stamp.agent.clone(),
             token: None,
@@ -750,10 +750,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(edit.next.title, "새 제목");
-        assert_eq!(
-            edit.next.edited_at.as_deref(),
-            Some("2026-11-16T10:00:00+09:00")
-        );
+        assert_eq!(edit.next.edited_at, "2026-11-16T10:00:00+09:00");
         assert_eq!(edit.next.token, None);
         assert_eq!(
             compact(&edit.event.to_json_value()),

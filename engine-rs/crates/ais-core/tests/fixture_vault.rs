@@ -2967,6 +2967,12 @@ fn runs_the_task_lifecycle() {
         (Some("TSK-1"), Some(true))
     );
     assert_eq!(created["status"], "draft");
+    assert!(
+        created["createdAt"]
+            .as_str()
+            .is_some_and(|at| !at.is_empty())
+    );
+    assert_eq!(created["editedAt"], created["createdAt"]);
     assert_eq!(created["criteriaDone"], 1);
     let text = read(".aisurada/tasks/TSK-1.md");
     assert!(
@@ -3004,6 +3010,12 @@ fn runs_the_task_lifecycle() {
         )
         .unwrap();
     assert_eq!(updated["changed"], true);
+    assert_eq!(updated["createdAt"], created["createdAt"]);
+    assert!(
+        updated["editedAt"]
+            .as_str()
+            .is_some_and(|at| !at.is_empty())
+    );
     assert!(
         read(".aisurada/tasks/TSK-1/activity.jsonl")
             .contains("\"kind\":\"edited\",\"by\":\"human\",\"fields\":[\"title\",\"project\"]}")
@@ -3133,6 +3145,28 @@ fn runs_the_task_lifecycle() {
         )
         .unwrap();
     assert_eq!(third["key"], "TSK-3");
+    let trashed_item = vault
+        .join(".aisurada/tasks/.trash")
+        .join(second["id"].as_str().unwrap())
+        .join("item.md");
+    let saved_item = std::fs::read_to_string(&trashed_item).unwrap();
+    let without_edited_at = saved_item
+        .lines()
+        .filter(|line| !line.starts_with("editedAt:"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(&trashed_item, &without_edited_at).unwrap();
+    assert!(
+        error("restore_task", json!({"id": key2}))
+            .message
+            .contains("editedAt 에 일시가 필요하다")
+    );
+    assert_eq!(
+        std::fs::read_to_string(&trashed_item).unwrap(),
+        without_edited_at
+    );
+    assert!(!vault.join(format!(".aisurada/tasks/{key2}.md")).exists());
+    std::fs::write(trashed_item, saved_item).unwrap();
     let restored = engine.call("restore_task", json!({"id": key2})).unwrap();
     assert_eq!(
         (restored["restored"].as_bool(), restored["key"].as_str()),
@@ -3147,7 +3181,7 @@ fn runs_the_task_lifecycle() {
     // 손으로 쓴 파일: 모르는 칸이 고친 뒤에도 남고, 못 읽는 파일은 건너뛴다고 알린다
     std::fs::write(
         vault.join(".aisurada/tasks/TSK-20.md"),
-        "---\nkey: TSK-20\nid: tkex0001-00000001\ntitle: 손\nstatus: draft\ncustom: 5\nscore: 1.5\nnested:\n  a: [1, 2]\n---\n본문\n",
+        "---\nkey: TSK-20\nid: tkex0001-00000001\ntitle: 손\nstatus: draft\ncreatedAt: '2026-11-13T09:00:00+09:00'\neditedAt: '2026-11-13T09:00:00+09:00'\ncustom: 5\nscore: 1.5\nnested:\n  a: [1, 2]\n---\n본문\n",
     )
     .unwrap();
     std::fs::write(vault.join(".aisurada/tasks/TSK-21.md"), "머리말이 없다\n").unwrap();
@@ -3179,6 +3213,46 @@ fn runs_the_task_lifecycle() {
         error("get_task", json!({"id": "TSK-99"})).message,
         "태스크를 못 찾았다: TSK-99"
     );
+
+    let invalid_dates = [
+        (22, "createdAt", "editedAt: '2026-11-13T09:00:00+09:00'"),
+        (
+            23,
+            "editedAt",
+            "createdAt: '2026-11-13T09:00:00+09:00'\neditedAt: null",
+        ),
+        (
+            24,
+            "createdAt",
+            "createdAt: '  '\neditedAt: '2026-11-13T09:00:00+09:00'",
+        ),
+    ];
+    for (number, _, dates) in invalid_dates {
+        std::fs::write(
+            vault.join(format!(".aisurada/tasks/TSK-{number}.md")),
+            format!(
+                "---\nkey: TSK-{number}\nid: tkex0001-000000{number:02}\ntitle: 일시 누락\nstatus: draft\n{dates}\n---\n"
+            ),
+        )
+        .unwrap();
+    }
+    let skipped = engine.call("list_tasks", json!({})).unwrap()["skipped"]
+        .as_array()
+        .unwrap()
+        .clone();
+    for (number, field, _) in invalid_dates {
+        assert!(skipped.contains(&json!(format!(
+            ".aisurada/tasks/TSK-{number}.md: {field} 에 일시가 필요하다"
+        ))));
+    }
+    let after_skipped = engine
+        .call(
+            "create_task",
+            json!({"title": "다음 태스크", "repo": "owner/name", "criteria": ["하나"]}),
+        )
+        .unwrap();
+    assert_eq!(after_skipped["key"], "TSK-25");
+    assert!(read(".aisurada/tasks/TSK-22.md").contains("title: 일시 누락"));
 }
 
 /// 승인 기록장(앱 폴더의 `ledger.json`) 글. vault 경로 해시 폴더를 스스로 찾는다.

@@ -227,13 +227,13 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
         "blockedBy": aggregate::unfinished_blockers(scan, &task.key),
         "blocks": blocks,
         "path": task.rel_path,
+        "createdAt": task.created_at,
+        "editedAt": task.edited_at,
     });
     for (key, value) in [
         ("repo", &task.repo),
         ("project", &task.project),
         ("baseBranch", &task.base_branch),
-        ("createdAt", &task.created_at),
-        ("editedAt", &task.edited_at),
         ("editedSession", &task.edited_session),
         ("editedAgent", &task.edited_agent),
     ] {
