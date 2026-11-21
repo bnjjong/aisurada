@@ -1,5 +1,7 @@
 //! git 명령 실행 어댑터. 셸 없이 인자를 그대로 넘기고, 시간이 지나면 죽인다.
 //!
+//! `Strict`는 `.git/config`가 사용자 몰래 명령을 돌리는 길(훅, `core.fsmonitor`)을 끈다. `Legacy`는 환경과 설정을 그대로 물려받는다(#92).
+//!
 //! 실행하지 못했거나 시간이 넘은 것은 코드 -1에 빈 출력으로 돌려준다. 부르는 쪽은 실패를 그 걸음의 빈 결과로 본다.
 
 use std::ffi::OsString;
@@ -53,6 +55,9 @@ impl VersionControl for GitCli {
                         "commit.gpgsign=false",
                         "-c",
                         "core.quotePath=false",
+                        // 받은 vault의 `.git/config`가 `core.fsmonitor`에 명령을 적어 두면 git이 status·add 때 그것을 실행한다
+                        "-c",
+                        "core.fsmonitor=false",
                     ])
                     .env_remove("GIT_INDEX_FILE")
                     .env("GIT_DIR", vault.join(".git"))

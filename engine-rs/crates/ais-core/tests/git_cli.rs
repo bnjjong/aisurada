@@ -95,13 +95,13 @@ fn output_exit_code_and_stdin_pass_through() {
 }
 
 #[test]
-fn strict_mode_pins_the_repository_and_turns_hooks_and_signing_off() {
+fn strict_mode_pins_the_repository_and_turns_hooks_signing_and_fsmonitor_off() {
     let (dir, program) = fake_git(
         "for a in \"$@\"; do echo \"arg:$a\"; done\necho \"dir:$GIT_DIR\"\necho \"tree:$GIT_WORK_TREE\"\necho \"author:$GIT_AUTHOR_NAME\"",
     );
     let git = cli(&program, 10_000, 10_000);
     let strict = git.run(&dir, GitMode::Strict, &["status"], b"").text();
-    assert!(strict.starts_with("arg:-c\narg:core.hooksPath=/dev/null\narg:-c\narg:commit.gpgsign=false\narg:-c\narg:core.quotePath=false\narg:status\n"), "{strict}");
+    assert!(strict.starts_with("arg:-c\narg:core.hooksPath=/dev/null\narg:-c\narg:commit.gpgsign=false\narg:-c\narg:core.quotePath=false\narg:-c\narg:core.fsmonitor=false\narg:status\n"), "{strict}");
     assert!(
         strict.contains(&format!("dir:{}\n", dir.join(".git").display())),
         "{strict}"
@@ -135,4 +135,77 @@ fn a_large_input_and_output_do_not_deadlock_the_pipes() {
     assert_eq!(result.output.len(), input.len());
     assert!(started.elapsed() < Duration::from_secs(20));
     fs::remove_dir_all(&dir).unwrap();
+}
+
+/// 진짜 `git`으로, 받은 vault의 `.git/config`가 `core.fsmonitor`에 적어 둔 명령이 `Strict` 실행에서 돌지 않는지 본다(#92).
+/// 같은 저장소에서 보통의 `git status`는 그 명령을 돌리므로(대조군), 시험이 헛돌지 않는다.
+#[test]
+fn strict_mode_does_not_run_a_fsmonitor_command_from_the_repository_config() {
+    use std::process::Command;
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let root = std::env::temp_dir().join(format!(
+        "ais-gitcli-fsmon-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::SeqCst)
+    ));
+    let _ = fs::remove_dir_all(&root);
+    let vault = root.join("vault");
+    fs::create_dir_all(&vault).unwrap();
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&vault)
+            .output()
+            .expect("git을 못 돌렸다");
+        assert!(
+            out.status.success(),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    git(&["init", "-q"]);
+    fs::write(vault.join("a.md"), "one\n").unwrap();
+    git(&["add", "a.md"]);
+    git(&[
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "-m",
+        "first",
+    ]);
+    // 악성 저장소: 돌면 표지 파일을 만드는 스크립트를 fsmonitor로 적는다
+    let marker = root.join("fsmonitor-ran");
+    let script = root.join("evil.sh");
+    fs::write(&script, format!("#!/bin/sh\ntouch {}\n", marker.display())).unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    git(&["config", "core.fsmonitor", script.to_str().unwrap()]);
+
+    // 대조군: 보통의 git은 status에서 그 명령을 돌린다
+    git(&["status", "--porcelain"]);
+    assert!(
+        marker.exists(),
+        "대조군이 fsmonitor 명령을 돌리지 않았다. 이 시험이 아무것도 못 본다"
+    );
+    fs::remove_file(&marker).unwrap();
+
+    // Strict는 자동 커밋이 쓰는 명령들을 돌려도 그 명령을 돌리지 않는다
+    fs::write(vault.join("a.md"), "two\n").unwrap();
+    let strict = GitCli::default();
+    for args in [
+        vec!["status", "--porcelain"],
+        vec!["add", "-A"],
+        vec!["diff", "--cached", "--name-only"],
+        vec!["log", "--oneline"],
+    ] {
+        let result = strict.run(&vault, GitMode::Strict, &args, b"");
+        assert_eq!(result.code, 0, "{args:?}");
+        assert!(
+            !marker.exists(),
+            "{args:?}: .git/config의 fsmonitor 명령이 돌았다"
+        );
+    }
+    fs::remove_dir_all(&root).unwrap();
 }
