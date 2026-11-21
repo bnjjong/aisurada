@@ -18,24 +18,32 @@ export function PickerPopover({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<CSSProperties>();
+  // 미리보기 안에서 메뉴에 초점을 옮겨도 Tab 탐색이 대화 상자 안에 머물게 한다.
+  const dialog = anchor.current?.closest<HTMLElement>(".note-preview[role='dialog']");
   useLayoutEffect(() => {
     const rect = anchor.current?.getBoundingClientRect();
     if (!rect) return;
+    const bounds = dialog?.getBoundingClientRect();
+    const left = bounds && dialog ? bounds.left + dialog.clientLeft : 0;
+    const top = bounds && dialog ? bounds.top + dialog.clientTop : 0;
+    const availableWidth = dialog?.clientWidth ?? window.innerWidth;
+    const availableHeight = dialog?.clientHeight ?? window.innerHeight;
     const margin = 8;
     const gap = 6;
-    const width = Math.min(280, window.innerWidth - margin * 2);
-    const below = window.innerHeight - rect.bottom - gap - margin;
-    const above = rect.top - gap - margin;
+    const width = Math.min(280, availableWidth - margin * 2);
+    const below = top + availableHeight - rect.bottom - gap - margin;
+    const above = rect.top - top - gap - margin;
     const opensAbove = below < 220 && above > below;
     setPlace({
-      left: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
+      position: dialog ? "absolute" : "fixed",
+      left: Math.max(margin, Math.min(rect.left - left, availableWidth - width - margin)),
       width,
       maxHeight: Math.max(0, opensAbove ? above : below),
       ...(opensAbove
-        ? { bottom: window.innerHeight - rect.top + gap }
-        : { top: rect.bottom + gap }),
+        ? { bottom: top + availableHeight - rect.top + gap }
+        : { top: rect.bottom - top + gap }),
     });
-  }, [anchor]);
+  }, [anchor, dialog]);
 
   useEffect(() => {
     if (!place) return;
@@ -87,7 +95,7 @@ export function PickerPopover({
       <div className="agenda-picker-title">{label}</div>
       {children}
     </div>,
-    document.body,
+    dialog ?? document.body,
   );
 }
 

@@ -61,12 +61,10 @@ export function NoteSubAgendas({
   note,
   agenda,
   controller,
-  readOnly,
 }: {
   note: Note;
   agenda: Agenda;
   controller: WorkspaceController;
-  readOnly: boolean;
 }) {
   const anchor = useRef<HTMLButtonElement>(null);
   const menuId = useId();
@@ -83,7 +81,7 @@ export function NoteSubAgendas({
   const save = (subAgendaIds: string[]) =>
     void controller.data.updateNote({ id: note.id }, { subAgendaIds });
 
-  if (readOnly ? !selected.length : !choices.length) return null;
+  if (!choices.length) return null;
   const labels = selected.map((item) => item.title + (item.archived ? " · 보관됨" : ""));
   const summary = (
     <>
@@ -92,10 +90,6 @@ export function NoteSubAgendas({
       {labels.length > 1 && <span className="sub-agenda-count">+{labels.length - 1}</span>}
     </>
   );
-  if (readOnly) {
-    return <span className="doc-agenda-chip sub-agenda-chip" title={labels.join(", ")}>{summary}</span>;
-  }
-
   return (
     <>
       <button

@@ -976,6 +976,56 @@ if (location.pathname.startsWith("/note-window/")) {
       click("검증 아젠다 화면으로 가기", $(".agenda-picker"));
       await until(() => location.pathname.startsWith("/agenda/") && !$(".agenda-picker"), "agenda screen");
     });
+    await test("preview-agenda-picker-saves-assignments", async () => {
+      const source = await engine(["create-sub-agenda", "agendaId=agfixture-00000001", "title=원래 분류"]);
+      const target = await engine(["create-agenda", "title=미리보기 목적지"]);
+      const category = await engine(["create-sub-agenda", "agendaId=" + target.id, "title=옮겨 갈 분류"]);
+      dispatchEvent(new Event("focus"));
+      go("/calendar?mode=day&date=" + cfg.today);
+      const calendarNote = () => $('.tl-block[data-calendar-note="' + cfg.id + '"]');
+      await until(calendarNote, "calendar note");
+      key(calendarNote(), "Enter");
+
+      const preview = () => $(".note-preview");
+      const subChip = () => $("button.sub-agenda-chip", preview());
+      await until(subChip, "sub-agenda button inside preview");
+      subChip().click();
+      await until(() => $(".agenda-picker button[role=menuitemcheckbox]", preview()), "sub-agenda menu inside preview");
+      esc();
+      await until(() => preview() && !$(".agenda-picker"), "Escape closes only the picker");
+      assert(document.activeElement === subChip(), "Escape did not return focus to the button");
+      subChip().click();
+      await until(() => button("원래 분류", $(".agenda-picker", preview())), "source category");
+      click("원래 분류", $(".agenda-picker", preview()));
+      await until(async () => (await engine(["get-doc", cfg.id])).subAgendaIds?.includes(source.id), "source category on disk");
+      assert(subChip().textContent.includes("원래 분류"), "preview category updated");
+      esc();
+
+      $("button.doc-agenda-chip:not(.sub-agenda-chip)", preview()).click();
+      await until(() => button("미리보기 목적지 분류 선택 후 이동", $(".agenda-picker", preview())), "destination menu");
+      const choose = button("미리보기 목적지 분류 선택 후 이동", $(".agenda-picker", preview()));
+      const bounds = choose.getBoundingClientRect();
+      assert(choose.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)), "menu button covered in preview");
+      choose.click();
+      await until(() => button("옮겨 갈 분류", $(".agenda-picker", preview())), "destination category");
+      click("옮겨 갈 분류", $(".agenda-picker", preview()));
+      await until(() => button("옮겨 갈 분류", $(".agenda-picker", preview()))?.getAttribute("aria-checked") === "true", "destination category selected");
+      click("이 아젠다로 옮기기", $(".agenda-picker", preview()));
+      await until(async () => {
+        const saved = await engine(["get-doc", cfg.id]);
+        return saved.agenda === target.slug && saved.subAgendaIds?.join() === category.id;
+      }, "destination agenda and category on disk");
+      await until(() => subChip()?.textContent.includes("옮겨 갈 분류"), "preview follows the moved note");
+      await until(() => $(".move-undo"), "move undo");
+      click("되돌리기", $(".move-undo"));
+      await until(async () => {
+        const saved = await engine(["get-doc", cfg.id]);
+        return saved.agenda === "demo" && saved.subAgendaIds?.join() === source.id;
+      }, "undo restores previous agenda and category");
+      await until(() => subChip()?.textContent.includes("원래 분류"), "preview shows the restored category");
+      esc();
+      await until(() => !preview(), "close preview");
+    });
     // Last on purpose: a selection left in the template editor disturbs later navigation.
     await test("C57-template-editor-selection-offers-no-comment", async () => {
       const made = await engine(["save-template", "name=C57 템플릿", "type=free", "desc=", "body=고를 글이 있는 본문"]);
