@@ -213,6 +213,17 @@ java -cp "$D/snake:$ORACLE/ais-engine.jar" SnakeCases engine-rs/golden/snake-cas
 - **일부러 남긴 것.** 저장 설정 `expandedSessionProjects`는 쓰는 곳이 없어졌지만 필드를 그대로 둔다. 16장이 설정을 정확히 21개로 정해 두었고 시험(`chapters14-17`)이 그 개수를 센다. 스킨 CSS(`skin-*.css`)의 공유 선택자 목록에 든 `.sess-toggle` 같은 이름도 해가 없어 그대로 두었다.
 - **세션 화면의 입구.** 이제 노트의 세션 칩(「열기」로 노트 옆 레일을 열고 거기서 화면으로)뿐이다. 노트가 없는 세션에 들어갈 화면 안의 길은 없다.
 
+### 프로젝트·아젠다·노트의 생성 및 수정 시각
+
+새 프로젝트, 아젠다, 메인·하위 노트의 파일에는 `createdAt`과 `editedAt`을 함께 쓴다. 내용이 바뀌면 `editedAt`을 갱신한다. 노트의 `created`는 달력에서 노트가 놓이는 시각이다.
+
+이전 파일에 시각이 없으면 일반 저장 때 누락된 필드를 채운다. 열려 있는 워크스페이스의 파일을 한꺼번에 보완할 때는 저장소 루트에서 다음 명령을 쓴다. 첫 명령은 대상 수를 확인한다. 두 번째 명령은 원본을 워크스페이스 밖의 새 백업 폴더에 저장한 뒤, 파일 머리에서 빠지거나 비어 있는 시각에 실행 당시 시각을 쓴다.
+
+```sh
+cargo run --manifest-path engine-rs/Cargo.toml --locked -p ais-core --example backfill_timestamps -- /path/to/vault
+cargo run --manifest-path engine-rs/Cargo.toml --locked -p ais-core --example backfill_timestamps -- /path/to/vault /path/to/new-backup
+```
+
 ### 프로젝트의 저장소와 아젠다의 `projectRepo`
 
 프로젝트가 저장소(로컬 폴더, GitHub 저장소, 또는 둘 다)를 여러 개 가지고, 아젠다가 그중 하나를 이름으로 가리킨다. 나중에 GitHub App 연동과 앱 안의 개발 기능이 이 위에 올라간다. **외부 설명서에 없는 확장이다.** 설명서 21.5는 프로젝트 파일의 키를 4개로 못 박아 두었고(조건부 키 없음), 20.5는 아젠다의 키를 6개로 정했다.

@@ -230,6 +230,27 @@ fn an_engine_with_fake_ports_works_without_any_environment_variable() {
     let same = engine.call("get_doc", json!({"id": note_id})).unwrap();
     assert_eq!(same["editedAt"], modified, "{same}");
 
+    // 예전 노트를 그대로 저장해도 비어 있는 생성 시각만 정해진다.
+    let legacy_file = vault.join("notes/demo/legacy-null/note.md");
+    std::fs::create_dir_all(legacy_file.parent().unwrap()).unwrap();
+    std::fs::write(
+        &legacy_file,
+        "---\nid: ndfake0001-00000001\nagenda: demo\ntype: free\ntitle: 예전 노트\ncreated: '2026-11-12T09:00:00+09:00'\ncreatedAt: null\neditedBy: app\neditedAt: '2026-11-13T00:00:00.000Z'\n---\n본문\n",
+    )
+    .unwrap();
+    let legacy = engine
+        .call("get_doc", json!({"id": "ndfake0001-00000001"}))
+        .unwrap();
+    engine
+        .call(
+            "update_doc",
+            json!({"id": legacy["id"], "body": legacy["body"], "f1": legacy["precondition"]}),
+        )
+        .unwrap();
+    let legacy = engine.call("get_doc", json!({"id": legacy["id"]})).unwrap();
+    assert_eq!(legacy["createdAt"], "2026-11-14T23:46:45.000Z");
+    assert_eq!(legacy["editedAt"], "2026-11-13T00:00:00.000Z");
+
     // 잠금 파일은 환경 변수(`AISURADA_LOCK_DIR`)가 아니라 약속에 준 폴더에 생겼다
     let locks = std::fs::read_dir(root.join("locks")).expect("가짜 잠금 폴더");
     assert!(
