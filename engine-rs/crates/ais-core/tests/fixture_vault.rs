@@ -4640,3 +4640,104 @@ fn sub_agendas_survive_note_rewrites_and_moves() {
     assert!(read().get("subAgendaIds").is_none());
     std::fs::remove_dir_all(vault).unwrap();
 }
+
+/// vault 안의 심볼릭 링크가 vault 밖을 가리켜도 쓰기·옮기기·읽기가 밖으로 번지지 않는지(#95, #96).
+#[cfg(unix)]
+#[test]
+fn symlinks_cannot_carry_reads_and_writes_outside_the_vault() {
+    use std::os::unix::fs::symlink;
+
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let pid = std::process::id();
+    let outside = vault
+        .parent()
+        .unwrap()
+        .join(format!("ais-outside-95-{pid}"));
+    let alias = vault.parent().unwrap().join(format!("ais-alias-95-{pid}"));
+    let _ = std::fs::remove_dir_all(&outside);
+    let _ = std::fs::remove_file(&alias);
+    std::fs::create_dir_all(outside.join("dir")).unwrap();
+    std::fs::write(outside.join("secret.html"), "<p>외부비밀글</p>").unwrap();
+
+    // 1) 경로 검사: 링크가 vault 안을 가리키면 통과, 밖이나 끊어진 곳이면 거절한다. 아직 없는 새 경로도 윗 폴더의 링크를 따라 본다
+    let confine = ais_core::ports::fs::check_confinement;
+    symlink(&outside, vault.join("hack")).unwrap();
+    symlink(vault.join("notes"), vault.join("inner")).unwrap();
+    symlink(vault.join("no-such-target"), vault.join("dangling")).unwrap();
+    symlink(&vault, &alias).unwrap();
+    assert!(confine(&vault, &vault.join("notes/demo/x.md")).is_ok());
+    assert!(confine(&vault, &vault.join("inner/demo/x.md")).is_ok());
+    assert!(
+        confine(&alias, &alias.join("notes/demo/x.md")).is_ok(),
+        "vault를 링크로 열어도 안쪽 경로는 통과한다"
+    );
+    for bad in [
+        "hack",
+        "hack/secret.html",
+        "hack/new/deep.md",
+        "dangling/x.md",
+    ] {
+        let error = confine(&vault, &vault.join(bad)).unwrap_err();
+        assert_eq!(error.kind, ErrorKind::InvalidArgument, "{bad}");
+    }
+
+    let engine = Engine::new(&vault);
+    let parent = "ndfx0002-00000002";
+
+    // 2) 읽기(#96): 밖을 가리키는 HTML 첨부의 글은 attachText에도 목록에도 나오지 않는다
+    let attach = vault.join("notes/demo/2026-11/parent/attach");
+    symlink(outside.join("secret.html"), attach.join("c-evil.html")).unwrap();
+    let docs = engine
+        .call("list_docs", json!({"limit": 0, "bodies": true}))
+        .unwrap();
+    let item = docs["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == parent)
+        .unwrap();
+    assert_eq!(item["attachText"], "첫째 문서 끝 둘째 & 문서");
+    let listed = engine
+        .call("list_attachments", json!({"id": parent}))
+        .unwrap();
+    let names: Vec<&str> = listed["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"b-second.html"), "{names:?}");
+    assert!(!names.contains(&"c-evil.html"), "{names:?}");
+
+    // 3) 쓰기(#95): `attach`가 밖을 가리키는 링크면 첨부를 쓰지 않는다
+    let child = "snfx0002-00000012";
+    let child_attach = vault.join("notes/demo/2026-11/parent/sub/child2/attach");
+    let _ = std::fs::remove_dir_all(&child_attach);
+    symlink(outside.join("dir"), &child_attach).unwrap();
+    let error = engine
+        .call(
+            "write_attachment",
+            json!({"id": parent, "subId": child, "name": "planted.txt", "content": "x"}),
+        )
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::InvalidArgument, "{}", error.message);
+    assert!(!outside.join("dir/planted.txt").exists());
+
+    // 4) 옮기기·지우기(#95): 휴지통 보관 폴더(`files`)가 밖을 가리키는 링크면 노트를 거기로 옮기지 않는다
+    std::fs::create_dir_all(vault.join(".aisurada/trash")).unwrap();
+    symlink(outside.join("dir"), vault.join(".aisurada/trash/files")).unwrap();
+    let note = "ndfx0003-00000003";
+    let error = engine.call("delete_doc", json!({"id": note})).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::InvalidArgument, "{}", error.message);
+    assert_eq!(
+        std::fs::read_dir(outside.join("dir")).unwrap().count(),
+        0,
+        "vault 밖 폴더로 노트가 옮겨졌다"
+    );
+    assert!(engine.call("get_doc", json!({"id": note})).is_ok());
+
+    let _ = std::fs::remove_dir_all(&outside);
+    let _ = std::fs::remove_file(&alias);
+}
