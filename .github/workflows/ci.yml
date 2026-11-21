@@ -40,6 +40,16 @@ jobs:
           rustup default stable
       - name: Check formatting
         run: cargo fmt --manifest-path engine-rs/Cargo.toml --all -- --check
+      # test.sh 는 통합 시험과 예제를 지어서 ais-core 가 늘 test-support(시험 전용 기능)가 켜진 채 빌드된다.
+      # 시험 없이 빌드하는 운영 모양이 깨져도 test.sh 는 모르므로 여기서 따로 본다(이슈 #84).
+      - name: Check production build (no test-support)
+        run: |
+          cargo check --manifest-path engine-rs/Cargo.toml --workspace
+          # 운영 의존 그래프에 test-support 가 끼어 있으면 위 검사가 의미를 잃으므로 막는다
+          if cargo tree --manifest-path engine-rs/Cargo.toml --workspace -e normal,build -f '{p} [{f}]' | grep -q 'test-support'; then
+            echo '운영 빌드에 test-support 가 켜져 있다' >&2
+            exit 1
+          fi
       # bash test.sh 안의 34장 받아들임 시험(ais-cli/tests/acceptance_bundle.rs)이 node 로 실행기를 부른다
       - name: Test engine
         run: bash test.sh
