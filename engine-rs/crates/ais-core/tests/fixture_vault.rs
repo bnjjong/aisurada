@@ -3490,6 +3490,130 @@ fn queues_ai_resource_changes_until_a_human_approves() {
     assert_eq!(read(&agent_path), live);
 }
 
+/// 휴지통 폴더 이름(`id`)과 메타의 `relPath`·`project`를 믿지 않는지: 자원 폴더 밖으로는 파일도 폴더도 만들지 않고 `AIS-400`이다(#94).
+#[test]
+fn restore_resource_refuses_paths_that_leave_the_resource_folder() {
+    isolate_writes();
+    let vault = fixture();
+    std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+    let engine = Engine::new(&vault);
+    let error = |command: &str, args: Value| engine.call(command, args).unwrap_err();
+
+    // 정상 자원 둘(스킬, 에이전트)을 지워 휴지통에 둔다
+    let mut ids = Vec::new();
+    for (kind, name) in [("skill", "탈출 스킬"), ("agent", "탈출 에이전트")] {
+        let made = engine
+            .call(
+                "save_resource",
+                json!({"kind": kind, "scope": "global", "name": name, "description": "d"}),
+            )
+            .unwrap();
+        let id = made["id"].as_str().unwrap().to_string();
+        engine.call("delete_resource", json!({"id": id})).unwrap();
+        ids.push((kind, name, id));
+    }
+    let trash_root = vault.join(".aisurada/resources/.trash");
+    let meta_of = |id: &str| trash_root.join(id).join("meta.json");
+    let honest: Vec<String> = ids
+        .iter()
+        .map(|(_, _, id)| std::fs::read_to_string(meta_of(id)).unwrap())
+        .collect();
+    let forge = |index: usize, project: &str, rel_path: &str| {
+        let (kind, name, id) = &ids[index];
+        std::fs::write(
+            meta_of(id),
+            format!(
+                "{{\"id\":\"{id}\",\"kind\":\"{kind}\",\"project\":{project},\"name\":\"{name}\",\"relPath\":\"{rel_path}\",\"deletedAt\":\"2026-01-01T00:00:00.000Z\"}}\n"
+            ),
+        )
+        .unwrap();
+    };
+    let escape_name = format!("ais-escape-94-{}", std::process::id());
+    let escape = vault.parent().unwrap().join(&escape_name);
+    let _ = std::fs::remove_dir_all(&escape);
+
+    // 1) 폴더 이름 자리에 id가 아닌 값(`..`, `/`)이 오면 파일 시스템을 보기 전에 거절한다
+    for bad in [
+        "../../../evil",
+        "../x",
+        "sk1-0123abcd/../../..",
+        "..",
+        "x/y",
+    ] {
+        let e = error("restore_resource", json!({"id": bad}));
+        assert_eq!(e.kind, ErrorKind::InvalidArgument, "{bad}: {}", e.message);
+    }
+
+    // 2) 메타의 relPath가 자원 폴더 밖이거나 종류·이름 조각과 다르게 계산되면 거절한다.
+    //    밖에 폴더가 생기지 않고 휴지통 항목과 메타도 그대로여야 한다
+    let forged: [(usize, String); 6] = [
+        (0, format!("../{escape_name}/SKILL.md")),
+        (
+            0,
+            format!(".aisurada/resources/global/skills/../../../../{escape_name}/SKILL.md"),
+        ),
+        (0, "notes/planted/SKILL.md".to_string()), // vault 안이지만 자원 폴더 밖
+        (
+            0,
+            ".aisurada/resources/global/agents/planted.md".to_string(),
+        ), // 종류가 다른 자리
+        (1, format!("../{escape_name}/planted.md")),
+        (1, ".aisurada/resources/global/agents/éé".to_string()), // 바이트로 자르면 글자 가운데에서 멈추던 모양
+    ];
+    for (index, rel_path) in &forged {
+        forge(*index, "null", rel_path);
+        let id = &ids[*index].2;
+        let before = std::fs::read_to_string(meta_of(id)).unwrap();
+        let e = error("restore_resource", json!({"id": id}));
+        assert_eq!(
+            e.kind,
+            ErrorKind::InvalidArgument,
+            "{rel_path}: {}",
+            e.message
+        );
+        assert!(!escape.exists(), "{rel_path}: vault 밖에 폴더가 생겼다");
+        assert!(!vault.join("notes/planted").exists(), "{rel_path}");
+        assert!(
+            !vault
+                .join(".aisurada/resources/global/agents/planted.md")
+                .exists(),
+            "{rel_path}"
+        );
+        assert!(
+            trash_root.join(id).join("item").exists()
+                || trash_root.join(id).join("item.md").exists(),
+            "{rel_path}: 휴지통 항목이 사라졌다"
+        );
+        assert_eq!(
+            std::fs::read_to_string(meta_of(id)).unwrap(),
+            before,
+            "{rel_path}"
+        );
+    }
+
+    // 3) 메타의 project가 `..`이면 relPath를 거기에 맞춰도 거절한다
+    forge(
+        0,
+        "\"..\"",
+        ".aisurada/resources/projects/../skills/x/SKILL.md",
+    );
+    let id = &ids[0].2;
+    assert_eq!(
+        error("restore_resource", json!({"id": id})).kind,
+        ErrorKind::InvalidArgument
+    );
+    assert!(!vault.join(".aisurada/resources/skills").exists());
+
+    // 4) 메타가 정직하면(처음 쓴 그대로) 되살아난다
+    for (index, (_, _, id)) in ids.iter().enumerate() {
+        std::fs::write(meta_of(id), &honest[index]).unwrap();
+        let back = engine.call("restore_resource", json!({"id": id})).unwrap();
+        assert_eq!(back["restored"], true, "{id}");
+        assert!(!trash_root.join(id).exists());
+    }
+    let _ = std::fs::remove_dir_all(&escape);
+}
+
 #[test]
 fn reads_resource_arguments_like_the_command_line() {
     isolate_writes();
