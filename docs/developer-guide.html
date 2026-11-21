@@ -542,7 +542,7 @@ java -cp &quot;$D/snake:$ORACLE/ais-engine.jar&quot; SnakeCases engine-rs/golden
 <li><code>create-sub-agenda agendaId=&lt;아젠다 ID&gt; title=&lt;이름&gt;</code>으로 분류를 추가합니다. 아젠다별 목록은 <code>list-agendas</code>의 <code>subAgendas</code>에 나옵니다.</li>
 <li><code>update-sub-agenda agendaId=&lt;아젠다 ID&gt; id=&lt;분류 ID&gt;</code>에 <code>title=&lt;이름&gt;</code> 또는 <code>archived=true|false</code>를 더해 분류를 고칩니다. 같은 아젠다 안에서는 이름이 고유합니다.</li>
 <li><code>create_doc</code>과 <code>update_doc</code>의 <code>subAgendaIds</code>는 전체 선택 목록입니다. 수정에서 생략하면 같은 아젠다의 기존 연결을 보존하고, 빈 배열을 보내면 지웁니다. 다른 아젠다로 옮길 때는 목적지 ID만 받을 수 있습니다.</li>
-<li>미리보기를 포함한 노트 머리의 선택기와 아젠다 화면의 필터는 같은 목록을 사용합니다. 아젠다 이동을 되돌릴 때는 직전 아젠다와 분류를 함께 복원합니다.</li>
+<li>미리보기를 포함한 노트 머리의 선택기와 아젠다 화면의 필터는 같은 목록을 사용합니다. 같은 워크스페이스를 열어 둔 동안 아젠다별 필터 선택을 기억하므로 노트 탭에서 「내 기록」으로 돌아와도 적용됩니다. 아젠다 이동을 되돌릴 때는 직전 아젠다와 분류를 함께 복원합니다.</li>
 <li><code>list_docs</code>와 <code>search_docs</code>는 <code>subAgendaId</code> 조건을 받습니다. <code>reindex</code>는 파일을 직접 편집해 잘못된 ID가 들어온 경우를 <code>subAgenda</code> 진단으로 돌려줍니다.</li>
 </ul>
 <h3 id="github-app-연결-githubrs"><a class="anchor" href="#github-app-연결-githubrs" aria-label="이 절의 링크">#</a>GitHub App 연결 (<code>github.rs</code>)</h3>

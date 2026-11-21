@@ -123,6 +123,7 @@ export interface WorkspaceState {
   settingsOpen: boolean;
   form: { kind: 'note' | 'agenda' | 'project'; id?: string; agenda?: string; subAgendaId?: string; project?: string } | null;
   hiddenAgendas: string[];
+  subAgendaFilters: ReadonlyMap<string, string>;
   previewOpened: Note | null;
   booting: boolean;
   busy: boolean;

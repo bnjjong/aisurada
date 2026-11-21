@@ -71,7 +71,7 @@ export class WorkspaceController {
       notice => this.notify(notice)
     );
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
-      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], previewOpened: null,
+      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
       theme: readTheme(services.storage), skin: readSkin(services.storage), typography: readTypography(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
@@ -84,6 +84,7 @@ export class WorkspaceController {
     const next = { ...this.state, ...update };
     if (update.workspace && update.workspace.path !== this.state.workspace?.path) {
       next.form = null; next.preview = null; next.previewOpened = null; next.hiddenAgendas = [];
+      next.subAgendaFilters = new Map();
     }
     if (update.noteWindows?.includes(next.preview || '')) { next.preview = null; next.previewOpened = null; }
     if (next.subNotes && update.noteWindows?.includes(next.subNotes.root)) next.subNotes = null;
@@ -199,6 +200,9 @@ export class WorkspaceController {
   settings = (open: boolean) => { if (this.context.kind === 'main') this.patch({ settingsOpen: open }); };
   form = (form: WorkspaceState['form']) => { if (this.context.kind === 'main') this.patch({ form }); };
   filterAgendas = (hidden: string[]) => this.patch({ hiddenAgendas: [...new Set(hidden)] });
+  selectSubAgendaFilter = (agendaId: string, filterId: string) => {
+    this.patch({ subAgendaFilters: new Map(this.state.subAgendaFilters).set(agendaId, filterId) });
+  };
   isNative = () => !!this.services.native;
   confirm = (text: string, options?: { title?: string; okLabel?: string; cancelLabel?: string }) =>
     this.services.host.confirmLeave(text, options);
