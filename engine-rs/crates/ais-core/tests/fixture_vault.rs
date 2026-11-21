@@ -1068,9 +1068,13 @@ fn writes_agendas_through_the_write_foundation() {
             .starts_with("aisurada://agenda/")
     );
     let file = vault.join(".aisurada/agendas/새-아젠다.md");
+    let at = created["createdAt"].as_str().unwrap();
+    assert_eq!(created["editedAt"], at);
     assert_eq!(
         std::fs::read_to_string(&file).unwrap(),
-        format!("---\nid: {id}\nslug: 새-아젠다\ntitle: 새 아젠다\nhue: teal\n---\n요약")
+        format!(
+            "---\nid: {id}\nslug: 새-아젠다\ntitle: 새 아젠다\nhue: teal\ncreatedAt: '{at}'\neditedAt: '{at}'\n---\n요약"
+        )
     );
     // 같은 이름이면 번호가 붙고, 새 아젠다는 목록에 보인다
     let second = engine
@@ -1100,7 +1104,10 @@ fn writes_agendas_through_the_write_foundation() {
     assert!(cleared.get("repo").is_none());
     let text = std::fs::read_to_string(&file).unwrap();
     assert!(
-        text.contains("title: 바뀜\nhue: teal\n---\n") && !text.contains("repo:"),
+        text.starts_with(&format!(
+            "---\nid: {id}\nslug: 새-아젠다\ntitle: 바뀜\nhue: teal\ncreatedAt: '{at}'\neditedAt: '{}'\n---\n",
+            cleared["editedAt"].as_str().unwrap()
+        )) && !text.contains("repo:"),
         "{text}"
     );
 
@@ -1614,10 +1621,12 @@ fn writes_projects_through_the_write_foundation() {
     assert!(id.starts_with("pj") && created["slug"] == "새-프로젝트");
     assert_eq!(created["repos"][0]["githubId"], 9);
     let file = vault.join(".aisurada/projects/새-프로젝트.md");
+    let at = created["createdAt"].as_str().unwrap();
+    assert_eq!(created["editedAt"], at);
     assert_eq!(
         std::fs::read_to_string(&file).unwrap(),
         format!(
-            "---\nid: {id}\nslug: 새-프로젝트\ntitle: 새 프로젝트\nhue: teal\nrepos: {repos}\n---\n요약"
+            "---\nid: {id}\nslug: 새-프로젝트\ntitle: 새 프로젝트\nhue: teal\ncreatedAt: '{at}'\neditedAt: '{at}'\nrepos: {repos}\n---\n요약"
         )
     );
 

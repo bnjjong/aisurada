@@ -11,7 +11,7 @@ use crate::model::ProjectRow;
 use crate::text::{is_blank, trim};
 use crate::vault::project::{ProjectInfo, is_valid_project_id, scan_projects};
 use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
-use crate::write::apparatus::next_id;
+use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::WriteScope;
@@ -99,8 +99,11 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
             "경로로 쓸 수 없는 값이다: {file_name}"
         )));
     }
+    let at = format_utc_millis(now_millis());
     let info = ProjectInfo {
         id,
+        created_at: Some(at.clone()),
+        edited_at: Some(at),
         slug,
         title: title.to_string(),
         hue,
@@ -131,18 +134,23 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
         Some(raw) => project_file::parse_strict(Some(raw))?,
         None => current.repos.clone(),
     };
-    let info = ProjectInfo {
+    let mut info = ProjectInfo {
         id: request.id.clone(),
+        created_at: current.created_at.clone(),
+        edited_at: current.edited_at.clone(),
         slug: current.slug.clone(),
         title,
         hue: hue.unwrap_or_else(|| current.hue.clone()),
         summary,
         repos,
     };
-    write_atomic(
-        &vault.join(project_file::rel_path(&info.slug)),
-        &project_file::render(&info),
-    )?;
+    if info != current {
+        info.edited_at = Some(format_utc_millis(now_millis()));
+        write_atomic(
+            &vault.join(project_file::rel_path(&info.slug)),
+            &project_file::render(&info),
+        )?;
+    }
     Ok(ProjectRow::from(&info))
 }
 

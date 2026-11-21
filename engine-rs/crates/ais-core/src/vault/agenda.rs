@@ -20,6 +20,8 @@ pub struct AgendaInfo {
     pub slug: String,
     pub title: String,
     pub hue: String,
+    pub created_at: Option<String>,
+    pub edited_at: Option<String>,
     pub repo: Option<String>,
     pub project: Option<String>,
     /// 프로젝트의 저장소 가운데 이 아젠다가 쓰는 이름
@@ -238,6 +240,8 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
             slug,
             title,
             hue,
+            created_at: kv.get("createdAt").filter(|s| !s.is_empty()).cloned(),
+            edited_at: kv.get("editedAt").filter(|s| !s.is_empty()).cloned(),
             repo,
             project,
             project_repo,

@@ -457,6 +457,7 @@ fn open_root(
             session_id: None,
             session_agent: None,
             edited_by: None,
+            created_at: None,
             edited_at: None,
             edited_session_id: None,
             edited_session_agent: None,

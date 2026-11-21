@@ -67,6 +67,7 @@ pub struct MetaData {
     pub doc_type: String,
     pub title: String,
     pub created: String,
+    pub created_at: Option<String>,
     pub date: String,
     pub time: String,
     pub session_id: Option<String>,

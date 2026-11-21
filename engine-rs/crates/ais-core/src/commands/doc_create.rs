@@ -16,7 +16,7 @@ use crate::text::encode_uri_component;
 use crate::vault::agenda::AgendaInfo;
 use crate::vault::scanner::NoteRecord;
 use crate::vault::sub_agenda;
-use crate::write::apparatus::{next_id, next_note_id, now_millis};
+use crate::write::apparatus::{format_utc_millis, next_id, next_note_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
 use crate::ports::fs::check_confinement;
@@ -115,7 +115,8 @@ pub fn create_doc_in(
     let (agenda_slug, agenda_created) = lookup_or_create_agenda(vault, scope, &parsed.agenda_key)?;
 
     // 날짜와 시각 배정: 오늘과 그날 겹치지 않는 5분 칸
-    let now = local_clock(now_millis());
+    let millis = now_millis();
+    let now = local_clock(millis);
     let (date, hour, minute, created) = parsed.slot(
         &now,
         scope
@@ -149,6 +150,7 @@ pub fn create_doc_in(
         &note_id,
         &agenda_slug,
         &created,
+        &format_utc_millis(millis),
         context.session.as_deref(),
         context.session_agent.as_deref(),
     );
@@ -216,8 +218,11 @@ fn lookup_or_create_agenda(
         AgendaMatch::Missing(slug_key) => slug_key,
     };
     let table = &scope.index.agendas.table;
+    let at = format_utc_millis(now_millis());
     let info = AgendaInfo {
         id: next_id("ag"),
+        created_at: Some(at.clone()),
+        edited_at: Some(at),
         slug: slug_key.clone(),
         title: key.to_string(),
         hue: agenda_file::least_used_hue(table.infos().map(|a| a.hue.as_str())).to_string(),

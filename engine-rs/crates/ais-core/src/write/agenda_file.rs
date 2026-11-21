@@ -47,6 +47,12 @@ pub fn render(info: &AgendaInfo) -> Vec<u8> {
     line("slug", &info.slug);
     line("title", &info.title);
     line("hue", &info.hue);
+    if let Some(at) = &info.created_at {
+        line("createdAt", at);
+    }
+    if let Some(at) = &info.edited_at {
+        line("editedAt", at);
+    }
     if let Some(repo) = &info.repo {
         line("repo", repo);
     }

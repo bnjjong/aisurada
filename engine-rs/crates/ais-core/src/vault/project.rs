@@ -42,6 +42,8 @@ pub struct ProjectInfo {
     pub slug: String,
     pub title: String,
     pub hue: String,
+    pub created_at: Option<String>,
+    pub edited_at: Option<String>,
     pub summary: String,
     pub repos: Vec<ProjectRepo>,
 }
@@ -131,6 +133,8 @@ fn read_project(file_name: &str, path: &Path) -> Option<ProjectInfo> {
         slug,
         title,
         hue,
+        created_at: kv.get("createdAt").filter(|s| !s.is_empty()).cloned(),
+        edited_at: kv.get("editedAt").filter(|s| !s.is_empty()).cloned(),
         summary,
         repos: parse_repos_lenient(kv.get("repos").map(String::as_str)),
     })
