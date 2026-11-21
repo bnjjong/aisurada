@@ -750,10 +750,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(edit.next.title, "새 제목");
-        assert_eq!(
-            edit.next.edited_at.as_deref(),
-            Some("2026-11-16T10:00:00+09:00")
-        );
+        assert_eq!(edit.next.edited_at, "2026-11-16T10:00:00+09:00");
         assert_eq!(edit.next.token, None);
         assert_eq!(
             compact(&edit.event.to_json_value()),
