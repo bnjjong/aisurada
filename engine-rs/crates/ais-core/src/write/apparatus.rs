@@ -5,8 +5,9 @@
 //! 없으면 실제 시계와 무작위 값을 쓴다. Java 엔진의 JVM 속성 `aisurada.test.now`, `aisurada.test.random`과 같은 뜻이라,
 //! 같은 값을 주면 두 엔진이 같은 id와 시각을 낸다. 이 파일은 그 값으로 id와 시각 글을 짓는다.
 
-use crate::kernel::time::format_utc_millis;
 use crate::ports;
+
+pub use crate::kernel::time::format_utc_millis;
 
 /// 지금의 유닉스 밀리초
 pub fn now_millis() -> i64 {
