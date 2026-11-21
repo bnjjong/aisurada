@@ -2035,7 +2035,7 @@ fn compare_doc_updates(h: &mut WriteHarness) {
     );
 
     // ---- 저장 상한: 상한 바로 아래 노트의 제목을 길게 ----
-    let filler = "a".repeat(999_800);
+    let filler = "a".repeat(999_720);
     put_both(
         h,
         "notes/work/big/note.md",

@@ -235,7 +235,7 @@ pub fn restore_doc(
                 title: "복구함".into(),
                 hue: "blue".into(),
                 created_at: Some(at.clone()),
-                edited_at: Some(at),
+                edited_at: Some(at.clone()),
                 repo: None,
                 project: None,
                 project_repo: None,
@@ -243,7 +243,7 @@ pub fn restore_doc(
             };
             write_atomic(
                 &vault.join(agenda_file::rel_path(&slug)),
-                &agenda_file::render(&recovered),
+                &agenda_file::render(&recovered, &at, &at),
             )?;
         }
     }

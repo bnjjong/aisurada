@@ -222,7 +222,7 @@ fn lookup_or_create_agenda(
     let info = AgendaInfo {
         id: next_id("ag"),
         created_at: Some(at.clone()),
-        edited_at: Some(at),
+        edited_at: Some(at.clone()),
         slug: slug_key.clone(),
         title: key.to_string(),
         hue: agenda_file::least_used_hue(table.infos().map(|a| a.hue.as_str())).to_string(),
@@ -233,7 +233,7 @@ fn lookup_or_create_agenda(
     };
     write_atomic(
         &vault.join(agenda_file::rel_path(&info.slug)),
-        &agenda_file::render(&info),
+        &agenda_file::render(&info, &at, &at),
     )?;
     Ok((slug_key, true))
 }

@@ -200,7 +200,7 @@ pub fn create(
     let info = AgendaInfo {
         id,
         created_at: Some(at.clone()),
-        edited_at: Some(at),
+        edited_at: Some(at.clone()),
         slug,
         title: title.to_string(),
         hue,
@@ -211,7 +211,7 @@ pub fn create(
     };
     write_atomic(
         &vault.join(agenda_file::rel_path(&info.slug)),
-        &agenda_file::render(&info),
+        &agenda_file::render(&info, &at, &at),
     )?;
     Ok(response(&info, &scope.index.vault_root))
 }
@@ -267,12 +267,21 @@ pub fn update(
         project_repo,
         summary,
     };
-    if info != *current {
-        info.edited_at = Some(format_utc_millis(now_millis()));
+    let changed = info != *current;
+    if changed || info.created_at.is_none() || info.edited_at.is_none() {
+        let at = format_utc_millis(now_millis());
+        let created_at = info.created_at.take().unwrap_or_else(|| at.clone());
+        let edited_at = if changed {
+            at
+        } else {
+            info.edited_at.take().unwrap_or(at)
+        };
         write_atomic(
             &vault.join(agenda_file::rel_path(&info.slug)),
-            &agenda_file::render(&info),
+            &agenda_file::render(&info, &created_at, &edited_at),
         )?;
+        info.created_at = Some(created_at);
+        info.edited_at = Some(edited_at);
     }
     Ok(response(&info, &scope.index.vault_root))
 }

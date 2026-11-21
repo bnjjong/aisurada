@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+use super::apparatus::{format_utc_millis, now_millis};
 use super::atomic::write_atomic;
 use super::confine::has_unusable_path_characters;
 use crate::ports::fs::check_confinement;
@@ -76,19 +77,20 @@ pub fn file_text(
     extra: &str,
 ) -> String {
     let meta = &sub.meta;
+    let at = format_utc_millis(now_millis());
     let front = NoteFront {
         id: &meta.id,
         agenda,
         doc_type: &meta.doc_type,
         title,
         created: &meta.created,
-        created_at: meta.created_at.as_deref(),
+        created_at: meta.created_at.as_deref().unwrap_or(&at),
         session_id: None,
         session_agent: None,
         tier: Tier::Reading,
         decision_confirmation: meta.decision_confirmation.as_deref(),
         edited_by: meta.edited_by.as_deref(),
-        edited_at: meta.edited_at.as_deref(),
+        edited_at: meta.edited_at.as_deref().unwrap_or(&at),
         edited_session_id: meta.edited_session_id.as_deref(),
         edited_session_agent: meta.edited_session_agent.as_deref(),
         tags,
@@ -214,19 +216,20 @@ pub fn rewrite_root(vault: &Path, root: &NoteRecord, body: &str) -> Result<Vec<u
         _ => None,
     };
     let session_agent = session_id.as_ref().and(meta.session_agent.as_deref());
+    let at = format_utc_millis(now_millis());
     let front = NoteFront {
         id: &meta.id,
         agenda: &agenda,
         doc_type: &meta.doc_type,
         title: &meta.title,
         created: &meta.created,
-        created_at: meta.created_at.as_deref(),
+        created_at: meta.created_at.as_deref().unwrap_or(&at),
         session_id: session_id.as_deref(),
         session_agent,
         tier: meta.tier,
         decision_confirmation: meta.decision_confirmation.as_deref(),
         edited_by: meta.edited_by.as_deref(),
-        edited_at: meta.edited_at.as_deref(),
+        edited_at: meta.edited_at.as_deref().unwrap_or(&at),
         edited_session_id: meta.edited_session_id.as_deref(),
         edited_session_agent: meta.edited_session_agent.as_deref(),
         tags: &meta.tags,

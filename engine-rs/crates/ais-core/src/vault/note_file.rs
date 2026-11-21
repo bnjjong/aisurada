@@ -8,7 +8,7 @@ use crate::frontmatter::{self, Value};
 use crate::text::utf16_len;
 
 /// 본문 파일 크기 상한입니다.
-const MAX_NOTE_FILE_BYTES: u64 = 1_000_000;
+pub const MAX_NOTE_FILE_BYTES: u64 = 1_000_000;
 /// 머리 YAML 길이 상한(UTF-16 코드 단위)입니다.
 const MAX_FRONTMATTER_UNITS: usize = 16_000;
 
