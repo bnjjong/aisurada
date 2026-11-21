@@ -2,6 +2,7 @@
 use crate::{ipc, lifecycle::HostState};
 use std::{
     fs,
+    io::{Read, Write},
     path::{Component, Path, PathBuf},
 };
 use tauri::{Runtime, State};
@@ -10,6 +11,136 @@ const ATTACHMENT_EXTENSIONS: &[&str] = &[
     "svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "pdf",
 ];
 const LIMIT: usize = 50_000_000;
+
+#[tauri::command]
+pub async fn read_drawio_attachment(
+    state: State<'_, HostState>,
+    note_dir: String,
+    name: String,
+) -> Result<tauri::ipc::Response, String> {
+    let vault = drawio_vault(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = drawio_attachment_path(&vault, &note_dir, &name, false)?;
+        let file_type = fs::symlink_metadata(&path)
+            .map_err(|e| format!("다이어그램 첨부를 찾을 수 없어요: {e}"))?
+            .file_type();
+        if !file_type.is_file() {
+            return Err("일반 파일로 저장된 다이어그램 첨부만 열 수 있어요.".into());
+        }
+        let mut bytes = Vec::new();
+        fs::File::open(path)
+            .and_then(|file| file.take(LIMIT as u64 + 1).read_to_end(&mut bytes))
+            .map_err(|e| format!("다이어그램 첨부를 읽지 못했어요: {e}"))?;
+        check_drawio_png(&bytes)?;
+        Ok(tauri::ipc::Response::new(bytes))
+    })
+    .await
+    .map_err(|e| format!("다이어그램 첨부 읽기가 끊겼어요: {e}"))?
+}
+
+#[tauri::command]
+pub async fn write_drawio_attachment(
+    state: State<'_, HostState>,
+    request: tauri::ipc::Request<'_>,
+) -> Result<(), String> {
+    let note_dir = ipc::header(&request, "note-dir")?;
+    let name = ipc::header(&request, "name")?;
+    let bytes = ipc::body(&request)?;
+    let vault = drawio_vault(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        check_drawio_png(&bytes)?;
+        let path = drawio_attachment_path(&vault, &note_dir, &name, true)?;
+        let parent = path.parent().ok_or("첨부를 둘 폴더를 찾지 못했어요.")?;
+        // 지난 노트 판은 이전 그림을 계속 가리킨다. 새 판은 쓰기가 끝난 뒤에만 공개한다.
+        let mut temp = tempfile::Builder::new()
+            .suffix(".tmp")
+            .tempfile_in(parent)
+            .map_err(|e| format!("다이어그램 임시 파일을 만들지 못했어요: {e}"))?;
+        temp.write_all(&bytes)
+            .and_then(|()| temp.as_file().sync_all())
+            .map_err(|e| format!("다이어그램 첨부를 쓰지 못했어요: {e}"))?;
+        temp.persist_noclobber(path)
+            .map_err(|e| format!("새 다이어그램 첨부를 저장하지 못했어요: {e}"))?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("다이어그램 첨부 쓰기가 끊겼어요: {e}"))?
+}
+
+fn drawio_vault(state: &HostState) -> Result<String, String> {
+    state
+        .vault
+        .lock()
+        .map_err(|_| "vault 잠금을 얻지 못했어요.")?
+        .clone()
+        .ok_or_else(|| "vault가 아직 열리지 않았어요.".into())
+}
+
+fn drawio_attachment_path(
+    vault: &str,
+    note_dir: &str,
+    name: &str,
+    create: bool,
+) -> Result<PathBuf, String> {
+    check_attachment_name(name)?;
+    if !name.to_ascii_lowercase().ends_with(".drawio.png")
+        || name.contains(['/', '\\'])
+        || name.contains("..")
+        || name.chars().any(char::is_control)
+        || name.encode_utf16().count() > 120
+    {
+        return Err("다이어그램 첨부 이름은 .drawio.png로 끝나는 파일 이름이어야 해요.".into());
+    }
+    let notes = canonical_vault(vault)?.join("notes");
+    let note_dir = Path::new(note_dir)
+        .canonicalize()
+        .map_err(|e| format!("노트 폴더를 찾을 수 없어요: {e}"))?;
+    if note_dir == notes || !note_dir.starts_with(notes) || !note_dir.is_dir() {
+        return Err("vault의 노트 폴더에서만 다이어그램을 열고 저장할 수 있어요.".into());
+    }
+    let attach = note_dir.join("attach");
+    if create {
+        match fs::create_dir(&attach) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(format!("첨부 폴더를 만들지 못했어요: {e}")),
+        }
+    }
+    let info =
+        fs::symlink_metadata(&attach).map_err(|e| format!("첨부 폴더를 찾을 수 없어요: {e}"))?;
+    if !info.is_dir() || info.file_type().is_symlink() {
+        return Err("노트의 attach 폴더에서만 다이어그램을 열고 저장할 수 있어요.".into());
+    }
+    Ok(attach.join(name))
+}
+
+fn check_drawio_png(bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() > LIMIT {
+        return Err("다이어그램 첨부는 50MB까지 저장할 수 있어요.".into());
+    }
+    let invalid = || "편집 원본이 담긴 draw.io PNG를 읽지 못했어요.".to_string();
+    let mut rest = bytes
+        .strip_prefix(b"\x89PNG\r\n\x1a\n")
+        .ok_or_else(invalid)?;
+    let mut has_source = false;
+    while let Some((size, chunk)) = rest.split_first_chunk::<4>() {
+        let size = u32::from_be_bytes(*size) as usize;
+        let span = size.checked_add(8).ok_or_else(invalid)?;
+        let content = chunk.get(4..span - 4).ok_or_else(invalid)?;
+        rest = chunk.get(span..).ok_or_else(invalid)?;
+        match &chunk[..4] {
+            b"tEXt" | b"zTXt" | b"iTXt" => {
+                has_source |= content
+                    .strip_prefix(b"mxfile\0")
+                    .is_some_and(|data| !data.is_empty());
+            }
+            b"IEND" if has_source && size == 0 && rest.is_empty() => return Ok(()),
+            b"IEND" => break,
+            _ => {}
+        }
+    }
+    Err(invalid())
+}
 
 #[tauri::command]
 pub async fn write_attachment_bytes(

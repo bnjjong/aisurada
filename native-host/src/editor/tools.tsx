@@ -9,16 +9,28 @@ import {
   $getRoot, $getSelection, $setSelection, $isRangeSelection, $isTextNode, $getNodeByKey, $createRangeSelection,
   $createParagraphNode, $isParagraphNode, $isRootNode,
   FORMAT_TEXT_COMMAND, PASTE_COMMAND, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_LOW, createCommand,
+  HISTORY_MERGE_TAG, HISTORY_PUSH_TAG,
 } from 'lexical';
-import type { BaseSelection, ElementNode, TextNode } from 'lexical';
+import type { BaseSelection, ElementNode, RangeSelection, TextNode } from 'lexical';
 import type { EditorProps } from './Editor.tsx';
-import { $createAnnotation, $isCallout, $createReference, $createImage, $createRelativeLink } from './nodes.tsx';
+import { $createAnnotation, $isCallout, $createReference, $createImage, $createRelativeLink, $isImage } from './nodes.tsx';
 import { calloutStyle } from './grammar.ts';
 import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock.ts';
+import { DrawioDialog, drawioAttachmentName, OPEN_DRAWIO_COMMAND } from './drawio.tsx';
+import type { DrawioAttachment } from './drawio.tsx';
 
 type Trigger = { key: string; start: number; size: number };
 // picked: 사용자가 ↑↓나 마우스로 항목을 직접 골랐는지. selected는 열 때부터 0이라, 이것만으로는 「고른 것」과 「맨 위에 놓인 것」을 가릴 수 없다.
 type Menu = { kind: 'slash' | 'note'; trigger: Trigger; query: string; selected: number; picked?: boolean; x: number; y: number };
+type DrawioTarget = { noteId: string; position: RangeSelection } | {
+  noteId: string; nodeKey: string; source: string; existing: DrawioAttachment;
+};
+
+function $hasDrawioTarget(target: DrawioTarget): boolean {
+  if ('position' in target) return true;
+  const node = $getNodeByKey(target.nodeKey);
+  return $isImage(node) && node.isAttached() && node.getSource() === target.source;
+}
 export const OPEN_COMMENT_COMMAND = createCommand<void>('aisurada:comment-compose');
 export const OPEN_ASK_COMMAND = createCommand<void>('aisurada:ask-compose');
 const formats = ['bold', 'italic', 'strikethrough', 'code'] as const;
@@ -45,6 +57,7 @@ const slashIcons: Record<string, string> = {
   code: 'M6 5L3 8l3 3M10 5l3 3-3 3',
   divider: 'M2.5 8h11',
   pdf: 'M4 2.5h5l3 3v8H4v-11zM9 2.5v3h3M6 8.5h4M6 10.5h2.5',
+  drawio: 'M2 2h5v4H2zM9 10h5v4H9zM4.5 6v6H9',
 };
 function SlashIcon({ name }: { name: string }) {
   return <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={slashIcons[name]} /></svg>;
@@ -64,6 +77,7 @@ export function EditorTools(props: EditorProps) {
   const commentRef = useRef(comment); commentRef.current = comment;
   const selection = useRef<BaseSelection | null>(null), composeRef = useRef(compose); composeRef.current = compose;
   const [menu, setMenu] = useState<Menu | null>(null), menuRef = useRef(menu); menuRef.current = menu;
+  const [drawio, setDrawio] = useState<DrawioTarget | null>(null);
   const [code, setCode] = useState<{ key: string; language: string } | null>(null), [callout, setCallout] = useState<{ key: string; kind: string } | null>(null);
   // 코드·콜아웃 안에 있을 때만 그 블록 오른쪽 위에 뜨는 선택 줄의 자리, 그리고 커서가 빈 줄에 있을 때 보이는 「+」와 안내의 자리.
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null), [line, setLine] = useState<{ x: number; y: number } | null>(null);
@@ -111,6 +125,9 @@ export function EditorTools(props: EditorProps) {
     { id: 'code', icon: 'code', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
     { id: 'divider', icon: 'divider', label: '구분선', desc: '내용을 나누는 가로줄', aliases: 'divider hr line 선 구분선 수평선' },
     { id: 'pdf', icon: 'pdf', label: 'PDF 첨부', desc: 'PDF 문서를 첨부해요', aliases: 'pdf 파일 문서 첨부 document file' },
+    ...(props.features?.host?.native && props.features.noteDirectory && props.onSaveDiagram
+      ? [{ id: 'drawio', icon: 'drawio', label: 'draw.io', desc: '다이어그램을 만들거나 가져와요', aliases: 'drawio 다이어그램' }]
+      : []),
   ].filter(item => (item.label + ' ' + item.aliases).toLowerCase().includes(menu?.query.toLowerCase() || ''));
   const notes = (props.features?.notes || []).filter(note => note.id !== props.features?.currentId && note.title.trim()
     && (props.features?.showRecords || note.tier !== 'record') && note.title.toLowerCase().includes(menu?.query.toLowerCase() || ''))
@@ -124,6 +141,67 @@ export function EditorTools(props: EditorProps) {
     const node = $getNodeByKey<TextNode>(trigger.key); if (!$isTextNode(node)) return null;
     const range = $createRangeSelection(); range.anchor.set(trigger.key, trigger.start, 'text'); range.focus.set(trigger.key, trigger.start + trigger.size, 'text');
     $setSelection(range); range.removeText(); return range;
+  }
+  useEffect(() => editor.registerCommand(OPEN_DRAWIO_COMMAND, nodeKey => {
+    const features = latest.current.features;
+    const node = $getNodeByKey(nodeKey);
+    if (!features?.host?.native || !features.currentId || !features.noteDirectory || !latest.current.onSaveDiagram
+      || !editor.isEditable() || !$isImage(node)) return false;
+    const source = node.getSource();
+    const name = drawioAttachmentName(source);
+    if (!name) return false;
+    setDrawio({ noteId: features.currentId, nodeKey, source, existing: { directory: features.noteDirectory, name } });
+    return true;
+  }, COMMAND_PRIORITY_LOW), [editor]);
+
+  async function saveDrawio(target: DrawioTarget, bytes: Uint8Array, label: string) {
+    const { host, noteDirectory } = latest.current.features ?? {};
+    const save = latest.current.onSaveDiagram;
+    const isCurrent = () => editor.getRootElement() && editor.isEditable()
+      && latest.current.features?.currentId === target.noteId
+      && latest.current.features?.noteDirectory === noteDirectory;
+    const moved = () => new Error('노트가 바뀌었어요. 현재 노트에서 다이어그램을 다시 열어 주세요.');
+    if (!host?.native || !noteDirectory || !save || !isCurrent()
+      || !editor.getEditorState().read(() => $hasDrawioTarget(target))) {
+      throw moved();
+    }
+    const name = `drawio-${crypto.randomUUID()}.drawio.png`;
+    await host.writeDrawio(noteDirectory, name, bytes);
+    if (!isCurrent()) throw moved();
+    const source = `attach/${name}`;
+    const previous = editor.getEditorState();
+    let applied = false;
+    editor.update(() => {
+      if (!$hasDrawioTarget(target)) return;
+      if ('position' in target) {
+        const position = target.position.clone();
+        const anchor = $getNodeByKey(position.anchor.key);
+        const image = $createImage(source, label);
+        if (anchor?.isAttached()) {
+          $setSelection(position);
+          position.insertNodes([image]);
+        } else {
+          $getRoot().append($createParagraphNode().append(image));
+        }
+      } else {
+        const node = $getNodeByKey(target.nodeKey);
+        if ($isImage(node)) node.setSource(source);
+      }
+      applied = true;
+    }, { discrete: true, tag: HISTORY_PUSH_TAG });
+    if (!applied) throw moved();
+
+    const changed = editor.getEditorState();
+    try {
+      if (await save()) return;
+      throw new Error('노트에 그림을 저장하지 못했어요. 노트 상태를 확인해 주세요.');
+    } catch (error) {
+      const current = editor.getEditorState();
+      if (isCurrent() && (current === changed || JSON.stringify(current) === JSON.stringify(changed))) {
+        editor.setEditorState(previous, { tag: HISTORY_MERGE_TAG });
+      }
+      throw error;
+    }
   }
   async function handleAttachmentFiles(files: File[]) {
     const features = latest.current.features;
@@ -217,6 +295,15 @@ export function EditorTools(props: EditorProps) {
     }
     if (id === 'note') { setMenu({ ...active, kind: 'note', query: '', selected: 0, picked: false }); return; }
     setMenu(null);
+    if (id === 'drawio') {
+      const noteId = latest.current.features?.currentId;
+      if (!noteId) return;
+      editor.update(() => {
+        const range = removeTrigger(active.trigger);
+        if (range) setDrawio({ noteId, position: range.clone() });
+      }, { discrete: true });
+      return;
+    }
     if (id === 'pdf') {
       editor.update(() => { removeTrigger(active.trigger); });
       const input = document.createElement('input');
@@ -463,6 +550,11 @@ export function EditorTools(props: EditorProps) {
   }, [editor]);
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>
+    {drawio && props.features?.host && <DrawioDialog
+      existing={'existing' in drawio ? drawio.existing : undefined}
+      host={props.features.host}
+      onSave={(bytes, label) => saveDrawio(drawio, bytes, label)}
+      onClose={() => setDrawio(null)} />}
     {(code || callout) && anchor && <div className="lex-toolbar lex-block-bar" style={{ top: anchor.top, right: anchor.right }}>
       {code && <select aria-label="코드 언어" value={code.language} onChange={event => {
         editor.update(() => { const node = $getNodeByKey(code.key); if ($isCodeNode(node)) node.setLanguage(event.target.value); });

@@ -149,6 +149,7 @@ export class ImageNode extends DecoratorNode<ReactNode> {
   static importJSON(value: ImageJSON) { return new ImageNode(value.source, value.alt, value.width ?? 0); }
   exportJSON(): ImageJSON { return { ...super.exportJSON(), source: this.getSource(), alt: this.getAlt(), width: this.getWidth() }; }
   getSource() { return this.getLatest().__source; } getAlt() { return this.getLatest().__alt; } getWidth() { return this.getLatest().__width; }
+  setSource(source: string) { this.getWritable().__source = source; }
   setWidth(width: number) { this.getWritable().__width = width > 0 ? Math.round(width) : 0; return this; }
   isInline() { return true; }
   createDOM() { const element = document.createElement('span'); element.className = 'lex-image'; element.contentEditable = 'false'; return element; }

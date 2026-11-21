@@ -6,6 +6,7 @@ import { $getNodeByKey, $getSelection, $isNodeSelection, CLICK_COMMAND, COMMAND_
 import { EditorContext } from './context.ts';
 import type { EditorFeatures } from './context.ts';
 import { relativePath } from './grammar.ts';
+import { drawioAttachmentName, OPEN_DRAWIO_COMMAND } from './drawio.tsx';
 
 const heights = new Map<string, number>();
 export function frameHeight(url: string, value?: number): number {
@@ -59,7 +60,8 @@ export function ImageView({ source, alt, width, nodeKey, onWidth }: { source: st
   const features = useContext(EditorContext), path = relativePath(source);
   if (path && features.noteDirectory && /\.html?$/i.test(path)) return <HTMLFrame path={path} label={alt} />;
   const url = path && features.noteDirectory && features.host?.native ? convertFileSrc(`${features.noteDirectory}/${path}`) : source;
-  return <ImageBox url={url} source={source} alt={alt} width={width} nodeKey={nodeKey} onWidth={onWidth} />;
+  const drawio = Boolean(features.host?.native && features.noteDirectory && drawioAttachmentName(source));
+  return <ImageBox key={url} url={url} source={source} alt={alt} width={width} nodeKey={nodeKey} onWidth={onWidth} drawio={drawio} />;
 }
 
 const IMAGE_MIN = 48;
@@ -79,7 +81,7 @@ export function imageFileName(source: string): string {
  * 크기 도구줄(작게·중간·본문 폭·원래 크기)이 나타난다. 더블클릭하면 원래 크기로 돌아간다.
  * 크기는 [onWidth]로 노트에 저장되고, 본문 폭보다 크게는 키울 수 없다.
  */
-function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; source: string; alt: string; width: number; nodeKey: string; onWidth(width: number): void }) {
+function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: string; source: string; alt: string; width: number; nodeKey: string; onWidth(width: number): void; drawio: boolean }) {
   const [editor] = useLexicalComposerContext();
   const [selected, setSelected, clearSelected] = useLexicalNodeSelection(nodeKey);
   const [editable, setEditable] = useState(() => editor.isEditable());
@@ -137,7 +139,9 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; 
           onDoubleClick={() => { if (editable && width > 0) onWidth(0); }} />
       )}
       {selected && editable && <>
-        <span className="lex-image-bar" role="toolbar" aria-label="이미지 크기">
+        <span className="lex-image-bar" role="toolbar" aria-label={drawio ? '다이어그램 도구' : '이미지 크기'}>
+          {drawio && <button type="button" onMouseDown={event => event.preventDefault()}
+            onClick={event => { event.stopPropagation(); editor.dispatchCommand(OPEN_DRAWIO_COMMAND, nodeKey); }}>편집</button>}
           {IMAGE_PRESETS.map(preset => <button key={preset.label} type="button" onMouseDown={event => event.preventDefault()}
             onClick={event => { event.stopPropagation(); onWidth(preset.width < 0 ? available() : preset.width); }}
             aria-pressed={preset.width > 0 ? width === preset.width : preset.width === 0 && width === 0}>{preset.label}</button>)}
@@ -148,7 +152,7 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth }: { url: string; 
         </span>
       </>}
     </span>
-    {fileName && !isGeneratedName && <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{fileName}</span>}
+    {fileName && !isGeneratedName && <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{drawio && alt ? alt : fileName}</span>}
   </span>;
 }
 export const FRAME_LINK = /^(?:https?|mailto|tel):/i;

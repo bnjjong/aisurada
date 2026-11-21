@@ -132,7 +132,10 @@ mod tests {
             items[1].note_ref.as_deref(),
             Some("ndmw1-aaaaaaaa/snmw2-bbbbbbbb")
         );
-        assert_eq!(items[1].body, "보기 후속 노트 · 정할 것 8개 가운데 3개 답함");
+        assert_eq!(
+            items[1].body,
+            "보기 후속 노트 · 정할 것 8개 가운데 3개 답함"
+        );
         assert!(items.iter().all(|i| i.task_key.is_none()));
     }
 

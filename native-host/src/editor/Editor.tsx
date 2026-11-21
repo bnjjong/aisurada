@@ -81,6 +81,7 @@ export interface EditorProps {
   label?: string;
   features?: EditorFeatures;
   onChange?(body: string, cursor: 1 | 2): void;
+  onSaveDiagram?(): Promise<boolean>;
   mirror?: { revision: number; body: string; external?: boolean };
   onMirrorPending?(pending: boolean): void;
   onMirrorConflict?(): void;

@@ -947,6 +947,11 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
    아래로 스크롤하면 모서리를 떠나 내용 중간으로 올라왔다. 둥근 모서리가 큰 스킨은 띠를 조금 더 높이고 손잡이를 안쪽으로 들인다. */
 .ui-modal-resizable > header { position: static; flex: none; }
 .ui-modal-resizable > .ui-modal-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.drawio-modal-editor > .ui-modal-body { display: flex; flex-direction: column; }
+.drawio-modal iframe { flex: 1 1 0; min-height: 0; width: 100%; border: 0; }
+.drawio-modal footer { margin-top: auto; flex: none; }
+.drawio-modal footer .button { padding: 8px 14px; }
+.drawio-modal .drawio-error { color: var(--danger, #c24040); }
 .ui-modal-resizable > .ui-modal-gripbar { flex: none; display: flex; align-items: center; justify-content: flex-end; height: var(--grip-bar); padding-right: var(--grip-inset); border-top: 1px solid var(--line); }
 .ui-modal-resizable > .ui-modal-gripbar .preview-grip { position: static; }
 :root[data-skin="tactile"] .ui-modal-resizable, :root[data-skin="glass"] .ui-modal-resizable { --grip-inset: 12px; --grip-bar: 34px; }

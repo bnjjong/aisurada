@@ -71,6 +71,8 @@ fn main() {
             engine::engine_commands,
             engine::engine_call,
             files::write_attachment_bytes,
+            files::read_drawio_attachment,
+            files::write_drawio_attachment,
             files::copy_dropped_attachment,
             files::open_in_default_app,
             files::open_external_path,
