@@ -12,7 +12,7 @@ use serde_json::{Value as Json, json};
 use super::subnote::check_writable;
 use crate::error::EngineError;
 use crate::frontmatter::{Value, dump_general_map};
-use crate::kernel::actor::CallContext;
+use crate::kernel::actor::{CallContext, Caller};
 use crate::kernel::time::format_utc_millis;
 use crate::text::{NOTE_ID, cut_utf16, is_blank};
 use crate::vault::agenda::is_valid_slug_segment;
@@ -29,6 +29,12 @@ use crate::write::sub_note::remove_tree;
 use crate::write::trash_file::{archive_path, entries_in_file_order, save};
 
 const RECOVERED_AGENDA: &str = "---\nid: ag-recovered\nslug: recovered\ntitle: 복구함\nhue: blue\n---\n복구함\n\n삭제됐다가 복구된 노트 중, 원래 아젠다가 사라진 것들이 모이는 곳이에요.";
+
+/// 이 호출자가 휴지통 항목을 건드려도 되는가. AI는 기록 층 노트의 보관물을 되살리지도 지우지도 못한다(이슈 #80, #82).
+/// 앱에는 층이 상관없으므로 보관 파일을 열지 않는다.
+fn may_touch(vault: &Path, entry: &TrashRecord, context: &CallContext) -> bool {
+    context.caller == Caller::App || archived_tier(vault, entry).visible_to(context.caller)
+}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -212,7 +218,7 @@ pub fn restore_doc(
         "restore-doc <휴지통 항목 id. list-trash 로 조회한다>",
     )?;
     // AI는 기록 층 노트를 되살리지 못한다(휴지통 목록에서도 안 보인다). 목록 파일을 고치기 전에 선다.
-    if !archived_tier(vault, &entry).visible_to(context.caller) {
+    if !may_touch(vault, &entry, context) {
         return Err(EngineError::record_tier_write(&entry.doc_id));
     }
     let table = &scope.index.agendas.table;
@@ -358,13 +364,21 @@ fn rewrite_agenda(
     Ok(removed_sub_agendas)
 }
 
-/// 휴지통 항목을 영구 삭제한다(보관물과 목록의 항목).
-pub fn purge_doc(vault: &Path, request: &TrashEntryRequest) -> Result<Json, EngineError> {
+/// 휴지통 항목을 영구 삭제한다(보관물과 목록의 항목). AI는 기록 층 노트의 보관물을 지우지 못한다.
+pub fn purge_doc(
+    vault: &Path,
+    request: &TrashEntryRequest,
+    context: &CallContext,
+) -> Result<Json, EngineError> {
     let first = find_entry(
         vault,
         &request.trash_id,
         "purge-doc <휴지통 항목 id. list-trash 로 조회한다>",
     )?;
+    // 보관물을 지우기 전에 선다(`restore_doc`과 같은 검사)
+    if !may_touch(vault, &first, context) {
+        return Err(EngineError::record_tier_write(&first.doc_id));
+    }
     let (entries, _) = entries_in_file_order(vault);
     remove_tree(&archive_path(vault, &first.file)?)?;
     let kept: Vec<TrashRecord> = entries
@@ -376,7 +390,8 @@ pub fn purge_doc(vault: &Path, request: &TrashEntryRequest) -> Result<Json, Engi
 }
 
 /// 휴지통을 비운다. 지운 개수, 못 지운 항목, 못 읽어 건너뛴 항목 수, 목록에 없는 보관물(고아) 수를 알린다.
-pub fn empty_trash(vault: &Path) -> Result<Json, EngineError> {
+/// AI가 부르면 자기에게 보이는 항목만 비우고, 기록 층 노트의 보관물은 목록에 그대로 남긴다(그 항목은 AI에게 알리지도 않는다).
+pub fn empty_trash(vault: &Path, context: &CallContext) -> Result<Json, EngineError> {
     let (entries, skipped) = entries_in_file_order(vault);
     let names: HashSet<&str> = entries.iter().map(|e| e.file.as_str()).collect();
     let orphans = fs::read_dir(vault.join(".aisurada/trash/files"))
@@ -388,16 +403,24 @@ pub fn empty_trash(vault: &Path) -> Result<Json, EngineError> {
         .unwrap_or(0);
     let mut retained: Vec<TrashRecord> = Vec::new();
     let mut failures: Vec<Json> = Vec::new();
+    let mut purged = 0;
     for entry in &entries {
-        let removed = archive_path(vault, &entry.file).and_then(|path| remove_tree(&path));
-        if let Err(error) = removed {
-            failures.push(json!({"trashId": entry.trash_id, "reason": error.message}));
+        if !may_touch(vault, entry, context) {
             retained.push(entry.clone());
+            continue;
+        }
+        let removed = archive_path(vault, &entry.file).and_then(|path| remove_tree(&path));
+        match removed {
+            Ok(()) => purged += 1,
+            Err(error) => {
+                failures.push(json!({"trashId": entry.trash_id, "reason": error.message}));
+                retained.push(entry.clone());
+            }
         }
     }
     save(vault, &retained)?;
     Ok(json!({
-        "purged": entries.len() - retained.len(),
+        "purged": purged,
         "failed": failures,
         "skipped": skipped,
         "orphans": orphans,

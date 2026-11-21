@@ -200,8 +200,8 @@ pub(super) static TABLE: &[Def] = &[
     write!("delete_comment", Standard, comment_write::CommentWriteRequest, |root, request, scope, ctx| comment_write::delete_comment(root, request, scope, ctx)),
     write!("delete_doc", Standard, trash_write::DeleteDocRequest, |root, request, scope, ctx| trash_write::delete_doc(root, request, scope, ctx)),
     write!("restore_doc", Standard, trash_write::TrashEntryRequest, |root, request, scope, ctx| trash_write::restore_doc(root, request, scope, ctx)),
-    write!("purge_doc", Standard, trash_write::TrashEntryRequest, |root, request, _scope| trash_write::purge_doc(root, request)),
-    write!("empty_trash", Standard, trash_write::EmptyTrashRequest, |root, _request, _scope| trash_write::empty_trash(root)),
+    write!("purge_doc", Standard, trash_write::TrashEntryRequest, |root, request, _scope, ctx| trash_write::purge_doc(root, request, ctx)),
+    write!("empty_trash", Standard, trash_write::EmptyTrashRequest, |root, _request, _scope, ctx| trash_write::empty_trash(root, ctx)),
     // ── 태스크 ──
     read!("get_task", task_commands::GetTaskRequest, |root, request| task_commands::get_task(root, request)),
     read!("list_tasks", task_commands::ListTasksRequest, |root, request| task_commands::list_tasks(root, request)),
