@@ -705,7 +705,7 @@ function FeedItem({ event }: { event: ActivityEvent }) {
   );
 }
 
-/** 다른 태스크와 연결을 건다. 막고 있음·막혀 있음·관련·중복 가운데 이 태스크 기준으로 고른다. */
+/** 다른 태스크와 연결을 건다. 막고 있음·막혀 있음·관련 가운데 이 태스크 기준으로 고른다. */
 function LinkModal({ call, task, close, done }: { call: Parameters<typeof getTask>[0]; task: TaskDetail; close: () => void; done: () => void }) {
   const [rows, setRows] = useState<TaskRow[] | null>(null);
   const [relation, setRelation] = useState<RelationType>("blocked-by");

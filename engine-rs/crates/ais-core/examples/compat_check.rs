@@ -4931,7 +4931,7 @@ fn compare_task_commands(h: &mut WriteHarness) {
     );
     task_step(
         h,
-        "연결 중복(유효)",
+        "새 중복 연결 등록",
         "link_tasks",
         &["link-tasks", "TSK-7", "TSK-8", "type=duplicates"],
         json!({"from": "TSK-7", "to": "TSK-8", "type": "duplicates"}),
