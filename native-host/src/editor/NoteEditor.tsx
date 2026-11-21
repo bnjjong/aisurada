@@ -252,6 +252,7 @@ export function NoteEditor({
           features={features}
           label={`${note.title} 본문 편집`}
           onChange={session.change}
+          onSaveDiagram={async () => await session.flush("diagram") === "saved"}
           mirror={snapshot.mirror}
           onMirrorPending={session.pause}
           onMirrorConflict={session.conflict}

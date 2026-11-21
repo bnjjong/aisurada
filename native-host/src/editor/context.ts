@@ -4,6 +4,8 @@ export interface EditorNote { id: string; title: string; created: string; agenda
 export interface EditorHost {
   native: boolean;
   writeImage(directory: string, name: string, bytes: Uint8Array): Promise<unknown>;
+  readDrawio(directory: string, name: string): Promise<string>;
+  writeDrawio(directory: string, name: string, bytes: Uint8Array): Promise<void>;
   openFile(path: string): Promise<void>;
   openPath?(path: string): Promise<void>;
   openURL(url: string): Promise<void>;

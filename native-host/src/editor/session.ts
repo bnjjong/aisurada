@@ -6,7 +6,7 @@ import { read } from '../data/commands.ts';
 
 export type SaveResult = 'saved' | 'unsaved' | 'conflict';
 export type RestoreResult = 'restored' | 'conflict' | 'unsaved' | 'not-recorded' | 'replaced-conflict' | 'replaced-unsaved' | 'unavailable';
-type SaveMode = 'auto' | 'explicit' | 'dispose' | 'keep' | 'restore';
+type SaveMode = 'auto' | 'explicit' | 'dispose' | 'keep' | 'restore' | 'diagram';
 type SaveClass = 'conflict' | 'error' | 'saved' | 'dirty' | 'saving';
 export interface SessionSnapshot {
   status: string; state: SaveClass; discarding: boolean;
@@ -144,7 +144,7 @@ export class EditorSession {
     }
     this.lastFailed = false;
     if (this.buffer === this.controller.data.note(this.ref)?.body) { this.ownEditing = false; this.controller.data.protect(this.ref, false); }
-    const titled = await this.title(mode);
+    const titled = mode === 'diagram' || await this.title(mode);
     if (this.released && !this.conflicted() && this.controller.data.getSnapshot().unsaved.includes(this.key())) this.controller.data.retryBody(this.ref);
     this.emit();
     return this.conflicted() ? 'conflict' : titled ? 'saved' : 'unsaved';

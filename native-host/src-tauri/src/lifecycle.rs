@@ -97,7 +97,11 @@ pub fn exit_app<R: Runtime>(app: tauri::AppHandle<R>) {
 pub fn is_allowed_navigation(url: &tauri::Url) -> bool {
     match url.scheme() {
         "tauri" => true,
-        "https" => url.host_str() == Some("tauri.localhost"),
+        "https" => {
+            // macOS 웹뷰는 노트 안의 편집기 틀을 열 때도 이 검사를 거친다.
+            url.host_str() == Some("tauri.localhost")
+                || url.as_str() == "https://embed.diagrams.net/?embed=1&proto=json&spin=1&noExitBtn=1&noSaveBtn=1&saveAndExit=0&suppressNewWindows=1"
+        }
         "http" => matches!(url.host_str(), Some("localhost") | Some("127.0.0.1")),
         "asset" => matches!(url.host_str(), Some("localhost")),
         "aisframe" => true,

@@ -9,6 +9,18 @@ export function editorHost(): EditorHost {
     writeImage: (directory, name, bytes) => invoke('write_attachment_bytes', bytes, {
       headers: { 'x-ais-note-dir': encodeURIComponent(directory), 'x-ais-name': encodeURIComponent(name) },
     }),
+    readDrawio: async (noteDir, name) => {
+      const bytes = await invoke<ArrayBuffer>('read_drawio_attachment', { noteDir, name });
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('다이어그램 첨부를 열 수 없어요.'));
+        reader.readAsDataURL(new Blob([bytes], { type: 'image/png' }));
+      });
+    },
+    writeDrawio: (directory, name, bytes) => invoke('write_drawio_attachment', bytes, {
+      headers: { 'x-ais-note-dir': encodeURIComponent(directory), 'x-ais-name': encodeURIComponent(name) },
+    }),
     openFile: path => invoke('open_in_default_app', { path }),
     openPath: path => isTauri() ? invoke('open_external_path', { path }) : Promise.resolve(),
     openURL: url => openUrl(url),
