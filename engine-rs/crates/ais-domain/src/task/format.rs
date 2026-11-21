@@ -100,7 +100,7 @@ fn blank_to_null(s: Option<String>) -> Option<String> {
 
 // ---------------------------------------------------------------- 읽기
 
-/// 파일 바이트를 태스크로 읽는다. 머리말이 없거나 못 읽거나 키·id·상태가 틀리면 이유 글을 돌려준다.
+/// 파일 바이트를 태스크로 읽는다. 필수 머리말을 읽을 수 없으면 그 이유를 돌려준다.
 /// 목록을 만들 때는 이런 파일을 건너뛰고 이유를 알린다.
 pub fn parse(bytes: &[u8], rel_path: &str) -> Result<Task, String> {
     if bytes.len() > MAX_FILE_BYTES {
@@ -159,6 +159,12 @@ pub fn parse(bytes: &[u8], rel_path: &str) -> Result<Task, String> {
                 .unwrap_or_else(|| "null".to_string())
         ));
     };
+    let required_time = |name: &str| match get(&map, name) {
+        Some(Value::Str(value)) if !java_blank(value) => Ok(value.clone()),
+        _ => Err(format!("{name} 에 일시가 필요하다")),
+    };
+    let created_at = required_time("createdAt")?;
+    let edited_at = required_time("editedAt")?;
     let pick = |name: &str, allowed: &[&str], default: &str| -> String {
         match str_of(&map, name) {
             Some(v) if allowed.contains(&java_trim(&v).to_lowercase().as_str()) => {
@@ -192,8 +198,8 @@ pub fn parse(bytes: &[u8], rel_path: &str) -> Result<Task, String> {
         refs: ref_list(get(&map, "refs")),
         body,
         extra,
-        created_at: str_of(&map, "createdAt"),
-        edited_at: str_of(&map, "editedAt"),
+        created_at,
+        edited_at,
         edited_session: str_of(&map, "editedSession"),
         edited_agent: str_of(&map, "editedAgent"),
         rel_path: rel_path.to_string(),
@@ -390,9 +396,9 @@ pub fn render(task: &Task) -> Result<Vec<u8>, EngineError> {
             .collect();
         put("refs", Value::List(rows));
     }
+    put("createdAt", text(&task.created_at));
+    put("editedAt", text(&task.edited_at));
     for (key, value) in [
-        ("createdAt", &task.created_at),
-        ("editedAt", &task.edited_at),
         ("editedSession", &task.edited_session),
         ("editedAgent", &task.edited_agent),
     ] {

@@ -1,4 +1,4 @@
-//! 태스크 파일을 vault에서 읽고 쓰는 곳. 규칙과 오류 문구는 Java 엔진의 `TaskStore`와 같다.
+//! 태스크 파일을 vault에서 읽고 쓰는 곳. 파일에 기록하는 일시는 태스크 모델에서 검사한다.
 //!
 //! ```text
 //! .aisurada/tasks/
@@ -82,6 +82,14 @@ fn is_dir(path: &Path) -> bool {
 
 // ---------------------------------------------------------------- 읽기
 
+fn read_task(file: &Path, rel_path: &str) -> Result<Task, String> {
+    if fs::metadata(file).is_ok_and(|m| m.len() > MAX_FILE_BYTES as u64) {
+        return Err("파일이 너무 크다".to_string());
+    }
+    let bytes = fs::read(file).map_err(|_| "파일을 못 읽었다".to_string())?;
+    format::parse(&bytes, rel_path)
+}
+
 /// 모든 태스크를 훑는다. 못 읽는 파일은 건너뛰고 이유를 `skipped`에 적는다. 점으로 시작하는 폴더(`.trash`)는 안 본다.
 pub fn scan(vault: &Path) -> Scan {
     let mut items: Vec<Task> = Vec::new();
@@ -98,16 +106,7 @@ pub fn scan(vault: &Path) -> Scan {
             continue;
         }
         let rel_path = rel(vault, &file);
-        let size = fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
-        if size > MAX_FILE_BYTES as u64 {
-            skipped.push(format!("{rel_path}: 파일이 너무 크다"));
-            continue;
-        }
-        let Ok(bytes) = fs::read(&file) else {
-            skipped.push(format!("{rel_path}: 파일을 못 읽었다"));
-            continue;
-        };
-        match format::parse(&bytes, &rel_path) {
+        match read_task(&file, &rel_path) {
             Err(reason) => skipped.push(format!("{rel_path}: {reason}")),
             Ok(task) => {
                 if name != format!("{}.md", task.key) {
@@ -184,7 +183,7 @@ pub fn create(vault: &Path, f: Fields, stamp: &Stamp, actor: &str) -> Result<Tas
     }
 
     let scan = scan(vault);
-    let number = next_number(vault, &scan);
+    let number = next_number(vault, &scan)?;
     let key = format!("TSK-{number}");
     let id = loop {
         let candidate = next_id("tk");
@@ -203,13 +202,28 @@ pub fn create(vault: &Path, f: Fields, stamp: &Stamp, actor: &str) -> Result<Tas
     })
 }
 
-/// 다음 번호. 지금 있는 태스크와 휴지통에 있는 태스크의 가장 큰 번호 + 1이다(지운 번호를 다시 쓰지 않는다).
-fn next_number(vault: &Path, scan: &Scan) -> u32 {
-    let mut max = scan.items.iter().map(Task::number).max().unwrap_or(0);
+/// 이미 쓰인 번호보다 큰 번호를 고르고, 읽기에서 건너뛴 파일의 자리도 피한다.
+fn next_number(vault: &Path, scan: &Scan) -> Result<u32, EngineError> {
+    let mut number = scan.items.iter().map(Task::number).max().unwrap_or(0);
     for entry in trash(vault) {
-        max = max.max(format::number_of(&entry.key));
+        number = number.max(format::number_of(&entry.key));
     }
-    max + 1
+    loop {
+        number = number
+            .checked_add(1)
+            .ok_or_else(|| EngineError::conflict("쓸 수 있는 태스크 번호가 없다"))?;
+        let path = file_path(vault, &format!("TSK-{number}"));
+        match fs::symlink_metadata(&path) {
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(number),
+            Err(_) => {
+                return Err(EngineError::internal(format!(
+                    "태스크 파일 자리를 확인하지 못했다: {}",
+                    rel(vault, &path)
+                )));
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------- 고치기
@@ -471,11 +485,18 @@ pub fn restore(vault: &Path, reference: &str) -> Result<Task, EngineError> {
             entry.rel_path
         )));
     }
+    let item = trash.join("item.md");
+    read_task(&item, &entry.rel_path).map_err(|reason| {
+        EngineError::conflict(format!(
+            "태스크 파일을 읽을 수 없어 되살리지 못했다: {}: {reason}",
+            entry.rel_path
+        ))
+    })?;
     let moved = (|| -> std::io::Result<()> {
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::rename(trash.join("item.md"), &target)?;
+        fs::rename(&item, &target)?;
         let activity = trash.join("activity");
         if is_dir(&activity) {
             fs::rename(&activity, root(vault).join(&entry.key))?;

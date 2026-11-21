@@ -113,8 +113,8 @@ pub struct Task {
     pub body: String,
     /// 머리말의 모르는 칸(그대로 보존한다)
     pub extra: Vec<(String, Value)>,
-    pub created_at: Option<String>,
-    pub edited_at: Option<String>,
+    pub created_at: String,
+    pub edited_at: String,
     pub edited_session: Option<String>,
     pub edited_agent: Option<String>,
     /// vault 기준 상대 경로

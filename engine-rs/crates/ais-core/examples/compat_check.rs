@@ -4684,18 +4684,18 @@ fn compare_task_commands(h: &mut WriteHarness) {
     put_both(
         h,
         ".aisurada/tasks/TSK-20.md",
-        "---\nkey: TSK-20\nid: tkex0001-00000001\ntitle: 손으로 쓴 태스크\nstatus: Draft\nrepo: a/b\nlabels:\n- 하나\n- 하나\n- ' '\ncriteria:\n- 문자열 기준\n- text: 맵 기준\n  done: 'TRUE'\n  checkedAt: 2026-11-02T10:00:00+09:00\n- {text: ' ', done: true}\nrefs:\n- {kind: note, target: ndfx0002-00000002}\n- {kind: web, target: x}\nlinks:\n- {type: blocks, to: TSK-1}\n- {type: nope, to: TSK-1}\ncustom: 5\nscore: 1.5\nflag: yes\nnested:\n  a: [1, 2]\n  b:\n    c: d\nempty:\nlist:\n- x: 1\n  y: [a, b]\n---\n\n손으로 쓴 본문\n",
+        "---\nkey: TSK-20\nid: tkex0001-00000001\ntitle: 손으로 쓴 태스크\nstatus: Draft\ncreatedAt: '2026-11-13T09:00:00+09:00'\neditedAt: '2026-11-13T09:00:00+09:00'\nrepo: a/b\nlabels:\n- 하나\n- 하나\n- ' '\ncriteria:\n- 문자열 기준\n- text: 맵 기준\n  done: 'TRUE'\n  checkedAt: 2026-11-02T10:00:00+09:00\n- {text: ' ', done: true}\nrefs:\n- {kind: note, target: ndfx0002-00000002}\n- {kind: web, target: x}\nlinks:\n- {type: blocks, to: TSK-1}\n- {type: nope, to: TSK-1}\ncustom: 5\nscore: 1.5\nflag: yes\nnested:\n  a: [1, 2]\n  b:\n    c: d\nempty:\nlist:\n- x: 1\n  y: [a, b]\n---\n\n손으로 쓴 본문\n",
     );
     put_both(h, ".aisurada/tasks/TSK-21.md", "머리말이 없다\n");
     put_both(
         h,
         ".aisurada/tasks/TSK-22.md",
-        "---\nkey: TSK-23\nid: tkex0002-00000002\ntitle: 이름이 다르다\nstatus: draft\n---\n",
+        "---\nkey: TSK-23\nid: tkex0002-00000002\ntitle: 이름이 다르다\nstatus: draft\ncreatedAt: '2026-11-13T09:00:00+09:00'\neditedAt: '2026-11-13T09:00:00+09:00'\n---\n",
     );
     put_both(
         h,
         ".aisurada/tasks/TSK-24.md",
-        "---\nkey: TSK-24\nid: tkex0001-00000001\ntitle: id가 겹친다\nstatus: draft\n---\n",
+        "---\nkey: TSK-24\nid: tkex0001-00000001\ntitle: id가 겹친다\nstatus: draft\ncreatedAt: '2026-11-13T09:00:00+09:00'\neditedAt: '2026-11-13T09:00:00+09:00'\n---\n",
     );
     put_both(
         h,
