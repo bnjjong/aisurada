@@ -274,6 +274,10 @@ pub enum WriteTool {
     CreateContainer,
     CreateComponent,
     CreateRelationship,
+    UpdatePositions,
+    UpdateSystem,
+    DeleteSystem,
+    DeleteRelationship,
 }
 
 impl WriteTool {
@@ -283,6 +287,10 @@ impl WriteTool {
             Self::CreateContainer => "create_container",
             Self::CreateComponent => "create_component",
             Self::CreateRelationship => "create_relationship",
+            Self::UpdatePositions => "update_positions",
+            Self::UpdateSystem => "update_system",
+            Self::DeleteSystem => "delete_system",
+            Self::DeleteRelationship => "delete_relationship",
         }
     }
 }

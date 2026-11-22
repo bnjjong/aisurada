@@ -2844,3 +2844,214 @@ body.col-resizing {
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
+
+/* Archyl Native Canvas & Cards */
+.archyl-canvas-viewport {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface);
+  background-image: radial-gradient(var(--line) 1.2px, transparent 1.2px);
+  background-size: 20px 20px;
+  cursor: grab;
+  user-select: none;
+}
+
+.archyl-canvas-viewport:active {
+  cursor: grabbing;
+}
+
+.archyl-canvas-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5000px;
+  height: 5000px;
+  pointer-events: none;
+}
+
+.archyl-canvas-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.archyl-rel-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 220px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+}
+
+.archyl-node {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  z-index: 2;
+  box-sizing: border-box;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.archyl-node:active {
+  cursor: grabbing;
+}
+
+/* 1. Person 카드 (타원형 아바타) */
+.archyl-node-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.person-avatar-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f97316;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.35);
+  margin-bottom: -16px;
+  z-index: 3;
+}
+
+.person-card-body {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 9999px;
+  padding: 24px 20px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* 2. 일반 사각 카드 (System & External) */
+.archyl-node-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  min-height: 110px;
+}
+
+.archyl-node-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.archyl-node-card.is-main-system {
+  border: 2px solid #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6, 0 6px 20px rgba(59, 130, 246, 0.15);
+}
+
+.archyl-node-card.is-external {
+  border: 1px dashed var(--line);
+  background: var(--soft);
+}
+
+.node-badge-wrapper {
+  margin-bottom: 8px;
+}
+
+.node-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.node-badge.system {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.node-badge.external {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+
+.node-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+  word-break: keep-all;
+}
+
+.node-desc {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: keep-all;
+}
+
+/* 캔버스 줌 컨트롤 */
+.archyl-zoom-controls {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 3px;
+  gap: 2px;
+}
+
+.archyl-zoom-controls button {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archyl-zoom-controls button:hover {
+  background: var(--soft);
+}
+
+.archyl-zoom-controls .zoom-level {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 6px;
+}

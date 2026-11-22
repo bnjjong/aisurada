@@ -10,9 +10,9 @@ import {
   connectArchyl,
 } from "../editor/archyl.ts";
 import type { ArchylModel, ArchylView } from "../editor/archyl.ts";
-import { renderDiagram } from "../editor/mermaid.tsx";
 import { ArchylCreateModal } from "./ArchylCreateModal.tsx";
 import type { ArchylCreateMode } from "./ArchylCreateModal.tsx";
+import { ArchylCanvas } from "./ArchylCanvas.tsx";
 
 export function ArchylArchitecturePage({
   slug,
@@ -38,9 +38,7 @@ export function ArchylArchitecturePage({
   const [selectedSystemId, setSelectedSystemId] = useState<string>("");
   const [selectedContainerId, setSelectedContainerId] = useState<string>("");
 
-  // 다이어그램 렌더링 결과
-  const [svg, setSvg] = useState<string>("");
-  const [renderError, setRenderError] = useState<string | null>(null);
+  // 소스 보기 및 알림 상태
   const [showSource, setShowSource] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -126,27 +124,6 @@ export function ArchylArchitecturePage({
       return "";
     }
   }, [model, currentView]);
-
-  // 4. Mermaid SVG 렌더링
-  useEffect(() => {
-    let active = true;
-    if (!mermaidSource) {
-      setSvg("");
-      setRenderError(null);
-      return;
-    }
-    setRenderError(null);
-    void renderDiagram(mermaidSource, document.documentElement.dataset.theme || "system")
-      .then((renderedSvg) => {
-        if (active) setSvg(renderedSvg);
-      })
-      .catch((err: any) => {
-        if (active) setRenderError(err?.message || "다이어그램을 렌더링하지 못했어요.");
-      });
-    return () => {
-      active = false;
-    };
-  }, [mermaidSource]);
 
   // 클립보드 복사
   const handleCopySource = async () => {
@@ -399,12 +376,6 @@ export function ArchylArchitecturePage({
 
         {!loading && !error && model && model.elements.length > 0 && (
           <>
-            {renderError && (
-              <div className="archyl-status-card error">
-                <p role="alert">다이어그램 생성 오류: {renderError}</p>
-              </div>
-            )}
-
             {showSource ? (
               <div className="archyl-source-view">
                 <pre>
@@ -412,9 +383,11 @@ export function ArchylArchitecturePage({
                 </pre>
               </div>
             ) : (
-              <div
-                className="archyl-diagram-wrapper"
-                dangerouslySetInnerHTML={{ __html: svg }}
+              <ArchylCanvas
+                projectId={archylProjectId}
+                model={model}
+                level={level}
+                onElementUpdated={() => void loadModel()}
               />
             )}
           </>
