@@ -11,6 +11,9 @@ export type ArchylElement = {
   description: string;
   technology: string;
   type: string;
+  isExternal?: boolean;
+  position?: { x: number; y: number };
+  tags?: string[];
 };
 export type ArchylModel = {
   elements: ArchylElement[];
@@ -41,7 +44,11 @@ export type ArchylWriteTool =
   | 'create_system'
   | 'create_container'
   | 'create_component'
-  | 'create_relationship';
+  | 'create_relationship'
+  | 'update_positions'
+  | 'update_system'
+  | 'delete_system'
+  | 'delete_relationship';
 
 export async function archylWrite(tool: ArchylWriteTool, args: Record<string, unknown>): Promise<unknown> {
   const value = await invoke('archyl_write', { tool, args });
@@ -112,6 +119,21 @@ export async function createArchylRelationship(params: {
   });
 }
 
+export async function updateArchylPositions(params: {
+  projectId: string;
+  positions: { id: string; type: string; x: number; y: number }[];
+}) {
+  return archylWrite('update_positions', params);
+}
+
+export async function deleteArchylSystem(systemId: string) {
+  return archylWrite('delete_system', { systemId });
+}
+
+export async function deleteArchylRelationship(relationshipId: string) {
+  return archylWrite('delete_relationship', { relationshipId });
+}
+
 export async function listArchylProjects(): Promise<ArchylProject[]> {
   const value = unwrap(await invoke('archyl_read', { tool: 'list_projects' }));
   const items = Array.isArray(value) ? value : row(value).projects ?? row(value).items;
@@ -149,12 +171,19 @@ export function parseArchylModel(value: unknown): ArchylModel {
       const { id } = data;
       if (!byId(id)) continue;
       const parent = text(data.parentId, kind === 'container' ? data.systemId : data.containerId, parentId);
+      const posObj = row(data.position);
+      const position = typeof posObj.x === 'number' && typeof posObj.y === 'number'
+        ? { x: posObj.x as number, y: posObj.y as number }
+        : undefined;
       elements.set(id, {
         id, kind, parentId: parent || elements.get(id)?.parentId,
         name: text(data.name, data.title) || id,
         description: text(data.description),
         technology: text(data.technology, ...array(data.technologies).map(item => row(item).name)),
-        type: data.isExternal === true ? 'external' : text(data.type, data.kind).toLowerCase(),
+        type: text(data.type, data.kind).toLowerCase(),
+        isExternal: data.isExternal === true || text(data.type, data.kind).toLowerCase() === 'external_system',
+        position,
+        tags: array(data.tags).map(String),
       });
       if (kind === 'system') add(data.containers, 'container', id);
       if (kind === 'container') add(data.components, 'component', id);
