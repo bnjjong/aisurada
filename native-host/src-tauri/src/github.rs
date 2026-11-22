@@ -394,13 +394,9 @@ pub struct KeychainStore {
 impl KeychainStore {
     /// 앱이 쓰는 키체인 항목(서비스 `co.kcd.aisurada.github-app`, 계정 `private-key`)
     pub fn app() -> Self {
-        Self::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-    }
-
-    pub(crate) fn new(service: &str, account: &str) -> Self {
-        Self {
-            service: service.into(),
-            account: account.into(),
+        KeychainStore {
+            service: KEYCHAIN_SERVICE.into(),
+            account: KEYCHAIN_ACCOUNT.into(),
         }
     }
 }

@@ -9,9 +9,7 @@ use super::agenda_write::{archive, hue_arg};
 use crate::error::EngineError;
 use crate::model::ProjectRow;
 use crate::text::{is_blank, trim};
-use crate::vault::project::{
-    ProjectInfo, ProjectType, is_archyl_project_id, is_valid_project_id, scan_projects,
-};
+use crate::vault::project::{ProjectInfo, ProjectType, is_valid_project_id, scan_projects};
 use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
 use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
@@ -25,7 +23,6 @@ pub struct CreateProjectRequest {
     pub title: Option<String>,
     #[serde(rename = "type")]
     pub project_type: Option<String>,
-    pub archyl_project_id: Option<String>,
     pub hue: Option<String>,
     pub summary: Option<String>,
     /// 저장소 목록(JSON 배열 글)
@@ -39,7 +36,6 @@ pub struct UpdateProjectRequest {
     pub title: Option<String>,
     #[serde(rename = "type")]
     pub project_type: Option<String>,
-    pub archyl_project_id: Option<String>,
     pub hue: Option<String>,
     pub summary: Option<String>,
     /// 주면 저장소 목록을 통째로 바꾼다. 빈 글이면 지운다.
@@ -90,23 +86,6 @@ fn parse_project_type(value: &str) -> Result<ProjectType, EngineError> {
     })
 }
 
-fn archyl_binding(
-    requested: Option<&str>,
-    existing: Option<String>,
-    project_type: ProjectType,
-) -> Result<Option<String>, EngineError> {
-    match requested.map(trim) {
-        Some("") => Ok(None),
-        Some(id) if project_type == ProjectType::Development && is_archyl_project_id(id) => {
-            Ok(Some(id.to_string()))
-        }
-        Some(_) => Err(EngineError::invalid_argument(
-            "개발 프로젝트에 올바른 Archyl 프로젝트 ID를 넣어야 한다",
-        )),
-        None => Ok(existing),
-    }
-}
-
 pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow, EngineError> {
     let title = trim(request.title.as_deref().unwrap_or(""));
     if title.is_empty() {
@@ -146,11 +125,6 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
         slug,
         title: title.to_string(),
         project_type,
-        archyl_project_id: archyl_binding(
-            request.archyl_project_id.as_deref(),
-            None,
-            project_type,
-        )?,
         hue,
         summary,
         repos,
@@ -163,7 +137,7 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
 }
 
 pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow, EngineError> {
-    const USAGE: &str = "update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>] [archylProjectId=<ID>]";
+    const USAGE: &str = "update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>]";
     require_id(&request.id, USAGE)?;
     let hue = hue_arg(request.hue.as_deref())?;
     let current = find(&scan_projects(vault), &request.id)?;
@@ -192,11 +166,6 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
         slug: current.slug.clone(),
         title,
         project_type,
-        archyl_project_id: archyl_binding(
-            request.archyl_project_id.as_deref(),
-            current.archyl_project_id.clone(),
-            project_type,
-        )?,
         hue: hue.unwrap_or_else(|| current.hue.clone()),
         summary,
         repos,
