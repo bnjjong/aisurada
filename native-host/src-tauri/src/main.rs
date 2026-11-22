@@ -3,6 +3,7 @@
 pub mod agents;
 mod approvals;
 mod archyl;
+mod archyl_view;
 #[cfg(feature = "claude")]
 pub mod ask;
 mod call_log;
@@ -103,6 +104,7 @@ fn main() {
             archyl::archyl_disconnect,
             archyl::archyl_read,
             archyl::archyl_write,
+            archyl_view::archyl_view,
             github::github_status,
             github::github_connect,
             github::github_disconnect,
