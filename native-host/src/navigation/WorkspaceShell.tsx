@@ -19,6 +19,7 @@ import { NotesPage } from "../ui/NotesPage.tsx";
 import { ResourcesPage } from "../ui/ResourcesPage.tsx";
 import { GlobalResourcesPage } from "../ui/globalResources/GlobalResourcesPage.tsx";
 import { ProjectPage } from "../ui/ProjectPage.tsx";
+import { ArchylArchitecturePage } from "../ui/ArchylArchitecturePage.tsx";
 import { TasksPage } from "../ui/TasksPage.tsx";
 import { TaskDetailPage } from "../ui/TaskDetailPage.tsx";
 import {
@@ -231,6 +232,8 @@ function RouteContent({
       return <TaskDetailPage taskKey={route.key} state={state} controller={controller} />;
     case "project":
       return <ProjectPage slug={route.slug} state={state} controller={controller} />;
+    case "architecture":
+      return <ArchylArchitecturePage slug={route.slug} state={state} controller={controller} />;
     case "session":
       return (
         <SessionRoute

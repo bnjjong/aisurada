@@ -2575,3 +2575,272 @@ body.col-resizing {
 .archyl-project-field { display: grid; gap: 8px; margin-bottom: 18px; }
 .archyl-project-field label { display: grid; gap: 8px; }
 .archyl-project-field > button { justify-self: start; }
+
+/* Archyl C4 Architecture Page & Modal */
+.archyl-page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.archyl-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.archyl-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.archyl-header-title h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.archyl-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--accent);
+}
+
+.archyl-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.archyl-header-actions .action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.archyl-header-actions .action-btn:hover:not(:disabled) {
+  background: var(--soft);
+  border-color: var(--line-focus, var(--line));
+}
+
+.archyl-header-actions .action-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.archyl-header-actions .action-btn.primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.archyl-header-actions .action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.archyl-view-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: var(--soft);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.archyl-level-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.archyl-level-tabs .level-tab {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.archyl-level-tabs .level-tab:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.archyl-level-tabs .level-tab.active {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}
+
+.archyl-level-selectors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.archyl-select-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.archyl-select-label select {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.source-toggle-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.source-toggle-btn:hover {
+  color: var(--ink);
+}
+
+.archyl-viewport {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 0;
+  position: relative;
+}
+
+.archyl-diagram-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: auto;
+}
+
+.archyl-diagram-wrapper svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.archyl-source-view {
+  width: 100%;
+  max-width: 1000px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.archyl-source-view pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.archyl-empty-card,
+.archyl-status-card {
+  max-width: 480px;
+  margin: 60px auto;
+  padding: 32px 24px;
+  text-align: center;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+}
+
+.archyl-status-card.error {
+  border-color: rgba(217, 83, 79, 0.4);
+  background: rgba(217, 83, 79, 0.05);
+  color: #d9534f;
+}
+
+.archyl-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 8px 0 16px;
+}
+
+.archyl-create-modal {
+  min-width: 460px;
+}
+
+.archyl-modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+
+.archyl-modal-tabs .tab-btn {
+  flex: 1;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.archyl-modal-tabs .tab-btn:hover {
+  color: var(--ink);
+}
+
+.archyl-modal-tabs .tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
