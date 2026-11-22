@@ -165,8 +165,8 @@ pub const SPECS: &[Spec] = &[
         tool: None,
         write: true,
         part4: false,
-        usage: "create-project title=<이름> [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [archylProjectId=<ID>]",
-        allowed: &["archylProjectId", "hue", "repos", "summary", "title", "type"],
+        usage: "create-project title=<이름> [type=development|general] [hue=<색>] [summary=<한 문단 설명>]",
+        allowed: &["hue", "repos", "summary", "title", "type"],
         max: Some(0),
     },
     Spec {
@@ -174,8 +174,8 @@ pub const SPECS: &[Spec] = &[
         tool: None,
         write: true,
         part4: false,
-        usage: "update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [archylProjectId=<ID>]",
-        allowed: &["archylProjectId", "hue", "repos", "summary", "title", "type"],
+        usage: "update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>]",
+        allowed: &["hue", "repos", "summary", "title", "type"],
         max: Some(1),
     },
     Spec {

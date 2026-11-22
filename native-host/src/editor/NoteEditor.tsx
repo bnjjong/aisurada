@@ -13,7 +13,6 @@ import type { EditorHandle } from "./Editor.tsx";
 import { EditorSession } from "./session.ts";
 import { editorHost } from "./platform.ts";
 import { ConflictDiff } from "./ConflictDiff.tsx";
-import { projectTypeOf } from "../ui/model.ts";
 import { Tags, Links, NotesBelow } from "../ui/NoteParts.tsx";
 import type { NoteMode } from "../ui/NoteParts.tsx";
 import { ReadMarkdown } from "../ui/ReadMarkdown.tsx";
@@ -106,15 +105,7 @@ export function NoteEditor({
     controller.openSubNotes(chain[0], [...chain.slice(1), id]);
   };
   const comments = state.vault.comments[key]?.comments || [];
-  const workspace = state.workspace;
-  const rootId = parent ? data.chain(parent)?.split("/")[0] : note.id;
-  const rootNote = parent ? workspace?.notes.find(item => item.id === rootId) : note;
-  const agenda = workspace?.agendas.find(item => item.id === rootNote?.agendaId);
-  const project = agenda?.project ? workspace?.projects.find(item => item.slug === agenda.project) : undefined;
-  const archylProjectId = project && projectTypeOf(project.type) === "development"
-    ? asText(project.archylProjectId) : undefined;
   const features = {
-    archylProjectId,
     currentId: note.id,
     notes: state.workspace?.notes.map((note) => ({
       id: note.id,

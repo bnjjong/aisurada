@@ -800,7 +800,7 @@
 {"key":["vault"],"kind":"tree","value":{"del":[],"set":{}}}
 {"key":["update-project","pjmwh21ips-001e0001","repos=[1]"],"kind":"run","value":{"err":"AIS-400 repos[1] 는 객체여야 한다"}}
 {"key":["vault"],"kind":"tree","value":{"del":[],"set":{}}}
-{"key":["update-project"],"kind":"run","value":{"err":"AIS-400 인자가 하나 필요하다: update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>] [archylProjectId=<ID>]"}}
+{"key":["update-project"],"kind":"run","value":{"err":"AIS-400 인자가 하나 필요하다: update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>]"}}
 {"key":["vault"],"kind":"tree","value":{"del":[],"set":{}}}
 {"key":["update-project","nope"],"kind":"run","value":{"err":"AIS-400 프로젝트 id 모양이 아니다: nope"}}
 {"key":["vault"],"kind":"tree","value":{"del":[],"set":{}}}

@@ -16,7 +16,6 @@ export interface EditorHost {
 export interface ConfirmOptions { title?: string; okLabel?: string; cancelLabel?: string; }
 export interface EditorFeatures {
   notes?: EditorNote[]; currentId?: string; showRecords?: boolean; noteDirectory?: string;
-  archylProjectId?: string;
   children?: { id: string; title: string }[];
   comments?: Record<string, string>;
   openNote?(id: string): void;

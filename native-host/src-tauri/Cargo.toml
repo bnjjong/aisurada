@@ -8,7 +8,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tempfile = "3"
-tauri = { version = "=2.11.2", features = ["protocol-asset", "unstable"] }
+tauri = { version = "=2.11.2", features = ["protocol-asset"] }
 tauri-plugin-fs = { version = "=2.5.1", features = ["watch"] }
 tauri-plugin-dialog = "=2.7.1"
 tauri-plugin-opener = "=2.5.4"

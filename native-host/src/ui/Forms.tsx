@@ -4,7 +4,6 @@ import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { Modal, Confirm } from "./Modal.tsx";
 import { Editor } from "../editor/Editor.tsx";
-import { ArchylProjectField } from "./ArchylConnect.tsx";
 import { PROJECT_TYPE_NAMES, TYPES, TYPE_NAMES, agendaRepoField, projectTypeOf } from "./model.ts";
 import { Icon } from "./Icon.tsx";
 import { RepoListEditor } from "./RepoListEditor.tsx";
@@ -313,7 +312,6 @@ function EntityForm({
         )[0],
     ),
     [projectType, setProjectType] = useState(() => projectTypeOf(old?.type)),
-    [archylProjectId, setArchylProjectId] = useState(asText(old?.archylProjectId)),
     [project, setProject] = useState(initial || asText(old?.project)),
     [repo, setRepo] = useState(asText(old?.repo)),
     [projectRepo, setProjectRepo] = useState(asText(old?.projectRepo)),
@@ -326,9 +324,7 @@ function EntityForm({
   // 아젠다가 고를 수 있는 저장소: 고른 프로젝트가 가진 항목들
   const projectRepos = parseRepos(ws.projects.find((p) => p.slug === project)?.repos);
   const projectTypeChanged = kind === "project" && projectType !== projectTypeOf(old?.type);
-  const bindingChanged = kind === "project" && projectType === "development"
-    && archylProjectId !== asText(old?.archylProjectId);
-  const isDirty = projectTypeChanged || bindingChanged || Boolean(
+  const isDirty = projectTypeChanged || Boolean(
     id
       ? title !== asText(old?.title) ||
         summary !== asText(old?.summary) ||
@@ -389,11 +385,7 @@ function EntityForm({
                       !id,
                     ),
                   }
-                : {
-                    ...reposField(old?.repos, repos, !id),
-                    type: projectType,
-                    ...(bindingChanged ? { archylProjectId } : {}),
-                  }),
+                : { ...reposField(old?.repos, repos, !id), type: projectType }),
             },
             id,
           );
@@ -437,9 +429,6 @@ function EntityForm({
               ))}
             </select>
           </label>
-        )}
-        {kind === "project" && projectType === "development" && (
-          <ArchylProjectField value={archylProjectId} onChange={setArchylProjectId} repos={repos} />
         )}
         <label className="hue-field">
           색

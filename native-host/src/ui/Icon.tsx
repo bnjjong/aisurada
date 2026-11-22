@@ -27,14 +27,6 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M4 5.5V12.5H9M4 8H9" />
     </>
   ),
-  architecture: (
-    <>
-      <rect x="2" y="2" width="4" height="3.5" rx=".8" />
-      <rect x="10" y="2" width="4" height="3.5" rx=".8" />
-      <rect x="6" y="10.5" width="4" height="3.5" rx=".8" />
-      <path d="M4 5.5v2.5h8V5.5M8 8v2.5" />
-    </>
-  ),
   clock: (
     <>
       <circle cx="8" cy="8" r="6" />
