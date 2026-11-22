@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $getRoot, $isElementNode } from "lexical";
+import { $createTextNode, $getNodeByKey, $getRoot, $isElementNode, HISTORY_PUSH_TAG } from "lexical";
 import type { LexicalNode } from "lexical";
 import { $isCodeNode } from "@lexical/code";
 import DOMPurify from "dompurify";
+import { EditorContext } from "./context.ts";
+import { archylHome, archylSource, archylView, getArchylModel } from "./archyl.ts";
 
 let rendering: Promise<unknown> = Promise.resolve();
 export function renderDiagram(source: string, theme: string): Promise<string> {
@@ -87,6 +89,35 @@ function Preview({
   const [theme, setTheme] = useState(
     document.documentElement.dataset.theme || "system",
   );
+  const features = useContext(EditorContext);
+  const currentProject = useRef(features.archylProjectId);
+  currentProject.current = features.archylProjectId;
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const view = archylView(source);
+  const canRefresh = Boolean(view && features.host?.native && features.archylProjectId === view.projectId && editor.isEditable());
+
+  async function refreshArchyl() {
+    if (!view || !canRefresh || refreshing) return;
+    setRefreshing(true);
+    setRefreshError("");
+    try {
+      const model = await getArchylModel(view.projectId);
+      const next = archylSource(model, view);
+      await renderDiagram(next, theme);
+      if (currentProject.current !== view.projectId || !editor.isEditable()) return;
+      editor.update(() => {
+        const node = $getNodeByKey(nodeKey);
+        if ($isCodeNode(node) && node.isAttached() && node.getTextContent() === source) {
+          node.clear().append($createTextNode(next));
+        }
+      }, { tag: HISTORY_PUSH_TAG });
+    } catch (reason) {
+      setRefreshError(String(reason));
+    } finally {
+      setRefreshing(false);
+    }
+  }
   useEffect(() => setExpanded(open), [open]);
   useEffect(() => {
     const observer = new MutationObserver(() =>
@@ -164,6 +195,17 @@ function Preview({
       <button onClick={() => setExpanded(!expanded)}>
         {expanded ? "코드 숨기기" : "코드"}
       </button>
+      {view && features.host?.native && (
+        <>
+          <button type="button" onClick={() => void features.host?.openURL(archylHome).catch(reason => setRefreshError(String(reason)))}>
+            Archyl 열기
+          </button>
+          {canRefresh && <button type="button" disabled={refreshing} onClick={() => void refreshArchyl()}>
+            {refreshing ? "가져오는 중…" : "Archyl 새로고침"}
+          </button>}
+        </>
+      )}
+      {refreshError && <div className="mermaid-error-bar" role="status">{refreshError}</div>}
       {error && !svg ? (
         <p role="status" className="mermaid-error">{error}</p>
       ) : (

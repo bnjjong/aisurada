@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { $insertNodeToNearestRoot } from '@lexical/utils';
 import { $wrapSelectionInMarkNode } from '@lexical/mark';
-import { $isCodeNode } from '@lexical/code';
+import { $createCodeNode, $isCodeNode } from '@lexical/code';
 import { $isTableSelection, $isTableCellNode, $isTableNode } from '@lexical/table';
 import {
   $getRoot, $getSelection, $setSelection, $isRangeSelection, $isTextNode, $getNodeByKey, $createRangeSelection,
-  $createParagraphNode, $isParagraphNode, $isRootNode,
+  $createParagraphNode, $createTextNode, $isParagraphNode, $isRootNode,
   FORMAT_TEXT_COMMAND, PASTE_COMMAND, KEY_TAB_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_LOW, createCommand,
   HISTORY_MERGE_TAG, HISTORY_PUSH_TAG,
 } from 'lexical';
@@ -18,6 +19,7 @@ import { calloutStyle } from './grammar.ts';
 import { $insertBlock, $formatSelection, $selectionHasFormat } from './wrapBlock.ts';
 import { DrawioDialog, drawioAttachmentName, OPEN_DRAWIO_COMMAND } from './drawio.tsx';
 import type { DrawioAttachment } from './drawio.tsx';
+import { ArchylPicker } from './ArchylPicker.tsx';
 
 type Trigger = { key: string; start: number; size: number };
 // picked: 사용자가 ↑↓나 마우스로 항목을 직접 골랐는지. selected는 열 때부터 0이라, 이것만으로는 「고른 것」과 「맨 위에 놓인 것」을 가릴 수 없다.
@@ -77,6 +79,9 @@ export function EditorTools(props: EditorProps) {
   const commentRef = useRef(comment); commentRef.current = comment;
   const selection = useRef<BaseSelection | null>(null), composeRef = useRef(compose); composeRef.current = compose;
   const [menu, setMenu] = useState<Menu | null>(null), menuRef = useRef(menu); menuRef.current = menu;
+  const [archyl, setArchyl] = useState<{ projectId: string; noteId: string; trigger: Trigger } | null>(null);
+  const archylTarget = useRef(archyl);
+  archylTarget.current = archyl;
   const [drawio, setDrawio] = useState<DrawioTarget | null>(null);
   const [code, setCode] = useState<{ key: string; language: string } | null>(null), [callout, setCallout] = useState<{ key: string; kind: string } | null>(null);
   // 코드·콜아웃 안에 있을 때만 그 블록 오른쪽 위에 뜨는 선택 줄의 자리, 그리고 커서가 빈 줄에 있을 때 보이는 「+」와 안내의 자리.
@@ -124,6 +129,9 @@ export function EditorTools(props: EditorProps) {
     { id: 'callout', icon: 'callout', label: '콜아웃', desc: '눈에 띄는 안내 상자', aliases: 'callout 정보 강조 안내' },
     { id: 'code', icon: 'code', label: '코드 블록', desc: '코드를 그대로 보여 줘요', aliases: 'code 코드 소스' },
     { id: 'divider', icon: 'divider', label: '구분선', desc: '내용을 나누는 가로줄', aliases: 'divider hr line 선 구분선 수평선' },
+    ...(props.features?.host?.native && props.features.archylProjectId
+      ? [{ id: 'archyl', icon: 'drawio', label: 'C4 다이어그램', desc: 'Archyl 모델에서 C4 뷰를 가져와요', aliases: 'archyl c4 아키텍처' }]
+      : []),
     { id: 'pdf', icon: 'pdf', label: 'PDF 첨부', desc: 'PDF 문서를 첨부해요', aliases: 'pdf 파일 문서 첨부 document file' },
     ...(props.features?.host?.native && props.features.noteDirectory && props.onSaveDiagram
       ? [{ id: 'drawio', icon: 'drawio', label: 'draw.io', desc: '다이어그램을 만들거나 가져와요', aliases: 'drawio 다이어그램' }]
@@ -295,6 +303,11 @@ export function EditorTools(props: EditorProps) {
     }
     if (id === 'note') { setMenu({ ...active, kind: 'note', query: '', selected: 0, picked: false }); return; }
     setMenu(null);
+    if (id === 'archyl') {
+      const { currentId: noteId, archylProjectId: projectId } = latest.current.features ?? {};
+      if (noteId && projectId) setArchyl({ projectId, noteId, trigger: active.trigger });
+      return;
+    }
     if (id === 'drawio') {
       const noteId = latest.current.features?.currentId;
       if (!noteId) return;
@@ -550,6 +563,21 @@ export function EditorTools(props: EditorProps) {
   }, [editor]);
   const candidates = menu?.kind === 'note' ? notes.map(note => ({ id: note.id, label: note.title, hint: note.agenda })) : slashItems;
   return <>
+    {archyl && <ArchylPicker projectId={archyl.projectId}
+      close={() => { archylTarget.current = null; setArchyl(null); }}
+      insert={source => {
+        const features = latest.current.features;
+        if (archylTarget.current !== archyl || features?.currentId !== archyl.noteId
+          || features.archylProjectId !== archyl.projectId || !editor.isEditable()) return;
+        editor.update(() => {
+          const { key, start, size } = archyl.trigger;
+          const text = $getNodeByKey(key);
+          if (!$isTextNode(text) || text.getTextContent().slice(start, start + size) !== '/') return;
+          if (removeTrigger(archyl.trigger)) $insertNodeToNearestRoot($createCodeNode('mermaid').append($createTextNode(source)));
+        }, { discrete: true, tag: HISTORY_PUSH_TAG });
+        archylTarget.current = null;
+        setArchyl(null);
+      }} />}
     {drawio && props.features?.host && <DrawioDialog
       existing={'existing' in drawio ? drawio.existing : undefined}
       host={props.features.host}

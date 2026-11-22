@@ -2571,3 +2571,7 @@ body.col-resizing {
 .agenda-picker-option .agenda-picker-item { flex: 1; min-width: 0; }
 .agenda-picker-choose-sub { flex: none; margin-right: 4px; font-size: 11px; }
 .agenda-picker-assignment { padding: 8px; overflow: auto; }
+
+.archyl-project-field { display: grid; gap: 8px; margin-bottom: 18px; }
+.archyl-project-field label { display: grid; gap: 8px; }
+.archyl-project-field > button { justify-self: start; }
