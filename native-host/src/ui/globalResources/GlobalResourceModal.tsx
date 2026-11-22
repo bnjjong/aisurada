@@ -27,6 +27,7 @@ export function GlobalResourceModal({ resource, onSave, onClose }: Props) {
       setError('리소스 이름을 입력해 주세요.');
       return;
     }
+    const now = new Date().toISOString();
     const updated: GlobalResourceItem = {
       id: resource?.id || `gres-${Date.now()}`,
       name: name.trim(),
@@ -37,8 +38,8 @@ export function GlobalResourceModal({ resource, onSave, onClose }: Props) {
       status: isMock ? 'mocking' : status,
       description: description.trim(),
       config: config.trim(),
-      createdAt: resource?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: resource?.createdAt ?? now,
+      editedAt: now,
     };
     onSave(updated);
     onClose();

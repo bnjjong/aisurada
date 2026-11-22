@@ -1529,7 +1529,18 @@ fn put_both(h: &WriteHarness, rel: &str, content: &str) {
     for root in [&h.a, &h.b] {
         let path = root.join(rel);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, content).unwrap();
+        fs::write(&path, content).unwrap();
+        // 옛 자원 파일의 빠진 일시는 파일 수정 시각으로 채우므로 비교 기준을 고정한다.
+        if rel.starts_with(".aisurada/resources/") {
+            let when = std::time::UNIX_EPOCH
+                + std::time::Duration::from_millis(WRITE_NOW.parse().unwrap());
+            fs::OpenOptions::new()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(when)
+                .unwrap();
+        }
     }
 }
 

@@ -43,7 +43,16 @@ function loadInfrasFromStorage(): GlobalResourceItem[] {
       return DEFAULT_GLOBAL_RESOURCES;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_GLOBAL_RESOURCES;
+    if (!Array.isArray(parsed) || !parsed.length) return DEFAULT_GLOBAL_RESOURCES;
+    const timestamp = (value: unknown) => typeof value === 'string' && value.trim() ? value : undefined;
+    const now = new Date().toISOString();
+    const infras = (parsed as (GlobalResourceItem & { updatedAt?: unknown })[]).map(({ updatedAt, ...item }) => {
+      const editedAt = timestamp(item.editedAt) ?? timestamp(updatedAt);
+      const createdAt = timestamp(item.createdAt) ?? editedAt ?? now;
+      return { ...item, createdAt, editedAt: editedAt ?? createdAt };
+    });
+    if (JSON.stringify(parsed) !== JSON.stringify(infras)) saveInfrasToStorage(infras);
+    return infras;
   } catch {
     return DEFAULT_GLOBAL_RESOURCES;
   }
@@ -316,6 +325,8 @@ export async function saveGlobalSkill(skill: GlobalSkill, call: EngineCall): Pro
   const updatedSkill: GlobalSkill = {
     ...skillToSave,
     id: savedRow.id || targetId,
+    createdAt: savedRow.createdAt,
+    editedAt: savedRow.editedAt,
     f1: savedRow.precondition || f1,
   };
 

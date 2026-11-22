@@ -21,7 +21,8 @@ export interface ResourceRow {
   skills: string[];
   repo?: string;
   tools: Record<string, unknown>;
-  editedAt?: string;
+  createdAt: string;
+  editedAt: string;
   editedSession?: string;
   editedAgent?: string;
   path: string;
@@ -113,7 +114,8 @@ export function toResource(v: unknown): ResourceRow | null {
   const kind = v.kind === "skill" || v.kind === "agent" ? v.kind : null;
   const scope = v.scope === "global" || v.scope === "project" ? v.scope : null;
   const name = text(v.name);
-  if (!id || !kind || !scope || !name) return null;
+  const createdAt = text(v.createdAt), editedAt = text(v.editedAt);
+  if (!id || !kind || !scope || !name || !createdAt?.trim() || !editedAt?.trim()) return null;
   const permission = v.permission === "read" || v.permission === "edit" || v.permission === "publish" ? v.permission : undefined;
   const source = v.source === "own" || v.source === "ref" ? v.source : undefined;
   return {
@@ -124,7 +126,8 @@ export function toResource(v: unknown): ResourceRow | null {
     skills: strings(v.skills),
     repo: text(v.repo),
     tools: isRecord(v.tools) ? v.tools : {},
-    editedAt: text(v.editedAt),
+    createdAt,
+    editedAt,
     editedSession: text(v.editedSession),
     editedAgent: text(v.editedAgent),
     path: text(v.path) ?? "",

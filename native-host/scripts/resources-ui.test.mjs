@@ -15,7 +15,10 @@ import { toArgv } from '../src/data/commands.ts';
 import { Rail } from '../src/ui/Rail.tsx';
 import { ProjectResourceRows, rowsByProject, expandKey, EMPTY_PROJECT_ROWS } from '../src/ui/RailProjectResources.tsx';
 
-const raw = (extra = {}) => ({ id: 'skmwd7nzi4-05049130', kind: 'skill', scope: 'global', name: '번역 검수', description: '번역을 검수한다', path: '.aisurada/resources/global/skills/번역-검수/SKILL.md', ...extra });
+const raw = (extra = {}) => ({
+  id: 'skmwd7nzi4-05049130', kind: 'skill', scope: 'global', name: '번역 검수', description: '번역을 검수한다', path: '.aisurada/resources/global/skills/번역-검수/SKILL.md',
+  createdAt: '2026-11-17T00:00:00Z', editedAt: '2026-11-18T00:00:00Z', ...extra,
+});
 const res = (extra = {}) => toResource(raw(extra));
 const agent = (extra = {}) => res({ id: 'apmwd7nzn1-5efcfe47', kind: 'agent', name: '코드 리뷰어', permission: 'edit', skills: ['skmwd7nzi4-05049130'], path: '.aisurada/resources/global/agents/코드-리뷰어.md', ...extra });
 const usable = (extra = {}) => ({ project: '앱', skills: [], agents: [], broken: [], missingSkills: [], ...extra });
@@ -23,13 +26,15 @@ const usable = (extra = {}) => ({ project: '앱', skills: [], agents: [], broken
 test('toResource reads an engine row, fills defaults, and refuses a row with the wrong shape', () => {
   const r = res({ tools: { claude: { a: 1 } }, referencedBy: ['앱'], editedSession: 's1' });
   assert.equal(r.kind, 'skill');
+  assert.equal(r.createdAt, raw().createdAt);
+  assert.equal(r.editedAt, raw().editedAt);
   assert.deepEqual(r.skills, []);
   assert.deepEqual(r.tools, { claude: { a: 1 } });
   assert.deepEqual(r.referencedBy, ['앱']);
   assert.equal(res().referencedBy, undefined);
   assert.equal(agent().permission, 'edit');
   assert.equal(agent({ permission: 'root' }).permission, undefined, 'unknown permission is not trusted');
-  for (const bad of [null, 'x', [], raw({ id: undefined }), raw({ kind: 'tool' }), raw({ scope: 'local' }), raw({ name: undefined })]) {
+  for (const bad of [null, 'x', [], raw({ id: undefined }), raw({ kind: 'tool' }), raw({ scope: 'local' }), raw({ name: undefined }), raw({ createdAt: null }), raw({ editedAt: ' ' })]) {
     assert.equal(toResource(bad), null);
   }
 });

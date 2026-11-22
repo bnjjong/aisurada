@@ -179,7 +179,7 @@ export interface GlobalSkill {
   body: string;
   tags: string[];
   createdAt: string;
-  updatedAt: string;
+  editedAt: string;
   f1?: string;
   path?: string;
   /** `dirty`면 승인한 뒤에 파일이 직접 고쳐진 것이다. 이 경우 화면의 값은 승인해 둔 옛 판이다. */
@@ -197,7 +197,7 @@ export interface GlobalResourceItem {
   description: string;
   status: 'active' | 'inactive' | 'mocking';
   createdAt: string;
-  updatedAt: string;
+  editedAt: string;
 }
 
 export interface GlobalResourcesData {
@@ -409,7 +409,7 @@ export const DEFAULT_GLOBAL_SKILLS: GlobalSkill[] = [
 요구사항을 분석하여 명확한 완료 기준을 가진 백로그 티켓을 발급합니다.`,
     tags: ['jira', 'issue', 'management'],
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
   },
 ];
 
@@ -425,7 +425,7 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
     description: 'Jira 이슈 트래커 (Mock 모드: 가상 티켓 연동 및 상태 시뮬레이션)',
     status: 'mocking',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
   },
   {
     id: 'gres-task',
@@ -438,7 +438,7 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
     description: 'Aisurada 내장 태스크 러너 및 비동기 작업 큐',
     status: 'active',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
   },
   {
     id: 'gres-github',
@@ -451,7 +451,7 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
     description: 'GitHub 원격 저장소 및 PR/이슈 연동',
     status: 'active',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
   },
   {
     id: 'gres-database',
@@ -464,7 +464,7 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
     description: '개발용 격리 데이터베이스 인스턴스',
     status: 'mocking',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
   },
   {
     id: 'gres-grafana',
@@ -477,7 +477,7 @@ export const DEFAULT_GLOBAL_RESOURCES: GlobalResourceItem[] = [
     description: '작업 메트릭 및 빌드 모니터링 대시보드',
     status: 'mocking',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
   },
 ];
 
@@ -648,7 +648,7 @@ export function skillFromForm(
       .map((t) => t.trim())
       .filter(Boolean),
     createdAt: existing?.createdAt || now,
-    updatedAt: now,
+    editedAt: now,
     f1: existing?.f1,
     path: existing?.path,
   };
@@ -678,8 +678,8 @@ export function resourceRowToGlobalSkill(row: ResourceRow): GlobalSkill {
     description: row.description,
     body: row.body || '',
     tags: [],
-    createdAt: row.editedAt || new Date().toISOString(),
-    updatedAt: row.editedAt || new Date().toISOString(),
+    createdAt: row.createdAt,
+    editedAt: row.editedAt,
     f1: row.precondition,
     path: row.path,
     approval: row.approval,

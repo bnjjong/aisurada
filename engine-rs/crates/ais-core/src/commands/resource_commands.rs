@@ -260,8 +260,9 @@ fn row(r: &Resource, with_body: bool, with_token: bool) -> Map<String, Json> {
     if !r.tools.is_empty() {
         m.insert("tools".into(), tools_json(r));
     }
+    m.insert("createdAt".into(), json!(r.created_at));
+    m.insert("editedAt".into(), json!(r.edited_at));
     for (key, value) in [
-        ("editedAt", &r.edited_at),
         ("editedSession", &r.edited_session),
         ("editedAgent", &r.edited_agent),
     ] {
@@ -430,9 +431,7 @@ pub fn list_resource_versions(
             m.insert("version".into(), json!(v.version));
             m.insert("savedAt".into(), json!(v.saved_at));
             m.insert("bytes".into(), json!(v.bytes));
-            if let Some(at) = v.edited_at {
-                m.insert("editedAt".into(), json!(at));
-            }
+            m.insert("editedAt".into(), json!(v.edited_at));
             if let Some(session) = v.edited_session {
                 m.insert("editedSession".into(), json!(session));
             }

@@ -15,14 +15,15 @@ use crate::ports::fs;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use std::time::UNIX_EPOCH;
 
 use regex::Regex;
 
-use super::{Resource, ResourceKind, approvals, format, refs};
+use super::{Resource, ResourceKind, approvals, format, refs, tools_equal};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::ports::fs::check_confinement;
 use crate::kernel::token::compute_token;
+use crate::ports::fs::check_confinement;
 use crate::text::compare_utf16;
 use crate::vault::agenda::is_valid_slug_segment;
 use crate::vault::project::{ProjectInfo, scan_projects};
@@ -67,7 +68,7 @@ pub struct Version {
     pub version: String,
     pub saved_at: i64,
     pub bytes: usize,
-    pub edited_at: Option<String>,
+    pub edited_at: String,
     pub edited_session: Option<String>,
 }
 
@@ -149,6 +150,15 @@ fn slug_from_rel(kind: ResourceKind, rel: &str) -> String {
 
 // ---------------------------------------------------------------- 읽기
 
+fn file_timestamp(meta: Option<&fs::Metadata>) -> String {
+    let millis = meta
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|at| at.duration_since(UNIX_EPOCH).ok())
+        .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok())
+        .unwrap_or_else(now_millis);
+    instant_text(millis)
+}
+
 /// 모든 범위의 자원을 훑는다. 못 읽는 파일은 건너뛰고 이유를 `skipped`에 적는다. 점으로 시작하는 폴더(`.trash` 등)는 안 본다.
 pub fn scan(vault: &Path) -> Scan {
     let mut items: Vec<Resource> = Vec::new();
@@ -213,7 +223,13 @@ fn scan_scope(
                 skipped.push(format!("{rel_path}: 파일을 못 읽었다"));
                 continue;
             };
-            match format::parse(&bytes, kind, project, &rel_path) {
+            match format::parse(
+                &bytes,
+                kind,
+                project,
+                &rel_path,
+                &file_timestamp(Some(&meta)),
+            ) {
                 Ok(r) => {
                     if !ids.insert(r.id.clone()) {
                         skipped.push(format!("{rel_path}: id 가 다른 자원과 겹친다: {}", r.id));
@@ -262,16 +278,13 @@ pub fn scan_served(vault: &Path) -> Result<Served, EngineError> {
                 states.push((r.id.clone(), TrustState::Approved));
                 items.push(r);
             }
-            TrustState::Dirty => {
-                let token = entry.map(|e| e.token.as_str()).unwrap_or_default();
-                match approved_copy(vault, &r, token) {
-                    None => untrusted.push(r),
-                    Some(approved) => {
-                        states.push((r.id.clone(), TrustState::Dirty));
-                        items.push(approved);
-                    }
+            TrustState::Dirty => match entry.and_then(|entry| approved_copy(vault, &r, entry)) {
+                None => untrusted.push(r),
+                Some(approved) => {
+                    states.push((r.id.clone(), TrustState::Dirty));
+                    items.push(approved);
                 }
-            }
+            },
         }
     }
     Ok(Served {
@@ -283,12 +296,23 @@ pub fn scan_served(vault: &Path) -> Result<Served, EngineError> {
 }
 
 /// 승인해 둔 사본을 자원으로 읽는다. 사본이 없거나 지문이 기록과 안 맞거나 못 읽으면 `None`이다.
-fn approved_copy(vault: &Path, live: &Resource, token: &str) -> Option<Resource> {
+fn approved_copy(vault: &Path, live: &Resource, entry: &approvals::Entry) -> Option<Resource> {
     let copy = approvals::copy(vault, &approvals::res_key(&live.id))?;
-    if compute_token(&copy) != token {
+    if compute_token(&copy) != entry.token {
         return None;
     }
-    format::parse(&copy, live.kind, live.project.as_deref(), &live.rel_path).ok()
+    format::parse(
+        &copy,
+        live.kind,
+        live.project.as_deref(),
+        &live.rel_path,
+        entry
+            .at
+            .as_deref()
+            .filter(|at| !at.trim().is_empty())
+            .unwrap_or(&live.created_at),
+    )
+    .ok()
 }
 
 /// 고칠 바탕이 되는 판. 승인한 판과 같으면 파일 그대로이고, 직접 고쳐졌으면 승인해 둔 사본(토큰만 지금 파일의 것)이다.
@@ -304,7 +328,7 @@ pub fn base_for_edit(vault: &Path, live: &Resource) -> Result<Resource, EngineEr
     if Some(&e.token) == live.token.as_ref() {
         return Ok(live.clone());
     }
-    let Some(approved) = approved_copy(vault, live, &e.token) else {
+    let Some(approved) = approved_copy(vault, live, e) else {
         return Err(EngineError::conflict(format!(
             "승인해 둔 판을 찾지 못해 고칠 수 없다. 승인하거나 지운 뒤 다시 한다(resolve-resource-edit): {}",
             live.rel_path
@@ -313,6 +337,8 @@ pub fn base_for_edit(vault: &Path, live: &Resource) -> Result<Resource, EngineEr
     Ok(Resource {
         rel_path: live.rel_path.clone(),
         token: live.token.clone(),
+        // 직접 고친 파일에는 시각 보완만으로 승인 사본을 덮어쓰지 않는다.
+        missing_timestamps: false,
         ..approved
     })
 }
@@ -439,9 +465,11 @@ pub fn plan_create(
         permission,
         skills,
         repo,
-        tools: f.tools.clone().unwrap_or_default(),
+        tools: format::stamp_tools(f.tools.clone().unwrap_or_default(), &[], &stamp.at),
         body: f.body.clone().unwrap_or_default(),
-        edited_at: Some(stamp.at.clone()),
+        created_at: stamp.at.clone(),
+        edited_at: stamp.at.clone(),
+        missing_timestamps: false,
         edited_session: stamp.session.clone(),
         edited_agent: stamp.agent.clone(),
         rel_path: rel(vault, &path),
@@ -495,7 +523,12 @@ pub fn plan_update(
         .clone()
         .unwrap_or_else(|| cur.description.clone());
     let body = f.body.clone().unwrap_or_else(|| cur.body.clone());
-    let tools = f.tools.clone().unwrap_or_else(|| cur.tools.clone());
+    let tools = match &f.tools {
+        Some(tools) if !tools_equal(tools, &cur.tools) => {
+            format::stamp_tools(tools.clone(), &cur.tools, &stamp.at)
+        }
+        _ => cur.tools.clone(),
+    };
 
     let mut permission = cur.permission.clone();
     let mut skills = cur.skills.clone();
@@ -543,7 +576,8 @@ pub fn plan_update(
         body: body.clone(),
         ..cur.clone()
     };
-    if new_slug == old_slug && format::render(&same)? == format::render(cur)? {
+    let content_changed = new_slug != old_slug || format::render(&same)? != format::render(cur)?;
+    if !content_changed && !cur.missing_timestamps {
         return Ok(Plan {
             before: Some(cur.clone()),
             after: cur.clone(),
@@ -562,9 +596,23 @@ pub fn plan_update(
         repo,
         tools,
         body,
-        edited_at: Some(stamp.at.clone()),
-        edited_session: stamp.session.clone(),
-        edited_agent: stamp.agent.clone(),
+        created_at: cur.created_at.clone(),
+        edited_at: if content_changed {
+            stamp.at.clone()
+        } else {
+            cur.edited_at.clone()
+        },
+        missing_timestamps: false,
+        edited_session: if content_changed {
+            stamp.session.clone()
+        } else {
+            cur.edited_session.clone()
+        },
+        edited_agent: if content_changed {
+            stamp.agent.clone()
+        } else {
+            cur.edited_agent.clone()
+        },
         rel_path: rel(vault, &new_path),
         token: None,
     };
@@ -820,7 +868,17 @@ pub fn peek_trash(vault: &Path, id: &str) -> Result<Resource, EngineError> {
     };
     fs::read(&file)
         .ok()
-        .and_then(|bytes| format::parse(&bytes, e.kind, e.project.as_deref(), &e.rel_path).ok())
+        .and_then(|bytes| {
+            let meta = fs::metadata(&file).ok();
+            format::parse(
+                &bytes,
+                e.kind,
+                e.project.as_deref(),
+                &e.rel_path,
+                &file_timestamp(meta.as_ref()),
+            )
+            .ok()
+        })
         .ok_or_else(|| EngineError::internal(format!("휴지통의 자원을 못 읽었다: {id}")))
 }
 
@@ -933,11 +991,17 @@ pub fn versions(vault: &Path, r: &Resource) -> Vec<Version> {
         let Ok(bytes) = fs::read(&p) else {
             continue;
         };
-        let Ok(old) = format::parse(&bytes, r.kind, r.project.as_deref(), &r.rel_path) else {
-            continue;
-        };
         let stamp = version.split('-').next().unwrap_or(version);
         let Ok(saved_at) = i64::from_str_radix(stamp, 36) else {
+            continue;
+        };
+        let Ok(old) = format::parse(
+            &bytes,
+            r.kind,
+            r.project.as_deref(),
+            &r.rel_path,
+            &instant_text(saved_at),
+        ) else {
             continue;
         };
         out.push(Version {
@@ -958,6 +1022,10 @@ pub fn read_version(vault: &Path, r: &Resource, version: &str) -> Result<Resourc
             "version 모양이 아니다: {version}"
         )));
     }
+    let saved_at = version
+        .split_once('-')
+        .and_then(|(stamp, _)| i64::from_str_radix(stamp, 36).ok())
+        .map(instant_text);
     let p = history_dir(vault, &r.id).join(format!("{version}.md"));
     if !is_file(&p) {
         return Err(EngineError::not_found(format!(
@@ -966,6 +1034,15 @@ pub fn read_version(vault: &Path, r: &Resource, version: &str) -> Result<Resourc
     }
     fs::read(&p)
         .ok()
-        .and_then(|bytes| format::parse(&bytes, r.kind, r.project.as_deref(), &r.rel_path).ok())
+        .and_then(|bytes| {
+            format::parse(
+                &bytes,
+                r.kind,
+                r.project.as_deref(),
+                &r.rel_path,
+                saved_at.as_deref().unwrap_or(&r.created_at),
+            )
+            .ok()
+        })
         .ok_or_else(|| EngineError::internal(format!("그 판을 못 읽었다: {version}")))
 }

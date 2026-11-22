@@ -332,6 +332,8 @@ test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
     body: saveInput.body,
     skills: [],
     tools: {},
+    createdAt: '2026-11-17T00:00:00.000Z',
+    editedAt: '2026-11-18T00:00:00.000Z',
     path: '.aisurada/resources/global/skills/project-manager/SKILL.md',
     precondition: 'f1:skill-token',
   };
@@ -339,6 +341,8 @@ test('globalSkillToSaveInput and resourceRowToGlobalSkill roundtrip', () => {
   const reconstructed = resourceRowToGlobalSkill(fakeRow);
   assert.equal(reconstructed.id, 'sk-proj-mgr-01');
   assert.equal(reconstructed.name, skill.name);
+  assert.equal(reconstructed.createdAt, fakeRow.createdAt);
+  assert.equal(reconstructed.editedAt, fakeRow.editedAt);
   assert.equal(reconstructed.f1, 'f1:skill-token');
 });
 
@@ -346,7 +350,7 @@ test('skillFromForm carries the write token and path of an edited skill; a new s
   const now = '2026-11-18T01:00:00.000Z';
   const existing = {
     id: 'sk1-aaaaaaaa', name: 'ai-sync', description: '옛 설명', body: '옛 본문', tags: ['x'],
-    createdAt: '2026-11-17T00:00:00.000Z', updatedAt: '2026-11-17T00:00:00.000Z',
+    createdAt: '2026-11-17T00:00:00.000Z', editedAt: '2026-11-17T00:00:00.000Z',
     f1: 'f1:abc', path: '.aisurada/resources/global/skills/ai-sync/SKILL.md',
   };
   const edited = skillFromForm(existing, { name: ' ai-sync ', description: ' 새 설명 ', tagsText: 'git, , commit ', body: ' 새 본문 ' }, now);
@@ -356,7 +360,7 @@ test('skillFromForm carries the write token and path of an edited skill; a new s
   assert.equal(edited.body, '새 본문');
   assert.deepEqual(edited.tags, ['git', 'commit']);
   assert.equal(edited.createdAt, existing.createdAt);
-  assert.equal(edited.updatedAt, now);
+  assert.equal(edited.editedAt, now);
   assert.equal(edited.f1, 'f1:abc', 'the write token is carried over');
   assert.equal(edited.path, existing.path);
   // 엔진은 기존 스킬을 고칠 때 id와 f1이 둘 다 있어야 받는다

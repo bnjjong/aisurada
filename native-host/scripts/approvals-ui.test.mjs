@@ -296,9 +296,12 @@ test('the decided tab shows the outcome and the reason; the policy tab has four 
   assert.ok(policy.includes(FIXED_NOTE));
 });
 
+const resourceTimes = { createdAt: '2026-11-17T00:00:00Z', editedAt: '2026-11-18T00:00:00Z' };
+
 test('the engine rows carry the dirty mark to the list, the rail shows the badge, and the page shows the banner', () => {
-  assert.equal(toResource({ id: 'sk1', kind: 'skill', scope: 'global', name: 'a', approval: 'dirty' }).approval, 'dirty');
-  assert.equal(toResource({ id: 'sk1', kind: 'skill', scope: 'global', name: 'a', approval: 'whatever' }).approval, undefined);
+  const skill = { id: 'sk1', kind: 'skill', scope: 'global', name: 'a', ...resourceTimes };
+  assert.equal(toResource({ ...skill, approval: 'dirty' }).approval, 'dirty');
+  assert.equal(toResource({ ...skill, approval: 'whatever' }).approval, undefined);
   const controller = {
     navigate() {}, form() {}, filterAgendas() {}, preference() {}, settings() {}, launcher() {}, callEngine: async () => ({}), isNative: () => true,
   };
@@ -381,10 +384,10 @@ test('the global resources page shows the banner and marks the agent whose file 
   const agent = {
     id: 'apx-aaaaaaaa', kind: 'agent', scope: 'global', name: '커밋 푸시 에이전트', description: '푸시한다', permission: 'edit', skills: [], body: '옛 지침',
     tools: { aisurada: { key: 'commit-push', engine: 'gemini', model: 'gemini-3.8-flash', order: 1, enabled: true, resources: [] } },
-    precondition: 'f1:aa', path: '.aisurada/resources/global/agents/a.md', approval: 'dirty',
+    precondition: 'f1:aa', path: '.aisurada/resources/global/agents/a.md', approval: 'dirty', ...resourceTimes,
   };
   const clean = { ...agent, id: 'apy-bbbbbbbb', name: '티켓 에이전트', approval: undefined, path: '.aisurada/resources/global/agents/b.md' };
-  const skill = { id: 'skx-cccccccc', kind: 'skill', scope: 'global', name: '스킬', description: '스킬이다', body: '본문', precondition: 'f1:cc', path: '.aisurada/resources/global/skills/s.md' };
+  const skill = { id: 'skx-cccccccc', kind: 'skill', scope: 'global', name: '스킬', description: '스킬이다', body: '본문', precondition: 'f1:cc', path: '.aisurada/resources/global/skills/s.md', ...resourceTimes };
   const rows = [agent, clean, skill];
   const { call } = fakeEngine({ 'list-resources': () => ({ resources: rows, skipped: [] }), 'get-resource': (argv) => rows.find((r) => r.id === argv[1]) });
   await syncGlobalResources(call);
