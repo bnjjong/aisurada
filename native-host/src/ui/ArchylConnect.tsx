@@ -29,7 +29,7 @@ export function ArchylConnect() {
   return (
     <section className="res-section" aria-label="Archyl 연결">
       <h2>Archyl</h2>
-      <p>{busy ? '브라우저에서 Archyl 연결을 완료해 주세요.' : connected ? '읽기 전용으로 연결되어 있어요.' : '개발 프로젝트의 C4 다이어그램을 노트에 불러와요.'}</p>
+      <p>{busy ? '브라우저에서 Archyl 연결을 완료해 주세요.' : connected ? '읽기와 쓰기 권한으로 연결되어 있어요.' : '개발 프로젝트의 C4 다이어그램을 노트에 불러와요.'}</p>
       <div className="res-toolbar">
         <button type="button" disabled={busy} onClick={() => void change(true)}>
           {connected ? '다시 연결' : '브라우저에서 Archyl 연결'}
