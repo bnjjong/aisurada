@@ -19,7 +19,7 @@ use tauri_plugin_opener::OpenerExt;
 
 const ISSUER: &str = "https://api.archyl.com";
 const MCP_ENDPOINT: &str = "https://api.archyl.com/mcp";
-const SCOPE: &str = "mcp:read";
+const SCOPE: &str = "mcp:read mcp:write";
 #[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "co.kcd.aisurada.archyl";
 const RECONNECT: &str = "설정에서 Archyl을 다시 연결해 주세요.";
@@ -181,12 +181,12 @@ fn token_request(agent: &ureq::Agent, client: &Client, grant: &[(&str, &str)]) -
     }
     let tokens: Tokens = json_body(response)?;
     if tokens.access_token.is_empty()
-        || tokens
-            .scope
-            .as_deref()
-            .is_some_and(|scope| scope.trim() != SCOPE)
+        || tokens.scope.as_deref().is_some_and(|scope| {
+            let granted: std::collections::HashSet<_> = scope.split_whitespace().collect();
+            !granted.contains("mcp:read") || !granted.contains("mcp:write")
+        })
     {
-        return Err("Archyl에서 읽기 전용 권한을 확인하지 못했어요.".into());
+        return Err("Archyl에서 읽기 및 쓰기 권한을 확인하지 못했어요.".into());
     }
     Ok(tokens)
 }

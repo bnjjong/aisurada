@@ -230,7 +230,7 @@ cargo run --manifest-path engine-rs/Cargo.toml --locked -p ais-core --example ba
 
 ### Archyl C4 연결
 
-설정에서 **브라우저에서 Archyl 연결**을 누르면 기본 브라우저에서 Archyl에 로그인하고 `mcp:read` 권한을 승인한다. 호스트(`archyl.rs`)가 PKCE와 임시 루프백 콜백으로 인증 결과를 받고, 연결에 필요한 값을 macOS 키체인에 둔다. Archyl이 GitHub 코드를 읽으려면 Archyl 프로젝트에서 해당 저장소를 연결한다.
+설정에서 **브라우저에서 Archyl 연결**을 누르면 기본 브라우저에서 Archyl에 로그인하고 `mcp:read`와 `mcp:write`(읽기와 쓰기) 권한을 승인한다. 호스트(`archyl.rs`)가 PKCE와 임시 루프백 콜백으로 인증 결과를 받고, 연결에 필요한 값을 macOS 키체인에 둔다. Archyl이 GitHub 코드를 읽으려면 Archyl 프로젝트에서 해당 저장소를 연결한다.
 
 개발 프로젝트를 만들거나 편집할 때 **Archyl 프로젝트 불러오기**를 누르고 프로젝트를 고른다. MCP 응답에 GitHub 저장소가 나오고 로컬 프로젝트의 `owner/repo`와 같으면 목록 위에 표시한다. 프로젝트 파일과 응답에는 선택한 `archylProjectId`가 들어간다. 명령줄의 생성과 수정에도 `archylProjectId=<ID>`를 쓸 수 있다. 수정할 때 빈 값을 주면 연결을 지운다.
 
