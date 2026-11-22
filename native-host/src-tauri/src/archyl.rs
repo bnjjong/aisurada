@@ -319,7 +319,9 @@ fn mcp_result(response: &mut ureq::http::Response<ureq::Body>, id: u64) -> Resul
             .map_err(|_| RESPONSE.to_string())?;
         serde_json::from_slice(&bytes).map_err(|_| RESPONSE.to_string())?
     };
-    if message["id"].as_u64() != Some(id) || !message["error"].is_null() {
+    let id_matches = message["id"].as_u64() == Some(id)
+        || message["id"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(id);
+    if !id_matches || !message["error"].is_null() {
         return Err(RESPONSE.into());
     }
     message
@@ -405,16 +407,30 @@ fn tool_call(
     {
         return Ok(value.clone());
     }
-    let text = result["content"]
-        .as_array()
-        .and_then(|items| {
-            items
-                .iter()
-                .find(|item| item["type"] == "text")
-                .and_then(|item| item["text"].as_str())
-        })
-        .ok_or_else(|| McpError::Other(RESPONSE.into()))?;
-    serde_json::from_str(text).map_err(|_| McpError::Other(RESPONSE.into()))
+    let content = result["content"].as_array();
+    if matches!(tool, ReadTool::ListProjects) && content.map_or(false, |items| items.is_empty()) {
+        return Ok(json!([]));
+    }
+    let text = content.and_then(|items| {
+        items
+            .iter()
+            .find(|item| item["type"] == "text")
+            .and_then(|item| item["text"].as_str())
+    });
+    let Some(text) = text else {
+        if matches!(tool, ReadTool::ListProjects) {
+            return Ok(json!([]));
+        }
+        return Err(McpError::Other(RESPONSE.into()));
+    };
+    if matches!(tool, ReadTool::ListProjects) && text.trim().is_empty() {
+        return Ok(json!([]));
+    }
+    match serde_json::from_str(text) {
+        Ok(parsed) => Ok(parsed),
+        Err(_) if matches!(tool, ReadTool::ListProjects) => Ok(json!([])),
+        Err(_) => Err(McpError::Other(RESPONSE.into())),
+    }
 }
 
 fn tool_error(error: McpError) -> String {
@@ -439,14 +455,6 @@ pub async fn archyl_connect(app: AppHandle, state: State<'_, ArchylState>) -> Re
             .map_err(|_| "다른 Archyl 요청이 진행 중이에요.")?;
         let agent = agent();
         let session = login(&app, &agent)?;
-        tool_call(
-            &agent,
-            &session.tokens.access_token,
-            ReadTool::ListProjects,
-            &json!({}),
-            MCP_ENDPOINT,
-        )
-        .map_err(tool_error)?;
         save_session(&session)
     })
     .await
@@ -641,6 +649,59 @@ mod tests {
         .map_err(tool_error)
         .unwrap();
         assert_eq!(model, json!({"systems":[],"relationships":[]}));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn list_projects_handles_empty_or_non_json_text_gracefully() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
+        let worker = std::thread::spawn(move || {
+            for step in 0..3 {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                let mut reader = BufReader::new(&mut stream);
+                loop {
+                    let mut line = String::new();
+                    assert_ne!(reader.read_line(&mut line).unwrap(), 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                }
+                let (status, extra, response) = match step {
+                    0 => (
+                        "200 OK",
+                        "Content-Type: application/json\r\n",
+                        r#"{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18"}}"#
+                            .to_string(),
+                    ),
+                    1 => ("202 Accepted", "", String::new()),
+                    _ => {
+                        let event = json!({"jsonrpc":"2.0","id":2,"result":{"content":[
+                            {"type":"text","text":"No projects found in this organization."}
+                        ]}});
+                        (
+                            "200 OK",
+                            "Content-Type: application/json\r\n",
+                            event.to_string(),
+                        )
+                    }
+                };
+                write!(stream, "HTTP/1.1 {status}\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len()).unwrap();
+            }
+        });
+        let projects = tool_call(
+            &agent(),
+            "fixture-token",
+            ReadTool::ListProjects,
+            &json!({}),
+            &endpoint,
+        )
+        .map_err(tool_error)
+        .unwrap();
+        assert_eq!(projects, json!([]));
         worker.join().unwrap();
     }
 }
