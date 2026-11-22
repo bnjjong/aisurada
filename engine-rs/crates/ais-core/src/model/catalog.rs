@@ -35,6 +35,8 @@ pub struct ProjectRow {
     pub id: String,
     pub slug: String,
     pub title: String,
+    #[serde(rename = "type")]
+    pub project_type: &'static str,
     pub hue: String,
     #[serde(skip_serializing_if = "Option::is_none", rename = "createdAt")]
     pub created_at: Option<String>,
@@ -52,6 +54,7 @@ impl From<&ProjectInfo> for ProjectRow {
             id: p.id.clone(),
             slug: p.slug.clone(),
             title: p.title.clone(),
+            project_type: p.project_type.as_str(),
             hue: p.hue.clone(),
             created_at: p.created_at.clone(),
             edited_at: p.edited_at.clone(),

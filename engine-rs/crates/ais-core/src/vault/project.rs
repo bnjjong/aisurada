@@ -36,11 +36,36 @@ pub struct ProjectRepo {
     pub github_id: Option<u64>,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectType {
+    #[default]
+    Development,
+    General,
+}
+
+impl ProjectType {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "development" => Some(Self::Development),
+            "general" => Some(Self::General),
+            _ => None,
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Development => "development",
+            Self::General => "general",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectInfo {
     pub id: String,
     pub slug: String,
     pub title: String,
+    pub project_type: ProjectType,
     pub hue: String,
     pub created_at: Option<String>,
     pub edited_at: Option<String>,
@@ -132,6 +157,10 @@ fn read_project(file_name: &str, path: &Path) -> Option<ProjectInfo> {
         id: id.to_string(),
         slug,
         title,
+        project_type: kv
+            .get("type")
+            .and_then(|value| ProjectType::parse(value))
+            .unwrap_or_default(),
         hue,
         created_at: kv.get("createdAt").filter(|s| !s.is_empty()).cloned(),
         edited_at: kv.get("editedAt").filter(|s| !s.is_empty()).cloned(),

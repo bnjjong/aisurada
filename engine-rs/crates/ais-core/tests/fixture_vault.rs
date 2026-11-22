@@ -1609,16 +1609,26 @@ fn writes_projects_through_the_write_foundation() {
     let vault = fixture();
     std::fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
     let engine = Engine::new(&vault);
+    let legacy = engine.call("list_projects", json!({})).unwrap();
+    let projects = legacy["items"].as_array().unwrap();
+    assert!(!projects.is_empty());
+    assert!(
+        projects
+            .iter()
+            .all(|project| project["type"] == "development")
+    );
+
     let repos = r#"[{"name":"web","path":"/tmp/a b","github":"owner/name","githubId":9},{"name":"api","github":"o/n"}]"#;
 
     let created = engine
         .call(
             "create_project",
-            json!({"title": "새 프로젝트", "hue": "teal", "summary": "요약", "repos": repos}),
+            json!({"title": "새 프로젝트", "type": "general", "hue": "teal", "summary": "요약", "repos": repos}),
         )
         .unwrap();
     let id = created["id"].as_str().unwrap().to_string();
     assert!(id.starts_with("pj") && created["slug"] == "새-프로젝트");
+    assert_eq!(created["type"], "general");
     assert_eq!(created["repos"][0]["githubId"], 9);
     let file = vault.join(".aisurada/projects/새-프로젝트.md");
     let at = created["createdAt"].as_str().unwrap();
@@ -1626,7 +1636,7 @@ fn writes_projects_through_the_write_foundation() {
     assert_eq!(
         std::fs::read_to_string(&file).unwrap(),
         format!(
-            "---\nid: {id}\nslug: 새-프로젝트\ntitle: 새 프로젝트\nhue: teal\ncreatedAt: '{at}'\neditedAt: '{at}'\nrepos: {repos}\n---\n요약"
+            "---\nid: {id}\nslug: 새-프로젝트\ntitle: 새 프로젝트\ntype: general\nhue: teal\ncreatedAt: '{at}'\neditedAt: '{at}'\nrepos: {repos}\n---\n요약"
         )
     );
 
@@ -1638,6 +1648,19 @@ fn writes_projects_through_the_write_foundation() {
         )
         .unwrap();
     assert_eq!(swapped["repos"].as_array().unwrap().len(), 1);
+    assert_eq!(swapped["type"], "general");
+    let retyped = engine
+        .call("update_project", json!({"id": id, "type": "development"}))
+        .unwrap();
+    assert_eq!(retyped["type"], "development");
+    assert_eq!(retyped["repos"], swapped["repos"]);
+    assert_eq!(retyped["createdAt"], at);
+    let snapshot = std::fs::read(&file).unwrap();
+    let invalid = engine
+        .call("update_project", json!({"id": id, "type": "unsupported"}))
+        .unwrap_err();
+    assert_eq!(invalid.kind, ErrorKind::InvalidArgument);
+    assert_eq!(std::fs::read(&file).unwrap(), snapshot);
     let cleared = engine
         .call("update_project", json!({"id": id, "repos": ""}))
         .unwrap();

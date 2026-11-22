@@ -4,7 +4,7 @@ import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { Modal, Confirm } from "./Modal.tsx";
 import { Editor } from "../editor/Editor.tsx";
-import { TYPES, TYPE_NAMES, agendaRepoField } from "./model.ts";
+import { PROJECT_TYPE_NAMES, TYPES, TYPE_NAMES, agendaRepoField, projectTypeOf } from "./model.ts";
 import { Icon } from "./Icon.tsx";
 import { RepoListEditor } from "./RepoListEditor.tsx";
 import { SubAgendaChoices } from "./SubAgendas.tsx";
@@ -311,6 +311,7 @@ function EntityForm({
             ws.agendas.filter((x) => x.hue === b).length,
         )[0],
     ),
+    [projectType, setProjectType] = useState(() => projectTypeOf(old?.type)),
     [project, setProject] = useState(initial || asText(old?.project)),
     [repo, setRepo] = useState(asText(old?.repo)),
     [projectRepo, setProjectRepo] = useState(asText(old?.projectRepo)),
@@ -322,7 +323,8 @@ function EntityForm({
     [busy, setBusy] = useState(false);
   // 아젠다가 고를 수 있는 저장소: 고른 프로젝트가 가진 항목들
   const projectRepos = parseRepos(ws.projects.find((p) => p.slug === project)?.repos);
-  const isDirty = Boolean(
+  const projectTypeChanged = kind === "project" && projectType !== projectTypeOf(old?.type);
+  const isDirty = projectTypeChanged || Boolean(
     id
       ? title !== asText(old?.title) ||
         summary !== asText(old?.summary) ||
@@ -383,7 +385,7 @@ function EntityForm({
                       !id,
                     ),
                   }
-                : reposField(old?.repos, repos, !id)),
+                : { ...reposField(old?.repos, repos, !id), type: projectType }),
             },
             id,
           );
@@ -414,6 +416,20 @@ function EntityForm({
             onChange={(e) => setTitle(e.target.value)}
           />
         </label>
+        {kind === "project" && (
+          <label>
+            유형
+            <select
+              aria-label="프로젝트 유형"
+              value={projectType}
+              onChange={(e) => setProjectType(projectTypeOf(e.target.value))}
+            >
+              {Object.entries(PROJECT_TYPE_NAMES).map(([value, name]) => (
+                <option key={value} value={value}>{name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="hue-field">
           색
           <div className="hue-selector">
