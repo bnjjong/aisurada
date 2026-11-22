@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode, RefObject } from 'react';
+import { zoomShortcutFor } from '../interaction/shortcuts.ts';
 
 type Size = { width: number; height: number };
 type Point = { x: number; y: number };
@@ -24,6 +25,7 @@ export function DrawioView({ src, alt, imageRef, onError, onResetWidth, children
   onResetWidth(): void;
   children: ReactNode;
 }) {
+  const viewRef = useRef<HTMLSpanElement>(null);
   const canvasRef = useRef<HTMLSpanElement>(null);
   const drag = useRef<(Point & { id: number }) | null>(null);
   const [canvas, setCanvas] = useState<Size>({ width: 0, height: 0 });
@@ -62,6 +64,34 @@ export function DrawioView({ src, alt, imageRef, onError, onResetWidth, children
     });
   }
 
+  function handleZoomShortcut(event: KeyboardEvent<HTMLSpanElement> | globalThis.KeyboardEvent): boolean {
+    const direction = zoomShortcutFor(event);
+    if (direction !== 1 && direction !== -1) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    zoom(direction === 1 ? ZOOM_STEP : 1 / ZOOM_STEP);
+    return true;
+  }
+
+  const zoomUnderPointer = useEffectEvent(handleZoomShortcut);
+  useEffect(() => {
+    const element = viewRef.current;
+    if (!element) return;
+    const keydown = (event: globalThis.KeyboardEvent) => {
+      if (element.matches(':hover')) zoomUnderPointer(event);
+    };
+    const enter = () => window.addEventListener('keydown', keydown, true);
+    const leave = () => window.removeEventListener('keydown', keydown, true);
+    element.addEventListener('pointerenter', enter);
+    element.addEventListener('pointerleave', leave);
+    if (element.matches(':hover')) enter();
+    return () => {
+      leave();
+      element.removeEventListener('pointerenter', enter);
+      element.removeEventListener('pointerleave', leave);
+    };
+  }, []);
+
   function pan(x: number, y: number) {
     if (!image || !fit) return;
     setView(current => {
@@ -87,6 +117,7 @@ export function DrawioView({ src, alt, imageRef, onError, onResetWidth, children
   }
 
   function handleKey(event: KeyboardEvent<HTMLSpanElement>) {
+    if (handleZoomShortcut(event)) return;
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     if (event.key === 'Escape' && view.scale !== null) {
       setView(FIT);
@@ -104,11 +135,11 @@ export function DrawioView({ src, alt, imageRef, onError, onResetWidth, children
     event.stopPropagation();
   }
 
-  return <span className="drawio-view" role="group" aria-label={alt || 'draw.io 다이어그램'} onKeyDownCapture={handleKey}>
+  return <span ref={viewRef} className="drawio-view" role="group" aria-label={alt || 'draw.io 다이어그램'} onKeyDownCapture={handleKey}>
     <span className="drawio-view-bar" role="group" aria-label="다이어그램 보기 도구">
-      <button type="button" aria-label="축소" disabled={!fit || scale <= fit} onClick={() => zoom(1 / ZOOM_STEP)}>−</button>
+      <button type="button" aria-label="축소" title="축소 (⌘−)" disabled={!fit || scale <= fit} onClick={() => zoom(1 / ZOOM_STEP)}>−</button>
       <output className="drawio-view-scale" aria-label="배율">{scale > 0 ? `${Math.round(scale * 100)}%` : '–'}</output>
-      <button type="button" aria-label="확대" disabled={!fit || scale >= maxScale} onClick={() => zoom(ZOOM_STEP)}>+</button>
+      <button type="button" aria-label="확대" title="확대 (⌘+)" disabled={!fit || scale >= maxScale} onClick={() => zoom(ZOOM_STEP)}>+</button>
       <button type="button" disabled={!fit || view.scale === null} onClick={() => setView(FIT)}>전체 맞춤</button>
     </span>
     <span className="drawio-view-media">
