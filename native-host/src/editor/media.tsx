@@ -1,4 +1,4 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useLexicalNodeSelection } from '@lexical/react/useLexicalNodeSelection';
@@ -88,21 +88,14 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
   const [editable, setEditable] = useState(() => editor.isEditable());
   const [live, setLive] = useState<number | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [viewing, setViewing] = useState(false);
   const frame = useRef<HTMLSpanElement>(null), image = useRef<HTMLImageElement>(null);
-  const viewButton = useRef<HTMLButtonElement>(null), restoreViewFocus = useRef(false);
   useEffect(() => editor.registerEditableListener(setEditable), [editor]);
-  useLayoutEffect(() => {
-    if (viewing || !restoreViewFocus.current) return;
-    restoreViewFocus.current = false;
-    viewButton.current?.focus({ preventScroll: true });
-  }, [viewing]);
   // 에디터의 기본 클릭 처리(리치텍스트)는 클릭 때 노드 선택을 지운다. 그보다 먼저 이 이미지를 눌렀는지 보고 선택한다.
   useEffect(() => editor.registerCommand(CLICK_COMMAND, (event: MouseEvent) => {
     const target = event.target as Element | null;
     if (!editable || !target || !frame.current?.contains(target)) return false;
     // 도구줄과 손잡이에서 난 클릭(끌기를 놓을 때 포함)도 여기서 끝낸다. 넘기면 기본 처리가 이미지 선택을 지운다.
-    if (target.closest('.lex-image-bar, .lex-image-grip, .drawio-preview-open, .drawio-view')) return true;
+    if (target.closest('.lex-image-bar, .lex-image-grip, .drawio-view-bar, .drawio-view-canvas.is-pannable')) return true;
     if (event.shiftKey) setSelected(!selected); else { clearSelected(); setSelected(true); }
     return true;
   }, COMMAND_PRIORITY_LOW), [editor, editable, selected, setSelected, clearSelected]);
@@ -121,7 +114,8 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
     const target = image.current;
     if (!target) return;
     event.preventDefault(); event.stopPropagation();
-    const grip = event.currentTarget, start = event.clientX, from = target.getBoundingClientRect().width, max = available();
+    const grip = event.currentTarget, start = event.clientX, max = available();
+    const from = (drawio ? frame.current ?? target : target).getBoundingClientRect().width;
     grip.setPointerCapture(event.pointerId);
     const move = (next: PointerEvent) => setLive(clamp(from + next.clientX - start, max));
     const release = (next: PointerEvent) => {
@@ -135,47 +129,39 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
   const hasFixedWidth = shown > 0;
   const fileName = imageFileName(source);
   const isGeneratedName = /^img-[a-z0-9]+-[a-z0-9]+\.[a-z0-9]+$/i.test(fileName);
-  if (viewing) return <span className="drawio-view-frame" ref={frame}>
-    <DrawioView src={url} alt={alt} onClose={() => setViewing(false)} />
-  </span>;
-  const caption = fileName && !isGeneratedName &&
-    <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{drawio && alt ? alt : fileName}</span>;
-  return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`} style={shown ? { width: shown } : undefined}>
-    <span className="lex-image-media">
-      {loadFailed ? (
-        <span className="lex-image-missing" title={source}>
-          ⚠️ 그림 파일을 찾을 수 없어요 {fileName ? `(${fileName})` : ''}
-        </span>
-      ) : (
-        <img ref={image} src={url} alt={alt} loading="lazy" draggable="false" style={shown ? { width: shown } : (isSvg ? { width: '100%' } : undefined)}
-          onError={() => setLoadFailed(true)}
-          onDoubleClick={() => { if (editable && width > 0) onWidth(0); }} />
-      )}
-      {selected && editable && <>
-        <span className="lex-image-bar" role="toolbar" aria-label={drawio ? '다이어그램 도구' : '이미지 크기'}>
-          {drawio && <button type="button" onMouseDown={event => event.preventDefault()}
-            onClick={event => { event.stopPropagation(); editor.dispatchCommand(OPEN_DRAWIO_COMMAND, nodeKey); }}>편집</button>}
-          {IMAGE_PRESETS.map(preset => <button key={preset.label} type="button" onMouseDown={event => event.preventDefault()}
-            onClick={event => { event.stopPropagation(); onWidth(preset.width < 0 ? available() : preset.width); }}
-            aria-pressed={preset.width > 0 ? width === preset.width : preset.width === 0 && width === 0}>{preset.label}</button>)}
-          {shown > 0 && <span className="lex-image-size">{shown}px</span>}
-        </span>
-        <span className="lex-image-grip" title="끌어서 크기 조절" aria-label="끌어서 이미지 크기 조절" onPointerDown={grab}>
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M10.5 3.5L3.5 10.5M10.5 7.5L7.5 10.5" /></svg>
-        </span>
-      </>}
+  const resetWidth = () => { if (editable && width > 0) onWidth(0); };
+  const imageTools = selected && editable && <>
+    <span className="lex-image-bar" role="toolbar" aria-label={drawio ? '다이어그램 도구' : '이미지 크기'}>
+      {drawio && <button type="button" onMouseDown={event => event.preventDefault()}
+        onClick={event => { event.stopPropagation(); editor.dispatchCommand(OPEN_DRAWIO_COMMAND, nodeKey); }}>편집</button>}
+      {IMAGE_PRESETS.map(preset => <button key={preset.label} type="button" onMouseDown={event => event.preventDefault()}
+        onClick={event => { event.stopPropagation(); onWidth(preset.width < 0 ? available() : preset.width); }}
+        aria-pressed={preset.width > 0 ? width === preset.width : preset.width === 0 && width === 0}>{preset.label}</button>)}
+      {shown > 0 && <span className="lex-image-size">{shown}px</span>}
     </span>
-    {drawio && !loadFailed ? <span className="drawio-preview-caption">
-      {caption}
-      <button ref={viewButton} className="drawio-preview-open" type="button"
-        aria-label={alt ? `${alt} 자세히 보기` : '다이어그램 자세히 보기'}
-        onClick={event => {
-          event.stopPropagation();
-          clearSelected();
-          restoreViewFocus.current = true;
-          setViewing(true);
-        }}>자세히 보기</button>
-    </span> : caption}
+    <span className="lex-image-grip" title="끌어서 크기 조절" aria-label="끌어서 이미지 크기 조절" onPointerDown={grab}>
+      <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M10.5 3.5L3.5 10.5M10.5 7.5L7.5 10.5" /></svg>
+    </span>
+  </>;
+  return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`} style={shown ? { width: shown } : undefined}>
+    {drawio && !loadFailed ? (
+      <DrawioView src={url} alt={alt} width={shown} imageRef={image} onError={() => setLoadFailed(true)} onResetWidth={resetWidth}>
+        {imageTools}
+      </DrawioView>
+    ) : (
+      <span className="lex-image-media">
+        {loadFailed ? (
+          <span className="lex-image-missing" title={source}>
+            ⚠️ 그림 파일을 찾을 수 없어요 {fileName ? `(${fileName})` : ''}
+          </span>
+        ) : (
+          <img ref={image} src={url} alt={alt} loading="lazy" draggable="false" style={shown ? { width: shown } : (isSvg ? { width: '100%' } : undefined)}
+            onError={() => setLoadFailed(true)} onDoubleClick={resetWidth} />
+        )}
+        {imageTools}
+      </span>
+    )}
+    {fileName && !isGeneratedName && <span className="lex-image-caption" title={alt && alt !== fileName ? `${fileName} (${alt})` : fileName}>{drawio && alt ? alt : fileName}</span>}
   </span>;
 }
 export const FRAME_LINK = /^(?:https?|mailto|tel):/i;
