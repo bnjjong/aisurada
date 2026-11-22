@@ -178,7 +178,7 @@ test('the runner bar shows the state, the auto-pickup switch and the concurrency
 const detailRaw = (extra = {}) => ({
   key: 'TSK-1', id: 'tkx-1', title: 'README 정리', type: 'feature', priority: 'medium', status: 'ready-for-develop', repo: 'o/r', labels: [], criteriaDone: 0, criteriaTotal: 1,
   blockedBy: [], blocks: [], path: '.aisurada/tasks/TSK-1.md', body: '', criteria: [{ text: '기준', done: false }], refs: [], links: [], readiness: [], ready: true,
-  transitions: [], activity: [], precondition: 'f1:x', ...extra,
+  transitions: [], activity: [], precondition: 'f1:x', createdAt: '2026-11-13T14:00:00+09:00', editedAt: '2026-11-13T14:00:00+09:00', ...extra,
 });
 const detail = (extra = {}) => toDetail(detailRaw(extra));
 const fakeController = (call = async () => ({})) => ({ navigate() {}, callEngine: async () => ({}), callHost: call, isNative: () => true });
@@ -250,9 +250,9 @@ test('the detail page and the board embed the runner pieces', () => {
   assert.ok(page.indexOf('aria-label="실행"') < page.indexOf('aria-label="설명"'), 'the runner area comes first in the main column');
 
   const rows = [
-    toTask({ key: 'TSK-1', id: 'tk1', title: '준비된 일', type: 'feature', priority: 'high', status: 'ready-for-develop', repo: 'o/r', labels: [], criteriaDone: 0, criteriaTotal: 1, blockedBy: [], blocks: [], path: 'p' }),
-    toTask({ key: 'TSK-2', id: 'tk2', title: '막힌 일', type: 'feature', priority: 'medium', status: 'ready-for-develop', repo: 'o/r', labels: [], criteriaDone: 0, criteriaTotal: 1, blockedBy: ['TSK-9'], blocks: [], path: 'p' }),
-    toTask({ key: 'TSK-3', id: 'tk3', title: '하는 중', type: 'feature', priority: 'medium', status: 'in-progress', repo: 'o/r', labels: [], criteriaDone: 0, criteriaTotal: 1, blockedBy: [], blocks: [], path: 'p' }),
+    toTask(detailRaw({ id: 'tk1', title: '준비된 일', priority: 'high' })),
+    toTask(detailRaw({ key: 'TSK-2', id: 'tk2', title: '막힌 일', blockedBy: ['TSK-9'] })),
+    toTask(detailRaw({ key: 'TSK-3', id: 'tk3', title: '하는 중', status: 'in-progress' })),
   ];
   const runner = snapshot({ active: [run({ taskKey: 'TSK-3', step: '받아오기' })] });
   const board = renderToStaticMarkup(React.createElement(TasksPage, { state: { ...state, route: '/tasks' }, controller: fakeController(), preset: { tasks: rows, view: 'board', runner } }));
