@@ -24,6 +24,12 @@ export function tabTitle(id: string, state: WorkspaceState): string {
     return `터미널 · ${label}`;
   }
   if (id.startsWith('ext:')) return id.slice(4).split('/').pop() || id.slice(4);
+  if (id.startsWith('arch:')) {
+    const slug = id.slice(5);
+    const proj = state.workspace?.projects.find((p: any) => p.slug === slug);
+    const projTitle = (proj?.title as string) || slug;
+    return `아키텍처 · ${projTitle}`;
+  }
   const sub = parseSubTab(id);
   // 후속 노트 탭: 제목만 돌려준다. ↳ 표시는 탭 바가 따로 붙인다. 목록을 아직 읽지 못했으면 이름 대신 「후속 노트」다.
   if (sub) return subNoteAt(state, sub.root, sub.ids)?.title || '후속 노트';

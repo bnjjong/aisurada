@@ -13,7 +13,7 @@ import { decisionAddress, usePendingDecisions } from "./decisionsStore.ts";
 import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
 import { RailRuns } from "./RailRuns.tsx";
 import { useSessionBadge } from "@claude-plug/session";
-import { parseRoute } from "../navigation/routes.ts";
+import { architectureAddress, parseRoute } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
@@ -147,6 +147,8 @@ export function Rail({
     id?: string,
   ) => {
     const isNone = slug === LOOSE_GROUP_KEY || slug === "" || slug === "__none__";
+    const projectObj = ws.projects.find((p) => p.slug === slug);
+    const isArchylTarget = !isNone && (asText(projectObj?.type) === "development" || Boolean(asText(projectObj?.archylProjectId)));
     const collapsed = railGroupCollapsed(state.prefs.collapsedProjects, ws.projects.length, slug);
     return (
       <section key={slug || LOOSE_GROUP_KEY} className="rail-group">
@@ -264,6 +266,23 @@ export function Rail({
               </div>
             );
           })}
+            {isArchylTarget && (
+              <div
+                className={`rail-agenda rail-sub-resource ${state.route === architectureAddress(slug) ? "agenda-selected" : ""}`}
+              >
+                <span className="agenda-dot sub-resource-icon" aria-hidden="true">
+                  <Icon name="architecture" size={13} />
+                </span>
+                <button
+                  type="button"
+                  className="agenda-name"
+                  onClick={() => controller.navigate(architectureAddress(slug))}
+                  title={`${name}의 C4 아키텍처 보기`}
+                >
+                  <span className="sub-resource-label">C4 아키텍처</span>
+                </button>
+              </div>
+            )}
             {!isNone && resourceRows(slug, name)}
           </div>
         )}

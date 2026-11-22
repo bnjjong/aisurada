@@ -267,6 +267,26 @@ impl ReadTool {
     }
 }
 
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WriteTool {
+    CreateSystem,
+    CreateContainer,
+    CreateComponent,
+    CreateRelationship,
+}
+
+impl WriteTool {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::CreateSystem => "create_system",
+            Self::CreateContainer => "create_container",
+            Self::CreateComponent => "create_component",
+            Self::CreateRelationship => "create_relationship",
+        }
+    }
+}
+
 enum McpError {
     Unauthorized,
     Other(String),
@@ -333,12 +353,12 @@ fn mcp_result(response: &mut ureq::http::Response<ureq::Body>, id: u64) -> Resul
 fn tool_call(
     agent: &ureq::Agent,
     access_token: &str,
-    tool: ReadTool,
+    tool_name: &str,
     args: &Value,
     endpoint: &str,
 ) -> std::result::Result<Value, McpError> {
     let mut session_id = None;
-    let mut version = "2025-06-18".to_string();
+    let mut version = "2025-03-26".to_string();
     let send = |message: Value, session: Option<&str>, version: &str| {
         let mut request = agent
             .post(endpoint)
@@ -355,7 +375,7 @@ fn tool_call(
         match response.status().as_u16() {
             401 => Err(McpError::Unauthorized),
             403 => Err(McpError::Other(
-                "이 Archyl 프로젝트를 읽을 권한이 없어요.".into(),
+                "이 Archyl 프로젝트를 읽거나 쓸 권한이 없어요.".into(),
             )),
             429 => Err(McpError::Other(
                 "Archyl 요청 한도에 도달했어요. 잠시 뒤 다시 시도해 주세요.".into(),
@@ -390,16 +410,23 @@ fn tool_call(
     )?;
     let mut response = send(
         json!({
-            "jsonrpc":"2.0", "id":2, "method":"tools/call", "params":{"name":tool.name(),"arguments":args}
+            "jsonrpc":"2.0", "id":2, "method":"tools/call", "params":{"name":tool_name,"arguments":args}
         }),
         session_id.as_deref(),
         &version,
     )?;
     let result = mcp_result(&mut response, 2).map_err(McpError::Other)?;
     if result["isError"].as_bool() == Some(true) {
-        return Err(McpError::Other(
-            "Archyl에서 요청한 모델을 가져오지 못했어요.".into(),
-        ));
+        let err_msg = result["content"]
+            .as_array()
+            .and_then(|items| {
+                items
+                    .iter()
+                    .find(|item| item["type"] == "text")
+                    .and_then(|item| item["text"].as_str())
+            })
+            .unwrap_or("Archyl에서 요청한 작업을 처리하지 못했어요.");
+        return Err(McpError::Other(err_msg.into()));
     }
     if let Some(value) = result
         .get("structuredContent")
@@ -408,7 +435,7 @@ fn tool_call(
         return Ok(value.clone());
     }
     let content = result["content"].as_array();
-    if matches!(tool, ReadTool::ListProjects) && content.map_or(false, |items| items.is_empty()) {
+    if tool_name == "list_projects" && content.map_or(false, |items| items.is_empty()) {
         return Ok(json!([]));
     }
     let text = content.and_then(|items| {
@@ -418,18 +445,18 @@ fn tool_call(
             .and_then(|item| item["text"].as_str())
     });
     let Some(text) = text else {
-        if matches!(tool, ReadTool::ListProjects) {
+        if tool_name == "list_projects" {
             return Ok(json!([]));
         }
         return Err(McpError::Other(RESPONSE.into()));
     };
-    if matches!(tool, ReadTool::ListProjects) && text.trim().is_empty() {
+    if tool_name == "list_projects" && text.trim().is_empty() {
         return Ok(json!([]));
     }
     match serde_json::from_str(text) {
         Ok(parsed) => Ok(parsed),
-        Err(_) if matches!(tool, ReadTool::ListProjects) => Ok(json!([])),
-        Err(_) => Err(McpError::Other(RESPONSE.into())),
+        Err(_) if tool_name == "list_projects" => Ok(json!([])),
+        Err(_) => Ok(json!({ "raw": text })),
     }
 }
 
@@ -437,6 +464,53 @@ fn tool_error(error: McpError) -> String {
     match error {
         McpError::Unauthorized => RECONNECT.into(),
         McpError::Other(message) => message,
+    }
+}
+
+fn execute_tool_with_session(
+    agent: &ureq::Agent,
+    session: &mut Session,
+    tool_name: &str,
+    args: &Value,
+) -> Result<Value> {
+    match tool_call(
+        agent,
+        &session.tokens.access_token,
+        tool_name,
+        args,
+        MCP_ENDPOINT,
+    ) {
+        Err(McpError::Unauthorized) => {
+            let refresh = session
+                .tokens
+                .refresh_token
+                .as_deref()
+                .ok_or_else(|| RECONNECT.to_string())?;
+            let mut tokens = token_request(
+                agent,
+                &session.client,
+                &[
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", refresh),
+                    ("resource", ISSUER),
+                    ("scope", SCOPE),
+                ],
+            )?;
+            if tokens.refresh_token.is_none() {
+                tokens.refresh_token = session.tokens.refresh_token.clone();
+            }
+            session.tokens = tokens;
+            save_session(session)?;
+            tool_call(
+                agent,
+                &session.tokens.access_token,
+                tool_name,
+                args,
+                MCP_ENDPOINT,
+            )
+            .map_err(tool_error)
+        }
+        result => result.map_err(tool_error),
     }
 }
 
@@ -500,45 +574,25 @@ pub async fn archyl_read(
         let agent = agent();
         let mut session =
             load_session()?.ok_or_else(|| "설정에서 Archyl을 연결해 주세요.".to_string())?;
-        match tool_call(
-            &agent,
-            &session.tokens.access_token,
-            tool,
-            &args,
-            MCP_ENDPOINT,
-        ) {
-            Err(McpError::Unauthorized) => {
-                let refresh = session
-                    .tokens
-                    .refresh_token
-                    .as_deref()
-                    .ok_or_else(|| RECONNECT.to_string())?;
-                let mut tokens = token_request(
-                    &agent,
-                    &session.client,
-                    &[
-                        ("grant_type", "refresh_token"),
-                        ("refresh_token", refresh),
-                        ("resource", ISSUER),
-                        ("scope", SCOPE),
-                    ],
-                )?;
-                if tokens.refresh_token.is_none() {
-                    tokens.refresh_token = session.tokens.refresh_token;
-                }
-                session.tokens = tokens;
-                save_session(&session)?;
-                tool_call(
-                    &agent,
-                    &session.tokens.access_token,
-                    tool,
-                    &args,
-                    MCP_ENDPOINT,
-                )
-                .map_err(tool_error)
-            }
-            result => result.map_err(tool_error),
-        }
+        execute_tool_with_session(&agent, &mut session, tool.name(), &args)
+    })
+    .await
+    .map_err(|_| NETWORK.to_string())?
+}
+
+#[tauri::command]
+pub async fn archyl_write(
+    state: State<'_, ArchylState>,
+    tool: WriteTool,
+    args: Value,
+) -> Result<Value> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = state.lock.lock().map_err(|_| NETWORK.to_string())?;
+        let agent = agent();
+        let mut session =
+            load_session()?.ok_or_else(|| "설정에서 Archyl을 연결해 주세요.".to_string())?;
+        execute_tool_with_session(&agent, &mut session, tool.name(), &args)
     })
     .await
     .map_err(|_| NETWORK.to_string())?
@@ -642,7 +696,7 @@ mod tests {
         let model = tool_call(
             &agent(),
             "fixture-token",
-            ReadTool::GetProjectC4Model,
+            ReadTool::GetProjectC4Model.name(),
             &json!({"projectId":"project1"}),
             &endpoint,
         )
@@ -695,7 +749,7 @@ mod tests {
         let projects = tool_call(
             &agent(),
             "fixture-token",
-            ReadTool::ListProjects,
+            ReadTool::ListProjects.name(),
             &json!({}),
             &endpoint,
         )

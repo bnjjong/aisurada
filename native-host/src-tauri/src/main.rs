@@ -102,6 +102,7 @@ fn main() {
             archyl::archyl_connect,
             archyl::archyl_disconnect,
             archyl::archyl_read,
+            archyl::archyl_write,
             github::github_status,
             github::github_connect,
             github::github_disconnect,

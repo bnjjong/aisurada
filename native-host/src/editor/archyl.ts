@@ -37,6 +37,81 @@ export const archylStatus = () => invoke<boolean>('archyl_status');
 export const connectArchyl = () => invoke<void>('archyl_connect');
 export const disconnectArchyl = () => invoke<void>('archyl_disconnect');
 
+export type ArchylWriteTool =
+  | 'create_system'
+  | 'create_container'
+  | 'create_component'
+  | 'create_relationship';
+
+export async function archylWrite(tool: ArchylWriteTool, args: Record<string, unknown>): Promise<unknown> {
+  const value = await invoke('archyl_write', { tool, args });
+  return unwrap(value);
+}
+
+export async function createArchylSystem(params: {
+  projectId: string;
+  name: string;
+  type: 'software_system' | 'person' | 'external_system';
+  description?: string;
+  isExternal?: boolean;
+}) {
+  return archylWrite('create_system', {
+    projectId: params.projectId,
+    name: params.name,
+    type: params.type,
+    ...(params.description ? { description: params.description } : {}),
+    ...(params.isExternal !== undefined ? { isExternal: params.isExternal } : {}),
+  });
+}
+
+export async function createArchylContainer(params: {
+  systemId: string;
+  name: string;
+  containerType: string;
+  description?: string;
+}) {
+  return archylWrite('create_container', {
+    systemId: params.systemId,
+    name: params.name,
+    containerType: params.containerType,
+    ...(params.description ? { description: params.description } : {}),
+  });
+}
+
+export async function createArchylComponent(params: {
+  containerId: string;
+  name: string;
+  componentType: string;
+  description?: string;
+}) {
+  return archylWrite('create_component', {
+    containerId: params.containerId,
+    name: params.name,
+    componentType: params.componentType,
+    ...(params.description ? { description: params.description } : {}),
+  });
+}
+
+export async function createArchylRelationship(params: {
+  projectId: string;
+  sourceId: string;
+  sourceType: number; // 1: system, 2: container, 3: component
+  targetId: string;
+  targetType: number;
+  type: string;
+  description?: string;
+}) {
+  return archylWrite('create_relationship', {
+    projectId: params.projectId,
+    sourceId: params.sourceId,
+    sourceType: params.sourceType,
+    targetId: params.targetId,
+    targetType: params.targetType,
+    type: params.type,
+    ...(params.description ? { description: params.description } : {}),
+  });
+}
+
 export async function listArchylProjects(): Promise<ArchylProject[]> {
   const value = unwrap(await invoke('archyl_read', { tool: 'list_projects' }));
   const items = Array.isArray(value) ? value : row(value).projects ?? row(value).items;
