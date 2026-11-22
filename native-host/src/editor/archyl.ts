@@ -119,13 +119,6 @@ export async function createArchylRelationship(params: {
   });
 }
 
-export async function updateArchylPositions(params: {
-  projectId: string;
-  positions: { id: string; type: string; x: number; y: number }[];
-}) {
-  return archylWrite('update_positions', params);
-}
-
 export async function deleteArchylSystem(systemId: string) {
   return archylWrite('delete_system', { systemId });
 }
@@ -157,6 +150,14 @@ export async function getArchylModel(projectId: string): Promise<ArchylModel> {
     projectId,
   }));
   return parseArchylModel(value);
+}
+
+export async function getArchylProjectTeam(projectId: string): Promise<string> {
+  const value = row(unwrap(await invoke('archyl_read', { tool: 'get_project', projectId })));
+  const project = row(value.project ?? value);
+  const teamId = text(project.teamId, project.team_id, row(project.team).id, value.teamId);
+  if (!byId(teamId)) throw Error('Archyl 프로젝트가 속한 팀을 확인할 수 없어요.');
+  return teamId;
 }
 
 export function parseArchylModel(value: unknown): ArchylModel {

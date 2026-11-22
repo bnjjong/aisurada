@@ -12,7 +12,7 @@ import {
 import type { ArchylModel, ArchylView } from "../editor/archyl.ts";
 import { ArchylCreateModal } from "./ArchylCreateModal.tsx";
 import type { ArchylCreateMode } from "./ArchylCreateModal.tsx";
-import { ArchylCanvas } from "./ArchylCanvas.tsx";
+import { ArchylProjectView } from "./ArchylProjectView.tsx";
 
 export function ArchylArchitecturePage({
   slug,
@@ -29,9 +29,11 @@ export function ArchylArchitecturePage({
   const archylProjectId = asText(project?.archylProjectId);
 
   const [connected, setConnected] = useState<boolean | null>(null);
-  const [model, setModel] = useState<ArchylModel | null>(null);
+  const [loadedModel, setLoadedModel] = useState<{ projectId: string; model: ArchylModel } | null>(null);
+  const model = loadedModel?.projectId === archylProjectId ? loadedModel?.model ?? null : null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewRevision, setPreviewRevision] = useState(0);
 
   // 뷰 레벨 상태
   const [level, setLevel] = useState<ArchylView["level"]>("context");
@@ -59,7 +61,7 @@ export function ArchylArchitecturePage({
     setError(null);
     try {
       const data = await getArchylModel(archylProjectId);
-      setModel(data);
+      setLoadedModel({ projectId: archylProjectId, model: data });
     } catch (err: any) {
       setError(err?.message || String(err));
     } finally {
@@ -68,10 +70,15 @@ export function ArchylArchitecturePage({
   }, [archylProjectId]);
 
   useEffect(() => {
-    if (archylProjectId) {
+    if (connected && archylProjectId) {
       void loadModel();
     }
-  }, [archylProjectId, loadModel]);
+  }, [connected, archylProjectId, loadModel]);
+
+  const refreshDiagram = () => {
+    setPreviewRevision((revision) => revision + 1);
+    void loadModel();
+  };
 
   // 시스템 및 컨테이너 목록
   const systems = useMemo(
@@ -227,8 +234,8 @@ export function ArchylArchitecturePage({
             type="button"
             className="action-btn"
             title="다이어그램 새로고침"
-            onClick={() => void loadModel()}
-            disabled={loading}
+            onClick={refreshDiagram}
+            disabled={connected !== true || loading}
           >
             <Icon name="history" size={14} />
             {loading ? "불러오는 중…" : "새로고침"}
@@ -252,6 +259,9 @@ export function ArchylArchitecturePage({
           >
             관계 연결
           </button>
+          <button type="button" className="action-btn" onClick={() => setShowSource(!showSource)}>
+            {showSource ? "Archyl 화면 보기" : "Mermaid 소스 보기"}
+          </button>
           <button
             type="button"
             className="action-btn"
@@ -274,7 +284,7 @@ export function ArchylArchitecturePage({
       </header>
 
       {/* 레벨 탭 및 상위 선택 바 */}
-      <div className="archyl-view-controls">
+      <div className="archyl-view-controls" hidden={!showSource}>
         <div className="archyl-level-tabs">
           <button
             type="button"
@@ -299,7 +309,7 @@ export function ArchylArchitecturePage({
           </button>
         </div>
 
-        <div className="archyl-level-selectors">
+        {(level === "container" || level === "component") && <div className="archyl-level-selectors">
           {level === "container" && (
             <label className="archyl-select-label">
               대상 시스템:
@@ -333,66 +343,40 @@ export function ArchylArchitecturePage({
               </select>
             </label>
           )}
-
-          <button
-            type="button"
-            className="source-toggle-btn"
-            onClick={() => setShowSource(!showSource)}
-          >
-            {showSource ? "다이어그램 보기" : "Mermaid 소스 보기"}
-          </button>
-        </div>
+        </div>}
       </div>
 
       {/* 본문 뷰 영역 */}
-      <main className="archyl-viewport">
-        {loading && (
+      <section className="archyl-viewport">
+        {showSource && loading && (
           <div className="archyl-status-card">
             <p>Archyl에서 C4 모델을 불러오는 중이에요…</p>
           </div>
         )}
 
         {error && (
-          <div className="archyl-status-card error">
+          <div className="archyl-model-error">
             <p role="alert">{error}</p>
-            <button type="button" className="action-btn" onClick={() => void loadModel()}>
-              다시 시도
-            </button>
           </div>
         )}
 
-        {!loading && !error && model && model.elements.length === 0 && (
-          <div className="archyl-empty-card">
-            <p>등록된 아키텍처 요소가 아직 없어요.</p>
-            <button
-              type="button"
-              className="action-btn primary"
-              onClick={() => setCreateModal("element")}
-            >
-              + 첫 번째 시스템 등록하기
-            </button>
-          </div>
+        {connected && (
+          <ArchylProjectView
+            key={archylProjectId}
+            projectId={archylProjectId}
+            revision={previewRevision}
+            hidden={showSource || createModal !== null}
+          />
         )}
 
-        {!loading && !error && model && model.elements.length > 0 && (
-          <>
-            {showSource ? (
-              <div className="archyl-source-view">
-                <pre>
-                  <code>{mermaidSource || "표시할 내용이 없어요."}</code>
-                </pre>
-              </div>
-            ) : (
-              <ArchylCanvas
-                projectId={archylProjectId}
-                model={model}
-                level={level}
-                onElementUpdated={() => void loadModel()}
-              />
-            )}
-          </>
+        {showSource && !loading && !error && model && (
+          <div className="archyl-source-view">
+            <pre>
+              <code>{mermaidSource || "표시할 내용이 없어요."}</code>
+            </pre>
+          </div>
         )}
-      </main>
+      </section>
 
       {/* 요소/관계 생성 모달 */}
       {createModal && model && (
@@ -408,9 +392,7 @@ export function ArchylArchitecturePage({
                 : undefined
           }
           close={() => setCreateModal(null)}
-          onCreated={() => {
-            void loadModel();
-          }}
+          onCreated={refreshDiagram}
         />
       )}
     </div>

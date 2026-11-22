@@ -255,6 +255,7 @@ fn login(app: &AppHandle, agent: &ureq::Agent) -> Result<Session> {
 #[serde(rename_all = "snake_case")]
 pub enum ReadTool {
     ListProjects,
+    GetProject,
     GetProjectC4Model,
 }
 
@@ -262,6 +263,7 @@ impl ReadTool {
     fn name(&self) -> &'static str {
         match self {
             Self::ListProjects => "list_projects",
+            Self::GetProject => "get_project",
             Self::GetProjectC4Model => "get_project_c4_model",
         }
     }
@@ -565,13 +567,7 @@ pub async fn archyl_read(
 ) -> Result<Value> {
     let args = match (tool, project_id) {
         (ReadTool::ListProjects, None) => json!({}),
-        (ReadTool::GetProjectC4Model, Some(id))
-            if !id.is_empty()
-                && id.len() <= 128
-                && id
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') =>
-        {
+        (ReadTool::GetProject | ReadTool::GetProjectC4Model, Some(id)) if valid_id(&id) => {
             json!({"projectId": id})
         }
         _ => return Err("Archyl 프로젝트를 확인할 수 없어요.".into()),
@@ -586,6 +582,14 @@ pub async fn archyl_read(
     })
     .await
     .map_err(|_| NETWORK.to_string())?
+}
+
+pub(crate) fn valid_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 #[tauri::command]
