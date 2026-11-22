@@ -411,13 +411,12 @@ fn tool_call(
     if matches!(tool, ReadTool::ListProjects) && content.map_or(false, |items| items.is_empty()) {
         return Ok(json!([]));
     }
-    let text = content
-        .and_then(|items| {
-            items
-                .iter()
-                .find(|item| item["type"] == "text")
-                .and_then(|item| item["text"].as_str())
-        });
+    let text = content.and_then(|items| {
+        items
+            .iter()
+            .find(|item| item["type"] == "text")
+            .and_then(|item| item["text"].as_str())
+    });
     let Some(text) = text else {
         if matches!(tool, ReadTool::ListProjects) {
             return Ok(json!([]));
