@@ -31,6 +31,9 @@ pub fn render(info: &ProjectInfo, created_at: &str, edited_at: &str) -> Vec<u8> 
     line("hue", &info.hue);
     line("createdAt", created_at);
     line("editedAt", edited_at);
+    if let Some(id) = &info.archyl_project_id {
+        line("archylProjectId", id);
+    }
     let repos = repos_json(&info.repos);
     if !repos.is_empty() {
         out.push_str(&format!("repos: {repos}\n"));

@@ -2,6 +2,7 @@
 #[cfg(feature = "claude")]
 pub mod agents;
 mod approvals;
+mod archyl;
 #[cfg(feature = "claude")]
 pub mod ask;
 mod call_log;
@@ -60,6 +61,7 @@ fn main() {
         .manage(lifecycle::HostState::default())
         .manage(secrets::SecretState::default())
         .manage(github::GithubState::default())
+        .manage(archyl::ArchylState::default())
         .manage(notifications::NotifyState::default())
         .invoke_handler(tauri::generate_handler![
             lifecycle::exit_app,
@@ -96,6 +98,10 @@ fn main() {
             terminal::pty_detach,
             terminal::pty_alive,
             terminal::pty_stats,
+            archyl::archyl_status,
+            archyl::archyl_connect,
+            archyl::archyl_disconnect,
+            archyl::archyl_read,
             github::github_status,
             github::github_connect,
             github::github_disconnect,

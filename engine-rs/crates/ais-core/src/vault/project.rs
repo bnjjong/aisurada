@@ -19,6 +19,14 @@ pub fn is_valid_project_id(id: &str) -> bool {
     PROJECT_ID.is_match(id)
 }
 
+pub(crate) fn is_archyl_project_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
 pub(crate) static GITHUB: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$").unwrap()
 });
@@ -66,6 +74,7 @@ pub struct ProjectInfo {
     pub slug: String,
     pub title: String,
     pub project_type: ProjectType,
+    pub archyl_project_id: Option<String>,
     pub hue: String,
     pub created_at: Option<String>,
     pub edited_at: Option<String>,
@@ -161,6 +170,10 @@ fn read_project(file_name: &str, path: &Path) -> Option<ProjectInfo> {
             .get("type")
             .and_then(|value| ProjectType::parse(value))
             .unwrap_or_default(),
+        archyl_project_id: kv
+            .get("archylProjectId")
+            .filter(|id| is_archyl_project_id(id))
+            .cloned(),
         hue,
         created_at: kv.get("createdAt").filter(|s| !s.is_empty()).cloned(),
         edited_at: kv.get("editedAt").filter(|s| !s.is_empty()).cloned(),
