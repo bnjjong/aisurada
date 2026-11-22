@@ -7,7 +7,6 @@ import {
   archylSource,
   getArchylModel,
   archylStatus,
-  connectArchyl,
 } from "../editor/archyl.ts";
 import type { ArchylModel, ArchylView } from "../editor/archyl.ts";
 import { ArchylCreateModal } from "./ArchylCreateModal.tsx";
@@ -47,13 +46,6 @@ export function ArchylArchitecturePage({
   // 생성 모달 상태
   const [createModal, setCreateModal] = useState<ArchylCreateMode | null>(null);
 
-  // 1. Archyl 연결 상태 확인
-  useEffect(() => {
-    void archylStatus()
-      .then(setConnected)
-      .catch(() => setConnected(false));
-  }, []);
-
   // 2. 모델 로드 함수
   const loadModel = useCallback(async () => {
     if (!archylProjectId) return;
@@ -70,10 +62,17 @@ export function ArchylArchitecturePage({
   }, [archylProjectId]);
 
   useEffect(() => {
-    if (connected && archylProjectId) {
-      void loadModel();
-    }
-  }, [connected, archylProjectId, loadModel]);
+    if (state.settingsOpen) return;
+    let active = true;
+    void archylStatus().then((status) => {
+      if (!active) return;
+      setConnected(status);
+      if (status) void loadModel();
+    }, () => {
+      if (active) setConnected(false);
+    });
+    return () => { active = false; };
+  }, [state.settingsOpen, loadModel]);
 
   const refreshDiagram = () => {
     setPreviewRevision((revision) => revision + 1);
@@ -183,7 +182,7 @@ export function ArchylArchitecturePage({
           <button
             type="button"
             className="action-btn primary"
-            onClick={() => void connectArchyl().then(() => void archylStatus().then(setConnected))}
+            onClick={() => controller.settings(true)}
           >
             Archyl 연결하기
           </button>

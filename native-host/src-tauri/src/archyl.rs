@@ -1,4 +1,4 @@
-//! Archyl SaaS 연결과 읽기 전용 MCP 호출.
+//! Archyl 연결과 MCP 읽기·쓰기.
 #[cfg(target_os = "macos")]
 use crate::github::{KeychainStore, SecretStore};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -22,9 +22,16 @@ const MCP_ENDPOINT: &str = "https://api.archyl.com/mcp";
 const SCOPE: &str = "mcp:read mcp:write";
 #[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "co.kcd.aisurada.archyl";
+const OAUTH_ACCOUNT: &str = "oauth";
+const API_KEY_ACCOUNT: &str = "api-key";
 const RECONNECT: &str = "설정에서 Archyl을 다시 연결해 주세요.";
 const NETWORK: &str = "Archyl에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.";
 const RESPONSE: &str = "Archyl 응답을 읽지 못했어요.";
+const API_KEY_REJECTED: &str =
+    "Archyl에서 API 키를 거절했어요. 키가 맞는지 또는 만료됐는지 확인해 주세요.";
+const ADDRESS_LIMIT: &str =
+    "Archyl이 이 접속 주소의 요청을 임시로 제한하고 있어요. 잠시 뒤 다시 시도해 주세요.";
+const RATE_LIMIT: &str = "Archyl 요청 한도에 도달했어요. 잠시 뒤 다시 시도해 주세요.";
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -52,35 +59,41 @@ struct Session {
     tokens: Tokens,
 }
 
+#[derive(Deserialize, Serialize)]
+struct SavedApiKey {
+    key: String,
+    active: bool,
+}
+
 #[cfg(target_os = "macos")]
-fn load_session() -> Result<Option<Session>> {
-    KeychainStore::new(KEYCHAIN_SERVICE, "oauth")
+fn load_credential<T: serde::de::DeserializeOwned>(account: &str) -> Result<Option<T>> {
+    KeychainStore::new(KEYCHAIN_SERVICE, account)
         .get()?
         .map(|saved| serde_json::from_str(&saved).map_err(|_| RECONNECT.into()))
         .transpose()
 }
 
 #[cfg(target_os = "macos")]
-fn save_session(session: &Session) -> Result<()> {
-    let value = serde_json::to_string(session).map_err(|_| RESPONSE.to_string())?;
-    KeychainStore::new(KEYCHAIN_SERVICE, "oauth").set(&value)
+fn save_credential<T: Serialize>(account: &str, credential: &T) -> Result<()> {
+    let value = serde_json::to_string(credential).map_err(|_| RESPONSE.to_string())?;
+    KeychainStore::new(KEYCHAIN_SERVICE, account).set(&value)
 }
 
 #[cfg(target_os = "macos")]
-fn delete_session() -> Result<()> {
-    KeychainStore::new(KEYCHAIN_SERVICE, "oauth").delete()
+fn delete_credential(account: &str) -> Result<()> {
+    KeychainStore::new(KEYCHAIN_SERVICE, account).delete()
 }
 
 #[cfg(not(target_os = "macos"))]
-fn load_session() -> Result<Option<Session>> {
+fn load_credential<T: serde::de::DeserializeOwned>(_: &str) -> Result<Option<T>> {
     Ok(None)
 }
 #[cfg(not(target_os = "macos"))]
-fn save_session(_: &Session) -> Result<()> {
+fn save_credential<T: Serialize>(_: &str, _: &T) -> Result<()> {
     Err("Archyl 연결은 macOS에서 쓸 수 있어요.".into())
 }
 #[cfg(not(target_os = "macos"))]
-fn delete_session() -> Result<()> {
+fn delete_credential(_: &str) -> Result<()> {
     Ok(())
 }
 
@@ -103,6 +116,31 @@ fn json_body<T: serde::de::DeserializeOwned>(
         .read_to_vec()
         .map_err(|_| RESPONSE.to_string())?;
     serde_json::from_slice(&body).map_err(|_| RESPONSE.into())
+}
+
+fn rejected_request(
+    response: ureq::http::Response<ureq::Body>,
+    fallback: &'static str,
+) -> &'static str {
+    match response.status().as_u16() {
+        429 => RATE_LIMIT,
+        403 => {
+            let body = json_body::<Value>(response).unwrap_or_default();
+            let message = body["message"]
+                .as_str()
+                .or_else(|| body["error"]["message"].as_str());
+            if message.is_some_and(|message| {
+                message
+                    .to_ascii_lowercase()
+                    .starts_with("too many refused requests from this address")
+            }) {
+                ADDRESS_LIMIT
+            } else {
+                fallback
+            }
+        }
+        _ => fallback,
+    }
 }
 
 fn random_urlsafe() -> Result<String> {
@@ -172,12 +210,12 @@ fn token_request(agent: &ureq::Agent, client: &Client, grant: &[(&str, &str)]) -
         )
         .map_err(|_| NETWORK.to_string())?;
     if !response.status().is_success() {
-        return Err(if response.status().is_client_error() {
+        let fallback = if response.status().is_client_error() {
             RECONNECT
         } else {
             NETWORK
-        }
-        .into());
+        };
+        return Err(rejected_request(response, fallback).into());
     }
     let tokens: Tokens = json_body(response)?;
     if tokens.access_token.is_empty()
@@ -215,7 +253,9 @@ fn login(app: &AppHandle, agent: &ureq::Agent) -> Result<Session> {
         )
         .map_err(|_| NETWORK.to_string())?;
     if !response.status().is_success() {
-        return Err("Archyl에서 로그인 요청을 등록하지 못했어요.".into());
+        return Err(
+            rejected_request(response, "Archyl에서 로그인 요청을 등록하지 못했어요.").into(),
+        );
     }
     let client: Client = json_body(response)?;
     let verifier = random_urlsafe()?;
@@ -302,6 +342,12 @@ enum McpError {
     Other(String),
 }
 
+#[derive(Clone, Copy)]
+enum RequestAuth<'a> {
+    Oauth(&'a str),
+    ApiKey(&'a str),
+}
+
 fn mcp_result(response: &mut ureq::http::Response<ureq::Body>, id: u64) -> Result<Value> {
     let content_type = response
         .headers()
@@ -362,17 +408,25 @@ fn mcp_result(response: &mut ureq::http::Response<ureq::Body>, id: u64) -> Resul
 
 fn tool_call(
     agent: &ureq::Agent,
-    access_token: &str,
+    auth: RequestAuth<'_>,
     tool_name: &str,
     args: &Value,
     endpoint: &str,
 ) -> std::result::Result<Value, McpError> {
+    let (header, value) = match auth {
+        RequestAuth::Oauth(token) => ("Authorization", format!("Bearer {token}")),
+        RequestAuth::ApiKey(key) => ("X-API-Key", key.to_owned()),
+    };
+    let mut value =
+        ureq::http::HeaderValue::from_str(&value).map_err(|_| McpError::Other(RESPONSE.into()))?;
+    value.set_sensitive(true);
+
     let mut session_id = None;
     let mut version = "2025-03-26".to_string();
     let send = |message: Value, session: Option<&str>, version: &str| {
         let mut request = agent
             .post(endpoint)
-            .header("Authorization", format!("Bearer {access_token}"))
+            .header(header, value.clone())
             .header("Accept", "application/json, text/event-stream")
             .header("MCP-Protocol-Version", version)
             .content_type("application/json");
@@ -384,11 +438,8 @@ fn tool_call(
             .map_err(|_| McpError::Other(NETWORK.into()))?;
         match response.status().as_u16() {
             401 => Err(McpError::Unauthorized),
-            403 => Err(McpError::Other(
-                "이 Archyl 프로젝트를 읽거나 쓸 권한이 없어요.".into(),
-            )),
-            429 => Err(McpError::Other(
-                "Archyl 요청 한도에 도달했어요. 잠시 뒤 다시 시도해 주세요.".into(),
+            403 | 429 => Err(McpError::Other(
+                rejected_request(response, "이 Archyl 프로젝트를 읽거나 쓸 권한이 없어요.").into(),
             )),
             status if (200..300).contains(&status) => Ok(response),
             _ => Err(McpError::Other(RESPONSE.into())),
@@ -436,7 +487,11 @@ fn tool_call(
                     .and_then(|item| item["text"].as_str())
             })
             .unwrap_or("Archyl에서 요청한 작업을 처리하지 못했어요.");
-        return Err(McpError::Other(err_msg.into()));
+        let err_msg = match auth {
+            RequestAuth::ApiKey(key) => err_msg.replace(key, "[가림]"),
+            RequestAuth::Oauth(_) => err_msg.to_owned(),
+        };
+        return Err(McpError::Other(err_msg));
     }
     if let Some(value) = result
         .get("structuredContent")
@@ -455,17 +510,21 @@ fn tool_call(
             .and_then(|item| item["text"].as_str())
     });
     let Some(text) = text else {
-        if tool_name == "list_projects" {
+        if tool_name == "list_projects" && matches!(auth, RequestAuth::Oauth(_)) {
             return Ok(json!([]));
         }
         return Err(McpError::Other(RESPONSE.into()));
     };
-    if tool_name == "list_projects" && text.trim().is_empty() {
+    if tool_name == "list_projects"
+        && (text.trim().is_empty() || text.trim() == "No projects found in this organization.")
+    {
         return Ok(json!([]));
     }
     match serde_json::from_str(text) {
         Ok(parsed) => Ok(parsed),
-        Err(_) if tool_name == "list_projects" => Ok(json!([])),
+        Err(_) if tool_name == "list_projects" && matches!(auth, RequestAuth::Oauth(_)) => {
+            Ok(json!([]))
+        }
         Err(_) => Ok(json!({ "raw": text })),
     }
 }
@@ -485,7 +544,7 @@ fn execute_tool_with_session(
 ) -> Result<Value> {
     match tool_call(
         agent,
-        &session.tokens.access_token,
+        RequestAuth::Oauth(&session.tokens.access_token),
         tool_name,
         args,
         MCP_ENDPOINT,
@@ -510,10 +569,10 @@ fn execute_tool_with_session(
                 tokens.refresh_token = session.tokens.refresh_token.clone();
             }
             session.tokens = tokens;
-            save_session(session)?;
+            save_credential(OAUTH_ACCOUNT, session)?;
             tool_call(
                 agent,
-                &session.tokens.access_token,
+                RequestAuth::Oauth(&session.tokens.access_token),
                 tool_name,
                 args,
                 MCP_ENDPOINT,
@@ -524,13 +583,106 @@ fn execute_tool_with_session(
     }
 }
 
-#[tauri::command]
-pub fn archyl_status() -> Result<bool> {
-    load_session().map(|session| session.is_some())
+fn execute_with_api_key(
+    agent: &ureq::Agent,
+    key: &str,
+    tool: &str,
+    args: &Value,
+    endpoint: &str,
+) -> Result<Value> {
+    tool_call(agent, RequestAuth::ApiKey(key), tool, args, endpoint).map_err(|error| match error {
+        McpError::Unauthorized => API_KEY_REJECTED.into(),
+        McpError::Other(message) => message,
+    })
+}
+
+fn verify_api_key(agent: &ureq::Agent, key: &str, endpoint: &str) -> Result<()> {
+    if key.is_empty() || !key.bytes().all(|byte| byte.is_ascii_graphic()) {
+        return Err("Archyl API 키를 한 줄로 입력해 주세요.".into());
+    }
+    let value = execute_with_api_key(
+        agent,
+        key,
+        ReadTool::ListProjects.name(),
+        &json!({}),
+        endpoint,
+    )?;
+    let projects = value
+        .get("data")
+        .filter(|data| !data.is_null())
+        .unwrap_or(&value);
+    if projects.is_array()
+        || projects
+            .get("projects")
+            .filter(|value| !value.is_null())
+            .or_else(|| projects.get("items"))
+            .is_some_and(Value::is_array)
+    {
+        return Ok(());
+    }
+    Err("Archyl에서 프로젝트 목록을 확인하지 못했어요.".into())
+}
+
+fn execute_configured_tool(tool: &str, args: &Value) -> Result<Value> {
+    let agent = agent();
+    if let Some(api_key) = load_credential::<SavedApiKey>(API_KEY_ACCOUNT)?.filter(|key| key.active)
+    {
+        return execute_with_api_key(&agent, &api_key.key, tool, args, MCP_ENDPOINT);
+    }
+    let mut session = load_credential(OAUTH_ACCOUNT)?
+        .ok_or_else(|| "설정에서 Archyl을 연결해 주세요.".to_string())?;
+    execute_tool_with_session(&agent, &mut session, tool, args)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ConnectionMethod {
+    ApiKey,
+    Oauth,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionStatus {
+    method: Option<ConnectionMethod>,
+    saved_api_key: bool,
+    saved_oauth: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum ConnectionRequest {
+    ApiKey { key: Option<String> },
+    Oauth { reuse: bool },
 }
 
 #[tauri::command]
-pub async fn archyl_connect(app: AppHandle, state: State<'_, ArchylState>) -> Result<()> {
+pub fn archyl_status() -> Result<ConnectionStatus> {
+    let api_key = load_credential::<SavedApiKey>(API_KEY_ACCOUNT)?;
+    let api_key_active = api_key.as_ref().is_some_and(|key| key.active);
+    let oauth = load_credential::<Session>(OAUTH_ACCOUNT);
+    let (method, saved_oauth) = if api_key_active {
+        (
+            Some(ConnectionMethod::ApiKey),
+            oauth.is_ok_and(|session| session.is_some()),
+        )
+    } else {
+        let saved = oauth?.is_some();
+        (saved.then_some(ConnectionMethod::Oauth), saved)
+    };
+    Ok(ConnectionStatus {
+        method,
+        saved_api_key: api_key.is_some(),
+        saved_oauth,
+    })
+}
+
+#[tauri::command]
+pub async fn archyl_connect(
+    app: AppHandle,
+    state: State<'_, ArchylState>,
+    connection: ConnectionRequest,
+) -> Result<()> {
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = state
@@ -538,8 +690,40 @@ pub async fn archyl_connect(app: AppHandle, state: State<'_, ArchylState>) -> Re
             .try_lock()
             .map_err(|_| "다른 Archyl 요청이 진행 중이에요.")?;
         let agent = agent();
-        let session = login(&app, &agent)?;
-        save_session(&session)
+        match connection {
+            ConnectionRequest::ApiKey { key } => {
+                let key = match key {
+                    Some(value) => value.trim().to_owned(),
+                    None => {
+                        load_credential::<SavedApiKey>(API_KEY_ACCOUNT)?
+                            .ok_or("저장한 Archyl API 키가 없어요.")?
+                            .key
+                    }
+                };
+                verify_api_key(&agent, &key, MCP_ENDPOINT)?;
+                save_credential(API_KEY_ACCOUNT, &SavedApiKey { key, active: true })
+            }
+            ConnectionRequest::Oauth { reuse } => {
+                let api_key = load_credential::<SavedApiKey>(API_KEY_ACCOUNT)?;
+                if reuse {
+                    let mut session = load_credential(OAUTH_ACCOUNT)?.ok_or(RECONNECT)?;
+                    execute_tool_with_session(
+                        &agent,
+                        &mut session,
+                        ReadTool::ListProjects.name(),
+                        &json!({}),
+                    )?;
+                } else {
+                    let session = login(&app, &agent)?;
+                    save_credential(OAUTH_ACCOUNT, &session)?;
+                }
+                if let Some(mut api_key) = api_key.filter(|key| key.active) {
+                    api_key.active = false;
+                    save_credential(API_KEY_ACCOUNT, &api_key)?;
+                }
+                Ok(())
+            }
+        }
     })
     .await
     .map_err(|_| NETWORK.to_string())?
@@ -553,7 +737,14 @@ pub async fn archyl_disconnect(state: State<'_, ArchylState>) -> Result<()> {
             .lock
             .try_lock()
             .map_err(|_| "다른 Archyl 요청이 진행 중이에요.")?;
-        delete_session()
+        let api_key = load_credential::<SavedApiKey>(API_KEY_ACCOUNT)?;
+        if api_key.is_some_and(|key| key.active) {
+            delete_credential(OAUTH_ACCOUNT)?;
+            delete_credential(API_KEY_ACCOUNT)
+        } else {
+            delete_credential(API_KEY_ACCOUNT)?;
+            delete_credential(OAUTH_ACCOUNT)
+        }
     })
     .await
     .map_err(|_| NETWORK.to_string())?
@@ -575,10 +766,7 @@ pub async fn archyl_read(
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = state.lock.lock().map_err(|_| NETWORK.to_string())?;
-        let agent = agent();
-        let mut session =
-            load_session()?.ok_or_else(|| "설정에서 Archyl을 연결해 주세요.".to_string())?;
-        execute_tool_with_session(&agent, &mut session, tool.name(), &args)
+        execute_configured_tool(tool.name(), &args)
     })
     .await
     .map_err(|_| NETWORK.to_string())?
@@ -601,10 +789,7 @@ pub async fn archyl_write(
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = state.lock.lock().map_err(|_| NETWORK.to_string())?;
-        let agent = agent();
-        let mut session =
-            load_session()?.ok_or_else(|| "설정에서 Archyl을 연결해 주세요.".to_string())?;
-        execute_tool_with_session(&agent, &mut session, tool.name(), &args)
+        execute_configured_tool(tool.name(), &args)
     })
     .await
     .map_err(|_| NETWORK.to_string())?
@@ -707,7 +892,7 @@ mod tests {
         });
         let model = tool_call(
             &agent(),
-            "fixture-token",
+            RequestAuth::Oauth("fixture-token"),
             ReadTool::GetProjectC4Model.name(),
             &json!({"projectId":"project1"}),
             &endpoint,
@@ -760,7 +945,7 @@ mod tests {
         });
         let projects = tool_call(
             &agent(),
-            "fixture-token",
+            RequestAuth::Oauth("fixture-token"),
             ReadTool::ListProjects.name(),
             &json!({}),
             &endpoint,
@@ -769,5 +954,119 @@ mod tests {
         .unwrap();
         assert_eq!(projects, json!([]));
         worker.join().unwrap();
+    }
+
+    const FIXTURE_API_KEY: &str = "fixture-archyl-key";
+
+    fn api_key_fixture(
+        responses: Vec<(&'static str, Value)>,
+    ) -> (String, std::thread::JoinHandle<Vec<Value>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
+        let worker = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for (status, response) in responses {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                let mut reader = BufReader::new(&mut stream);
+                let mut key_present = false;
+                let mut size = 0;
+                loop {
+                    let mut line = String::new();
+                    assert_ne!(reader.read_line(&mut line).unwrap(), 0);
+                    let line = line.trim_end().to_ascii_lowercase();
+                    if line.is_empty() {
+                        break;
+                    }
+                    if let Some(key) = line.strip_prefix("x-api-key: ") {
+                        assert_eq!(key, FIXTURE_API_KEY);
+                        key_present = true;
+                    }
+                    assert!(!line.starts_with("authorization:"));
+                    if let Some(length) = line.strip_prefix("content-length: ") {
+                        size = length.parse().unwrap();
+                    }
+                }
+                assert!(key_present);
+                let mut body = vec![0; size];
+                reader.read_exact(&mut body).unwrap();
+                requests.push(serde_json::from_slice(&body).unwrap());
+                let body = if response.is_null() {
+                    String::new()
+                } else {
+                    response.to_string()
+                };
+                write!(stream, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+            requests
+        });
+        (endpoint, worker)
+    }
+
+    fn mcp_fixture(result: Value) -> Vec<(&'static str, Value)> {
+        vec![
+            (
+                "200 OK",
+                json!({"jsonrpc":"2.0", "id":1, "result":{"protocolVersion":"2025-03-26"}}),
+            ),
+            ("202 Accepted", Value::Null),
+            ("200 OK", json!({"jsonrpc":"2.0", "id":2, "result": result})),
+        ]
+    }
+
+    #[test]
+    fn api_key_verification_requires_a_project_listing() {
+        let (endpoint, worker) =
+            api_key_fixture(mcp_fixture(json!({"structuredContent":{"projects":[]}})));
+        verify_api_key(&agent(), FIXTURE_API_KEY, &endpoint).unwrap();
+        let requests = worker.join().unwrap();
+        assert_eq!(requests[2]["params"]["name"], "list_projects");
+
+        let invalid = json!({"content":[{"type":"text","text":"Unknown response"}]});
+        let (endpoint, worker) = api_key_fixture(mcp_fixture(invalid));
+        assert!(verify_api_key(&agent(), FIXTURE_API_KEY, &endpoint).is_err());
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn api_key_also_authenticates_write_tools() {
+        let (endpoint, worker) =
+            api_key_fixture(mcp_fixture(json!({"structuredContent":{"id":"system-1"}})));
+        let result = execute_with_api_key(
+            &agent(),
+            FIXTURE_API_KEY,
+            WriteTool::CreateSystem.name(),
+            &json!({"projectId":"project-1", "name":"fixture"}),
+            &endpoint,
+        )
+        .unwrap();
+        assert_eq!(result["id"], "system-1");
+        assert_eq!(worker.join().unwrap()[2]["params"]["name"], "create_system");
+    }
+
+    #[test]
+    fn api_key_distinguishes_auth_failure_from_address_limit() {
+        let errors = [
+            (
+                "401 Unauthorized",
+                json!({"message":"Invalid API key"}),
+                API_KEY_REJECTED,
+            ),
+            (
+                "403 Forbidden",
+                json!({"message":"Too many refused requests from this address, try again later"}),
+                ADDRESS_LIMIT,
+            ),
+        ];
+        for (status, body, expected) in errors {
+            let (endpoint, worker) = api_key_fixture(vec![(status, body)]);
+            assert_eq!(
+                verify_api_key(&agent(), FIXTURE_API_KEY, &endpoint),
+                Err(expected.into())
+            );
+            assert_eq!(worker.join().unwrap().len(), 1);
+        }
     }
 }

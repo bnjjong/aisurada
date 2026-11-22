@@ -36,8 +36,19 @@ function githubRepository(value: unknown): string {
   return /^[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9._-]{1,100}$/i.test(name) ? name.toLowerCase() : '';
 }
 
-export const archylStatus = () => invoke<boolean>('archyl_status');
-export const connectArchyl = () => invoke<void>('archyl_connect');
+type ArchylMethod = 'api_key' | 'oauth';
+export type ArchylConnection = {
+  method: ArchylMethod | null;
+  savedApiKey: boolean;
+  savedOauth: boolean;
+};
+export type ArchylConnectionRequest =
+  | { method: 'api_key'; key?: string }
+  | { method: 'oauth'; reuse: boolean };
+
+export const archylConnection = () => invoke<ArchylConnection>('archyl_status');
+export const archylStatus = async () => (await archylConnection()).method !== null;
+export const connectArchyl = (connection: ArchylConnectionRequest) => invoke<void>('archyl_connect', { connection });
 export const disconnectArchyl = () => invoke<void>('archyl_disconnect');
 
 export type ArchylWriteTool =
