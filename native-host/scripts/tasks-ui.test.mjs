@@ -16,7 +16,8 @@ import { Rail } from '../src/ui/Rail.tsx';
 
 const raw = (extra = {}) => ({
   key: 'TSK-14', id: 'tkmwd7nzi4-05049130', title: '프로젝트를 지울 때 자원 폴더도 정리하기', type: 'bug', priority: 'high', status: 'draft', repo: 'bnjjong/aisurada',
-  labels: ['엔진'], criteriaDone: 0, criteriaTotal: 2, blockedBy: [], blocks: [], path: '.aisurada/tasks/TSK-14.md', ...extra,
+  labels: ['엔진'], criteriaDone: 0, criteriaTotal: 2, blockedBy: [], blocks: [], path: '.aisurada/tasks/TSK-14.md',
+  createdAt: '2026-11-13T14:00:00+09:00', editedAt: '2026-11-13T14:05:07+09:00', ...extra,
 });
 const task = (extra = {}) => toTask(raw(extra));
 const detailRaw = (extra = {}) => raw({
@@ -41,12 +42,22 @@ test('toTask reads an engine row, fills defaults, and refuses a row with the wro
   const t = task();
   assert.equal(t.key, 'TSK-14');
   assert.equal(t.status, 'draft');
+  assert.equal(t.createdAt, raw().createdAt);
+  assert.equal(t.editedAt, raw().editedAt);
   assert.deepEqual(t.labels, ['엔진']);
   assert.equal(task({ type: 'epic' }).type, 'feature', 'unknown type falls back');
   assert.equal(task({ priority: 'urgent' }).priority, 'medium', 'unknown priority falls back');
   assert.deepEqual(task({ labels: undefined }).labels, []);
   for (const bad of [null, 'x', [], raw({ key: undefined }), raw({ id: undefined }), raw({ title: undefined }), raw({ status: 'sleeping' })]) {
     assert.equal(toTask(bad), null);
+  }
+  for (const field of ['createdAt', 'editedAt']) {
+    const missing = raw();
+    delete missing[field];
+    assert.equal(toTask(missing), null, `${field} 누락`);
+    for (const value of [null, '', ' \t ', 123]) {
+      assert.equal(toTask(raw({ [field]: value })), null, `${field}에 잘못된 값`);
+    }
   }
 });
 
@@ -108,7 +119,7 @@ test('engine calls: argv, token, from and parsed results', async () => {
     return typeof a === 'function' ? a(argv) : a;
   };
   const call = engine({
-    'list-tasks': (argv) => (argv.includes('trash=true') ? { trash: [{ key: 'TSK-2', id: 'tkx-00000000', title: '지움', deletedAt: 'now' }, { bad: 1 }] } : { tasks: [raw(), { bad: 1 }], skipped: ['x.md: 못 읽음'] }),
+    'list-tasks': (argv) => (argv.includes('trash=true') ? { trash: [{ key: 'TSK-2', id: 'tkx-00000000', title: '지움', deletedAt: 'now' }, { bad: 1 }] } : { tasks: [raw(), raw({ key: 'TSK-2', editedAt: null })], skipped: ['x.md: 못 읽음'] }),
     'get-task': detailRaw(),
     'create-task': detailRaw({ key: 'TSK-15' }),
     'update-task': detailRaw({ title: '바뀜' }),
@@ -142,6 +153,7 @@ test('engine calls: argv, token, from and parsed results', async () => {
   await restoreTask(call, 'TSK-14');
   assert.deepEqual(calls.slice(-2), [['delete-task', 'TSK-14'], ['restore-task', 'TSK-14']]);
   await assert.rejects(() => getTask(engine({ 'get-task': { nope: 1 } }), 'TSK-1'), /모양이 틀려요/);
+  await assert.rejects(() => getTask(engine({ 'get-task': detailRaw({ createdAt: null }) }), 'TSK-14'), /모양이 틀려요/);
 });
 
 test('validateTaskForm blocks what the engine would refuse, and requires at least one completion criterion', () => {

@@ -571,10 +571,10 @@ export function TaskDetailPage({
                   />
                 </dd>
                 <dt>만든 때</dt>
-                <dd>{task.createdAt ? timeLabel(task.createdAt) : "—"}</dd>
+                <dd>{timeLabel(task.createdAt)}</dd>
                 <dt>고친 때</dt>
                 <dd>
-                  {task.editedAt ? timeLabel(task.editedAt) : "—"}
+                  {timeLabel(task.editedAt)}
                   {edited && <small className="task-edited">{edited}</small>}
                 </dd>
               </dl>

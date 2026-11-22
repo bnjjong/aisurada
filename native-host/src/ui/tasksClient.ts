@@ -42,8 +42,8 @@ export interface TaskRow {
   blockedBy: string[];
   /** 이 태스크가 막고 있는 태스크 키 */
   blocks: string[];
-  createdAt?: string;
-  editedAt?: string;
+  createdAt: string;
+  editedAt: string;
   editedSession?: string;
   editedAgent?: string;
   path: string;
@@ -183,6 +183,8 @@ export function toTask(v: unknown): TaskRow | null {
   if (!isRecord(v)) return null;
   const key = text(v.key), id = text(v.id), title = text(v.title);
   if (!key || !id || !title || !isStatus(v.status)) return null;
+  const createdAt = text(v.createdAt), editedAt = text(v.editedAt);
+  if (!createdAt?.trim() || !editedAt?.trim()) return null;
   return {
     key, id, title,
     type: isType(v.type) ? v.type : "feature",
@@ -196,8 +198,8 @@ export function toTask(v: unknown): TaskRow | null {
     criteriaTotal: count(v.criteriaTotal),
     blockedBy: strings(v.blockedBy),
     blocks: strings(v.blocks),
-    createdAt: text(v.createdAt),
-    editedAt: text(v.editedAt),
+    createdAt,
+    editedAt,
     editedSession: text(v.editedSession),
     editedAgent: text(v.editedAgent),
     path: text(v.path) ?? "",
