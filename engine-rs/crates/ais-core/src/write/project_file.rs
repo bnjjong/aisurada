@@ -19,7 +19,7 @@ pub fn archived_rel_path(slug: &str, id: &str) -> String {
     format!(".aisurada/trash/projects/{slug}-{id}.md")
 }
 
-/// 프로젝트 파일 전체 내용: 머리(`id`, `slug`, `title`, `hue`와 저장소가 있으면 `repos: <한 줄 JSON>`)와 요약 본문
+/// 프로젝트 속성, 저장소 목록, 요약 본문을 파일에 쓴다.
 pub fn render(info: &ProjectInfo, created_at: &str, edited_at: &str) -> Vec<u8> {
     let mut out = String::from("---\n");
     let mut line =
@@ -27,6 +27,7 @@ pub fn render(info: &ProjectInfo, created_at: &str, edited_at: &str) -> Vec<u8> 
     line("id", &info.id);
     line("slug", &info.slug);
     line("title", &info.title);
+    line("type", info.project_type.as_str());
     line("hue", &info.hue);
     line("createdAt", created_at);
     line("editedAt", edited_at);

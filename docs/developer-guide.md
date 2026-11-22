@@ -224,6 +224,10 @@ cargo run --manifest-path engine-rs/Cargo.toml --locked -p ais-core --example ba
 cargo run --manifest-path engine-rs/Cargo.toml --locked -p ais-core --example backfill_timestamps -- /path/to/vault /path/to/new-backup
 ```
 
+### 프로젝트 유형
+
+프로젝트 생성·편집에서 코딩이 필요한 프로젝트는 **개발**, 일상 업무는 **일반**으로 분류한다. 프로젝트 파일과 목록 응답의 `type`에는 `development` 또는 `general`이 들어간다. 유형이 없는 예전 파일은 개발로 읽는다. 명령줄에서는 생성·수정할 때 `type=development` 또는 `type=general`을 넘긴다.
+
 ### 프로젝트의 저장소와 아젠다의 `projectRepo`
 
 프로젝트가 저장소(로컬 폴더, GitHub 저장소, 또는 둘 다)를 여러 개 가지고, 아젠다가 그중 하나를 이름으로 가리킨다. 나중에 GitHub App 연동과 앱 안의 개발 기능이 이 위에 올라간다. **외부 설명서에 없는 확장이다.** 설명서 21.5는 프로젝트 파일의 키를 4개로 못 박아 두었고(조건부 키 없음), 20.5는 아젠다의 키를 6개로 정했다.

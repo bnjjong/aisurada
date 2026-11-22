@@ -34,6 +34,15 @@ export const TYPE_NAMES: Record<string, string> = {
   report: "보고",
   free: "자유",
 };
+export const PROJECT_TYPE_NAMES = {
+  development: "개발",
+  general: "일반",
+} as const;
+
+export function projectTypeOf(value: unknown): keyof typeof PROJECT_TYPE_NAMES {
+  return value === "general" ? "general" : "development";
+}
+
 /** 좌측 메뉴(레일) 폭의 범위와 기본값. 설정 `railWidth`의 보정 범위(200~420, 기본 264)와 같다. */
 export const RAIL_WIDTH_MIN = 200;
 export const RAIL_WIDTH_MAX = 420;

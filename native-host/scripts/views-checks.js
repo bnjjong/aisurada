@@ -548,17 +548,35 @@ if (location.pathname.startsWith("/note-window/")) {
       await until(() => !$(".cmdk-overlay"), "search closed");
     });
     await test("entity-project-and-agenda-form-create", async () => {
-      // 레일의 「＋」 하나가 메뉴를 열고, 거기서 새 프로젝트와 새 아젠다를 고른다.
+      // 노트 구역의 「＋」에서 새 프로젝트와 새 아젠다를 고른다.
+      go("/notes");
+      await until(() => button("새로 만들기"), "project create control");
       click("새로 만들기");
       await until(() => $(".act-menu"), "new menu");
       click("새 프로젝트", $(".act-menu"));
       await until(() => $('[aria-label="프로젝트 이름"]'), "project form");
       fill($('[aria-label="프로젝트 이름"]'), "검증 프로젝트");
+      const typeField = () => $('[aria-label="프로젝트 유형"]', $(".ndf"));
+      assert(typeField()?.value === "development", "project type defaults to development");
+      fill(typeField(), "general");
       click("만들기", $(".ndf"));
       await until(() => !$(".ndf"), "project form saved");
-      projectId = (await engine(["list-projects"])).find(
+      const createdProject = (await engine(["list-projects"])).find(
         (p) => p.title === "검증 프로젝트",
-      ).id;
+      );
+      projectId = createdProject.id;
+      assert(createdProject.type === "general", "general type persisted");
+
+      go("/project/" + encodeURIComponent(createdProject.slug));
+      await until(() => button("프로젝트 편집"), "project detail");
+      click("프로젝트 편집");
+      await until(() => typeField()?.value === "general", "project edit retains general type");
+      fill(typeField(), "development");
+      click("저장", $(".ndf"));
+      await until(() => !$(".ndf"), "project type updated");
+
+      go("/notes");
+      await until(() => button("새로 만들기"), "agenda create control");
       click("새로 만들기");
       await until(() => $(".act-menu"), "new menu");
       click("새 아젠다", $(".act-menu"));
@@ -567,6 +585,7 @@ if (location.pathname.startsWith("/note-window/")) {
       const project = (await engine(["list-projects"])).find(
         (p) => p.id === projectId,
       );
+      assert(project.type === "development", "development type persisted after edit");
       fill($$(".ndf select")[1], project.slug);
       click("만들기", $(".ndf"));
       await until(

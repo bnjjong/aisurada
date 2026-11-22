@@ -1,4 +1,4 @@
-//! 프로젝트 쓰기: `create_project`, `update_project`, `delete_project`. 인자 이름과 응답 필드는 Java 엔진과 같다.
+//! 프로젝트 생성, 수정, 삭제. 유형과 저장소 목록을 프로젝트 파일에 기록한다.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -9,7 +9,7 @@ use super::agenda_write::{archive, hue_arg};
 use crate::error::EngineError;
 use crate::model::ProjectRow;
 use crate::text::{is_blank, trim};
-use crate::vault::project::{ProjectInfo, is_valid_project_id, scan_projects};
+use crate::vault::project::{ProjectInfo, ProjectType, is_valid_project_id, scan_projects};
 use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
 use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
@@ -21,6 +21,8 @@ use crate::write::{project_file, slug};
 #[serde(default, rename_all = "camelCase")]
 pub struct CreateProjectRequest {
     pub title: Option<String>,
+    #[serde(rename = "type")]
+    pub project_type: Option<String>,
     pub hue: Option<String>,
     pub summary: Option<String>,
     /// 저장소 목록(JSON 배열 글)
@@ -32,6 +34,8 @@ pub struct CreateProjectRequest {
 pub struct UpdateProjectRequest {
     pub id: String,
     pub title: Option<String>,
+    #[serde(rename = "type")]
+    pub project_type: Option<String>,
     pub hue: Option<String>,
     pub summary: Option<String>,
     /// 주면 저장소 목록을 통째로 바꾼다. 빈 글이면 지운다.
@@ -74,12 +78,26 @@ fn find(projects: &[ProjectInfo], id: &str) -> Result<ProjectInfo, EngineError> 
         .ok_or_else(|| EngineError::not_found(format!("Project not found: {id}")))
 }
 
+fn parse_project_type(value: &str) -> Result<ProjectType, EngineError> {
+    ProjectType::parse(trim(value)).ok_or_else(|| {
+        EngineError::invalid_argument(format!(
+            "type 은 development 또는 general 이어야 한다: {value}"
+        ))
+    })
+}
+
 pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow, EngineError> {
     let title = trim(request.title.as_deref().unwrap_or(""));
     if title.is_empty() {
         return Err(EngineError::invalid_argument("title 이 필요하다"));
     }
     let hue = hue_arg(request.hue.as_deref())?;
+    let project_type = request
+        .project_type
+        .as_deref()
+        .map(parse_project_type)
+        .transpose()?
+        .unwrap_or_default();
     let summary = request.summary.clone().unwrap_or_default();
     let repos = project_file::parse_strict(request.repos.as_deref())?;
     let projects = scan_projects(vault);
@@ -106,6 +124,7 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
         edited_at: Some(at.clone()),
         slug,
         title: title.to_string(),
+        project_type,
         hue,
         summary,
         repos,
@@ -118,10 +137,16 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
 }
 
 pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow, EngineError> {
-    const USAGE: &str = "update-project <프로젝트 id> [title=<이름>] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>]";
+    const USAGE: &str = "update-project <프로젝트 id> [title=<이름>] [type=development|general] [hue=<색>] [summary=<한 문단 설명>] [repos=<저장소 목록 JSON을 통째로 바꾼다. 빈 값이면 지운다>]";
     require_id(&request.id, USAGE)?;
     let hue = hue_arg(request.hue.as_deref())?;
     let current = find(&scan_projects(vault), &request.id)?;
+    let project_type = request
+        .project_type
+        .as_deref()
+        .map(parse_project_type)
+        .transpose()?
+        .unwrap_or(current.project_type);
     let title = match trim(request.title.as_deref().unwrap_or("")) {
         "" => current.title.clone(),
         given => given.to_string(),
@@ -140,6 +165,7 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
         edited_at: current.edited_at.clone(),
         slug: current.slug.clone(),
         title,
+        project_type,
         hue: hue.unwrap_or_else(|| current.hue.clone()),
         summary,
         repos,

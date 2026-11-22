@@ -5,6 +5,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { Confirm, Modal } from "./Modal.tsx";
+import { PROJECT_TYPE_NAMES, projectTypeOf } from "./model.ts";
 import { Page } from "./OtherPages.tsx";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
 import { ResourceItem } from "./ResourceItem.tsx";
@@ -176,6 +177,7 @@ export function ProjectPage({
 
   return (
     <Page title={asText(project.title)} className="res-page res-project">
+      <p className="res-intro">프로젝트 유형 · {PROJECT_TYPE_NAMES[projectTypeOf(project.type)]}</p>
       {asText(project.summary) && <p className="res-intro">{asText(project.summary)}</p>}
       <div className="res-toolbar">
         <button type="button" onClick={() => controller.form({ kind: "project", id: asText(project.id) })}>
