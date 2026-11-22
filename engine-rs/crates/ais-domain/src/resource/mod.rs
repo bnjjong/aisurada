@@ -75,10 +75,13 @@ pub struct Resource {
     pub permission: Option<String>,
     pub skills: Vec<String>,
     pub repo: Option<String>,
-    /// 도구별 선택 칸. 안쪽 값은 검사하지 않고 그대로 보존한다.
+    /// 도구별 선택 칸. 프로세스와 엔진 설정의 일시만 엔진이 관리한다.
     pub tools: Vec<(String, Value)>,
     pub body: String,
-    pub edited_at: Option<String>,
+    pub created_at: String,
+    pub edited_at: String,
+    /// 이전 파일을 읽을 때 채운 일시를 다음 저장에 기록한다.
+    pub missing_timestamps: bool,
     pub edited_session: Option<String>,
     pub edited_agent: Option<String>,
     /// vault 기준 상대 경로
@@ -124,8 +127,30 @@ pub fn tools_equal(a: &[(String, Value)], b: &[(String, Value)]) -> bool {
         && a.iter().all(|(k, v)| {
             b.iter()
                 .find(|(k2, _)| k2 == k)
-                .is_some_and(|(_, v2)| values_equal(v, v2))
+                .is_some_and(|(_, v2)| tool_settings_equal(k, v, v2))
         })
+}
+
+fn stores_tool_timestamps(name: &str) -> bool {
+    matches!(name, "aisurada" | "claude" | "codex" | "gemini")
+}
+
+fn is_tool_timestamp(key: &Value) -> bool {
+    matches!(key, Value::Str(s) if s == "createdAt" || s == "editedAt")
+}
+
+fn tool_settings_equal(name: &str, a: &Value, b: &Value) -> bool {
+    if let (true, Value::Map(a), Value::Map(b)) = (stores_tool_timestamps(name), a, b) {
+        let mut a = a.iter().filter(|(key, _)| !is_tool_timestamp(key));
+        let b = b.iter().filter(|(key, _)| !is_tool_timestamp(key));
+        return a.clone().count() == b.clone().count()
+            && a.all(|(key, value)| {
+                b.clone()
+                    .find(|(other, _)| other == key)
+                    .is_some_and(|(_, other)| values_equal(value, other))
+            });
+    }
+    values_equal(a, b)
 }
 
 /// 프로젝트 참조 목록의 한 줄. `hint`는 쓴 때의 이름이다(`refs` 파일의 한 줄).

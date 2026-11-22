@@ -6,7 +6,9 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value as Json;
 
-use super::{Resource, ResourceKind};
+use super::{
+    Resource, ResourceKind, is_tool_timestamp, stores_tool_timestamps, tool_settings_equal,
+};
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
@@ -45,6 +47,7 @@ pub fn parse(
     kind: ResourceKind,
     project: Option<&str>,
     rel_path: &str,
+    fallback_at: &str,
 ) -> Result<Resource, String> {
     if bytes.len() > MAX_FILE_BYTES {
         return Err(format!("파일이 {MAX_FILE_BYTES}바이트를 넘는다"));
@@ -117,6 +120,16 @@ pub fn parse(
             }
         }
     }
+    let stored_created = timestamp(&map, "createdAt");
+    let stored_edited = timestamp(&map, "editedAt");
+    let created_at = stored_created.or(stored_edited).unwrap_or(fallback_at);
+    let edited_at = stored_edited.unwrap_or(created_at);
+    let mut missing_timestamps = stored_created.is_none() || stored_edited.is_none();
+    for (name, value) in &mut tools {
+        if let (true, Value::Map(entries)) = (stores_tool_timestamps(name), value) {
+            missing_timestamps |= fill_tool_times(entries, created_at, edited_at);
+        }
+    }
     Ok(Resource {
         id,
         kind,
@@ -128,12 +141,71 @@ pub fn parse(
         repo,
         tools,
         body,
-        edited_at: str_of(&map, "editedAt"),
+        created_at: created_at.to_owned(),
+        edited_at: edited_at.to_owned(),
+        missing_timestamps,
         edited_session: str_of(&map, "editedSession"),
         edited_agent: str_of(&map, "editedAgent"),
         rel_path: rel_path.to_string(),
         token: Some(compute_token(bytes)),
     })
+}
+
+fn timestamp<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a str> {
+    match get(map, key) {
+        Some(Value::Str(value)) if !java_blank(value) => Some(value),
+        _ => None,
+    }
+}
+
+fn fill_tool_times(entries: &mut Vec<(Value, Value)>, created_at: &str, edited_at: &str) -> bool {
+    let mut changed = false;
+    for (name, fallback) in [("createdAt", created_at), ("editedAt", edited_at)] {
+        if timestamp(entries, name).is_none() {
+            let key = Value::Str(name.into());
+            let value = Value::Str(fallback.into());
+            if let Some(entry) = entries.iter_mut().find(|(existing, _)| *existing == key) {
+                entry.1 = value;
+            } else {
+                entries.push((key, value));
+            }
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// 새 설정에는 두 시각을 쓰고, 설정 내용이 바뀌면 수정 시각만 갱신한다.
+pub fn stamp_tools(
+    mut tools: Vec<(String, Value)>,
+    before: &[(String, Value)],
+    at: &str,
+) -> Vec<(String, Value)> {
+    for (name, value) in &mut tools {
+        if !stores_tool_timestamps(name) {
+            continue;
+        }
+        let previous = before
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value);
+        let unchanged = previous.is_some_and(|old| tool_settings_equal(name, value, old));
+        if let Value::Map(entries) = value {
+            let old = match previous {
+                Some(Value::Map(entries)) => entries.as_slice(),
+                _ => &[],
+            };
+            let created_at = timestamp(old, "createdAt").unwrap_or(at);
+            let edited_at = if unchanged {
+                timestamp(old, "editedAt").unwrap_or(at)
+            } else {
+                at
+            };
+            entries.retain(|(key, _)| !is_tool_timestamp(key));
+            fill_tool_times(entries, created_at, edited_at);
+        }
+    }
+    tools
 }
 
 fn skill_list(value: Option<&Value>) -> Vec<String> {
@@ -185,8 +257,9 @@ pub fn render(resource: &Resource) -> Result<Vec<u8>, EngineError> {
             ),
         ));
     }
+    map.push((text("createdAt"), text(&resource.created_at)));
+    map.push((text("editedAt"), text(&resource.edited_at)));
     for (key, value) in [
-        ("editedAt", &resource.edited_at),
         ("editedSession", &resource.edited_session),
         ("editedAgent", &resource.edited_agent),
     ] {
@@ -197,6 +270,50 @@ pub fn render(resource: &Resource) -> Result<Vec<u8>, EngineError> {
     let yaml = dump_map(&map)
         .map_err(|e| EngineError::internal(format!("자원을 YAML로 쓰지 못했다: {e}")))?;
     Ok(format!("---\n{yaml}---\n{}\n", resource.body).into_bytes())
+}
+
+#[cfg(test)]
+mod timestamp_tests {
+    use super::*;
+
+    const FIRST: &str = "2026-11-22T00:00:00Z";
+    const SECOND: &str = "2026-11-22T00:10:00Z";
+
+    #[test]
+    fn resource_timestamps_fill_legacy_fields_and_stamp_changed_settings() {
+        let raw = b"---\nid: apabc-0123abcd\nname: Agent\ncreatedAt: null\neditedAt: '2026-11-22T00:00:00Z'\ntools:\n  aisurada: {enabled: true}\n  codex: {model: original}\n  custom: {editedAt: custom-value}\n---\nbody\n";
+        let resource = parse(raw, ResourceKind::Agent, None, "agent.md", SECOND).unwrap();
+        assert_eq!(resource.created_at, FIRST);
+        assert_eq!(resource.edited_at, FIRST);
+        assert!(resource.missing_timestamps);
+        let raw_tools = |model: &str| {
+            let yaml = format!(
+                "aisurada: {{enabled: true}}\ncodex: {{model: {model}, createdAt: spoof}}\ncustom: {{editedAt: custom-value}}\n"
+            );
+            frontmatter::parse(&yaml)
+                .unwrap()
+                .into_iter()
+                .map(|(key, value)| (value_to_string(&key).unwrap(), value))
+                .collect()
+        };
+        let settings = stamp_tools(raw_tools("new"), &resource.tools, SECOND);
+        let get_time = |name: &str, field: &str| {
+            let (_, Value::Map(values)) = settings.iter().find(|(key, _)| key == name).unwrap()
+            else {
+                panic!("설정 객체가 필요하다");
+            };
+            timestamp(values, field).unwrap().to_owned()
+        };
+        assert_eq!(get_time("aisurada", "editedAt"), FIRST);
+        assert_eq!(get_time("codex", "createdAt"), FIRST);
+        assert_eq!(get_time("codex", "editedAt"), SECOND);
+        assert_eq!(get_time("custom", "editedAt"), "custom-value");
+        assert!(super::super::tools_equal(
+            &resource.tools,
+            &raw_tools("original")
+        ));
+        assert!(!super::super::tools_equal(&resource.tools, &settings));
+    }
 }
 
 // ---------------------------------------------------------------- 인자 검사
