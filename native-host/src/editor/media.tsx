@@ -66,7 +66,7 @@ export function ImageView({ source, alt, width, nodeKey, onWidth }: { source: st
 }
 
 const IMAGE_MIN = 48;
-// 도구줄의 크기 고르기. width < 0 은 본문 폭에 맞춤, 0 은 크기를 정하지 않은 원래 크기.
+// 도구줄의 크기 고르기. -1은 본문 폭, 0은 원래 크기다.
 const IMAGE_PRESETS: { label: string; width: number }[] = [
   { label: '작게', width: 240 }, { label: '중간', width: 480 }, { label: '본문 폭', width: -1 }, { label: '원래 크기', width: 0 },
 ];
@@ -79,7 +79,7 @@ export function imageFileName(source: string): string {
 }
 /**
  * 노트 이미지 한 장. 누르면 선택되어 모서리 손잡이(끌어서 가로 조절, 세로는 비율대로)와
- * 크기 도구줄(작게·중간·본문 폭·원래 크기)이 나타난다. 더블클릭하면 원래 크기로 돌아간다.
+ * 크기 도구줄(작게·중간·본문 폭·원래 크기)이 나타난다. 더블클릭하면 기본 너비로 돌아간다.
  * 크기는 [onWidth]로 노트에 저장되고, 본문 폭보다 크게는 키울 수 없다.
  */
 function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: string; source: string; alt: string; width: number; nodeKey: string; onWidth(width: number): void; drawio: boolean }) {
@@ -125,27 +125,36 @@ function ImageBox({ url, source, alt, width, nodeKey, onWidth, drawio }: { url: 
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', release); grip.addEventListener('pointercancel', release);
   };
   const isSvg = /\.svg(?:[?#]|$)/i.test(source) || /\.svg(?:[?#]|$)/i.test(url);
+  const showDrawio = drawio && !loadFailed;
   const shown = live ?? (width > 0 ? width : 0);
   const hasFixedWidth = shown > 0;
   const fileName = imageFileName(source);
   const isGeneratedName = /^img-[a-z0-9]+-[a-z0-9]+\.[a-z0-9]+$/i.test(fileName);
   const resetWidth = () => { if (editable && width > 0) onWidth(0); };
+  const activePreset = width > 0 ? width : drawio ? -1 : 0;
+  const chooseWidth = (preset: number) => {
+    if (preset < 0) onWidth(drawio ? 0 : available());
+    else if (preset === 0 && drawio) {
+      const naturalWidth = image.current?.naturalWidth;
+      if (naturalWidth) onWidth(naturalWidth);
+    } else onWidth(preset);
+  };
   const imageTools = selected && editable && <>
     <span className="lex-image-bar" role="toolbar" aria-label={drawio ? '다이어그램 도구' : '이미지 크기'}>
       {drawio && <button type="button" onMouseDown={event => event.preventDefault()}
         onClick={event => { event.stopPropagation(); editor.dispatchCommand(OPEN_DRAWIO_COMMAND, nodeKey); }}>편집</button>}
       {IMAGE_PRESETS.map(preset => <button key={preset.label} type="button" onMouseDown={event => event.preventDefault()}
-        onClick={event => { event.stopPropagation(); onWidth(preset.width < 0 ? available() : preset.width); }}
-        aria-pressed={preset.width > 0 ? width === preset.width : preset.width === 0 && width === 0}>{preset.label}</button>)}
+        onClick={event => { event.stopPropagation(); chooseWidth(preset.width); }}
+        aria-pressed={drawio && preset.width === 0 ? undefined : preset.width === activePreset}>{preset.label}</button>)}
       {shown > 0 && <span className="lex-image-size">{shown}px</span>}
     </span>
     <span className="lex-image-grip" title="끌어서 크기 조절" aria-label="끌어서 이미지 크기 조절" onPointerDown={grab}>
       <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M10.5 3.5L3.5 10.5M10.5 7.5L7.5 10.5" /></svg>
     </span>
   </>;
-  return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`} style={shown ? { width: shown } : undefined}>
-    {drawio && !loadFailed ? (
-      <DrawioView src={url} alt={alt} width={shown} imageRef={image} onError={() => setLoadFailed(true)} onResetWidth={resetWidth}>
+  return <span ref={frame} className={`lex-image-frame${isSvg ? ' is-svg' : ''}${showDrawio ? ' is-drawio' : ''}${hasFixedWidth ? ' has-fixed-width' : ''}${selected && editable ? ' is-selected' : ''}`} style={shown ? { width: shown } : undefined}>
+    {showDrawio ? (
+      <DrawioView src={url} alt={alt} imageRef={image} onError={() => setLoadFailed(true)} onResetWidth={resetWidth}>
         {imageTools}
       </DrawioView>
     ) : (

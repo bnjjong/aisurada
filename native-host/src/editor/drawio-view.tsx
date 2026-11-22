@@ -16,10 +16,9 @@ function limitOffset(offset: Point, image: Size, canvas: Size, scale: number): P
   return { x: Math.max(-x, Math.min(x, offset.x)), y: Math.max(-y, Math.min(y, offset.y)) };
 }
 
-export function DrawioView({ src, alt, width, imageRef, onError, onResetWidth, children }: {
+export function DrawioView({ src, alt, imageRef, onError, onResetWidth, children }: {
   src: string;
   alt: string;
-  width: number;
   imageRef: RefObject<HTMLImageElement | null>;
   onError(): void;
   onResetWidth(): void;
@@ -34,14 +33,18 @@ export function DrawioView({ src, alt, width, imageRef, onError, onResetWidth, c
   useLayoutEffect(() => {
     const element = canvasRef.current;
     if (!element) return;
-    const measure = () => setCanvas({ width: element.clientWidth, height: element.clientHeight });
+    const measure = () => {
+      const { width, height } = element.getBoundingClientRect();
+      setCanvas({ width, height });
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
-  const fit = image && Math.min(1, canvas.width / image.width, canvas.height / image.height);
+  const fit = image && Math.min(canvas.width / image.width, canvas.height / image.height);
+  const maxScale = Math.max(MAX_SCALE, (fit ?? 0) * MAX_SCALE);
   const scale = Math.max(fit || 0, view.scale ?? 0);
   const offset = image ? limitOffset(view.offset, image, canvas, scale) : FIT.offset;
   const canPan = Boolean(image && fit &&
@@ -51,7 +54,7 @@ export function DrawioView({ src, alt, width, imageRef, onError, onResetWidth, c
     if (!image || !fit) return;
     setView(current => {
       const previous = Math.max(fit, current.scale ?? fit);
-      const next = Math.min(MAX_SCALE, previous * factor);
+      const next = Math.min(maxScale, previous * factor);
       if (next <= fit) return FIT;
       const center = limitOffset(current.offset, image, canvas, previous);
       const ratio = next / previous;
@@ -105,7 +108,7 @@ export function DrawioView({ src, alt, width, imageRef, onError, onResetWidth, c
     <span className="drawio-view-bar" role="group" aria-label="다이어그램 보기 도구">
       <button type="button" aria-label="축소" disabled={!fit || scale <= fit} onClick={() => zoom(1 / ZOOM_STEP)}>−</button>
       <output className="drawio-view-scale" aria-label="배율">{scale > 0 ? `${Math.round(scale * 100)}%` : '–'}</output>
-      <button type="button" aria-label="확대" disabled={!fit || scale >= MAX_SCALE} onClick={() => zoom(ZOOM_STEP)}>+</button>
+      <button type="button" aria-label="확대" disabled={!fit || scale >= maxScale} onClick={() => zoom(ZOOM_STEP)}>+</button>
       <button type="button" disabled={!fit || view.scale === null} onClick={() => setView(FIT)}>전체 맞춤</button>
     </span>
     <span className="drawio-view-media">
@@ -116,10 +119,7 @@ export function DrawioView({ src, alt, width, imageRef, onError, onResetWidth, c
           if (drag.current?.id === event.pointerId) drag.current = null;
         }}>
         <img ref={imageRef} src={src} alt={alt} loading="lazy" draggable={false}
-          style={{
-            width: width || undefined,
-            transform: fit && view.scale !== null ? `translate(${offset.x}px, ${offset.y}px) scale(${scale / fit})` : undefined,
-          }}
+          style={fit && view.scale !== null ? { transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale / fit})` } : undefined}
           onLoad={event => {
             const { naturalWidth, naturalHeight } = event.currentTarget;
             if (naturalWidth > 0 && naturalHeight > 0) setImage({ width: naturalWidth, height: naturalHeight });
