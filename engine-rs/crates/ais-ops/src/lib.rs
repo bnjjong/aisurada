@@ -11,6 +11,7 @@ pub mod agent_cli;
 pub mod doctor;
 pub mod env;
 pub mod install;
+pub mod manager;
 pub mod migrate;
 pub mod old_sidecar;
 pub mod register;

@@ -70,10 +70,10 @@ fn cases() -> Vec<String> {
     add(r#"{"jsonrpc":"2.0","id":"abc","method":"tools/list","params":{}}"#);
 
     // 모든 도구 호출(읽기 모드에서는 쓰기 도구가 막히고, 쓰기 모드에서는 영구 삭제만 막힌다)
-    // Java 엔진 시절 이후 추가된 새 도구(create_task, list_decisions)는 Java 기준 테이프와 견줄 때 제외한다
+    // Java 엔진 시절 이후 추가된 새 도구(create_task, add_task_comment, list_decisions)는 Java 기준 테이프와 견줄 때 제외한다
     for (n, name) in CLI_TOOL_NAMES
         .iter()
-        .filter(|&&name| name != "create_task" && name != "list_decisions")
+        .filter(|&&name| !matches!(name, "create_task" | "add_task_comment" | "list_decisions"))
         .enumerate()
     {
         add(&format!(
@@ -284,7 +284,7 @@ fn main() -> ExitCode {
                 }
             }
             if line.contains(r#""method":"tools/list""#) {
-                // Java 엔진(java-engine-final) 이후 추가/변경된 create_task·list_decisions(목록 끝)와 get_task 문구를 Java 기준 테이프와 견주기 위해 정규화한다
+                // Java 엔진(java-engine-final) 이후 추가/변경된 create_task·add_task_comment·list_decisions(목록 끝)와 get_task 문구를 Java 기준 테이프와 견주기 위해 정규화한다
                 if let Some(pos) = rust_output.find(r#",{"name":"create_task""#) {
                     rust_output = format!("{}]}}}}", &rust_output[..pos]);
                 } else if let Some(pos) = rust_output.find(r#",{"name":"list_decisions""#) {

@@ -9,7 +9,7 @@ import { formatRelativeTime } from "./dates.ts";
 import { dismissToast, kindLabel, markRead, useNotifications, visibleItems } from "./notificationsStore.ts";
 import type { NotifyItem, NotifyKind } from "./notificationsStore.ts";
 
-const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", test: "i" };
+const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", manager: "접", test: "i" };
 
 /** 알림 종류를 나타내는 동그라미. 색은 종류가 정한다(`notifications.css`의 `.ntf-ico-*`). */
 function KindMark({ kind }: { kind: NotifyKind }) {

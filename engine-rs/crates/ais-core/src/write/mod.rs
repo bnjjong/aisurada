@@ -64,3 +64,5 @@ pub(crate) use crate::note::slug;
 pub use ais_kernel::snake_dump;
 #[cfg(not(feature = "test-support"))]
 pub(crate) use ais_kernel::snake_dump;
+pub use atomic::write_atomic;
+pub use pipeline::acquire_lock;

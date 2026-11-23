@@ -220,7 +220,12 @@ fn bad_arguments_and_help_exit_cleanly() {
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(0));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("사용법: ais-cli mcp [--write]"));
+    assert!(
+        String::from_utf8_lossy(&output.stdout)
+            .contains("사용법: ais-cli mcp [--write | --manager NAME]")
+    );
+    let (code, _) = converse(&vault, &["--manager"], &[]);
+    assert_eq!(code, 2);
     let _ = std::fs::remove_dir_all(&vault);
 }
 

@@ -277,7 +277,14 @@ pub const TOOLS: &[McpTool] = &[
     McpTool {
         name: "create_task",
         description: "새 태스크(티켓) 1건을 만든다. repo(owner/name), title, criteria(완료 기준 목록 1개 이상)는 필수다. status는 draft로 시작한다. 응답에 key(TSK-1), id, precondition(f1)이 들어 있다.",
-        input_schema: "{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\",\"description\":\"태스크 요약 제목\"},\"repo\":{\"type\":\"string\",\"description\":\"저장소(owner/name)\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"완료 기준 목록. 1개 이상 필수\"},\"type\":{\"type\":\"string\",\"enum\":[\"feature\",\"bug\",\"chore\"],\"description\":\"태스크 유형. 기본 feature\"},\"priority\":{\"type\":\"string\",\"enum\":[\"high\",\"medium\",\"low\"],\"description\":\"우선순위. 기본 medium\"},\"project\":{\"type\":\"string\",\"description\":\"프로젝트 slug\"},\"base\":{\"type\":\"string\",\"description\":\"기준 브랜치. 예: main\"},\"body\":{\"type\":\"string\",\"description\":\"상세 설명(마크다운)\"},\"labels\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"라벨 목록\"},\"refs\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"참조 목록\"}},\"required\":[\"title\",\"repo\",\"criteria\"],\"additionalProperties\":false}",
+        input_schema: r#"{"type":"object","properties":{"title":{"type":"string","description":"태스크 요약 제목"},"repo":{"type":"string","description":"저장소(owner/name)"},"criteria":{"type":"array","items":{"type":"string"},"description":"완료 기준 목록. 1개 이상 필수"},"type":{"type":"string","enum":["feature","bug","chore"],"description":"태스크 유형. 기본 feature"},"priority":{"type":"string","enum":["high","medium","low"],"description":"우선순위. 기본 medium"},"project":{"type":"string","description":"프로젝트 slug"},"base":{"type":"string","description":"기준 브랜치. 예: main"},"body":{"type":"string","description":"상세 설명(마크다운)"},"labels":{"type":"array","items":{"type":"string"},"description":"라벨 목록"},"refs":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["note","github","slack"]},"target":{"type":"string","description":"노트 식별자, GitHub 이슈·PR 또는 Slack 메시지 주소"},"title":{"type":"string"}},"required":["kind","target"],"additionalProperties":false},"description":"참조 목록"}},"required":["title","repo","criteria"],"additionalProperties":false}"#,
+        write: true,
+        destructive: false,
+    },
+    McpTool {
+        name: "add_task_comment",
+        description: "태스크에 댓글을 남긴다. id(키 또는 식별자)와 body(댓글, 20000자까지)가 필요하다.",
+        input_schema: r#"{"type":"object","properties":{"id":{"type":"string"},"body":{"type":"string","maxLength":20000}},"required":["id","body"],"additionalProperties":false}"#,
         write: true,
         destructive: false,
     },

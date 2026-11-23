@@ -31,6 +31,23 @@ pub struct CallContext {
     pub session: Option<String>,
     /// 세션을 연 에이전트 이름(`codex` 따위). 없으면 claude로 본다. 노트에 적는 편집 도장이 읽는다.
     pub session_agent: Option<String>,
+    #[serde(skip)]
+    pub manager: Option<ManagerContext>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagerContext {
+    pub name: String,
+    pub repos: Vec<String>,
+}
+
+/// 등록부와 파일에 쓸 수 있는 매니저 이름인지 본다.
+pub fn valid_manager_name(value: &str) -> bool {
+    (1..=32).contains(&value.len())
+        && value.as_bytes()[0].is_ascii_lowercase()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
 impl CallContext {
@@ -45,6 +62,7 @@ impl CallContext {
             caller: Caller::Ai,
             session,
             session_agent,
+            manager: None,
         }
     }
 }

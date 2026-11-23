@@ -1289,6 +1289,7 @@ fn apply_run<'a>(vault: &'a Path, change: &changes::Change) -> Run<'a> {
                 .map_or_else(|| "null".to_string(), java_text),
             session: field("session"),
             agent: field("agent"),
+            manager: None,
         },
         apply: true,
         by: "approved",

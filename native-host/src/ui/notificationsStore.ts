@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
 
 export type HostCall = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "test";
+export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "manager" | "test";
 export type EventKind = Exclude<NotifyKind, "test">;
 
 export interface NotifyItem {
@@ -69,6 +69,7 @@ export const EVENT_KINDS: readonly { id: EventKind; label: string; hint: string 
   { id: "failed", label: "실패하거나 막혔을 때", hint: "한도를 넘었거나 에이전트가 멈췄어요" },
   { id: "done", label: "Done으로 바뀌었을 때", hint: "조용히 알려도 돼요" },
   { id: "approval", label: "스킬·에이전트 변경이 승인을 기다릴 때", hint: "AI가 쓴 변경은 사람이 승인해야 적용돼요. 늦으면 AI의 일이 막혀요" },
+  { id: "manager", label: "매니저가 태스크를 접수했을 때", hint: "새 제보를 초안으로 받았어요" },
   { id: "decision", label: "AI가 노트에서 답을 기다릴 때", hint: "AI가 노트에 쓴 「정할 것」에 답하고 「답 다 했음」을 체크하면 AI가 이어 가요" },
 ];
 
@@ -82,6 +83,7 @@ export const DEFAULT_SETTINGS: NotifySettings = {
     done: { inApp: true, macos: false },
     approval: { inApp: true, macos: true },
     decision: { inApp: true, macos: true },
+    manager: { inApp: true, macos: true },
   },
 };
 
@@ -93,7 +95,7 @@ export const TOAST_MS = 8000;
 // ---------------------------------------------------------------- 읽기
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "decision", "test"]);
+const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "decision", "manager", "test"]);
 
 /** 호스트 행을 알림으로 읽는다. 모양이 틀리면 null이다. */
 export function toItem(v: unknown): NotifyItem | null {
@@ -130,6 +132,7 @@ export function toSettings(v: unknown): NotifySettings {
       done: channel(events.done, d.events.done),
       approval: channel(events.approval, d.events.approval),
       decision: channel(events.decision, d.events.decision),
+      manager: channel(events.manager, d.events.manager),
     },
   };
 }
@@ -258,7 +261,7 @@ export async function sendTest(call: HostCall): Promise<PushResult | null> {
 // ---------------------------------------------------------------- 표시
 
 export const kindLabel = (k: NotifyKind): string =>
-  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", decision: "정할 것", test: "시험" })[k];
+  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", decision: "정할 것", manager: "매니저", test: "시험" })[k];
 
 /** 시험 알림의 배너 결과를 사람이 읽을 글로 푼다. */
 export function bannerMessage(banner: string): string {

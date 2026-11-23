@@ -36,7 +36,7 @@ pub mod write;
 pub use ais_kernel::error;
 pub use ais_kernel::json;
 /// 호출 맥락(누가, 어느 세션에서). 앱과 명령줄이 엔진을 부를 때 넘긴다.
-pub use ais_kernel::kernel::actor::{CallContext, Caller};
+pub use ais_kernel::kernel::actor::{CallContext, Caller, ManagerContext, valid_manager_name};
 pub use ais_kernel::text;
 
 #[cfg(feature = "test-support")]

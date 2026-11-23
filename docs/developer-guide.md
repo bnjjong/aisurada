@@ -350,6 +350,34 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
 - **`ais-cli`가 넘겨 주는 이름.** `ais-cli`는 `engine-rs/crates/ais-cli/src/registry.rs`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`, 승인 명령 7개는 `ENGINE_COMMANDS_APPROVALS`)에 든 이름만 엔진으로 넘긴다. 새 명령을 넣고 이 목록에 빠뜨리면 실제 앱에서 「알 수 없는 이름」(종료 코드 2)으로 거절된다. Java 시절에 태스크 명령이 이 목록에 빠져 있던 적이 있다(`5b38c33`). 지금은 `crates/ais-cli/tests/command_tables.rs`가 엔진의 명령 목록(`ais_core::engine::catalog()`)에 있고 이 목록에 없는 이름을 잡아 실패한다.
 - **아직 없는 것.** 코드를 고치고 PR을 올리는 러너(4단계), 태스크 안 채팅(정의 에이전트, 3b), 질문을 위 단계 에이전트가 먼저 푸는 계층(5단계). 승인 워크플로우(이슈 #53)는 러너가 코드를 고치기 전에 필요하다. 읽기 전용 러너는 아래 「러너」에 있다.
 
+### Hermes 매니저 연결
+
+매니저는 이름, 열린 도구, 허용 저장소와 아젠다로 제한한다. 등록부는 앱 지원 폴더의 `managers.json`에 있다. 새 태스크는 Draft로 남고 태스크와 댓글 활동에 매니저가 기록된다. `refs`에 `kind: slack`과 Slack 메시지 주소를 넣으면 제보 출처로 연결된다.
+
+```sh
+ais-cli manager add hermes label=Hermes repos=bnjjong/aisurada agendas=개발 webhook=http://127.0.0.1:8644/webhooks/aisurada
+ais-cli manager config hermes
+ais-cli manager list
+```
+
+- `config`가 출력하는 `mcp_servers.aisurada` 항목을 Hermes 전용 프로필의 설정에 합친다. Hermes가 출력에 적힌 새 `ais-cli`를 실행할 수 있어야 한다.
+- Hermes가 새 제보를 받으면 비슷한 태스크와 노트를 먼저 찾고, 중복은 기존 태스크의 댓글로 남긴다. 새 작업은 초안으로 접수하고, 정보가 부족하면 되묻는다. 매니저용 서버가 연결할 때 이 규칙을 안내한다.
+- `manager update hermes repos=소유자/저장소 agendas=아젠다`는 지정한 목록을 교체한다. `manager disable hermes`를 실행하면 떠 있는 서버도 다음 도구 호출부터 거절한다. `manager enable hermes`로 다시 켠다.
+- 러너가 들어 있는 macOS 빌드는 새 제보를 앱에서 알린다. 첫 조회에서 기존 태스크 상태를 기록하고, 그 뒤 개발 준비·검토·완료·실패로 바뀐 경우에 상태를 알린다. 주소는 이 기기의 웹훅으로 제한한다. 태스크 설명과 노트 본문은 상태 알림에 싣지 않는다.
+- 상태 알림을 사용하려면 macOS 키체인에 서비스가 `aisurada.manager.webhook`, 계정이 `hermes`인 일반 암호 항목을 만든다. Hermes 라우트에도 같은 서명 키를 설정한다. Slack 연결 뒤 아래 항목을 그 라우트에 추가해 원래 스레드에 답글을 단다.
+
+```yaml
+events: [aisurada.task.status]
+signature: generic
+deliver: slack
+deliver_only: true
+prompt: "{message}"
+deliver_extra:
+  chat_id: "{channel}"
+  thread_id: "{thread_id}"
+```
+
+
 ### 알림 (`notifications.rs`)
 
 태스크 시스템 2단계다. 알림 목록 저장, 채널 설정, macOS 배너를 호스트의 이 모듈 한 곳에서 맡는다. **외부 설명서에 없는 확장이다.** 러너(3단계)도 화면도 같은 `push`를 거치므로 「어디로 보낼지」가 한 곳에서만 정해진다. 알림을 만드는 쪽은 러너(질문, 보고, 실패), 승인 알림(`approvals.rs`, 아래 「승인 워크플로」의 「알림」)과 **설정의 「시험 알림 보내기」**다.
@@ -658,7 +686,7 @@ Claude 같은 MCP 클라이언트가 노트를 도구로 쓰게 하는 모드다
 
 연결하는 법, 도구의 인자, 안전장치, 응답과 오류 예시는 [`mcp-guide.md`](mcp-guide.md)에 따로 정리했다. 이 절은 만드는 쪽 이야기만 적는다.
 
-- **도구.** 이름은 엔진 도구 40개와 같다. 기본은 읽기 20개만 내놓고 `--write`를 주면 39개를 내놓는다(둘 다 `tools/list`로 직접 세어 확인했다, 2026-11-20). `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
+- **도구.** 기본은 읽기 도구만 내놓고 `--write`를 주면 쓰기 도구도 연다. `--manager NAME` 모드는 등록부에서 고른 도구만 내놓는다. `purge_doc`(영구 삭제)는 어느 쪽에도 없다. 모델이 되돌릴 수 없는 삭제를 하지 못하게 하려는 것이다. 읽기와 쓰기의 구분은 `mcp_tools.rs`의 `write` 깃발에 있다.
 - **호출 길.** 도구 호출은 단발 `ais-cli`와 같은 길(`ais_cli::run`)을 프로세스 하나에서 되풀이한다. 명령줄 길이 표준 출력·오류에 쓰는 글은 호출마다 모아서 돌려주므로 프로토콜 출력에 섞이지 않는다. 도구를 부를 때마다 자동 커밋을 지켜본다(`watch`). 유휴 타이머가 MCP 서버 안에서 돌기 때문이다.
 - **vault.** 도구를 부를 때마다 정한다. `AISURADA_VAULT`가 있으면 그것, 없으면 앱이 지금 연 vault(위 「앱이 연 vault」)다. 서버 하나는 한 번에 vault 하나를 맡지만 호출마다 바뀔 수 있다.
 - **스키마를 고칠 때.** `mcp_tools.rs`의 입력 스키마 키는 도구 해석기(`tool.rs`)가 받는 키와 이름과 차례까지 같아야 하고, 필수 키는 스키마 차례대로 검사해야 하며, 읽기 전용 표시는 엔진의 쓰기 명령 목록과 맞아야 한다. 명령줄 쪽 옵션(`spec_table.rs`)은 정렬돼 있어야 하고 모두 엔진 인자로 이어져야 한다. 이 넷은 `engine-rs/crates/ais-cli/tests/table_contracts.rs`가 지킨다(2026-11-16 추가, 지금 37개 도구와 명령 명세 전체가 통과하고, 표를 일부러 어긋나게 하면 실패하는 것을 확인했다). 사용법 글과 옵션 목록의 알려진 어긋남 7건(`repos`·`projectRepo`·`query`가 사용법 글에 없는 것 따위)은 시험의 `KNOWN_USAGE_GAPS`에 적혀 있고, 사용법 글은 Java가 오류 때 찍던 글이라 고치면 `cli_compat`의 기준과 어긋난다. 도구의 인자를 바꾸면 두 표, `tool.rs`, `mcp_compat`의 기대를 함께 맞춘다.

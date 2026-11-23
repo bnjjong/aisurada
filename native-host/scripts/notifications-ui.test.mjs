@@ -177,7 +177,7 @@ test('texts: banner results, kind names, visible items', () => {
   assert.equal(itemAddress({ kind: 'pr', taskKey: 'TSK-3' }), '/task/TSK-3');
   assert.equal(itemAddress({ kind: 'test', taskKey: null }), null);
   assert.equal(kindLabel('approval'), '승인');
-  assert.deepEqual(EVENT_KINDS.map((e) => e.id), ['question', 'pr', 'failed', 'done', 'approval', 'decision']);
+  assert.deepEqual(EVENT_KINDS.map((e) => e.id), ['question', 'pr', 'failed', 'done', 'approval', 'manager', 'decision']);
   assert.equal(actionLabel({ kind: 'decision', taskKey: null, noteRef: 'nd1-a/sn2-b' }), '답하러 가기', 'a decision notice opens its note');
   assert.equal(itemAddress({ kind: 'decision', taskKey: null, noteRef: 'nd1-a/sn2-b' }), '/sub/nd1-a/sn2-b');
   assert.equal(itemAddress({ kind: 'decision', taskKey: null, noteRef: 'nd1-a' }), '/doc/nd1-a');

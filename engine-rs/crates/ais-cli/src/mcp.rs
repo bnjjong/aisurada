@@ -12,6 +12,7 @@ use std::io::{BufRead, Write};
 use ais_core::json::{self, JsonValue};
 
 use crate::env::{Env, SessionSource};
+use crate::manager::{self, Manager};
 use crate::mcp_tools::TOOLS;
 
 pub const SERVER_NAME: &str = "aisurada";
@@ -124,8 +125,46 @@ pub struct Call {
 /// 도구를 부르는 쪽. 인자는 `[도구 이름, 압축한 JSON 인자]`이고, 세션 출처는 이 호출에만 쓴다.
 pub type Caller<'a> = dyn FnMut(&[String], Option<SessionSource>) -> Call + 'a;
 
+struct ManagerGate {
+    initial: Manager,
+    env: Env,
+}
+
+impl ManagerGate {
+    fn current(&self) -> Result<Manager, String> {
+        manager::find_enabled(&self.env, &self.initial.name)
+    }
+
+    fn check(&self, tool: &str, arguments: &JsonValue) -> Result<Manager, String> {
+        let current = self.current()?;
+        if !self.initial.tools.iter().any(|name| name == tool)
+            || !current.tools.iter().any(|name| name == tool)
+        {
+            return Err(format!(
+                "매니저 {}에게 열지 않은 도구다: {tool}",
+                current.name
+            ));
+        }
+        let scope = match tool {
+            "create_task" => Some(("repo", "저장소", &current.repos)),
+            "create_doc" => Some(("agenda", "아젠다", &current.agendas)),
+            _ => None,
+        };
+        if let Some((key, label, allowed)) = scope
+            && !matches!(arguments.get(key), Some(JsonValue::Str(value)) if allowed.contains(value))
+        {
+            return Err(format!(
+                "허용하지 않은 {label}다. 쓸 수 있는 {label}: {}",
+                allowed.join(", ")
+            ));
+        }
+        Ok(current)
+    }
+}
+
 pub struct McpServer<'a> {
     allow_write: bool,
+    manager: Option<ManagerGate>,
     caller: Box<Caller<'a>>,
     /// initialize 요청의 `clientInfo.name`. 어느 에이전트가 붙었는지 가릴 때 쓴다.
     client_name: Option<String>,
@@ -135,6 +174,7 @@ impl<'a> McpServer<'a> {
     pub fn new(allow_write: bool, caller: Box<Caller<'a>>) -> Self {
         McpServer {
             allow_write,
+            manager: None,
             caller,
             client_name: None,
         }
@@ -225,14 +265,25 @@ impl<'a> McpServer<'a> {
             quote(version),
             quote(SERVER_NAME),
             quote(SERVER_VERSION),
-            quote(&instructions(self.client_name.as_deref()))
+            quote(&self.manager.as_ref().map_or_else(
+                || instructions(self.client_name.as_deref()),
+                |gate| format!(
+                    "매니저 {}의 제보 접수 도구다. 새 일은 Draft로 만들고, 만들기 전에 유사 태스크와 노트를 찾는다. 중복 제보는 기존 태스크 댓글로 남긴다. Slack 출처는 refs의 slack 항목으로 보관한다. 판단 정보가 부족하면 되묻고, 쓰기 결과를 확인한 뒤 제보자에게 알린다.",
+                    gate.initial.name
+                )
+            ))
         )
     }
 
     fn tools_list_result(&self) -> String {
+        let active = self.manager.as_ref().and_then(|gate| gate.current().ok());
         let tools: Vec<String> = TOOLS
             .iter()
-            .filter(|tool| is_exposed(tool, self.allow_write))
+            .filter(|tool| match &self.manager {
+                Some(gate) => gate.initial.tools.iter().any(|name| name == tool.name)
+                    && active.as_ref().is_some_and(|m| m.tools.iter().any(|name| name == tool.name)),
+                None => is_exposed(tool, self.allow_write),
+            })
             .map(|tool| {
                 let mut annotations = format!("\"readOnlyHint\":{}", !tool.write);
                 if tool.write {
@@ -275,7 +326,15 @@ impl<'a> McpServer<'a> {
                 ),
             );
         }
-        if !is_exposed(tool, self.allow_write) {
+        let managed = if let Some(gate) = &self.manager {
+            match gate.check(name, arguments) {
+                Ok(manager) => Some((gate, manager)),
+                Err(message) => return result(id, &tool_result(&message, true)),
+            }
+        } else {
+            None
+        };
+        if managed.is_none() && !is_exposed(tool, self.allow_write) {
             return result(
                 id,
                 &tool_result(
@@ -292,7 +351,12 @@ impl<'a> McpServer<'a> {
             self.client_name.as_deref(),
             meta_session_id(params.get("_meta")),
         );
-        let call = (self.caller)(&[name.clone(), json::compact(arguments)], session);
+        let args = [name.clone(), json::compact(arguments)];
+        let call = if let Some((gate, manager)) = managed {
+            call_engine(&gate.env, &args, session, Some(&manager))
+        } else {
+            (self.caller)(&args, session)
+        };
         if call.status == 0 {
             let text = if call.stdout.is_empty() {
                 "(출력 없음)"
@@ -382,14 +446,26 @@ fn error(id: &str, code: i32, message: &str) -> String {
     )
 }
 
-/// `ais-cli mcp [--write]`의 진입점. 표준 입력이 닫힐 때까지 돌고 종료 코드를 돌려준다.
+/// `ais-cli mcp [--write | --manager NAME]`의 진입점. 표준 입력이 닫힐 때까지 돌고 종료 코드를 돌려준다.
 pub fn run_stdio(args: &[String], env: &Env) -> i32 {
     let mut write = false;
-    for arg in args {
-        match arg.as_str() {
+    let mut manager_name = None;
+    let mut args = args.iter().map(String::as_str);
+    while let Some(arg) = args.next() {
+        match arg {
             "--write" => write = true,
+            "--manager" if manager_name.is_none() => {
+                let Some(name) = args.next().filter(|name| !name.starts_with('-')) else {
+                    eprintln!("--manager 뒤에 매니저 이름이 필요하다");
+                    return 2;
+                };
+                manager_name = Some(name);
+            }
+            option if option.starts_with("--manager=") && manager_name.is_none() => {
+                manager_name = option.strip_prefix("--manager=");
+            }
             "--help" | "-h" => {
-                println!("사용법: ais-cli mcp [--write]");
+                println!("사용법: ais-cli mcp [--write | --manager NAME]");
                 println!(
                     "  MCP 서버로 선다(표준 입출력). vault는 AISURADA_VAULT로 정하고, 없으면 앱이 열어 둔 vault를 호출마다 따른다."
                 );
@@ -400,19 +476,31 @@ pub fn run_stdio(args: &[String], env: &Env) -> i32 {
                 return 0;
             }
             other => {
-                eprintln!("알 수 없는 인자: {other} (ais-cli mcp [--write])");
+                eprintln!("알 수 없는 인자: {other} (ais-cli mcp [--write | --manager NAME])");
                 return 2;
             }
         }
     }
+    let manager = match manager_name
+        .map(|name| manager::find_enabled(env, name))
+        .transpose()
+    {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("{error}");
+            return 2;
+        }
+    };
     // 프로토콜 출력은 표준 출력으로만 낸다. 안내 글은 표준 오류로 낸다.
     let vault = crate::env::resolve_vault(env);
     eprintln!(
         "aisurada MCP 서버 {SERVER_VERSION}: {}{}",
-        if write {
-            "읽기+쓰기"
+        if let Some(manager) = &manager {
+            format!("매니저 {}", manager.name)
+        } else if write {
+            "읽기+쓰기".into()
         } else {
-            "읽기 전용"
+            "읽기 전용".into()
         },
         if vault.as_deref().is_none_or(is_blank) {
             " (vault를 아직 못 정했다. 앱을 열어 vault를 열면 도구 호출이 그 vault를 쓴다)"
@@ -425,8 +513,12 @@ pub fn run_stdio(args: &[String], env: &Env) -> i32 {
     watch_vault(&base);
     let mut server = McpServer::new(
         write,
-        Box::new(move |args, session| call_engine(&base, args, session)),
+        Box::new(move |args, session| call_engine(&base, args, session, None)),
     );
+    server.manager = manager.map(|initial| ManagerGate {
+        initial,
+        env: env.clone(),
+    });
     let stdin = std::io::stdin();
     match server.serve(stdin.lock(), std::io::stdout().lock()) {
         Ok(()) => 0,
@@ -448,12 +540,19 @@ fn watch_vault(env: &Env) {
 }
 
 /// 도구 한 번을 명령줄과 같은 길로 부른다. 안쪽에서 패닉이 나도 서버는 살아 있게 종료 코드 1로 바꾼다.
-fn call_engine(base: &Env, args: &[String], session: Option<SessionSource>) -> Call {
+fn call_engine(
+    base: &Env,
+    args: &[String],
+    session: Option<SessionSource>,
+    manager: Option<&Manager>,
+) -> Call {
     watch_vault(base);
     let mut env = base.clone();
     env.session = session;
     let args = args.to_vec();
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| crate::run(&args, &env))) {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::run_with_manager(&args, &env, manager)
+    })) {
         Ok(outcome) => Call {
             status: outcome.code,
             stdout: outcome.stdout,

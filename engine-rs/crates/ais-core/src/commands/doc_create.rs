@@ -153,6 +153,7 @@ pub fn create_doc_in(
         &format_utc_millis(millis),
         context.session.as_deref(),
         context.session_agent.as_deref(),
+        context.manager.as_ref().map(|manager| manager.name.as_str()),
     );
     check_size(&text, &note_rel)?;
     write_atomic(&note_dir.join("note.md"), text.as_bytes())?;

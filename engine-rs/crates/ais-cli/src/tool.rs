@@ -668,6 +668,7 @@ fn resource_or_task_tool(
             &TASK_BOOLS,
         ),
         "get_task" => (&["id", "activity"], &TASK_BOOLS),
+        "add_task_comment" => (&["id", "body"], &TASK_BOOLS),
         "create_task" => (
             &[
                 "title", "repo", "criteria", "type", "priority", "project", "base", "body",
@@ -679,6 +680,10 @@ fn resource_or_task_tool(
     };
     validate_keys(tool, props, keys)?;
 
+    if tool == "add_task_comment" {
+        required_string(tool, props, "id")?;
+        required_string(tool, props, "body")?;
+    }
     if tool == "create_task" {
         required_string(tool, props, "title")?;
         required_string(tool, props, "repo")?;
@@ -746,7 +751,8 @@ fn resource_or_task_tool(
         | "restore_resource"
         | "list_resource_versions"
         | "get_resource_change"
-        | "get_task" => &["id"],
+        | "get_task"
+        | "add_task_comment" => &["id"],
         "usable_resources" => &["project"],
         "set_resource_ref" => &["project", "id"],
         _ => &[],
