@@ -10,9 +10,9 @@
 .archyl-workspace { container-type: inline-size; }
 .archyl-toolbar, .archyl-toolbar nav, .archyl-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .archyl-toolbar { justify-content: space-between; margin-bottom: 10px; }
-.archyl-toolbar button, .archyl-chat header button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; min-height: 30px; font-size: 12px; }
+.archyl-toolbar :is(button, .archyl-project-link), .archyl-chat header button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; min-height: 30px; font-size: 12px; }
 .archyl-toolbar button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); color: var(--ink); font-weight: 650; }
-.archyl-source { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; margin-inline: 3px; }
+.archyl-project-link { color: var(--accent); text-underline-offset: 2px; }
 .archyl-workbench { display: grid; grid-template-columns: minmax(0, 1fr) clamp(228px, 31%, 335px); align-items: start; gap: 12px; }
 .archyl-workbench[data-chat-open="false"] { grid-template-columns: minmax(0, 1fr); }
 .archyl-map-column { min-width: 0; }

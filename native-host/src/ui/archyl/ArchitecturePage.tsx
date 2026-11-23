@@ -95,6 +95,7 @@ function LinkedArchitecture({ project, writable, controller }: {
   const busy = useRef(false);
   const generation = useRef(0);
   const host = controller.callHost;
+  const projectUrl = `https://app.archyl.com/project/${encodeURIComponent(project.id)}`;
 
   useEffect(() => {
     const sequence = ++generation.current;
@@ -189,7 +190,9 @@ function LinkedArchitecture({ project, writable, controller }: {
           ))}
         </nav>
         <div className="archyl-toolbar-actions">
-          <span className="archyl-source"><Icon name="tree" size={14} /> Archyl</span>
+          <a className="archyl-project-link" href={projectUrl} target="_blank" rel="noreferrer">
+            <Icon name="popout" size={14} /> Archyl에서 열기
+          </a>
           <button type="button" onClick={() => void reload()} disabled={loading || sending} aria-label="다이어그램 새로고침"><Icon name="history" size={15} /></button>
           <button
             ref={toggle}
