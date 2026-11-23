@@ -3,7 +3,7 @@ import { migrateLegacy } from './migrateLegacy.ts';
 import { sampleWorkspace } from './sample.ts';
 import { addRecent, homePath, KEYS, lastWorkspace, readJSON, readSampleTemplates, readSkin, readTheme, recentWorkspaces,
   removeRecent, savedOpenIds, writeJSON } from './storage.ts';
-import { waitingAnswers, unsavedAnswers, noteRailNow } from '@claude-plug/state';
+import { waitingAnswers, unsavedAnswers, noteRailNow, CLAUDE_ENABLED } from '@claude-plug/state';
 import { asRow, asText, workspaceName } from './types.ts';
 import { TabModel } from '../navigation/tabs.ts';
 import { NoteScrollMemory } from '../navigation/scroll.ts';
@@ -15,7 +15,7 @@ import { shortcutFor, zoomShortcutFor } from '../interaction/shortcuts.ts';
 import type { KeyInput } from '../interaction/shortcuts.ts';
 import { readTypography, stepScale } from './typography.ts';
 import type { Typography } from './typography.ts';
-import type { RecentWorkspace, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import type { RecentWorkspace, SettingsSection, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
@@ -71,7 +71,7 @@ export class WorkspaceController {
       notice => this.notify(notice)
     );
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
-      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
+      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, settingsSection: 'look', form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
       theme: readTheme(services.storage), skin: readSkin(services.storage), typography: readTypography(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
@@ -197,7 +197,15 @@ export class WorkspaceController {
     writePreferences(this.services.storage, update as any, true);
     this.refreshTheme();
   };
-  settings = (open: boolean) => { if (this.context.kind === 'main') this.patch({ settingsOpen: open }); };
+  settings = (open: boolean, section?: SettingsSection) => {
+    if (this.context.kind === 'main') {
+      const resolved = section === 'ai' && !CLAUDE_ENABLED ? 'look' : section;
+      this.patch({
+        settingsOpen: open,
+        ...(resolved ? { settingsSection: resolved } : {}),
+      });
+    }
+  };
   form = (form: WorkspaceState['form']) => { if (this.context.kind === 'main') this.patch({ form }); };
   filterAgendas = (hidden: string[]) => this.patch({ hiddenAgendas: [...new Set(hidden)] });
   selectSubAgendaFilter = (agendaId: string, filterId: string) => {

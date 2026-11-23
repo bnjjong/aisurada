@@ -63,7 +63,7 @@ function ProjectArchitecture({ linkKey, name, controller }: {
             <>
               <p>Archyl에 로그인하면 이 프로젝트의 C4 다이어그램을 볼 수 있어요.</p>
               {account.error && <p className="archyl-error" role="alert">{account.error}</p>}
-              <button className="button-primary" type="button" onClick={() => controller.settings(true)}>연결 설정</button>
+              <button className="button-primary" type="button" onClick={() => controller.settings(true, 'connections')}>연결 설정</button>
             </>
           )}
         </div>
@@ -245,7 +245,7 @@ function LinkedArchitecture({ project, writable, controller }: {
               <Icon name="issue" size={14} />
               {targetName ? <><span>선택한 요소</span><strong>{targetName}</strong></> : <span>다이어그램 전체</span>}
             </p>
-            {!writable && <p>이 Archyl 연결은 조회 전용이에요. <button type="button" onClick={() => controller.settings(true)}>연결 설정</button></p>}
+            {!writable && <p>이 Archyl 연결은 조회 전용이에요. <button type="button" onClick={() => controller.settings(true, 'connections')}>연결 설정</button></p>}
             {writable && !CLAUDE_ENABLED && <p>이 빌드에서는 Claude 챗을 사용할 수 없어요.</p>}
             <label htmlFor="archyl-request">변경 요청</label>
             <textarea

@@ -159,7 +159,7 @@ export function NotificationBell({ controller }: { controller: WorkspaceControll
             onReadAll={() => void markRead(call)}
             onSettings={() => {
               setOpen(false);
-              controller.settings(true);
+              controller.settings(true, 'notifications');
             }}
           />
         </Popover>
