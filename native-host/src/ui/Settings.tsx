@@ -2,6 +2,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Skin, WorkspaceState } from "../workspace/types.ts";
 import { ClaudeConnect } from "@claude-plug/connect";
 import { CLAUDE_ENABLED } from "@claude-plug/state";
+import { ArchylConnect } from "./archyl/ArchylConnect.tsx";
 import { GithubConnect } from "./GithubConnect.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
 import { TypographySettings } from "./TypographySettings.tsx";
@@ -130,6 +131,7 @@ export function Settings({
       <NotificationSettings controller={controller} />
       <ClaudeConnect />
       <GithubConnect controller={controller} />
+      <ArchylConnect controller={controller} />
     </Modal>
   );
 }

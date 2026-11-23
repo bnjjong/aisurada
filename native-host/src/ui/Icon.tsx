@@ -144,6 +144,26 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M8 2v2.5M5.5 8h.01M10.5 8h.01M5.5 10.5h5" />
     </>
   ),
+  person: (
+    <>
+      <circle cx="8" cy="5" r="2.3" />
+      <path d="M3.5 13v-1.2a2.8 2.8 0 0 1 2.8-2.8h3.4a2.8 2.8 0 0 1 2.8 2.8V13" />
+    </>
+  ),
+  database: (
+    <>
+      <ellipse cx="8" cy="4" rx="5" ry="2" />
+      <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2" />
+    </>
+  ),
+  gitBranch: (
+    <>
+      <circle cx="4" cy="3.5" r="1.5" />
+      <circle cx="4" cy="12.5" r="1.5" />
+      <circle cx="12" cy="3.5" r="1.5" />
+      <path d="M4 5v6c0-2 2-3 4-3s4-1 4-3" />
+    </>
+  ),
   globe: (
     <>
       <circle cx="8" cy="8" r="6" />

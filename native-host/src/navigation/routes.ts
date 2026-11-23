@@ -14,7 +14,7 @@ export type ScreenRoute =
   | { kind: 'notes'; open: string[] }
   | { kind: 'templates'; open: string }
   | { kind: 'session'; id: string }
-  | { kind: 'project'; slug: string }
+  | { kind: 'project' | 'architecture'; slug: string }
   | { kind: 'task'; key: string }
   | { kind: 'terminal'; id: string | null }
   | { kind: PlainPage };
@@ -42,7 +42,7 @@ export function parseRoute(address: string): ScreenRoute {
     const plain = ['favorites', 'connections', 'review', 'trash', 'guide', 'resources', 'tasks', 'global-resources'] as const;
     const page = plain.find(kind => path === `/${kind}`);
     if (page) return { kind: page };
-    const segment = /^\/(doc|agenda|session|terminal|project|task)\/([^/]+)$/.exec(path);
+    const segment = /^\/(doc|agenda|session|terminal|project|architecture|task)\/([^/]+)$/.exec(path);
     if (!segment) return { kind: 'unknown' };
     const id = decodeURIComponent(segment[2]);
     switch (segment[1]) {
@@ -50,6 +50,7 @@ export function parseRoute(address: string): ScreenRoute {
       case 'agenda': return { kind: 'agenda', id, open: (query.get('open') || '').split(',').filter(Boolean) };
       case 'session': return { kind: 'session', id };
       case 'project': return { kind: 'project', slug: id };
+      case 'architecture': return { kind: 'architecture', slug: id };
       case 'task': return { kind: 'task', key: id };
       default: return { kind: 'terminal', id };
     }
@@ -59,6 +60,7 @@ export function parseRoute(address: string): ScreenRoute {
 export const docAddress = (id: string) => `/doc/${encodeURIComponent(id)}`;
 export const fileAddress = (path: string) => `/file?path=${encodeURIComponent(path)}`;
 export const agendaAddress = (id: string) => `/agenda/${encodeURIComponent(id)}`;
+export const architectureAddress = (slug: string) => '/architecture/' + encodeURIComponent(slug);
 export const projectAddress = (slug: string) => `/project/${encodeURIComponent(slug)}`;
 export const taskAddress = (key: string) => `/task/${encodeURIComponent(key)}`;
 export const sessionAddress = (id: string) => `/session/${encodeURIComponent(id)}`;
@@ -78,7 +80,7 @@ export function parseSubTab(id: string): { root: string; ids: string[] } | null 
 }
 
 /** 최상위 볼트 노트를 가리키는 탭인가. 터미널·외부 파일·세션·후속 노트 탭은 아니다. */
-export const isNoteTab = (id: string) => !/^(term:|ext:|sess:|sub:)/.test(id);
+export const isNoteTab = (id: string) => !/^(term:|ext:|sess:|sub:|arch:)/.test(id);
 
 /** 앱을 껐다 켜도 남기는 탭인가. 최상위 노트 탭과 후속 노트 탭이다. */
 export const isStoredTab = (id: string) => isNoteTab(id) || parseSubTab(id) !== null;
@@ -91,6 +93,7 @@ export function tabRootId(id: string): string | null {
 
 export function routeTab(route: ScreenRoute): string | null {
   if (route.kind === 'doc') return route.id;
+  if (route.kind === 'architecture') return 'arch:' + route.slug;
   if (route.kind === 'sub') return subTabId(route.root, route.ids);
   if (route.kind === 'file' && route.path) return `ext:${route.path}`;
   if (route.kind === 'terminal') return `term:${route.id ?? 'main'}`;
@@ -106,6 +109,7 @@ export function activeTab(address: string): string | null {
 export function tabAddress(id: string): string {
   const sub = parseSubTab(id);
   if (sub) return subAddress(sub.root, sub.ids);
+  if (id.startsWith('arch:')) return architectureAddress(id.slice(5));
   if (id.startsWith('ext:')) return fileAddress(id.slice(4));
   if (id === 'term:main') return '/terminal';
   if (id.startsWith('term:')) return `/terminal/${encodeURIComponent(id.slice(5))}`;

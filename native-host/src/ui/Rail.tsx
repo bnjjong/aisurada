@@ -13,7 +13,7 @@ import { decisionAddress, usePendingDecisions } from "./decisionsStore.ts";
 import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
 import { RailRuns } from "./RailRuns.tsx";
 import { useSessionBadge } from "@claude-plug/session";
-import { parseRoute } from "../navigation/routes.ts";
+import { architectureAddress, parseRoute } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
@@ -264,6 +264,13 @@ export function Rail({
               </div>
             );
           })}
+            {!isNone && id && (
+              <div className={'rail-agenda' + (route.kind === 'architecture' && route.slug === slug ? ' active' : '')}>
+                <button className="agenda-name" type="button" onClick={() => controller.navigate(architectureAddress(slug))}>
+                  <Icon name="tree" size={15} /> C4 아키텍처
+                </button>
+              </div>
+            )}
             {!isNone && resourceRows(slug, name)}
           </div>
         )}
