@@ -14,13 +14,14 @@ use serde_json::{Value as Json, json};
 
 use super::note_meta_write::BoolArg;
 use crate::error::EngineError;
-use crate::kernel::actor::CallContext;
+use crate::kernel::actor::{CallContext, ManagerContext};
 use crate::task::aggregate::{self, Fields, Scan};
 use crate::task::format::{self, java_trim};
 use crate::task::store;
 use crate::task::transitions::{self, HUMAN};
 use crate::task::{Task, TaskStatus};
 use crate::text::{is_blank, trim};
+use crate::vault::check_manager_project;
 use crate::write::marker::check_workspace_marker;
 use crate::write::stamp::stamp_of;
 
@@ -521,15 +522,15 @@ pub fn restore_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, Engi
 fn scan_for_reader(vault: &Path, context: &CallContext) -> Result<Scan, EngineError> {
     let mut scan = store::scan(vault);
     if let Some(manager) = &context.manager {
-        crate::vault::check_manager_project(vault, manager)?;
+        check_manager_project(vault, manager)?;
         scan.items.retain(|task| task.project.as_deref() == Some(&manager.project));
         scan.skipped.clear();
     }
     Ok(scan)
 }
 
-fn check_manager_repo(vault: &Path, manager: &crate::ManagerContext, repo: Option<&str>) -> Result<(), EngineError> {
-    let project = crate::vault::check_manager_project(vault, manager)?;
+fn check_manager_repo(vault: &Path, manager: &ManagerContext, repo: Option<&str>) -> Result<(), EngineError> {
+    let project = check_manager_project(vault, manager)?;
     if repo.is_some_and(|repo| {
         manager.repos.iter().any(|allowed| allowed == repo)
             && project.repos.iter().any(|allowed| allowed.github.as_deref() == Some(repo))

@@ -3,13 +3,12 @@
 use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
+use ais_core::engine::{ManagerProject, manager_project};
 use ais_core::valid_manager_name;
-use ais_core::vault::{ManagerProject, manager_project};
 use ais_core::write::{acquire_lock, write_atomic};
 use ais_domain::task::format;
-use ais_infra::ports::fs;
+use ais_infra::ports::{clock, fs, ids};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -105,7 +104,7 @@ impl Manager {
             slack_channels: Vec::new(),
             notify: default_states(),
             notify_enabled: false,
-            registration: now().as_nanos().to_string(),
+            registration: registration_id(),
             legacy_key: false,
         }
     }
@@ -440,10 +439,12 @@ fn copy_manager(
     Ok(target)
 }
 
-fn now() -> std::time::Duration {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
+fn registration_id() -> String {
+    format!(
+        "{}{:020}",
+        clock().now_millis().max(0),
+        ids().next_random_u64()
+    )
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -496,7 +497,7 @@ pub fn record(
     fs::create_dir_all(path.parent().ok_or("매니저 기록 폴더가 없다")?)
         .map_err(|error| error.to_string())?;
     let mut history = history(env, manager)?;
-    let at = now().as_millis() as u64;
+    let at = clock().now_millis().max(0) as u64;
     if !matches!(tool, "status_webhook" | "test_webhook") && result == "ok" {
         history.first_call.get_or_insert(at);
     }
@@ -595,7 +596,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
             let previous = item.clone();
             set_options(item, options)?;
             if previous.legacy() {
-                item.registration = now().as_nanos().to_string();
+                item.registration = registration_id();
                 item.legacy_key = true;
                 bind(item, env)?;
             } else {

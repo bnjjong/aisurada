@@ -9,6 +9,7 @@ use super::comment_copy;
 use super::scanner::{NoteRecord, NoteScan, scan_note_paths, scan_notes, scan_project_notes};
 use super::sub_agenda::{self, SubAgenda};
 use crate::error::EngineError;
+use crate::kernel::actor::{CallContext, ManagerContext};
 use crate::ports::fs;
 
 pub struct NoteIndex {
@@ -30,7 +31,7 @@ impl NoteIndex {
     }
 
     /// 매니저가 볼 수 있는 아젠다와 노트만 읽는다.
-    pub fn for_reader(root: &Path, ctx: &crate::CallContext) -> Result<Self, EngineError> {
+    pub fn for_reader(root: &Path, ctx: &CallContext) -> Result<Self, EngineError> {
         let Some(manager) = &ctx.manager else {
             return Ok(Self::fresh(root));
         };
@@ -49,7 +50,7 @@ impl NoteIndex {
 
     pub(crate) fn for_manager_write(
         root: &Path,
-        manager: &crate::ManagerContext,
+        manager: &ManagerContext,
     ) -> Result<Self, EngineError> {
         super::check_manager_project(root, manager)?;
         match Self::build_with(root, Some(&manager.project), scan_project_notes) {

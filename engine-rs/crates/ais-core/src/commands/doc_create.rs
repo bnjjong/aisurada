@@ -113,7 +113,6 @@ pub fn create_doc_in(
     let (raw_title, raw_body) = (parsed.title.as_str(), parsed.body.as_str());
 
     let (agenda_slug, agenda_created) = if let Some(manager) = &context.manager {
-        crate::vault::check_manager_project(vault, manager)?;
         let agenda = scope.index.agendas.table.by_slug(&parsed.agenda_key).filter(|agenda| {
             agenda.project.as_deref() == Some(&manager.project) && manager.agendas.contains(&agenda.slug)
         }).ok_or_else(|| EngineError::invalid_argument("매니저에게 허용하지 않은 프로젝트 아젠다다"))?;
