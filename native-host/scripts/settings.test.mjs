@@ -5,7 +5,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { WorkspaceController } from '../src/workspace/controller.ts';
 import { KEYS } from '../src/workspace/storage.ts';
-import { SETTINGS_SECTIONS } from '../src/ui/settingsSections.ts';
+import { SETTINGS_SECTIONS, SETTINGS_INDEX, searchSettings } from '../src/ui/settingsSections.ts';
 import { SettingsLayoutView } from '../src/ui/Settings.tsx';
 import { isFontAvailable, clearFontCache, filterAvailableFonts } from '../src/ui/fontAvailability.ts';
 import { TypographySettings } from '../src/ui/TypographySettings.tsx';
@@ -161,4 +161,38 @@ test('글꼴 칩 렌더링: 기본 칩과 설치된 추천 글꼴 칩이 보이�
   // Pretendard 칩과 D2Coding 칩이 aria-pressed="true" 상태여야 한다
   assert.match(htmlCustom, /<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>Pretendard<\/button>/);
   assert.match(htmlCustom, /<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>D2Coding<\/button>/);
+});
+
+test('설정 검색: 검색어로 라벨과 키워드를 찾고, AI 제외 옵션 및 최대 8개 제한을 지킨다', () => {
+  // 1. 빈 검색어는 빈 배열
+  assert.deepEqual(searchSettings('', { claude: true }), []);
+  assert.deepEqual(searchSettings('   ', { claude: true }), []);
+
+  // 2. '글꼴' 검색 -> 앱 글꼴, 터미널 글꼴 등
+  const fontResults = searchSettings('글꼴', { claude: true });
+  assert.ok(fontResults.length >= 2);
+  assert.ok(fontResults.some(r => r.key === 'ui-font'));
+  assert.ok(fontResults.some(r => r.key === 'terminal-font'));
+
+  // 3. 'claude' 검색 (대소문자 무시)
+  const claudeResults = searchSettings('CLAUDE', { claude: true });
+  assert.ok(claudeResults.some(r => r.key === 'claude'));
+
+  // 4. claude: false 일 때 AI 항목 제외
+  const noClaudeResults = searchSettings('CLAUDE', { claude: false });
+  assert.equal(noClaudeResults.length, 0);
+
+  // 5. '설정' 또는 넓은 검색어 시 최대 8개 제한
+  const broadResults = searchSettings('알림', { claude: true });
+  assert.ok(broadResults.length <= 8);
+});
+
+test('색인 유효성: SETTINGS_INDEX의 모든 항목은 유효한 6개 묶음 중 하나에 속한다', () => {
+  const validSections = new Set(SETTINGS_SECTIONS.map(s => s.id));
+  for (const item of SETTINGS_INDEX) {
+    assert.ok(validSections.has(item.section), `잘못된 섹션: ${item.section}`);
+    assert.ok(item.key.length > 0, 'key는 비어있지 않아야 함');
+    assert.ok(item.label.length > 0, 'label은 비어있지 않아야 함');
+    assert.ok(Array.isArray(item.keywords) && item.keywords.length > 0, 'keywords는 배열이어야 함');
+  }
 });

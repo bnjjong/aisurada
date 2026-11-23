@@ -1,11 +1,15 @@
 // 설정 화면. 6개 묶음(모양, 글꼴, 노트, 알림, AI, 연결)으로 나누어 패널을 보인다.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { SettingsSection, WorkspaceState } from "../workspace/types.ts";
 import { CLAUDE_ENABLED } from "@claude-plug/state";
 import { Modal } from "./Modal.tsx";
 import { SettingsPane } from "./SettingsParts.tsx";
-import { SETTINGS_SECTIONS } from "./settingsSections.ts";
+import {
+  SETTINGS_SECTIONS,
+  searchSettings,
+  type SearchIndexItem,
+} from "./settingsSections.ts";
 import { Icon } from "./Icon.tsx";
 import { LookSettings } from "./LookSettings.tsx";
 import { TypographySettings } from "./TypographySettings.tsx";
@@ -28,15 +32,97 @@ export function SettingsLayoutView({
   claudeEnabled,
   panes,
 }: SettingsLayoutViewProps) {
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const visibleSections = SETTINGS_SECTIONS.filter(
     (s) => claudeEnabled || s.id !== "ai",
   );
+
+  const isSearching = query.trim().length > 0;
+  const results = isSearching
+    ? searchSettings(query, { claude: claudeEnabled })
+    : [];
+
+  const jumpToSetting = (item: SearchIndexItem) => {
+    setQuery("");
+    setActiveIndex(0);
+    onSelectSection(item.section);
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (typeof document !== "undefined") {
+            const el = document.querySelector(`[data-setting="${item.key}"]`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.add("set-flash");
+              setTimeout(() => el.classList.remove("set-flash"), 1200);
+              const focusable = el.querySelector<HTMLElement>(
+                "input, button, select, textarea",
+              );
+              if (focusable) focusable.focus();
+            }
+          }
+        }, 50);
+      });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      setQuery("");
+      setActiveIndex(0);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (results.length > 0) {
+        setActiveIndex((prev) => (prev + 1) % results.length);
+      }
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (results.length > 0) {
+        setActiveIndex((prev) => (prev - 1 + results.length) % results.length);
+      }
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (results.length > 0) {
+        jumpToSetting(results[activeIndex] || results[0]);
+      }
+    }
+  };
 
   return (
     <div className="set-frame">
       <div className="set-layout">
         <nav className="set-nav" aria-label="설정 묶음">
-          <div className="set-tabs" role="tablist" aria-orientation="vertical">
+          <div className="set-search-wrap">
+            <input
+              type="search"
+              className="set-search-input"
+              placeholder="설정 찾기..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActiveIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              aria-label="설정 찾기"
+            />
+          </div>
+
+          <div
+            className="set-tabs"
+            role="tablist"
+            aria-orientation="vertical"
+            hidden={isSearching}
+          >
             {visibleSections.map((s) => (
               <button
                 type="button"
@@ -54,6 +140,36 @@ export function SettingsLayoutView({
               </button>
             ))}
           </div>
+
+          {isSearching && (
+            <div className="set-results" role="listbox" aria-label="설정 검색 결과">
+              {results.length === 0 ? (
+                <p className="set-no-results">찾는 설정이 없어요</p>
+              ) : (
+                results.map((item, idx) => {
+                  const meta = SETTINGS_SECTIONS.find((s) => s.id === item.section);
+                  const isSelected = idx === activeIndex;
+                  return (
+                    <button
+                      type="button"
+                      key={`${item.section}-${item.key}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`set-result ${isSelected ? "active" : ""}`}
+                      onClick={() => jumpToSetting(item)}
+                    >
+                      <Icon name={meta?.icon || "note"} size={16} />
+                      <div className="set-result-text">
+                        <span className="set-result-label">{item.label}</span>
+                        <span className="set-result-section">{meta?.name}</span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
           <p className="set-nav-foot">
             이 기기에만 적용돼요. 노트 파일은 바뀌지 않아요.
           </p>
