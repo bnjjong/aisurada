@@ -296,14 +296,6 @@ fn attempt_delivery(
             }
         })
         .ok_or(DeliveryError::Unavailable)?;
-    let mut allowed = manager
-        .slack_channels
-        .iter()
-        .filter(|value| manager_webhook::slack_channel_id(value))
-        .peekable();
-    if allowed.peek().is_some() && !allowed.any(|value| value == &channel) {
-        return Err(DeliveryError::Unavailable);
-    }
     let status = TaskStatus::parse(&item.status).ok_or(DeliveryError::Unavailable)?;
     let secret = manager_webhook::keychain_secret(manager)
         .map_err(|_| DeliveryError::Keychain)?

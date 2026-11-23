@@ -122,7 +122,7 @@ export function ManagerConnection({ form, history, controller, update }: {
     </div>
     {format === "hermes" ? (
       <ol className="mgr-instructions">
-        <li>Hermes에서 <strong>{profile}</strong> 프로필을 만들고 아래 설정을 그 프로필의 <code>config.yaml</code>에 합치세요.</li>
+        <li>Hermes에서 <strong>{profile}</strong> 프로필을 만들고 아래 설정을 그 프로필의 <code>config.yaml</code>에 합치세요. 이미 연결한 프로필이 있으면 그 프로필을 사용하세요.</li>
         <li>기본 Hermes 프로필에 공용 Slack 봇을 설정하세요. <code>gateway.multiplex_profiles</code>를 켜고 <code>gateway.profile_routes</code>에서 Slack 채널 ID를 이 프로필에 연결하세요.</li>
         <li>Hermes 게이트웨이를 다시 시작한 뒤 프로젝트 채널에서 봇에게 태스크 목록을 물어보세요.</li>
       </ol>
@@ -282,7 +282,7 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
       tools: template?.tools ?? data.defaultTools,
       repos: [], agendas: [], slackChannels: migrate?.slackChannels ?? [],
       notify: template?.notify ?? data.defaultNotify,
-      notifyEnabled: migrate?.notifyEnabled ?? false,
+      notifyEnabled: template?.notifyEnabled ?? false,
       webhook: migrate?.webhook ?? null,
     };
   });
@@ -341,10 +341,11 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
           <label className="mgr-label">보이는 이름<input maxLength={40} value={form.label} onChange={event => update({ label: event.target.value })} /></label>
         </div>
         <dl className="mgr-meta">
-          <dt>가져오는 설정</dt><dd>{kindLabel(source.kind)} · 도구 {source.tools.length}개 · 알릴 상태 {source.notify.length}개</dd>
+          <dt>가져오는 설정</dt><dd>{kindLabel(source.kind)} · 도구 {source.tools.length}개 · 알릴 상태 {source.notify.length}개 · 상태 알림 {source.notifyEnabled ? "켜짐" : "꺼짐"}</dd>
           <dt>새로 고를 설정</dt><dd>저장소, 아젠다, Slack 채널, 서명 비밀</dd>
           <dt>웹훅 주소</dt><dd>{project && inputsValid(form) ? webhookFor(form.name, source) : "프로젝트와 이름을 골라 주세요"}</dd>
         </dl>
+        <p className="mgr-hint">복사본은 꺼져 있어요. 연결을 마친 뒤 켜 주세요.</p>
       </>}
       {step === 1 && <>
         <ProjectChoice value={form.project} projects={projects} onChange={selectProject} />

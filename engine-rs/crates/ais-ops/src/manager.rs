@@ -415,6 +415,7 @@ fn copy_manager(
     target.kind.clone_from(&source.kind);
     target.tools.clone_from(&source.tools);
     target.notify.clone_from(&source.notify);
+    target.notify_enabled = source.notify_enabled;
     let slug = options
         .iter()
         .rev()
@@ -435,7 +436,6 @@ fn copy_manager(
     }
     set_options(&mut target, options)?;
     target.enabled = false;
-    target.notify_enabled = false;
     bind(&mut target, env)?;
     if target.vault == source.vault && target.project_id == source.project_id {
         return Err("다른 프로젝트로만 복사할 수 있다".into());

@@ -516,6 +516,14 @@ pub fn restore_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, Engi
 
 // ---------------------------------------------------------------- 읽기
 
+pub(super) fn project_task_count(vault: &Path, slug: &str) -> usize {
+    store::scan(vault)
+        .items
+        .into_iter()
+        .filter(|task| task.project.as_deref() == Some(slug))
+        .count()
+}
+
 fn scan_for_reader(vault: &Path, context: &CallContext) -> Result<Scan, EngineError> {
     let mut scan = store::scan(vault);
     if let Some(manager) = &context.manager {

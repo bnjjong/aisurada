@@ -163,7 +163,7 @@ pub async fn manager_test_webhook<R: Runtime>(
     .map_err(|error| error.to_string())?
 }
 
-pub fn slack_channel_id(channel: &str) -> bool {
+fn slack_channel_id(channel: &str) -> bool {
     (2..=64).contains(&channel.len())
         && matches!(channel.as_bytes()[0], b'C' | b'G')
         && channel

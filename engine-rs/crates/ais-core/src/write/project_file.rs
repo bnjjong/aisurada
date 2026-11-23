@@ -3,11 +3,9 @@
 use crate::error::EngineError;
 use crate::frontmatter::dump_string;
 use crate::json::{JsonValue, append_string, parse};
-use crate::ports::fs;
 use crate::text::{trim, utf16_len};
 use crate::vault::agenda::is_valid_slug_segment;
-use crate::vault::project::{GITHUB, ProjectInfo, ProjectRepo, is_valid_project_id};
-use std::{io::ErrorKind, path::Path};
+use crate::vault::project::{ARCHIVED_PROJECTS_DIR, GITHUB, ProjectInfo, ProjectRepo};
 
 const MAX_ENTRIES: usize = 20;
 const MAX_PATH_UNITS: usize = 1024;
@@ -18,28 +16,7 @@ pub fn rel_path(slug: &str) -> String {
 }
 
 pub fn archived_rel_path(slug: &str, id: &str) -> String {
-    format!(".aisurada/trash/projects/{slug}-{id}.md")
-}
-
-/// 지운 프로젝트를 가리키는 옛 태스크가 새 프로젝트에 붙지 않도록 이름을 남겨 둔다.
-pub fn archived_slugs(vault: &Path) -> Result<Vec<String>, EngineError> {
-    let scan_error = |error| EngineError::internal(format!("지워진 프로젝트 목록을 읽지 못했다: {error}"));
-    let entries = match fs::read_dir(vault.join(".aisurada/trash/projects")) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(scan_error(error)),
-    };
-    let mut slugs = Vec::new();
-    for entry in entries {
-        let name = entry.map_err(scan_error)?.file_name();
-        let Some(stem) = name.to_str().and_then(|name| name.strip_suffix(".md")) else { continue };
-        let Some((prefix, _)) = stem.rsplit_once('-') else { continue };
-        let Some((slug, _)) = prefix.rsplit_once('-') else { continue };
-        if is_valid_project_id(&stem[slug.len() + 1..]) && is_valid_slug_segment(slug) {
-            slugs.push(slug.to_owned());
-        }
-    }
-    Ok(slugs)
+    format!("{ARCHIVED_PROJECTS_DIR}/{slug}-{id}.md")
 }
 
 /// 프로젝트 속성, 저장소 목록, 요약 본문을 파일에 쓴다.
