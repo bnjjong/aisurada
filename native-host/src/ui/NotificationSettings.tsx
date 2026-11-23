@@ -78,7 +78,7 @@ export function NotificationSettingsView({
         </label>
       </SettingsGroup>
 
-      <details className="ntf-focus-details">
+      <details className="ntf-focus-details" data-setting="ntf-focus">
         <summary>집중 모드에서는?</summary>
         <p>
           집중 모드는 macOS가 처리해요. 집중 모드에서 aisurada를 허용하지 않으면 macOS가 배너를 막아요.

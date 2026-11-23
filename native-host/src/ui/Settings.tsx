@@ -26,6 +26,32 @@ export interface SettingsLayoutViewProps {
   panes: Record<SettingsSection, ReactNode>;
 }
 
+/**
+ * 탭 목록에서 화살표 및 Home/End 키로 다음 묶음을 계산하는 순수 함수
+ */
+export function nextSection(
+  current: SettingsSection,
+  key: string,
+  visible: readonly SettingsSection[],
+): SettingsSection | null {
+  const idx = visible.indexOf(current);
+  if (idx < 0) return null;
+  const len = visible.length;
+  if (key === "ArrowDown" || key === "ArrowRight") {
+    return visible[(idx + 1) % len];
+  }
+  if (key === "ArrowUp" || key === "ArrowLeft") {
+    return visible[(idx - 1 + len) % len];
+  }
+  if (key === "Home") {
+    return visible[0];
+  }
+  if (key === "End") {
+    return visible[len - 1];
+  }
+  return null;
+}
+
 export function SettingsLayoutView({
   section,
   onSelectSection,
@@ -43,6 +69,24 @@ export function SettingsLayoutView({
   const results = isSearching
     ? searchSettings(query, { claude: claudeEnabled })
     : [];
+
+  const handleTabKeyDown = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    current: SettingsSection,
+  ) => {
+    const next = nextSection(
+      current,
+      e.key,
+      visibleSections.map((v) => v.id),
+    );
+    if (next) {
+      e.preventDefault();
+      onSelectSection(next);
+      if (typeof document !== "undefined") {
+        document.getElementById(`set-tab-${next}`)?.focus();
+      }
+    }
+  };
 
   const jumpToSetting = (item: SearchIndexItem) => {
     setQuery("");
@@ -134,6 +178,7 @@ export function SettingsLayoutView({
                 tabIndex={section === s.id ? 0 : -1}
                 className={`set-nav-item ${section === s.id ? "active" : ""}`}
                 onClick={() => onSelectSection(s.id)}
+                onKeyDown={(e) => handleTabKeyDown(e, s.id)}
               >
                 <Icon name={s.icon} size={16} />
                 <span>{s.name}</span>

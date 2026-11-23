@@ -77,6 +77,7 @@ test('Claude Desktop용 조각은 있을 때만 접힌 칸으로 보인다', () 
   assert.match(html, /<details/);
   assert.match(html, /claude_desktop_config\.json/);
   assert.match(html, /mcpServers/);
+  assert.match(html, /<button[^>]*>복사<\/button>/);
 });
 
 test('4부를 끈 판의 빈 구현은 아무것도 그리지 않는다', () => {

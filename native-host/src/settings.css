@@ -83,10 +83,11 @@
 }
 
 .set-result:hover,
-.set-result.active,
-.set-result[aria-selected="true"] {
+:root:root .set-result.active,
+:root:root .set-result[aria-selected="true"] {
   background: var(--surface);
   box-shadow: var(--sh-1, 0 1px 3px rgba(0, 0, 0, 0.08));
+  border-left: 2px solid var(--accent);
 }
 
 .set-result-text {

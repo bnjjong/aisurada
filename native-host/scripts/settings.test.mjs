@@ -6,9 +6,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { WorkspaceController } from '../src/workspace/controller.ts';
 import { KEYS } from '../src/workspace/storage.ts';
 import { SETTINGS_SECTIONS, SETTINGS_INDEX, searchSettings } from '../src/ui/settingsSections.ts';
-import { SettingsLayoutView } from '../src/ui/Settings.tsx';
+import { SettingsLayoutView, nextSection } from '../src/ui/Settings.tsx';
 import { isFontAvailable, clearFontCache, filterAvailableFonts } from '../src/ui/fontAvailability.ts';
 import { TypographySettings } from '../src/ui/TypographySettings.tsx';
+import { toSettings } from '../src/ui/notificationsStore.ts';
+import { LookSettings } from '../src/ui/LookSettings.tsx';
+import { NoteSettings } from '../src/ui/NoteSettings.tsx';
+import { NotificationSettingsView } from '../src/ui/NotificationSettings.tsx';
+import { SettingsGroup, SettingsPane, SettingsRow } from '../src/ui/SettingsParts.tsx';
+import { ConnectView } from '../src/plugs/claude/connect.tsx';
+import { GithubConnect } from '../src/ui/GithubConnect.tsx';
+import { ArchylConnect } from '../src/ui/archyl/ArchylConnect.tsx';
 
 function harness(t, { context = { kind: 'main' }, values = {} } = {}) {
   const map = new Map(Object.entries(values)), writes = [], warnings = [];
@@ -194,5 +202,105 @@ test('색인 유효성: SETTINGS_INDEX의 모든 항목은 유효한 6개 묶음
     assert.ok(item.key.length > 0, 'key는 비어있지 않아야 함');
     assert.ok(item.label.length > 0, 'label은 비어있지 않아야 함');
     assert.ok(Array.isArray(item.keywords) && item.keywords.length > 0, 'keywords는 배열이어야 함');
+  }
+});
+
+test('탭 키보드 탐색(nextSection): 화살표 및 Home/End 키로 올바른 다음 묶음을 순환 계산한다', () => {
+  const visible = ['look', 'fonts', 'notes', 'notifications', 'ai', 'connections'];
+
+  // 아래/오른쪽: 다음 묶음 (마지막에서 첫 번째로 순환)
+  assert.equal(nextSection('look', 'ArrowDown', visible), 'fonts');
+  assert.equal(nextSection('connections', 'ArrowDown', visible), 'look');
+  assert.equal(nextSection('fonts', 'ArrowRight', visible), 'notes');
+
+  // 위/왼쪽: 이전 묶음 (첫 번째에서 마지막으로 순환)
+  assert.equal(nextSection('look', 'ArrowUp', visible), 'connections');
+  assert.equal(nextSection('notes', 'ArrowUp', visible), 'fonts');
+  assert.equal(nextSection('look', 'ArrowLeft', visible), 'connections');
+
+  // Home / End: 처음과 끝
+  assert.equal(nextSection('notes', 'Home', visible), 'look');
+  assert.equal(nextSection('notes', 'End', visible), 'connections');
+
+  // 지원하지 않는 키는 null
+  assert.equal(nextSection('look', 'Enter', visible), null);
+  assert.equal(nextSection('look', 'Tab', visible), null);
+});
+
+test('색인 전수 검증: SETTINGS_INDEX의 모든 key가 실제 설정 화면에 data-setting으로 정확히 하나씩 존재한다', (t) => {
+  const h = harness(t);
+  const dummyState = h.controller.getSnapshot();
+
+  const panes = {
+    look: React.createElement(LookSettings, { controller: h.controller, state: dummyState }),
+    fonts: React.createElement(TypographySettings, { controller: h.controller, typography: dummyState.typography }),
+    notes: React.createElement(NoteSettings, { controller: h.controller, state: dummyState }),
+    notifications: React.createElement(NotificationSettingsView, {
+      settings: toSettings({}),
+      native: true,
+      banner: '',
+      error: '',
+      onChange() {},
+      onTest() {},
+    }),
+    ai: React.createElement(SettingsPane, { title: 'AI', desc: 'Claude가 노트를 다루는 범위와 기다리는 시간을 정해요.' },
+      React.createElement('div', { className: 'set-group' },
+        React.createElement('h4', null, 'Claude 연결'),
+        React.createElement(ConnectView, {
+          status: { claudeFound: true, registered: true, write: false, stale: false },
+          busy: false,
+          error: '',
+          onConnect() {},
+          onDisconnect() {},
+        })
+      ),
+      React.createElement(SettingsGroup, { title: '묻기' },
+        React.createElement(SettingsRow, {
+          as: 'label',
+          settingKey: 'ask-timeout',
+          className: 'set-switch set-ask-timeout',
+          title: 'AI 응답 대기 시간',
+          desc: '노트에서 AI에게 질문하고 응답을 기다리는 최대 시간이에요.',
+          control: React.createElement('select', null)
+        })
+      )
+    ),
+    connections: React.createElement('div', null,
+      React.createElement(GithubConnect, { controller: h.controller }),
+      React.createElement(ArchylConnect, { controller: h.controller })
+    ),
+  };
+
+  const html = renderToStaticMarkup(
+    React.createElement(SettingsLayoutView, {
+      section: 'look',
+      onSelectSection() {},
+      claudeEnabled: true,
+      panes,
+    })
+  );
+
+  const renderedKeys = [...html.matchAll(/data-setting="([^"]+)"/g)].map((m) => m[1]);
+  const indexKeys = SETTINGS_INDEX.map((item) => item.key);
+
+  // 1. SETTINGS_INDEX의 모든 키가 화면에 있어야 한다
+  for (const key of indexKeys) {
+    assert.ok(
+      renderedKeys.includes(key),
+      `색인 key '${key}'가 실제 설정 화면 DOM에 존재하지 않습니다. (data-setting 누락)`
+    );
+  }
+
+  // 2. 각 키는 중복 없이 정확히 1개여야 한다
+  const keyCounts = new Map();
+  for (const k of renderedKeys) {
+    keyCounts.set(k, (keyCounts.get(k) || 0) + 1);
+  }
+  for (const key of indexKeys) {
+    assert.equal(
+      keyCounts.get(key),
+      1,
+      `key '${key}'가 화면에 ${keyCounts.get(key)}개 존재합니다 (정확히 1개여야 함).`
+    );
   }
 });

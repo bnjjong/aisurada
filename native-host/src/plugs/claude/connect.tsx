@@ -144,6 +144,9 @@ export function ConnectView({
             넣고 Claude Desktop을 다시 시작해요.
           </p>
           <pre>{desktop}</pre>
+          <button type="button" onClick={() => void navigator.clipboard?.writeText(desktop)}>
+            복사
+          </button>
         </details>
       )}
     </div>
