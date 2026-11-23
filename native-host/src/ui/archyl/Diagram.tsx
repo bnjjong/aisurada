@@ -2,7 +2,8 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import { Icon } from '../Icon.tsx';
 import type { ArchylElement, ArchylRelationship } from './client.ts';
-import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, positionNodes, routeEdges } from './layout.ts';
+import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, placeLabels, positionNodes, routeEdges } from './layout.ts';
+import type { DiagramLabel } from './layout.ts';
 
 const KIND_ICON: Record<string, string> = {
   person: 'person', system: 'grid', external: 'globe', container: 'tab', component: 'tree', code: 'note',
@@ -27,6 +28,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
   const viewport = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [area, setArea] = useState({ width: 1, height: 1 });
+  const [labels, setLabels] = useState<DiagramLabel[]>([]);
   const [camera, setCamera] = useState({ zoom: 1, x: 0, y: 0 });
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const nodes = useMemo(() => positionNodes(elements), [elements]);
@@ -34,7 +36,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
   const box = useMemo(() => bounds(nodes), [nodes]);
   const fit = Math.min(1.12, Math.max(.025, (area.width - 46) / box.width), Math.max(.025, (area.height - 78) / box.height));
   const scale = Math.min(2.5, camera.zoom * fit);
-  const typeScale = Math.max(1, Math.min(1.75, 1 / scale));
+  const typeScale = Math.max(1, Math.min(1.6, 1 / scale));
   const x = (area.width - box.width * scale) / 2 - box.minX * scale + camera.x;
   const y = (area.height - 32 - box.height * scale) / 2 - box.minY * scale + camera.y;
   const resize = (amount: number) => setCamera(current => ({
@@ -48,25 +50,41 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
     const measure = () => setArea({ width: node.clientWidth, height: node.clientHeight });
     const observer = new ResizeObserver(measure);
     observer.observe(node);
+    const appearance = new MutationObserver(measure);
+    appearance.observe(document.documentElement, { attributes: true, attributeFilter: ['data-skin', 'data-theme', 'style'] });
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+    systemTheme.addEventListener('change', measure);
     measure();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      appearance.disconnect();
+      systemTheme.removeEventListener('change', measure);
+    };
   }, []);
 
   useLayoutEffect(() => {
     const target = canvas.current;
     if (!target || !area.width || !area.height) return;
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    target.width = Math.ceil(area.width * ratio);
-    target.height = Math.ceil(area.height * ratio);
+    const width = Math.ceil(area.width * ratio);
+    const height = Math.ceil(area.height * ratio);
+    if (target.width !== width) target.width = width;
+    if (target.height !== height) target.height = height;
     const context = target.getContext('2d');
     if (!context) return;
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, width, height);
     context.setTransform(ratio * scale, 0, 0, ratio * scale, ratio * x, ratio * y);
-    const stroke = getComputedStyle(target).color;
+    const style = getComputedStyle(target);
+    const stroke = style.color;
+    const accent = style.getPropertyValue('--accent').trim() || stroke;
     context.strokeStyle = context.fillStyle = stroke;
+    context.font = '500 11px ' + style.fontFamily;
     for (const edge of edges) {
       const active = Boolean(edge.id && edge.id === selected);
-      context.globalAlpha = active ? 1 : .75;
-      context.lineWidth = (active ? 2.2 : 1.35) / scale;
+      context.strokeStyle = context.fillStyle = active ? accent : stroke;
+      context.globalAlpha = active ? 1 : .9;
+      context.lineWidth = (active ? 2.3 : 1.55) / scale;
       context.beginPath();
       context.moveTo(edge.start.x, edge.start.y);
       context.bezierCurveTo(edge.a.x, edge.a.y, edge.b.x, edge.b.y, edge.end.x, edge.end.y);
@@ -80,7 +98,20 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
       context.closePath();
       context.fill();
     }
-  }, [area, edges, scale, selected, x, y]);
+    const nextLabels = placeLabels(edges, nodes, { ...area, x, y, scale }, selected, title => context.measureText(title).width);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.strokeStyle = stroke;
+    context.globalAlpha = .8;
+    context.lineWidth = 1;
+    for (const label of nextLabels) {
+      if (label.center.x === label.anchor.x && label.center.y === label.anchor.y) continue;
+      context.beginPath();
+      context.moveTo(label.anchor.x, label.anchor.y);
+      context.lineTo(label.center.x, label.center.y);
+      context.stroke();
+    }
+    setLabels(nextLabels);
+  }, [area, edges, nodes, scale, selected, x, y]);
 
   function startPan(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
@@ -102,7 +133,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
       }}
       onLostPointerCapture={() => { drag.current = null; }}
     >
-      <canvas aria-hidden="true" />
+      <canvas ref={canvas} aria-hidden="true" />
       {!nodes.length && <p className="archyl-diagram-empty">이 레벨에 표시할 요소가 없어요.</p>}
       <div
         className="archyl-diagram-world"
@@ -128,13 +159,9 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
           </button>
         ))}
       </div>
-      {edges.map((edge, index) => {
-        if (scale < .35 && selected !== edge.id) return null;
-        const left = x + edge.labelPosition.x * scale;
-        const top = y + edge.labelPosition.y * scale;
-        const title = [edge.label || '관계', edge.technology].filter(Boolean).join(' · ');
-        if (left < 0 || left > area.width || top < 0 || top > area.height) return null;
-        const style = { left, top };
+      {labels.map(({ edge, index, title, center, width, height, compact }) => {
+        const style = { left: center.x, top: center.y, width, height };
+        const caption = compact ? <Icon name="link" size={12} /> : <span>{title}</span>;
         return edge.id ? (
           <button
             key={edge.id}
@@ -142,10 +169,11 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
             type="button"
             style={style}
             title={title}
+            aria-label={title}
             aria-pressed={edge.id === selected}
             onClick={() => select(edge.id)}
-          >{title}</button>
-        ) : <span className="archyl-edge" key={index} style={style}>{title}</span>;
+          >{caption}</button>
+        ) : <span className="archyl-edge" key={index} style={style} title={title}>{caption}</span>;
       })}
       <div className="archyl-zoom" aria-label="다이어그램 배율">
         <button type="button" aria-label="축소" onClick={() => resize(.8)}>−</button>
