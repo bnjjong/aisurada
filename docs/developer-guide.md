@@ -350,21 +350,24 @@ AI가 고친 스킬·에이전트 정의가 곧바로 쓰이지 않고, 사람�
 - **`ais-cli`가 넘겨 주는 이름.** `ais-cli`는 `engine-rs/crates/ais-cli/src/registry.rs`의 목록(`ENGINE_COMMANDS_61`, 태스크 9개는 `ENGINE_COMMANDS_TASKS`, 승인 명령 7개는 `ENGINE_COMMANDS_APPROVALS`)에 든 이름만 엔진으로 넘긴다. 새 명령을 넣고 이 목록에 빠뜨리면 실제 앱에서 「알 수 없는 이름」(종료 코드 2)으로 거절된다. Java 시절에 태스크 명령이 이 목록에 빠져 있던 적이 있다(`5b38c33`). 지금은 `crates/ais-cli/tests/command_tables.rs`가 엔진의 명령 목록(`ais_core::engine::catalog()`)에 있고 이 목록에 없는 이름을 잡아 실패한다.
 - **아직 없는 것.** 코드를 고치고 PR을 올리는 러너(4단계), 태스크 안 채팅(정의 에이전트, 3b), 질문을 위 단계 에이전트가 먼저 푸는 계층(5단계). 승인 워크플로우(이슈 #53)는 러너가 코드를 고치기 전에 필요하다. 읽기 전용 러너는 아래 「러너」에 있다.
 
-### Hermes 매니저 연결
+### 프로젝트별 매니저 연결
 
-매니저는 이름, 열린 도구, 허용 저장소와 아젠다로 제한한다. 등록부는 앱 지원 폴더의 `managers.json`에 있다. 새 태스크는 Draft로 남고 태스크와 댓글 활동에 매니저가 기록된다. `refs`에 `kind: slack`과 Slack 메시지 주소를 넣으면 제보 출처로 연결된다.
+에이전트 탭의 「매니저」에서 프로젝트별로 매니저를 추가하고 관리한다. 프로젝트, 권한, 연결, 상태 알림을 차례로 고른다. 상태 알림은 건너뛸 수 있다. 프로젝트 페이지에서는 연결된 매니저와 매니저가 쓰는 저장소·아젠다를 확인한다.
+
+- 매니저는 등록한 vault와 프로젝트 하나의 태스크와 노트를 읽는다. 태스크를 만들면 프로젝트가 자동으로 들어가고 상태는 초안이다. 태스크 만들기와 댓글은 허용한 GitHub 저장소에서, 노트 만들기는 허용한 아젠다에서 가능하다. 엔진은 쓸 때마다 그 대상이 프로젝트에 속하는지 다시 확인한다.
+- 설정을 복사해 다른 프로젝트의 매니저를 만들 수 있다. 종류, 표시 이름, 도구, 상태 알림 설정을 가져오고 저장소, 아젠다, Slack 채널을 새로 고른다. 웹훅 마지막 경로는 새 프로젝트에 맞춰 바꾸고 상태 알림을 설정할 때 별도의 서명 비밀을 만든다.
+- 등록부는 이 기기의 앱 지원 폴더 아래 `managers.json`에 둔다. 기존 매니저는 목록에서 프로젝트와 쓰기 권한을 다시 지정하면 연결할 수 있다. 이때 기존 웹훅 서명 비밀을 이어 쓴다. 상세의 기록에는 시각, 도구, 결과, 대상 식별자를 최근 1,000건까지 남긴다.
+- Hermes는 프로젝트별 프로필에 해당 매니저의 MCP 설정을 넣는다. 공용 Slack 봇은 기본 프로필에 두고, 지원하는 Hermes에서 `gateway.multiplex_profiles`를 켠 뒤 `gateway.profile_routes`의 `platform: slack`, `chat_id`, `profile`로 채널을 배정한다. aisurada에 입력한 채널 이름은 카드와 상세에 표시한다. [Hermes 채널별 프로필 설정](https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways#routing-shared-bot-chats-to-profiles-profile_routes)
+
+명령줄에서는 현재 vault에서 프로젝트의 값으로 등록한다. 아래 예시의 `demo-project`와 `demo`는 프로젝트와 아젠다의 주소에 쓰는 이름이다. `update`에 목록을 주면 그 목록을 교체한다. `disable`을 실행하면 떠 있는 매니저 서버도 다음 호출부터 쓰기와 읽기를 거절한다.
 
 ```sh
-ais-cli manager add hermes label=Hermes repos=bnjjong/aisurada agendas=개발 webhook=http://127.0.0.1:8644/webhooks/aisurada
-ais-cli manager config hermes
+ais-cli manager add hermes-demo project=demo-project label=Hermes repos=demo/shared agendas=demo
+ais-cli manager config hermes-demo
 ais-cli manager list
 ```
 
-- `config`가 출력하는 `mcp_servers.aisurada` 항목을 Hermes 전용 프로필의 설정에 합친다. Hermes가 출력에 적힌 새 `ais-cli`를 실행할 수 있어야 한다.
-- Hermes가 새 제보를 받으면 비슷한 태스크와 노트를 먼저 찾고, 중복은 기존 태스크의 댓글로 남긴다. 새 작업은 초안으로 접수하고, 정보가 부족하면 되묻는다. 매니저용 서버가 연결할 때 이 규칙을 안내한다.
-- `manager update hermes repos=소유자/저장소 agendas=아젠다`는 지정한 목록을 교체한다. `manager disable hermes`를 실행하면 떠 있는 서버도 다음 도구 호출부터 거절한다. `manager enable hermes`로 다시 켠다.
-- 러너가 들어 있는 macOS 빌드는 새 제보를 앱에서 알린다. 첫 조회에서 기존 태스크 상태를 기록하고, 그 뒤 개발 준비·검토·완료·실패로 바뀐 경우에 상태를 알린다. 주소는 이 기기의 웹훅으로 제한한다. 태스크 설명과 노트 본문은 상태 알림에 싣지 않는다.
-- 상태 알림을 사용하려면 macOS 키체인에 서비스가 `aisurada.manager.webhook`, 계정이 `hermes`인 일반 암호 항목을 만든다. Hermes 라우트에도 같은 서명 키를 설정한다. Slack 연결 뒤 아래 항목을 그 라우트에 추가해 원래 스레드에 답글을 단다.
+러너가 들어 있는 macOS 빌드는 매니저가 접수한 태스크의 상태가 바뀌면 설정한 경우에 알린다. 주소는 이 기기에서 실행 중인 웹훅으로 제한한다. 서명 비밀은 상태 알림 설정에서 만들고 macOS 키체인에 둔다. Hermes의 프로젝트별 경로에 같은 서명 비밀과 다음 옵션을 설정한다. `refs`에 `kind: slack`과 Slack 메시지 주소가 있으면 원래 스레드로 알린다. 시험 알림은 화면에서 입력한 Slack 채널 ID로 보낸다. [Hermes 웹훅 설정](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks)
 
 ```yaml
 events: [aisurada.task.status]
@@ -376,7 +379,6 @@ deliver_extra:
   chat_id: "{channel}"
   thread_id: "{thread_id}"
 ```
-
 
 ### 알림 (`notifications.rs`)
 

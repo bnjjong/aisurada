@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
+import { ProjectManagers } from "./ManagersPage.tsx";
+import { useManagers } from "./managersStore.tsx";
 import { Confirm, Modal } from "./Modal.tsx";
 import { PROJECT_TYPE_NAMES, projectTypeOf } from "./model.ts";
 import { Page } from "./OtherPages.tsx";
@@ -31,6 +33,7 @@ export function ProjectPage({
   const ws = state.workspace!;
   const project = ws.projects.find((p) => p.slug === slug || p.id === slug);
   const projectSlug = project ? asText(project.slug) : slug;
+  const managers = useManagers().data?.items.filter(item => item.manager.project === projectSlug && item.manager.enabled && !item.issue) ?? [];
   const [usable, setUsable] = useState<UsableResources | null>(null);
   const [globals, setGlobals] = useState<ResourceRow[]>([]);
   const [trash, setTrash] = useState<TrashRow[]>([]);
@@ -189,6 +192,7 @@ export function ProjectPage({
       </div>
       {error && <p role="alert" className="res-error">{error}</p>}
 
+      <ProjectManagers key={projectSlug} project={projectSlug} workspace={ws} controller={controller} />
       <section className="res-section" aria-label="저장소">
         <header className="res-section-head">
           <h2>저장소</h2>
@@ -196,7 +200,10 @@ export function ProjectPage({
         {repos.length ? (
           <ul className="res-plain">
             {repos.map((r) => (
-              <li key={r.name}>{repoLabel(r)}</li>
+              <li key={r.name}>{repoLabel(r)}
+                {r.github && managers.some(item => item.manager.repos.includes(r.github!) && item.manager.tools.some(tool => tool === "create_task" || tool === "add_task_comment")) &&
+                  <span className="mgr-badge is-ok">매니저가 씀</span>}
+              </li>
             ))}
           </ul>
         ) : (
@@ -215,6 +222,8 @@ export function ProjectPage({
                 <button type="button" className="res-link" onClick={() => controller.navigate(`/agenda/${encodeURIComponent(a.id)}`)}>
                   {a.title}
                 </button>
+                {managers.some(item => item.manager.agendas.includes(a.slug) && item.manager.tools.includes("create_doc")) &&
+                  <span className="mgr-badge is-ok">매니저가 씀</span>}
               </li>
             ))}
           </ul>

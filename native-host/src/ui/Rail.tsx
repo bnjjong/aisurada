@@ -11,6 +11,7 @@ import { badgeText, badgeTotal } from "./approvalsClient.ts";
 import { useApprovalCounts } from "./approvalsStore.ts";
 import { decisionAddress, usePendingDecisions } from "./decisionsStore.ts";
 import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
+import { deliveryIssue, enabledManagers, useManagers } from "./managersStore.tsx";
 import { RailRuns } from "./RailRuns.tsx";
 import { useSessionBadge } from "@claude-plug/session";
 import { architectureAddress, parseRoute } from "../navigation/routes.ts";
@@ -39,6 +40,7 @@ const NAV_ITEMS: Record<RailTab, ReadonlyArray<readonly [string, string]>> = {
   ],
   agents: [
     ["tasks", "태스크"],
+    ["managers", "매니저"],
   ],
   global: [
     ["global-resources", "글로벌 리소스 정의"],
@@ -63,10 +65,15 @@ export function Rail({
   // 러너가 사람의 답을 기다리는 태스크의 수. 태스크 메뉴에 배지로 붙는다
   const runner = useRunner();
   const waitingAnswers = runner.waiting.length;
+  const managers = useManagers();
+  const activeManagers = enabledManagers(managers.data);
+  const managerIssues = managers.error ? 1 : managers.data?.items.filter(item =>
+    (item.manager.project && item.issue === "프로젝트를 찾을 수 없어요") || deliveryIssue(item)).length ?? 0;
+  const managerSummary = activeManagers.length === 1 ? `${activeManagers[0].manager.label} 켜짐` : `${activeManagers.length}개 켜짐`;
   // AI가 노트에 쓴 「정할 것」 가운데 사람의 답을 기다리는 노트(후속 노트 포함)
   const decisions = usePendingDecisions();
   // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 답을 기다리는 노트 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
-  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts));
+  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerIssues);
   // 켜질 탭은 화면 주소가 정한다. 주소가 탭을 정하지 않는 화면이면 직전에 켜 둔 탭이다
   const tab = activeRailTab(state.route);
   useEffect(() => rememberRailTab(state.route), [state.route]);
@@ -386,13 +393,14 @@ export function Rail({
         <nav data-rail-section="nav" aria-label={tab === "notes" ? "노트 메뉴" : tab === "agents" ? "에이전트 메뉴" : "글로벌 리소스 메뉴"}>
         {NAV_ITEMS[tab].map(([path, label]) => (
           <button
-            className={`nav-item ${(path === "tasks" ? state.route.startsWith("/task") : state.route.startsWith("/" + path)) ? "active" : ""}`}
+            className={`nav-item ${(path === "tasks" ? route.kind === "tasks" || route.kind === "task" : path === "managers" ? route.kind === "managers" || route.kind === "manager" : state.route.startsWith("/" + path)) ? "active" : ""}`}
             key={path}
             onClick={() => controller.navigate("/" + path)}
           >
             {label}
             {path === "trash" && !!ws.trash.length && ` ${ws.trash.length}`}
             {path === "tasks" && waitingAnswers > 0 && <span className="nav-badge" role="img" aria-label={`사람의 답을 기다리는 태스크 ${waitingAnswers}개`}>{countText(waitingAnswers)}</span>}
+            {path === "managers" && managerIssues > 0 && <span className="nav-badge" role="img" aria-label={`확인이 필요한 매니저 문제 ${managerIssues}개`}>{countText(managerIssues)}</span>}
             {path === "resources" && approvalBadge && <span className="nav-badge" role="img" aria-label={`승인이 필요한 변경 ${approvalBadge}개`}>{approvalBadge}</span>}
           </button>
         ))}
@@ -406,6 +414,12 @@ export function Rail({
         >
           <i aria-hidden="true" />
           러너 · {runnerSummary(runner)}
+        </button>
+      )}
+      {tab === "agents" && !!managers.data?.items.length && (
+        <button type="button" className={`rail-runner rail-managers ${managerIssues ? "is-warn" : activeManagers.length ? "is-ready" : ""}`}
+          onClick={() => controller.navigate("/managers")}>
+          <i aria-hidden="true" />매니저 · {managerSummary}
         </button>
       )}
       {tab === "agents" && runner.supported && <RailRuns controller={controller} taskKey={route.kind === "task" ? route.key : undefined} />}

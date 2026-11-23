@@ -4,7 +4,8 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { SettingsSection, WorkspaceState } from "../workspace/types.ts";
 import { CLAUDE_ENABLED } from "@claude-plug/state";
 import { Modal } from "./Modal.tsx";
-import { SettingsPane } from "./SettingsParts.tsx";
+import { enabledManagers, useManagers } from "./managersStore.tsx";
+import { SettingsGroup, SettingsPane, SettingsRow } from "./SettingsParts.tsx";
 import {
   SETTINGS_SECTIONS,
   searchSettings,
@@ -201,6 +202,11 @@ export function Settings({
   state: WorkspaceState;
 }) {
   const section = state.settingsSection || "look";
+  const { data } = useManagers();
+  const active = enabledManagers(data);
+  const projectNames = [...new Set(active.map(item =>
+    state.workspace?.projects.find(project => project.slug === item.manager.project)?.title || item.manager.project,
+  ))];
 
   const panes: Record<SettingsSection, ReactNode> = {
     look: <LookSettings controller={controller} state={state} />,
@@ -212,6 +218,15 @@ export function Settings({
       <SettingsPane title="연결" desc="앱이 바깥 서비스에 닿는 연결이에요. 키는 이 Mac의 키체인에만 둬요.">
         <GithubConnect controller={controller} />
         <ArchylConnect controller={controller} />
+        <SettingsGroup>
+          <SettingsRow as="div" title="매니저 연결" settingKey="managers"
+            desc={`에이전트 탭의 「매니저」에서 연결을 관리해요.${active.length ? ` 지금 ${active.length}개가 켜져 있어요(${projectNames.join(", ")}).` : ""}`}
+            control={<button type="button" onClick={() => {
+              controller.settings(false);
+              controller.navigate("/managers");
+            }}>매니저 화면 열기 →</button>}
+          />
+        </SettingsGroup>
       </SettingsPane>
     ),
   };
