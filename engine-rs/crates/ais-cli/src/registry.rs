@@ -32,7 +32,7 @@ pub fn tool(name: &str) -> Option<&'static Spec> {
     SPECS.iter().find(|spec| spec.tool == Some(name))
 }
 
-/// `ais-cli`가 도구로 받는 이름 40개
+/// `ais-cli`가 도구로 받는 이름 41개
 pub const CLI_TOOL_NAMES: &[&str] = &[
     "create_doc",
     "update_doc",
@@ -73,6 +73,7 @@ pub const CLI_TOOL_NAMES: &[&str] = &[
     "list_tasks",
     "get_task",
     "create_task",
+    "add_task_comment",
     "list_decisions",
 ];
 
@@ -120,6 +121,7 @@ pub fn tool_description(name: &str) -> &'static str {
         "list_tasks" => "태스크(티켓) 목록을 상태, 유형, 저장소, 라벨로 거른다",
         "get_task" => "태스크 1건을 설명, 완료 기준, 연결, 활동과 함께 낸다",
         "create_task" => "새 태스크(티켓) 1건을 만든다",
+        "add_task_comment" => "태스크에 댓글을 남긴다",
         "list_decisions" => "노트의 결정 블록(정할 것)과 사람이 남긴 답을 낸다",
         _ => "",
     }
@@ -136,6 +138,7 @@ pub const DIRECT_COMMANDS: &[&str] = &[
     "codex-mcp",
     "gemini-mcp",
     "wait-decisions",
+    "manager",
 ];
 
 /// 앱이 쓰는 사이드카 고유 명령 61개

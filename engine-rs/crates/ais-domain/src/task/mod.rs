@@ -87,7 +87,7 @@ pub struct Link {
     pub to: String,
 }
 
-/// 태스크가 가리키는 자원(노트 또는 GitHub 이슈·PR)
+/// 태스크가 가리키는 자원(노트, GitHub 이슈·PR 또는 Slack 제보)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ref {
     pub kind: String,
@@ -106,6 +106,7 @@ pub struct Task {
     pub repo: Option<String>,
     pub project: Option<String>,
     pub base_branch: Option<String>,
+    pub manager: Option<String>,
     pub labels: Vec<String>,
     pub criteria: Vec<Criterion>,
     pub links: Vec<Link>,

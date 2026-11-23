@@ -161,9 +161,13 @@ impl ParsedNewDoc {
         at: &str,
         session: Option<&str>,
         session_agent: Option<&str>,
+        manager: Option<&str>,
     ) -> String {
         let session_id = session.filter(|_| self.tool);
         let session_agent = session_id.and(session_agent.and_then(agent_for_file));
+        let extra = manager
+            .filter(|name| self.tool && crate::task::format::valid_manager(name))
+            .map_or_else(String::new, |name| format!("manager: \"{name}\"\n"));
         let front = NoteFront {
             id: note_id,
             agenda: agenda_slug,
@@ -186,7 +190,7 @@ impl ParsedNewDoc {
             template: self.template.as_deref(),
             evaluation: None,
             links: &self.links,
-            extra: "",
+            extra: &extra,
         }
         .render();
         format!("---\n{front}---\n{}", self.body)
@@ -357,6 +361,7 @@ mod tests {
             "2026-11-15T00:00:00.000Z",
             Some("s-1"),
             Some("Codex"),
+            None,
         );
         assert!(text.starts_with("---\nid: ndzz0001-0000aaaa\n"), "{text}");
         assert!(text.contains("sessionId: s-1\n") && text.contains("sessionAgent: codex\n"));
@@ -369,6 +374,7 @@ mod tests {
             "2026-11-15T00:00:00.000Z",
             Some("s-1"),
             Some("Codex"),
+            None,
         );
         assert!(!text.contains("sessionId"), "{text}");
         assert!(text.contains("type: plan\n"));

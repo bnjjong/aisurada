@@ -7,5 +7,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+ais-domain = { path = "../ais-domain" }
 ais-core = { path = "../ais-core" }
 libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

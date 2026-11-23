@@ -125,6 +125,9 @@ impl TaskEvent {
         if let Some(agent) = &self.stamp.agent {
             entries.push(("agent".to_string(), text(agent)));
         }
+        if let Some(manager) = &self.stamp.manager {
+            entries.push(("manager".to_string(), text(manager)));
+        }
         match &self.kind {
             EventKind::Created => {}
             EventKind::Edited { fields } => entries.push((
@@ -222,6 +225,7 @@ impl NewTask {
             repo: Some(self.repo),
             project: self.project,
             base_branch: self.base_branch,
+            manager: stamp.manager.clone(),
             labels: self.labels.unwrap_or_default(),
             criteria: normalize_criteria(&[], &self.criteria, stamp, actor),
             links: Vec::new(),
@@ -640,6 +644,7 @@ mod tests {
             at: at.to_string(),
             session: None,
             agent: None,
+            manager: None,
         }
     }
 

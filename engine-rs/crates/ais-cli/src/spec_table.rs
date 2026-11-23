@@ -747,7 +747,7 @@ pub const SPECS: &[Spec] = &[
     },
     Spec {
         name: "add-task-comment",
-        tool: None,
+        tool: Some("add_task_comment"),
         write: true,
         part4: false,
         usage: "add-task-comment <키 또는 id> body=<댓글> [actor=human|runner]",

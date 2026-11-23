@@ -23,7 +23,9 @@ use crate::env::{Env, MISSING_VAULT_MESSAGE};
 use crate::error::CliError;
 
 /// 운영 도구(`ais-ops`)의 모듈과 호출 결과를 같은 이름으로 다시 내놓아 `ais_cli::register` 같은 경로가 그대로 통한다.
-pub use ais_ops::{Outcome, agent_cli, doctor, env, install, migrate, old_sidecar, register};
+pub use ais_ops::{
+    Outcome, agent_cli, doctor, env, install, manager, migrate, old_sidecar, register,
+};
 
 /// 명령줄 오류를 표준 오류 글과 종료 코드로 바꾼다.
 fn outcome_from_error(error: &CliError) -> Outcome {
@@ -32,6 +34,10 @@ fn outcome_from_error(error: &CliError) -> Outcome {
 
 /// `ais-cli`를 부른다. `args`는 프로그램 이름을 뺀 명령줄이다.
 pub fn run(args: &[String], env: &Env) -> Outcome {
+    run_with_manager(args, env, None)
+}
+
+fn run_with_manager(args: &[String], env: &Env, manager: Option<&manager::Manager>) -> Outcome {
     let Some(first) = args.first().map(String::as_str) else {
         return Outcome::out(registry::usage_text());
     };
@@ -47,6 +53,7 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
         return Outcome::err(registry::unknown_name_text(first), 2);
     }
     match first {
+        "manager" => return manager::run(&args[1..], env),
         "doctor" => return doctor::run(&args[1..], env),
         "sweep" => return install::sweep(&args[1..], env),
         "install" => return install::install(env),
@@ -68,10 +75,16 @@ pub fn run(args: &[String], env: &Env) -> Outcome {
         return Outcome::err(registry::unknown_name_text(first), 2);
     }
 
-    run_engine(first, is_tool, &args[1..], env)
+    run_engine(first, is_tool, &args[1..], env, manager)
 }
 
-fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome {
+fn run_engine(
+    name: &str,
+    is_tool: bool,
+    rest: &[String],
+    env: &Env,
+    manager: Option<&manager::Manager>,
+) -> Outcome {
     // 1. vault 정하기: `AISURADA_VAULT`가 먼저, 없으면 앱이 열어 둔 vault
     let Some(raw_vault) = env::resolve_vault(env) else {
         return Outcome::err(format!("AIS-400 {MISSING_VAULT_MESSAGE}\n"), 2);
@@ -104,7 +117,7 @@ fn run_engine(name: &str, is_tool: bool, rest: &[String], env: &Env) -> Outcome 
 
     // 3. 해석하고 엔진을 부른다
     let outcome = if is_tool {
-        run_tool(name, rest, &vault, session.as_ref())
+        run_tool(name, rest, &vault, session.as_ref(), manager)
     } else {
         run_command(name, rest, &vault, session.as_ref())
     };
@@ -123,8 +136,13 @@ fn run_tool(
     rest: &[String],
     vault: &str,
     session: Option<&env::SessionSource>,
+    manager: Option<&manager::Manager>,
 ) -> Result<legacy::Legacy, CliError> {
-    let call = tool::parse_tool(name, rest, session)?;
+    let mut call = tool::parse_tool(name, rest, session)?;
+    call.context.manager = manager.map(|value| ais_core::ManagerContext {
+        name: value.name.clone(),
+        repos: value.repos.clone(),
+    });
     let response = Engine::new(vault).call_as(&call.context, &call.command, call.args.clone())?;
     Ok(legacy::to_legacy(&call, vault, response))
 }

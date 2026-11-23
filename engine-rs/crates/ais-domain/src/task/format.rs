@@ -50,7 +50,55 @@ static GITHUB_URL: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// 머리말의 알려진 칸. 이 밖의 칸은 `extra`로 보존한다.
-const KNOWN: [&str; 17] = [
+pub fn valid_manager(value: &str) -> bool {
+    (1..=32).contains(&value.len())
+        && value.as_bytes()[0].is_ascii_lowercase()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+static SLACK_LINK: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^https://[a-z0-9][a-z0-9-]*\.slack\.com/archives/([CGD][A-Z0-9]{2,})/p([0-9]{10})([0-9]{6})(?:\?([^#\s]+))?$").unwrap()
+});
+
+/// URL에서 채널과 답글을 달 원글 시각을 얻는다. 답글 주소면 thread_ts를 쓴다.
+pub fn slack_thread(url: &str) -> Option<(String, String)> {
+    let parts = SLACK_LINK.captures(url)?;
+    let channel = &parts[1];
+    let mut thread = format!("{}.{}", &parts[2], &parts[3]);
+    if let Some(query) = parts.get(4) {
+        let mut provided_thread = false;
+        for (key, value) in query
+            .as_str()
+            .split('&')
+            .filter_map(|pair| pair.split_once('='))
+        {
+            match key {
+                "cid" if value != channel => return None,
+                "thread_ts" => {
+                    let (seconds, micros) = value.split_once('.')?;
+                    if provided_thread
+                        || seconds.len() != 10
+                        || micros.len() != 6
+                        || !seconds
+                            .bytes()
+                            .chain(micros.bytes())
+                            .all(|byte| byte.is_ascii_digit())
+                    {
+                        return None;
+                    }
+                    thread = value.to_string();
+                    provided_thread = true;
+                }
+                _ => {}
+            }
+        }
+    }
+    Some((channel.to_string(), thread))
+}
+
+const KNOWN: [&str; 18] = [
     "key",
     "id",
     "title",
@@ -60,6 +108,7 @@ const KNOWN: [&str; 17] = [
     "repo",
     "project",
     "baseBranch",
+    "manager",
     "labels",
     "criteria",
     "links",
@@ -192,6 +241,7 @@ pub fn parse(bytes: &[u8], rel_path: &str) -> Result<Task, String> {
         repo: blank_to_null(str_of(&map, "repo")),
         project: blank_to_null(str_of(&map, "project")),
         base_branch: blank_to_null(str_of(&map, "baseBranch")),
+        manager: str_of(&map, "manager").filter(|value| valid_manager(value)),
         labels: label_list(get(&map, "labels")),
         criteria: criteria_list(get(&map, "criteria")),
         links: link_list(get(&map, "links")),
@@ -309,6 +359,7 @@ fn valid_ref(kind: &str, target: &str) -> bool {
     match kind {
         "note" => NOTE_ID.is_match(target) || SUB_NOTE_ID.is_match(target),
         "github" => GITHUB_SHORT.is_match(target) || GITHUB_URL.is_match(target),
+        "slack" => slack_thread(target).is_some(),
         _ => false,
     }
 }
@@ -337,6 +388,9 @@ pub fn render(task: &Task) -> Result<Vec<u8>, EngineError> {
     }
     if let Some(base) = &task.base_branch {
         put("baseBranch", text(base));
+    }
+    if let Some(manager) = &task.manager {
+        put("manager", text(manager));
     }
     if !task.labels.is_empty() {
         put(
@@ -667,6 +721,11 @@ pub fn refs(raw: &Json) -> Result<Vec<Ref>, EngineError> {
             )));
         };
         if !valid_ref(java_trim(&kind), java_trim(&target)) {
+            if java_trim(&kind) == "slack" {
+                return Err(bad(
+                    "refs 항목이 틀렸다. slack 은 Slack 메시지 주소여야 한다",
+                ));
+            }
             return Err(bad(format!(
                 "refs 항목이 틀렸다. note 는 노트 id(nd…), github 는 owner/name#번호나 이슈·PR 주소여야 한다: {}",
                 json::java_record_string(item)

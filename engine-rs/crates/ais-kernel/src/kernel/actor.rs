@@ -31,6 +31,14 @@ pub struct CallContext {
     pub session: Option<String>,
     /// 세션을 연 에이전트 이름(`codex` 따위). 없으면 claude로 본다. 노트에 적는 편집 도장이 읽는다.
     pub session_agent: Option<String>,
+    #[serde(skip)]
+    pub manager: Option<ManagerContext>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagerContext {
+    pub name: String,
+    pub repos: Vec<String>,
 }
 
 impl CallContext {
@@ -45,6 +53,7 @@ impl CallContext {
             caller: Caller::Ai,
             session,
             session_agent,
+            manager: None,
         }
     }
 }

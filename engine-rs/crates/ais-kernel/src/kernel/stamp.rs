@@ -8,4 +8,5 @@ pub struct Stamp {
     pub at: String,
     pub session: Option<String>,
     pub agent: Option<String>,
+    pub manager: Option<String>,
 }

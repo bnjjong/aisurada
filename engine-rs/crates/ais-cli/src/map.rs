@@ -76,6 +76,7 @@ pub fn context_for(caller: Caller, session: Option<&SessionSource>) -> CallConte
         caller,
         session: session.map(|source| source.id.clone()),
         session_agent: session.and_then(|source| agent_for_file(&source.agent)),
+        manager: None,
     }
 }
 
@@ -320,6 +321,7 @@ mod tests {
                 caller: Caller::App,
                 session: Some("g-1".into()),
                 session_agent: Some("gemini".into()),
+                manager: None,
             }
         );
     }

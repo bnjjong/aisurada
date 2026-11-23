@@ -24,5 +24,6 @@ pub fn stamp_of(context: &CallContext) -> Stamp {
         at: iso_offset_date_time(now_millis()),
         session,
         agent,
+        manager: context.manager.as_ref().map(|manager| manager.name.clone()),
     }
 }

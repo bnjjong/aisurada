@@ -234,6 +234,7 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
         ("repo", &task.repo),
         ("project", &task.project),
         ("baseBranch", &task.base_branch),
+        ("manager", &task.manager),
         ("editedSession", &task.edited_session),
         ("editedAgent", &task.edited_agent),
     ] {
@@ -455,6 +456,11 @@ pub fn add_task_comment(
     let reference = only_ref(&request.id, COMMENT_USAGE)?;
     let scan = store::scan(vault);
     let task = store::find(&scan, reference)?;
+    if let Some(manager) = &context.manager
+        && !task.repo.as_ref().is_some_and(|repo| manager.repos.contains(repo))
+    {
+        return Err(EngineError::invalid_argument("매니저에게 허용하지 않은 저장소의 태스크다"));
+    }
     let body = format::comment(request.body.as_deref().unwrap_or(""))?;
     let actor = actor_of(&request.actor)?;
     let ev = store::comment(vault, task, &body, &stamp_of(&context), &actor)?;
