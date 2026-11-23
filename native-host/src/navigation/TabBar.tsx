@@ -16,6 +16,11 @@ interface Drag {
 }
 
 export function tabTitle(id: string, state: WorkspaceState): string {
+  if (id.startsWith('arch:')) {
+    const slug = id.slice(5);
+    const name = state.workspace?.projects.find(project => project.slug === slug || project.id === slug)?.name;
+    return '아키텍처 · ' + (typeof name === 'string' ? name : slug);
+  }
   if (id === 'term:main') return '터미널';
   if (id.startsWith('term:')) {
     const termId = id.slice(5);
