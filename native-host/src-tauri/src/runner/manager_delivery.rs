@@ -1,11 +1,12 @@
 //! 매니저 태스크가 들어오거나 상태가 바뀌었을 때 알린다.
 
-use super::{job::Ctx, store};
+use super::{job::Ctx, protocol::REPORT_NOTE_LINK, store};
 use crate::manager_webhook::{self, delivery_id, DeliveryError, EVENT};
 use crate::notifications::NewItem;
 use ais_cli::{env::Env, manager};
 use ais_domain::task::{format::slack_thread, TaskStatus};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fs,
@@ -187,6 +188,12 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
 }
 
 fn record_expired(ctx: &Ctx, item: &Pending) {
+    if ctx
+        .call(&["get-task", &item.task_key, "activity=1"])
+        .is_ok_and(|task| slack_source(&task).is_none())
+    {
+        return;
+    }
     let env = Env::from_process();
     if let Ok(manager) = delivery_manager(ctx, &env, item) {
         record_result(
@@ -216,12 +223,13 @@ fn deliver_and_record(ctx: &Ctx, item: &Pending, manual: bool) -> Result<u16, De
     let env = Env::from_process();
     let manager = delivery_manager(ctx, &env, item)?;
     let result = attempt_delivery(ctx, item, manual, &manager);
-    if item.attempts == 0
-        || result.is_ok()
-        || matches!(
-            result,
-            Err(DeliveryError::Unavailable | DeliveryError::Unconfirmed)
-        )
+    if !matches!(result, Err(DeliveryError::NoSlackSource))
+        && (item.attempts == 0
+            || result.is_ok()
+            || matches!(
+                result,
+                Err(DeliveryError::Unavailable | DeliveryError::Unconfirmed)
+            ))
     {
         record_result(
             &env,
@@ -242,6 +250,9 @@ fn record_result(env: &Env, manager: &manager::Manager, item: &Pending, reason: 
 fn delivery_error(error: &DeliveryError) -> &'static str {
     match error {
         DeliveryError::Unavailable => "매니저 설정이나 현재 태스크의 Slack 출처를 확인해 주세요.",
+        DeliveryError::NoSlackSource => {
+            "Slack 원글 주소가 있는 태스크에만 상태 알림을 보낼 수 있어요."
+        }
         DeliveryError::MissingSecret => "상태 알림 설정에서 서명 비밀을 만들어 주세요.",
         DeliveryError::Keychain => "macOS 키체인에서 서명 비밀을 읽을 수 없어요.",
         DeliveryError::Unconfirmed => {
@@ -250,6 +261,37 @@ fn delivery_error(error: &DeliveryError) -> &'static str {
         DeliveryError::Retry { rejected: true } => "Hermes가 Slack에 알림을 전달하지 못했어요.",
         DeliveryError::Retry { rejected: false } => "Hermes의 알림 응답을 받지 못했어요.",
     }
+}
+
+fn slack_source(task: &Value) -> Option<(String, String)> {
+    task["refs"].as_array()?.iter().find_map(|reference| {
+        if reference["kind"] != "slack" {
+            return None;
+        }
+        slack_thread(reference["target"].as_str()?)
+    })
+}
+
+fn review_has_report_note(task: &Value) -> bool {
+    let mut events = task["activity"].as_array().into_iter().flatten().rev();
+    let Some(review) = events.find(|event| event["kind"] == "status" && event["to"] == "in-review")
+    else {
+        return false;
+    };
+    review["by"] == "runner"
+        && events
+            .take_while(|event| event["kind"] != "status")
+            .find(|event| event["kind"] == "comment" && event["by"] == "runner")
+            .and_then(|comment| comment["body"].as_str())
+            .and_then(|body| body.strip_prefix("**분석 보고**\n\n"))
+            .and_then(|body| body.strip_prefix(REPORT_NOTE_LINK))
+            .and_then(|body| body.split_once(')'))
+            .is_some_and(|(id, _)| {
+                id.starts_with("nd")
+                    && id
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+            })
 }
 
 fn attempt_delivery(
@@ -261,6 +303,14 @@ fn attempt_delivery(
     if ctx.host.vault().as_deref() != Some(ctx.vault.as_str()) {
         return Err(DeliveryError::Retry { rejected: false });
     }
+    let mut argv = vec!["get-task", item.task_key.as_str()];
+    if manual || item.status != "in-review" {
+        argv.push("activity=1");
+    }
+    let task = ctx
+        .call(&argv)
+        .map_err(|_| DeliveryError::Retry { rejected: false })?;
+    let (channel, thread) = slack_source(&task).ok_or(DeliveryError::NoSlackSource)?;
     if !manager.enabled || manager.scope().is_none() {
         return Err(DeliveryError::Unavailable);
     }
@@ -270,9 +320,6 @@ fn attempt_delivery(
         manager.webhook_for_status(&item.status)
     }
     .ok_or(DeliveryError::Unavailable)?;
-    let task = ctx
-        .call(&["get-task", &item.task_key, "activity=1"])
-        .map_err(|_| DeliveryError::Retry { rejected: false })?;
     let repo = task["repo"].as_str().ok_or(DeliveryError::Unavailable)?;
     if task["id"].as_str() != Some(&item.task_id)
         || task["manager"].as_str() != Some(manager.name.as_str())
@@ -284,18 +331,6 @@ fn attempt_delivery(
     {
         return Err(DeliveryError::Unavailable);
     }
-    let (channel, thread) = task["refs"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find_map(|reference| {
-            if reference["kind"] == "slack" {
-                slack_thread(reference["target"].as_str()?)
-            } else {
-                None
-            }
-        })
-        .ok_or(DeliveryError::Unavailable)?;
     let status = TaskStatus::parse(&item.status).ok_or(DeliveryError::Unavailable)?;
     let secret = manager_webhook::keychain_secret(manager)
         .map_err(|_| DeliveryError::Keychain)?
@@ -303,7 +338,7 @@ fn attempt_delivery(
     if ctx.host.vault().as_deref() != Some(ctx.vault.as_str()) {
         return Err(DeliveryError::Retry { rejected: false });
     }
-    let message = if manual {
+    let mut message = if manual {
         format!("{}의 현재 상태는 {}입니다.", item.task_key, status.title())
     } else {
         format!(
@@ -312,6 +347,9 @@ fn attempt_delivery(
             status.title()
         )
     };
+    if !manual && status == TaskStatus::InReview && review_has_report_note(&task) {
+        message.push_str("\n조사 노트가 저장됐어요. aisurada의 태스크 댓글에서 열 수 있어요.");
+    }
     let payload = serde_json::json!({
         "event_type": EVENT,
         "channel": channel,
@@ -344,4 +382,46 @@ pub(super) fn send_current(ctx: &Ctx, key: &str) -> Result<(), String> {
     deliver_and_record(ctx, &item, true)
         .map(|_| ())
         .map_err(|error| delivery_error(&error).into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn finds_only_a_slack_message_source() {
+        assert_eq!(slack_source(&json!({"refs": []})), None);
+        assert_eq!(
+            slack_source(&json!({"refs": [{"kind": "slack", "target": "https://example.com"}]})),
+            None
+        );
+        let linked = json!({"refs": [{"kind": "slack", "target": "https://example.slack.com/archives/CDEMO123/p1234567890123456"}]});
+        assert_eq!(
+            slack_source(&linked),
+            Some(("CDEMO123".into(), "1234567890.123456".into()))
+        );
+    }
+
+    #[test]
+    fn mentions_a_note_only_for_the_corresponding_runner_review() {
+        let activity = json!({"activity": [
+            {"kind": "status", "by": "runner", "to": "in-progress"},
+            {"kind": "comment", "by": "runner", "body": format!("**분석 보고**\n\n{REPORT_NOTE_LINK}ndtest-00000001)\n\n보고")},
+            {"kind": "status", "by": "runner", "to": "in-review"},
+            {"kind": "comment", "by": "human", "body": "확인 중"},
+        ]});
+        assert!(review_has_report_note(&activity));
+
+        let mut without_note = activity.clone();
+        without_note["activity"][1]["body"] = json!("**분석 보고**\n\n보고만 남김");
+        assert!(!review_has_report_note(&without_note));
+
+        let mut second_review = activity;
+        second_review["activity"].as_array_mut().unwrap().extend([
+            json!({"kind": "status", "by": "runner", "to": "in-progress"}),
+            json!({"kind": "status", "by": "runner", "to": "in-review"}),
+        ]);
+        assert!(!review_has_report_note(&second_review));
+    }
 }

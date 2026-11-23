@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::path::Path;
 
 pub const REPORT_MARK: &str = "[보고]";
+pub const REPORT_NOTE_LINK: &str = "[조사 노트 열기](aisurada://doc/";
 pub const QUESTION_MARK: &str = "[질문]";
 /// 댓글 하나에 싣는 글자 수의 상한. claude가 아주 긴 답을 해도 태스크 파일이 부풀지 않게 한다.
 pub const COMMENT_CHARS: usize = 12_000;

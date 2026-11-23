@@ -22,6 +22,8 @@ static KEYCHAIN_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub enum DeliveryError {
     Unavailable,
     #[cfg(feature = "claude")]
+    NoSlackSource,
+    #[cfg(feature = "claude")]
     MissingSecret,
     #[cfg(feature = "claude")]
     Keychain,
