@@ -34,7 +34,12 @@ pub(crate) fn open(
     context: &CallContext,
 ) -> Result<WriteScope, EngineError> {
     let lock = acquire_lock(vault)?;
-    let index = reconcile_index(vault, marker_required)?;
+    let index = if let Some(manager) = &context.manager {
+        check_workspace_marker(vault)?;
+        NoteIndex::for_manager_write(vault, manager)?
+    } else {
+        reconcile_index(vault, marker_required)?
+    };
     let record = CommitRecord::open(vault, context);
     Ok(WriteScope {
         index,

@@ -16,6 +16,8 @@ export type ScreenRoute =
   | { kind: 'session'; id: string }
   | { kind: 'project' | 'architecture'; slug: string }
   | { kind: 'task'; key: string }
+  | { kind: 'managers'; project?: string }
+  | { kind: 'manager'; name: string }
   | { kind: 'terminal'; id: string | null }
   | { kind: PlainPage };
 
@@ -33,6 +35,7 @@ export function parseRoute(address: string): ScreenRoute {
       return { kind: 'notes', open };
     }
     if (path === '/templates') return { kind: 'templates', open: query.get('open') || '' };
+    if (path === '/managers') return { kind: 'managers', project: query.get('project') || undefined };
     if (path === '/terminal') return { kind: 'terminal', id: null };
     if (path.startsWith('/sub/')) {
       // 후속 노트: /sub/<최상위 노트 id>/<후속 id>/<그 아래 후속 id>… 사슬 전체가 주소다.
@@ -42,7 +45,7 @@ export function parseRoute(address: string): ScreenRoute {
     const plain = ['favorites', 'connections', 'review', 'trash', 'guide', 'resources', 'tasks', 'global-resources'] as const;
     const page = plain.find(kind => path === `/${kind}`);
     if (page) return { kind: page };
-    const segment = /^\/(doc|agenda|session|terminal|project|architecture|task)\/([^/]+)$/.exec(path);
+    const segment = /^\/(doc|agenda|session|terminal|project|architecture|task|manager)\/([^/]+)$/.exec(path);
     if (!segment) return { kind: 'unknown' };
     const id = decodeURIComponent(segment[2]);
     switch (segment[1]) {
@@ -52,6 +55,7 @@ export function parseRoute(address: string): ScreenRoute {
       case 'project': return { kind: 'project', slug: id };
       case 'architecture': return { kind: 'architecture', slug: id };
       case 'task': return { kind: 'task', key: id };
+      case 'manager': return { kind: 'manager', name: id };
       default: return { kind: 'terminal', id };
     }
   } catch { return { kind: 'unknown' }; }
@@ -62,6 +66,8 @@ export const fileAddress = (path: string) => `/file?path=${encodeURIComponent(pa
 export const agendaAddress = (id: string) => `/agenda/${encodeURIComponent(id)}`;
 export const architectureAddress = (slug: string) => '/architecture/' + encodeURIComponent(slug);
 export const projectAddress = (slug: string) => `/project/${encodeURIComponent(slug)}`;
+export const managersAddress = (project?: string) => project ? `/managers?project=${encodeURIComponent(project)}` : "/managers";
+export const managerAddress = (name: string) => `/manager/${encodeURIComponent(name)}`;
 export const taskAddress = (key: string) => `/task/${encodeURIComponent(key)}`;
 export const sessionAddress = (id: string) => `/session/${encodeURIComponent(id)}`;
 export const notesAddress = (open: string[] = []) =>

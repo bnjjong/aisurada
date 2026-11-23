@@ -25,6 +25,8 @@ export function railTabOf(route: ScreenRoute): RailTab | null {
       return 'notes';
     case 'tasks':
     case 'task':
+    case 'managers':
+    case 'manager':
     case 'resources':
     case 'project':
       return 'agents';

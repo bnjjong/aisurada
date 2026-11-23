@@ -19,7 +19,7 @@ use crate::vault::sub_agenda;
 use crate::write::apparatus::{format_utc_millis, next_id, next_note_id, now_millis};
 use crate::write::atomic::write_atomic;
 use crate::write::confine::has_unusable_path_characters;
-use crate::ports::fs::check_confinement;
+use crate::ports::fs::{self, check_confinement};
 use crate::write::doc_place::{folder_name, parent_folder};
 use crate::write::local_time::local_clock;
 use crate::write::pipeline::WriteScope;
@@ -112,7 +112,14 @@ pub fn create_doc_in(
     }
     let (raw_title, raw_body) = (parsed.title.as_str(), parsed.body.as_str());
 
-    let (agenda_slug, agenda_created) = lookup_or_create_agenda(vault, scope, &parsed.agenda_key)?;
+    let (agenda_slug, agenda_created) = if let Some(manager) = &context.manager {
+        let agenda = scope.index.agendas.table.by_slug(&parsed.agenda_key).filter(|agenda| {
+            agenda.project.as_deref() == Some(&manager.project) && manager.agendas.contains(&agenda.slug)
+        }).ok_or_else(|| EngineError::invalid_argument("매니저에게 허용하지 않은 프로젝트 아젠다다"))?;
+        (agenda.slug.clone(), false)
+    } else {
+        lookup_or_create_agenda(vault, scope, &parsed.agenda_key)?
+    };
 
     // 날짜와 시각 배정: 오늘과 그날 겹치지 않는 5분 칸
     let millis = now_millis();
@@ -145,6 +152,15 @@ pub fn create_doc_in(
     }
     let note_dir = vault.join(&note_rel);
     check_confinement(vault, &note_dir)?;
+    if context.manager.is_some() {
+        let notes = vault.join("notes");
+        let agenda = notes.join(&agenda_slug);
+        let is_link = |path: &Path| fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink());
+        if is_link(&notes) || is_link(&agenda) {
+            return Err(EngineError::invalid_argument("매니저는 실제 프로젝트 아젠다 폴더에만 노트를 쓸 수 있다"));
+        }
+        check_confinement(&agenda, &note_dir)?;
+    }
 
     let text = parsed.render(
         &note_id,

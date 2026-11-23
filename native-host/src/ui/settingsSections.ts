@@ -128,6 +128,12 @@ export const SETTINGS_INDEX: readonly SearchIndexItem[] = [
     label: "Archyl 연결",
     keywords: ["archyl", "아킬", "c4", "다이어그램", "엔진"],
   },
+  {
+    section: "connections",
+    key: "managers",
+    label: "매니저 연결",
+    keywords: ["hermes", "슬랙", "slack", "mcp", "프로젝트", "웹훅"],
+  },
 ];
 
 /**

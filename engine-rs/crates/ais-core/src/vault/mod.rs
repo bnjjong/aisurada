@@ -18,10 +18,23 @@ internal_mods!(
 pub mod facts;
 pub mod git;
 pub mod index;
+
+pub(crate) fn check_manager_project(
+    root: &Path,
+    manager: &ManagerContext,
+) -> Result<project::ProjectInfo, EngineError> {
+    project::scan_projects(root)
+        .into_iter()
+        .find(|item| item.slug == manager.project && item.id == manager.project_id)
+        .ok_or_else(|| EngineError::not_found("매니저의 프로젝트를 찾을 수 없다"))
+}
 pub mod template;
 pub mod trash;
 
+use crate::error::EngineError;
+use crate::kernel::actor::ManagerContext;
 use serde::Serialize;
+use std::path::Path;
 
 /// 훑다가 건너뛴 파일 하나. `kind`는 `note`, `agenda`, `docTemplate`, `ritualTemplate`, `trash` 가운데 하나다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

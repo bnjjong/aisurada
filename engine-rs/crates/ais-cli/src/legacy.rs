@@ -47,7 +47,7 @@ impl Legacy {
 /// 새 모양의 응답을 옛 모양으로 되돌린다. 모양이 바뀌지 않은 명령은 그대로 돌려준다.
 pub fn to_legacy(call: &EngineCall, vault: &str, response: Value) -> Legacy {
     match call.command.as_str() {
-        "list_docs" => Legacy::plain(list_docs(vault, response)),
+        "list_docs" => Legacy::plain(list_docs(call, vault, response)),
         "list_agendas" => Legacy::plain(list_agendas(vault, response)),
         "list_projects" | "list_tags" => Legacy::plain(items(response)),
         "list_templates" => list_templates(call, vault, response),
@@ -81,7 +81,7 @@ fn text<'a>(call: &'a EngineCall, key: &str) -> &'a str {
 }
 
 /// 노트 줄에서 새 모양에만 있는 키를 빼고, 옛 모양에 있던 `agendaTitle`·`date`·`time`을 채운다.
-fn restore_note_row(row: &mut Map<String, Value>, index: &NoteIndex) {
+fn restore_note_row(row: &mut Map<String, Value>, index: Option<&NoteIndex>) {
     row.remove("folder");
     let id = row
         .get("id")
@@ -95,9 +95,9 @@ fn restore_note_row(row: &mut Map<String, Value>, index: &NoteIndex) {
         .to_string();
     row.insert(
         "agendaTitle".into(),
-        json!(index.agendas.table.title_of(&slug)),
+        json!(index.map_or("", |index| index.agendas.table.title_of(&slug))),
     );
-    if let Some(note) = index.note(&id) {
+    if let Some(note) = index.and_then(|index| index.note(&id)) {
         row.insert("date".into(), json!(note.meta.date));
         row.insert("time".into(), json!(note.meta.time));
     }
@@ -114,14 +114,14 @@ fn drop_empty_tags(row: &mut Map<String, Value>) {
     }
 }
 
-fn list_docs(vault: &str, response: Value) -> Value {
-    let index = NoteIndex::fresh(Path::new(vault));
+fn list_docs(call: &EngineCall, vault: &str, response: Value) -> Value {
+    let index = NoteIndex::for_reader(Path::new(vault), &call.context).ok();
     Value::Array(
         rows(response)
             .into_iter()
             .map(|row| match row {
                 Value::Object(mut map) => {
-                    restore_note_row(&mut map, &index);
+                    restore_note_row(&mut map, index.as_ref());
                     drop_empty_tags(&mut map);
                     Value::Object(map)
                 }
@@ -213,8 +213,8 @@ fn get_doc(call: &EngineCall, vault: &str, response: Value) -> Value {
     let Value::Object(mut map) = response else {
         return response;
     };
-    let index = NoteIndex::fresh(Path::new(vault));
-    restore_note_row(&mut map, &index);
+    let index = NoteIndex::for_reader(Path::new(vault), &call.context).ok();
+    restore_note_row(&mut map, index.as_ref());
     // 도구 표면(AI)에는 노트가 속한 아젠다의 사실층도 실어 준다
     if call.context.caller == Caller::Ai {
         let slug = map
@@ -222,7 +222,12 @@ fn get_doc(call: &EngineCall, vault: &str, response: Value) -> Value {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_string();
-        if let Some(facts) = read_facts(Path::new(vault), &slug) {
+        if (call.context.manager.is_none()
+            || index
+                .as_ref()
+                .is_some_and(|index| index.agendas.table.has_slug(&slug)))
+            && let Some(facts) = read_facts(Path::new(vault), &slug)
+        {
             map.insert("agendaFacts".into(), json!(facts));
         }
     }
@@ -245,12 +250,12 @@ fn get_doc(call: &EngineCall, vault: &str, response: Value) -> Value {
 fn search_docs(call: &EngineCall, vault: &str, response: Value) -> Value {
     let total = response.get("total").cloned().unwrap_or(json!(0));
     let truncated = response.get("truncated") == Some(&Value::Bool(true));
-    let index = NoteIndex::fresh(Path::new(vault));
+    let index = NoteIndex::for_reader(Path::new(vault), &call.context).ok();
     let docs: Vec<Value> = rows(response)
         .into_iter()
         .map(|row| match row {
             Value::Object(mut map) => {
-                restore_note_row(&mut map, &index);
+                restore_note_row(&mut map, index.as_ref());
                 drop_empty_tags(&mut map);
                 Value::Object(map)
             }
@@ -279,7 +284,7 @@ fn normalized_parent(raw: &str) -> String {
 }
 
 /// 하위 노트 줄: 새 모양의 `rootId`·`parentId`·`folder`를 빼고 `date`·`time`을 채운다.
-fn restore_sub_row(row: &mut Map<String, Value>, index: &NoteIndex) {
+fn restore_sub_row(row: &mut Map<String, Value>, index: Option<&NoteIndex>) {
     for key in ["rootId", "parentId", "folder"] {
         row.remove(key);
     }
@@ -288,7 +293,7 @@ fn restore_sub_row(row: &mut Map<String, Value>, index: &NoteIndex) {
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
-    if let Some((_, sub)) = index.find_sub(&id) {
+    if let Some((_, sub)) = index.and_then(|index| index.find_sub(&id)) {
         row.insert("date".into(), json!(sub.meta.date));
         row.insert("time".into(), json!(sub.meta.time));
     }
@@ -296,12 +301,12 @@ fn restore_sub_row(row: &mut Map<String, Value>, index: &NoteIndex) {
 
 fn list_sub_notes(call: &EngineCall, vault: &str, response: Value) -> Value {
     let parent = normalized_parent(text(call, "parent"));
-    let index = NoteIndex::fresh(Path::new(vault));
+    let index = NoteIndex::for_reader(Path::new(vault), &call.context).ok();
     let sub_notes: Vec<Value> = rows(response)
         .into_iter()
         .map(|row| match row {
             Value::Object(mut map) => {
-                restore_sub_row(&mut map, &index);
+                restore_sub_row(&mut map, index.as_ref());
                 let id = map
                     .get("id")
                     .and_then(Value::as_str)
@@ -320,8 +325,8 @@ fn get_sub_note(call: &EngineCall, vault: &str, response: Value) -> Value {
     let Value::Object(mut map) = response else {
         return response;
     };
-    let index = NoteIndex::fresh(Path::new(vault));
-    restore_sub_row(&mut map, &index);
+    let index = NoteIndex::for_reader(Path::new(vault), &call.context).ok();
+    restore_sub_row(&mut map, index.as_ref());
     map.insert(
         "parent".into(),
         json!(normalized_parent(text(call, "parent"))),

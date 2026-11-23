@@ -6,7 +6,11 @@ mod table;
 
 use crate::kernel::actor::CallContext;
 use crate::ports::Ports;
-use crate::write::pipeline::{self, WriteScope};
+use crate::vault::{agenda, project};
+use crate::write::{
+    marker::check_workspace_marker,
+    pipeline::{self, WriteScope},
+};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -41,6 +45,41 @@ pub fn catalog() -> impl Iterator<Item = CommandInfo> {
         name: def.name,
         access: def.access,
         scope: def.scope,
+    })
+}
+
+/// 매니저를 등록할 때 확인하는 프로젝트와 그 프로젝트에 속한 쓰기 대상.
+pub struct ManagerProject {
+    pub id: String,
+    pub repos: Vec<String>,
+    pub agendas: Vec<String>,
+}
+
+pub fn manager_project(root: &Path, slug: &str) -> Option<ManagerProject> {
+    check_workspace_marker(root).ok()?;
+    let project = project::scan_projects(root)
+        .into_iter()
+        .find(|item| item.slug == slug)?;
+    let scan = agenda::scan_agendas(root);
+    Some(ManagerProject {
+        id: project.id,
+        repos: project
+            .repos
+            .into_iter()
+            .filter_map(|repo| repo.github)
+            .collect(),
+        agendas: scan
+            .table
+            .infos()
+            .filter(|item| {
+                item.project.as_deref() == Some(slug)
+                    && scan
+                        .table
+                        .by_slug(&item.slug)
+                        .is_some_and(|current| current.id == item.id)
+            })
+            .map(|item| item.slug.clone())
+            .collect(),
     })
 }
 

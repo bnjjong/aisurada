@@ -51,7 +51,7 @@ pub fn execute(
         .map(|note| {
             let attach = request
                 .bodies
-                .then(|| attach_text::extract(&index.vault_root, note))
+                .then(|| attach_text::extract(index, note))
                 .flatten();
             NoteRow::from_record(note, context.caller, request.bodies, attach)
         })

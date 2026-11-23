@@ -150,13 +150,13 @@ impl Collector {
         });
     }
 
-    fn collect_all(&mut self) {
+    fn collect_all(&mut self, includes: impl Fn(&str, &Path) -> bool) {
         let notes = self.vault.join("notes");
         let Some(entries) = sorted_entries(&notes) else {
             return;
         };
         for (name, path) in entries {
-            if is_dir(&path) {
+            if includes(&name, &path) && is_dir(&path) {
                 self.collect_folder(&path, &name, 0);
             }
         }
@@ -274,8 +274,19 @@ impl Collector {
 /// vault의 `notes/`를 훑어 노트를 모읍니다.
 pub fn scan_notes(vault_root: &Path, agendas: &AgendaTable) -> NoteScan {
     let mut collector = Collector::new(vault_root);
-    collector.collect_all();
-    open_collected(collector, agendas)
+    collector.collect_all(|_, _| true);
+    open_collected(collector, agendas, false)
+}
+
+pub(super) fn scan_project_notes(vault_root: &Path, agendas: &AgendaTable) -> NoteScan {
+    let mut collector = Collector::new(vault_root);
+    if is_symlink(&vault_root.join("notes")) {
+        return NoteScan::default();
+    }
+    collector.collect_all(|slug, path| agendas.has_slug(slug) && !is_symlink(path));
+    let mut scan = open_collected(collector, agendas, true);
+    scan.notes.retain(|note| agendas.has_slug(&note.meta.agenda_slug));
+    scan
 }
 
 /// 받은 vault 상대 경로(`notes/…`)가 가리키는 자리만 훑는다. 트림한 앞뒤 `/`를 떼고 `notes/`로 시작하는 것만, 같은 경로는 한 번만 본다.
@@ -292,22 +303,26 @@ pub fn scan_note_paths(
             collector.collect_path(path)?;
         }
     }
-    Ok(open_collected(collector, agendas))
+    Ok(open_collected(collector, agendas, false))
 }
 
 /// 모은 후보를 하나씩 열어 노트 목록을 만든다.
-fn open_collected(mut collector: Collector, agendas: &AgendaTable) -> NoteScan {
+fn open_collected(mut collector: Collector, agendas: &AgendaTable, scoped: bool) -> NoteScan {
     let mut notes: Vec<NoteRecord> = Vec::new();
     let mut ids: HashSet<String> = HashSet::new();
     let mut opening_skipped: Vec<Skipped> = Vec::new();
     let candidates = std::mem::take(&mut collector.candidates);
     for candidate in &candidates {
+        if scoped && is_symlink(&candidate.body_file) {
+            continue;
+        }
         if let Some(record) = open_root(
             &collector.vault,
             candidate,
             agendas,
             &mut ids,
             &mut opening_skipped,
+            scoped,
         ) {
             notes.push(record);
         }
@@ -400,6 +415,7 @@ fn open_root(
     agendas: &AgendaTable,
     ids: &mut HashSet<String>,
     skipped: &mut Vec<Skipped>,
+    scoped: bool,
 ) -> Option<NoteRecord> {
     let rel = candidate
         .path
@@ -497,6 +513,7 @@ fn open_root(
             &mut subs,
             &mut sub_ids,
             skipped,
+            scoped,
         );
         record.sub_notes = subs;
     }
@@ -514,12 +531,13 @@ fn scan_sub_notes(
     subs: &mut Vec<NoteRecord>,
     sub_ids: &mut HashSet<String>,
     skipped: &mut Vec<Skipped>,
+    scoped: bool,
 ) {
     if nest_level > 8 {
         return; // 9겹째부터는 이유 없이 조용히 안 본다
     }
     let sub_dir = container.join("sub");
-    if !is_dir(&sub_dir) {
+    if !is_dir(&sub_dir) || (scoped && is_symlink(&sub_dir)) {
         return;
     }
     let Some(entries) = sorted_entries(&sub_dir) else {
@@ -551,6 +569,9 @@ fn scan_sub_notes(
             continue;
         };
 
+        if scoped && is_symlink(&content_file) {
+            continue;
+        }
         let skip = |reason: &str, skipped: &mut Vec<Skipped>| {
             skipped.push(Skipped {
                 kind: "note",
@@ -619,6 +640,7 @@ fn scan_sub_notes(
                 subs,
                 sub_ids,
                 skipped,
+                scoped,
             );
         }
     }

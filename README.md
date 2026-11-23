@@ -16,7 +16,7 @@ vault 폴더를 부를 때마다 훑어서 답합니다. 색인 파일을 만들
 
 `ais-cli`는 명령 1개를 처리하고 끝나는 단발 실행 파일입니다. 호출마다 vault를 새로 훑어서 답하므로 상주 프로세스가 없고, 떠 있는 동안 바뀐 파일도 다음 호출에 보입니다. 표준 입출력으로 오래 도는 것은 MCP 서버로 서는 `ais-cli mcp`뿐입니다. 데스크톱 앱은 같은 코드를 프로세스 안에서 직접 부릅니다.
 
-매니저 등록과 연결은 `ais-cli manager`를 사용합니다. 자세한 설정은 [개발자 가이드](docs/developer-guide.md)를 참고합니다.
+매니저는 데스크톱 앱의 에이전트 탭에서 프로젝트별로 추가하고 관리합니다. 명령줄에서는 `ais-cli manager`를 씁니다. [개발자 가이드](docs/developer-guide.md#프로젝트별-매니저-연결)
 
 아래 명령 예시의 `dist/ais-cli`는 `./build.sh`가 만드는 실행 파일입니다. vault는 `export AISURADA_VAULT=/path/to/vault`로 주는 것으로 봅니다([실행](#실행)).
 

@@ -56,7 +56,7 @@ pub fn execute(
     let mut names: Vec<String> = Vec::new();
     if !owner.is_single_file {
         let attach_dir = index.vault_root.join(&owner.rel_path).join("attach");
-        if let Ok(entries) = fs::read_dir(&attach_dir) {
+        if index.can_read_related(owner, &attach_dir) && let Ok(entries) = fs::read_dir(&attach_dir) {
             names = entries
                 .flatten()
                 .filter_map(|e| {
@@ -69,6 +69,7 @@ pub fn execute(
                     is_valid_attachment_name(name)
                         && fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
                         // vault 밖을 가리키는 링크는 읽을 수 없으니 목록에도 내지 않는다
+                        && index.can_read_related(owner, path)
                         && check_confinement(&index.vault_root, path).is_ok()
                 })
                 .map(|(name, _)| name)

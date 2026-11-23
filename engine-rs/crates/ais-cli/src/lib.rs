@@ -141,7 +141,10 @@ fn run_tool(
     let mut call = tool::parse_tool(name, rest, session)?;
     call.context.manager = manager.map(|value| ais_core::ManagerContext {
         name: value.name.clone(),
+        project: value.project.clone(),
+        project_id: value.project_id.clone(),
         repos: value.repos.clone(),
+        agendas: value.agendas.clone(),
     });
     let response = Engine::new(vault).call_as(&call.context, &call.command, call.args.clone())?;
     Ok(legacy::to_legacy(&call, vault, response))

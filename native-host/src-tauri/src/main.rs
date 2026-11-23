@@ -18,6 +18,7 @@ mod github;
 mod ipc;
 mod layout;
 mod lifecycle;
+mod manager_webhook;
 mod markdown;
 mod menu;
 mod migration;
@@ -70,6 +71,8 @@ fn main() {
             workspace::is_workspace,
             workspace::create_workspace_dir,
             sidecar::sidecar_call,
+            manager_webhook::manager_webhook_secret,
+            manager_webhook::manager_test_webhook,
             engine::engine_commands,
             engine::engine_call,
             files::write_attachment_bytes,

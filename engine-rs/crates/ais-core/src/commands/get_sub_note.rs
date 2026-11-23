@@ -7,7 +7,7 @@ use crate::kernel::actor::CallContext;
 use crate::error::EngineError;
 use crate::model::SubNoteRow;
 use crate::text::{SUB_NOTE_ID, is_blank};
-use crate::vault::comments::read_comments;
+use crate::vault::comments::{CommentsEnvelope, read_comments};
 use crate::vault::index::NoteIndex;
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -63,6 +63,11 @@ pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallCon
     };
     check_readable(root, context.caller)?;
 
-    let comments = read_comments(&index.vault_root, &sub_comments_file(index, root, sub));
+    let file = sub_comments_file(index, root, sub);
+    let comments = if index.can_read_related(root, &file) {
+        read_comments(&index.vault_root, &file)
+    } else {
+        CommentsEnvelope::Absent
+    };
     Ok(SubNoteRow::from_record(sub, true, Some(comments)))
 }

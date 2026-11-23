@@ -21,6 +21,7 @@ import { refreshApprovalCounts, resetApprovalsStore, startApprovalsWatch } from 
 import { refreshDecisions, resetDecisionsStore, startDecisionsWatch } from './ui/decisionsStore.ts';
 import { refreshRunner, runnerChanged } from './ui/runnerStore.ts';
 import { NotificationToasts } from './ui/NotificationCenter.tsx';
+import { ManagersProvider } from './ui/managersStore.tsx';
 import { MoveUndoToast } from './ui/MoveUndo.tsx';
 
 // Window identity is decided once, before any internal navigation.
@@ -165,7 +166,9 @@ function WorkspaceApp() {
   }
   return <>
     {!state.workspace || state.route.split('?')[0] === '/launcher'
-      ? <Launcher controller={controller} state={state} /> : <WorkspaceShell controller={controller} state={state} />}
+      ? <Launcher controller={controller} state={state} /> : <ManagersProvider key={state.workspace.path} controller={controller} workspace={state.workspace}>
+        <WorkspaceShell controller={controller} state={state} />
+      </ManagersProvider>}
     {state.notice && <NoticeBox notice={state.notice} onClose={controller.clearNotice} />}
     {state.workspace && <NotificationToasts controller={controller} />}
     {state.workspace && <MoveUndoToast />}

@@ -577,3 +577,215 @@ fn a_codex_client_session_in_meta_is_stamped_and_other_clients_are_not_trusted()
     assert!(!front.contains("sessionId:"), "{front}");
     let _ = std::fs::remove_dir_all(&vault);
 }
+
+#[test]
+fn manager_stays_in_its_registered_vault_and_project() {
+    let vault = fixture("manager-project");
+    let other_vault = fixture("manager-other-vault");
+    let project_file = vault.join(".aisurada/projects/demo-project.md");
+    let project = r#"---
+id: pjfx000a-000000f1
+slug: demo-project
+title: 첫 프로젝트
+repos: [{"name":"shared","github":"demo/shared"}]
+---
+"#;
+    std::fs::write(&project_file, project).unwrap();
+    std::fs::write(
+        vault.join(".aisurada/projects/other-project.md"),
+        project
+            .replace("pjfx000a-000000f1", "pjfx000b-000000f2")
+            .replace("demo-project", "other-project"),
+    )
+    .unwrap();
+    std::fs::write(vault.join(".aisurada/agendas/other.md"),
+        "---\nid: agfx000a-0000001f\nslug: other\ntitle: 다른 프로젝트\nproject: other-project\n---\n").unwrap();
+
+    let cli = |args: &[&str]| {
+        let (code, stdout, stderr) = run_cli(&vault, &[], args);
+        assert_eq!(code, 0, "{stderr}");
+        serde_json::from_str::<Value>(&stdout).unwrap()
+    };
+    let outside = cli(&[
+        "create-task",
+        "repo=demo/shared",
+        "project=other-project",
+        "title=다른 태스크",
+        r#"criteria=["확인"]"#,
+    ]);
+    let outside_doc = cli(&[
+        "create-doc",
+        "agenda=other",
+        "type=plan",
+        "title=scopecheck 외부",
+        "body=다른 본문",
+    ]);
+    let outside_key = outside["key"].as_str().unwrap();
+    let outside_id = outside_doc["id"].as_str().unwrap();
+
+    assert_ne!(
+        run_cli(
+            &vault,
+            &[],
+            &[
+                "manager",
+                "add",
+                "bad",
+                "project=demo-project",
+                "repos=demo/no"
+            ]
+        )
+        .0,
+        0
+    );
+    assert_ne!(
+        run_cli(
+            &vault,
+            &[],
+            &[
+                "manager",
+                "add",
+                "bad",
+                "project=demo-project",
+                "agendas=other"
+            ]
+        )
+        .0,
+        0
+    );
+    cli(&[
+        "manager",
+        "add",
+        "hermes-demo",
+        "project=demo-project",
+        "repos=demo/shared",
+        "agendas=demo",
+        "tools=create_task,add_task_comment,create_doc,list_tasks,get_task,list_docs,search_docs,get_doc,list_tags,list_sub_notes",
+        "slackChannels=#demo",
+        "webhook=http://127.0.0.1:8644/webhooks/demo-project",
+    ]);
+    let copy = cli(&[
+        "manager",
+        "copy",
+        "hermes-demo",
+        "hermes-other",
+        "project=other-project",
+    ]);
+    assert_eq!(copy["repos"], json!([]));
+    assert_eq!(copy["agendas"], json!([]));
+    assert_eq!(copy["slackChannels"], json!([]));
+    assert_eq!(copy["enabled"], false);
+    assert_eq!(
+        copy["webhook"],
+        "http://127.0.0.1:8644/webhooks/other-project"
+    );
+
+    let switch = [("AISURADA_VAULT", other_vault.to_str().unwrap())];
+    let run = |messages: &[Value]| {
+        let (code, replies) =
+            converse_with(&vault, &["--manager", "hermes-demo"], &switch, messages);
+        assert_eq!(code, 0);
+        replies
+    };
+    let replies = run(&[
+        call(
+            1,
+            "create_task",
+            json!({"repo":"demo/shared","title":"scopecheck 내부","criteria":["확인"],"body":"기록에서 빼야 할 본문"}),
+        ),
+        call(
+            2,
+            "create_task",
+            json!({"project":"other-project","repo":"demo/shared","title":"다른 범위","criteria":["확인"]}),
+        ),
+        call(3, "list_tasks", json!({"bodies":true})),
+        call(4, "get_task", json!({"id":outside_key})),
+        call(
+            5,
+            "add_task_comment",
+            json!({"id":outside_key,"body":"다른 범위 댓글"}),
+        ),
+        call(
+            6,
+            "create_doc",
+            json!({"agenda":"demo","type":"plan","title":"scopecheck 내부 노트","body":"기록에서 빼야 할 노트 본문"}),
+        ),
+        call(
+            7,
+            "create_doc",
+            json!({"agenda":"other","type":"plan","title":"외부 노트","body":"다른 범위"}),
+        ),
+        call(8, "list_docs", json!({})),
+        call(9, "search_docs", json!({"query":"scopecheck"})),
+        call(10, "get_doc", json!({"id":outside_id})),
+        call(11, "list_sub_notes", json!({"parent":outside_id})),
+        call(12, "list_tasks", json!({"trash":true})),
+    ]);
+    let task = tool_json(&replies[0]);
+    assert_eq!(task["project"], "demo-project");
+    assert_eq!(task["status"], "draft");
+    assert_eq!(tool_json(&replies[2])["tasks"].as_array().unwrap().len(), 1);
+    let doc = tool_json(&replies[5]);
+    assert_eq!(doc["agenda"], "demo");
+    let listed = tool_json(&replies[7]);
+    assert!(!listed.as_array().unwrap().is_empty());
+    assert!(
+        listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|note| note["agenda"] == "demo")
+    );
+    let hits = tool_json(&replies[8]);
+    assert_eq!(hits["total"], 1);
+    assert_eq!(hits["docs"][0]["id"], doc["id"]);
+    for i in [1, 3, 4, 6, 9, 10, 11] {
+        assert_eq!(replies[i]["result"]["isError"], true, "{}", replies[i]);
+    }
+    let history = cli(&["manager", "dashboard"]);
+    let events = &history["items"][0]["history"];
+    assert!(events["firstCall"].is_number());
+    assert_eq!(events["events"].as_array().unwrap().len(), 12);
+    assert!(!events.to_string().contains("기록에서 빼야 할"));
+    assert_eq!(
+        events["events"].as_array().unwrap().last().unwrap()["target"],
+        task["key"]
+    );
+
+    std::fs::write(
+        &project_file,
+        project.replace("demo/shared", "demo/replaced"),
+    )
+    .unwrap();
+    let replies = run(&[call(
+        1,
+        "create_task",
+        json!({"repo":"demo/shared","title":"이전 저장소","criteria":["확인"]}),
+    )]);
+    assert_eq!(replies[0]["result"]["isError"], true);
+    let registry = vault.join("Library/Application Support/aisurada/managers.json");
+    let mut rows = cli(&["manager", "list"]).as_array().unwrap().clone();
+    rows.push(json!({
+        "name": "legacy", "label": "Hermes", "enabled": true,
+        "tools": ["list_tasks"], "repos": ["demo/shared"], "agendas": [],
+        "webhook": "http://127.0.0.1:8644/webhooks/demo-project",
+    }));
+    std::fs::write(registry, serde_json::to_vec(&rows).unwrap()).unwrap();
+    let (code, _) = converse(&vault, &["--manager", "legacy"], &[]);
+    assert_eq!(
+        code, 2,
+        "프로젝트를 지정하기 전에는 기존 등록으로 연결할 수 없다"
+    );
+    let migrated = cli(&["manager", "update", "legacy", "project=other-project"]);
+    assert_eq!(migrated["project"], "other-project");
+    assert_eq!(migrated["legacyKey"], true, "기존 키체인 계정을 이어 쓴다");
+    let (code, _) = converse(
+        &vault,
+        &["--manager", "legacy"],
+        &[call(1, "list_tasks", json!({}))],
+    );
+    assert_eq!(code, 0);
+
+    std::fs::remove_dir_all(vault).unwrap();
+    std::fs::remove_dir_all(other_vault).unwrap();
+}

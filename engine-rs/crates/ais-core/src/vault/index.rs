@@ -6,15 +6,17 @@ use std::path::{Path, PathBuf};
 use super::Skipped;
 use super::agenda::{AgendaScan, AgendaTable, scan_agendas};
 use super::comment_copy;
-use super::scanner::{NoteRecord, NoteScan, scan_note_paths, scan_notes};
+use super::scanner::{NoteRecord, NoteScan, scan_note_paths, scan_notes, scan_project_notes};
 use super::sub_agenda::{self, SubAgenda};
 use crate::error::EngineError;
+use crate::kernel::actor::{CallContext, ManagerContext};
 use crate::ports::fs;
 
 pub struct NoteIndex {
     pub vault_root: PathBuf,
     pub agendas: AgendaScan,
     pub scan: NoteScan,
+    pub(crate) manager_scoped: bool,
     pub(crate) sub_agendas: HashMap<String, Vec<SubAgenda>>,
     /// `scan.notes`를 만든 시각 차례(같으면 경로 차례)로 늘어놓은 번호
     order: Vec<usize>,
@@ -28,6 +30,15 @@ impl NoteIndex {
         Self::build(vault_root).0
     }
 
+    /// 매니저가 볼 수 있는 아젠다와 노트만 읽는다.
+    pub fn for_reader(root: &Path, ctx: &CallContext) -> Result<Self, EngineError> {
+        let Some(manager) = &ctx.manager else {
+            return Ok(Self::fresh(root));
+        };
+        super::check_manager_project(root, manager)?;
+        Ok(Self::build_with(root, Some(&manager.project), scan_project_notes).0)
+    }
+
     /// 쓰기용으로 디스크를 훑습니다(색인 맞추기). 맞추기를 세우는 문제(제목이 빈 아젠다, 같은 slug에 다른 id,
     /// 코멘트 id가 파일 사이에서 겹침)를 만나면 쓰기가 일을 하지 않도록 오류로 돌려줍니다.
     pub fn reconciled(vault_root: &Path) -> Result<NoteIndex, EngineError> {
@@ -37,10 +48,23 @@ impl NoteIndex {
         }
     }
 
+    pub(crate) fn for_manager_write(
+        root: &Path,
+        manager: &ManagerContext,
+    ) -> Result<Self, EngineError> {
+        super::check_manager_project(root, manager)?;
+        match Self::build_with(root, Some(&manager.project), scan_project_notes) {
+            (_, Some(_)) => Err(EngineError::conflict(
+                "매니저가 쓰기 전에 프로젝트의 노트와 아젠다를 확인해 주세요",
+            )),
+            (index, None) => Ok(index),
+        }
+    }
+
     /// 받은 vault 상대 경로가 가리키는 노트만 훑어 색인을 만든다(`reindex_paths`). 경로 검사에 걸리거나 맞추기를 세우는 문제가 있으면 오류다.
     pub fn reconciled_paths(vault_root: &Path, paths: &[String]) -> Result<NoteIndex, EngineError> {
         let path_error = std::cell::RefCell::new(None);
-        let (index, fatal) = Self::build_with(vault_root, |root, table| {
+        let (index, fatal) = Self::build_with(vault_root, None, |root, table| {
             scan_note_paths(root, table, paths).unwrap_or_else(|error| {
                 *path_error.borrow_mut() = Some(error);
                 NoteScan::default()
@@ -53,16 +77,21 @@ impl NoteIndex {
     }
 
     fn build(vault_root: &Path) -> (NoteIndex, Option<EngineError>) {
-        Self::build_with(vault_root, scan_notes)
+        Self::build_with(vault_root, None, scan_notes)
     }
 
     fn build_with(
         vault_root: &Path,
+        project: Option<&str>,
         scan_with: impl FnOnce(&Path, &AgendaTable) -> NoteScan,
     ) -> (NoteIndex, Option<EngineError>) {
         let vault_root =
             std::path::absolute(vault_root).unwrap_or_else(|_| vault_root.to_path_buf());
         let mut agendas = scan_agendas(&vault_root);
+        if let Some(project) = project {
+            agendas.table.retain_project(project);
+            agendas.skipped.clear();
+        }
         let mut scan = scan_with(&vault_root, &agendas.table);
         let mut sub_agendas = HashMap::new();
         if fs::metadata(vault_root.join(sub_agenda::DIR)).is_ok() {
@@ -114,12 +143,18 @@ impl NoteIndex {
                 vault_root,
                 agendas,
                 scan,
+                manager_scoped: project.is_some(),
                 sub_agendas,
                 order,
                 by_id,
             },
             fatal,
         )
+    }
+
+    pub(crate) fn can_read_related(&self, note: &NoteRecord, file: &Path) -> bool {
+        !self.manager_scoped
+            || fs::check_confinement(&self.vault_root.join(&note.rel_path), file).is_ok()
     }
 
     pub(crate) fn sub_agendas(&self, slug: &str) -> &[SubAgenda] {

@@ -3,6 +3,7 @@ import { App } from './App';
 import './styles.css';
 import './tasks.css';
 import './runner.css';
+import './managers.css';
 import './approvals.css';
 import './diff-view.css';
 import './notifications.css';

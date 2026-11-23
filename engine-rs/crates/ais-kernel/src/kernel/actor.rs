@@ -38,7 +38,10 @@ pub struct CallContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManagerContext {
     pub name: String,
+    pub project: String,
+    pub project_id: String,
     pub repos: Vec<String>,
+    pub agendas: Vec<String>,
 }
 
 /// 등록부와 파일에 쓸 수 있는 매니저 이름인지 본다.
