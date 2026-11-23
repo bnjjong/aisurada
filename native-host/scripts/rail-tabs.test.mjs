@@ -78,7 +78,7 @@ test('the agents tab shows tasks, the runner line, and the global resources tab 
   const html = rail('/tasks');
   assert.match(html, /role="tab"[^>]*aria-selected="true"[^>]*>에이전트/);
   assert.match(html, /role="tab"[^>]*aria-selected="false"[^>]*>노트/);
-  assert.deepEqual(navLabels(html), ['태스크']);
+  assert.deepEqual(navLabels(html), ['태스크', '매니저']);
   assert.match(html, /class="nav-item active">태스크/);
   assert.match(html, />러너 · 쉬는 중</);
   assert.match(html, /aria-label="최근 실행"[\s\S]*아직 러너가 돌린 실행이 없어요/, '「최근 실행」 explains itself while it is empty');
@@ -106,7 +106,7 @@ test('the guide stays in the footer for both tabs and keeps whichever tab was on
   const onGuide = rail('/guide');
   assert.match(onGuide, /aria-selected="true"[^>]*>에이전트/, 'the guide opened from the agents tab leaves that tab on');
   assert.match(onGuide, /class="iconbtn icon-btn active" title="연동 가이드" aria-label="연동 가이드" aria-current="page"/);
-  assert.deepEqual(navLabels(onGuide), ['태스크']);
+  assert.deepEqual(navLabels(onGuide), ['태스크', '매니저']);
 });
 
 test('the agents tab badge adds waiting questions and waiting approvals, and shows on the notes tab too', () => {
