@@ -30,7 +30,7 @@ use std::{
     time::{Duration, Instant},
 };
 use store::{Phase, RunRecord, Settings};
-use tauri::{Manager, Runtime, State};
+use tauri::{Manager, Runtime, State, WebviewWindow};
 
 /// 집을 태스크를 찾는 주기. `ais-cli`는 호출마다 JVM을 띄우므로 너무 짧게 잡지 않는다. 급하면 「지금 실행」이 있다.
 pub const POLL_INTERVAL: Duration = Duration::from_secs(15);
@@ -90,6 +90,19 @@ impl Runner {
 
     /// 주기 스레드를 띄운다. 앱이 끝날 때까지 돈다.
     pub fn start(self: &Arc<Self>) {
+        if self.host.observes_managers() {
+            let me = self.clone();
+            thread::spawn(move || {
+                while !me.shutdown.load(Ordering::SeqCst) {
+                    if let Some(vault) = me.host.vault() {
+                        if let Err(error) = manager_delivery::poll(&me.ctx(vault)) {
+                            eprintln!("매니저 태스크 변경을 확인하지 못했다: {error}");
+                        }
+                    }
+                    thread::park_timeout(POLL_INTERVAL);
+                }
+            });
+        }
         let me = self.clone();
         thread::spawn(move || {
             while !me.shutdown.load(Ordering::SeqCst) {
@@ -124,11 +137,6 @@ impl Runner {
         if self.reconciled.lock().unwrap().as_deref() != Some(vault.as_str()) {
             *self.reconciled.lock().unwrap() = Some(vault.clone());
             self.reconcile(&ctx);
-        }
-        if self.host.observes_managers() {
-            if let Err(error) = manager_delivery::poll(&ctx) {
-                eprintln!("매니저 태스크 변경을 확인하지 못했다: {error}");
-            }
         }
         if ctx.settings.auto_pickup && self.host.claude_available() {
             self.pickup(&ctx);
@@ -486,10 +494,14 @@ async fn blocking<T: Send + 'static>(
 }
 
 #[tauri::command]
-pub async fn manager_send_status(
+pub async fn manager_send_status<R: Runtime>(
+    window: WebviewWindow<R>,
     state: State<'_, RunnerState>,
     task_key: String,
 ) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("상태 알림은 메인 창에서 보내 주세요.".into());
+    }
     let runner = state.0.clone();
     blocking(move || {
         let vault = runner.host.vault().ok_or("열린 vault가 없어요.")?;

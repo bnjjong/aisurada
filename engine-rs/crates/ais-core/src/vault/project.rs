@@ -2,6 +2,7 @@
 
 use crate::ports::fs;
 use std::collections::{HashMap, HashSet};
+use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -14,9 +15,36 @@ use crate::text::{compare_utf16, trim, utf16_len};
 
 static PROJECT_ID: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^pj[0-9a-z]+-[0-9a-f]{8}$").unwrap());
+pub(crate) const ARCHIVED_PROJECTS_DIR: &str = ".aisurada/trash/projects";
 /// 프로젝트 id 모양인가
 pub fn is_valid_project_id(id: &str) -> bool {
     PROJECT_ID.is_match(id)
+}
+
+/// 보관된 프로젝트의 주소를 새 프로젝트가 사용하지 않도록 찾는다.
+pub fn archived_project_slugs(vault: &Path) -> io::Result<Vec<String>> {
+    let entries = match fs::read_dir(vault.join(ARCHIVED_PROJECTS_DIR)) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let mut slugs = Vec::new();
+    for entry in entries {
+        let name = entry?.file_name();
+        let Some(stem) = name.to_str().and_then(|name| name.strip_suffix(".md")) else {
+            continue;
+        };
+        let Some((prefix, _)) = stem.rsplit_once('-') else {
+            continue;
+        };
+        let Some((slug, _)) = prefix.rsplit_once('-') else {
+            continue;
+        };
+        if is_valid_project_id(&stem[slug.len() + 1..]) && is_valid_slug_segment(slug) {
+            slugs.push(slug.to_owned());
+        }
+    }
+    Ok(slugs)
 }
 
 pub(crate) static GITHUB: LazyLock<Regex> = LazyLock::new(|| {

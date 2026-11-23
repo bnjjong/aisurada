@@ -14,6 +14,7 @@ use super::{
     store::{self, Phase, RunRecord, Settings, MAX_QUESTIONS, MAX_WORK_MINUTES},
 };
 use crate::notifications::NewItem;
+use ais_cli::{env::Env, manager};
 use serde_json::Value;
 use std::{
     path::PathBuf,
@@ -466,7 +467,63 @@ impl Run<'_> {
         }
     }
 
-    /// 내보내기(보고): 보고를 댓글로 남기고 In Review로 보낸다.
+    fn report_note(&self, text: &str) -> Result<Option<String>, String> {
+        if self.rec.orchestrated || self.task.manager.is_empty() {
+            return Ok(None);
+        }
+        let task = self.ctx.get_task(&self.rec.task_key)?;
+        if task.status != "in-progress"
+            || task.manager != self.task.manager
+            || task.project != self.task.project
+        {
+            return Ok(None);
+        }
+        let manager = manager::find_enabled(&Env::from_process(), &task.manager)?;
+        if !manager.in_vault(&self.ctx.vault)
+            || manager.project != task.project
+            || !manager.repos.contains(&task.repo)
+            || !manager.tools.iter().any(|tool| tool == "create_doc")
+        {
+            return Ok(None);
+        }
+        let project = manager
+            .scope()
+            .ok_or("매니저의 프로젝트를 찾지 못했어요.")?;
+        if !project.repos.contains(&task.repo) {
+            return Ok(None);
+        }
+        let agendas: Vec<_> = manager
+            .agendas
+            .iter()
+            .filter(|agenda| project.agendas.contains(agenda))
+            .collect();
+        let [agenda] = agendas.as_slice() else {
+            return Err("노트로 저장할 아젠다 하나를 매니저 권한에서 지정해 주세요.".into());
+        };
+        let tag = format!("runner-report-{}", self.rec.run_id);
+        let agenda = format!("agenda={agenda}");
+        let heading = format!("{} 조사 보고", self.rec.task_key);
+        let found = self
+            .ctx
+            .call(&["search-docs", &heading, &agenda, &format!("tag={tag}")])?;
+        if let Some(id) = found["docs"][0]["id"].as_str() {
+            return Ok(Some(id.to_owned()));
+        }
+        let result = self.ctx.call(&[
+            "create-doc",
+            &agenda,
+            "type=research",
+            &format!("title={heading} · {}", protocol::clip(&task.title, 100)),
+            &format!("body={}", protocol::clip(text, protocol::COMMENT_CHARS)),
+            &format!("tags={}", serde_json::json!([tag])),
+        ])?;
+        result["id"]
+            .as_str()
+            .map(|id| Some(id.to_owned()))
+            .ok_or_else(|| "조사 노트의 주소를 확인하지 못했어요.".into())
+    }
+
+    /// 매니저의 조사 보고는 노트로도 남기고, 태스크는 기존처럼 댓글을 거쳐 In Review로 보낸다.
     fn report(&mut self, text: &str) -> Ending {
         self.step("내보내기", "보고를 댓글로 남기고 In Review로 보낸다");
         let label = if self.rec.orchestrated {
@@ -474,7 +531,15 @@ impl Run<'_> {
         } else {
             "분석 보고"
         };
-        let body = format!("**{label}**\n\n{}", text.trim());
+        let note_link = match self.report_note(text) {
+            Ok(Some(id)) => format!("[조사 노트 열기](aisurada://doc/{id})\n\n"),
+            Ok(None) => String::new(),
+            Err(error) => {
+                self.event("내보내기", &format!("조사 보고는 댓글에만 남겨요. {error}"));
+                String::new()
+            }
+        };
+        let body = format!("**{label}**\n\n{note_link}{}", text.trim());
         if let Err(e) = self.ctx.comment(&self.rec.task_key, "runner", &body) {
             return self.fail(&format!("보고를 댓글로 남기지 못했다: {e}"));
         }

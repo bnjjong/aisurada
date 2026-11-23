@@ -6,10 +6,13 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::agenda_write::{archive, hue_arg};
+use super::task_commands::project_task_count;
 use crate::error::EngineError;
 use crate::model::ProjectRow;
 use crate::text::{is_blank, trim};
-use crate::vault::project::{ProjectInfo, ProjectType, is_valid_project_id, scan_projects};
+use crate::vault::project::{
+    ProjectInfo, ProjectType, archived_project_slugs, is_valid_project_id, scan_projects,
+};
 use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
 use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
@@ -102,7 +105,11 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
     let repos = project_file::parse_strict(request.repos.as_deref())?;
     let projects = scan_projects(vault);
     let id = next_id("pj");
-    let taken: HashSet<String> = projects.iter().map(|p| p.slug.clone()).collect();
+    let archived = archived_project_slugs(vault).map_err(|error| {
+        EngineError::internal(format!("지워진 프로젝트 목록을 읽지 못했다: {error}"))
+    })?;
+    let taken: HashSet<String> = projects.iter().map(|p| p.slug.clone())
+        .chain(archived).collect();
     let Some(slug) = agenda_file::pick_free_slug(&slug::build(title, 50), &taken) else {
         return Err(EngineError::invalid_argument(format!(
             "같은 이름의 프로젝트가 {MAX_SLUG_SUFFIX} 개까지 차 있어 새로 만들 수 없다: {title}"
@@ -207,6 +214,13 @@ pub fn delete(
     if agendas > 0 {
         return Err(EngineError::invalid_argument(format!(
             "아젠다가 {agendas}건 있는 프로젝트는 지울 수 없다. 먼저 그 아젠다를 옮긴다: {}",
+            project.slug
+        )));
+    }
+    let tasks = project_task_count(vault, &project.slug);
+    if tasks > 0 {
+        return Err(EngineError::invalid_argument(format!(
+            "태스크가 {tasks}건 있는 프로젝트는 지울 수 없다. 먼저 그 태스크를 옮긴다: {}",
             project.slug
         )));
     }

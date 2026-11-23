@@ -7,10 +7,14 @@ use ais_cli::{env::Env, manager};
 use ais_domain::task::{format::slack_thread, TaskStatus};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fs,
     io::ErrorKind,
 };
+
+const RETRY_WINDOW_MS: u64 = 45 * 60 * 1000;
+const INITIAL_RETRY_MS: u64 = 15 * 1000;
+const MAX_RETRY_MS: u64 = 5 * 60 * 1000;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +37,12 @@ struct Pending {
     manager: String,
     status: String,
     attempts: u8,
+    #[serde(default)]
+    registration: String,
+    #[serde(default)]
+    first_attempt_at: Option<u64>,
+    #[serde(default)]
+    next_attempt_at: u64,
 }
 
 #[derive(Default, Deserialize, PartialEq, Serialize)]
@@ -58,7 +68,15 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
         .root()
         .join(format!("managers-{}.json", delivery_id(&ctx.vault)));
     let saved = match fs::read(&path) {
-        Ok(bytes) => Some(serde_json::from_slice::<History>(&bytes).map_err(|e| e.to_string())?),
+        Ok(bytes) => match serde_json::from_slice::<History>(&bytes) {
+            Ok(history) => Some(history),
+            Err(error) => {
+                let backup = path.with_extension(format!("corrupt-{}.json", store::now_ms()));
+                fs::rename(&path, &backup).map_err(|error| error.to_string())?;
+                eprintln!("매니저 알림 상태 파일을 별도로 보관하고 다시 만들어요: {error}");
+                None
+            }
+        },
         Err(error) if error.kind() == ErrorKind::NotFound => None,
         Err(error) => return Err(error.to_string()),
     };
@@ -102,6 +120,9 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
                             manager: row.manager,
                             status: row.status.clone(),
                             attempts: 0,
+                            registration: configured.registration().into(),
+                            first_attempt_at: None,
+                            next_attempt_at: 0,
                         });
                     }
                     _ => {}
@@ -110,14 +131,6 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
         }
         next.statuses.insert(row.id, row.status);
     }
-    next.pending.retain(|item| {
-        next.statuses.contains_key(&item.task_id)
-            && managers.iter().any(|manager| {
-                manager.name == item.manager
-                    && manager.enabled
-                    && manager.webhook_for_status(&item.status).is_some()
-            })
-    });
     if saved.as_ref() != Some(&next) {
         let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
         store::write_atomic(&path, &bytes)?;
@@ -130,21 +143,41 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
         ctx.host.changed(None);
     }
 
-    if let Some(mut item) = next.pending.pop_front() {
-        let result = deliver_and_record(ctx, &item, false);
-        match result {
-            Ok(_) => {}
-            Err(DeliveryError::Unavailable | DeliveryError::MissingSecret) => {}
-            Err(DeliveryError::Retry { rejected }) if item.attempts < 5 => {
-                item.attempts += 1;
-                if rejected {
-                    // Hermes가 실패 응답을 주기 전에 요청 ID를 기록하므로 재시도에는 새 ID를 쓴다.
+    let now = store::now_ms();
+    let mut tasks = HashSet::new();
+    let due = next
+        .pending
+        .iter()
+        .position(|item| tasks.insert(&item.task_id) && item.next_attempt_at <= now);
+    if let Some(index) = due {
+        if next.pending[index].first_attempt_at.is_none() {
+            next.pending[index].first_attempt_at = Some(now);
+            let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
+            store::write_atomic(&path, &bytes)?;
+        }
+        let mut item = next.pending.remove(index).expect("대기열에서 확인한 항목");
+        let deadline = item
+            .first_attempt_at
+            .unwrap_or(now)
+            .saturating_add(RETRY_WINDOW_MS);
+        if now >= deadline {
+            record_expired(ctx, &item);
+        } else {
+            let result = deliver_and_record(ctx, &item, false);
+            if matches!(
+                result,
+                Err(DeliveryError::Retry { .. }
+                    | DeliveryError::MissingSecret
+                    | DeliveryError::Keychain)
+            ) {
+                let delay = (INITIAL_RETRY_MS << item.attempts.min(5)).min(MAX_RETRY_MS);
+                item.attempts = item.attempts.saturating_add(1);
+                if matches!(result, Err(DeliveryError::Retry { rejected: true })) {
+                    // Slack 전달 실패가 확인됐으므로 Hermes의 중복 판정을 피할 새 ID를 쓴다.
                     item.id = delivery_id(&format!("{}:{}", item.id, item.attempts));
                 }
-                next.pending.push_back(item);
-            }
-            Err(DeliveryError::Retry { .. }) => {
-                eprintln!("{} 매니저 알림을 여러 번 보내지 못했다", item.task_key);
+                item.next_attempt_at = now.saturating_add(delay).min(deadline);
+                next.pending.insert(index, item);
             }
         }
         let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
@@ -153,27 +186,70 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
     Ok(())
 }
 
-fn deliver_and_record(ctx: &Ctx, item: &Pending, manual: bool) -> Result<u16, DeliveryError> {
+fn record_expired(ctx: &Ctx, item: &Pending) {
     let env = Env::from_process();
-    let manager =
-        manager::find_enabled(&env, &item.manager).map_err(|_| DeliveryError::Unavailable)?;
-    if !manager.in_vault(&ctx.vault) {
-        return Err(DeliveryError::Unavailable);
-    }
-    let result = attempt_delivery(ctx, item, manual, &manager);
-    if result.is_ok() || manual || !matches!(result, Err(DeliveryError::Unavailable)) {
-        let outcome = if result.is_ok() { "ok" } else { "failed" };
-        if let Err(error) = manager::record(
+    if let Ok(manager) = delivery_manager(ctx, &env, item) {
+        record_result(
             &env,
             &manager,
-            "status_webhook",
-            outcome,
-            Some(&item.task_key),
-        ) {
-            eprintln!("매니저 상태 알림을 기록하지 못했다: {error}");
-        }
+            item,
+            Some("재시도 시간이 지나 알림을 보낼 수 없었어요."),
+        );
+    }
+}
+
+fn delivery_manager(
+    ctx: &Ctx,
+    env: &Env,
+    item: &Pending,
+) -> Result<manager::Manager, DeliveryError> {
+    let manager = manager::find(env, &item.manager).map_err(|_| DeliveryError::Unavailable)?;
+    if !manager.in_vault(&ctx.vault)
+        || (!item.registration.is_empty() && manager.registration() != item.registration)
+    {
+        return Err(DeliveryError::Unavailable);
+    }
+    Ok(manager)
+}
+
+fn deliver_and_record(ctx: &Ctx, item: &Pending, manual: bool) -> Result<u16, DeliveryError> {
+    let env = Env::from_process();
+    let manager = delivery_manager(ctx, &env, item)?;
+    let result = attempt_delivery(ctx, item, manual, &manager);
+    if item.attempts == 0
+        || result.is_ok()
+        || matches!(
+            result,
+            Err(DeliveryError::Unavailable | DeliveryError::Unconfirmed)
+        )
+    {
+        record_result(
+            &env,
+            &manager,
+            item,
+            result.as_ref().err().map(delivery_error),
+        );
     }
     result
+}
+
+fn record_result(env: &Env, manager: &manager::Manager, item: &Pending, reason: Option<&str>) {
+    if let Err(error) = manager::record_webhook(env, manager, &item.task_key, reason) {
+        eprintln!("매니저 상태 알림을 기록하지 못했다: {error}");
+    }
+}
+
+fn delivery_error(error: &DeliveryError) -> &'static str {
+    match error {
+        DeliveryError::Unavailable => "매니저 설정이나 현재 태스크의 Slack 출처를 확인해 주세요.",
+        DeliveryError::MissingSecret => "상태 알림 설정에서 서명 비밀을 만들어 주세요.",
+        DeliveryError::Keychain => "macOS 키체인에서 서명 비밀을 읽을 수 없어요.",
+        DeliveryError::Unconfirmed => {
+            "Hermes가 중복 요청으로 답해 Slack 전달 여부를 확인하지 못했어요."
+        }
+        DeliveryError::Retry { rejected: true } => "Hermes가 Slack에 알림을 전달하지 못했어요.",
+        DeliveryError::Retry { rejected: false } => "Hermes의 알림 응답을 받지 못했어요.",
+    }
 }
 
 fn attempt_delivery(
@@ -184,6 +260,9 @@ fn attempt_delivery(
 ) -> Result<u16, DeliveryError> {
     if ctx.host.vault().as_deref() != Some(ctx.vault.as_str()) {
         return Err(DeliveryError::Retry { rejected: false });
+    }
+    if !manager.enabled || manager.scope().is_none() {
+        return Err(DeliveryError::Unavailable);
     }
     let url = if manual && manager.notify_enabled {
         manager.webhook.as_deref()
@@ -218,7 +297,12 @@ fn attempt_delivery(
         })
         .ok_or(DeliveryError::Unavailable)?;
     let status = TaskStatus::parse(&item.status).ok_or(DeliveryError::Unavailable)?;
-    let secret = manager_webhook::keychain_secret(manager).ok_or(DeliveryError::MissingSecret)?;
+    let secret = manager_webhook::keychain_secret(manager)
+        .map_err(|_| DeliveryError::Keychain)?
+        .ok_or(DeliveryError::MissingSecret)?;
+    if ctx.host.vault().as_deref() != Some(ctx.vault.as_str()) {
+        return Err(DeliveryError::Retry { rejected: false });
+    }
     let message = if manual {
         format!("{}의 현재 상태는 {}입니다.", item.task_key, status.title())
     } else {
@@ -253,13 +337,11 @@ pub(super) fn send_current(ctx: &Ctx, key: &str) -> Result<(), String> {
         manager: required("manager")?.into(),
         status: required("status")?.into(),
         attempts: 0,
+        registration: String::new(),
+        first_attempt_at: None,
+        next_attempt_at: 0,
     };
     deliver_and_record(ctx, &item, true)
         .map(|_| ())
-        .map_err(|error| match error {
-            DeliveryError::Unavailable | DeliveryError::MissingSecret => {
-                "매니저 설정, 웹훅 서명 키 또는 Slack 출처를 확인해 주세요.".into()
-            }
-            DeliveryError::Retry { .. } => "상태 알림을 전달하지 못했어요.".into(),
-        })
+        .map_err(|error| delivery_error(&error).into())
 }

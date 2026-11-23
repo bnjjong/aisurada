@@ -132,6 +132,10 @@ impl Manager {
             && self.project_id == other.project_id
     }
 
+    pub fn registration(&self) -> &str {
+        &self.registration
+    }
+
     pub fn keychain_account(&self) -> String {
         if self.legacy_key {
             self.name.clone()
@@ -412,7 +416,6 @@ fn copy_manager(
     target.tools.clone_from(&source.tools);
     target.notify.clone_from(&source.notify);
     target.notify_enabled = source.notify_enabled;
-    target.enabled = false;
     let slug = options
         .iter()
         .rev()
@@ -432,6 +435,7 @@ fn copy_manager(
         target.webhook = Some(format!("{base}/{segment}"));
     }
     set_options(&mut target, options)?;
+    target.enabled = false;
     bind(&mut target, env)?;
     if target.vault == source.vault && target.project_id == source.project_id {
         return Err("다른 프로젝트로만 복사할 수 있다".into());
@@ -454,6 +458,8 @@ pub struct Event {
     tool: String,
     result: String,
     target: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -485,6 +491,27 @@ pub fn record(
     result: &str,
     target: Option<&str>,
 ) -> Result<(), String> {
+    record_event(env, manager, tool, result, target, None)
+}
+
+pub fn record_webhook(
+    env: &Env,
+    manager: &Manager,
+    target: &str,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    let result = if reason.is_some() { "failed" } else { "ok" };
+    record_event(env, manager, "status_webhook", result, Some(target), reason)
+}
+
+fn record_event(
+    env: &Env,
+    manager: &Manager,
+    tool: &str,
+    result: &str,
+    target: Option<&str>,
+    reason: Option<&str>,
+) -> Result<(), String> {
     if manager.legacy() {
         return Ok(());
     }
@@ -496,7 +523,19 @@ pub fn record(
     let path = history_path(env, manager)?;
     fs::create_dir_all(path.parent().ok_or("매니저 기록 폴더가 없다")?)
         .map_err(|error| error.to_string())?;
-    let mut history = history(env, manager)?;
+    let mut history = match fs::read(&path) {
+        Ok(bytes) => match serde_json::from_slice::<History>(&bytes) {
+            Ok(history) => history,
+            Err(error) => {
+                let backup = path.with_extension(format!("corrupt-{}.json", registration_id()));
+                fs::rename(&path, &backup).map_err(|error| error.to_string())?;
+                eprintln!("매니저 호출 기록을 별도로 보관하고 다시 만들어요: {error}");
+                History::default()
+            }
+        },
+        Err(error) if error.kind() == ErrorKind::NotFound => History::default(),
+        Err(error) => return Err(error.to_string()),
+    };
     let at = clock().now_millis().max(0) as u64;
     if !matches!(tool, "status_webhook" | "test_webhook") && result == "ok" {
         history.first_call.get_or_insert(at);
@@ -516,6 +555,7 @@ pub fn record(
             tool: tool.into(),
             result: result.into(),
             target: target.map(str::to_owned),
+            reason: reason.map(str::to_owned),
         },
     );
     history.events.truncate(1000);
@@ -534,12 +574,11 @@ fn dashboard(env: &Env, managers: &[Manager]) -> Result<Value, String> {
                 Some("프로젝트를 지정해 주세요")
             } else if item.scope().is_none() {
                 Some("프로젝트를 찾을 수 없어요")
-            } else if history.is_err() {
-                Some("호출 기록을 읽을 수 없어요")
             } else {
                 None
             };
-            json!({"manager": item, "issue": issue, "history": history.unwrap_or_default()})
+            let history_issue = history.is_err().then_some("호출 기록을 읽을 수 없어요");
+            json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history.unwrap_or_default()})
         })
         .collect();
     Ok(json!({
@@ -603,7 +642,14 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
                 if item.project != previous.project {
                     return Err("프로젝트를 바꾸려면 다른 프로젝트로 복사해 주세요".into());
                 }
-                item.check_targets(&item.scope().ok_or("매니저의 프로젝트를 찾을 수 없다")?)?;
+                let project = item.scope().ok_or("매니저의 프로젝트를 찾을 수 없다")?;
+                if item.repos != previous.repos
+                    || item.agendas != previous.agendas
+                    || item.tools != previous.tools
+                    || (item.enabled && !previous.enabled)
+                {
+                    item.check_targets(&project)?;
+                }
             }
             item.clone()
         }

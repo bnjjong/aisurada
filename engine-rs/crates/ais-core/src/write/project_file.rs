@@ -5,7 +5,7 @@ use crate::frontmatter::dump_string;
 use crate::json::{JsonValue, append_string, parse};
 use crate::text::{trim, utf16_len};
 use crate::vault::agenda::is_valid_slug_segment;
-use crate::vault::project::{GITHUB, ProjectInfo, ProjectRepo};
+use crate::vault::project::{ARCHIVED_PROJECTS_DIR, GITHUB, ProjectInfo, ProjectRepo};
 
 const MAX_ENTRIES: usize = 20;
 const MAX_PATH_UNITS: usize = 1024;
@@ -16,7 +16,7 @@ pub fn rel_path(slug: &str) -> String {
 }
 
 pub fn archived_rel_path(slug: &str, id: &str) -> String {
-    format!(".aisurada/trash/projects/{slug}-{id}.md")
+    format!("{ARCHIVED_PROJECTS_DIR}/{slug}-{id}.md")
 }
 
 /// 프로젝트 속성, 저장소 목록, 요약 본문을 파일에 쓴다.

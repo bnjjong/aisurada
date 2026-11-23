@@ -8,7 +8,7 @@ import { PROJECT_TYPE_NAMES, projectTypeOf } from "./model.ts";
 import { SettingsSwitch } from "./SettingsParts.tsx";
 import { copyManagerConfig, ManagerEditor, ManagerSetup } from "./ManagerSetup.tsx";
 import {
-  deliveryIssue, enabledManagers, eventName, eventResult, eventTime, kindLabel, managerError, managerProjects,
+  belongsTo, deliveryIssue, enabledManagers, eventName, eventResult, eventTime, kindLabel, managerError, managerProjects,
   todayEvents, useManagers, webhookEvent, type ManagerConfig, type ManagerItem, type ManagerProject,
 } from "./managersStore.tsx";
 
@@ -76,10 +76,11 @@ export function ManagersPage({ project, name, workspace, controller }: {
   const [failure, setFailure] = useState("");
   const projects = managerProjects(workspace);
   const items = data?.items ?? [];
-  const active = enabledManagers(data);
-  const today = todayEvents(items.flatMap(item => item.history.events));
-  const calls = today.filter(event => !webhookEvent(event));
   const shown = project ? projects.filter(item => item.slug === project) : projects;
+  const withinFilter = ({ manager }: ManagerItem) => !project || shown.some(item => belongsTo(manager, item));
+  const active = enabledManagers(data).filter(withinFilter);
+  const today = todayEvents(items.filter(withinFilter).flatMap(item => item.history.events));
+  const calls = today.filter(event => !webhookEvent(event));
   const selected = name ? items.find(item => item.manager.name === name) : undefined;
 
   const action = async (kind: "config" | "enable" | "disable" | "remove", manager: ManagerConfig) => {
@@ -125,10 +126,10 @@ export function ManagersPage({ project, name, workspace, controller }: {
           <button type="button" aria-pressed={!project} onClick={() => controller.navigate(managersAddress())}>모든 프로젝트</button>
           {projects.map(item => <button type="button" key={item.slug} aria-pressed={item.slug === project} onClick={() => controller.navigate(managersAddress(item.slug))}>{item.title}</button>)}
         </nav>
-        {!project && items.some(item => item.issue && !projects.some(p => p.slug === item.manager.project)) && (
+        {!project && items.some(item => item.issue && !projects.some(p => belongsTo(item.manager, p))) && (
           <section className="mgr-project" aria-label="확인이 필요한 매니저">
             <h2>확인이 필요한 매니저</h2>
-            {items.filter(item => item.issue && !projects.some(p => p.slug === item.manager.project)).map(item => (
+            {items.filter(item => item.issue && !projects.some(p => belongsTo(item.manager, p))).map(item => (
               <div className="mgr-between mgr-panel" key={item.manager.name}>
                 <div><strong>{item.manager.label}</strong><p>{item.manager.name} · {item.issue}</p></div>
                 <button type="button" onClick={() => item.manager.project ? open(item.manager.name) : setSetup({ migrate: item.manager })}>
@@ -140,7 +141,7 @@ export function ManagersPage({ project, name, workspace, controller }: {
         )}
         {!shown.length && <p className="mgr-hint">{project ? "이 프로젝트를 찾을 수 없어요." : "프로젝트를 만들면 매니저를 추가할 수 있어요."}</p>}
         {shown.map(item => {
-          const group = items.filter(entry => entry.manager.project === item.slug);
+          const group = items.filter(entry => belongsTo(entry.manager, item));
           const canAdd = item.repos.length > 0;
           return <section className="mgr-project" key={item.slug} aria-label={item.title}>
             <header className="mgr-between mgr-project-head">
@@ -159,7 +160,7 @@ export function ManagersPage({ project, name, workspace, controller }: {
               <button type="button" className="primary" onClick={() => setSetup({ project: item.slug })}>＋ 이 프로젝트에 매니저 추가</button>
             </div>}
             {group.map(entry => <ManagerCard key={entry.manager.name} item={entry} busy={working === entry.manager.name}
-              canCopy={projects.some(p => p.slug !== item.slug)} action={(kind, manager) => void action(kind, manager)}
+              canCopy={projects.some(p => !belongsTo(entry.manager, p))} action={(kind, manager) => void action(kind, manager)}
               open={() => open(entry.manager.name)} copy={() => setSetup({ source: entry.manager })} />)}
           </section>;
         })}
@@ -184,7 +185,7 @@ function ManagerDetail({ item, projects, controller, busy, action, setup }: {
   const [deleting, setDeleting] = useState(false);
   const { data } = useManagers();
   const { manager, history } = item;
-  const project = projects.find(p => p.slug === manager.project);
+  const project = projects.find(p => belongsTo(manager, p));
   const last = history.events.find(event => !webhookEvent(event));
   const webhook = history.events.find(webhookEvent);
   return <>
@@ -194,12 +195,12 @@ function ManagerDetail({ item, projects, controller, busy, action, setup }: {
     <div className="mgr-between mgr-detail-actions">
       <div className="mgr-actions">
         <ManagerMark manager={manager} />
-        <span className="mgr-badge">{project?.title ?? manager.project ?? "프로젝트 미지정"}</span>
+        <span className="mgr-badge">{project?.title || manager.project || "프로젝트 미지정"}</span>
         <ManagerStatePill item={item} />
         {!manager.project ? <button type="button" onClick={() => setup({ migrate: manager })}>프로젝트 지정</button> :
           <button type="button" disabled={busy || (!manager.enabled && !!item.issue)} onClick={() => void action(manager.enabled ? "disable" : "enable", manager)}>{manager.enabled ? "끄기" : "켜기"}</button>}
         <button type="button" disabled={busy || !project || !!item.issue} onClick={() => void action("config", manager)}>MCP 설정 복사</button>
-        <button type="button" disabled={!project || !projects.some(p => p.slug !== manager.project)} onClick={() => setup({ source: manager })}>다른 프로젝트로 복사</button>
+        <button type="button" disabled={busy || !manager.project || !projects.some(p => !belongsTo(manager, p))} onClick={() => setup({ source: manager })}>다른 프로젝트로 복사</button>
       </div>
       <button type="button" className="mgr-danger" disabled={busy} onClick={() => setDeleting(true)}>지우기</button>
     </div>
@@ -229,7 +230,7 @@ function ManagerDetail({ item, projects, controller, busy, action, setup }: {
           <dl className="mgr-meta">
             <dt>첫 호출</dt><dd>{history.firstCall ? new Date(history.firstCall).toLocaleString("ko-KR") : "대기 중"}</dd>
             <dt>마지막 호출</dt><dd>{eventTime(last?.at)}</dd>
-            <dt>웹훅</dt><dd>{webhook ? `${eventResult(webhook.result)} · ${eventTime(webhook.at)}` : "—"}</dd>
+            <dt>웹훅</dt><dd>{webhook ? `${eventResult(webhook.result)} · ${eventTime(webhook.at)}` : "—"}{webhook?.reason && <p>{webhook.reason}</p>}</dd>
           </dl>
         </section>
       </aside>
@@ -252,12 +253,13 @@ function ManagerHistory({ item }: { item: ManagerItem }) {
     <dl className="mgr-counts">{counts.map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
     <section className="mgr-panel">
       <h2>최근 호출</h2>
+      {item.historyIssue && <p className="mgr-error" role="status">{item.historyIssue}</p>}
       {item.history.events.length ? <div className="mgr-table-wrap"><table className="mgr-table">
         <thead><tr><th>시각</th><th>도구</th><th>결과</th><th>대상</th></tr></thead>
         <tbody>{item.history.events.slice(0, 50).map((event, index) => <tr key={`${event.at}-${index}`}>
           <td title={new Date(event.at).toLocaleString("ko-KR")}>{eventTime(event.at)}</td>
           <td>{eventName(event.tool)}</td>
-          <td><span className={`mgr-badge ${event.result === "ok" ? "is-ok" : "is-error"}`}>{eventResult(event.result)}</span></td>
+          <td><span className={`mgr-badge ${event.result === "ok" ? "is-ok" : "is-error"}`}>{eventResult(event.result)}</span>{event.reason && <p>{event.reason}</p>}</td>
           <td>{event.target ?? "—"}</td>
         </tr>)}</tbody>
       </table></div> : <p className="mgr-intro">아직 호출 기록이 없어요.</p>}
@@ -273,7 +275,7 @@ export function ProjectManagers({ project, workspace, controller }: {
   const { data, error } = useManagers();
   const projects = managerProjects(workspace);
   const target = projects.find(item => item.slug === project);
-  const items = data?.items.filter(item => item.manager.project === project) ?? [];
+  const items = target ? data?.items.filter(item => belongsTo(item.manager, target)) ?? [] : [];
   return <section className="res-section mgr-project-section" aria-label="매니저">
     <header className="res-section-head"><h2>매니저</h2>
       <button type="button" disabled={!data || !target?.repos.length} onClick={() => setAdding(true)}>＋ 매니저 추가</button>

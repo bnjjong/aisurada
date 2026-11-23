@@ -10,6 +10,7 @@ export interface ManagerConfig {
   label: string;
   kind: ManagerKind;
   project: string;
+  projectId?: string;
   enabled: boolean;
   tools: string[];
   repos: string[];
@@ -24,10 +25,12 @@ export interface ManagerEvent {
   tool: string;
   result: "ok" | "rejected" | "failed";
   target: string | null;
+  reason?: string;
 }
 export interface ManagerItem {
   manager: ManagerConfig;
   issue: string | null;
+  historyIssue?: string | null;
   history: { firstCall: number | null; events: ManagerEvent[] };
 }
 export interface ManagerDashboard {
@@ -112,6 +115,7 @@ export const eventResult = (result: ManagerEvent["result"]) =>
 
 export function managerProjects(workspace: Workspace) {
   return workspace.projects.map(project => ({
+    id: asText(project.id),
     slug: asText(project.slug),
     title: asText(project.title) || asText(project.slug),
     type: project.type,
@@ -121,3 +125,5 @@ export function managerProjects(workspace: Workspace) {
 }
 
 export type ManagerProject = ReturnType<typeof managerProjects>[number];
+export const belongsTo = (manager: ManagerConfig, project: ManagerProject) =>
+  manager.project === project.slug && (!manager.projectId || manager.projectId === project.id);

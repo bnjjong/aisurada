@@ -663,6 +663,7 @@ repos: [{"name":"shared","github":"demo/shared"}]
         "tools=create_task,add_task_comment,create_doc,list_tasks,get_task,list_docs,search_docs,get_doc,list_tags,list_sub_notes",
         "slackChannels=#demo",
         "webhook=http://127.0.0.1:8644/webhooks/demo-project",
+        "notifyEnabled=true",
     ]);
     let copy = cli(&[
         "manager",
@@ -675,6 +676,7 @@ repos: [{"name":"shared","github":"demo/shared"}]
     assert_eq!(copy["agendas"], json!([]));
     assert_eq!(copy["slackChannels"], json!([]));
     assert_eq!(copy["enabled"], false);
+    assert_eq!(copy["notifyEnabled"], true);
     assert_eq!(
         copy["webhook"],
         "http://127.0.0.1:8644/webhooks/other-project"
