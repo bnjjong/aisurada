@@ -98,6 +98,8 @@ export function ConnectView({
             </span>
             <input
               type="checkbox"
+              role="switch"
+              className="set-toggle"
               checked={write}
               disabled={busy}
               onChange={(e) => onWrite(e.target.checked)}

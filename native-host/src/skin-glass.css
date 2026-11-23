@@ -170,7 +170,8 @@
   .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
   .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
   .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
-  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask,
+  .set-nav-item, .set-result
 ) { background: transparent; box-shadow: none; }
 :root[data-skin="glass"] :where(
   .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
@@ -201,12 +202,15 @@
 :root[data-skin="glass"] input[type="radio"]:checked::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-ink); }
 :root[data-skin="glass"] input:disabled { opacity: .5; cursor: not-allowed; }
 :root[data-skin="glass"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; border: 0; background: transparent; box-shadow: none; accent-color: var(--accent); }
-:root[data-skin="glass"] .set-switch input[type="checkbox"] { position: relative; display: block; width: 44px; height: 26px; border-radius: 999px; }
-:root[data-skin="glass"] .set-switch input[type="checkbox"]::after {
+:root[data-skin="glass"] .set-toggle[type="checkbox"] { position: relative; display: block; width: 44px; height: 26px; border-radius: 999px; }
+:root[data-skin="glass"] .set-toggle[type="checkbox"]::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: 0; border-radius: 50%;
   background: #ffffff; box-shadow: 0 2px 6px rgba(10, 22, 51, .3); transform: none; transition: transform .18s;
 }
-:root[data-skin="glass"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(18px); background: #ffffff; border: 0; }
+:root[data-skin="glass"] .set-toggle[type="checkbox"]:checked::after { transform: translateX(18px); background: #ffffff; border: 0; }
+:root[data-skin="glass"] .set-card { border: 1px solid var(--rim); border-radius: 18px; }
+:root[data-skin="glass"] .set-nav { background: var(--glass-solid, var(--soft)); }
+:root[data-skin="glass"] .set-nav-item[aria-selected="true"] { background: var(--glass-solid, #ffffff); }
 
 /* 설정: 화면 모양 고르기 카드 */
 :root[data-skin="glass"] .set-skin-option { border: 1px solid var(--rim); border-radius: 18px; background: var(--soft); }

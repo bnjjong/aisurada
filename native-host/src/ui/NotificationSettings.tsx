@@ -34,14 +34,14 @@ export function NotificationSettingsView({
           <strong>앱 안</strong>
           <small>토스트와 배지예요. 끄면 알림 센터(종)에만 쌓여요.</small>
         </span>
-        <input type="checkbox" role="switch" className="ntf-switch" aria-label="앱 안 알림" disabled={!native} checked={settings.inApp} onChange={(e) => toggle("inApp", e.target.checked)} />
+        <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label="앱 안 알림" disabled={!native} checked={settings.inApp} onChange={(e) => toggle("inApp", e.target.checked)} />
       </label>
       <label className="ntf-row">
         <span>
           <strong>macOS 알림센터</strong>
           <small>앱이 뒤에 있어도 배너로 알려요.</small>
         </span>
-        <input type="checkbox" role="switch" className="ntf-switch" aria-label="macOS 알림센터" disabled={!native} checked={settings.macos} onChange={(e) => toggle("macos", e.target.checked)} />
+        <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label="macOS 알림센터" disabled={!native} checked={settings.macos} onChange={(e) => toggle("macos", e.target.checked)} />
       </label>
       <label className="ntf-row ntf-off">
         <span>
@@ -69,10 +69,10 @@ export function NotificationSettingsView({
                 <small>{e.hint}</small>
               </td>
               <td>
-                <input type="checkbox" role="switch" className="ntf-switch" aria-label={`${e.label} · 앱 안`} disabled={!native} checked={settings.events[e.id].inApp} onChange={(ev) => toggle("inApp", ev.target.checked, e.id)} />
+                <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label={`${e.label} · 앱 안`} disabled={!native} checked={settings.events[e.id].inApp} onChange={(ev) => toggle("inApp", ev.target.checked, e.id)} />
               </td>
               <td>
-                <input type="checkbox" role="switch" className="ntf-switch" aria-label={`${e.label} · macOS`} disabled={!native} checked={settings.events[e.id].macos} onChange={(ev) => toggle("macos", ev.target.checked, e.id)} />
+                <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label={`${e.label} · macOS`} disabled={!native} checked={settings.events[e.id].macos} onChange={(ev) => toggle("macos", ev.target.checked, e.id)} />
               </td>
             </tr>
           ))}

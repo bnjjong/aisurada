@@ -1,4 +1,6 @@
-/* 설정 모달 기본 틀 및 레이아웃 */
+/* 설정 모달 전용 스타일 (규격화된 4단계 글자, 6묶음 그리드, 토글 및 카드) */
+
+/* 1. 모달 본체와 레이아웃 틀 */
 .settings-modal .ui-modal-body {
   overflow: hidden;
   display: flex;
@@ -17,6 +19,7 @@
   height: 100%;
 }
 
+/* 2. 좌측 네비게이션 */
 .set-nav {
   background: var(--soft);
   padding: 12px 12px 14px;
@@ -67,6 +70,7 @@
   padding: 0 4px;
 }
 
+/* 3. 우측 패널 공통 */
 .set-panes {
   overflow-y: auto;
   min-width: 0;
@@ -82,6 +86,642 @@
   display: none !important;
 }
 
+.set-pane-head {
+  margin-bottom: 24px;
+}
+
+.set-pane-head h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.set-pane-head p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.set-group {
+  margin-bottom: 24px;
+}
+
+.set-group:last-child {
+  margin-bottom: 0;
+}
+
+.set-group > h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.set-card {
+  background: var(--soft);
+  border-radius: var(--radius, 12px);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+/* 4. 줄(Row) 및 컨트롤 */
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.set-row:last-child {
+  border-bottom: 0;
+}
+
+.set-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.set-row-label strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.set-row-label small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.set-example-tag {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 5. 단일 스위치 규칙 (.set-toggle) */
+.set-toggle,
+:root[data-skin] .set-toggle[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sunken, var(--line));
+  box-shadow: var(--in, none);
+  cursor: pointer;
+}
+
+.set-toggle::after,
+:root[data-skin] .set-toggle[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--sh-1, 0 0 0 1px var(--line));
+  transform: none;
+  transition: transform .15s;
+}
+
+.set-toggle:checked,
+:root[data-skin] .set-toggle[type="checkbox"]:checked {
+  background: var(--accent);
+  box-shadow: var(--in-acc, none);
+}
+
+.set-toggle:checked::after,
+:root[data-skin] .set-toggle[type="checkbox"]:checked::after {
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-ink, var(--surface));
+  transform: translateX(16px);
+}
+
+.set-toggle:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.set-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* 6. 상태 점 및 상태 줄 */
+.set-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.set-dot-ok { background: var(--ok); }
+.set-dot-off { background: var(--muted); }
+.set-dot-warn { background: var(--warn); }
+
+.set-status-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+}
+
+.set-status-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.set-status-main {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.set-status-desc {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* 7. 화면 모양(Look) 카드 스타일 */
+.set-skin {
+  border: 0;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.set-skin legend {
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.set-skin-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.set-skin-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+  cursor: pointer;
+  text-align: center;
+}
+
+.set-skin-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.set-skin-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft, var(--soft));
+  outline: 2px solid var(--accent);
+}
+
+.set-skin-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.set-skin-text strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.set-skin-text small {
+  display: none;
+}
+
+.set-skin-selected-desc {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* 모양 미리보기 그림 */
+.skin-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 58px;
+  padding: 0 8px;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.skin-preview i { display: block; width: 40px; height: 20px; flex: none; }
+.skin-preview b { display: block; width: 50px; height: 16px; }
+
+.skin-preview[data-skin-preview="classic"] { background: #f3f5ee; }
+.skin-preview[data-skin-preview="classic"] i { border-radius: 8px !important; background: #2f5542; }
+.skin-preview[data-skin-preview="classic"] b { border: 1px solid #d5dccb; border-radius: 8px !important; background: #fdfdfa; }
+
+.skin-preview[data-skin-preview="tactile"] { background: #e6ebf5; }
+.skin-preview[data-skin-preview="tactile"] i {
+  border-radius: 999px !important;
+  background: #1e4fd8;
+  box-shadow: 0 1px 2px rgba(18,48,160,.4), 0 6px 14px -4px rgba(30,79,216,.55), inset 0 1px 0 rgba(255,255,255,.28) !important;
+}
+.skin-preview[data-skin-preview="tactile"] b {
+  border-radius: 999px !important;
+  background: #dae1ee;
+  box-shadow: inset 0 1px 3px rgba(10,22,51,.18), inset 0 0 0 1px rgba(10,22,51,.04) !important;
+}
+
+.skin-preview[data-skin-preview="grid"] { background: #eef2f8; }
+.skin-preview[data-skin-preview="grid"] i { border-radius: 2px !important; background: #0a1633; }
+.skin-preview[data-skin-preview="grid"] b { border: 1px solid #0a1633; border-radius: 2px !important; background: #fff; }
+
+.skin-preview[data-skin-preview="glass"] {
+  background: radial-gradient(120px 80px at 10% 0%, rgba(30,79,216,.45), transparent 70%),
+              radial-gradient(120px 80px at 100% 10%, rgba(25,194,224,.5), transparent 70%),
+              radial-gradient(140px 90px at 70% 120%, rgba(208,31,26,.3), transparent 70%), #e6edfa;
+}
+.skin-preview[data-skin-preview="glass"] i {
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #3a6bf0, #1e4fd8);
+  box-shadow: 0 6px 16px -6px rgba(30,79,216,.65), inset 0 1px 0 rgba(255,255,255,.4) !important;
+}
+.skin-preview[data-skin-preview="glass"] b {
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 12px !important;
+  background: rgba(255,255,255,.6);
+}
+
+.skin-preview[data-skin-preview="modern"] { background: #f6f7f9; }
+.skin-preview[data-skin-preview="modern"] i { border-radius: 8px !important; background: #0b1220; }
+.skin-preview[data-skin-preview="modern"] b {
+  border: 1px solid #cfd4dd;
+  border-radius: 8px !important;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(11,18,32,.06) !important;
+}
+
+/* 8. 타이포그래피 및 배율 단추 */
+.set-typo {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.typo-row {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.typo-row:last-child {
+  margin-bottom: 0;
+}
+
+.typo-row > strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.typo-row > small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.typo-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.typo-scale button {
+  min-width: 56px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+:root:root .typo-scale button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.typo-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.typo-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
+  font-size: 13px;
+}
+
+.typo-field button {
+  flex: none;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.typo-problem {
+  margin: 0;
+  color: var(--err);
+  font-size: 12px;
+}
+
+.typo-preview {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.typo-preview-label {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  margin-right: 8px;
+}
+
+.typo-preview-mono {
+  font-size: 12px;
+}
+
+/* 9. 알림(Notifications) 설정 스타일 */
+.ntf-settings {
+  display: grid;
+  gap: 16px;
+}
+
+.ntf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.ntf-row:last-child {
+  border-bottom: 0;
+}
+
+.ntf-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.ntf-row strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ntf-row small, .ntf-table small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ntf-off {
+  opacity: .6;
+}
+
+.ntf-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.ntf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ntf-table th {
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.ntf-table th:first-child,
+.ntf-table td:first-child {
+  text-align: left;
+}
+
+.ntf-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.ntf-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.ntf-test {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.ntf-test button {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+.ntf-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ntf-result {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ntf-error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--err-bg, #fde8e8);
+  color: var(--err, #c24040);
+  font-size: 12px;
+}
+
+.ntf-focus-details {
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.ntf-focus-details summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.ntf-focus-details p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* 10. 연결(Connect) 스타일 */
+.set-connect {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.set-connect-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.set-connect-status {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.set-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px;
+}
+
+.set-connect-error {
+  margin: 8px 18px;
+  color: var(--err, #b67537);
+  font-size: 12px;
+}
+
+.set-connect-desktop {
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+
+.set-connect-desktop summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.set-connect-desktop pre {
+  margin: 8px 0;
+  padding: 12px;
+  overflow-x: auto;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.set-github-field {
+  display: grid;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 12px;
+}
+
+.set-github-field input {
+  padding: 9px 11px;
+  font-size: 13px;
+}
+
+.set-github-key {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 18px;
+}
+
+.set-github-key small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+/* 11. 검색 결과 및 이동 하이라이트 */
+.set-flash {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px;
+}
+
+/* 12. 컨테이너 쿼리 (620px 이하 좁은 화면) */
 @container settings (max-width: 620px) {
   .set-layout {
     grid-template-columns: 1fr;
@@ -90,6 +730,7 @@
   .set-nav {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    padding: 10px 14px;
   }
   .set-tabs {
     flex-direction: row;
@@ -105,5 +746,8 @@
   }
   .set-pane {
     padding: 16px 18px 22px;
+  }
+  .set-skin-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
