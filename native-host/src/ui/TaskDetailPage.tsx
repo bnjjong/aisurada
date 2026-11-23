@@ -2,6 +2,7 @@
 // 상태는 상태 메뉴에서 바꾼다. 메뉴에는 사람이 바꿀 수 있는 곳만 나오고, 조건이 모자란 곳은 까닭과 함께 막혀 보인다(엔진이 알려 준다).
 // 러너(읽기 전용)의 실행은 「실행」 영역에서 보고 시작하고 멈추고 질문에 답한다. 채팅은 이 화면에서 필요할 때 여는 선택 기능인데 아직 없다(3b).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
@@ -163,6 +164,10 @@ export function TaskDetailPage({
   };
 
   const slackSource = task.refs.find((ref) => ref.kind === "slack");
+  const openCommentLink = (url: string) => {
+    if (/^\/doc\/[^/?#]+$/.test(url)) controller.navigate(url);
+    else if (controller.isNative() && /^https?:\/\//i.test(url)) void openUrl(url).catch(() => {});
+  };
   return (
     <section className="page-scroll task-page task-detail">
       <div className="route-page task-page">
@@ -532,7 +537,7 @@ export function TaskDetailPage({
               ) : (
                 <ol className="task-feed">
                   {shown.map((e, i) => (
-                    <FeedItem key={`${e.at}-${i}`} event={e} />
+                    <FeedItem key={`${e.at}-${i}`} event={e} onLink={openCommentLink} />
                   ))}
                 </ol>
               )}
@@ -723,12 +728,14 @@ function StatusMenu({ task, busy, defaultOpen = false, onPick }: { task: TaskDet
   );
 }
 
-function FeedItem({ event }: { event: ActivityEvent }) {
+function FeedItem({ event, onLink }: { event: ActivityEvent; onLink(url: string): void }) {
   return (
     <li className={`task-feed-item task-feed-${event.kind}`}>
       <div>
         <strong>{activityWho(event)}</strong>가 {activityText(event)}
-        {event.kind === "comment" && event.body && <p className="task-comment-body">{event.body}</p>}
+        {event.kind === "comment" && event.body && (
+          <div className="task-comment-body"><ReadMarkdown body={event.body} comment onLink={onLink} /></div>
+        )}
       </div>
       <time dateTime={event.at}>{timeLabel(event.at)}</time>
     </li>

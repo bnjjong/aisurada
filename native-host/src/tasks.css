@@ -116,8 +116,11 @@
 .task-comment-form input { flex: 1; padding: 8px 14px; font-size: 13px; }
 .task-feed { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
 .task-feed-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.6; }
+.task-feed-item > div { min-width: 0; }
 .task-feed-item time { flex: none; font-size: 12px; color: var(--muted); }
-.task-comment-body { margin: 4px 0 0; padding: 8px 12px; border-radius: 12px; background: var(--soft); white-space: pre-wrap; }
+.task-comment-body { margin: 4px 0 0; padding: 8px 12px; border-radius: 12px; background: var(--soft); overflow-wrap: anywhere; }
+.task-comment-body .read-markdown > :first-child { margin-top: 0; }
+.task-comment-body .read-markdown > :last-child { margin-bottom: 0; }
 .task-dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: 13px; }
 .task-dl dt { color: var(--muted); }
 .task-dl dd { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; min-width: 0; }

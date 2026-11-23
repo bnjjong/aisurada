@@ -7,6 +7,8 @@ import { sanitizeHtml } from "../lib/sanitize.ts";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { renderDiagram } from "../editor/mermaid.tsx";
 import { highlightCodeBlocks } from "../editor/codeSyntax.ts";
+import { parseAisurada } from "../interaction/links.ts";
+import { docAddress } from "../navigation/routes.ts";
 const escape = (s: string) =>
   s
     .replace(/&/g, "&amp;")
@@ -58,10 +60,10 @@ function readingSource(body: string, external: boolean) {
     return prefix + sentinelInline(line.slice(prefix.length));
   }).join("\n");
 }
-export function readingHTML(body: string, external = false, renderer?: Renderer) {
-  return (reader.parse(readingSource(body, external), { renderer, gfm: true, async: false }) as string).replace(/[\ue020-\ue027]/g, "");
+export function readingHTML(body: string, external = false, renderer?: Renderer, keepLineBreaks = false) {
+  return (reader.parse(readingSource(body, external || keepLineBreaks), { renderer, gfm: true, breaks: keepLineBreaks, async: false }) as string).replace(/[\ue020-\ue027]/g, "");
 }
-export function markdownHTML(body: string, external = false) {
+export function markdownHTML(body: string, external = false, comment = false) {
   const renderer = new Renderer();
   renderer.html = ({ text, block }) =>
     external
@@ -74,7 +76,16 @@ export function markdownHTML(body: string, external = false) {
             allowed.has(name.toLowerCase()) ? tag : escape(tag),
           )
       : escape(text);
-  const html = readingHTML(body, external, renderer);
+  if (comment) {
+    renderer.image = ({ text }) => escape(text);
+    const renderLink = renderer.link;
+    renderer.link = function (token) {
+      const target = parseAisurada(token.href);
+      const href = target?.kind === "doc" && !target.ws && !target.window ? docAddress(target.id) : token.href;
+      return renderLink.call(this, { ...token, href });
+    };
+  }
+  const html = readingHTML(body, external, renderer, comment);
   const template = document.createElement("template");
   template.innerHTML = html;
   if (external) {
@@ -116,6 +127,7 @@ export function ReadMarkdown({
   html,
   preparedHTML,
   external = false,
+  comment = false,
   directory,
   native = false,
   onLink,
@@ -125,6 +137,7 @@ export function ReadMarkdown({
   // Only HTML produced by markdownHTML, before native asset resolution.
   preparedHTML?: SanitizedHTML;
   external?: boolean;
+  comment?: boolean;
   directory?: string;
   native?: boolean;
   onLink?(url: string): void | boolean;
@@ -133,7 +146,7 @@ export function ReadMarkdown({
   const rendered = useMemo(() => {
     const safe = preparedHTML ?? (
       html === undefined
-        ? markdownHTML(body || "", external)
+        ? markdownHTML(body || "", external, comment)
         : sanitizeHtml(html));
     // 이미지 크기 표기 `![alt|480](주소)`: alt 끝의 `|숫자`를 떼어 가로 크기로 쓴다(에디터와 같은 규칙).
     const sized = /alt="[^"]*\|\d{2,4}"/.test(safe);
@@ -159,7 +172,7 @@ export function ReadMarkdown({
       }
     });
     return template.innerHTML;
-  }, [body, html, preparedHTML, external, directory, native]);
+  }, [body, html, preparedHTML, external, comment, directory, native]);
   const [theme, setTheme] = useState(
     document.documentElement.dataset.theme || "system",
   );
