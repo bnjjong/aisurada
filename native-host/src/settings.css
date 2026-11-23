@@ -859,6 +859,9 @@
     font-size: 13px;
     white-space: nowrap;
   }
+  .set-results {
+    max-height: 200px;
+  }
   .set-nav-foot {
     display: none;
   }
@@ -867,5 +870,11 @@
   }
   .set-skin-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container settings (max-width: 440px) {
+  .set-skin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
