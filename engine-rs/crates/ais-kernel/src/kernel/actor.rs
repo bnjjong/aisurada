@@ -41,6 +41,15 @@ pub struct ManagerContext {
     pub repos: Vec<String>,
 }
 
+/// 등록부와 파일에 쓸 수 있는 매니저 이름인지 본다.
+pub fn valid_manager_name(value: &str) -> bool {
+    (1..=32).contains(&value.len())
+        && value.as_bytes()[0].is_ascii_lowercase()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
 impl CallContext {
     /// 앱(화면)의 호출. 세션이 없다.
     pub fn app() -> Self {

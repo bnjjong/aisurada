@@ -14,7 +14,7 @@ use super::{Criterion, Link, Ref, Task, TaskStatus};
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
-use crate::kernel::token::compute_token;
+use crate::kernel::{actor::valid_manager_name, token::compute_token};
 use crate::snake_dump::dump_map;
 use crate::text::{NOTE_ID, SUB_NOTE_ID, trim, utf16_len};
 
@@ -50,14 +50,6 @@ static GITHUB_URL: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// 머리말의 알려진 칸. 이 밖의 칸은 `extra`로 보존한다.
-pub fn valid_manager(value: &str) -> bool {
-    (1..=32).contains(&value.len())
-        && value.as_bytes()[0].is_ascii_lowercase()
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
-}
-
 static SLACK_LINK: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^https://[a-z0-9][a-z0-9-]*\.slack\.com/archives/([CGD][A-Z0-9]{2,})/p([0-9]{10})([0-9]{6})(?:\?([^#\s]+))?$").unwrap()
 });
@@ -241,7 +233,7 @@ pub fn parse(bytes: &[u8], rel_path: &str) -> Result<Task, String> {
         repo: blank_to_null(str_of(&map, "repo")),
         project: blank_to_null(str_of(&map, "project")),
         base_branch: blank_to_null(str_of(&map, "baseBranch")),
-        manager: str_of(&map, "manager").filter(|value| valid_manager(value)),
+        manager: str_of(&map, "manager").filter(|value| valid_manager_name(value)),
         labels: label_list(get(&map, "labels")),
         criteria: criteria_list(get(&map, "criteria")),
         links: link_list(get(&map, "links")),

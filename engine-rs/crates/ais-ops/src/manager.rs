@@ -4,8 +4,10 @@ use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
+use ais_core::valid_manager_name;
 use ais_core::write::{acquire_lock, write_atomic};
 use ais_domain::task::format;
+use ais_infra::ports::fs;
 use serde::{Deserialize, Serialize};
 
 use crate::{Outcome, env::Env};
@@ -46,7 +48,7 @@ impl Manager {
     }
 
     fn validate(&self) -> Result<(), String> {
-        if !format::valid_manager(&self.name) {
+        if !valid_manager_name(&self.name) {
             return Err(
                 "매니저 이름은 소문자로 시작하는 소문자·숫자·하이픈 1~32자여야 한다".into(),
             );
@@ -122,7 +124,7 @@ fn file(env: &Env) -> Result<PathBuf, String> {
 }
 
 pub fn list(env: &Env) -> Result<Vec<Manager>, String> {
-    let bytes = match std::fs::read(file(env)?) {
+    let bytes = match fs::read(file(env)?) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(format!("매니저 등록부를 읽지 못했다: {error}")),
@@ -182,7 +184,7 @@ fn command(args: &[String], env: &Env) -> Result<String, String> {
         args.first().map(String::as_str),
         Some("add" | "update" | "enable" | "disable")
     ) {
-        std::fs::create_dir_all(folder).map_err(|e| e.to_string())?;
+        fs::create_dir_all(folder).map_err(|e| e.to_string())?;
         Some(acquire_lock(folder).map_err(|e| e.to_string())?)
     } else {
         None

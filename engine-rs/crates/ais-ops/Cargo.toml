@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 ais-domain = { path = "../ais-domain" }
+ais-infra = { path = "../ais-infra" }
 ais-core = { path = "../ais-core" }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }

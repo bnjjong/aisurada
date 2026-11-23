@@ -13,9 +13,9 @@ use super::front::NoteFront;
 use super::meta::{Link, TEMPLATE_ID, agent_for_file};
 use super::placement::{created_text, parse_date_arg, parse_time_arg};
 use crate::error::EngineError;
-use crate::kernel::doc_type::DocType;
 use crate::kernel::tier::Tier;
 use crate::kernel::time::{CivilDate, LocalClock};
+use crate::kernel::{actor::valid_manager_name, doc_type::DocType};
 use crate::text::{is_blank, trim};
 
 pub const CREATE_USAGE: &str = "create-doc agenda=<slug 또는 이름> type=<유형> title=<제목> body=<본문> [date=<YYYY-MM-DD>] [time=<HH:MM>] [format=markdown] [links=<JSON 배열>] [tags=<JSON 배열>] [template=<템플릿 id>] [tier=reading|record]";
@@ -166,7 +166,7 @@ impl ParsedNewDoc {
         let session_id = session.filter(|_| self.tool);
         let session_agent = session_id.and(session_agent.and_then(agent_for_file));
         let extra = manager
-            .filter(|name| self.tool && crate::task::format::valid_manager(name))
+            .filter(|name| self.tool && valid_manager_name(name))
             .map_or_else(String::new, |name| format!("manager: \"{name}\"\n"));
         let front = NoteFront {
             id: note_id,
