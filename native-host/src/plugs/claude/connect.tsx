@@ -137,7 +137,7 @@ export function ConnectView({
         </p>
       )}
       {desktop && (
-        <details className="set-connect-desktop" style={{ padding: "0 18px 14px" }}>
+        <details className="set-connect-desktop">
           <summary>Claude Desktop에 연결하려면</summary>
           <p>
             Claude Desktop 설정 파일(<code>claude_desktop_config.json</code>)의 <code>mcpServers</code>에 아래를 합쳐

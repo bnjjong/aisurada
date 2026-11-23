@@ -57,7 +57,7 @@ export function GithubConnectView({
           className="set-connect-status"
         />
         {native && connected && status && (
-          <p className="set-connect-hint" style={{ padding: "0 18px", margin: "0 0 12px" }}>
+          <p className="set-connect-hint">
             GitHub 전용 저장소를 받는 폴더: <code>{status.cloneRoot}</code>
             <br />
             개인 키는 키체인에 들어갔어요. 내려받은 .pem 파일은 지워도 돼요.

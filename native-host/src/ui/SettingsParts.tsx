@@ -111,10 +111,10 @@ export function StatusLine({
   role?: string;
 }) {
   return (
-    <div className={`set-status-line ${className}`.trim()} role={role}>
+    <div className={`set-status-line ${className}`.trim()}>
       <div className="set-status-head">
         <span className={`set-dot set-dot-${status}`} aria-hidden="true" />
-        <strong className="set-status-main">{text}</strong>
+        <strong className="set-status-main" role={role}>{text}</strong>
       </div>
       {desc && <p className="set-status-desc">{desc}</p>}
     </div>

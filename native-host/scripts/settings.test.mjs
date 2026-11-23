@@ -153,9 +153,9 @@ test('글꼴 칩 렌더링: 기본 칩과 설치된 추천 글꼴 칩이 보이�
     })
   );
 
-  // 앱 글꼴 및 터미널 글꼴 영역에 각각 기본 칩이 aria-pressed="true" 상태여야 한다
-  const defaultChips = [...htmlDefault.matchAll(/<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>기본<\/button>/g)];
-  assert.equal(defaultChips.length, 2);
+  // 앱 글꼴 영역은 '기본', 터미널 글꼴 영역은 '기본 (D2Coding)' 칩이 각각 aria-pressed="true" 상태여야 한다
+  assert.match(htmlDefault, /<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>기본<\/button>/);
+  assert.match(htmlDefault, /<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>기본 \(D2Coding\)<\/button>/);
 
   // 2. uiFont가 Pretendard로 설정된 상태
   const htmlCustom = renderToStaticMarkup(
@@ -193,6 +193,19 @@ test('설정 검색: 검색어로 라벨과 키워드를 찾고, AI 제외 옵�
   // 5. '설정' 또는 넓은 검색어 시 최대 8개 제한
   const broadResults = searchSettings('알림', { claude: true });
   assert.ok(broadResults.length <= 8);
+
+  // 6. 띄어쓰기 무시 및 결함 14번 실측 검색어 검증
+  const reviewResults = searchSettings('리뷰', { claude: true });
+  assert.ok(reviewResults.some(r => r.key === 'ntf-events'));
+
+  const c4Results = searchSettings('c4', { claude: true });
+  assert.ok(c4Results.some(r => r.key === 'archyl'));
+
+  const noSpaceResults = searchSettings('제목앞', { claude: true });
+  assert.ok(noSpaceResults.some(r => r.key === 'titleDatePrefix'));
+
+  const darkResults = searchSettings('다크모드', { claude: true });
+  assert.equal(darkResults.length, 0);
 });
 
 test('색인 유효성: SETTINGS_INDEX의 모든 항목은 유효한 6개 묶음 중 하나에 속한다', () => {

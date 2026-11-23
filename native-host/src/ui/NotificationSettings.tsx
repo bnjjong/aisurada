@@ -28,7 +28,7 @@ export function NotificationSettingsView({
   const message = bannerMessage(banner);
 
   return (
-    <div className="ntf-settings" aria-label="알림 설정">
+    <div className="ntf-settings">
       {!native && <p className="ntf-note">알림 설정은 앱에서만 바꿀 수 있어요.</p>}
 
       <SettingsGroup title="받는 곳">
@@ -76,14 +76,15 @@ export function NotificationSettingsView({
             checked={false}
           />
         </label>
-      </SettingsGroup>
 
-      <details className="ntf-focus-details" data-setting="ntf-focus">
-        <summary>집중 모드에서는?</summary>
-        <p>
-          집중 모드는 macOS가 처리해요. 집중 모드에서 aisurada를 허용하지 않으면 macOS가 배너를 막아요.
-        </p>
-      </details>
+        <details className="ntf-focus-details" data-setting="ntf-focus">
+          <summary>집중 모드에서는?</summary>
+          <p>
+            macOS의 집중 모드는 macOS가 처리해요. 집중 모드에서 aisurada를 허용하지 않으면 배너가
+            막히고 알림 센터에 쌓여요. 허용 목록은 시스템 설정의 집중 모드에서 바꿔요.
+          </p>
+        </details>
+      </SettingsGroup>
 
       <SettingsGroup title="소식별">
         <div data-setting="ntf-events">
