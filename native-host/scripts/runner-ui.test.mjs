@@ -88,7 +88,7 @@ test('refreshRunner stores the host status; a missing command marks the runner a
   assert.equal(runnerSummary(s), '일하는 중 1 · 답 기다림 1');
   assert.equal(runnerSummary({ ...s, active: [], waiting: [] }), '쉬는 중');
   assert.equal(runnerSummary({ ...s, active: [], waiting: [], settings: { ...s.settings, autoPickup: true } }), '집을 일을 기다려요');
-  assert.equal(runnerSummary({ ...s, claudeAvailable: false }), 'claude를 못 찾았어요');
+  assert.equal(runnerSummary({ ...s, active: [], waiting: [], settings: { ...s.settings, autoPickup: true }, claudeAvailable: false }), '자동 조사에 Claude가 필요해요');
 
   await refreshRunner(fakeHost({ runner_status: new Error('Command runner_status not found') }).call);
   s = getRunnerSnapshot();

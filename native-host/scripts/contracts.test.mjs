@@ -41,7 +41,7 @@ test('production and development CSP retain their separate boundaries', () => {
   assert.ok(config.app.security.csp.includes("frame-ancestors 'none'"));
   assert.ok(config.app.security.devCsp.includes('ws://localhost:1420'));
   assert.ok(!config.app.security.devCsp.includes('media-src'));
-  assert.ok(config.app.security.csp.endsWith('frame-src aisframe: http://aisframe.localhost'));
+  assert.ok(config.app.security.csp.endsWith('frame-src aisframe: http://aisframe.localhost https://embed.diagrams.net'));
   assert.ok(!/<style\b|\sstyle\s*=/i.test(readFileSync(new URL('../index.html',import.meta.url),'utf8')));
   assert.equal(config.build.frontendDist, '../dist');
 });
