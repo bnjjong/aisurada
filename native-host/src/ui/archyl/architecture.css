@@ -17,25 +17,29 @@
 .archyl-workbench[data-chat-open="false"] { grid-template-columns: minmax(0, 1fr); }
 .archyl-map-column { min-width: 0; }
 .archyl-parent { margin-bottom: 8px; }
-.archyl-diagram { position: relative; height: clamp(355px, 63vh, 760px); overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: radial-gradient(color-mix(in srgb, var(--muted) 32%, transparent) .75px, transparent .75px) 0 0 / 17px 17px, var(--surface); cursor: grab; touch-action: none; }
+.archyl-diagram { --archyl-card-surface: var(--surface); position: relative; height: clamp(355px, 63vh, 760px); overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: radial-gradient(color-mix(in srgb, var(--muted) 32%, transparent) .75px, transparent .75px) 0 0 / 17px 17px, var(--surface); cursor: grab; touch-action: none; }
+:root[data-skin="glass"] .archyl-diagram { --archyl-card-surface: light-dark(#fff, #18243e); }
 .archyl-diagram:active { cursor: grabbing; }
-.archyl-diagram > canvas { position: absolute; inset: 0; width: 100%; height: 100%; color: color-mix(in srgb, var(--ink) 57%, var(--surface)); pointer-events: none; }
+.archyl-diagram > canvas { position: absolute; inset: 0; width: 100%; height: 100%; color: color-mix(in srgb, var(--muted) 61%, var(--archyl-card-surface)); pointer-events: none; }
 .archyl-diagram-world { position: absolute; inset: 0; transform-origin: top left; pointer-events: none; }
-.archyl-card { position: absolute; display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; pointer-events: auto; text-align: left; border: 1px solid var(--line); border-top: 3px solid color-mix(in srgb, var(--muted) 66%, var(--surface)); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 4px 10px #101a3520; overflow: hidden; }
-.archyl-card:hover, .archyl-card[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 0; }
-.archyl-card[data-kind="system"] { border-top-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.archyl-card { position: absolute; display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; pointer-events: auto; text-align: left; border: 1px solid var(--line); border-top: 3px solid color-mix(in srgb, var(--muted) 66%, var(--surface)); border-radius: 12px; color: var(--ink); background: var(--archyl-card-surface); box-shadow: 0 4px 10px #101a3520; overflow: hidden; }
+.archyl-card:hover:not(:disabled), .archyl-card[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 0; background: var(--archyl-card-surface); }
+.archyl-card[data-kind="system"] { border-top-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--archyl-card-surface)); }
 .archyl-card[data-kind="person"] { border-top-color: #bd9142; }
-.archyl-card-kind { display: flex; gap: 6px; align-items: center; font-size: calc(10px * var(--archyl-type-scale)); line-height: 1.15; color: var(--muted); }
+.archyl-card-kind { display: flex; flex: none; gap: 6px; align-items: center; font-size: calc(10px * var(--archyl-type-scale)); line-height: 1.15; color: var(--muted); }
 .archyl-card-icon { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 6px; color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
 .archyl-card[data-kind="person"] .archyl-card-icon { background: color-mix(in srgb, #bd9142 26%, var(--surface)); }
-.archyl-card strong, .archyl-card-description, .archyl-card-tech { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.archyl-card strong, .archyl-card-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; }
+.archyl-card strong { flex: none; text-wrap: balance; }
+.archyl-card-tech { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .archyl-card strong { font-size: calc(14px * var(--archyl-type-scale)); line-height: 1.15; }
 .archyl-card-description { font-size: calc(11px * var(--archyl-type-scale)); line-height: 1.2; color: var(--muted); }
 .archyl-card-tech { font-size: 11px; color: var(--muted); }
 .archyl-diagram-world[data-density="compact"] .archyl-card-tech,
 .archyl-diagram-world[data-density="minimal"] :is(.archyl-card-description, .archyl-card-tech) { display: none; }
-.archyl-edge { position: absolute; max-width: 130px; transform: translate(-50%, -50%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 5px; line-height: 1.5; font-size: 11px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); }
-.archyl-edge[aria-pressed="true"] { outline: 2px solid var(--accent); }
+.archyl-edge { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); overflow: hidden; padding: 2px 5px; font-size: 11px; line-height: 14px; font-weight: 500; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--archyl-card-surface); }
+.archyl-edge > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; text-align: center; text-wrap: balance; }
+.archyl-edge:hover:not(:disabled), .archyl-edge[aria-pressed="true"] { outline: 2px solid var(--accent); background: var(--archyl-card-surface); }
 .archyl-diagram-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
 .archyl-zoom { position: absolute; bottom: 9px; left: 9px; display: flex; align-items: center; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .archyl-zoom button { display: grid; place-items: center; width: 28px; height: 27px; padding: 0; border: 0; }
