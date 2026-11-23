@@ -3,6 +3,7 @@
 // 호스트 커맨드를 더하지 않는다.
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { StatusLine } from "../../ui/SettingsParts.tsx";
 
 export interface ConnectStatus {
   claudeFound: boolean;
@@ -66,22 +67,35 @@ export function ConnectView({
   onRefresh?: () => void;
 }) {
   let line: string;
-  if (!status && error) line = "연결 상태를 확인하지 못했어요.";
-  else if (!status) line = "확인하는 중이에요…";
-  else if (!status.claudeFound) line = "Claude Code를 찾지 못했어요. 설치한 뒤 설정을 다시 열어 주세요.";
-  else if (!status.registered) line = "연결되어 있지 않아요.";
-  else if (status.stale) line = "예전 앱의 경로로 연결되어 있어요. 아래에서 다시 연결해 주세요.";
-  else line = status.write ? "연결되어 있어요 · 노트를 읽고 쓸 수 있어요" : "연결되어 있어요 · 노트를 읽기만 해요";
+  let dotStatus: "ok" | "off" | "warn";
+  if (!status && error) {
+    line = "연결 상태를 확인하지 못했어요.";
+    dotStatus = "warn";
+  } else if (!status) {
+    line = "확인하는 중이에요…";
+    dotStatus = "off";
+  } else if (!status.claudeFound) {
+    line = "Claude Code를 찾지 못했어요. 설치한 뒤 설정을 다시 열어 주세요.";
+    dotStatus = "warn";
+  } else if (!status.registered) {
+    line = "연결되어 있지 않아요.";
+    dotStatus = "off";
+  } else if (status.stale) {
+    line = "예전 앱의 경로로 연결되어 있어요. 아래에서 다시 연결해 주세요.";
+    dotStatus = "warn";
+  } else {
+    line = status.write ? "연결되어 있어요 · 노트를 읽고 쓸 수 있어요" : "연결되어 있어요 · 노트를 읽기만 해요";
+    dotStatus = "ok";
+  }
+
   return (
-    <fieldset className="set-connect">
-      <legend>Claude 연결</legend>
-      <p className="set-connect-hint">
-        Claude Code가 이 워크스페이스의 노트를 도구로 찾아 읽을 수 있게 연결해요. 연결은 지금 연 워크스페이스 하나에
-        묶여요. 다른 워크스페이스에서 다시 연결하면 그쪽으로 바뀌어요.
-      </p>
-      <p className="set-connect-status" role="status">
-        {line}
-      </p>
+    <div className="set-card set-connect" data-setting="claude">
+      <StatusLine
+        status={dotStatus}
+        text={line}
+        desc="Claude Code가 이 워크스페이스의 노트를 도구로 찾아 읽을 수 있게 연결해요. 연결은 지금 연 워크스페이스 하나에 묶여요. 다른 워크스페이스에서 다시 연결하면 그쪽으로 바뀌어요."
+        className="set-connect-status"
+      />
       {!status && error && onRefresh && (
         <div className="set-connect-actions">
           <button type="button" disabled={busy} onClick={onRefresh}>
@@ -91,8 +105,8 @@ export function ConnectView({
       )}
       {status?.claudeFound && (
         <>
-          <label className="set-switch set-connect-write">
-            <span>
+          <label className="set-row set-switch set-connect-write" data-setting="claude-write">
+            <span className="set-row-label">
               <strong>노트를 만들고 고치는 것도 허용</strong>
               <small>끄면 Claude는 읽기만 해요. 켜도 영구 삭제는 못 해요.</small>
             </span>
@@ -123,29 +137,33 @@ export function ConnectView({
         </p>
       )}
       {desktop && (
-        <details className="set-connect-desktop">
+        <details className="set-connect-desktop" style={{ padding: "0 18px 14px" }}>
           <summary>Claude Desktop에 연결하려면</summary>
           <p>
             Claude Desktop 설정 파일(<code>claude_desktop_config.json</code>)의 <code>mcpServers</code>에 아래를 합쳐
             넣고 Claude Desktop을 다시 시작해요.
           </p>
           <pre>{desktop}</pre>
-          <button type="button" onClick={() => void navigator.clipboard.writeText(desktop)}>
-            복사
-          </button>
         </details>
       )}
-    </fieldset>
+    </div>
   );
 }
 
-export function ClaudeConnect({ call = callHost }: { call?: ConnectCall }) {
+export function ClaudeConnect({
+  call = callHost,
+  readStatus = parseConnectStatus,
+}: {
+  call?: ConnectCall;
+  readStatus?: (stdout: string) => ConnectStatus | null;
+}) {
   const [status, setStatus] = useState<ConnectStatus | null>(null);
-  const [write, setWrite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [write, setWrite] = useState(false);
   const [desktop, setDesktop] = useState("");
   const alive = useRef(true);
+
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -157,37 +175,40 @@ export function ClaudeConnect({ call = callHost }: { call?: ConnectCall }) {
     try {
       const reply = await call(["claude-mcp", "status"]);
       if (!alive.current) return;
-      const next = reply.status === 0 ? parseConnectStatus(reply.stdout) : null;
-      if (!next) {
+      const parsed = readStatus(reply.stdout);
+      if (parsed) {
+        setStatus(parsed);
+        setWrite(parsed.write);
+      } else {
+        setStatus(null);
         setError(connectFailure(reply));
-        return;
       }
-      setStatus(next);
-      if (next.registered) setWrite(next.write);
     } catch (e) {
-      if (alive.current) setError(String(e));
+      if (alive.current) {
+        setStatus(null);
+        setError(String(e));
+      }
     }
-  }, [call]);
+  }, [call, readStatus]);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // Claude Desktop에 붙여 넣을 조각은 쓰기 허용에 따라 달라진다. 등록은 하지 않는 명령이라 부담이 없다.
   useEffect(() => {
-    let current = true;
-    call(["claude-mcp", "config", ...(write ? ["--write"] : [])])
-      .then((reply) => {
-        if (!current) return;
-        if (reply.status !== 0) return setDesktop("");
-        try {
-          setDesktop(JSON.stringify(JSON.parse(reply.stdout), null, 2));
-        } catch {
-          setDesktop("");
+    let cancelled = false;
+    (async () => {
+      try {
+        const reply = await call(["claude-mcp", "desktop-snippet", ...(write ? ["--write"] : [])]);
+        if (!cancelled && reply.status === 0 && reply.stdout.trim()) {
+          setDesktop(reply.stdout.trim());
         }
-      })
-      .catch(() => current && setDesktop(""));
+      } catch {
+        /* Desktop 조각 읽기는 실패해도 본체 동작을 막지 않는다 */
+      }
+    })();
     return () => {
-      current = false;
+      cancelled = true;
     };
   }, [call, write]);
 

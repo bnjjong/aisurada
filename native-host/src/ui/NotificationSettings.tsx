@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { EVENT_KINDS, bannerMessage, refreshNotifications, saveSettings, sendTest, useNotifications, withSwitch } from "./notificationsStore.ts";
 import type { EventKind, NotifySettings } from "./notificationsStore.ts";
+import { SettingsGroup, SettingsPane } from "./SettingsParts.tsx";
 
 export function NotificationSettingsView({
   settings,
@@ -25,68 +26,120 @@ export function NotificationSettingsView({
 }) {
   const toggle = (channelKey: "inApp" | "macos", value: boolean, event?: EventKind) => onChange(withSwitch(settings, channelKey, value, event));
   const message = bannerMessage(banner);
+
   return (
-    <section className="ntf-settings" aria-label="알림 설정">
-      <h3>알림</h3>
+    <div className="ntf-settings" aria-label="알림 설정">
       {!native && <p className="ntf-note">알림 설정은 앱에서만 바꿀 수 있어요.</p>}
-      <label className="ntf-row">
-        <span>
-          <strong>앱 안</strong>
-          <small>토스트와 배지예요. 끄면 알림 센터(종)에만 쌓여요.</small>
-        </span>
-        <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label="앱 안 알림" disabled={!native} checked={settings.inApp} onChange={(e) => toggle("inApp", e.target.checked)} />
-      </label>
-      <label className="ntf-row">
-        <span>
-          <strong>macOS 알림센터</strong>
-          <small>앱이 뒤에 있어도 배너로 알려요.</small>
-        </span>
-        <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label="macOS 알림센터" disabled={!native} checked={settings.macos} onChange={(e) => toggle("macos", e.target.checked)} />
-      </label>
-      <label className="ntf-row ntf-off">
-        <span>
-          <strong>Telegram</strong>
-          <small>준비 중이에요.</small>
-        </span>
-        <input type="checkbox" role="switch" className="ntf-switch" aria-label="Telegram" disabled checked={false} readOnly />
-      </label>
-      <p className="ntf-note">
-        macOS의 집중 모드는 macOS가 처리해요. 집중 모드에서 aisurada를 허용하지 않으면 배너가 막히고 알림 센터에 쌓여요. 허용 목록은 시스템 설정의 집중 모드에서 바꿔요.
-      </p>
-      <table className="ntf-table">
-        <thead>
-          <tr>
-            <th scope="col">소식</th>
-            <th scope="col">앱 안</th>
-            <th scope="col">macOS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {EVENT_KINDS.map((e) => (
-            <tr key={e.id}>
-              <td>
-                <strong>{e.label}</strong>
-                <small>{e.hint}</small>
-              </td>
-              <td>
-                <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label={`${e.label} · 앱 안`} disabled={!native} checked={settings.events[e.id].inApp} onChange={(ev) => toggle("inApp", ev.target.checked, e.id)} />
-              </td>
-              <td>
-                <input type="checkbox" role="switch" className="ntf-switch set-toggle" aria-label={`${e.label} · macOS`} disabled={!native} checked={settings.events[e.id].macos} onChange={(ev) => toggle("macos", ev.target.checked, e.id)} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="ntf-test">
+
+      <SettingsGroup title="받는 곳">
+        <label className="ntf-row" data-setting="ntf-inapp">
+          <span>
+            <strong>앱 안</strong>
+            <small>토스트와 배지예요. 끄면 알림 센터(종)에만 쌓여요.</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="ntf-switch set-toggle"
+            aria-label="앱 안 알림"
+            disabled={!native}
+            checked={settings.inApp}
+            onChange={(e) => toggle("inApp", e.target.checked)}
+          />
+        </label>
+        <label className="ntf-row" data-setting="ntf-macos">
+          <span>
+            <strong>macOS 알림센터</strong>
+            <small>앱이 뒤에 있어도 배너로 알려요.</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="ntf-switch set-toggle"
+            aria-label="macOS 알림센터"
+            disabled={!native}
+            checked={settings.macos}
+            onChange={(e) => toggle("macos", e.target.checked)}
+          />
+        </label>
+        <label className="ntf-row ntf-off">
+          <span>
+            <strong>Telegram</strong>
+            <small>준비 중이에요.</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="ntf-switch set-toggle"
+            aria-label="Telegram"
+            disabled
+            checked={false}
+          />
+        </label>
+      </SettingsGroup>
+
+      <details className="ntf-focus-details">
+        <summary>집중 모드에서는?</summary>
+        <p>
+          집중 모드는 macOS가 처리해요. 집중 모드에서 aisurada를 허용하지 않으면 macOS가 배너를 막아요.
+        </p>
+      </details>
+
+      <SettingsGroup title="소식별">
+        <div data-setting="ntf-events">
+          <table className="ntf-table">
+            <thead>
+              <tr>
+                <th scope="col">소식</th>
+                <th scope="col">앱 안</th>
+                <th scope="col">macOS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {EVENT_KINDS.map((e) => (
+                <tr key={e.id}>
+                  <td>
+                    <strong>{e.label}</strong>
+                    <small>{e.hint}</small>
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      className="ntf-switch set-toggle"
+                      aria-label={`${e.label} · 앱 안`}
+                      disabled={!native}
+                      checked={settings.events[e.id].inApp}
+                      onChange={(ev) => toggle("inApp", ev.target.checked, e.id)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      className="ntf-switch set-toggle"
+                      aria-label={`${e.label} · macOS`}
+                      disabled={!native}
+                      checked={settings.events[e.id].macos}
+                      onChange={(ev) => toggle("macos", ev.target.checked, e.id)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SettingsGroup>
+
+      <div className="ntf-test" data-setting="ntf-test">
         <button type="button" disabled={!native} onClick={onTest}>
           시험 알림 보내기
         </button>
         <span className="ntf-hint">설정대로 토스트와 배너가 가는지 확인해요.</span>
       </div>
-      {message && <p className="ntf-result" role="status">{message}</p>}
-      {error && <p role="alert" className="ntf-error">{error}</p>}
-    </section>
+      {banner && <p className="ntf-result" role="status">{message}</p>}
+      {error && <p className="ntf-error" role="alert">{error}</p>}
+    </div>
   );
 }
 
@@ -99,13 +152,15 @@ export function NotificationSettings({ controller }: { controller: WorkspaceCont
     if (native) void refreshNotifications(call);
   }, [native, call]);
   return (
-    <NotificationSettingsView
-      settings={n.settings}
-      native={native}
-      banner={n.lastBanner}
-      error={n.error}
-      onChange={(next) => void saveSettings(call, next)}
-      onTest={() => void sendTest(call)}
-    />
+    <SettingsPane title="알림" desc="어디로, 어떤 소식을 알릴지 정해요. 꺼도 알림 센터(종)에는 쌓여요.">
+      <NotificationSettingsView
+        settings={n.settings}
+        native={native}
+        banner={n.lastBanner}
+        error={n.error}
+        onChange={(next) => void saveSettings(call, next)}
+        onTest={() => void sendTest(call)}
+      />
+    </SettingsPane>
   );
 }

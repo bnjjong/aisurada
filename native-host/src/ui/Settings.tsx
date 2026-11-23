@@ -4,6 +4,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { SettingsSection, WorkspaceState } from "../workspace/types.ts";
 import { CLAUDE_ENABLED } from "@claude-plug/state";
 import { Modal } from "./Modal.tsx";
+import { SettingsPane } from "./SettingsParts.tsx";
 import { SETTINGS_SECTIONS } from "./settingsSections.ts";
 import { Icon } from "./Icon.tsx";
 import { LookSettings } from "./LookSettings.tsx";
@@ -92,10 +93,10 @@ export function Settings({
     notifications: <NotificationSettings controller={controller} />,
     ai: <AiSettings controller={controller} state={state} />,
     connections: (
-      <>
+      <SettingsPane title="연결" desc="앱이 바깥 서비스에 닿는 연결이에요. 키는 이 Mac의 키체인에만 둬요.">
         <GithubConnect controller={controller} />
         <ArchylConnect controller={controller} />
-      </>
+      </SettingsPane>
     ),
   };
 

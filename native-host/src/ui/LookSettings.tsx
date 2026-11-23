@@ -2,6 +2,7 @@
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Skin, WorkspaceState } from "../workspace/types.ts";
 import { UI_SCALES } from "../workspace/typography.ts";
+import { SettingsPane } from "./SettingsParts.tsx";
 
 /** 설정에서 고를 수 있는 화면 모양. 순서가 곧 화면에 나오는 순서다. */
 export const SKIN_OPTIONS: readonly { id: Skin; label: string; hint: string }[] = [
@@ -39,10 +40,12 @@ export function LookSettings({
   controller: Pick<WorkspaceController, "preference">;
   state: Pick<WorkspaceState, "skin" | "typography">;
 }) {
+  const currentSkin = SKIN_OPTIONS.find((s) => s.id === state.skin) ?? SKIN_OPTIONS[0];
+
   return (
-    <>
-      <fieldset className="set-skin">
-        <legend>화면 모양</legend>
+    <SettingsPane title="모양" desc="앱이 어떻게 보이는지 정해요. 밝게·어둡게는 레일의 ◐ 단추가 그대로 맡아요.">
+      <div className="set-group" data-setting="skin">
+        <h4>화면 모양</h4>
         <div className="set-skin-grid">
           {SKIN_OPTIONS.map((option) => (
             <label className="set-skin-option" key={option.id}>
@@ -59,32 +62,37 @@ export function LookSettings({
               </span>
               <span className="set-skin-text">
                 <strong>{option.label}</strong>
-                <small>{option.hint}</small>
               </span>
             </label>
           ))}
         </div>
-      </fieldset>
-      <fieldset className="set-typo">
-        <div className="typo-row">
-          <strong id="typo-scale-label">화면 크기</strong>
-          <small>
-            글자와 버튼을 앱 전체에서 함께 키우거나 줄여요. ⌘ + / ⌘ - / ⌘ 0 키로도 바꿀 수 있어요. 지금은 {state.typography.scale}%예요.
-          </small>
-          <div className="typo-scale" role="group" aria-labelledby="typo-scale-label">
-            {UI_SCALES.map((scale) => (
-              <button
-                type="button"
-                key={scale}
-                aria-pressed={state.typography.scale === scale}
-                onClick={() => controller.preference({ uiScale: scale })}
-              >
-                {scale}%
-              </button>
-            ))}
+        <p className="set-skin-selected-desc">
+          <strong>{currentSkin.label}</strong> · {currentSkin.hint}
+        </p>
+      </div>
+
+      <div className="set-group" data-setting="scale">
+        <h4>화면 크기</h4>
+        <div className="set-card set-typo" style={{ padding: "16px 18px" }}>
+          <div className="typo-row">
+            <small style={{ margin: "0 0 10px", display: "block" }}>
+              글자와 단추를 앱 전체에서 함께 키우거나 줄여요. ⌘ + / ⌘ - / ⌘ 0 키로도 바꿀 수 있어요. 지금은 {state.typography.scale}%예요.
+            </small>
+            <div className="typo-scale" role="group" aria-label="화면 크기">
+              {UI_SCALES.map((scale) => (
+                <button
+                  type="button"
+                  key={scale}
+                  aria-pressed={state.typography.scale === scale}
+                  onClick={() => controller.preference({ uiScale: scale })}
+                >
+                  {scale}%
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </fieldset>
-    </>
+      </div>
+    </SettingsPane>
   );
 }

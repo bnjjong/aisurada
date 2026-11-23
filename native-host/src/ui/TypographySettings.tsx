@@ -123,28 +123,38 @@ export function TypographySettings({
   typography: Typography;
 }) {
   return (
-    <fieldset className="set-typo">
-      <FontField
-        id="typo-ui-font"
-        label="앱 글꼴"
-        hint="앱 전체에 쓸 글꼴이에요. 설치된 글꼴 이름이나 쉼표로 이은 글꼴 목록(Pretendard, sans-serif)을 적어요. 고른 글꼴에 없는 글자는 기본 글꼴이 채워요."
-        placeholder="Pretendard 또는 글꼴 목록 (비우면 기본 글꼴)"
-        suggestions={UI_FONT_SUGGESTIONS}
-        value={typography.uiFont}
-        sample="다람쥐 헌 쳇바퀴에 타고파. The quick brown fox jumps over the lazy dog. 0123456789"
-        onCommit={(font) => controller.preference({ uiFont: font })}
-      />
-      <FontField
-        id="typo-terminal-font"
-        label="터미널 글꼴"
-        hint="터미널에 쓸 고정폭 글꼴이에요. 고른 글꼴에 한글이 없으면 D2Coding이 채워요. 열려 있는 터미널도 바로 바뀌어요."
-        placeholder="MesloLGS NF 또는 글꼴 목록 (비우면 D2Coding)"
-        suggestions={TERMINAL_FONT_SUGGESTIONS}
-        value={typography.terminalFont}
-        mono
-        sample="~/project git:main ❯ ls -la  한글 폭 확인"
-        onCommit={(font) => controller.preference({ terminalFont: font })}
-      />
-    </fieldset>
+    <div className="set-typo">
+      <div className="set-group" data-setting="ui-font">
+        <h4>앱 글꼴</h4>
+        <div className="set-card" style={{ padding: "16px 18px" }}>
+          <FontField
+            id="typo-ui-font"
+            label="앱 글꼴"
+            hint="앱 전체에 쓸 글꼴이에요. 설치된 글꼴 이름이나 쉼표로 이은 글꼴 목록(Pretendard, sans-serif)을 적어요. 고른 글꼴에 없는 글자는 기본 글꼴이 채워요."
+            placeholder="Pretendard 또는 글꼴 목록 (비우면 기본 글꼴)"
+            suggestions={UI_FONT_SUGGESTIONS}
+            value={typography.uiFont}
+            sample="다람쥐 헌 쳇바퀴에 타고파. The quick brown fox jumps over the lazy dog. 0123456789"
+            onCommit={(font) => controller.preference({ uiFont: font })}
+          />
+        </div>
+      </div>
+      <div className="set-group" data-setting="terminal-font">
+        <h4>터미널 글꼴</h4>
+        <div className="set-card" style={{ padding: "16px 18px" }}>
+          <FontField
+            id="typo-terminal-font"
+            label="터미널 글꼴"
+            hint="터미널에 쓸 고정폭 글꼴이에요. 고른 글꼴에 한글이 없으면 D2Coding이 채워요. 열려 있는 터미널도 바로 바뀌어요."
+            placeholder="MesloLGS NF 또는 글꼴 목록 (비우면 D2Coding)"
+            suggestions={TERMINAL_FONT_SUGGESTIONS}
+            value={typography.terminalFont}
+            mono
+            sample="~/project git:main ❯ ls -la  한글 폭 확인"
+            onCommit={(font) => controller.preference({ terminalFont: font })}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
