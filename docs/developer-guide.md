@@ -770,13 +770,13 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 ### 화면 모양 (skin)
 
-설정 → 「화면 모양」에서 **물성**(기본값), **격자**, **유리**, **모던**, **기본**(이전 모양) 중에서 고른다. 밝게·어둡게(`data-theme`, 레일의 ◐)와는 따로 고르므로 모든 모양에 밝게와 어둡게가 있다.
+설정 → 모양 → 화면 모양에서 **물성**(기본값), **격자**, **유리**, **모던**, **기본**(이전 모양) 중에서 고른다. 밝게·어둡게(`data-theme`, 레일의 ◐)와는 따로 고르므로 모든 모양에 밝게와 어둡게가 있다.
 
 | 무엇 | 어디 |
 |---|---|
 | 저장 | `aisurada.prefs.v1`의 `state.skin`(`'tactile'`·`'grid'`·`'glass'`·`'modern'`·`'classic'`). 16장의 설정 21개에 들어가지 않는 **확장 값**이라, 고르기 전에는 `readPreferences` 결과에 나타나지 않는다. `readSkin`이 읽고, 없거나 모르는 값(없앤 `'page'` 포함)이면 물성이다 |
 | 적용 | `<html data-skin>`. `main.tsx`가 첫 그리기 전에 걸고, `App.tsx`가 `state.skin`을 따라간다. 다른 창은 `storage` 이벤트와 포커스에서 `refreshTheme`으로 따라온다. 노트 창은 설정을 쓰지 않는다 |
-| 기본 모양 | `src/styles.css`. 설정의 모양 고르기 카드(`.set-skin*`, `.skin-preview`)도 여기에 둔다. 카드의 미리보기 그림은 지금 켠 모양과 상관없이 각자의 모양을 그린다 |
+| 기본 모양 | `src/styles.css`. 설정의 모양 고르기 카드(`.set-skin*`, `.skin-preview`)는 `src/settings.css`에 둔다. 카드의 미리보기 그림은 지금 켠 모양과 상관없이 각자의 모양을 그린다 |
 | 물성 | `src/skin-tactile.css`. 눌리는 것은 떠 있고 쓰는 것은 파인 둥근 모양. 모든 규칙이 `:root[data-skin="tactile"]` 아래에 있어서 다른 모양에는 영향이 없다. 파일 맨 위에 다섯 규칙(깊이가 역할, 반경은 높이의 절반, 선 대신 면, 위에서 한 방향의 빛, 회색에도 색)과 토큰이 있다 |
 | 격자 | `src/skin-grid.css`. 반경 2px, 그림자 없음, 네이비 먹선 상자. 켜짐·선택은 네이비로 채우고 빨강은 포커스·현재 위치·눌림에만 쓴다. 「모든 요소 반경 2px·그림자 없음」을 한 줄(`:root[data-skin="grid"] *`)로 덮고 원이 필요한 몇 곳만 되돌린다 |
 | 유리 | `src/skin-glass.css`. 반투명 흰 면(`--surface`)에 흐림(`backdrop-filter`)을 건 패널, 배경에는 블루·시안·레드의 빛번짐(`:root`의 `radial-gradient`). 컨트롤 반경 12px, 패널 24px, 강조는 블루 유리구슬. 글자 색은 불투명하게 둬서 대비를 지킨다. `--surface`가 반투명이라 이 값을 불투명한 바탕으로 쓰는 새 요소는 `--glass-solid`를 쓴다 |
@@ -792,13 +792,13 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 - 격자는 모든 요소의 반경과 그림자를 한 줄로 덮는다. 설정 카드의 미리보기 그림은 그 규칙에 흔들리지 않도록 `styles.css`에서 반경·그림자에만 `!important`를 쓴다.
 - 유리는 `backdrop-filter`를 큰 패널에만 건다. 버튼마다 걸면 느려진다. 맨살 버튼과 일반 버튼은 반투명 배경만 쓴다.
 
-새 모양을 더하려면 `types.ts`의 `Skin`, `storage.ts`의 `SKINS`, `Settings.tsx`의 `SKIN_OPTIONS`, `src/skin-<이름>.css`와 `main.tsx`의 import, 미리보기 그림 규칙(`styles.css`)을 함께 고친다. 시험은 `scripts/chapters14-17.test.mjs`의 「화면 모양」과 `scripts/views-checks.js`의 설정 점검(다섯 모양을 차례로 눌러 `data-skin`과 저장 값을 잰다)이다.
+새 모양을 더하려면 `types.ts`의 `Skin`, `storage.ts`의 `SKINS`, `LookSettings.tsx`의 `SKIN_OPTIONS`, `src/skin-<이름>.css`와 `main.tsx`의 import, 미리보기 그림 규칙(`settings.css`)을 함께 고친다. 시험은 `scripts/chapters14-17.test.mjs`의 「화면 모양」과 `scripts/views-checks.js`의 설정 점검(다섯 모양을 차례로 눌러 `data-skin`과 저장 값을 잰다)이다.
 
 ### 설정 화면 (settings)
 
 설정 창(880×620 모달)은 좌측 208px 네비게이션과 우측 패널로 구성되며, 6개 묶음으로 설정을 나누어 제공한다.
 
-- **6개 묶음**: 모양(`look`), 글꼴(`fonts`), 노트(`notes`), 알림(`notifications`), AI(`ai`), 연결(`connections`). Claude 플러그인이 비활성화된 판에서는 `ai` 묶음이 숨겨지며, `ai` 묶음으로 진입 요청 시 `connections`로 대체된다.
+- **6개 묶음**: 모양(`look`), 글꼴(`fonts`), 노트(`notes`), 알림(`notifications`), AI(`ai`), 연결(`connections`). Claude 플러그인이 비활성화된 판에서는 `ai` 묶음이 숨겨지며, `ai` 묶음으로 진입 요청 시 `look`으로 대체된다.
 - **컨트롤러 API**: `controller.settings(open: boolean, section?: SettingsSection)`. 특정 묶음으로 바로 열 수 있다(알림 센터에서는 `notifications`, 아키텍처 화면에서는 `connections`). 보조 창(노트 창)에서는 열리지 않는다. 한 번 선택된 묶음은 앱이 켜져 있는 동안 메모리(`WorkspaceState.settingsSection`)에 유지된다.
 - **설정 검색**: 좌측 네비게이션 상단 검색창에서 17개 설정 항목(`SETTINGS_INDEX`)을 실시간 검색한다. 키워드·라벨·섹션 이름으로 매칭되며 최대 8개까지 표시된다. 위/아래 방향키와 Enter로 결과를 선택하면 해당 묶음으로 이동하고, `[data-setting="<키>"]` 요소를 화면 중앙으로 스크롤한 뒤 1.2초간 `.set-flash` 테두리로 강조한다. Esc 키를 누르면 검색어가 초기화되고 원래 탭 목록으로 돌아온다.
 - **새 설정 항목 추가 시**: JSX 요소에 `data-setting="<고유키>"` 속성을 부여하고, `src/ui/settingsSections.ts`의 `SETTINGS_INDEX`에 `{ section, key, label, keywords }` 항목을 등록한다.
@@ -1142,7 +1142,7 @@ node fixtures/runner-test.mjs
 
 - 엔진 시험(`bash test.sh` 178건), 화면 Node 시험 641건, 기준 맞대기(어긋남 0), 34장 받아들임(기준 jar로 27건 모두 맞음), 실제 창 점검 10종 248건은 통과한다(2026-11-15, 5d). 호스트 `cargo test`의 옛 실패 4건(`ask::tests`)은 2026-11-16에 고쳤다(§8). 수치와 근거는 [5d 기록](rust-engine-step5d-java-removal.md)에 있다.
 - 사람이 앱을 직접 조작해 본 확인은 아직 없다. 점검표는 §9의 문서에 있다.
-- 실제 창 화면 점검 묶음(`test:views:acceptance`)은 2026-11-20에 첫 점검 `rail-eight-order-settings-three-local-switches`에서 선다. 레일 개편 뒤 설정 단추가 `rail-activity-btn`이 되었는데 점검은 아직 `button.iconbtn[title="설정"]`을 찾는다(이 묶음은 첫 실패에서 멈추므로 뒤의 점검은 돌지 않는다). 아젠다 옮기기 점검은 `--only`로 따로 돌려 통과했다. 묶음 전체를 지금 화면에 맞추는 일은 따로 남았다.
+- 실제 창 화면 점검 묶음(`test:views:acceptance`)은 레일 개편 뒤 설정 단추가 `rail-activity-btn`이 되었는데 이번에 `button[aria-label="설정"]`으로 고쳐졌다. 아젠다 옮기기 점검은 `--only`로 따로 돌려 통과했다. 묶음 전체를 지금 화면에 맞추는 일은 따로 남았다.
 - MCP 서버(`ais-cli mcp`)는 진짜 엔진과 진짜 프로세스로 표준 입출력 왕복을 잰다. 진짜 Claude Code 2.1.318로는 격리 HOME에서 등록, 쓰기 모드로 바꿔 끼우기, 연결 확인(`✔ Connected`), 끊기까지 확인했다. 못 한 것: 모델이 실제로 도구를 부르는 흐름, Claude Desktop, MCP 규격 공식 문서와의 대조(받는 개정은 2024-11-05, 2025-03-26, 2025-06-18이고 규격은 다른 자료로 짰다).
 - 설정 화면의 「Claude 연결」 단추는 4부 실제 창 점검에서 가짜 claude로 눌러 보았다. 진짜 claude로 화면의 단추를 눌러 본 적은 없다(손 확인 4-4).
 - 설정의 「글꼴과 크기」는 브라우저(개발 서버, 샘플 vault)에서 다섯 모양 모두 눈으로 보았다. 실제 WKWebView 점검(`test:views:acceptance` 28건, `test:navigation:acceptance` 13건, 둘 다 4부를 뺀 판)에서 웹뷰 확대가 되는 것(`innerWidth`가 배율만큼 변함), ⌘ 단축키, 앱 글꼴 적용·오류·기본값, 열려 있는 터미널의 글꼴 변경, 150% 확대 중 터미널 화면이 칸 안에 드는 것까지 확인했다. **못 본 것:** 터미널과 편집기가 확대된 채로 눈에 어떻게 보이는지(글자가 또렷한지, 편집기 팝오버 위치)는 화면을 직접 보지 못했다(점검은 DOM 값과 크기만 잰다). 노트 창(`note-*`)에서 같은 권한으로 확대되는지는 점검이 없고(권한 목록이 메인과 같다는 것만 계약 시험이 잰다), 4부를 켠 판은 안 돌렸다.
