@@ -82,9 +82,15 @@ export const configText = (config: McpConfig, kind: ManagerKind) => {
     JSON.stringify({ mcpServers: { aisurada: { command, args } } }, null, 2);
 };
 
-export async function copyManagerConfig(controller: WorkspaceController, manager: ManagerConfig) {
-  const value = await controller.callEngine(["manager", "config", manager.name]) as McpConfig;
-  await navigator.clipboard.writeText(configText(value, manager.kind));
+// WebKit는 클릭을 처리하는 동안 복사를 시작해야 한다. 호스트에서 받을 값은 항목에 약속으로 넘긴다.
+function copyFromHost(text: Promise<string>) {
+  const content = text.then(value => new Blob([value], { type: "text/plain" }));
+  return navigator.clipboard.write([new ClipboardItem({ "text/plain": content })]);
+}
+
+export function copyManagerConfig(controller: WorkspaceController, manager: ManagerConfig) {
+  return copyFromHost(controller.callEngine(["manager", "config", manager.name])
+    .then(value => configText(value as McpConfig, manager.kind)));
 }
 
 export function ManagerConnection({ form, history, controller, update }: {
@@ -182,7 +188,7 @@ export function ManagerNotifications({ form, controller, update }: {
         <div className="mgr-actions">
           <code aria-label="가려진 서명 비밀">{masked || "만드는 중…"}</code>
           <button type="button" disabled={working || !masked} onClick={() => void act(async () => {
-            await navigator.clipboard.writeText(await callSecret("copy"));
+            await copyFromHost(callSecret("copy"));
             setText("서명 비밀을 복사했어요.");
           })}>복사</button>
           <button type="button" disabled={working || !masked} onClick={() => void act(async () => {
