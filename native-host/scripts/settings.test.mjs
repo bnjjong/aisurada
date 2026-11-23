@@ -1,6 +1,9 @@
 // 설정 화면의 컨트롤러 동작, 묶음 정의, 검색, 글꼴 감지 시험
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { WorkspaceController } from '../src/workspace/controller.ts';
@@ -280,7 +283,16 @@ test('색인 전수 검증: SETTINGS_INDEX의 모든 key가 실제 설정 화면
     ),
     connections: React.createElement('div', null,
       React.createElement(GithubConnect, { controller: h.controller }),
-      React.createElement(ArchylConnect, { controller: h.controller })
+      React.createElement(ArchylConnect, { controller: h.controller }),
+      React.createElement(SettingsGroup, null,
+        React.createElement(SettingsRow, {
+          as: 'div',
+          title: '매니저 연결',
+          settingKey: 'managers',
+          desc: '에이전트 탭의 「매니저」에서 연결을 관리해요.',
+          control: React.createElement('button', { type: 'button' }, '매니저 화면 열기 →')
+        })
+      )
     ),
   };
 
@@ -316,4 +328,38 @@ test('색인 전수 검증: SETTINGS_INDEX의 모든 key가 실제 설정 화면
       `key '${key}'가 화면에 ${keyCounts.get(key)}개 존재합니다 (정확히 1개여야 함).`
     );
   }
+});
+
+test('기본 모양(classic) 대비 CSS: 고른 탭과 꺼진 스위치에 classic 전용 대비 규칙이 존재한다', async () => {
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const css = await fs.readFile(
+    path.join(currentDir, '../src/settings.css'),
+    'utf-8'
+  );
+
+  // 고른 탭: classic 스킨 선택자에 border-left 및 color accent 규칙 존재 확인
+  assert.ok(
+    /:root\[data-skin="classic"\]\s+\.set-nav-item\[aria-selected="true"\]/.test(css),
+    'classic 스킨의 고른 탭 선택자가 settings.css에 있어야 합니다.'
+  );
+  assert.ok(
+    css.includes('border-left: 2px solid var(--accent);'),
+    '고른 탭에 좌측 악센트 테두리가 있어야 합니다.'
+  );
+
+  // 스위치: classic 스킨 선택자에 border 테두리 부여 확인
+  assert.ok(
+    /:root\[data-skin="classic"\]\s+\.set-toggle\[type="checkbox"\]/.test(css),
+    'classic 스킨의 스위치 선택자가 settings.css에 있어야 합니다.'
+  );
+  assert.ok(
+    css.includes('border: 1px solid var(--muted);'),
+    '스위치에 muted 테두리가 있어야 합니다.'
+  );
+
+  // 스킨 격리: settings.css는 기본 클래스만 사용하여 각 스킨별 고유 손잡이 크기/모양을 덮어쓰지 않아야 한다
+  assert.ok(
+    !css.includes(':root[data-skin] .set-toggle'),
+    'settings.css에 :root[data-skin] .set-toggle 선택자가 없어야 각 스킨(격자 네모, 모던 14px 등)의 고유 모양이 보존됩니다.'
+  );
 });
