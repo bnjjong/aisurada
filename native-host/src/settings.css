@@ -715,6 +715,42 @@
   color: var(--muted);
 }
 
+/* 10. 글꼴 칩 추천 */
+.set-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.set-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.set-chip:hover {
+  background: var(--soft);
+  border-color: var(--ink-3);
+}
+
+:root:root .set-chip[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink, #ffffff);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
 /* 11. 검색 결과 및 이동 하이라이트 */
 .set-flash {
   outline: 2px solid var(--accent) !important;

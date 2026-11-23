@@ -7,6 +7,8 @@ import { WorkspaceController } from '../src/workspace/controller.ts';
 import { KEYS } from '../src/workspace/storage.ts';
 import { SETTINGS_SECTIONS } from '../src/ui/settingsSections.ts';
 import { SettingsLayoutView } from '../src/ui/Settings.tsx';
+import { isFontAvailable, clearFontCache, filterAvailableFonts } from '../src/ui/fontAvailability.ts';
+import { TypographySettings } from '../src/ui/TypographySettings.tsx';
 
 function harness(t, { context = { kind: 'main' }, values = {} } = {}) {
   const map = new Map(Object.entries(values)), writes = [], warnings = [];
@@ -108,4 +110,55 @@ test('그리기: SettingsLayoutView는 4부 유무에 따라 탭 수가 달라�
   assert.equal(noClaudeTabs.length, 5);
   assert.ok(!htmlNoClaude.includes('id="set-tab-ai"'));
   assert.ok(!htmlNoClaude.includes('id="set-pane-ai"'));
+});
+
+test('글꼴 감지 유틸: fallback과의 폭 차이로 설치 여부를 판정하고 캐시한다', () => {
+  clearFontCache();
+  // measure mock: 'InstalledFont'는 폭이 500, 나머지는 monospace 300, serif 350
+  const mockMeasure = (font) => {
+    if (font.includes('InstalledFont')) return 500;
+    if (font.includes('monospace')) return 300;
+    if (font.includes('serif')) return 350;
+    return 300;
+  };
+
+  assert.equal(isFontAvailable('InstalledFont', mockMeasure), true);
+  assert.equal(isFontAvailable('MissingFont', mockMeasure), false);
+
+  // 빈 이름은 true
+  assert.equal(isFontAvailable(''), true);
+
+  // 필터 함수 확인
+  const filtered = filterAvailableFonts(['InstalledFont', 'MissingFont'], mockMeasure);
+  assert.deepEqual(filtered, ['InstalledFont']);
+});
+
+test('글꼴 칩 렌더링: 기본 칩과 설치된 추천 글꼴 칩이 보이고 현재 값에 따라 눌림 상태가 맞는다', () => {
+  const dummyController = { preference() {} };
+
+  // 1. 글꼴이 설정되지 않은 상태 (기본값)
+  const htmlDefault = renderToStaticMarkup(
+    React.createElement(TypographySettings, {
+      controller: dummyController,
+      typography: { uiFont: '', terminalFont: '', scale: 100 },
+      availableFonts: ['Pretendard', 'D2Coding'],
+    })
+  );
+
+  // 앱 글꼴 및 터미널 글꼴 영역에 각각 기본 칩이 aria-pressed="true" 상태여야 한다
+  const defaultChips = [...htmlDefault.matchAll(/<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>기본<\/button>/g)];
+  assert.equal(defaultChips.length, 2);
+
+  // 2. uiFont가 Pretendard로 설정된 상태
+  const htmlCustom = renderToStaticMarkup(
+    React.createElement(TypographySettings, {
+      controller: dummyController,
+      typography: { uiFont: 'Pretendard', terminalFont: 'D2Coding', scale: 100 },
+      availableFonts: ['Pretendard', 'D2Coding'],
+    })
+  );
+
+  // Pretendard 칩과 D2Coding 칩이 aria-pressed="true" 상태여야 한다
+  assert.match(htmlCustom, /<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>Pretendard<\/button>/);
+  assert.match(htmlCustom, /<button[^>]*class="set-chip"[^>]*aria-pressed="true"[^>]*>D2Coding<\/button>/);
 });
