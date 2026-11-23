@@ -26,6 +26,32 @@ export interface SettingsLayoutViewProps {
   panes: Record<SettingsSection, ReactNode>;
 }
 
+/**
+ * 탭 목록에서 화살표 및 Home/End 키로 다음 묶음을 계산하는 순수 함수
+ */
+export function nextSection(
+  current: SettingsSection,
+  key: string,
+  visible: readonly SettingsSection[],
+): SettingsSection | null {
+  const idx = visible.indexOf(current);
+  if (idx < 0) return null;
+  const len = visible.length;
+  if (key === "ArrowDown" || key === "ArrowRight") {
+    return visible[(idx + 1) % len];
+  }
+  if (key === "ArrowUp" || key === "ArrowLeft") {
+    return visible[(idx - 1 + len) % len];
+  }
+  if (key === "Home") {
+    return visible[0];
+  }
+  if (key === "End") {
+    return visible[len - 1];
+  }
+  return null;
+}
+
 export function SettingsLayoutView({
   section,
   onSelectSection,
@@ -44,6 +70,24 @@ export function SettingsLayoutView({
     ? searchSettings(query, { claude: claudeEnabled })
     : [];
 
+  const handleTabKeyDown = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    current: SettingsSection,
+  ) => {
+    const next = nextSection(
+      current,
+      e.key,
+      visibleSections.map((v) => v.id),
+    );
+    if (next) {
+      e.preventDefault();
+      onSelectSection(next);
+      if (typeof document !== "undefined") {
+        document.getElementById(`set-tab-${next}`)?.focus();
+      }
+    }
+  };
+
   const jumpToSetting = (item: SearchIndexItem) => {
     setQuery("");
     setActiveIndex(0);
@@ -54,7 +98,13 @@ export function SettingsLayoutView({
           if (typeof document !== "undefined") {
             const el = document.querySelector(`[data-setting="${item.key}"]`);
             if (el) {
-              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              const prefersReducedMotion =
+                typeof window !== "undefined" &&
+                window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+              el.scrollIntoView({
+                behavior: prefersReducedMotion ? "auto" : "smooth",
+                block: "center",
+              });
               el.classList.add("set-flash");
               setTimeout(() => el.classList.remove("set-flash"), 1200);
               const focusable = el.querySelector<HTMLElement>(
@@ -70,10 +120,12 @@ export function SettingsLayoutView({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      setQuery("");
-      setActiveIndex(0);
+      if (query.trim().length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        setQuery("");
+        setActiveIndex(0);
+      }
       return;
     }
     if (e.key === "ArrowDown") {
@@ -105,6 +157,15 @@ export function SettingsLayoutView({
           <div className="set-search-wrap">
             <input
               type="search"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={isSearching}
+              aria-controls="set-search-results"
+              aria-activedescendant={
+                isSearching && results[activeIndex]
+                  ? `set-result-${activeIndex}`
+                  : undefined
+              }
               className="set-search-input"
               placeholder="설정 찾기..."
               value={query}
@@ -134,6 +195,7 @@ export function SettingsLayoutView({
                 tabIndex={section === s.id ? 0 : -1}
                 className={`set-nav-item ${section === s.id ? "active" : ""}`}
                 onClick={() => onSelectSection(s.id)}
+                onKeyDown={(e) => handleTabKeyDown(e, s.id)}
               >
                 <Icon name={s.icon} size={16} />
                 <span>{s.name}</span>
@@ -142,7 +204,12 @@ export function SettingsLayoutView({
           </div>
 
           {isSearching && (
-            <div className="set-results" role="listbox" aria-label="설정 검색 결과">
+            <div
+              id="set-search-results"
+              className="set-results"
+              role="listbox"
+              aria-label="설정 검색 결과"
+            >
               {results.length === 0 ? (
                 <p className="set-no-results">찾는 설정이 없어요</p>
               ) : (
@@ -153,6 +220,7 @@ export function SettingsLayoutView({
                     <button
                       type="button"
                       key={`${item.section}-${item.key}`}
+                      id={`set-result-${idx}`}
                       role="option"
                       aria-selected={isSelected}
                       className={`set-result ${isSelected ? "active" : ""}`}

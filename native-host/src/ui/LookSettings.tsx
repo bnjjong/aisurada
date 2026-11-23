@@ -73,9 +73,9 @@ export function LookSettings({
 
       <div className="set-group" data-setting="scale">
         <h4>화면 크기</h4>
-        <div className="set-card set-typo" style={{ padding: "16px 18px" }}>
+        <div className="set-card set-card-padded set-typo">
           <div className="typo-row">
-            <small style={{ margin: "0 0 10px", display: "block" }}>
+            <small className="set-scale-hint">
               글자와 단추를 앱 전체에서 함께 키우거나 줄여요. ⌘ + / ⌘ - / ⌘ 0 키로도 바꿀 수 있어요. 지금은 {state.typography.scale}%예요.
             </small>
             <div className="typo-scale" role="group" aria-label="화면 크기">

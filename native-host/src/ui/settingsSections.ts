@@ -30,37 +30,37 @@ export const SETTINGS_INDEX: readonly SearchIndexItem[] = [
     section: "look",
     key: "skin",
     label: "화면 모양",
-    keywords: ["스킨", "모양", "테마", "다크모드", "물성", "격자", "유리", "모던", "클래식"],
+    keywords: ["스킨", "화면 모양", "모양", "테마", "기본", "물성", "격자", "유리", "모던"],
   },
   {
     section: "look",
     key: "scale",
-    label: "화면 배율",
-    keywords: ["배율", "크기", "줌", "확대", "축소", "글자 크기", "단축키"],
+    label: "화면 크기",
+    keywords: ["화면 크기", "배율", "크기", "줌", "확대", "축소", "글자 크기", "단축키"],
   },
   {
     section: "fonts",
     key: "ui-font",
     label: "앱 글꼴",
-    keywords: ["글꼴", "폰트", "앱 폰트", "pretendard", "본문 글꼴"],
+    keywords: ["글꼴", "폰트", "앱 글꼴", "앱 폰트", "pretendard", "본문 글꼴"],
   },
   {
     section: "fonts",
     key: "terminal-font",
     label: "터미널 글꼴",
-    keywords: ["터미널", "고정폭", "monospace", "d2coding", "콘솔"],
+    keywords: ["터미널 글꼴", "터미널", "고정폭", "monospace", "d2coding", "콘솔"],
   },
   {
     section: "notes",
     key: "titleDatePrefix",
     label: "제목 앞 날짜",
-    keywords: ["날짜", "제목 날짜", "접두사", "prefix", "목록"],
+    keywords: ["제목 앞 날짜", "날짜", "제목 날짜", "접두사", "prefix", "목록"],
   },
   {
     section: "notes",
     key: "showRecordTier",
     label: "기록 노트",
-    keywords: ["기록", "레코드", "일지", "아카이브", "검색 포함"],
+    keywords: ["기록", "기록 노트", "레코드", "일지", "아카이브", "검색 포함"],
   },
   {
     section: "notes",
@@ -89,8 +89,8 @@ export const SETTINGS_INDEX: readonly SearchIndexItem[] = [
   {
     section: "notifications",
     key: "ntf-events",
-    label: "알릴 소식",
-    keywords: ["소식", "이벤트", "러너", "마크다운", "깃허브", "이슈"],
+    label: "소식별",
+    keywords: ["소식별", "알림 소식", "소식", "질문", "리뷰", "실패", "Done", "완료", "승인", "매니저", "답"],
   },
   {
     section: "notifications",
@@ -101,37 +101,38 @@ export const SETTINGS_INDEX: readonly SearchIndexItem[] = [
   {
     section: "ai",
     key: "claude",
-    label: "Claude Code 연결",
-    keywords: ["claude", "클로드", "인공지능", "ai", "터미널"],
+    label: "Claude 연결",
+    keywords: ["claude", "클로드", "인공지능", "ai", "연결", "mcp"],
   },
   {
     section: "ai",
     key: "claude-write",
-    label: "파일 쓰기 허용",
-    keywords: ["파일 쓰기", "수정 권한", "편집", "write"],
+    label: "노트를 만들고 고치는 것도 허용",
+    keywords: ["파일 쓰기", "수정 권한", "편집", "write", "노트 만들기", "노트 고치기"],
   },
   {
     section: "ai",
     key: "ask-timeout",
-    label: "응답 대기 시간",
-    keywords: ["타임아웃", "대기 시간", "timeout", "응답 시간"],
+    label: "AI 응답 대기 시간",
+    keywords: ["타임아웃", "대기 시간", "timeout", "응답 시간", "ai 응답"],
   },
   {
     section: "connections",
     key: "github",
     label: "GitHub 연결",
-    keywords: ["깃허브", "github", "저장소", "repo", "app id", "토큰"],
+    keywords: ["깃허브", "github", "저장소", "repo", "app id", "pem", "개인 키"],
   },
   {
     section: "connections",
     key: "archyl",
     label: "Archyl 연결",
-    keywords: ["archyl", "아킬", "엔진", "동기화", "원격"],
+    keywords: ["archyl", "아킬", "c4", "다이어그램", "엔진"],
   },
 ];
 
 /**
  * 주어진 검색어로 설정 인덱스를 검색한다.
+ * 띄어쓰기를 무시하며 대소문자를 구분하지 않는다.
  * claudeEnabled가 false이면 ai 섹션 항목은 결과에서 제외한다.
  * 최대 8개 결과를 반환한다.
  */
@@ -139,18 +140,19 @@ export function searchSettings(
   query: string,
   options: { claude: boolean },
 ): SearchIndexItem[] {
-  const q = query.trim().toLowerCase();
+  const clean = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+  const q = clean(query);
   if (!q) return [];
 
   const sectionNameMap = new Map<SettingsSection, string>(
-    SETTINGS_SECTIONS.map((s) => [s.id, s.name.toLowerCase()]),
+    SETTINGS_SECTIONS.map((s) => [s.id, clean(s.name)]),
   );
 
   return SETTINGS_INDEX.filter((item) => {
     if (!options.claude && item.section === "ai") return false;
 
-    const labelMatch = item.label.toLowerCase().includes(q);
-    const keywordMatch = item.keywords.some((k) => k.toLowerCase().includes(q));
+    const labelMatch = clean(item.label).includes(q);
+    const keywordMatch = item.keywords.some((k) => clean(k).includes(q));
     const sectionName = sectionNameMap.get(item.section) ?? "";
     const sectionMatch = sectionName.includes(q);
 

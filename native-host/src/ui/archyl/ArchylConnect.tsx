@@ -15,15 +15,15 @@ export function ArchylConnect({ controller }: { controller: WorkspaceController 
 
   if (!native) {
     line = 'Archyl은 데스크톱 앱에서 연결할 수 있어요.';
+  } else if (account.phase === 'login') {
+    line = '브라우저에서 Archyl 로그인을 완료해 주세요.';
+    dotStatus = 'warn';
   } else if (connected) {
     line = `연결됨 · ${connected.writable ? '조회 및 변경' : '조회 전용'}`;
     dotStatus = 'ok';
     desc = `접근할 수 있는 프로젝트 ${connected.projects.length}개`;
   } else if (account.phase === 'checking') {
     line = 'MCP 연결을 확인하고 있어요.';
-  } else if (account.phase === 'login') {
-    line = '브라우저에서 Archyl 로그인을 완료해 주세요.';
-    dotStatus = 'warn';
   } else {
     line = 'Archyl 계정으로 연결하면 C4 다이어그램을 열 수 있어요.';
   }

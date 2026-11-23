@@ -1,10 +1,11 @@
-// 설정 화면의 「글꼴과 크기」. 앱 글꼴·터미널 글꼴 입력을 보인다.
+// 설정 화면의 「글꼴」. 앱 글꼴·터미널 글꼴 입력을 보인다.
 // 값은 컨트롤러의 preference()로 저장하고, 앱에 거는 일(CSS 변수, 웹뷰 확대)은 App이 상태를 보고 한다.
 import { useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { fontProblem, normalizeFont, previewFamily } from "../workspace/typography.ts";
 import type { Typography } from "../workspace/typography.ts";
 import { filterAvailableFonts } from "./fontAvailability.ts";
+import { SettingsPane } from "./SettingsParts.tsx";
 
 /** 글꼴 입력 칸에서 목록으로 보여 주는 이름들. 설치되어 있어야 보이고, 목록에 없는 이름도 직접 적을 수 있다. */
 export const UI_FONT_SUGGESTIONS = [
@@ -18,7 +19,6 @@ export const UI_FONT_SUGGESTIONS = [
   "OpenDyslexic",
 ];
 export const TERMINAL_FONT_SUGGESTIONS = [
-  "D2Coding",
   "Menlo",
   "Monaco",
   "SF Mono",
@@ -90,11 +90,10 @@ function FontField({
     onCommit(fontName);
   };
 
+  const defaultChipLabel = mono ? "기본 (D2Coding)" : "기본";
+
   return (
     <div className="typo-row">
-      <label htmlFor={id}>
-        <strong>{label}</strong>
-      </label>
       <small>{hint}</small>
       <div className="typo-field">
         <input
@@ -105,6 +104,7 @@ function FontField({
           placeholder={placeholder}
           spellCheck={false}
           autoComplete="off"
+          aria-label={label}
           aria-invalid={problem ? true : undefined}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
@@ -137,11 +137,13 @@ function FontField({
         <button
           type="button"
           className="set-chip"
-          role="button"
           aria-pressed={shown === "" ? "true" : "false"}
+          style={{
+            fontFamily: mono ? previewFamily.terminal("") : previewFamily.ui(""),
+          }}
           onClick={() => handleChip("")}
         >
-          기본
+          {defaultChipLabel}
         </button>
         {chips.map((name) => {
           const isPressed = shown === name;
@@ -150,8 +152,10 @@ function FontField({
               key={name}
               type="button"
               className="set-chip"
-              role="button"
               aria-pressed={isPressed ? "true" : "false"}
+              style={{
+                fontFamily: (mono ? previewFamily.terminal : previewFamily.ui)(name),
+              }}
               onClick={() => handleChip(name)}
             >
               {name}
@@ -193,40 +197,45 @@ export function TypographySettings({
   const termAvailable = availableTerminalFonts ?? availableFonts;
 
   return (
-    <div className="set-typo">
-      <div className="set-group" data-setting="ui-font">
-        <h4>앱 글꼴</h4>
-        <div className="set-card" style={{ padding: "16px 18px" }}>
-          <FontField
-            id="typo-ui-font"
-            label="앱 글꼴"
-            hint="앱 전체에 쓸 글꼴이에요. 설치된 글꼴 이름이나 쉼표로 이은 글꼴 목록(Pretendard, sans-serif)을 적어요. 고른 글꼴에 없는 글자는 기본 글꼴이 채워요."
-            placeholder="Pretendard 또는 글꼴 목록 (비우면 기본 글꼴)"
-            suggestions={UI_FONT_SUGGESTIONS}
-            availableFonts={uiAvailable}
-            value={typography.uiFont}
-            sample="다람쥐 헌 쳇바퀴에 타고파. The quick brown fox jumps over the lazy dog. 0123456789"
-            onCommit={(font) => controller.preference({ uiFont: font })}
-          />
+    <SettingsPane
+      title="글꼴"
+      desc="앱과 터미널에 쓸 글꼴을 골라요. 고르면 바로 바뀌어요."
+    >
+      <div className="set-typo">
+        <div className="set-group" data-setting="ui-font">
+          <h4>앱 글꼴</h4>
+          <div className="set-card set-card-padded">
+            <FontField
+              id="typo-ui-font"
+              label="앱 글꼴"
+              hint="앱 전체에 쓸 글꼴이에요. 설치된 글꼴 이름이나 쉼표로 이은 글꼴 목록(Pretendard, sans-serif)을 적어요. 고른 글꼴에 없는 글자는 기본 글꼴이 채워요."
+              placeholder="Pretendard 또는 글꼴 목록 (비우면 기본 글꼴)"
+              suggestions={UI_FONT_SUGGESTIONS}
+              availableFonts={uiAvailable}
+              value={typography.uiFont}
+              sample="다람쥐 헌 쳇바퀴에 타고파. The quick brown fox jumps over the lazy dog. 0123456789"
+              onCommit={(font) => controller.preference({ uiFont: font })}
+            />
+          </div>
+        </div>
+        <div className="set-group" data-setting="terminal-font">
+          <h4>터미널 글꼴</h4>
+          <div className="set-card set-card-padded">
+            <FontField
+              id="typo-terminal-font"
+              label="터미널 글꼴"
+              hint="터미널에 쓸 고정폭 글꼴이에요. 고른 글꼴에 한글이 없으면 D2Coding이 채워요. 열려 있는 터미널도 바로 바뀌어요."
+              placeholder="MesloLGS NF 또는 글꼴 목록 (비우면 D2Coding)"
+              suggestions={TERMINAL_FONT_SUGGESTIONS}
+              availableFonts={termAvailable}
+              value={typography.terminalFont}
+              mono
+              sample="~/project git:main ❯ ls -la  한글 폭 확인"
+              onCommit={(font) => controller.preference({ terminalFont: font })}
+            />
+          </div>
         </div>
       </div>
-      <div className="set-group" data-setting="terminal-font">
-        <h4>터미널 글꼴</h4>
-        <div className="set-card" style={{ padding: "16px 18px" }}>
-          <FontField
-            id="typo-terminal-font"
-            label="터미널 글꼴"
-            hint="터미널에 쓸 고정폭 글꼴이에요. 고른 글꼴에 한글이 없으면 D2Coding이 채워요. 열려 있는 터미널도 바로 바뀌어요."
-            placeholder="MesloLGS NF 또는 글꼴 목록 (비우면 D2Coding)"
-            suggestions={TERMINAL_FONT_SUGGESTIONS}
-            availableFonts={termAvailable}
-            value={typography.terminalFont}
-            mono
-            sample="~/project git:main ❯ ls -la  한글 폭 확인"
-            onCommit={(font) => controller.preference({ terminalFont: font })}
-          />
-        </div>
-      </div>
-    </div>
+    </SettingsPane>
   );
 }

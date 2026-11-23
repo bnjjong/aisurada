@@ -83,10 +83,11 @@
 }
 
 .set-result:hover,
-.set-result.active,
-.set-result[aria-selected="true"] {
+:root:root .set-result.active,
+:root:root .set-result[aria-selected="true"] {
   background: var(--surface);
   box-shadow: var(--sh-1, 0 1px 3px rgba(0, 0, 0, 0.08));
+  border-left: 2px solid var(--accent);
 }
 
 .set-result-text {
@@ -97,7 +98,7 @@
 }
 
 .set-result-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
@@ -106,7 +107,7 @@
 }
 
 .set-result-section {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -144,6 +145,13 @@
   box-shadow: var(--sh-1, 0 1px 3px rgba(0, 0, 0, 0.08));
 }
 
+:root:not([data-skin]) .set-nav-item[aria-selected="true"] {
+  background: var(--surface);
+  box-shadow: var(--sh-1, 0 1px 3px rgba(0, 0, 0, 0.08));
+  border-left: 2px solid var(--accent);
+  color: var(--accent);
+}
+
 .set-nav-foot {
   margin-top: auto;
   font-size: 12px;
@@ -160,6 +168,10 @@
 
 .set-pane {
   padding: 20px 28px 28px;
+}
+
+.set-card-padded {
+  padding: 16px 18px;
 }
 
 .set-pane[hidden],
@@ -246,8 +258,12 @@
 
 .set-example-tag {
   display: inline-block;
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -268,6 +284,10 @@
   background: var(--sunken, var(--line));
   box-shadow: var(--in, none);
   cursor: pointer;
+}
+
+:root:not([data-skin]) .set-toggle[type="checkbox"] {
+  border: 1px solid var(--muted);
 }
 
 .set-toggle::after,
@@ -292,8 +312,7 @@
   box-shadow: var(--in-acc, none);
 }
 
-.set-toggle:checked::after,
-:root[data-skin] .set-toggle[type="checkbox"]:checked::after {
+.set-toggle:checked::after {
   top: 3px;
   left: 3px;
   width: 18px;
@@ -353,21 +372,6 @@
 }
 
 /* 7. 화면 모양(Look) 카드 스타일 */
-.set-skin {
-  border: 0;
-  padding: 0;
-  margin: 0 0 24px;
-}
-
-.set-skin legend {
-  padding: 0;
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  color: var(--muted);
-}
-
 .set-skin-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -415,12 +419,16 @@
   font-weight: 600;
 }
 
-.set-skin-text small {
-  display: none;
-}
-
 .set-skin-selected-desc {
   margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.set-scale-hint {
+  margin: 0 0 10px;
+  display: block;
   font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
@@ -550,7 +558,7 @@
 .typo-field button {
   flex: none;
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .typo-problem {
@@ -565,7 +573,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--soft);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -573,12 +581,12 @@
 .typo-preview-label {
   color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 12px;
   margin-right: 8px;
 }
 
 .typo-preview-mono {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* 9. 알림(Notifications) 설정 스타일 */
@@ -592,7 +600,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
 }
@@ -632,7 +640,7 @@
 .ntf-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .ntf-table th {
@@ -656,6 +664,11 @@
   vertical-align: middle;
 }
 
+.ntf-table td strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .ntf-table tr:last-child td {
   border-bottom: 0;
 }
@@ -670,7 +683,7 @@
 
 .ntf-test button {
   padding: 6px 14px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .ntf-hint {
@@ -697,7 +710,7 @@
 }
 
 .ntf-focus-details {
-  margin: 12px 0;
+  margin: 8px 0 0;
   font-size: 12px;
 }
 
@@ -727,7 +740,7 @@
 }
 
 .set-connect-status {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 13px;
   color: var(--ink);
 }
@@ -740,6 +753,10 @@
   padding: 14px 18px;
 }
 
+.set-connect-actions button {
+  font-size: 13px;
+}
+
 .set-connect-error {
   margin: 8px 18px;
   color: var(--err, #b67537);
@@ -748,6 +765,7 @@
 
 .set-connect-desktop {
   margin: 14px 0 0;
+  padding: 0 18px 14px;
   font-size: 12px;
 }
 
@@ -763,7 +781,7 @@
   background: var(--soft);
   border: 1px solid var(--line);
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
@@ -814,7 +832,7 @@
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;

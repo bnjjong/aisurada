@@ -137,13 +137,16 @@ export function ConnectView({
         </p>
       )}
       {desktop && (
-        <details className="set-connect-desktop" style={{ padding: "0 18px 14px" }}>
+        <details className="set-connect-desktop">
           <summary>Claude Desktop에 연결하려면</summary>
           <p>
             Claude Desktop 설정 파일(<code>claude_desktop_config.json</code>)의 <code>mcpServers</code>에 아래를 합쳐
             넣고 Claude Desktop을 다시 시작해요.
           </p>
           <pre>{desktop}</pre>
+          <button type="button" onClick={() => void navigator.clipboard?.writeText(desktop)}>
+            복사
+          </button>
         </details>
       )}
     </div>

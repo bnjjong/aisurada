@@ -206,6 +206,8 @@ if (location.pathname.startsWith("/note-window/")) {
       key(document.body, "0", { code: "Digit0", metaKey: true });
       await until(() => innerWidth === width, `Cmd+0 to 100% (innerWidth ${innerWidth})`);
       // 앱 글꼴: 멈추면 저장하고, 본문 글꼴이 바뀌고, 「기본값」으로 돌아온다
+      click($("#set-tab-fonts"));
+      await until(() => !$("#set-pane-fonts")?.hidden, "fonts pane visible");
       fill($("#typo-ui-font"), "Georgia");
       await until(() => document.documentElement.style.getPropertyValue("--font-ui") === '"Georgia", var(--font-ui-base)', "font variable");
       assert(/^Georgia/.test(getComputedStyle(document.body).fontFamily), "body font " + getComputedStyle(document.body).fontFamily);
