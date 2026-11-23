@@ -532,7 +532,7 @@ impl Run<'_> {
             "분석 보고"
         };
         let note_link = match self.report_note(text) {
-            Ok(Some(id)) => format!("[조사 노트 열기](aisurada://doc/{id})\n\n"),
+            Ok(Some(id)) => format!("{}{id})\n\n", protocol::REPORT_NOTE_LINK),
             Ok(None) => String::new(),
             Err(error) => {
                 self.event("내보내기", &format!("조사 보고는 댓글에만 남겨요. {error}"));

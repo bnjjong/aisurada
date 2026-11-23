@@ -437,7 +437,7 @@ cargo run --manifest-path engine-rs/Cargo.toml --locked -p ais-core --example ba
 ais-cli manager config hermes-demo
 ais-cli manager list</code></pre></div>
 <p>러너가 들어 있는 macOS 빌드는 매니저가 접수한 태스크의 상태가 바뀌면 설정한 경우에 알린다. 주소는 이 기기에서 실행 중인 웹훅으로 제한한다. 서명 비밀은 macOS 키체인에 둔다. 키체인 접근 오류는 매니저 화면에 표시한다. Hermes 경로에는 같은 서명 비밀과 다음 옵션을 설정한다. <code>refs</code>에 <code>kind: slack</code>과 Slack 메시지 주소가 있으면 원래 스레드로 알린다. 매니저에 등록한 Slack 채널은 카드와 상세에서 보여 준다. 시험 알림은 화면에서 입력한 채널 ID로 보낸다. <a href="https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks">Hermes 웹훅 설정</a></p>
-<p>Slack 알림은 태스크 자동 실행과 별도로 처리한다. 연결에 실패하면 첫 시도부터 최대 45분 동안 재시도 간격을 늘린다. Hermes가 중복 요청이라고만 답하면 매니저 기록에 전달 여부를 확인할 수 없다고 표시한다. 매니저 기록에는 시각, 도구, 결과, 대상 식별자와 상태 알림 실패 사유를 최근 1,000건까지 남긴다.</p>
+<p>Slack 알림은 태스크 자동 실행과 별도로 처리한다. 원글 주소가 있는 태스크에만 Slack으로 알린다. 검토 상태를 알릴 때 조사 노트도 저장됐다면 그 사실을 같은 스레드에 함께 알린다. 조사 노트 링크는 aisurada 태스크 댓글에서 연다. 연결에 실패하면 첫 시도부터 최대 45분 동안 재시도 간격을 늘린다. Hermes가 중복 요청이라고만 답하면 매니저 기록에 전달 여부를 확인할 수 없다고 표시한다. 매니저 기록에는 시각, 도구, 결과, 대상 식별자와 상태 알림 실패 사유를 최근 1,000건까지 남긴다.</p>
 <div class="code"><div class="code-bar"><span class="code-lang">yaml</span><button type="button" class="copy" aria-label="코드 복사">복사</button></div><pre><code>events: [aisurada.task.status]
 signature: generic
 deliver: slack
