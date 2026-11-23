@@ -118,9 +118,12 @@ export interface RecentWorkspace { path: string; name: string; opened: string; c
 /** 설정에서 고르는 화면 모양. 물성(tactile), 격자(grid), 유리(glass), 모던(modern), 이전 모양(classic). */
 export type Skin = 'tactile' | 'grid' | 'glass' | 'modern' | 'classic';
 
+export type SettingsSection = 'look' | 'fonts' | 'notes' | 'notifications' | 'ai' | 'connections';
+
 export interface WorkspaceState {
   prefs: import('../ui/model.ts').Preferences;
   settingsOpen: boolean;
+  settingsSection: SettingsSection;
   form: { kind: 'note' | 'agenda' | 'project'; id?: string; agenda?: string; subAgendaId?: string; project?: string } | null;
   hiddenAgendas: string[];
   subAgendaFilters: ReadonlyMap<string, string>;

@@ -133,7 +133,8 @@
   .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
   .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
   .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
-  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask,
+  .set-nav-item, .set-result
 ) { box-shadow: none; background: transparent; }
 :root[data-skin="tactile"] :where(
   .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
@@ -163,13 +164,17 @@
 :root[data-skin="tactile"] input:disabled { opacity: 1; background: var(--bg); box-shadow: none; cursor: not-allowed; }
 :root[data-skin="tactile"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; background: transparent; box-shadow: none; border-radius: 0; accent-color: var(--accent); }
 /* 설정의 켜고 끄는 항목은 스위치로 그린다. 동작은 그대로 체크박스다. */
-:root[data-skin="tactile"] .set-switch input[type="checkbox"] { position: relative; width: 44px; height: 24px; border-radius: 999px; display: block; }
-:root[data-skin="tactile"] .set-switch input[type="checkbox"]::after {
+:root[data-skin="tactile"] .set-toggle[type="checkbox"] { position: relative; width: 44px; height: 24px; border-radius: 999px; display: block; }
+:root[data-skin="tactile"] .set-toggle[type="checkbox"]::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: 0; border-radius: 50%;
   background: var(--surface); box-shadow: var(--sh-1); transform: none; transition: transform .15s;
 }
-:root[data-skin="tactile"] .set-switch input[type="checkbox"]:checked { background: var(--accent); box-shadow: var(--in-acc); }
-:root[data-skin="tactile"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(20px); background: var(--accent-ink); border: 0; }
+:root[data-skin="tactile"] .set-toggle[type="checkbox"]:checked { background: var(--accent); box-shadow: var(--in-acc); }
+:root[data-skin="tactile"] .set-toggle[type="checkbox"]:checked::after { transform: translateX(20px); background: var(--accent-ink); border: 0; }
+
+/* 설정: 카드 및 탭 */
+:root[data-skin="tactile"] .set-card { border-radius: 20px; border: 0; box-shadow: var(--sh-1); }
+:root[data-skin="tactile"] .set-nav-item[aria-selected="true"] { background: var(--surface); box-shadow: var(--sh-1); }
 
 /* 설정: 화면 모양 고르기 카드 */
 :root[data-skin="tactile"] .set-skin { border-bottom: 0; }

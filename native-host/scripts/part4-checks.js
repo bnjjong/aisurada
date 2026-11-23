@@ -158,8 +158,10 @@ try {
   // 설정의 「Claude 연결」: 실제 창에서 눌러 보고, 진짜 ais-cli(claude-mcp)가 가짜 claude에 등록하는 왕복을 잰다
   if (cfg.part4Check) await test('enabled-claude-connect-real-host', async () => {
     go('/');
-    await until(() => document.querySelector('button.iconbtn[title="설정"]'));
-    document.querySelector('button.iconbtn[title="설정"]').click();
+    await until(() => document.querySelector('button[aria-label="설정"]'));
+    document.querySelector('button[aria-label="설정"]').click();
+    await until(() => document.querySelector('#set-tab-ai'));
+    document.querySelector('#set-tab-ai').click();
     await until(() => document.querySelector('.settings-modal .set-connect'));
     const status = () => document.querySelector('.set-connect-status')?.textContent || '';
     await until(() => status().includes('연결되어 있지 않아요'));

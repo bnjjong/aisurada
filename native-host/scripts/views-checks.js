@@ -148,7 +148,7 @@ if (location.pathname.startsWith("/note-window/")) {
         "rail order",
       );
       const before = (await fetch("/calls").then((r) => r.json())).length;
-      $('button.iconbtn[title="설정"]').click();
+      $('button[aria-label="설정"]').click();
       await until(() => $(".settings-modal"), "settings");
       assert(
         $$(".set-switch").length === 3 && !$(".set-ask-timeout"),
@@ -169,6 +169,8 @@ if (location.pathname.startsWith("/note-window/")) {
           `skin ${skin} saved`,
         );
       }
+      $('#set-tab-notes').click();
+      await until(() => !$('#set-pane-notes[hidden]'), "notes pane");
       $(".set-switch input").click();
       const s = JSON.parse(localStorage.getItem("aisurada.prefs.v1")).state;
       assert(
@@ -187,7 +189,7 @@ if (location.pathname.startsWith("/note-window/")) {
       const prefs = () => JSON.parse(localStorage.getItem("aisurada.prefs.v1")).state;
       const scale = (label) => $$(".typo-scale button").find((b) => b.textContent === label);
       const near = (width, factor) => Math.abs(innerWidth - width / factor) <= 2;
-      $('button.iconbtn[title="설정"]').click();
+      $('button[aria-label="설정"]').click();
       await until(() => $(".settings-modal .set-typo"), "typography section");
       assert(scale("100%").getAttribute("aria-pressed") === "true", "default scale is 100%");
       const width = innerWidth;
@@ -528,8 +530,10 @@ if (location.pathname.startsWith("/note-window/")) {
         !$('.tl-block[data-calendar-note="ndfixture-00000003"]'),
         "record visible by default",
       );
-      $('button.iconbtn[title="설정"]').click();
-      await until(() => $(".set-switch"), "settings");
+      $('button[aria-label="설정"]').click();
+      await until(() => $("#set-tab-notes"), "settings");
+      $("#set-tab-notes").click();
+      await until(() => !$('#set-pane-notes[hidden]'), "notes pane");
       $$(".set-switch input")[1].click();
       esc();
       await until(

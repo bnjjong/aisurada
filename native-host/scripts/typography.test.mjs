@@ -12,6 +12,7 @@ import {
 import { zoomShortcutFor } from '../src/interaction/shortcuts.ts';
 import { WorkspaceController } from '../src/workspace/controller.ts';
 import { TypographySettings } from '../src/ui/TypographySettings.tsx';
+import { LookSettings } from '../src/ui/LookSettings.tsx';
 
 const createStorage = (initial = {}) => {
   const map = new Map(Object.entries(initial)), writes = [];
@@ -200,20 +201,22 @@ test('applyScale: 웹뷰 확대를 배율의 배수(1.25)로 부르고, 실패�
   assert.equal(none.warnings.length, 0);
 });
 
-const render = (typography) => renderToStaticMarkup(React.createElement(TypographySettings, { controller: { preference() {} }, typography })).replace(/<!-- -->/g, '');
+const renderTypo = (typography) => renderToStaticMarkup(React.createElement(TypographySettings, { controller: { preference() {} }, typography })).replace(/<!-- -->/g, '');
+const renderLook = (typography) => renderToStaticMarkup(React.createElement(LookSettings, { controller: { preference() {} }, state: { typography, skin: 'tactile' } })).replace(/<!-- -->/g, '');
 
-test('설정 화면: 글꼴과 크기 구역에 배율 단추 여섯 개, 글꼴 입력 둘, 미리보기 둘이 있다', () => {
-  const html = render({ scale: 125, uiFont: 'Pretendard', terminalFont: '' });
-  assert.match(html, /<legend>글꼴과 크기<\/legend>/);
-  const buttons = [...html.matchAll(/<button type="button" aria-pressed="(true|false)">(\d+)%<\/button>/g)].map(m => [m[2], m[1]]);
+test('설정 화면: 모양 구역에 배율 단추 여섯 개, 글꼴 구역에 글꼴 입력 둘, 미리보기 둘이 있다', () => {
+  const lookHtml = renderLook({ scale: 125, uiFont: 'Pretendard', terminalFont: '' });
+  const buttons = [...lookHtml.matchAll(/<button type="button" aria-pressed="(true|false)">(\d+)%<\/button>/g)].map(m => [m[2], m[1]]);
   assert.deepEqual(buttons, [['90', 'false'], ['100', 'false'], ['110', 'false'], ['125', 'true'], ['150', 'false'], ['175', 'false']]);
-  assert.match(html, /지금은 125%예요/);
-  assert.match(html, /<input id="typo-ui-font"[^>]*value="Pretendard"/);
-  assert.match(html, /<input id="typo-terminal-font"[^>]*value=""/);
-  assert.equal([...html.matchAll(/<p class="typo-preview[^"]*"/g)].length, 2);
+  assert.match(lookHtml, /지금은 125%예요/);
+
+  const typoHtml = renderTypo({ scale: 125, uiFont: 'Pretendard', terminalFont: '' });
+  assert.match(typoHtml, /<input id="typo-ui-font"[^>]*value="Pretendard"/);
+  assert.match(typoHtml, /<input id="typo-terminal-font"[^>]*value=""/);
+  assert.equal([...typoHtml.matchAll(/<p class="typo-preview[^"]*"/g)].length, 2);
   // 미리보기는 고른 글꼴을 쓰고, 비운 터미널은 기본(--font-mono)을 쓴다
-  assert.match(html, /style="font-family:&quot;Pretendard&quot;, var\(--font-ui-base\)"/);
-  assert.match(html, /style="font-family:var\(--font-mono\)"/);
+  assert.match(typoHtml, /style="font-family:&quot;Pretendard&quot;, var\(--font-ui-base\)"/);
+  assert.match(typoHtml, /style="font-family:var\(--font-mono\)"/);
   // 기본 글꼴일 때는 「기본값」 단추가 꺼져 있다
-  assert.match(html, /<button type="button" disabled="">기본값<\/button>/);
+  assert.match(typoHtml, /<button type="button" disabled="">기본값<\/button>/);
 });

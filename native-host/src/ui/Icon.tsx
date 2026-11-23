@@ -193,6 +193,22 @@ const PATHS: Record<string, ReactNode> = {
   zap: (
     <polygon points="9 1.5 3.5 8.5 7.5 8.5 7 14.5 12.5 7.5 8.5 7.5 9 1.5" />
   ),
+  palette: (
+    <>
+      <path d="M8 2.2a5.8 5.8 0 1 0 0 11.6c.9 0 1.4-.6 1.4-1.3 0-.4-.2-.7-.4-1s-.4-.6-.4-1c0-.7.6-1.3 1.3-1.3h1.3a2.8 2.8 0 0 0 2.8-2.8C14 4.6 11.3 2.2 8 2.2z" />
+      <circle cx="5.2" cy="7" r=".6" fill="currentColor" stroke="none" />
+      <circle cx="7.4" cy="4.9" r=".6" fill="currentColor" stroke="none" />
+      <circle cx="10.4" cy="5.4" r=".6" fill="currentColor" stroke="none" />
+    </>
+  ),
+  type: <path d="M3 4.5V3h10v1.5M8 3v10M6 13h4" />,
+  bell: <path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3" />,
+  chain: (
+    <>
+      <path d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2.5-2.5a2.5 2.5 0 0 0-3.5-3.5l-.7.7" />
+      <path d="M9.5 6.5a2.5 2.5 0 0 0-3.5 0L3.5 9a2.5 2.5 0 0 0 3.5 3.5l.7-.7" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

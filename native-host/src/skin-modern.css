@@ -102,7 +102,8 @@
   .lex-toolbar button, .sel-bar button, .slash-item, .note-picker-item, .lex-table-menu button, .lex-row-dot > button,
   .note-editor-status button, .note-toc button, .month-cell > button:first-child, .doc-listitem .fav-toggle,
   .agenda-history-note, .fav-row .fav-open, .templates-layout aside button, .report-row header button, .nhist-item,
-  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask
+  .cmdk-item, .ask-image-thumb button, .doc-meta button, .lex-cell-menu-btn, .lex-row-comment, .lex-row-ask,
+  .set-nav-item, .set-result
 ) { background: transparent; box-shadow: none; }
 :root[data-skin="modern"] :where(
   .sample-button, .text-button, .rail-back, .agenda-summary button, .tab-button, .tab-close, .rail-footer button,
@@ -131,13 +132,15 @@
 :root[data-skin="modern"] input[type="radio"]:checked::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-ink); }
 :root[data-skin="modern"] input:disabled { opacity: .5; box-shadow: none; cursor: not-allowed; }
 :root[data-skin="modern"] input[type="range"] { appearance: auto; -webkit-appearance: auto; padding: 0; border: 0; background: transparent; box-shadow: none; accent-color: var(--accent); }
-:root[data-skin="modern"] .set-switch input[type="checkbox"] { position: relative; display: block; width: 36px; height: 20px; border-radius: 999px; background: var(--strong); border-color: var(--strong); box-shadow: none; }
-:root[data-skin="modern"] .set-switch input[type="checkbox"]::after {
+:root[data-skin="modern"] .set-toggle[type="checkbox"] { position: relative; display: block; width: 36px; height: 20px; border-radius: 999px; background: var(--strong); border-color: var(--strong); box-shadow: none; }
+:root[data-skin="modern"] .set-toggle[type="checkbox"]::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border: 0; border-radius: 50%;
   background: #ffffff; box-shadow: 0 1px 2px rgba(11, 18, 32, .3); transform: none; transition: transform .15s;
 }
-:root[data-skin="modern"] .set-switch input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
-:root[data-skin="modern"] .set-switch input[type="checkbox"]:checked::after { transform: translateX(16px); background: #ffffff; border: 0; }
+:root[data-skin="modern"] .set-toggle[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+:root[data-skin="modern"] .set-toggle[type="checkbox"]:checked::after { transform: translateX(16px); background: #ffffff; border: 0; }
+:root[data-skin="modern"] .set-card { border-radius: 10px; border: 1px solid var(--line); }
+:root[data-skin="modern"] .set-nav-item[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-text, var(--accent)); }
 
 /* 설정: 화면 모양 고르기 카드 */
 :root[data-skin="modern"] .set-skin-option { border-radius: 10px; }

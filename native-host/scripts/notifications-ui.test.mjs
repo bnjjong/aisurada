@@ -232,8 +232,8 @@ test('the settings section: three channels, the table of six news, the focus-mod
   assert.match(html, /준비 중이에요/);
   assert.match(html, /집중 모드에서 aisurada를 허용하지 않으면/);
   for (const e of EVENT_KINDS) assert.match(html, new RegExp(`aria-label="${e.label} · 앱 안"`));
-  assert.equal((html.match(/class="ntf-switch"/g) ?? []).length, 3 + 12, 'three channels and six news in two channels');
-  assert.doesNotMatch(html, /set-switch/, 'not the class the settings acceptance test counts');
+  assert.equal((html.match(/\bntf-switch\b/g) ?? []).length, 3 + EVENT_KINDS.length * 2, 'three channels and news in two channels');
+  assert.doesNotMatch(html, /\bset-switch\b/, 'not the class the settings acceptance test counts');
   assert.match(html, /시험 알림 보내기/);
   const doneMacos = /aria-label="Done으로 바뀌었을 때 · macOS"[^>]*>/.exec(html)[0];
   assert.doesNotMatch(doneMacos, /checked/, 'Done is not on macOS by default');

@@ -794,9 +794,18 @@ pnpm release:build                       # 정식 번들(릴리스 설정). 아�
 
 새 모양을 더하려면 `types.ts`의 `Skin`, `storage.ts`의 `SKINS`, `Settings.tsx`의 `SKIN_OPTIONS`, `src/skin-<이름>.css`와 `main.tsx`의 import, 미리보기 그림 규칙(`styles.css`)을 함께 고친다. 시험은 `scripts/chapters14-17.test.mjs`의 「화면 모양」과 `scripts/views-checks.js`의 설정 점검(다섯 모양을 차례로 눌러 `data-skin`과 저장 값을 잰다)이다.
 
+### 설정 화면 (settings)
+
+설정 창(880×620 모달)은 좌측 208px 네비게이션과 우측 패널로 구성되며, 6개 묶음으로 설정을 나누어 제공한다.
+
+- **6개 묶음**: 모양(`look`), 글꼴(`fonts`), 노트(`notes`), 알림(`notifications`), AI(`ai`), 연결(`connections`). Claude 플러그인이 비활성화된 판에서는 `ai` 묶음이 숨겨지며, `ai` 묶음으로 진입 요청 시 `connections`로 대체된다.
+- **컨트롤러 API**: `controller.settings(open: boolean, section?: SettingsSection)`. 특정 묶음으로 바로 열 수 있다(알림 센터에서는 `notifications`, 아키텍처 화면에서는 `connections`). 보조 창(노트 창)에서는 열리지 않는다. 한 번 선택된 묶음은 앱이 켜져 있는 동안 메모리(`WorkspaceState.settingsSection`)에 유지된다.
+- **설정 검색**: 좌측 네비게이션 상단 검색창에서 17개 설정 항목(`SETTINGS_INDEX`)을 실시간 검색한다. 키워드·라벨·섹션 이름으로 매칭되며 최대 8개까지 표시된다. 위/아래 방향키와 Enter로 결과를 선택하면 해당 묶음으로 이동하고, `[data-setting="<키>"]` 요소를 화면 중앙으로 스크롤한 뒤 1.2초간 `.set-flash` 테두리로 강조한다. Esc 키를 누르면 검색어가 초기화되고 원래 탭 목록으로 돌아온다.
+- **새 설정 항목 추가 시**: JSX 요소에 `data-setting="<고유키>"` 속성을 부여하고, `src/ui/settingsSections.ts`의 `SETTINGS_INDEX`에 `{ section, key, label, keywords }` 항목을 등록한다.
+
 ### 글꼴과 화면 크기 (typography)
 
-설정 → 「글꼴과 크기」에서 **화면 크기**(90·100·110·125·150·175%), **앱 글꼴**, **터미널 글꼴**을 고른다. 글꼴은 설치된 글꼴 이름 하나나 쉼표로 이은 CSS 글꼴 목록이고, 비우면(「기본값」) 기본 글꼴이다. 화면 크기는 ⌘ + / ⌘ - / ⌘ 0(Ctrl도 됨)으로도 바꾼다.
+설정 → 「글꼴」에서 **앱 글꼴**과 **터미널 글꼴**을 고르고, 「모양」에서 **화면 크기**(90·100·110·125·150·175%)를 고른다. 설치된 추천 글꼴은 캔버스 2D 기반 감지(`isFontAvailable`)를 통해 칩(`.set-chip`)으로 즉시 선택할 수 있으며, 빈 값(「기본」) 칩을 누르면 기본 글꼴로 복원된다. 직접 글꼴 이름이나 쉼표로 이은 CSS 글꼴 목록을 적을 수도 있다. 화면 크기는 ⌘ + / ⌘ - / ⌘ 0(Ctrl도 됨)으로도 바꾼다.
 
 | 무엇 | 어디 |
 |---|---|
@@ -1025,6 +1034,7 @@ node fixtures/runner-test.mjs
 | 순수 로직(Node) | `test:screen`, `test:workspace`, `test:navigation`, `test:interaction`, `test:data`, `test:editor`, `test:views`, `test:autosave`, `test:chapters`, `test:cli-script`, `test:connect` | 호스트 없이 돈다. `test:cli-script`는 앱에 든 `ais-cli` 스크립트를, `test:connect`는 설정의 Claude 연결 화면을 잰다 |
 | 4부 | `scripts/chapter03-04.test.mjs`, `chapter06`, `chapter08`, `chapter09`, `chapter10`, `part4-ask-run.test.mjs` | `test-native.sh`가 부른다 |
 | 글꼴과 크기 | `scripts/typography.test.mjs` | 설정의 「글꼴과 크기」(위 §7 「글꼴과 화면 크기」). `test-native.sh`가 부른다 |
+| 설정 화면 | `scripts/settings.test.mjs` | 6개 묶음 탭 렌더, 설정 검색(키워드/AI 제외/최대 8개 제한), 글꼴 감지 유틸 및 칩 렌더. `test-native.sh`가 부른다 |
 | 계약 | `node --test scripts/contracts.test.mjs` | 번들 식별자, 권한, CSP |
 | 호스트 | `cargo test --manifest-path native-host/src-tauri/Cargo.toml --locked` | |
 | 실제 창 | `test:acceptance`, `test:workspace:acceptance`, `test:navigation:acceptance`, `test:interaction:acceptance`, `test:data:acceptance`, `test:editor:acceptance`, `test:autosave:acceptance`, `test:views:acceptance` | 종류별 한 번에 하나씩. 4부를 뺀 판을 잰다. 편집기와 화면 점검은 `node scripts/workspace-acceptance.mjs --views --only=<점검 이름,…>`처럼 고른 것만 돌릴 수 있다(화면은 `pnpm build:noclaude`를 먼저 한다) |

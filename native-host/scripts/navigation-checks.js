@@ -126,13 +126,18 @@ if (location.pathname.startsWith('/note-window/')) {
         await until(() => measured(), 10000, 'terminal font published');
         assert(/^'?"?D2Coding/.test(measured()), 'default terminal font ' + measured());
         const prefs = () => JSON.parse(localStorage.getItem('aisurada.prefs.v1')).state;
-        document.querySelector('button.iconbtn[title="설정"]').click(); await until(() => document.querySelector('#typo-terminal-font'), 10000, 'settings');
+        document.querySelector('button[aria-label="설정"]').click();
+        await until(() => document.querySelector('#set-tab-fonts'), 10000, 'settings');
+        document.querySelector('#set-tab-fonts').click();
+        await until(() => document.querySelector('#typo-terminal-font'), 10000, 'fonts pane');
         const input = document.querySelector('#typo-terminal-font');
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Monaco'); input.dispatchEvent(new Event('input', { bubbles: true }));
         await until(() => /^"?Monaco/.test(measured()) && /D2Coding/.test(measured()), 10000, 'terminal font changed: ' + measured());
         assert(prefs().terminalFont === 'Monaco', 'terminal font saved');
         // 확대한 채로도 터미널이 그대로 있고 칸을 다시 잰다
         const width = innerWidth;
+        document.querySelector('#set-tab-look').click();
+        await until(() => !document.querySelector('#set-pane-look[hidden]'), 10000, 'look pane');
         [...document.querySelectorAll('.typo-scale button')].find(b => b.textContent === '150%').click();
         await until(() => Math.abs(innerWidth - width / 1.5) <= 2, 10000, 'zoom 150% with the terminal open');
         await wait(500);
@@ -141,6 +146,8 @@ if (location.pathname.startsWith('/note-window/')) {
         assert(screenWidth > 0 && screenWidth <= hostWidth, `terminal screen ${screenWidth} inside host ${hostWidth}`);
         [...document.querySelectorAll('.typo-scale button')].find(b => b.textContent === '100%').click();
         await until(() => innerWidth === width, 10000, 'zoom back to 100%');
+        document.querySelector('#set-tab-fonts').click();
+        await until(() => !document.querySelector('#set-pane-fonts[hidden]'), 10000, 'fonts pane');
         [...document.querySelectorAll('.typo-row')].find(row => row.querySelector('#typo-terminal-font')).querySelector('button').click();
         await until(() => /D2Coding/.test(measured()) && !/Monaco/.test(measured()), 10000, 'terminal font reset: ' + measured());
         assert(prefs().terminalFont === '', 'terminal font reset saved');

@@ -967,7 +967,6 @@ textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent);
 .ui-modal-full { width: calc(100vw - 32px) !important; height: calc(100vh - 32px) !important; max-width: none !important; max-height: none !important; }
 .ui-modal-full .preview-grip { display: none; }
 .ui-modal form { padding: 24px; }.ui-modal form > footer { padding: 18px 0 0; margin-top: 24px; }.ui-modal label { font-size: 12px; }.ndf form > label, .template-editor > label { display: grid; gap: 8px; margin-bottom: 18px; }.ndf input, .ndf select, .template-editor input, .template-editor select { padding: 9px 11px; font-size: 13px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }.form-grid label { display: grid; gap: 8px; }.ndf .lex-editor { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 24px 0; }.ndf .lex-content { min-height: 140px; padding-bottom: 20px; }
-.set-switch { display: flex; align-items: center; justify-content: space-between; gap: 30px; margin: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }.set-switch strong { display: block; font-size: 14px; }.set-switch small { display: block; color: var(--muted); line-height: 1.7; margin-top: 6px; }.set-switch input { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }.set-switch select { flex: none; font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }.settings-example { padding: 0 24px 20px; font-size: 12px; color: var(--muted); }
 .ui-modal.note-preview { width: max-content; max-width: calc(100vw - 48px); overflow: hidden; }.note-preview > header h2 { font-size: 15px; overflow: hidden; text-overflow: ellipsis; }.preview-resize { width: 800px; height: 65vh; min-width: 280px; min-height: 200px; max-width: calc(100vw - 50px); max-height: 73vh; overflow: auto; resize: both; }.preview-resize .note-reading { max-width: 100%; --reading-pad-x: 52px; --reading-pad-top: 28px; padding: var(--reading-pad-top) var(--reading-pad-x) 64px; }.preview-tools { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px 0; }.preview-tools button { font-size: 11px; padding: 5px 8px; }.preview-full .preview-resize { width: calc(100vw - 50px); height: 75vh; resize: none; }.preview-full.ui-modal { width: calc(100vw - 48px); }.note-preview > footer { padding: 12px 20px; }
 .subnote-fullscreen .subnote-page { width: min(1000px, 100%); }.subnote-page > header nav { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }.subnote-page > header button { padding: 5px 8px; font-size: 11px; }.missing-subnote { padding: 25px; }
 .cmdk-item > span { min-width: 0; }.cmdk-item strong { display: block; }.cmdk-item .cmdk-snippet { display: block; margin-top: 7px; line-height: 1.6; color: var(--muted); font-size: 12px; }.cmdk-item mark { background: #d5bb5d55; color: inherit; }.cmdk-item small { font-size: 10px; }.cmdk-group { margin: 10px 15px 3px; color: var(--muted); font-size: 10px; font-weight: 500; }.cmdk-more { padding: 8px 18px; font-size: 11px; color: var(--muted); }
@@ -1565,19 +1564,6 @@ code.is-symbol { font-weight: 700; }
 
 /* 설정: 화면 모양 고르기. 두 모양 모두에서 보이도록 기본 규칙은 여기에 둔다.
    미리보기 그림은 지금 켜 둔 모양과 상관없이 각자의 모양을 그린다. */
-.set-skin { margin: 24px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
-.set-skin legend { padding: 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
-.set-connect { margin: 24px; padding: 0 0 20px; border: 0; border-top: 1px solid var(--line); min-width: 0; }
-.set-connect legend { padding: 16px 0 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
-.set-connect p { margin: 0 0 12px; font-size: 12px; line-height: 1.7; color: var(--muted); }
-.set-connect .set-connect-status { color: var(--ink); font-size: 13px; }
-.set-connect .set-switch { margin: 0 0 14px; padding-bottom: 14px; }
-.set-connect-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.set-connect .set-connect-error { margin-top: 12px; color: #b67537; }
-.set-github-field { display: grid; gap: 6px; margin: 0 0 12px; font-size: 12px; }
-.set-github-field input { padding: 9px 11px; font-size: 13px; }
-.set-github-key { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.set-github-key small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .repo-editor { margin: 0 0 18px; padding: 0; border: 0; min-width: 0; }
 .repo-editor legend { padding: 0; margin-bottom: 6px; font-size: 12px; }
 .repo-editor-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: var(--muted); }
@@ -1694,52 +1680,6 @@ code.is-symbol { font-weight: 700; }
 .entity-foot .entity-delete { margin: 0 auto 0 -12px; padding: 9px 12px; background: transparent; box-shadow: none; border-color: transparent; color: var(--err, #c92a2a); }
 .entity-foot .entity-delete:hover:not(:disabled) { background: var(--soft); box-shadow: none; }
 .entity-foot .button-primary { padding: 9px 22px; font-size: 12px; font-weight: 600; }
-.set-connect-desktop { margin-top: 16px; font-size: 12px; }
-.set-connect-desktop summary { cursor: pointer; color: var(--muted); }
-.set-connect-desktop pre { margin: 10px 0; padding: 12px; overflow-x: auto; background: var(--soft); border: 1px solid var(--line); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
-.set-skin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.set-skin-option { position: relative; display: grid; align-content: start; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
-.set-skin-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
-.set-skin-option:has(input:checked) { border-color: var(--accent); background: var(--soft); }
-.set-skin-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
-.set-skin-text strong { display: block; font-size: 14px; font-weight: 600; }
-.set-skin-text small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-/* 설정의 「글꼴과 크기」: 화면 배율 단추 줄과 글꼴 입력 두 줄. 단추는 일반 button이라 스킨의 단추 모양을 따르고, 고른 단추만 :root:root로 색을 덮는다. */
-.set-typo { margin: 24px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
-.set-typo legend { padding: 0; margin-bottom: 14px; font-size: 14px; font-weight: 600; }
-.typo-row { display: grid; gap: 8px; margin: 0 0 20px; }
-.typo-row:last-child { margin-bottom: 0; }
-.typo-row > strong { font-size: 13px; font-weight: 600; }
-.typo-row > small { color: var(--muted); font-size: 12px; line-height: 1.6; }
-.typo-scale { display: flex; flex-wrap: wrap; gap: 6px; }
-.typo-scale button { min-width: 56px; padding: 7px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
-:root:root .typo-scale button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.typo-field { display: flex; gap: 8px; align-items: center; }
-.typo-field input { flex: 1; min-width: 0; padding: 9px 11px; font-size: 13px; }
-.typo-field button { flex: none; padding: 8px 12px; font-size: 12px; }
-.typo-problem { margin: 0; color: var(--err); font-size: 12px; }
-.typo-preview { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
-.typo-preview-label { color: var(--muted); font-family: var(--font-ui); font-size: 11px; margin-right: 8px; }
-.typo-preview-mono { font-size: 12px; }
-/* 미리보기 그림은 격자·지면의 「모든 요소 반경·그림자 덮기」 규칙에도 흔들리지 않도록 반경과 그림자에만 !important를 쓴다. */
-.skin-preview { display: flex; align-items: center; gap: 10px; height: 68px; padding: 0 14px; border-radius: 8px !important; overflow: hidden; }
-.skin-preview i { display: block; width: 52px; height: 24px; flex: none; }
-.skin-preview b { display: block; width: 76px; height: 20px; }
-.skin-preview[data-skin-preview="classic"] { background: #f3f5ee; }
-.skin-preview[data-skin-preview="classic"] i { border-radius: 8px !important; background: #2f5542; }
-.skin-preview[data-skin-preview="classic"] b { border: 1px solid #d5dccb; border-radius: 8px !important; background: #fdfdfa; }
-.skin-preview[data-skin-preview="tactile"] { background: #e6ebf5; }
-.skin-preview[data-skin-preview="tactile"] i { border-radius: 999px !important; background: #1e4fd8; box-shadow: 0 1px 2px rgba(18,48,160,.4), 0 6px 14px -4px rgba(30,79,216,.55), inset 0 1px 0 rgba(255,255,255,.28) !important; }
-.skin-preview[data-skin-preview="tactile"] b { border-radius: 999px !important; background: #dae1ee; box-shadow: inset 0 1px 3px rgba(10,22,51,.18), inset 0 0 0 1px rgba(10,22,51,.04) !important; }
-.skin-preview[data-skin-preview="grid"] { background: #eef2f8; }
-.skin-preview[data-skin-preview="grid"] i { border-radius: 2px !important; background: #0a1633; }
-.skin-preview[data-skin-preview="grid"] b { border: 1px solid #0a1633; border-radius: 2px !important; background: #fff; }
-.skin-preview[data-skin-preview="glass"] { background: radial-gradient(120px 80px at 10% 0%, rgba(30,79,216,.45), transparent 70%), radial-gradient(120px 80px at 100% 10%, rgba(25,194,224,.5), transparent 70%), radial-gradient(140px 90px at 70% 120%, rgba(208,31,26,.3), transparent 70%), #e6edfa; }
-.skin-preview[data-skin-preview="glass"] i { border-radius: 12px !important; background: linear-gradient(180deg, #3a6bf0, #1e4fd8); box-shadow: 0 6px 16px -6px rgba(30,79,216,.65), inset 0 1px 0 rgba(255,255,255,.4) !important; }
-.skin-preview[data-skin-preview="glass"] b { border: 1px solid rgba(255,255,255,.85); border-radius: 12px !important; background: rgba(255,255,255,.6); }
-.skin-preview[data-skin-preview="modern"] { background: #f6f7f9; }
-.skin-preview[data-skin-preview="modern"] i { border-radius: 8px !important; background: #0b1220; }
-.skin-preview[data-skin-preview="modern"] b { border: 1px solid #cfd4dd; border-radius: 8px !important; background: #fff; box-shadow: 0 1px 2px rgba(11,18,32,.06) !important; }
 
 /* ───────── 아이콘 단추 · 더 보기 메뉴 · 아젠다 화면 정리 ─────────
    글자 단추를 아이콘으로 줄인 노트 정보줄과 아젠다 화면이 함께 쓴다. 색은 모두 토큰을 따르고,

@@ -36,35 +36,5 @@
 .ntf-toast { display: grid; grid-template-columns: 36px minmax(0, 1fr) 28px; gap: 12px; padding: 14px 10px 14px 14px; border-radius: 22px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-3, 0 12px 32px rgba(0, 0, 0, .2)); }
 .ntf-close { align-self: start; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; font-size: 16px; color: var(--muted); }
 
-/* 설정의 「알림」: .set-switch는 설정 화면 시험이 세므로 다른 이름을 쓴다 */
-.ntf-settings { display: grid; gap: 12px; margin: 24px 0 8px; }
-.ntf-settings h3 { margin: 0; font-size: 14px; }
-.ntf-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px; border-radius: 14px; background: var(--soft); font-size: 13px; }
-.ntf-row span { display: grid; gap: 2px; }
-.ntf-row small, .ntf-table small { display: block; font-size: 11px; line-height: 1.5; color: var(--muted); }
-.ntf-off { opacity: .6; }
-/* 모양(skin)마다 체크박스를 따로 꾸미므로(`:root[data-skin] input[type="checkbox"]`) 같은 무게 이상으로 덮어서 모든 모양에서 같은 스위치로 보이게 한다 */
-.ntf-switch,
-:root[data-skin] .ntf-switch[type="checkbox"] { appearance: none; -webkit-appearance: none; display: block; flex: none; position: relative; width: 40px; height: 24px; margin: 0; padding: 0; border: 0; border-radius: 999px; background: var(--sunken, var(--line)); box-shadow: var(--in, none); cursor: pointer; }
-.ntf-switch::after,
-:root[data-skin] .ntf-switch[type="checkbox"]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1, 0 0 0 1px var(--line)); transform: none; transition: transform .15s; }
-.ntf-switch:checked,
-:root[data-skin] .ntf-switch[type="checkbox"]:checked { background: var(--accent); box-shadow: var(--in-acc, none); }
-.ntf-switch:checked::after,
-:root[data-skin] .ntf-switch[type="checkbox"]:checked::after { top: 3px; left: 3px; width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--accent-ink, var(--surface)); transform: translateX(16px); }
-.ntf-switch:disabled { opacity: .5; cursor: default; }
-.ntf-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.ntf-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
-.ntf-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: 13px; }
-.ntf-table th { padding: 0 10px 2px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); }
-.ntf-table th:first-child, .ntf-table td:first-child { text-align: left; }
-.ntf-table td { padding: 8px 10px; background: var(--soft); text-align: center; vertical-align: middle; }
-.ntf-table td:first-child { border-radius: 12px 0 0 12px; }
-.ntf-table td:last-child { border-radius: 0 12px 12px 0; }
-.ntf-test { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.ntf-test button { padding: 6px 14px; font-size: 12px; }
-.ntf-hint { font-size: 12px; color: var(--muted); }
-.ntf-result { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--soft); font-size: 12px; line-height: 1.6; }
-.ntf-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--err-bg); color: var(--err); font-size: 12px; }
 .ntf-ico-approval { background: var(--warn-bg); color: var(--warn); font-size: 12px; }
 .ntf-ico-decision { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 12px; }
