@@ -1,12 +1,11 @@
 //! 노트의 `attach/` 폴더에 든 HTML 첨부에서 글만 뽑아 한 줄로 잇습니다(검색과 본문 미리보기용).
 
 use crate::ports::fs::{self, check_confinement};
-use std::path::Path;
 use std::sync::LazyLock;
 
 use regex::Regex;
 
-use super::scanner::NoteRecord;
+use super::{index::NoteIndex, scanner::NoteRecord};
 use crate::text::{compare_utf16, trim, utf16_len};
 
 const MAX_FILE_BYTES: u64 = 4_194_304;
@@ -19,11 +18,14 @@ static APOS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"&#0*39;").unwrap())
 static SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[ \t\n\x0B\x0C\r]+").unwrap());
 
 /// 노트의 HTML 첨부 글을 뽑습니다. 파일 하나로 된 노트이거나 HTML 첨부가 없으면 `None`입니다.
-pub fn extract(vault_root: &Path, note: &NoteRecord) -> Option<String> {
+pub fn extract(index: &NoteIndex, note: &NoteRecord) -> Option<String> {
     if note.is_single_file {
         return None;
     }
-    let attach_dir = vault_root.join(&note.rel_path).join("attach");
+    let attach_dir = index.vault_root.join(&note.rel_path).join("attach");
+    if !index.can_read_related(note, &attach_dir) {
+        return None;
+    }
     let mut names: Vec<String> = fs::read_dir(&attach_dir)
         .ok()?
         .flatten()
@@ -40,7 +42,7 @@ pub fn extract(vault_root: &Path, note: &NoteRecord) -> Option<String> {
         let file = attach_dir.join(&name);
         // vault 안을 가리키는 심볼릭 링크는 따라가지만, 밖을 가리키는 링크(`~/.ssh/…` 따위)는 읽지 않고 건너뛴다.
         // 일반 파일이 아니거나 너무 크면 건너뛴다
-        if check_confinement(vault_root, &file).is_err() {
+        if !index.can_read_related(note, &file) || check_confinement(&index.vault_root, &file).is_err() {
             continue;
         }
         let Ok(meta) = fs::metadata(&file) else {

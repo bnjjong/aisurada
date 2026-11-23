@@ -132,10 +132,14 @@ struct ManagerGate {
 
 impl ManagerGate {
     fn current(&self) -> Result<Manager, String> {
-        manager::find_enabled(&self.env, &self.initial.name)
+        let current = manager::find_enabled(&self.env, &self.initial.name)?;
+        if !self.initial.same_registration(&current) {
+            return Err("매니저 등록이 바뀌었다. 서버를 다시 연결해 주세요".into());
+        }
+        Ok(current)
     }
 
-    fn check(&self, tool: &str, arguments: &JsonValue) -> Result<Manager, String> {
+    fn check(&self, tool: &str) -> Result<Manager, String> {
         let current = self.current()?;
         if !self.initial.tools.iter().any(|name| name == tool)
             || !current.tools.iter().any(|name| name == tool)
@@ -145,20 +149,13 @@ impl ManagerGate {
                 current.name
             ));
         }
-        let scope = match tool {
-            "create_task" => Some(("repo", "저장소", &current.repos)),
-            "create_doc" => Some(("agenda", "아젠다", &current.agendas)),
-            _ => None,
-        };
-        if let Some((key, label, allowed)) = scope
-            && !matches!(arguments.get(key), Some(JsonValue::Str(value)) if allowed.contains(value))
-        {
-            return Err(format!(
-                "허용하지 않은 {label}다. 쓸 수 있는 {label}: {}",
-                allowed.join(", ")
-            ));
-        }
         Ok(current)
+    }
+
+    fn record(&self, tool: &str, result: &str, target: Option<&str>) {
+        if let Err(error) = manager::record(&self.env, &self.initial, tool, result, target) {
+            eprintln!("매니저 호출 기록을 쓰지 못했다: {error}");
+        }
     }
 }
 
@@ -268,8 +265,8 @@ impl<'a> McpServer<'a> {
             quote(&self.manager.as_ref().map_or_else(
                 || instructions(self.client_name.as_deref()),
                 |gate| format!(
-                    "매니저 {}의 제보 접수 도구다. 새 일은 Draft로 만들고, 만들기 전에 유사 태스크와 노트를 찾는다. 중복 제보는 기존 태스크 댓글로 남긴다. Slack 출처는 refs의 slack 항목으로 보관한다. 판단 정보가 부족하면 되묻고, 쓰기 결과를 확인한 뒤 제보자에게 알린다.",
-                    gate.initial.name
+                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. 새 태스크는 초안으로 만들고, 만들기 전에 유사 태스크와 노트를 찾는다. 중복 제보는 기존 태스크 댓글로 남긴다. Slack 출처는 refs의 slack 항목으로 보관한다. 판단 정보가 부족하면 되묻고, 쓰기 결과를 확인한 뒤 제보자에게 알린다.",
+                    gate.initial.name, gate.initial.project
                 )
             ))
         )
@@ -306,6 +303,9 @@ impl<'a> McpServer<'a> {
         };
         let params = params.expect("name을 읽었으므로 params가 있다");
         let Some(tool) = find(name) else {
+            if let Some(gate) = &self.manager {
+                gate.record("unknown", "rejected", None);
+            }
             return error(id, INVALID_PARAMS, &format!("없는 도구다: {name}"));
         };
         let empty = JsonValue::Object(Vec::new());
@@ -315,9 +315,15 @@ impl<'a> McpServer<'a> {
             Some(value) => value,
         };
         if !matches!(arguments, JsonValue::Object(_)) {
+            if let Some(gate) = &self.manager {
+                gate.record(tool.name, "rejected", None);
+            }
             return error(id, INVALID_PARAMS, "arguments는 객체여야 한다");
         }
         if NEVER_EXPOSED.contains(&name.as_str()) {
+            if let Some(gate) = &self.manager {
+                gate.record(tool.name, "rejected", None);
+            }
             return result(
                 id,
                 &tool_result(
@@ -327,9 +333,12 @@ impl<'a> McpServer<'a> {
             );
         }
         let managed = if let Some(gate) = &self.manager {
-            match gate.check(name, arguments) {
+            match gate.check(name) {
                 Ok(manager) => Some((gate, manager)),
-                Err(message) => return result(id, &tool_result(&message, true)),
+                Err(message) => {
+                    gate.record(tool.name, "rejected", None);
+                    return result(id, &tool_result(&message, true));
+                }
             }
         } else {
             None
@@ -353,7 +362,20 @@ impl<'a> McpServer<'a> {
         );
         let args = [name.clone(), json::compact(arguments)];
         let call = if let Some((gate, manager)) = managed {
-            call_engine(&gate.env, &args, session, Some(&manager))
+            let call = call_engine(&gate.env, &args, session, Some(&manager));
+            let payload = (call.status == 0)
+                .then(|| serde_json::from_str::<serde_json::Value>(&call.stdout).ok())
+                .flatten();
+            let target = payload
+                .as_ref()
+                .and_then(|value| value["key"].as_str().or_else(|| value["id"].as_str()));
+            let outcome = match call.status {
+                0 => "ok",
+                2..=5 => "rejected",
+                _ => "failed",
+            };
+            gate.record(tool.name, outcome, target);
+            call
         } else {
             (self.caller)(&args, session)
         };
@@ -492,7 +514,11 @@ pub fn run_stdio(args: &[String], env: &Env) -> i32 {
         }
     };
     // 프로토콜 출력은 표준 출력으로만 낸다. 안내 글은 표준 오류로 낸다.
-    let vault = crate::env::resolve_vault(env);
+    let vault = if let Some(manager) = &manager {
+        Some(manager.vault.clone())
+    } else {
+        crate::env::resolve_vault(env)
+    };
     eprintln!(
         "aisurada MCP 서버 {SERVER_VERSION}: {}{}",
         if let Some(manager) = &manager {
@@ -510,7 +536,11 @@ pub fn run_stdio(args: &[String], env: &Env) -> i32 {
     );
 
     let base = env.clone();
-    watch_vault(&base);
+    if let Some(manager) = &manager {
+        ais_core::write::autocommit::watch(std::path::Path::new(&manager.vault));
+    } else {
+        watch_vault(&base);
+    }
     let mut server = McpServer::new(
         write,
         Box::new(move |args, session| call_engine(&base, args, session, None)),
@@ -546,8 +576,12 @@ fn call_engine(
     session: Option<SessionSource>,
     manager: Option<&Manager>,
 ) -> Call {
-    watch_vault(base);
     let mut env = base.clone();
+    if let Some(manager) = manager {
+        env.vars
+            .insert("AISURADA_VAULT".into(), manager.vault.clone());
+    }
+    watch_vault(&env);
     env.session = session;
     let args = args.to_vec();
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

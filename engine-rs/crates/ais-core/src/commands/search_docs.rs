@@ -139,7 +139,7 @@ fn utf16(s: &str) -> Vec<u16> {
 /// 본문과 HTML 첨부 글에서 검색어를 찾아 앞 24, 뒤 76 코드 단위의 맥락 글을 만든다.
 fn body_snippet(index: &NoteIndex, note: &NoteRecord, needle: &[u16]) -> Option<String> {
     let plain = plain_text::extract(note.format, &note.body);
-    let haystack = match attach_text::extract(&index.vault_root, note) {
+    let haystack = match attach_text::extract(index, note) {
         Some(attach) => format!("{plain} {attach}"),
         None => plain,
     };

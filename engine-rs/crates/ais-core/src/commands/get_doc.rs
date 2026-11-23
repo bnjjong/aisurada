@@ -23,13 +23,11 @@ pub fn execute(index: &NoteIndex, request: &GetDocRequest, context: &CallContext
     check_readable(note, context.caller)?;
 
     // 파일 하나로 된 노트는 코멘트 파일을 둘 폴더가 없다
-    let comments = if note.is_single_file {
-        CommentsEnvelope::Absent
+    let file = index.vault_root.join(&note.rel_path).join("comments.json");
+    let comments = if !note.is_single_file && index.can_read_related(note, &file) {
+        read_comments(&index.vault_root, &file)
     } else {
-        read_comments(
-            &index.vault_root,
-            &index.vault_root.join(&note.rel_path).join("comments.json"),
-        )
+        CommentsEnvelope::Absent
     };
     Ok(DocRow {
         note: NoteRow::from_record(note, context.caller, true, None),

@@ -58,6 +58,13 @@ impl AgendaTable {
         }
     }
 
+    pub(super) fn retain_project(&mut self, project: &str) {
+        self.slug_to_info.retain(|_, agenda| agenda.project.as_deref() == Some(project));
+        self.id_to_info.retain(|_, agenda| {
+            self.slug_to_info.get(&agenda.slug).is_some_and(|current| current.id == agenda.id)
+        });
+    }
+
     pub fn has_slug(&self, slug: &str) -> bool {
         self.slug_to_info.contains_key(slug)
     }

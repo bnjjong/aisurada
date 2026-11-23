@@ -48,5 +48,9 @@ pub fn execute(
             sub_comments_file(index, root, sub)
         }
     };
-    Ok(read_comments(&index.vault_root, &file))
+    if index.can_read_related(root, &file) {
+        Ok(read_comments(&index.vault_root, &file))
+    } else {
+        Ok(CommentsEnvelope::Absent)
+    }
 }

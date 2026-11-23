@@ -328,7 +328,7 @@ fn refetch<'a>(scan: &'a Scan, task: &'a Task) -> &'a Task {
 // ---------------------------------------------------------------- 쓰기
 
 pub fn create_task(vault: &Path, request: &CreateTaskRequest, context: &CallContext) -> Result<Json, EngineError> {
-    let fields = fields_of(
+    let mut fields = fields_of(
         &request.title,
         &request.task_type,
         &request.priority,
@@ -340,9 +340,16 @@ pub fn create_task(vault: &Path, request: &CreateTaskRequest, context: &CallCont
         &request.criteria,
         &request.refs,
     )?;
+    if let Some(manager) = &context.manager {
+        if request.project.as_ref().is_some_and(|project| project != &manager.project) {
+            return Err(EngineError::invalid_argument("매니저의 프로젝트로만 태스크를 만들 수 있다"));
+        }
+        check_manager_repo(vault, manager, fields.repo.as_deref())?;
+        fields.project = Some(manager.project.clone());
+    }
     let actor = actor_of(&request.actor)?;
     let task = store::create(vault, fields, &stamp_of(&context), &actor)?;
-    let scan = store::scan(vault);
+    let scan = scan_for_reader(vault, context)?;
     let mut m = detail(vault, &scan, refetch(&scan, &task), 0)?;
     m["created"] = json!(true);
     Ok(m)
@@ -456,10 +463,11 @@ pub fn add_task_comment(
     let reference = only_ref(&request.id, COMMENT_USAGE)?;
     let scan = store::scan(vault);
     let task = store::find(&scan, reference)?;
-    if let Some(manager) = &context.manager
-        && !task.repo.as_ref().is_some_and(|repo| manager.repos.contains(repo))
-    {
-        return Err(EngineError::invalid_argument("매니저에게 허용하지 않은 저장소의 태스크다"));
+    if let Some(manager) = &context.manager {
+        if task.project.as_deref() != Some(&manager.project) {
+            return Err(EngineError::not_found("매니저의 프로젝트에서 태스크를 찾지 못했다"));
+        }
+        check_manager_repo(vault, manager, task.repo.as_deref())?;
     }
     let body = format::comment(request.body.as_deref().unwrap_or(""))?;
     let actor = actor_of(&request.actor)?;
@@ -510,9 +518,33 @@ pub fn restore_task(vault: &Path, request: &TaskRefRequest) -> Result<Json, Engi
 
 // ---------------------------------------------------------------- 읽기
 
-pub fn list_tasks(vault: &Path, request: &ListTasksRequest) -> Result<Json, EngineError> {
+fn scan_for_reader(vault: &Path, context: &CallContext) -> Result<Scan, EngineError> {
+    let mut scan = store::scan(vault);
+    if let Some(manager) = &context.manager {
+        crate::vault::check_manager_project(vault, manager)?;
+        scan.items.retain(|task| task.project.as_deref() == Some(&manager.project));
+        scan.skipped.clear();
+    }
+    Ok(scan)
+}
+
+fn check_manager_repo(vault: &Path, manager: &crate::ManagerContext, repo: Option<&str>) -> Result<(), EngineError> {
+    let project = crate::vault::check_manager_project(vault, manager)?;
+    if repo.is_some_and(|repo| {
+        manager.repos.iter().any(|allowed| allowed == repo)
+            && project.repos.iter().any(|allowed| allowed.github.as_deref() == Some(repo))
+    }) {
+        return Ok(());
+    }
+    Err(EngineError::invalid_argument("매니저에게 허용하지 않은 프로젝트 저장소다"))
+}
+
+pub fn list_tasks(vault: &Path, request: &ListTasksRequest, context: &CallContext) -> Result<Json, EngineError> {
     check_workspace_marker(vault)?;
     if is_true(&request.trash) {
+        if context.manager.is_some() {
+            return Err(EngineError::invalid_argument("매니저에게 태스크 휴지통을 열지 않는다"));
+        }
         let rows: Vec<Json> = store::trash(vault)
             .into_iter()
             .map(|e| json!({"key": e.key, "id": e.id, "title": e.title, "path": e.rel_path, "deletedAt": e.deleted_at}))
@@ -537,7 +569,7 @@ pub fn list_tasks(vault: &Path, request: &ListTasksRequest) -> Result<Json, Engi
     let only_blocked = is_true(&request.blocked);
     let bodies = is_true(&request.bodies);
 
-    let scan = store::scan(vault);
+    let scan = scan_for_reader(vault, context)?;
     let mut items: Vec<&Task> = scan
         .items
         .iter()
@@ -590,10 +622,10 @@ fn activity_limit(raw: &Option<Json>) -> Result<usize, EngineError> {
     }
 }
 
-pub fn get_task(vault: &Path, request: &GetTaskRequest) -> Result<Json, EngineError> {
+pub fn get_task(vault: &Path, request: &GetTaskRequest, context: &CallContext) -> Result<Json, EngineError> {
     check_workspace_marker(vault)?;
     let reference = only_ref(&request.id, GET_USAGE)?;
-    let scan = store::scan(vault);
+    let scan = scan_for_reader(vault, context)?;
     let task = store::find(&scan, reference)?;
     let limit = activity_limit(&request.activity)?;
     detail(vault, &scan, refetch(&scan, task), limit)
