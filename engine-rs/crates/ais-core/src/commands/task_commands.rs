@@ -462,12 +462,9 @@ pub fn add_task_comment(
     context: &CallContext,
 ) -> Result<Json, EngineError> {
     let reference = only_ref(&request.id, COMMENT_USAGE)?;
-    let scan = store::scan(vault);
+    let scan = scan_for_reader(vault, context)?;
     let task = store::find(&scan, reference)?;
     if let Some(manager) = &context.manager {
-        if task.project.as_deref() != Some(&manager.project) {
-            return Err(EngineError::not_found("매니저의 프로젝트에서 태스크를 찾지 못했다"));
-        }
         check_manager_repo(vault, manager, task.repo.as_deref())?;
     }
     let body = format::comment(request.body.as_deref().unwrap_or(""))?;
