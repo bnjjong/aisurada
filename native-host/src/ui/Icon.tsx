@@ -79,6 +79,8 @@ const PATHS: Record<string, ReactNode> = {
   ),
   close: <path d="M4 4l8 8M12 4l-8 8" />,
   maximize: <rect x="2.5" y="2.5" width="11" height="11" rx="1.5" />,
+  play: <path d="M5 3v10l8-5z" />,
+  pause: <path d="M6 3v10M10 3v10" />,
   restore: (
     <>
       <path d="M5.5 3.5V2.5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1" />

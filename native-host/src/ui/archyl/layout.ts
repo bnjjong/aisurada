@@ -157,6 +157,26 @@ function pointOnCurve(edge: DiagramEdge, t: number): Point {
   return { x: value('x'), y: value('y') };
 }
 
+export function measureEdge(edge: DiagramEdge): (progress: number) => Point {
+  const segments = 24;
+  const lengths = [0];
+  let previous = edge.start;
+  for (let step = 1; step <= segments; step++) {
+    const next = pointOnCurve(edge, step / segments);
+    lengths.push(lengths[step - 1] + Math.hypot(next.x - previous.x, next.y - previous.y));
+    previous = next;
+  }
+  const length = lengths[segments];
+  return progress => {
+    if (progress <= 0 || length === 0) return edge.start;
+    if (progress >= 1) return edge.end;
+    const distance = progress * length;
+    const step = lengths.findIndex(value => value >= distance);
+    const fraction = (distance - lengths[step - 1]) / (lengths[step] - lengths[step - 1]);
+    return pointOnCurve(edge, (step - 1 + fraction) / segments);
+  };
+}
+
 export function placeLabels(
   edges: DiagramEdge[],
   nodes: DiagramNode[],
