@@ -17,6 +17,8 @@ pub struct TaskInfo {
     pub priority: String,
     pub status: String,
     pub repo: String,
+    pub project: String,
+    pub manager: String,
     pub base: Option<String>,
     pub body: String,
     pub criteria: Vec<(String, bool)>,
@@ -69,6 +71,8 @@ impl TaskInfo {
             priority: text(v, "priority"),
             status: text(v, "status"),
             repo: text(v, "repo"),
+            project: text(v, "project"),
+            manager: text(v, "manager"),
             base: v
                 .get("baseBranch")
                 .or_else(|| v.get("base"))

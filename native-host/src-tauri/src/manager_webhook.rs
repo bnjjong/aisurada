@@ -13,12 +13,19 @@ use tauri::{Runtime, State, WebviewWindow};
 pub const EVENT: &str = "aisurada.task.status";
 #[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "aisurada.manager.webhook";
+#[cfg(target_os = "macos")]
+const KEYCHAIN_ITEM_NOT_FOUND: i32 = -25300;
+#[cfg(target_os = "macos")]
+static KEYCHAIN_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Debug)]
 pub enum DeliveryError {
     Unavailable,
     #[cfg(feature = "claude")]
     MissingSecret,
+    #[cfg(feature = "claude")]
+    Keychain,
+    Unconfirmed,
     Retry {
         rejected: bool,
     },
@@ -56,8 +63,11 @@ fn active_manager<R: Runtime>(
 
 #[cfg(target_os = "macos")]
 fn ensure_secret(manager: &manager::Manager, regenerate: bool) -> Result<Vec<u8>, String> {
-    if !regenerate {
-        if let Some(secret) = keychain_secret(manager) {
+    let _write = KEYCHAIN_WRITE
+        .lock()
+        .map_err(|_| "키체인 작업을 완료하지 못했어요")?;
+    if let Some(secret) = keychain_secret(manager)? {
+        if !regenerate {
             return Ok(secret);
         }
     }
@@ -122,12 +132,7 @@ pub async fn manager_test_webhook<R: Runtime>(
 ) -> Result<Value, String> {
     let (env, manager) = active_manager(&window, &state, &name)?;
     manager::validate_webhook(&url)?;
-    if !(2..=64).contains(&channel.len())
-        || !matches!(channel.as_bytes()[0], b'C' | b'G')
-        || !channel
-            .bytes()
-            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
-    {
+    if !slack_channel_id(&channel) {
         return Err("시험 알림을 받을 Slack 채널 ID를 적어 주세요".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
@@ -147,6 +152,9 @@ pub async fn manager_test_webhook<R: Runtime>(
             DeliveryError::Retry { rejected: true } => {
                 "웹훅이 Slack에 알림을 전달하지 못했어요. 채널 ID와 봇 연결을 확인해 주세요."
             }
+            DeliveryError::Unconfirmed => {
+                "Hermes가 중복 요청으로 답해 Slack 전달 여부를 확인하지 못했어요."
+            }
             _ => "시험 알림을 전달하지 못했어요. 웹훅 주소와 서명 비밀을 확인해 주세요.",
         })?;
         Ok(json!({"status": status, "elapsed": started.elapsed().as_millis() as u64}))
@@ -155,19 +163,30 @@ pub async fn manager_test_webhook<R: Runtime>(
     .map_err(|error| error.to_string())?
 }
 
+pub fn slack_channel_id(channel: &str) -> bool {
+    (2..=64).contains(&channel.len())
+        && matches!(channel.as_bytes()[0], b'C' | b'G')
+        && channel
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+}
+
 #[cfg(target_os = "macos")]
-pub fn keychain_secret(manager: &manager::Manager) -> Option<Vec<u8>> {
-    security_framework::passwords::get_generic_password(
+pub fn keychain_secret(manager: &manager::Manager) -> Result<Option<Vec<u8>>, String> {
+    match security_framework::passwords::get_generic_password(
         KEYCHAIN_SERVICE,
         &manager.keychain_account(),
-    )
-    .ok()
-    .filter(|secret| !secret.is_empty())
+    ) {
+        Ok(secret) if !secret.is_empty() => Ok(Some(secret)),
+        Ok(_) => Err("키체인의 서명 비밀이 비어 있어요".into()),
+        Err(error) if error.code() == KEYCHAIN_ITEM_NOT_FOUND => Ok(None),
+        Err(error) => Err(format!("키체인의 서명 비밀을 읽지 못했어요. {error}")),
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn keychain_secret(_manager: &manager::Manager) -> Option<Vec<u8>> {
-    None
+pub fn keychain_secret(_manager: &manager::Manager) -> Result<Option<Vec<u8>>, String> {
+    Ok(None)
 }
 
 pub fn send_webhook(
@@ -231,13 +250,11 @@ pub fn send_webhook(
         .map_err(|_| DeliveryError::Retry { rejected: false })?;
     let acknowledgment: Value =
         serde_json::from_slice(&bytes).map_err(|_| DeliveryError::Retry { rejected: false })?;
-    if !matches!(
-        acknowledgment["status"].as_str(),
-        Some("delivered" | "duplicate")
-    ) {
-        return Err(DeliveryError::Retry { rejected: false });
+    match acknowledgment["status"].as_str() {
+        Some("delivered") => Ok(status),
+        Some("duplicate") => Err(DeliveryError::Unconfirmed),
+        _ => Err(DeliveryError::Retry { rejected: false }),
     }
-    Ok(status)
 }
 
 #[cfg(test)]
@@ -252,6 +269,14 @@ mod tests {
 
     #[test]
     fn delivers_signed_status_to_loopback_receiver() {
+        assert_eq!(send_with_reply("delivered").unwrap(), 200);
+        assert!(matches!(
+            send_with_reply("duplicate"),
+            Err(DeliveryError::Unconfirmed)
+        ));
+    }
+
+    fn send_with_reply(acknowledgment: &'static str) -> Result<u16, DeliveryError> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let url = format!(
             "http://{}/webhooks/aisurada",
@@ -287,7 +312,7 @@ mod tests {
             let signed = [timestamp.as_bytes(), b".", &body].concat();
             let expected = hmac::sign(&hmac::Key::new(hmac::HMAC_SHA256, secret), &signed);
             assert_eq!(headers["x-webhook-signature-v2"], hex(expected.as_ref()));
-            let body = r#"{"status":"delivered"}"#;
+            let body = json!({"status": acknowledgment}).to_string();
             write!(
                 socket,
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -299,7 +324,8 @@ mod tests {
             "event_type": EVENT, "channel": "CDEMO123", "thread_id": "1234567890.123456",
             "task_key": "TSK-1", "status": "in-review",
         });
-        send_webhook(&url, secret, "demo-event", &payload).unwrap();
+        let result = send_webhook(&url, secret, "demo-event", &payload);
         response.join().unwrap();
+        result
     }
 }

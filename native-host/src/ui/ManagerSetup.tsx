@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { dump } from "js-yaml";
 import type { WorkspaceController } from "../workspace/controller.ts";
-import { Modal } from "./Modal.tsx";
+import { Confirm, Modal } from "./Modal.tsx";
 import { SettingsSwitch } from "./SettingsParts.tsx";
 import {
-  eventName, eventTime, kindLabel, managerError, useManagers, webhookEvent, writeTools,
+  belongsTo, eventName, eventTime, kindLabel, managerError, useManagers, webhookEvent, writeTools,
   type ManagerConfig, type ManagerDashboard, type ManagerItem, type ManagerKind, type ManagerProject,
 } from "./managersStore.tsx";
 
@@ -76,10 +76,12 @@ interface McpConfig {
   mcp_servers: { aisurada: { command: string; args: string[]; tools: { include: string[] } } };
 }
 
-export const configText = (config: McpConfig, kind: ManagerKind) => {
-  const { command, args } = config.mcp_servers.aisurada;
-  return kind === "hermes" ? dump(config, { lineWidth: 100 }) :
-    JSON.stringify({ mcpServers: { aisurada: { command, args } } }, null, 2);
+export const configText = (config: McpConfig, kind: ManagerKind, name: string) => {
+  const server = config.mcp_servers.aisurada;
+  const key = `aisurada-${name}`;
+  const { command, args } = server;
+  return kind === "hermes" ? dump({ mcp_servers: { [key]: server } }, { lineWidth: 100 }) :
+    JSON.stringify({ mcpServers: { [key]: { command, args } } }, null, 2);
 };
 
 // WebKit는 클릭을 처리하는 동안 복사를 시작해야 한다. 호스트에서 받을 값은 항목에 약속으로 넘긴다.
@@ -90,7 +92,7 @@ function copyFromHost(text: Promise<string>) {
 
 export function copyManagerConfig(controller: WorkspaceController, manager: ManagerConfig) {
   return copyFromHost(controller.callEngine(["manager", "config", manager.name])
-    .then(value => configText(value as McpConfig, manager.kind)));
+    .then(value => configText(value as McpConfig, manager.kind, manager.name)));
 }
 
 export function ManagerConnection({ form, history, controller, update }: {
@@ -103,7 +105,7 @@ export function ManagerConnection({ form, history, controller, update }: {
   const [error, setError] = useState("");
   const first = history?.firstCall;
   const last = history?.events.find(event => !webhookEvent(event) && event.result === "ok");
-  const profile = `${form.project}-manager`;
+  const profile = form.name;
 
   useEffect(() => {
     let live = true;
@@ -128,10 +130,10 @@ export function ManagerConnection({ form, history, controller, update }: {
     {error && <p role="alert" className="mgr-error">{error}</p>}
     {config && <div className="mgr-code">
       <button type="button" onClick={async () => {
-        try { await navigator.clipboard.writeText(configText(config, format)); setMessage("설정을 복사했어요."); }
+        try { await navigator.clipboard.writeText(configText(config, format, form.name)); setMessage("설정을 복사했어요."); }
         catch (e) { setError(managerError(e)); }
       }}>복사</button>
-      <pre>{configText(config, format)}</pre>
+      <pre>{configText(config, format, form.name)}</pre>
     </div>}
     <label className="mgr-label">이 매니저가 듣는 Slack 채널
       <input value={form.slackChannels.join(", ")} placeholder="#project-qa" onChange={event =>
@@ -139,8 +141,8 @@ export function ManagerConnection({ form, history, controller, update }: {
       <small>여러 채널은 쉼표로 나눠요. 채널 연결은 Hermes에서 설정해요.</small>
     </label>
     <div className={`mgr-feedback ${first ? "is-ok" : ""}`} role="status">
-      <strong>{first ? `연결됐어요 · ${eventTime(first)}` : "첫 호출을 기다리는 중이에요"}</strong>
-      <small>{first && last ? `최근 성공 · ${eventTime(last.at)} ${eventName(last.tool)}` : "연결을 기다리는 동안 다음 단계로 갈 수 있어요."}</small>
+      <strong>{!form.enabled ? "매니저가 꺼져 있어요" : first ? `연결됐어요 · ${eventTime(first)}` : "첫 호출을 기다리는 중이에요"}</strong>
+      <small>{!form.enabled ? "Hermes 설정을 마친 뒤 매니저 상세에서 켜고 첫 호출을 확인하세요." : first && last ? `최근 성공 · ${eventTime(last.at)} ${eventName(last.tool)}` : "연결을 기다리는 동안 다음 단계로 갈 수 있어요."}</small>
     </div>
     {message && <small role="status">{message}</small>}
   </div>;
@@ -155,12 +157,14 @@ export function ManagerNotifications({ form, controller, update }: {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const [rotating, setRotating] = useState(false);
   const { refresh } = useManagers();
   const callSecret = (action: string) => controller.callHost<string>("manager_webhook_secret", { name: form.name, action });
 
   useEffect(() => {
     if (!form.notifyEnabled) return;
     let live = true;
+    setError(""); setMasked("");
     void controller.callHost<string>("manager_webhook_secret", { name: form.name, action: "ensure" })
       .then(value => { if (live) setMasked(value); })
       .catch(e => { if (live) setError(managerError(e)); });
@@ -181,20 +185,17 @@ export function ManagerNotifications({ form, controller, update }: {
       <label className="mgr-label">웹훅 주소
         <input value={form.webhook ?? ""} placeholder="http://127.0.0.1:8644/webhooks/project"
           onChange={event => update({ webhook: event.target.value })} />
-        <small>이 Mac의 주소만 받아요. Hermes에서 프로젝트별로 다른 경로를 설정해 주세요.</small>
+        <small>이 Mac의 주소만 받아요. Hermes에서 매니저마다 다른 경로를 설정해 주세요.</small>
       </label>
       <div className="mgr-label">
         서명 비밀
         <div className="mgr-actions">
-          <code aria-label="가려진 서명 비밀">{masked || "만드는 중…"}</code>
+          <code aria-label="가려진 서명 비밀">{masked || (error ? "확인 필요" : "읽는 중…")}</code>
           <button type="button" disabled={working || !masked} onClick={() => void act(async () => {
             await copyFromHost(callSecret("copy"));
             setText("서명 비밀을 복사했어요.");
           })}>복사</button>
-          <button type="button" disabled={working || !masked} onClick={() => void act(async () => {
-            setMasked(await callSecret("rotate"));
-            setText("Hermes 웹훅 설정에도 새 서명 비밀을 넣어 주세요.");
-          })}>다시 만들기</button>
+          <button type="button" disabled={working || !masked} onClick={() => setRotating(true)}>다시 만들기</button>
         </div>
         <small>키체인에 저장해요. Hermes 웹훅의 서명 비밀에 같은 값을 넣어 주세요.</small>
       </div>
@@ -214,6 +215,12 @@ export function ManagerNotifications({ form, controller, update }: {
     </>}
     {text && <small role="status">{text}</small>}
     {error && form.notifyEnabled && <p role="alert" className="mgr-error">{error}</p>}
+    {rotating && <Confirm title="서명 비밀을 다시 만들까요?" label="다시 만들기"
+      description="Hermes에 새 서명 비밀을 넣을 때까지 Slack 상태 알림 전송이 실패해요."
+      close={() => setRotating(false)} accept={() => act(async () => {
+        setMasked(await callSecret("rotate"));
+        setText("Hermes 웹훅 설정에도 새 서명 비밀을 넣어 주세요.");
+      })} />}
   </div>;
 }
 
@@ -228,8 +235,8 @@ function suggestedName(kind: ManagerKind, slug: string, names: string[]) {
   return name;
 }
 
-function webhookFor(project: string, source?: ManagerConfig) {
-  const segment = encodeURIComponent(project).replace(/[!'()*~]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+function webhookFor(name: string, source?: ManagerConfig) {
+  const segment = encodeURIComponent(name);
   const existing = source?.webhook;
   const prefix = existing ? existing.slice(0, existing.lastIndexOf("/") + 1) : "http://127.0.0.1:8644/webhooks/";
   return prefix + segment;
@@ -263,19 +270,20 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
 }) {
   const [step, setStep] = useState(source ? 0 : 1);
   const [registered, setRegistered] = useState(false);
+  const [customName, setCustomName] = useState(false);
   const [form, setForm] = useState<ManagerConfig>(() => {
     const template = source ?? migrate;
-    const project = initialProject ?? (source ? projects.find(item => item.slug !== source.project && item.repos.length)?.slug : undefined) ?? "";
+    const project = initialProject ?? (source ? projects.find(item => !belongsTo(source, item) && item.repos.length)?.slug : undefined) ?? "";
     const kind = template?.kind ?? "hermes";
     return {
-      kind, project, enabled: migrate?.enabled ?? true,
+      kind, project, enabled: migrate?.enabled ?? !source,
       label: template?.label ?? "Hermes",
       name: migrate?.name ?? suggestedName(kind, project, data.names),
       tools: template?.tools ?? data.defaultTools,
       repos: [], agendas: [], slackChannels: migrate?.slackChannels ?? [],
       notify: template?.notify ?? data.defaultNotify,
-      notifyEnabled: template?.notifyEnabled ?? false,
-      webhook: migrate?.webhook ?? (project ? webhookFor(project, source) : null),
+      notifyEnabled: migrate?.notifyEnabled ?? false,
+      webhook: migrate?.webhook ?? null,
     };
   });
   const [busy, setBusy] = useState(false);
@@ -286,11 +294,10 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
   const selectProject = (slug: string) => {
     const target = projects.find(item => item.slug === slug);
     update({
-      project: slug, name: migrate?.name ?? suggestedName(form.kind, slug, data.names),
+      project: slug, name: customName || migrate ? form.name : suggestedName(form.kind, slug, data.names),
       repos: migrate?.repos.filter(repo => target?.repos.some(item => item.github === repo)) ?? [],
       agendas: migrate?.agendas.filter(agenda => target?.agendas.some(item => item.slug === agenda || item.title === agenda))
         .map(agenda => target!.agendas.find(item => item.slug === agenda || item.title === agenda)!.slug) ?? [],
-      webhook: migrate?.webhook ?? webhookFor(slug, source),
     });
   };
 
@@ -302,18 +309,20 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
 
   const register = () => work(async () => {
     const args = registered || migrate ? ["update", form.name] : source ? ["copy", source.name, form.name] : ["add", form.name];
-    const newSettings = { ...form, notifyEnabled: false };
+    const webhook = form.webhook ?? webhookFor(form.name, source);
+    const newSettings = { ...form, webhook, notifyEnabled: false };
     await controller.callEngine(["manager", ...args, `project=${form.project}`, `enabled=${form.enabled}`, ...settings(newSettings)]);
+    update({ webhook });
     setRegistered(true);
     await refresh();
     setStep(3);
   });
   const save = (skip = false) => work(async () => {
-    const next = { ...form, notifyEnabled: !skip && form.notifyEnabled, webhook: form.webhook?.trim() || null };
-    if (next.notifyEnabled && (!next.webhook || !next.notify.length)) {
+    const next = { ...form, webhook: form.webhook?.trim() || null };
+    if (!skip && next.notifyEnabled && (!next.webhook || !next.notify.length)) {
       throw new Error("웹훅 주소와 알릴 상태를 골라 주세요.");
     }
-    await controller.callEngine(["manager", "update", form.name, ...settings(next)]);
+    await controller.callEngine(["manager", "update", form.name, ...(skip ? ["notifyEnabled=false"] : settings(next))]);
     await refresh();
     opened(form.name);
   });
@@ -326,15 +335,15 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
     <div className="mgr-modal-body">
       {step === 0 && source && <>
         <p className="mgr-hint">원본 · {source.project} · {source.label} ({source.name})</p>
-        <ProjectChoice value={form.project} projects={projects.filter(item => item.slug !== source.project)} onChange={selectProject} />
+        <ProjectChoice value={form.project} projects={projects.filter(item => !belongsTo(source, item))} onChange={selectProject} />
         <div className="mgr-columns">
-          <label className="mgr-label">새 이름<input maxLength={32} value={form.name} onChange={event => update({ name: event.target.value })} /></label>
+          <label className="mgr-label">새 이름<input maxLength={32} value={form.name} onChange={event => { setCustomName(true); update({ name: event.target.value }); }} /></label>
           <label className="mgr-label">보이는 이름<input maxLength={40} value={form.label} onChange={event => update({ label: event.target.value })} /></label>
         </div>
         <dl className="mgr-meta">
-          <dt>가져오는 설정</dt><dd>{kindLabel(source.kind)} · 도구 {source.tools.length}개 · 알릴 상태 {source.notify.length}개 · 상태 알림 {source.notifyEnabled ? "켜짐" : "꺼짐"}</dd>
+          <dt>가져오는 설정</dt><dd>{kindLabel(source.kind)} · 도구 {source.tools.length}개 · 알릴 상태 {source.notify.length}개</dd>
           <dt>새로 고를 설정</dt><dd>저장소, 아젠다, Slack 채널, 서명 비밀</dd>
-          <dt>웹훅 주소</dt><dd>{form.webhook || "프로젝트를 골라 주세요"}</dd>
+          <dt>웹훅 주소</dt><dd>{project && inputsValid(form) ? webhookFor(form.name, source) : "프로젝트와 이름을 골라 주세요"}</dd>
         </dl>
       </>}
       {step === 1 && <>
@@ -343,13 +352,13 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
           <strong>어떤 매니저인가요?</strong>
           <div className="mgr-kinds mgr-columns">
             {(["hermes", "mcp"] as const).map(kind => <button type="button" key={kind} aria-pressed={form.kind === kind} onClick={() =>
-              update({ kind, label: kindLabel(kind), name: migrate?.name ?? suggestedName(kind, form.project, data.names) })}>
+              update({ kind, label: kindLabel(kind), name: customName || migrate ? form.name : suggestedName(kind, form.project, data.names) })}>
               <strong>{kindLabel(kind)}</strong><small>{kind === "hermes" ? "프로젝트별 Hermes 프로필과 연결해요." : "MCP 서버를 연결할 수 있는 다른 에이전트예요."}</small>
             </button>)}
           </div>
         </div>
         <div className="mgr-columns">
-          <label className="mgr-label">이름<input maxLength={32} readOnly={!!migrate} value={form.name} onChange={event => update({ name: event.target.value })} />
+          <label className="mgr-label">이름<input maxLength={32} readOnly={!!migrate} value={form.name} onChange={event => { setCustomName(true); update({ name: event.target.value }); }} />
             <small>태스크와 기록에 남아요. 영문 소문자로 시작하고 숫자와 하이픈을 쓸 수 있어요.</small>
           </label>
           <label className="mgr-label">보이는 이름<input maxLength={40} value={form.label} onChange={event => update({ label: event.target.value })} />
