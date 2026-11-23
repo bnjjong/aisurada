@@ -6,6 +6,7 @@ import './runner.css';
 import './approvals.css';
 import './diff-view.css';
 import './notifications.css';
+import './settings.css';
 import './editor-insert.css';
 import './skin-tactile.css';
 import './skin-grid.css';

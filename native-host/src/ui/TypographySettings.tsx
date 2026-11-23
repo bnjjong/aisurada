@@ -1,12 +1,12 @@
-// 설정 화면의 「글꼴과 크기」. 화면 배율 단추 줄과 앱 글꼴·터미널 글꼴 입력을 보인다.
+// 설정 화면의 「글꼴과 크기」. 앱 글꼴·터미널 글꼴 입력을 보인다.
 // 값은 컨트롤러의 preference()로 저장하고, 앱에 거는 일(CSS 변수, 웹뷰 확대)은 App이 상태를 보고 한다.
 import { useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
-import { UI_SCALES, fontProblem, normalizeFont, previewFamily } from "../workspace/typography.ts";
+import { fontProblem, normalizeFont, previewFamily } from "../workspace/typography.ts";
 import type { Typography } from "../workspace/typography.ts";
 
 /** 글꼴 입력 칸에서 목록으로 보여 주는 이름들. 설치되어 있어야 보이고, 목록에 없는 이름도 직접 적을 수 있다. */
-const UI_FONT_SUGGESTIONS = [
+export const UI_FONT_SUGGESTIONS = [
   "Apple SD Gothic Neo",
   "AppleMyungjo",
   "Noto Sans KR",
@@ -16,7 +16,7 @@ const UI_FONT_SUGGESTIONS = [
   "Helvetica Neue",
   "OpenDyslexic",
 ];
-const TERMINAL_FONT_SUGGESTIONS = ["D2Coding", "Menlo", "Monaco", "SF Mono", "JetBrains Mono", "Fira Code", "Hack", "MesloLGS NF"];
+export const TERMINAL_FONT_SUGGESTIONS = ["D2Coding", "Menlo", "Monaco", "SF Mono", "JetBrains Mono", "Fira Code", "Hack", "MesloLGS NF"];
 
 /**
  * 글꼴 이름 한 줄 입력과 미리보기. 치는 동안에는 잠깐 멈췄을 때, 또는 칸을 떠나거나 Enter를 눌렀을 때 저장한다.
@@ -124,25 +124,6 @@ export function TypographySettings({
 }) {
   return (
     <fieldset className="set-typo">
-      <legend>글꼴과 크기</legend>
-      <div className="typo-row">
-        <strong id="typo-scale-label">화면 크기</strong>
-        <small>
-          글자와 버튼을 앱 전체에서 함께 키우거나 줄여요. ⌘ + / ⌘ - / ⌘ 0 키로도 바꿀 수 있어요. 지금은 {typography.scale}%예요.
-        </small>
-        <div className="typo-scale" role="group" aria-labelledby="typo-scale-label">
-          {UI_SCALES.map((scale) => (
-            <button
-              type="button"
-              key={scale}
-              aria-pressed={typography.scale === scale}
-              onClick={() => controller.preference({ uiScale: scale })}
-            >
-              {scale}%
-            </button>
-          ))}
-        </div>
-      </div>
       <FontField
         id="typo-ui-font"
         label="앱 글꼴"

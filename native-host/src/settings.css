@@ -1,0 +1,109 @@
+/* 설정 모달 기본 틀 및 레이아웃 */
+.settings-modal .ui-modal-body {
+  overflow: hidden;
+  display: flex;
+  padding: 0;
+}
+
+.set-frame {
+  flex: 1;
+  min-width: 0;
+  container: settings / inline-size;
+}
+
+.set-layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  height: 100%;
+}
+
+.set-nav {
+  background: var(--soft);
+  padding: 12px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+}
+
+.set-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.set-nav-item {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm, 6px);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.set-nav-item:hover {
+  background: var(--surface);
+}
+
+.set-nav-item[aria-selected="true"] {
+  background: var(--surface);
+  box-shadow: var(--sh-1, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+.set-nav-foot {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 0 4px;
+}
+
+.set-panes {
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.set-pane {
+  padding: 20px 28px 28px;
+}
+
+.set-pane[hidden],
+.set-tabs[hidden],
+.set-results[hidden] {
+  display: none !important;
+}
+
+@container settings (max-width: 620px) {
+  .set-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .set-nav {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .set-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .set-nav-item {
+    height: 34px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .set-nav-foot {
+    display: none;
+  }
+  .set-pane {
+    padding: 16px 18px 22px;
+  }
+}
