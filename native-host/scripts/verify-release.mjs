@@ -16,7 +16,7 @@ const checks = [];
 const pass = label => { checks.push(label); console.log(`PASS ${label}`); };
 const kib = path => Number(execFileSync('du', ['-sk', path], { encoding: 'utf8' }).split(/\s+/)[0]);
 
-for (const file of [cli, join(resources, 'LICENSE.txt'), join(resources, 'user-guide.html')]) assert.ok(existsSync(file), `Missing ${file}`);
+for (const file of [cli, join(resources, 'LICENSE.txt'), join(resources, 'licenses/pierre-diffs.txt'), join(resources, 'licenses/shiki.txt'), join(resources, 'user-guide.html')]) assert.ok(existsSync(file), `Missing ${file}`);
 assert.ok((statSync(cli).mode & 0o111) !== 0, 'bin/ais-cli is not executable');
 pass('app contains the ais-cli binary, license notice and user guide');
 // 5단계 뒤의 앱에는 Java 실행 환경도 jar도 없다

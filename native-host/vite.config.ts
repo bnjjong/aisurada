@@ -30,11 +30,15 @@ export default defineConfig(({ mode }) => {
       },
     ],
     resolve: {
-      alias: {
-        '@claude-plug': mode === 'noclaude'
-          ? resolve(__dirname, 'src/plugs/empty')
-          : resolve(__dirname, 'src/plugs/claude'),
-      },
+      alias: [
+        {
+          find: '@claude-plug',
+          replacement: mode === 'noclaude'
+            ? resolve(__dirname, 'src/plugs/empty')
+            : resolve(__dirname, 'src/plugs/claude'),
+        },
+        { find: /^shiki\/langs$/, replacement: resolve(__dirname, 'src/ui/diffView/shikiLangs.ts') },
+      ],
     },
     server: {
       host: host || 'localhost',

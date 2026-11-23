@@ -38,12 +38,6 @@
 .apv-oneline { margin: 0; font-size: 13px; line-height: 1.6; word-break: break-word; }
 .apv-compare del { background: var(--err-bg); color: var(--err); text-decoration: line-through; }
 .apv-compare ins { background: var(--ok-bg); color: var(--ok); text-decoration: none; }
-.apv-diff { width: 100%; border-collapse: collapse; table-layout: fixed; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.apv-diff th { padding: 2px 6px; text-align: left; color: var(--muted); font: 600 11px/1.6 inherit; }
-.apv-diff td { padding: 0 6px; vertical-align: top; white-space: pre-wrap; word-break: break-word; border-top: 1px solid transparent; }
-.apv-diff td + td { border-left: 1px solid var(--line); }
-.apv-row-change td:first-child, .apv-row-del td:first-child { background: var(--err-bg); }
-.apv-row-change td:last-child, .apv-row-add td:last-child { background: var(--ok-bg); }
 
 .apv-policy { display: grid; gap: 4px; }
 .apv-policy-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
@@ -65,4 +59,4 @@
 .apv-confirm p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink); }
 .apv-danger { border-color: var(--err); background: var(--err); color: var(--surface); font-weight: 600; }
 
-@media (max-width: 640px) { .apv-banner { flex-direction: column; align-items: flex-start; } .apv-diff { font-size: 11px; } }
+@media (max-width: 640px) { .apv-banner { flex-direction: column; align-items: flex-start; } }

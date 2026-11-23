@@ -6,6 +6,8 @@
       "resources/ais-cli": null,
       "../.release/bin/ais-cli": "bin/ais-cli",
       "../../LICENSE": "LICENSE.txt",
+      "../node_modules/@pierre/diffs/LICENSE.md": "licenses/pierre-diffs.txt",
+      "../node_modules/shiki/LICENSE": "licenses/shiki.txt",
       "../../docs/user-guide.html": "user-guide.html"
     },
     "macOS": {

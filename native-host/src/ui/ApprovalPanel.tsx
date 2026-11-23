@@ -2,13 +2,14 @@
 // 승인하기 전에는 목록·AI의 조회·실행 입력 어디에도 반영되지 않는다(엔진이 지킨다). 파일을 손으로 고친 것(승인 안 된 직접 수정)도 여기서 받아들이거나 되돌린다.
 // 그리는 부분(`ApprovalsView`)과 엔진을 부르는 부분(`ApprovalsDialog`)을 나눠서, 그리는 부분은 서버 렌더로 시험한다.
 import { useCallback, useEffect, useState } from "react";
+import { DiffView } from "./diffView/DiffView.tsx";
 import { Modal } from "./Modal.tsx";
 import {
   FIXED_NOTE, POLICY_LABEL, POLICY_ROWS, STATUS_LABEL, approveChange, badgeText, fieldDiffs, getChange, loadApprovals, proposerLabel,
-  rejectChange, resolveEdit, savePolicy, sideBySide, targetLabel,
+  rejectChange, resolveEdit, savePolicy, targetLabel,
 } from "./approvalsClient.ts";
 import type {
-  ApprovalsOverview, ChangeDetail, ChangeRow, DiffRow, FieldDiff, Policy, PolicyKey, PolicyValue, ResolveAction, ResourceView, Unapproved,
+  ApprovalsOverview, ChangeDetail, ChangeRow, FieldDiff, Policy, PolicyKey, PolicyValue, ResolveAction, ResourceView, Unapproved,
 } from "./approvalsClient.ts";
 import { setApprovalCounts } from "./approvalsStore.ts";
 import { formatRelativeTime } from "./dates.ts";
@@ -31,27 +32,6 @@ const nameOf = (names: Record<string, string>, id: string): string => names[id] 
 
 // ---------------------------------------------------------------- 비교
 
-function Lines({ rows }: { rows: DiffRow[] }) {
-  return (
-    <table className="apv-diff" aria-label="줄 단위 비교">
-      <thead>
-        <tr>
-          <th scope="col">이전 판</th>
-          <th scope="col">새 판</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i} className={`apv-row apv-row-${r.kind}`}>
-            <td>{r.left === null ? "" : r.left || " "}</td>
-            <td>{r.right === null ? "" : r.right || " "}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 function Field({ diff }: { diff: FieldDiff }) {
   if (diff.kind === "line") {
     return (
@@ -68,7 +48,16 @@ function Field({ diff }: { diff: FieldDiff }) {
   return (
     <div className="apv-field" data-field={diff.key}>
       <h4>{diff.label}</h4>
-      <Lines rows={sideBySide(diff.before, diff.after)} />
+      <DiffView
+        before={diff.before}
+        after={diff.after}
+        beforeLabel="이전 판"
+        afterLabel="새 판"
+        label="줄 단위 비교"
+        lang={diff.key === "tools" ? "json" : "markdown"}
+        defaultStyle="split"
+        rememberAs="approvals"
+      />
     </div>
   );
 }

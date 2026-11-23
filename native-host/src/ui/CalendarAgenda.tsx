@@ -14,7 +14,7 @@ import { AgendaFilter } from "./Rail.tsx";
 import { NoteReading } from "../navigation/NoteReading.tsx";
 import { Confirm, Modal } from "./Modal.tsx";
 import { Icon } from "./Icon.tsx";
-import { DiffTable } from "./History.tsx";
+import { DiffView } from "./diffView/DiffView.tsx";
 import { AgendaRepoLabel } from "./AgendaRepoLabel.tsx";
 import { AgentMarks } from "./AgentMark.tsx";
 import { DecisionMark } from "./DecisionMark.tsx";
@@ -1005,7 +1005,8 @@ function Facts({
       )}
       {difference && (
         <Modal title="사실층 차이" close={() => setDifference(false)} wide>
-          <DiffTable left={draft.trim()} right={base} />
+          <DiffView before={draft.trim()} after={base} beforeLabel="내 글" afterLabel="저장된 글"
+            label="사실층 비교" tone="neutral" rememberAs="facts" />
           <footer>
             <button onClick={() => setDifference(false)}>닫기</button>
             <button

@@ -4,6 +4,7 @@ import './styles.css';
 import './tasks.css';
 import './runner.css';
 import './approvals.css';
+import './diff-view.css';
 import './notifications.css';
 import './editor-insert.css';
 import './skin-tactile.css';

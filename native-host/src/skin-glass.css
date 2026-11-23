@@ -127,7 +127,7 @@
   -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
 }
 :root[data-skin="glass"] .cdiff { background: var(--glass-solid); -webkit-backdrop-filter: blur(36px); backdrop-filter: blur(36px); }
-:root[data-skin="glass"] :is(.subnote-page > header, .cdiff-table th, .lex-block-bar) {
+:root[data-skin="glass"] :is(.subnote-page > header, .lex-block-bar) {
   background: var(--glass-solid);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  DEFAULT_POLICY, DIFF_LIMIT, FIXED_NOTE, POLICY_ROWS, approveChange, badgeText, badgeTotal, fieldDiffs, getChange, loadApprovals, loadCounts,
-  proposerLabel, rejectChange, resolveEdit, savePolicy, sideBySide, targetLabel, toChange, toCounts, toDetail, toOverview, toPolicy, toUnapproved, toView,
+  DEFAULT_POLICY, FIXED_NOTE, POLICY_ROWS, approveChange, badgeText, badgeTotal, fieldDiffs, getChange, loadApprovals, loadCounts,
+  proposerLabel, rejectChange, resolveEdit, savePolicy, targetLabel, toChange, toCounts, toDetail, toOverview, toPolicy, toUnapproved, toView,
 } from '../src/ui/approvalsClient.ts';
 import {
   POLL_MS, getApprovalsSnapshot, refreshApprovalCounts, resetApprovalsStore, setApprovalCounts, startApprovalsWatch,
@@ -148,27 +148,6 @@ test('fieldDiffs lists only what changed; a skill has no agent fields; create an
   assert.deepEqual(fieldDiffs(undefined, undefined), []);
 });
 
-test('sideBySide: equal lines on both sides, changed blocks paired, the extra side left empty', () => {
-  assert.deepEqual(sideBySide('a\nb', 'a\nb').map((r) => r.kind), ['same', 'same']);
-  const one = sideBySide('a\nb\nc', 'a\nB\nc');
-  assert.deepEqual(one.map((r) => [r.kind, r.left, r.right]), [['same', 'a', 'a'], ['change', 'b', 'B'], ['same', 'c', 'c']]);
-  const added = sideBySide('a', 'a\nx\ny');
-  assert.deepEqual(added.map((r) => [r.kind, r.left, r.right]), [['same', 'a', 'a'], ['add', null, 'x'], ['add', null, 'y']]);
-  const dropped = sideBySide('a\nx\nb', 'a\nb');
-  assert.deepEqual(dropped.map((r) => [r.kind, r.left, r.right]), [['same', 'a', 'a'], ['del', 'x', null], ['same', 'b', 'b']]);
-  const uneven = sideBySide('a\nb\nc', 'a\nX');
-  assert.deepEqual(uneven.map((r) => r.kind), ['same', 'change', 'del']);
-  assert.deepEqual(sideBySide('', ''), [], 'two empty texts have no lines');
-  assert.deepEqual(sideBySide('', 'x').map((r) => r.kind), ['add']);
-  assert.deepEqual(sideBySide('x', '').map((r) => r.kind), ['del']);
-  // 너무 큰 글은 정확한 비교 대신 통째로 바뀐 것으로 본다
-  const big = (n, t) => Array.from({ length: n }, (_, i) => `${t}${i}`).join('\n');
-  const huge = sideBySide(big(2100, 'a'), big(2100, 'b'));
-  assert.ok(2100 * 2100 > DIFF_LIMIT);
-  assert.equal(huge.length, 2100, 'paired as one changed block');
-  assert.ok(huge.every((r) => r.kind === 'change'));
-});
-
 test('the store keeps the counts, ignores a failed read, and watches focus and the clock', async () => {
   resetApprovalsStore();
   assert.deepEqual(getApprovalsSnapshot(), { counts: { pending: 0, unapproved: 0 }, loaded: false });
@@ -229,9 +208,10 @@ test('an opened change shows the old and new version side by side; a load in pro
   assert.match(html, /data-field="permission"/);
   assert.match(html, /<del>read<\/del>[\s\S]*<ins>publish<\/ins>/);
   assert.match(html, /aria-label="줄 단위 비교"/);
-  assert.match(html, /<th scope="col">이전 판<\/th><th scope="col">새 판<\/th>/);
-  assert.match(html, /apv-row-same/);
-  assert.match(html, /apv-row-change/);
+  assert.match(html, /data-diff-style="split" data-tone="change"/);
+  assert.match(html, /이전 판에만 1줄\(빨강\), 새 판에만 1줄\(초록\) 있어요\./);
+  assert.match(html, /aria-pressed="true">나란히 보기/);
+  assert.match(html, /role="status">비교를 그리는 중이에요\./);
   assert.match(render({ open: new Set(['pcmw1-aaaaaaaa']), details: { 'pcmw1-aaaaaaaa': 'loading' } }), /불러오는 중이에요/);
   const created = toDetail({ ...change({ summary: '새 스킬 만들기' }), after: view({ kind: 'skill', permission: undefined, skills: undefined }), changedFields: [] });
   assert.match(renderToStaticMarkup(React.createElement(Compare, { before: created.before, after: created.after, note: '새로 만들어요.' })), /새로 만들어요\./);

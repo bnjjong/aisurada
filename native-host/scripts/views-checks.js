@@ -11,6 +11,11 @@ const post = (path, data) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+function deepText(node) {
+  if (!node) return "";
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+  return deepText(node.shadowRoot) + Array.from(node.childNodes, deepText).join("");
+}
 async function until(fn, label, timeout = 20000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
@@ -445,7 +450,7 @@ if (location.pathname.startsWith("/note-window/")) {
       const previous = $$(".nhist-item").at(-1);
       previous.click();
       await until(
-        () => $(".nhist-diff")?.textContent.includes("이전 판만의 문장"),
+        () => deepText($(".nhist-diff")).includes("이전 판만의 문장"),
         "older diff",
       );
       const selected = $('.nhist-item[aria-selected="true"]').textContent;
@@ -455,7 +460,7 @@ if (location.pathname.startsWith("/note-window/")) {
         "history search",
       );
       assert(
-        $(".nhist-diff").textContent.includes("이전 판만의 문장"),
+        deepText($(".nhist-diff")).includes("이전 판만의 문장"),
         "search changed selection",
       );
       fill($(".nhist-search"), "");
@@ -466,7 +471,7 @@ if (location.pathname.startsWith("/note-window/")) {
       );
       $(".nhist-modes .nhist-mode:last-child").click();
       await until(
-        () => $(".nhist-diff")?.textContent.includes("이전 판만의 문장"),
+        () => deepText($(".nhist-diff")).includes("이전 판만의 문장"),
         "previous mode",
       );
       $(".nhist-restore").click();
@@ -644,10 +649,7 @@ if (location.pathname.startsWith("/note-window/")) {
       assert($(".ag-facts-area").value === "내가 바꾼 사실", "draft lost");
       $(".ag-facts-diff-btn").click();
       await until(() => $('[aria-label="사실층 차이"]'), "facts diff");
-      assert(
-        $('[aria-label="사실층 차이"]').textContent.includes("외부 사실"),
-        "diff missing disk",
-      );
+      await until(() => deepText($('[aria-label="사실층 차이"]')).includes("외부 사실"), "diff missing disk");
       click("그래도 저장", $('[aria-label="사실층 차이"]'));
       await until(
         () => $(".facts-text")?.textContent === "내가 바꾼 사실",
