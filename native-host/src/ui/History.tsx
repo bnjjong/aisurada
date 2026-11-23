@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { asRow, asText, rows } from "../workspace/types.ts";
 import type { Row } from "../workspace/types.ts";
 import { fromArgv, read } from "../data/commands.ts";
 import { Modal } from "./Modal.tsx";
-import { compareBodies } from "../editor/diff.ts";
-import type { DiffRow } from "../editor/diff.ts";
+import { DiffView } from "./diffView/DiffView.tsx";
 import { stripMarkers } from "../editor/grammar.ts";
 import { formatDateTime } from "./dates.ts";
 // 13.4: why the note's present text could not be recorded first, from the first
@@ -17,111 +16,6 @@ export function restoreReason(commit: { outcome?: unknown; blocked?: unknown } |
   if (commit.blocked === "in-progress") return "워크스페이스에서 git 병합이나 리베이스가 진행 중이에요.";
   if (commit.blocked === "not-main") return "워크스페이스의 git이 main 브랜치에 있지 않아요.";
   return "워크스페이스에서 다른 git 작업이 돌고 있어요. 잠시 뒤 다시 해 주세요.";
-}
-export function DiffTable({
-  left,
-  right,
-  fold = false,
-}: {
-  left: string;
-  right: string;
-  fold?: boolean;
-}) {
-  const diff = useMemo(() => compareBodies(left, right), [left, right]),
-    [expanded, setExpanded] = useState<Set<number>>(new Set());
-  useEffect(() => setExpanded(new Set()), [left, right]);
-  const show = new Set<number>();
-  diff.rows.forEach((r, i) => {
-    if (r.kind !== "same")
-      for (
-        let j = Math.max(0, i - 3);
-        j <= Math.min(diff.rows.length - 1, i + 3);
-        j++
-      )
-        show.add(j);
-  });
-  const display: (
-    | { row: DiffRow; index: number }
-    | { skip: number; index: number }
-  )[] = [];
-  for (let i = 0; i < diff.rows.length; ) {
-    if (!fold || show.has(i)) {
-      display.push({ row: diff.rows[i], index: i });
-      i++;
-    } else {
-      const start = i;
-      while (i < diff.rows.length && !show.has(i)) i++;
-      if (expanded.has(start))
-        for (let j = start; j < i; j++)
-          display.push({ row: diff.rows[j], index: j });
-      else display.push({ skip: i - start, index: start });
-    }
-  }
-  return (
-    <>
-      <p className="cdiff-count">
-        왼쪽에만 {diff.deleted}줄, 오른쪽에만 {diff.added}줄 있어요.
-        {diff.skipped
-          ? ` 줄 ${diff.skipped}개는 너무 길어서 줄 안까지 갈라 보지 않았습니다.`
-          : ""}
-      </p>
-      {left === right && <p className="cdiff-msg">두 글이 글자까지 같아요.</p>}
-      <table className="cdiff-table">
-        <thead>
-          <tr>
-            <th>왼쪽</th>
-            <th>오른쪽</th>
-            <th>표시</th>
-            <th>본문</th>
-          </tr>
-        </thead>
-        <tbody>
-          {display.map((item) =>
-            "skip" in item ? (
-              <tr key={item.index}>
-                <td colSpan={4}>
-                  <button
-                    className="cdiff-fold"
-                    onClick={() =>
-                      setExpanded(new Set([...expanded, item.index]))
-                    }
-                  >
-                    같은 줄 {item.skip}개를 접었어요. 누르면 펼쳐요
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              <tr className={`cdiff-row-${item.row.kind}`} key={item.index}>
-                <td>{item.row.left}</td>
-                <td>{item.row.right}</td>
-                <td>
-                  {item.row.kind === "del"
-                    ? "−"
-                    : item.row.kind === "add"
-                      ? "+"
-                      : ""}
-                </td>
-                <td>
-                  {item.row.pieces
-                    ? item.row.pieces.map((p, i) => (
-                        <span
-                          key={i}
-                          className={
-                            p.changed ? "cdiff-word-change" : undefined
-                          }
-                        >
-                          {p.text}
-                        </span>
-                      ))
-                    : item.row.text || " "}
-                </td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
-    </>
-  );
 }
 const versionTime = (value: unknown) => {
   return formatDateTime(asText(value));
@@ -388,16 +282,20 @@ export function History({
             ) : selected && !ready ? (
               <p>판의 본문을 읽고 있어요.</p>
             ) : ready ? (
-              <DiffTable
-                fold
-                left={stripMarkers(
+              <DiffView
+                label="판 비교"
+                tone="neutral"
+                rememberAs="history"
+                beforeLabel={mode === "current" ? "이 판" : "앞 판"}
+                afterLabel={mode === "current" ? "지금 글" : "이 판"}
+                before={stripMarkers(
                   mode === "current"
                     ? bodies[selected]
                     : older
                       ? bodies[older]
                       : "",
                 )}
-                right={stripMarkers(
+                after={stripMarkers(
                   mode === "current" ? current : bodies[selected],
                 )}
               />

@@ -72,6 +72,7 @@
     "@lexical/selection": "0.47.0",
     "@lexical/table": "0.47.0",
     "@lexical/utils": "0.47.0",
+    "@pierre/diffs": "1.7.1",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-deep-link": "2.4.9",
     "@tauri-apps/plugin-dialog": "2.7.1",
@@ -89,6 +90,7 @@
     "mermaid": "12.2.0",
     "prismjs": "1.30.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "shiki": "4.1.0"
   }
 }

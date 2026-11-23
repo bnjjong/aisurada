@@ -1,0 +1,30 @@
+.ais-diff { min-width: 0; }
+.ais-diff > p, .ais-diff-bar p { margin: 0; color: var(--muted); font-size: 12px; }
+.ais-diff-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ais-diff-styles { display: flex; flex-wrap: wrap; gap: 4px; }
+.ais-diff-styles button { padding: 4px 8px; font-size: 11px; }
+.ais-diff-styles button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.ais-diff-body {
+  display: block;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  --diffs-font-family: var(--font-ui);
+  --diffs-header-font-family: var(--font-ui);
+  --diffs-font-size: 13px;
+  --diffs-line-height: 21px;
+  --diffs-light-bg: var(--surface);
+  --diffs-dark-bg: var(--surface);
+  --diffs-light: var(--ink);
+  --diffs-dark: var(--ink);
+}
+.ais-diff[data-tone="neutral"] .ais-diff-body {
+  --diffs-deletion-color-override: rgb(130, 130, 150);
+  --diffs-addition-color-override: rgb(120, 100, 200);
+  --diffs-bg-deletion-override: rgba(140, 140, 160, 0.08);
+  --diffs-bg-addition-override: rgba(120, 100, 200, 0.08);
+  --diffs-bg-deletion-emphasis-override: rgba(140, 140, 160, 0.25);
+  --diffs-bg-addition-emphasis-override: rgba(120, 100, 200, 0.25);
+}
+.cdiff-scroll .ais-diff { padding: 16px 30px; }
