@@ -21,6 +21,7 @@
 :root[data-skin="glass"] .archyl-diagram { --archyl-card-surface: light-dark(#fff, #18243e); }
 .archyl-diagram:active { cursor: grabbing; }
 .archyl-diagram > canvas { position: absolute; inset: 0; width: 100%; height: 100%; color: color-mix(in srgb, var(--muted) 61%, var(--archyl-card-surface)); pointer-events: none; }
+.archyl-diagram > .archyl-flow { color: var(--accent); }
 .archyl-diagram-world { position: absolute; inset: 0; transform-origin: top left; pointer-events: none; }
 .archyl-card { position: absolute; display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; pointer-events: auto; text-align: left; border: 1px solid var(--line); border-top: 3px solid color-mix(in srgb, var(--muted) 66%, var(--surface)); border-radius: 12px; color: var(--ink); background: var(--archyl-card-surface); box-shadow: 0 4px 10px #101a3520; overflow: hidden; }
 .archyl-card:hover:not(:disabled), .archyl-card[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 0; background: var(--archyl-card-surface); }
@@ -44,6 +45,9 @@
 .archyl-zoom { position: absolute; bottom: 9px; left: 9px; display: flex; align-items: center; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .archyl-zoom button { display: grid; place-items: center; width: 28px; height: 27px; padding: 0; border: 0; }
 .archyl-zoom output { min-width: 38px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .archyl-zoom .archyl-flow-toggle { display: none; }
+}
 .archyl-minimap { position: absolute; right: 10px; bottom: 10px; width: 76px; height: 39px; border: 4px solid var(--surface); outline: 1px solid var(--line); border-radius: 5px; background: var(--soft); pointer-events: none; }
 .archyl-minimap i { position: absolute; min-width: 2px; min-height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--accent) 38%, var(--surface)); }
 .archyl-minimap i[data-selected="true"] { background: var(--accent); }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARD_HEIGHT, CARD_WIDTH, placeLabels, routeEdges } from '../src/ui/archyl/layout.ts';
+import { CARD_HEIGHT, CARD_WIDTH, measureEdge, placeLabels, positionNodes, routeEdges } from '../src/ui/archyl/layout.ts';
 
 const points = [
   ['person', 0, 64], ['app', 478, 0], ['vault', 1140, -145],
@@ -22,6 +22,24 @@ test('관계선은 같은 카드 가장자리에서 간격을 두고 시작한�
   assert.deepEqual(right.map(edge => edge.start.y), [CARD_HEIGHT / 2 - 20, CARD_HEIGHT / 2, CARD_HEIGHT / 2 + 20]);
   assert.ok(edges[4].start.x < edges[5].start.x);
   assert.equal(edges[4].start.y, CARD_HEIGHT);
+});
+
+test('Archyl에 저장된 C4 요소 좌표를 유지한다', () => {
+  const model = points.map(([id, x, y]) => ({ id, position: { x, y } }));
+  assert.deepEqual(positionNodes(model).map(({ id, x, y }) => [id, x, y]), points);
+});
+
+test('관계 흐름은 관계선 위에서 출발점부터 화살표까지 이동한다', () => {
+  const edge = edges[4];
+  const locate = measureEdge(edge);
+  assert.deepEqual(locate(0), edge.start);
+  assert.deepEqual(locate(1), edge.end);
+  const samples = [0, .25, .5, .75, 1].map(locate);
+  const steps = samples.slice(1).map((point, index) => Math.hypot(
+    point.x - samples[index].x, point.y - samples[index].y,
+  ));
+  assert.ok(Math.min(...steps) > Math.max(...steps) * .95);
+  assert.ok(samples.every((point, index) => index === 0 || point.y > samples[index - 1].y));
 });
 
 test('맞춤 배율에서 긴 관계 라벨이 카드나 다른 라벨을 가리지 않는다', () => {
