@@ -128,6 +128,8 @@ fn main() {
             #[cfg(feature = "claude")]
             runner::runner_status,
             #[cfg(feature = "claude")]
+            runner::manager_send_status,
+            #[cfg(feature = "claude")]
             runner::runner_settings_set,
             #[cfg(feature = "claude")]
             runner::runner_run,

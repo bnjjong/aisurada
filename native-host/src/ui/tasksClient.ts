@@ -35,6 +35,7 @@ export interface TaskRow {
   repo?: string;
   project?: string;
   baseBranch?: string;
+  manager?: string;
   labels: string[];
   criteriaDone: number;
   criteriaTotal: number;
@@ -57,7 +58,7 @@ export interface TaskCriterion {
 }
 
 export interface TaskRef {
-  kind: "note" | "github";
+  kind: "note" | "github" | "slack";
   target: string;
   title?: string;
 }
@@ -88,6 +89,7 @@ export interface ActivityEvent {
   by?: string;
   session?: string;
   agent?: string;
+  manager?: string;
   body?: string;
   from?: string;
   to?: string;
@@ -193,6 +195,7 @@ export function toTask(v: unknown): TaskRow | null {
     repo: text(v.repo),
     project: text(v.project),
     baseBranch: text(v.baseBranch),
+    ...(typeof v.manager === "string" ? { manager: v.manager } : {}),
     labels: strings(v.labels),
     criteriaDone: count(v.criteriaDone),
     criteriaTotal: count(v.criteriaTotal),
@@ -216,7 +219,7 @@ function toCriterion(v: unknown): TaskCriterion | null {
 function toRef(v: unknown): TaskRef | null {
   if (!isRecord(v)) return null;
   const target = text(v.target);
-  if ((v.kind !== "note" && v.kind !== "github") || !target) return null;
+  if ((v.kind !== "note" && v.kind !== "github" && v.kind !== "slack") || !target) return null;
   return { kind: v.kind, target, title: text(v.title) };
 }
 
@@ -233,6 +236,7 @@ function toEvent(v: unknown): ActivityEvent | null {
   if (!at || !kind) return null;
   return {
     at, kind, by: text(v.by), session: text(v.session), agent: text(v.agent), body: text(v.body), from: text(v.from), to: text(v.to),
+    ...(typeof v.manager === "string" ? { manager: v.manager } : {}),
     fields: Array.isArray(v.fields) ? strings(v.fields) : undefined, type: text(v.type), with: text(v.with), direction: text(v.direction),
   };
 }
@@ -482,6 +486,7 @@ export interface TaskFilter {
   type: TaskType | "";
   label: string;
   blockedOnly: boolean;
+  manager?: string;
 }
 
 export const NO_FILTER: TaskFilter = { query: "", repo: "", type: "", label: "", blockedOnly: false };
@@ -493,6 +498,7 @@ export function filterTasks(tasks: TaskRow[], f: TaskFilter): TaskRow[] {
     if (q && !t.title.toLowerCase().includes(q) && !t.key.toLowerCase().includes(q)) return false;
     if (f.repo && t.repo !== f.repo) return false;
     if (f.type && t.type !== f.type) return false;
+    if (f.manager && t.manager !== f.manager) return false;
     if (f.label && !t.labels.includes(f.label)) return false;
     if (f.blockedOnly && t.blockedBy.length === 0) return false;
     return true;
@@ -508,7 +514,7 @@ export function groupByStatus(tasks: TaskRow[]): Record<TaskStatus, TaskRow[]> {
   return out;
 }
 
-export const isActiveFilter = (f: TaskFilter): boolean => !!(f.query.trim() || f.repo || f.type || f.label || f.blockedOnly);
+export const isActiveFilter = (f: TaskFilter): boolean => !!(f.query.trim() || f.repo || f.type || f.label || f.manager || f.blockedOnly);
 
 /** 거를 수 있는 값들: 쓰인 저장소와 라벨. */
 export function filterChoices(tasks: TaskRow[]): { repos: string[]; labels: string[] } {
@@ -554,6 +560,7 @@ const CLI_NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex
 
 /** 활동 한 줄을 누가 했는지와 무엇을 했는지 글로 푼다. */
 export function activityWho(e: ActivityEvent): string {
+  if (e.manager) return e.manager;
   if (e.session) return `AI(${CLI_NAMES[e.agent ?? "claude"] ?? e.agent ?? "Claude Code"})`;
   return ACTORS[e.by ?? "human"] ?? e.by ?? "사람";
 }

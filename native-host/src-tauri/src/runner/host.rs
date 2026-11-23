@@ -68,6 +68,9 @@ pub trait Host: Send + Sync + 'static {
     fn changed(&self, task_key: Option<&str>);
     /// 설정과 실행 기록을 두는 폴더
     fn root(&self) -> PathBuf;
+    fn observes_managers(&self) -> bool {
+        false
+    }
 }
 
 /// 실제 앱의 [Host].
@@ -161,6 +164,10 @@ impl<R: Runtime> Host for AppHost<R> {
 
     fn root(&self) -> PathBuf {
         default_root()
+    }
+
+    fn observes_managers(&self) -> bool {
+        true
     }
 }
 

@@ -18,8 +18,8 @@ use std::{
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
-pub const KINDS: [&str; 7] = [
-    "question", "pr", "failed", "done", "approval", "decision", "test",
+pub const KINDS: [&str; 8] = [
+    "question", "pr", "failed", "done", "approval", "decision", "manager", "test",
 ];
 /// 목록에 두는 알림의 수. 넘으면 오래된 것부터 버린다.
 pub const MAX_ITEMS: usize = 200;
@@ -86,6 +86,8 @@ pub struct Events {
     /// AI가 노트에 쓴 「정할 것」(결정 블록)이 사람의 답을 기다릴 때. 답이 늦으면 AI가 멈춰 있으니 둘 다 켜 둔다(결정 5-나).
     #[serde(default = "on_both")]
     pub decision: Channel,
+    #[serde(default = "on_both")]
+    pub manager: Channel,
 }
 
 fn on_both() -> Channel {
@@ -129,6 +131,7 @@ impl Default for Events {
             done: done_default(),
             approval: on_both(),
             decision: on_both(),
+            manager: on_both(),
         }
     }
 }
@@ -159,6 +162,7 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "done" => settings.events.done,
         "approval" => settings.events.approval,
         "decision" => settings.events.decision,
+        "manager" => settings.events.manager,
         _ => Channel {
             in_app: true,
             macos: true,

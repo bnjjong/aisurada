@@ -63,6 +63,9 @@ export function TaskDetailPage({
   const [selectedNoteId, setSelectedNoteId] = useState("");
   const [refInput, setRefInput] = useState("");
   const [refError, setRefError] = useState("");
+  const [sendingStatus, setSendingStatus] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const runner = useRunner();
   const github = useGithub();
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
 
@@ -75,7 +78,7 @@ export function TaskDetailPage({
     }
   }, [github.status?.connected, controller]);
 
-  const runnerVersion = useRunner().version;
+  const runnerVersion = runner.version;
 
   const reload = useCallback(async () => {
     try {
@@ -159,6 +162,7 @@ export function TaskDetailPage({
     await run(() => updateTask(call, task, form));
   };
 
+  const slackSource = task.refs.find((ref) => ref.kind === "slack");
   return (
     <section className="page-scroll task-page task-detail">
       <div className="route-page task-page">
@@ -220,6 +224,32 @@ export function TaskDetailPage({
         <div className="task-cols">
           <div className="task-main">
             <RunnerPanel task={task} controller={controller} preset={preset?.runner} />
+            {task.manager && (
+              <section className="task-sec" aria-label="제보 출처">
+                <h2>제보 출처</h2>
+                <p>매니저 · {task.manager}</p>
+                {slackSource && (
+                  <div className="task-inline-actions">
+                    <a href={slackSource.target} target="_blank" rel="noreferrer">Slack 제보 열기</a>
+                    {runner.supported && (
+                      <button type="button" disabled={sendingStatus} onClick={async () => {
+                        setSendingStatus(true);
+                        setStatusMessage("");
+                        try {
+                          await controller.callHost("manager_send_status", { taskKey: task.key });
+                          setStatusMessage("Slack에 상태를 알렸어요.");
+                        } catch (err) {
+                          setStatusMessage(explainError(err));
+                        } finally {
+                          setSendingStatus(false);
+                        }
+                      }}>Slack 스레드에 상태 알리기</button>
+                    )}
+                  </div>
+                )}
+                {statusMessage && <p role="status">{statusMessage}</p>}
+              </section>
+            )}
 
             <section className="task-sec" aria-label="설명">
               <h2>
@@ -364,13 +394,13 @@ export function TaskDetailPage({
                 <ul className="task-links">
                   {task.refs.map((r) => (
                     <li key={`${r.kind}:${r.target}`}>
-                      <span className="task-chip-plain">{r.kind === "note" ? "노트" : "GitHub"}</span>
+                      <span className="task-chip-plain">{r.kind === "note" ? "노트" : r.kind === "slack" ? "Slack" : "GitHub"}</span>
                       {r.kind === "note" ? (
                         <button type="button" className="task-link-key" onClick={() => controller.navigate(docAddress(r.target))}>
                           {noteTitle(r.target) || r.title || r.target}
                         </button>
                       ) : (
-                        <a className="task-link-key" href={githubUrl(r.target)} target="_blank" rel="noreferrer">
+                        <a className="task-link-key" href={r.kind === "slack" ? r.target : githubUrl(r.target)} target="_blank" rel="noreferrer">
                           {r.target.replace("https://github.com/", "")}
                         </a>
                       )}

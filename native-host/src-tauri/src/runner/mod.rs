@@ -9,6 +9,7 @@
 //! ```
 pub mod host;
 pub mod job;
+mod manager_delivery;
 pub mod protocol;
 mod providers;
 pub mod store;
@@ -123,6 +124,11 @@ impl Runner {
         if self.reconciled.lock().unwrap().as_deref() != Some(vault.as_str()) {
             *self.reconciled.lock().unwrap() = Some(vault.clone());
             self.reconcile(&ctx);
+        }
+        if self.host.observes_managers() {
+            if let Err(error) = manager_delivery::poll(&ctx) {
+                eprintln!("매니저 태스크 변경을 확인하지 못했다: {error}");
+            }
         }
         if ctx.settings.auto_pickup && self.host.claude_available() {
             self.pickup(&ctx);
@@ -477,6 +483,19 @@ async fn blocking<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| format!("러너 작업이 끊겼어요: {e}"))?
+}
+
+#[tauri::command]
+pub async fn manager_send_status(
+    state: State<'_, RunnerState>,
+    task_key: String,
+) -> Result<(), String> {
+    let runner = state.0.clone();
+    blocking(move || {
+        let vault = runner.host.vault().ok_or("열린 vault가 없어요.")?;
+        manager_delivery::send_current(&runner.ctx(vault), &task_key)
+    })
+    .await
 }
 
 #[tauri::command]

@@ -92,7 +92,7 @@ export function TaskFormModal({
     addRef({ kind: "note", target: note.id, title: note.title });
     setNoteId("");
   };
-  const refName = (r: TaskRef) => (r.kind === "note" ? `노트 · ${r.title ?? r.target}` : `GitHub · ${r.target.replace("https://github.com/", "")}`);
+  const refName = (r: TaskRef) => (r.kind === "note" ? `노트 · ${r.title ?? r.target}` : r.kind === "slack" ? `Slack · ${r.title ?? r.target}` : `GitHub · ${r.target.replace("https://github.com/", "")}`);
   const unknownRepo = form.repo !== "" && !repos.some((r) => r.repo === form.repo);
 
   return (

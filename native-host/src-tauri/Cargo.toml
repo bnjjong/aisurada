@@ -7,6 +7,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+ais-domain = { path = "../../engine-rs/crates/ais-domain" }
 tempfile = "3"
 tauri = { version = "=2.11.2", features = ["protocol-asset"] }
 tauri-plugin-fs = { version = "=2.5.1", features = ["watch"] }

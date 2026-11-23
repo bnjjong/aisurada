@@ -120,6 +120,7 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
   const visible = useMemo(() => filterTasks(all, filter), [all, filter]);
   const grouped = useMemo(() => groupByStatus(visible), [visible]);
   const choices = useMemo(() => filterChoices(all), [all]);
+  const managers = useMemo(() => [...new Set(all.flatMap((task) => task.manager ? [task.manager] : []))].sort(), [all]);
   const repos = useMemo(() => repoChoices(ws.projects), [ws.projects]);
   const notes = useMemo(() => ws.notes.map((n) => ({ id: n.id, title: asText(n.title) })), [ws.notes]);
   const open = (key: string) => controller.navigate(taskAddress(key));
@@ -131,6 +132,7 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
       <button type="button" className="task-card-title" onClick={() => open(t.key)}>
         {t.title}
       </button>
+      {t.manager && <span className="task-chip-plain">매니저 · {t.manager}</span>}
       {t.labels.length > 0 && (
         <ul className="task-labels" aria-label="라벨">
           {t.labels.map((l) => (
@@ -216,6 +218,7 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
               <button type="button" className="task-card-title" onClick={() => open(t.key)}>
                 {t.title}
               </button>
+              {t.manager && <span className="task-chip-plain">매니저 · {t.manager}</span>}
             </td>
             <td>
               <StatusPill status={t.status} />
@@ -286,6 +289,12 @@ export function TasksPage({ state, controller, preset }: { state: WorkspaceState
             </option>
           ))}
         </select>
+        {(managers.length > 0 || filter.manager) && (
+          <select aria-label="만든 매니저 거르기" value={filter.manager ?? ""} onChange={(e) => set("manager", e.target.value)}>
+            <option value="">모든 매니저</option>
+            {managers.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        )}
         <label className="task-check">
           <input type="checkbox" checked={filter.blockedOnly} onChange={(e) => set("blockedOnly", e.target.checked)} />
           막힌 것만
