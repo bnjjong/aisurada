@@ -120,9 +120,11 @@ export function TaskDetailPage({
         ? { ...next, intakeSources: current.intakeSources } : next);
       else await reload();
       setError("");
+      return true;
     } catch (e) {
       setError(explainError(e));
       await reload();
+      return false;
     } finally {
       setBusy(false);
     }
@@ -162,7 +164,7 @@ export function TaskDetailPage({
   const saveField = async (patch: Partial<TaskForm>) => {
     if (!task) return;
     const form = { ...formFromTask(task), ...patch };
-    await run(() => updateTask(call, task, form));
+    return run(() => updateTask(call, task, form));
   };
 
   const slackSource = task.refs.find((ref) => ref.kind === "slack");
@@ -601,7 +603,8 @@ export function TaskDetailPage({
               </ul>
               <p className="task-hint">세 가지가 차야 상태 메뉴에서 Ready For Develop을 고를 수 있어요.</p>
             </section>
-            <TaskSlackSources entries={task.intakeSources ?? []} firstUrl={slackSource?.target} controller={controller}>
+            <TaskSlackSources entries={task.intakeSources ?? []} firstRef={slackSource} controller={controller} busy={busy}
+              onSaveFirst={source => saveField({ refs: task.refs.map(ref => ref === slackSource ? { ...ref, ...source } : ref) })}>
               {task.manager && slackSource && runner.supported && <button type="button" disabled={sendingStatus} onClick={async () => {
                 setSendingStatus(true);
                 setStatusMessage("");

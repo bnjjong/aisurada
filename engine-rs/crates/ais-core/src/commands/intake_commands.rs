@@ -1162,7 +1162,8 @@ fn apply_task(
             .collect();
         values.insert(
             0,
-            json!({"kind": "slack", "target": entry.url, "title": "Slack 원글"}),
+            json!({"kind": "slack", "target": entry.url, "title": "Slack 원글",
+                   "reporter": entry.reporter, "excerpt": entry.excerpt}),
         );
         draft.refs = Some(json!(values));
         let task = task_commands::create_task(vault, &draft, context)?;

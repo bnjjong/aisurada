@@ -189,6 +189,7 @@
 .intake-timeline small { display: block; }
 .intake-source-panel { display: grid; gap: 8px; }
 .intake-source-panel h2 { margin: 0; }
+.intake-source-editor { display: grid; gap: 8px; margin-top: 8px; }
 
 .intake-drawer a, .intake-source-panel a { color: var(--accent-text, var(--accent)); }
 

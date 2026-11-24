@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { taskAddress } from "../navigation/routes.ts";
-import { channelId, channelLabel, resultLabel, slackEmoji, slackLink, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
+import { channelId, channelLabel, resultLabel, slackEmoji, slackLink, slackMessageTime, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
 import { Modal } from "./Modal.tsx";
 import { SettingsSwitch } from "./SettingsParts.tsx";
+import type { TaskRef } from "./tasksClient.ts";
 import { eventTime, managerError, useManagers, type ManagerItem } from "./managersStore.tsx";
 
 const countLabels = ["오늘 접수", "새 태스크", "재제보 댓글", "되물음 대기", "무시"];
@@ -516,22 +517,57 @@ function ChannelEditor({ value, registered, configured, close, save }: {
   </Modal>;
 }
 
-export function TaskSlackSources({ entries, firstUrl, controller, children }: {
-  entries: IntakeSource[]; firstUrl?: string; controller: WorkspaceController; children?: ReactNode;
+type SlackSourceText = Pick<TaskRef, "reporter" | "excerpt">;
+
+function TaskSlackRef({ reference, controller, busy, save }: {
+  reference: TaskRef; controller: WorkspaceController; busy?: boolean;
+  save?(text: SlackSourceText): Promise<boolean | undefined>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [reporter, setReporter] = useState(reference.reporter ?? "");
+  const [excerpt, setExcerpt] = useState(reference.excerpt ?? "");
+  const postedAt = slackMessageTime(reference.target);
+  return <blockquote className="intake-quote">
+    <strong>처음{reference.reporter && ` · ${reference.reporter}`}{postedAt != null && ` · ${time(postedAt)}`}</strong>
+    {reference.excerpt && <p>{reference.excerpt}</p>}
+    <div className="mgr-actions">
+      <SlackIntakeLink url={reference.target} controller={controller}>Slack 원글 열기</SlackIntakeLink>
+      {save && !editing && <button type="button" disabled={busy} onClick={() => {
+        setReporter(reference.reporter ?? "");
+        setExcerpt(reference.excerpt ?? "");
+        setEditing(true);
+      }}>원글 정보 편집</button>}
+    </div>
+    {save && editing && <form className="intake-source-editor" onSubmit={async event => {
+      event.preventDefault();
+      if (await save({ reporter: reporter.trim(), excerpt: excerpt.trim() })) setEditing(false);
+    }}>
+      <label className="mgr-label">제보자<input value={reporter} maxLength={100} onChange={event => setReporter(event.target.value)} /></label>
+      <label className="mgr-label">원글 인용<textarea rows={3} value={excerpt} maxLength={200} onChange={event => setExcerpt(event.target.value)} /></label>
+      <div className="mgr-actions">
+        <button type="button" onClick={() => setEditing(false)}>취소</button>
+        <button type="submit" disabled={busy}>저장</button>
+      </div>
+    </form>}
+  </blockquote>;
+}
+
+export function TaskSlackSources({ entries, firstRef, controller, busy, onSaveFirst, children }: {
+  entries: IntakeSource[]; firstRef?: TaskRef; controller: WorkspaceController; children?: ReactNode; busy?: boolean;
+  onSaveFirst?(text: SlackSourceText): Promise<boolean | undefined>;
 }) {
   const first = entries.find(entry => entry.taskOrigin === "created");
   const reports = entries.filter(entry => entry.taskOrigin === "commented");
-  const total = reports.length + (first || firstUrl ? 1 : 0);
+  const total = reports.length + (first || firstRef ? 1 : 0);
   if (!total) return null;
   return <section className="task-sec intake-source-panel" aria-label="출처">
     <header className="mgr-between"><h2>출처</h2><span className="mgr-badge">제보 {total}번</span></header>
-    {!first && firstUrl && <blockquote className="intake-quote">
-      <strong>처음</strong><p><SlackIntakeLink url={firstUrl} controller={controller}>Slack 원글 열기</SlackIntakeLink></p>
-    </blockquote>}
+    {!first && firstRef && <TaskSlackRef key={firstRef.target} reference={firstRef} controller={controller} busy={busy} save={onSaveFirst} />}
     {[...(first ? [first] : []), ...reports].map(entry => <blockquote className="intake-quote" key={entry.id}>
       <strong>{entry.taskOrigin === "created" ? "처음" : "재제보"} · {entry.reporter} · {time(slackTime(entry.messageTs))}</strong>
       {entry.excerpt && <p>{entry.excerpt}</p>}
-      <span><SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink>{entry.reactionAdded && " · ✅"}</span>
+      <SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink>
+      <SlackReactions entry={entry} />
     </blockquote>)}
     {children}
   </section>;

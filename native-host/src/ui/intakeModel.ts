@@ -67,7 +67,7 @@ export interface IntakeEntry {
   history: IntakeProcessing[];
 }
 
-export type IntakeSource = Pick<IntakeEntry, "id" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded">;
+export type IntakeSource = Pick<IntakeEntry, "id" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded" | "reactions">;
 
 export interface IntakeRow {
   entry: IntakeEntry;
@@ -105,6 +105,13 @@ export function slackTimestamp(milliseconds: number) {
   return `${Math.floor(milliseconds / 1000)}.${String((milliseconds % 1000) * 1000).padStart(6, "0")}`;
 }
 
+const slackPermalink = /^https:\/\/[a-z0-9][a-z0-9-]*\.slack\.com\/archives\/[CGD][A-Z0-9]{2,}\/p(\d{10})(\d{6})(?:\?[^#\s]+)?$/i;
+
 export function slackLink(url: string) {
-  return /^https:\/\/[a-z0-9][a-z0-9-]*\.slack\.com\/archives\/[CGD][A-Z0-9]{2,}\/p\d{16}(?:\?[^#\s]+)?$/i.test(url) ? url : null;
+  return slackPermalink.test(url) ? url : null;
+}
+
+export function slackMessageTime(url: string) {
+  const parts = slackPermalink.exec(url);
+  return parts ? slackTime(`${parts[1]}.${parts[2]}`) : undefined;
 }
