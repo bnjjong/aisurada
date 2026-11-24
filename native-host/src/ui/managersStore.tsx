@@ -55,6 +55,12 @@ export const useManagers = () => useContext(ManagerContext);
 export const managerError = (error: unknown) =>
   error instanceof SidecarCommandError ? error.stderr : error instanceof Error ? error.message : String(error);
 
+function intakeQuestionBody({ excerpt, question }: IntakeData["asked"][number]) {
+  const original = excerpt?.replace(/\s+/g, " ").trim();
+  const draft = question?.replace(/\s+/g, " ").trim();
+  return [original && `「${original}」`, draft, "원장에서 답글 초안을 확인해 주세요."].filter(Boolean).join(" · ");
+}
+
 export function ManagersProvider({ controller, workspace, children }: {
   controller: WorkspaceController;
   workspace: Workspace;
@@ -110,7 +116,7 @@ export function ManagersProvider({ controller, workspace, children }: {
           try {
             await controller.callHost("notifications_push", { expectedVault: workspace.path, item: {
               id, kind: "intake-question", title: `${item.manager.label}가 제보에 물어볼 내용을 남겼어요`,
-              body: "접수 원장에서 답글 초안을 확인하고 Slack 스레드에 보낼 수 있어요.",
+              body: intakeQuestionBody(request),
               intake: { manager: item.manager.name, entry: request.id, url: request.url },
             } });
           } catch {

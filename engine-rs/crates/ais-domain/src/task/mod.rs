@@ -93,6 +93,8 @@ pub struct Ref {
     pub kind: String,
     pub target: String,
     pub title: Option<String>,
+    pub reporter: Option<String>,
+    pub excerpt: Option<String>,
 }
 
 #[derive(Clone, Debug)]

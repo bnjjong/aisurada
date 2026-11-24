@@ -62,6 +62,8 @@ export interface TaskRef {
   kind: "note" | "github" | "slack";
   target: string;
   title?: string;
+  reporter?: string;
+  excerpt?: string;
 }
 
 export interface TaskRelated {
@@ -222,7 +224,8 @@ function toRef(v: unknown): TaskRef | null {
   if (!isRecord(v)) return null;
   const target = text(v.target);
   if ((v.kind !== "note" && v.kind !== "github" && v.kind !== "slack") || !target) return null;
-  return { kind: v.kind, target, title: text(v.title) };
+  return { kind: v.kind, target, title: text(v.title),
+    ...(v.kind === "slack" ? { reporter: text(v.reporter), excerpt: text(v.excerpt) } : {}) };
 }
 
 function toRelated(v: unknown): TaskRelated | null {
@@ -248,7 +251,12 @@ function toIntakeSource(v: unknown): IntakeSource | null {
   const id = text(v.id), url = text(v.url), messageTs = text(v.messageTs);
   const taskOrigin = v.taskOrigin;
   if (!id || !url || !messageTs || (taskOrigin !== "created" && taskOrigin !== "commented")) return null;
-  return { id, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "", reactionAdded: v.reactionAdded === true };
+  const reactions = listOf(v.reactions, item => {
+    if (!isRecord(item) || !text(item.name) || typeof item.count !== "number" || item.count < 1) return null;
+    return { name: item.name as string, count: item.count };
+  });
+  return { id, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "",
+    reactionAdded: v.reactionAdded === true, reactions };
 }
 
 const listOf = <T,>(v: unknown, read: (x: unknown) => T | null): T[] => (Array.isArray(v) ? v.map(read).filter((x): x is T => x !== null) : []);
@@ -315,7 +323,9 @@ export function createArgv(form: TaskForm): string[] {
   return argv;
 }
 
-const refForEngine = (r: TaskRef) => (r.title ? { kind: r.kind, target: r.target, title: r.title } : { kind: r.kind, target: r.target });
+const refForEngine = ({ kind, target, title, reporter, excerpt }: TaskRef) => ({
+  kind, target, title, ...(kind === "slack" ? { reporter, excerpt } : {}),
+});
 
 export async function createTask(call: EngineCall, form: TaskForm): Promise<TaskDetail> {
   return detailOf(await call(fromArgv(createArgv(form))));
@@ -323,7 +333,9 @@ export async function createTask(call: EngineCall, form: TaskForm): Promise<Task
 
 const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 const sameCriteria = (a: TaskCriterion[], b: TaskCriterion[]) => a.length === b.length && a.every((c, i) => c.text === b[i].text && c.done === b[i].done);
-const sameRefs = (a: TaskRef[], b: TaskRef[]) => a.length === b.length && a.every((r, i) => r.kind === b[i].kind && r.target === b[i].target && (r.title ?? "") === (b[i].title ?? ""));
+const sameRefs = (a: TaskRef[], b: TaskRef[]) => a.length === b.length && a.every((r, i) =>
+  r.kind === b[i].kind && r.target === b[i].target && (r.title ?? "") === (b[i].title ?? "")
+  && (r.reporter ?? "") === (b[i].reporter ?? "") && (r.excerpt ?? "") === (b[i].excerpt ?? ""));
 
 /**
  * 고치기 인자. 바뀐 칸만 간다(그래서 같은 값이면 엔진이 파일을 안 바꾼다). 완료 기준은 확인 여부까지 통째로 보낸다.

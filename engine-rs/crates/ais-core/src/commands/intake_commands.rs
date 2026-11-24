@@ -1,6 +1,6 @@
 //! 매니저의 Slack 제보 원장과 채널 커서를 vault에 저장한다.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::ErrorKind;
@@ -45,6 +45,8 @@ struct Ledger {
     entries: BTreeMap<String, Entry>,
     #[serde(skip)]
     task_sources: BTreeMap<String, Vec<String>>,
+    #[serde(skip)]
+    repeat_counts: BTreeMap<String, usize>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -52,6 +54,8 @@ struct Ledger {
 struct Channel {
     id: String,
     label: String,
+    #[serde(default, skip_serializing_if = "ChannelVisibility::is_unknown")]
+    visibility: ChannelVisibility,
     emoji: String,
     mark_processed: bool,
     paused: bool,
@@ -64,6 +68,21 @@ struct Channel {
     last_scheduled_at: Option<i64>,
     #[serde(default)]
     schedule: Option<Schedule>,
+}
+
+#[derive(Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ChannelVisibility {
+    #[default]
+    Unknown,
+    Public,
+    Private,
+}
+
+impl ChannelVisibility {
+    fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -195,10 +214,31 @@ struct Entry {
     task_id: Option<String>,
     task_origin: Option<ResultKind>,
     reaction_added: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    reactions: Vec<SlackReaction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    report_reaction: Option<ReportReaction>,
     #[serde(default)]
     mark_requested: bool,
     reply_ts: Option<String>,
     history: Vec<Processing>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SlackReaction {
+    name: String,
+    count: u32,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ReportReaction {
+    name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    at: Option<i64>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -207,6 +247,10 @@ struct Processing {
     revision: String,
     result: ResultKind,
     at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    checked_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    searched_at: Option<i64>,
     via: ProcessVia,
     decision: String,
     question: String,
@@ -242,6 +286,10 @@ struct Record {
     excerpt: String,
     result: ResultKind,
     via: ProcessVia,
+    checked_at: Option<i64>,
+    searched_at: Option<i64>,
+    reactions: Option<Vec<SlackReaction>>,
+    report_reaction: Option<ReportReaction>,
     #[serde(default)]
     decision: String,
     #[serde(default)]
@@ -268,11 +316,14 @@ struct Move {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct Configure {
     channel: String,
-    label: String,
-    emoji: String,
-    mark_processed: bool,
-    paused: bool,
-    interval_minutes: u16,
+    label: Option<String>,
+    visibility: Option<ChannelVisibility>,
+    emoji: Option<String>,
+    mark_processed: Option<bool>,
+    paused: Option<bool>,
+    interval_minutes: Option<u16>,
+    #[serde(default)]
+    create_only: bool,
     #[serde(default)]
     schedule: ScheduleUpdate,
 }
@@ -344,7 +395,7 @@ pub(crate) fn execute(
     let path = ledger_path(vault)?;
     let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
     if matches!(operation, IntakeOperation::Get) {
-        return Ledger::read(&path)?.get(manager, allowed_channels, parse("get_intake", args)?, context.caller);
+        return Ledger::read(&path)?.get(vault, manager, allowed_channels, parse("get_intake", args)?, context.caller);
     }
     let mut ledger = Ledger::load(&path)?;
     let (response, changed) = match operation {
@@ -400,6 +451,16 @@ fn slack_channel(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+}
+
+fn slack_emoji(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 80
+        && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"_+-".contains(&byte))
+}
+
+fn slack_reaction_name(name: &str) -> bool {
+    name.len() <= 80 && name.split("::").all(slack_emoji)
 }
 
 fn check_channel(allowed: &[String], channel: &str) -> Result<(), EngineError> {
@@ -474,7 +535,7 @@ pub(super) fn sources_for_task(vault: &Path, task_id: &str) -> Result<Value, Eng
     let mut rows: Vec<_> = keys.iter().filter_map(|key| ledger.entries.get(key)).collect();
     rows.sort_by_key(|entry| (entry.task_origin != Some(ResultKind::Created), &entry.message_ts));
     // 같은 프로젝트의 매니저가 같은 Slack 출처를 연결하면 화면에는 한 번만 싣는다.
-    let mut shown = std::collections::HashSet::new();
+    let mut shown = HashSet::new();
     rows.retain(|entry| shown.insert(&entry.id));
     Ok(json!(rows))
 }
@@ -493,6 +554,13 @@ impl Ledger {
             if let Some(task) = &entry.task_id {
                 ledger.task_sources.entry(task.clone()).or_default().push(key.clone());
             }
+        }
+        for (task, keys) in &ledger.task_sources {
+            let reports: HashSet<_> = keys.iter().filter_map(|key| {
+                let entry = &ledger.entries[key];
+                (entry.task_origin == Some(ResultKind::Commented)).then_some(&entry.id)
+            }).collect();
+            ledger.repeat_counts.insert(task.clone(), reports.len());
         }
         let ledger = Arc::new(ledger);
         if let Some(stamp) = stamp
@@ -554,6 +622,7 @@ impl Ledger {
 
     fn get(
         &self,
+        vault: &Path,
         manager: &ManagerContext,
         allowed: &[String],
         query: Query,
@@ -589,6 +658,7 @@ impl Ledger {
         let mut counts = [0_u64; 5];
         let mut waiting = 0;
         let mut rows_revision = DefaultHasher::new();
+        let mut repos = BTreeMap::new();
         let prefix = manager_key(manager, "");
         let entries = self.entries.range(prefix.clone()..)
             .take_while(|(key, _)| key.starts_with(&prefix))
@@ -601,6 +671,8 @@ impl Ledger {
             entry.id.hash(&mut rows_revision);
             event.revision.hash(&mut rows_revision);
             entry.reaction_added.hash(&mut rows_revision);
+            let repeat_count = entry.task_id.as_ref().and_then(|id| self.repeat_counts.get(id));
+            repeat_count.hash(&mut rows_revision);
             if entry.received_at >= now - 48 * 60 * MINUTE
                 && clock().local_clock(entry.received_at).date == local.date
             {
@@ -616,8 +688,14 @@ impl Ledger {
             if event.result == ResultKind::Asked {
                 waiting += 1;
                 if allowed.contains(&entry.channel) {
-                    // 앱 알림은 인용을 노출하지 않고 원장 항목을 연다.
-                    asked.push(json!({ "id": entry.id, "at": event.at, "revision": event.revision, "url": entry.url }));
+                    let mut question = json!({
+                        "id": entry.id, "at": event.at, "revision": event.revision, "url": entry.url
+                    });
+                    if caller == Caller::App {
+                        question["excerpt"] = json!(short(&entry.excerpt, 100));
+                        question["question"] = json!(short(&event.question, 140));
+                    }
+                    asked.push(question);
                     if !query.summary {
                         pending.push(entry.view()?);
                     }
@@ -647,18 +725,31 @@ impl Ledger {
                 }));
             }
             if caller == Caller::App && !query.summary {
-                views.push((event.at, entry.view()?));
+                let mut view = entry.view()?;
+                if let Some((key, id)) = entry.task_key.as_deref().zip(entry.task_id.as_deref()) {
+                    let repo = repos.entry(key).or_insert_with(|| {
+                        store::read_by_key(vault, key)
+                            .filter(|task| task.id == id)
+                            .and_then(|task| task.repo)
+                    });
+                    view["taskRepo"] = json!(repo);
+                }
+                if event.result == ResultKind::Commented {
+                    view["repeatCount"] = json!(repeat_count);
+                }
+                views.push((event.at, view));
             }
         }
         views.sort_by_key(|(at, _)| std::cmp::Reverse(*at));
         let stalled_minutes = channels.iter().filter_map(|channel| channel.stalled_minutes(now, local)).max();
         let channels: Vec<_> = channels.iter().map(|channel| {
             let mut view = json!(channel);
+            view["stalledMinutes"] = json!(channel.stalled_minutes(now, local));
             view["nextCheckAt"] = json!(channel.next_check_at(now, local));
             view
         }).collect();
         Ok(json!({
-            "channels": channels, "rows": views.into_iter().map(|(_, view)| view).collect::<Vec<_>>(),
+            "checkedAt": now, "channels": channels, "rows": views.into_iter().map(|(_, view)| view).collect::<Vec<_>>(),
             "rowsRevision": format!("{:016x}", rows_revision.finish()),
             "pending": pending, "unmarked": unmarked, "asked": asked, "waiting": waiting, "counts": counts,
             "stalledMinutes": stalled_minutes
@@ -672,39 +763,48 @@ impl Ledger {
         mut request: Configure,
     ) -> Result<(Value, bool), EngineError> {
         check_channel(allowed, &request.channel)?;
-        let emoji = request.emoji.trim().trim_matches(':');
-        if emoji.is_empty()
-            || emoji.len() > 80
-            || !emoji
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || b"_+-".contains(&byte))
-            || !(1..=1440).contains(&request.interval_minutes)
+        let emoji = request.emoji.as_deref().map(|value| value.trim().trim_matches(':'));
+        if emoji.is_some_and(|name| !slack_emoji(name))
+            || request.interval_minutes.is_some_and(|minutes| !(1..=1440).contains(&minutes))
         {
-            return Err(invalid(
-                "제보 기준 이모지 이름과 확인 간격(1~1440분)을 확인해 주세요",
-            ));
+            return Err(invalid("제보 기준 이모지 이름과 확인 간격(1~1440분)을 확인해 주세요"));
         }
         if let ScheduleUpdate::Set(Some(schedule)) = &mut request.schedule {
             schedule.validate()?;
         }
         let now = clock().now_millis();
         let key = manager_key(manager, &request.channel);
-        let channel = self.channels.entry(key).or_insert_with(|| Channel {
-            id: request.channel.clone(),
-            label: String::new(),
-            emoji: String::new(),
-            mark_processed: true,
-            paused: false,
-            interval_minutes: 10,
-            enabled_at: now,
-            cursor: format!("{:010}.{:06}", now / 1000, (now % 1000) * 1000),
-            revision: revision(),
-            last_check_at: None,
-            last_check_via: None,
-            last_scheduled_at: None,
-            schedule: None,
-        });
-        let mut restart_monitoring = channel.paused && !request.paused;
+        let channel = match self.channels.entry(key) {
+            std::collections::btree_map::Entry::Occupied(_) if request.create_only => {
+                return Err(invalid("이미 설정한 제보 채널이다"));
+            }
+            std::collections::btree_map::Entry::Occupied(existing) => existing.into_mut(),
+            std::collections::btree_map::Entry::Vacant(new) => {
+                if request.label.is_none() || emoji.is_none() || request.mark_processed.is_none()
+                    || request.paused.is_none() || request.interval_minutes.is_none()
+                {
+                    return Err(invalid("새 제보 채널에는 채널 이름, 이모지, 처리 표시, 정지 여부와 간격을 지정한다"));
+                }
+                new.insert(Channel {
+                    id: request.channel.clone(),
+                    label: String::new(),
+                    visibility: ChannelVisibility::Unknown,
+                    emoji: String::new(),
+                    mark_processed: true,
+                    paused: false,
+                    interval_minutes: 10,
+                    enabled_at: now,
+                    cursor: format!("{:010}.{:06}", now / 1000, (now % 1000) * 1000),
+                    revision: String::new(),
+                    last_check_at: None,
+                    last_check_via: None,
+                    last_scheduled_at: None,
+                    schedule: None,
+                })
+            }
+        };
+        let paused = request.paused.unwrap_or(channel.paused);
+        let mut restart_monitoring = channel.paused && !paused;
         if let ScheduleUpdate::Set(schedule) = request.schedule {
             restart_monitoring |= channel.schedule != schedule;
             channel.schedule = schedule;
@@ -713,11 +813,18 @@ impl Ledger {
             channel.enabled_at = now;
             channel.last_scheduled_at = None;
         }
-        channel.label = short(&request.label, 80);
-        channel.emoji = emoji.into();
-        channel.mark_processed = request.mark_processed;
-        channel.paused = request.paused;
-        channel.interval_minutes = request.interval_minutes;
+        if let Some(label) = request.label {
+            channel.label = short(&label, 80);
+        }
+        if let Some(visibility) = request.visibility {
+            channel.visibility = visibility;
+        }
+        if let Some(emoji) = emoji {
+            channel.emoji = emoji.into();
+        }
+        channel.mark_processed = request.mark_processed.unwrap_or(channel.mark_processed);
+        channel.paused = paused;
+        channel.interval_minutes = request.interval_minutes.unwrap_or(channel.interval_minutes);
         channel.revision = revision();
         Ok((json!(channel), true))
     }
@@ -812,6 +919,8 @@ impl Ledger {
             revision: revision(),
             result: request.result,
             at: clock().now_millis(),
+            checked_at: None,
+            searched_at: None,
             via: ProcessVia::Manual,
             decision: if request.result == ResultKind::Pending {
                 "다시 처리 요청"
@@ -832,7 +941,7 @@ impl Ledger {
         context: &CallContext,
         manager: &ManagerContext,
         allowed: &[String],
-        request: Record,
+        mut request: Record,
     ) -> Result<(Value, bool), EngineError> {
         agent_via(request.via)?;
         let channel = self.channel(manager, allowed, &request.channel)?;
@@ -913,12 +1022,42 @@ impl Ledger {
                 task_id: None,
                 task_origin: None,
                 reaction_added: false,
+                reactions: Vec::new(),
+                report_reaction: None,
                 mark_requested: false,
                 reply_ts: None,
                 history: Vec::new(),
             }
         };
 
+        if request.checked_at.is_some_and(|at| at <= 0 || at > now) {
+            return Err(invalid("확인을 시작한 시각은 현재보다 뒤일 수 없다"));
+        }
+        let posted_at = (source_ts / 1000) as i64;
+        if request.searched_at.is_some_and(|at| at < posted_at || at > now
+            || request.checked_at.is_some_and(|started| at < started)) {
+            return Err(invalid("검색 시각은 제보 이후부터 현재까지의 범위여야 한다"));
+        }
+        if let Some(reactions) = request.reactions.take() {
+            let mut names = HashSet::new();
+            if reactions.len() > 30 || reactions.iter().any(|reaction| {
+                !slack_reaction_name(&reaction.name) || reaction.count == 0 || !names.insert(&reaction.name)
+            }) {
+                return Err(invalid("Slack 반응 이름과 개수를 확인해 주세요"));
+            }
+            entry.reactions = reactions;
+        }
+        if let Some(mut reaction) = request.report_reaction.take() {
+            if !slack_reaction_name(&reaction.name)
+                || reaction.at.is_some_and(|at| at < posted_at || at > now)
+            {
+                return Err(invalid("제보 반응의 이름과 시각을 확인해 주세요"));
+            }
+            reaction.by = reaction.by.map(|by| short(&by, 100)).filter(|by| !by.is_empty());
+            if reaction.at.is_some() || reaction.by.is_some() {
+                entry.report_reaction = Some(reaction);
+            }
+        }
         let question = short(&request.question, 500);
         if request.reaction_added.is_some() {
             return Err(invalid("Slack 표시 여부는 접수한 항목에 따로 기록한다"));
@@ -953,6 +1092,8 @@ impl Ledger {
             revision: revision(),
             result: request.result,
             at: now,
+            checked_at: request.checked_at,
+            searched_at: request.searched_at,
             via: request.via,
             decision: short(&request.decision, 500),
             question,
@@ -1031,7 +1172,8 @@ fn apply_task(
             .collect();
         values.insert(
             0,
-            json!({"kind": "slack", "target": entry.url, "title": "Slack 원글"}),
+            json!({"kind": "slack", "target": entry.url, "title": "Slack 원글",
+                   "reporter": entry.reporter, "excerpt": entry.excerpt}),
         );
         draft.refs = Some(json!(values));
         let task = task_commands::create_task(vault, &draft, context)?;
@@ -1093,6 +1235,7 @@ mod tests {
     fn intake_schedule_waits_for_work_hours_and_clears_after_a_desktop_check() {
         let mut channel = Channel {
             id: "CTEST123".into(), label: "가상 채널".into(), emoji: "ticket".into(),
+            visibility: ChannelVisibility::Unknown,
             mark_processed: true, paused: false, interval_minutes: 10,
             enabled_at: local_time(23, 9, 0).0,
             cursor: "1795500000.000000".into(), revision: "original".into(),

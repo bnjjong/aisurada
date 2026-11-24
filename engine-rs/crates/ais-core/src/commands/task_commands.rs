@@ -286,8 +286,10 @@ fn detail(
             .iter()
             .map(|r| {
                 let mut v = json!({"kind": r.kind, "target": r.target});
-                if let Some(title) = &r.title {
-                    v["title"] = json!(title);
+                for (key, value) in [("title", &r.title), ("reporter", &r.reporter), ("excerpt", &r.excerpt)] {
+                    if let Some(value) = value {
+                        v[key] = json!(value);
+                    }
                 }
                 v
             })

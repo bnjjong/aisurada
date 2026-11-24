@@ -320,6 +320,13 @@ fn link_list(value: Option<&Value>) -> Vec<Link> {
     out
 }
 
+fn slack_ref_text(kind: &str, value: Option<String>, limit: usize) -> Option<String> {
+    if kind != "slack" {
+        return None;
+    }
+    blank_to_null(value.map(|text| text.trim().chars().take(limit).collect()))
+}
+
 fn ref_list(value: Option<&Value>) -> Vec<Ref> {
     let mut out: Vec<Ref> = Vec::new();
     if let Some(Value::List(items)) = value {
@@ -332,6 +339,8 @@ fn ref_list(value: Option<&Value>) -> Vec<Ref> {
                 continue;
             }
             let reference = Ref {
+                reporter: slack_ref_text(&kind, str_of(m, "reporter"), 100),
+                excerpt: slack_ref_text(&kind, str_of(m, "excerpt"), 200),
                 kind,
                 target,
                 title: blank_to_null(str_of(m, "title")),
@@ -434,8 +443,14 @@ pub fn render(task: &Task) -> Result<Vec<u8>, EngineError> {
                     (text("kind"), text(&r.kind)),
                     (text("target"), text(&r.target)),
                 ];
-                if let Some(title) = &r.title {
-                    row.push((text("title"), text(title)));
+                for (key, value) in [
+                    ("title", &r.title),
+                    ("reporter", &r.reporter),
+                    ("excerpt", &r.excerpt),
+                ] {
+                    if let Some(value) = value {
+                        row.push((text(key), text(value)));
+                    }
                 }
                 Value::Map(row)
             })
@@ -700,7 +715,7 @@ pub fn refs(raw: &Json) -> Result<Vec<Ref>, EngineError> {
             )));
         };
         for (key, _) in entries {
-            if !["kind", "target", "title"].contains(&key.as_str()) {
+            if !["kind", "target", "title", "reporter", "excerpt"].contains(&key.as_str()) {
                 return Err(bad(format!("refs 항목에 모르는 키가 있다: {key}")));
             }
         }
@@ -723,9 +738,12 @@ pub fn refs(raw: &Json) -> Result<Vec<Ref>, EngineError> {
                 json::java_record_string(item)
             )));
         }
+        let kind = java_trim(&kind);
         let title = string_of(entries, "title");
         let reference = Ref {
-            kind: java_trim(&kind).to_string(),
+            reporter: slack_ref_text(kind, string_of(entries, "reporter"), 100),
+            excerpt: slack_ref_text(kind, string_of(entries, "excerpt"), 200),
+            kind: kind.to_string(),
             target: java_trim(&target).to_string(),
             title: title
                 .filter(|t| !trim(t).is_empty())
