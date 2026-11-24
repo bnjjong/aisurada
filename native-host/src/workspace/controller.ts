@@ -293,11 +293,14 @@ export class WorkspaceController {
     const keep = (dispose: () => void) => { if (this.disposed) dispose(); else this.inputDisposers.add(dispose); };
     if (this.services.menu) void this.services.menu(id => { void this.handleMenu(id); }).then(keep)
       .catch(error => this.services.warn('메뉴를 듣지 못했어요', error));
-    if (this.context.kind !== 'main') return;
     if (this.services.navigateRequested) void this.services.navigateRequested(nav => {
       if (this.disposed || !nav?.path) return;
-      this.navigate(nav.path);
       const route = parseRoute(nav.path);
+      if (this.context.kind === 'note') {
+        if (route.kind === 'sub' && route.root === this.context.docId) this.openSubNotes(route.root, route.ids);
+        return;
+      }
+      this.navigate(nav.path);
       if (nav.sub) {
         const parts = nav.sub.split('/').filter(Boolean);
         if (parts.length > 0) {
@@ -314,6 +317,7 @@ export class WorkspaceController {
         }
       }
     }).then(keep).catch(error => this.services.warn('이동 요청을 듣지 못했어요', error));
+    if (this.context.kind !== 'main') return;
     if (this.services.deepLinks) void connectLinkSource(this.services.deepLinks, urls => { void this.receiveURLs(urls); },
       () => this.linkRevision, error => this.services.warn('앱을 연 주소를 읽지 못했어요', error)).then(keep)
       .catch(error => this.services.warn('딥링크를 듣지 못했어요', error));
@@ -443,7 +447,12 @@ export class WorkspaceController {
   // 4.8: 그 창을 여는 링크는 도착 주소 /doc/<root>를 쓰고, 그 길에서 생기는 주소 바뀜 한 번은 창을 닫지 않고 넘긴다. 다른 길은 이미 그 주소가 아니면 쓴다.
   openSubNotes = (root: string, ids: string[], alwaysArrive = false) => {
     if (!ids.length) { if (this.context.kind !== 'main') this.patch({ subNotes: null }); return; }
-    if (this.isPoppedOut(root)) { this.focusNoteWindow(root); return; }
+    if (this.isPoppedOut(root)) {
+      this.focusNoteWindow(root);
+      if (this.context.kind === 'main') void this.services.openSubNoteInWindow?.(root, ids)
+        .catch(error => this.services.warn('별도 창에서 후속 노트를 열지 못했어요', error));
+      return;
+    }
     if (this.context.kind === 'main') { this.navigate(subAddress(root, ids)); return; }
     this.patch({ subNotes: {
       root, ids, arrival: !alwaysArrive && this.state.route === docAddress(root) ? null : docAddress(root),
