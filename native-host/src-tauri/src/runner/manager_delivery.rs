@@ -105,6 +105,7 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
                         body: row.title,
                         task_key: Some(row.key),
                         note_ref: None,
+                        intake: None,
                         id: Some(format!("manager-{}", row.id)),
                     }),
                     Some(old)

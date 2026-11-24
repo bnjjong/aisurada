@@ -232,7 +232,7 @@ function RouteContent({
     case "managers":
       return <ManagersPage project={route.project} workspace={state.workspace!} controller={controller} />;
     case "manager":
-      return <ManagersPage key={route.name} name={route.name} workspace={state.workspace!} controller={controller} />;
+      return <ManagersPage key={route.name} name={route.name} intake={route.intake} workspace={state.workspace!} controller={controller} />;
     case "task":
       return <TaskDetailPage taskKey={route.key} state={state} controller={controller} />;
     case "architecture":

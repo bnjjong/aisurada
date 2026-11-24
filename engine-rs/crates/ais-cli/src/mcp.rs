@@ -13,7 +13,8 @@ use ais_core::json::{self, JsonValue};
 
 use crate::env::{Env, SessionSource};
 use crate::manager::{self, Manager};
-use crate::mcp_tools::TOOLS;
+use crate::mcp_tools::{MANAGER_INTAKE_TOOLS, TOOLS};
+use ais_core::{CallContext, engine::IntakeOperation};
 
 pub const SERVER_NAME: &str = "aisurada";
 pub const SERVER_VERSION: &str = "0.1.0";
@@ -141,15 +142,19 @@ impl ManagerGate {
 
     fn check(&self, tool: &str) -> Result<Manager, String> {
         let current = self.current()?;
-        if !self.initial.tools.iter().any(|name| name == tool)
-            || !current.tools.iter().any(|name| name == tool)
-        {
+        if !self.allowed(&current, tool) {
             return Err(format!(
                 "매니저 {}에게 열지 않은 도구다: {tool}",
                 current.name
             ));
         }
         Ok(current)
+    }
+
+    fn allowed(&self, current: &Manager, tool: &str) -> bool {
+        manager::INTAKE_TOOLS.contains(&tool)
+            || (self.initial.tools.iter().any(|name| name == tool)
+                && current.tools.iter().any(|name| name == tool))
     }
 
     fn record(&self, tool: &str, result: &str, target: Option<&str>) {
@@ -265,7 +270,7 @@ impl<'a> McpServer<'a> {
             quote(&self.manager.as_ref().map_or_else(
                 || instructions(self.client_name.as_deref()),
                 |gate| format!(
-                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. 새 태스크는 초안으로 만들고, 만들기 전에 유사 태스크와 노트를 찾는다. 중복 제보는 기존 태스크 댓글로 남긴다. Slack 출처는 refs의 slack 항목으로 보관한다. 판단 정보가 부족하면 되묻고, 쓰기 결과를 확인한 뒤 제보자에게 알린다.",
+                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. Slack 제보는 get_intake로 등록 채널, 커서와 처리 대기를 읽고, 채널의 커서 뒤 글만 읽는다. 지정 이모지가 달린 글의 시각마다 get_intake로 기존 기록을 확인한다. 유사 태스크와 노트를 찾은 뒤 record_intake로 새 태스크, 재제보 댓글, 되물음 초안이나 무시를 기록한다. asked는 새 스레드 답변이 있을 때만, pending은 다음 확인에 다시 처리한다. 제보를 모두 기록한 뒤 move_cursor를 부른다. 처리 표시가 켜져 있으면 성공한 항목의 Slack 원글에 ✅를 달고 reactionAdded를 기록한다. 되물음은 스레드 답글 초안으로 사용자에게 확인받는다. Slack 연결 없이 들어온 직접 제보는 기존 도구로 처리한다.",
                     gate.initial.name, gate.initial.project
                 )
             ))
@@ -274,11 +279,16 @@ impl<'a> McpServer<'a> {
 
     fn tools_list_result(&self) -> String {
         let active = self.manager.as_ref().and_then(|gate| gate.current().ok());
+        let intake = if self.manager.is_some() {
+            MANAGER_INTAKE_TOOLS
+        } else {
+            &[]
+        };
         let tools: Vec<String> = TOOLS
             .iter()
+            .chain(intake)
             .filter(|tool| match &self.manager {
-                Some(gate) => gate.initial.tools.iter().any(|name| name == tool.name)
-                    && active.as_ref().is_some_and(|m| m.tools.iter().any(|name| name == tool.name)),
+                Some(gate) => active.as_ref().is_some_and(|current| gate.allowed(current, tool.name)),
                 None => is_exposed(tool, self.allow_write),
             })
             .map(|tool| {
@@ -302,7 +312,18 @@ impl<'a> McpServer<'a> {
             return error(id, INVALID_PARAMS, "params.name이 필요하다");
         };
         let params = params.expect("name을 읽었으므로 params가 있다");
-        let Some(tool) = find(name) else {
+        let intake = match (self.manager.is_some(), name.as_str()) {
+            (true, "get_intake") => Some(IntakeOperation::Get),
+            (true, "record_intake") => Some(IntakeOperation::Record),
+            (true, "move_cursor") => Some(IntakeOperation::Move),
+            _ => None,
+        };
+        let tool = if intake.is_some() {
+            MANAGER_INTAKE_TOOLS.iter().find(|tool| tool.name == name)
+        } else {
+            find(name)
+        };
+        let Some(tool) = tool else {
             if let Some(gate) = &self.manager {
                 gate.record("unknown", "rejected", None);
             }
@@ -360,6 +381,47 @@ impl<'a> McpServer<'a> {
             self.client_name.as_deref(),
             meta_session_id(params.get("_meta")),
         );
+        if let (Some(operation), Some((gate, manager))) = (intake, managed.as_ref()) {
+            let raw = json::compact(arguments);
+            if raw.len() > 1_048_576 {
+                gate.record(tool.name, "rejected", None);
+                return result(id, &tool_result("접수 인자는 1 MiB까지 보낼 수 있다", true));
+            }
+            let args: serde_json::Value = match serde_json::from_str(&raw) {
+                Ok(value) => value,
+                Err(_) => return result(id, &tool_result("접수 인자를 읽지 못했다", true)),
+            };
+            if matches!(operation, IntakeOperation::Record) {
+                let required = match args["result"].as_str() {
+                    Some("created") => Some("create_task"),
+                    Some("commented") => Some("add_task_comment"),
+                    _ => None,
+                };
+                if let Some(required) = required
+                    && !gate.allowed(manager, required)
+                {
+                    gate.record(tool.name, "rejected", None);
+                    return result(
+                        id,
+                        &tool_result("매니저에게 허용하지 않은 태스크 작업이다", true),
+                    );
+                }
+            }
+            let context = CallContext::ai(
+                session.as_ref().map(|source| source.id.clone()),
+                session.as_ref().map(|source| source.agent.clone()),
+            );
+            return match manager.intake(operation, context, args) {
+                Ok(value) => {
+                    gate.record(tool.name, "ok", value["item"]["entry"]["id"].as_str());
+                    result(id, &tool_result(&value.to_string(), false))
+                }
+                Err(error) => {
+                    gate.record(tool.name, "rejected", None);
+                    result(id, &tool_result(&error.to_string(), true))
+                }
+            };
+        }
         let args = [name.clone(), json::compact(arguments)];
         let call = if let Some((gate, manager)) = managed {
             let call = call_engine(&gate.env, &args, session, Some(&manager));

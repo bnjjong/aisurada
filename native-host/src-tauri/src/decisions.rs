@@ -64,6 +64,7 @@ pub fn items_from_reply(stdout: &str) -> Vec<NewItem> {
                     note_ref.replace('/', "-")
                 )),
                 note_ref: Some(note_ref),
+                intake: None,
             })
         })
         .collect()
@@ -164,6 +165,7 @@ mod tests {
             notifications::build_item(
                 NewItem {
                     note_ref: Some("../etc".into()),
+                    intake: None,
                     ..items_from_reply(r#"{"notes":[{"id":"nd1-a","total":1}]}"#).remove(0)
                 },
                 1,

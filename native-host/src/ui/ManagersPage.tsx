@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Workspace } from "../workspace/types.ts";
 import { managerAddress, managersAddress, projectAddress } from "../navigation/routes.ts";
+import { IntakeBadges, IntakeConnection, ManagerIntake } from "./ManagerIntake.tsx";
 import { Confirm } from "./Modal.tsx";
 import { Page } from "./OtherPages.tsx";
 import { PROJECT_TYPE_NAMES, projectTypeOf } from "./model.ts";
@@ -57,6 +58,7 @@ function ManagerCard({ item, busy, canCopy, action, open, copy }: {
         <dt>오늘</dt><dd>태스크 {metric(item, "create_task")} · 댓글 {metric(item, "add_task_comment")} · 거절 {todayEvents(item.history.events).filter(event => event.result === "rejected").length}</dd>
       </dl>
     </div>
+    <IntakeBadges item={item} />
     {deliveryIssue(item) && <p className="mgr-error" role="status">최근 상태 알림을 보내지 못했어요.</p>}
     <footer className="mgr-actions">
       <button type="button" onClick={open}>열기</button>
@@ -66,8 +68,8 @@ function ManagerCard({ item, busy, canCopy, action, open, copy }: {
   </article>;
 }
 
-export function ManagersPage({ project, name, workspace, controller }: {
-  project?: string; name?: string; workspace: Workspace; controller: WorkspaceController;
+export function ManagersPage({ project, name, intake, workspace, controller }: {
+  project?: string; name?: string; intake?: string; workspace: Workspace; controller: WorkspaceController;
 }) {
   const { data, error, refresh } = useManagers();
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -109,7 +111,7 @@ export function ManagersPage({ project, name, workspace, controller }: {
       {!data && error && <button type="button" onClick={() => void refresh()}>다시 읽기</button>}
       {data && name && !selected && <p>매니저를 찾을 수 없어요. <button onClick={() => controller.navigate(managersAddress())}>매니저 목록</button></p>}
       {data && selected && <ManagerDetail item={selected} projects={projects} controller={controller}
-        busy={working === selected.manager.name} action={action} setup={setSetup} />}
+        busy={working === selected.manager.name} action={action} setup={setSetup} intake={intake} />}
       {data && !name && <>
         <p className="mgr-intro">매니저는 Slack 등에서 받은 제보를 태스크로 접수해요. 매니저 하나는 프로젝트 하나에 연결돼요.</p>
         <div className="mgr-between mgr-overview">
@@ -173,15 +175,21 @@ export function ManagersPage({ project, name, workspace, controller }: {
 }
 
 const tabs = [
-  ["history", "기록"], ["permissions", "권한"], ["connection", "연결"], ["notifications", "상태 알림"],
+  ["history", "기록"], ["intake", "접수"], ["permissions", "권한"], ["connection", "연결"], ["notifications", "상태 알림"],
 ] as const;
 
-function ManagerDetail({ item, projects, controller, busy, action, setup }: {
+function ManagerDetail({ item, projects, controller, busy, action, setup, intake }: {
   item: ManagerItem; projects: ManagerProject[]; controller: WorkspaceController; busy: boolean;
   action(kind: "config" | "enable" | "disable" | "remove", manager: ManagerConfig): Promise<void>;
   setup(value: Setup): void;
+  intake?: string;
 }) {
-  const [tab, setTab] = useState<(typeof tabs)[number][0]>("history");
+  const [tab, setTab] = useState<(typeof tabs)[number][0]>(intake ? "intake" : "history");
+  const selectedTab = intake ? "intake" : tab;
+  const openTab = (next: typeof tab) => {
+    setTab(next);
+    if (intake) controller.navigate(managerAddress(item.manager.name));
+  };
   const [deleting, setDeleting] = useState(false);
   const { data } = useManagers();
   const { manager, history } = item;
@@ -206,12 +214,17 @@ function ManagerDetail({ item, projects, controller, busy, action, setup }: {
     </div>
     {item.issue && <p className="mgr-error" role="status">{item.issue}</p>}
     <nav className="mgr-tabs" aria-label="매니저 상세">
-      {tabs.map(([key, label]) => <button type="button" key={key} aria-pressed={tab === key} disabled={key !== "history" && !project} onClick={() => setTab(key)}>{label}</button>)}
+      {tabs.map(([key, label]) => <button type="button" key={key} aria-pressed={selectedTab === key} disabled={key !== "history" && !project} onClick={() => openTab(key)}>{label}
+        {key === "intake" && !!item.intake?.waiting && <span className="mgr-badge mgr-intake-warning">{item.intake.waiting}</span>}
+      </button>)}
     </nav>
+    {selectedTab === "intake" && project ? <ManagerIntake item={item} controller={controller} entryId={intake} onConnection={() => openTab("connection")} /> :
     <div className="mgr-detail">
-      <div>
-        {tab === "history" ? <ManagerHistory item={item} /> : project && data && <ManagerEditor key={tab}
-          item={item} project={project} data={data} controller={controller} tab={tab} />}
+      <div className={selectedTab === "connection" ? "intake-stack" : undefined}>
+        {selectedTab === "connection" && project && <IntakeConnection item={item} controller={controller} />}
+        {selectedTab === "history" ? <ManagerHistory item={item} /> : selectedTab !== "intake" && project && data && <ManagerEditor
+          key={selectedTab === "connection" ? item.manager.slackChannels.join(",") : selectedTab}
+          item={item} project={project} data={data} controller={controller} tab={selectedTab} />}
       </div>
       <aside>
         <section className="mgr-panel"><h2>세부 정보</h2>
@@ -234,7 +247,7 @@ function ManagerDetail({ item, projects, controller, busy, action, setup }: {
           </dl>
         </section>
       </aside>
-    </div>
+    </div>}
     {deleting && <Confirm title="매니저를 지울까요?" close={() => setDeleting(false)}
       description={`${manager.label}의 연결 설정과 기기에 남긴 호출 기록을 지워요.`}
       accept={() => action("remove", manager)} />}

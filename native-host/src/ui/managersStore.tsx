@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { SidecarCommandError } from "../workspace/engine.ts";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { asText, type Workspace } from "../workspace/types.ts";
+import type { IntakeData } from "./intakeModel.ts";
 import { parseRepos } from "./repoLinks.ts";
 
 export type ManagerKind = "hermes" | "mcp";
@@ -31,6 +32,8 @@ export interface ManagerItem {
   manager: ManagerConfig;
   issue: string | null;
   historyIssue?: string | null;
+  intake?: IntakeData | null;
+  intakeIssue?: string | null;
   history: { firstCall: number | null; events: ManagerEvent[] };
 }
 export interface ManagerDashboard {
@@ -60,6 +63,7 @@ export function ManagersProvider({ controller, workspace, children }: {
   const [data, setData] = useState<ManagerDashboard | null>(null);
   const [error, setError] = useState("");
   const request = useRef(0);
+  const notified = useRef(new Set<string>());
   const sample = workspace.sample;
   const refresh = useCallback(async () => {
     if (sample) return;
@@ -89,6 +93,35 @@ export function ManagersProvider({ controller, workspace, children }: {
       window.removeEventListener("focus", onFocus);
     };
   }, [refresh, sample]);
+
+  useEffect(() => {
+    if (!controller.isNative() || !data) return;
+    const earliest = Date.now() - 24 * 60 * 60 * 1000;
+    // 한 번에 하나씩 넣어 알림 목록의 쓰기 순서를 지킨다.
+    let live = true;
+    const publish = async () => {
+      for (const item of data.items) {
+        if (!item.manager.enabled || item.issue) continue;
+        for (const request of item.intake?.asked ?? []) {
+          if (!live || request.at < earliest) continue;
+          const id = "intake-question-" + request.revision;
+          if (notified.current.has(id)) continue;
+          notified.current.add(id);
+          try {
+            await controller.callHost("notifications_push", { expectedVault: workspace.path, item: {
+              id, kind: "intake-question", title: `${item.manager.label}가 제보에 되물었어요`,
+              body: "Slack 스레드에 남길 답글 초안을 확인해 주세요.",
+              intake: { manager: item.manager.name, entry: request.id, url: request.url },
+            } });
+          } catch {
+            notified.current.delete(id);
+          }
+        }
+      }
+    };
+    void publish();
+    return () => { live = false; };
+  }, [controller, data, workspace.path]);
 
   return <ManagerContext.Provider value={{ data, error, refresh }}>{children}</ManagerContext.Provider>;
 }

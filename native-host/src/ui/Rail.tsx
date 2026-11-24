@@ -69,11 +69,14 @@ export function Rail({
   const activeManagers = enabledManagers(managers.data);
   const managerIssues = managers.error ? 1 : managers.data?.items.filter(item =>
     (item.manager.project && item.issue === "프로젝트를 찾을 수 없어요") || deliveryIssue(item)).length ?? 0;
+  const intakeWaiting = activeManagers.reduce((total, item) => total + (item.intake?.waiting ?? 0), 0);
+  const intakeStalled = activeManagers.filter(item => item.intake?.stalledMinutes != null).length;
+  const managerAttention = managerIssues + intakeWaiting + intakeStalled;
   const managerSummary = activeManagers.length === 1 ? `${activeManagers[0].manager.label} 켜짐` : `${activeManagers.length}개 켜짐`;
   // AI가 노트에 쓴 「정할 것」 가운데 사람의 답을 기다리는 노트(후속 노트 포함)
   const decisions = usePendingDecisions();
   // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 답을 기다리는 노트 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
-  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerIssues);
+  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerAttention);
   // 켜질 탭은 화면 주소가 정한다. 주소가 탭을 정하지 않는 화면이면 직전에 켜 둔 탭이다
   const tab = activeRailTab(state.route);
   useEffect(() => rememberRailTab(state.route), [state.route]);
@@ -417,9 +420,11 @@ export function Rail({
         </button>
       )}
       {tab === "agents" && !!managers.data?.items.length && (
-        <button type="button" className={`rail-runner rail-managers ${managerIssues ? "is-warn" : activeManagers.length ? "is-ready" : ""}`}
+        <button type="button" className={`rail-runner rail-managers ${managerAttention ? "is-warn" : activeManagers.length ? "is-ready" : ""}`}
           onClick={() => controller.navigate("/managers")}>
           <i aria-hidden="true" />매니저 · {managerSummary}
+          {intakeWaiting > 0 && <span className="mgr-badge mgr-intake-warning">대기 {intakeWaiting}</span>}
+          {intakeStalled > 0 && <span className="mgr-badge is-error">확인 지연 {intakeStalled}</span>}
         </button>
       )}
       {tab === "agents" && runner.supported && <RailRuns controller={controller} taskKey={route.kind === "task" ? route.key : undefined} />}

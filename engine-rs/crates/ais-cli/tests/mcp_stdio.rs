@@ -791,3 +791,221 @@ repos: [{"name":"shared","github":"demo/shared"}]
     std::fs::remove_dir_all(vault).unwrap();
     std::fs::remove_dir_all(other_vault).unwrap();
 }
+
+#[test]
+fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let vault = fixture("intake-ledger");
+    let projects = vault.join(".aisurada/projects");
+    for (slug, id) in [
+        ("intake", "pjfx100a-000000f1"),
+        ("outside", "pjfx100b-000000f2"),
+    ] {
+        std::fs::write(
+            projects.join(format!("{slug}.md")),
+            format!("---\nid: {id}\nslug: {slug}\ntitle: {slug}\nrepos: [{{\"name\":\"shared\",\"github\":\"demo/shared\"}}]\n---\n"),
+        ).unwrap();
+    }
+
+    let cli = |args: &[&str]| {
+        let (status, stdout, stderr) = run_cli(&vault, &[], args);
+        assert_eq!(status, 0, "{stderr}");
+        serde_json::from_str::<Value>(&stdout).unwrap()
+    };
+    let name = "hermes-intake";
+    let channel = "CDEMO123";
+    cli(&[
+        "manager",
+        "add",
+        name,
+        "project=intake",
+        "repos=demo/shared",
+    ]);
+    cli(&[
+        "manager",
+        "add",
+        "hermes-other",
+        "project=outside",
+        "repos=demo/shared",
+        "tools=list_tasks",
+    ]);
+    let desktop =
+        |action: &str, payload: Value| cli(&["manager", action, name, &payload.to_string()]);
+    let configure = json!({"channel": channel, "label": "#제보", "emoji": "ticket", "intervalMinutes": 10,
+        "markProcessed": true, "paused": false});
+    let cursor = desktop("intake-channel", configure.clone());
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let at = |seconds: u64| format!("{:010}.000000", now - seconds);
+    let first = at(30);
+    let repeat = at(20);
+    let reply = at(10);
+    let start = at(60);
+    let rewind = |revision: &Value| {
+        desktop(
+            "intake-rewind",
+            json!({
+                "channel": channel, "revision": revision, "messageTs": start
+            }),
+        )
+    };
+    let cursor = rewind(&cursor["revision"]);
+
+    let tool = |manager: &str, name: &str, args: Value| {
+        let (status, rows) = converse(&vault, &["--manager", manager], &[call(1, name, args)]);
+        assert_eq!(status, 0);
+        rows.into_iter().next().unwrap()
+    };
+    let own = |tool_name, args| tool(name, tool_name, args);
+    let mcp = |tool_name, args| tool_json(&own(tool_name, args));
+    let rejected = |response: Value| assert_eq!(response["result"]["isError"], true, "{response}");
+    let move_to = |cursor: &Value, ts: &str, reports: &[&str]| {
+        json!({
+            "channel": channel, "revision": cursor["revision"], "messageTs": ts,
+            "via": "scheduled", "reportTimestamps": reports
+        })
+    };
+    let report = |ts: &str| {
+        json!({
+            "channel": channel, "messageTs": ts, "url": format!("https://demo.slack.com/archives/{channel}/p{}", ts.replace('.', "")),
+            "reporter": "제보자", "excerpt": "가".repeat(210), "via": "scheduled"
+        })
+    };
+    rejected(own("move_cursor", move_to(&cursor, &first, &[&first])));
+    rejected(own("get_intake", json!({"channel":"CNOTMINE"})));
+
+    let mut original = report(&first);
+    original["result"] = json!("created");
+    original["task"] = json!({"title":"원글 태스크", "repo":"demo/shared", "criteria":["확인"]});
+    let created = mcp("record_intake", original.clone());
+    let task_key = created["item"]["entry"]["taskKey"].as_str().unwrap();
+    assert_eq!(created["recorded"], false);
+    assert_eq!(
+        created["item"]["entry"]["excerpt"]
+            .as_str()
+            .unwrap()
+            .chars()
+            .count(),
+        200
+    );
+    assert_eq!(
+        mcp("record_intake", original.clone())["item"],
+        created["item"]
+    );
+    assert_eq!(
+        mcp("list_tasks", json!({}))["tasks"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let task = mcp("get_task", json!({"id":task_key}));
+    assert_eq!(
+        (task["status"].as_str(), task["refs"][0]["target"].as_str()),
+        (Some("draft"), original["url"].as_str())
+    );
+
+    let mut asked = report(&repeat);
+    asked["result"] = json!("asked");
+    asked["question"] = json!("어떤 화면인가요?");
+    let question = mcp("record_intake", asked.clone());
+    let cursor = mcp("move_cursor", move_to(&cursor, &repeat, &[&first, &repeat]));
+    assert_eq!(
+        mcp("get_intake", json!({}))["pending"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    rejected(own("move_cursor", move_to(&cursor, &first, &[])));
+
+    let foreign = cli(&[
+        "create-task",
+        "repo=demo/shared",
+        "project=outside",
+        "title=다른 프로젝트",
+        r#"criteria=["확인"]"#,
+    ]);
+    asked["result"] = json!("commented");
+    asked["replyTs"] = json!(reply);
+    asked["priorRevision"] = question["item"]["current"]["revision"].clone();
+    asked["taskKey"] = foreign["key"].clone();
+    rejected(own("record_intake", asked.clone()));
+    asked["taskKey"] = json!(task_key);
+    let commented = mcp("record_intake", asked.clone());
+    assert_eq!(
+        commented["item"]["entry"]["history"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(mcp("record_intake", asked.clone())["recorded"], true);
+    assert_eq!(
+        mcp("get_task", json!({"id":task_key}))["activity"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| event["kind"] == "comment")
+            .count(),
+        1
+    );
+    assert_eq!(mcp("get_intake", json!({}))["waiting"], 0);
+
+    let cursors = rewind(&cursor["revision"]);
+    assert_eq!(cursors["cursor"], start);
+    rejected(own("move_cursor", move_to(&cursor, &repeat, &[])));
+    assert_eq!(
+        mcp("get_intake", json!({"channel":channel,"messageTs":first}))["recorded"],
+        true
+    );
+    assert_eq!(
+        cli(&["manager", "intake-sources", task_key])
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    let mut ack = original.clone();
+    ack["priorRevision"] = created["item"]["current"]["revision"].clone();
+    ack["reactionAdded"] = json!(true);
+    assert_eq!(
+        mcp("record_intake", ack)["item"]["entry"]["reactionAdded"],
+        true
+    );
+    let reviewed = desktop(
+        "intake-review",
+        json!({"id": commented["item"]["entry"]["id"],
+        "revision": commented["item"]["current"]["revision"], "result": "pending"}),
+    );
+    assert_eq!(reviewed["current"]["result"], "pending");
+
+    cli(&[
+        "manager",
+        "intake-channel",
+        "hermes-other",
+        &configure.to_string(),
+    ]);
+    assert_eq!(
+        tool_json(&tool(
+            "hermes-other",
+            "get_intake",
+            json!({"channel":channel,"messageTs":first})
+        )),
+        json!({"recorded":true,"item":null})
+    );
+    rejected(tool("hermes-other", "record_intake", original));
+
+    let mut paused = configure;
+    paused["paused"] = json!(true);
+    let paused = desktop("intake-channel", paused);
+    rejected(own("move_cursor", move_to(&paused, &repeat, &[])));
+    let raw = std::fs::read_to_string(vault.join(".aisurada/intake/ledger.json")).unwrap();
+    assert!(!raw.contains(&"가".repeat(201)));
+    std::fs::remove_dir_all(vault).unwrap();
+}
