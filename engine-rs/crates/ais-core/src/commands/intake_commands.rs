@@ -640,7 +640,7 @@ impl Ledger {
             self.channel(manager, allowed, id)?;
             let existing = self.entries.get(&manager_key(manager, &format!("{id}:{ts}")));
             return Ok(json!({
-                "checkedAt": clock().now_millis(), "recorded": existing.is_some(),
+                "recorded": existing.is_some(),
                 "item": existing.map(Entry::view).transpose()?
             }));
         }
