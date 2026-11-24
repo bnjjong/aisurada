@@ -1235,6 +1235,7 @@ mod tests {
     fn intake_schedule_waits_for_work_hours_and_clears_after_a_desktop_check() {
         let mut channel = Channel {
             id: "CTEST123".into(), label: "가상 채널".into(), emoji: "ticket".into(),
+            visibility: ChannelVisibility::Unknown,
             mark_processed: true, paused: false, interval_minutes: 10,
             enabled_at: local_time(23, 9, 0).0,
             cursor: "1795500000.000000".into(), revision: "original".into(),
