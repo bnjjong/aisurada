@@ -459,6 +459,10 @@ fn slack_emoji(name: &str) -> bool {
         && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"_+-".contains(&byte))
 }
 
+fn slack_reaction_name(name: &str) -> bool {
+    name.len() <= 80 && name.split("::").all(slack_emoji)
+}
+
 fn check_channel(allowed: &[String], channel: &str) -> Result<(), EngineError> {
     if !slack_channel(channel) || !allowed.iter().any(|value| value == channel) {
         return Err(invalid("매니저에 등록된 Slack 채널 ID가 필요하다"));
@@ -684,8 +688,14 @@ impl Ledger {
             if event.result == ResultKind::Asked {
                 waiting += 1;
                 if allowed.contains(&entry.channel) {
-                    // 앱 알림은 인용을 노출하지 않고 원장 항목을 연다.
-                    asked.push(json!({ "id": entry.id, "at": event.at, "revision": event.revision, "url": entry.url }));
+                    let mut question = json!({
+                        "id": entry.id, "at": event.at, "revision": event.revision, "url": entry.url
+                    });
+                    if caller == Caller::App {
+                        question["excerpt"] = json!(short(&entry.excerpt, 100));
+                        question["question"] = json!(short(&event.question, 140));
+                    }
+                    asked.push(question);
                     if !query.summary {
                         pending.push(entry.view()?);
                     }
@@ -1031,14 +1041,14 @@ impl Ledger {
         if let Some(reactions) = request.reactions.take() {
             let mut names = HashSet::new();
             if reactions.len() > 30 || reactions.iter().any(|reaction| {
-                !slack_emoji(&reaction.name) || reaction.count == 0 || !names.insert(&reaction.name)
+                !slack_reaction_name(&reaction.name) || reaction.count == 0 || !names.insert(&reaction.name)
             }) {
                 return Err(invalid("Slack 반응 이름과 개수를 확인해 주세요"));
             }
             entry.reactions = reactions;
         }
         if let Some(mut reaction) = request.report_reaction.take() {
-            if !slack_emoji(&reaction.name)
+            if !slack_reaction_name(&reaction.name)
                 || reaction.at.is_some_and(|at| at < posted_at || at > now)
             {
                 return Err(invalid("제보 반응의 이름과 시각을 확인해 주세요"));

@@ -57,6 +57,14 @@
 .mgr-project-row { padding: 8px 0; border-top: 1px solid var(--line); }
 .mgr-project-row .mgr-mark { width: 25px; height: 25px; border-radius: 7px; }
 .rail-managers.is-ready i { background: var(--good, #2ea577); }
+.workspace-rail button.rail-manager-row { margin-top: 6px; border-radius: 12px; }
+.workspace-rail button.rail-manager-row[aria-current="page"] {
+  background: color-mix(in srgb, var(--surface), var(--accent) 12%);
+}
+.rail-manager-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.rail-manager-name small { display: block; }
+.intake-badges { display: grid; gap: 6px; }
+.intake-badges .mgr-badge { white-space: normal; overflow-wrap: anywhere; }
 .mgr-back { margin-bottom: 10px; }
 .mgr-detail-actions { margin-bottom: 12px; }
 .mgr-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }

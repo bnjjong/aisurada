@@ -83,7 +83,7 @@ export interface IntakeData {
   counts: [number, number, number, number, number];
   waiting: number;
   stalledMinutes: number | null;
-  asked: { id: string; at: number; revision: string; url: string }[];
+  asked: { id: string; at: number; revision: string; url: string; excerpt?: string; question?: string }[];
 }
 
 export const resultLabel: Record<IntakeResult, string> = {

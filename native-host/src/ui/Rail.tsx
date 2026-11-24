@@ -14,7 +14,7 @@ import { runnerSummary, runnerTone, useRunner } from "./runnerStore.ts";
 import { deliveryIssue, enabledManagers, useManagers } from "./managersStore.tsx";
 import { RailRuns } from "./RailRuns.tsx";
 import { useSessionBadge } from "@claude-plug/session";
-import { architectureAddress, parseRoute } from "../navigation/routes.ts";
+import { architectureAddress, managerAddress, parseRoute } from "../navigation/routes.ts";
 import { activeRailTab, RAIL_TABS, railTabTarget, rememberRailTab } from "../navigation/railTabs.ts";
 import type { RailTab } from "../navigation/railTabs.ts";
 import { ResourceFormModal } from "./ResourceFormModal.tsx";
@@ -70,6 +70,7 @@ export function Rail({
   const managerIssues = managers.error ? 1 : managers.data?.items.filter(item =>
     (item.manager.project && item.issue === "프로젝트를 찾을 수 없어요") || deliveryIssue(item)).length ?? 0;
   const intakeWaiting = activeManagers.reduce((total, item) => total + (item.intake?.waiting ?? 0), 0);
+  const managersWithWaiting = activeManagers.filter(item => (item.intake?.waiting ?? 0) > 0);
   const intakeStalled = activeManagers.filter(item => item.intake?.stalledMinutes != null).length;
   const managerAttention = managerIssues + intakeWaiting + intakeStalled;
   const managerSummary = activeManagers.length === 1 ? `${activeManagers[0].manager.label} 켜짐` : `${activeManagers.length}개 켜짐`;
@@ -420,12 +421,21 @@ export function Rail({
         </button>
       )}
       {tab === "agents" && !!managers.data?.items.length && (
-        <button type="button" className={`rail-runner rail-managers ${managerAttention ? "is-warn" : activeManagers.length ? "is-ready" : ""}`}
-          onClick={() => controller.navigate("/managers")}>
-          <i aria-hidden="true" />매니저 · {managerSummary}
-          {intakeWaiting > 0 && <span className="mgr-badge mgr-intake-warning">대기 {intakeWaiting}</span>}
-          {intakeStalled > 0 && <span className="mgr-badge is-error">확인 지연 {intakeStalled}</span>}
-        </button>
+        <div className="rail-manager-group">
+          <button type="button" className={`rail-runner rail-managers ${managerAttention ? "is-warn" : activeManagers.length ? "is-ready" : ""}`}
+            onClick={() => controller.navigate("/managers")}>
+            <i aria-hidden="true" />매니저 · {managerSummary}
+            {intakeStalled > 0 && <span className="mgr-badge is-error">확인 지연 {intakeStalled}</span>}
+          </button>
+          {managersWithWaiting.map(({ manager, intake }) => <button key={manager.name} type="button"
+            className="rail-runner rail-manager-row is-wait"
+            aria-current={route.kind === "manager" && route.name === manager.name ? "page" : undefined}
+            onClick={() => controller.navigate(managerAddress(manager.name))}>
+            <i aria-hidden="true" />
+            <span className="rail-manager-name">{manager.label}<small>{manager.name} · {manager.project}</small></span>
+            <span className="mgr-badge mgr-intake-warning">대기 {intake?.waiting}</span>
+          </button>)}
+        </div>
       )}
       {tab === "agents" && runner.supported && <RailRuns controller={controller} taskKey={route.kind === "task" ? route.key : undefined} />}
       {tab === "global" ? (

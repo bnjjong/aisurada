@@ -28,11 +28,21 @@ export function SlackIntakeLink({ url, controller, children }: { url: string; co
 
 export function IntakeBadges({ item }: { item: ManagerItem }) {
   const intake = item.intake;
-  if (!intake || !item.manager.enabled) return null;
-  return <div className="mgr-actions">
-    {intake.waiting > 0 && <span className="mgr-badge mgr-intake-warning">되물음 대기 {intake.waiting}</span>}
-    {intake.stalledMinutes !== null && <span className="mgr-badge is-error">확인 {intake.stalledMinutes}분째 없음</span>}
-    {intake.counts[0] > 0 && <span className="mgr-badge">오늘 접수 {intake.counts[0]}</span>}
+  if (!intake || !item.manager.enabled || !(intake.waiting || intake.counts[0] || intake.stalledMinutes != null)) return null;
+  const delayed = intake.channels.filter(channel => channel.stalledMinutes != null);
+  return <div className="intake-badges">
+    <div className="mgr-actions">
+      {intake.waiting > 0 && <span className="mgr-badge mgr-intake-warning">되물음 대기 {intake.waiting}</span>}
+      {intake.counts[0] > 0 && <span className="mgr-badge">오늘 접수 {intake.counts[0]}</span>}
+    </div>
+    {delayed.length > 0 && <div>
+      <div className="mgr-actions">{delayed.map(channel => <span key={channel.id} className="mgr-badge is-error">
+        {channelLabel(channel)} · 확인 {channel.stalledMinutes}분째 없음
+      </span>)}</div>
+      <small>{item.manager.kind === "hermes"
+        ? "Hermes 게이트웨이와 채널의 예약 작업을 확인해 주세요."
+        : "매니저의 채널 예약 작업을 확인해 주세요."}</small>
+    </div>}
   </div>;
 }
 
@@ -70,7 +80,7 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
         <span className="mgr-badge">{channel.markProcessed ? "✅ 처리 표시" : "처리 표시 끔"}</span>
         {channel.paused ? <span className="mgr-badge mgr-intake-warning">멈춤</span>
           : channel.stalledMinutes != null ? <span className="mgr-badge is-error">확인 {channel.stalledMinutes}분째 없음</span>
-          : channel.lastCheckAt != null && <span className="mgr-badge is-ok">정상</span>}
+          : channel.lastCheckAt != null && <span className="mgr-badge is-ok">{channel.schedule ? "정상" : "확인됨"}</span>}
       </div>
       <CursorTimes channel={channel} />
       <div className="intake-cursor-track" aria-label="최근 제보의 처리 상태">
@@ -526,6 +536,8 @@ function TaskSlackRef({ reference, controller, busy, save }: {
   const [editing, setEditing] = useState(false);
   const [reporter, setReporter] = useState(reference.reporter ?? "");
   const [excerpt, setExcerpt] = useState(reference.excerpt ?? "");
+  const [original, setOriginal] = useState(reference);
+  const [conflict, setConflict] = useState(false);
   const postedAt = slackMessageTime(reference.target);
   return <blockquote className="intake-quote">
     <strong>처음{reference.reporter && ` · ${reference.reporter}`}{postedAt != null && ` · ${time(postedAt)}`}</strong>
@@ -535,15 +547,22 @@ function TaskSlackRef({ reference, controller, busy, save }: {
       {save && !editing && <button type="button" disabled={busy} onClick={() => {
         setReporter(reference.reporter ?? "");
         setExcerpt(reference.excerpt ?? "");
+        setOriginal(reference);
+        setConflict(false);
         setEditing(true);
       }}>원글 정보 편집</button>}
     </div>
     {save && editing && <form className="intake-source-editor" onSubmit={async event => {
       event.preventDefault();
+      if (reference.reporter !== original.reporter || reference.excerpt !== original.excerpt) {
+        setConflict(true);
+        return;
+      }
       if (await save({ reporter: reporter.trim(), excerpt: excerpt.trim() })) setEditing(false);
     }}>
       <label className="mgr-label">제보자<input value={reporter} maxLength={100} onChange={event => setReporter(event.target.value)} /></label>
       <label className="mgr-label">원글 인용<textarea rows={3} value={excerpt} maxLength={200} onChange={event => setExcerpt(event.target.value)} /></label>
+      {conflict && <small role="alert">원글 정보가 바뀌었어요. 편집을 다시 열어 최신 내용을 확인해 주세요.</small>}
       <div className="mgr-actions">
         <button type="button" onClick={() => setEditing(false)}>취소</button>
         <button type="submit" disabled={busy}>저장</button>
