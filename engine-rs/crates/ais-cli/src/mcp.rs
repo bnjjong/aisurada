@@ -270,7 +270,7 @@ impl<'a> McpServer<'a> {
             quote(&self.manager.as_ref().map_or_else(
                 || instructions(self.client_name.as_deref()),
                 |gate| format!(
-                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. Slack 제보는 get_intake로 등록 채널, 커서와 처리 대기를 읽고, 채널의 커서 뒤 글만 읽는다. 지정 이모지가 달린 글의 시각마다 get_intake로 기존 기록을 확인한다. 유사 태스크와 노트를 찾은 뒤 record_intake로 새 태스크, 재제보 댓글, 되물음 초안이나 무시를 기록한다. asked는 새 스레드 답변이 있을 때만, pending은 다음 확인에 다시 처리한다. 제보를 모두 기록한 뒤 move_cursor를 부른다. 처리 표시가 켜져 있으면 성공한 항목의 Slack 원글에 ✅를 달고 reactionAdded를 기록한다. 되물음은 스레드 답글 초안으로 사용자에게 확인받는다. Slack 연결 없이 들어온 직접 제보는 기존 도구로 처리한다.",
+                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. Slack 제보는 get_intake로 등록 채널, 커서와 처리 대기를 읽고, 채널의 커서 뒤 글만 읽는다. 지정 이모지가 달린 글의 시각마다 get_intake로 기존 기록을 확인한다. 유사 태스크와 노트를 찾은 뒤 record_intake로 새 태스크, 재제보 댓글, 되물음 초안이나 무시를 기록한다. 확인을 시작할 때 받은 checkedAt과 실제 검색을 마친 searchedAt을 넘긴다. Slack에서 제공한 반응 목록과 제보 반응의 사람·시각이 있으면 reactions와 reportReaction에 기록한다. asked는 새 스레드 답변이 있을 때만, pending은 다음 확인에 다시 처리한다. 제보를 모두 기록한 뒤 move_cursor를 부른다. 처리 표시가 켜져 있으면 성공한 항목의 Slack 원글에 ✅를 달고 reactionAdded를 기록한다. 되물음은 스레드 답글 초안으로 사용자에게 확인받는다. Slack 연결 없이 들어온 직접 제보는 기존 도구로 처리한다.",
                     gate.initial.name, gate.initial.project
                 )
             ))

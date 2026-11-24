@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { taskAddress } from "../navigation/routes.ts";
-import { channelId, channelLabel, resultLabel, slackLink, slackTime, slackTimestamp, viaLabel, type IntakeChannel, type IntakeData, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
+import { channelId, channelLabel, resultLabel, slackEmoji, slackLink, slackTime, slackTimestamp, viaLabel, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
 import { Modal } from "./Modal.tsx";
 import { eventTime, managerError, useManagers, type ManagerItem } from "./managersStore.tsx";
 
@@ -45,7 +45,7 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
     <div className="intake-cursor-main">
       <div className="mgr-actions">
         <strong>{channelLabel(channel)}</strong>
-        <span className="mgr-badge">:{channel.emoji}: 제보</span>
+        <span className="mgr-badge">{slackEmoji(channel.emoji)} 제보</span>
         <span className="mgr-badge">{channel.markProcessed ? "✅ 처리 표시" : "처리 표시 끔"}</span>
         {channel.paused ? <span className="mgr-badge mgr-intake-warning">멈춤</span>
           : channel.stalledMinutes != null ? <span className="mgr-badge is-error">확인 {channel.stalledMinutes}분째 없음</span>
@@ -109,6 +109,44 @@ function RewindDialog({ channel, rows, close, save, busy, error }: {
   </Modal>;
 }
 
+function SlackReactions({ entry }: { entry: Pick<IntakeEntry, "reactions" | "reactionAdded"> }) {
+  const reactions = entry.reactions ?? [];
+  if (!reactions.length && !entry.reactionAdded) return null;
+  return <div className="mgr-actions intake-reactions">
+    {reactions.map(({ name, count }) => <span key={name} className="mgr-badge" title={name}>{slackEmoji(name)} {count}</span>)}
+    {entry.reactionAdded && !reactions.some(reaction => reaction.name === "white_check_mark")
+      && <span className="mgr-badge" title="Slack 처리 표시">✅</span>}
+  </div>;
+}
+
+function EntryTimeline({ row }: { row: IntakeRow }) {
+  const { entry, current } = row;
+  const trigger = entry.reportReaction;
+  const timeline: { id: string; at: number; content: ReactNode }[] = [
+    { id: "posted", at: slackTime(entry.messageTs), content: <>Slack에 원글이 올라왔어요<small>{entry.reporter}</small></> },
+  ];
+  if (trigger?.at != null) timeline.push({
+    id: "report-reaction", at: trigger.at, content: <>{slackEmoji(trigger.name)} 제보 반응{trigger.by && <small>{trigger.by}</small>}</>,
+  });
+  for (const event of entry.history) {
+    if (event.checkedAt != null) timeline.push({
+      id: `${event.revision}-checked`, at: event.checkedAt, content: <>매니저가 Slack 확인을 시작했어요<small>{viaLabel[event.via]}</small></>,
+    });
+    if (event.searchedAt != null) timeline.push({
+      id: `${event.revision}-searched`, at: event.searchedAt, content: "비슷한 태스크와 노트를 검색했어요",
+    });
+    timeline.push({
+      id: event.revision, at: event.at, content: <>
+        <strong>{resultLabel[event.result]}</strong> · {viaLabel[event.via]}{event.decision && <small>{event.decision}</small>}
+        {event !== current && event.question && <small>{event.question}</small>}
+      </>,
+    });
+  }
+  return <ol className="intake-timeline">{timeline.sort((a, b) => a.at - b.at).map(event =>
+    <li key={event.id}><time>{time(event.at)}</time><span>{event.content}</span></li>
+  )}</ol>;
+}
+
 function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
   row: IntakeRow; channel?: IntakeChannel; controller: WorkspaceController; close(): void;
   action(result: "pending" | "ignored"): void; busy: boolean; error: string;
@@ -130,10 +168,12 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
       <blockquote className="intake-quote">
         <strong>{entry.reporter} · {time(slackTime(entry.messageTs))} · {channel ? channelLabel(channel) : entry.channel}</strong>
         <p>{entry.excerpt || "인용한 글이 없어요."}</p>
-        {entry.reactionAdded && <span title="Slack 처리 표시">✅</span>}
+        <SlackReactions entry={entry} />
+        {entry.reportReaction?.by && entry.reportReaction.at == null &&
+          <small>제보 반응 · {entry.reportReaction.by}</small>}
       </blockquote>
       <dl className="mgr-meta">
-        <dt>원글</dt><dd><SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink></dd>
+        <dt>원글 주소</dt><dd><code>{entry.url}</code><br /><SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink></dd>
         <dt>매니저</dt><dd>{entry.manager} · {viaLabel[current.via]}</dd>
         {current.decision && <><dt>판단</dt><dd>{current.decision}</dd></>}
         {current.question && <><dt>답글 초안</dt><dd>{current.question}
@@ -142,17 +182,13 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
         {entry.taskKey && <><dt>태스크</dt><dd><button type="button" onClick={() => controller.navigate(taskAddress(entry.taskKey!))}>{entry.taskKey}</button></dd></>}
       </dl>
       <h3>처리 이력</h3>
-      <ol className="intake-timeline">
-        <li><time>{time(slackTime(entry.messageTs))}</time><span>Slack에 원글이 올라왔어요</span></li>
-        {entry.history.map(event => <li key={event.revision}><time>{time(event.at)}</time>
-          <span><strong>{resultLabel[event.result]}</strong> · {viaLabel[event.via]}{event.decision && <small>{event.decision}</small>}
-          {event !== current && event.question && <small>{event.question}</small>}</span></li>)}
-      </ol>
+      <EntryTimeline row={row} />
       {current.result === "asked" && <p className="mgr-warning">스레드에 답이 오면 다음 확인 때 매니저가 다시 검토해요.</p>}
       {error && <p role="alert" className="mgr-error">{error}</p>}
       <footer className="mgr-actions">
         <button type="button" className="primary" disabled={busy || current.result === "pending"} onClick={() => action("pending")}>다시 처리</button>
         <button type="button" disabled={busy || current.result === "ignored"} onClick={() => action("ignored")}>무시로 표시</button>
+        <small className="intake-entry-id">원장 ID <code>{entry.id}</code></small>
       </footer>
       </div>
   </Modal>;

@@ -197,10 +197,31 @@ struct Entry {
     task_id: Option<String>,
     task_origin: Option<ResultKind>,
     reaction_added: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    reactions: Vec<SlackReaction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    report_reaction: Option<ReportReaction>,
     #[serde(default)]
     mark_requested: bool,
     reply_ts: Option<String>,
     history: Vec<Processing>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SlackReaction {
+    name: String,
+    count: u32,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ReportReaction {
+    name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    at: Option<i64>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -211,6 +232,8 @@ struct Processing {
     at: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     checked_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    searched_at: Option<i64>,
     via: ProcessVia,
     decision: String,
     question: String,
@@ -247,6 +270,9 @@ struct Record {
     result: ResultKind,
     via: ProcessVia,
     checked_at: Option<i64>,
+    searched_at: Option<i64>,
+    reactions: Option<Vec<SlackReaction>>,
+    report_reaction: Option<ReportReaction>,
     #[serde(default)]
     decision: String,
     #[serde(default)]
@@ -405,6 +431,12 @@ fn slack_channel(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+}
+
+fn slack_emoji(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 80
+        && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"_+-".contains(&byte))
 }
 
 fn check_channel(allowed: &[String], channel: &str) -> Result<(), EngineError> {
@@ -584,7 +616,7 @@ impl Ledger {
             self.channel(manager, allowed, id)?;
             let existing = self.entries.get(&manager_key(manager, &format!("{id}:{ts}")));
             return Ok(json!({
-                "recorded": existing.is_some(),
+                "checkedAt": clock().now_millis(), "recorded": existing.is_some(),
                 "item": existing.map(Entry::view).transpose()?
             }));
         }
@@ -702,12 +734,7 @@ impl Ledger {
     ) -> Result<(Value, bool), EngineError> {
         check_channel(allowed, &request.channel)?;
         let emoji = request.emoji.trim().trim_matches(':');
-        if emoji.is_empty()
-            || emoji.len() > 80
-            || !emoji
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || b"_+-".contains(&byte))
-            || !(1..=1440).contains(&request.interval_minutes)
+        if !slack_emoji(emoji) || !(1..=1440).contains(&request.interval_minutes)
         {
             return Err(invalid(
                 "제보 기준 이모지 이름과 확인 간격(1~1440분)을 확인해 주세요",
@@ -842,6 +869,7 @@ impl Ledger {
             result: request.result,
             at: clock().now_millis(),
             checked_at: None,
+            searched_at: None,
             via: ProcessVia::Manual,
             decision: if request.result == ResultKind::Pending {
                 "다시 처리 요청"
@@ -862,7 +890,7 @@ impl Ledger {
         context: &CallContext,
         manager: &ManagerContext,
         allowed: &[String],
-        request: Record,
+        mut request: Record,
     ) -> Result<(Value, bool), EngineError> {
         agent_via(request.via)?;
         let channel = self.channel(manager, allowed, &request.channel)?;
@@ -943,6 +971,8 @@ impl Ledger {
                 task_id: None,
                 task_origin: None,
                 reaction_added: false,
+                reactions: Vec::new(),
+                report_reaction: None,
                 mark_requested: false,
                 reply_ts: None,
                 history: Vec::new(),
@@ -951,6 +981,31 @@ impl Ledger {
 
         if request.checked_at.is_some_and(|at| at <= 0 || at > now) {
             return Err(invalid("확인을 시작한 시각은 현재보다 뒤일 수 없다"));
+        }
+        let posted_at = (source_ts / 1000) as i64;
+        if request.searched_at.is_some_and(|at| at < posted_at || at > now
+            || request.checked_at.is_some_and(|started| at < started)) {
+            return Err(invalid("검색 시각은 제보 이후부터 현재까지의 범위여야 한다"));
+        }
+        if let Some(reactions) = request.reactions.take() {
+            let mut names = HashSet::new();
+            if reactions.len() > 30 || reactions.iter().any(|reaction| {
+                !slack_emoji(&reaction.name) || reaction.count == 0 || !names.insert(&reaction.name)
+            }) {
+                return Err(invalid("Slack 반응 이름과 개수를 확인해 주세요"));
+            }
+            entry.reactions = reactions;
+        }
+        if let Some(mut reaction) = request.report_reaction.take() {
+            if !slack_emoji(&reaction.name)
+                || reaction.at.is_some_and(|at| at < posted_at || at > now)
+            {
+                return Err(invalid("제보 반응의 이름과 시각을 확인해 주세요"));
+            }
+            reaction.by = reaction.by.map(|by| short(&by, 100)).filter(|by| !by.is_empty());
+            if reaction.at.is_some() || reaction.by.is_some() {
+                entry.report_reaction = Some(reaction);
+            }
         }
         let question = short(&request.question, 500);
         if request.reaction_added.is_some() {
@@ -987,6 +1042,7 @@ impl Ledger {
             result: request.result,
             at: now,
             checked_at: request.checked_at,
+            searched_at: request.searched_at,
             via: request.via,
             decision: short(&request.decision, 500),
             question,

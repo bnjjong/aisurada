@@ -30,9 +30,21 @@ export interface IntakeProcessing {
   result: IntakeResult;
   at: number;
   checkedAt?: number;
+  searchedAt?: number;
   via: IntakeVia;
   decision: string;
   question: string;
+}
+
+export interface SlackReaction {
+  name: string;
+  count: number;
+}
+
+export interface ReportReaction {
+  name: string;
+  by?: string;
+  at?: number;
 }
 
 export interface IntakeEntry {
@@ -47,6 +59,8 @@ export interface IntakeEntry {
   taskKey: string | null;
   taskOrigin: "created" | "commented" | null;
   reactionAdded: boolean;
+  reactions?: SlackReaction[];
+  reportReaction?: ReportReaction;
   history: IntakeProcessing[];
 }
 
@@ -73,6 +87,10 @@ export const resultLabel: Record<IntakeResult, string> = {
   created: "새 태스크", commented: "재제보 댓글", asked: "되물음 대기", ignored: "무시", pending: "다시 처리 대기",
 };
 export const viaLabel: Record<IntakeVia, string> = { desktop: "데스크톱 대화", scheduled: "예약 확인", manual: "사람이 처리" };
+const slackEmojis = new Map([
+  ["ticket", "🎫"], ["beetle", "🐞"], ["eyes", "👀"], ["white_check_mark", "✅"],
+]);
+export const slackEmoji = (name: string) => slackEmojis.get(name) ?? `:${name}:`;
 export const channelLabel = (channel: IntakeChannel) => channel.label || channel.id;
 export const channelId = /^[CGD][A-Z0-9]{2,79}$/;
 
