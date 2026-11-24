@@ -92,6 +92,19 @@ pub fn to_call(
         "list-tags" => list_tags_args(parsed)?,
         "list-templates" => list_templates_args(parsed)?,
         "list-sub-notes" => list_sub_notes_args(parsed)?,
+        "get-sub-note" => {
+            let mut args = plain_args(parsed);
+            if let Some(raw) = parsed.option("includeIdPath") {
+                let include = trim(raw).parse::<bool>().map_err(|_| {
+                    CliError::new(
+                        400,
+                        format!("includeIdPath 은 true 나 false 여야 한다: {raw}"),
+                    )
+                })?;
+                args.insert("includeIdPath".into(), json!(include));
+            }
+            args
+        }
         "history" => history_args(parsed)?,
         "session-titles" => {
             let mut args = Map::new();

@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { documentDir } from '@tauri-apps/api/path';
-import { listen } from '@tauri-apps/api/event';
+import { emitTo, listen } from '@tauri-apps/api/event';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -8,6 +8,7 @@ import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { confirm, open } from '@tauri-apps/plugin-dialog';
 import * as fs from '@tauri-apps/plugin-fs';
 import { sanitizeHtml } from '../lib/sanitize.ts';
+import { subAddress } from '../navigation/routes.ts';
 import { engineCommands } from './engineCommands.ts';
 import type { WorkspaceServices } from './types.ts';
 
@@ -56,6 +57,7 @@ export function workspaceServices(): WorkspaceServices {
     navigateRequested: received => isTauri()
       ? getCurrentWebviewWindow().listen<{ path: string; rail?: string | null; sub?: string | null }>('ais://navigate', event => received(event.payload))
       : Promise.resolve(() => {}),
+    openSubNoteInWindow: (root, ids) => emitTo({ kind: 'WebviewWindow', label: `note-${root}` }, 'ais://navigate', { path: subAddress(root, ids) }),
     ...(isTauri() ? { deepLinks: { listen: onOpenUrl, current: getCurrent } } : {}),
     ...(import.meta.hot ? { developmentLinks: (received: (urls: string[]) => void) => {
       const hot = import.meta.hot!;
