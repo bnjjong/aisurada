@@ -54,6 +54,8 @@ struct Ledger {
 struct Channel {
     id: String,
     label: String,
+    #[serde(default, skip_serializing_if = "ChannelVisibility::is_unknown")]
+    visibility: ChannelVisibility,
     emoji: String,
     mark_processed: bool,
     paused: bool,
@@ -66,6 +68,21 @@ struct Channel {
     last_scheduled_at: Option<i64>,
     #[serde(default)]
     schedule: Option<Schedule>,
+}
+
+#[derive(Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ChannelVisibility {
+    #[default]
+    Unknown,
+    Public,
+    Private,
+}
+
+impl ChannelVisibility {
+    fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -299,11 +316,14 @@ struct Move {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct Configure {
     channel: String,
-    label: String,
-    emoji: String,
-    mark_processed: bool,
-    paused: bool,
-    interval_minutes: u16,
+    label: Option<String>,
+    visibility: Option<ChannelVisibility>,
+    emoji: Option<String>,
+    mark_processed: Option<bool>,
+    paused: Option<bool>,
+    interval_minutes: Option<u16>,
+    #[serde(default)]
+    create_only: bool,
     #[serde(default)]
     schedule: ScheduleUpdate,
 }
@@ -733,34 +753,48 @@ impl Ledger {
         mut request: Configure,
     ) -> Result<(Value, bool), EngineError> {
         check_channel(allowed, &request.channel)?;
-        let emoji = request.emoji.trim().trim_matches(':');
-        if !slack_emoji(emoji) || !(1..=1440).contains(&request.interval_minutes)
+        let emoji = request.emoji.as_deref().map(|value| value.trim().trim_matches(':'));
+        if emoji.is_some_and(|name| !slack_emoji(name))
+            || request.interval_minutes.is_some_and(|minutes| !(1..=1440).contains(&minutes))
         {
-            return Err(invalid(
-                "제보 기준 이모지 이름과 확인 간격(1~1440분)을 확인해 주세요",
-            ));
+            return Err(invalid("제보 기준 이모지 이름과 확인 간격(1~1440분)을 확인해 주세요"));
         }
         if let ScheduleUpdate::Set(Some(schedule)) = &mut request.schedule {
             schedule.validate()?;
         }
         let now = clock().now_millis();
         let key = manager_key(manager, &request.channel);
-        let channel = self.channels.entry(key).or_insert_with(|| Channel {
-            id: request.channel.clone(),
-            label: String::new(),
-            emoji: String::new(),
-            mark_processed: true,
-            paused: false,
-            interval_minutes: 10,
-            enabled_at: now,
-            cursor: format!("{:010}.{:06}", now / 1000, (now % 1000) * 1000),
-            revision: revision(),
-            last_check_at: None,
-            last_check_via: None,
-            last_scheduled_at: None,
-            schedule: None,
-        });
-        let mut restart_monitoring = channel.paused && !request.paused;
+        let channel = match self.channels.entry(key) {
+            std::collections::btree_map::Entry::Occupied(_) if request.create_only => {
+                return Err(invalid("이미 설정한 제보 채널이다"));
+            }
+            std::collections::btree_map::Entry::Occupied(existing) => existing.into_mut(),
+            std::collections::btree_map::Entry::Vacant(new) => {
+                if request.label.is_none() || emoji.is_none() || request.mark_processed.is_none()
+                    || request.paused.is_none() || request.interval_minutes.is_none()
+                {
+                    return Err(invalid("새 제보 채널에는 채널 이름, 이모지, 처리 표시, 정지 여부와 간격을 지정한다"));
+                }
+                new.insert(Channel {
+                    id: request.channel.clone(),
+                    label: String::new(),
+                    visibility: ChannelVisibility::Unknown,
+                    emoji: String::new(),
+                    mark_processed: true,
+                    paused: false,
+                    interval_minutes: 10,
+                    enabled_at: now,
+                    cursor: format!("{:010}.{:06}", now / 1000, (now % 1000) * 1000),
+                    revision: String::new(),
+                    last_check_at: None,
+                    last_check_via: None,
+                    last_scheduled_at: None,
+                    schedule: None,
+                })
+            }
+        };
+        let paused = request.paused.unwrap_or(channel.paused);
+        let mut restart_monitoring = channel.paused && !paused;
         if let ScheduleUpdate::Set(schedule) = request.schedule {
             restart_monitoring |= channel.schedule != schedule;
             channel.schedule = schedule;
@@ -769,11 +803,18 @@ impl Ledger {
             channel.enabled_at = now;
             channel.last_scheduled_at = None;
         }
-        channel.label = short(&request.label, 80);
-        channel.emoji = emoji.into();
-        channel.mark_processed = request.mark_processed;
-        channel.paused = request.paused;
-        channel.interval_minutes = request.interval_minutes;
+        if let Some(label) = request.label {
+            channel.label = short(&label, 80);
+        }
+        if let Some(visibility) = request.visibility {
+            channel.visibility = visibility;
+        }
+        if let Some(emoji) = emoji {
+            channel.emoji = emoji.into();
+        }
+        channel.mark_processed = request.mark_processed.unwrap_or(channel.mark_processed);
+        channel.paused = paused;
+        channel.interval_minutes = request.interval_minutes.unwrap_or(channel.interval_minutes);
         channel.revision = revision();
         Ok((json!(channel), true))
     }

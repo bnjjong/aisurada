@@ -160,7 +160,13 @@
 }
 .intake-row-open:hover { color: var(--accent-text, var(--accent)); text-decoration: underline; }
 .intake-channel-row { padding-top: 10px; border-top: 1px solid var(--line); }
-.intake-channel-row strong { overflow-wrap: anywhere; }
+.intake-channel-name { min-width: 0; overflow-wrap: anywhere; }
+.intake-emoji-form { align-items: end; }
+.intake-emoji-form input { width: 8em; }
+.intake-cursor-panel { display: grid; gap: 8px; }
+.intake-cursor-panel strong { overflow-wrap: anywhere; }
+.intake-cursor-panel .intake-cursor-times { display: grid; margin-bottom: 0; }
+.intake-cursor-panel .intake-cursor-times div { flex-wrap: wrap; }
 .ui-modal-backdrop:has(> .intake-drawer) { justify-content: flex-end; padding: 0; }
 .ui-modal.intake-drawer { width: min(470px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 16px 0 0 16px; }
 .intake-drawer-body { display: grid; gap: 14px; padding: 6px 22px 24px; overflow-y: auto; }

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { taskAddress } from "../navigation/routes.ts";
-import { channelId, channelLabel, resultLabel, slackEmoji, slackLink, slackTime, slackTimestamp, viaLabel, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
+import { channelId, channelLabel, resultLabel, slackEmoji, slackLink, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
 import { Modal } from "./Modal.tsx";
+import { SettingsSwitch } from "./SettingsParts.tsx";
 import { eventTime, managerError, useManagers, type ManagerItem } from "./managersStore.tsx";
 
 const countLabels = ["오늘 접수", "새 태스크", "재제보 댓글", "되물음 대기", "무시"];
@@ -34,11 +35,30 @@ export function IntakeBadges({ item }: { item: ManagerItem }) {
   </div>;
 }
 
+function CursorTimes({ channel }: { channel: IntakeChannel }) {
+  return <dl className="intake-cursor-times">
+    <div><dt>읽은 곳</dt><dd>{time(slackTime(channel.cursor))}까지</dd></div>
+    <div><dt>마지막 확인</dt><dd>{channel.lastCheckAt ? time(channel.lastCheckAt) : "확인 전"}
+      {channel.lastCheckVia && ` · ${viaLabel[channel.lastCheckVia]}`}</dd></div>
+    {channel.nextCheckAt != null && <div><dt>다음 예약 예상</dt><dd>{time(channel.nextCheckAt)}</dd></div>}
+  </dl>;
+}
+
+export function IntakeConnectionCursor({ item }: { item: ManagerItem }) {
+  const channels = item.intake?.channels;
+  if (!channels?.length) return null;
+  return <section className="mgr-panel intake-cursor-panel">
+    <h2>커서</h2>
+    {channels.map(channel => <div key={channel.id}>
+      <strong>{channelLabel(channel)}</strong>
+      <CursorTimes channel={channel} />
+    </div>)}
+  </section>;
+}
+
 function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
   channel: IntakeChannel; rows: IntakeRow[]; onRewind(): void; onPause(): void; disabled: boolean;
 }) {
-  const cursor = slackTime(channel.cursor);
-  const next = channel.nextCheckAt;
   const latest = rows.filter(row => row.entry.channel === channel.id).slice(0, 8).reverse();
   return <section className="mgr-panel intake-cursor">
     <div className="intake-channel-icon" aria-hidden="true">#</div>
@@ -51,12 +71,7 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
           : channel.stalledMinutes != null ? <span className="mgr-badge is-error">확인 {channel.stalledMinutes}분째 없음</span>
           : channel.lastCheckAt != null && <span className="mgr-badge is-ok">정상</span>}
       </div>
-      <dl className="intake-cursor-times">
-        <div><dt>읽은 곳</dt><dd>{time(cursor)}까지</dd></div>
-        <div><dt>마지막 확인</dt><dd>{channel.lastCheckAt ? time(channel.lastCheckAt) : "확인 전"}
-          {channel.lastCheckVia && ` · ${viaLabel[channel.lastCheckVia]}`}</dd></div>
-        {next != null && <div><dt>다음 예약 예상</dt><dd>{time(next)}</dd></div>}
-      </dl>
+      <CursorTimes channel={channel} />
       <div className="intake-cursor-track" aria-label="최근 제보의 처리 상태">
         {latest.map(({ entry, current }) => <span key={entry.id} title={`${time(slackTime(entry.messageTs))} · ${resultLabel[current.result]}`}
           className={`intake-dot is-${current.result}`} />)}
@@ -71,9 +86,16 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
 }
 
 function configureArgs(channel: IntakeChannel) {
-  return { channel: channel.id, label: channel.label, emoji: channel.emoji, markProcessed: channel.markProcessed, paused: channel.paused,
+  return { channel: channel.id, label: channel.label, visibility: channel.visibility ?? "unknown" as ChannelVisibility, emoji: channel.emoji, markProcessed: channel.markProcessed, paused: channel.paused,
     intervalMinutes: channel.intervalMinutes, schedule: channel.schedule ?? null };
 }
+
+type ChannelSettings = ReturnType<typeof configureArgs>;
+type ChannelSettingsUpdate = Pick<ChannelSettings, "channel"> & Partial<ChannelSettings> & { createOnly?: boolean };
+
+const visibilityLabel: Record<ChannelVisibility, string> = {
+  public: "공개", private: "비공개", unknown: "공개 여부 미설정",
+};
 
 function RewindDialog({ channel, rows, close, save, busy, error }: {
   channel: IntakeChannel; rows: IntakeRow[]; close(): void; save(ts: string): void; busy: boolean; error: string;
@@ -254,7 +276,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
     {!row && !rewind && error && <p role="alert" className="mgr-error">{error}</p>}
     {channels.map(channel => <CursorCard key={channel.id} channel={channel} rows={rows} disabled={busy}
       onRewind={() => { setError(""); setRewind(channel); }}
-      onPause={() => void execute("intake-channel", { ...configureArgs(channel), paused: !channel.paused })} />)}
+      onPause={() => void execute("intake-channel", { channel: channel.id, paused: !channel.paused })} />)}
     {data && !channels.length && <section className="mgr-panel mgr-between">
       <span>설정한 제보 채널이 없어요.</span><button type="button" onClick={onConnection}>제보 채널 설정</button>
     </section>}
@@ -300,6 +322,44 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
   </div>;
 }
 
+function IntakeChannelRow({ channel, busy, save, edit, rewind }: {
+  channel: IntakeChannel; busy: boolean; save(update: ChannelSettingsUpdate, done?: () => void): void;
+  edit(): void; rewind(): void;
+}) {
+  const label = channelLabel(channel);
+  const [draft, setDraft] = useState<string | null>(null);
+  const emoji = (draft ?? channel.emoji).trim().replace(/^:+|:+$/g, "");
+  return <div className="mgr-between intake-channel-row">
+    <div className="intake-channel-name">
+      <strong>{label}</strong>
+      <small>{channel.id} · {visibilityLabel[channel.visibility ?? "unknown"]}
+        {channel.paused && " · 멈춤"}</small>
+      <small>{channel.schedule ? `예약 ${channel.intervalMinutes}분마다` : "예약 지연 알림 꺼짐"}</small>
+    </div>
+    <form className="mgr-actions intake-emoji-form" onSubmit={event => {
+      event.preventDefault();
+      if (emoji && emoji !== channel.emoji) save({ channel: channel.id, emoji }, () => setDraft(null));
+    }}>
+      <label className="mgr-label"><span>제보 이모지</span>
+        <input aria-label={`${label} 제보 이모지`} value={draft ?? channel.emoji} disabled={busy}
+          list="intake-emoji-names" maxLength={82} onChange={event => setDraft(event.target.value)} />
+      </label>
+      {emoji !== channel.emoji && <button type="submit" disabled={busy || !/^[a-z0-9_+-]{1,80}$/i.test(emoji)}>이모지 저장</button>}
+    </form>
+    <label className="mgr-check">
+      <SettingsSwitch ariaLabel={`${label} ✅ 처리 표시`} checked={channel.markProcessed} disabled={busy}
+        onChange={markProcessed => save({ channel: channel.id, markProcessed })} /> ✅ 처리 표시
+    </label>
+    <div className="mgr-actions">
+      <button type="button" disabled={busy} onClick={edit}>설정</button>
+      <button type="button" disabled={busy} onClick={() => save({ channel: channel.id, paused: !channel.paused })}>
+        {channel.paused ? "다시 켜기" : "멈추기"}
+      </button>
+      <button type="button" disabled={busy} onClick={rewind}>되감기</button>
+    </div>
+  </div>;
+}
+
 export function IntakeConnection({ item, controller }: { item: ManagerItem; controller: WorkspaceController }) {
   const { refresh } = useManagers();
   const [channel, setChannel] = useState<IntakeChannel | null | undefined>();
@@ -322,29 +382,28 @@ export function IntakeConnection({ item, controller }: { item: ManagerItem; cont
       <button type="button" onClick={() => setChannel(null)}>＋ 채널 추가</button>
     </header>
     {!rewind && (error || item.intakeIssue) && <p role="alert" className="mgr-error">{error || item.intakeIssue}</p>}
-    {configured.map(value => <div className="mgr-between intake-channel-row" key={value.id}>
-      <div><strong>{channelLabel(value)}</strong><small>{value.id} · :{value.emoji}: · {value.schedule ? `예약 ${value.intervalMinutes}분마다` : "예약 지연 알림 꺼짐"}</small>
-        <small>{time(slackTime(value.cursor))}까지 읽음{value.lastCheckAt ? ` · 마지막 확인 ${time(value.lastCheckAt)}` : ""}</small></div>
-      <div className="mgr-actions">
-        <span className="mgr-badge">{value.markProcessed ? "✅ 표시 켬" : "처리 표시 끔"}</span>
-        {value.paused && <span className="mgr-badge mgr-intake-warning">멈춤</span>}
-        <button type="button" disabled={busy} onClick={() => setChannel(value)}>설정</button>
-        <button type="button" disabled={busy} onClick={() => void run(async () => {
-          await call("intake-channel", { ...configureArgs(value), paused: !value.paused });
-          await refresh();
-        })}>{value.paused ? "다시 켜기" : "멈추기"}</button>
-        <button type="button" disabled={busy} onClick={() => void run(async () => {
-          const data = await call("intake", { channel: value.id }) as IntakeData;
-          const current = data.channels.find(channel => channel.id === value.id);
-          if (current) setRewind({ channel: current, rows: data.rows });
-        })}>되감기</button>
-      </div>
-    </div>)}
+    <datalist id="intake-emoji-names">
+      <option value="ticket">🎫</option><option value="beetle">🐞</option>
+    </datalist>
+    {configured.map(value => <IntakeChannelRow key={value.id} channel={value} busy={busy}
+      save={(update, done) => void run(async () => {
+        await call("intake-channel", update);
+        await refresh();
+        done?.();
+      })}
+      edit={() => setChannel(value)}
+      rewind={() => void run(async () => {
+        const data = await call("intake", { channel: value.id }) as IntakeData;
+        const current = data.channels.find(channel => channel.id === value.id);
+        if (current) setRewind({ channel: current, rows: data.rows });
+      })} />)}
     {!configured.length && <p className="mgr-intro">Slack 채널 ID와 제보를 찾을 기준 이모지를 설정해 주세요.</p>}
     {channel !== undefined && <ChannelEditor value={channel} registered={registered} configured={configured} close={() => setChannel(undefined)}
       save={async payload => {
-        await call("intake-channel", payload);
-        await refresh();
+        if (Object.keys(payload).length > 1) {
+          await call("intake-channel", payload);
+          await refresh();
+        }
         setChannel(undefined);
       }} />}
     {rewind && <RewindDialog channel={rewind.channel} rows={rewind.rows} close={() => { setRewind(null); setError(""); }} busy={busy} error={error}
@@ -371,11 +430,12 @@ function minutesOfTime(value: string, end = false) {
 
 function ChannelEditor({ value, registered, configured, close, save }: {
   value: IntakeChannel | null; registered: string[]; configured: IntakeChannel[]; close(): void;
-  save(value: ReturnType<typeof configureArgs>): Promise<void>;
+  save(value: ChannelSettingsUpdate): Promise<void>;
 }) {
   const [form, setForm] = useState(() => value ? configureArgs(value) : {
-    channel: "", label: "", emoji: "ticket", markProcessed: true, paused: false, intervalMinutes: 10, schedule: null,
+    channel: "", label: "", visibility: "unknown" as ChannelVisibility, emoji: "ticket", markProcessed: true, paused: false, intervalMinutes: 10, schedule: null,
   });
+  const initial = useRef(form);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const update = (patch: Partial<typeof form>) => setForm(current => ({ ...current, ...patch }));
@@ -391,7 +451,11 @@ function ChannelEditor({ value, registered, configured, close, save }: {
       event.preventDefault();
       setBusy(true);
       setError("");
-      try { await save({ ...form, channel }); }
+      try {
+        const changes = Object.fromEntries(Object.entries(form).filter(([key, field]) =>
+          field !== initial.current[key as keyof ChannelSettings]));
+        await save(value ? { ...changes, channel } : { ...form, channel, createOnly: true });
+      }
       catch (reason) { setError(managerError(reason)); }
       finally { setBusy(false); }
     }}>
@@ -401,6 +465,11 @@ function ChannelEditor({ value, registered, configured, close, save }: {
         <datalist id="intake-registered-channels">{registered.map(id => <option key={id} value={id} />)}</datalist>
         <label className="mgr-label">채널 표시 이름<input value={form.label} maxLength={80} placeholder="#프로젝트-제보"
           onChange={event => update({ label: event.target.value })} /></label>
+        <label className="mgr-label">채널 공개 여부
+          <select value={form.visibility} onChange={event => update({ visibility: event.target.value as ChannelVisibility })}>
+            {Object.entries(visibilityLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>
         <div className="mgr-columns">
           <label className="mgr-label">제보 기준 이모지<input required value={form.emoji} placeholder="ticket"
             onChange={event => update({ emoji: event.target.value })} /></label>

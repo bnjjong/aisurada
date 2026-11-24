@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Workspace } from "../workspace/types.ts";
 import { managerAddress, managersAddress, projectAddress } from "../navigation/routes.ts";
-import { IntakeBadges, IntakeConnection, ManagerIntake } from "./ManagerIntake.tsx";
+import { IntakeBadges, IntakeConnection, IntakeConnectionCursor, ManagerIntake } from "./ManagerIntake.tsx";
 import { Confirm } from "./Modal.tsx";
 import { Page } from "./OtherPages.tsx";
 import { PROJECT_TYPE_NAMES, projectTypeOf } from "./model.ts";
@@ -227,6 +227,7 @@ function ManagerDetail({ item, projects, controller, busy, action, setup, intake
           item={item} project={project} data={data} controller={controller} tab={selectedTab} />}
       </div>
       <aside>
+        {selectedTab === "connection" && <IntakeConnectionCursor item={item} />}
         <section className="mgr-panel"><h2>세부 정보</h2>
           <dl className="mgr-meta">
             <dt>프로젝트</dt><dd>{project?.title || manager.project || "—"}</dd>

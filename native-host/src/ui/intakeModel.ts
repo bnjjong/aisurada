@@ -7,9 +7,12 @@ export interface IntakeSchedule {
   endMinute: number;
 }
 
+export type ChannelVisibility = "public" | "private" | "unknown";
+
 export interface IntakeChannel {
   id: string;
   label: string;
+  visibility?: ChannelVisibility;
   emoji: string;
   markProcessed: boolean;
   paused: boolean;
