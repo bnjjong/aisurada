@@ -8,7 +8,7 @@
 
 use serde_json::Value;
 
-use super::{Engine, finish, parse_args};
+use super::{Engine, acquire_lock, finish, parse_args};
 use crate::commands::{
     agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, decisions,
     doc_create, doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc,
@@ -35,6 +35,17 @@ impl Engine {
     ) -> Result<Value, EngineError> {
         let _installed = self.install_ports();
         intake_commands::authorize(&self.vault_root, operation, context)?;
+        if matches!(operation, IntakeOperation::Move) {
+            // 커서는 파일에 저장하고 제보 기록이나 설정 변경과 함께 커밋한다.
+            let _lock = acquire_lock(&self.vault_root)?;
+            return intake_commands::execute(
+                &self.vault_root,
+                operation,
+                context,
+                allowed_channels,
+                args,
+            );
+        }
         let _scope = operation
             .is_write()
             .then(|| self.open_scope(Scope::Standard, context))

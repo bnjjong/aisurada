@@ -639,7 +639,13 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
         _ => {}
     }
     let [action, name, options @ ..] = args else {
-        return Err("사용법: ais-cli manager list | add NAME project=… […] | update NAME […] | enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME".into());
+        return Err(concat!(
+            "ais-cli manager 사용법\n",
+            "  list | dashboard | add NAME project=… […] | update NAME […]\n",
+            "  enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME\n",
+            "  intake NAME [JSON] | intake-channel NAME JSON | intake-rewind NAME JSON\n",
+            "  intake-review NAME JSON | intake-sources TASK"
+        ).into());
     };
     if action == "intake-sources" && options.is_empty() {
         return Engine::new(canonical_vault(env)?)

@@ -997,9 +997,108 @@ fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
             "get_intake",
             json!({"channel":channel,"messageTs":first})
         )),
-        json!({"recorded":true,"item":null})
+        json!({"recorded":false,"item":null})
     );
-    rejected(tool("hermes-other", "record_intake", original));
+    rejected(tool("hermes-other", "record_intake", original.clone()));
+
+    // 0.2.3의 원장 형식으로 바꿔 읽어도 작성한 매니저의 기록은 남는다.
+    let ledger_path = vault.join(".aisurada/intake/ledger.json");
+    let mut ledger: Value = serde_json::from_slice(&std::fs::read(&ledger_path).unwrap()).unwrap();
+    let records = ledger["entries"].as_object_mut().unwrap();
+    let previous = std::mem::take(records);
+    for (_, entry) in previous {
+        records.insert(entry["id"].as_str().unwrap().into(), entry);
+    }
+    std::fs::write(&ledger_path, serde_json::to_vec(&ledger).unwrap()).unwrap();
+    assert_eq!(
+        mcp("get_intake", json!({"channel":channel,"messageTs":first}))["item"]["entry"]["taskKey"],
+        task_key
+    );
+
+    let shared = at(5);
+    let mut ignored = report(&shared);
+    ignored["result"] = json!("ignored");
+    assert_eq!(mcp("record_intake", ignored)["recorded"], false);
+    cli(&[
+        "manager",
+        "update",
+        "hermes-other",
+        "tools=list_tasks,create_task,add_task_comment",
+    ]);
+    let outsider = |name, args| tool("hermes-other", name, args);
+    let other_channel = cli(&["manager", "intake", "hermes-other"]);
+    let other_cursor = cli(&["manager", "intake-rewind", "hermes-other", &json!({
+        "channel": channel, "revision": other_channel["channels"][0]["revision"], "messageTs": start
+    }).to_string()]);
+    assert_eq!(
+        tool_json(&outsider(
+            "get_intake",
+            json!({"channel":channel,"messageTs":shared})
+        ))["recorded"],
+        false
+    );
+    rejected(outsider(
+        "move_cursor",
+        move_to(&other_cursor, &shared, &[&shared]),
+    ));
+    let mut report_from_other = report(&shared);
+    report_from_other["result"] = json!("created");
+    report_from_other["task"] =
+        json!({"title":"다른 프로젝트 제보", "repo":"demo/shared", "criteria":["확인"]});
+    let revision_before = other_channel["rowsRevision"].clone();
+    let created_outside = tool_json(&outsider("record_intake", report_from_other));
+    assert_eq!(created_outside["recorded"], false);
+    let created_outside_key = created_outside["item"]["entry"]["taskKey"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        cli(&["get-task", created_outside_key])["project"],
+        "outside"
+    );
+    assert_eq!(
+        mcp("get_intake", json!({"channel":channel,"messageTs":shared}))["item"]["current"]["result"],
+        "ignored"
+    );
+
+    let duplicate = at(6);
+    let mut comment_from_other = report(&duplicate);
+    comment_from_other["result"] = json!("commented");
+    comment_from_other["taskKey"] = foreign["key"].clone();
+    assert_eq!(
+        tool_json(&outsider("record_intake", comment_from_other))["recorded"],
+        false
+    );
+    let other_after_record = cli(&["manager", "intake", "hermes-other"]);
+    assert_ne!(other_after_record["rowsRevision"], revision_before);
+    let foreign_key = foreign["key"].as_str().unwrap();
+    assert_eq!(
+        cli(&["get-task", foreign_key])["intakeSources"][0]["taskOrigin"],
+        "commented"
+    );
+    assert!(
+        mcp("get_task", json!({"id":task_key}))
+            .get("intakeSources")
+            .is_none()
+    );
+    assert_eq!(
+        cli(&["get-task", task_key])["intakeSources"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        tool_json(&outsider(
+            "move_cursor",
+            move_to(&other_cursor, &shared, &[&duplicate, &shared])
+        ))["cursor"],
+        shared
+    );
+    let other_after_move = cli(&["manager", "intake", "hermes-other"]);
+    assert_eq!(
+        other_after_move["rowsRevision"],
+        other_after_record["rowsRevision"]
+    );
 
     let mut paused = configure;
     paused["paused"] = json!(true);
