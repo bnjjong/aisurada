@@ -1,6 +1,6 @@
 # aisurada
 
-**macOS Apple Silicon 배포:** [0.2.2 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.2.2) · Java 없는 Rust 엔진 판(패치 릴리즈) · [설치 안내와 제한 사항](docs/releases/0.2.2.md)
+**macOS Apple Silicon 배포:** [0.2.3 다운로드](https://github.com/bnjjong/aisurada/releases/tag/v0.2.3) · Java 없는 Rust 엔진 판(패치 릴리즈) · [설치 안내와 제한 사항](docs/releases/0.2.3.md)
 
 사용 방법은 [HTML 사용자 가이드](docs/user-guide.html)에 정리했습니다. 파일을 내려받아 브라우저에서 열면 검색·목차·코드 복사·인쇄를 사용할 수 있습니다.
 
