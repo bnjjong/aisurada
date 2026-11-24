@@ -3,11 +3,12 @@
 // 이 모듈은 호스트 명령을 부르고, 호스트가 알려 주는 사건(`ais://notifications`)을 받아 기억하고 토스트로 띄울 뿐이다.
 // 집중 모드는 macOS가 처리한다(앱이 상태를 읽지 않는다): 집중 모드에서 aisurada를 허용하지 않으면 OS가 배너를 막는다.
 import { useSyncExternalStore } from "react";
+import { slackLink } from "./intakeModel.ts";
 
 export type HostCall = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "manager" | "test";
-export type EventKind = Exclude<NotifyKind, "test">;
+export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "manager" | "intake-question" | "test";
+export type EventKind = Exclude<NotifyKind, "test" | "intake-question">;
 
 export interface NotifyItem {
   id: string;
@@ -18,6 +19,7 @@ export interface NotifyItem {
   taskKey: string | null;
   /** 눌렀을 때 열 노트(`노트id` 또는 `노트id/하위노트id`). 결정 블록 알림이 쓴다 */
   noteRef: string | null;
+  intake?: { manager: string; entry: string; url: string };
   /** 만든 시각(유닉스 밀리초) */
   at: number;
   read: boolean;
@@ -69,7 +71,7 @@ export const EVENT_KINDS: readonly { id: EventKind; label: string; hint: string 
   { id: "failed", label: "실패하거나 막혔을 때", hint: "한도를 넘었거나 에이전트가 멈췄어요" },
   { id: "done", label: "Done으로 바뀌었을 때", hint: "조용히 알려도 돼요" },
   { id: "approval", label: "스킬·에이전트 변경이 승인을 기다릴 때", hint: "AI가 쓴 변경은 사람이 승인해야 적용돼요. 늦으면 AI의 일이 막혀요" },
-  { id: "manager", label: "매니저가 태스크를 접수했을 때", hint: "새 제보를 초안으로 받았어요" },
+  { id: "manager", label: "매니저가 제보를 접수하거나 되물었을 때", hint: "되물음은 앱 안에서 알려요" },
   { id: "decision", label: "AI가 노트에서 답을 기다릴 때", hint: "AI가 노트에 쓴 「정할 것」에 답하고 「답 다 했음」을 체크하면 AI가 이어 가요" },
 ];
 
@@ -95,16 +97,23 @@ export const TOAST_MS = 8000;
 // ---------------------------------------------------------------- 읽기
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "decision", "manager", "test"]);
+const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "decision", "manager", "intake-question", "test"]);
 
 /** 호스트 행을 알림으로 읽는다. 모양이 틀리면 null이다. */
 export function toItem(v: unknown): NotifyItem | null {
   if (!isRecord(v)) return null;
   const { id, kind, title } = v;
   if (typeof id !== "string" || !id || typeof kind !== "string" || !KINDS.has(kind) || typeof title !== "string") return null;
+  const target = v.intake;
+  const intake = kind === "intake-question" && isRecord(target) && typeof target.manager === "string"
+    && /^[a-z][a-z0-9-]{0,31}$/.test(target.manager) && typeof target.entry === "string"
+    && /^[CGD][A-Z0-9]{2,79}:\d{10}\.\d{6}$/.test(target.entry)
+    && typeof target.url === "string" && slackLink(target.url)
+    ? { manager: target.manager, entry: target.entry, url: target.url } : undefined;
   return {
     id,
     kind: kind as NotifyKind,
+    ...(intake ? { intake } : {}),
     title,
     body: typeof v.body === "string" ? v.body : "",
     taskKey: typeof v.taskKey === "string" && v.taskKey ? v.taskKey : null,
@@ -261,7 +270,7 @@ export async function sendTest(call: HostCall): Promise<PushResult | null> {
 // ---------------------------------------------------------------- 표시
 
 export const kindLabel = (k: NotifyKind): string =>
-  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", decision: "정할 것", manager: "매니저", test: "시험" })[k];
+  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", decision: "정할 것", manager: "매니저", "intake-question": "되물음", test: "시험" })[k];
 
 /** 시험 알림의 배너 결과를 사람이 읽을 글로 푼다. */
 export function bannerMessage(banner: string): string {

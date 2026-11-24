@@ -570,6 +570,7 @@ impl Run<'_> {
                 body: format!("{} — {label}가 올라왔어요", self.task.title),
                 task_key: Some(self.rec.task_key.clone()),
                 note_ref: None,
+                intake: None,
                 id: Some(format!("run-{}-done", self.rec.run_id)),
             },
         );
@@ -608,6 +609,7 @@ impl Run<'_> {
                 body: format!("{} — {}", self.task.title, protocol::clip(question, 160)),
                 task_key: Some(self.rec.task_key.clone()),
                 note_ref: None,
+                intake: None,
                 id: Some(format!("run-{}-q{}", self.rec.run_id, self.rec.questions)),
             },
         );
@@ -636,6 +638,7 @@ impl Run<'_> {
                 body: format!("{} — {}", self.task.title, protocol::clip(message, 160)),
                 task_key: Some(self.rec.task_key.clone()),
                 note_ref: None,
+                intake: None,
                 id: Some(format!("run-{}-failed", self.rec.run_id)),
             },
         );

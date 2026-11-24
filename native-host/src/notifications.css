@@ -38,3 +38,6 @@
 
 .ntf-ico-approval { background: var(--warn-bg); color: var(--warn); font-size: 12px; }
 .ntf-ico-decision { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 12px; }
+
+.ntf-ico-intake-question { color: var(--ink); background: color-mix(in srgb, var(--surface), var(--warn) 25%); }
+.ntf-slack-link { margin-inline-start: 8px; font-size: 12px; }

@@ -18,13 +18,28 @@ use std::{
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
-pub const KINDS: [&str; 8] = [
-    "question", "pr", "failed", "done", "approval", "decision", "manager", "test",
+pub const KINDS: [&str; 9] = [
+    "question",
+    "pr",
+    "failed",
+    "done",
+    "approval",
+    "decision",
+    "manager",
+    "intake-question",
+    "test",
 ];
 /// 목록에 두는 알림의 수. 넘으면 오래된 것부터 버린다.
 pub const MAX_ITEMS: usize = 200;
 const MAX_TITLE: usize = 120;
 const MAX_BODY: usize = 400;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IntakeTarget {
+    pub manager: String,
+    pub entry: String,
+    pub url: String,
+}
 
 /// 알림 하나.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -40,6 +55,8 @@ pub struct Item {
     /// 눌렀을 때 열 노트(`노트id` 또는 `노트id/하위노트id`). 결정 블록 알림이 쓴다. 없으면 null
     #[serde(default)]
     pub note_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intake: Option<IntakeTarget>,
     /// 만든 시각(유닉스 밀리초)
     pub at: u64,
     pub read: bool,
@@ -57,6 +74,8 @@ pub struct NewItem {
     pub task_key: Option<String>,
     #[serde(default)]
     pub note_ref: Option<String>,
+    #[serde(default)]
+    pub intake: Option<IntakeTarget>,
     #[serde(default)]
     pub id: Option<String>,
 }
@@ -163,6 +182,10 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "approval" => settings.events.approval,
         "decision" => settings.events.decision,
         "manager" => settings.events.manager,
+        "intake-question" => Channel {
+            in_app: settings.events.manager.in_app,
+            macos: false,
+        },
         _ => Channel {
             in_app: true,
             macos: true,
@@ -289,6 +312,22 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         }
         _ => None,
     };
+    let intake = match (new.kind.as_str(), new.intake) {
+        ("intake-question", Some(target)) => {
+            let source = ais_domain::task::format::slack_thread(&target.url);
+            if !ais_core::valid_manager_name(&target.manager)
+                || target.url.len() > 512
+                || !source.is_some_and(|(channel, ts)| format!("{channel}:{ts}") == target.entry)
+            {
+                return Err("알림이 가리키는 제보 항목을 확인할 수 없다".into());
+            }
+            Some(target)
+        }
+        ("intake-question", None) | (_, Some(_)) => {
+            return Err("되물음 알림의 원장 항목을 지정한다".into())
+        }
+        _ => None,
+    };
     let id = match new.id {
         Some(id) if !id.trim().is_empty() => {
             let id = id.trim().to_string();
@@ -306,6 +345,7 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         body: clip(&new.body, MAX_BODY),
         task_key,
         note_ref,
+        intake,
         at,
         read: false,
     })
@@ -513,8 +553,12 @@ pub fn notifications_push<R: Runtime>(
     host: State<'_, HostState>,
     state: State<'_, NotifyState>,
     item: NewItem,
+    expected_vault: Option<String>,
 ) -> Result<PushOut, String> {
     let vault = current_vault(&host)?;
+    if expected_vault.is_some_and(|expected| expected != vault) {
+        return Err("알림을 보내기 전에 열린 vault가 바뀌었다".into());
+    }
     let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
     push(&app, &default_dir(), &vault, item)
 }
@@ -575,6 +619,7 @@ mod tests {
             body: String::new(),
             task_key: None,
             note_ref: None,
+            intake: None,
             id: None,
         }
     }
@@ -587,6 +632,7 @@ mod tests {
             body: String::new(),
             task_key: None,
             note_ref: None,
+            intake: None,
             at: 1,
             read,
         }
@@ -932,6 +978,7 @@ mod tests {
             body: "b".into(),
             task_key: Some("TSK-1".into()),
             note_ref: None,
+            intake: None,
             at: 5,
             read: false,
         };

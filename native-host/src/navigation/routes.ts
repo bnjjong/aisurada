@@ -17,7 +17,7 @@ export type ScreenRoute =
   | { kind: 'project' | 'architecture'; slug: string }
   | { kind: 'task'; key: string }
   | { kind: 'managers'; project?: string }
-  | { kind: 'manager'; name: string }
+  | { kind: 'manager'; name: string; intake?: string }
   | { kind: 'terminal'; id: string | null }
   | { kind: PlainPage };
 
@@ -55,7 +55,10 @@ export function parseRoute(address: string): ScreenRoute {
       case 'project': return { kind: 'project', slug: id };
       case 'architecture': return { kind: 'architecture', slug: id };
       case 'task': return { kind: 'task', key: id };
-      case 'manager': return { kind: 'manager', name: id };
+      case 'manager': {
+        const intake = query.get('intake');
+        return { kind: 'manager', name: id, ...(intake ? { intake } : {}) };
+      }
       default: return { kind: 'terminal', id };
     }
   } catch { return { kind: 'unknown' }; }
@@ -67,7 +70,8 @@ export const agendaAddress = (id: string) => `/agenda/${encodeURIComponent(id)}`
 export const architectureAddress = (slug: string) => '/architecture/' + encodeURIComponent(slug);
 export const projectAddress = (slug: string) => `/project/${encodeURIComponent(slug)}`;
 export const managersAddress = (project?: string) => project ? `/managers?project=${encodeURIComponent(project)}` : "/managers";
-export const managerAddress = (name: string) => `/manager/${encodeURIComponent(name)}`;
+export const managerAddress = (name: string, intake?: string) =>
+  `/manager/${encodeURIComponent(name)}${intake ? `?intake=${encodeURIComponent(intake)}` : ""}`;
 export const taskAddress = (key: string) => `/task/${encodeURIComponent(key)}`;
 export const sessionAddress = (id: string) => `/session/${encodeURIComponent(id)}`;
 export const notesAddress = (open: string[] = []) =>

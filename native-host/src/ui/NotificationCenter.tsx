@@ -4,12 +4,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { WorkspaceController } from "../workspace/controller.ts";
-import { docAddress, subAddress, taskAddress } from "../navigation/routes.ts";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { isTauri } from "@tauri-apps/api/core";
+import { docAddress, managerAddress, subAddress, taskAddress } from "../navigation/routes.ts";
 import { formatRelativeTime } from "./dates.ts";
 import { dismissToast, kindLabel, markRead, useNotifications, visibleItems } from "./notificationsStore.ts";
 import type { NotifyItem, NotifyKind } from "./notificationsStore.ts";
 
-const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", manager: "접", test: "i" };
+const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", manager: "접", "intake-question": "?", test: "i" };
 
 /** 알림 종류를 나타내는 동그라미. 색은 종류가 정한다(`notifications.css`의 `.ntf-ico-*`). */
 function KindMark({ kind }: { kind: NotifyKind }) {
@@ -21,8 +23,9 @@ function KindMark({ kind }: { kind: NotifyKind }) {
 }
 
 /** 알림 한 줄에 붙는 단추 이름. 질문은 「답하기」, 승인은 「승인하러 가기」, 결정 블록은 「답하러 가기」, 그 밖의 태스크 알림은 「태스크 보기」. */
-export const actionLabel = (item: Pick<NotifyItem, "kind" | "taskKey"> & { noteRef?: string | null }): string | null =>
+export const actionLabel = (item: Pick<NotifyItem, "kind" | "taskKey"> & Pick<Partial<NotifyItem>, "noteRef" | "intake">): string | null =>
   item.kind === "approval" ? "승인하러 가기" : item.kind === "decision" ? (item.noteRef ? "답하러 가기" : null)
+    : item.kind === "intake-question" ? (item.intake ? "원장 항목 보기" : null)
     : !item.taskKey ? null : item.kind === "question" ? "답하기" : "태스크 보기";
 
 /** 결정 블록 알림의 노트 참조(`노트id` 또는 `노트id/하위노트id`)를 화면 주소로 바꾼다. */
@@ -32,9 +35,20 @@ export const noteRefAddress = (ref: string): string => {
 };
 
 /** 알림을 눌렀을 때 갈 곳. 태스크 알림은 그 태스크, 승인 알림은 스킬·에이전트 페이지, 결정 블록 알림은 그 노트다. 갈 곳이 없으면 null이다. */
-export const itemAddress = (item: Pick<NotifyItem, "kind" | "taskKey"> & { noteRef?: string | null }): string | null =>
+export const itemAddress = (item: Pick<NotifyItem, "kind" | "taskKey"> & Pick<Partial<NotifyItem>, "noteRef" | "intake">): string | null =>
   item.kind === "approval" ? "/resources" : item.kind === "decision" ? (item.noteRef ? noteRefAddress(item.noteRef) : null)
+    : item.intake ? managerAddress(item.intake.manager, item.intake.entry)
     : item.taskKey ? taskAddress(item.taskKey) : null;
+
+function SlackAction({ item }: { item: NotifyItem }) {
+  if (!item.intake) return null;
+  const { url } = item.intake;
+  return <a className="ntf-slack-link" href={url} target="_blank" rel="noreferrer" onClick={event => {
+    if (!isTauri()) return;
+    event.preventDefault();
+    void openUrl(url).catch(() => {});
+  }}>Slack에서 열기</a>;
+}
 
 export type CenterTab = "unread" | "all";
 
@@ -97,10 +111,11 @@ export function NotificationPanel({
                   </p>
                 )}
                 {actionLabel(item) && (
-                  <button type="button" className={item.kind === "question" || item.kind === "decision" ? "button-primary" : ""} onClick={() => onOpen(item)}>
+                  <button type="button" className={item.kind === "question" || item.kind === "decision" || item.kind === "intake-question" ? "button-primary" : ""} onClick={() => onOpen(item)}>
                     {actionLabel(item)}
                   </button>
                 )}
+                <SlackAction item={item} />
                 {!actionLabel(item) && !item.read && (
                   <button type="button" onClick={() => onOpen(item)}>
                     읽음으로
@@ -230,10 +245,11 @@ export function ToastStack({ toasts, onDismiss, onOpen }: { toasts: NotifyItem[]
               </p>
             )}
             {actionLabel(item) && (
-              <button type="button" className={item.kind === "question" || item.kind === "decision" ? "button-primary" : ""} onClick={() => onOpen(item)}>
+              <button type="button" className={item.kind === "question" || item.kind === "decision" || item.kind === "intake-question" ? "button-primary" : ""} onClick={() => onOpen(item)}>
                 {actionLabel(item)}
               </button>
             )}
+            <SlackAction item={item} />
           </div>
           <button type="button" className="ntf-close" aria-label="닫기" onClick={() => onDismiss(item.id)}>
             ×
