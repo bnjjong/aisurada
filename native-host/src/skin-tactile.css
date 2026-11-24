@@ -157,7 +157,7 @@
 :root[data-skin="tactile"] input[type="checkbox"] { border-radius: 6px; }
 :root[data-skin="tactile"] input[type="radio"] { border-radius: 50%; }
 :root[data-skin="tactile"] input[type="checkbox"]:checked, :root[data-skin="tactile"] input[type="radio"]:checked { background: var(--accent); box-shadow: var(--sh-acc); }
-:root[data-skin="tactile"] input[type="checkbox"]:checked::after {
+:root[data-skin="tactile"] input[type="checkbox"]:not(.set-toggle):checked::after {
   content: ""; width: 9px; height: 5px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: translateY(-1px) rotate(-45deg);
 }
 :root[data-skin="tactile"] input[type="radio"]:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-ink); }
@@ -170,7 +170,14 @@
   background: var(--surface); box-shadow: var(--sh-1); transform: none; transition: transform .15s;
 }
 :root[data-skin="tactile"] .set-toggle[type="checkbox"]:checked { background: var(--accent); box-shadow: var(--in-acc); }
-:root[data-skin="tactile"] .set-toggle[type="checkbox"]:checked::after { transform: translateX(20px); background: var(--accent-ink); border: 0; }
+:root[data-skin="tactile"] .set-toggle[type="checkbox"]:checked::after {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  transform: translateX(20px);
+  background: var(--accent-ink);
+}
 
 /* 설정: 카드 및 탭 */
 :root[data-skin="tactile"] .set-card { border-radius: 20px; border: 0; box-shadow: var(--sh-1); }
