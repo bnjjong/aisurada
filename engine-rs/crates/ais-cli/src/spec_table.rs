@@ -67,7 +67,7 @@ pub const SPECS: &[Spec] = &[
         write: false,
         part4: false,
         usage: "get-sub-note <부모 노트 id> <하위 노트 id>",
-        allowed: &[],
+        allowed: &["includeIdPath"],
         max: Some(2),
     },
     Spec {

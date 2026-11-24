@@ -67,6 +67,21 @@ impl NoteRecord {
     pub fn hides_body_and_token(&self) -> bool {
         self.format == Format::Json || self.is_extension_folder
     }
+
+    /// 이 최상위 노트부터 주어진 후속 노트까지의 ID를 차례대로 모은다.
+    pub(crate) fn sub_note_id_path(&self, sub: &Self) -> Option<Vec<String>> {
+        let mut ids = vec![sub.id.clone()];
+        let mut current = sub;
+        while let Some(parent_id) = current.direct_parent_id.as_deref() {
+            ids.push(parent_id.to_owned());
+            if parent_id == self.id {
+                ids.reverse();
+                return Some(ids);
+            }
+            current = self.sub_notes.iter().find(|note| note.id == parent_id)?;
+        }
+        None
+    }
 }
 
 /// 훑기 결과

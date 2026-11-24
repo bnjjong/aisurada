@@ -9,7 +9,6 @@ use crate::model::SubNoteRow;
 use crate::text::{SUB_NOTE_ID, is_blank};
 use crate::vault::comments::{CommentsEnvelope, read_comments};
 use crate::vault::index::NoteIndex;
-use crate::vault::scanner::NoteRecord;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -17,6 +16,7 @@ pub struct GetSubNoteRequest {
     /// 부모 사슬. 주지 않으면 후속 노트 id만으로 찾는다.
     pub parent: Option<String>,
     pub id: String,
+    pub include_id_path: bool,
 }
 
 #[derive(Serialize)]
@@ -24,7 +24,7 @@ pub struct GetSubNoteRequest {
 pub struct FoundSubNote {
     #[serde(flatten)]
     note: SubNoteRow,
-    /// ID만으로 조회했을 때, 최상위 노트부터 찾은 후속 노트까지의 ID 목록.
+    /// 최상위 노트부터 찾은 후속 노트까지의 ID 목록.
     #[serde(skip_serializing_if = "Option::is_none")]
     id_path: Option<Vec<String>>,
 }
@@ -83,25 +83,12 @@ pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallCon
     };
     Ok(FoundSubNote {
         note: SubNoteRow::from_record(sub, true, Some(comments)),
-        id_path: if parent.is_none() {
-            Some(id_path(root, sub)?)
+        id_path: if request.include_id_path {
+            Some(root.sub_note_id_path(sub).ok_or_else(|| {
+                EngineError::internal(format!("후속 노트의 상위 경로를 찾을 수 없다: {id}"))
+            })?)
         } else {
             None
         },
     })
-}
-
-fn id_path(root: &NoteRecord, sub: &NoteRecord) -> Result<Vec<String>, EngineError> {
-    let mut ids = vec![sub.id.clone()];
-    let mut current = sub;
-    while let Some(parent_id) = current.direct_parent_id.as_deref() {
-        ids.push(parent_id.to_owned());
-        if parent_id == root.id {
-            ids.reverse();
-            return Ok(ids);
-        }
-        current = root.sub_notes.iter().find(|note| note.id == parent_id)
-            .ok_or_else(|| EngineError::internal(format!("상위 노트를 찾을 수 없다: {parent_id}")))?;
-    }
-    Err(EngineError::internal(format!("최상위 노트에 닿지 못했다: {}", root.id)))
 }

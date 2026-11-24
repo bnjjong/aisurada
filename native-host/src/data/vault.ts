@@ -221,11 +221,11 @@ export class VaultData {
       return;
     }
     try {
-      const result = await engineRefusal(this.services.host, read.subNote(parent, id));
+      const result = await engineRefusal(this.services.host, read.subNote(parent, id, true));
       if (!this.valid(generation) || !result.ok) return;
       const row = asRow(result.value);
       if (row?.id !== id) return;
-      const resolved = parent ? parts : row.idPath;
+      const resolved = row.idPath;
       if (!Array.isArray(resolved) || resolved.length < 2 || resolved.at(-1) !== id ||
         !resolved.every((part): part is string => typeof part === 'string')) return;
       const [root, ...ids] = resolved;

@@ -436,9 +436,12 @@ fn opens_notes_sub_notes_comments_attachments_and_facts() {
     let sub = engine
         .call("get_sub_note", json!({"id": "snfx0001-00000011"}))
         .unwrap();
-    assert_eq!(sub["idPath"], json!([parent, "snfx0001-00000011"]));
+    assert!(sub.get("idPath").is_none());
     let nested = engine
-        .call("get_sub_note", json!({"id": "snfx0005-00000015"}))
+        .call(
+            "get_sub_note",
+            json!({"id": "snfx0005-00000015", "includeIdPath": true}),
+        )
         .unwrap();
     assert_eq!(
         nested["idPath"],
