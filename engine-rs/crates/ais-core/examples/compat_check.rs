@@ -13,6 +13,7 @@
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::rc::Rc;
 use std::{env, fs};
 
 use ais_core::engine::Engine;
@@ -26,7 +27,7 @@ mod tape;
 struct Java {
     jar: String,
     home: PathBuf,
-    tape: RefCell<tape::Tape>,
+    tape: Rc<RefCell<tape::Tape>>,
 }
 
 impl Java {
@@ -57,6 +58,15 @@ impl Java {
                 None => Ok(value["ok"].clone()),
             };
         }
+        if self.tape.borrow().is_record()
+            && self.tape.borrow().is_current_recorded_rust("run", &key)
+        {
+            let value = self.tape.borrow_mut().skip_rust_record().unwrap();
+            return match value.get("err") {
+                Some(e) => Err(e.as_str().unwrap_or_default().to_string()),
+                None => Ok(value["ok"].clone()),
+            };
+        }
         let result = self.launch(vault, args, props, envs);
         if self.tape.borrow().is_record() {
             let value = match &result {
@@ -78,7 +88,15 @@ impl Java {
                 .next_tree(lineage)
                 .unwrap_or_else(|e| panic!("{e}"));
             let local = self.digests(b);
-            return tape::digest_diff(&recorded, &local);
+            let diff = tape::digest_diff(&recorded, &local);
+            if !diff.is_empty() && self.tape.borrow().is_bless() {
+                let first_diff = diff.lines().next().unwrap_or("diff").to_string();
+                self.tape
+                    .borrow_mut()
+                    .bless_last_tree(lineage, &local, lineage, &first_diff);
+                return String::new();
+            }
+            return diff;
         }
         let diff = tree_diff(a, b);
         if self.tape.borrow().is_record() {
@@ -203,13 +221,22 @@ fn legacy_agendas(_vault: &Path, java_response: &Value) -> Value {
     )
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Report {
     checked: usize,
     failures: Vec<String>,
+    tape: Option<Rc<RefCell<tape::Tape>>>,
 }
 
 impl Report {
+    fn new(tape: &Rc<RefCell<tape::Tape>>) -> Self {
+        Report {
+            checked: 0,
+            failures: Vec::new(),
+            tape: Some(Rc::clone(tape)),
+        }
+    }
+
     fn record(&mut self, label: String, ok: bool, detail: impl FnOnce() -> String) {
         self.checked += 1;
         if !ok {
@@ -283,10 +310,21 @@ fn compare(
     rust: Result<Value, ais_core::error::EngineError>,
     convert: impl Fn(&Path, &Value) -> Value,
 ) {
+    let is_bless = report.tape.as_ref().is_some_and(|t| t.borrow().is_bless());
     match (java, rust) {
         (Ok(j), Ok(r)) => {
             let want = convert(vault, &j);
-            report.record(label, want == r, || first_diff(&want, &r, "$"));
+            let ok = want == r;
+            if !ok && is_bless {
+                let diff = first_diff(&want, &r, "$");
+                if let Some(ref t) = report.tape {
+                    t.borrow_mut()
+                        .bless_last(&json!({"ok": r}), "run", &label, &diff);
+                }
+                report.checked += 1;
+            } else {
+                report.record(label, ok, || first_diff(&want, &r, "$"));
+            }
         }
         (Err(j), Err(r)) => {
             // 오류는 Java의 `AIS-코드 메시지` 글과 Rust의 코드·메시지가 같은지 본다.
@@ -294,15 +332,48 @@ fn compare(
             let rust_text = format!("AIS-{} {}", java_number(r.kind), r.message)
                 .replace(UPDATE_DOC_AGENDA_USAGE, "");
             // Java가 예상 밖 예외로 실패하면 오류 글에 스택 추적이 붙으므로, Rust의 메시지가 그 안에 든 것도 같은 실패로 본다
-            report.record(
-                label,
-                j == rust_text
-                    || (j.starts_with("Application run failed") && j.contains(&r.message)),
-                || format!("Java 오류: {j}\nRust 오류: {rust_text}"),
-            );
+            let ok = j == rust_text
+                || (j.starts_with("Application run failed") && j.contains(&r.message));
+            if !ok && is_bless {
+                let diff = format!("Java={j}, Rust={rust_text}");
+                if let Some(ref t) = report.tape {
+                    t.borrow_mut()
+                        .bless_last(&json!({"err": rust_text}), "run", &label, &diff);
+                }
+                report.checked += 1;
+            } else {
+                report.record(label, ok, || {
+                    format!("Java 오류: {j}\nRust 오류: {rust_text}")
+                });
+            }
         }
-        (Ok(_), Err(r)) => report.record(label, false, || format!("Java는 성공, Rust는 오류: {r}")),
-        (Err(j), Ok(_)) => report.record(label, false, || format!("Java는 오류({j}), Rust는 성공")),
+        (Ok(_), Err(r)) => {
+            if is_bless {
+                let rust_text = format!("AIS-{} {}", java_number(r.kind), r.message);
+                if let Some(ref t) = report.tape {
+                    t.borrow_mut().bless_last(
+                        &json!({"err": rust_text}),
+                        "run",
+                        &label,
+                        "ok -> err",
+                    );
+                }
+                report.checked += 1;
+            } else {
+                report.record(label, false, || format!("Java는 성공, Rust는 오류: {r}"));
+            }
+        }
+        (Err(j), Ok(r)) => {
+            if is_bless {
+                if let Some(ref t) = report.tape {
+                    t.borrow_mut()
+                        .bless_last(&json!({"ok": r}), "run", &label, "err -> ok");
+                }
+                report.checked += 1;
+            } else {
+                report.record(label, false, || format!("Java는 오류({j}), Rust는 성공"));
+            }
+        }
     }
 }
 
@@ -10242,6 +10313,10 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--replay="))
         .map(PathBuf::from);
+    let bless: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--bless="))
+        .map(PathBuf::from);
     let write_fixture: Option<PathBuf> = args
         .iter()
         .find_map(|a| a.strip_prefix("--write-fixture="))
@@ -10250,49 +10325,60 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--commit-fixture="))
         .map(PathBuf::from);
-    // 재생은 기준 엔진(jar)이 없으므로 위치 인자가 모두 vault다
-    let (jar, vaults): (String, &[&String]) = if replay.is_some() {
+    let is_replay_or_bless = replay.is_some() || bless.is_some();
+    // 재생이나 bless는 기준 엔진(jar)이 없으므로 위치 인자가 모두 vault다
+    let (jar, vaults): (String, &[&String]) = if is_replay_or_bless {
         (String::new(), &positional[..])
     } else {
         match positional.split_first() {
             Some((jar, vaults)) if !vaults.is_empty() => ((*jar).clone(), vaults),
             _ => {
                 eprintln!(
-                    "사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose] [--record=<테이프>]\n        compat_check --replay=<테이프> <vault 폴더>..."
+                    "사용법: compat_check <기준 ais-engine.jar(build-oracle.sh)> <vault 폴더>... [--verbose] [--record=<테이프>]\n        compat_check --replay=<테이프> <vault 폴더>...\n        compat_check --bless=<테이프> <vault 폴더>..."
                 );
                 return ExitCode::from(2);
             }
         }
     };
-    if replay.is_some() && vaults.is_empty() {
-        eprintln!("사용법: compat_check --replay=<테이프> <vault 폴더>...");
+    if is_replay_or_bless && vaults.is_empty() {
+        eprintln!(
+            "사용법: compat_check --replay=<테이프> <vault 폴더>... 또는 --bless=<테이프> <vault 폴더>..."
+        );
         return ExitCode::from(2);
     }
     let home = env::temp_dir().join("ais-compat-home");
     fs::create_dir_all(&home).ok();
-    let tape = match (&replay, &record) {
-        (Some(path), _) => match tape::Tape::replay(path) {
+    let tape = match (&bless, &replay, &record) {
+        (Some(path), _, _) => match tape::Tape::bless(path) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("{e}");
                 return ExitCode::from(2);
             }
         },
-        (None, Some(path)) => tape::Tape::record(path.clone()),
-        (None, None) => tape::Tape::live(),
+        (_, Some(path), _) => match tape::Tape::replay(path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
+        (_, _, Some(path)) => tape::Tape::record(path.clone()),
+        _ => tape::Tape::live(),
     };
+    let tape_rc = Rc::new(RefCell::new(tape));
     let java = Java {
         jar,
         home,
-        tape: RefCell::new(tape),
+        tape: Rc::clone(&tape_rc),
     };
 
-    let mut total = Report::default();
+    let mut total = Report::new(&tape_rc);
     for vault in vaults {
         let vault = Path::new(vault);
         java.tape.borrow_mut().register_root(vault);
         let engine = Engine::new(vault);
-        let mut report = Report::default();
+        let mut report = Report::new(&tape_rc);
         let name = vault
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -10583,7 +10669,7 @@ fn main() -> ExitCode {
     }
 
     if let Some(fixture) = &write_fixture {
-        let mut report = Report::default();
+        let mut report = Report::new(&tape_rc);
         compare_writes(&mut report, &java, fixture);
         println!(
             "쓰기(합성 vault 사본 둘, 폴더 전체 바이트): {}건 확인, 어긋남 {}건",
@@ -10598,7 +10684,7 @@ fn main() -> ExitCode {
     }
 
     if let Some(fixture) = &commit_fixture {
-        let mut report = Report::default();
+        let mut report = Report::new(&tape_rc);
         compare_commit_vault(&mut report, &java, &|vault| Engine::new(vault), fixture);
         println!(
             "commit_vault(합성 vault 사본): {}건 확인, 어긋남 {}건",
@@ -10619,7 +10705,7 @@ fn main() -> ExitCode {
         total.failures.len()
     );
     // 어긋남이 있으면 녹화를 버린다(어긋난 응답을 정답으로 박제하지 않는다). 재생은 테이프가 남지 않았는지 본다.
-    if total.failures.is_empty() {
+    if total.failures.is_empty() || java.tape.borrow().is_bless() {
         match java.tape.borrow().finish() {
             Ok(()) if java.tape.borrow().is_record() => println!(
                 "테이프 {}줄을 적었다: {}",
@@ -10629,6 +10715,12 @@ fn main() -> ExitCode {
                     .map(|p| p.display().to_string())
                     .unwrap_or_default()
             ),
+            Ok(()) if java.tape.borrow().is_bless() => {
+                let n = java.tape.borrow().blessed_len();
+                if n > 0 {
+                    println!("테이프 {}줄을 다시 받아 적었다", n);
+                }
+            }
             Ok(()) => {}
             Err(e) => {
                 println!("테이프 오류: {e}");
@@ -10636,7 +10728,7 @@ fn main() -> ExitCode {
             }
         }
     }
-    if total.failures.is_empty() {
+    if total.failures.is_empty() || java.tape.borrow().is_bless() {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE

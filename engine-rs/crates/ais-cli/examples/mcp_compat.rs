@@ -179,25 +179,36 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--replay="))
         .map(PathBuf::from);
+    let bless: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--bless="))
+        .map(PathBuf::from);
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
-    // 재생은 기준 폴더(jar)가 필요 없다
+    // 재생과 다시 적기(bless)는 기준 폴더(jar)가 필요 없다
     let dist: Option<&Path> = positional.first().map(|d| Path::new(d.as_str()));
-    if replay.is_none() && dist.is_none() {
+    if replay.is_none() && bless.is_none() && dist.is_none() {
         eprintln!(
-            "사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)> [--record=<테이프>]\n        mcp_compat --replay=<테이프>"
+            "사용법: mcp_compat <ais-cli.jar와 ais-engine.jar가 든 기준 폴더(build-oracle.sh)> [--record=<테이프>]\n        mcp_compat --replay=<테이프>\n        mcp_compat --bless=<테이프>"
         );
         return ExitCode::from(2);
     }
-    let mut tape = match (&replay, &record) {
-        (Some(path), _) => match tape::Tape::replay(path) {
+    let mut tape = match (&bless, &replay, &record) {
+        (Some(path), _, _) => match tape::Tape::bless(path) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("{e}");
                 return ExitCode::from(2);
             }
         },
-        (None, Some(path)) => tape::Tape::record(path.clone()),
-        (None, None) => tape::Tape::live(),
+        (None, Some(path), _) => match tape::Tape::replay(path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
+        (None, None, Some(path)) => tape::Tape::record(path.clone()),
+        (None, None, None) => tape::Tape::live(),
     };
     let root: PathBuf = env::temp_dir().join(format!("ais-mcp-compat-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -207,10 +218,10 @@ fn main() -> ExitCode {
     let case_file = root.join("cases.jsonl");
     fs::write(&case_file, cases.join("\n") + "\n").expect("사례 파일");
 
-    // Java 구동기를 같은 패키지 이름으로 컴파일한다(서버 클래스가 패키지 안에서만 보인다). 재생은 Java를 쓰지 않는다.
+    // Java 구동기를 같은 패키지 이름으로 컴파일한다(서버 클래스가 패키지 안에서만 보인다). 재생이나 bless는 Java를 쓰지 않는다.
     let mut classpath = String::new();
     let compiled = root.join("classes");
-    if let (None, Some(dist)) = (&replay, dist) {
+    if let (None, None, Some(dist)) = (&bless, &replay, dist) {
         classpath = format!(
             "{}:{}",
             dist.join("ais-cli.jar").display(),
@@ -231,8 +242,9 @@ fn main() -> ExitCode {
     let mut failures: Vec<String> = Vec::new();
     for write in [false, true] {
         let key = vec![write.to_string()];
-        let java_lines: Vec<String> = if replay.is_some() {
-            tape.next("mcp", &key)
+        let (java_lines, skipped) = if replay.is_some() || bless.is_some() {
+            let lines: Vec<String> = tape
+                .next("mcp", &key)
                 .unwrap_or_else(|e| panic!("{e}"))
                 .as_array()
                 .map(|lines| {
@@ -241,7 +253,21 @@ fn main() -> ExitCode {
                         .map(|l| l.as_str().unwrap_or_default().to_string())
                         .collect()
                 })
-                .unwrap_or_default()
+                .unwrap_or_default();
+            (lines, false)
+        } else if tape.is_record() && tape.is_current_recorded_rust("mcp", &key) {
+            let lines: Vec<String> = tape
+                .skip_rust_record()
+                .and_then(|val| {
+                    val.as_array().map(|lines| {
+                        lines
+                            .iter()
+                            .map(|l| l.as_str().unwrap_or_default().to_string())
+                            .collect()
+                    })
+                })
+                .unwrap_or_default();
+            (lines, true)
         } else {
             let mut command = Command::new("java");
             command
@@ -258,17 +284,19 @@ fn main() -> ExitCode {
                 "Java 구동기 실패: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
-            String::from_utf8_lossy(&output.stdout)
+            let lines = String::from_utf8_lossy(&output.stdout)
                 .lines()
                 .map(str::to_string)
-                .collect()
+                .collect();
+            (lines, false)
         };
-        if tape.is_record() {
+        if tape.is_record() && !skipped {
             tape.push("mcp", key, &json!(java_lines));
         }
 
         let mut server = McpServer::new(write, Box::new(fake));
         let mut index = 0usize;
+        let mut rust_all_lines: Vec<String> = Vec::new();
         for line in &cases {
             if line.trim().is_empty() {
                 continue;
@@ -309,7 +337,7 @@ fn main() -> ExitCode {
             let rust = format!("{index} {rust_output}");
             let java = java_lines.get(index).cloned().unwrap_or_default();
             checked += 1;
-            if java != rust {
+            if java != rust && !tape.is_bless() {
                 failures.push(format!(
                     "쓰기={write} 사례 {index}: {}\n    Java: {}\n    Rust: {}",
                     clip(line),
@@ -317,9 +345,32 @@ fn main() -> ExitCode {
                     clip(&rust)
                 ));
             }
+            rust_all_lines.push(rust);
             index += 1;
         }
-        if java_lines.len() != index {
+        if tape.is_bless() {
+            if rust_all_lines != java_lines {
+                let first_diff = rust_all_lines
+                    .iter()
+                    .zip(java_lines.iter())
+                    .enumerate()
+                    .find(|(_, (r, j))| r != j)
+                    .map(|(i, (r, j))| format!("사례 {i}: expected {}, got {}", clip(j), clip(r)))
+                    .unwrap_or_else(|| {
+                        format!(
+                            "줄 수 다름: rust {}, tape {}",
+                            rust_all_lines.len(),
+                            java_lines.len()
+                        )
+                    });
+                tape.bless_last(
+                    &json!(rust_all_lines),
+                    "mcp",
+                    &format!("write={write}"),
+                    &first_diff,
+                );
+            }
+        } else if java_lines.len() != index {
             failures.push(format!(
                 "쓰기={write}: 답 줄 수가 다르다 (Java {}, Rust {index})",
                 java_lines.len()
@@ -340,6 +391,9 @@ fn main() -> ExitCode {
         }
         if tape.is_record() {
             println!("테이프 {}줄을 적었다", tape.recorded_len());
+        }
+        if tape.is_bless() && tape.blessed_len() > 0 {
+            println!("테이프 {}줄을 다시 받아 적었다", tape.blessed_len());
         }
     }
     if failures.is_empty() {

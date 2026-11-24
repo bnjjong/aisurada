@@ -112,6 +112,16 @@ impl Harness {
                 stderr: v["stderr"].as_str().unwrap_or_default().to_string(),
             };
         }
+        if self.tape.borrow().is_record()
+            && self.tape.borrow().is_current_recorded_rust("cli", &key)
+        {
+            let v = self.tape.borrow_mut().skip_rust_record().unwrap();
+            return Raw {
+                code: v["code"].as_i64().unwrap_or(-1) as i32,
+                stdout: v["stdout"].as_str().unwrap_or_default().to_string(),
+                stderr: v["stderr"].as_str().unwrap_or_default().to_string(),
+            };
+        }
         let raw = self.launch_java(args, extra_env);
         if self.tape.borrow().is_record() {
             let value = json!({"code": raw.code, "stdout": raw.stdout, "stderr": raw.stderr});
@@ -129,7 +139,15 @@ impl Harness {
                 .next_tree("vault")
                 .unwrap_or_else(|e| panic!("{e}"));
             let local = self.tape.borrow().digest_files(&tree(&self.b));
-            return tape::digest_diff(&recorded, &local);
+            let diff = tape::digest_diff(&recorded, &local);
+            if !diff.is_empty() && self.tape.borrow().is_bless() {
+                let first_diff = diff.lines().next().unwrap_or("diff").to_string();
+                self.tape
+                    .borrow_mut()
+                    .bless_last_tree("vault", &local, "vault", &first_diff);
+                return String::new();
+            }
+            return diff;
         }
         let diff = tree_diff(&self.a, &self.b);
         if self.tape.borrow().is_record() {
@@ -265,46 +283,90 @@ impl Harness {
         }
 
         let code_ok = java.code == rust.code;
-        self.record(format!("{label} 종료 코드"), code_ok, || {
-            format!(
-                "Java {} / Rust {}\n    Java 오류: {}\n    Rust 오류: {}",
-                java.code,
-                rust.code,
-                clip(&java_err),
-                clip(&rust.stderr)
-            )
-        });
-        // 안쪽 실패(종료 코드 1)는 Java가 스택 추적을 붙이고, 휴지통 경고는 Java 로거가 시각을 붙여 찍으므로(Rust는 이 경고를 내지 않는다) 글을 견주지 않는다
-        if java.code != 1 && !java_err.contains("aisurada.cmd.TrashCommands") {
-            self.record(format!("{label} 오류 글"), java_err == rust_err, || {
-                format!(
-                    "Java: {}\n    Rust: {}",
-                    clip(&java_err),
-                    clip(&rust.stderr)
-                )
-            });
-        }
+        let err_ok = java.code == 1
+            || java_err.contains("aisurada.cmd.TrashCommands")
+            || java_err == rust_err;
         let parsed = (
             serde_json::from_str::<Value>(&java_out),
             serde_json::from_str::<Value>(&rust.stdout),
         );
-        match parsed {
+        let out_ok = match parsed {
             (Ok(mut j), Ok(mut r)) => {
-                // 걸린 시간은 돌릴 때마다 다르다
                 strip_key(&mut j, "elapsedMs");
                 strip_key(&mut r, "elapsedMs");
-                self.record(format!("{label} 응답"), j == r, || {
-                    first_diff(&j, &r, "$")
-                });
+                j == r
             }
-            _ => {
-                self.record(format!("{label} 출력"), java_out == rust.stdout, || {
+            _ => java_out == rust.stdout,
+        };
+
+        if self.tape.borrow().is_bless() && (!code_ok || !err_ok || !out_ok) {
+            let diff_place = if !code_ok {
+                format!("exit code Java={} Rust={}", java.code, rust.code)
+            } else if !err_ok {
+                "stderr diff".to_string()
+            } else {
+                match (
+                    serde_json::from_str::<Value>(&java_out),
+                    serde_json::from_str::<Value>(&rust.stdout),
+                ) {
+                    (Ok(mut j), Ok(mut r)) => {
+                        strip_key(&mut j, "elapsedMs");
+                        strip_key(&mut r, "elapsedMs");
+                        first_diff(&j, &r, "$")
+                    }
+                    _ => "stdout diff".to_string(),
+                }
+            };
+            let rust_val = json!({
+                "code": rust.code,
+                "stdout": rust.stdout,
+                "stderr": rust.stderr,
+            });
+            self.tape
+                .borrow_mut()
+                .bless_last(&rust_val, &args[0], label, &diff_place);
+            self.report.checked += 1;
+        } else {
+            self.record(format!("{label} 종료 코드"), code_ok, || {
+                format!(
+                    "Java {} / Rust {}\n    Java 오류: {}\n    Rust 오류: {}",
+                    java.code,
+                    rust.code,
+                    clip(&java_err),
+                    clip(&rust.stderr)
+                )
+            });
+            // 안쪽 실패(종료 코드 1)는 Java가 스택 추적을 붙이고, 휴지통 경고는 Java 로거가 시각을 붙여 찍으므로(Rust는 이 경고를 내지 않는다) 글을 견주지 않는다
+            if java.code != 1 && !java_err.contains("aisurada.cmd.TrashCommands") {
+                self.record(format!("{label} 오류 글"), java_err == rust_err, || {
                     format!(
                         "Java: {}\n    Rust: {}",
-                        clip(&java_out),
-                        clip(&rust.stdout)
+                        clip(&java_err),
+                        clip(&rust.stderr)
                     )
                 });
+            }
+            match (
+                serde_json::from_str::<Value>(&java_out),
+                serde_json::from_str::<Value>(&rust.stdout),
+            ) {
+                (Ok(mut j), Ok(mut r)) => {
+                    // 걸린 시간은 돌릴 때마다 다르다
+                    strip_key(&mut j, "elapsedMs");
+                    strip_key(&mut r, "elapsedMs");
+                    self.record(format!("{label} 응답"), j == r, || {
+                        first_diff(&j, &r, "$")
+                    });
+                }
+                _ => {
+                    self.record(format!("{label} 출력"), java_out == rust.stdout, || {
+                        format!(
+                            "Java: {}\n    Rust: {}",
+                            clip(&java_out),
+                            clip(&rust.stdout)
+                        )
+                    });
+                }
             }
         }
         if write {
@@ -2048,27 +2110,38 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--replay="))
         .map(PathBuf::from);
-    // 재생은 기준 엔진(jar)이 없으므로 위치 인자는 합성 vault 하나다
-    let (jar, fixture) = match (&replay, positional.as_slice()) {
-        (Some(_), [fixture]) => (String::new(), (*fixture).clone()),
-        (None, [jar, fixture]) => ((*jar).clone(), (*fixture).clone()),
+    let bless: Option<PathBuf> = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--bless="))
+        .map(PathBuf::from);
+    // 재생이나 bless는 기준 엔진(jar)이 없으므로 위치 인자는 합성 vault 하나다
+    let (jar, fixture) = match (&replay, &bless, positional.as_slice()) {
+        (Some(_), _, [fixture]) | (_, Some(_), [fixture]) => (String::new(), (*fixture).clone()),
+        (None, None, [jar, fixture]) => ((*jar).clone(), (*fixture).clone()),
         _ => {
             eprintln!(
-                "사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose] [--history] [--record=<테이프>]\n        cli_compat --replay=<테이프> <합성 vault> [--history]"
+                "사용법: cli_compat <기준 ais-engine.jar(build-oracle.sh)> <합성 vault> [--verbose] [--history] [--record=<테이프>]\n        cli_compat --replay=<테이프> <합성 vault> [--history]\n        cli_compat --bless=<테이프> <합성 vault> [--history]"
             );
             return ExitCode::from(2);
         }
     };
-    let tape = match (&replay, &record) {
-        (Some(path), _) => match tape::Tape::replay(path) {
+    let tape = match (&bless, &replay, &record) {
+        (Some(path), _, _) => match tape::Tape::bless(path) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("{e}");
                 return ExitCode::from(2);
             }
         },
-        (None, Some(path)) => tape::Tape::record(path.clone()),
-        (None, None) => tape::Tape::live(),
+        (_, Some(path), _) => match tape::Tape::replay(path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
+        (_, _, Some(path)) => tape::Tape::record(path.clone()),
+        _ => tape::Tape::live(),
     };
     let mut h = Harness::new(&jar, Path::new(&fixture), verbose, tape);
 
@@ -2096,7 +2169,7 @@ fn main() -> ExitCode {
     for failure in report.failures.iter().take(40) {
         println!("  어긋남: {failure}");
     }
-    let failed = !report.failures.is_empty();
+    let failed = !report.failures.is_empty() && !h.tape.borrow().is_bless();
     // 어긋남이 있으면 녹화를 버린다. 재생은 테이프가 남지 않았는지 본다.
     let tape_error = if failed {
         None
@@ -2107,6 +2180,11 @@ fn main() -> ExitCode {
         println!("테이프 오류: {e}");
     } else if !failed && h.tape.borrow().is_record() {
         println!("테이프 {}줄을 적었다", h.tape.borrow().recorded_len());
+    } else if !failed && h.tape.borrow().is_bless() {
+        let n = h.tape.borrow().blessed_len();
+        if n > 0 {
+            println!("테이프 {}줄을 다시 받아 적었다", n);
+        }
     }
     let failed = failed || tape_error.is_some();
     let _ = fs::remove_dir_all(&h.root);
