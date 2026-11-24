@@ -301,6 +301,10 @@
 :root:not([data-skin]) .set-toggle[type="checkbox"]::after {
   top: 2px;
   left: 2px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
 }
 
 .set-toggle::after {
@@ -324,6 +328,10 @@
 }
 
 .set-toggle:checked::after {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
   background: var(--accent-ink, var(--surface));
   transform: translateX(16px);
 }

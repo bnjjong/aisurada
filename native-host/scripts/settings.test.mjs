@@ -363,3 +363,20 @@ test('기본 모양(classic) 대비 CSS: 고른 탭과 꺼진 스위치에 class
     'settings.css에 :root[data-skin] .set-toggle 선택자가 없어야 각 스킨(격자 네모, 모던 14px 등)의 고유 모양이 보존됩니다.'
   );
 });
+
+test('스킨별 스위치-체크박스 격리: 체크박스 체크마크 규칙이 스위치(.set-toggle)를 오염시키지 않아야 한다', async () => {
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const skins = ['skin-tactile.css', 'skin-grid.css', 'skin-modern.css', 'skin-glass.css'];
+
+  for (const file of skins) {
+    const css = await fs.readFile(path.join(currentDir, '../src', file), 'utf-8');
+    assert.ok(
+      css.includes('input[type="checkbox"]:not(.set-toggle):checked::after'),
+      `${file}의 체크박스 체크마크 선택자에 :not(.set-toggle)이 포함되어 스위치 손잡이 크기를 오염시키지 않아야 합니다.`
+    );
+    assert.ok(
+      css.includes('.set-toggle[type="checkbox"]:checked::after'),
+      `${file}에 스위치 켜짐 상태(checked::after) 손잡이 규칙이 있어야 합니다.`
+    );
+  }
+});
