@@ -12,15 +12,36 @@ use super::{Engine, finish, parse_args};
 use crate::commands::{
     agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, decisions,
     doc_create, doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc,
-    get_sub_note, get_template, history, init_workspace, list_agendas, list_attachments,
-    list_comments, list_docs, list_projects, list_sub_notes, list_tags, list_templates, list_trash,
-    note_meta_write, project_write, reindex, resource_commands, search_docs, session_commands,
-    shard_notes, sub_agenda_write, sub_note_write, task_commands, template_write, trash_write,
-    write_attachment,
+    get_sub_note, get_template, history, init_workspace, intake_commands, list_agendas,
+    list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
+    list_templates, list_trash, note_meta_write, project_write, reindex, resource_commands,
+    search_docs, session_commands, shard_notes, sub_agenda_write, sub_note_write, task_commands,
+    template_write, trash_write, write_attachment,
 };
 use crate::error::EngineError;
 use crate::kernel::actor::CallContext;
 use crate::vault::index::NoteIndex;
+
+pub use intake_commands::IntakeOperation;
+
+impl Engine {
+    /// 등록된 매니저의 접수 도구와 앱의 접수 관리가 함께 쓰는 입구다.
+    pub fn call_intake(
+        &self,
+        operation: IntakeOperation,
+        context: &CallContext,
+        allowed_channels: &[String],
+        args: Value,
+    ) -> Result<Value, EngineError> {
+        let _installed = self.install_ports();
+        intake_commands::authorize(&self.vault_root, operation, context)?;
+        let _scope = operation
+            .is_write()
+            .then(|| self.open_scope(Scope::Standard, context))
+            .transpose()?;
+        intake_commands::execute(&self.vault_root, operation, context, allowed_channels, args)
+    }
+}
 
 /// 명령이 vault를 고치는가
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

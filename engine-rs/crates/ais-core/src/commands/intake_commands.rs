@@ -4,15 +4,14 @@ use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
-use super::{Engine, Scope, parse_args};
-use crate::commands::task_commands::{self, AddTaskCommentRequest, CreateTaskRequest};
+use super::task_commands::{self, AddTaskCommentRequest, CreateTaskRequest};
 use crate::error::EngineError;
 use crate::kernel::actor::{CallContext, Caller, ManagerContext};
 use crate::ports::{clock, fs, ids};
-use crate::task::{format, store};
+use crate::task::{Task, format, store};
 use crate::vault::check_manager_project;
 use crate::write::{marker::check_workspace_marker, write_atomic};
 
@@ -191,88 +190,76 @@ struct SourceQuery {
     task_key: String,
 }
 
-impl Engine {
-    pub fn call_intake(
-        &self,
-        operation: IntakeOperation,
-        context: &CallContext,
-        allowed_channels: &[String],
-        args: Value,
-    ) -> Result<Value, EngineError> {
-        let _installed = self.ports.clone().map(crate::ports::install);
-        let vault = self.vault_root.as_path();
-        check_workspace_marker(vault)?;
-        let path = ledger_path(vault)?;
-        if matches!(operation, IntakeOperation::Sources) {
-            if context.caller != Caller::App || context.manager.is_some() {
-                return Err(invalid("태스크 출처는 앱에서 조회한다"));
-            }
-            let query: SourceQuery = parse_args("intake_sources", args)?;
-            let scan = store::scan(vault);
-            let task = store::find(&scan, &query.task_key)?;
-            let mut rows: Vec<_> = Ledger::load(&path)?
-                .entries
-                .into_values()
-                .filter(|entry| entry.task_id.as_deref() == Some(&task.id))
-                .collect();
-            rows.sort_by_key(|entry| {
-                (
-                    entry.task_origin != Some(ResultKind::Created),
-                    entry.message_ts.clone(),
-                )
-            });
-            return Ok(json!(rows));
+impl IntakeOperation {
+    pub(crate) fn is_write(self) -> bool {
+        !matches!(self, Self::Get | Self::Sources)
+    }
+}
+
+pub(crate) fn authorize(
+    vault: &Path,
+    operation: IntakeOperation,
+    context: &CallContext,
+) -> Result<(), EngineError> {
+    check_workspace_marker(vault)?;
+    if matches!(operation, IntakeOperation::Sources) {
+        if context.caller != Caller::App || context.manager.is_some() {
+            return Err(invalid("태스크 출처는 앱에서 조회한다"));
         }
-        let manager = context
-            .manager
-            .as_ref()
-            .ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
-        check_manager_project(vault, manager)?;
-        if matches!(operation, IntakeOperation::Get) {
-            let query: Query = parse_args("get_intake", args)?;
-            return Ledger::load(&path)?.get(manager, allowed_channels, query, context.caller);
-        }
-        let manual = matches!(
-            operation,
-            IntakeOperation::Configure | IntakeOperation::Rewind | IntakeOperation::Review
-        );
+        return Ok(());
+    }
+    let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
+    check_manager_project(vault, manager)?;
+    if operation.is_write() {
+        let manual = matches!(operation, IntakeOperation::Configure | IntakeOperation::Rewind | IntakeOperation::Review);
         if manual != (context.caller == Caller::App) {
             return Err(invalid("이 접수 명령을 현재 호출자가 쓸 수 없다"));
         }
-        let _scope = self.open_scope(Scope::Standard, context)?;
-        fs::check_confinement(vault, &path)?;
-        let mut ledger = Ledger::load(&path)?;
-        let response = match operation {
-            IntakeOperation::Record => ledger.record(
-                vault,
-                context,
-                manager,
-                allowed_channels,
-                parse_args("record_intake", args)?,
-            )?,
-            IntakeOperation::Move => {
-                ledger.advance(manager, allowed_channels, parse_args("move_cursor", args)?)?
-            }
-            IntakeOperation::Configure => ledger.configure(
-                manager,
-                allowed_channels,
-                parse_args("configure_intake", args)?,
-            )?,
-            IntakeOperation::Rewind => ledger.rewind(
-                manager,
-                allowed_channels,
-                parse_args("rewind_cursor", args)?,
-            )?,
-            IntakeOperation::Review => {
-                ledger.review(manager, parse_args("review_intake", args)?)?
-            }
-            IntakeOperation::Get | IntakeOperation::Sources => unreachable!(),
-        };
-        if response.1 {
-            ledger.save(&path)?;
-        }
-        Ok(response.0)
     }
+    Ok(())
+}
+
+pub(crate) fn execute(
+    vault: &Path,
+    operation: IntakeOperation,
+    context: &CallContext,
+    allowed_channels: &[String],
+    args: Value,
+) -> Result<Value, EngineError> {
+    let path = ledger_path(vault)?;
+    let mut ledger = Ledger::load(&path)?;
+    if matches!(operation, IntakeOperation::Sources) {
+        let query: SourceQuery = parse("intake_sources", args)?;
+        let scan = store::scan(vault);
+        let task = store::find(&scan, &query.task_key)?;
+        let mut rows: Vec<_> = ledger.entries.into_values()
+            .filter(|entry| entry.task_id.as_deref() == Some(&task.id))
+            .collect();
+        rows.sort_by(|left, right| {
+            (left.task_origin != Some(ResultKind::Created), &left.message_ts)
+                .cmp(&(right.task_origin != Some(ResultKind::Created), &right.message_ts))
+        });
+        return Ok(json!(rows));
+    }
+    let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
+    let (response, changed) = match operation {
+        IntakeOperation::Get => return ledger.get(manager, allowed_channels, parse("get_intake", args)?, context.caller),
+        IntakeOperation::Record => ledger.record(vault, context, manager, allowed_channels, parse("record_intake", args)?)?,
+        IntakeOperation::Move => ledger.advance(manager, allowed_channels, parse("move_cursor", args)?)?,
+        IntakeOperation::Configure => ledger.configure(manager, allowed_channels, parse("configure_intake", args)?)?,
+        IntakeOperation::Rewind => ledger.rewind(manager, allowed_channels, parse("rewind_cursor", args)?)?,
+        IntakeOperation::Review => ledger.review(manager, parse("review_intake", args)?)?,
+        IntakeOperation::Sources => unreachable!(),
+    };
+    if changed {
+        ledger.save(&path)?;
+    }
+    Ok(response)
+}
+
+fn parse<T: DeserializeOwned>(name: &str, args: Value) -> Result<T, EngineError> {
+    serde_json::from_value(args)
+        .map_err(|error| EngineError::invalid_argument(format!("{name} 인자가 잘못됐다: {error}")))
 }
 
 fn invalid(message: &str) -> EngineError {
@@ -819,7 +806,7 @@ fn apply_task(
     }
     if request.result == ResultKind::Created {
         // 원장 저장 전에 연결이 끊겨도 원글 주소로 이미 만든 태스크를 찾는다.
-        let matches_source = |task: &crate::task::Task| {
+        let matches_source = |task: &Task| {
             task.refs.iter().any(|item| {
                 item.kind == "slack"
                     && source_matches(&item.target, &entry.channel, &entry.message_ts)
@@ -903,7 +890,7 @@ fn apply_task(
 fn check_task(
     vault: &Path,
     manager: &ManagerContext,
-    task: &crate::task::Task,
+    task: &Task,
 ) -> Result<(), EngineError> {
     if task.project.as_deref() != Some(&manager.project) {
         return Err(invalid("매니저와 같은 프로젝트의 태스크만 접수할 수 있다"));

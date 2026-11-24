@@ -2,13 +2,10 @@
 //!
 //! 받는 명령은 [`table`]의 표 하나에 적혀 있다. 명령 목록, 쓰기 목록, 디스패처가 모두 이 표에서 나온다.
 
-mod intake;
 mod table;
 
-pub use intake::IntakeOperation;
-
 use crate::kernel::actor::CallContext;
-use crate::ports::Ports;
+use crate::ports::{Installed, Ports, install};
 use crate::vault::{agenda, project};
 use crate::write::{
     marker::check_workspace_marker,
@@ -22,7 +19,7 @@ use serde_json::Value;
 
 use crate::error::EngineError;
 
-pub use table::{Access, Scope};
+pub use table::{Access, IntakeOperation, Scope};
 
 /// 명령 표의 한 줄을 바깥에 보여 주는 모양. 표의 처리 함수는 보여 주지 않는다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,13 +126,17 @@ impl Engine {
         command: &str,
         args: Value,
     ) -> Result<Value, EngineError> {
-        let _installed = self.ports.clone().map(crate::ports::install);
+        let _installed = self.install_ports();
         match find(command) {
             Some(def) => (def.run)(self, context, args),
             None => Err(EngineError::unsupported(format!(
                 "이 엔진에는 {command} 명령이 없다"
             ))),
         }
+    }
+
+    fn install_ports(&self) -> Option<Installed> {
+        self.ports.clone().map(install)
     }
 
     /// 이름과 인자 객체로 명령을 실행하고 응답 JSON을 돌려줍니다.
