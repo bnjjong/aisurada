@@ -2,7 +2,10 @@
 //!
 //! 받는 명령은 [`table`]의 표 하나에 적혀 있다. 명령 목록, 쓰기 목록, 디스패처가 모두 이 표에서 나온다.
 
+mod intake;
 mod table;
+
+pub use intake::IntakeOperation;
 
 use crate::kernel::actor::CallContext;
 use crate::ports::Ports;

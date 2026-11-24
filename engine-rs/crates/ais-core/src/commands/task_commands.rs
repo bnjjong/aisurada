@@ -534,7 +534,7 @@ fn scan_for_reader(vault: &Path, context: &CallContext) -> Result<Scan, EngineEr
     Ok(scan)
 }
 
-fn check_manager_repo(vault: &Path, manager: &ManagerContext, repo: Option<&str>) -> Result<(), EngineError> {
+pub(crate) fn check_manager_repo(vault: &Path, manager: &ManagerContext, repo: Option<&str>) -> Result<(), EngineError> {
     let project = check_manager_project(vault, manager)?;
     if repo.is_some_and(|repo| {
         manager.repos.iter().any(|allowed| allowed == repo)

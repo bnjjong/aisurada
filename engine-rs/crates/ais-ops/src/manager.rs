@@ -4,9 +4,9 @@ use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use ais_core::engine::{ManagerProject, manager_project};
-use ais_core::valid_manager_name;
+use ais_core::engine::{Engine, IntakeOperation, ManagerProject, manager_project};
 use ais_core::write::{acquire_lock, write_atomic};
+use ais_core::{CallContext, ManagerContext, valid_manager_name};
 use ais_domain::task::format;
 use ais_infra::ports::{clock, fs, ids};
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,7 @@ pub const DEFAULT_TOOLS: [&str; 7] = [
     "add_task_comment",
     "create_doc",
 ];
+pub const INTAKE_TOOLS: [&str; 3] = ["get_intake", "record_intake", "move_cursor"];
 pub const OPTIONAL_TOOLS: [&str; 7] = [
     "list_docs",
     "list_tags",
@@ -231,6 +232,26 @@ impl Manager {
         Ok(())
     }
 
+    pub fn context(&self) -> ManagerContext {
+        ManagerContext {
+            name: self.name.clone(),
+            project: self.project.clone(),
+            project_id: self.project_id.clone(),
+            repos: self.repos.clone(),
+            agendas: self.agendas.clone(),
+        }
+    }
+
+    pub fn intake(
+        &self,
+        operation: IntakeOperation,
+        mut context: CallContext,
+        args: Value,
+    ) -> Result<Value, ais_core::error::EngineError> {
+        context.manager = Some(self.context());
+        Engine::new(&self.vault).call_intake(operation, &context, &self.slack_channels, args)
+    }
+
     pub fn config(&self, exe: &str) -> Result<Value, String> {
         if exe.is_empty() {
             return Err("ais-cli 실행 파일 경로를 찾지 못했다".into());
@@ -238,10 +259,16 @@ impl Manager {
         if self.legacy() {
             return Err("먼저 기존 매니저에 프로젝트를 지정해 주세요".into());
         }
+        let tools: Vec<_> = self
+            .tools
+            .iter()
+            .map(String::as_str)
+            .chain(INTAKE_TOOLS)
+            .collect();
         Ok(json!({
             "mcp_servers": {"aisurada": {
                 "command": exe, "args": ["mcp", "--manager", self.name],
-                "tools": {"include": self.tools}
+                "tools": {"include": tools}
             }}
         }))
     }
@@ -578,7 +605,11 @@ fn dashboard(env: &Env, managers: &[Manager]) -> Result<Value, String> {
                 None
             };
             let history_issue = history.is_err().then_some("호출 기록을 읽을 수 없어요");
-            json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history.unwrap_or_default()})
+            let intake = (issue.is_none() && !item.slack_channels.is_empty())
+                .then(|| item.intake(IntakeOperation::Get, CallContext::app(), json!({"summary": true})));
+            let intake_issue = intake.as_ref().and_then(|result| result.as_ref().err()).map(ToString::to_string);
+            json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history.unwrap_or_default(),
+                "intake": intake.and_then(Result::ok), "intakeIssue": intake_issue})
         })
         .collect();
     Ok(json!({
@@ -594,7 +625,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     let folder = folder(env)?;
     let _lock = if matches!(
         args.first().map(String::as_str),
-        Some("add" | "update" | "enable" | "disable" | "copy" | "remove")
+        Some("add" | "update" | "enable" | "disable" | "copy" | "remove" | "intake-channel")
     ) {
         fs::create_dir_all(&folder).map_err(|error| error.to_string())?;
         Some(acquire_lock(&folder).map_err(|error| error.to_string())?)
@@ -610,6 +641,57 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     let [action, name, options @ ..] = args else {
         return Err("사용법: ais-cli manager list | add NAME project=… […] | update NAME […] | enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME".into());
     };
+    if action == "intake-sources" && options.is_empty() {
+        return Engine::new(canonical_vault(env)?)
+            .call_intake(
+                IntakeOperation::Sources,
+                &CallContext::app(),
+                &[],
+                json!({"taskKey": name}),
+            )
+            .map_err(|error| error.to_string());
+    }
+    let operation = match action.as_str() {
+        "intake" => Some(IntakeOperation::Get),
+        "intake-channel" => Some(IntakeOperation::Configure),
+        "intake-rewind" => Some(IntakeOperation::Rewind),
+        "intake-review" => Some(IntakeOperation::Review),
+        _ => None,
+    };
+    if let Some(operation) = operation {
+        let item = managers
+            .iter_mut()
+            .find(|item| &item.name == name)
+            .ok_or("등록한 매니저를 찾을 수 없다")?;
+        if item.vault != canonical_vault(env)? {
+            return Err("현재 작업 폴더에 등록된 매니저만 관리할 수 있다".into());
+        }
+        let payload = match options {
+            [] if action == "intake" => json!({}),
+            [raw] if raw.len() <= 1_048_576 => {
+                serde_json::from_str(raw).map_err(|_| "접수 인자는 JSON 객체여야 한다")?
+            }
+            _ => return Err("접수 인자는 JSON 객체 하나를 지정한다".into()),
+        };
+        let mut added = false;
+        if action == "intake-channel" {
+            let id = payload["channel"]
+                .as_str()
+                .ok_or("Slack 채널 ID를 지정한다")?;
+            if !item.slack_channels.iter().any(|current| current == id) {
+                item.slack_channels.push(id.to_owned());
+                item.validate()?;
+                added = true;
+            }
+        }
+        let result = item
+            .intake(operation, CallContext::app(), payload)
+            .map_err(|error| error.to_string())?;
+        if added {
+            save_registry(&folder, &managers)?;
+        }
+        return Ok(result);
+    }
     let existing = managers.iter().position(|item| item.name == *name);
     let missing = || format!("등록되지 않은 매니저다: {name}");
     let updated = match (action.as_str(), existing, options) {
@@ -670,12 +752,16 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
         _ => return Err(format!("매니저 명령의 인자를 확인해 주세요: {action}")),
     };
     updated.validate()?;
-    let bytes = serde_json::to_vec_pretty(&managers).map_err(|error| error.to_string())?;
-    write_atomic(&folder.join("managers.json"), &bytes).map_err(|error| error.to_string())?;
+    save_registry(&folder, &managers)?;
     if action == "remove" && !updated.legacy() {
         let _ = fs::remove_file(history_path(env, &updated)?);
     }
     Ok(json!(updated))
+}
+
+fn save_registry(folder: &Path, managers: &[Manager]) -> Result<(), String> {
+    let bytes = serde_json::to_vec_pretty(managers).map_err(|error| error.to_string())?;
+    write_atomic(&folder.join("managers.json"), &bytes).map_err(|error| error.to_string())
 }
 
 pub fn run(args: &[String], env: &Env) -> Outcome {
