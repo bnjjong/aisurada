@@ -1,6 +1,6 @@
 //! 매니저의 Slack 제보 원장과 채널 커서를 vault에 저장한다.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::ErrorKind;
@@ -45,6 +45,8 @@ struct Ledger {
     entries: BTreeMap<String, Entry>,
     #[serde(skip)]
     task_sources: BTreeMap<String, Vec<String>>,
+    #[serde(skip)]
+    repeat_counts: BTreeMap<String, usize>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -207,6 +209,8 @@ struct Processing {
     revision: String,
     result: ResultKind,
     at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    checked_at: Option<i64>,
     via: ProcessVia,
     decision: String,
     question: String,
@@ -242,6 +246,7 @@ struct Record {
     excerpt: String,
     result: ResultKind,
     via: ProcessVia,
+    checked_at: Option<i64>,
     #[serde(default)]
     decision: String,
     #[serde(default)]
@@ -344,7 +349,7 @@ pub(crate) fn execute(
     let path = ledger_path(vault)?;
     let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
     if matches!(operation, IntakeOperation::Get) {
-        return Ledger::read(&path)?.get(manager, allowed_channels, parse("get_intake", args)?, context.caller);
+        return Ledger::read(&path)?.get(vault, manager, allowed_channels, parse("get_intake", args)?, context.caller);
     }
     let mut ledger = Ledger::load(&path)?;
     let (response, changed) = match operation {
@@ -474,7 +479,7 @@ pub(super) fn sources_for_task(vault: &Path, task_id: &str) -> Result<Value, Eng
     let mut rows: Vec<_> = keys.iter().filter_map(|key| ledger.entries.get(key)).collect();
     rows.sort_by_key(|entry| (entry.task_origin != Some(ResultKind::Created), &entry.message_ts));
     // 같은 프로젝트의 매니저가 같은 Slack 출처를 연결하면 화면에는 한 번만 싣는다.
-    let mut shown = std::collections::HashSet::new();
+    let mut shown = HashSet::new();
     rows.retain(|entry| shown.insert(&entry.id));
     Ok(json!(rows))
 }
@@ -493,6 +498,13 @@ impl Ledger {
             if let Some(task) = &entry.task_id {
                 ledger.task_sources.entry(task.clone()).or_default().push(key.clone());
             }
+        }
+        for (task, keys) in &ledger.task_sources {
+            let reports: HashSet<_> = keys.iter().filter_map(|key| {
+                let entry = &ledger.entries[key];
+                (entry.task_origin == Some(ResultKind::Commented)).then_some(&entry.id)
+            }).collect();
+            ledger.repeat_counts.insert(task.clone(), reports.len());
         }
         let ledger = Arc::new(ledger);
         if let Some(stamp) = stamp
@@ -554,6 +566,7 @@ impl Ledger {
 
     fn get(
         &self,
+        vault: &Path,
         manager: &ManagerContext,
         allowed: &[String],
         query: Query,
@@ -589,6 +602,7 @@ impl Ledger {
         let mut counts = [0_u64; 5];
         let mut waiting = 0;
         let mut rows_revision = DefaultHasher::new();
+        let mut repos = BTreeMap::new();
         let prefix = manager_key(manager, "");
         let entries = self.entries.range(prefix.clone()..)
             .take_while(|(key, _)| key.starts_with(&prefix))
@@ -601,6 +615,8 @@ impl Ledger {
             entry.id.hash(&mut rows_revision);
             event.revision.hash(&mut rows_revision);
             entry.reaction_added.hash(&mut rows_revision);
+            let repeat_count = entry.task_id.as_ref().and_then(|id| self.repeat_counts.get(id));
+            repeat_count.hash(&mut rows_revision);
             if entry.received_at >= now - 48 * 60 * MINUTE
                 && clock().local_clock(entry.received_at).date == local.date
             {
@@ -647,18 +663,31 @@ impl Ledger {
                 }));
             }
             if caller == Caller::App && !query.summary {
-                views.push((event.at, entry.view()?));
+                let mut view = entry.view()?;
+                if let Some((key, id)) = entry.task_key.as_deref().zip(entry.task_id.as_deref()) {
+                    let repo = repos.entry(key).or_insert_with(|| {
+                        store::read_by_key(vault, key)
+                            .filter(|task| task.id == id)
+                            .and_then(|task| task.repo)
+                    });
+                    view["taskRepo"] = json!(repo);
+                }
+                if event.result == ResultKind::Commented {
+                    view["repeatCount"] = json!(repeat_count);
+                }
+                views.push((event.at, view));
             }
         }
         views.sort_by_key(|(at, _)| std::cmp::Reverse(*at));
         let stalled_minutes = channels.iter().filter_map(|channel| channel.stalled_minutes(now, local)).max();
         let channels: Vec<_> = channels.iter().map(|channel| {
             let mut view = json!(channel);
+            view["stalledMinutes"] = json!(channel.stalled_minutes(now, local));
             view["nextCheckAt"] = json!(channel.next_check_at(now, local));
             view
         }).collect();
         Ok(json!({
-            "channels": channels, "rows": views.into_iter().map(|(_, view)| view).collect::<Vec<_>>(),
+            "checkedAt": now, "channels": channels, "rows": views.into_iter().map(|(_, view)| view).collect::<Vec<_>>(),
             "rowsRevision": format!("{:016x}", rows_revision.finish()),
             "pending": pending, "unmarked": unmarked, "asked": asked, "waiting": waiting, "counts": counts,
             "stalledMinutes": stalled_minutes
@@ -812,6 +841,7 @@ impl Ledger {
             revision: revision(),
             result: request.result,
             at: clock().now_millis(),
+            checked_at: None,
             via: ProcessVia::Manual,
             decision: if request.result == ResultKind::Pending {
                 "다시 처리 요청"
@@ -919,6 +949,9 @@ impl Ledger {
             }
         };
 
+        if request.checked_at.is_some_and(|at| at <= 0 || at > now) {
+            return Err(invalid("확인을 시작한 시각은 현재보다 뒤일 수 없다"));
+        }
         let question = short(&request.question, 500);
         if request.reaction_added.is_some() {
             return Err(invalid("Slack 표시 여부는 접수한 항목에 따로 기록한다"));
@@ -953,6 +986,7 @@ impl Ledger {
             revision: revision(),
             result: request.result,
             at: now,
+            checked_at: request.checked_at,
             via: request.via,
             decision: short(&request.decision, 500),
             question,

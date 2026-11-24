@@ -144,7 +144,14 @@
 .intake-search input { max-width: 200px; flex: 1 0 135px; }
 .intake-table td:nth-child(2) { width: 55%; font-family: inherit; }
 .intake-table :is(th, td):first-child { min-width: 82px; }
-.intake-table td:nth-child(2) small, .intake-channel-row small { display: block; }
+.intake-table td small, .intake-channel-row small { display: block; overflow-wrap: anywhere; }
+.intake-table tbody tr { cursor: pointer; }
+.intake-table tbody tr:is(:hover, :focus-within, [data-selected="true"]) {
+  background: color-mix(in srgb, var(--surface), var(--accent) 9%);
+}
+.intake-table .intake-row-decision {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .intake-table td:last-child { min-width: 76px; }
 .intake-table .intake-row-open {
   padding: 0; border: 0; border-radius: 2px; background: transparent; box-shadow: none;

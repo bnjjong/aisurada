@@ -47,7 +47,9 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
         <strong>{channelLabel(channel)}</strong>
         <span className="mgr-badge">:{channel.emoji}: 제보</span>
         <span className="mgr-badge">{channel.markProcessed ? "✅ 처리 표시" : "처리 표시 끔"}</span>
-        {channel.paused && <span className="mgr-badge mgr-intake-warning">멈춤</span>}
+        {channel.paused ? <span className="mgr-badge mgr-intake-warning">멈춤</span>
+          : channel.stalledMinutes != null ? <span className="mgr-badge is-error">확인 {channel.stalledMinutes}분째 없음</span>
+          : channel.lastCheckAt != null && <span className="mgr-badge is-ok">정상</span>}
       </div>
       <dl className="intake-cursor-times">
         <div><dt>읽은 곳</dt><dd>{time(cursor)}까지</dd></div>
@@ -234,13 +236,24 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
       </div>
       <div className="mgr-table-wrap"><table className="mgr-table intake-table">
         <thead><tr><th scope="col">시각</th><th scope="col">원글</th><th scope="col">결과</th><th scope="col">처리</th></tr></thead>
-        <tbody>{shown.map(({ entry, current }) => <tr key={entry.id}>
-          <td>{time(current.at)}</td>
-          <td><button type="button" className="intake-row-open" onClick={() => { setError(""); setSelected(entry.id); }}>{entry.excerpt || "Slack에서 받은 제보"}</button>
-            <small>{entry.reporter} · {eventTime(slackTime(entry.messageTs))}{entry.reactionAdded && " · ✅"}</small></td>
-          <td><span className={`mgr-badge intake-result is-${current.result}`}>{resultLabel[current.result]}{entry.taskKey && ` · ${entry.taskKey}`}</span></td>
-          <td>{viaLabel[current.via]}</td>
-        </tr>)}</tbody>
+        <tbody>{shown.map(({ entry, current, taskRepo, repeatCount }) => {
+          const open = () => { setError(""); setSelected(entry.id); };
+          return <tr key={entry.id} data-selected={selected === entry.id}
+            onClick={() => { if (window.getSelection()?.type !== "Range") open(); }}>
+            <td>{time(current.at)}</td>
+            <td><button type="button" className="intake-row-open" onClick={event => { event.stopPropagation(); open(); }}
+              aria-haspopup="dialog">{entry.excerpt || "Slack에서 받은 제보"}</button>
+              <small>{entry.reporter} · {eventTime(slackTime(entry.messageTs))}{entry.reactionAdded && " · ✅"}</small></td>
+            <td>
+              <span className={`mgr-badge intake-result is-${current.result}`}>{resultLabel[current.result]}{entry.taskKey && ` · ${entry.taskKey}`}</span>
+              {taskRepo && <small>{taskRepo}</small>}
+              {!!repeatCount && <small>재제보 {repeatCount}건</small>}
+              {current.decision && <small className="intake-row-decision" title={current.decision}>{current.decision}</small>}
+            </td>
+            <td>{current.via === "scheduled" && current.checkedAt != null
+              ? `예약 ${eventTime(current.checkedAt)}` : viaLabel[current.via]}</td>
+          </tr>;
+        })}</tbody>
       </table></div>
       {!shown.length && <p className="mgr-intro">{!data ? "원장을 읽는 중이에요." : rows.length ? "검색 조건에 맞는 제보가 없어요." : "원장에 기록한 제보가 없어요."}</p>}
     </section>

@@ -90,6 +90,15 @@ fn read_task(file: &Path, rel_path: &str) -> Result<Task, String> {
     format::parse(&bytes, rel_path)
 }
 
+/// 키에 해당하는 활성 태스크 파일 하나를 읽는다.
+pub(crate) fn read_by_key(vault: &Path, key: &str) -> Option<Task> {
+    if !KEY.is_match(key) {
+        return None;
+    }
+    let path = file_path(vault, key);
+    read_task(&path, &rel(vault, &path)).ok().filter(|task| task.key == key)
+}
+
 /// 모든 태스크를 훑는다. 못 읽는 파일은 건너뛰고 이유를 `skipped`에 적는다. 점으로 시작하는 폴더(`.trash`)는 안 본다.
 pub fn scan(vault: &Path) -> Scan {
     let mut items: Vec<Task> = Vec::new();

@@ -300,15 +300,15 @@ pub const TOOLS: &[McpTool] = &[
 pub const MANAGER_INTAKE_TOOLS: &[McpTool] = &[
     McpTool {
         name: "get_intake",
-        description: "등록한 제보 채널의 설정, 커서와 처리 대기를 읽는다. channel과 messageTs를 함께 주면 그 글을 이미 기록했는지 확인한다.",
+        description: "등록한 제보 채널의 설정, 커서와 처리 대기를 읽는다. 확인을 시작할 때 응답의 checkedAt을 기록한다. channel과 messageTs를 함께 주면 그 글을 이미 기록했는지 확인한다.",
         input_schema: r#"{"type":"object","properties":{"channel":{"type":"string"},"messageTs":{"type":"string"}},"additionalProperties":false}"#,
         write: false,
         destructive: false,
     },
     McpTool {
         name: "record_intake",
-        description: "Slack 원글 하나의 처리 결과를 기록한다. created에는 create_task와 같은 task 객체 또는 이미 같은 원글을 연결한 taskKey를, commented에는 기존 taskKey를, asked에는 답글 초안 question을 준다. 원글을 검토하기 전에 get_intake를 부른다. 재처리에는 priorRevision을, 되물음의 새 답변은 replyTs도 준다. 저장 후 Slack 반응을 달았다면 같은 항목과 priorRevision 및 reactionAdded=true를 보내 표시를 기록한다.",
-        input_schema: r#"{"type":"object","properties":{"channel":{"type":"string"},"messageTs":{"type":"string"},"url":{"type":"string"},"reporter":{"type":"string"},"excerpt":{"type":"string","description":"원글 앞 200자"},"result":{"enum":["created","commented","asked","ignored"]},"via":{"enum":["desktop","scheduled"]},"decision":{"type":"string"},"question":{"type":"string"},"task":{"type":"object","properties":{"title":{"type":"string"},"repo":{"type":"string"},"criteria":{"type":"array","items":{"type":"string"}},"body":{"type":"string"},"type":{"enum":["feature","bug","chore"]},"priority":{"enum":["high","medium","low"]}},"required":["title","repo","criteria"],"additionalProperties":false},"taskKey":{"type":"string"},"priorRevision":{"type":"string"},"replyTs":{"type":"string"},"reactionAdded":{"type":"boolean"}},"required":["channel","messageTs","url","reporter","excerpt","result","via"],"additionalProperties":false}"#,
+        description: "Slack 원글 하나의 처리 결과를 기록한다. created에는 create_task와 같은 task 객체 또는 이미 같은 원글을 연결한 taskKey를, commented에는 기존 taskKey를, asked에는 답글 초안 question을 준다. 원글을 검토하기 전에 get_intake를 부른다. 확인을 시작할 때 받은 checkedAt을 전달할 수 있다. 재처리에는 priorRevision을, 되물음의 새 답변은 replyTs도 준다. 저장 후 Slack 반응을 달았다면 같은 항목과 priorRevision 및 reactionAdded=true를 보내 표시를 기록한다.",
+        input_schema: r#"{"type":"object","properties":{"channel":{"type":"string"},"messageTs":{"type":"string"},"url":{"type":"string"},"reporter":{"type":"string"},"excerpt":{"type":"string","description":"원글 앞 200자"},"result":{"enum":["created","commented","asked","ignored"]},"via":{"enum":["desktop","scheduled"]},"checkedAt":{"type":"integer","description":"확인을 시작할 때 get_intake가 준 밀리초 시각"},"decision":{"type":"string"},"question":{"type":"string"},"task":{"type":"object","properties":{"title":{"type":"string"},"repo":{"type":"string"},"criteria":{"type":"array","items":{"type":"string"}},"body":{"type":"string"},"type":{"enum":["feature","bug","chore"]},"priority":{"enum":["high","medium","low"]}},"required":["title","repo","criteria"],"additionalProperties":false},"taskKey":{"type":"string"},"priorRevision":{"type":"string"},"replyTs":{"type":"string"},"reactionAdded":{"type":"boolean"}},"required":["channel","messageTs","url","reporter","excerpt","result","via"],"additionalProperties":false}"#,
         write: true,
         destructive: false,
     },

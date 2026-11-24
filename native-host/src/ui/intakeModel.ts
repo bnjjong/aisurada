@@ -22,12 +22,14 @@ export interface IntakeChannel {
   lastScheduledAt: number | null;
   schedule?: IntakeSchedule | null;
   nextCheckAt?: number | null;
+  stalledMinutes?: number | null;
 }
 
 export interface IntakeProcessing {
   revision: string;
   result: IntakeResult;
   at: number;
+  checkedAt?: number;
   via: IntakeVia;
   decision: string;
   question: string;
@@ -53,6 +55,8 @@ export type IntakeSource = Pick<IntakeEntry, "id" | "url" | "messageTs" | "repor
 export interface IntakeRow {
   entry: IntakeEntry;
   current: IntakeProcessing;
+  taskRepo?: string | null;
+  repeatCount?: number | null;
 }
 
 export interface IntakeData {
