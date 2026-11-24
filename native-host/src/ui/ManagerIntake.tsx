@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { taskAddress } from "../navigation/routes.ts";
-import { channelId, channelLabel, resultLabel, slackLink, slackTime, slackTimestamp, viaLabel, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow } from "./intakeModel.ts";
+import { channelId, channelLabel, resultLabel, slackLink, slackTime, slackTimestamp, viaLabel, type IntakeChannel, type IntakeData, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
 import { Modal } from "./Modal.tsx";
 import { eventTime, managerError, useManagers, type ManagerItem } from "./managersStore.tsx";
 
@@ -38,7 +38,7 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
   channel: IntakeChannel; rows: IntakeRow[]; onRewind(): void; onPause(): void; disabled: boolean;
 }) {
   const cursor = slackTime(channel.cursor);
-  const next = (channel.lastScheduledAt ?? channel.enabledAt) + channel.intervalMinutes * 60_000;
+  const next = channel.nextCheckAt;
   const latest = rows.filter(row => row.entry.channel === channel.id).slice(0, 8).reverse();
   return <section className="mgr-panel intake-cursor">
     <div className="intake-channel-icon" aria-hidden="true">#</div>
@@ -53,7 +53,7 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
         <div><dt>읽은 곳</dt><dd>{time(cursor)}까지</dd></div>
         <div><dt>마지막 확인</dt><dd>{channel.lastCheckAt ? time(channel.lastCheckAt) : "확인 전"}
           {channel.lastCheckVia && ` · ${viaLabel[channel.lastCheckVia]}`}</dd></div>
-        {!channel.paused && <div><dt>다음 예약 확인</dt><dd>{time(next)}</dd></div>}
+        {next != null && <div><dt>다음 예약 예상</dt><dd>{time(next)}</dd></div>}
       </dl>
       <div className="intake-cursor-track" aria-label="최근 제보의 처리 상태">
         {latest.map(({ entry, current }) => <span key={entry.id} title={`${time(slackTime(entry.messageTs))} · ${resultLabel[current.result]}`}
@@ -69,7 +69,8 @@ function CursorCard({ channel, rows, onRewind, onPause, disabled }: {
 }
 
 function configureArgs(channel: IntakeChannel) {
-  return { channel: channel.id, label: channel.label, emoji: channel.emoji, markProcessed: channel.markProcessed, paused: channel.paused, intervalMinutes: channel.intervalMinutes };
+  return { channel: channel.id, label: channel.label, emoji: channel.emoji, markProcessed: channel.markProcessed, paused: channel.paused,
+    intervalMinutes: channel.intervalMinutes, schedule: channel.schedule ?? null };
 }
 
 function RewindDialog({ channel, rows, close, save, busy, error }: {
@@ -111,6 +112,15 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
   action(result: "pending" | "ignored"): void; busy: boolean; error: string;
 }) {
   const { entry, current } = row;
+  const [copyStatus, setCopyStatus] = useState("");
+  const copyQuestion = async () => {
+    try {
+      await navigator.clipboard.writeText(current.question);
+      setCopyStatus("답글 초안을 복사했어요.");
+    } catch {
+      setCopyStatus("복사할 수 없어요. 위 초안의 문장을 선택해 주세요.");
+    }
+  };
   return <Modal title="원장 항목" close={close} className="mgr-modal intake-drawer" resizable={false}>
       <div className="intake-drawer-body">
       <span className={`mgr-badge intake-result is-${current.result}`}>{resultLabel[current.result]}</span>
@@ -124,7 +134,9 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
         <dt>원글</dt><dd><SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink></dd>
         <dt>매니저</dt><dd>{entry.manager} · {viaLabel[current.via]}</dd>
         {current.decision && <><dt>판단</dt><dd>{current.decision}</dd></>}
-        {current.question && <><dt>물어본 것</dt><dd>{current.question}</dd></>}
+        {current.question && <><dt>답글 초안</dt><dd>{current.question}
+          <div className="mgr-actions intake-draft"><button type="button" onClick={() => void copyQuestion()}>초안 복사</button>
+            {copyStatus && <small role="status">{copyStatus}</small>}</div></dd></>}
         {entry.taskKey && <><dt>태스크</dt><dd><button type="button" onClick={() => controller.navigate(taskAddress(entry.taskKey!))}>{entry.taskKey}</button></dd></>}
       </dl>
       <h3>처리 이력</h3>
@@ -156,31 +168,36 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const name = item.manager.name;
-  const channels = data?.channels ?? [];
+  const channels = item.intake?.channels ?? data?.channels ?? [];
+  const counts = item.intake?.counts ?? data?.counts;
   const rows = data?.rows ?? [];
-  const load = useCallback(async () =>
-    controller.callEngine(["manager", "intake", name]) as Promise<IntakeData>, [controller, name]);
+  const rowsRevision = item.intake?.rowsRevision;
+  const loadedRevision = useRef<string | undefined>(undefined);
+  const request = useRef(0);
+  const load = useCallback(async () => {
+    const id = ++request.current;
+    const value = await controller.callEngine(["manager", "intake", name]) as IntakeData;
+    if (id === request.current) {
+      loadedRevision.current = value.rowsRevision;
+      setData(value);
+      setError("");
+    }
+  }, [controller, name]);
   useEffect(() => {
+    if (rowsRevision !== undefined && rowsRevision === loadedRevision.current) return;
     let active = true;
-    const read = async () => {
-      try {
-        const value = await load();
-        if (active) setData(value);
-      } catch (reason) {
-        if (active) setError(managerError(reason));
-      }
-    };
-    void read();
-    const timer = window.setInterval(() => { if (!document.hidden) void read(); }, 5000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [load]);
+    void load().catch(reason => {
+      if (active) setError(managerError(reason));
+    });
+    return () => { active = false; request.current++; };
+  }, [load, rowsRevision]);
   useEffect(() => { if (entryId) setSelected(entryId); }, [entryId]);
   const execute = async (action: string, payload: object, after?: () => void) => {
     setBusy(true);
     setError("");
     try {
       await controller.callEngine(["manager", action, name, JSON.stringify(payload)]);
-      setData(await load());
+      await load();
       await refresh();
       after?.();
     } catch (reason) {
@@ -189,7 +206,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
       setBusy(false);
     }
   };
-  const channelById = useMemo(() => new Map(data?.channels.map(channel => [channel.id, channel])), [data]);
+  const channelById = useMemo(() => new Map(channels.map(channel => [channel.id, channel])), [channels]);
   const search = query.trim().toLowerCase();
   const shown = rows.filter(({ entry, current }) =>
     (filter === "all" || filter === current.result) &&
@@ -204,7 +221,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
       <span>설정한 제보 채널이 없어요.</span><button type="button" onClick={onConnection}>제보 채널 설정</button>
     </section>}
     <dl className="mgr-counts intake-counts">{countLabels.map((label, index) => <div key={label}>
-      <dt>{label}</dt><dd>{data?.counts[index] ?? "—"}</dd>
+      <dt>{label}</dt><dd>{counts?.[index] ?? "—"}</dd>
     </div>)}</dl>
     <section className="mgr-panel">
       <div className="mgr-between intake-search">
@@ -212,6 +229,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
           <button type="button" key={result} aria-pressed={filter === result} onClick={() => setFilter(result)}>
             {result === "all" ? "전체" : resultLabel[result]} {result === "all" ? rows.length : rows.filter(row => row.current.result === result).length}
           </button>)}</nav>
+        <button type="button" onClick={() => void load().catch(reason => setError(managerError(reason)))}>새로고침</button>
         <input type="search" value={query} aria-label="접수 원장 검색" placeholder="원글·제보자·태스크 키" onChange={event => setQuery(event.target.value)} />
       </div>
       <div className="mgr-table-wrap"><table className="mgr-table intake-table">
@@ -256,7 +274,7 @@ export function IntakeConnection({ item, controller }: { item: ManagerItem; cont
     </header>
     {!rewind && (error || item.intakeIssue) && <p role="alert" className="mgr-error">{error || item.intakeIssue}</p>}
     {configured.map(value => <div className="mgr-between intake-channel-row" key={value.id}>
-      <div><strong>{channelLabel(value)}</strong><small>{value.id} · :{value.emoji}: · {value.intervalMinutes}분마다</small>
+      <div><strong>{channelLabel(value)}</strong><small>{value.id} · :{value.emoji}: · {value.schedule ? `예약 ${value.intervalMinutes}분마다` : "예약 지연 알림 꺼짐"}</small>
         <small>{time(slackTime(value.cursor))}까지 읽음{value.lastCheckAt ? ` · 마지막 확인 ${time(value.lastCheckAt)}` : ""}</small></div>
       <div className="mgr-actions">
         <span className="mgr-badge">{value.markProcessed ? "✅ 표시 켬" : "처리 표시 끔"}</span>
@@ -289,18 +307,36 @@ export function IntakeConnection({ item, controller }: { item: ManagerItem; cont
   </section>;
 }
 
+const weekdays = ["월", "화", "수", "목", "금", "토", "일"];
+const defaultSchedule: IntakeSchedule = { days: [1, 2, 3, 4, 5], startMinute: 9 * 60, endMinute: 18 * 60 };
+
+function scheduleTime(minutes: number) {
+  const time = minutes % (24 * 60);
+  return `${String(Math.floor(time / 60)).padStart(2, "0")}:${String(time % 60).padStart(2, "0")}`;
+}
+
+function minutesOfTime(value: string, end = false) {
+  const [hour, minute] = value.split(":").map(Number);
+  return end && hour === 0 && minute === 0 ? 24 * 60 : hour * 60 + minute;
+}
+
 function ChannelEditor({ value, registered, configured, close, save }: {
   value: IntakeChannel | null; registered: string[]; configured: IntakeChannel[]; close(): void;
   save(value: ReturnType<typeof configureArgs>): Promise<void>;
 }) {
   const [form, setForm] = useState(() => value ? configureArgs(value) : {
-    channel: "", label: "", emoji: "ticket", markProcessed: true, paused: false, intervalMinutes: 10,
+    channel: "", label: "", emoji: "ticket", markProcessed: true, paused: false, intervalMinutes: 10, schedule: null,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const update = (patch: Partial<typeof form>) => setForm(current => ({ ...current, ...patch }));
   const channel = form.channel.trim().toUpperCase();
   const duplicate = !value && configured.some(item => item.id === channel);
+  const schedule = form.schedule;
+  const validSchedule = !schedule || (schedule.days.length > 0 && schedule.startMinute < schedule.endMinute);
+  const updateSchedule = (patch: Partial<IntakeSchedule>) => {
+    if (schedule) update({ schedule: { ...schedule, ...patch } });
+  };
   return <Modal title={value ? "제보 채널 설정" : "제보 채널 추가"} close={close} className="mgr-modal" defaultWidth={480}>
     <form onSubmit={async event => {
       event.preventDefault();
@@ -322,6 +358,31 @@ function ChannelEditor({ value, registered, configured, close, save }: {
           <label className="mgr-label">예약 확인 간격(분)<input required type="number" min={1} max={1440} value={form.intervalMinutes}
             onChange={event => update({ intervalMinutes: Number(event.target.value) })} /></label>
         </div>
+        <label className="mgr-check"><input type="checkbox" checked={!!schedule}
+          onChange={event => update({ schedule: event.target.checked ? defaultSchedule : null })} />예약 확인 지연 알리기</label>
+        {schedule && <fieldset className="mgr-choices intake-schedule">
+          <legend>예약이 실행되는 시간 · 이 기기의 시간대</legend>
+          <div className="mgr-actions">{weekdays.map((label, index) => {
+            const day = index + 1;
+            const selected = schedule.days.includes(day);
+            return <label className="mgr-check" key={label}><input type="checkbox" checked={selected}
+              onChange={() => updateSchedule({ days: selected ? schedule.days.filter(value => value !== day) : [...schedule.days, day] })} />{label}</label>;
+          })}</div>
+          <div className="mgr-columns">
+            <label className="mgr-label">시작<input required type="time" value={scheduleTime(schedule.startMinute)}
+              onInput={event => {
+                const value = event.currentTarget.value;
+                if (value) updateSchedule({ startMinute: minutesOfTime(value) });
+              }} /></label>
+            <label className="mgr-label">종료<input required type="time" value={scheduleTime(schedule.endMinute)}
+              onInput={event => {
+                const value = event.currentTarget.value;
+                if (value) updateSchedule({ endMinute: minutesOfTime(value, true) });
+              }} /></label>
+          </div>
+          <small>종료를 00:00으로 설정하면 자정까지 확인해요.</small>
+          {!validSchedule && <p className="mgr-warning">요일을 하나 이상 고르고 종료 시각을 시작 이후로 설정해 주세요.</p>}
+        </fieldset>}
         <label className="mgr-check"><input type="checkbox" checked={form.markProcessed}
           onChange={event => update({ markProcessed: event.target.checked })} />처리한 원글에 ✅ 달기</label>
         <label className="mgr-check"><input type="checkbox" checked={form.paused}
@@ -331,14 +392,14 @@ function ChannelEditor({ value, registered, configured, close, save }: {
       </div>
       <footer className="mgr-actions">
         <button type="button" onClick={close}>취소</button>
-        <button type="submit" className="primary" disabled={busy || duplicate || !channelId.test(channel)}>저장</button>
+        <button type="submit" className="primary" disabled={busy || duplicate || !channelId.test(channel) || !validSchedule}>저장</button>
       </footer>
     </form>
   </Modal>;
 }
 
 export function TaskSlackSources({ entries, firstUrl, controller, children }: {
-  entries: IntakeEntry[]; firstUrl?: string; controller: WorkspaceController; children?: ReactNode;
+  entries: IntakeSource[]; firstUrl?: string; controller: WorkspaceController; children?: ReactNode;
 }) {
   const first = entries.find(entry => entry.taskOrigin === "created");
   const reports = entries.filter(entry => entry.taskOrigin === "commented");

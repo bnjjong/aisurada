@@ -76,7 +76,7 @@ export function Rail({
   // AI가 노트에 쓴 「정할 것」 가운데 사람의 답을 기다리는 노트(후속 노트 포함)
   const decisions = usePendingDecisions();
   // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 답을 기다리는 노트 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
-  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerAttention);
+  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerIssues + intakeWaiting);
   // 켜질 탭은 화면 주소가 정한다. 주소가 탭을 정하지 않는 화면이면 직전에 켜 둔 탭이다
   const tab = activeRailTab(state.route);
   useEffect(() => rememberRailTab(state.route), [state.route]);

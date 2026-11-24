@@ -8,7 +8,6 @@ import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { docAddress, projectAddress } from "../navigation/routes.ts";
 import { TaskSlackSources } from "./ManagerIntake.tsx";
-import type { IntakeEntry } from "./intakeModel.ts";
 import { Confirm, Modal } from "./Modal.tsx";
 import { Icon } from "./Icon.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
@@ -68,7 +67,6 @@ export function TaskDetailPage({
   const [refError, setRefError] = useState("");
   const [sendingStatus, setSendingStatus] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [intakeSources, setIntakeSources] = useState<{ key: string; entries: IntakeEntry[] }>({ key: "", entries: [] });
   const runner = useRunner();
   const github = useGithub();
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
@@ -104,18 +102,6 @@ export function TaskDetailPage({
     return () => window.removeEventListener("focus", onFocus);
   }, [reload]);
 
-  useEffect(() => {
-    if (ws.sample) return;
-    let current = true;
-    const read = () => void call(["manager", "intake-sources", taskKey])
-      .then(value => {
-        if (current && Array.isArray(value)) setIntakeSources({ key: taskKey, entries: value });
-      }).catch(() => {});
-    read();
-    window.addEventListener("focus", read);
-    return () => { current = false; window.removeEventListener("focus", read); };
-  }, [call, taskKey, ws.sample]);
-
   // 러너가 이 태스크의 상태를 바꾸면(질문, 보고, 실패) 호스트가 사건을 알린다. 그때 다시 읽는다
   useEffect(() => {
     if (runnerVersion > 0) void reload();
@@ -130,7 +116,8 @@ export function TaskDetailPage({
     setBusy(true);
     try {
       const next = await job();
-      if (next) setTask(next);
+      if (next) setTask(current => current?.id === next.id && !next.intakeSources
+        ? { ...next, intakeSources: current.intakeSources } : next);
       else await reload();
       setError("");
     } catch (e) {
@@ -614,7 +601,7 @@ export function TaskDetailPage({
               </ul>
               <p className="task-hint">세 가지가 차야 상태 메뉴에서 Ready For Develop을 고를 수 있어요.</p>
             </section>
-            <TaskSlackSources entries={intakeSources.key === taskKey ? intakeSources.entries : []} firstUrl={slackSource?.target} controller={controller}>
+            <TaskSlackSources entries={task.intakeSources ?? []} firstUrl={slackSource?.target} controller={controller}>
               {task.manager && slackSource && runner.supported && <button type="button" disabled={sendingStatus} onClick={async () => {
                 setSendingStatus(true);
                 setStatusMessage("");

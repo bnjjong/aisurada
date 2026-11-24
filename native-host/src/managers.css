@@ -176,3 +176,8 @@
 .intake-source-panel h2 { margin: 0; }
 
 .intake-drawer a, .intake-source-panel a { color: var(--accent-text, var(--accent)); }
+
+.intake-schedule .mgr-actions { gap: 4px; }
+.intake-schedule .mgr-check { gap: 5px; padding: 6px; font-size: 12px; }
+.intake-schedule > small { color: var(--muted); }
+.intake-draft { margin-top: 6px; }

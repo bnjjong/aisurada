@@ -109,8 +109,8 @@ export function ManagersProvider({ controller, workspace, children }: {
           notified.current.add(id);
           try {
             await controller.callHost("notifications_push", { expectedVault: workspace.path, item: {
-              id, kind: "intake-question", title: `${item.manager.label}가 제보에 되물었어요`,
-              body: "Slack 스레드에 남길 답글 초안을 확인해 주세요.",
+              id, kind: "intake-question", title: `${item.manager.label}가 제보에 물어볼 내용을 남겼어요`,
+              body: "접수 원장에서 답글 초안을 확인하고 Slack 스레드에 보낼 수 있어요.",
               intake: { manager: item.manager.name, entry: request.id, url: request.url },
             } });
           } catch {
