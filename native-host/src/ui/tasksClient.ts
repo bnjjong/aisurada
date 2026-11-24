@@ -2,6 +2,7 @@
 // (폼 값 → 인자, 거르기, 상태별 묶기, 한 줄 풀이)을 모아 시험으로 잰다.
 // 규칙(완료 기준 필수, 상태 전이의 누가·조건, 막혀 있음)은 엔진이 지킨다. 이 층은 규칙을 다시 만들지 않고, 엔진이 알려 준
 // `transitions`(사람이 바꿀 수 있는 곳과 막힌 까닭)를 그대로 보여 준다.
+import type { IntakeSource } from "./intakeModel.ts";
 import { explainError as explainResourceError } from "./resourcesClient.ts";
 import type { EngineCall } from "./resourcesClient.ts";
 import { asText } from "../workspace/types.ts";
@@ -108,6 +109,7 @@ export interface TaskDetail extends TaskRow {
   ready: boolean;
   transitions: TransitionOption[];
   activity: ActivityEvent[];
+  intakeSources?: IntakeSource[];
   /** 고칠 때 넘기는 쓰기 전 토큰 */
   precondition?: string;
 }
@@ -241,6 +243,14 @@ function toEvent(v: unknown): ActivityEvent | null {
   };
 }
 
+function toIntakeSource(v: unknown): IntakeSource | null {
+  if (!isRecord(v)) return null;
+  const id = text(v.id), url = text(v.url), messageTs = text(v.messageTs);
+  const taskOrigin = v.taskOrigin;
+  if (!id || !url || !messageTs || (taskOrigin !== "created" && taskOrigin !== "commented")) return null;
+  return { id, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "", reactionAdded: v.reactionAdded === true };
+}
+
 const listOf = <T,>(v: unknown, read: (x: unknown) => T | null): T[] => (Array.isArray(v) ? v.map(read).filter((x): x is T => x !== null) : []);
 
 /** `get-task`나 만들기·고치기·상태 바꾸기 응답을 상세로 읽는다. 모양이 틀리면 null이다. */
@@ -258,6 +268,7 @@ export function toDetail(v: unknown): TaskDetail | null {
     transitions: listOf(v.transitions, (x) =>
       isRecord(x) && isStatus(x.to) ? { to: x.to, title: text(x.title) ?? x.to, ok: x.ok === true, reason: text(x.reason) } : null),
     activity: listOf(v.activity, toEvent),
+    ...(Array.isArray(v.intakeSources) ? { intakeSources: listOf(v.intakeSources, toIntakeSource) } : {}),
     precondition: text(v.precondition),
   };
 }

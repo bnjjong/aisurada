@@ -1,21 +1,29 @@
 //! 매니저의 Slack 제보 원장과 채널 커서를 vault에 저장한다.
 
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use super::task_commands::{self, AddTaskCommentRequest, CreateTaskRequest};
 use crate::error::EngineError;
-use crate::kernel::actor::{CallContext, Caller, ManagerContext};
+use crate::kernel::{
+    actor::{CallContext, Caller, ManagerContext},
+    time::{LocalClock, days_from_civil},
+};
 use crate::ports::{clock, fs, ids};
 use crate::task::{Task, format, store};
 use crate::vault::check_manager_project;
 use crate::write::{marker::check_workspace_marker, write_atomic};
 
 const MINUTE: i64 = 60_000;
+const DAY_MINUTES: u16 = 24 * 60;
 const WEEK_SECONDS: u64 = 7 * 24 * 60 * 60;
 const LEDGER_PATH: &str = ".aisurada/intake/ledger.json";
 
@@ -35,6 +43,8 @@ pub enum IntakeOperation {
 struct Ledger {
     channels: BTreeMap<String, Channel>,
     entries: BTreeMap<String, Entry>,
+    #[serde(skip)]
+    task_sources: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -52,6 +62,103 @@ struct Channel {
     last_check_at: Option<i64>,
     last_check_via: Option<ProcessVia>,
     last_scheduled_at: Option<i64>,
+    #[serde(default)]
+    schedule: Option<Schedule>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Schedule {
+    days: Vec<u8>,
+    start_minute: u16,
+    end_minute: u16,
+}
+
+impl Schedule {
+    fn validate(&mut self) -> Result<(), EngineError> {
+        self.days.sort_unstable();
+        self.days.dedup();
+        if self.days.is_empty()
+            || self.days.iter().any(|day| !(1..=7).contains(day))
+            || self.start_minute >= self.end_minute
+            || self.end_minute > DAY_MINUTES
+        {
+            return Err(invalid("예약 확인 요일과 시작·종료 시각을 확인해 주세요"));
+        }
+        Ok(())
+    }
+
+    fn includes_day(&self, day: i64) -> bool {
+        // 1970-01-01은 목요일이고, 설정은 월요일을 1로 센다.
+        self.days.contains(&((day + 3).rem_euclid(7) as u8 + 1))
+    }
+
+    fn window(&self, day: i64, offset: i64) -> (i64, i64) {
+        let at = |minute| {
+            let wall = (day * i64::from(DAY_MINUTES) + i64::from(minute)) * MINUTE;
+            let guess = wall - offset * 1000;
+            wall - clock().local_clock(guess).offset_seconds * 1000
+        };
+        (at(self.start_minute), at(self.end_minute))
+    }
+}
+
+#[derive(Default)]
+enum ScheduleUpdate {
+    #[default]
+    Keep,
+    Set(Option<Schedule>),
+}
+
+impl<'de> Deserialize<'de> for ScheduleUpdate {
+    fn deserialize<D: Deserializer<'de>>(reader: D) -> Result<Self, D::Error> {
+        Option::<Schedule>::deserialize(reader).map(Self::Set)
+    }
+}
+
+fn local_day(local: LocalClock) -> i64 {
+    let date = local.date;
+    days_from_civil(date.year, i64::from(date.month), i64::from(date.day))
+}
+
+impl Channel {
+    fn stalled_minutes(&self, now: i64, local: LocalClock) -> Option<i64> {
+        let schedule = self.schedule.as_ref().filter(|_| !self.paused)?;
+        let mut day = local_day(local);
+        let minute = local.hour * 60 + local.minute;
+        if !schedule.includes_day(day)
+            || minute < u32::from(schedule.start_minute)
+            || minute >= u32::from(schedule.end_minute)
+        {
+            return None;
+        }
+        // 자정을 넘어 연속으로 켠 예약은 같은 확인 구간으로 본다.
+        let all_day = schedule.start_minute == 0 && schedule.end_minute == DAY_MINUTES;
+        let window_start = if all_day && schedule.days.len() == 7 {
+            self.enabled_at
+        } else {
+            while all_day && schedule.includes_day(day - 1) {
+                day -= 1;
+            }
+            schedule.window(day, local.offset_seconds).0
+        };
+        let checked = self.last_check_at.unwrap_or(self.enabled_at);
+        let elapsed = (now - checked.max(self.enabled_at).max(window_start)) / MINUTE;
+        (elapsed >= (i64::from(self.interval_minutes) * 3).max(30)).then_some(elapsed)
+    }
+
+    fn next_check_at(&self, now: i64, local: LocalClock) -> Option<i64> {
+        let schedule = self.schedule.as_ref().filter(|_| !self.paused)?;
+        let today = local_day(local);
+        let interval = i64::from(self.interval_minutes.max(1)) * MINUTE;
+        (today..=today + 7).filter(|day| schedule.includes_day(*day)).find_map(|day| {
+            let (start, end) = schedule.window(day, local.offset_seconds);
+            let base = self.last_scheduled_at.filter(|time| *time >= start && *time < end)
+                .map_or(start, |time| time + interval);
+            let next = if base > now { base } else { base + ((now - base) / interval + 1) * interval };
+            (next < end).then_some(next)
+        })
+    }
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -166,6 +273,8 @@ struct Configure {
     mark_processed: bool,
     paused: bool,
     interval_minutes: u16,
+    #[serde(default)]
+    schedule: ScheduleUpdate,
 }
 
 #[derive(Deserialize)]
@@ -226,30 +335,25 @@ pub(crate) fn execute(
     allowed_channels: &[String],
     args: Value,
 ) -> Result<Value, EngineError> {
-    let path = ledger_path(vault)?;
-    let mut ledger = Ledger::load(&path)?;
     if matches!(operation, IntakeOperation::Sources) {
         let query: SourceQuery = parse("intake_sources", args)?;
         let scan = store::scan(vault);
         let task = store::find(&scan, &query.task_key)?;
-        let mut rows: Vec<_> = ledger.entries.into_values()
-            .filter(|entry| entry.task_id.as_deref() == Some(&task.id))
-            .collect();
-        rows.sort_by(|left, right| {
-            (left.task_origin != Some(ResultKind::Created), &left.message_ts)
-                .cmp(&(right.task_origin != Some(ResultKind::Created), &right.message_ts))
-        });
-        return Ok(json!(rows));
+        return sources_for_task(vault, &task.id);
     }
+    let path = ledger_path(vault)?;
     let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
+    if matches!(operation, IntakeOperation::Get) {
+        return Ledger::read(&path)?.get(manager, allowed_channels, parse("get_intake", args)?, context.caller);
+    }
+    let mut ledger = Ledger::load(&path)?;
     let (response, changed) = match operation {
-        IntakeOperation::Get => return ledger.get(manager, allowed_channels, parse("get_intake", args)?, context.caller),
         IntakeOperation::Record => ledger.record(vault, context, manager, allowed_channels, parse("record_intake", args)?)?,
         IntakeOperation::Move => ledger.advance(manager, allowed_channels, parse("move_cursor", args)?)?,
         IntakeOperation::Configure => ledger.configure(manager, allowed_channels, parse("configure_intake", args)?)?,
         IntakeOperation::Rewind => ledger.rewind(manager, allowed_channels, parse("rewind_cursor", args)?)?,
         IntakeOperation::Review => ledger.review(manager, parse("review_intake", args)?)?,
-        IntakeOperation::Sources => unreachable!(),
+        IntakeOperation::Get | IntakeOperation::Sources => unreachable!(),
     };
     if changed {
         ledger.save(&path)?;
@@ -305,8 +409,12 @@ fn check_channel(allowed: &[String], channel: &str) -> Result<(), EngineError> {
     Ok(())
 }
 
-fn channel_key(manager: &ManagerContext, channel: &str) -> String {
-    format!("{}/{}/{channel}", manager.project_id, manager.name)
+fn scoped_key(project_id: &str, manager: &str, id: &str) -> String {
+    format!("{project_id}/{manager}/{id}")
+}
+
+fn manager_key(manager: &ManagerContext, id: &str) -> String {
+    scoped_key(&manager.project_id, &manager.name, id)
 }
 
 fn revision() -> String {
@@ -344,21 +452,85 @@ fn source_matches(url: &str, channel: &str, message_ts: &str) -> bool {
         && format::slack_thread(url).is_some_and(|(_, ts)| ts == message_ts)
 }
 
-fn belongs(entry: &Entry, manager: &ManagerContext) -> bool {
-    entry.manager == manager.name && entry.project_id == manager.project_id
+struct CachedLedger {
+    path: PathBuf,
+    stamp: (SystemTime, u64),
+    ledger: Arc<Ledger>,
+}
+
+// 앱의 여러 조회가 같은 파일을 읽는다. 마지막으로 연 원장 하나만 재사용한다.
+static READ_LEDGER: Mutex<Option<CachedLedger>> = Mutex::new(None);
+
+fn file_stamp(path: &Path) -> Option<(SystemTime, u64)> {
+    let meta = fs::metadata(path).ok()?;
+    Some((meta.modified().ok()?, meta.len()))
+}
+
+pub(super) fn sources_for_task(vault: &Path, task_id: &str) -> Result<Value, EngineError> {
+    let ledger = Ledger::read(&ledger_path(vault)?)?;
+    let Some(keys) = ledger.task_sources.get(task_id) else {
+        return Ok(json!([]));
+    };
+    let mut rows: Vec<_> = keys.iter().filter_map(|key| ledger.entries.get(key)).collect();
+    rows.sort_by_key(|entry| (entry.task_origin != Some(ResultKind::Created), &entry.message_ts));
+    // 같은 프로젝트의 매니저가 같은 Slack 출처를 연결하면 화면에는 한 번만 싣는다.
+    let mut shown = std::collections::HashSet::new();
+    rows.retain(|entry| shown.insert(&entry.id));
+    Ok(json!(rows))
 }
 
 impl Ledger {
-    fn load(path: &Path) -> Result<Self, EngineError> {
-        match fs::read(path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
-                EngineError::internal(format!("접수 원장을 읽지 못했다: {error}"))
-            }),
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(EngineError::internal(format!(
-                "접수 원장을 읽지 못했다: {error}"
-            ))),
+    fn read(path: &Path) -> Result<Arc<Self>, EngineError> {
+        let mut cache = READ_LEDGER.lock().unwrap_or_else(|error| error.into_inner());
+        let stamp = file_stamp(path);
+        if let Some(saved) = cache.as_ref()
+            && saved.path == path && stamp == Some(saved.stamp)
+        {
+            return Ok(Arc::clone(&saved.ledger));
         }
+        let mut ledger = Self::load(path)?;
+        for (key, entry) in &ledger.entries {
+            if let Some(task) = &entry.task_id {
+                ledger.task_sources.entry(task.clone()).or_default().push(key.clone());
+            }
+        }
+        let ledger = Arc::new(ledger);
+        if let Some(stamp) = stamp
+            && file_stamp(path) == Some(stamp)
+        {
+            *cache = Some(CachedLedger { path: path.to_owned(), stamp, ledger: Arc::clone(&ledger) });
+        }
+        Ok(ledger)
+    }
+
+    fn load(path: &Path) -> Result<Self, EngineError> {
+        let bytes = match fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Self::default()),
+            Err(error) => return Err(EngineError::internal(format!("접수 원장을 읽지 못했다: {error}"))),
+        };
+        let mut ledger: Self = serde_json::from_slice(&bytes).map_err(|error|
+            EngineError::internal(format!("접수 원장을 읽지 못했다: {error}")))?;
+        // 이전 원장은 채널과 시각만 키로 썼다. 원글 ID는 알림과 화면에서 계속 쓴다.
+        let mut legacy = Vec::new();
+        for (key, entry) in &ledger.entries {
+            let scoped = scoped_key(&entry.project_id, &entry.manager, &entry.id);
+            if *key == entry.id {
+                legacy.push((key.clone(), scoped));
+            } else if *key != scoped {
+                return Err(invalid("접수 항목의 저장 위치와 매니저가 일치하지 않는다"));
+            }
+        }
+        for (key, scoped) in legacy {
+            let entry = ledger.entries.remove(&key).unwrap();
+            ledger.entries.entry(scoped).or_insert(entry);
+        }
+        for channel in ledger.channels.values_mut() {
+            if let Some(schedule) = &mut channel.schedule {
+                schedule.validate()?;
+            }
+        }
+        Ok(ledger)
     }
 
     fn save(&self, path: &Path) -> Result<(), EngineError> {
@@ -376,7 +548,7 @@ impl Ledger {
     ) -> Result<&Channel, EngineError> {
         check_channel(allowed, id)?;
         self.channels
-            .get(&channel_key(manager, id))
+            .get(&manager_key(manager, id))
             .ok_or_else(|| invalid("연결 탭에서 제보 채널을 먼저 설정해 주세요"))
     }
 
@@ -397,18 +569,18 @@ impl Ledger {
                 .as_deref()
                 .ok_or_else(|| invalid("메시지 시각과 채널을 함께 지정한다"))?;
             self.channel(manager, allowed, id)?;
-            let existing = self.entries.get(&format!("{id}:{ts}"));
+            let existing = self.entries.get(&manager_key(manager, &format!("{id}:{ts}")));
             return Ok(json!({
                 "recorded": existing.is_some(),
-                "item": existing.filter(|entry| belongs(entry, manager)).map(Entry::view).transpose()?
+                "item": existing.map(Entry::view).transpose()?
             }));
         }
         let now = clock().now_millis();
-        let local_date = clock().local_clock(now).date;
+        let local = clock().local_clock(now);
         let channels: Vec<_> = allowed
             .iter()
             .filter(|id| query.channel.as_ref().is_none_or(|channel| channel == *id))
-            .filter_map(|id| self.channels.get(&channel_key(manager, id)))
+            .filter_map(|id| self.channels.get(&manager_key(manager, id)))
             .collect();
         let mut views = Vec::new();
         let mut pending = Vec::new();
@@ -416,17 +588,21 @@ impl Ledger {
         let mut asked = Vec::new();
         let mut counts = [0_u64; 5];
         let mut waiting = 0;
-        for entry in self.entries.values().filter(|entry| {
-            belongs(entry, manager)
-                && (caller == Caller::App || allowed.contains(&entry.channel))
-                && query
-                    .channel
-                    .as_ref()
-                    .is_none_or(|channel| channel == &entry.channel)
+        let mut rows_revision = DefaultHasher::new();
+        let prefix = manager_key(manager, "");
+        let entries = self.entries.range(prefix.clone()..)
+            .take_while(|(key, _)| key.starts_with(&prefix))
+            .map(|(_, entry)| entry);
+        for entry in entries.filter(|entry| {
+            (caller == Caller::App || allowed.contains(&entry.channel))
+                && query.channel.as_ref().is_none_or(|channel| channel == &entry.channel)
         }) {
             let event = entry.current()?;
+            entry.id.hash(&mut rows_revision);
+            event.revision.hash(&mut rows_revision);
+            entry.reaction_added.hash(&mut rows_revision);
             if entry.received_at >= now - 48 * 60 * MINUTE
-                && clock().local_clock(entry.received_at).date == local_date
+                && clock().local_clock(entry.received_at).date == local.date
             {
                 counts[0] += 1;
                 match event.result {
@@ -475,17 +651,15 @@ impl Ledger {
             }
         }
         views.sort_by_key(|(at, _)| std::cmp::Reverse(*at));
-        let stalled_minutes = channels
-            .iter()
-            .filter(|channel| !channel.paused)
-            .filter_map(|channel| {
-                let elapsed =
-                    (now - channel.last_scheduled_at.unwrap_or(channel.enabled_at)) / MINUTE;
-                (elapsed >= (i64::from(channel.interval_minutes) * 3).max(30)).then_some(elapsed)
-            })
-            .max();
+        let stalled_minutes = channels.iter().filter_map(|channel| channel.stalled_minutes(now, local)).max();
+        let channels: Vec<_> = channels.iter().map(|channel| {
+            let mut view = json!(channel);
+            view["nextCheckAt"] = json!(channel.next_check_at(now, local));
+            view
+        }).collect();
         Ok(json!({
             "channels": channels, "rows": views.into_iter().map(|(_, view)| view).collect::<Vec<_>>(),
+            "rowsRevision": format!("{:016x}", rows_revision.finish()),
             "pending": pending, "unmarked": unmarked, "asked": asked, "waiting": waiting, "counts": counts,
             "stalledMinutes": stalled_minutes
         }))
@@ -495,7 +669,7 @@ impl Ledger {
         &mut self,
         manager: &ManagerContext,
         allowed: &[String],
-        request: Configure,
+        mut request: Configure,
     ) -> Result<(Value, bool), EngineError> {
         check_channel(allowed, &request.channel)?;
         let emoji = request.emoji.trim().trim_matches(':');
@@ -510,8 +684,11 @@ impl Ledger {
                 "제보 기준 이모지 이름과 확인 간격(1~1440분)을 확인해 주세요",
             ));
         }
+        if let ScheduleUpdate::Set(Some(schedule)) = &mut request.schedule {
+            schedule.validate()?;
+        }
         let now = clock().now_millis();
-        let key = channel_key(manager, &request.channel);
+        let key = manager_key(manager, &request.channel);
         let channel = self.channels.entry(key).or_insert_with(|| Channel {
             id: request.channel.clone(),
             label: String::new(),
@@ -525,8 +702,14 @@ impl Ledger {
             last_check_at: None,
             last_check_via: None,
             last_scheduled_at: None,
+            schedule: None,
         });
-        if channel.paused && !request.paused {
+        let mut restart_monitoring = channel.paused && !request.paused;
+        if let ScheduleUpdate::Set(schedule) = request.schedule {
+            restart_monitoring |= channel.schedule != schedule;
+            channel.schedule = schedule;
+        }
+        if restart_monitoring {
             channel.enabled_at = now;
             channel.last_scheduled_at = None;
         }
@@ -563,7 +746,7 @@ impl Ledger {
             if timestamp(ts)? > next_ts
                 || !self
                     .entries
-                    .contains_key(&format!("{}:{ts}", request.channel))
+                    .contains_key(&manager_key(manager, &format!("{}:{ts}", request.channel)))
             {
                 return Err(invalid(
                     "커서를 옮기기 전에 확인한 제보를 모두 원장에 기록한다",
@@ -572,7 +755,7 @@ impl Ledger {
         }
         let channel = self
             .channels
-            .get_mut(&channel_key(manager, &request.channel))
+            .get_mut(&manager_key(manager, &request.channel))
             .unwrap();
         if let Some(ts) = request.message_ts {
             channel.cursor = ts;
@@ -605,7 +788,7 @@ impl Ledger {
         }
         let channel = self
             .channels
-            .get_mut(&channel_key(manager, &request.channel))
+            .get_mut(&manager_key(manager, &request.channel))
             .unwrap();
         channel.cursor = request.message_ts;
         channel.revision = revision();
@@ -622,8 +805,7 @@ impl Ledger {
         }
         let entry = self
             .entries
-            .get_mut(&request.id)
-            .filter(|entry| belongs(entry, manager))
+            .get_mut(&manager_key(manager, &request.id))
             .ok_or_else(|| EngineError::not_found("접수 항목을 찾을 수 없다"))?;
         check_revision(&entry.current()?.revision, &request.revision)?;
         entry.history.push(Processing {
@@ -671,10 +853,8 @@ impl Ledger {
             }
         }
         let id = format!("{}:{}", request.channel, request.message_ts);
-        let mut entry = if let Some(previous) = self.entries.get(&id) {
-            if !belongs(previous, manager) {
-                return Ok((json!({"recorded": true, "item": null}), false));
-            }
+        let key = manager_key(manager, &id);
+        let mut entry = if let Some(previous) = self.entries.get(&key) {
             let event = previous.current()?;
             let new_reply = request
                 .reply_ts
@@ -696,7 +876,7 @@ impl Ledger {
                         &event.revision,
                         request.prior_revision.as_deref().unwrap_or_default(),
                     )?;
-                    let stored = self.entries.get_mut(&id).unwrap();
+                    let stored = self.entries.get_mut(&key).unwrap();
                     stored.reaction_added = true;
                     return Ok((json!({"recorded": true, "item": stored.view()?}), true));
                 }
@@ -778,7 +958,7 @@ impl Ledger {
             question,
         });
         let response = json!({"recorded": false, "item": entry.view()?});
-        self.entries.insert(id, entry);
+        self.entries.insert(key, entry);
         Ok((response, true))
     }
 }
@@ -896,4 +1076,46 @@ fn check_task(
         return Err(invalid("매니저와 같은 프로젝트의 태스크만 접수할 수 있다"));
     }
     task_commands::check_manager_repo(vault, manager, task.repo.as_deref())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn local_time(day: i64, hour: i64, minute: i64) -> (i64, LocalClock) {
+        let wall = (days_from_civil(2026, 11, day) * i64::from(DAY_MINUTES) + hour * 60 + minute) * MINUTE;
+        let approximate = wall - clock().local_clock(wall).offset_seconds * 1000;
+        let at = wall - clock().local_clock(approximate).offset_seconds * 1000;
+        (at, clock().local_clock(at))
+    }
+
+    #[test]
+    fn intake_schedule_waits_for_work_hours_and_clears_after_a_desktop_check() {
+        let mut channel = Channel {
+            id: "CTEST123".into(), label: "가상 채널".into(), emoji: "ticket".into(),
+            mark_processed: true, paused: false, interval_minutes: 10,
+            enabled_at: local_time(23, 9, 0).0,
+            cursor: "1795500000.000000".into(), revision: "original".into(),
+            last_check_at: None, last_check_via: None, last_scheduled_at: None, schedule: None,
+        };
+        let (monday, monday_local) = local_time(30, 9, 31);
+        assert_eq!(channel.stalled_minutes(monday, monday_local), None);
+        assert_eq!(channel.next_check_at(monday, monday_local), None);
+
+        channel.schedule = Some(Schedule { days: vec![1, 2, 3, 4, 5], start_minute: 540, end_minute: 1080 });
+        assert_eq!(channel.stalled_minutes(monday, monday_local), Some(31));
+        channel.last_check_at = Some(local_time(27, 17, 0).0);
+        channel.last_scheduled_at = channel.last_check_at;
+        let (weekend, weekend_local) = local_time(28, 13, 0);
+        assert_eq!(channel.stalled_minutes(weekend, weekend_local), None);
+        assert_eq!(channel.next_check_at(weekend, weekend_local), Some(local_time(30, 9, 0).0));
+        let (opening, opening_local) = local_time(30, 9, 15);
+        assert_eq!(channel.stalled_minutes(opening, opening_local), None);
+        assert_eq!(channel.stalled_minutes(monday, monday_local), Some(31));
+        channel.last_check_at = Some(monday - MINUTE);
+        channel.last_check_via = Some(ProcessVia::Desktop);
+        assert_eq!(channel.stalled_minutes(monday, monday_local), None);
+        let (after_hours, after_hours_local) = local_time(30, 18, 1);
+        assert_eq!(channel.stalled_minutes(after_hours, after_hours_local), None);
+    }
 }

@@ -1,6 +1,12 @@
 export type IntakeResult = "created" | "commented" | "asked" | "ignored" | "pending";
 export type IntakeVia = "desktop" | "scheduled" | "manual";
 
+export interface IntakeSchedule {
+  days: number[];
+  startMinute: number;
+  endMinute: number;
+}
+
 export interface IntakeChannel {
   id: string;
   label: string;
@@ -14,6 +20,8 @@ export interface IntakeChannel {
   lastCheckAt: number | null;
   lastCheckVia: IntakeVia | null;
   lastScheduledAt: number | null;
+  schedule?: IntakeSchedule | null;
+  nextCheckAt?: number | null;
 }
 
 export interface IntakeProcessing {
@@ -40,6 +48,8 @@ export interface IntakeEntry {
   history: IntakeProcessing[];
 }
 
+export type IntakeSource = Pick<IntakeEntry, "id" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded">;
+
 export interface IntakeRow {
   entry: IntakeEntry;
   current: IntakeProcessing;
@@ -48,6 +58,7 @@ export interface IntakeRow {
 export interface IntakeData {
   channels: IntakeChannel[];
   rows: IntakeRow[];
+  rowsRevision?: string;
   counts: [number, number, number, number, number];
   waiting: number;
   stalledMinutes: number | null;

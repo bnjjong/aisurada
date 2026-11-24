@@ -8,6 +8,7 @@ use crate::kernel::actor::CallContext;
 use crate::ports::{Installed, Ports, install};
 use crate::vault::{agenda, project};
 use crate::write::{
+    acquire_lock,
     marker::check_workspace_marker,
     pipeline::{self, WriteScope},
 };
