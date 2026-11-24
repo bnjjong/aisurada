@@ -11,6 +11,7 @@ import { extractTitle } from './title.ts';
 import { withoutTitleMismatch } from './titleWarning.ts';
 
 export interface NoteRef { id: string; parent?: string; }
+export interface SubNoteMatch { note: Note; root: string; ids: string[]; }
 export interface FailureLine { text: string; key?: string; kind: 'failed' | 'conflict' | 'reloaded'; }
 export interface CommentState { state: string; comments: Row[]; reason?: string; }
 export interface VaultMemory {
@@ -205,6 +206,36 @@ export class VaultData {
     const generation = this.generation;
     this.visibleParents.set(parent, (this.visibleParents.get(parent) || 0) + 1);
     return () => { if (generation !== this.generation) return; const count = (this.visibleParents.get(parent) || 1) - 1; if (count) this.visibleParents.set(parent, count); else this.visibleParents.delete(parent); };
+  }
+  async findSubNote(path: string): Promise<SubNoteMatch | undefined> {
+    const generation = this.generation, workspace = this.workspace();
+    if (!workspace) return;
+    const parts = path.split('/');
+    const id = parts.at(-1)!;
+    const parent = parts.slice(0, -1).join('/');
+    if (workspace.sample) {
+      const ref = this.refFor(id), chain = this.chain(id);
+      if (!ref?.parent || !chain || (parent && path !== chain)) return;
+      const note = this.note(ref), [root, ...ids] = chain.split('/');
+      if (note) return { note, root, ids };
+      return;
+    }
+    try {
+      const result = await engineRefusal(this.services.host, read.subNote(parent, id));
+      if (!this.valid(generation) || !result.ok) return;
+      const row = asRow(result.value);
+      if (row?.id !== id) return;
+      const resolved = parent ? parts : row.idPath;
+      if (!Array.isArray(resolved) || resolved.length < 2 || resolved.at(-1) !== id ||
+        !resolved.every((part): part is string => typeof part === 'string')) return;
+      const [root, ...ids] = resolved;
+      const note = this.workspace()?.notes.find(item => item.id === root);
+      if (!note) return;
+      return { note: this.toNote({ ...row, agenda: note.agenda }, note.agendaId), root, ids };
+    } catch (error) {
+      this.services.warn('후속 노트를 검색하지 못했어요', error);
+      return;
+    }
   }
   async loadSubNotes(parent: string): Promise<Note[]> {
     const generation = this.generation, chain = this.chain(parent), ref = this.refFor(parent), workspace = this.workspace();

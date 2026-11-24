@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { asText } from "../workspace/types.ts";
 import type { Note, WorkspaceState } from "../workspace/types.ts";
+import type { SubNoteMatch } from "../data/vault.ts";
 import { docAddress } from "../navigation/routes.ts";
 import { NoteReading, NoteRail, noteDirOf } from "../navigation/NoteReading.tsx";
 import { holdSubChain } from "../navigation/subNotes.ts";
 import { Settings } from "../ui/Settings.tsx";
 import { Forms } from "../ui/Forms.tsx";
 import { visibleNotes, displayTitle, TYPE_NAMES } from "../ui/model.ts";
-import { findNotes, emptySearch, searchTrim } from "../ui/search.ts";
+import { findNotes, emptySearch, searchTrim, subNoteSearchPath } from "../ui/search.ts";
 
 export function InteractionOverlays({
   controller,
@@ -44,16 +45,33 @@ function QuickSearch({
 }) {
   const [query, setQuery] = useState(""),
     [selected, setSelected] = useState(0);
+  const workspace = state.workspace!;
   const [initial] = useState(() => ({
-    recent: controller.recentNotes.list(state.workspace!.path),
+    recent: controller.recentNotes.list(workspace.path),
     live: controller.recentNotes.mounted(),
   }));
+  const [lookup, setLookup] = useState<{ path: string; hit?: SubNoteMatch } | null>(null);
+  const subPath = subNoteSearchPath(query);
+  const searching = !!subPath && lookup?.path !== subPath;
+  const subHit = lookup?.path === subPath ? lookup.hit : undefined;
+  const subRoot = subHit && workspace.notes.find((note) => note.id === subHit.root);
+  const found = subRoot && (state.prefs.showRecords || subRoot.tier !== "record") ? subHit : undefined;
+  useEffect(() => {
+    if (!subPath) return;
+    let current = true;
+    void controller.data.findSubNote(subPath).then((hit) => {
+      if (current) setLookup({ path: subPath, hit });
+    });
+    return () => { current = false; };
+  }, [controller, subPath, workspace.path]);
   const results = useMemo(() => {
-    const notes = visibleNotes(state.workspace!.notes, state.prefs.showRecords);
-    return searchTrim(query)
-      ? findNotes(notes, state.workspace!.agendas, query)
-      : emptySearch(notes, initial.recent, initial.live);
-  }, [query, state.workspace, state.prefs.showRecords]);
+    if (searching) return [];
+    const notes = visibleNotes(workspace.notes, state.prefs.showRecords);
+    if (!searchTrim(query)) return emptySearch(notes, initial.recent, initial.live);
+    const hits = findNotes(notes, workspace.agendas, query);
+    if (found) hits.unshift({ note: found.note, rank: 0, snippet: "" });
+    return hits;
+  }, [query, workspace, state.prefs.showRecords, initial, searching, found]);
   const matches = results.slice(0, 20);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -63,7 +81,8 @@ function QuickSearch({
   }, []);
   const open = (note: Note) => {
     controller.closeSearch();
-    controller.navigate(docAddress(note.id));
+    if (found?.note === note) controller.openSubNotes(found.root, found.ids);
+    else controller.navigate(docAddress(note.id));
   };
   return (
     <div className="cmdk-overlay" onClick={controller.closeSearch}>
@@ -87,7 +106,9 @@ function QuickSearch({
           placeholder="노트 찾기…"
           value={query}
           onChange={(event) => {
-            setQuery(event.target.value);
+            const value = event.target.value;
+            if (subNoteSearchPath(value) !== subPath) setLookup(null);
+            setQuery(value);
             setSelected(0);
           }}
           onKeyDown={(event) => {
@@ -114,7 +135,7 @@ function QuickSearch({
             }
           }}
         />
-        <div className="cmdk-results" id="cmdk-results" role="listbox">
+        <div className="cmdk-results" id="cmdk-results" role="listbox" aria-busy={searching}>
           {matches.length ? (
             matches.map((hit, index) => (
               <button
@@ -154,7 +175,7 @@ function QuickSearch({
                   </span>
                 )}
                 <small>
-                  {state.workspace!.agendas.find(
+                  {workspace.agendas.find(
                     (a) => a.id === hit.note.agendaId,
                   )?.title || "삭제된 아젠다"}{" "}
                   · {TYPE_NAMES[asText(hit.note.type)]} ·{" "}
@@ -163,7 +184,9 @@ function QuickSearch({
               </button>
             ))
           ) : (
-            <p className="cmdk-empty">일치하는 노트가 없어요.</p>
+            <p className="cmdk-empty">
+              {searching ? "후속 노트를 찾는 중이에요." : "일치하는 노트가 없어요."}
+            </p>
           )}
           {searchTrim(query) && results.length > 20 && (
             <p className="cmdk-more">

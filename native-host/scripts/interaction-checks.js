@@ -42,6 +42,29 @@ if(location.pathname.startsWith('/note-window/')) {
       document.querySelector('.cmdk-input').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
       await until(()=>!document.querySelector('.cmdk-input'));assert(location.pathname===doc(cfg.legacyId),'search changed route');
     });
+    await test('search-opens-nested-sub-note-by-id-or-copied-path', async () => {
+      const id = 'snfixture-00000002';
+      const chain = `${cfg.id}/${cfg.childId}/${id}`;
+      const search = async query => {
+        press({ key: 'k', code: 'KeyK' });
+        await until(() => document.querySelector('.cmdk-input'));
+        const input = document.querySelector('.cmdk-input');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, query);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await until(() => document.querySelector('.cmdk-item')?.textContent.includes('두 단계 하위 노트'));
+        return input;
+      };
+      const opened = () => location.pathname === `/sub/${chain}` &&
+        document.querySelector('.note-body')?.textContent.includes('두 단계 사슬의 본문');
+      const input = await search(id);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      await until(opened, 'ID 검색 결과를 Enter로 열기');
+      go(doc(cfg.legacyId));
+      await search(chain);
+      document.querySelector('.cmdk-item').click();
+      await until(opened, '복사한 경로의 검색 결과 클릭');
+      go(doc(cfg.legacyId));
+    });
     await test('window-link-and-window-scoped-close',async()=>{
       await links([link(cfg.id,cfg.raw,'&window=1')]);
       await until(async()=> (await invoke('note_windows')).includes(cfg.id));

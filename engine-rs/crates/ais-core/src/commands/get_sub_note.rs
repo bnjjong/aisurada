@@ -1,6 +1,6 @@
 //! `get_sub_note`: 후속 노트 하나를 본문과 코멘트까지 읽는다.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::subnote::{check_readable, resolve_container, sub_comments_file};
 use crate::kernel::actor::CallContext;
@@ -9,6 +9,7 @@ use crate::model::SubNoteRow;
 use crate::text::{SUB_NOTE_ID, is_blank};
 use crate::vault::comments::{CommentsEnvelope, read_comments};
 use crate::vault::index::NoteIndex;
+use crate::vault::scanner::NoteRecord;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -18,7 +19,17 @@ pub struct GetSubNoteRequest {
     pub id: String,
 }
 
-pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallContext) -> Result<SubNoteRow, EngineError> {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FoundSubNote {
+    #[serde(flatten)]
+    note: SubNoteRow,
+    /// ID만으로 조회했을 때, 최상위 노트부터 찾은 후속 노트까지의 ID 목록.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id_path: Option<Vec<String>>,
+}
+
+pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallContext) -> Result<FoundSubNote, EngineError> {
     if is_blank(&request.id) {
         return Err(EngineError::invalid_argument(
             "인자가 둘 필요하다: get-sub-note <부모 노트 id> <하위 노트 id>",
@@ -26,7 +37,8 @@ pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallCon
     }
     let id = request.id.as_str();
 
-    let (root, sub) = match request.parent.as_deref().filter(|p| !is_blank(p)) {
+    let parent = request.parent.as_deref().filter(|p| !is_blank(p));
+    let (root, sub) = match parent {
         Some(parent) => {
             let container = resolve_container(index, parent)?;
             if !SUB_NOTE_ID.is_match(id) {
@@ -69,5 +81,27 @@ pub fn execute(index: &NoteIndex, request: &GetSubNoteRequest, context: &CallCon
     } else {
         CommentsEnvelope::Absent
     };
-    Ok(SubNoteRow::from_record(sub, true, Some(comments)))
+    Ok(FoundSubNote {
+        note: SubNoteRow::from_record(sub, true, Some(comments)),
+        id_path: if parent.is_none() {
+            Some(id_path(root, sub)?)
+        } else {
+            None
+        },
+    })
+}
+
+fn id_path(root: &NoteRecord, sub: &NoteRecord) -> Result<Vec<String>, EngineError> {
+    let mut ids = vec![sub.id.clone()];
+    let mut current = sub;
+    while let Some(parent_id) = current.direct_parent_id.as_deref() {
+        ids.push(parent_id.to_owned());
+        if parent_id == root.id {
+            ids.reverse();
+            return Ok(ids);
+        }
+        current = root.sub_notes.iter().find(|note| note.id == parent_id)
+            .ok_or_else(|| EngineError::internal(format!("상위 노트를 찾을 수 없다: {parent_id}")))?;
+    }
+    Err(EngineError::internal(format!("최상위 노트에 닿지 못했다: {}", root.id)))
 }

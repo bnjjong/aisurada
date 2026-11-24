@@ -3,6 +3,16 @@ import { asText } from "../workspace/types.ts";
 import { tags } from "./model.ts";
 export const searchTrim = (s: string) =>
   s.replace(/^[\s\u001c-\u001f]+|[\s\u001c-\u001f]+$/g, "");
+
+export function subNoteSearchPath(query: string): string {
+  const path = searchTrim(query).toLowerCase().replace(/^#doc:/, "");
+  const [first, ...rest] = path.split("/");
+  const subId = /^sn[0-9a-z]+-[0-9a-f]{8}$/;
+  if (!rest.length) return subId.test(first) ? path : "";
+  return /^nd[0-9a-z]+-[0-9a-f]{8}$/.test(first) && rest.every((id) => subId.test(id))
+    ? path
+    : "";
+}
 const entities = (s: string) =>
   s
     .replace(/&amp;/g, "&")
