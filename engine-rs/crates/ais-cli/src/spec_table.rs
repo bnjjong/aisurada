@@ -66,7 +66,7 @@ pub const SPECS: &[Spec] = &[
         tool: Some("get_sub_note"),
         write: false,
         part4: false,
-        usage: "get-sub-note <부모 노트 id> <하위 노트 id>",
+        usage: "get-sub-note <부모 노트 id> <하위 노트 id> [includeIdPath=true. 최상위 노트부터의 ID 경로를 싣는다]",
         allowed: &["includeIdPath"],
         max: Some(2),
     },
