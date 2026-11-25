@@ -135,22 +135,14 @@ pub async fn manager_test_webhook<R: Runtime>(
     name: String,
     url: String,
     channel: String,
+    platform: Option<String>,
 ) -> Result<Value, String> {
     let (env, manager) = active_manager(&window, &state, &name)?;
     manager::validate_webhook(&url)?;
-    if !slack_channel_id(&channel) {
-        return Err("시험 알림을 받을 Slack 채널 ID를 적어 주세요".into());
-    }
-    if !manager.allows_slack_channel(&channel) {
-        return Err("매니저의 연결 탭에서 등록한 Slack 채널을 골라 주세요".into());
-    }
+    let payload = test_payload(&manager, platform.as_deref().unwrap_or("slack"), &channel)?;
     tauri::async_runtime::spawn_blocking(move || {
         let secret = ensure_secret(&env, &manager, false)?;
         let id = delivery_id(&format!("test:{}:{:?}", manager.name, SystemTime::now()));
-        let payload = json!({
-            "event_type": EVENT, "channel": channel, "thread_id": "", "status": "test",
-            "message": "aisurada 매니저 연결 시험 알림이에요.",
-        });
         let started = Instant::now();
         let result = send_webhook(&url, &secret, &id, &payload);
         let outcome = if result.is_ok() { "ok" } else { "failed" };
@@ -159,7 +151,7 @@ pub async fn manager_test_webhook<R: Runtime>(
         }
         let status = result.map_err(|error| match error {
             DeliveryError::Unconfirmed => {
-                "전달 여부를 확인할 수 없어요. Slack 채널의 시험 알림을 확인해 주세요."
+                "전달 여부를 확인할 수 없어요. 선택한 대화에서 시험 알림을 확인해 주세요."
             }
             _ => "시험 알림을 전달하지 못했어요. 웹훅 주소와 서명 비밀을 확인해 주세요.",
         })?;
@@ -167,6 +159,37 @@ pub async fn manager_test_webhook<R: Runtime>(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+fn test_payload(
+    manager: &manager::Manager,
+    platform: &str,
+    channel: &str,
+) -> Result<Value, String> {
+    let mut payload = json!({
+        "event_type": EVENT, "platform": platform, "status": "test",
+        "message": "aisurada 매니저 연결 시험 알림이에요.",
+    });
+    match platform {
+        "slack" => {
+            if !slack_channel_id(channel) || !manager.allows_slack_channel(channel) {
+                return Err("매니저의 연결 탭에서 등록한 Slack 채널 ID를 골라 주세요".into());
+            }
+            payload["channel"] = channel.into();
+            payload["thread_id"] = "".into();
+        }
+        "telegram" => {
+            if !manager::valid_telegram_chat_id(channel)
+                || !manager.telegram_chats.iter().any(|chat| chat == channel)
+            {
+                return Err("허용할 텔레그램 대화 ID를 저장한 뒤 골라 주세요".into());
+            }
+            payload["chat_id"] = channel.into();
+            payload["message_thread_id"] = "".into();
+        }
+        _ => return Err("지원하는 시험 알림 대상을 골라 주세요".into()),
+    }
+    Ok(payload)
 }
 
 fn slack_channel_id(channel: &str) -> bool {
@@ -280,6 +303,23 @@ mod tests {
         net::TcpListener,
         thread,
     };
+
+    #[test]
+    fn test_notice_uses_the_selected_platform_and_allowed_conversation() {
+        let manager: manager::Manager = serde_json::from_value(json!({
+            "name": "hermes-demo", "label": "Hermes", "enabled": true,
+            "tools": [], "repos": [], "agendas": [],
+            "slackChannels": ["CDEMO123"], "telegramChats": ["-10012345"]
+        }))
+        .unwrap();
+        let telegram = test_payload(&manager, "telegram", "-10012345").unwrap();
+        assert_eq!(telegram["chat_id"], "-10012345");
+        assert_eq!(telegram["message_thread_id"], "");
+        assert!(test_payload(&manager, "telegram", "12345").is_err());
+        let slack = test_payload(&manager, "slack", "CDEMO123").unwrap();
+        assert_eq!(slack["channel"], "CDEMO123");
+        assert!(test_payload(&manager, "slack", "CDEMO456").is_err());
+    }
 
     #[test]
     fn delivers_signed_status_to_loopback_receiver() {

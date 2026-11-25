@@ -172,13 +172,23 @@ export function ManagerConnection({ form, history, controller, update }: {
 }
 
 const channelId = /^[CG][A-Z0-9]{1,63}$/;
+const telegramChatId = /^-?[1-9][0-9]{0,18}$/;
 export function ManagerNotifications({ form, controller, update }: {
   form: ManagerConfig; controller: WorkspaceController; update: Update;
 }) {
   const [masked, setMasked] = useState("");
-  const channels = [...new Set(form.slackChannels.filter(value => channelId.test(value)))];
-  const [channel, setChannel] = useState(() => channels[0] ?? "");
-  const testChannel = channels.includes(channel) ? channel : channels[0] ?? "";
+  const [testTarget, setTestTarget] = useState("");
+  const targets = [
+    { platform: "slack", label: "Slack", webhook: form.webhook, ids: form.slackChannels, pattern: channelId },
+    { platform: "telegram", label: "텔레그램", webhook: form.telegramWebhook, ids: form.telegramChats ?? [], pattern: telegramChatId },
+  ].flatMap(({ platform, label, webhook, ids, pattern }) => {
+    const url = webhook?.trim();
+    if (!url) return [];
+    return [...new Set(ids.map(id => id.trim()).filter(id => pattern.test(id)))].map(id => ({
+      key: `${platform}:${id}`, platform, label: `${label} · ${id}`, channel: id, url,
+    }));
+  });
+  const target = targets.find(item => item.key === testTarget) ?? targets[0];
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
@@ -239,14 +249,15 @@ export function ManagerNotifications({ form, controller, update }: {
         </div>
       </Choices>
       <div className="mgr-actions mgr-test">
-        <label className="mgr-label">시험 알림을 받을 Slack 채널
-          <select value={testChannel} onChange={event => setChannel(event.target.value)} disabled={!channels.length}>
-            {!channels.length && <option value="">연결 탭에서 채널을 등록해 주세요</option>}
-            {channels.map(id => <option value={id} key={id}>{id}</option>)}
+        <label className="mgr-label">시험 알림을 받을 대화
+          <select value={target?.key ?? ""} onChange={event => setTestTarget(event.target.value)} disabled={!targets.length}>
+            {!targets.length && <option value="">웹훅 주소와 허용 대화를 설정해 주세요</option>}
+            {targets.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}
           </select>
         </label>
-        <button type="button" disabled={working || !form.webhook || !masked || !testChannel} onClick={() => void act(async () => {
-          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, url: form.webhook?.trim(), channel: testChannel });
+        <button type="button" disabled={working || !masked || !target} onClick={() => target && void act(async () => {
+          const { platform, url, channel } = target;
+          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, platform, url, channel });
           setText(`보냈어요 · HTTP ${answer.status} · ${answer.elapsed}ms`);
           await refresh();
         })}>시험 알림 보내기</button>
