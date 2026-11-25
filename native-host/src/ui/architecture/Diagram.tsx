@@ -13,7 +13,7 @@ const FLOW_PERIOD_MS = 1450;
 
 type DiagramNodeLike = Point & { id: string };
 
-function iconFor(item: C4Element) {
+export function iconFor(item: C4Element) {
   const hint = (item.name + ' ' + item.technology).toLowerCase();
   if (/\bgithub\b/.test(hint)) return 'gitBranch';
   if (/database|db\b|sqlite|postgres|mysql|데이터베이스/.test(hint)) return 'database';
