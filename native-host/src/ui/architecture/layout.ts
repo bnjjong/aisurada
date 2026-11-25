@@ -312,6 +312,8 @@ export function placeLabels(
   view: Viewport,
   selected: string | null,
   measure: (text: string) => number,
+  /** 라벨을 카드와 같은 비율로 키우는 배율. 글자, 여백, 높이, 후보 너비를 함께 곱한다. `measure`도 같은 배율의 글꼴로 재야 한다. */
+  unit = 1,
 ): DiagramLabel[] {
   const project = (point: Point) => ({
     x: view.x + point.x * view.scale,
@@ -324,7 +326,10 @@ export function placeLabels(
       top: origin.y, bottom: origin.y + CARD_HEIGHT * view.scale,
     };
   });
-  const maxWidth = Math.max(104, Math.min(168, Math.floor(view.width / 4.8)));
+  // 글이 한 줄로 들어갈 수 있으면 줄바꿈 없이 한 줄로 놓는다. 칸이 좁을 때만 두 줄이나 아이콘으로 줄인다.
+  const maxWidth = Math.max(104 * unit, Math.min(520 * unit, Math.floor(view.width * .46)));
+  const offsets = [0, -18, 18, -34, 34, -50, 50].map(offset => offset * unit);
+  const compactWidth = 26 * unit;
   const placements: DiagramLabel[] = [];
   const candidates = edges.map((edge, index) => ({ edge, index }));
   if (selected) candidates.sort((a, b) => Number(b.edge.id === selected) - Number(a.edge.id === selected));
@@ -332,8 +337,9 @@ export function placeLabels(
   for (const { edge, index } of candidates) {
     const title = [edge.label || '관계', edge.technology].filter(Boolean).join(' · ');
     if (view.scale < .3 && edge.id !== selected) continue;
-    const textWidth = Math.ceil(measure(title)) + 16;
-    const widths = [...new Set([Math.min(maxWidth, textWidth), Math.min(132, textWidth), Math.min(92, textWidth), 26])];
+    // 좌우 여백 14와 테두리 2를 더한다(`architecture.css`의 `.c4-edge`와 같은 값이다)
+    const textWidth = Math.ceil(measure(title)) + 14 * unit + 2;
+    const widths = [...new Set([Math.min(maxWidth, textWidth), Math.min(168 * unit, textWidth), Math.min(120 * unit, textWidth), Math.min(92 * unit, textWidth), compactWidth].map(Math.round))];
     const anchors = [.5, .36, .64, .23, .77, .12, .88].map(t => {
       const anchor = project(pointOnCurve(edge, t));
       const next = project(pointOnCurve(edge, t + .01));
@@ -344,9 +350,9 @@ export function placeLabels(
     });
     let placed = false;
     for (const width of widths) {
-      const compact = width === 26 && width < textWidth;
-      const height = !compact && textWidth > width ? 38 : 22;
-      for (const offset of [0, -18, 18, -34, 34, -50, 50]) {
+      const compact = width === Math.round(compactWidth) && width < textWidth;
+      const height = !compact && textWidth > width ? Math.round(36 * unit + 2) : Math.round(20 * unit + 2);
+      for (const offset of offsets) {
         for (const { anchor, normal } of anchors) {
           const center = { x: anchor.x + normal.x * offset, y: anchor.y + normal.y * offset };
           const rect = {

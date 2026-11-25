@@ -183,3 +183,27 @@ test('지점이 정해진 선은 자동 간격 나눔에 끼지 않고, 같은 �
   assert.deepEqual(one.start, portPoint(trio[0], portById('right')), '지점이 정해진 끝은 움직이지 않는다');
   assert.ok(two.start.x >= 0, '자동 선은 그대로 그려진다');
 });
+
+test('라벨은 배율(unit)에 비례해 카드와 같은 비율로 커진다', () => {
+  const view = { width: 3200, height: 1800, scale: 1, x: 0, y: 0 };
+  const at = unit => placeLabels(edges, nodes, view, null, text => text.length * 8 * unit, unit).find(label => label.edge.id === '0');
+  const one = at(1);
+  const two = at(2);
+  assert.equal(one.height, 22);
+  assert.equal(two.height, 42, '한 줄 높이는 20*unit+2다');
+  const ratio = (two.width - 2) / (one.width - 2);
+  assert.ok(ratio > 1.95 && ratio < 2.05, `너비도 같은 비율로 커진다: ${one.width} -> ${two.width}`);
+});
+
+test('한 줄로 들어가면 줄바꿈 없이 한 줄이고, 칸이 좁을 때만 두 줄이나 아이콘으로 줄인다', () => {
+  const measure = text => text.length * 10;
+  const title = '작업 지시, 노트 작성 및 의사결정 승인';
+  const wide = placeLabels(edges, nodes, { width: 1600, height: 900, scale: 1, x: 0, y: 0 }, null, measure).find(label => label.edge.id === '0');
+  assert.equal(wide.title, title);
+  assert.equal(wide.height, 22, '넓은 칸에서는 한 줄이다');
+  assert.equal(wide.width, title.length * 10 + 16, '글 폭에 맞춘 너비다(잘리지 않는다)');
+  assert.equal(wide.compact, false);
+  const narrow = placeLabels(edges, nodes, { width: 360, height: 900, scale: .4, x: 0, y: 0 }, null, measure).find(label => label.edge.id === '0');
+  assert.ok(!narrow || narrow.compact || narrow.height === 38 || narrow.width < wide.width, '좁은 칸에서는 줄이거나 아이콘이다');
+});
+
