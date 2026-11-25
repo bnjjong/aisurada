@@ -13,7 +13,6 @@ use serde_json::{Value, json};
 
 use super::task_commands::{self, AddTaskCommentRequest, CreateTaskRequest};
 use crate::error::EngineError;
-use crate::frontmatter;
 use crate::kernel::{
     actor::{CallContext, Caller, ManagerContext},
     time::{LocalClock, days_from_civil},
@@ -1427,10 +1426,7 @@ fn apply_task(
         let receipt = entry.source.as_ref().map(|_| entry.id.as_str());
         let matches_source = |task: &Task| {
             if let Some(receipt) = receipt {
-                return task.extra.iter().any(|(key, value)| {
-                    key == store::INTAKE_RECEIPT
-                        && matches!(value, frontmatter::Value::Str(id) if id == receipt)
-                });
+                return task.intake_receipt() == Some(receipt);
             }
             task.refs.iter().any(|item| {
                 item.kind == RefKind::Slack

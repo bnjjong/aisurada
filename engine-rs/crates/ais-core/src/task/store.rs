@@ -30,7 +30,6 @@ use crate::write::sub_note::remove_tree;
 
 pub const ROOT: &str = ".aisurada/tasks";
 pub const ACTIVITY_KEEP: usize = 500;
-pub(crate) const INTAKE_RECEIPT: &str = "intakeReceipt";
 
 pub struct TrashEntry {
     pub id: String,
@@ -209,10 +208,7 @@ pub fn create(
     let path = file_path(vault, &key);
     let (mut task, event) = new.into_task(key.clone(), id, rel(vault, &path), stamp, actor);
     if let Some(receipt) = receipt {
-        task.extra.push((
-            INTAKE_RECEIPT.into(),
-            crate::frontmatter::Value::Str(receipt.into()),
-        ));
+        task.set_intake_receipt(receipt);
     }
     let bytes = format::render(&task)?;
     write_atomic(&path, &bytes)?;

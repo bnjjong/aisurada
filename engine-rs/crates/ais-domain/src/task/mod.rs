@@ -8,6 +8,8 @@ pub mod transitions;
 use crate::frontmatter::Value;
 use crate::kernel::task_link::TaskLinkKind;
 
+const INTAKE_RECEIPT: &str = "intakeReceipt";
+
 /// 태스크 상태
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TaskStatus {
@@ -208,5 +210,19 @@ impl Task {
     /// `TSK-14`의 번호. 키 모양이 아니면 0이다.
     pub fn number(&self) -> u32 {
         format::number_of(&self.key)
+    }
+
+    /// 원장에 결과를 쓰기 전에 중단됐을 때 이미 만든 태스크를 찾는 접수 번호다.
+    pub fn intake_receipt(&self) -> Option<&str> {
+        self.extra.iter().find_map(|(key, value)| match value {
+            Value::Str(receipt) if key == INTAKE_RECEIPT => Some(receipt.as_str()),
+            _ => None,
+        })
+    }
+
+    pub fn set_intake_receipt(&mut self, receipt: &str) {
+        self.extra.retain(|(key, _)| key != INTAKE_RECEIPT);
+        self.extra
+            .push((INTAKE_RECEIPT.into(), Value::Str(receipt.into())));
     }
 }
