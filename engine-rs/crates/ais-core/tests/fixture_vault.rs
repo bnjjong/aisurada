@@ -3815,7 +3815,9 @@ fn reads_resource_arguments_like_the_command_line() {
             json!({"kind": "skill", "scope": "global", "name": "도구 글", "description": "d", "tools": "{\"claude\":{\"n\":1}}"}),
         )
         .unwrap();
-    assert_eq!(a["tools"], b["tools"]);
+    assert_eq!(a["tools"]["claude"]["n"], b["tools"]["claude"]["n"]);
+    assert!(a["tools"]["claude"]["createdAt"].is_string());
+    assert!(b["tools"]["claude"]["createdAt"].is_string());
     // 읽기만 하는 명령도 표식이 없는 폴더에서는 일하지 않는다
     let bare = std::env::temp_dir().join(format!("ais-res-bare-{}", std::process::id()));
     std::fs::create_dir_all(&bare).unwrap();
