@@ -2,6 +2,7 @@
 //!
 //! 앱 안에서 Rust `ais-cli`(`ais_cli::run`)를 같은 프로세스로 부른다. 사이드카도, 프로세스 띄우기도, Java도 없다.
 use crate::lifecycle::HostState;
+use ais_cli::env::AI_SESSION_ENV;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -11,14 +12,6 @@ use std::{
 use tauri::{Manager, Runtime, State};
 
 pub type Environment = BTreeMap<OsString, OsString>;
-/// 엔진이 「AI 세션이 보낸 요청」으로 읽는 환경변수(`SessionAgents`). 앱이 엔진에 넘기는 환경에서는 지운다.
-const AI_SESSION_ENV: [&str; 5] = [
-    "AISURADA_SESSION_ID",
-    "AISURADA_SESSION_AGENT",
-    "CLAUDE_CODE_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-];
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Reply {
     pub status: i32,
@@ -252,15 +245,13 @@ mod tests {
         let c = context(temp.path(), true);
         let bin = c.resource.as_ref().unwrap().join("bin/ais-cli");
         touch(&bin);
-        let e = env(&[
+        let mut e = env(&[
             ("HOME", "/home/x"),
             ("PATH", "/usr/bin"),
             ("AISURADA_VAULT", "/stale"),
-            ("AISURADA_SESSION_ID", "s1"),
-            ("CLAUDE_CODE_SESSION_ID", "s2"),
-            ("CODEX_THREAD_ID", "s3"),
             ("KEEP_ME", "yes"),
         ]);
+        e.extend(env(&AI_SESSION_ENV.map(|key| (key, "agent-session"))));
         let cli = cli_env(&c, &e, "/my vault");
         assert_eq!(
             cli.vars.get("AISURADA_VAULT").map(String::as_str),

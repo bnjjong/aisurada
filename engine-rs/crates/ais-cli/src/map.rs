@@ -72,12 +72,15 @@ fn positional_names(command: &str) -> &'static [&'static str] {
 /// 호출자와 세션 표식으로 호출 맥락을 만든다. 쓰기 명령이 노트에 누가 고쳤는지 적을 때 읽는다.
 /// 에이전트 이름은 노트에 적는 값(`claude`는 적지 않는다)일 때만 싣는다.
 pub fn context_for(caller: Caller, session: Option<&SessionSource>) -> CallContext {
-    CallContext {
-        caller,
-        session: session.map(|source| source.id.clone()),
-        session_agent: session.and_then(|source| agent_for_file(&source.agent)),
-        manager: None,
+    if caller == Caller::App && session.is_none() {
+        return CallContext::app();
     }
+    let mut context = CallContext::ai(
+        session.map(|source| source.id.clone()),
+        session.and_then(|source| agent_for_file(&source.agent)),
+    );
+    context.caller = caller;
+    context
 }
 
 /// 명령 표면 호출을 엔진 호출로 바꾼다.
@@ -328,15 +331,9 @@ mod tests {
         };
         let with = to_call(&parsed, Some(&source)).unwrap();
         assert_eq!(with.args, plain.args);
-        assert_eq!(
-            with.context,
-            CallContext {
-                caller: Caller::App,
-                session: Some("g-1".into()),
-                session_agent: Some("gemini".into()),
-                manager: None,
-            }
-        );
+        let mut expected = CallContext::ai(Some("g-1".into()), Some("gemini".into()));
+        expected.caller = Caller::App;
+        assert_eq!(with.context, expected);
     }
 
     #[test]

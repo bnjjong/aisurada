@@ -93,13 +93,9 @@ struct Run<'a> {
     channel: String,
 }
 
-/// AI의 통로 판별: AI 세션 표식이 달렸거나 AI 도구로 불렀으면 AI다. 앱 화면은 세션 표식 없이 부른다.
+/// 로컬 작업자 권한이 확인된 요청만 사람의 직접 편집으로 처리한다.
 fn is_ai(context: &CallContext) -> bool {
-    context.caller == Caller::Ai
-        || context
-            .session
-            .as_deref()
-            .is_some_and(|s| !crate::task::format::java_blank(s))
+    !context.is_local_operator() || context.has_agent_provenance()
 }
 
 fn run<'a>(vault: &'a Path, context: &CallContext) -> Run<'a> {

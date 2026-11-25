@@ -14,6 +14,25 @@ pub const MISSING_VAULT_MESSAGE: &str = "vault를 정하지 못했다. AISURADA_
 /// 앱이 지금 연 vault를 적어 두는 파일 이름
 const POINTER_FILE: &str = "current-vault.json";
 
+pub const AI_SESSION_ENV: [&str; 8] = [
+    "AISURADA_SESSION_ID",
+    "AISURADA_SESSION_AGENT",
+    "CLAUDE_CODE_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_CONVERSATION_ID",
+    "GEMINI_SESSION_ID",
+    "AGY_CONVERSATION_ID",
+];
+
+/// 세션의 에이전트를 하나로 정할 수 없을 때도 로컬 작업자 권한은 부여하지 않는다.
+pub fn has_agent_session(env: &Env) -> bool {
+    env.session.is_some()
+        || AI_SESSION_ENV
+            .iter()
+            .any(|name| env.var(name).is_some_and(|value| !trim(value).is_empty()))
+}
+
 /// 한 번의 호출이 보는 환경
 #[derive(Debug, Clone, Default)]
 pub struct Env {

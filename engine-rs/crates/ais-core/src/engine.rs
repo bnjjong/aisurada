@@ -140,9 +140,8 @@ impl Engine {
         self.ports.clone().map(install)
     }
 
-    /// 이름과 인자 객체로 명령을 실행하고 응답 JSON을 돌려줍니다.
-    /// 과도기 입구: 호출 맥락을 인자의 `caller`·`session`·`sessionAgent` 칸에서 읽어 [`Engine::call_as`]로 넘긴다. 시험과 녹화 하네스가 쓴다.
-    /// 새 호출은 [`Engine::call_as`]를 쓴다.
+    /// 시험과 녹화 하네스에서 합성 요청의 호출자를 재현한다. 운영 호출은 [`Engine::call_as`]를 쓴다.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn call(&self, command: &str, args: Value) -> Result<Value, EngineError> {
         let context = context_from_args(command, &args)?;
         self.call_as(&context, command, args)
@@ -160,14 +159,22 @@ impl Engine {
     }
 }
 
-/// 과도기 입구용: 인자 객체의 `caller`·`session`·`sessionAgent` 칸을 호출 맥락으로 읽는다. 객체가 아닌 인자는 맥락이 없는 것으로 보고
-/// (요청 읽기가 같은 오류를 낸다), 칸 값이 틀리면 요청 읽기와 같은 글로 거절한다.
+/// 합성 요청의 `caller`와 세션 표식으로 시험할 호출 권한을 만든다.
+#[cfg(any(test, feature = "test-support"))]
 fn context_from_args(command: &str, args: &Value) -> Result<CallContext, EngineError> {
-    match args {
-        Value::Object(_) => serde_json::from_value(args.clone())
-            .map_err(|e| EngineError::invalid_argument(format!("{command} 인자가 잘못됐다: {e}"))),
-        _ => Ok(CallContext::default()),
+    let context: CallContext = match args {
+        Value::Object(_) => serde_json::from_value(args.clone()).map_err(|e| {
+            EngineError::invalid_argument(format!("{command} 인자가 잘못됐다: {e}"))
+        })?,
+        _ => CallContext::default(),
+    };
+    if !context.has_agent_provenance() {
+        let mut operator = CallContext::app();
+        operator.session = context.session;
+        operator.session_agent = context.session_agent;
+        return Ok(operator);
     }
+    Ok(context)
 }
 
 fn find(command: &str) -> Option<&'static table::Def> {

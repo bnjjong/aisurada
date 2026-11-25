@@ -119,7 +119,7 @@ fn run_engine(
     let outcome = if is_tool {
         run_tool(name, rest, &vault, session.as_ref(), manager)
     } else {
-        run_command(name, rest, &vault, session.as_ref())
+        run_command(name, rest, &vault, session.as_ref(), env)
     };
     match outcome {
         Ok(legacy) => Outcome {
@@ -149,11 +149,15 @@ fn run_command(
     rest: &[String],
     vault: &str,
     session: Option<&env::SessionSource>,
+    env: &Env,
 ) -> Result<legacy::Legacy, CliError> {
     let spec = registry::command(name)
         .ok_or_else(|| CliError::new(409, format!("이 판에는 {name}이 없다")))?;
     let parsed = parse::parse_command(spec, rest)?;
-    let call = map::to_call(&parsed, session)?;
+    let mut call = map::to_call(&parsed, session)?;
+    if env::has_agent_session(env) {
+        call.context.clear_local_authority();
+    }
     let response = Engine::new(vault).call_as(&call.context, &call.command, call.args.clone())?;
     Ok(legacy::to_legacy(&call, vault, response))
 }
