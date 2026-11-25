@@ -357,8 +357,29 @@ export function mergeUnsaved(saved: AskThread, memory: AskThread | null): AskThr
   return kept.length === 0 ? saved : { ...saved, turns: [...saved.turns, ...kept] };
 }
 
-/** C4: 실패 에러 문자열을 사용자가 이해하기 쉬운 한국어로 변환 */
-export function humanizeAskError(raw: unknown): { message: string; raw: string } {
+/** C4: 실패 에러 문자열 또는 종류(kind)를 사용자가 이해하기 쉬운 한국어로 변환 */
+export function humanizeAskError(raw: unknown): { message: string; raw: string; kind?: string } {
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    const record = raw as Record<string, unknown>;
+    const kind = typeof record.kind === 'string' ? record.kind : undefined;
+    const rawText = typeof record.message === 'string' ? record.message : String(raw);
+    if (kind === 'no_cli') {
+      return { message: 'Claude CLI(claude)를 찾지 못했어요. 설치되어 있는지 확인해 주세요.', raw: rawText, kind };
+    }
+    if (kind === 'login_required') {
+      return { message: 'Claude 로그인이 필요해요. 터미널에서 claude login을 실행해 주세요.', raw: rawText, kind };
+    }
+    if (kind === 'timeout') {
+      return { message: '응답 시간이 너무 오래 걸려 중단되었어요.', raw: rawText, kind };
+    }
+    if (kind === 'cancelled') {
+      return { message: '사용자에 의해 질문이 중단되었어요.', raw: rawText, kind };
+    }
+    if (kind === 'not_found') {
+      return { message: '항목을 찾을 수 없어요.', raw: rawText, kind };
+    }
+  }
+
   const text = typeof raw === 'string' ? raw : String(raw ?? '');
   if (!text) return { message: '답변을 받아오지 못했어요.', raw: '' };
 
@@ -372,6 +393,7 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string }
     return {
       message: 'Claude CLI(claude)를 찾지 못했어요. 설치되어 있는지 확인해 주세요.',
       raw: text,
+      kind: 'no_cli',
     };
   }
   if (
@@ -384,6 +406,7 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string }
     return {
       message: 'Claude 로그인이 필요해요. 터미널에서 claude login을 실행해 주세요.',
       raw: text,
+      kind: 'login_required',
     };
   }
   if (
@@ -396,12 +419,14 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string }
     return {
       message: '응답 시간이 너무 오래 걸려 중단되었어요.',
       raw: text,
+      kind: 'timeout',
     };
   }
   if (text.includes('중단') || lower.includes('cancel')) {
     return {
       message: '사용자에 의해 질문이 중단되었어요.',
       raw: text,
+      kind: 'cancelled',
     };
   }
   return {

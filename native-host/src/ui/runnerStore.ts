@@ -3,6 +3,7 @@
 // 이 모듈은 호스트 명령을 부르고, 호스트가 알려 주는 사건(`ais://runner`)을 받아 기억할 뿐이다.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { TypedHostCall } from "../workspace/hostCommands.ts";
+import { extractErrorKind, isRecord } from "./engineClient.ts";
 
 export type HostCall = TypedHostCall;
 
@@ -94,7 +95,6 @@ const EMPTY: RunnerSnapshot = {
 
 // ---------------------------------------------------------------- 읽기
 
-const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const PHASES = new Set<string>(["running", "waiting-answer", "done", "failed", "cancelled", "abandoned"]);
 const num = (v: unknown, fallback = 0) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -181,6 +181,10 @@ function explain(e: unknown): string {
 
 /** 호스트에 이 명령이 없다는 오류인지(claude를 뺀 빌드, 브라우저 미리보기). */
 export function isMissingCommand(e: unknown): boolean {
+  const kind = extractErrorKind(e);
+  if (kind === "command_not_found" || (isRecord(e) && e.kind === "command_not_found")) {
+    return true;
+  }
   const text = explain(e);
   return /not found|not allowed|unknown command|command .* (not|isn)|없는 명령|알 수 없는/i.test(text);
 }
