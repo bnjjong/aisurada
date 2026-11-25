@@ -15,7 +15,7 @@ import { shortcutFor, zoomShortcutFor } from '../interaction/shortcuts.ts';
 import type { KeyInput } from '../interaction/shortcuts.ts';
 import { readTypography, stepScale } from './typography.ts';
 import type { Typography } from './typography.ts';
-import type { RecentWorkspace, SettingsSection, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import type { RecentWorkspace, Row, SettingsSection, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
@@ -26,7 +26,57 @@ import { RecentNotes } from '../ui/recent.ts';
 import { blocksEscape } from '../ui/layers.ts';
 import type { RestoreResult } from '../editor/session.ts';
 
-export class WorkspaceController {
+/**
+ * 워크스페이스 화면 탐색 및 탭 제어 인터페이스
+ */
+export interface WorkspaceNavigation {
+  navigate(path: string, replace?: boolean): void;
+  locationChanged(path: string): void;
+  selectTab(id: string | null): void;
+  closeTab(id: string): void;
+  closeActiveTab(): void;
+  reorderTab(id: string, index: number): void;
+}
+
+/**
+ * 사용자 환경 설정 및 테마·화면 크기 제어 인터페이스
+ */
+export interface WorkspacePreferences {
+  preference(update: Partial<Preferences> & { theme?: 'light' | 'dark'; skin?: Skin; uiScale?: number; uiFont?: string; terminalFont?: string }): void;
+  refreshTheme(): void;
+  zoomBy(direction: 1 | -1 | 0): void;
+  applyScale(scale: number): void;
+  settings(open: boolean, section?: SettingsSection): void;
+}
+
+/**
+ * 네이티브 호스트 및 엔진 호출 인터페이스
+ */
+export interface WorkspaceHostBridge {
+  isNative(): boolean;
+  callHost<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+  callEngine(request: string[] | Call): Promise<unknown>;
+  pickDirectory(): Promise<string | null>;
+  chooseFile(extensions: string[]): Promise<string | null>;
+}
+
+/**
+ * 워크스페이스 라이프사이클 및 파일 관리 인터페이스
+ */
+export interface WorkspaceLifecycle {
+  boot(seedSample?: boolean, developmentLink?: string): Promise<void>;
+  open(rawPath: string, menu?: boolean): Promise<boolean>;
+  create(rawName: string): Promise<boolean>;
+  sample(): Promise<boolean>;
+  openRecent(item: RecentWorkspace): Promise<boolean>;
+  forgetRecent(path: string): void;
+  launcher(): Promise<boolean>;
+  refresh(): Promise<void>;
+  dispose(): void;
+  waitForIdle(): Promise<void>;
+}
+
+export class WorkspaceController implements WorkspaceNavigation, WorkspacePreferences, WorkspaceHostBridge, WorkspaceLifecycle {
   readonly context: WindowContext;
   private services: WorkspaceServices;
   private state: WorkspaceState;
@@ -56,8 +106,8 @@ export class WorkspaceController {
   readonly recentNotes: RecentNotes;
   private childRemovers = new Map<symbol, { id: string; remove: (child: string) => void }>();
   private buffers = new Map<symbol, { key: string; read: () => string }>();
-  private moving = new Set<string>();
-  lastRestoreCommit: import('./types.ts').Row | null = null;
+  moving = new Set<string>();
+  lastRestoreCommit: Row | null = null;
 
   constructor(services: WorkspaceServices, context: WindowContext, route: string) {
     this.services = services;
