@@ -1,119 +1,46 @@
-import { useEffect, useSyncExternalStore } from 'react';
+// C4 모델을 엔진(`get_c4_model`, `apply_c4_changes`)과 호스트(`c4_chat`)로 읽고 쓰는 얇은 층.
+// 규칙과 검사는 엔진이 한다. 여기서는 응답 모양을 확인하고 오류를 사람이 읽는 글로 바꾼다.
+import { isRecord, explainEngineError } from '../engineClient.ts';
+import type { EngineCall } from '../engineClient.ts';
 import type { WorkspaceController } from '../../workspace/controller.ts';
+import type { C4Model, C4Operation } from './model.ts';
 
-export type ArchylProject = { id: string; name: string };
-export type C4Element = {
-  id: string;
-  name: string;
-  description: string;
-  technology: string;
-  level: number;
-  parentId: string | null;
-  kind: string;
-  position: { x: number; y: number } | null;
-  icon: string | null;
-  color: string | null;
-};
-export type C4Relationship = {
-  id: string | null;
-  source: string;
-  target: string;
-  label: string;
-  technology: string;
-};
-export type C4Model = { elements: C4Element[]; relationships: C4Relationship[] };
-export type ArchylMessage = { role: 'user' | 'assistant'; text: string; warning?: string; updated?: boolean };
-export type ArchylReply = { message: string; applied: number; warning: string | null; model: C4Model | null };
-type Connection = { writable: boolean; projects: ArchylProject[] };
-type Account = {
-  connection: Connection | null;
-  phase: 'idle' | 'checking' | 'login' | 'disconnect';
-  error: string;
-  checked: boolean;
-  revision: number;
-};
+export type C4Message = { role: 'user' | 'assistant'; text: string; warning?: string; updated?: boolean };
+export type C4Reply = { message: string; applied: number; warning: string | null; model: C4Model | null };
 
-let account: Account = { connection: null, phase: 'idle', error: '', checked: false, revision: 0 };
-let requestId = 0;
-let cancelledLogin = 0;
-const listeners = new Set<() => void>();
-const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
-const getAccount = () => account;
-function setAccount(patch: Partial<Account>) {
-  account = { ...account, ...patch };
-  listeners.forEach(listener => listener());
+export function errorText(value: unknown): string {
+  return explainEngineError(value, (_, kind) => kind === 'precondition_failed'
+    ? '다른 곳(AI나 다른 창)에서 먼저 고쳤어요. 최신 모델을 다시 불러왔어요. 한 번 더 시도해 주세요.' : undefined);
 }
 
-export const errorText = (value: unknown) =>
-  typeof value === 'string' ? value : value instanceof Error ? value.message : 'Archyl 요청을 처리하지 못했어요.';
+export const isPreconditionError = (value: unknown) =>
+  isRecord(value) && (value.kind === 'precondition_failed' || /AIS-412/.test(String(value.message ?? value.stderr ?? '')));
 
-async function change(
-  phase: Exclude<Account['phase'], 'idle'>,
-  invoke: () => Promise<Connection | null>,
-) {
-  if (account.phase !== 'idle') return;
-  const id = ++requestId;
-  setAccount({ phase, error: '' });
-  try {
-    const connection = await invoke();
-    if (id === requestId) {
-      setAccount({ connection, checked: true, revision: account.revision + (phase === 'checking' ? 0 : 1) });
-    }
-  } catch (error) {
-    if (id === requestId && id !== cancelledLogin) {
-      setAccount({ checked: true, error: errorText(error), ...(phase === 'checking' ? { connection: null } : {}) });
-    }
-  } finally {
-    if (id === requestId) setAccount({ phase: 'idle' });
+/** 엔진 응답을 모델로 읽는다. 모양이 틀리면 오류를 던진다. */
+export function readModel(value: unknown): C4Model {
+  if (!isRecord(value) || !Array.isArray(value.elements) || !Array.isArray(value.relationships)
+    || !isRecord(value.views) || typeof value.precondition !== 'string' || typeof value.project !== 'string') {
+    throw new Error('C4 모델 응답의 모양을 확인하지 못했어요.');
   }
+  return value as unknown as C4Model;
 }
 
-export const reloadAccount = (host: WorkspaceController['callHost']) =>
-  change('checking', () => host<Connection | null>('archyl_status'));
-export const loginAccount = (host: WorkspaceController['callHost'], readOnly: boolean) =>
-  change('login', () => host<Connection>('archyl_login', { readOnly }));
-export const disconnectAccount = (host: WorkspaceController['callHost']) =>
-  change('disconnect', async () => { await host('archyl_disconnect'); return null; });
-
-export async function cancelLogin(host: WorkspaceController['callHost']) {
-  if (account.phase !== 'login') return;
-  const id = requestId;
-  cancelledLogin = id;
-  try { await host('archyl_cancel_login'); }
-  catch (error) {
-    if (id === requestId) {
-      cancelledLogin = 0;
-      setAccount({ error: errorText(error) });
-    }
-  }
+export async function getC4Model(call: EngineCall, project: string): Promise<C4Model> {
+  return readModel(await call({ command: 'get_c4_model', args: { project } }));
 }
 
-export function useArchylAccount(controller: WorkspaceController) {
-  const snapshot = useSyncExternalStore(subscribe, getAccount, getAccount);
-  const native = controller.isNative();
-  const host = controller.callHost;
-  useEffect(() => { if (native) void reloadAccount(host); }, [host, native]);
-  return snapshot;
+/** 변경 묶음을 한 번에 적용한다. 읽은 모델의 확인 값을 실어 보내서, 그 사이 바뀌었으면 엔진이 아무것도 쓰지 않고 거절한다. */
+export async function applyC4Changes(call: EngineCall, model: C4Model, operations: C4Operation[]): Promise<C4Model> {
+  return readModel(await call({
+    command: 'apply_c4_changes',
+    args: { project: model.project, f1: model.precondition, operations },
+  }));
 }
 
-export const getArchylModel = (host: WorkspaceController['callHost'], projectId: string) =>
-  host<C4Model>('archyl_model', { projectId });
-export const sendArchylRequest = (
+export const sendC4Request = (
   host: WorkspaceController['callHost'],
-  projectId: string,
+  project: string,
   selectedId: string | null,
   request: string,
-  history: ArchylMessage[],
-) => host<ArchylReply>('archyl_chat', { projectId, selectedId, request, history: history.slice(-8) });
-
-export function readProjectLink(key: string): string {
-  try { return localStorage.getItem(key) ?? ''; } catch { return ''; }
-}
-
-export function writeProjectLink(key: string, value: string): boolean {
-  try {
-    if (value) localStorage.setItem(key, value);
-    else localStorage.removeItem(key);
-    return true;
-  } catch { return false; }
-}
+  history: C4Message[],
+) => host<C4Reply>('c4_chat', { project, selectedId, request, history: history.slice(-8) });

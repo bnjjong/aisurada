@@ -1,5 +1,5 @@
 // Each item is an argv cell. Values pass directly to the host, without a shell.
-export type Fields = Record<string, string | number | boolean | string[] | undefined>;
+export type Fields = Record<string, string | number | boolean | string[] | object[] | undefined>;
 const cells = (fields: Fields) => Object.entries(fields).filter(([, value]) => value !== undefined)
   .map(([key, value]) => `${key}=${Array.isArray(value) ? JSON.stringify(value) : String(value)}`);
 

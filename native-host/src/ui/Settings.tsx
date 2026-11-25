@@ -18,7 +18,6 @@ import { NoteSettings } from "./NoteSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
 import { AiSettings } from "./AiSettings.tsx";
 import { GithubConnect } from "./GithubConnect.tsx";
-import { ArchylConnect } from "./architecture/ArchylConnect.tsx";
 
 export interface SettingsLayoutViewProps {
   section: SettingsSection;
@@ -285,7 +284,6 @@ export function Settings({
     connections: (
       <SettingsPane title="연결" desc="앱이 바깥 서비스에 닿는 연결이에요. 키는 이 Mac의 키체인에만 둬요.">
         <GithubConnect controller={controller} />
-        <ArchylConnect controller={controller} />
         <SettingsGroup>
           <SettingsRow as="div" title="매니저 연결" settingKey="managers"
             desc={`에이전트 탭의 「매니저」에서 연결을 관리해요.${active.length ? ` 지금 ${active.length}개가 켜져 있어요(${projectNames.join(", ")}).` : ""}`}

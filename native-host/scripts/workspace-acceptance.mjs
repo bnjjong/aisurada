@@ -19,6 +19,7 @@ const autosaveCheck = process.argv.includes('--autosave');
 const viewsCheck = process.argv.includes('--views');
 const resourcesCheck = process.argv.includes('--resources');
 const tasksCheck = process.argv.includes('--tasks');
+const architectureCheck = process.argv.includes('--architecture');
 // 노트가 많을 때 앱이 노트를 읽어 오는 시간(이슈 #59). 점검이라기보다 재는 일이라 통과·실패 대신 숫자를 찍는다.
 const perfCheck = process.argv.includes('--perf');
 const perfNotes = Number(process.env.AIS_PERF_NOTES || 2000);
@@ -119,7 +120,7 @@ if (part4Check) {
   ].map(line => JSON.stringify(line)).join('\n') + '\n');
 }
 // `--only=<점검 이름,…>`: 편집기 점검은 그 사례만, 화면 점검(--views)은 그 점검만 돌린다(앞 점검이 깨졌을 때 한 점검을 따로 보려고)
-const cfg = { only: viewsCheck ? onlyCases : undefined, part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck || perfCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, perfCheck, perf: { notes: perfNotes }, today };
+const cfg = { only: viewsCheck ? onlyCases : undefined, part4Check, askMarksCheck, sessionId, parent: root, vault, raw: dataCheck || editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck || architectureCheck || perfCheck ? vault : vault + '/.', id, legacyId, external, rootNote, childId, childNote, grandchildNote, navigationCheck, interactionCheck, dataCheck, editorCheck, autosaveCheck, viewsCheck, resourcesCheck, tasksCheck, architectureCheck, perfCheck, perf: { notes: perfNotes }, today };
 const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
 // 앱이 엔진을 부르는 길은 둘이다: 문자열 목록을 받는 `sidecar_call`과 호출 객체를 받는 `engine_call`. 호스트가 두 길의 호출을 이 파일에 적고
 // (`AISURADA_CALL_LOG`), 점검은 어느 길로 갔든 같은 문자열 목록(argv)으로 센다.
@@ -187,6 +188,12 @@ if (tasksCheck) {
   }
   cfg.tasks = { seededKey: seeded.key };
 }
+if (architectureCheck) {
+  // C4 아키텍처: 프로젝트 하나(모델은 없다). 요소와 관계는 화면에서 만들고, 엔진이 쓴 값을 점검이 다시 읽는다.
+  await cliRun(['init-workspace', 'name=검증 공간', 'templates=[]']);
+  const project = await cliRun(['create-project', 'title=아키텍처 점검']);
+  cfg.architecture = { projectSlug: project.slug };
+}
 let finish, noteResult;
 const completed = new Promise(resolve => { finish = resolve; });
 const boot = `window.__AIS_FIXTURE__=${JSON.stringify(cfg)};
@@ -218,7 +225,7 @@ const server = createServer(async (req, res) => {
   }
   if (path === '/bootstrap.js' || path === '/workspace-checks.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });
-    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, perfCheck ? 'scripts/perf-checks.js' : resourcesCheck ? 'scripts/resources-checks.js' : tasksCheck ? 'scripts/tasks-checks.js' : askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
+    res.end(path === '/bootstrap.js' ? boot : dataCheck || autosaveCheck ? dataDriver : readFileSync(join(host, perfCheck ? 'scripts/perf-checks.js' : resourcesCheck ? 'scripts/resources-checks.js' : tasksCheck ? 'scripts/tasks-checks.js' : architectureCheck ? 'scripts/architecture-checks.js' : askMarksCheck ? 'scripts/part4-checks.js' : viewsCheck ? 'scripts/views-checks.js' : editorCheck ? 'scripts/editor-checks.js' : interactionCheck ? 'scripts/interaction-checks.js' : navigationCheck ? 'scripts/navigation-checks.js' : 'scripts/workspace-checks.js'))); return;
   }
   if (probeAssets.has(path)) { res.writeHead(200, { 'Content-Type': path.endsWith('.css') ? 'text/css' : 'text/javascript' }); res.end(probeAssets.get(path)); return; }
   if (path.startsWith('/assets/')) {
@@ -288,7 +295,7 @@ try {
     ? start('cargo', ['run', '--manifest-path', join(host, 'src-tauri/Cargo.toml'), '--no-default-features', '--'])
     : start(join(host, 'node_modules/.bin/tauri'), ['dev', ...(perfCheck ? ['--release'] : []), '--config', override, '--no-watch', '--', ...(claudeHost ? [] : ['--no-default-features'])]);
   app.on('exit', code => { if (code) finish([{ id: 'native-process', ok: false, error: `exited ${code}` }]); });
-  timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), perfCheck ? 1_800_000 : editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck ? 420_000 : 180_000);
+  timer = setTimeout(() => finish([{ id: 'timeout', ok: false, error: 'No page result within fixture deadline' }]), perfCheck ? 1_800_000 : editorCheck || autosaveCheck || viewsCheck || resourcesCheck || tasksCheck || architectureCheck ? 420_000 : 180_000);
   results = await completed;
   if (!results.length || results.some(result => !result.ok)) throw Error('Workspace checks failed');
   if (!existsSync(join(vault, '.aisurada/workspace.json')) || existsSync(join(vault, 'notes/demo/legacy.md'))) throw Error('Workspace initialization or migration missing on disk');
