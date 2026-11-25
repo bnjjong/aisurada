@@ -116,8 +116,8 @@ export function Diagram({
     for (const edge of edges) {
       const active = edge.id === selectedRelationship;
       context.strokeStyle = context.fillStyle = active ? accent : stroke;
-      context.globalAlpha = active ? 1 : .9;
-      context.lineWidth = (active ? 2.3 : 1.55) / scale;
+      context.globalAlpha = active ? 1 : .85;
+      context.lineWidth = (active ? 2.2 : 1.3) / scale;
       context.beginPath();
       context.moveTo(edge.start.x, edge.start.y);
       context.bezierCurveTo(edge.a.x, edge.a.y, edge.b.x, edge.b.y, edge.end.x, edge.end.y);
@@ -279,7 +279,10 @@ export function Diagram({
             onClick={() => { if (!suppressClick.current) selectElement(item.id); }}
             onDoubleClick={() => drill(item.id)}
           >
-            <span className="c4-card-kind"><span className="c4-card-icon"><Icon name={iconFor(item)} size={15} /></span>{KIND_LABELS[item.kind] ?? '요소'}</span>
+            <span className="c4-card-head">
+              <span className="c4-card-icon"><Icon name={iconFor(item)} size={18} /></span>
+              <span className="c4-card-kind">{KIND_LABELS[item.kind] ?? '요소'}</span>
+            </span>
             <strong>{item.name}</strong>
             {item.description && <span className="c4-card-description">{item.description}</span>}
             {item.technology && <span className="c4-card-tech">{item.technology}</span>}
