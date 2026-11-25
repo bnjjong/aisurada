@@ -1,5 +1,5 @@
 (function () {
-  let last = -1, timer = 0;
+  let lastReportedHeight = null, timer = 0;
   // 문서의 아래쪽 끝을 잰다. overflow가 hidden·clip·scroll·auto인 조상 안에서 잘려 보이지 않는 부분은
   // 넣지 않는다. 지도 타일처럼 상자 밖으로 삐져나온 자손이 높이를 부풀려 아래에 빈 띠를 만들거나
   // 상한(1600px)을 넘기는 것을 막기 위해서다.
@@ -35,8 +35,14 @@
     if (!document.body) return;
     const bottom = documentBottom();
     const style = getComputedStyle(document.body);
-    const height = Math.ceil(bottom + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.marginBottom) || 0));
-    if (height !== last) { last = height; parent.postMessage({aisframeHeight: height}, '*'); }
+    const measuredHeight = bottom + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.marginBottom) || 0);
+    const height = Math.ceil(measuredHeight);
+    if (height === lastReportedHeight) return;
+    // 첨부 칸 높이가 바뀔 때 문서가 다시 배치되며 생기는 작은 축소를 걸러 반복을 끊는다.
+    // 올림 전 높이로 비교해야 첨부 아래에 남는 빈 띠가 3px 이하다.
+    if (lastReportedHeight !== null && height < lastReportedHeight && lastReportedHeight - measuredHeight <= 3) return;
+    lastReportedHeight = height;
+    parent.postMessage({ aisframeHeight: height }, '*');
   }
   function schedule() { if (!timer) timer = setTimeout(send, 30); }
   if (document.body) {
