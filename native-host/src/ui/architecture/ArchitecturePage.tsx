@@ -202,42 +202,45 @@ function ProjectArchitecture({ project, name, controller }: {
                 </select>
               </label>
             )}
-            {model ? (
-              <Diagram
-                key={level + ':' + (parentKey ?? '')}
-                elements={visible}
-                relationships={model.relationships}
-                positions={positions}
-                selectedElement={selectedElement}
-                selectedRelationship={selectedRelationship}
-                selectElement={pickElement}
-                selectRelationship={pickRelationship}
-                drill={drill}
-                onMove={moveNodes}
-                onConnect={canAdd ? (source, target, sourcePort, targetPort) => { setNotice(''); setConnect(null); setDialog({ type: 'relation', source, target, sourcePort, targetPort }); } : undefined}
-                onReconnect={(id, change) => {
-                  setNotice('');
-                  void mutate([{ op: 'put_relationship', id, ...change }]).then(failure => setNotice(failure ?? ''));
-                }}
-                resetKey={resetKey}
-                connecting={connect !== null}
-                emptyText={emptyText}
-              />
-            ) : <div className="c4-empty"><p role={loading ? 'status' : undefined}>{loading ? '다이어그램을 불러오고 있어요.' : '다시 불러오기를 눌러 주세요.'}</p></div>}
-            {model && (
-              <section className="c4-details" aria-label="선택한 항목" aria-live="polite">
-                <Details
-                  model={model}
-                  element={element}
-                  relation={relation}
-                  edit={() => setDialog(element ? { type: 'element', existing: element } : { type: 'relation', existing: relation })}
-                  remove={() => setDialog({ type: 'delete', target: element ? { kind: 'element', id: element.id } : { kind: 'relationship', id: relation!.id } })}
-                  connect={() => setDialog({ type: 'relation', source: element?.id })}
-                  open={element && (element.kind === 'system' || element.kind === 'container') ? () => drill(element.id) : undefined}
-                  pickRelation={pickRelationship}
+            <div className="c4-diagram-wrap">
+              {model ? (
+                <Diagram
+                  key={level + ':' + (parentKey ?? '')}
+                  elements={visible}
+                  relationships={model.relationships}
+                  positions={positions}
+                  selectedElement={selectedElement}
+                  selectedRelationship={selectedRelationship}
+                  selectElement={pickElement}
+                  selectRelationship={pickRelationship}
+                  drill={drill}
+                  onMove={moveNodes}
+                  onConnect={canAdd ? (source, target, sourcePort, targetPort) => { setNotice(''); setConnect(null); setDialog({ type: 'relation', source, target, sourcePort, targetPort }); } : undefined}
+                  onReconnect={(id, change) => {
+                    setNotice('');
+                    void mutate([{ op: 'put_relationship', id, ...change }]).then(failure => setNotice(failure ?? ''));
+                  }}
+                  resetKey={resetKey}
+                  connecting={connect !== null}
+                  emptyText={emptyText}
                 />
-              </section>
-            )}
+              ) : <div className="c4-empty"><p role={loading ? 'status' : undefined}>{loading ? '다이어그램을 불러오고 있어요.' : '다시 불러오기를 눌러 주세요.'}</p></div>}
+              {model && (element || relation) && (
+                <aside className="c4-details" aria-label="선택한 항목" aria-live="polite">
+                  <Details
+                    model={model}
+                    element={element}
+                    relation={relation}
+                    edit={() => setDialog(element ? { type: 'element', existing: element } : { type: 'relation', existing: relation })}
+                    remove={() => setDialog({ type: 'delete', target: element ? { kind: 'element', id: element.id } : { kind: 'relationship', id: relation!.id } })}
+                    connect={() => setDialog({ type: 'relation', source: element?.id })}
+                    open={element && (element.kind === 'system' || element.kind === 'container') ? () => drill(element.id) : undefined}
+                    pickRelation={pickRelationship}
+                    onClose={() => { setSelectedElement(null); setSelectedRelationship(null); }}
+                  />
+                </aside>
+              )}
+            </div>
           </div>
         </div>
       </div>
