@@ -8,7 +8,7 @@
 
 use serde_json::Value;
 
-use super::{Engine, acquire_lock, finish, parse_args};
+use super::{Engine, acquire_lock, check_workspace_marker, finish, parse_args};
 use crate::commands::{
     agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, decisions,
     doc_create, doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc,
@@ -19,12 +19,18 @@ use crate::commands::{
     template_write, trash_write, write_attachment,
 };
 use crate::error::EngineError;
-use crate::kernel::actor::CallContext;
+use crate::kernel::actor::{CallContext, ManagerContext};
 use crate::vault::index::NoteIndex;
 
 pub use intake_commands::IntakeOperation;
 
 impl Engine {
+    pub fn manager_work_today(&self, managers: &[ManagerContext]) -> Result<Value, EngineError> {
+        let _installed = self.install_ports();
+        check_workspace_marker(&self.vault_root)?;
+        task_commands::manager_work_today(&self.vault_root, managers)
+    }
+
     /// 등록된 매니저의 접수 도구와 앱의 접수 관리가 함께 쓰는 입구다.
     pub fn call_intake(
         &self,

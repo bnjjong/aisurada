@@ -3,14 +3,14 @@
 //! ```text
 //! .aisurada/tasks/
 //!   TSK-14.md                  태스크(머리말 + 설명)
-//!   TSK-14/activity.jsonl      활동(만들기, 상태 바뀜, 고침, 연결, 댓글). 한 줄에 사건 하나, 최근 500줄까지
+//!   TSK-14/activity.jsonl      상세 활동 최근 500줄과 오늘 집계에 쓰는 매니저 댓글
 //!   .trash/<id>/               지운 태스크
 //! ```
 //!
 //! 연결은 건 쪽 파일에만 적고 반대쪽(막혀 있음 따위)은 읽을 때 계산하므로 두 파일이 어긋날 일이 없다.
 
-use crate::ports::fs;
-use std::collections::HashSet;
+use crate::ports::{clock, fs};
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use serde_json::Value as Json;
@@ -20,7 +20,7 @@ use super::format::{self, KEY, MAX_FILE_BYTES};
 use super::{Task, TaskStatus};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
-use crate::kernel::stamp::Stamp;
+use crate::kernel::{actor::ManagerContext, stamp::Stamp, time::parse_instant};
 use crate::kernel::token::compute_token;
 use crate::text::compare_utf16;
 use crate::vault::project::scan_projects;
@@ -30,6 +30,7 @@ use crate::write::sub_note::remove_tree;
 
 pub const ROOT: &str = ".aisurada/tasks";
 pub const ACTIVITY_KEEP: usize = 500;
+const RECENT_WORK_MILLIS: i64 = 48 * 60 * 60 * 1000;
 
 pub struct TrashEntry {
     pub id: String,
@@ -191,6 +192,7 @@ pub fn create(
     stamp: &Stamp,
     actor: &str,
     receipt: Option<&str>,
+    manager: Option<&ManagerContext>,
 ) -> Result<Task, EngineError> {
     if let Some(project) = &new.project {
         require_project(vault, project)?;
@@ -206,9 +208,13 @@ pub fn create(
         }
     };
     let path = file_path(vault, &key);
-    let (mut task, event) = new.into_task(key.clone(), id, rel(vault, &path), stamp, actor);
+    let (mut task, mut event) = new.into_task(key.clone(), id, rel(vault, &path), stamp, actor);
     if let Some(receipt) = receipt {
         task.set_intake_receipt(receipt);
+    }
+    if let Some(manager) = manager {
+        task.record_manager_project(&manager.project_id);
+        event.record_manager_project(&manager.project_id);
     }
     let bytes = format::render(&task)?;
     write_atomic(&path, &bytes)?;
@@ -332,8 +338,12 @@ pub fn comment(
     body: &str,
     stamp: &Stamp,
     actor: &str,
+    manager: Option<&ManagerContext>,
 ) -> Result<Json, EngineError> {
-    let event = task.comment(body, stamp, actor);
+    let mut event = task.comment(body, stamp, actor);
+    if let Some(manager) = manager {
+        event.record_manager_project(&manager.project_id);
+    }
     append_activity(vault, &task.key, &event)?;
     Ok(activity_json(&event.to_json_value()))
 }
@@ -390,8 +400,17 @@ fn append_activity(vault: &Path, key: &str, event: &TaskEvent) -> Result<(), Eng
         }
     }
     lines.push(json::compact(&event.to_json_value()));
-    while lines.len() > ACTIVITY_KEEP {
-        lines.remove(0);
+    if lines.len() > ACTIVITY_KEEP {
+        let recent = lines.split_off(lines.len() - ACTIVITY_KEEP);
+        let cutoff = now_millis() - RECENT_WORK_MILLIS;
+        // 상세 활동 기록이 잘려도 오늘 매니저가 남긴 댓글은 계속 집계할 수 있다.
+        lines.retain(|line| {
+            let Some(event) = activity_line(line) else {
+                return false;
+            };
+            manager_comment(&event).is_some_and(|(_, at)| at >= cutoff)
+        });
+        lines.extend(recent);
     }
     write_atomic(&path, format!("{}\n", lines.join("\n")).as_bytes())
 }
@@ -428,24 +447,105 @@ fn is_long_text(text: &str) -> bool {
 
 /// 활동을 오래된 것부터 읽는다. `limit`이 양수면 가장 최근 그만큼만 낸다. 못 읽는 줄은 건너뛴다.
 pub fn activity(vault: &Path, key: &str, limit: usize) -> Result<Vec<Json>, EngineError> {
-    let path = activity_path(vault, key);
-    if !is_file(&path) {
+    read_activity(vault, &activity_path(vault, key), limit)
+}
+
+fn read_activity(vault: &Path, path: &Path, limit: usize) -> Result<Vec<Json>, EngineError> {
+    if !is_file(path) {
         return Ok(Vec::new());
     }
-    let text = read_activity_text(vault, &path)?;
-    let mut out: Vec<Json> = Vec::new();
-    for line in read_lines(&text) {
-        if format::java_blank(line) {
-            continue;
-        }
-        if let Ok(parsed @ JsonValue::Object(_)) = json::parse(line) {
-            out.push(activity_json(&parsed));
-        }
-    }
+    let text = read_activity_text(vault, path)?;
+    let mut out: Vec<Json> = read_lines(&text).into_iter().filter_map(activity_line).collect();
     if limit > 0 && out.len() > limit {
         out.drain(..out.len() - limit);
     }
     Ok(out)
+}
+
+fn activity_line(line: &str) -> Option<Json> {
+    let parsed @ JsonValue::Object(_) = json::parse(line).ok()? else {
+        return None;
+    };
+    Some(activity_json(&parsed))
+}
+
+fn work_time(value: &str) -> Option<i64> {
+    i64::try_from(parse_instant(value)?.div_euclid(1_000_000)).ok()
+}
+
+fn manager_comment(event: &Json) -> Option<(&str, i64)> {
+    if event["kind"] != "comment" {
+        return None;
+    }
+    Some((event["manager"].as_str()?, work_time(event["at"].as_str()?)?))
+}
+
+struct ManagerWork<'a> {
+    manager: &'a ManagerContext,
+    tasks: usize,
+    comments: usize,
+}
+
+impl ManagerWork<'_> {
+    fn matches_project(&self, task: &Task, recorded_id: Option<&str>) -> bool {
+        recorded_id.map_or_else(
+            || task.project.as_deref() == Some(self.manager.project.as_str()),
+            |id| id == self.manager.project_id,
+        )
+    }
+}
+
+pub fn manager_work_today(vault: &Path, managers: &[ManagerContext]) -> Result<Json, EngineError> {
+    if managers.is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    let mut work: BTreeMap<_, _> = managers.iter().map(|manager| (
+        manager.name.as_str(),
+        ManagerWork { manager, tasks: 0, comments: 0 },
+    )).collect();
+    let clock = clock();
+    let now = clock.now_millis();
+    let today = clock.local_clock(now).date;
+    let is_today = |at: i64| {
+        (now - RECENT_WORK_MILLIS..=now).contains(&at) && clock.local_clock(at).date == today
+    };
+    let mut count = |task: &Task, activity: &Path| -> Result<(), EngineError> {
+        if let Some(row) = task.manager.as_deref().and_then(|name| work.get_mut(name))
+            && row.matches_project(task, task.manager_project_id())
+            && work_time(&task.created_at).is_some_and(is_today)
+        {
+            row.tasks += 1;
+        }
+        for event in read_activity(vault, activity, 0)? {
+            if let Some((manager, at)) = manager_comment(&event)
+                && let Some(row) = work.get_mut(manager)
+                && row.matches_project(task, event["managerProjectId"].as_str())
+                && is_today(at)
+            {
+                row.comments += 1;
+            }
+        }
+        Ok(())
+    };
+
+    let scan = scan(vault);
+    for task in &scan.items {
+        count(task, &activity_path(vault, &task.key))?;
+    }
+    for deleted in trash(vault) {
+        if scan.by_id(&deleted.id).is_some() {
+            continue;
+        }
+        let folder = root(vault).join(".trash").join(&deleted.id);
+        if let Ok(task) = read_task(&folder.join("item.md"), &deleted.rel_path)
+            && task.id == deleted.id
+        {
+            count(&task, &folder.join("activity/activity.jsonl"))?;
+        }
+    }
+    Ok(Json::Object(work.into_iter().map(|(name, row)| (
+        name.into(), serde_json::json!({"tasks": row.tasks, "comments": row.comments}),
+    )).collect()))
 }
 
 // ---------------------------------------------------------------- 지우기·되살리기

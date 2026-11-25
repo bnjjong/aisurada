@@ -66,6 +66,7 @@ pub struct TaskEvent {
     stamp: Stamp,
     by: String,
     kind: EventKind,
+    manager_project_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -100,7 +101,12 @@ impl TaskEvent {
             stamp: stamp.clone(),
             by: actor.to_string(),
             kind,
+            manager_project_id: None,
         }
+    }
+
+    pub fn record_manager_project(&mut self, id: &str) {
+        self.manager_project_id = Some(id.into());
     }
 
     /// 활동 파일에 붙는 모양. 칸 차례는 `at`, `kind`, `by`, (`session`, `agent`), 사건마다 다른 칸이다.
@@ -127,6 +133,9 @@ impl TaskEvent {
         }
         if let Some(manager) = &self.stamp.manager {
             entries.push(("manager".to_string(), text(manager)));
+        }
+        if let Some(project) = &self.manager_project_id {
+            entries.push(("managerProjectId".to_string(), text(project)));
         }
         match &self.kind {
             EventKind::Created => {}

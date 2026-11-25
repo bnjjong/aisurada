@@ -315,7 +315,12 @@ fn detail(
             })
             .collect::<Vec<_>>()
     );
-    m["activity"] = json!(store::activity(vault, &task.key, activity_limit)?);
+    let visible_activity = if activity_limit == 0 {
+        store::ACTIVITY_KEEP
+    } else {
+        activity_limit.min(store::ACTIVITY_KEEP)
+    };
+    m["activity"] = json!(store::activity(vault, &task.key, visible_activity)?);
     if let Some(token) = &task.token {
         m["precondition"] = json!(token);
     }
@@ -343,7 +348,7 @@ pub(super) fn create_intake_task(
     receipt: Option<&str>,
 ) -> Result<Task, EngineError> {
     let (task, actor) = prepare_task(vault, request, context)?;
-    store::create(vault, task, &stamp_of(context), &actor, receipt)
+    store::create(vault, task, &stamp_of(context), &actor, receipt, context.manager.as_ref())
 }
 
 pub(super) fn prepare_task(
@@ -487,7 +492,7 @@ pub fn add_task_comment(
     }
     let body = format::comment(request.body.as_deref().unwrap_or(""))?;
     let actor = actor_of(&request.actor)?;
-    let ev = store::comment(vault, task, &body, &stamp_of(&context), &actor)?;
+    let ev = store::comment(vault, task, &body, &stamp_of(context), &actor, context.manager.as_ref())?;
     Ok(json!({"key": task.key, "comment": ev}))
 }
 
@@ -660,4 +665,8 @@ pub fn get_task(vault: &Path, request: &GetTaskRequest, context: &CallContext) -
         value["intakeSources"] = sources;
     }
     Ok(value)
+}
+
+pub(crate) fn manager_work_today(vault: &Path, managers: &[ManagerContext]) -> Result<Json, EngineError> {
+    store::manager_work_today(vault, managers)
 }

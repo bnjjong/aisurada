@@ -22,6 +22,7 @@ import { refreshDecisions, resetDecisionsStore, startDecisionsWatch } from './ui
 import { refreshRunner, runnerChanged } from './ui/runnerStore.ts';
 import { NotificationToasts } from './ui/NotificationCenter.tsx';
 import { ManagersProvider } from './ui/managersStore.tsx';
+import { parseRoute } from './navigation/routes.ts';
 import { MoveUndoToast } from './ui/MoveUndo.tsx';
 
 // Window identity is decided once, before any internal navigation.
@@ -164,9 +165,11 @@ function WorkspaceApp() {
       )}
     </main>;
   }
+  const dashboardRoute = parseRoute(state.route).kind;
+  const showManagerWork = dashboardRoute === 'managers' || dashboardRoute === 'manager' || dashboardRoute === 'project';
   return <>
     {!state.workspace || state.route.split('?')[0] === '/launcher'
-      ? <Launcher controller={controller} state={state} /> : <ManagersProvider key={state.workspace.path} controller={controller} workspace={state.workspace}>
+      ? <Launcher controller={controller} state={state} /> : <ManagersProvider key={state.workspace.path} controller={controller} workspace={state.workspace} showWork={showManagerWork}>
         <WorkspaceShell controller={controller} state={state} />
       </ManagersProvider>}
     {state.notice && <NoticeBox notice={state.notice} onClose={controller.clearNotice} />}
