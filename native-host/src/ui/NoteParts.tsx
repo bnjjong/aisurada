@@ -13,6 +13,7 @@ import { Icon } from "./Icon.tsx";
 import { sessionAgentId, sessionAgentLabel } from "./AgentMark.tsx";
 import { History } from "./History.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
+import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 import {
   TYPE_NAMES,
   HUE_COLORS,
@@ -495,30 +496,11 @@ function Evaluation({
     rangeRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const outside = (e: PointerEvent) => {
-      if (
-        !box.current?.contains(e.target as Node) &&
-        !(e.target as Element).closest(".doc-eval-badge")
-      )
-        close();
-    };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, [close]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation?.();
-        close();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [close]);
+  usePopoverDismiss({
+    ref: box,
+    onClose: close,
+    shouldIgnoreTarget: (target) => !!(target as Element).closest?.(".doc-eval-badge"),
+  });
 
   const save = () => {
     void controller.data.evaluate(note.id, score, memo);

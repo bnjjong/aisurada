@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon.tsx";
+import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 
 export function PickerPopover({
   anchor,
@@ -45,23 +46,22 @@ export function PickerPopover({
     });
   }, [anchor, dialog]);
 
+  usePopoverDismiss({
+    ref: box,
+    anchorRef: anchor,
+    onClose,
+    enabled: !!place,
+    restoreFocus: true,
+    closeOnScroll: true,
+    closeOnResize: true,
+  });
+
   useEffect(() => {
     if (!place) return;
     const panel = box.current;
     (panel?.querySelector<HTMLElement>("[data-picker-search]") ?? panel)?.focus({ preventScroll: true });
 
-    const outside = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!panel?.contains(target) && !anchor.current?.contains(target)) onClose();
-    };
     const keys = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-        anchor.current?.focus({ preventScroll: true });
-        return;
-      }
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       const buttons = [...(panel?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
       if (!buttons.length) return;
@@ -72,22 +72,12 @@ export function PickerPopover({
         : current <= 0 ? buttons.length - 1 : current - 1;
       buttons[next].focus();
     };
-    const close = (event: Event) => {
-      if (event.type === "scroll" && panel?.contains(event.target as Node)) return;
-      onClose();
-    };
 
-    document.addEventListener("pointerdown", outside);
     window.addEventListener("keydown", keys, true);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
     return () => {
-      document.removeEventListener("pointerdown", outside);
       window.removeEventListener("keydown", keys, true);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
     };
-  }, [anchor, onClose, place]);
+  }, [place]);
 
   return createPortal(
     <div className="agenda-picker act-menu" role="dialog" aria-label={label}

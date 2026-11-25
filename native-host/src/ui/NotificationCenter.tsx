@@ -1,6 +1,6 @@
 // 알림 센터(레일의 종 단추가 여는 목록)와 앱 안 토스트. 알림을 쌓고 보내는 일은 호스트가 하고(`notificationsStore.ts`),
 // 이 화면은 목록을 보이고 읽음으로 바꾸고 태스크로 데려다 줄 뿐이다.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { WorkspaceController } from "../workspace/controller.ts";
@@ -10,6 +10,7 @@ import { docAddress, managerAddress, subAddress, taskAddress } from "../navigati
 import { formatRelativeTime } from "./dates.ts";
 import { dismissToast, kindLabel, markRead, useNotifications, visibleItems } from "./notificationsStore.ts";
 import type { NotifyItem, NotifyKind } from "./notificationsStore.ts";
+import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 
 const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", manager: "접", "intake-question": "?", test: "i" };
 
@@ -191,22 +192,11 @@ function Popover({ anchor, onClose, children }: { anchor: RefObject<HTMLElement 
     const rect = anchor.current?.getBoundingClientRect();
     if (rect) setPlace({ top: rect.bottom + 8, left: Math.max(8, Math.min(rect.left, window.innerWidth - 400)) });
   }, [anchor]);
-  useEffect(() => {
-    const outside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (box.current?.contains(target) || anchor.current?.contains(target)) return;
-      onClose();
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", outside);
-      document.removeEventListener("keydown", key);
-    };
-  }, [anchor, onClose]);
+  usePopoverDismiss({
+    ref: box,
+    anchorRef: anchor,
+    onClose,
+  });
   if (!place) return null;
   return createPortal(
     <div className="ntf-pop" ref={box} style={{ top: place.top, left: place.left }}>
