@@ -80,7 +80,7 @@ fn a_new_project_has_an_empty_model_and_edits_write_two_files() {
             {"op":"put_element","id":"me","kind":"person","name":"개발자"},
             {"op":"put_element","id":"app","kind":"system","name":"aisurada"},
             {"op":"put_relationship","source":"me","target":"app","label":"지시"},
-            {"op":"set_positions","view":"context","positions":{"me":{"x":1,"y":2},"app":{"x":300,"y":2}}}
+            {"op":"set_positions","view":"context","positions":{"me":{"x":1,"y":2},"app":{"x":300,"y":2},"r1":{"x":150,"y":50}}}
         ]),
     )
     .unwrap();
@@ -99,6 +99,7 @@ fn a_new_project_has_an_empty_model_and_edits_write_two_files() {
     assert_eq!(again["precondition"], applied["precondition"]);
     assert_eq!(again["elements"], applied["elements"]);
     assert_eq!(again["views"]["context"]["app"], json!({"x": 300, "y": 2}));
+    assert_eq!(again["views"]["context"]["r1"], json!({"x": 150, "y": 50}));
 }
 
 #[test]

@@ -155,6 +155,10 @@ impl Model {
         self.elements.iter().find(|element| element.id == id)
     }
 
+    pub fn relationship(&self, id: &str) -> Option<&Relationship> {
+        self.relationships.iter().find(|relationship| relationship.id == id)
+    }
+
     /// 모델이 규칙에 맞는지 검사한다. 파일을 읽을 때와 변경을 적용한 뒤에 부른다.
     pub fn validate(&self) -> Result<(), EngineError> {
         if self.elements.len() > MAX_ELEMENTS {
@@ -292,11 +296,11 @@ impl Views {
             .is_some_and(|element| element.kind == want)
     }
 
-    /// 없어진 요소의 좌표와 범위를 잃은 뷰를 지운다.
+    /// 없어진 요소·관계의 좌표와 범위를 잃은 뷰를 지운다.
     pub fn prune(&mut self, model: &Model) {
         self.views.retain(|view, _| Self::scope_exists(view, model));
         for positions in self.views.values_mut() {
-            positions.retain(|id, _| model.element(id).is_some());
+            positions.retain(|id, _| model.element(id).is_some() || model.relationship(id).is_some());
         }
         self.views.retain(|_, positions| !positions.is_empty());
     }
@@ -308,8 +312,8 @@ impl Views {
                 return Err(invalid(format!("뷰가 가리키는 범위가 없다: {view}")));
             }
             for (id, position) in positions {
-                if model.element(id).is_none() {
-                    return Err(invalid(format!("뷰 {view}의 요소가 없다: {id}")));
+                if model.element(id).is_none() && model.relationship(id).is_none() {
+                    return Err(invalid(format!("뷰 {view}의 요소나 관계가 없다: {id}")));
                 }
                 if position.x.abs() > MAX_COORDINATE || position.y.abs() > MAX_COORDINATE {
                     return Err(invalid(format!("뷰 {view}의 {id} 좌표가 범위를 넘는다")));

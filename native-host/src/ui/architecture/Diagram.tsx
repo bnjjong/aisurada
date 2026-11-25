@@ -85,6 +85,7 @@ export function Diagram({
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   const panned = useRef(false);
   const grab = useRef<{ id: string; pointer: number; x: number; y: number; origin: Point; last: Point; active: boolean } | null>(null);
+  const grabLabel = useRef<{ id: string; pointer: number; x: number; y: number; origin: Point; last: Point; active: boolean } | null>(null);
   const suppressClick = useRef(false);
   const [moved, setMoved] = useState<Record<string, Point>>({});
   const placed = useMemo(() => positionNodes(elements, positions), [elements, positions]);
@@ -267,7 +268,8 @@ export function Diagram({
       context.closePath();
       context.fill();
     }
-    const nextLabels = placeLabels(edges, nodes, { ...area, x, y, scale }, selectedRelationship, title => context.measureText(title).width, labelUnit);
+    const effectivePositions = { ...positions, ...moved };
+    const nextLabels = placeLabels(edges, nodes, { ...area, x, y, scale }, selectedRelationship, title => context.measureText(title).width, labelUnit, effectivePositions);
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.strokeStyle = stroke;
     context.globalAlpha = .8;
@@ -280,7 +282,7 @@ export function Diagram({
       context.stroke();
     }
     setLabels(nextLabels);
-  }, [area, edges, nodes, scale, selectedRelationship, x, y]);
+  }, [area, edges, labelUnit, moved, nodes, positions, scale, selectedRelationship, x, y]);
 
   useLayoutEffect(() => {
     const target = flowCanvas.current;
@@ -364,7 +366,43 @@ export function Diagram({
     suppressClick.current = true;
     setTimeout(() => { suppressClick.current = false; }, 0);
     // 끌던 카드는 마지막 좌표를 쓴다. 이벤트가 빨리 이어지면 아직 다시 그리기 전이라 `nodes`가 낡을 수 있다.
-    onMove({ ...Object.fromEntries(nodes.map(item => [item.id, { x: Math.round(item.x), y: Math.round(item.y) }])), [current.id]: current.last });
+    const next: Record<string, Point> = { ...positions };
+    for (const item of nodes) next[item.id] = { x: Math.round(item.x), y: Math.round(item.y) };
+    next[current.id] = current.last;
+    onMove(next);
+  }
+
+  function startGrabLabel(event: PointerEvent<HTMLButtonElement>, edgeId: string, currentCenter: Point) {
+    if (!onMove || event.button !== 0) return;
+    event.stopPropagation();
+    const origin = positions[edgeId] ?? toWorld(currentCenter, { x: pixelX, y: pixelY }, scale);
+    grabLabel.current = { id: edgeId, pointer: event.pointerId, x: event.clientX, y: event.clientY, origin, last: origin, active: false };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* 이미 끝난 포인터 */ }
+  }
+
+  function moveGrabLabel(event: PointerEvent<HTMLButtonElement>) {
+    const current = grabLabel.current;
+    if (!current || current.pointer !== event.pointerId) return;
+    const dx = event.clientX - current.x;
+    const dy = event.clientY - current.y;
+    if (!current.active && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    if (!current.active) setLocked(frame => frame ?? natural);
+    current.active = true;
+    current.last = { x: Math.round(current.origin.x + dx / scale), y: Math.round(current.origin.y + dy / scale) };
+    setMoved(previous => ({ ...previous, [current.id]: current.last }));
+  }
+
+  function endGrabLabel(event: PointerEvent<HTMLButtonElement>) {
+    const current = grabLabel.current;
+    if (!current || current.pointer !== event.pointerId) return;
+    grabLabel.current = null;
+    if (!current.active || !onMove) return;
+    suppressClick.current = true;
+    setTimeout(() => { suppressClick.current = false; }, 0);
+    const next: Record<string, Point> = { ...positions };
+    for (const item of nodes) next[item.id] = { x: Math.round(item.x), y: Math.round(item.y) };
+    next[current.id] = current.last;
+    onMove(next);
   }
 
   const toScreen = (point: Point): Point => ({ x: pixelX + point.x * scale, y: pixelY + point.y * scale });
@@ -476,7 +514,13 @@ export function Diagram({
             title={title}
             aria-label={title}
             aria-pressed={edge.id === selectedRelationship}
-            onClick={() => selectRelationship(edge.id)}
+            data-dragging={Boolean(moved[edge.id])}
+            data-movable={Boolean(onMove)}
+            onPointerDown={event => startGrabLabel(event, edge.id, center)}
+            onPointerMove={moveGrabLabel}
+            onPointerUp={endGrabLabel}
+            onPointerCancel={endGrabLabel}
+            onClick={() => { if (!suppressClick.current) selectRelationship(edge.id); }}
           >{caption}</button>
         );
       })}

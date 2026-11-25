@@ -306,6 +306,21 @@ export function measureEdge(edge: DiagramEdge): (progress: number) => Point {
   };
 }
 
+export function nearestAnchorOnCurve(edge: DiagramEdge, point: Point, project: (p: Point) => Point): Point {
+  let closest = project(pointOnCurve(edge, 0.5));
+  let minDistance = Math.hypot(point.x - closest.x, point.y - closest.y);
+  for (let step = 0; step <= 40; step++) {
+    const t = step / 40;
+    const pt = project(pointOnCurve(edge, t));
+    const dist = Math.hypot(point.x - pt.x, point.y - pt.y);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closest = pt;
+    }
+  }
+  return closest;
+}
+
 export function placeLabels(
   edges: DiagramEdge[],
   nodes: DiagramNode[],
@@ -314,6 +329,8 @@ export function placeLabels(
   measure: (text: string) => number,
   /** 라벨을 카드와 같은 비율로 키우는 배율. 글자, 여백, 높이, 후보 너비를 함께 곱한다. `measure`도 같은 배율의 글꼴로 재야 한다. */
   unit = 1,
+  /** 사용자가 직접 옮겨 둔 라벨의 월드 좌표. 있으면 이 위치를 우선 쓴다. */
+  positions?: Record<string, Point>,
 ): DiagramLabel[] {
   const project = (point: Point) => ({
     x: view.x + point.x * view.scale,
@@ -339,6 +356,23 @@ export function placeLabels(
     if (view.scale < .3 && edge.id !== selected) continue;
     // 좌우 여백 14와 테두리 2를 더한다(`architecture.css`의 `.c4-edge`와 같은 값이다)
     const textWidth = Math.ceil(measure(title)) + 14 * unit + 2;
+
+    // 사용자가 직접 위치를 지정한 경우 우선 배치한다
+    const custom = positions?.[edge.id];
+    if (custom) {
+      const center = project(custom);
+      const width = Math.min(maxWidth, textWidth);
+      const height = textWidth > width ? Math.round(36 * unit + 2) : Math.round(20 * unit + 2);
+      const anchor = nearestAnchorOnCurve(edge, center, project);
+      const rect = {
+        left: center.x - width / 2, right: center.x + width / 2,
+        top: center.y - height / 2, bottom: center.y + height / 2,
+      };
+      placements.push({ edge, index, title, center, anchor, width, height, compact: false });
+      obstacles.push(rect);
+      continue;
+    }
+
     const widths = [...new Set([Math.min(maxWidth, textWidth), Math.min(168 * unit, textWidth), Math.min(120 * unit, textWidth), Math.min(92 * unit, textWidth), compactWidth].map(Math.round))];
     const anchors = [.5, .36, .64, .23, .77, .12, .88].map(t => {
       const anchor = project(pointOnCurve(edge, t));
