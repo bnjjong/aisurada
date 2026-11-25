@@ -9,6 +9,7 @@ use crate::frontmatter::Value;
 use crate::kernel::task_link::TaskLinkKind;
 
 const INTAKE_RECEIPT: &str = "intakeReceipt";
+const MANAGER_PROJECT_ID: &str = "managerProjectId";
 
 /// 태스크 상태
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -224,5 +225,17 @@ impl Task {
         self.extra.retain(|(key, _)| key != INTAKE_RECEIPT);
         self.extra
             .push((INTAKE_RECEIPT.into(), Value::Str(receipt.into())));
+    }
+
+    pub fn manager_project_id(&self) -> Option<&str> {
+        self.extra.iter().find_map(|(key, value)| match value {
+            Value::Str(id) if key == MANAGER_PROJECT_ID => Some(id.as_str()),
+            _ => None,
+        })
+    }
+
+    pub fn record_manager_project(&mut self, id: &str) {
+        self.extra
+            .push((MANAGER_PROJECT_ID.into(), Value::Str(id.into())));
     }
 }

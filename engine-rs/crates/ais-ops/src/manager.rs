@@ -596,13 +596,12 @@ fn record_event(
     write_atomic(&path, &bytes).map_err(|error| error.to_string())
 }
 
-fn dashboard(env: &Env, managers: &[Manager]) -> Result<Value, String> {
+fn dashboard(env: &Env, managers: &[Manager], include_work: bool) -> Result<Value, String> {
     let vault = canonical_vault(env)?;
-    let items: Vec<_> = managers
+    let registrations: Vec<_> = managers
         .iter()
         .filter(|item| item.legacy() || item.vault == vault)
         .map(|item| {
-            let history = history(env, item);
             let issue = if item.legacy() {
                 Some("프로젝트를 지정해 주세요")
             } else if item.scope().is_none() {
@@ -610,11 +609,32 @@ fn dashboard(env: &Env, managers: &[Manager]) -> Result<Value, String> {
             } else {
                 None
             };
+            (item, issue)
+        })
+        .collect();
+    let work = include_work.then(|| {
+        let scopes: Vec<_> = registrations
+            .iter()
+            .filter(|(_, issue)| issue.is_none())
+            .map(|(item, _)| item.context())
+            .collect();
+        Engine::new(&vault).manager_work_today(&scopes)
+    });
+    let work_issue = work
+        .as_ref()
+        .and_then(|result| result.as_ref().err())
+        .map(ToString::to_string);
+    let work = work.and_then(Result::ok);
+    let items: Vec<_> = registrations
+        .into_iter()
+        .map(|(item, issue)| {
+            let history = history(env, item);
             let history_issue = history.is_err().then_some("호출 기록을 읽을 수 없어요");
             let intake = issue.is_none()
                 .then(|| item.intake(IntakeOperation::Get, CallContext::app(), json!({"summary": true})));
             let intake_issue = intake.as_ref().and_then(|result| result.as_ref().err()).map(ToString::to_string);
             json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history.unwrap_or_default(),
+                "work": work.as_ref().and_then(|counts| counts.get(&item.name)), "workIssue": work_issue,
                 "intake": intake.and_then(Result::ok), "intakeIssue": intake_issue})
         })
         .collect();
@@ -641,13 +661,16 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     let mut managers = list(env)?;
     match args {
         [action] if action == "list" => return Ok(json!(managers)),
-        [action] if action == "dashboard" => return dashboard(env, &managers),
+        [action] if action == "dashboard" => return dashboard(env, &managers, true),
+        [action, option] if action == "dashboard" && option == "--summary" => {
+            return dashboard(env, &managers, false);
+        }
         _ => {}
     }
     let [action, name, options @ ..] = args else {
         return Err(concat!(
             "ais-cli manager 사용법\n",
-            "  list | dashboard | add NAME project=… […] | update NAME […]\n",
+            "  list | dashboard [--summary] | add NAME project=… […] | update NAME […]\n",
             "  enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME\n",
             "  intake NAME [JSON] | intake-channel NAME JSON | intake-rewind NAME JSON\n",
             "  intake-review NAME JSON | intake-sources TASK"

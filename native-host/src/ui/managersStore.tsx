@@ -34,8 +34,12 @@ export interface ManagerItem {
   historyIssue?: string | null;
   intake?: IntakeData | null;
   intakeIssue?: string | null;
+  work?: ManagerWork | null;
+  workIssue?: string | null;
   history: { firstCall: number | null; events: ManagerEvent[] };
 }
+
+interface ManagerWork { tasks: number; comments: number }
 export interface ManagerDashboard {
   items: ManagerItem[];
   names: string[];
@@ -61,44 +65,66 @@ function intakeQuestionBody({ excerpt, question }: IntakeData["asked"][number]) 
   return [original && `「${original}」`, draft, "원장에서 답글 초안을 확인해 주세요."].filter(Boolean).join(" · ");
 }
 
-export function ManagersProvider({ controller, workspace, children }: {
+export function ManagersProvider({ controller, workspace, showWork, children }: {
   controller: WorkspaceController;
   workspace: Workspace;
+  showWork: boolean;
   children: ReactNode;
 }) {
   const [data, setData] = useState<ManagerDashboard | null>(null);
   const [error, setError] = useState("");
   const request = useRef(0);
+  const readingWork = useRef<number | undefined>(undefined);
+  const lastWorkRead = useRef(0);
   const notified = useRef(new Set<string>());
   const sample = workspace.sample;
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (includeWork = showWork) => {
     if (sample) return;
     const current = ++request.current;
+    if (includeWork) {
+      lastWorkRead.current = Date.now();
+      readingWork.current = current;
+    }
     try {
-      const value = await controller.callEngine(["manager", "dashboard"]) as ManagerDashboard;
+      const value = await controller.callEngine(includeWork ? ["manager", "dashboard"] : ["manager", "dashboard", "--summary"]) as ManagerDashboard;
       if (!Array.isArray(value?.items)) throw new Error("매니저 등록부 응답을 읽지 못했어요.");
       if (current === request.current) {
-        setData(value);
+        setData(previous => {
+          if (includeWork || !showWork || !previous) return value;
+          const prior = new Map(previous.items.map(item => [item.manager.name, item]));
+          return { ...value, items: value.items.map(item => {
+            const saved = prior.get(item.manager.name);
+            if (!saved || item.issue || saved.manager.projectId !== item.manager.projectId) return item;
+            return { ...item, work: saved.work, workIssue: saved.workIssue };
+          }) };
+        });
         setError("");
       }
     } catch (e) {
       if (current === request.current) {
         setError(managerError(e));
       }
+    } finally {
+      if (readingWork.current === current) readingWork.current = undefined;
     }
-  }, [controller, sample]);
+  }, [controller, sample, showWork]);
   useEffect(() => {
     if (sample) return;
     void refresh();
-    const interval = window.setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
+    const interval = window.setInterval(() => {
+      if (!document.hidden && readingWork.current === undefined) {
+        void refresh(showWork && Date.now() - lastWorkRead.current >= 15_000);
+      }
+    }, 5000);
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
     return () => {
       request.current++;
+      readingWork.current = undefined;
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [refresh, sample]);
+  }, [refresh, sample, showWork]);
 
   useEffect(() => {
     if (!controller.isNative() || !data) return;
@@ -144,6 +170,11 @@ export const todayEvents = (events: ManagerEvent[]) => {
   const start = new Date().setHours(0, 0, 0, 0);
   return events.filter(event => event.at >= start);
 };
+export const workCount = (item: ManagerItem, kind: keyof ManagerWork) => item.work?.[kind] ?? "—";
+export function totalCreatedTasks(items: ManagerItem[]) {
+  const scoped = items.filter(item => !item.issue);
+  return scoped.every(item => item.work) ? scoped.reduce((sum, item) => sum + (item.work?.tasks ?? 0), 0) : "—";
+}
 export const eventTime = (time?: number | null) => time
   ? new Date(time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
   : "—";

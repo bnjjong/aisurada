@@ -745,6 +745,7 @@ repos: [{"name":"shared","github":"demo/shared"}]
         assert_eq!(replies[i]["result"]["isError"], true, "{}", replies[i]);
     }
     let history = cli(&["manager", "dashboard"]);
+    assert_eq!(history["items"][0]["work"], json!({"tasks":1,"comments":0}));
     let events = &history["items"][0]["history"];
     assert!(events["firstCall"].is_number());
     assert_eq!(events["events"].as_array().unwrap().len(), 12);
@@ -984,6 +985,16 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
         .find(|item| item["manager"]["name"] == name)
         .unwrap();
     assert_eq!(item["intake"]["counts"], desktop["counts"]);
+    assert_eq!(item["work"], json!({"tasks":1,"comments":1}));
+    let summary = cli(&["manager", "dashboard", "--summary"]);
+    let item = summary["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["manager"]["name"] == name)
+        .unwrap();
+    assert!(item["work"].is_null());
+    assert_eq!(item["intake"]["counts"], desktop["counts"]);
     let tasks = vault.join(".aisurada/tasks");
     assert_eq!(
         std::fs::read_dir(tasks)
@@ -997,6 +1008,40 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
             .count(),
         1
     );
+    // 상세 활동의 500건을 넘겨도 오늘 저장한 매니저 댓글은 집계에 남는다.
+    let activity = vault
+        .join(".aisurada/tasks")
+        .join(task_key)
+        .join("activity.jsonl");
+    let mut lines = std::fs::read_to_string(&activity).unwrap();
+    lines.push_str(
+        "{\"at\":\"2020-01-01T00:00:00Z\",\"kind\":\"edited\",\"by\":\"human\"}\n"
+            .repeat(500)
+            .as_str(),
+    );
+    std::fs::write(activity, lines).unwrap();
+    mcp(
+        "add_task_comment",
+        json!({"id":task_key,"body":"매니저가 직접 남긴 댓글"}),
+    );
+    cli(&["add-task-comment", task_key, "body=사람이 남긴 댓글"]);
+    assert_eq!(
+        cli(&["get-task", task_key, "activity=0"])["activity"]
+            .as_array()
+            .unwrap()
+            .len(),
+        500
+    );
+    cli(&["delete-task", task_key]);
+    let dashboard = cli(&["manager", "dashboard"]);
+    let item = dashboard["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["manager"]["name"] == name)
+        .unwrap();
+    assert_eq!(item["work"], json!({"tasks":1,"comments":2}));
+    assert_eq!(item["intake"]["counts"], desktop["counts"]);
     std::fs::remove_dir_all(vault).unwrap();
 }
 
@@ -1330,6 +1375,14 @@ fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     assert_eq!(sources[0]["url"], original["url"]);
     assert_eq!(sources[2]["source"]["kind"], "telegram");
     assert_eq!(sources[2]["taskOrigin"], "commented");
+    let dashboard = cli(&["manager", "dashboard"]);
+    let item = dashboard["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["manager"]["name"] == name)
+        .unwrap();
+    assert_eq!(item["work"], json!({"tasks":1,"comments":2}));
     let raw = std::fs::read_to_string(vault.join(".aisurada/intake/ledger.json")).unwrap();
     assert!(!raw.contains(&"가".repeat(201)));
     std::fs::remove_dir_all(vault).unwrap();

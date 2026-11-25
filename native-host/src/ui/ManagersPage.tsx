@@ -10,7 +10,7 @@ import { SettingsSwitch } from "./SettingsParts.tsx";
 import { copyManagerConfig, ManagerEditor, ManagerSetup } from "./ManagerSetup.tsx";
 import {
   belongsTo, deliveryIssue, enabledManagers, eventName, eventResult, eventTime, kindLabel, managerError, managerProjects,
-  todayEvents, useManagers, webhookEvent, type ManagerConfig, type ManagerItem, type ManagerProject,
+  todayEvents, totalCreatedTasks, useManagers, webhookEvent, workCount, type ManagerConfig, type ManagerItem, type ManagerProject,
 } from "./managersStore.tsx";
 
 type Setup = { project?: string; source?: ManagerConfig; migrate?: ManagerConfig };
@@ -55,7 +55,7 @@ function ManagerCard({ item, busy, canCopy, action, open, copy }: {
       <dl className="mgr-meta">
         <dt>상태 알림</dt><dd>{manager.notifyEnabled && manager.webhook ? manager.webhook : "꺼짐"}</dd>
         <dt>마지막 호출</dt><dd>{last ? `${eventTime(last.at)} · ${eventName(last.tool)} ${eventResult(last.result)}` : "—"}</dd>
-        <dt>오늘</dt><dd>태스크 {metric(item, "create_task")} · 댓글 {metric(item, "add_task_comment")} · 거절 {todayEvents(item.history.events).filter(event => event.result === "rejected").length}</dd>
+        <dt>오늘</dt><dd>태스크 {workCount(item, "tasks")} · 댓글 {workCount(item, "comments")} · 거절 {todayEvents(item.history.events).filter(event => event.result === "rejected").length}</dd>
       </dl>
     </div>
     <IntakeBadges item={item} />
@@ -81,7 +81,8 @@ export function ManagersPage({ project, name, intake, workspace, controller }: {
   const shown = project ? projects.filter(item => item.slug === project) : projects;
   const withinFilter = ({ manager }: ManagerItem) => !project || shown.some(item => belongsTo(manager, item));
   const active = enabledManagers(data).filter(withinFilter);
-  const today = todayEvents(items.filter(withinFilter).flatMap(item => item.history.events));
+  const shownItems = items.filter(withinFilter);
+  const today = todayEvents(shownItems.flatMap(item => item.history.events));
   const calls = today.filter(event => !webhookEvent(event));
   const selected = name ? items.find(item => item.manager.name === name) : undefined;
 
@@ -117,7 +118,7 @@ export function ManagersPage({ project, name, intake, workspace, controller }: {
         <div className="mgr-between mgr-overview">
           <div className="mgr-actions">
             <span className="mgr-badge is-ok">켜짐 {active.length}</span>
-            <small>오늘 호출 {calls.length} · 만든 태스크 {calls.filter(event => event.tool === "create_task" && event.result === "ok").length} · 거절 {calls.filter(event => event.result === "rejected").length}</small>
+            <small>오늘 호출 {calls.length} · 만든 태스크 {totalCreatedTasks(shownItems)} · 거절 {calls.filter(event => event.result === "rejected").length}</small>
           </div>
           <div className="mgr-actions">
             <button type="button" onClick={() => void refresh()}>새로고침</button>
@@ -259,12 +260,13 @@ function ManagerHistory({ item }: { item: ManagerItem }) {
   const today = todayEvents(item.history.events);
   const counts = [
     ["오늘 호출", today.filter(event => !webhookEvent(event)).length],
-    ["만든 태스크", metric(item, "create_task")], ["댓글", metric(item, "add_task_comment")],
+    ["만든 태스크", workCount(item, "tasks")], ["댓글", workCount(item, "comments")],
     ["노트", metric(item, "create_doc")], ["거절", today.filter(event => event.result === "rejected").length],
     ["보낸 알림", today.filter(event => event.tool === "status_webhook" && event.result === "ok").length],
   ];
   return <>
     <dl className="mgr-counts">{counts.map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
+    {item.workIssue && <p className="mgr-error" role="status">오늘 업무 집계를 읽을 수 없어요.</p>}
     <section className="mgr-panel">
       <h2>최근 호출</h2>
       {item.historyIssue && <p className="mgr-error" role="status">{item.historyIssue}</p>}
@@ -297,7 +299,7 @@ export function ProjectManagers({ project, workspace, controller }: {
     {error && <p role="alert" className="mgr-error">{error}</p>}
     {items.map(item => <div className="mgr-between mgr-project-row" key={item.manager.name}>
       <div className="mgr-actions"><ManagerMark manager={item.manager} /><strong>{item.manager.label}</strong><small>{item.manager.name}</small>
-        <ManagerStatePill item={item} /><small>마지막 호출 {eventTime(item.history.events.find(event => !webhookEvent(event))?.at)} · 오늘 태스크 {metric(item, "create_task")}</small></div>
+        <ManagerStatePill item={item} /><small>마지막 호출 {eventTime(item.history.events.find(event => !webhookEvent(event))?.at)} · 오늘 태스크 {workCount(item, "tasks")}</small></div>
       <button type="button" onClick={() => controller.navigate(managerAddress(item.manager.name))}>열기</button>
     </div>)}
     {!items.length && <p className="res-empty">{target?.repos.length ? "이 프로젝트에 매니저가 없어요." : "프로젝트 편집에서 GitHub 저장소를 추가하면 매니저가 태스크를 만들 수 있어요."}</p>}
