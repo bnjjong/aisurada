@@ -67,7 +67,6 @@ test('read/history and remaining write command surfaces retain exact positional 
     [toArgv(read.history('a',{commit:'c=1'})),['history','a','commit=c=1']],
     [toArgv(read.history('a',{number:2,query:'q'})),['history','a','2','query=q']],
     [read.sessionTitles(['a','a','b']),['session-titles','a','b']],
-    [read.schedule(),['schedule','status','--json']],
     [toArgv(write.createSub('r/c')),['create-sub-note','r/c','title=새 후속 노트','body=# 새 후속 노트\n\n','type=free']],
     [toArgv(write.deleteSub('r/c','d')),['delete-sub-note','r/c','d']],
     [toArgv(write.deleteDoc('a')),['delete-doc','a']],

@@ -1,8 +1,6 @@
 use super::*;
 
 const GET_USAGE: &str = "get-resource <자원 id> [version=<list-resource-versions 의 판>]";
-#[allow(dead_code)]
-const SAVE_USAGE: &str = "save-resource kind=skill|agent scope=global|project=<프로젝트 slug> name=<이름> description=<설명> [body=<지침>] [permission=read|edit|publish. 에이전트] [skills=<스킬 id JSON 배열. 에이전트> ] [repo=<프로젝트 저장소 이름. 프로젝트 에이전트. 빈 값이면 지운다>] [tools=<도구별 칸 JSON 객체. 예: {\"claude\":{...}}. 빈 값이면 비운다>]  |  고칠 때: save-resource id=<자원 id> f1=<직전에 읽은 토큰> [고칠 칸...]. AI가 보낸 변경은 정책에 따라 승인 대기에 오를 수 있다(응답의 queued)";
 const DELETE_USAGE: &str = "delete-resource <자원 id>";
 const RESTORE_USAGE: &str =
     "restore-resource <휴지통의 자원 id. list-resources trash=true 로 조회한다>";
