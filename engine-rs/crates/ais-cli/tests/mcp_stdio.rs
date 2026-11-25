@@ -876,6 +876,8 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
     let mut payload = report("telegram", "bot:chat:1");
     payload["source"]["postedAt"] = json!(1_700_000_000_000_i64);
     payload["source"]["url"] = json!("https://t.me/demo/1");
+    payload["source"]["destination"] =
+        json!({"conversation":"-10012345","message":"42","thread":"11"});
     for url in ["javascript:alert(1)", "https://person@t.me/demo/1"] {
         let mut unsafe_link = payload.clone();
         unsafe_link["source"]["url"] = json!(url);
@@ -996,6 +998,8 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
     assert_eq!(sources[0]["taskOrigin"], "created");
     assert_eq!(sources[0]["source"]["postedAt"], 1_700_000_000_000_i64);
     assert_eq!(sources[0]["url"], "https://t.me/demo/1");
+    assert_eq!(sources[0]["destination"]["conversation"], "-10012345");
+    assert_eq!(sources[0]["destination"]["thread"], "11");
     assert_eq!(sources[0]["reporter"], "텔레그램 사용자");
     assert_eq!(sources[0]["excerpt"], "로그인 화면이 멈춰요");
     assert_eq!(sources[1]["taskOrigin"], "commented");
@@ -1025,6 +1029,27 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
         .unwrap();
     assert_eq!(item["intake"]["counts"], desktop["counts"]);
     assert_eq!(item["work"], json!({"tasks":1,"comments":1}));
+    // 태스크가 원래 상태로 돌아와도 두 변경은 각각 보관된다.
+    cli(&["transition-task", task_key, "to=ready-for-develop"]);
+    cli(&["transition-task", task_key, "to=draft"]);
+    let status_tasks = cli(&["manager", "status-tasks"]);
+    let changes = status_tasks["tasks"][0]["statusChanges"]
+        .as_array()
+        .unwrap();
+    assert_eq!(changes.len(), 2);
+    assert_ne!(changes[0]["id"], changes[1]["id"]);
+    assert_eq!(changes[0]["status"], "ready-for-develop");
+    assert_eq!(changes[1]["status"], "draft");
+    assert_eq!(cli(&["manager", "status-tasks"]), status_tasks);
+    let configured = cli(&[
+        "manager",
+        "update",
+        name,
+        "telegramWebhook=http://127.0.0.1:8644/webhooks/demo-telegram",
+        "telegramChats=[\"-10012345\"]",
+        "notifyEnabled=true",
+    ]);
+    assert_eq!(configured["telegramChats"], json!(["-10012345"]));
     let summary = cli(&["manager", "dashboard", "--summary"]);
     let item = summary["items"]
         .as_array()

@@ -169,6 +169,9 @@ export function TaskDetailPage({
   };
 
   const slackSource = task.refs.find((ref) => ref.kind === "slack");
+  const firstReport = task.intakeSources?.find(source => source.taskOrigin === "created" && source.manager === task.manager);
+  const statusDestination = firstReport?.source ? firstReport.source.kind === "telegram" && !!firstReport.destination
+    : !!(firstReport?.url || slackSource);
   const openCommentLink = (url: string) => {
     if (/^\/doc\/[^/?#]+$/.test(url)) controller.navigate(url);
     else if (controller.isNative() && /^https?:\/\//i.test(url)) void openUrl(url).catch(() => {});
@@ -606,18 +609,18 @@ export function TaskDetailPage({
             </section>
             <TaskReportSources entries={task.intakeSources ?? []} firstRef={slackSource} controller={controller} busy={busy}
               onSaveFirst={source => saveField({ refs: task.refs.map(ref => ref === slackSource ? { ...ref, ...source } : ref) })}>
-              {task.manager && slackSource && runner.supported && <button type="button" disabled={sendingStatus} onClick={async () => {
+              {task.manager && statusDestination && runner.supported && <button type="button" disabled={sendingStatus} onClick={async () => {
                 setSendingStatus(true);
                 setStatusMessage("");
                 try {
                   await controller.callHost("manager_send_status", { taskKey: task.key });
-                  setStatusMessage("Slack에 상태를 알렸어요.");
+                  setStatusMessage("원래 제보 대화에 상태를 알렸어요.");
                 } catch (err) {
                   setStatusMessage(explainError(err));
                 } finally {
                   setSendingStatus(false);
                 }
-              }}>Slack 스레드에 상태 알리기</button>}
+              }}>제보 대화에 상태 알리기</button>}
               {statusMessage && <p role="status">{statusMessage}</p>}
             </TaskReportSources>
           </aside>

@@ -65,7 +65,7 @@ export interface HostCommandMap {
 
   // 매니저 및 웹훅
   manager_webhook_secret: { args: { name: string; action: string }; result: string };
-  manager_test_webhook: { args: { name: string; url: string; channel: string }; result: { status: number; elapsed: number } };
+  manager_test_webhook: { args: { name: string; platform?: string; url: string; channel: string }; result: { status: number; elapsed: number } };
   manager_send_status: { args: { taskKey: string }; result: unknown };
 
   // Archyl 및 C4

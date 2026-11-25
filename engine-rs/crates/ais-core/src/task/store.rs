@@ -290,13 +290,16 @@ pub fn transition(
     expected_from: Option<&str>,
     stamp: &Stamp,
 ) -> Result<Task, EngineError> {
-    let changed = cur.transition_to(
+    let mut changed = cur.transition_to(
         to,
         actor,
         expected_from,
         || unfinished_blockers(&scan(vault), &cur.key),
         stamp,
     )?;
+    if cur.manager.is_some() {
+        changed.next.record_status_change(next_id("st"));
+    }
     let bytes = format::render(&changed.next)?;
     write_atomic(&vault.join(&cur.rel_path), &bytes)?;
     append_activity(vault, &cur.key, &changed.event)?;

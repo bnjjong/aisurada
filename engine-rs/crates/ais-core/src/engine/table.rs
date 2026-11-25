@@ -25,6 +25,12 @@ use crate::vault::index::NoteIndex;
 pub use intake_commands::IntakeOperation;
 
 impl Engine {
+    pub fn manager_status_tasks(&self) -> Result<Value, EngineError> {
+        let _installed = self.install_ports();
+        check_workspace_marker(&self.vault_root)?;
+        Ok(task_commands::manager_status_tasks(&self.vault_root))
+    }
+
     pub fn manager_work_today(&self, managers: &[ManagerContext]) -> Result<Value, EngineError> {
         let _installed = self.install_ports();
         check_workspace_marker(&self.vault_root)?;

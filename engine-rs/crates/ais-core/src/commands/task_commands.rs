@@ -667,6 +667,16 @@ pub fn get_task(vault: &Path, request: &GetTaskRequest, context: &CallContext) -
     Ok(value)
 }
 
+pub(crate) fn manager_status_tasks(vault: &Path) -> Json {
+    let scan = store::scan(vault);
+    let rows: Vec<_> = scan.items.iter().filter(|task| task.manager.is_some()).map(|task| {
+        let mut summary = row(&scan, task, false);
+        summary["statusChanges"] = json!(task.status_changes().collect::<Vec<_>>());
+        summary
+    }).collect();
+    json!({"tasks": rows})
+}
+
 pub(crate) fn manager_work_today(vault: &Path, managers: &[ManagerContext]) -> Result<Json, EngineError> {
     store::manager_work_today(vault, managers)
 }

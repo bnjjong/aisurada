@@ -10,6 +10,14 @@ use crate::kernel::task_link::TaskLinkKind;
 
 const INTAKE_RECEIPT: &str = "intakeReceipt";
 const MANAGER_PROJECT_ID: &str = "managerProjectId";
+const STATUS_CHANGES: &str = "statusChanges";
+
+#[derive(serde::Serialize)]
+pub struct StatusChange<'a> {
+    pub id: &'a str,
+    pub at: &'a str,
+    pub status: &'a str,
+}
 
 /// 태스크 상태
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -241,6 +249,44 @@ impl Task {
     pub fn record_manager_project(&mut self, id: &str) {
         self.extra
             .push((MANAGER_PROJECT_ID.into(), Value::Str(id.into())));
+    }
+
+    pub fn status_changes(&self) -> impl Iterator<Item = StatusChange<'_>> {
+        self.extra
+            .iter()
+            .find_map(|(key, value)| match value {
+                Value::List(changes) if key == STATUS_CHANGES => Some(changes),
+                _ => None,
+            })
+            .into_iter()
+            .flatten()
+            .filter_map(|change| {
+                let Value::List(fields) = change else {
+                    return None;
+                };
+                let [Value::Str(id), Value::Str(at), Value::Str(status)] = fields.as_slice() else {
+                    return None;
+                };
+                Some(StatusChange { id, at, status })
+            })
+    }
+
+    /// 상태 변경과 알림에 쓸 식별자를 같은 태스크 파일에 쓴다.
+    pub fn record_status_change(&mut self, id: String) {
+        let change = Value::List(vec![
+            Value::Str(id),
+            Value::Str(self.edited_at.clone()),
+            Value::Str(self.status.label().into()),
+        ]);
+        if let Some((_, Value::List(changes))) =
+            self.extra.iter_mut().find(|(key, _)| key == STATUS_CHANGES)
+        {
+            changes.push(change);
+        } else {
+            self.extra.retain(|(key, _)| key != STATUS_CHANGES);
+            self.extra
+                .push((STATUS_CHANGES.into(), Value::List(vec![change])));
+        }
     }
 }
 

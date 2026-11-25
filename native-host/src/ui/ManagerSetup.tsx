@@ -20,11 +20,19 @@ const states = [
 ];
 const updateList = (list: string[], value: string) =>
   list.includes(value) ? list.filter(item => item !== value) : [...list, value];
+const notificationSettings = (config: ManagerConfig) => [
+  `webhook=${config.webhook?.trim() || ""}`,
+  `telegramWebhook=${config.telegramWebhook?.trim() || ""}`,
+  `telegramChats=${JSON.stringify((config.telegramChats ?? []).map(value => value.trim()).filter(Boolean))}`,
+  `notify=${config.notify.join(",")}`, `notifyEnabled=${config.notifyEnabled}`,
+];
+const hasStatusWebhook = (config: ManagerConfig) =>
+  !!(config.webhook?.trim() || (config.telegramWebhook?.trim() && config.telegramChats?.some(chat => chat.trim())));
 const settings = (config: ManagerConfig) => [
   `label=${config.label.trim()}`, `kind=${config.kind}`, `tools=${config.tools.join(",")}`,
   `repos=${JSON.stringify(config.repos)}`, `agendas=${JSON.stringify(config.agendas)}`,
   `slackChannels=${JSON.stringify(config.slackChannels.map(value => value.trim()).filter(Boolean))}`,
-  `webhook=${config.webhook ?? ""}`, `notify=${config.notify.join(",")}`, `notifyEnabled=${config.notifyEnabled}`,
+  ...notificationSettings(config),
 ];
 
 type Update = (patch: Partial<ManagerConfig>) => void;
@@ -98,7 +106,7 @@ async function copyFromHost(text: Promise<string>) {
 
 async function checkNotificationSetup(form: ManagerConfig, controller: WorkspaceController) {
   if (!form.notifyEnabled) return;
-  if (!form.webhook?.trim() || !form.notify.length) {
+  if (!hasStatusWebhook(form) || !form.notify.length) {
     throw new Error("웹훅 주소와 알릴 상태를 골라 주세요.");
   }
   await controller.callHost("manager_webhook_secret", { name: form.name, action: "ensure" });
@@ -164,13 +172,23 @@ export function ManagerConnection({ form, history, controller, update }: {
 }
 
 const channelId = /^[CG][A-Z0-9]{1,63}$/;
+const telegramChatId = /^-?[1-9][0-9]{0,18}$/;
 export function ManagerNotifications({ form, controller, update }: {
   form: ManagerConfig; controller: WorkspaceController; update: Update;
 }) {
   const [masked, setMasked] = useState("");
-  const channels = [...new Set(form.slackChannels.filter(value => channelId.test(value)))];
-  const [channel, setChannel] = useState(() => channels[0] ?? "");
-  const testChannel = channels.includes(channel) ? channel : channels[0] ?? "";
+  const [testTarget, setTestTarget] = useState("");
+  const targets = [
+    { platform: "slack", label: "Slack", webhook: form.webhook, ids: form.slackChannels, pattern: channelId },
+    { platform: "telegram", label: "텔레그램", webhook: form.telegramWebhook, ids: form.telegramChats ?? [], pattern: telegramChatId },
+  ].flatMap(({ platform, label, webhook, ids, pattern }) => {
+    const url = webhook?.trim();
+    if (!url) return [];
+    return [...new Set(ids.map(id => id.trim()).filter(id => pattern.test(id)))].map(id => ({
+      key: `${platform}:${id}`, platform, label: `${label} · ${id}`, channel: id, url,
+    }));
+  });
+  const target = targets.find(item => item.key === testTarget) ?? targets[0];
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
@@ -195,14 +213,23 @@ export function ManagerNotifications({ form, controller, update }: {
   };
   return <div className="mgr-fields">
     <div className="mgr-between">
-      <div><strong>태스크 상태가 바뀌면 알리기</strong><p>매니저가 만든 태스크의 상태를 제보가 온 Slack 스레드에 보내요.</p></div>
+      <div><strong>태스크 상태가 바뀌면 알리기</strong><p>매니저가 만든 태스크의 상태를 원래 제보가 온 대화에 보내요.</p></div>
       <SettingsSwitch checked={form.notifyEnabled} ariaLabel="태스크 상태가 바뀌면 알리기" onChange={notifyEnabled => update({ notifyEnabled })} />
     </div>
     {form.notifyEnabled && <>
-      <label className="mgr-label">웹훅 주소
+      <label className="mgr-label">Slack 웹훅 주소
         <input value={form.webhook ?? ""} placeholder="http://127.0.0.1:8644/webhooks/project"
           onChange={event => update({ webhook: event.target.value })} />
         <small>이 Mac의 주소만 받아요. Hermes에서 매니저마다 다른 경로를 설정해 주세요.</small>
+      </label>
+      <label className="mgr-label">텔레그램 웹훅 주소
+        <input value={form.telegramWebhook ?? ""} placeholder="http://127.0.0.1:8644/webhooks/project-telegram"
+          onChange={event => update({ telegramWebhook: event.target.value })} />
+      </label>
+      <label className="mgr-label">텔레그램 알림을 허용할 대화 ID
+        <input value={(form.telegramChats ?? []).join(",")} placeholder="123456789, -100123456789"
+          onChange={event => update({ telegramChats: event.target.value.split(",") })} />
+        <small>텔레그램에서 확인한 숫자 ID를 쉼표로 나눠 주세요.</small>
       </label>
       <div className="mgr-label">
         서명 비밀
@@ -222,14 +249,15 @@ export function ManagerNotifications({ form, controller, update }: {
         </div>
       </Choices>
       <div className="mgr-actions mgr-test">
-        <label className="mgr-label">시험 알림을 받을 Slack 채널
-          <select value={testChannel} onChange={event => setChannel(event.target.value)} disabled={!channels.length}>
-            {!channels.length && <option value="">연결 탭에서 채널을 등록해 주세요</option>}
-            {channels.map(id => <option value={id} key={id}>{id}</option>)}
+        <label className="mgr-label">시험 알림을 받을 대화
+          <select value={target?.key ?? ""} onChange={event => setTestTarget(event.target.value)} disabled={!targets.length}>
+            {!targets.length && <option value="">웹훅 주소와 허용 대화를 설정해 주세요</option>}
+            {targets.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}
           </select>
         </label>
-        <button type="button" disabled={working || !form.webhook || !masked || !testChannel} onClick={() => void act(async () => {
-          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, url: (form.webhook ?? '').trim(), channel: testChannel });
+        <button type="button" disabled={working || !masked || !target} onClick={() => target && void act(async () => {
+          const { platform, url, channel } = target;
+          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, platform, url, channel });
           setText(`보냈어요 · HTTP ${answer.status} · ${answer.elapsed}ms`);
           await refresh();
         })}>시험 알림 보내기</button>
@@ -238,7 +266,7 @@ export function ManagerNotifications({ form, controller, update }: {
     {text && <small role="status">{text}</small>}
     {error && form.notifyEnabled && <p role="alert" className="mgr-error">{error}</p>}
     {rotating && <Confirm title="서명 비밀을 다시 만들까요?" label="다시 만들기"
-      description="Hermes에 새 서명 비밀을 넣을 때까지 Slack 상태 알림 전송이 실패해요."
+      description="Hermes의 각 상태 알림 경로에 새 서명 비밀을 넣어 주세요."
       close={() => setRotating(false)} accept={() => act(async () => {
         setMasked(await callSecret("rotate"));
         setText("Hermes 웹훅 설정에도 새 서명 비밀을 넣어 주세요.");
@@ -306,6 +334,8 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
       notify: template?.notify ?? data.defaultNotify,
       notifyEnabled: template?.notifyEnabled ?? false,
       webhook: migrate?.webhook ?? null,
+      telegramWebhook: migrate?.telegramWebhook ?? null,
+      telegramChats: migrate?.telegramChats ?? [],
     };
   });
   const [busy, setBusy] = useState(false);
@@ -432,7 +462,7 @@ export function ManagerEditor({ controller, item, project, data, tab }: {
     setBusy(true); setMessage(""); setError("");
     const patch = tab === "permissions" ? [`tools=${form.tools.join(",")}`, `repos=${JSON.stringify(form.repos)}`, `agendas=${JSON.stringify(form.agendas)}`] :
       tab === "connection" ? [`slackChannels=${JSON.stringify(form.slackChannels.map(value => value.trim()).filter(Boolean))}`] :
-        [`webhook=${form.webhook?.trim() || ""}`, `notify=${form.notify.join(",")}`, `notifyEnabled=${form.notifyEnabled}`];
+        notificationSettings(form);
     try {
       if (tab === "notifications") await checkNotificationSetup(form, controller);
       await controller.callEngine(["manager", "update", form.name, ...patch]);

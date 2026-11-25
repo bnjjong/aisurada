@@ -27,7 +27,10 @@ def add_intake_source(*, event, **_):
     intake_source = {
         "kind": "telegram",
         "key": hashlib.sha256(message_identity.encode()).hexdigest(),
+        "destination": {"conversation": str(source.chat_id), "message": str(event.message_id)},
     }
+    if thread_id := getattr(source, "thread_id", None):
+        intake_source["destination"]["thread"] = str(thread_id)
     if message.date is not None:
         intake_source["postedAt"] = int(message.date.timestamp() * 1000)
     message_link = getattr(message, "link", None)

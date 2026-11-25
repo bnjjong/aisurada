@@ -17,6 +17,8 @@ export interface ManagerConfig {
   repos: string[];
   agendas: string[];
   webhook: string | null;
+  telegramWebhook?: string | null;
+  telegramChats?: string[];
   slackChannels: string[];
   notify: string[];
   notifyEnabled: boolean;
@@ -142,7 +144,7 @@ export const writeTools = ["create_task", "add_task_comment", "create_doc"];
 export const kindLabel = (kind: ManagerKind) => kind === "hermes" ? "Hermes" : "다른 MCP 에이전트";
 export const webhookEvent = (event: ManagerEvent) => event.tool === "status_webhook" || event.tool === "test_webhook";
 export const deliveryIssue = (item: ManagerItem) => item.manager.enabled && item.manager.notifyEnabled &&
-  !!item.manager.webhook && latestWebhook(item.history)?.result === "failed";
+  !!(item.manager.webhook || item.manager.telegramWebhook) && latestWebhook(item.history)?.result === "failed";
 export const enabledManagers = (data: ManagerDashboard | null) =>
   data?.items.filter(({ manager, issue }) => manager.enabled && !!manager.project && !issue) ?? [];
 

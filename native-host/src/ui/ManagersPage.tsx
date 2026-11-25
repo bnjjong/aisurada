@@ -53,7 +53,8 @@ function ManagerCard({ item, busy, canCopy, action, open, copy }: {
         <dt>도구</dt><dd>{manager.tools.length}개</dd>
       </dl>
       <dl className="mgr-meta">
-        <dt>상태 알림</dt><dd>{manager.notifyEnabled && manager.webhook ? manager.webhook : "꺼짐"}</dd>
+        <dt>상태 알림</dt><dd>{manager.notifyEnabled && (manager.webhook || manager.telegramWebhook)
+          ? [manager.webhook && "Slack", manager.telegramWebhook && "텔레그램"].filter(Boolean).join(" · ") : "꺼짐"}</dd>
         <dt>마지막 호출</dt><dd>{last ? `${eventTime(last.at)} · ${eventName(last.tool)} ${eventResult(last.result)}` : "—"}</dd>
         <dt>오늘</dt><dd>태스크 {workCount(item, "tasks")} · 댓글 {workCount(item, "comments")} · 거절 {today.rejected}</dd>
       </dl>
@@ -240,7 +241,7 @@ function ManagerDetail({ item, projects, controller, busy, action, setup, intake
             <dt>도구</dt><dd>{manager.tools.length}개</dd>
             <dt>저장소</dt><dd>{plural(manager.repos)}</dd>
             <dt>아젠다</dt><dd>{plural(manager.agendas)}</dd>
-            <dt>상태 알림</dt><dd>{manager.notifyEnabled && manager.webhook ? `켜짐 · ${manager.notify.length}개 상태` : "꺼짐"}</dd>
+            <dt>상태 알림</dt><dd>{manager.notifyEnabled && (manager.webhook || manager.telegramWebhook) ? `켜짐 · ${manager.notify.length}개 상태` : "꺼짐"}</dd>
           </dl>
         </section>
         <section className="mgr-panel"><h2>연결 상태</h2>
