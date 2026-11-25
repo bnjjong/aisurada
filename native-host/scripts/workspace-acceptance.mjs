@@ -63,7 +63,18 @@ if (askMarksCheck || interactionCheck || dataCheck || editorCheck || autosaveChe
 write(external, '# 외부 기록\n\n별도의 Markdown 본문이에요.\n');
 if (editorCheck) {
   write(rootNote, noteHead(id, '실제 엔진 기록') + '# 실제 엔진 기록\n\n![검증 HTML](attach/frame.html)\n\n```mermaid\ngraph TD; A-->B\n```\n\n기능 검사 끝');
-  write(join(vault, 'notes/demo/root/attach/frame.html'), '<!doctype html><html><body><p>격리된 HTML 첨부</p></body></html>');
+  write(join(vault, 'notes/demo/root/attach/frame.html'), `<!doctype html><html><head><style>
+    body[data-layout], body[data-layout] p { margin: 0; }
+    body[data-layout] p { height: 501px; }
+    @media (min-height: 501px) { body[data-layout] p { height: 498px; } }
+    body[data-layout="collapsed"] p { height: 497px; }
+    body[data-layout="fractional"] p { height: 497.5px; }
+  </style></head><body><p>격리된 HTML 첨부</p><script>
+    addEventListener('message', event => {
+      if (event.source !== parent) return;
+      if (['responsive', 'collapsed', 'fractional'].includes(event.data)) document.body.dataset.layout = event.data;
+    });
+  </script></body></html>`);
 }
 if (navigationCheck) for (const key of ['one', 'two']) write(join(vault, `.aisurada/templates/doc/${key}.md`), `---\nid: ${key}\nname: 템플릿 ${key}\nformat: markdown\ntype: free\nbuiltin: false\n---\n본문 ${key}\n`);
 if (viewsCheck) {

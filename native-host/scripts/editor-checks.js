@@ -118,6 +118,30 @@ try{
   go('/doc/'+cfg.id);await until(()=>content()?.querySelector('iframe'),'HTML frame');const frame=content().querySelector('iframe');assert(frame.getAttribute('sandbox')==='allow-scripts','sandbox');assert(frame.getAttribute('referrerpolicy')==='no-referrer','referrer');assert(frame.getAttribute('loading')==='lazy','lazy');assert(frame.src.startsWith('aisframe://localhost/'),'protocol');assert(document.querySelector('.ais-html-frame-ask').hidden,'ask visible');
   await pause(150);const initial=frame.style.height;dispatchEvent(new MessageEvent('message',{source:window,data:{aisframeHeight:999}}));await pause(30);assert(frame.style.height===initial,'accepted foreign window');dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,data:{aisframeHeight:400.1}}));await until(()=>frame.style.height==='401px','height rounding');dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,data:{aisframeHeight:9999}}));await until(()=>frame.style.height==='1600px','height clamp');
  });
+ await test('html-frame-height-settles-and-follows-larger-shrink',async()=>{
+  const frame=content().querySelector('iframe');
+  const heights=[];
+  const collect=event=>{
+   if(event.source===frame.contentWindow&&typeof event.data?.aisframeHeight==='number') heights.push(event.data.aisframeHeight);
+  };
+  addEventListener('message',collect);
+  try {
+   frame.contentWindow.postMessage('responsive','*');
+   await until(()=>frame.style.height==='501px','HTML 첨부 높이 501px',1000);
+   await pause(1000);
+   const firstFullHeight=heights.indexOf(501);
+   assert(firstFullHeight>=0&&heights.length===firstFullHeight+1,'501px 이후에 높이를 다시 보냈다 ('+heights.join(', ')+')');
+   assert(frame.style.height==='501px','3px 줄인 높이를 적용했다');
+   frame.contentWindow.postMessage('collapsed','*');
+   await until(()=>frame.style.height==='497px','HTML 첨부 높이 4px 감소',1000);
+   frame.contentWindow.postMessage('responsive','*');
+   await until(()=>frame.style.height==='501px','HTML 첨부 높이 복원',1000);
+   frame.contentWindow.postMessage('fractional','*');
+   await until(()=>frame.style.height==='498px','3.5px 감소 후 높이 올림',1000);
+  } finally {
+   removeEventListener('message',collect);
+  }
+ });
  await test('mermaid-renders-svg-labels-outside-editable',async()=>{await until(()=>document.querySelector('.mermaid-svg svg text'),'Mermaid labels',30000);const svg=document.querySelector('.mermaid-svg svg');assert(!content().contains(svg),'preview inside editable');assert(svg.textContent.includes('A')&&svg.textContent.includes('B'),'missing labels');assert(!svg.querySelector('foreignObject,image,a'),'unsafe SVG nodes');assert(content().querySelector('.lex-code').classList.contains('ais-mermaid-source-folded'),'not collapsed by default');});
  await test('child-tab-edits-through-update-sub-note',async()=>{await until(()=>document.querySelector('.child-note-list button'),'child navigation');document.querySelector('.child-note-list button').click();await until(()=>location.pathname.startsWith('/sub/')&&document.querySelector('.lex-content h1')?.textContent==='하위 파일 노트','child editor');assert(!document.querySelector('.subnote-page'),'child opened a modal in the main window');const root=document.querySelector('.lex-content');edit('편집검증','하위 Markdown 파일의 본문이에요.',root);await until(async()=>{const n=await engine(['get-sub-note',cfg.id,cfg.childId]);return n.body.includes('편집검증')},'child engine write');document.querySelector('.tab-item.tab-selected .tabx-close').click();await until(()=>!location.pathname.startsWith('/sub/'),'child close');document.querySelector(`.tab-item[data-tab-id="${cfg.id}"] .tab-button`).click();await until(()=>location.pathname===`/doc/${encodeURIComponent(cfg.id)}`,'parent tab');});
 }catch(error){if(!results.some(result=>!result.ok))results.push({id:'editor-driver',ok:false,error:String(error)});console.error(error)}
