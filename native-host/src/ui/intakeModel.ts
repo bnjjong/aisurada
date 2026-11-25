@@ -99,7 +99,6 @@ export interface IntakeData {
   waiting: number;
   stalledMinutes: number | null;
   attention?: (IntakeAttention & { id: string; revision: string; url: string; excerpt?: string })[];
-  asked: { id: string; at: number; revision: string; url: string; excerpt?: string; question?: string }[];
 }
 
 export const resultLabel: Record<IntakeResult, string> = {

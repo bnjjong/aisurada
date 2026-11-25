@@ -750,6 +750,34 @@ fn dashboard(
     }))
 }
 
+fn intake_questions(env: &Env, managers: &[Manager]) -> Result<Value, String> {
+    let vault = canonical_vault(env)?;
+    let mut notices = Vec::new();
+    for item in managers
+        .iter()
+        .filter(|item| !item.legacy() && item.vault == vault)
+    {
+        if item.scope().is_none() {
+            continue;
+        }
+        let Value::Array(questions) = item
+            .intake(IntakeOperation::Questions, CallContext::app(), json!({}))
+            .map_err(|error| error.to_string())?
+        else {
+            return Err("되물음 알림 목록을 읽지 못했다".into());
+        };
+        for mut question in questions {
+            if !item.enabled && question.get("reviewReason").is_none() {
+                continue;
+            }
+            question["manager"] = json!(item.name);
+            question["label"] = json!(item.label);
+            notices.push(question);
+        }
+    }
+    Ok(json!(notices))
+}
+
 fn command(args: &[String], env: &Env) -> Result<Value, String> {
     let folder = folder(env)?;
     let _lock = if matches!(
@@ -763,6 +791,9 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     };
     let mut registry = read_registry(env)?;
     match args {
+        [action] if action == "intake-questions" => {
+            return intake_questions(env, &registry.managers);
+        }
         [action] if action == "list" => return Ok(json!(registry.managers)),
         [action, flags @ ..] if action == "dashboard" => {
             if flags
@@ -783,7 +814,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
             "  list | dashboard [--summary] [--compact] | history NAME | add NAME project=… […] | update NAME […]\n",
             "  enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME\n",
             "  intake NAME [JSON] | intake-channel NAME JSON | intake-rewind NAME JSON\n",
-            "  intake-review NAME JSON | intake-sources TASK"
+            "  intake-review NAME JSON | intake-sources TASK | intake-questions"
         ).into());
     };
     if action == "intake-sources" && options.is_empty() {

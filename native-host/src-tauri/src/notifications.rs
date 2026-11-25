@@ -10,12 +10,13 @@ use crate::{ipc::NOTIFICATIONS, lifecycle::HostState};
 use ring::digest;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Emitter, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
 pub const KINDS: [&str; 10] = [
@@ -39,7 +40,8 @@ const MAX_BODY: usize = 400;
 pub struct IntakeTarget {
     pub manager: String,
     pub entry: String,
-    pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 /// 알림 하나.
@@ -237,16 +239,46 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     })
 }
 
-/// 목록을 읽는다. 없거나 망가졌으면 빈 목록이다(알림은 지워져도 큰일이 아니고, 앱이 죽으면 안 된다).
-pub fn load_items(dir: &Path, vault: &str) -> Vec<Item> {
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Inbox {
+    items: Vec<Item>,
+    #[serde(default)]
+    delivered_questions: BTreeSet<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum SavedInbox {
+    Current(Inbox),
+    Legacy(Vec<Item>),
+}
+
+fn load_inbox(dir: &Path, vault: &str) -> Inbox {
     fs::read(items_path(dir, vault))
         .ok()
-        .and_then(|b| serde_json::from_slice::<Vec<Item>>(&b).ok())
+        .and_then(|b| serde_json::from_slice::<SavedInbox>(&b).ok())
+        .map(|saved| match saved {
+            SavedInbox::Current(inbox) => inbox,
+            SavedInbox::Legacy(items) => Inbox {
+                delivered_questions: items
+                    .iter()
+                    .filter(|item| item.kind == "intake-question")
+                    .map(|item| item.id.clone())
+                    .collect(),
+                items,
+            },
+        })
         .unwrap_or_default()
 }
 
-fn save_items(dir: &Path, vault: &str, items: &[Item]) -> Result<(), String> {
-    let bytes = serde_json::to_vec(items).map_err(|e| format!("알림을 글로 못 바꿨다: {e}"))?;
+fn save_inbox(dir: &Path, vault: &str, inbox: &Inbox) -> Result<(), String> {
+    let bytes = if inbox.delivered_questions.is_empty() {
+        serde_json::to_vec(&inbox.items)
+    } else {
+        serde_json::to_vec(inbox)
+    }
+    .map_err(|e| format!("알림을 글로 못 바꿨다: {e}"))?;
     write_atomic(&items_path(dir, vault), &bytes)
 }
 
@@ -314,19 +346,21 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         _ => None,
     };
     let intake = match (new.kind.as_str(), new.intake) {
-        (kind @ ("intake-question" | "intake-review"), Some(target)) => {
-            let source = ais_domain::task::format::slack_thread(&target.url);
-            let slack =
-                source.is_some_and(|(channel, ts)| format!("{channel}:{ts}") == target.entry);
-            let direct = kind == "intake-review"
-                && target.url.is_empty()
-                && target.entry.strip_prefix("intake-").is_some_and(|id| {
-                    id.len() == 16 && id.bytes().all(|byte| byte.is_ascii_hexdigit())
-                });
-            if !ais_core::valid_manager_name(&target.manager)
-                || target.url.len() > 512
-                || !(slack || direct)
-            {
+        ("intake-question" | "intake-review", Some(target)) => {
+            let valid_entry = match target.url.as_deref() {
+                Some(url) => {
+                    url.len() <= 512
+                        && ais_domain::task::format::slack_thread(url)
+                            .is_some_and(|(channel, ts)| format!("{channel}:{ts}") == target.entry)
+                }
+                None => target.entry.strip_prefix("intake-").is_some_and(|id| {
+                    id.len() == 16
+                        && id
+                            .bytes()
+                            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                }),
+            };
+            if !ais_core::valid_manager_name(&target.manager) || !valid_entry {
                 return Err("알림이 가리키는 제보 항목을 확인할 수 없다".into());
             }
             Some(target)
@@ -488,15 +522,17 @@ pub fn push<R: Runtime>(
     vault: &str,
     new: NewItem,
 ) -> Result<PushOut, String> {
+    let state = app.state::<NotifyState>();
+    let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
     let settings = load_settings(dir);
-    let mut items = load_items(dir, vault);
-    let item = build_item(new, now_ms(), items.len())?;
+    let mut inbox = load_inbox(dir, vault);
+    let item = build_item(new, now_ms(), inbox.items.len())?;
     let r = route(&settings, &item.kind);
-    let stored = push_item(&mut items, item.clone());
+    let stored = push_item(&mut inbox.items, item.clone());
     if stored {
-        save_items(dir, vault, &items)?;
+        save_inbox(dir, vault, &inbox)?;
     }
-    let unread_count = unread(&items);
+    let unread_count = unread(&inbox.items);
     if !stored {
         return Ok(PushOut {
             item: None,
@@ -532,6 +568,62 @@ pub fn push<R: Runtime>(
     })
 }
 
+fn save_intake_questions(
+    dir: &Path,
+    vault: &str,
+    mut items: Vec<Item>,
+) -> Result<(Vec<Item>, usize), String> {
+    let mut inbox = load_inbox(dir, vault);
+    let before = inbox.delivered_questions.len();
+    let mut added = Vec::new();
+    items.sort_by(|a, b| a.at.cmp(&b.at).then(a.id.cmp(&b.id)));
+    for item in items {
+        if inbox.delivered_questions.insert(item.id.clone())
+            && push_item(&mut inbox.items, item.clone())
+        {
+            added.push(item);
+        }
+    }
+    if inbox.delivered_questions.len() != before {
+        // 알림 목록과 각 질문의 전달 기록을 함께 저장한다.
+        save_inbox(dir, vault, &inbox)?;
+    }
+    added.retain(|item| inbox.items.iter().any(|saved| saved.id == item.id));
+    Ok((added, unread(&inbox.items)))
+}
+
+pub fn deliver_intake_questions<R: Runtime>(
+    app: &AppHandle<R>,
+    host: &HostState,
+    vault: &str,
+    items: Vec<Item>,
+) -> Result<(), String> {
+    if items.is_empty() {
+        return Ok(());
+    }
+    let current = host.vault.lock().map_err(|_| "vault 잠금을 얻지 못했다")?;
+    if current.as_deref() != Some(vault) {
+        return Ok(());
+    }
+    let state = app.state::<NotifyState>();
+    let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
+    let dir = default_dir();
+    let (added, unread) = save_intake_questions(&dir, vault, items)?;
+    let settings = load_settings(&dir);
+    for item in added {
+        let toast = route(&settings, &item.kind).toast;
+        let _ = app.emit(
+            NOTIFICATIONS,
+            Changed {
+                unread,
+                pushed: Some(item),
+                toast,
+            },
+        );
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn notifications_list(
     host: State<'_, HostState>,
@@ -547,7 +639,7 @@ pub fn notifications_list(
         }
     };
     let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
-    let items = load_items(&default_dir(), &vault);
+    let items = load_inbox(&default_dir(), &vault).items;
     let unread_count = unread(&items);
     Ok(ListOut {
         items,
@@ -559,7 +651,6 @@ pub fn notifications_list(
 pub fn notifications_push<R: Runtime>(
     app: AppHandle<R>,
     host: State<'_, HostState>,
-    state: State<'_, NotifyState>,
     item: NewItem,
     expected_vault: Option<String>,
 ) -> Result<PushOut, String> {
@@ -567,7 +658,9 @@ pub fn notifications_push<R: Runtime>(
     if expected_vault.is_some_and(|expected| expected != vault) {
         return Err("알림을 보내기 전에 열린 vault가 바뀌었다".into());
     }
-    let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
+    if matches!(item.kind.as_str(), "intake-question" | "intake-review") {
+        return Err("제보 알림은 저장된 원장에서 가져온다".into());
+    }
     push(&app, &default_dir(), &vault, item)
 }
 
@@ -582,11 +675,11 @@ pub fn notifications_mark_read<R: Runtime>(
     let vault = current_vault(&host)?;
     let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
     let dir = default_dir();
-    let mut items = load_items(&dir, &vault);
-    if mark_read(&mut items, ids.as_deref()) > 0 {
-        save_items(&dir, &vault, &items)?;
+    let mut inbox = load_inbox(&dir, &vault);
+    if mark_read(&mut inbox.items, ids.as_deref()) > 0 {
+        save_inbox(&dir, &vault, &inbox)?;
     }
-    let unread_count = unread(&items);
+    let unread_count = unread(&inbox.items);
     let _ = app.emit(
         NOTIFICATIONS,
         Changed {
@@ -936,14 +1029,22 @@ mod tests {
         assert_eq!(vault_key(a), vault_key(a));
         let mut items = vec![];
         push_item(&mut items, item("x", false));
-        save_items(dir.path(), a, &items).unwrap();
-        assert_eq!(load_items(dir.path(), a), items);
+        save_inbox(
+            dir.path(),
+            a,
+            &Inbox {
+                items: items.clone(),
+                ..Inbox::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(load_inbox(dir.path(), a).items, items);
         assert!(
-            load_items(dir.path(), b).is_empty(),
+            load_inbox(dir.path(), b).items.is_empty(),
             "another vault has its own list"
         );
         fs::write(items_path(dir.path(), b), b"[{\"bad\":").unwrap();
-        assert!(load_items(dir.path(), b).is_empty());
+        assert!(load_inbox(dir.path(), b).items.is_empty());
         // 원자적 쓰기는 임시 파일을 남기지 않는다
         let names: Vec<String> = fs::read_dir(dir.path())
             .unwrap()
@@ -1001,5 +1102,77 @@ mod tests {
         )
         .unwrap();
         assert_eq!(old.task_key, None, "taskKey may be missing");
+    }
+
+    #[test]
+    fn intake_receipts_survive_inbox_eviction_and_preserve_legacy_read_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = "/example";
+        let mut old = item("intake-question-legacy", true);
+        old.kind = "intake-question".into();
+        fs::write(
+            items_path(dir.path(), vault),
+            serde_json::to_vec(&vec![old.clone()]).unwrap(),
+        )
+        .unwrap();
+        let mut direct = item("intake-question-direct", false);
+        direct.kind = "intake-question".into();
+        assert_eq!(
+            save_intake_questions(dir.path(), vault, vec![old.clone(), direct.clone()])
+                .unwrap()
+                .0,
+            vec![direct.clone()]
+        );
+        let mut inbox = load_inbox(dir.path(), vault);
+        assert!(inbox.items.iter().any(|i| i.id == old.id && i.read));
+        for number in 0..MAX_ITEMS {
+            push_item(
+                &mut inbox.items,
+                item(&format!("unrelated-{number}"), false),
+            );
+        }
+        save_inbox(dir.path(), vault, &inbox).unwrap();
+        assert!(save_intake_questions(dir.path(), vault, vec![old, direct])
+            .unwrap()
+            .0
+            .is_empty());
+        assert_eq!(load_inbox(dir.path(), vault).items, inbox.items);
+    }
+
+    #[test]
+    fn intake_delivery_can_retry_after_a_failed_atomic_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = "/example";
+        let path = items_path(dir.path(), vault);
+        fs::create_dir(&path).unwrap();
+        let direct = item("intake-question-retry", false);
+        assert!(save_intake_questions(dir.path(), vault, vec![direct.clone()]).is_err());
+        fs::remove_dir(&path).unwrap();
+        assert_eq!(
+            save_intake_questions(dir.path(), vault, vec![direct.clone()])
+                .unwrap()
+                .0,
+            vec![direct]
+        );
+    }
+
+    #[test]
+    fn intake_toasts_follow_the_manager_in_app_setting() {
+        let mut settings = Settings::default();
+        assert_eq!(
+            route(&settings, "intake-question"),
+            Route {
+                toast: true,
+                banner: false
+            }
+        );
+        settings.events.manager.in_app = false;
+        assert_eq!(
+            route(&settings, "intake-question"),
+            Route {
+                toast: false,
+                banner: false
+            }
+        );
     }
 }

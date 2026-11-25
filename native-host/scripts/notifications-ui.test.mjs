@@ -39,6 +39,14 @@ test('toSettings keeps what is valid and falls back to the defaults for the rest
   assert.equal(DEFAULT_SETTINGS.events.done.macos, false, 'Done is quiet by default');
 });
 
+test('a direct intake question without a permalink opens its ledger entry', () => {
+  const direct = item({ kind: 'intake-question', taskKey: null,
+    intake: { manager: 'hermes-demo', entry: 'intake-0123456789abcdef' } });
+  assert.equal(actionLabel(direct), '원장 항목 보기');
+  assert.equal(itemAddress(direct), '/manager/hermes-demo?intake=intake-0123456789abcdef');
+  assert.equal(direct.intake.url, undefined);
+});
+
 test('withSwitch changes one switch and leaves the rest', () => {
   assert.equal(withSwitch(DEFAULT_SETTINGS, 'inApp', false).inApp, false);
   assert.equal(withSwitch(DEFAULT_SETTINGS, 'macos', false).macos, false);
