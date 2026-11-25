@@ -2,8 +2,9 @@
 // 태스크를 집고 claude에게 맡기고 보고·질문을 남기는 일은 모두 호스트(Rust, `runner/`)가 한다.
 // 이 모듈은 호스트 명령을 부르고, 호스트가 알려 주는 사건(`ais://runner`)을 받아 기억할 뿐이다.
 import { useEffect, useState, useSyncExternalStore } from "react";
+import type { TypedHostCall } from "../workspace/hostCommands.ts";
 
-export type HostCall = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+export type HostCall = TypedHostCall;
 
 export type RunPhase = "running" | "waiting-answer" | "done" | "failed" | "cancelled" | "abandoned";
 

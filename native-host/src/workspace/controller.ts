@@ -16,6 +16,7 @@ import type { KeyInput } from '../interaction/shortcuts.ts';
 import { readTypography, stepScale } from './typography.ts';
 import type { Typography } from './typography.ts';
 import type { RecentWorkspace, Row, SettingsSection, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import type { TypedHostCall } from './hostCommands.ts';
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
@@ -54,7 +55,7 @@ export interface WorkspacePreferences {
  */
 export interface WorkspaceHostBridge {
   isNative(): boolean;
-  callHost<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+  callHost: TypedHostCall;
   callEngine(request: string[] | Call): Promise<unknown>;
   pickDirectory(): Promise<string | null>;
   chooseFile(extensions: string[]): Promise<string | null>;
@@ -811,7 +812,8 @@ export class WorkspaceController implements WorkspaceNavigation, WorkspacePrefer
     }).catch(() => {});
   }
 
-  callHost = <T,>(command: string, args?: Record<string, unknown>): Promise<T> => this.services.host.invoke<T>(command, args);
+  callHost: TypedHostCall = (<T>(command: string, args?: Record<string, unknown>): Promise<T> =>
+    this.services.host.invoke<T>(command, args)) as TypedHostCall;
   /** 폼에서 폴더 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */
   pickDirectory = (): Promise<string | null> => this.services.host.chooseDirectory().catch(() => null);
   /** 폼에서 확장자가 맞는 파일 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */

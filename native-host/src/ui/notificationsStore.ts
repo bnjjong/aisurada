@@ -4,8 +4,9 @@
 // 집중 모드는 macOS가 처리한다(앱이 상태를 읽지 않는다): 집중 모드에서 aisurada를 허용하지 않으면 OS가 배너를 막는다.
 import { useSyncExternalStore } from "react";
 import { slackLink } from "./intakeModel.ts";
+import type { TypedHostCall } from "../workspace/hostCommands.ts";
 
-export type HostCall = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+export type HostCall = TypedHostCall;
 
 export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "manager" | "intake-question" | "test";
 export type EventKind = Exclude<NotifyKind, "test" | "intake-question">;

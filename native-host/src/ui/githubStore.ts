@@ -2,8 +2,9 @@
 // GitHub에 닿는 일은 모두 호스트(Rust)가 한다. 이 모듈은 호스트 명령을 부르고 결과를 기억할 뿐이다.
 // 개인 키 내용은 화면으로 오지 않는다. 화면은 키 파일의 경로만 호스트에 넘긴다.
 import { useSyncExternalStore } from "react";
+import type { TypedHostCall } from "../workspace/hostCommands.ts";
 
-export type HostCall = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+export type HostCall = TypedHostCall;
 
 export interface GithubStatus {
   connected: boolean;
