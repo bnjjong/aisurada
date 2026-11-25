@@ -37,7 +37,7 @@ export function extractErrorKind(e: unknown): string | undefined {
     if (typeof e.code === "string" && e.code) return e.code;
   }
   const stderr = extractErrorMessage(e);
-  if (/AIS-412/.test(stderr)) return "conflict";
+  if (/AIS-412/.test(stderr)) return "precondition_failed";
   if (/AIS-409/.test(stderr)) return "conflict";
   if (/AIS-404/.test(stderr)) return "not_found";
   if (/AIS-400/.test(stderr)) return "invalid_argument";
@@ -70,7 +70,7 @@ export function explainEngineError(
     if (custom) return custom;
   }
 
-  if (kind === "conflict" || /AIS-412/.test(stderr)) {
+  if (kind === "precondition_failed" || /AIS-412/.test(stderr)) {
     return "다른 곳(AI나 다른 창)에서 먼저 고쳤어요. 목록을 새로 불러온 뒤 다시 고쳐 주세요.";
   }
   if (kind === "no_cli") {

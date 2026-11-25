@@ -81,13 +81,3 @@ for name in compat cli mcp; do
     tail -n 12 "$WORK/$name.log"
 done
 exit "$status"
-
-status=0
-wait "$P1" || status=1
-wait "$P2" || status=1
-wait "$P3" || status=1
-for name in compat cli mcp; do
-    echo "== $name"
-    tail -n 12 "$WORK/$name.log"
-done
-exit "$status"

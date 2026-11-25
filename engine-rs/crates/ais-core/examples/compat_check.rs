@@ -100,8 +100,13 @@ impl Java {
         }
         let diff = tree_diff(a, b);
         if self.tape.borrow().is_record() {
-            let digests = self.digests(a);
-            self.tape.borrow_mut().push_tree(lineage, &digests);
+            let key = [lineage.to_string()];
+            if self.tape.borrow().is_current_recorded_rust("tree", &key) {
+                self.tape.borrow_mut().skip_rust_record().unwrap();
+            } else {
+                let digests = self.digests(a);
+                self.tape.borrow_mut().push_tree(lineage, &digests);
+            }
         }
         diff
     }
@@ -313,7 +318,17 @@ fn compare(
     let is_bless = report.tape.as_ref().is_some_and(|t| t.borrow().is_bless());
     match (java, rust) {
         (Ok(j), Ok(r)) => {
-            let want = convert(vault, &j);
+            let want = if j.is_object()
+                && j.get("items").is_some()
+                && j.get("subNotes").is_none()
+                && j.get("templates").is_none()
+                && j.get("trash").is_none()
+            {
+                // 이미 Rust 모양으로 bless된 테이프 응답이면 convert를 다시 씌우지 않는다
+                j.clone()
+            } else {
+                convert(vault, &j)
+            };
             let ok = want == r;
             if !ok && is_bless {
                 let diff = first_diff(&want, &r, "$");
@@ -631,12 +646,13 @@ fn walk_subs(
         );
     }
     let Ok(list) = &java_list else { return };
-    for row in list
+    let sub_rows = list
         .get("subNotes")
+        .or_else(|| list.get("items"))
         .and_then(Value::as_array)
         .cloned()
-        .unwrap_or_default()
-    {
+        .unwrap_or_default();
+    for row in sub_rows {
         let Some(sub) = row.get("id").and_then(Value::as_str) else {
             continue;
         };
@@ -1403,6 +1419,10 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--bless="))
         .map(PathBuf::from);
+    if bless.is_some() && env::var("CI").is_ok() {
+        eprintln!("CI 환경에서는 --bless를 실행할 수 없습니다");
+        return ExitCode::FAILURE;
+    }
     let write_fixture: Option<PathBuf> = args
         .iter()
         .find_map(|a| a.strip_prefix("--write-fixture="))
@@ -1791,7 +1811,8 @@ fn main() -> ExitCode {
         total.failures.len()
     );
     // 어긋남이 있으면 녹화를 버린다(어긋난 응답을 정답으로 박제하지 않는다). 재생은 테이프가 남지 않았는지 본다.
-    if total.failures.is_empty() || java.tape.borrow().is_bless() {
+    let has_failures = !total.failures.is_empty();
+    if !has_failures {
         match java.tape.borrow().finish() {
             Ok(()) if java.tape.borrow().is_record() => println!(
                 "테이프 {}줄을 적었다: {}",
@@ -1804,7 +1825,10 @@ fn main() -> ExitCode {
             Ok(()) if java.tape.borrow().is_bless() => {
                 let n = java.tape.borrow().blessed_len();
                 if n > 0 {
-                    println!("테이프 {}줄을 다시 받아 적었다", n);
+                    println!("테이프 {}줄을 다시 받아 적었다:", n);
+                    for item in java.tape.borrow().blessed_list() {
+                        println!("  - {item}");
+                    }
                 }
             }
             Ok(()) => {}
@@ -1814,9 +1838,9 @@ fn main() -> ExitCode {
             }
         }
     }
-    if total.failures.is_empty() || java.tape.borrow().is_bless() {
-        ExitCode::SUCCESS
-    } else {
+    if has_failures {
         ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

@@ -11,7 +11,7 @@ import { humanizeAskError } from "../src/plugs/claude/askText.ts";
 test("extractErrorKind recognizes structured kind and AIS-### codes", () => {
   assert.equal(extractErrorKind({ kind: "conflict" }), "conflict");
   assert.equal(extractErrorKind({ kind: "command_not_found" }), "command_not_found");
-  assert.equal(extractErrorKind({ stderr: "AIS-412 precondition failed" }), "conflict");
+  assert.equal(extractErrorKind({ stderr: "AIS-412 precondition failed" }), "precondition_failed");
   assert.equal(extractErrorKind({ stderr: "AIS-409 conflict occurred" }), "conflict");
   assert.equal(extractErrorKind({ stderr: "AIS-404 resource not found" }), "not_found");
   assert.equal(extractErrorKind({ stderr: "AIS-400 invalid argument" }), "invalid_argument");
@@ -61,7 +61,7 @@ test("humanizeAskError branches by kind even if message text is changed or local
 });
 
 test("explainEngineError maintains Korean messages when structured error kinds are provided", () => {
-  const conflict = explainEngineError({ kind: "conflict", message: "concurrent modification" });
+  const conflict = explainEngineError({ kind: "precondition_failed", message: "concurrent modification" });
   assert.match(conflict, /다른 곳\(AI나 다른 창\)에서 먼저 고쳤어요/);
 
   const timeout = explainEngineError({ kind: "timeout", message: "slow backend" });

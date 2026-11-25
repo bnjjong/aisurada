@@ -2114,6 +2114,10 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--bless="))
         .map(PathBuf::from);
+    if bless.is_some() && std::env::var("CI").is_ok() {
+        eprintln!("CI 환경에서는 --bless를 실행할 수 없습니다");
+        return ExitCode::from(2);
+    }
     // 재생이나 bless는 기준 엔진(jar)이 없으므로 위치 인자는 합성 vault 하나다
     let (jar, fixture) = match (&replay, &bless, positional.as_slice()) {
         (Some(_), _, [fixture]) | (_, Some(_), [fixture]) => (String::new(), (*fixture).clone()),
@@ -2169,7 +2173,7 @@ fn main() -> ExitCode {
     for failure in report.failures.iter().take(40) {
         println!("  어긋남: {failure}");
     }
-    let failed = !report.failures.is_empty() && !h.tape.borrow().is_bless();
+    let failed = !report.failures.is_empty();
     // 어긋남이 있으면 녹화를 버린다. 재생은 테이프가 남지 않았는지 본다.
     let tape_error = if failed {
         None
@@ -2183,7 +2187,10 @@ fn main() -> ExitCode {
     } else if !failed && h.tape.borrow().is_bless() {
         let n = h.tape.borrow().blessed_len();
         if n > 0 {
-            println!("테이프 {}줄을 다시 받아 적었다", n);
+            println!("테이프 {}줄을 다시 받아 적었다:", n);
+            for item in h.tape.borrow().blessed_list() {
+                println!("  - {item}");
+            }
         }
     }
     let failed = failed || tape_error.is_some();

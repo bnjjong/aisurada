@@ -647,11 +647,8 @@ export function taskMeta(t: TaskRow): string {
 
 /** 엔진이 돌려준 오류를 사람이 읽을 글로 풀어 쓴다. */
 export function explainError(e: unknown): string {
-  return explainEngineError(e, (stderr, kind) => {
-    if (
-      (kind === "conflict" && (/AIS-409/.test(stderr) || /이미 바뀌었다/.test(stderr))) ||
-      (/AIS-409/.test(stderr) && /이미 바뀌었다/.test(stderr))
-    ) {
+  return explainEngineError(e, (stderr) => {
+    if (/AIS-409/.test(stderr) && /이미 바뀌었다/.test(stderr)) {
       return "다른 곳(러너나 다른 창)에서 먼저 상태를 바꿨어요. 새로 불러온 뒤 다시 해 주세요.";
     }
   });

@@ -37,7 +37,7 @@ test('TypedHostCall: WorkspaceController.callHost passes typed command and argum
   const ctrl = new WorkspaceController(createMockServices(invocations), { kind: 'main' }, '/');
 
   // typed invocation: is_workspace
-  const isWs = await ctrl.callHost('is_workspace', { path: '/test/vault' });
+  const isWs = await ctrl.callHost('is_workspace', { root: '/test/vault' });
   assert.equal(isWs, true);
 
   // typed invocation: read_external_md
@@ -49,7 +49,7 @@ test('TypedHostCall: WorkspaceController.callHost passes typed command and argum
   assert.equal(secret, 'whsec_test123');
 
   assert.equal(invocations.length, 3);
-  assert.deepEqual(invocations[0], { command: 'is_workspace', args: { path: '/test/vault' } });
+  assert.deepEqual(invocations[0], { command: 'is_workspace', args: { root: '/test/vault' } });
   assert.deepEqual(invocations[1], { command: 'read_external_md', args: { path: '/test/note.md' } });
   assert.deepEqual(invocations[2], { command: 'manager_webhook_secret', args: { name: 'slack', action: 'ensure' } });
 

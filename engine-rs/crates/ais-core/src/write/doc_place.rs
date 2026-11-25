@@ -8,7 +8,7 @@ pub use crate::note::placement::{
     CreatedParts, folder_name, folder_name_from, id_tail, parse_date_arg, parse_time_arg,
     read_created,
 };
-pub(crate) use crate::ports::fs;
+use crate::ports::fs;
 use std::path::Path;
 
 use super::confine::{absolute_normalized, has_unusable_path_characters};

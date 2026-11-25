@@ -172,6 +172,7 @@ test('setupPopoverDismiss: Escape 키다운 시 onClose 및 이벤트 전파 방
 
     let defaultPrevented = false;
     let stopped = false;
+    let stopImmediate = false;
     const escEvent = {
       key: 'Escape',
       preventDefault: () => {
@@ -180,12 +181,16 @@ test('setupPopoverDismiss: Escape 키다운 시 onClose 및 이벤트 전파 방
       stopPropagation: () => {
         stopped = true;
       },
+      stopImmediatePropagation: () => {
+        stopImmediate = true;
+      },
     };
 
     env.dispatchWin('keydown', escEvent, true);
     assert.equal(closed, 1);
     assert.equal(defaultPrevented, true);
     assert.equal(stopped, true);
+    assert.equal(stopImmediate, true);
     assert.equal(anchorEl.focused, true);
 
     cleanup();
