@@ -795,8 +795,8 @@ pub const SPECS: &[Spec] = &[
         tool: Some("apply_c4_changes"),
         write: true,
         part4: false,
-        usage: "apply-c4-changes <프로젝트 slug> f1=<직전에 읽은 토큰> operations=<변경 JSON 배열. 예: [{\"op\":\"put_element\",\"id\":\"api\",\"kind\":\"container\",\"name\":\"API\",\"parent\":\"app\"}]>",
-        allowed: &["f1", "operations", "diagram"],
+        usage: "apply-c4-changes <프로젝트 slug> [diagram=<아키텍처 id. 없으면 main>] f1=<직전에 읽은 토큰> operations=<변경 JSON 배열. 예: [{\"op\":\"put_element\",\"id\":\"api\",\"kind\":\"container\",\"name\":\"API\",\"parent\":\"app\"}]>",
+        allowed: &["diagram", "f1", "operations"],
         max: Some(1),
     },
     Spec {
