@@ -19,7 +19,6 @@ import { NotificationSettingsView } from '../src/ui/NotificationSettings.tsx';
 import { SettingsGroup, SettingsPane, SettingsRow } from '../src/ui/SettingsParts.tsx';
 import { ConnectView } from '../src/plugs/claude/connect.tsx';
 import { GithubConnect } from '../src/ui/GithubConnect.tsx';
-import { ArchylConnect } from '../src/ui/archyl/ArchylConnect.tsx';
 
 function harness(t, { context = { kind: 'main' }, values = {} } = {}) {
   const map = new Map(Object.entries(values)), writes = [], warnings = [];
@@ -201,8 +200,8 @@ test('설정 검색: 검색어로 라벨과 키워드를 찾고, AI 제외 옵�
   const reviewResults = searchSettings('리뷰', { claude: true });
   assert.ok(reviewResults.some(r => r.key === 'ntf-events'));
 
-  const c4Results = searchSettings('c4', { claude: true });
-  assert.ok(c4Results.some(r => r.key === 'archyl'));
+  // Archyl 연결 설정은 없어졌다(C4 모델은 vault가 직접 가진다)
+  assert.ok(!searchSettings('archyl', { claude: true }).some(r => r.key === 'archyl'));
 
   const noSpaceResults = searchSettings('제목앞', { claude: true });
   assert.ok(noSpaceResults.some(r => r.key === 'titleDatePrefix'));
@@ -283,7 +282,6 @@ test('색인 전수 검증: SETTINGS_INDEX의 모든 key가 실제 설정 화면
     ),
     connections: React.createElement('div', null,
       React.createElement(GithubConnect, { controller: h.controller }),
-      React.createElement(ArchylConnect, { controller: h.controller }),
       React.createElement(SettingsGroup, null,
         React.createElement(SettingsRow, {
           as: 'div',

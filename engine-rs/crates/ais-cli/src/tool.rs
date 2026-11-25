@@ -668,6 +668,8 @@ fn resource_or_task_tool(
             &TASK_BOOLS,
         ),
         "get_task" => (&["id", "activity"], &TASK_BOOLS),
+        "get_c4_model" => (&["project"], &TASK_BOOLS),
+        "apply_c4_changes" => (&["project", "f1", "operations"], &TASK_BOOLS),
         "add_task_comment" => (&["id", "body"], &TASK_BOOLS),
         "create_task" => (
             &[
@@ -728,7 +730,7 @@ fn resource_or_task_tool(
             }
         } else if (*key == "skills" && matches!(value, JsonValue::Array(_)))
             || (*key == "tools" && matches!(value, JsonValue::Object(_)))
-            || ((*key == "criteria" || *key == "labels" || *key == "refs")
+            || ((*key == "criteria" || *key == "labels" || *key == "refs" || *key == "operations")
                 && matches!(value, JsonValue::Array(_)))
         {
             json::compact(value)
@@ -753,7 +755,7 @@ fn resource_or_task_tool(
         | "get_resource_change"
         | "get_task"
         | "add_task_comment" => &["id"],
-        "usable_resources" => &["project"],
+        "usable_resources" | "get_c4_model" | "apply_c4_changes" => &["project"],
         "set_resource_ref" => &["project", "id"],
         _ => &[],
     };

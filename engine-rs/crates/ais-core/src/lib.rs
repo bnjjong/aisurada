@@ -52,4 +52,4 @@ pub use ais_kernel::{frontmatter, kernel};
 #[cfg(not(feature = "test-support"))]
 pub(crate) use ais_kernel::{frontmatter, kernel};
 
-internal_mods!(commands, model, resource, session, task);
+internal_mods!(c4, commands, model, resource, session, task);

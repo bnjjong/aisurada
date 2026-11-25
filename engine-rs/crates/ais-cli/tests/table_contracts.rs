@@ -212,6 +212,7 @@ fn engine_command_names() -> Vec<&'static str> {
         .chain(registry::ENGINE_COMMANDS_TASKS)
         .chain(registry::ENGINE_COMMANDS_APPROVALS)
         .chain(registry::ENGINE_COMMANDS_SUB_AGENDAS)
+        .chain(registry::ENGINE_COMMANDS_C4)
         .copied()
         .collect()
 }

@@ -62,7 +62,7 @@ fn positional_names(command: &str) -> &'static [&'static str] {
         "history" => &["id", "number"],
         "link-docs" | "link-tasks" => &["from", "to"],
         "restore-doc" | "purge-doc" => &["trashId"],
-        "usable-resources" => &["project"],
+        "usable-resources" | "get-c4-model" | "apply-c4-changes" => &["project"],
         "set-resource-ref" => &["project", "id"],
         "search-docs" => &["query"],
         _ => &[],

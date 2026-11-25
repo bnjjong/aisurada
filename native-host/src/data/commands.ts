@@ -1,5 +1,5 @@
 // Each item is an argv cell. Values pass directly to the host, without a shell.
-export type Fields = Record<string, string | number | boolean | string[] | undefined>;
+export type Fields = Record<string, string | number | boolean | string[] | object[] | undefined>;
 const cells = (fields: Fields) => Object.entries(fields).filter(([, value]) => value !== undefined)
   .map(([key, value]) => `${key}=${Array.isArray(value) ? JSON.stringify(value) : String(value)}`);
 
@@ -25,6 +25,7 @@ const POSITIONAL: Record<string, string[]> = {
   resolve_resource_edit: ['id'],
   get_ask: ['id', 'subId'], append_ask_turn: ['id', 'subId'], list_chats: ['id', 'subId'], append_chat_turn: ['id', 'subId'],
   read_session: ['id'],
+  get_c4_model: ['project'], apply_c4_changes: ['project'],
 };
 /** 자리 인자를 여럿 받는 명령: 호출 객체에서는 그 인자들을 이 이름의 배열로 둔다. */
 const VARIADIC: Record<string, string> = { session_titles: 'ids' };

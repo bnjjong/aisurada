@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARD_HEIGHT, CARD_WIDTH, measureEdge, placeLabels, positionNodes, routeEdges } from '../src/ui/archyl/layout.ts';
+import { CARD_HEIGHT, CARD_WIDTH, measureEdge, placeLabels, positionNodes, routeEdges } from '../src/ui/architecture/layout.ts';
 
 const points = [
   ['person', 0, 64], ['app', 478, 0], ['vault', 1140, -145],
-  ['llm', 1130, 87], ['cli', 1122, 338], ['archyl', 312, 491], ['github', 639, 491],
+  ['llm', 1130, 87], ['cli', 1122, 338], ['catalog', 312, 491], ['github', 639, 491],
 ];
 const nodes = points.map(([id, x, y]) => ({ id, x, y }));
 const edges = routeEdges(nodes, [
@@ -12,7 +12,7 @@ const edges = routeEdges(nodes, [
   ['app', 'vault', '노트, 설정 및 워크트리 파일 읽기/쓰기'],
   ['app', 'llm', '프롬프트 전송 및 에이전트 추론 요청'],
   ['app', 'cli', '터미널 세션 및 빌드/테스트 도구 구동'],
-  ['app', 'archyl', 'C4 아키텍처 모델 조회 및 쓰기'],
+  ['app', 'catalog', 'C4 아키텍처 모델 조회 및 쓰기'],
   ['app', 'github', '원격 브랜치 push, PR 생성 및 변경 검토'],
 ].map(([source, target, label], index) => ({ id: String(index), source, target, label, technology: '' })));
 
@@ -24,9 +24,17 @@ test('관계선은 같은 카드 가장자리에서 간격을 두고 시작한�
   assert.equal(edges[4].start.y, CARD_HEIGHT);
 });
 
-test('Archyl에 저장된 C4 요소 좌표를 유지한다', () => {
-  const model = points.map(([id, x, y]) => ({ id, position: { x, y } }));
-  assert.deepEqual(positionNodes(model).map(({ id, x, y }) => [id, x, y]), points);
+test('저장된 요소 좌표는 그대로 두고, 좌표가 없는 요소는 저장된 요소 아래 격자에 놓는다', () => {
+  const elements = points.map(([id]) => ({ id }));
+  const positions = Object.fromEntries(points.map(([id, x, y]) => [id, { x, y }]));
+  assert.deepEqual(positionNodes(elements, positions).map(({ id, x, y }) => [id, x, y]), points);
+
+  const placed = positionNodes([...elements, { id: 'new-1' }, { id: 'new-2' }], positions);
+  const fresh = placed.slice(points.length);
+  const bottom = Math.max(...points.map(([, , y]) => y)) + CARD_HEIGHT;
+  assert.ok(fresh.every(node => node.y >= bottom), '새 요소는 기존 요소와 겹치지 않는 아래쪽에 놓인다');
+  assert.notDeepEqual([fresh[0].x, fresh[0].y], [fresh[1].x, fresh[1].y]);
+  assert.deepEqual(positionNodes([{ id: 'only' }]).map(({ x, y }) => [x, y]), [[0, 0]]);
 });
 
 test('관계 흐름은 관계선 위에서 출발점부터 화살표까지 이동한다', () => {

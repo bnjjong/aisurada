@@ -1,18 +1,16 @@
-import type { ArchylElement, ArchylModel, ArchylRelationship } from './client.ts';
+import type { C4Element, C4Model, C4Relationship, Point } from './model.ts';
+import { KIND_LABELS, LEVEL_LABELS } from './model.ts';
+
+export { KIND_LABELS, LEVEL_LABELS };
 
 export const CARD_WIDTH = 226;
 export const CARD_HEIGHT = 144;
 const GAP_X = 96;
 const GAP_Y = 50;
-export const LEVEL_LABELS = ['시스템 컨텍스트', '컨테이너', '컴포넌트', '코드'];
-export const KIND_LABELS: Record<string, string> = {
-  person: '사람', system: '시스템', external: '외부 시스템', container: '컨테이너', component: '컴포넌트', code: '코드',
-};
-export type Point = { x: number; y: number };
-export type DiagramNode = ArchylElement & Point;
-export type DiagramEdge = ArchylRelationship & { start: Point; end: Point; a: Point; b: Point };
+export type DiagramNode = C4Element & Point;
+export type DiagramEdge = C4Relationship & { start: Point; end: Point; a: Point; b: Point };
 
-export function projectSlice(model: ArchylModel, level: number, parentId: string | null) {
+export function projectSlice(model: C4Model, level: number, parentId: string | null) {
   const nodes = model.elements.filter(item => item.level === level && (level === 1 || item.parentId === parentId));
   const ids = new Set(nodes.map(item => item.id));
   const related = new Set<string>();
@@ -25,19 +23,14 @@ export function projectSlice(model: ArchylModel, level: number, parentId: string
   return nodes.concat(model.elements.filter(item => !ids.has(item.id) && related.has(item.id)));
 }
 
-export function positionNodes(elements: ArchylElement[]): DiagramNode[] {
-  const occupied = new Set<string>();
+/** 저장된 좌표가 있는 요소는 그 자리에 두고, 없는 요소는 저장된 요소들 아래에 격자로 늘어놓는다. */
+export function positionNodes(elements: C4Element[], positions: Record<string, Point> = {}): DiagramNode[] {
   const fixed: DiagramNode[] = [];
-  const missing: ArchylElement[] = [];
+  const missing: C4Element[] = [];
   for (const item of elements) {
-    const point = item.position;
-    const key = point && JSON.stringify([point.x, point.y]);
-    if (point && key && !occupied.has(key)) {
-      occupied.add(key);
-      fixed.push({ ...item, ...point });
-    } else {
-      missing.push(item);
-    }
+    const point = positions[item.id];
+    if (point) fixed.push({ ...item, x: point.x, y: point.y });
+    else missing.push(item);
   }
   const baselineX = fixed.length ? Math.min(...fixed.map(item => item.x)) : 0;
   const baselineY = fixed.length ? Math.max(...fixed.map(item => item.y)) + CARD_HEIGHT + GAP_Y : 0;
@@ -60,7 +53,7 @@ export function bounds(nodes: DiagramNode[]) {
   };
 }
 
-export function routeEdges(nodes: DiagramNode[], relationships: ArchylRelationship[]): DiagramEdge[] {
+export function routeEdges(nodes: DiagramNode[], relationships: C4Relationship[]): DiagramEdge[] {
   const byId = new Map(nodes.map(item => [item.id, item]));
   const count = new Map<string, number>();
   const edges: DiagramEdge[] = [];

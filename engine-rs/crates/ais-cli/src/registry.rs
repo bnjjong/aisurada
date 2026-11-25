@@ -32,7 +32,7 @@ pub fn tool(name: &str) -> Option<&'static Spec> {
     SPECS.iter().find(|spec| spec.tool == Some(name))
 }
 
-/// `ais-cli`가 도구로 받는 이름 41개
+/// `ais-cli`가 도구로 받는 이름 43개
 pub const CLI_TOOL_NAMES: &[&str] = &[
     "create_doc",
     "update_doc",
@@ -75,6 +75,8 @@ pub const CLI_TOOL_NAMES: &[&str] = &[
     "create_task",
     "add_task_comment",
     "list_decisions",
+    "get_c4_model",
+    "apply_c4_changes",
 ];
 
 /// `--list`가 도구 이름 옆에 적는 한 줄 설명
@@ -123,6 +125,10 @@ pub fn tool_description(name: &str) -> &'static str {
         "create_task" => "새 태스크(티켓) 1건을 만든다",
         "add_task_comment" => "태스크에 댓글을 남긴다",
         "list_decisions" => "노트의 결정 블록(정할 것)과 사람이 남긴 답을 낸다",
+        "get_c4_model" => {
+            "프로젝트의 C4 아키텍처 모델(요소, 관계, 뷰별 위치)을 쓰기 전 토큰과 함께 낸다"
+        }
+        "apply_c4_changes" => "프로젝트의 C4 아키텍처 모델에 변경 묶음을 한 번에 적용한다",
         _ => "",
     }
 }
@@ -240,6 +246,9 @@ pub const ENGINE_COMMANDS_DECISIONS: &[&str] = &["list-decisions", "pending-deci
 
 pub const ENGINE_COMMANDS_SUB_AGENDAS: &[&str] = &["create-sub-agenda", "update-sub-agenda"];
 
+/// C4 아키텍처 모델 명령 2개
+pub const ENGINE_COMMANDS_C4: &[&str] = &["get-c4-model", "apply-c4-changes"];
+
 /// 사이드카 고유 명령 전부를 쉼표로 이은 글
 fn engine_command_list() -> String {
     [
@@ -248,6 +257,7 @@ fn engine_command_list() -> String {
         ENGINE_COMMANDS_APPROVALS.join(", "),
         ENGINE_COMMANDS_DECISIONS.join(", "),
         ENGINE_COMMANDS_SUB_AGENDAS.join(", "),
+        ENGINE_COMMANDS_C4.join(", "),
     ]
     .join(", ")
 }
@@ -264,6 +274,7 @@ pub fn is_engine_command(name: &str) -> bool {
         || ENGINE_COMMANDS_APPROVALS.contains(&name)
         || ENGINE_COMMANDS_DECISIONS.contains(&name)
         || ENGINE_COMMANDS_SUB_AGENDAS.contains(&name)
+        || ENGINE_COMMANDS_C4.contains(&name)
 }
 
 /// `--list`가 찍는 글
@@ -349,6 +360,7 @@ mod tests {
             .chain(ENGINE_COMMANDS_TASKS)
             .chain(ENGINE_COMMANDS_APPROVALS)
             .chain(ENGINE_COMMANDS_SUB_AGENDAS)
+            .chain(ENGINE_COMMANDS_C4)
         {
             assert!(command(name).is_some(), "명령 {name}의 명세가 없다");
         }

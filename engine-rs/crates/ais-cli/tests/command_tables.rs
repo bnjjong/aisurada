@@ -95,6 +95,7 @@ fn differences() -> Vec<String> {
         .chain(registry::ENGINE_COMMANDS_APPROVALS)
         .chain(registry::ENGINE_COMMANDS_DECISIONS)
         .chain(registry::ENGINE_COMMANDS_SUB_AGENDAS)
+        .chain(registry::ENGINE_COMMANDS_C4)
         .map(|c| snake(c))
         .collect();
     for name in cli.difference(&engine) {

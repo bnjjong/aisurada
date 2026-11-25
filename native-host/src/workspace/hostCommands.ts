@@ -68,13 +68,8 @@ export interface HostCommandMap {
   manager_test_webhook: { args: { name: string; url: string; channel: string }; result: { status: number; elapsed: number } };
   manager_send_status: { args: { taskKey: string }; result: unknown };
 
-  // Archyl
-  archyl_status: { args?: Record<string, never>; result: unknown };
-  archyl_login: { args: { readOnly: boolean }; result: unknown };
-  archyl_cancel_login: { args?: Record<string, never>; result: unknown };
-  archyl_disconnect: { args?: Record<string, never>; result: unknown };
-  archyl_model: { args: { projectId: string }; result: unknown };
-  archyl_chat: { args: unknown; result: unknown };
+  // C4 아키텍처 챗
+  c4_chat: { args: unknown; result: unknown };
 
   // 터미널 PTY
   pty_start: { args: unknown; result: unknown };

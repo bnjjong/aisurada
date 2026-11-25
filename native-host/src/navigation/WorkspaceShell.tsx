@@ -18,7 +18,7 @@ import { Calendar, AgendaPage } from "../ui/CalendarAgenda.tsx";
 import { NotesPage } from "../ui/NotesPage.tsx";
 import { ResourcesPage } from "../ui/ResourcesPage.tsx";
 import { GlobalResourcesPage } from "../ui/globalResources/GlobalResourcesPage.tsx";
-import { ArchitecturePage } from "../ui/archyl/ArchitecturePage.tsx";
+import { ArchitecturePage } from "../ui/architecture/ArchitecturePage.tsx";
 import { ManagersPage } from "../ui/ManagersPage.tsx";
 import { ProjectPage } from "../ui/ProjectPage.tsx";
 import { TasksPage } from "../ui/TasksPage.tsx";
