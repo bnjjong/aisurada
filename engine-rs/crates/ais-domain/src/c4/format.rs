@@ -157,6 +157,8 @@ pub fn model_json(model: &Model) -> Json {
                 "target": r.target,
                 "label": r.label,
                 "technology": r.technology,
+                "sourcePort": r.source_port,
+                "targetPort": r.target_port,
             })
         })
         .collect();
@@ -290,6 +292,8 @@ fn relationship_of(value: Value, index: usize) -> Result<Relationship, EngineErr
         target,
         label: take_str(&what, &mut fields, "label")?.unwrap_or_default(),
         technology: take_str(&what, &mut fields, "technology")?.unwrap_or_default(),
+        source_port: take_str(&what, &mut fields, "sourcePort")?.unwrap_or_default(),
+        target_port: take_str(&what, &mut fields, "targetPort")?.unwrap_or_default(),
         extra: fields,
         id,
     })
@@ -351,6 +355,8 @@ fn relationship_value(relation: &Relationship) -> Value {
     ];
     put_str(&mut pairs, "label", &relation.label);
     put_str(&mut pairs, "technology", &relation.technology);
+    put_str(&mut pairs, "sourcePort", &relation.source_port);
+    put_str(&mut pairs, "targetPort", &relation.target_port);
     pairs.extend(relation.extra.iter().map(|(k, v)| (text(k), v.clone())));
     Value::Map(pairs)
 }

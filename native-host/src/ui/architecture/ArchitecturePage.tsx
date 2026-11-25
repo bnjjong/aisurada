@@ -18,7 +18,7 @@ const NO_POSITIONS: Record<string, Point> = {};
 
 type Dialog =
   | { type: 'element'; existing?: C4Element }
-  | { type: 'relation'; existing?: C4Relationship; source?: string; target?: string }
+  | { type: 'relation'; existing?: C4Relationship; source?: string; target?: string; sourcePort?: string; targetPort?: string }
   | { type: 'delete'; target: { kind: 'element' | 'relationship'; id: string } };
 
 export function ArchitecturePage({ slug, state, controller }: {
@@ -214,10 +214,10 @@ function ProjectArchitecture({ project, name, controller }: {
                 selectRelationship={pickRelationship}
                 drill={drill}
                 onMove={moveNodes}
-                onConnect={canAdd ? (source, target) => { setNotice(''); setConnect(null); setDialog({ type: 'relation', source, target }); } : undefined}
-                onReconnect={(id, source, target) => {
+                onConnect={canAdd ? (source, target, sourcePort, targetPort) => { setNotice(''); setConnect(null); setDialog({ type: 'relation', source, target, sourcePort, targetPort }); } : undefined}
+                onReconnect={(id, change) => {
                   setNotice('');
-                  void mutate([{ op: 'put_relationship', id, source, target }]).then(failure => setNotice(failure ?? ''));
+                  void mutate([{ op: 'put_relationship', id, ...change }]).then(failure => setNotice(failure ?? ''));
                 }}
                 resetKey={resetKey}
                 connecting={connect !== null}
@@ -245,7 +245,7 @@ function ProjectArchitecture({ project, name, controller }: {
         <ElementFormModal model={model} level={level} parentId={parentKey} existing={dialog.existing} submit={mutate} close={() => setDialog(null)} />
       )}
       {model && dialog?.type === 'relation' && (
-        <RelationFormModal model={model} existing={dialog.existing} source={dialog.source} target={dialog.target} submit={mutate} close={() => setDialog(null)} />
+        <RelationFormModal model={model} existing={dialog.existing} source={dialog.source} target={dialog.target} sourcePort={dialog.sourcePort} targetPort={dialog.targetPort} submit={mutate} close={() => setDialog(null)} />
       )}
       {deleting && (
         <Confirm title="지울까요?" description={deleteText} close={() => setDialog(null)} accept={() => confirmDelete(deleting)} />
