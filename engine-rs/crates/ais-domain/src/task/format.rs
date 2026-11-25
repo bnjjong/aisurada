@@ -725,7 +725,7 @@ pub fn refs(raw: &Json) -> Result<Vec<Ref>, EngineError> {
                 json::java_record_string(item)
             )));
         };
-        let Some(kind) = RefKind::parse(&kind_str) else {
+        let Some(kind) = RefKind::parse(java_trim(&kind_str)) else {
             return Err(bad(format!(
                 "refs 항목이 틀렸다. note 는 노트 id(nd…), github 는 owner/name#번호나 이슈·PR 주소여야 한다: {}",
                 json::java_record_string(item)

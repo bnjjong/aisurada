@@ -74,6 +74,16 @@ test('8.10: the turn id, the cut of 20,000 characters, the failure text and the 
   assert.deepEqual(failed.images, ['attach/a.png']);
 });
 
+test('TSK-4: a rail answer that is ok but blank becomes an error turn; a real answer is untouched', () => {
+  const blank = railTurnFrom({ id: 'rt3', askedAt: 't', question: 'q', model: 'm', effort: 'e', images: [], answer: { ok: true, answer: ' \n', elapsed_ms: 30100 } });
+  assert.match(blank.error, /답이 비어 있다/);
+  assert.equal(blank.answer, '');
+  assert.equal(blank.elapsedMs, 30100);
+  const real = railTurnFrom({ id: 'rt4', askedAt: 't', question: 'q', model: 'm', effort: 'e', images: [], answer: { ok: true, answer: '답', elapsed_ms: 1 } });
+  assert.equal(real.error, undefined);
+  assert.equal(real.answer, '답');
+});
+
 test('8.14: merging the file with the memory', () => {
   const chat = (id, count) => ({ noteId: 'n', chatId: id, sourceSessionId: 's', createdAt: '', turns: Array.from({ length: count }, (_, i) => ({ id: `${id}${i}`, askedAt: '', question: '', answer: '', model: '', effort: '', elapsedMs: 0 })) });
   const merged = mergeChats([chat('a', 1), chat('b', 1)], [chat('a', 2), chat('c', 1), chat('d', 1)], new Set(['d']));

@@ -357,6 +357,17 @@ export function mergeUnsaved(saved: AskThread, memory: AskThread | null): AskThr
   return kept.length === 0 ? saved : { ...saved, turns: [...saved.turns, ...kept] };
 }
 
+/** TSK-4: 호스트(`ask.rs`)가 빈 답에 붙이는 글자. 이 글자로 「답이 비어 끝난 물음」을 알아본다. */
+export const EMPTY_ANSWER_MARK = '답이 비어 있다';
+
+/** TSK-4: 호스트가 ok 로 답했는데 글이 없을 때 화면이 직접 채우는 까닭. */
+export const EMPTY_ANSWER_ERROR = `AI가 종료 코드 0 으로 끝났지만 ${EMPTY_ANSWER_MARK}. 도구 실행이 실패했을 수 있다.`;
+
+/** TSK-4: ok 인데 글이 비었으면 실패로 본다. 소요 시간만 남는 「무응답」 말풍선을 막는다. */
+export function isBlankAnswer(ok: boolean, answer: string | null | undefined): boolean {
+  return ok && !(answer ?? '').trim();
+}
+
 /** C4: 실패 에러 문자열 또는 종류(kind)를 사용자가 이해하기 쉬운 한국어로 변환 */
 export function humanizeAskError(raw: unknown): { message: string; raw: string; kind?: string } {
   if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
@@ -382,6 +393,10 @@ export function humanizeAskError(raw: unknown): { message: string; raw: string; 
 
   const text = typeof raw === 'string' ? raw : String(raw ?? '');
   if (!text) return { message: '답변을 받아오지 못했어요.', raw: '' };
+
+  if (text.includes(EMPTY_ANSWER_MARK)) {
+    return { message: 'AI가 답을 주지 않았어요. 도구 실행이 실패했을 수 있어요. 다시 질문해 주세요.', raw: text, kind: 'empty_answer' };
+  }
 
   const lower = text.toLowerCase();
   if (

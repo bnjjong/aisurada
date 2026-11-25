@@ -78,6 +78,10 @@ wait "$P2" || status=1
 wait "$P3" || status=1
 for name in compat cli mcp; do
     echo "== $name"
-    tail -n 12 "$WORK/$name.log"
+    if [ "$MODE" = "bless" ]; then
+        cat "$WORK/$name.log"
+    else
+        tail -n 12 "$WORK/$name.log"
+    fi
 done
 exit "$status"
