@@ -70,7 +70,7 @@ fn cases() -> Vec<String> {
     add(r#"{"jsonrpc":"2.0","id":"abc","method":"tools/list","params":{}}"#);
 
     // 모든 도구 호출(읽기 모드에서는 쓰기 도구가 막히고, 쓰기 모드에서는 영구 삭제만 막힌다)
-    // Java 엔진 시절 이후 추가된 새 도구(create_task, add_task_comment, list_decisions, get_c4_model, apply_c4_changes)는 Java 기준 테이프와 견줄 때 제외한다
+    // Java 엔진 시절 이후 추가된 새 도구(create_task, add_task_comment, list_decisions, get_c4_model, apply_c4_changes와 C4 아키텍처 관리 4개)는 Java 기준 테이프와 견줄 때 제외한다
     for (n, name) in CLI_TOOL_NAMES
         .iter()
         .filter(|&&name| {
@@ -81,6 +81,10 @@ fn cases() -> Vec<String> {
                     | "list_decisions"
                     | "get_c4_model"
                     | "apply_c4_changes"
+                    | "list_c4_diagrams"
+                    | "create_c4_diagram"
+                    | "rename_c4_diagram"
+                    | "delete_c4_diagram"
             )
         })
         .enumerate()

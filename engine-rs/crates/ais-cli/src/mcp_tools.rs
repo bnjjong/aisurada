@@ -297,17 +297,45 @@ pub const TOOLS: &[McpTool] = &[
     },
     McpTool {
         name: "get_c4_model",
-        description: "프로젝트의 C4 아키텍처 모델을 읽는다: 요소(사람, 시스템, 외부 시스템, 컨테이너, 컴포넌트), 관계, 뷰별 위치. 응답의 precondition은 apply_c4_changes의 f1에 그대로 넣는다. 아직 모델이 없는 프로젝트는 빈 모델이 온다. 요소의 level은 1(시스템 컨텍스트), 2(컨테이너), 3(컴포넌트)이다.",
-        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"}},"required":["project"],"additionalProperties":false}"#,
+        description: "프로젝트의 C4 아키텍처 모델을 읽는다: 요소(사람, 시스템, 외부 시스템, 컨테이너, 컴포넌트), 관계, 뷰별 위치. 응답의 precondition은 apply_c4_changes의 f1에 그대로 넣는다. 프로젝트는 아키텍처를 여러 개 가질 수 있고 diagram으로 고른다(안 주면 main). 응답의 diagram에 id와 이름이 있다. 아직 모델이 없는 프로젝트는 빈 모델이 온다. 요소의 level은 1(시스템 컨텍스트), 2(컨테이너), 3(컴포넌트)이다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main(기존 아키텍처). list_c4_diagrams로 목록을 본다."}},"required":["project"],"additionalProperties":false}"#,
         write: false,
         destructive: false,
     },
     McpTool {
         name: "apply_c4_changes",
         description: "프로젝트의 C4 아키텍처 모델에 변경 묶음을 한 번에 적용한다. 하나라도 틀리면 아무것도 바꾸지 않고 몇 번째 변경이 왜 틀렸는지 알린다. f1이 꼭 필요하다(직전에 get_c4_model이나 apply_c4_changes가 준 precondition). 그 사이 다른 곳에서 고쳐졌으면 거절한다. 변경(op): put_element(id, kind, name, description, technology, parent, codeRef: 없는 id면 만들고 있으면 준 칸만 고친다. kind는 person, system, external, container, component. container의 parent는 system, component의 parent는 container), delete_element(id: 자식과 닿은 관계도 함께 지운다), put_relationship(id 선택, source, target, label, technology, sourcePort, targetPort: id를 안 주면 새 id를 붙인다. 있는 id면 준 칸만 고친다. sourcePort와 targetPort는 선이 출발·도착 카드의 어느 연결 지점에 붙는지이고 top-1, top-2, top-3, bottom-1, bottom-2, bottom-3, left-1, left-2, left-3, right-1, right-2, right-3 중 하나다. 빈 글이면 자동 배치로 돌아간다), delete_relationship(id), set_positions(view, positions: view는 context, container:<시스템 id>, component:<컨테이너 id>, positions는 요소나 관계 id별 {x, y}). id는 영문자나 숫자로 시작하고 영문자, 숫자, -, _ 만 쓰는 64자 이하다.",
-        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"f1":{"type":"string","description":"쓰기 전 토큰. 직전에 get_c4_model이나 apply_c4_changes가 준 precondition 값(f1:…)을 그대로 넣는다. 안 주면 거절된다."},"operations":{"type":"array","minItems":1,"maxItems":200,"description":"순서대로 적용할 변경 목록","items":{"type":"object","properties":{"op":{"type":"string","enum":["put_element","delete_element","put_relationship","delete_relationship","set_positions"]},"id":{"type":"string"},"kind":{"type":"string","enum":["person","system","external","container","component"]},"name":{"type":"string"},"description":{"type":"string"},"technology":{"type":"string"},"parent":{"type":"string"},"codeRef":{"type":"string"},"source":{"type":"string"},"target":{"type":"string"},"label":{"type":"string"},"sourcePort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"targetPort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"view":{"type":"string"},"positions":{"type":"object","additionalProperties":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"],"additionalProperties":false}}},"required":["op"],"additionalProperties":false}}},"required":["project","f1","operations"],"additionalProperties":false}"#,
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main(기존 아키텍처). list_c4_diagrams로 목록을 본다."},"f1":{"type":"string","description":"쓰기 전 토큰. 직전에 get_c4_model이나 apply_c4_changes가 준 precondition 값(f1:…)을 그대로 넣는다. 안 주면 거절된다."},"operations":{"type":"array","minItems":1,"maxItems":200,"description":"순서대로 적용할 변경 목록","items":{"type":"object","properties":{"op":{"type":"string","enum":["put_element","delete_element","put_relationship","delete_relationship","set_positions"]},"id":{"type":"string"},"kind":{"type":"string","enum":["person","system","external","container","component"]},"name":{"type":"string"},"description":{"type":"string"},"technology":{"type":"string"},"parent":{"type":"string"},"codeRef":{"type":"string"},"source":{"type":"string"},"target":{"type":"string"},"label":{"type":"string"},"sourcePort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"targetPort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"view":{"type":"string"},"positions":{"type":"object","additionalProperties":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"],"additionalProperties":false}}},"required":["op"],"additionalProperties":false}}},"required":["project","f1","operations"],"additionalProperties":false}"#,
         write: true,
         destructive: false,
+    },
+    McpTool {
+        name: "list_c4_diagrams",
+        description: "프로젝트가 가진 C4 아키텍처(다이어그램) 목록을 낸다. 항목마다 id, name, elements와 relationships 개수가 있다. 첫 항목은 늘 main(기존 아키텍처)이다. id를 get_c4_model과 apply_c4_changes의 diagram에 넣는다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"}},"required":["project"],"additionalProperties":false}"#,
+        write: false,
+        destructive: false,
+    },
+    McpTool {
+        name: "create_c4_diagram",
+        description: "프로젝트에 새 C4 아키텍처를 빈 모델로 만든다. id는 arch-2, arch-3처럼 자동으로 붙고 응답에 온다. 이름은 60자 이하이고 같은 프로젝트 안에서 겹칠 수 없다. 프로젝트마다 50개까지 만들 수 있다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"name":{"type":"string","description":"아키텍처 이름(60자 이하)"}},"required":["project","name"],"additionalProperties":false}"#,
+        write: true,
+        destructive: false,
+    },
+    McpTool {
+        name: "rename_c4_diagram",
+        description: "C4 아키텍처의 이름만 바꾼다. 모델과 precondition은 그대로다. id(diagram)는 바뀌지 않는다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id(main도 된다)"},"name":{"type":"string","description":"새 이름(60자 이하)"}},"required":["project","diagram","name"],"additionalProperties":false}"#,
+        write: true,
+        destructive: false,
+    },
+    McpTool {
+        name: "delete_c4_diagram",
+        description: "C4 아키텍처를 파일째 지운다. 사람이 지우라고 했을 때만 쓴다. main을 지우면 요소와 관계가 모두 사라지고 빈 main이 된다. 되살리는 길은 vault의 git 이력뿐이다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"지울 아키텍처 id"}},"required":["project","diagram"],"additionalProperties":false}"#,
+        write: true,
+        destructive: true,
     },
 ];
 

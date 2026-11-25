@@ -668,8 +668,12 @@ fn resource_or_task_tool(
             &TASK_BOOLS,
         ),
         "get_task" => (&["id", "activity"], &TASK_BOOLS),
-        "get_c4_model" => (&["project"], &TASK_BOOLS),
-        "apply_c4_changes" => (&["project", "f1", "operations"], &TASK_BOOLS),
+        "get_c4_model" => (&["project", "diagram"], &TASK_BOOLS),
+        "apply_c4_changes" => (&["project", "diagram", "f1", "operations"], &TASK_BOOLS),
+        "list_c4_diagrams" => (&["project"], &TASK_BOOLS),
+        "create_c4_diagram" => (&["project", "name"], &TASK_BOOLS),
+        "rename_c4_diagram" => (&["project", "diagram", "name"], &TASK_BOOLS),
+        "delete_c4_diagram" => (&["project", "diagram"], &TASK_BOOLS),
         "add_task_comment" => (&["id", "body"], &TASK_BOOLS),
         "create_task" => (
             &[
@@ -755,7 +759,8 @@ fn resource_or_task_tool(
         | "get_resource_change"
         | "get_task"
         | "add_task_comment" => &["id"],
-        "usable_resources" | "get_c4_model" | "apply_c4_changes" => &["project"],
+        "usable_resources" | "get_c4_model" | "apply_c4_changes" | "list_c4_diagrams"
+        | "create_c4_diagram" | "rename_c4_diagram" | "delete_c4_diagram" => &["project"],
         "set_resource_ref" => &["project", "id"],
         _ => &[],
     };
