@@ -23,12 +23,10 @@ pub async fn announce_self_write<R: Runtime>(
     rel_path: String,
 ) -> Result<(), String> {
     validate_relative(&rel_path)?;
-    let current = state
-        .vault
-        .lock()
-        .map_err(|_| "vault 잠금을 얻지 못했다")?
-        .clone();
-    if current.as_deref() != Some(root.as_str()) {
+    let Some(current) = state.current_vault() else {
+        return Ok(());
+    };
+    if current != root {
         return Ok(());
     }
     window

@@ -80,7 +80,9 @@ fn run_with_grace(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = command.spawn().map_err(RunError::Spawn)?;
-    let deadline = Instant::now() + timeout;
+    let deadline = Instant::now()
+        .checked_add(timeout)
+        .unwrap_or_else(|| Instant::now() + Duration::from_secs(86400 * 365));
     if let Some(mut stdin) = child.stdin.take() {
         thread::spawn(move || {
             let _ = stdin.write_all(input.as_deref().unwrap_or_default());
@@ -159,7 +161,9 @@ fn terminate(child: &mut Child, grace: Duration) {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
-    let deadline = Instant::now() + grace;
+    let deadline = Instant::now()
+        .checked_add(grace)
+        .unwrap_or_else(|| Instant::now() + Duration::from_secs(60));
     loop {
         if matches!(child.try_wait(), Ok(Some(_))) {
             return;
@@ -276,5 +280,15 @@ mod tests {
             thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(std::fs::read(marker).unwrap(), b"alive");
+    }
+
+    #[test]
+    fn huge_timeout_does_not_overflow_or_panic() {
+        let mut c = command("echo ok");
+        let Outcome::Finished(output) = run(&mut c, None, Duration::MAX).unwrap() else {
+            panic!("should finish");
+        };
+        assert!(output.status.success());
+        assert_eq!(output.stdout.trim_ascii(), b"ok");
     }
 }

@@ -62,11 +62,7 @@ fn check<R: Runtime>(app: &AppHandle<R>) {
     let Some(state) = app.try_state::<HostState>() else {
         return;
     };
-    let vault = match state.vault.lock() {
-        Ok(g) => g.clone(),
-        Err(_) => None,
-    };
-    let Some(vault) = vault else { return };
+    let Some(vault) = state.current_vault() else { return };
     let argv = ["list-resource-changes".to_string(), "decided=0".to_string()];
     let Ok(reply) = sidecar::call_blocking(app, &vault, &argv) else {
         return;

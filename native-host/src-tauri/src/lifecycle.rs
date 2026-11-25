@@ -18,6 +18,20 @@ pub struct HostState {
     pub layout_generation: AtomicU64,
 }
 impl HostState {
+    /// 현재 열려 있는 vault 경로를 돌려줍니다. 잠금에 실패하면 None입니다.
+    pub fn current_vault(&self) -> Option<String> {
+        self.vault.lock().ok()?.clone()
+    }
+
+    /// 현재 열려 있는 vault 경로를 돌려주거나, 잠금 실패/미열림 시 한국어 에러를 돌려줍니다.
+    pub fn require_vault(&self) -> Result<String, String> {
+        self.vault
+            .lock()
+            .map_err(|_| "vault 잠금을 얻지 못했어요.".to_string())?
+            .clone()
+            .ok_or_else(|| "vault가 아직 열리지 않았어요.".to_string())
+    }
+
     pub fn page_loaded(&self, label: &str) {
         if label == "main" {
             self.reap_terminals();
