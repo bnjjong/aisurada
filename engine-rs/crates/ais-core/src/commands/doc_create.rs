@@ -12,9 +12,9 @@ use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 use crate::note::create::{NewDocInput, ParsedNewDoc};
 use crate::note::front::check_size;
-use crate::text::encode_uri_component;
-use crate::vault::agenda::AgendaInfo;
-use crate::vault::scanner::NoteRecord;
+use crate::text::{encode_uri_component, is_blank};
+use crate::vault::agenda::{AgendaInfo, scan_agendas};
+use crate::vault::scanner::{NoteRecord, scan_notes};
 use crate::vault::sub_agenda;
 use crate::write::apparatus::{format_utc_millis, next_id, next_note_id, now_millis};
 use crate::write::atomic::write_atomic;
@@ -124,11 +124,14 @@ pub fn create_doc_in(
     // 날짜와 시각 배정: 오늘과 그날 겹치지 않는 5분 칸
     let millis = now_millis();
     let now = local_clock(millis);
+    let all_notes = (context.manager.is_some() && request.time.as_deref().is_none_or(is_blank)).then(|| {
+        let agendas = scan_agendas(vault);
+        scan_notes(vault, &agendas.table)
+    });
+    let existing = scope.index.root_notes().chain(all_notes.iter().flat_map(|scan| &scan.notes));
     let (date, hour, minute, created) = parsed.slot(
         &now,
-        scope
-            .index
-            .root_notes()
+        existing
             .filter(|note| !note.meta.tier.is_record())
             .map(|note| note.meta.created.as_str()),
     );

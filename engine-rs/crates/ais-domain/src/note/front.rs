@@ -4,8 +4,11 @@ use super::meta::{Evaluation, Format, Link, MetaData, agent_for_file};
 use crate::error::EngineError;
 use crate::frontmatter::dump_string;
 use crate::frontmatter::{Value, dump_general_map};
-use crate::kernel::tier::Tier;
-use crate::kernel::time::{civil_from_days, format_utc_millis};
+use crate::kernel::{
+    actor::valid_manager_name,
+    tier::Tier,
+    time::{civil_from_days, format_utc_millis},
+};
 
 pub struct NoteFront<'a> {
     pub id: &'a str,
@@ -204,6 +207,38 @@ pub struct Draft<'a> {
     pub links: &'a [Link],
 }
 
+fn keep_manager_position(mut front: String, raw: &[(Value, Value)]) -> String {
+    let Some(index) = raw.iter().position(|(key, value)| {
+        matches!((key, value), (Value::Str(key), Value::Str(name))
+            if key == "manager" && valid_manager_name(name))
+    }) else {
+        return front;
+    };
+    let position = |key: &str| {
+        if front.starts_with(&format!("{key}:")) {
+            Some(0)
+        } else {
+            front.find(&format!("\n{key}:")).map(|at| at + 1)
+        }
+    };
+    let Some(start) = position("manager") else {
+        return front;
+    };
+    let next = raw[index + 1..].iter().find_map(|(key, _)| {
+        let Value::Str(key) = key else { return None };
+        position(key)
+    });
+    if let Some(next) = next.filter(|next| *next < start) {
+        let end = front[start..]
+            .find('\n')
+            .map_or(front.len(), |at| start + at + 1);
+        let line = front[start..end].to_owned();
+        front.replace_range(start..end, "");
+        front.insert_str(next, &line);
+    }
+    front
+}
+
 /// 편집 도장 판정(1.10)을 하고 쓸 파일 글 전체를 돌려준다.
 ///
 /// A는 옛 도장을 넣어 새 값으로 지은 글(본문은 `body`), B는 파일의 옛 머리 맵을 그대로 다시 쓴 글(본문은 `old_body`)이다.
@@ -219,7 +254,7 @@ pub fn judge(
     now_millis: i64,
 ) -> Result<String, EngineError> {
     let meta = draft.meta;
-    // 엔진이 모르는 머리 칸은 그대로 이어 쓴다. 맨 끝에 붙으므로 모르는 칸이 가운데 있던 노트는 처음 한 번 순서가 바뀌고, 그 쓰기는 편집 도장이 찍힌다
+    // 엔진이 모르는 머리 칸은 끝에 이어 쓴다. 매니저의 출처 표시는 기존 위치를 우선한다.
     let extra = extra_front(raw);
     let now = format_utc_millis(now_millis);
     let mut front = NoteFront {
@@ -251,8 +286,10 @@ pub fn judge(
     } else {
         ("---\n", "---\n")
     };
-    let without_missing_times =
-        front.render_with_times(meta.created_at.is_some(), meta.edited_at.is_some());
+    let without_missing_times = keep_manager_position(
+        front.render_with_times(meta.created_at.is_some(), meta.edited_at.is_some()),
+        raw,
+    );
     // 누락을 채운 것만으로 기존 수정 시각이 바뀌지 않게 비교한다.
     let mut original = raw.to_vec();
     original.retain(|(key, _)| {
@@ -278,9 +315,15 @@ pub fn judge(
         front.edited_at = edited_at;
         front.edited_session_id = edited_session;
         front.edited_session_agent = edited_agent.as_deref();
-        return Ok(format!("{open}{}{close}{body}", front.render()));
+        return Ok(format!(
+            "{open}{}{close}{body}",
+            keep_manager_position(front.render(), raw)
+        ));
     }
-    Ok(format!("{open}{}{close}{body}", front.render()))
+    Ok(format!(
+        "{open}{}{close}{body}",
+        keep_manager_position(front.render(), raw)
+    ))
 }
 
 /// 한국 시각(+09:00)으로 분까지 적은 글 `yyyy-MM-ddTHH:mm:00+09:00`

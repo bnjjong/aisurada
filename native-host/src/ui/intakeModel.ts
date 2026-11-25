@@ -77,9 +77,16 @@ export type IntakeSource =
   Pick<IntakeEntry, "id" | "source" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded" | "reactions">
   & Partial<Pick<IntakeEntry, "manager" | "receivedAt">>;
 
+export type IntakeAttentionReason = "question_limit" | "no_answer";
+export const attentionLabel: Record<IntakeAttentionReason, string> = {
+  question_limit: "질문 한도", no_answer: "답 없음",
+};
+interface IntakeAttention { reason: IntakeAttentionReason; at: number }
+
 export interface IntakeRow {
   entry: IntakeEntry;
   current: IntakeProcessing;
+  attention?: IntakeAttention;
   taskRepo?: string | null;
   repeatCount?: number | null;
 }
@@ -91,6 +98,7 @@ export interface IntakeData {
   counts: [number, number, number, number, number];
   waiting: number;
   stalledMinutes: number | null;
+  attention?: (IntakeAttention & { id: string; revision: string; url: string; excerpt?: string })[];
 }
 
 export const resultLabel: Record<IntakeResult, string> = {

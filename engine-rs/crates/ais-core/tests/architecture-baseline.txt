@@ -41,7 +41,7 @@ edge model -> vault 10
 edge note -> error 8
 edge note -> frontmatter 4
 edge note -> json 1
-edge note -> kernel 21
+edge note -> kernel 20
 edge note -> text 10
 edge ports -> adapters 1
 edge ports -> error 2

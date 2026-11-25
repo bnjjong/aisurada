@@ -36,13 +36,28 @@ export interface ManagerItem {
   intakeIssue?: string | null;
   work?: ManagerWork | null;
   workIssue?: string | null;
-  history: { firstCall: number | null; events: ManagerEvent[] };
+  history: {
+    firstCall: number | null;
+    events: ManagerEvent[];
+    revision?: string;
+    latestCall?: ManagerEvent | null;
+    latestSuccess?: ManagerEvent | null;
+    latestWebhook?: ManagerEvent | null;
+    today?: DailyCalls;
+  };
+}
+interface DailyCalls {
+  calls: number;
+  notes: number;
+  rejected: number;
+  sent: number;
 }
 
 interface ManagerWork { tasks: number; comments: number }
 export interface ManagerDashboard {
   items: ManagerItem[];
   names: string[];
+  registryIssue?: string | null;
   defaultTools: string[];
   optionalTools: string[];
   defaultNotify: string[];
@@ -79,7 +94,8 @@ export function ManagersProvider({ controller, workspace, showWork, children }: 
       readingWork.current = current;
     }
     try {
-      const value = await controller.callEngine(includeWork ? ["manager", "dashboard"] : ["manager", "dashboard", "--summary"]) as ManagerDashboard;
+      const args = ["manager", "dashboard", "--compact", ...(includeWork ? [] : ["--summary"])];
+      const value = await controller.callEngine(args) as ManagerDashboard;
       if (!Array.isArray(value?.items)) throw new Error("매니저 등록부 응답을 읽지 못했어요.");
       if (current === request.current) {
         setData(previous => {
@@ -126,11 +142,31 @@ export const writeTools = ["create_task", "add_task_comment", "create_doc"];
 export const kindLabel = (kind: ManagerKind) => kind === "hermes" ? "Hermes" : "다른 MCP 에이전트";
 export const webhookEvent = (event: ManagerEvent) => event.tool === "status_webhook" || event.tool === "test_webhook";
 export const deliveryIssue = (item: ManagerItem) => item.manager.enabled && item.manager.notifyEnabled &&
-  !!item.manager.webhook && item.history.events.find(webhookEvent)?.result === "failed";
+  !!item.manager.webhook && latestWebhook(item.history)?.result === "failed";
 export const enabledManagers = (data: ManagerDashboard | null) =>
   data?.items.filter(({ manager, issue }) => manager.enabled && !!manager.project && !issue) ?? [];
 
-export const todayEvents = (events: ManagerEvent[]) => {
+type ManagerHistory = ManagerItem["history"];
+export const latestCall = (history: ManagerHistory) =>
+  history.latestCall ?? history.events.find(event => !webhookEvent(event));
+export const latestSuccess = (history?: ManagerHistory) =>
+  history?.latestSuccess ?? history?.events.find(event => !webhookEvent(event) && event.result === "ok");
+export const latestWebhook = (history: ManagerHistory) =>
+  history.latestWebhook ?? history.events.find(webhookEvent);
+
+export function dailyCalls({ today, events }: ManagerHistory): DailyCalls {
+  if (today) return today;
+  const relevant = todayEvents(events);
+  const ok = (tool: string) => relevant.filter(event => event.result === "ok" && event.tool === tool).length;
+  return {
+    calls: relevant.filter(event => !webhookEvent(event)).length,
+    notes: ok("create_doc"),
+    rejected: relevant.filter(event => event.result === "rejected").length,
+    sent: ok("status_webhook"),
+  };
+}
+
+const todayEvents = (events: ManagerEvent[]) => {
   const start = new Date().setHours(0, 0, 0, 0);
   return events.filter(event => event.at >= start);
 };

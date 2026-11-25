@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::Skipped;
-use super::agenda::{AgendaScan, AgendaTable, scan_agendas};
+use super::agenda::{AgendaScan, AgendaTable, scan_agendas, scan_agendas_for_project};
 use super::comment_copy;
 use super::scanner::{NoteRecord, NoteScan, scan_note_paths, scan_notes, scan_project_notes};
 use super::sub_agenda::{self, SubAgenda};
@@ -55,7 +55,7 @@ impl NoteIndex {
         super::check_manager_project(root, manager)?;
         match Self::build_with(root, Some(&manager.project), scan_project_notes) {
             (_, Some(_)) => Err(EngineError::conflict(
-                "매니저가 쓰기 전에 프로젝트의 노트와 아젠다를 확인해 주세요",
+                "매니저가 쓰기 전에 이 프로젝트의 아젠다 주소와 노트의 댓글 식별자가 겹치는지 확인해 주세요",
             )),
             (index, None) => Ok(index),
         }
@@ -87,11 +87,14 @@ impl NoteIndex {
     ) -> (NoteIndex, Option<EngineError>) {
         let vault_root =
             std::path::absolute(vault_root).unwrap_or_else(|_| vault_root.to_path_buf());
-        let mut agendas = scan_agendas(&vault_root);
-        if let Some(project) = project {
-            agendas.table.retain_project(project);
-            agendas.skipped.clear();
-        }
+        let mut agendas = match project {
+            Some(project) => {
+                let mut scoped = scan_agendas_for_project(&vault_root, project);
+                scoped.skipped.clear();
+                scoped
+            }
+            None => scan_agendas(&vault_root),
+        };
         let mut scan = scan_with(&vault_root, &agendas.table);
         let mut sub_agendas = HashMap::new();
         if fs::metadata(vault_root.join(sub_agenda::DIR)).is_ok() {

@@ -19,7 +19,7 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
-pub const KINDS: [&str; 9] = [
+pub const KINDS: [&str; 10] = [
     "question",
     "pr",
     "failed",
@@ -28,6 +28,7 @@ pub const KINDS: [&str; 9] = [
     "decision",
     "manager",
     "intake-question",
+    "intake-review",
     "test",
 ];
 /// 목록에 두는 알림의 수. 넘으면 오래된 것부터 버린다.
@@ -184,7 +185,7 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "approval" => settings.events.approval,
         "decision" => settings.events.decision,
         "manager" => settings.events.manager,
-        "intake-question" => Channel {
+        "intake-question" | "intake-review" => Channel {
             in_app: settings.events.manager.in_app,
             macos: false,
         },
@@ -345,7 +346,7 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         _ => None,
     };
     let intake = match (new.kind.as_str(), new.intake) {
-        ("intake-question", Some(target)) => {
+        ("intake-question" | "intake-review", Some(target)) => {
             let valid_entry = match target.url.as_deref() {
                 Some(url) => {
                     url.len() <= 512
@@ -364,8 +365,8 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
             }
             Some(target)
         }
-        ("intake-question", None) | (_, Some(_)) => {
-            return Err("되물음 알림의 원장 항목을 지정한다".into())
+        ("intake-question" | "intake-review", None) | (_, Some(_)) => {
+            return Err("접수 알림의 원장 항목을 지정한다".into())
         }
         _ => None,
     };
@@ -608,8 +609,9 @@ pub fn deliver_intake_questions<R: Runtime>(
     let _guard = state.lock.lock().map_err(|_| "알림 잠금을 얻지 못했다")?;
     let dir = default_dir();
     let (added, unread) = save_intake_questions(&dir, vault, items)?;
-    let toast = route(&load_settings(&dir), "intake-question").toast;
+    let settings = load_settings(&dir);
     for item in added {
+        let toast = route(&settings, &item.kind).toast;
         let _ = app.emit(
             NOTIFICATIONS,
             Changed {
@@ -656,8 +658,8 @@ pub fn notifications_push<R: Runtime>(
     if expected_vault.is_some_and(|expected| expected != vault) {
         return Err("알림을 보내기 전에 열린 vault가 바뀌었다".into());
     }
-    if item.kind == "intake-question" {
-        return Err("되물음 알림은 저장된 원장에서 가져온다".into());
+    if matches!(item.kind.as_str(), "intake-question" | "intake-review") {
+        return Err("제보 알림은 저장된 원장에서 가져온다".into());
     }
     push(&app, &default_dir(), &vault, item)
 }

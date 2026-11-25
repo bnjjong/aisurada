@@ -119,6 +119,9 @@
 .task-feed-item > div { min-width: 0; }
 .task-feed-item time { flex: none; font-size: 12px; color: var(--muted); }
 .task-comment-body { margin: 4px 0 0; padding: 8px 12px; border-radius: 12px; background: var(--soft); overflow-wrap: anywhere; }
+.task-comment-body .read-markdown { font-size: inherit; line-height: inherit; }
+.task-comment-body .read-markdown :is(h1, h2, h3, h4, h5, h6) { font-size: 1em; line-height: inherit; margin: 10px 0 5px; }
+.task-comment-body .read-markdown :is(p, ul, ol, pre, blockquote) { margin-block: 0 8px; }
 .task-comment-body .read-markdown > :first-child { margin-top: 0; }
 .task-comment-body .read-markdown > :last-child { margin-bottom: 0; }
 .task-dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: 13px; }

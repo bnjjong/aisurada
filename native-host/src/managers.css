@@ -122,7 +122,7 @@
 
 .intake-stack { display: grid; gap: 10px; min-width: 0; }
 .mgr-tabs button .mgr-badge { margin-inline-start: 6px; }
-.mgr-intake-warning, .intake-result.is-asked {
+.mgr-intake-warning, .intake-result.is-asked, .intake-result.is-attention {
   color: var(--ink);
   background: color-mix(in srgb, var(--surface), var(--warn) 24%);
 }

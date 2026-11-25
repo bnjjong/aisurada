@@ -67,17 +67,19 @@ export function Rail({
   const waitingAnswers = runner.waiting.length;
   const managers = useManagers();
   const activeManagers = enabledManagers(managers.data);
-  const managerIssues = managers.error ? 1 : managers.data?.items.filter(item =>
-    (item.manager.project && item.issue === "프로젝트를 찾을 수 없어요") || deliveryIssue(item)).length ?? 0;
+  const managerIssues = Number(!!(managers.error || managers.data?.registryIssue)) + (managers.data?.items
+    .filter(item => !!item.issue || !!item.intakeIssue || deliveryIssue(item)).length ?? 0);
   const intakeWaiting = activeManagers.reduce((total, item) => total + (item.intake?.waiting ?? 0), 0);
-  const managersWithWaiting = activeManagers.filter(item => (item.intake?.waiting ?? 0) > 0);
+  const reviewItems = managers.data?.items.reduce((total, item) => total + (item.intake?.attention?.length ?? 0), 0) ?? 0;
+  const managersWithWaiting = managers.data?.items.filter(item =>
+    (item.manager.enabled && !!item.intake?.waiting) || !!item.intake?.attention?.length) ?? [];
   const intakeStalled = activeManagers.filter(item => item.intake?.stalledMinutes != null).length;
-  const managerAttention = managerIssues + intakeWaiting + intakeStalled;
+  const managerAttention = managerIssues + intakeWaiting + intakeStalled + reviewItems;
   const managerSummary = activeManagers.length === 1 ? `${activeManagers[0].manager.label} 켜짐` : `${activeManagers.length}개 켜짐`;
   // AI가 노트에 쓴 「정할 것」 가운데 사람의 답을 기다리는 노트(후속 노트 포함)
   const decisions = usePendingDecisions();
   // 에이전트 탭 이름 옆 배지는 「내 차례」(질문 대기 + 답을 기다리는 노트 + 승인 대기)의 합이다. 사람이 병목이라 다른 탭에서도 보이게 한다
-  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerIssues + intakeWaiting);
+  const mineBadge = countText(waitingAnswers + decisions.length + badgeTotal(approvalCounts) + managerIssues + intakeWaiting + reviewItems);
   // 켜질 탭은 화면 주소가 정한다. 주소가 탭을 정하지 않는 화면이면 직전에 켜 둔 탭이다
   const tab = activeRailTab(state.route);
   useEffect(() => rememberRailTab(state.route), [state.route]);
@@ -433,7 +435,8 @@ export function Rail({
             onClick={() => controller.navigate(managerAddress(manager.name))}>
             <i aria-hidden="true" />
             <span className="rail-manager-name">{manager.label}<small>{manager.name} · {manager.project}</small></span>
-            <span className="mgr-badge mgr-intake-warning">대기 {intake?.waiting}</span>
+            {!!intake?.attention?.length && <span className="mgr-badge is-error">검토 {intake.attention.length}</span>}
+            {manager.enabled && !!intake?.waiting && <span className="mgr-badge mgr-intake-warning">대기 {intake.waiting}</span>}
           </button>)}
         </div>
       )}

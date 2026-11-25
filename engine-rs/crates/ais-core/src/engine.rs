@@ -61,7 +61,7 @@ pub fn manager_project(root: &Path, slug: &str) -> Option<ManagerProject> {
     let project = project::scan_projects(root)
         .into_iter()
         .find(|item| item.slug == slug)?;
-    let scan = agenda::scan_agendas(root);
+    let scan = agenda::scan_agendas_for_project(root, slug);
     Some(ManagerProject {
         id: project.id,
         repos: project

@@ -24,6 +24,8 @@ use crate::write::{marker::check_workspace_marker, write_atomic};
 
 const MINUTE: i64 = 60_000;
 const DAY_MINUTES: u16 = 24 * 60;
+const QUESTION_LIMIT: usize = 2;
+const ANSWER_WAIT: i64 = 3 * 24 * 60 * MINUTE;
 const WEEK_SECONDS: u64 = 7 * 24 * 60 * 60;
 const LEDGER_PATH: &str = ".aisurada/intake/ledger.json";
 
@@ -51,7 +53,7 @@ struct Ledger {
     #[serde(skip)]
     repeat_counts: BTreeMap<String, usize>,
     #[serde(skip)]
-    pending_questions: BTreeSet<String>,
+    notice_entries: BTreeSet<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -267,6 +269,23 @@ struct ReportReaction {
     at: Option<i64>,
 }
 
+#[derive(Clone, Copy, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum AttentionReason {
+    QuestionLimit,
+    NoAnswer,
+}
+
+#[derive(Clone, Copy, Serialize)]
+struct Attention {
+    reason: AttentionReason,
+    at: i64,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Processing {
@@ -280,6 +299,8 @@ struct Processing {
     via: ProcessVia,
     decision: String,
     question: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    question_limit: bool,
 }
 
 impl Entry {
@@ -298,7 +319,25 @@ impl Entry {
     }
 
     fn view(&self) -> Result<Value, EngineError> {
-        Ok(json!({ "entry": self, "current": self.current()? }))
+        let current = self.current()?;
+        let mut view = json!({ "entry": self, "current": current });
+        if let Some(attention) = current.attention(clock().now_millis()) {
+            view["attention"] = json!(attention);
+        }
+        Ok(view)
+    }
+}
+
+impl Processing {
+    fn attention(&self, now: i64) -> Option<Attention> {
+        if self.question_limit {
+            return Some(Attention { reason: AttentionReason::QuestionLimit, at: self.at });
+        }
+        let deadline = self.at.saturating_add(ANSWER_WAIT);
+        (self.result == ResultKind::Asked && now >= deadline).then_some(Attention {
+            reason: AttentionReason::NoAnswer,
+            at: deadline,
+        })
     }
 }
 
@@ -414,6 +453,7 @@ struct Review {
     id: String,
     revision: String,
     result: ResultKind,
+    task: Option<CreateTaskRequest>,
 }
 
 #[derive(Deserialize)]
@@ -501,7 +541,7 @@ pub(crate) fn execute(
         IntakeOperation::Rewind => {
             ledger.rewind(manager, allowed_channels, parse("rewind_cursor", args)?)?
         }
-        IntakeOperation::Review => ledger.review(manager, parse("review_intake", args)?)?,
+        IntakeOperation::Review => ledger.review(vault, context, manager, parse("review_intake", args)?)?,
         IntakeOperation::Get | IntakeOperation::Sources | IntakeOperation::Questions => unreachable!(),
     };
     if changed {
@@ -663,8 +703,8 @@ impl Ledger {
         }
         let mut ledger = Self::load(path)?;
         for (key, entry) in &ledger.entries {
-            if entry.history.last().is_some_and(|event| event.result == ResultKind::Asked) {
-                ledger.pending_questions.insert(key.clone());
+            if entry.history.last().is_some_and(|event| event.result == ResultKind::Asked || event.question_limit) {
+                ledger.notice_entries.insert(key.clone());
             }
             if let Some(task) = &entry.task_id {
                 ledger.task_sources.entry(task.clone()).or_default().push(key.clone());
@@ -737,22 +777,32 @@ impl Ledger {
 
     fn questions(&self, manager: &ManagerContext, allowed: &[String]) -> Result<Value, EngineError> {
         let prefix = manager_key(manager, "");
+        let now = clock().now_millis();
         let mut notices = Vec::new();
-        for key in self.pending_questions.range(prefix.clone()..).take_while(|key| key.starts_with(&prefix)) {
+        for key in self.notice_entries.range(prefix.clone()..).take_while(|key| key.starts_with(&prefix)) {
             let entry = &self.entries[key];
-            if entry.source.is_none() && !allowed.contains(&entry.channel) {
+            let event = entry.current()?;
+            let attention = event.attention(now);
+            if attention.is_none() && entry.source.is_none() && !allowed.contains(&entry.channel) {
                 continue;
             }
-            // 질문 본문과 이 버전은 원장 결과와 같은 저장에 들어간다.
-            let event = entry.current()?;
-            notices.push(json!({
-                "id": format!("intake-question-{}", event.revision),
+            let (id, at) = match attention {
+                Some(item) => (format!("intake-review-{}-{}", manager.name, event.revision), item.at),
+                None => (format!("intake-question-{}", event.revision), event.at),
+            };
+            let mut notice = json!({
+                "id": id,
                 "entry": entry.id,
-                "at": event.at,
+                "at": at,
                 "excerpt": short(&entry.excerpt, 100),
-                "question": short(&event.question, 140),
                 "url": entry.source.is_none().then_some(entry.url.as_str()),
-            }));
+            });
+            if let Some(item) = attention {
+                notice["reviewReason"] = json!(item.reason);
+            } else {
+                notice["question"] = json!(short(&event.question, 140));
+            }
+            notices.push(notice);
         }
         Ok(json!(notices))
     }
@@ -806,6 +856,7 @@ impl Ledger {
         let mut direct_pending = Vec::new();
         let mut unmarked = Vec::new();
         let mut asked = Vec::new();
+        let mut attention_items = Vec::new();
         let mut counts = [0_u64; 5];
         let mut waiting = 0;
         let mut rows_revision = DefaultHasher::new();
@@ -819,6 +870,8 @@ impl Ledger {
                 && query.channel.as_ref().is_none_or(|channel| channel == &entry.channel)
         }) {
             let event = entry.current()?;
+            let attention = event.attention(now);
+            attention.map(|item| item.reason).hash(&mut rows_revision);
             entry.id.hash(&mut rows_revision);
             event.revision.hash(&mut rows_revision);
             entry.reaction_added.hash(&mut rows_revision);
@@ -831,12 +884,19 @@ impl Ledger {
                 match event.result {
                     ResultKind::Created => counts[1] += 1,
                     ResultKind::Commented => counts[2] += 1,
-                    ResultKind::Asked => counts[3] += 1,
+                    ResultKind::Asked if attention.is_none() => counts[3] += 1,
+                    ResultKind::Asked => {},
                     ResultKind::Ignored => counts[4] += 1,
                     ResultKind::Pending => {}
                 }
             }
-            if event.result == ResultKind::Asked {
+            if let Some(attention) = attention {
+                attention_items.push(json!({
+                    "id": entry.id, "at": attention.at, "reason": attention.reason,
+                    "revision": event.revision, "url": entry.url,
+                    "excerpt": (caller == Caller::App).then(|| short(&entry.excerpt, 100)),
+                }));
+            } else if event.result == ResultKind::Asked {
                 waiting += 1;
                 if allowed.contains(&entry.channel) {
                     let mut question = json!({
@@ -905,6 +965,7 @@ impl Ledger {
             "rowsRevision": format!("{:016x}", rows_revision.finish()),
             "pending": pending, "directPending": direct_pending, "unmarked": unmarked,
             "asked": asked, "waiting": waiting, "counts": counts,
+            "attention": attention_items,
             "stalledMinutes": stalled_minutes
         }))
     }
@@ -1057,35 +1118,67 @@ impl Ledger {
 
     fn review(
         &mut self,
+        vault: &Path,
+        context: &CallContext,
         manager: &ManagerContext,
         request: Review,
     ) -> Result<(Value, bool), EngineError> {
-        if !matches!(request.result, ResultKind::Pending | ResultKind::Ignored) {
-            return Err(invalid("다시 처리 또는 무시만 지정할 수 있다"));
+        if !matches!(request.result, ResultKind::Pending | ResultKind::Ignored | ResultKind::Created)
+            || (request.result == ResultKind::Created) != request.task.is_some()
+        {
+            return Err(invalid("다시 처리, 무시 또는 새 태스크 내용이 있는 접수를 지정한다"));
         }
-        let entry = self
-            .entries
-            .get_mut(&manager_key(manager, &request.id))
+        let key = manager_key(manager, &request.id);
+        let entry = self.entries.get_mut(&key)
             .ok_or_else(|| EngineError::not_found("접수 항목을 찾을 수 없다"))?;
-        check_revision(&entry.current()?.revision, &request.revision)?;
+        let current = entry.current()?;
+        if request.result == ResultKind::Created
+            && current.result == ResultKind::Created
+            && current.via == ProcessVia::Manual
+            && entry.history.iter().rev().nth(1).is_some_and(|previous| previous.revision == request.revision)
+        {
+            return Ok((entry.view()?, false));
+        }
+        check_revision(&current.revision, &request.revision)?;
         if entry.work.is_some() {
             return Err(invalid("매니저가 시작한 태스크 작업을 먼저 마쳐 주세요"));
         }
-        entry.history.push(Processing {
+        let now = clock().now_millis();
+        let attention = current.attention(now).is_some();
+        if request.result == ResultKind::Created && !attention {
+            return Err(invalid("사람이 확인할 제보만 원장에서 바로 접수할 수 있다"));
+        }
+        let decision = match request.result {
+            ResultKind::Created => "사람이 초안으로 접수",
+            ResultKind::Pending => "다시 처리 요청",
+            _ => "무시로 표시",
+        };
+        let mut event = Processing {
             revision: revision(),
             result: request.result,
-            at: clock().now_millis(),
+            at: now,
             checked_at: None,
             searched_at: None,
             via: ProcessVia::Manual,
-            decision: if request.result == ResultKind::Pending {
-                "다시 처리 요청"
-            } else {
-                "무시로 표시"
-            }
-            .into(),
+            decision: decision.into(),
             question: String::new(),
-        });
+            question_limit: false,
+        };
+        if request.result == ResultKind::Created {
+            let outcome = Outcome {
+                result: ResultKind::Created,
+                decision: decision.into(),
+                question: String::new(),
+                task: request.task,
+                task_key: None,
+            };
+            resolve(vault, context, manager, entry, &outcome, &mut event)?;
+        }
+        if attention && request.result != ResultKind::Pending {
+            entry.mark_requested = self.channels.get(&manager_key(manager, &entry.channel))
+                .is_some_and(|channel| channel.mark_processed);
+        }
+        entry.history.push(event);
         Ok((entry.view()?, true))
     }
 }
@@ -1177,6 +1270,7 @@ impl Ledger {
                 via: ProcessVia::Direct,
                 decision: String::new(),
                 question: String::new(),
+                question_limit: false,
             }],
             work: None,
         };
@@ -1201,7 +1295,7 @@ impl Ledger {
             .cloned()
             .ok_or_else(|| invalid("이 매니저의 직접 제보 접수 번호가 필요하다"))?;
         let current = entry.current()?;
-        if current.result != ResultKind::Pending {
+        if current.result != ResultKind::Pending || current.attention(clock().now_millis()).is_some() {
             return Ok((json!({"recorded": true, "item": entry.view()?}), false));
         }
         check_revision(&current.revision, &request.prior_revision)?;
@@ -1225,11 +1319,15 @@ impl Ledger {
             via: ProcessVia::Direct,
             decision: String::new(),
             question: String::new(),
+            question_limit: false,
         };
         resolve(vault, context, manager, &mut entry, &outcome, &mut event)?;
         entry.work = None;
         entry.history.push(event);
-        let response = json!({"recorded": false, "item": entry.view()?});
+        let mut response = json!({"recorded": false, "item": entry.view()?});
+        if entry.current()?.question_limit {
+            response["questionAccepted"] = json!(false);
+        }
         self.entries.insert(key, entry);
         Ok((response, true))
     }
@@ -1268,8 +1366,8 @@ impl Ledger {
                 .reply_ts
                 .as_ref()
                 .is_some_and(|ts| previous.reply_ts.as_ref().is_none_or(|last| ts > last));
-            let reopen = event.result == ResultKind::Pending
-                || (event.result == ResultKind::Asked && new_reply);
+            let reopen = event.attention(now).is_none()
+                && (event.result == ResultKind::Pending || (event.result == ResultKind::Asked && new_reply));
             if !reopen || request.prior_revision.is_none() {
                 if request.reaction_added == Some(true)
                     && channel.mark_processed
@@ -1381,6 +1479,7 @@ impl Ledger {
             via: request.via,
             decision: String::new(),
             question: String::new(),
+            question_limit: false,
         };
         let outcome = Outcome {
             result: request.result,
@@ -1391,7 +1490,10 @@ impl Ledger {
         };
         resolve(vault, context, manager, &mut entry, &outcome, &mut event)?;
         entry.history.push(event);
-        let response = json!({"recorded": false, "item": entry.view()?});
+        let mut response = json!({"recorded": false, "item": entry.view()?});
+        if entry.current()?.question_limit {
+            response["questionAccepted"] = json!(false);
+        }
         self.entries.insert(key, entry);
         Ok((response, true))
     }
@@ -1424,8 +1526,7 @@ fn prepare_direct_work(
                 .as_deref()
                 .ok_or_else(|| invalid("재제보를 남길 태스크 키를 지정한다"))?;
             let scan = store::scan(vault);
-            let task = store::find(&scan, reference)?;
-            check_task(vault, manager, task)?;
+            let task = find_intake_task(vault, manager, &scan, reference)?;
             Some(task.id.clone())
         }
         _ => return Ok(None),
@@ -1462,6 +1563,14 @@ fn resolve(
         }
         _ => {}
     }
+    if outcome.result == ResultKind::Asked
+        && entry.history.iter().filter(|event| event.result == ResultKind::Asked).count() >= QUESTION_LIMIT
+    {
+        event.result = ResultKind::Pending;
+        event.question_limit = true;
+        event.question.clear();
+        event.decision = "질문을 두 번 남겨 사람이 검토하도록 넘겼어요.".into();
+    }
     Ok(())
 }
 
@@ -1474,8 +1583,7 @@ fn apply_task(
 ) -> Result<(String, String), EngineError> {
     let scan = store::scan(vault);
     if let Some(id) = &entry.task_id {
-        let task = store::find(&scan, id)?;
-        check_task(vault, manager, task)?;
+        let task = find_intake_task(vault, manager, &scan, id)?;
         if entry.task_origin != Some(request.result)
             || request
                 .task_key
@@ -1504,8 +1612,7 @@ fn apply_task(
                     "새 태스크 내용과 이미 만든 태스크 키 중 하나만 지정한다",
                 ));
             }
-            let task = store::find(&scan, reference)?;
-            check_task(vault, manager, task)?;
+            let task = find_intake_task(vault, manager, &scan, reference)?;
             if !matches_source(task) {
                 return Err(invalid(if receipt.is_some() {
                     "태스크에 같은 접수 번호가 연결되어 있지 않다"
@@ -1520,7 +1627,7 @@ fn apply_task(
             .iter()
             .find(|task| task.project.as_deref() == Some(&manager.project) && matches_source(task))
         {
-            check_task(vault, manager, task)?;
+            task_commands::check_manager_repo(vault, manager, task.repo.as_deref())?;
             return Ok((task.key.clone(), task.id.clone()));
         }
         let mut draft = request
@@ -1559,8 +1666,7 @@ fn apply_task(
         .task_key
         .as_deref()
         .ok_or_else(|| invalid("재제보를 남길 태스크 키를 지정한다"))?;
-    let task = store::find(&scan, reference)?;
-    check_task(vault, manager, task)?;
+    let task = find_intake_task(vault, manager, &scan, reference)?;
     if entry
         .work
         .as_ref()
@@ -1591,15 +1697,18 @@ fn apply_task(
     Ok((task.key.clone(), task.id.clone()))
 }
 
-fn check_task(
+fn find_intake_task<'a>(
     vault: &Path,
     manager: &ManagerContext,
-    task: &Task,
-) -> Result<(), EngineError> {
+    scan: &'a ais_domain::task::aggregate::Scan,
+    reference: &str,
+) -> Result<&'a Task, EngineError> {
+    let task = store::find(scan, reference)?;
     if task.project.as_deref() != Some(&manager.project) {
-        return Err(invalid("매니저와 같은 프로젝트의 태스크만 접수할 수 있다"));
+        return Err(store::task_not_found(reference));
     }
-    task_commands::check_manager_repo(vault, manager, task.repo.as_deref())
+    task_commands::check_manager_repo(vault, manager, task.repo.as_deref())?;
+    Ok(task)
 }
 
 #[cfg(test)]
