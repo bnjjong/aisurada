@@ -72,3 +72,38 @@ test('요소를 지우면 자식과 닿은 관계가 함께 사라지는 수를 
   assert.deepEqual(deletionImpact(model, 'app'), { elements: 3, relationships: 3 });
   assert.deepEqual(deletionImpact(model, 'me'), { elements: 0, relationships: 1 });
 });
+
+test('엔진 호출은 아키텍처를 diagram으로 고르고, 쓰기는 읽은 모델의 아키텍처로 간다', async () => {
+  const { getC4Model, applyC4Changes, listC4Diagrams, createC4Diagram, renameC4Diagram, deleteC4Diagram, readModel } = await import('../src/ui/architecture/client.ts');
+  const sent = [];
+  const answer = diagram => ({ ...model, diagram });
+  const call = async request => {
+    sent.push(request);
+    if (request.command === 'list_c4_diagrams') return { diagrams: [{ id: 'main', name: '기본' }, { id: 'arch-2', name: '배포', elements: 1, relationships: 0 }] };
+    if (request.command === 'create_c4_diagram' || request.command === 'rename_c4_diagram') return { diagram: { id: 'arch-2', name: request.args.name } };
+    if (request.command === 'delete_c4_diagram') return { deleted: request.args.diagram };
+    return answer({ id: request.args.diagram, name: '배포' });
+  };
+  const loaded = await getC4Model(call, 'demo', 'arch-2');
+  assert.deepEqual(sent.at(-1), { command: 'get_c4_model', args: { project: 'demo', diagram: 'arch-2' } });
+  await getC4Model(call, 'demo');
+  assert.equal(sent.at(-1).args.diagram, 'main', '안 고르면 기본 아키텍처');
+
+  await applyC4Changes(call, loaded, [{ op: 'delete_element', id: 'gh' }]);
+  assert.deepEqual(sent.at(-1).args, { project: 'demo', diagram: 'arch-2', f1: 'f1:x', operations: [{ op: 'delete_element', id: 'gh' }] });
+
+  assert.deepEqual((await listC4Diagrams(call, 'demo')).map(item => item.id), ['main', 'arch-2']);
+  assert.equal((await createC4Diagram(call, 'demo', '배포')).id, 'arch-2');
+  assert.equal((await renameC4Diagram(call, 'demo', 'arch-2', '운영')).name, '운영');
+  assert.deepEqual(sent.at(-1).args, { project: 'demo', diagram: 'arch-2', name: '운영' });
+  await deleteC4Diagram(call, 'demo', 'arch-2');
+  assert.deepEqual(sent.at(-1), { command: 'delete_c4_diagram', args: { project: 'demo', diagram: 'arch-2' } });
+
+  assert.throws(() => readModel({ ...model }), /모양/, 'diagram이 없는 응답은 받지 않는다');
+});
+
+test('아키텍처 관리 명령은 프로젝트 slug를 자리 인자로 보낸다', async () => {
+  const { toArgv } = await import('../src/data/commands.ts');
+  assert.deepEqual(toArgv({ command: 'rename_c4_diagram', args: { project: 'demo', diagram: 'arch-2', name: '운영' } }), ['rename-c4-diagram', 'demo', 'diagram=arch-2', 'name=운영']);
+  assert.deepEqual(toArgv({ command: 'list_c4_diagrams', args: { project: 'demo' } }), ['list-c4-diagrams', 'demo']);
+});

@@ -26,6 +26,7 @@ const POSITIONAL: Record<string, string[]> = {
   get_ask: ['id', 'subId'], append_ask_turn: ['id', 'subId'], list_chats: ['id', 'subId'], append_chat_turn: ['id', 'subId'],
   read_session: ['id'],
   get_c4_model: ['project'], apply_c4_changes: ['project'],
+  list_c4_diagrams: ['project'], create_c4_diagram: ['project'], rename_c4_diagram: ['project'], delete_c4_diagram: ['project'],
 };
 /** 자리 인자를 여럿 받는 명령: 호출 객체에서는 그 인자들을 이 이름의 배열로 둔다. */
 const VARIADIC: Record<string, string> = { session_titles: 'ids' };

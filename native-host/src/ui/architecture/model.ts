@@ -16,9 +16,13 @@ export type C4Element = {
 export type C4Relationship = { id: string; source: string; target: string; label: string; technology: string; sourcePort?: string; targetPort?: string };
 export type Point = { x: number; y: number };
 export type C4Views = Record<string, Record<string, Point>>;
+/** 프로젝트가 가진 아키텍처 하나의 이름표. `main`은 기존 아키텍처이고 파일이 없어도 늘 있다. 개수는 파일이 깨졌으면 없다. */
+export type C4Diagram = { id: string; name: string; elements?: number; relationships?: number };
+export const MAIN_DIAGRAM = 'main';
 /** 엔진이 주는 모델 한 벌. `precondition`은 다음 쓰기에 그대로 싣는 확인 값이다. */
 export type C4Model = {
   project: string;
+  diagram: C4Diagram;
   elements: C4Element[];
   relationships: C4Relationship[];
   views: C4Views;
