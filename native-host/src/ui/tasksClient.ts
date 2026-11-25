@@ -3,8 +3,8 @@
 // 규칙(완료 기준 필수, 상태 전이의 누가·조건, 막혀 있음)은 엔진이 지킨다. 이 층은 규칙을 다시 만들지 않고, 엔진이 알려 준
 // `transitions`(사람이 바꿀 수 있는 곳과 막힌 까닭)를 그대로 보여 준다.
 import type { IntakeSource } from "./intakeModel.ts";
-import { explainError as explainResourceError } from "./resourcesClient.ts";
-import type { EngineCall } from "./resourcesClient.ts";
+import { explainEngineError } from "./engineClient.ts";
+import type { EngineCall } from "./engineClient.ts";
 import { asText } from "../workspace/types.ts";
 import type { Row } from "../workspace/types.ts";
 import { parseRepos } from "./repoLinks.ts";
@@ -638,7 +638,9 @@ export function taskMeta(t: TaskRow): string {
 
 /** 엔진이 돌려준 오류를 사람이 읽을 글로 풀어 쓴다. */
 export function explainError(e: unknown): string {
-  const stderr = isRecord(e) && typeof e.stderr === "string" ? e.stderr : e instanceof Error ? e.message : String(e);
-  if (/AIS-409/.test(stderr) && /이미 바뀌었다/.test(stderr)) return "다른 곳(러너나 다른 창)에서 먼저 상태를 바꿨어요. 새로 불러온 뒤 다시 해 주세요.";
-  return explainResourceError(e);
+  return explainEngineError(e, (stderr) => {
+    if (/AIS-409/.test(stderr) && /이미 바뀌었다/.test(stderr)) {
+      return "다른 곳(러너나 다른 창)에서 먼저 상태를 바꿨어요. 새로 불러온 뒤 다시 해 주세요.";
+    }
+  });
 }

@@ -1,9 +1,9 @@
 // 승인이 필요한 변경의 수를 레일의 배지와 스킬·에이전트 페이지가 같이 보도록 한 곳에 둔다(#53).
 // 수는 엔진(`list-resource-changes`)이 알려 주고, 이 모듈은 부르고 기억할 뿐이다. 알림(창이 닫혀 있어도 알리는 쪽)은 호스트가 따로 한다.
-import { useSyncExternalStore } from "react";
 import { loadCounts } from "./approvalsClient.ts";
 import type { ApprovalCounts } from "./approvalsClient.ts";
-import type { EngineCall } from "./resourcesClient.ts";
+import { createExternalStore } from "./engineClient.ts";
+import type { EngineCall } from "./engineClient.ts";
 
 export interface ApprovalsSnapshot {
   counts: ApprovalCounts;
@@ -15,33 +15,24 @@ export interface ApprovalsSnapshot {
 export const POLL_MS = 60_000;
 
 const EMPTY: ApprovalsSnapshot = { counts: { pending: 0, unapproved: 0 }, loaded: false };
-let snapshot: ApprovalsSnapshot = EMPTY;
-const listeners = new Set<() => void>();
 
-function publish(next: ApprovalsSnapshot) {
-  if (next.loaded === snapshot.loaded && next.counts.pending === snapshot.counts.pending && next.counts.unapproved === snapshot.counts.unapproved) return;
-  snapshot = next;
-  for (const listener of [...listeners]) listener();
-}
+const store = createExternalStore<ApprovalsSnapshot>(
+  EMPTY,
+  (prev, next) => prev.loaded === next.loaded && prev.counts.pending === next.counts.pending && prev.counts.unapproved === next.counts.unapproved,
+);
 
-export const subscribeApprovals = (listener: () => void) => {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};
-export const getApprovalsSnapshot = () => snapshot;
-export const useApprovalCounts = (): ApprovalCounts =>
-  useSyncExternalStore(subscribeApprovals, getApprovalsSnapshot, getApprovalsSnapshot).counts;
+export const subscribeApprovals = store.subscribe;
+export const getApprovalsSnapshot = store.getSnapshot;
+export const useApprovalCounts = (): ApprovalCounts => store.useStore().counts;
 
 /** 시험이 서로 새지 않게 처음 상태로 돌린다. */
 export function resetApprovalsStore() {
-  snapshot = EMPTY;
+  store.publish(EMPTY);
 }
 
 /** 패널이 이미 읽은 수를 그대로 반영한다(다시 부르지 않는다). */
 export function setApprovalCounts(counts: ApprovalCounts) {
-  publish({ counts, loaded: true });
+  store.publish({ counts, loaded: true });
 }
 
 /** 엔진에서 수를 읽는다. 못 읽으면(엔진이 낡았거나 vault가 없음) 이전 수를 그대로 둔다. */
