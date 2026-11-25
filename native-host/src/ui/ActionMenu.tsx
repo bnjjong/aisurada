@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon.tsx";
 import type { IconName } from "./Icon.tsx";
+import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 
 export type ActionMenuItem =
   | "separator"
@@ -53,24 +54,22 @@ export function ActionMenu({
       });
   }, [anchor]);
 
+  usePopoverDismiss({
+    ref: box,
+    anchorRef: anchor,
+    onClose,
+    enabled: !!place,
+    restoreFocus: true,
+    closeOnScroll: true,
+    closeOnResize: true,
+  });
+
   useEffect(() => {
     if (!place) return;
     // 첫 항목이 아니라 메뉴 상자에 포커스를 둔다. 첫 항목에 두면 마우스로 열어도 포커스 테두리가 남아 선택된 것처럼 보인다.
     // 키보드 사용자는 화살표나 Tab 으로 항목에 들어간다.
     box.current?.focus();
-    const outside = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (!box.current?.contains(target) && !anchor.current?.contains(target))
-        onClose();
-    };
     const keys = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
-        anchor.current?.focus();
-        return;
-      }
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       const buttons = [
         ...(box.current?.querySelectorAll<HTMLButtonElement>("button") ?? []),
@@ -86,17 +85,11 @@ export function ActionMenu({
             : at - 1;
       buttons[next].focus();
     };
-    document.addEventListener("pointerdown", outside);
     window.addEventListener("keydown", keys, true);
-    window.addEventListener("resize", onClose);
-    window.addEventListener("scroll", onClose, true);
     return () => {
-      document.removeEventListener("pointerdown", outside);
       window.removeEventListener("keydown", keys, true);
-      window.removeEventListener("resize", onClose);
-      window.removeEventListener("scroll", onClose, true);
     };
-  }, [anchor, onClose, place]);
+  }, [place]);
 
   return createPortal(
     <div

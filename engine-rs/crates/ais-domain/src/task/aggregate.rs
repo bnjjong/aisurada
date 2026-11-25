@@ -9,9 +9,9 @@
 //! - 상태 전이는 `transitions`의 규칙과 조건을 지키고, 이 태스크를 막고 있는 미완료 태스크가 없어야 시작한다.
 //! - 연결은 자기 자신에게 못 걸고, 서로를 막는 순환(`blocks`)을 못 만들며, 태스크마다 `MAX_LINKS`개까지다.
 
-use super::format::{self, DEFAULT_PRIORITY, DEFAULT_TYPE, MAX_LINKS};
+use super::format::{self, MAX_LINKS};
 use super::transitions;
-use super::{Criterion, Link, Ref, Task, TaskStatus};
+use super::{Criterion, Link, Ref, Task, TaskPriority, TaskStatus, TaskType};
 use crate::error::EngineError;
 use crate::json::JsonValue;
 use crate::kernel::stamp::Stamp;
@@ -23,8 +23,8 @@ use crate::text::compare_utf16;
 #[derive(Default)]
 pub struct Fields {
     pub title: Option<String>,
-    pub task_type: Option<String>,
-    pub priority: Option<String>,
+    pub task_type: Option<TaskType>,
+    pub priority: Option<TaskPriority>,
     pub repo: Option<String>,
     pub project: Option<String>,
     pub base_branch: Option<String>,
@@ -157,8 +157,8 @@ impl TaskEvent {
 /// 검사를 마친 새 태스크의 재료. 번호·id·파일 자리는 저장소가 정해 [`NewTask::into_task`]에 넘긴다.
 pub struct NewTask {
     title: String,
-    task_type: Option<String>,
-    priority: Option<String>,
+    task_type: Option<TaskType>,
+    priority: Option<TaskPriority>,
     repo: String,
     pub project: Option<String>,
     base_branch: Option<String>,
@@ -217,10 +217,8 @@ impl NewTask {
             key,
             id,
             title: self.title,
-            task_type: self.task_type.unwrap_or_else(|| DEFAULT_TYPE.to_string()),
-            priority: self
-                .priority
-                .unwrap_or_else(|| DEFAULT_PRIORITY.to_string()),
+            task_type: self.task_type.unwrap_or(TaskType::DEFAULT),
+            priority: self.priority.unwrap_or(TaskPriority::DEFAULT),
             status: TaskStatus::Draft,
             repo: Some(self.repo),
             project: self.project,
@@ -283,8 +281,8 @@ impl Task {
             )));
         }
         let title = f.title.unwrap_or_else(|| cur.title.clone());
-        let task_type = f.task_type.unwrap_or_else(|| cur.task_type.clone());
-        let priority = f.priority.unwrap_or_else(|| cur.priority.clone());
+        let task_type = f.task_type.unwrap_or(cur.task_type);
+        let priority = f.priority.unwrap_or(cur.priority);
         let repo = match f.repo {
             Some(r) => Some(r).filter(|r| !r.is_empty()),
             None => cur.repo.clone(),
@@ -312,8 +310,8 @@ impl Task {
 
         let same = Task {
             title: title.clone(),
-            task_type: task_type.clone(),
-            priority: priority.clone(),
+            task_type,
+            priority,
             repo: repo.clone(),
             project: project.clone(),
             base_branch: base.clone(),
@@ -708,8 +706,8 @@ mod tests {
             "human",
         );
         assert_eq!(task.status, TaskStatus::Draft);
-        assert_eq!(task.task_type, DEFAULT_TYPE);
-        assert_eq!(task.priority, DEFAULT_PRIORITY);
+        assert_eq!(task.task_type, TaskType::DEFAULT);
+        assert_eq!(task.priority, TaskPriority::DEFAULT);
         assert_eq!(task.criteria[0].checked_by, None);
         assert_eq!(task.criteria[1].checked_by.as_deref(), Some("human"));
         assert_eq!(
@@ -747,7 +745,7 @@ mod tests {
         // 달라지면 새 상태와 고친 칸 이름이 사건에 든다
         let changed = Fields {
             title: Some("새 제목".into()),
-            priority: Some("high".into()),
+            priority: Some(TaskPriority::High),
             ..Fields::default()
         };
         let edit = cur

@@ -17,6 +17,11 @@ pub fn metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
     super::store().metadata(path.as_ref())
 }
 
+/// 파일이나 폴더가 있는지 본다. `metadata`의 성공 여부를 본다.
+pub fn exists(path: impl AsRef<Path>) -> bool {
+    super::store().metadata(path.as_ref()).is_ok()
+}
+
 pub fn symlink_metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
     super::store().symlink_metadata(path.as_ref())
 }

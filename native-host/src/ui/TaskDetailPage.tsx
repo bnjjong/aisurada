@@ -3,6 +3,7 @@
 // 러너(읽기 전용)의 실행은 「실행」 영역에서 보고 시작하고 멈추고 질문에 답한다. 채팅은 이 화면에서 필요할 때 여는 선택 기능인데 아직 없다(3b).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
@@ -672,21 +673,11 @@ export function TaskDetailPage({
 function StatusMenu({ task, busy, defaultOpen = false, onPick }: { task: TaskDetail; busy: boolean; defaultOpen?: boolean; onPick: (to: TaskStatus) => void }) {
   const [open, setOpen] = useState(defaultOpen);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", outside);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
+  usePopoverDismiss({
+    ref: box,
+    enabled: open,
+    onClose: () => setOpen(false),
+  });
   return (
     <div className="task-status-menu" ref={box}>
       <button type="button" className="task-status-button" aria-haspopup="menu" aria-expanded={open} disabled={busy} onClick={() => setOpen((o) => !o)}>
@@ -800,21 +791,11 @@ function LinkModal({ call, task, close, done }: { call: Parameters<typeof getTas
 function InlineTypeSelect({ type, busy, onChange }: { type: TaskType; busy: boolean; onChange: (t: TaskType) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", outside);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
+  usePopoverDismiss({
+    ref: box,
+    enabled: open,
+    onClose: () => setOpen(false),
+  });
 
   const choices: TaskType[] = ["feature", "bug", "chore"];
   return (
@@ -855,21 +836,11 @@ function InlineTypeSelect({ type, busy, onChange }: { type: TaskType; busy: bool
 function InlinePrioritySelect({ priority, busy, onChange }: { priority: TaskPriority; busy: boolean; onChange: (p: TaskPriority) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", outside);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
+  usePopoverDismiss({
+    ref: box,
+    enabled: open,
+    onClose: () => setOpen(false),
+  });
 
   const choices: TaskPriority[] = ["high", "medium", "low"];
   return (

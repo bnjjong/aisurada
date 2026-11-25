@@ -155,7 +155,7 @@ impl NoteFront<'_> {
                 out.push_str(&format!("  - to: {}\n", dump_string(&link.to, 3)));
                 out.push_str(&format!(
                     "    kind: {}\n",
-                    dump_string(&link.kind.to_lowercase(), 3)
+                    dump_string(link.kind.as_str(), 3)
                 ));
             }
         }
@@ -297,6 +297,7 @@ pub fn kst_minute(millis: i64) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::note::meta::LinkKind;
     use super::*;
 
     fn pair(key: &str, value: Value) -> (Value, Value) {
@@ -355,7 +356,7 @@ mod tests {
             }),
             links: &[Link {
                 to: "ndzz0002-0000bbbb".into(),
-                kind: "direct".into(),
+                kind: LinkKind::Direct,
             }],
             extra: "",
         }

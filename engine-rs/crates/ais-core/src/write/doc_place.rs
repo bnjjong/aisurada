@@ -8,7 +8,7 @@ pub use crate::note::placement::{
     CreatedParts, folder_name, folder_name_from, id_tail, parse_date_arg, parse_time_arg,
     read_created,
 };
-use crate::ports::fs;
+pub(crate) use crate::ports::fs;
 use std::path::Path;
 
 use super::confine::{absolute_normalized, has_unusable_path_characters};
@@ -37,7 +37,7 @@ pub fn place_folder(
         return Ok(current_rel.to_string());
     }
     let current = vault.join(current_rel);
-    if !current.exists() {
+    if !fs::exists(&current) {
         return Ok(canonical_rel.to_string());
     }
     let chosen = (1..=99)
@@ -48,7 +48,7 @@ pub fn place_folder(
                 format!("{canonical_rel}-{n}")
             }
         })
-        .find(|candidate| !vault.join(candidate).exists())
+        .find(|candidate| !fs::exists(&vault.join(candidate)))
         .ok_or_else(|| {
             EngineError::internal(format!(
                 "옮길 자리를 못 찾았다(같은 이름이 99 개까지 차 있다): {canonical_rel}"
@@ -62,7 +62,7 @@ pub fn place_folder(
 pub fn move_path(source: &Path, target: &Path) -> Result<(), EngineError> {
     let source = absolute_normalized(source);
     let target = absolute_normalized(target);
-    if target.exists() {
+    if fs::exists(&target) {
         return Err(EngineError::internal(format!(
             "옮길 자리에 이미 무엇이 있어 옮기지 않았다: {}",
             target.display()

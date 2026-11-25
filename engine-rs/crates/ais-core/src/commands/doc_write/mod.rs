@@ -2,6 +2,10 @@
 //! 인자 이름, 검사 순서, 오류 문구와 응답 필드는 Java 엔진과 같고, 파일 글은 바이트까지 같다.
 //! 아젠다 옮기기(`agenda`)는 Java 엔진 뒤에 더했다(TSK-2). 이미 있는 아젠다만 받고 아젠다를 새로 만들지 않는다.
 
+mod place;
+mod retag;
+mod warning;
+
 use crate::ports::fs;
 use std::path::Path;
 
@@ -28,6 +32,10 @@ use crate::write::doc_place::{check_path, folder_name, move_path, parent_folder,
 use crate::write::meta_writer::editor_of;
 use crate::write::pipeline::WriteScope;
 use crate::write::{precondition, warnings};
+
+use place::place_and_write;
+use retag::retag_sub_notes;
+use warning::collect_content_warnings;
 
 /// `update_doc` 요청. `tags`는 호출 객체에서는 문자열 배열, 명령줄에서는 JSON 배열 글로 온다.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -189,62 +197,19 @@ pub fn update_doc(
     // 자리 갈래: 부모 폴더와 폴더 이름
     let parent = parent_folder(vault, agenda, date);
     let folder = folder_name(date, hour, minute, title, note_id);
-    let content_name = note
-        .content_file
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let check_text_size = |rel: &str| check_size(&text, rel);
 
     let mut warnings_found: Vec<String> = Vec::new();
-    let final_rel: String;
-    if !note.is_single_file {
-        // 폴더 노트: 경로 검사, 빈자리 고르기, 옮기기 뒤에 상한을 보고 쓴다
-        let canonical = format!("{parent}/{folder}");
-        check_path(vault, &canonical)?;
-        if agenda_changed {
-            check_text_size(&canonical)?;
-        }
-        final_rel = place_folder(vault, old_rel, &canonical)?;
-        if !agenda_changed {
-            check_text_size(&final_rel)?;
-        }
-        if let Err(error) =
-            write_atomic(&vault.join(&final_rel).join(&content_name), text.as_bytes())
-        {
-            if agenda_changed
-                && final_rel != old_rel
-                && let Err(rollback) = move_path(&vault.join(&final_rel), &vault.join(old_rel))
-            {
-                return Err(EngineError::internal(format!(
-                    "{}. 노트 폴더를 원래 자리로 돌리지 못했다: {}",
-                    error.message, rollback.message
-                )));
-            }
-            return Err(error);
-        }
-    } else if note.format == Format::Html {
-        // 옛 .html 단일 파일: 이름만 바꾼다. 상한, 경로, 쓰기 차례이고 같은 이름 파일은 덮는다
-        final_rel = format!("{parent}/{folder}.html");
-        check_text_size(&final_rel)?;
-        check_path(vault, &final_rel)?;
-        write_atomic(&vault.join(&final_rel), text.as_bytes())?;
-        if final_rel != old_rel {
-            remove_old(vault, old_rel, &mut warnings_found);
-        }
-    } else {
-        // 옛 .md, .json 단일 파일: 빈자리를 안 보고 새 폴더에 쓴 뒤 옛 파일을 지운다
-        final_rel = format!("{parent}/{folder}");
-        check_text_size(&final_rel)?;
-        check_path(vault, &final_rel)?;
-        let name = if note.format == Format::Json {
-            "note.json"
-        } else {
-            "note.md"
-        };
-        write_atomic(&vault.join(&final_rel).join(name), text.as_bytes())?;
-        remove_old(vault, old_rel, &mut warnings_found);
-    }
+
+    // 정식 자리에 파일 쓰기 및 이전 파일 정리
+    let final_rel = place_and_write(
+        vault,
+        note,
+        &parent,
+        &folder,
+        text,
+        agenda_changed,
+        &mut warnings_found,
+    )?;
 
     // 옮긴 폴더 노트의 후속 노트 머리를 새 아젠다로 맞춘다(옛 단일 파일 노트에는 후속 노트가 없다)
     if let (Some(slug), false) = (&moved_to, note.is_single_file) {
@@ -259,19 +224,14 @@ pub fn update_doc(
     }
 
     // 경고: 못 치운 옛 자리, 후속 노트 머리, 들여쓴 블록, 제목과 첫 헤딩, U+FFFD 차례
-    if let Some(given) = given_body.filter(|_| note.format != Format::Html) {
-        warnings_found.extend(warnings::detect_indented_blocks_warning(Some(given)));
-    }
-    if note.format == Format::Markdown {
-        warnings_found.extend(warnings::detect_title_mismatch_warning(body, title));
-    }
-    if let Some(given) = given_body {
-        let grown = warnings::count_broken_chars(given) as i64
-            - warnings::count_broken_chars(&old_body) as i64;
-        if grown > 0 {
-            warnings_found.push(warnings::broken_char_warning(given, grown as usize));
-        }
-    }
+    collect_content_warnings(
+        note.format,
+        given_body,
+        &old_body,
+        body,
+        title,
+        &mut warnings_found,
+    );
 
     let mut response = json!({
         "id": note_id,
@@ -292,92 +252,4 @@ pub fn update_doc(
         response["warning"] = json!(warnings_found.join("\n"));
     }
     Ok(response)
-}
-
-/// 옛 단일 파일을 지운다. 못 지우면 응답을 실패로 바꾸지 않고 경고로 알린다.
-fn remove_old(vault: &Path, old_rel: &str, warnings: &mut Vec<String>) {
-    match fs::remove_file(vault.join(old_rel)) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(_) => warnings.push(format!(
-            "옛 노트 삭제 실패 — 같은 id가 둘 남았을 수 있어요(정리 필요): {old_rel}"
-        )),
-    }
-}
-
-/// 옮긴 노트 폴더 안 후속 노트들의 머리 `agenda:` 줄을 새 `slug`로 바꾼다.
-/// 색인은 후속 노트의 아젠다를 폴더 자리로 읽으므로 이 줄이 낡아도 목록은 그대로지만, 파일을 직접 읽는 사람과 도구를 위해 맞춘다.
-/// 그 줄 하나만 바꾸고 나머지 바이트(편집 도장 포함)는 그대로 둔다. 폴더째 옮기기는 이미 끝났으므로
-/// 한 파일을 못 고쳐도 되돌리지 않고 `warnings`에 적는다.
-fn retag_sub_notes(
-    vault: &Path,
-    old_folder: &Path,
-    new_rel: &str,
-    subs: &[NoteRecord],
-    slug: &str,
-    warnings: &mut Vec<String>,
-) {
-    let new_folder = vault.join(new_rel);
-    let line = format!("agenda: {}", dump_string(slug, 1));
-    for sub in subs {
-        let Ok(inside) = sub.content_file.strip_prefix(old_folder) else {
-            continue;
-        };
-        let path = new_folder.join(inside);
-        let result = fs::read(&path)
-            .map_err(|e| e.to_string())
-            .and_then(|bytes| String::from_utf8(bytes).map_err(|_| "UTF-8 이 아니다".to_string()))
-            .and_then(|text| match replace_agenda_line(&text, &line) {
-                Some(changed) if changed != text => {
-                    write_atomic(&path, changed.as_bytes()).map_err(|e| e.message)
-                }
-                _ => Ok(()),
-            });
-        if let Err(reason) = result {
-            warnings.push(format!(
-                "후속 노트 머리의 agenda 를 못 고쳤다: {} ({reason})",
-                rel_of(vault, &path)
-            ));
-        }
-    }
-}
-
-/// 머리 울타리 안에서 들여쓰지 않은 `agenda:` 줄을 `line`으로 바꾼 글. 머리나 그 줄이 없으면 `None`
-fn replace_agenda_line(text: &str, line: &str) -> Option<String> {
-    let (yaml, _) = split_fence(text)?;
-    let mut offset = yaml.as_ptr() as usize - text.as_ptr() as usize;
-    for raw in yaml.split_inclusive('\n') {
-        let content = raw.trim_end_matches(['\n', '\r']);
-        if content.starts_with("agenda:") {
-            let end = offset + content.len();
-            return Some(format!("{}{line}{}", &text[..offset], &text[end..]));
-        }
-        offset += raw.len();
-    }
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::replace_agenda_line;
-
-    #[test]
-    fn replaces_only_the_agenda_line_of_the_head() {
-        let text = "---\nid: sn1\nagenda: demo\ntitle: t\n---\n\nagenda: 본문은 그대로\n";
-        assert_eq!(
-            replace_agenda_line(text, "agenda: home").as_deref(),
-            Some("---\nid: sn1\nagenda: home\ntitle: t\n---\n\nagenda: 본문은 그대로\n")
-        );
-        let html = "<!--aisurada\nid: sn1\nagenda: demo\n-->\n<p>x</p>";
-        assert_eq!(
-            replace_agenda_line(html, "agenda: home").as_deref(),
-            Some("<!--aisurada\nid: sn1\nagenda: home\n-->\n<p>x</p>")
-        );
-        // 들여쓴 줄(다른 키의 값)은 아젠다 줄이 아니다. 머리가 없으면 손대지 않는다
-        assert_eq!(
-            replace_agenda_line("---\nmeta:\n  agenda: x\n---\n", "agenda: y"),
-            None
-        );
-        assert_eq!(replace_agenda_line("agenda: x\n", "agenda: y"), None);
-    }
 }

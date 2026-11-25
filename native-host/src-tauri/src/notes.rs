@@ -76,7 +76,7 @@ fn record<R: Runtime>(app: &tauri::AppHandle<R>, id: &str, g: Geometry) {
 }
 fn saved<R: Runtime>(app: &tauri::AppHandle<R>) -> Vec<Saved> {
     let state = app.state::<HostState>();
-    let Some(vault) = state.vault.lock().unwrap().clone() else {
+    let Some(vault) = state.current_vault() else {
         return vec![];
     };
     let _lock = state.note_file_lock.lock().unwrap();

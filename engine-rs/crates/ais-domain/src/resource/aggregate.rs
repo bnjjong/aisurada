@@ -10,8 +10,7 @@
 //!
 //! 승인 기록(`approvals.rs`)·대기 변경 파일(`changes.rs`)·자원 파일(`store.rs`)에 쓰고 읽는 일은 저장소가 한다.
 
-use super::format::PERMISSIONS;
-use super::{Resource, ResourceKind, tools_equal};
+use super::{Resource, ResourceKind, ResourcePermission, tools_equal};
 use crate::error::{EngineError, ErrorKind};
 
 pub const AUTO: &str = "auto";
@@ -149,11 +148,8 @@ pub struct Decision {
     pub reasons: Vec<Category>,
 }
 
-fn rank(permission: Option<&str>) -> usize {
-    PERMISSIONS
-        .iter()
-        .position(|p| *p == permission.unwrap_or("read"))
-        .unwrap_or(0)
+fn rank(permission: Option<ResourcePermission>) -> usize {
+    permission.unwrap_or(ResourcePermission::DEFAULT).rank()
 }
 
 /// 자원 변경의 갈래. `before`는 고치기 전(만들기면 `None`), `after`는 고친 뒤(지우기면 `None`)다.
@@ -167,8 +163,8 @@ pub fn classify(before: Option<&Resource>, after: Option<&Resource>) -> Vec<Cate
     if let Some(after) = after
         && any.kind == ResourceKind::Agent
     {
-        let b = before.map_or(0, |r| rank(r.permission.as_deref()));
-        let a = rank(after.permission.as_deref());
+        let b = before.map_or(0, |r| rank(r.permission));
+        let a = rank(after.permission);
         if a > b {
             out.push(Category::PermissionRaise);
         } else if a < b {
@@ -303,14 +299,18 @@ mod tests {
     use super::*;
     use crate::frontmatter::Value;
 
-    fn agent(project: Option<&str>, permission: &str, tools: Vec<(String, Value)>) -> Resource {
+    fn agent(
+        project: Option<&str>,
+        permission: ResourcePermission,
+        tools: Vec<(String, Value)>,
+    ) -> Resource {
         Resource {
             id: "ap1-00000001".into(),
             kind: ResourceKind::Agent,
             project: project.map(str::to_string),
             name: "n".into(),
             description: "d".into(),
-            permission: Some(permission.into()),
+            permission: Some(permission),
             skills: Vec::new(),
             repo: None,
             tools,
@@ -359,8 +359,8 @@ mod tests {
 
     #[test]
     fn classifies_permission_and_tools_changes() {
-        let before = agent(None, "read", Vec::new());
-        let raised = agent(None, "edit", Vec::new());
+        let before = agent(None, ResourcePermission::Read, Vec::new());
+        let raised = agent(None, ResourcePermission::Edit, Vec::new());
         assert_eq!(
             classify(Some(&before), Some(&raised)),
             vec![Category::GlobalChange, Category::PermissionRaise]
@@ -371,12 +371,12 @@ mod tests {
         );
         let tooled = agent(
             Some("alpha"),
-            "read",
+            ResourcePermission::Read,
             vec![("claude".into(), Value::Bool(true))],
         );
         assert_eq!(
             classify(
-                Some(&agent(Some("alpha"), "read", Vec::new())),
+                Some(&agent(Some("alpha"), ResourcePermission::Read, Vec::new())),
                 Some(&tooled)
             ),
             vec![Category::ProjectContent, Category::ToolsChange]

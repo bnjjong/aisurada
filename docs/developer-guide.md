@@ -142,10 +142,11 @@ MCP 도구 표(`mcp_tools.rs`)도 마찬가지로 직접 고치고, `engine-rs/t
 
 ```bash
 engine-rs/tools/golden/run.sh replay   # Java 없이 셋을 녹화본과 견준다(`cargo test -p ais-cli --test golden`이 같은 일을 한다)
+engine-rs/tools/golden/run.sh bless    # Java 없이 지금 Rust 엔진이 낸 새 답을 테이프에 다시 받아 적는다(바뀐 줄만 origin="rust")
 engine-rs/tools/golden/run.sh record   # 기준 Java(JDK 21)와 어긋남 0일 때만 테이프를 새로 쓴다. 동작을 알고 바꿨을 때만 하고, 이유를 커밋 본문에 적는다
 ```
 
-`record`는 어긋남이 하나라도 있으면 테이프를 쓰지 않는다(어긋난 응답을 정답으로 굳히지 않는다). **의도해서 Java와 달라진 것은 테이프를 손으로 고쳤다.** 그 항목은 `record`가 어긋남으로 보니, 기준을 다시 녹화할 일이 생기면 아래 목록을 먼저 본다. ① `cli.ndjson`의 도구 표면 `list_comments`·`list_attachments`가 기록 층 노트 셋(`ndfx0008-00000008`, `ndfx0009-00000009`, `ndsr0004-000000a4`)에 부모로 불리는 6건: Java는 빈 목록(종료 코드 0)을 답했고 지금은 AIS-409(종료 코드 3)다([#80](https://github.com/bnjjong/aisurada/issues/80), 2026-11-16). 승인 대기 변경 파일(`.aisurada/pending/*.json`)은 맞대기가 키 차례를 같게 보므로 테이프도 읽은 값을 정렬해 센다. 이 파일의 바이트 자체는 `serialization_golden.rs`가 못박는다. 시험이 의존 방향을 지키는지(`architecture.rs`)와 명령 정보를 적은 표들이 어긋나지 않는지(`command_tables.rs`)도 Java 없이 돈다. 둘 다 지금 모양을 기준으로 박제해 새 위반이 생기거나 줄어도 실패하며, 기준을 새로 쓰는 법은 각 파일 머리말에 있다.
+`record`는 어긋남이 하나라도 있으면 테이프를 쓰지 않는다(어긋난 응답을 정답으로 굳히지 않는다). **의도해서 Java와 달라진 것은 `bless`로 다시 받아 적거나 테이프를 손으로 고친다.** `bless`는 Java(JDK 21) 없이도 Rust 엔진의 변경된 응답을 골든 테이프에 반영하는 모드다. 바뀌지 않은 줄은 원본 바이트 그대로 보존되며, 바뀐 줄에만 `"origin": "rust"` 표시가 남는다. 나중에 Java 엔진으로 다시 녹화(`record`)할 때도 `rust` 출처의 줄은 Java 호출 없이 보존된다. `bless`를 돌릴 때는 바뀐 줄의 목록(명령, 라벨, 처음 달라진 자리)을 반드시 확인하고 커밋 본문에 적어야 한다. CI 환경에서는 실수로 테이프가 갱신되지 않도록 `bless` 실행이 차단된다. **Java와 의도해서 달라진 항목**은 `record`가 어긋남으로 보니, 기준을 다시 녹화할 일이 생기면 아래 목록을 먼저 본다. ① `cli.ndjson`의 도구 표면 `list_comments`·`list_attachments`가 기록 층 노트 셋(`ndfx0008-00000008`, `ndfx0009-00000009`, `ndsr0004-000000a4`)에 부모로 불리는 6건: Java는 빈 목록(종료 코드 0)을 답했고 지금은 AIS-409(종료 코드 3)다([#80](https://github.com/bnjjong/aisurada/issues/80), 2026-11-16). 승인 대기 변경 파일(`.aisurada/pending/*.json`)은 맞대기가 키 차례를 같게 보므로 테이프도 읽은 값을 정렬해 센다. 이 파일의 바이트 자체는 `serialization_golden.rs`가 못박는다. 시험이 의존 방향을 지키는지(`architecture.rs`)와 명령 정보를 적은 표들이 어긋나지 않는지(`command_tables.rs`)도 Java 없이 돈다. 둘 다 지금 모양을 기준으로 박제해 새 위반이 생기거나 줄어도 실패하며, 기준을 새로 쓰는 법은 각 파일 머리말에 있다.
 
 노트 머리 읽기·쓰기를 Java와 맞대려면 기준값은 노트 머리가 들어가므로 저장소 밖 폴더에 뽑는다.
 

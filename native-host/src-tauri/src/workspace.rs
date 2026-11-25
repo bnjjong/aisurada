@@ -133,7 +133,7 @@ pub fn allow_workspace<R: Runtime>(
 
 #[tauri::command]
 pub fn vault_root(state: State<'_, HostState>) -> Option<String> {
-    state.vault.lock().unwrap().clone()
+    state.current_vault()
 }
 
 #[tauri::command]

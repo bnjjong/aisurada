@@ -1,7 +1,7 @@
 // 승인 워크플로(#53)를 화면에서 부르는 얇은 층. AI가 쓴 스킬·에이전트 변경이 정책에 따라 「대기 변경」으로 올라오고, 사람이 이전 판과 견주어 보고
 // 승인하거나 거절한다. 규칙(무엇이 승인 대상이고 누가 AI인지, 승인한 판만 쓰이는 것)은 엔진이 지킨다. 이 층은 엔진 응답의 모양을 정리하고,
 // 비교 화면이 쓰는 순수한 계산(필드별 비교, 줄 단위 비교, 사람이 읽을 글)을 모아 시험으로 잰다.
-import type { EngineCall } from "./resourcesClient.ts";
+import type { EngineCall } from "./engineClient.ts";
 import { fromArgv } from "../data/commands.ts";
 
 export type ChangeStatus = "pending" | "approved" | "rejected" | "stale";

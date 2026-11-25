@@ -19,7 +19,7 @@ use std::time::UNIX_EPOCH;
 
 use regex::Regex;
 
-use super::{Resource, ResourceKind, approvals, format, refs, tools_equal};
+use super::{Resource, ResourceKind, ResourcePermission, approvals, format, refs, tools_equal};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
 use crate::kernel::token::compute_token;
@@ -437,7 +437,7 @@ pub fn plan_create(
 
     let (mut permission, mut skills, mut repo) = (None, Vec::new(), None);
     if kind == ResourceKind::Agent {
-        permission = Some(f.permission.clone().unwrap_or_else(|| "read".to_string()));
+        permission = Some(f.permission.unwrap_or(ResourcePermission::DEFAULT));
         skills = f.skills.clone().unwrap_or_default();
         repo = f.repo.clone().filter(|r| !r.is_empty());
         validate_agent_links(vault, &scan, project, &skills, repo.as_deref())?;
@@ -530,12 +530,12 @@ pub fn plan_update(
         _ => cur.tools.clone(),
     };
 
-    let mut permission = cur.permission.clone();
+    let mut permission = cur.permission;
     let mut skills = cur.skills.clone();
     let mut repo = cur.repo.clone();
     if cur.kind == ResourceKind::Agent {
-        if let Some(p) = &f.permission {
-            permission = Some(p.clone());
+        if let Some(p) = f.permission {
+            permission = Some(p);
         }
         if let Some(s) = &f.skills {
             skills = s.clone();
@@ -743,7 +743,7 @@ fn trash_item(kind: ResourceKind) -> &'static str {
 /// 자원을 휴지통으로 보낸다(스킬은 폴더째). 되살릴 수 있다.
 pub fn delete(vault: &Path, r: &Resource) -> Result<(), EngineError> {
     let trash = root(vault).join(".trash").join(&r.id);
-    if trash.exists() {
+    if fs::exists(&trash) {
         return Err(EngineError::conflict(format!(
             "휴지통에 같은 id 가 이미 있다: {}",
             r.id
@@ -831,7 +831,7 @@ pub fn restore(vault: &Path, id: &str) -> Result<Resource, EngineError> {
     } else {
         target.clone()
     };
-    if destination.exists() {
+    if fs::exists(&destination) {
         return Err(EngineError::conflict(format!(
             "제자리에 같은 이름이 이미 있어 되살리지 못했다. 그 이름을 바꾸거나 지운 뒤 다시 한다: {}",
             e.rel_path
@@ -964,7 +964,7 @@ fn snapshot(vault: &Path, id: &str, bytes: &[u8]) -> Result<(), EngineError> {
     let base = to_base36(now_millis());
     let mut name = base.clone();
     let mut n = 1;
-    while dir.join(format!("{name}.md")).exists() {
+    while fs::exists(&dir.join(format!("{name}.md"))) {
         name = format!("{base}-{n}");
         n += 1;
     }

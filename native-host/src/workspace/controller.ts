@@ -15,7 +15,8 @@ import { shortcutFor, zoomShortcutFor } from '../interaction/shortcuts.ts';
 import type { KeyInput } from '../interaction/shortcuts.ts';
 import { readTypography, stepScale } from './typography.ts';
 import type { Typography } from './typography.ts';
-import type { RecentWorkspace, SettingsSection, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import type { RecentWorkspace, Row, SettingsSection, Skin, StoragePort, WindowContext, Workspace, WorkspaceServices, WorkspaceState } from './types.ts';
+import type { TypedHostCall } from './hostCommands.ts';
 import { claudeSelfWrites } from '../data/selfWrites.ts';
 import { VaultData } from '../data/vault.ts';
 import { write } from '../data/commands.ts';
@@ -26,7 +27,57 @@ import { RecentNotes } from '../ui/recent.ts';
 import { blocksEscape } from '../ui/layers.ts';
 import type { RestoreResult } from '../editor/session.ts';
 
-export class WorkspaceController {
+/**
+ * 워크스페이스 화면 탐색 및 탭 제어 인터페이스
+ */
+export interface WorkspaceNavigation {
+  navigate(path: string, replace?: boolean): void;
+  locationChanged(path: string): void;
+  selectTab(id: string | null): void;
+  closeTab(id: string): void;
+  closeActiveTab(): void;
+  reorderTab(id: string, index: number): void;
+}
+
+/**
+ * 사용자 환경 설정 및 테마·화면 크기 제어 인터페이스
+ */
+export interface WorkspacePreferences {
+  preference(update: Partial<Preferences> & { theme?: 'light' | 'dark'; skin?: Skin; uiScale?: number; uiFont?: string; terminalFont?: string }): void;
+  refreshTheme(): void;
+  zoomBy(direction: 1 | -1 | 0): void;
+  applyScale(scale: number): void;
+  settings(open: boolean, section?: SettingsSection): void;
+}
+
+/**
+ * 네이티브 호스트 및 엔진 호출 인터페이스
+ */
+export interface WorkspaceHostBridge {
+  isNative(): boolean;
+  callHost: TypedHostCall;
+  callEngine(request: string[] | Call): Promise<unknown>;
+  pickDirectory(): Promise<string | null>;
+  chooseFile(extensions: string[]): Promise<string | null>;
+}
+
+/**
+ * 워크스페이스 라이프사이클 및 파일 관리 인터페이스
+ */
+export interface WorkspaceLifecycle {
+  boot(seedSample?: boolean, developmentLink?: string): Promise<void>;
+  open(rawPath: string, menu?: boolean): Promise<boolean>;
+  create(rawName: string): Promise<boolean>;
+  sample(): Promise<boolean>;
+  openRecent(item: RecentWorkspace): Promise<boolean>;
+  forgetRecent(path: string): void;
+  launcher(): Promise<boolean>;
+  refresh(): Promise<void>;
+  dispose(): void;
+  waitForIdle(): Promise<void>;
+}
+
+export class WorkspaceController implements WorkspaceNavigation, WorkspacePreferences, WorkspaceHostBridge, WorkspaceLifecycle {
   readonly context: WindowContext;
   private services: WorkspaceServices;
   private state: WorkspaceState;
@@ -56,8 +107,8 @@ export class WorkspaceController {
   readonly recentNotes: RecentNotes;
   private childRemovers = new Map<symbol, { id: string; remove: (child: string) => void }>();
   private buffers = new Map<symbol, { key: string; read: () => string }>();
-  private moving = new Set<string>();
-  lastRestoreCommit: import('./types.ts').Row | null = null;
+  moving = new Set<string>();
+  lastRestoreCommit: Row | null = null;
 
   constructor(services: WorkspaceServices, context: WindowContext, route: string) {
     this.services = services;
@@ -71,7 +122,7 @@ export class WorkspaceController {
       notice => this.notify(notice)
     );
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
-      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, settingsSection: 'look', form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
+      prefs: readPreferences(services.storage, context.kind === 'main'), settingsOpen: false, settingsSection: 'look', form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
       theme: readTheme(services.storage), skin: readSkin(services.storage), typography: readTypography(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
@@ -160,7 +211,7 @@ export class WorkspaceController {
   };
   closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
   reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
-  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), typography: this.typographyNow(), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), typography: this.typographyNow(), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) } : {}) });
   // 글꼴과 배율은 설정에서 저장소에 쓰고, 모든 창이 저장소를 읽어 따른다. 단 노트 창에서 단축키로 바꾼 배율은
   // 설정을 공유 저장소에 쓰지 않는 규칙(15.14) 때문에 그 창에만 남는다. 그 창은 다시 저장소를 읽어도 자기 배율을 지킨다.
   private localScale?: number;
@@ -190,11 +241,11 @@ export class WorkspaceController {
         if (saved !== null) values.set(KEYS.prefs, saved);
         this.windowPrefs = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } };
       }
-      writePreferences(this.windowPrefs, update as any, true);
-      this.patch({ prefs: readPreferences(this.windowPrefs, false) as unknown as Preferences });
+      writePreferences(this.windowPrefs, update, true);
+      this.patch({ prefs: readPreferences(this.windowPrefs, false) });
       return;
     }
-    writePreferences(this.services.storage, update as any, true);
+    writePreferences(this.services.storage, update, true);
     this.refreshTheme();
   };
   settings = (open: boolean, section?: SettingsSection) => {
@@ -761,7 +812,8 @@ export class WorkspaceController {
     }).catch(() => {});
   }
 
-  callHost = <T,>(command: string, args?: Record<string, unknown>): Promise<T> => this.services.host.invoke<T>(command, args);
+  callHost: TypedHostCall = (<T>(command: string, args?: Record<string, unknown>): Promise<T> =>
+    this.services.host.invoke<T>(command, args)) as TypedHostCall;
   /** 폼에서 폴더 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */
   pickDirectory = (): Promise<string | null> => this.services.host.chooseDirectory().catch(() => null);
   /** 폼에서 확장자가 맞는 파일 하나를 고른다. 취소하거나 고르는 창이 없는 환경이면 null이다. */

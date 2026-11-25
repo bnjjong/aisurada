@@ -11,7 +11,6 @@ ais-kernel = { path = "../ais-kernel" }
 ais-domain = { path = "../ais-domain" }
 ais-infra = { path = "../ais-infra" }
 libc = "0.2"
-libyaml-safer = "0.3"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

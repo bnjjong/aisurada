@@ -71,6 +71,87 @@ impl TaskStatus {
     }
 }
 
+/// 태스크 종류(`feature`, `bug`, `chore`)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TaskType {
+    Feature,
+    Bug,
+    Chore,
+}
+
+impl TaskType {
+    pub const ALL: [TaskType; 3] = [TaskType::Feature, TaskType::Bug, TaskType::Chore];
+    pub const DEFAULT: TaskType = TaskType::Feature;
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            TaskType::Feature => "feature",
+            TaskType::Bug => "bug",
+            TaskType::Chore => "chore",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<TaskType> {
+        let v = raw.trim_matches(|c: char| c <= ' ').to_lowercase();
+        Self::ALL.into_iter().find(|t| t.as_str() == v)
+    }
+}
+
+/// 태스크 우선순위(`high`, `medium`, `low`)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TaskPriority {
+    High,
+    Medium,
+    Low,
+}
+
+impl TaskPriority {
+    pub const ALL: [TaskPriority; 3] = [
+        TaskPriority::High,
+        TaskPriority::Medium,
+        TaskPriority::Low,
+    ];
+    pub const DEFAULT: TaskPriority = TaskPriority::Medium;
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            TaskPriority::High => "high",
+            TaskPriority::Medium => "medium",
+            TaskPriority::Low => "low",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<TaskPriority> {
+        let v = raw.trim_matches(|c: char| c <= ' ').to_lowercase();
+        Self::ALL.into_iter().find(|p| p.as_str() == v)
+    }
+}
+
+/// 태스크가 가리키는 자원 종류(`note`, `github`, `slack`)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RefKind {
+    Note,
+    Github,
+    Slack,
+}
+
+impl RefKind {
+    pub const ALL: [RefKind; 3] = [RefKind::Note, RefKind::Github, RefKind::Slack];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            RefKind::Note => "note",
+            RefKind::Github => "github",
+            RefKind::Slack => "slack",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<RefKind> {
+        let v = raw.trim_matches(|c: char| c <= ' ').to_lowercase();
+        Self::ALL.into_iter().find(|k| k.as_str() == v)
+    }
+}
+
 /// 완료 기준 한 줄
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Criterion {
@@ -90,7 +171,7 @@ pub struct Link {
 /// 태스크가 가리키는 자원(노트, GitHub 이슈·PR 또는 Slack 제보)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ref {
-    pub kind: String,
+    pub kind: RefKind,
     pub target: String,
     pub title: Option<String>,
     pub reporter: Option<String>,
@@ -102,8 +183,8 @@ pub struct Task {
     pub key: String,
     pub id: String,
     pub title: String,
-    pub task_type: String,
-    pub priority: String,
+    pub task_type: TaskType,
+    pub priority: TaskPriority,
     pub status: TaskStatus,
     pub repo: Option<String>,
     pub project: Option<String>,

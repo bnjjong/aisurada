@@ -87,6 +87,8 @@ pub fn serve(vault: Option<&str>, url_path: &str) -> Response<Vec<u8>> {
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
+        "avif" => "image/avif",
+        "bmp" => "image/bmp",
         "woff" => "font/woff",
         "woff2" => "font/woff2",
         _ => return response(403, None, vec![]),

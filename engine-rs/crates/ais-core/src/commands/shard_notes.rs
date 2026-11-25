@@ -217,7 +217,7 @@ fn mapping_path(vault: &Path, apply: bool) -> PathBuf {
     );
     let mut file = directory.join(format!("{stem}.tsv"));
     let mut n = 2;
-    while file.exists() {
+    while fs::exists(&file) {
         file = directory.join(format!("{stem}~{n}.tsv"));
         n += 1;
     }
@@ -371,7 +371,7 @@ struct Row {
 }
 
 fn read_rows(file: &Path) -> Result<Vec<Row>, EngineError> {
-    if !file.exists() {
+    if !fs::exists(file) {
         return Ok(Vec::new());
     }
     let bytes = fs::read(file)
@@ -506,12 +506,12 @@ pub fn verify_shard(vault: &Path, request: &VerifyShardRequest) -> Result<Json, 
         }
         checked += 1;
         let target = resolve(vault, &row.new_rel)?;
-        if !target.exists() {
+        if !fs::exists(&target) {
             missing.push(item(&row.id, &row.new_rel, "옮겨 갔다고 적힌 자리가 없다"));
             continue;
         }
         let size = file_size::measure(&target);
-        if row.old_rel != row.new_rel && resolve(vault, &row.old_rel)?.exists() {
+        if row.old_rel != row.new_rel && fs::exists(&resolve(vault, &row.old_rel)?) {
             left.push(item(
                 &row.id,
                 &row.old_rel,

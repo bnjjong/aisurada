@@ -68,12 +68,7 @@ pub async fn write_drawio_attachment(
 }
 
 fn drawio_vault(state: &HostState) -> Result<String, String> {
-    state
-        .vault
-        .lock()
-        .map_err(|_| "vault 잠금을 얻지 못했어요.")?
-        .clone()
-        .ok_or_else(|| "vault가 아직 열리지 않았어요.".into())
+    state.require_vault()
 }
 
 fn drawio_attachment_path(

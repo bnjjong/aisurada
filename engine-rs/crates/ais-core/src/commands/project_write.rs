@@ -5,20 +5,19 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::agenda_write::{archive, hue_arg};
+use super::agenda_write::{archive, hue_arg, require_entity_id};
 use super::task_commands::project_task_count;
 use crate::error::EngineError;
 use crate::model::ProjectRow;
-use crate::text::{is_blank, trim};
+use crate::text::trim;
 use crate::vault::project::{
     ProjectInfo, ProjectType, archived_project_slugs, is_valid_project_id, scan_projects,
 };
-use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
+use crate::write::agenda_file;
 use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
-use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::WriteScope;
-use crate::write::{project_file, slug};
+use crate::write::project_file;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -60,17 +59,7 @@ pub struct DeleteProjectResponse {
 }
 
 fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
-    if is_blank(id) {
-        return Err(EngineError::invalid_argument(format!(
-            "인자가 하나 필요하다: {usage}"
-        )));
-    }
-    if !is_valid_project_id(id) {
-        return Err(EngineError::invalid_argument(format!(
-            "프로젝트 id 모양이 아니다: {id}"
-        )));
-    }
-    Ok(())
+    require_entity_id(id, usage, is_valid_project_id, "프로젝트")
 }
 
 fn find(projects: &[ProjectInfo], id: &str) -> Result<ProjectInfo, EngineError> {
@@ -110,20 +99,10 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
     })?;
     let taken: HashSet<String> = projects.iter().map(|p| p.slug.clone())
         .chain(archived).collect();
-    let Some(slug) = agenda_file::pick_free_slug(&slug::build(title, 50), &taken) else {
-        return Err(EngineError::invalid_argument(format!(
-            "같은 이름의 프로젝트가 {MAX_SLUG_SUFFIX} 개까지 차 있어 새로 만들 수 없다: {title}"
-        )));
-    };
+    let slug = agenda_file::allocate_entity_slug("프로젝트가", title, &taken)?;
     let hue = hue.unwrap_or_else(|| {
         agenda_file::least_used_hue(projects.iter().map(|p| p.hue.as_str())).to_string()
     });
-    let file_name = format!("{slug}.md");
-    if has_unusable_path_characters(&file_name) {
-        return Err(EngineError::invalid_argument(format!(
-            "경로로 쓸 수 없는 값이다: {file_name}"
-        )));
-    }
     let at = format_utc_millis(now_millis());
     let info = ProjectInfo {
         id,
@@ -179,13 +158,11 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
     };
     let changed = info != current;
     if changed || info.created_at.is_none() || info.edited_at.is_none() {
-        let at = format_utc_millis(now_millis());
-        let created_at = info.created_at.take().unwrap_or_else(|| at.clone());
-        let edited_at = if changed {
-            at
-        } else {
-            info.edited_at.take().unwrap_or(at)
-        };
+        let (created_at, edited_at) = agenda_file::resolve_edit_timestamps(
+            changed,
+            info.created_at.take(),
+            info.edited_at.take(),
+        );
         write_atomic(
             &vault.join(project_file::rel_path(&info.slug)),
             &project_file::render(&info, &created_at, &edited_at),

@@ -3,12 +3,13 @@
 // 규칙은 엔진이 지킨다(참조하지 않은 것은 쓸 수 없는 자원에 안 나온다). 이 층은 규칙을 다시 만들지 않는다.
 
 import { fromArgv } from "../data/commands.ts";
-import type { Call } from "../data/commands.ts";
+import { isRecord, explainEngineError } from "./engineClient.ts";
+import type { EngineCall } from "./engineClient.ts";
 
 export type ResourceKind = "skill" | "agent";
 export type Permission = "read" | "edit" | "publish";
-/** 엔진 호출 한 번. 문자열 목록(명령줄 길)이나 호출 객체(`engine_call`이 맡은 명령)를 받는다. */
-export type EngineCall = (request: string[] | Call) => Promise<unknown>;
+export type { EngineCall };
+export { isRecord };
 
 export interface ResourceRow {
   id: string;
@@ -105,7 +106,6 @@ export const BODY_MAX = 100_000;
 
 const text = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === "string") : []);
-const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 /** 엔진 행을 자원으로 읽는다. 모양이 틀리면 null이다. */
 export function toResource(v: unknown): ResourceRow | null {
@@ -401,8 +401,5 @@ export function selectableSkills(opts: { project?: string; globals: ResourceRow[
 
 /** 엔진이 돌려준 오류를 사람이 읽을 글로 풀어 쓴다. */
 export function explainError(e: unknown): string {
-  const stderr = isRecord(e) && typeof e.stderr === "string" ? e.stderr : e instanceof Error ? e.message : String(e);
-  if (/AIS-412/.test(stderr)) return "다른 곳(AI나 다른 창)에서 먼저 고쳤어요. 목록을 새로 불러온 뒤 다시 고쳐 주세요.";
-  const m = /AIS-\d+\s+(.*)/s.exec(stderr);
-  return (m ? m[1] : stderr).trim() || "알 수 없는 오류가 났어요.";
+  return explainEngineError(e);
 }

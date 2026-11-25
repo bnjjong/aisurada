@@ -445,7 +445,7 @@ pub fn activity(vault: &Path, key: &str, limit: usize) -> Result<Vec<Json>, Engi
 /// 태스크를 휴지통으로 보낸다(활동 기록도 함께). 되살릴 수 있다.
 pub fn delete(vault: &Path, task: &Task) -> Result<(), EngineError> {
     let trash = root(vault).join(".trash").join(&task.id);
-    if trash.exists() {
+    if fs::exists(&trash) {
         return Err(EngineError::conflict(format!(
             "휴지통에 같은 id 가 이미 있다: {}",
             task.id
@@ -488,7 +488,7 @@ pub fn restore(vault: &Path, reference: &str) -> Result<Task, EngineError> {
     let entry = find_trash(vault, reference)?;
     let trash = root(vault).join(".trash").join(&entry.id);
     let target = vault.join(&entry.rel_path);
-    if target.exists() {
+    if fs::exists(&target) {
         return Err(EngineError::conflict(format!(
             "제자리에 같은 키의 태스크가 이미 있어 되살리지 못했다: {}",
             entry.rel_path

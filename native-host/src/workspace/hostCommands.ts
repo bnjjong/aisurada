@@ -1,0 +1,125 @@
+/**
+ * 네이티브 호스트(Tauri / Rust)가 노출하는 IPC 커맨드 타입 맵
+ * 명령 이름(command), 전달 인자(args), 반환 결과(result)의 단일 진실 공급원(SSOT)이다.
+ */
+
+export interface HostCommandMap {
+  // 앱 수명주기 및 윈도우 관리
+  exit_app: { args?: { code?: number }; result: void };
+  begin_quit: { args?: Record<string, never>; result: void };
+  cancel_quit: { args?: Record<string, never>; result: void };
+  show_in_main: { args: { path?: string; rail?: string | null; sub?: string | null; id?: string }; result: void };
+  open_note_window: { args: { id: string }; result: void };
+  note_windows: { args?: Record<string, never>; result: string[] };
+  close_note_windows: { args?: Record<string, never>; result: void };
+  destroy_current_window: { args?: Record<string, never>; result: void };
+  saved_note_windows: { args?: Record<string, never>; result: string[] };
+  restore_note_windows: { args: { ids: string[] }; result: void };
+  remember_note_window: { args: { id: string; geometry: unknown }; result: void };
+
+  // 워크스페이스 및 볼트 관리
+  allow_workspace: { args: { path: string }; result: void };
+  vault_root: { args?: Record<string, never>; result: string | null };
+  is_workspace: { args: { path: string }; result: boolean };
+  create_workspace_dir: { args: { path: string }; result: void };
+
+  // 엔진 및 사이드카
+  engine_commands: { args?: Record<string, never>; result: string[] };
+  engine_call: { args: { request: unknown }; result: unknown };
+  sidecar_call: { args: { request?: string[]; argv?: string[] }; result: unknown };
+
+  // 파일 및 마크다운
+  read_external_md: { args: { path: string }; result: string };
+  allow_external_images: { args: { mdPath: string; srcs: string[] }; result: void };
+  resolve_md_target: { args: { source: string; target: string }; result: string | null };
+  open_in_default_app: { args: { path: string }; result: void };
+  open_external_path: { args: { path: string }; result: void };
+  write_attachment_bytes: { args: { path: string; bytes: number[] }; result: void };
+  read_drawio_attachment: { args: { path: string }; result: string };
+  write_drawio_attachment: { args: { path: string; xml: string }; result: void };
+  copy_dropped_attachment: { args: { source: string; target: string }; result: void };
+  announce_self_write: { args: { root: string }; result: void };
+
+  // GitHub 연동
+  github_status: { args?: Record<string, never>; result: unknown };
+  github_connect: { args: { appId: string; pemPath: string }; result: unknown };
+  github_disconnect: { args?: Record<string, never>; result: unknown };
+  github_repositories: { args?: Record<string, never>; result: unknown };
+  github_clone: { args: { repoFullName: string }; result: unknown };
+
+  // 알림 센터
+  notifications_list: { args?: Record<string, never>; result: unknown[] };
+  notifications_push: { args: { expectedVault: string; item: unknown }; result: void };
+  notifications_mark_read: { args: { ids: string[] }; result: void };
+  notifications_settings_get: { args?: Record<string, never>; result: unknown };
+  notifications_settings_set: { args: { settings: unknown }; result: unknown };
+
+  // 태스크 러너
+  runner_status: { args?: Record<string, never>; result: unknown };
+  runner_run: { args: { taskKey: string }; result: unknown };
+  runner_stop: { args: { taskKey: string }; result: unknown };
+  runner_answer: { args: { taskKey: string; text: string }; result: unknown };
+  runner_settings_set: { args: { settings: unknown }; result: unknown };
+  runner_runs: { args: { taskKey: string }; result: unknown[] };
+  runner_recent_runs: { args?: Record<string, never>; result: unknown[] };
+
+  // 매니저 및 웹훅
+  manager_webhook_secret: { args: { name: string; action: string }; result: string };
+  manager_test_webhook: { args: { name: string; url?: string; channel?: string }; result: { status: number; elapsed: number } };
+  manager_send_status: { args: { taskKey: string }; result: unknown };
+
+  // Archyl
+  archyl_status: { args?: Record<string, never>; result: unknown };
+  archyl_login: { args: { readOnly: boolean }; result: unknown };
+  archyl_cancel_login: { args?: Record<string, never>; result: unknown };
+  archyl_disconnect: { args?: Record<string, never>; result: unknown };
+  archyl_model: { args: { projectId: string }; result: unknown };
+  archyl_chat: { args: unknown; result: unknown };
+
+  // 터미널 PTY
+  pty_start: { args: unknown; result: unknown };
+  pty_write: { args: unknown; result: unknown };
+  pty_resize: { args: unknown; result: unknown };
+  pty_detach: { args: unknown; result: unknown };
+  pty_alive: { args: unknown; result: unknown };
+  pty_stats: { args: unknown; result: unknown };
+  pty_start_session: { args: unknown; result: unknown };
+
+  // 시크릿 마스킹
+  secret_table_probe: { args?: Record<string, never>; result: unknown };
+  secret_table_status: { args?: Record<string, never>; result: unknown };
+  mask_scrollback: { args: { text: string }; result: string };
+  scan_text_shapes: { args: { text: string }; result: unknown };
+
+  // AI 및 세션
+  ask_claude: { args: unknown; result: unknown };
+  ask_runtime: { args?: Record<string, never>; result: unknown };
+  cancel_ask: { args?: Record<string, never>; result: unknown };
+  list_claude_agents: { args?: Record<string, never>; result: unknown };
+  alive_pids: { args?: Record<string, never>; result: number[] };
+  held_agent_sessions: { args?: Record<string, never>; result: unknown };
+  release_agent_session: { args: { sessionKey: string }; result: unknown };
+  write_session_image: { args: unknown; result: unknown };
+  start_dictation: { args: unknown; result: unknown };
+}
+
+export type HostCommandName = keyof HostCommandMap;
+
+export type HostCommandArgs<K extends HostCommandName> = HostCommandMap[K]['args'];
+
+export type HostCommandResult<K extends HostCommandName> = HostCommandMap[K]['result'];
+
+/**
+ * 정형화된 호스트 IPC 호출 함수 인터페이스.
+ * 등록된 명령에 대해서는 타입 추론 및 인자 검사가 엄격히 적용되며,
+ * 임의의 문자열 명령 호출도 제네릭 fallback으로 지원한다.
+ */
+export interface TypedHostCall {
+  <K extends HostCommandName>(
+    command: K,
+    ...args: HostCommandMap[K]['args'] extends undefined | Record<string, never>
+      ? [args?: HostCommandMap[K]['args']]
+      : [args: HostCommandMap[K]['args']]
+  ): Promise<HostCommandMap[K]['result']>;
+  <T = unknown>(command: string, args?: Record<string, unknown>): Promise<T>;
+}

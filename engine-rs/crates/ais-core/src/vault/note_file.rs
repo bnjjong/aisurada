@@ -53,31 +53,44 @@ pub struct SplitText {
     pub body: String,
 }
 
+/// 울타리로 머리 YAML 글자열과 본문 글자열을 가릅니다.
+/// 맨 앞 BOM은 떼고, 본문 앞 줄바꿈(\r\n 또는 \n)을 정리합니다. 머리 YAML을 파싱하지 않습니다.
+pub fn split_content(content: &str) -> Option<(&str, &str)> {
+    let content = content.strip_prefix('\u{FEFF}').unwrap_or(content);
+    let (yaml, raw_body) = split_fence(content)?;
+    let body = raw_body.strip_prefix("\r\n").unwrap_or(raw_body);
+    let body = body.strip_prefix('\n').unwrap_or(body);
+    Some((yaml, body))
+}
+
+/// 머리 울타리가 있으면 본문만, 없으면 내용 전체를 돌려줍니다. 머리 YAML을 파싱하지 않습니다.
+pub fn body_of(content: &str) -> &str {
+    if let Some((_, body)) = split_content(content) {
+        body
+    } else {
+        content
+    }
+}
+
 /// 이미 UTF-8 글로 읽은 노트 내용을 머리와 본문으로 가릅니다. 맨 앞 BOM은 떼고 보고,
 /// 머리가 길이 상한(UTF-16 16,000자)을 넘으면 머리를 읽지 않습니다. 파일 크기와 UTF-8 검사는 부르는 쪽 몫입니다.
 pub fn split_text(content: &str) -> SplitText {
-    let content = content.strip_prefix('\u{FEFF}').unwrap_or(content);
-
-    let Some((yaml, raw_body)) = split_fence(content) else {
+    let Some((yaml, body)) = split_content(content) else {
         return SplitText {
             frontmatter: None,
             body: String::new(),
         };
     };
 
-    // 본문 앞 줄바꿈을 정리한다: \r\n 1개를 떼고, 이어서 \n 1개를 뗀다
-    let body = raw_body.strip_prefix("\r\n").unwrap_or(raw_body);
-    let body = body.strip_prefix('\n').unwrap_or(body).to_string();
-
     if utf16_len(yaml) > MAX_FRONTMATTER_UNITS {
         return SplitText {
             frontmatter: None,
-            body,
+            body: body.to_string(),
         };
     }
     SplitText {
         frontmatter: frontmatter::parse(yaml),
-        body,
+        body: body.to_string(),
     }
 }
 

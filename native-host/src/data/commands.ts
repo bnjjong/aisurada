@@ -2,8 +2,6 @@
 export type Fields = Record<string, string | number | boolean | string[] | undefined>;
 const cells = (fields: Fields) => Object.entries(fields).filter(([, value]) => value !== undefined)
   .map(([key, value]) => `${key}=${Array.isArray(value) ? JSON.stringify(value) : String(value)}`);
-const command = (name: string, positional: string[] = [], fields: Fields = {}, token?: string) =>
-  [name, ...positional, ...cells(fields), ...(token ? [`f1=${token}`] : [])];
 
 /**
  * 엔진 호출 하나: 명령 이름(snake_case)과 인자 객체. `engine_call`은 이 객체를 그대로 받고, 명령줄 길로 보낼 때는
@@ -81,10 +79,8 @@ export const read = {
     args: includeIdPath ? { parent, id, includeIdPath } : { parent, id } }),
   facts: (id: string): Call => ({ command: 'get_agenda_facts', args: { id } }),
   history: (id: string, fields: Fields = {}): Call => ({ command: 'history', args: { id, ...fields } }),
-  commit: (): Call => ({ command: 'commit_vault' }), schedule: () => ['schedule', 'status', '--json'],
+  commit: (): Call => ({ command: 'commit_vault' }),
   sessionTitles: (ids: string[]) => ['session-titles', ...new Set(ids)],
-  readSession: (sessionId: string, limit = 100, urls = true) => ['read-session', sessionId, `limit=${limit}`, `urls=${urls}`],
-  listChats: (noteId: string, subId?: string) => ['list-chats', noteId, ...(subId ? [subId] : [])],
 };
 
 export interface NewDoc {
@@ -126,8 +122,6 @@ export const write = {
   saveRitual: (id: string, fields: Fields): Call => ({ command: 'save_ritual_template', args: { id, ...fields } }),
   deleteTemplate: (id: string): Call => ({ command: 'delete_doc_template', args: { id } }),
   facts: (id: string, facts: string): Call => ({ command: 'update_agenda_facts', args: { id, facts: facts.trim() } }),
-  appendChatTurn: (noteId: string, subId: string | undefined, fields: Fields) =>
-    command('append-chat-turn', [noteId, ...(subId ? [subId] : [])], fields),
 };
 
 export function cleanTags(value: unknown): string[] {

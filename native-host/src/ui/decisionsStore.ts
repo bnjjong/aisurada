@@ -1,9 +1,9 @@
 // AI가 노트에 쓴 「정할 것」(결정 블록) 가운데 사람의 답을 기다리는 노트를 레일 배지와 노트 목록이 같이 보도록 한 곳에 둔다.
 // 목록은 엔진(`pending-decisions`)이 알려 주고 이 모듈은 부르고 기억할 뿐이다. 알림(창이 닫혀 있어도 알리는 쪽)은 호스트(`decisions.rs`)가 한다.
-import { useSyncExternalStore } from "react";
 import { fromArgv } from "../data/commands.ts";
 import { docAddress, subAddress } from "../navigation/routes.ts";
-import type { EngineCall } from "./resourcesClient.ts";
+import { createExternalStore, isRecord } from "./engineClient.ts";
+import type { EngineCall } from "./engineClient.ts";
 
 export interface PendingDecisionNote {
   /** 메인 노트 id */
@@ -25,11 +25,7 @@ export interface DecisionsSnapshot {
 export const POLL_MS = 15_000;
 
 const EMPTY: DecisionsSnapshot = { notes: [], loaded: false };
-let snapshot: DecisionsSnapshot = EMPTY;
-let shape = "";
-const listeners = new Set<() => void>();
 
-const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
 
 /** 엔진 응답을 읽는다. 모양이 틀린 줄은 건너뛴다. */
@@ -47,34 +43,24 @@ export function toPendingNotes(out: unknown): PendingDecisionNote[] {
   });
 }
 
-function publish(next: DecisionsSnapshot) {
-  const nextShape = JSON.stringify(next);
-  if (nextShape === shape) return;
-  shape = nextShape;
-  snapshot = next;
-  for (const listener of [...listeners]) listener();
-}
+const store = createExternalStore<DecisionsSnapshot>(
+  EMPTY,
+  (prev, next) => JSON.stringify(prev) === JSON.stringify(next),
+);
 
-export const subscribeDecisions = (listener: () => void) => {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};
-export const getDecisionsSnapshot = () => snapshot;
+export const subscribeDecisions = store.subscribe;
+export const getDecisionsSnapshot = store.getSnapshot;
 /** 답을 기다리는 노트들 */
-export const usePendingDecisions = (): PendingDecisionNote[] =>
-  useSyncExternalStore(subscribeDecisions, getDecisionsSnapshot, getDecisionsSnapshot).notes;
+export const usePendingDecisions = (): PendingDecisionNote[] => store.useStore().notes;
 
 /** 시험이 서로 새지 않게 처음 상태로 돌린다. */
 export function resetDecisionsStore() {
-  snapshot = EMPTY;
-  shape = "";
+  store.publish(EMPTY);
 }
 
 /** 이미 읽은 목록을 그대로 반영한다. */
 export function setPendingDecisions(notes: PendingDecisionNote[]) {
-  publish({ notes, loaded: true });
+  store.publish({ notes, loaded: true });
 }
 
 /** 엔진에서 목록을 읽는다. 못 읽으면(엔진이 낡았거나 vault가 없음) 이전 목록을 그대로 둔다. */

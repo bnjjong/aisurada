@@ -19,7 +19,7 @@ use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::note::front::{check_size, extra_front};
 use crate::text::{cut_utf16, trim};
-use crate::vault::note_file::split_text;
+use crate::vault::note_file::{body_of, split_text};
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, NoteRecord};
 
@@ -169,12 +169,7 @@ pub fn read_derived(file: &Path) -> (String, Option<Vec<u8>>) {
         }
         let bytes = fs::read(file).ok()?;
         let content = String::from_utf8(bytes.clone()).ok()?;
-        let split = split_text(&content);
-        let body = if split.frontmatter.is_some() {
-            split.body
-        } else {
-            content
-        };
+        let body = body_of(&content).to_string();
         Some((body, Some(bytes)))
     };
     read().unwrap_or_else(|| (String::new(), None))
@@ -290,7 +285,7 @@ pub fn strip_child_cards(body: &str, sub_id: &str) -> String {
 /// 파일이나 폴더(안의 것까지)를 지운다. 없으면 아무것도 안 한다. 심볼릭 링크는 따라가지 않고 링크만 지운다.
 pub fn remove_tree(target: &Path) -> Result<(), EngineError> {
     // Java `Files.exists`처럼 링크를 따라가 보고, 가리키는 곳이 없으면 아무것도 안 한다
-    if !target.exists() {
+    if !fs::exists(target) {
         return Ok(());
     }
     let Ok(metadata) = fs::symlink_metadata(target) else {

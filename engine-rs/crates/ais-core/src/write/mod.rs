@@ -1,13 +1,11 @@
 //! 쓰기 명령이 함께 쓰는 공통 기반입니다.
 //!
-//! - [`apparatus`]: 시험용 시계와 난수, id 발급
+//! - [`apparatus`]: 시험용 시계와 난수, id 발급, 시간대별 시계 및 고친 기록 도장
 //! - [`confine`]: 경로 조각 검사와 기준 폴더 가두기
 //! - [`atomic`]: 임시 파일에 쓰고 이름을 바꿔 한 번에 교체하는 쓰기
 //! - 쓰기 잠금: `ports::VaultLock`(어댑터 `adapters/flock_lock.rs`: 프로세스 안 줄 세우기와 프로세스 간 파일 잠금)
-//! - [`precondition`]: 고치기 전 확인 값(`f1`) 검사
-//! - [`marker`]: 워크스페이스 표식 검사
+//! - [`pipeline`]: 쓰기 명령 한 번의 길(잠금 → 표식 검사 → 선결 조건 검사 → 색인 맞추기 → 자동 커밋 기록)
 //! - [`autocommit`]: git 자동 커밋
-//! - [`pipeline`]: 쓰기 명령 한 번의 길(잠금 → 표식 → 색인 맞추기 → 자동 커밋 기록)
 //! - [`slug`]: 제목에서 폴더·파일 이름(slug) 만들기
 //! - [`agenda_file`]: 아젠다 파일 만들기
 //! - [`project_file`]: 프로젝트 파일 만들기와 저장소 목록 검사
@@ -17,7 +15,6 @@
 //! - [`meta_writer`]: 노트 머리만 고쳐 쓰기(편집 도장 판정 포함)
 //! - [`doc_place`]: 날짜·시각 인자, 부모 폴더, 폴더 이름, 폴더 옮기기
 //! - [`first_heading`]: 본문 첫 헤딩 글
-//! - [`local_time`]: 이 프로세스의 시간대로 본 날짜와 시각
 //! - [`snake_dump`]: SnakeYAML과 같은 YAML 방출기(태스크·자원 파일)
 //! - [`json_out`]: 파일에 쓰는 JSON 글(들여쓰기 두 칸)
 //! - [`trash_file`]: 휴지통 목록 파일과 보관 폴더 쓰기
@@ -31,19 +28,29 @@ internal_mods!(
     comments_file,
     doc_place,
     json_out,
-    local_time,
-    marker,
     meta_writer,
     pipeline,
-    precondition,
     project_file,
-    stamp,
     sub_note,
     template_file,
     trash_file,
     warnings,
 );
 pub mod autocommit;
+
+pub mod marker {
+    pub use super::pipeline::check_workspace_marker;
+}
+pub mod precondition {
+    pub use super::pipeline::check_precondition as check;
+}
+pub mod local_time {
+    pub use super::apparatus::{LocalClock, iso_offset_date_time, local_clock};
+}
+pub mod stamp {
+    pub use super::apparatus::{Stamp, stamp_of};
+}
+
 #[cfg(feature = "test-support")]
 pub use crate::kernel::confine;
 #[cfg(not(feature = "test-support"))]

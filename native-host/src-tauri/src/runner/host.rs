@@ -87,8 +87,7 @@ impl<R: Runtime> AppHost<R> {
 impl<R: Runtime> Host for AppHost<R> {
     fn vault(&self) -> Option<String> {
         let state = self.app.try_state::<crate::lifecycle::HostState>()?;
-        let guard = state.vault.lock().ok()?;
-        guard.clone()
+        state.current_vault()
     }
 
     fn engine(&self, vault: &str, argv: &[String]) -> Result<Reply, String> {

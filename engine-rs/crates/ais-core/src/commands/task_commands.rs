@@ -25,8 +25,6 @@ use crate::vault::check_manager_project;
 use crate::write::marker::check_workspace_marker;
 use crate::write::stamp::stamp_of;
 
-#[allow(dead_code)]
-const CREATE_USAGE: &str = "create-task title=<요약> repo=<owner/name> criteria=<완료 기준 JSON 배열. 하나 이상. 예: [\"…\",{\"text\":\"…\"}]> [type=feature|bug|chore] [priority=high|medium|low] [project=<프로젝트 slug>] [base=<기준 브랜치>] [body=<설명>] [labels=<JSON 배열>] [refs=<연결한 자원 JSON 배열. 예: [{\"kind\":\"note\",\"target\":\"nd…\"},{\"kind\":\"github\",\"target\":\"owner/name#53\"}]>] [actor=human|runner]";
 const GET_USAGE: &str =
     "get-task <키(TSK-14) 또는 id> [activity=<최근 활동 개수. 기본 100. 0이면 전부>]";
 const UPDATE_USAGE: &str = "update-task <키 또는 id> f1=<직전에 읽은 토큰> [title=<요약>] [type=] [priority=] [repo=<owner/name>] [project=<프로젝트 slug. 빈 값이면 지운다>] [base=<기준 브랜치. 빈 값이면 지운다>] [body=<설명>] [labels=<JSON 배열. 전체 교체>] [criteria=<JSON 배열. 전체 교체>] [refs=<JSON 배열. 전체 교체>] [actor=human|runner]";
@@ -218,8 +216,8 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
         "key": task.key,
         "id": task.id,
         "title": task.title,
-        "type": task.task_type,
-        "priority": task.priority,
+        "type": task.task_type.as_str(),
+        "priority": task.priority.as_str(),
         "status": task.status.label(),
         "statusTitle": task.status.title(),
         "labels": task.labels,
@@ -285,7 +283,7 @@ fn detail(
         task.refs
             .iter()
             .map(|r| {
-                let mut v = json!({"kind": r.kind, "target": r.target});
+                let mut v = json!({"kind": r.kind.as_str(), "target": r.target});
                 for (key, value) in [("title", &r.title), ("reporter", &r.reporter), ("excerpt", &r.excerpt)] {
                     if let Some(value) = value {
                         v[key] = json!(value);

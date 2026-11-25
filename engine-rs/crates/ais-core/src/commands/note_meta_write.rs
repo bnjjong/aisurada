@@ -216,7 +216,7 @@ pub fn link_docs(
     check_not_self(&request.from, &request.to)?;
     let token = f1_arg(&request.f1);
     let note = find(scope, &request.from, context.caller)?;
-    let links = match apply_link(&note.meta.links, &request.to, &kind, remove) {
+    let links = match apply_link(&note.meta.links, &request.to, kind, remove) {
         LinkOutcome::Unchanged(why) => {
             return Ok(json!({"id": request.from, "changed": false, "note": why}));
         }
@@ -238,7 +238,7 @@ pub fn link_docs(
     let mut response = json!({
         "id": request.from,
         "to": request.to,
-        "kind": kind,
+        "kind": kind.as_str(),
         "removed": remove,
         "changed": true,
         "path": written.path,

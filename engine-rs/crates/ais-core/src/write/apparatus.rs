@@ -5,13 +5,68 @@
 //! 없으면 실제 시계와 무작위 값을 쓴다. Java 엔진의 JVM 속성 `aisurada.test.now`, `aisurada.test.random`과 같은 뜻이라,
 //! 같은 값을 주면 두 엔진이 같은 id와 시각을 낸다. 이 파일은 그 값으로 id와 시각 글을 짓는다.
 
+use crate::kernel::actor::CallContext;
+pub use crate::kernel::stamp::Stamp;
+pub use crate::kernel::time::{LocalClock, format_utc_millis};
 use crate::ports;
-
-pub use crate::kernel::time::format_utc_millis;
 
 /// 지금의 유닉스 밀리초
 pub fn now_millis() -> i64 {
     ports::clock().now_millis()
+}
+
+/// 유닉스 밀리초를 이 프로세스의 시간대로 풀어 날짜와 시, 분, 초(초 아래는 버림)를 돌려준다. 시간대를 못 읽으면 UTC로 본다.
+pub fn local_clock(millis: i64) -> LocalClock {
+    ports::clock().local_clock(millis)
+}
+
+/// 이 프로세스의 시간대로 본 `yyyy-MM-ddTHH:mm:ss±HH:MM`(Java `ISO_OFFSET_DATE_TIME`, 초 아래는 버림). 오프셋이 0이면 `Z`다.
+pub fn iso_offset_date_time(millis: i64) -> String {
+    let clock = local_clock(millis);
+    let offset = if clock.offset_seconds == 0 {
+        "Z".to_string()
+    } else {
+        let abs = clock.offset_seconds.abs();
+        let mut text = format!(
+            "{}{:02}:{:02}",
+            if clock.offset_seconds < 0 { '-' } else { '+' },
+            abs / 3600,
+            abs % 3600 / 60
+        );
+        if abs % 60 != 0 {
+            text.push_str(&format!(":{:02}", abs % 60));
+        }
+        text
+    };
+    format!(
+        "{}T{:02}:{:02}:{:02}{offset}",
+        clock.date.iso(),
+        clock.hour,
+        clock.minute,
+        clock.second
+    )
+}
+
+/// 지금의 고친 기록. AI 세션이 고쳤으면 세션 id와(claude가 아니면) CLI 이름이 남고, 사람이 고쳤으면 시각만 남는다.
+pub fn stamp_of(context: &CallContext) -> Stamp {
+    let session = context
+        .session
+        .as_deref()
+        .filter(|s| !crate::kernel::java::java_blank(s))
+        .map(str::to_string);
+    let agent = session.as_ref().and_then(|_| {
+        context
+            .session_agent
+            .as_deref()
+            .filter(|a| *a != "claude")
+            .map(str::to_string)
+    });
+    Stamp {
+        at: iso_offset_date_time(now_millis()),
+        session,
+        agent,
+        manager: context.manager.as_ref().map(|manager| manager.name.clone()),
+    }
 }
 
 /// 시험 난수 목록을 환경 변수에서 다시 읽는다(시험과 맞대기 하네스만 쓴다).
@@ -114,5 +169,11 @@ mod tests {
                 .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
         );
         assert_ne!(next_random_u64(), next_random_u64());
+    }
+
+    #[test]
+    fn local_clock_and_iso_offset_date_time_behave_sensibly() {
+        let text = iso_offset_date_time(0);
+        assert!(text.starts_with("1970-01-01T") || text.starts_with("1969-12-31T"));
     }
 }

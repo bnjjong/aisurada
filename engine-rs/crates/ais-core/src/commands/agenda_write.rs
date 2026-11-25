@@ -12,12 +12,10 @@ use crate::model::AgendaRow;
 use crate::text::{encode_uri_component, is_blank, trim};
 use crate::vault::agenda::{AgendaInfo, is_valid_agenda_id, is_valid_slug_segment};
 use crate::vault::project::scan_projects;
-use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
+use crate::write::agenda_file;
 use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
-use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::WriteScope;
-use crate::write::slug;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -135,18 +133,27 @@ fn project_repo_arg(
     Ok(Some(name.to_string()))
 }
 
-pub(crate) fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
+pub(crate) fn require_entity_id(
+    id: &str,
+    usage: &str,
+    validator: impl Fn(&str) -> bool,
+    kind_name: &str,
+) -> Result<(), EngineError> {
     if is_blank(id) {
         return Err(EngineError::invalid_argument(format!(
             "인자가 하나 필요하다: {usage}"
         )));
     }
-    if !is_valid_agenda_id(id) {
+    if !validator(id) {
         return Err(EngineError::invalid_argument(format!(
-            "아젠다 id 모양이 아니다: {id}"
+            "{kind_name} id 모양이 아니다: {id}"
         )));
     }
     Ok(())
+}
+
+pub(crate) fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
+    require_entity_id(id, usage, is_valid_agenda_id, "아젠다")
 }
 
 pub(crate) fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a AgendaInfo, EngineError> {
@@ -182,20 +189,10 @@ pub fn create(
     let rows: Vec<&AgendaInfo> = scope.index.agendas.table.infos().collect();
     let id = next_id("ag");
     let taken: HashSet<String> = rows.iter().map(|r| r.slug.clone()).collect();
-    let Some(slug) = agenda_file::pick_free_slug(&slug::build(title, 50), &taken) else {
-        return Err(EngineError::invalid_argument(format!(
-            "같은 이름의 아젠다가 {MAX_SLUG_SUFFIX} 개까지 차 있어 새로 만들 수 없다: {title}"
-        )));
-    };
+    let slug = agenda_file::allocate_entity_slug("아젠다가", title, &taken)?;
     let hue = hue.unwrap_or_else(|| {
         agenda_file::least_used_hue(rows.iter().map(|r| r.hue.as_str())).to_string()
     });
-    let file_name = format!("{slug}.md");
-    if has_unusable_path_characters(&file_name) {
-        return Err(EngineError::invalid_argument(format!(
-            "경로로 쓸 수 없는 값이다: {file_name}"
-        )));
-    }
     let at = format_utc_millis(now_millis());
     let info = AgendaInfo {
         id,
@@ -269,13 +266,11 @@ pub fn update(
     };
     let changed = info != *current;
     if changed || info.created_at.is_none() || info.edited_at.is_none() {
-        let at = format_utc_millis(now_millis());
-        let created_at = info.created_at.take().unwrap_or_else(|| at.clone());
-        let edited_at = if changed {
-            at
-        } else {
-            info.edited_at.take().unwrap_or(at)
-        };
+        let (created_at, edited_at) = agenda_file::resolve_edit_timestamps(
+            changed,
+            info.created_at.take(),
+            info.edited_at.take(),
+        );
         write_atomic(
             &vault.join(agenda_file::rel_path(&info.slug)),
             &agenda_file::render(&info, &created_at, &edited_at),
@@ -327,14 +322,14 @@ pub fn delete(
 
 /// 파일을 휴지통 폴더로 옮긴다. 옮길 파일이 없으면 경고만 하고 넘어가고, 옮길 자리에 이미 있으면 실패한다.
 pub(crate) fn archive(source: &Path, target: &Path, kind: &str) -> Result<(), EngineError> {
-    if !source.exists() {
+    if !fs::exists(source) {
         eprintln!(
             "Warning: 옮길 {kind} 파일이 없어 옮기지 않았다: {}",
             source.display()
         );
         return Ok(());
     }
-    if target.exists() {
+    if fs::exists(target) {
         return Err(EngineError::internal(format!(
             "옮길 자리에 이미 무엇이 있어 옮기지 않았다: {}",
             target.display()

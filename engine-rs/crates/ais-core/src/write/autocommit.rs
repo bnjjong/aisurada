@@ -398,7 +398,7 @@ impl AutoCommit {
             "CHERRY_PICK_HEAD",
             "REVERT_HEAD",
         ] {
-            if git_dir.join(marker).exists() {
+            if fs::exists(&git_dir.join(marker)) {
                 return CommitResult::new("skipped", Some("in-progress"));
             }
         }

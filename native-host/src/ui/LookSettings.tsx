@@ -3,35 +3,73 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Skin, WorkspaceState } from "../workspace/types.ts";
 import { UI_SCALES } from "../workspace/typography.ts";
 import { SettingsPane } from "./SettingsParts.tsx";
+import { SKIN_OPTIONS, findSkinOption, type SkinOption } from "../workspace/skin.ts";
 
-/** 설정에서 고를 수 있는 화면 모양. 순서가 곧 화면에 나오는 순서다. */
-export const SKIN_OPTIONS: readonly { id: Skin; label: string; hint: string }[] = [
-  {
-    id: "tactile",
-    label: "물성",
-    hint: "눌리는 것은 떠 있고, 쓰는 것은 파여 있는 둥근 모양이에요.",
-  },
-  {
-    id: "grid",
-    label: "격자",
-    hint: "4px 격자와 또렷한 먹선, 각진 모서리로 정확하게 그린 모양이에요.",
-  },
-  {
-    id: "glass",
-    label: "유리",
-    hint: "반투명 유리 패널과 은은한 빛번짐으로 가볍게 그린 모양이에요.",
-  },
-  {
-    id: "modern",
-    label: "모던",
-    hint: "얇은 선과 차분한 회색, 작은 곡률로 정돈한 모양이에요.",
-  },
-  {
-    id: "classic",
-    label: "기본",
-    hint: "얇은 테두리와 평평한 면으로 그린 이전 모양이에요.",
-  },
-];
+export { SKIN_OPTIONS, type SkinOption } from "../workspace/skin.ts";
+
+/**
+ * 화면 모양 단추(라디오 카드 한 장) 컴포넌트
+ */
+export function SkinOptionCard({
+  option,
+  checked,
+  onChange,
+}: {
+  option: SkinOption;
+  checked: boolean;
+  onChange: (id: Skin) => void;
+}) {
+  return (
+    <label className="set-skin-option">
+      <input
+        type="radio"
+        name="skin"
+        value={option.id}
+        checked={checked}
+        onChange={() => onChange(option.id)}
+      />
+      <span className="skin-preview" data-skin-preview={option.id} aria-hidden="true">
+        <i />
+        <b />
+      </span>
+      <span className="set-skin-text">
+        <strong>{option.label}</strong>
+      </span>
+    </label>
+  );
+}
+
+/**
+ * 스킨 선택 라디오 단추 목록 그리드 컴포넌트
+ */
+export function SkinPicker({
+  skin,
+  onChange,
+}: {
+  skin: Skin;
+  onChange: (skin: Skin) => void;
+}) {
+  const currentSkin = findSkinOption(skin);
+
+  return (
+    <div className="set-group" data-setting="skin">
+      <h4>화면 모양</h4>
+      <div className="set-skin-grid" role="radiogroup" aria-label="화면 모양">
+        {SKIN_OPTIONS.map((option) => (
+          <SkinOptionCard
+            key={option.id}
+            option={option}
+            checked={skin === option.id}
+            onChange={onChange}
+          />
+        ))}
+      </div>
+      <p className="set-skin-selected-desc">
+        <strong>{currentSkin.label}</strong> · {currentSkin.hint}
+      </p>
+    </div>
+  );
+}
 
 export function LookSettings({
   controller,
@@ -40,36 +78,12 @@ export function LookSettings({
   controller: Pick<WorkspaceController, "preference">;
   state: Pick<WorkspaceState, "skin" | "typography">;
 }) {
-  const currentSkin = SKIN_OPTIONS.find((s) => s.id === state.skin) ?? SKIN_OPTIONS[0];
-
   return (
     <SettingsPane title="모양" desc="앱이 어떻게 보이는지 정해요. 밝게·어둡게는 레일의 ◐ 단추가 그대로 맡아요.">
-      <div className="set-group" data-setting="skin">
-        <h4>화면 모양</h4>
-        <div className="set-skin-grid">
-          {SKIN_OPTIONS.map((option) => (
-            <label className="set-skin-option" key={option.id}>
-              <input
-                type="radio"
-                name="skin"
-                value={option.id}
-                checked={state.skin === option.id}
-                onChange={() => controller.preference({ skin: option.id })}
-              />
-              <span className="skin-preview" data-skin-preview={option.id} aria-hidden="true">
-                <i />
-                <b />
-              </span>
-              <span className="set-skin-text">
-                <strong>{option.label}</strong>
-              </span>
-            </label>
-          ))}
-        </div>
-        <p className="set-skin-selected-desc">
-          <strong>{currentSkin.label}</strong> · {currentSkin.hint}
-        </p>
-      </div>
+      <SkinPicker
+        skin={state.skin}
+        onChange={(skin) => controller.preference({ skin })}
+      />
 
       <div className="set-group" data-setting="scale">
         <h4>화면 크기</h4>

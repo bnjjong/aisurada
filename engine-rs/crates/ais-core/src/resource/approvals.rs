@@ -200,7 +200,7 @@ fn str_of(entries: &[(String, JsonValue)], key: &str) -> Option<String> {
 
 fn load(vault: &Path) -> Result<Ledger, EngineError> {
     let file = ledger_file(vault)?;
-    if !file.exists() {
+    if !fs::exists(&file) {
         return adopt_baseline(vault);
     }
     let failed = |message: &str| {
