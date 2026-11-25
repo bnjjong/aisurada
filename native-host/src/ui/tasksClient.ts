@@ -259,7 +259,10 @@ function toIntakeSource(v: unknown): IntakeSource | null {
     if (!isRecord(item) || !text(item.name) || typeof item.count !== "number" || item.count < 1) return null;
     return { name: item.name as string, count: item.count };
   });
-  return { id, source, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "",
+  const target = isRecord(v.destination) ? v.destination : undefined;
+  const conversation = text(target?.conversation), message = text(target?.message);
+  const destination = conversation && message ? { conversation, message, thread: text(target?.thread) } : undefined;
+  return { id, source, destination, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "",
     manager: text(v.manager), receivedAt: intakeTime(v.receivedAt),
     reactionAdded: v.reactionAdded === true, reactions };
 }

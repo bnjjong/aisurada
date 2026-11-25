@@ -212,6 +212,8 @@ struct Entry {
     id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source: Option<DirectSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    destination: Option<SourceDestination>,
     channel: String,
     message_ts: String,
     url: String,
@@ -252,6 +254,21 @@ struct DirectSource {
     posted_at: Option<i64>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct SourceDestination {
+    conversation: String,
+    message: String,
+    thread: Option<String>,
+}
+
+impl SourceDestination {
+    fn valid(&self) -> bool {
+        let valid_id = |id: &str| !id.is_empty() && id.len() <= 128
+            && id.bytes().all(|b| b.is_ascii_alphanumeric() || b"._:-".contains(&b));
+        valid_id(&self.conversation) && valid_id(&self.message) && self.thread.as_deref().is_none_or(valid_id)
+    }
+}
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SlackReaction {
@@ -365,6 +382,7 @@ struct SubmittedSource {
     key: String,
     posted_at: Option<i64>,
     url: Option<String>,
+    destination: Option<SourceDestination>,
 }
 
 #[derive(Deserialize)]
@@ -1190,7 +1208,7 @@ impl Ledger {
         request: Submit,
     ) -> Result<(Value, bool), EngineError> {
         let now = clock().now_millis();
-        let SubmittedSource { kind, key, posted_at, url } = request.source;
+        let SubmittedSource { kind, key, posted_at, url, destination } = request.source;
         let source = DirectSource { kind, key, posted_at };
         if source.kind == "slack"
             || source.kind.len() > 32
@@ -1215,6 +1233,9 @@ impl Ledger {
         }
         if url.as_deref().is_some_and(|url| !direct_source_url(url)) {
             return Err(invalid("원글 주소는 사용자 정보나 공백이 없는 HTTPS 주소여야 한다"));
+        }
+        if destination.as_ref().is_some_and(|target| !target.valid()) {
+            return Err(invalid("제보의 대화, 메시지, 주제 식별자를 확인해 주세요"));
         }
         let reporter = short(&request.reporter, 100);
         let excerpt = short(&request.excerpt, 200);
@@ -1245,6 +1266,7 @@ impl Ledger {
         let entry = Entry {
             id: id.clone(),
             source: Some(source),
+            destination,
             channel: String::new(),
             message_ts: String::new(),
             url: url.unwrap_or_default(),
@@ -1408,6 +1430,7 @@ impl Ledger {
             Entry {
                 id: id.clone(),
                 source: None,
+                destination: None,
                 channel: request.channel.clone(),
                 message_ts: request.message_ts.clone(),
                 url: request.url.split('?').next().unwrap_or_default().into(),

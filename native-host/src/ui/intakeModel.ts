@@ -58,6 +58,7 @@ export interface DirectIntakeSource {
 export interface IntakeEntry {
   id: string;
   source?: DirectIntakeSource;
+  destination?: { conversation: string; message: string; thread?: string };
   channel: string;
   messageTs: string;
   url: string;
@@ -74,7 +75,7 @@ export interface IntakeEntry {
 }
 
 export type IntakeSource =
-  Pick<IntakeEntry, "id" | "source" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded" | "reactions">
+  Pick<IntakeEntry, "id" | "source" | "destination" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded" | "reactions">
   & Partial<Pick<IntakeEntry, "manager" | "receivedAt">>;
 
 export type IntakeAttentionReason = "question_limit" | "no_answer";

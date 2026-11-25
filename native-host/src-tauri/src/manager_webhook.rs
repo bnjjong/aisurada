@@ -18,15 +18,13 @@ use manager::{KEYCHAIN_ITEM_NOT_FOUND, KEYCHAIN_SERVICE};
 pub enum DeliveryError {
     Unavailable,
     #[cfg(feature = "claude")]
-    NoSlackSource,
+    NoSource,
     #[cfg(feature = "claude")]
     MissingSecret,
     #[cfg(feature = "claude")]
     Keychain,
     Unconfirmed,
-    Retry {
-        rejected: bool,
-    },
+    Retry,
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -160,11 +158,8 @@ pub async fn manager_test_webhook<R: Runtime>(
             eprintln!("매니저 시험 알림을 기록하지 못했다: {error}");
         }
         let status = result.map_err(|error| match error {
-            DeliveryError::Retry { rejected: true } => {
-                "웹훅이 Slack에 알림을 전달하지 못했어요. 채널 ID와 봇 연결을 확인해 주세요."
-            }
             DeliveryError::Unconfirmed => {
-                "Hermes가 중복 요청으로 답해 Slack 전달 여부를 확인하지 못했어요."
+                "전달 여부를 확인할 수 없어요. Slack 채널의 시험 알림을 확인해 주세요."
             }
             _ => "시험 알림을 전달하지 못했어요. 웹훅 주소와 서명 비밀을 확인해 주세요.",
         })?;
@@ -225,7 +220,7 @@ pub fn send_webhook(
     let body = payload.to_string();
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| DeliveryError::Retry { rejected: false })?
+        .map_err(|_| DeliveryError::Retry)?
         .as_secs()
         .to_string();
     let signature = hmac::sign(
@@ -246,10 +241,18 @@ pub fn send_webhook(
         .header("X-Webhook-Signature-V2", hex(signature.as_ref()))
         .header("X-Request-ID", id)
         .send(body)
-        .map_err(|_| DeliveryError::Retry { rejected: false })?;
+        .map_err(|error| match error {
+            ureq::Error::ConnectionFailed => DeliveryError::Retry,
+            ureq::Error::Io(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+                DeliveryError::Retry
+            }
+            _ => DeliveryError::Unconfirmed,
+        })?;
     if !response.status().is_success() {
-        return Err(DeliveryError::Retry {
-            rejected: response.status().as_u16() == 502,
+        return Err(match response.status().as_u16() {
+            429 => DeliveryError::Retry,
+            400 | 401 | 403 | 404 => DeliveryError::Unavailable,
+            _ => DeliveryError::Unconfirmed,
         });
     }
     let status = response.status().as_u16();
@@ -258,13 +261,13 @@ pub fn send_webhook(
         .with_config()
         .limit(4096)
         .read_to_vec()
-        .map_err(|_| DeliveryError::Retry { rejected: false })?;
+        .map_err(|_| DeliveryError::Unconfirmed)?;
     let acknowledgment: Value =
-        serde_json::from_slice(&bytes).map_err(|_| DeliveryError::Retry { rejected: false })?;
+        serde_json::from_slice(&bytes).map_err(|_| DeliveryError::Unconfirmed)?;
     match acknowledgment["status"].as_str() {
         Some("delivered") => Ok(status),
         Some("duplicate") => Err(DeliveryError::Unconfirmed),
-        _ => Err(DeliveryError::Retry { rejected: false }),
+        _ => Err(DeliveryError::Unconfirmed),
     }
 }
 
@@ -280,14 +283,22 @@ mod tests {
 
     #[test]
     fn delivers_signed_status_to_loopback_receiver() {
-        assert_eq!(send_with_reply("delivered").unwrap(), 200);
+        assert_eq!(send_with_reply(200, "delivered").unwrap(), 200);
         assert!(matches!(
-            send_with_reply("duplicate"),
+            send_with_reply(200, "duplicate"),
+            Err(DeliveryError::Unconfirmed)
+        ));
+        assert!(matches!(
+            send_with_reply(429, "rate_limited"),
+            Err(DeliveryError::Retry)
+        ));
+        assert!(matches!(
+            send_with_reply(502, "error"),
             Err(DeliveryError::Unconfirmed)
         ));
     }
 
-    fn send_with_reply(acknowledgment: &'static str) -> Result<u16, DeliveryError> {
+    fn send_with_reply(status: u16, acknowledgment: &'static str) -> Result<u16, DeliveryError> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let url = format!(
             "http://{}/webhooks/aisurada",
@@ -326,7 +337,7 @@ mod tests {
             let body = json!({"status": acknowledgment}).to_string();
             write!(
                 socket,
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             )
             .unwrap();

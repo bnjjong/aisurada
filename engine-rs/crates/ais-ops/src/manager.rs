@@ -81,6 +81,10 @@ pub struct Manager {
     pub repos: Vec<String>,
     pub agendas: Vec<String>,
     pub webhook: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub telegram_webhook: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub telegram_chats: Vec<String>,
     #[serde(default = "default_kind")]
     pub kind: String,
     #[serde(default)]
@@ -111,6 +115,8 @@ impl Manager {
             repos: Vec::new(),
             agendas: Vec::new(),
             webhook: None,
+            telegram_webhook: None,
+            telegram_chats: Vec::new(),
             kind: default_kind(),
             project: String::new(),
             project_id: String::new(),
@@ -163,10 +169,8 @@ impl Manager {
         self.slack_channels.iter().any(|allowed| allowed == channel)
     }
 
-    pub fn webhook_for_status(&self, status: &str) -> Option<&str> {
-        (self.notify_enabled && self.notify.iter().any(|value| value == status))
-            .then_some(self.webhook.as_deref())
-            .flatten()
+    pub fn notifies(&self, status: &str) -> bool {
+        self.notify_enabled && self.notify.iter().any(|value| value == status)
     }
 
     fn validate(&self) -> Result<(), String> {
@@ -232,6 +236,21 @@ impl Manager {
         }
         if let Some(webhook) = &self.webhook {
             validate_webhook(webhook)?;
+        }
+        if let Some(webhook) = &self.telegram_webhook {
+            validate_webhook(webhook)?;
+            if self.webhook.as_ref() == Some(webhook) {
+                return Err("Slack과 텔레그램에 서로 다른 웹훅 경로를 지정한다".into());
+            }
+        }
+        if self.telegram_chats.len() > 20
+            || self
+                .telegram_chats
+                .iter()
+                .any(|id| !valid_telegram_chat_id(id))
+            || self.telegram_chats.iter().collect::<HashSet<_>>().len() != self.telegram_chats.len()
+        {
+            return Err("텔레그램 대화 ID는 중복 없이 숫자로 20개까지 적는다".into());
         }
         Ok(())
     }
@@ -311,6 +330,12 @@ fn safe_webhook_segment(segment: &str) -> bool {
         i += 1;
     }
     true
+}
+
+pub fn valid_telegram_chat_id(value: &str) -> bool {
+    value
+        .parse::<i64>()
+        .is_ok_and(|id| id != 0 && id.to_string() == value)
 }
 
 pub fn validate_webhook(webhook: &str) -> Result<(), String> {
@@ -460,6 +485,10 @@ fn set_options(manager: &mut Manager, options: &[String]) -> Result<(), String> 
             "agendas" => manager.agendas = items(value)?,
             "project" => manager.project = value.to_owned(),
             "webhook" => manager.webhook = (!value.is_empty()).then(|| value.to_owned()),
+            "telegramWebhook" => {
+                manager.telegram_webhook = (!value.is_empty()).then(|| value.to_owned())
+            }
+            "telegramChats" => manager.telegram_chats = items(value)?,
             "slackChannels" => manager.slack_channels = items(value)?,
             "notify" => manager.notify = items(value)?,
             "notifyEnabled" => {
@@ -791,6 +820,11 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     };
     let mut registry = read_registry(env)?;
     match args {
+        [action] if action == "status-tasks" => {
+            return Engine::new(canonical_vault(env)?)
+                .manager_status_tasks()
+                .map_err(|error| error.to_string());
+        }
         [action] if action == "intake-questions" => {
             return intake_questions(env, &registry.managers);
         }
@@ -814,7 +848,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
             "  list | dashboard [--summary] [--compact] | history NAME | add NAME project=… […] | update NAME […]\n",
             "  enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME\n",
             "  intake NAME [JSON] | intake-channel NAME JSON | intake-rewind NAME JSON\n",
-            "  intake-review NAME JSON | intake-sources TASK | intake-questions"
+            "  intake-review NAME JSON | intake-sources TASK | intake-questions | status-tasks"
         ).into());
     };
     if action == "intake-sources" && options.is_empty() {

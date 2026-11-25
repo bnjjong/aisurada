@@ -8,7 +8,7 @@ use ais_domain::task::{format::slack_thread, TaskStatus};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     fs,
     io::ErrorKind,
 };
@@ -27,7 +27,29 @@ struct Row {
     repo: String,
     project: Option<String>,
     status: String,
-    edited_at: String,
+    #[serde(default)]
+    status_changes: Vec<StatusChange>,
+}
+
+#[derive(Deserialize)]
+struct StatusChange {
+    id: String,
+    status: String,
+    at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "platform", rename_all = "snake_case")]
+enum Destination {
+    Slack {
+        channel: String,
+        thread: String,
+    },
+    Telegram {
+        chat: String,
+        message: String,
+        thread: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -44,14 +66,34 @@ struct Pending {
     first_attempt_at: Option<u64>,
     #[serde(default)]
     next_attempt_at: u64,
+    #[serde(default, alias = "in_flight")]
+    sending: bool,
     #[serde(default)]
-    in_flight: bool,
+    change: Option<String>,
+    #[serde(default)]
+    changed_at: Option<String>,
+    #[serde(default)]
+    destination: Option<Destination>,
+    #[serde(default)]
+    webhook: Option<String>,
 }
 
-#[derive(Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Default, Deserialize, PartialEq, Serialize)]
 struct History {
     statuses: HashMap<String, String>,
     pending: VecDeque<Pending>,
+    #[serde(default)]
+    observed: BTreeSet<String>,
+    #[serde(default)]
+    outcomes: VecDeque<DeliveryOutcome>,
+}
+
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
+struct DeliveryOutcome {
+    id: String,
+    change: Option<String>,
+    destination: Option<Destination>,
+    result: String,
 }
 
 pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
@@ -62,7 +104,7 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
     if managers.is_empty() {
         return Ok(());
     }
-    let list = ctx.call(&["list-tasks"])?;
+    let list = ctx.call(&["manager", "status-tasks"])?;
     let rows = list["tasks"]
         .as_array()
         .ok_or("태스크 목록을 읽지 못했다")?;
@@ -74,71 +116,46 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
         Ok(bytes) => match serde_json::from_slice::<History>(&bytes) {
             Ok(history) => Some(history),
             Err(error) => {
-                let backup = path.with_extension(format!("corrupt-{}.json", store::now_ms()));
-                fs::rename(&path, &backup).map_err(|error| error.to_string())?;
-                eprintln!("매니저 알림 상태 파일을 별도로 보관하고 다시 만들어요: {error}");
-                None
+                return Err(format!("매니저 알림 상태를 읽지 못했어요. {error}"));
             }
         },
         Err(error) if error.kind() == ErrorKind::NotFound => None,
         Err(error) => return Err(error.to_string()),
     };
-    let mut next = History::default();
-    if let Some(previous) = &saved {
-        next.pending = previous.pending.clone();
-    }
+    let initial = saved.is_none();
+    let mut next = saved.clone().unwrap_or_default();
+    let previous_statuses = std::mem::take(&mut next.statuses);
     let mut arrived = Vec::new();
     for row in rows
         .iter()
         .filter_map(|row| serde_json::from_value::<Row>(row.clone()).ok())
     {
-        if let Some(previous) = &saved {
-            let configured = managers.iter().find(|item| {
-                item.name == row.manager
-                    && item.enabled
-                    && item.repos.contains(&row.repo)
-                    && row.project.as_deref() == Some(item.project.as_str())
-            });
-            if let Some(configured) = configured {
-                match previous.statuses.get(&row.id) {
-                    None => arrived.push(NewItem {
-                        kind: "manager".into(),
-                        title: format!("{}가 태스크를 접수했어요", configured.label),
-                        body: row.title,
-                        task_key: Some(row.key),
-                        note_ref: None,
-                        intake: None,
-                        id: Some(format!("manager-{}", row.id)),
-                    }),
-                    Some(old)
-                        if old != &row.status
-                            && configured.webhook_for_status(&row.status).is_some() =>
-                    {
-                        next.pending.push_back(Pending {
-                            id: delivery_id(&format!(
-                                "{}:{}:{}",
-                                row.id, row.status, row.edited_at
-                            )),
-                            task_key: row.key,
-                            task_id: row.id.clone(),
-                            manager: row.manager,
-                            status: row.status.clone(),
-                            attempts: 0,
-                            registration: configured.registration().into(),
-                            first_attempt_at: None,
-                            next_attempt_at: 0,
-                            in_flight: false,
-                        });
-                    }
-                    _ => {}
-                }
+        let configured = managers.iter().find(|item| {
+            item.name == row.manager
+                && item.enabled
+                && item.repos.contains(&row.repo)
+                && row.project.as_deref() == Some(item.project.as_str())
+        });
+        if let Some(configured) = configured {
+            if !initial && !previous_statuses.contains_key(&row.id) {
+                arrived.push(NewItem {
+                    kind: "manager".into(),
+                    title: format!("{}가 태스크를 접수했어요", configured.label),
+                    body: row.title.clone(),
+                    task_key: Some(row.key.clone()),
+                    note_ref: None,
+                    intake: None,
+                    id: Some(format!("manager-{}", row.id)),
+                });
             }
         }
+        queue_changes(&mut next, &row, configured, || {
+            ctx.call(&["get-task", &row.key, "activity=1"])
+        });
         next.statuses.insert(row.id, row.status);
     }
     if saved.as_ref() != Some(&next) {
-        let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
-        store::write_atomic(&path, &bytes)?;
+        save_history(&path, &next)?;
     }
     let refresh_tasks = !arrived.is_empty();
     for item in arrived {
@@ -155,69 +172,161 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
         .iter()
         .position(|item| tasks.insert(&item.task_id) && item.next_attempt_at <= now);
     if let Some(index) = due {
-        let pending = &next.pending[index];
-        let deadline = pending
-            .first_attempt_at
-            .unwrap_or(now)
-            .saturating_add(RETRY_WINDOW_MS);
-        if pending.in_flight {
-            let item = next.pending.remove(index).expect("대기열에서 확인한 항목");
-            let env = Env::from_process();
-            if let Ok(manager) = delivery_manager(ctx, &env, &item) {
-                record_result(&env, &manager, &item, Some(
-                    "알림을 보내는 중 앱이 멈췄어요. Slack 스레드에서 전달 여부를 확인해 주세요.",
-                ));
-            }
-        } else if now >= deadline {
-            let item = next.pending.remove(index).expect("대기열에서 확인한 항목");
-            record_expired(ctx, &item);
-        } else {
-            let pending = &mut next.pending[index];
-            pending.first_attempt_at.get_or_insert(now);
-            pending.in_flight = true;
-            let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
-            store::write_atomic(&path, &bytes)?;
-
-            let mut item = next.pending.remove(index).expect("대기열에서 확인한 항목");
-            let result = deliver_and_record(ctx, &item, false);
-            if matches!(
-                result,
-                Err(DeliveryError::Retry { .. }
-                    | DeliveryError::MissingSecret
-                    | DeliveryError::Keychain)
-            ) {
-                let delay = (INITIAL_RETRY_MS << item.attempts.min(5)).min(MAX_RETRY_MS);
-                item.attempts = item.attempts.saturating_add(1);
-                if matches!(result, Err(DeliveryError::Retry { rejected: true })) {
-                    // Slack 전달 실패가 확인됐으므로 Hermes의 중복 판정을 피할 새 ID를 쓴다.
-                    item.id = delivery_id(&format!("{}:{}", item.id, item.attempts));
-                }
-                item.next_attempt_at = now.saturating_add(delay).min(deadline);
-                item.in_flight = false;
-                next.pending.insert(index, item);
-            }
-        }
-        let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
-        store::write_atomic(&path, &bytes)?;
+        run_pending(ctx, &mut next, &path, index, now)?;
     }
     Ok(())
 }
 
-fn record_expired(ctx: &Ctx, item: &Pending) {
-    if ctx
-        .call(&["get-task", &item.task_key, "activity=1"])
-        .is_ok_and(|task| slack_source(&task).is_none())
-    {
-        return;
+fn queue_changes(
+    history: &mut History,
+    row: &Row,
+    manager: Option<&manager::Manager>,
+    load_task: impl FnOnce() -> Result<Value, String>,
+) {
+    let unseen: Vec<_> = row
+        .status_changes
+        .iter()
+        .map(|change| (format!("{}:{}", row.id, change.id), change))
+        .filter(|(key, _)| !history.observed.contains(key))
+        .collect();
+    let subscribed = |change: &StatusChange| {
+        manager.is_some_and(|manager| {
+            manager.notifies(&change.status)
+                && (manager.webhook.is_some() || manager.telegram_webhook.is_some())
+        })
+    };
+    let task = if unseen.iter().any(|(_, change)| subscribed(change)) {
+        match load_task() {
+            Ok(task) if task["id"].as_str() == Some(&row.id) => Some(task),
+            _ => return,
+        }
+    } else {
+        None
+    };
+    let target = task
+        .as_ref()
+        .and_then(|task| original_destination(task, &manager?.project_id))
+        .filter(|target| manager.is_some_and(|manager| target.webhook(manager).is_some()));
+    for (key, change) in unseen {
+        if let Some((target, manager)) = target.as_ref().zip(manager).filter(|_| subscribed(change))
+        {
+            history.pending.push_back(Pending {
+                id: delivery_id(&key),
+                task_key: row.key.clone(),
+                task_id: row.id.clone(),
+                manager: row.manager.clone(),
+                status: change.status.clone(),
+                attempts: 0,
+                registration: manager.registration().into(),
+                first_attempt_at: None,
+                next_attempt_at: 0,
+                sending: false,
+                change: Some(change.id.clone()),
+                changed_at: Some(change.at.clone()),
+                destination: Some(target.clone()),
+                webhook: target.webhook(manager).map(str::to_owned),
+            });
+        }
+        history.observed.insert(key);
     }
+}
+
+fn save_history(path: &std::path::Path, history: &History) -> Result<(), String> {
+    store::write_atomic(
+        path,
+        &serde_json::to_vec(history).map_err(|e| e.to_string())?,
+    )
+}
+
+fn terminal_before_send(
+    item: &Pending,
+    now: u64,
+    deadline: u64,
+) -> Option<(DeliveryError, &'static str)> {
+    if item.sending {
+        // 앞선 실행에서 발송을 시작한 기록이 있으면 자동으로 다시 보내지 않는다.
+        return Some((
+            DeliveryError::Unconfirmed,
+            delivery_error(&DeliveryError::Unconfirmed),
+        ));
+    }
+    (now >= deadline).then_some((
+        DeliveryError::Unavailable,
+        "재시도 시간이 지나 알림을 보낼 수 없었어요.",
+    ))
+}
+
+fn run_pending(
+    ctx: &Ctx,
+    history: &mut History,
+    path: &std::path::Path,
+    index: usize,
+    now: u64,
+) -> Result<(), String> {
+    let mut item = history.pending[index].clone();
+    let deadline = item
+        .first_attempt_at
+        .unwrap_or(now)
+        .saturating_add(RETRY_WINDOW_MS);
+    let (result, reason) = if let Some((error, reason)) = terminal_before_send(&item, now, deadline)
+    {
+        (Err(error), Some(reason))
+    } else {
+        if item.destination.is_none() {
+            let env = Env::from_process();
+            if let Ok(manager) = delivery_manager(ctx, &env, &item) {
+                item.destination = ctx
+                    .call(&["get-task", &item.task_key, "activity=1"])
+                    .ok()
+                    .and_then(|task| original_destination(&task, &manager.project_id));
+                item.webhook = item
+                    .destination
+                    .as_ref()
+                    .and_then(|target| target.webhook(&manager))
+                    .map(str::to_owned);
+            }
+        }
+        item.first_attempt_at.get_or_insert(now);
+        item.sending = true;
+        history.pending[index] = item.clone();
+        save_history(path, history)?;
+        (deliver_and_record(ctx, &item, false), None)
+    };
+    if matches!(
+        result,
+        Err(DeliveryError::Retry | DeliveryError::MissingSecret | DeliveryError::Keychain)
+    ) {
+        let delay = (INITIAL_RETRY_MS << item.attempts.min(5)).min(MAX_RETRY_MS);
+        item.attempts = item.attempts.saturating_add(1);
+        item.next_attempt_at = now.saturating_add(delay).min(deadline);
+        item.sending = false;
+        history.pending[index] = item;
+        return save_history(path, history);
+    }
+    if let Some(reason) = reason {
+        record_terminal(ctx, &item, reason);
+    }
+    history.pending.remove(index);
+    let outcome = match result {
+        Ok(_) => "delivered",
+        Err(DeliveryError::Unconfirmed) => "unconfirmed",
+        Err(_) if now >= deadline => "expired",
+        Err(_) => "failed",
+    };
+    history.outcomes.push_front(DeliveryOutcome {
+        id: item.id,
+        change: item.change,
+        destination: item.destination,
+        result: outcome.into(),
+    });
+    history.outcomes.truncate(1000);
+    save_history(path, history)
+}
+
+fn record_terminal(ctx: &Ctx, item: &Pending, reason: &str) {
     let env = Env::from_process();
     if let Ok(manager) = delivery_manager(ctx, &env, item) {
-        record_result(
-            &env,
-            &manager,
-            item,
-            Some("재시도 시간이 지나 알림을 보낼 수 없었어요."),
-        );
+        record_result(&env, &manager, item, Some(reason));
     }
 }
 
@@ -239,7 +348,7 @@ fn deliver_and_record(ctx: &Ctx, item: &Pending, manual: bool) -> Result<u16, De
     let env = Env::from_process();
     let manager = delivery_manager(ctx, &env, item)?;
     let result = attempt_delivery(ctx, item, manual, &manager);
-    if !matches!(result, Err(DeliveryError::NoSlackSource))
+    if !matches!(result, Err(DeliveryError::NoSource))
         && (item.attempts == 0
             || result.is_ok()
             || matches!(
@@ -265,17 +374,14 @@ fn record_result(env: &Env, manager: &manager::Manager, item: &Pending, reason: 
 
 fn delivery_error(error: &DeliveryError) -> &'static str {
     match error {
-        DeliveryError::Unavailable => "매니저 설정이나 현재 태스크의 Slack 출처를 확인해 주세요.",
-        DeliveryError::NoSlackSource => {
-            "Slack 원글 주소가 있는 태스크에만 상태 알림을 보낼 수 있어요."
-        }
+        DeliveryError::Unavailable => "매니저의 알림 설정과 제보 대화의 허용 여부를 확인해 주세요.",
+        DeliveryError::NoSource => "원래 제보의 알림 대상을 찾을 수 없어요.",
         DeliveryError::MissingSecret => "상태 알림 설정에서 서명 비밀을 만들어 주세요.",
         DeliveryError::Keychain => "macOS 키체인에서 서명 비밀을 읽을 수 없어요.",
         DeliveryError::Unconfirmed => {
-            "Hermes가 중복 요청으로 답해 Slack 전달 여부를 확인하지 못했어요."
+            "전달 여부를 확인할 수 없어요. 원래 대화의 알림을 확인해 주세요."
         }
-        DeliveryError::Retry { rejected: true } => "Hermes가 Slack에 알림을 전달하지 못했어요.",
-        DeliveryError::Retry { rejected: false } => "Hermes의 알림 응답을 받지 못했어요.",
+        DeliveryError::Retry => "지금 Hermes에 연결할 수 없어요. 다시 연결을 시도해요.",
     }
 }
 
@@ -286,6 +392,98 @@ fn slack_source(task: &Value) -> Option<(String, String)> {
         }
         slack_thread(reference["target"].as_str()?)
     })
+}
+
+fn original_destination(task: &Value, project_id: &str) -> Option<Destination> {
+    let original = task["intakeSources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|item| item["taskOrigin"] == "created" && item["manager"] == task["manager"]);
+    let Some(original) = original else {
+        let (channel, thread) = slack_source(task)?;
+        return Some(Destination::Slack { channel, thread });
+    };
+    if original["projectId"].as_str() != Some(project_id) {
+        return None;
+    }
+    match original["source"]["kind"].as_str() {
+        None => {
+            let (channel, thread) = slack_thread(original["url"].as_str()?)?;
+            Some(Destination::Slack { channel, thread })
+        }
+        Some("telegram") => {
+            let target = &original["destination"];
+            let chat = target["conversation"]
+                .as_str()
+                .filter(|value| manager::valid_telegram_chat_id(value))?;
+            let message = target["message"]
+                .as_str()
+                .filter(|value| telegram_message_id(value))?;
+            let thread = target["thread"].as_str();
+            if thread.is_some_and(|value| !telegram_message_id(value)) {
+                return None;
+            }
+            Some(Destination::Telegram {
+                chat: chat.into(),
+                message: message.into(),
+                thread: thread.map(str::to_owned),
+            })
+        }
+        Some(_) => None,
+    }
+}
+
+fn telegram_message_id(value: &str) -> bool {
+    value
+        .parse::<u32>()
+        .is_ok_and(|id| id > 0 && id.to_string() == value)
+}
+
+impl Destination {
+    fn webhook<'a>(&self, manager: &'a manager::Manager) -> Option<&'a str> {
+        match self {
+            Self::Slack { channel, .. } => manager
+                .allows_slack_channel(channel)
+                .then_some(manager.webhook.as_deref())
+                .flatten(),
+            Self::Telegram { chat, .. } => manager
+                .telegram_chats
+                .contains(chat)
+                .then_some(manager.telegram_webhook.as_deref())
+                .flatten(),
+        }
+    }
+
+    fn payload(&self, item: &Pending, message: String) -> Value {
+        let mut payload = serde_json::json!({
+            "event_type": EVENT,
+            "task_key": item.task_key,
+            "status": item.status,
+            "status_change_id": item.change,
+            "message": message,
+        });
+        match self {
+            Self::Slack {
+                channel, thread, ..
+            } => {
+                payload["platform"] = "slack".into();
+                payload["channel"] = channel.as_str().into();
+                payload["thread_id"] = thread.as_str().into();
+            }
+            Self::Telegram {
+                chat,
+                message,
+                thread,
+            } => {
+                payload["platform"] = "telegram".into();
+                payload["chat_id"] = chat.as_str().into();
+                payload["original_message_id"] = message.as_str().into();
+                payload["message_thread_id"] = thread.as_deref().unwrap_or_default().into();
+            }
+        }
+        payload
+    }
 }
 
 fn review_has_report_note(task: &Value) -> bool {
@@ -317,25 +515,31 @@ fn attempt_delivery(
     manager: &manager::Manager,
 ) -> Result<u16, DeliveryError> {
     if ctx.host.vault().as_deref() != Some(ctx.vault.as_str()) {
-        return Err(DeliveryError::Retry { rejected: false });
+        return Err(DeliveryError::Retry);
     }
     let mut argv = vec!["get-task", item.task_key.as_str()];
     if manual || item.status != "in-review" {
         argv.push("activity=1");
     }
-    let task = ctx
-        .call(&argv)
-        .map_err(|_| DeliveryError::Retry { rejected: false })?;
-    let (channel, thread) = slack_source(&task).ok_or(DeliveryError::NoSlackSource)?;
-    if !manager.enabled || !manager.allows_slack_channel(&channel) {
+    let task = ctx.call(&argv).map_err(|_| DeliveryError::Retry)?;
+    let target = original_destination(&task, &manager.project_id).ok_or(DeliveryError::NoSource)?;
+    if item
+        .destination
+        .as_ref()
+        .is_some_and(|saved| saved != &target)
+    {
         return Err(DeliveryError::Unavailable);
     }
-    let url = if manual && manager.notify_enabled {
-        manager.webhook.as_deref()
-    } else {
-        manager.webhook_for_status(&item.status)
+    if !manager.enabled || manager.scope().is_none() {
+        return Err(DeliveryError::Unavailable);
     }
-    .ok_or(DeliveryError::Unavailable)?;
+    if !manager.notify_enabled || (!manual && !manager.notifies(&item.status)) {
+        return Err(DeliveryError::Unavailable);
+    }
+    let url = target.webhook(manager).ok_or(DeliveryError::Unavailable)?;
+    if item.webhook.as_deref().is_some_and(|saved| saved != url) {
+        return Err(DeliveryError::Unavailable);
+    }
     let repo = task["repo"].as_str().ok_or(DeliveryError::Unavailable)?;
     if task["id"].as_str() != Some(&item.task_id)
         || task["manager"].as_str() != Some(manager.name.as_str())
@@ -352,7 +556,7 @@ fn attempt_delivery(
         .map_err(|_| DeliveryError::Keychain)?
         .ok_or(DeliveryError::MissingSecret)?;
     if ctx.host.vault().as_deref() != Some(ctx.vault.as_str()) {
-        return Err(DeliveryError::Retry { rejected: false });
+        return Err(DeliveryError::Retry);
     }
     let mut message = if manual {
         format!("{}의 현재 상태는 {}입니다.", item.task_key, status.title())
@@ -363,17 +567,22 @@ fn attempt_delivery(
             status.title()
         )
     };
-    if !manual && status == TaskStatus::InReview && review_has_report_note(&task) {
+    let latest_review = task["activity"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .rev()
+        .find(|event| event["kind"] == "status" && event["to"] == "in-review");
+    if !manual
+        && status == TaskStatus::InReview
+        && item.changed_at.as_deref().map_or(true, |at| {
+            latest_review.is_some_and(|event| event["at"].as_str() == Some(at))
+        })
+        && review_has_report_note(&task)
+    {
         message.push_str("\n조사 노트가 저장됐어요. aisurada의 태스크 댓글에서 열 수 있어요.");
     }
-    let payload = serde_json::json!({
-        "event_type": EVENT,
-        "channel": channel,
-        "thread_id": thread,
-        "task_key": item.task_key,
-        "status": item.status,
-        "message": message,
-    });
+    let payload = target.payload(item, message);
     manager_webhook::send_webhook(url, &secret, &item.id, &payload)
 }
 
@@ -394,7 +603,11 @@ pub(super) fn send_current(ctx: &Ctx, key: &str) -> Result<(), String> {
         registration: String::new(),
         first_attempt_at: None,
         next_attempt_at: 0,
-        in_flight: false,
+        sending: false,
+        change: None,
+        changed_at: None,
+        destination: None,
+        webhook: None,
     };
     deliver_and_record(ctx, &item, true)
         .map(|_| ())
@@ -405,6 +618,67 @@ pub(super) fn send_current(ctx: &Ctx, key: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn queues_each_saved_change_once_for_the_original_telegram_topic() {
+        let row: Row = serde_json::from_value(json!({
+            "id":"task-1","key":"TSK-1","title":"로그인","status":"done","project":"demo",
+            "manager":"hermes-demo","repo":"demo/shared",
+            "statusChanges":[
+                {"id":"st-one","status":"waiting-answer","at":"2026-11-25T06:10:00Z"},
+                {"id":"st-two","status":"done","at":"2026-11-25T06:11:00Z"}
+            ]
+        }))
+        .unwrap();
+        let mut manager: manager::Manager = serde_json::from_value(json!({
+            "name":"hermes-demo","label":"Hermes","enabled":true,"tools":["list_tasks"],"repos":["demo/shared"],
+            "agendas":[],"project":"demo","projectId":"project-id","notifyEnabled":true,
+            "notify":["waiting-answer","done"],"webhook":"http://127.0.0.1:8644/webhooks/slack",
+            "telegramWebhook":"http://127.0.0.1:8644/webhooks/telegram","telegramChats":["-10012345"]
+        })).unwrap();
+        let task = json!({"id":"task-1","manager":"hermes-demo",
+            "refs":[{"kind":"slack","target":"https://demo.slack.com/archives/CDEMO123/p1234567890123456"}],
+            "intakeSources":[
+                {"taskOrigin":"created","manager":"hermes-demo","projectId":"project-id","source":{"kind":"telegram"},
+                 "destination":{"conversation":"-10012345","message":"42","thread":"11"}},
+                {"taskOrigin":"commented","manager":"hermes-demo","projectId":"project-id","source":{"kind":"telegram"},
+                 "destination":{"conversation":"98765","message":"88"}}
+            ]
+        });
+        let mut history = History::default();
+        queue_changes(&mut history, &row, Some(&manager), || Ok(task.clone()));
+        assert_eq!(history.pending.len(), 2);
+        assert_ne!(history.pending[0].id, history.pending[1].id);
+        let first = &history.pending[0];
+        let destination = first.destination.as_ref().unwrap();
+        let payload = destination.payload(first, "시험".into());
+        assert_eq!(payload["platform"], "telegram");
+        assert_eq!(payload["chat_id"], "-10012345");
+        assert_eq!(payload["message_thread_id"], "11");
+        assert_eq!(payload["original_message_id"], "42");
+        assert_eq!(payload["status_change_id"], "st-one");
+        assert_eq!(
+            first.webhook.as_deref(),
+            manager.telegram_webhook.as_deref()
+        );
+        let mut restored: History =
+            serde_json::from_slice(&serde_json::to_vec(&history).unwrap()).unwrap();
+        queue_changes(&mut restored, &row, Some(&manager), || {
+            panic!("stored events are already queued")
+        });
+        assert_eq!(restored.pending, history.pending);
+        restored.pending[0].sending = true;
+        let reopened: History =
+            serde_json::from_slice(&serde_json::to_vec(&restored).unwrap()).unwrap();
+        assert!(matches!(
+            terminal_before_send(&reopened.pending[0], 0, 1),
+            Some((DeliveryError::Unconfirmed, _))
+        ));
+        manager.telegram_chats.clear();
+        let mut rejected = History::default();
+        queue_changes(&mut rejected, &row, Some(&manager), || Ok(task));
+        assert!(rejected.pending.is_empty());
+    }
 
     #[test]
     fn finds_only_a_slack_message_source() {
