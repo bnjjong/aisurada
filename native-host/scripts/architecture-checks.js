@@ -116,6 +116,30 @@ try {
     assert(left === saved[id].x && top === saved[id].y, `저장한 자리(${saved[id].x},${saved[id].y})에 놓인다: ${left},${top}`);
   });
 
+  await test('mouse-wheel-zooms-around-the-pointer', async () => {
+    const diagram = document.querySelector('.c4-diagram');
+    const percent = () => parseInt(document.querySelector('.c4-zoom output').textContent, 10);
+    const centre = () => { const r = cardOf('aisurada').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    const wheel = (deltaY, at) => {
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY, clientX: at.x, clientY: at.y });
+      cardOf('aisurada').dispatchEvent(event);
+      return event;
+    };
+    const start = percent();
+    const anchor = centre();
+    const zoomIn = wheel(-240, anchor);
+    assert(zoomIn.defaultPrevented, '페이지가 같이 스크롤되면 안 된다');
+    await until(() => percent() > start, '휠로 확대됨');
+    const moved = centre();
+    assert(Math.abs(moved.x - anchor.x) <= 2 && Math.abs(moved.y - anchor.y) <= 2, `포인터 아래 카드가 제자리에 있다: ${anchor.x},${anchor.y} -> ${moved.x},${moved.y}`);
+    const zoomed = percent();
+    wheel(240, centre());
+    await until(() => percent() < zoomed, '휠로 축소됨');
+    document.querySelector('.c4-zoom button[aria-label="화면에 맞추기"]').click();
+    await until(() => percent() === start, '화면에 맞추면 처음 배율로 돌아옴');
+    assert(diagram, 'diagram');
+  });
+
   await test('editing-a-selected-element-changes-only-what-was-edited', async () => {
     cardOf('aisurada').click();
     await until(() => document.querySelector('.c4-details-head strong')?.textContent === 'aisurada', '상세');

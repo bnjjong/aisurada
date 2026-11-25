@@ -53,6 +53,51 @@ export function bounds(nodes: DiagramNode[]) {
   };
 }
 
+export const MIN_ZOOM = .45;
+export const MAX_ZOOM = 8;
+export const MAX_SCALE = 2.5;
+/** 화면 아래쪽에 두는 확대 도구 줄의 높이. 가운데 정렬에서 뺀다. */
+const TOOLBAR_SPACE = 32;
+
+export type Camera = { zoom: number; x: number; y: number };
+/** 카메라가 보는 틀: 맞춤 배율, 보이는 칸의 크기, 요소 전체의 경계. */
+export type CameraFrame = { fit: number; width: number; height: number; box: ReturnType<typeof bounds> };
+
+/** 맞춤 배율에 사용자가 고른 확대를 곱한 실제 배율. 너무 커지지 않게 막는다. */
+export const viewScale = (camera: Camera, frame: CameraFrame) => Math.min(MAX_SCALE, camera.zoom * frame.fit);
+
+/** 요소 전체를 칸 가운데에 두고 카메라가 민 만큼 옮긴 월드의 왼쪽 위 화면 좌표. */
+export function viewOrigin(camera: Camera, frame: CameraFrame): Point {
+  const scale = viewScale(camera, frame);
+  return {
+    x: (frame.width - frame.box.width * scale) / 2 - frame.box.minX * scale + camera.x,
+    y: (frame.height - TOOLBAR_SPACE - frame.box.height * scale) / 2 - frame.box.minY * scale + camera.y,
+  };
+}
+
+/**
+ * `anchor`(칸 안의 화면 좌표) 아래의 그림 위치가 그대로 있도록 `factor`배 확대·축소한 새 카메라.
+ * 배율 상한에 닿은 뒤에는 확대 값을 더 올리지 않아서, 돌아설 때 바로 반응한다.
+ */
+export function zoomCameraAt(camera: Camera, factor: number, anchor: Point, frame: CameraFrame): Camera {
+  const maxZoom = Math.min(MAX_ZOOM, MAX_SCALE / frame.fit);
+  const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, camera.zoom * factor));
+  if (zoom === camera.zoom) return camera;
+  const from = viewScale(camera, frame);
+  const to = viewScale({ ...camera, zoom }, frame);
+  const origin = viewOrigin(camera, frame);
+  const world = { x: (anchor.x - origin.x) / from, y: (anchor.y - origin.y) / from };
+  const base = viewOrigin({ zoom, x: 0, y: 0 }, frame);
+  return { zoom, x: anchor.x - world.x * to - base.x, y: anchor.y - world.y * to - base.y };
+}
+
+/** 휠 한 번의 움직임을 확대 배수로 바꾼다. 트랙패드 모아 쥐기(ctrl 키가 붙어 온다)는 더 민감하게 받는다. */
+export function wheelFactor(deltaY: number, deltaMode: number, pinch: boolean): number {
+  const lines = deltaMode === 1 ? 16 : deltaMode === 2 ? 400 : 1;
+  const clamped = Math.max(-240, Math.min(240, deltaY * lines));
+  return Math.exp(-clamped * (pinch ? .01 : .0015));
+}
+
 export function routeEdges(nodes: DiagramNode[], relationships: C4Relationship[]): DiagramEdge[] {
   const byId = new Map(nodes.map(item => [item.id, item]));
   const count = new Map<string, number>();

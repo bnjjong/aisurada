@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARD_HEIGHT, CARD_WIDTH, measureEdge, placeLabels, positionNodes, routeEdges } from '../src/ui/architecture/layout.ts';
+import { CARD_HEIGHT, CARD_WIDTH, MAX_SCALE, MIN_ZOOM, measureEdge, placeLabels, positionNodes, routeEdges, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from '../src/ui/architecture/layout.ts';
 
 const points = [
   ['person', 0, 64], ['app', 478, 0], ['vault', 1140, -145],
@@ -69,4 +69,46 @@ test('맞춤 배율에서 긴 관계 라벨이 카드나 다른 라벨을 가리
     assert.ok(cards.every(card => !hit(box, card)));
     assert.ok(boxes.slice(index + 1).every(other => !hit(box, other)));
   });
+});
+
+const frame = (fit = .5) => ({ fit, width: 1000, height: 600, box: { minX: 0, minY: 0, width: 800, height: 400 } });
+const worldAt = (camera, f, point) => {
+  const origin = viewOrigin(camera, f);
+  const scale = viewScale(camera, f);
+  return { x: (point.x - origin.x) / scale, y: (point.y - origin.y) / scale };
+};
+
+test('휠 확대는 포인터 아래의 그림 위치를 그대로 둔다', () => {
+  const f = frame();
+  const camera = { zoom: 1, x: 10, y: -20 };
+  const anchor = { x: 640, y: 210 };
+  for (const factor of [1.5, 1.1, .6]) {
+    const next = zoomCameraAt(camera, factor, anchor, f);
+    const before = worldAt(camera, f, anchor);
+    const after = worldAt(next, f, anchor);
+    assert.ok(Math.abs(before.x - after.x) < 1e-9 && Math.abs(before.y - after.y) < 1e-9, `factor ${factor}`);
+    assert.ok(factor > 1 ? next.zoom > camera.zoom : next.zoom < camera.zoom);
+  }
+});
+
+test('확대는 하한과 배율 상한에서 멈추고, 상한에서 돌아설 때 바로 줄어든다', () => {
+  const f = frame(1.12);
+  let camera = { zoom: 1, x: 0, y: 0 };
+  for (let step = 0; step < 40; step++) camera = zoomCameraAt(camera, 1.5, { x: 500, y: 300 }, f);
+  assert.ok(viewScale(camera, f) <= MAX_SCALE + 1e-9);
+  assert.equal(viewScale(camera, f), MAX_SCALE);
+  assert.equal(zoomCameraAt(camera, 1.5, { x: 500, y: 300 }, f), camera, '상한에서는 같은 카메라를 돌려준다');
+  const back = zoomCameraAt(camera, .9, { x: 500, y: 300 }, f);
+  assert.ok(viewScale(back, f) < MAX_SCALE, '돌아서면 바로 반응한다');
+  let low = { zoom: 1, x: 0, y: 0 };
+  for (let step = 0; step < 40; step++) low = zoomCameraAt(low, .5, { x: 500, y: 300 }, f);
+  assert.equal(low.zoom, MIN_ZOOM);
+});
+
+test('휠 움직임은 위로 굴리면 확대, 아래로 굴리면 축소이고 한 번에 크게 뛰지 않는다', () => {
+  assert.ok(wheelFactor(-100, 0, false) > 1);
+  assert.ok(wheelFactor(100, 0, false) < 1);
+  assert.ok(wheelFactor(-10, 0, true) > wheelFactor(-10, 0, false), '모아 쥐기는 더 민감하다');
+  assert.ok(wheelFactor(-5000, 0, false) <= Math.exp(.0015 * 240) + 1e-9, '아주 큰 값도 막는다');
+  assert.ok(wheelFactor(-3, 1, false) > wheelFactor(-3, 0, false), '줄 단위 휠은 줄 높이만큼 곱한다');
 });
