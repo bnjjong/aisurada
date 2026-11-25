@@ -237,13 +237,13 @@ try {
   const moveTo = at => window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 11, clientX: at.x, clientY: at.y }));
   const upAt = at => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 11, button: 0, clientX: at.x, clientY: at.y }));
   const preview = () => document.querySelector('.c4-link path');
-  const PORT_IDS = ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left', 'right'];
+  const PORT_IDS = ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left-1', 'left-2', 'left-3', 'right-1', 'right-2', 'right-3', 'left', 'right'];
   // 누르고 나서 화면이 끌기 상태로 바뀌고 리스너가 붙을 때까지 기다린다(사람은 누른 뒤에야 움직인다)
   const begin = async (target, at) => { down(target, at); await until(preview, '끌기가 시작됨'); await wait(60); };
 
   await test('dragging-from-a-card-port-makes-a-relationship-through-the-form', async () => {
     const source = await idOf('GitHub');
-    const port = portOf(source, 'right');
+    const port = portOf(source, 'right-2');
     assert(port, '카드에 연결 지점이 있다');
     const target = cardOf('다른 곳에서 만든 것');
     // 빈 곳에 놓으면 아무 일도 없다
@@ -281,7 +281,7 @@ try {
     const github = await idOf('GitHub');
     const elsewhere = await idOf('다른 곳에서 만든 것');
     const late = await idOf('늦은 요소');
-    const port = portOf(github, 'right');
+    const port = portOf(github, 'right-2');
     await begin(port, middle(port));
     moveTo(middle(cardOf('다른 곳에서 만든 것')));
     upAt(middle(cardOf('다른 곳에서 만든 것')));
@@ -292,7 +292,7 @@ try {
     await until(async () => (await model()).relationships.some(r => r.label === '끌어서 만든 관계'), '엔진에 관계가 생김');
     const line = (await model()).relationships.find(r => r.label === '끌어서 만든 관계');
     assert(line.source === github && line.target === elsewhere, `끌어서 만든 방향: ${JSON.stringify(line)}`);
-    assert(line.sourcePort === 'right', `출발 연결 지점이 저장된다: ${line.sourcePort}`);
+    assert(line.sourcePort === 'right-2' || line.sourcePort === 'right', `출발 연결 지점이 저장된다: ${line.sourcePort}`);
     assert(PORT_IDS.includes(line.targetPort), `도착 연결 지점은 놓은 자리에서 가장 가까운 지점이다: ${line.targetPort}`);
     const count = (await model()).relationships.length;
     // 관계를 고르면 양 끝에 손잡이가 보이고, 도착 끝을 다른 카드로 옮긴다

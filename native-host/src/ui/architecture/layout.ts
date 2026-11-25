@@ -104,16 +104,21 @@ export type Port = { id: string; side: PortSide; at: number };
 
 const CENTER_PORTS: Port[] = [
   { id: 'top-2', side: 'top', at: .5 }, { id: 'bottom-2', side: 'bottom', at: .5 },
-  { id: 'left', side: 'left', at: .5 }, { id: 'right', side: 'right', at: .5 },
+  { id: 'left-2', side: 'left', at: .5 }, { id: 'right-2', side: 'right', at: .5 },
 ];
 const BOX_PORTS: Port[] = [
   { id: 'top-1', side: 'top', at: .25 }, { id: 'top-2', side: 'top', at: .5 }, { id: 'top-3', side: 'top', at: .75 },
   { id: 'bottom-1', side: 'bottom', at: .25 }, { id: 'bottom-2', side: 'bottom', at: .5 }, { id: 'bottom-3', side: 'bottom', at: .75 },
-  { id: 'left', side: 'left', at: .5 }, { id: 'right', side: 'right', at: .5 },
+  { id: 'left-1', side: 'left', at: .25 }, { id: 'left-2', side: 'left', at: .5 }, { id: 'left-3', side: 'left', at: .75 },
+  { id: 'right-1', side: 'right', at: .25 }, { id: 'right-2', side: 'right', at: .5 }, { id: 'right-3', side: 'right', at: .75 },
 ];
 
 /** 엔진이 저장하는 연결 지점 이름(`PORT_IDS`)으로 지점을 찾는다. 모르는 이름이면 `undefined`다. */
-export const portById = (id: string | undefined): Port | undefined => BOX_PORTS.find(port => port.id === id);
+export const portById = (id: string | undefined): Port | undefined => {
+  if (id === 'left') return BOX_PORTS.find(port => port.id === 'left-2');
+  if (id === 'right') return BOX_PORTS.find(port => port.id === 'right-2');
+  return BOX_PORTS.find(port => port.id === id);
+};
 
 /** 변이 바깥을 향하는 방향. 선은 이 방향으로 카드에서 뻗어 나온다. */
 export function portNormal(port: Port): Point {
@@ -125,7 +130,7 @@ export function portNormal(port: Port): Point {
   }
 }
 
-/** 상자 모양 카드는 위·아래 3개와 양옆 1개, 알약 모양인 사람은 모서리가 둥글어서 네 변의 가운데만 둔다. */
+/** 상자 모양 카드는 네 변마다 3개씩 12개, 알약 모양인 사람은 모서리가 둥글어서 네 변의 가운데만 둔다. */
 export const portsFor = (kind: string): Port[] => kind === 'person' ? CENTER_PORTS : BOX_PORTS;
 
 /** 카드 상자 안에서의 연결 지점 비율(0~1). */
