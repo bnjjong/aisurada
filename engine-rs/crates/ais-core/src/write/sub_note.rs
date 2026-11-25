@@ -19,7 +19,7 @@ use crate::error::EngineError;
 use crate::frontmatter::Value;
 use crate::note::front::{check_size, extra_front};
 use crate::text::{cut_utf16, trim};
-use crate::vault::note_file::split_text;
+use crate::vault::note_file::{body_of, split_text};
 use crate::vault::note_meta::get;
 use crate::vault::scanner::{Format, NoteRecord};
 
@@ -169,12 +169,7 @@ pub fn read_derived(file: &Path) -> (String, Option<Vec<u8>>) {
         }
         let bytes = fs::read(file).ok()?;
         let content = String::from_utf8(bytes.clone()).ok()?;
-        let split = split_text(&content);
-        let body = if split.frontmatter.is_some() {
-            split.body
-        } else {
-            content
-        };
+        let body = body_of(&content).to_string();
         Some((body, Some(bytes)))
     };
     read().unwrap_or_else(|| (String::new(), None))

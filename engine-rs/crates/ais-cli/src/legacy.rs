@@ -13,11 +13,10 @@ use serde_json::{Map, Value, json};
 
 use ais_core::Caller;
 use ais_core::text::{encode_uri_component, trim};
-use ais_core::vault::agenda::{AgendaTable, scan_agendas};
 use ais_core::vault::facts::read_facts;
-use ais_core::vault::note_meta::parse_created;
 use ais_core::vault::template::{Category, scan_templates};
 use ais_core::vault::trash::scan_trash;
+use ais_core::vault::{AgendaTable, parse_created, scan_agendas};
 
 use crate::map::EngineCall;
 

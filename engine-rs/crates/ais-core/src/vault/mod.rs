@@ -31,6 +31,9 @@ pub(crate) fn check_manager_project(
 pub mod template;
 pub mod trash;
 
+pub use agenda::{AgendaInfo, AgendaTable, scan_agendas};
+pub use note_meta::parse_created;
+
 use crate::error::EngineError;
 use crate::kernel::actor::ManagerContext;
 use serde::Serialize;
