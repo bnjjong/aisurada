@@ -71,6 +71,11 @@ export function Diagram({
   const scale = viewScale(camera, frame);
   const typeScale = Math.max(1, Math.min(1.6, 1 / scale));
   const { x, y } = viewOrigin(camera, frame);
+  // 카드와 글자는 `scale()` 변환 대신 `zoom`으로 키운다. 변환은 작게 그린 층을 늘려 쓰는 길이 있어 글자가 번질 수 있고,
+  // `zoom`은 처음부터 최종 크기로 배치한다. 이동도 소수점 위치에 그리면 번지므로 화면 픽셀에 맞춰 반올림한다.
+  const density = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  const pixelX = Math.round(x * density) / density;
+  const pixelY = Math.round(y * density) / density;
   const resize = (amount: number) => setCamera(current => ({
     ...current, zoom: Math.max(MIN_ZOOM, Math.min(Math.min(MAX_ZOOM, MAX_SCALE / fit), current.zoom * amount)),
   }));
@@ -275,10 +280,11 @@ export function Diagram({
       <canvas ref={canvas} aria-hidden="true" />
       {playing && edges.length > 0 && <canvas className="c4-flow" ref={flowCanvas} aria-hidden="true" />}
       {!nodes.length && <p className="c4-diagram-empty">{emptyText ?? '이 레벨에 표시할 요소가 없어요.'}</p>}
+      <div className="c4-diagram-pan" style={{ transform: 'translate(' + pixelX + 'px, ' + pixelY + 'px)' }}>
       <div
         className="c4-diagram-world"
         data-density={scale < .46 ? 'minimal' : scale < .8 ? 'compact' : 'normal'}
-        style={{ '--c4-type-scale': typeScale, transform: 'translate(' + x + 'px, ' + y + 'px) scale(' + scale + ')' } as CSSProperties}
+        style={{ '--c4-type-scale': typeScale, zoom: scale } as CSSProperties}
       >
         {nodes.map(item => (
           <button
@@ -307,6 +313,7 @@ export function Diagram({
             {item.technology && <span className="c4-card-tech">{item.technology}</span>}
           </button>
         ))}
+      </div>
       </div>
       {labels.map(({ edge, title, center, width, height, compact }) => {
         const style = { left: center.x, top: center.y, width, height };
