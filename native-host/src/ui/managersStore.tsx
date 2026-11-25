@@ -59,12 +59,6 @@ export const useManagers = () => useContext(ManagerContext);
 export const managerError = (error: unknown) =>
   error instanceof SidecarCommandError ? error.stderr : error instanceof Error ? error.message : String(error);
 
-function intakeQuestionBody({ excerpt, question }: IntakeData["asked"][number]) {
-  const original = excerpt?.replace(/\s+/g, " ").trim();
-  const draft = question?.replace(/\s+/g, " ").trim();
-  return [original && `「${original}」`, draft, "원장에서 답글 초안을 확인해 주세요."].filter(Boolean).join(" · ");
-}
-
 export function ManagersProvider({ controller, workspace, showWork, children }: {
   controller: WorkspaceController;
   workspace: Workspace;
@@ -76,7 +70,6 @@ export function ManagersProvider({ controller, workspace, showWork, children }: 
   const request = useRef(0);
   const readingWork = useRef<number | undefined>(undefined);
   const lastWorkRead = useRef(0);
-  const notified = useRef(new Set<string>());
   const sample = workspace.sample;
   const refresh = useCallback(async (includeWork = showWork) => {
     if (sample) return;
@@ -125,35 +118,6 @@ export function ManagersProvider({ controller, workspace, showWork, children }: 
       window.removeEventListener("focus", onFocus);
     };
   }, [refresh, sample, showWork]);
-
-  useEffect(() => {
-    if (!controller.isNative() || !data) return;
-    const earliest = Date.now() - 24 * 60 * 60 * 1000;
-    // 한 번에 하나씩 넣어 알림 목록의 쓰기 순서를 지킨다.
-    let live = true;
-    const publish = async () => {
-      for (const item of data.items) {
-        if (!item.manager.enabled || item.issue) continue;
-        for (const request of item.intake?.asked ?? []) {
-          if (!live || request.at < earliest) continue;
-          const id = "intake-question-" + request.revision;
-          if (notified.current.has(id)) continue;
-          notified.current.add(id);
-          try {
-            await controller.callHost("notifications_push", { expectedVault: workspace.path, item: {
-              id, kind: "intake-question", title: `${item.manager.label}가 제보에 물어볼 내용을 남겼어요`,
-              body: intakeQuestionBody(request),
-              intake: { manager: item.manager.name, entry: request.id, url: request.url },
-            } });
-          } catch {
-            notified.current.delete(id);
-          }
-        }
-      }
-    };
-    void publish();
-    return () => { live = false; };
-  }, [controller, data, workspace.path]);
 
   return <ManagerContext.Provider value={{ data, error, refresh }}>{children}</ManagerContext.Provider>;
 }

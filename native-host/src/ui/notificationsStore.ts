@@ -20,7 +20,7 @@ export interface NotifyItem {
   taskKey: string | null;
   /** 눌렀을 때 열 노트(`노트id` 또는 `노트id/하위노트id`). 결정 블록 알림이 쓴다 */
   noteRef: string | null;
-  intake?: { manager: string; entry: string; url: string };
+  intake?: { manager: string; entry: string; url?: string };
   /** 만든 시각(유닉스 밀리초) */
   at: number;
   read: boolean;
@@ -106,11 +106,7 @@ export function toItem(v: unknown): NotifyItem | null {
   const { id, kind, title } = v;
   if (typeof id !== "string" || !id || typeof kind !== "string" || !KINDS.has(kind) || typeof title !== "string") return null;
   const target = v.intake;
-  const intake = kind === "intake-question" && isRecord(target) && typeof target.manager === "string"
-    && /^[a-z][a-z0-9-]{0,31}$/.test(target.manager) && typeof target.entry === "string"
-    && /^[CGD][A-Z0-9]{2,79}:\d{10}\.\d{6}$/.test(target.entry)
-    && typeof target.url === "string" && slackLink(target.url)
-    ? { manager: target.manager, entry: target.entry, url: target.url } : undefined;
+  const intake = kind === "intake-question" ? intakeTarget(target) : undefined;
   return {
     id,
     kind: kind as NotifyKind,
@@ -122,6 +118,17 @@ export function toItem(v: unknown): NotifyItem | null {
     at: typeof v.at === "number" && Number.isFinite(v.at) ? v.at : 0,
     read: v.read === true,
   };
+}
+
+function intakeTarget(target: unknown): NotifyItem["intake"] {
+  if (!isRecord(target) || typeof target.manager !== "string" || !/^[a-z][a-z0-9-]{0,31}$/.test(target.manager)
+    || typeof target.entry !== "string") return undefined;
+  const { manager, entry, url } = target;
+  if (typeof url === "string" && /^[CGD][A-Z0-9]{2,79}:\d{10}\.\d{6}$/.test(entry) && slackLink(url)) {
+    return { manager, entry, url };
+  }
+  if (url == null && /^intake-[0-9a-f]{16}$/.test(entry)) return { manager, entry };
+  return undefined;
 }
 
 const channel = (v: unknown, fallback: Channel): Channel =>
