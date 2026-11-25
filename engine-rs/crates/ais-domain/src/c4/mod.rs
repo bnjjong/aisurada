@@ -104,8 +104,17 @@ pub struct Relationship {
     pub target: String,
     pub label: String,
     pub technology: String,
+    /// 선이 출발 요소의 어느 연결 지점에 붙는지(`PORT_IDS` 중 하나). 비어 있으면 자동 배치가 정한다.
+    pub source_port: String,
+    /// 선이 도착 요소의 어느 연결 지점에 붙는지. 비어 있으면 자동 배치가 정한다.
+    pub target_port: String,
     pub extra: Vec<(String, Value)>,
 }
+
+/// 카드 가장자리의 연결 지점 이름. 상자 카드는 여덟 개를 모두 쓰고, 알약 모양인 사람은 `top-2`, `bottom-2`, `left`, `right`만 쓴다.
+pub const PORT_IDS: [&str; 8] = [
+    "top-1", "top-2", "top-3", "bottom-1", "bottom-2", "bottom-3", "left", "right",
+];
 
 /// 요소와 관계 전체(`model.yaml`)
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -184,6 +193,18 @@ impl Model {
                     return Err(invalid(format!(
                         "관계 {}의 {side} 요소가 없다: {end}",
                         relation.id
+                    )));
+                }
+            }
+            for (side, port) in [
+                ("sourcePort", &relation.source_port),
+                ("targetPort", &relation.target_port),
+            ] {
+                if !port.is_empty() && !PORT_IDS.contains(&port.as_str()) {
+                    return Err(invalid(format!(
+                        "관계 {}의 {side}는 {} 중 하나여야 한다: {port:?}",
+                        relation.id,
+                        PORT_IDS.join(", ")
                     )));
                 }
             }

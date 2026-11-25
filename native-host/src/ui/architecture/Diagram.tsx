@@ -32,11 +32,18 @@ type Link = {
   kind: 'create' | 'reconnect';
   fixedId: string;
   from: Point;
+  /** `create`에서 끌기를 시작한 연결 지점의 이름 */
+  port?: string;
   edge?: string;
   end?: 'source' | 'target';
+  /** 끌기를 시작한 화면 좌표. 거의 움직이지 않은 눌림은 바꾸지 않는 데 쓴다 */
+  start: Point;
   pointer: Point;
   over: string | null;
 };
+
+/** 이보다 적게 움직인 눌림(화면 픽셀)은 끌기로 보지 않는다. 손잡이를 누르기만 해서 모델이 바뀌면 안 된다. */
+const LINK_MIN_DRAG = 6;
 
 function portStyle(port: Port): CSSProperties {
   const fraction = portFraction(port);
@@ -58,10 +65,10 @@ export function Diagram({
   drill(id: string): void;
   /** 끌기를 마치면 보이는 모든 요소의 좌표를 알린다. 없으면 끌 수 없다 */
   onMove?(positions: Record<string, Point>): void;
-  /** 카드의 연결 지점에서 다른 카드로 끌어다 놓으면 알린다. 없으면 연결 지점을 보이지 않는다 */
-  onConnect?(source: string, target: string): void;
-  /** 고른 관계의 한쪽 끝을 다른 카드로 끌어다 놓으면 새 출발·도착 요소를 알린다. 없으면 끝을 옮길 수 없다 */
-  onReconnect?(relationshipId: string, source: string, target: string): void;
+  /** 카드의 연결 지점에서 다른 카드로 끌어다 놓으면 두 카드와 두 연결 지점을 알린다. 없으면 연결 지점을 보이지 않는다 */
+  onConnect?(source: string, target: string, sourcePort: string, targetPort: string): void;
+  /** 고른 관계의 한쪽 끝을 카드의 연결 지점으로 끌어다 놓으면 바뀐 끝의 요소와 지점을 알린다(같은 카드의 다른 지점도 된다). 없으면 끝을 옮길 수 없다 */
+  onReconnect?(relationshipId: string, change: { source: string; target: string; sourcePort?: string; targetPort?: string }): void;
   /** 바뀌면 끄는 중에 임시로 둔 자리를 버리고 저장된 자리로 돌아간다 */
   resetKey: number;
   connecting?: boolean;
@@ -155,14 +162,22 @@ export function Diagram({
       panned.current = true;
       setTimeout(() => { panned.current = false; }, 0);
       if (!active) return;
-      const over = hitCard(localPoint(event), active.fixedId);
-      if (!over) return;
-      if (active.kind === 'create') { current.onConnect?.(active.fixedId, over); return; }
+      const point = localPoint(event);
+      if (Math.hypot(point.x - active.start.x, point.y - active.start.y) < LINK_MIN_DRAG) return;
+      const over = hitCard(point, active.fixedId);
+      const node = over ? current.nodes.find(item => item.id === over) : undefined;
+      if (!over || !node) return;
+      // 놓은 자리에서 가장 가까운 연결 지점에 붙인다
+      const landed = nearestPort(node, toWorld(point, { x: current.pixelX, y: current.pixelY }, current.scale), node.kind).id;
+      if (active.kind === 'create') { current.onConnect?.(active.fixedId, over, active.port ?? '', landed); return; }
       const edge = current.relationships.find(item => item.id === active.edge);
       if (!edge) return;
+      const dragged = active.end === 'source' ? 'sourcePort' : 'targetPort';
       const source = active.end === 'source' ? over : edge.source;
       const target = active.end === 'target' ? over : edge.target;
-      if (source !== edge.source || target !== edge.target) current.onReconnect?.(edge.id, source, target);
+      // 카드도 지점도 그대로면 바뀐 것이 없다
+      if (source === edge.source && target === edge.target && edge[dragged] === landed) return;
+      current.onReconnect?.(edge.id, { source, target, [dragged]: landed });
     };
     const cancel = () => setLink(null);
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setLink(null); } };
@@ -182,7 +197,8 @@ export function Diagram({
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
-    setLink({ kind: 'create', fixedId: node.id, from: portPoint(node, port), pointer: localPoint(event), over: null });
+    const pointer = localPoint(event);
+    setLink({ kind: 'create', fixedId: node.id, from: portPoint(node, port), port: port.id, start: pointer, pointer, over: null });
   }
 
   function startReconnect(event: PointerEvent<HTMLElement>, edge: (typeof edges)[number], end: 'source' | 'target') {
@@ -190,7 +206,8 @@ export function Diagram({
     event.stopPropagation();
     event.preventDefault();
     const fixed = end === 'target' ? edge.start : edge.end;
-    setLink({ kind: 'reconnect', edge: edge.id, end, fixedId: end === 'target' ? edge.source : edge.target, from: fixed, pointer: localPoint(event), over: null });
+    const pointer = localPoint(event);
+    setLink({ kind: 'reconnect', edge: edge.id, end, fixedId: end === 'target' ? edge.source : edge.target, from: fixed, start: pointer, pointer, over: null });
   }
 
   useLayoutEffect(() => {

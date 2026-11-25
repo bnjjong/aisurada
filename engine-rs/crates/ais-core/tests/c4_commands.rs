@@ -255,3 +255,49 @@ fn operations_may_come_from_the_command_line_as_a_json_string() {
         .unwrap();
     assert_eq!(applied["elements"][0]["id"], "a");
 }
+
+#[test]
+fn a_line_keeps_its_ports_in_the_file_and_in_the_answer() {
+    let vault = vault("ports");
+    let engine = Engine::new(&vault);
+    let first = get(&engine, "demo");
+    let applied = apply(
+        &engine,
+        "demo",
+        first["precondition"].as_str().unwrap(),
+        json!([
+            {"op":"put_element","id":"me","kind":"person","name":"개발자"},
+            {"op":"put_element","id":"app","kind":"system","name":"aisurada"},
+            {"op":"put_relationship","source":"me","target":"app","label":"지시","sourcePort":"right","targetPort":"top-2"}
+        ]),
+    )
+    .unwrap();
+    assert_eq!(applied["relationships"][0]["sourcePort"], "right");
+    assert_eq!(applied["relationships"][0]["targetPort"], "top-2");
+    let file = std::fs::read_to_string(vault.join(".aisurada/c4/demo/model.yaml")).unwrap();
+    assert!(
+        file.contains("sourcePort: right") && file.contains("targetPort: top-2"),
+        "{file}"
+    );
+
+    // 한쪽만 옮기면 다른 쪽은 그대로, 틀린 이름은 아무것도 쓰지 않고 거절한다
+    let token = applied["precondition"].as_str().unwrap();
+    let moved = apply(
+        &engine,
+        "demo",
+        token,
+        json!([{"op":"put_relationship","id":"r1","targetPort":"left"}]),
+    )
+    .unwrap();
+    assert_eq!(moved["relationships"][0]["sourcePort"], "right");
+    assert_eq!(moved["relationships"][0]["targetPort"], "left");
+    let refused = apply(
+        &engine,
+        "demo",
+        moved["precondition"].as_str().unwrap(),
+        json!([{"op":"put_relationship","id":"r1","sourcePort":"middle"}]),
+    )
+    .unwrap_err();
+    assert!(refused.message.contains("middle"), "{}", refused.message);
+    assert_eq!(get(&engine, "demo")["precondition"], moved["precondition"]);
+}

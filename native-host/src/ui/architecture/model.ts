@@ -12,7 +12,8 @@ export type C4Element = {
   parentId: string | null;
   codeRef: string | null;
 };
-export type C4Relationship = { id: string; source: string; target: string; label: string; technology: string };
+/** `sourcePort`, `targetPort`는 선이 카드의 어느 연결 지점에 붙는지다. 비어 있으면 자동 배치가 정한다. */
+export type C4Relationship = { id: string; source: string; target: string; label: string; technology: string; sourcePort?: string; targetPort?: string };
 export type Point = { x: number; y: number };
 export type C4Views = Record<string, Record<string, Point>>;
 /** 엔진이 주는 모델 한 벌. `precondition`은 다음 쓰기에 그대로 싣는 확인 값이다. */
@@ -27,7 +28,7 @@ export type C4Model = {
 export type C4Operation =
   | { op: 'put_element'; id: string; kind?: string; name?: string; description?: string; technology?: string; parent?: string; codeRef?: string }
   | { op: 'delete_element'; id: string }
-  | { op: 'put_relationship'; id?: string; source?: string; target?: string; label?: string; technology?: string }
+  | { op: 'put_relationship'; id?: string; source?: string; target?: string; label?: string; technology?: string; sourcePort?: string; targetPort?: string }
   | { op: 'delete_relationship'; id: string }
   | { op: 'set_positions'; view: string; positions: Record<string, Point> };
 
@@ -71,7 +72,8 @@ export function newElementId(name: string, kind: string, taken: Iterable<string>
 }
 
 export type ElementForm = { kind: string; name: string; description: string; technology: string; codeRef: string };
-export type RelationForm = { source: string; target: string; label: string; technology: string };
+/** `sourcePort`, `targetPort`는 폼 칸이 아니다. 끌어서 만들 때 놓은 연결 지점을 새 관계에 실어 보내려고 들고 있다. */
+export type RelationForm = { source: string; target: string; label: string; technology: string; sourcePort?: string; targetPort?: string };
 
 export const emptyElementForm = (kind: string): ElementForm => ({ kind, name: '', description: '', technology: '', codeRef: '' });
 export const elementFormOf = (element: C4Element): ElementForm => ({
@@ -104,7 +106,10 @@ export function editElementOps(before: C4Element, form: ElementForm): C4Operatio
 }
 
 export function createRelationOps(form: RelationForm): C4Operation[] {
-  return [{ op: 'put_relationship', source: form.source, target: form.target, label: form.label.trim(), technology: form.technology.trim() }];
+  const op: Extract<C4Operation, { op: 'put_relationship' }> = { op: 'put_relationship', source: form.source, target: form.target, label: form.label.trim(), technology: form.technology.trim() };
+  if (form.sourcePort) op.sourcePort = form.sourcePort;
+  if (form.targetPort) op.targetPort = form.targetPort;
+  return [op];
 }
 
 export function editRelationOps(before: C4Relationship, form: RelationForm): C4Operation[] {

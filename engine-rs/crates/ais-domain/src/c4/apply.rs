@@ -39,12 +39,15 @@ pub enum Operation {
     DeleteElement {
         id: String,
     },
+    #[serde(rename_all = "camelCase")]
     PutRelationship {
         id: Option<String>,
         source: Option<String>,
         target: Option<String>,
         label: Option<String>,
         technology: Option<String>,
+        source_port: Option<String>,
+        target_port: Option<String>,
     },
     DeleteRelationship {
         id: String,
@@ -168,6 +171,8 @@ fn apply_one(
             target,
             label,
             technology,
+            source_port,
+            target_port,
         } => {
             let created = put_relationship(
                 model,
@@ -176,6 +181,7 @@ fn apply_one(
                 target.as_deref(),
                 label.as_deref(),
                 technology.as_deref(),
+                (source_port.as_deref(), target_port.as_deref()),
             )?;
             outcome.created_relationships.extend(created);
             Ok(())
@@ -303,6 +309,7 @@ fn put_relationship(
     target: Option<&str>,
     label: Option<&str>,
     technology: Option<&str>,
+    (source_port, target_port): (Option<&str>, Option<&str>),
 ) -> Result<Option<String>, EngineError> {
     if let Some(id) = id {
         if !is_valid_id(id) {
@@ -320,6 +327,12 @@ fn put_relationship(
             }
             if let Some(technology) = technology {
                 relation.technology = technology.trim().to_string();
+            }
+            if let Some(port) = source_port {
+                relation.source_port = port.trim().to_string();
+            }
+            if let Some(port) = target_port {
+                relation.target_port = port.trim().to_string();
             }
             return Ok(None);
         }
@@ -346,6 +359,8 @@ fn put_relationship(
         target: target.to_string(),
         label: label.unwrap_or_default().trim().to_string(),
         technology: technology.unwrap_or_default().trim().to_string(),
+        source_port: source_port.unwrap_or_default().trim().to_string(),
+        target_port: target_port.unwrap_or_default().trim().to_string(),
         extra: Vec::new(),
     });
     Ok(created)
@@ -587,5 +602,130 @@ mod tests {
         assert_eq!(views.views["context"].len(), 1);
         let far = "version: 1\nviews:\n  context:\n    me: {x: 99999999, y: 2}\n";
         assert!(format::parse_views(far, &model).is_err());
+    }
+
+    #[test]
+    fn a_line_remembers_which_ports_it_attaches_to() {
+        let (model, views) = base();
+        let out = run(
+            &model,
+            &views,
+            json!([{"op":"put_relationship","id":"r1","sourcePort":"right","targetPort":"top-2"}]),
+        )
+        .unwrap();
+        let line = out
+            .model
+            .relationships
+            .iter()
+            .find(|r| r.id == "r1")
+            .unwrap();
+        assert_eq!(
+            (line.source_port.as_str(), line.target_port.as_str()),
+            ("right", "top-2")
+        );
+        assert_eq!(line.label, "지시", "고치지 않은 칸은 그대로다");
+        // 한쪽만 고치면 다른 쪽은 그대로다
+        let again = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_relationship","id":"r1","targetPort":"left"}]),
+        )
+        .unwrap();
+        let line = again
+            .model
+            .relationships
+            .iter()
+            .find(|r| r.id == "r1")
+            .unwrap();
+        assert_eq!(
+            (line.source_port.as_str(), line.target_port.as_str()),
+            ("right", "left")
+        );
+        // 빈 글은 자동 배치로 되돌린다
+        let cleared = run(
+            &again.model,
+            &again.views,
+            json!([{"op":"put_relationship","id":"r1","sourcePort":"","targetPort":""}]),
+        )
+        .unwrap();
+        let line = cleared
+            .model
+            .relationships
+            .iter()
+            .find(|r| r.id == "r1")
+            .unwrap();
+        assert!(line.source_port.is_empty() && line.target_port.is_empty());
+        // 새 관계도 지점을 받을 수 있다
+        let made = run(
+            &model,
+            &views,
+            json!([{"op":"put_relationship","source":"me","target":"gh","sourcePort":"bottom-3","targetPort":"top-1"}]),
+        )
+        .unwrap();
+        let line = made.model.relationships.last().unwrap();
+        assert_eq!(
+            (line.source_port.as_str(), line.target_port.as_str()),
+            ("bottom-3", "top-1")
+        );
+    }
+
+    #[test]
+    fn an_unknown_port_is_refused_and_changes_nothing() {
+        let (model, views) = base();
+        let err = run(
+            &model,
+            &views,
+            json!([{"op":"put_relationship","id":"r1","sourcePort":"middle"}]),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains("sourcePort") && err.contains("middle"),
+            "{err}"
+        );
+        assert!(model.relationships.iter().all(|r| r.source_port.is_empty()));
+    }
+
+    #[test]
+    fn ports_survive_the_files_and_show_in_json() {
+        let (model, views) = base();
+        let out = run(
+            &model,
+            &views,
+            json!([{"op":"put_relationship","id":"r2","sourcePort":"left","targetPort":"bottom-2"}]),
+        )
+        .unwrap();
+        let text = format::render_model(&out.model).unwrap();
+        assert!(
+            text.contains("sourcePort: left") && text.contains("targetPort: bottom-2"),
+            "{text}"
+        );
+        assert_eq!(format::parse_model(&text).unwrap(), out.model);
+        let json = format::model_json(&out.model);
+        let line = json["relationships"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == "r2")
+            .unwrap();
+        assert_eq!(
+            (line["sourcePort"].as_str(), line["targetPort"].as_str()),
+            (Some("left"), Some("bottom-2"))
+        );
+        let auto = json["relationships"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == "r1")
+            .unwrap();
+        assert_eq!(auto["sourcePort"].as_str(), Some(""), "자동은 빈 글이다");
+        // 손으로 쓴 파일의 틀린 지점은 이유를 달고 멈춘다
+        let hand = "version: 1\nelements:\n  - {id: a, kind: system, name: A}\n  - {id: b, kind: system, name: B}\nrelationships:\n  - {id: r1, source: a, target: b, sourcePort: nowhere}\n";
+        assert!(
+            format::parse_model(hand)
+                .unwrap_err()
+                .to_string()
+                .contains("sourcePort")
+        );
     }
 }

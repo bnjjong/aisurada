@@ -103,7 +103,7 @@ export type PortSide = 'top' | 'bottom' | 'left' | 'right';
 export type Port = { id: string; side: PortSide; at: number };
 
 const CENTER_PORTS: Port[] = [
-  { id: 'top', side: 'top', at: .5 }, { id: 'bottom', side: 'bottom', at: .5 },
+  { id: 'top-2', side: 'top', at: .5 }, { id: 'bottom-2', side: 'bottom', at: .5 },
   { id: 'left', side: 'left', at: .5 }, { id: 'right', side: 'right', at: .5 },
 ];
 const BOX_PORTS: Port[] = [
@@ -111,6 +111,19 @@ const BOX_PORTS: Port[] = [
   { id: 'bottom-1', side: 'bottom', at: .25 }, { id: 'bottom-2', side: 'bottom', at: .5 }, { id: 'bottom-3', side: 'bottom', at: .75 },
   { id: 'left', side: 'left', at: .5 }, { id: 'right', side: 'right', at: .5 },
 ];
+
+/** 엔진이 저장하는 연결 지점 이름(`PORT_IDS`)으로 지점을 찾는다. 모르는 이름이면 `undefined`다. */
+export const portById = (id: string | undefined): Port | undefined => BOX_PORTS.find(port => port.id === id);
+
+/** 변이 바깥을 향하는 방향. 선은 이 방향으로 카드에서 뻗어 나온다. */
+export function portNormal(port: Port): Point {
+  switch (port.side) {
+    case 'top': return { x: 0, y: -1 };
+    case 'bottom': return { x: 0, y: 1 };
+    case 'left': return { x: -1, y: 0 };
+    default: return { x: 1, y: 0 };
+  }
+}
 
 /** 상자 모양 카드는 위·아래 3개와 양옆 1개, 알약 모양인 사람은 모서리가 둥글어서 네 변의 가운데만 둔다. */
 export const portsFor = (kind: string): Port[] => kind === 'person' ? CENTER_PORTS : BOX_PORTS;
@@ -214,10 +227,21 @@ export function routeEdges(nodes: DiagramNode[], relationships: C4Relationship[]
       a = { x: start.x + shift / 3, y: middle };
       b = { x: end.x + shift / 3, y: middle };
     }
+    // 저장된 연결 지점이 있으면 그 지점에서 시작·도착하고, 그 변이 향하는 쪽으로 곡선이 뻗는다.
+    // 지점이 정해진 끝은 아래의 자동 간격 나눔에 끼지 않는다.
+    const fromPort = source.id === target.id ? undefined : portById(relation.sourcePort);
+    const toPort = source.id === target.id ? undefined : portById(relation.targetPort);
+    if (fromPort) start = portPoint(source, fromPort);
+    if (toPort) end = portPoint(target, toPort);
+    if (fromPort || toPort) {
+      const reach = Math.max(44, Math.min(150, Math.hypot(end.x - start.x, end.y - start.y) / 2));
+      if (fromPort) { const normal = portNormal(fromPort); a = { x: start.x + normal.x * reach, y: start.y + normal.y * reach }; }
+      if (toPort) { const normal = portNormal(toPort); b = { x: end.x + normal.x * reach, y: end.y + normal.y * reach }; }
+    }
     edges.push({ ...relation, start, end, a, b });
     if (source.id !== target.id) {
-      addPort(source, horizontal, sign, start, a, horizontal ? ty : tx);
-      addPort(target, horizontal, -sign, end, b, horizontal ? sy : sx);
+      if (!fromPort) addPort(source, horizontal, sign, start, a, horizontal ? ty : tx);
+      if (!toPort) addPort(target, horizontal, -sign, end, b, horizontal ? sy : sx);
     }
   }
 

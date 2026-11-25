@@ -216,6 +216,7 @@ try {
   const moveTo = at => window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 11, clientX: at.x, clientY: at.y }));
   const upAt = at => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 11, button: 0, clientX: at.x, clientY: at.y }));
   const preview = () => document.querySelector('.c4-link path');
+  const PORT_IDS = ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left', 'right'];
   // 누르고 나서 화면이 끌기 상태로 바뀌고 리스너가 붙을 때까지 기다린다(사람은 누른 뒤에야 움직인다)
   const begin = async (target, at) => { down(target, at); await until(preview, '끌기가 시작됨'); await wait(60); };
 
@@ -270,6 +271,8 @@ try {
     await until(async () => (await model()).relationships.some(r => r.label === '끌어서 만든 관계'), '엔진에 관계가 생김');
     const line = (await model()).relationships.find(r => r.label === '끌어서 만든 관계');
     assert(line.source === github && line.target === elsewhere, `끌어서 만든 방향: ${JSON.stringify(line)}`);
+    assert(line.sourcePort === 'right', `출발 연결 지점이 저장된다: ${line.sourcePort}`);
+    assert(PORT_IDS.includes(line.targetPort), `도착 연결 지점은 놓은 자리에서 가장 가까운 지점이다: ${line.targetPort}`);
     const count = (await model()).relationships.length;
     // 관계를 고르면 양 끝에 손잡이가 보이고, 도착 끝을 다른 카드로 옮긴다
     // 라벨이 아이콘만 보일 수 있으니 접근성 이름으로 찾고, 라벨이 없으면 카드 상세의 관계 목록으로 고른다
@@ -299,6 +302,35 @@ try {
     await until(async () => (await model()).relationships.find(r => r.id === line.id)?.source === 'person-1', '엔진에 시작 끝이 바뀜');
     const again = (await model()).relationships.find(r => r.id === line.id);
     assert(again.target === late && again.label === '끌어서 만든 관계', `도착과 이름은 그대로다: ${JSON.stringify(again)}`);
+    assert(PORT_IDS.includes(again.sourcePort), `옮긴 끝의 연결 지점이 저장된다: ${again.sourcePort}`);
+  });
+
+  await test('dragging-a-line-end-onto-another-port-of-the-same-card-changes-where-it-attaches', async () => {
+    const line = (await model()).relationships.find(r => r.label === '끌어서 만든 관계');
+    const late = await idOf('늦은 요소');
+    assert(line.target === late, '앞 점검에서 도착이 늦은 요소다');
+    await until(() => document.querySelector('.c4-edge-end[data-end="target"]'), '관계가 선택된 채로 남음');
+    // 누르기만 하고 놓으면 아무것도 바뀌지 않는다
+    const stamp = (await model()).precondition;
+    const handle = () => document.querySelector('.c4-edge-end[data-end="target"]');
+    await begin(handle(), middle(handle()));
+    upAt(middle(handle()));
+    await until(() => !preview(), '눌렀다 놓으면 끌기가 끝남');
+    await wait(150);
+    assert((await model()).precondition === stamp, '움직이지 않은 눌림은 모델을 바꾸지 않는다');
+    // 같은 카드의 다른 연결 지점으로 옮기면 지점만 바뀐다
+    const wanted = line.targetPort === 'bottom-3' ? 'top-1' : 'bottom-3';
+    const port = portOf(late, wanted);
+    await begin(handle(), middle(handle()));
+    moveTo(middle(port));
+    await until(() => document.querySelector('.c4-port[data-near="true"]')?.dataset.port === wanted, '가장 가까운 연결 지점이 강조됨');
+    upAt(middle(port));
+    await until(async () => (await model()).relationships.find(r => r.id === line.id)?.targetPort === wanted, '엔진에 도착 연결 지점이 바뀜');
+    const moved = (await model()).relationships.find(r => r.id === line.id);
+    assert(moved.target === late && moved.source === line.source && moved.label === line.label, `카드와 이름은 그대로다: ${JSON.stringify(moved)}`);
+    assert(moved.sourcePort === line.sourcePort, '반대쪽 지점도 그대로다');
+    // 선의 끝이 그 지점으로 옮겨 그려진다
+    await until(() => { const a = middle(handle()), b = middle(portOf(late, wanted)); return Math.abs(a.x - b.x) <= 4 && Math.abs(a.y - b.y) <= 4; }, '선의 끝이 새 연결 지점에 붙음');
   });
 } catch { /* 첫 실패 뒤의 점검은 앞 상태에 기대므로 멈춘다 */ }
 await post('/result', results);

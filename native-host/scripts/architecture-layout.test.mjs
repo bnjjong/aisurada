@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARD_HEIGHT, CARD_WIDTH, MAX_SCALE, MIN_ZOOM, linkCurve, measureEdge, nearestPort, nodeAt, placeLabels, portPoint, portsFor, positionNodes, routeEdges, toWorld, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from '../src/ui/architecture/layout.ts';
+import { CARD_HEIGHT, CARD_WIDTH, MAX_SCALE, MIN_ZOOM, linkCurve, measureEdge, nearestPort, nodeAt, placeLabels, portById, portNormal, portPoint, portsFor, positionNodes, routeEdges, toWorld, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from '../src/ui/architecture/layout.ts';
 
 const points = [
   ['person', 0, 64], ['app', 478, 0], ['vault', 1140, -145],
@@ -116,7 +116,7 @@ test('휠 움직임은 위로 굴리면 확대, 아래로 굴리면 축소이고
 test('연결 지점은 상자 카드에 8개(위·아래 3개씩, 양옆 1개), 사람 카드에는 네 변 가운데 4개다', () => {
   const box = portsFor('system');
   assert.deepEqual(box.map(port => port.id), ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left', 'right']);
-  assert.deepEqual(portsFor('person').map(port => port.id), ['top', 'bottom', 'left', 'right']);
+  assert.deepEqual(portsFor('person').map(port => port.id), ['top-2', 'bottom-2', 'left', 'right']);
   const node = { x: 100, y: 50 };
   const at = id => portPoint(node, box.find(port => port.id === id));
   assert.deepEqual(at('top-2'), { x: 100 + CARD_WIDTH / 2, y: 50 });
@@ -132,7 +132,7 @@ test('가장 가까운 연결 지점은 포인터가 놓인 쪽의 지점이다'
   assert.equal(nearestPort(node, { x: CARD_WIDTH * .7, y: CARD_HEIGHT + 30 }, 'system').id, 'bottom-3');
   assert.equal(nearestPort(node, { x: -40, y: CARD_HEIGHT / 2 }, 'system').id, 'left');
   assert.equal(nearestPort(node, { x: CARD_WIDTH + 40, y: 10 }, 'system').id, 'right');
-  assert.equal(nearestPort(node, { x: CARD_WIDTH * .3, y: -20 }, 'person').id, 'top', '사람은 가운데 지점만 있다');
+  assert.equal(nearestPort(node, { x: CARD_WIDTH * .3, y: -20 }, 'person').id, 'top-2', '사람은 가운데 지점만 있다');
 });
 
 test('포인터 아래의 카드를 월드 좌표로 찾고, 겹치면 위에 그린 카드가 이기며, 여백만큼 바깥도 친다', () => {
@@ -150,4 +150,36 @@ test('미리보기 곡선은 가로로 뻗었다가 도착점으로 들어온다
   const { a, b } = linkCurve({ x: 0, y: 0 }, { x: 200, y: 80 });
   assert.deepEqual(a, { x: 100, y: 0 });
   assert.deepEqual(b, { x: 100, y: 80 });
+});
+
+test('저장된 연결 지점이 있으면 선은 그 지점에서 시작·도착하고 그 변이 향하는 쪽으로 뻗는다', () => {
+  const pair = [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 600, y: 40 }];
+  const [auto] = routeEdges(pair, [{ id: 'r', source: 'a', target: 'b', label: '', technology: '' }]);
+  const [fixed] = routeEdges(pair, [{ id: 'r', source: 'a', target: 'b', label: '', technology: '', sourcePort: 'bottom-3', targetPort: 'top-1' }]);
+  assert.deepEqual(fixed.start, portPoint(pair[0], portById('bottom-3')));
+  assert.deepEqual(fixed.end, portPoint(pair[1], portById('top-1')));
+  assert.ok(fixed.a.y > fixed.start.y && fixed.a.x === fixed.start.x, '아래 변에서는 아래로 뻗는다');
+  assert.ok(fixed.b.y < fixed.end.y && fixed.b.x === fixed.end.x, '위 변으로는 위에서 들어온다');
+  assert.notDeepEqual(auto.start, fixed.start, '지점이 없으면 자동 배치다');
+  assert.deepEqual(portNormal(portById('left')), { x: -1, y: 0 });
+});
+
+test('지점이 한쪽만 정해지면 다른 쪽은 자동 배치를 따르고, 모르는 이름은 자동으로 본다', () => {
+  const pair = [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 600, y: 40 }];
+  const base = { id: 'r', source: 'a', target: 'b', label: '', technology: '' };
+  const [auto] = routeEdges(pair, [base]);
+  const [half] = routeEdges(pair, [{ ...base, sourcePort: 'top-2' }]);
+  assert.deepEqual(half.start, portPoint(pair[0], portById('top-2')));
+  assert.deepEqual(half.end, auto.end, '도착은 그대로 자동이다');
+  const [unknown] = routeEdges(pair, [{ ...base, sourcePort: 'nowhere', targetPort: '' }]);
+  assert.deepEqual(unknown.start, auto.start);
+  assert.deepEqual(unknown.end, auto.end);
+});
+
+test('지점이 정해진 선은 자동 간격 나눔에 끼지 않고, 같은 변의 자동 선들만 나눠 선다', () => {
+  const trio = [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 600, y: 0 }, { id: 'c', x: 600, y: 300 }];
+  const lines = ['b', 'c'].map((target, index) => ({ id: 'r' + index, source: 'a', target, label: '', technology: '' }));
+  const [one, two] = routeEdges(trio, [{ ...lines[0], sourcePort: 'right' }, lines[1]]);
+  assert.deepEqual(one.start, portPoint(trio[0], portById('right')), '지점이 정해진 끝은 움직이지 않는다');
+  assert.ok(two.start.x >= 0, '자동 선은 그대로 그려진다');
 });

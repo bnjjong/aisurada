@@ -68,17 +68,20 @@ export function ElementFormModal({ model, level, parentId, existing, submit, clo
   );
 }
 
-export function RelationFormModal({ model, existing, source, target, submit, close }: {
+export function RelationFormModal({ model, existing, source, target, sourcePort, targetPort, submit, close }: {
   model: C4Model;
   existing?: C4Relationship;
   source?: string;
   target?: string;
+  /** 끌어서 만들 때 선이 붙은 연결 지점(폼에는 보이지 않고 새 관계에 실린다) */
+  sourcePort?: string;
+  targetPort?: string;
   submit: Submit;
   close(): void;
 }) {
   const first = model.elements[0]?.id ?? '';
   const [form, setForm] = useState<RelationForm>(() => existing ? relationFormOf(existing) : {
-    source: source ?? first, target: target ?? model.elements.find(item => item.id !== (source ?? first))?.id ?? first, label: '', technology: '',
+    source: source ?? first, target: target ?? model.elements.find(item => item.id !== (source ?? first))?.id ?? first, label: '', technology: '', sourcePort, targetPort,
   });
   const { error, busy, run } = useSubmit(submit, close);
   const set = <K extends keyof RelationForm>(key: K, value: RelationForm[K]) => setForm(current => ({ ...current, [key]: value }));
