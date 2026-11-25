@@ -9,6 +9,7 @@ import {
   TYPES,
   displayTitle,
   railAgendaOrder,
+  HUE_COLORS,
 } from "./model.ts";
 import { AgendaFilter } from "./Rail.tsx";
 import { NoteReading } from "../navigation/NoteReading.tsx";
@@ -225,6 +226,12 @@ export function Calendar({
                     1,
                     layout.counts?.get(n.id) || layout.count,
                   );
+                  const agenda = ws.agendas.find((a) => a.id === n.agendaId);
+                  const agendaHue = agenda ? asText(agenda.hue) : "";
+                  const agendaColor =
+                    (agendaHue && HUE_COLORS[agendaHue]) ||
+                    agendaHue ||
+                    undefined;
                   return (
                     <button
                       className="tl-block"
@@ -239,6 +246,9 @@ export function Calendar({
                           dragged?.id === n.id
                             ? `translateY(${dragged.delta}px)`
                             : undefined,
+                        ...(agendaColor
+                          ? ({ "--agenda-color": agendaColor } as React.CSSProperties)
+                          : {}),
                       }}
                       onClick={(e) => {
                         if (e.detail === 0) controller.showPreview(n.id);
@@ -347,17 +357,27 @@ export function Calendar({
                         <h3>{date.slice(5)}</h3>
                         {all
                           .filter((n) => n.date === date)
-                          .map((n) => (
-                            <button
-                              className="mchip"
-                              key={n.id}
-                              onClick={() => controller.showPreview(n.id)}
-                            >
-                              <AgentMarks note={n} />
-                              <DecisionMark noteId={n.id} />
-                              {n.time} {n.title || "제목 없는 노트"}
-                            </button>
-                          ))}
+                          .map((n) => {
+                            const a = ws.agendas.find((ag) => ag.id === n.agendaId);
+                            const hue = a ? asText(a.hue) : "";
+                            const color = (hue && HUE_COLORS[hue]) || hue || undefined;
+                            return (
+                              <button
+                                className="mchip"
+                                key={n.id}
+                                style={
+                                  color
+                                    ? ({ "--agenda-color": color } as React.CSSProperties)
+                                    : undefined
+                                }
+                                onClick={() => controller.showPreview(n.id)}
+                              >
+                                <AgentMarks note={n} />
+                                <DecisionMark noteId={n.id} />
+                                {n.time} {n.title || "제목 없는 노트"}
+                              </button>
+                            );
+                          })}
                       </section>
                     );
                   },
@@ -419,6 +439,7 @@ export function Calendar({
                     current={date.startsWith(view.date.slice(0, 7))}
                     isToday={date === ws.today}
                     notes={all.filter((n) => n.date === date)}
+                    agendas={ws.agendas}
                     open={(id) => controller.showPreview(id)}
                     day={() => route("day", date)}
                   />
@@ -436,6 +457,7 @@ function MonthCell({
   current,
   isToday,
   notes,
+  agendas,
   open,
   day,
 }: {
@@ -443,6 +465,7 @@ function MonthCell({
   current: boolean;
   isToday?: boolean;
   notes: Note[];
+  agendas: Agenda[];
   open(id: string): void;
   day(): void;
 }) {
@@ -480,18 +503,28 @@ function MonthCell({
       </button>
       {current && (
         <>
-          {notes.slice(0, shown).map((n) => (
-            <button
-              className="mchip"
-              key={n.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                open(n.id);
-              }}
-            >
-              {n.title || "제목 없는 노트"}
-            </button>
-          ))}
+          {notes.slice(0, shown).map((n) => {
+            const a = agendas.find((ag) => ag.id === n.agendaId);
+            const hue = a ? asText(a.hue) : "";
+            const color = (hue && HUE_COLORS[hue]) || hue || undefined;
+            return (
+              <button
+                className="mchip"
+                key={n.id}
+                style={
+                  color
+                    ? ({ "--agenda-color": color } as React.CSSProperties)
+                    : undefined
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  open(n.id);
+                }}
+              >
+                {n.title || "제목 없는 노트"}
+              </button>
+            );
+          })}
           {notes.length > shown && (
             <button
               onClick={(e) => {

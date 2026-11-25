@@ -256,7 +256,8 @@
 :root[data-skin="tactile"] .month-grid { border: 0; border-radius: 20px; overflow: hidden; background: var(--soft); }
 :root[data-skin="tactile"] .month-cell { border-right-color: var(--line); border-bottom-color: var(--line); }
 :root[data-skin="tactile"] .month-cell .mchip { border-radius: 999px; background: var(--surface); }
-:root[data-skin="tactile"] .day-timeline .tl-block { border: 0; border-radius: 12px; background: var(--accent-soft); }
+:root[data-skin="tactile"] .day-timeline .tl-block { border: 0; border-radius: 12px; background: color-mix(in srgb, var(--agenda-color, var(--accent)) 16%, var(--surface)); }
+:root[data-skin="tactile"] .day-timeline .tl-block:hover { background: color-mix(in srgb, var(--agenda-color, var(--accent)) 24%, var(--surface)); }
 :root[data-skin="tactile"] .report-bar { border-radius: 999px; background: var(--bg); }
 :root[data-skin="tactile"] .note-composition span { border-radius: 999px; background: var(--bg); }
 :root[data-skin="tactile"] .note-toc { border: 0; border-radius: 16px; box-shadow: var(--sh-2); }

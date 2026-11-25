@@ -168,7 +168,8 @@
 :root[data-skin="modern"] :is(.workspace-option, .child-page-card, .ag-facts, .link-picker, .category-picker, .ask-mark-group, .sess-dock-row, .relnote, .ais-html-frame, .week-columns, .month-grid) { border-radius: 10px; }
 :root[data-skin="modern"] .workspace-option { border-color: var(--line); }
 :root[data-skin="modern"] .workspace-option.selected { border-color: var(--accent); background: var(--accent-soft); }
-:root[data-skin="modern"] .tl-block { border: 1px solid var(--line); border-radius: 8px; background: var(--accent-soft); }
+:root[data-skin="modern"] .tl-block { border: 1px solid color-mix(in srgb, var(--agenda-color, var(--accent)) 25%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--agenda-color, var(--accent)) 14%, var(--surface)); }
+:root[data-skin="modern"] .tl-block:hover { background: color-mix(in srgb, var(--agenda-color, var(--accent)) 22%, var(--surface)); }
 :root[data-skin="modern"] :is(.ui-modal, .note-preview, .subnote-page, .cmdk-panel) { border: 0; border-radius: 14px; box-shadow: var(--sh-2); }
 :root[data-skin="modern"] :is(.sel-bar, .comment-compose-popover, .slash-menu, .note-picker, .comment-card, .lex-table-menu, .doc-eval-pop, .connection-detail, .ask-hovercard, .note-toc, .task-menu) {
   border: 0; border-radius: 12px; box-shadow: var(--sh-2);

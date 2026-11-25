@@ -160,7 +160,8 @@
 :root[data-skin="grid"] :is(.ui-modal > header, .note-preview > header, .subnote-page > header) { border-bottom-color: var(--strong); }
 :root[data-skin="grid"] .notice { border: 1px solid var(--strong); }
 :root[data-skin="grid"] .vault-write-failures, :root[data-skin="grid"] .doc-conflict-banner { background: var(--err-bg); color: var(--err); }
-:root[data-skin="grid"] .tl-block { background: var(--soft); border: 1px solid var(--line); border-left: 3px solid var(--accent); }
+:root[data-skin="grid"] .tl-block { background: color-mix(in srgb, var(--agenda-color, var(--accent)) 10%, var(--surface)); border: 1px solid var(--line); border-left: 3px solid var(--agenda-color, var(--accent)); }
+:root[data-skin="grid"] .tl-block:hover { background: color-mix(in srgb, var(--agenda-color, var(--accent)) 18%, var(--surface)); }
 
 /* 세션 입력창 카드: 격자는 각지게 */
 :root[data-skin="grid"] .sess-composer-box { border: 1px solid var(--strong); border-radius: 2px; }
