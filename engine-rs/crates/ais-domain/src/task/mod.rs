@@ -260,4 +260,42 @@ mod tests {
         assert_eq!(RefKind::parse("slack "), None);
         assert_eq!(RefKind::parse(" github"), None);
     }
+
+    #[test]
+    fn test_task_type_and_priority_parse_loose() {
+        // TaskType은 공백과 대소문자를 너그럽게 수락한다
+        assert_eq!(TaskType::parse(" FEATURE "), Some(TaskType::Feature));
+        assert_eq!(TaskType::parse("bug"), Some(TaskType::Bug));
+        assert_eq!(TaskType::parse(" Chore "), Some(TaskType::Chore));
+        assert_eq!(TaskType::parse("invalid"), None);
+
+        // TaskPriority도 공백과 대소문자를 너그럽게 수락한다
+        assert_eq!(TaskPriority::parse(" HIGH "), Some(TaskPriority::High));
+        assert_eq!(TaskPriority::parse("Medium"), Some(TaskPriority::Medium));
+        assert_eq!(TaskPriority::parse("low "), Some(TaskPriority::Low));
+        assert_eq!(TaskPriority::parse("urgent"), None);
+    }
+
+    #[test]
+    fn test_task_format_refs_accepts_trimmed_kind() {
+        use serde_json::json;
+
+        // 인자 길(refs)은 kind의 앞뒤 공백을 trim하여 수락한다
+        let valid_json = json!([
+            {"kind": " github", "target": "bnjjong/aisurada#10"},
+            {"kind": "note ", "target": "nd1-12345678"}
+        ]);
+        let parsed = format::refs(&valid_json).expect("공백이 든 kind도 trim되어 수락되어야 한다");
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].kind, RefKind::Github);
+        assert_eq!(parsed[0].target, "bnjjong/aisurada#10");
+        assert_eq!(parsed[1].kind, RefKind::Note);
+        assert_eq!(parsed[1].target, "nd1-12345678");
+
+        // 그러나 대소문자가 다른 kind는 거절된다
+        let invalid_json = json!([
+            {"kind": "GitHub", "target": "bnjjong/aisurada#10"}
+        ]);
+        assert!(format::refs(&invalid_json).is_err());
+    }
 }

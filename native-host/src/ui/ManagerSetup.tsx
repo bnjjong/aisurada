@@ -229,7 +229,7 @@ export function ManagerNotifications({ form, controller, update }: {
           </select>
         </label>
         <button type="button" disabled={working || !form.webhook || !masked || !testChannel} onClick={() => void act(async () => {
-          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, url: form.webhook?.trim(), channel: testChannel });
+          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, url: (form.webhook ?? '').trim(), channel: testChannel });
           setText(`보냈어요 · HTTP ${answer.status} · ${answer.elapsed}ms`);
           await refresh();
         })}>시험 알림 보내기</button>
