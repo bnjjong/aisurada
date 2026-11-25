@@ -19,7 +19,7 @@ import { NotificationSettingsView } from '../src/ui/NotificationSettings.tsx';
 import { SettingsGroup, SettingsPane, SettingsRow } from '../src/ui/SettingsParts.tsx';
 import { ConnectView } from '../src/plugs/claude/connect.tsx';
 import { GithubConnect } from '../src/ui/GithubConnect.tsx';
-import { ArchylConnect } from '../src/ui/archyl/ArchylConnect.tsx';
+import { ArchylConnect } from '../src/ui/architecture/ArchylConnect.tsx';
 
 function harness(t, { context = { kind: 'main' }, values = {} } = {}) {
   const map = new Map(Object.entries(values)), writes = [], warnings = [];

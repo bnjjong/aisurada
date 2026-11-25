@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import { Icon } from '../Icon.tsx';
-import type { ArchylElement, ArchylRelationship } from './client.ts';
+import type { C4Element, C4Relationship } from './client.ts';
 import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, measureEdge, placeLabels, positionNodes, routeEdges } from './layout.ts';
 import type { DiagramLabel } from './layout.ts';
 
@@ -10,7 +10,7 @@ const KIND_ICON: Record<string, string> = {
 };
 const FLOW_PERIOD_MS = 1450;
 
-function iconFor(item: ArchylElement) {
+function iconFor(item: C4Element) {
   const icon = item.icon?.toLowerCase() ?? '';
   const name = item.name.toLowerCase();
   if (icon.includes('github') || /^github\b/.test(name)) return 'gitBranch';
@@ -20,8 +20,8 @@ function iconFor(item: ArchylElement) {
 }
 
 export function Diagram({ elements, relationships, selected, select, drill }: {
-  elements: ArchylElement[];
-  relationships: ArchylRelationship[];
+  elements: C4Element[];
+  relationships: C4Relationship[];
   selected: string | null;
   select(id: string | null): void;
   drill(id: string): void;
@@ -174,7 +174,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
 
   return (
     <div
-      className="archyl-diagram"
+      className="c4-diagram"
       ref={viewport}
       aria-label="Archyl C4 다이어그램"
       onPointerDown={startPan}
@@ -187,18 +187,18 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
       onLostPointerCapture={() => { drag.current = null; }}
     >
       <canvas ref={canvas} aria-hidden="true" />
-      {playing && edges.length > 0 && <canvas className="archyl-flow" ref={flowCanvas} aria-hidden="true" />}
-      {!nodes.length && <p className="archyl-diagram-empty">이 레벨에 표시할 요소가 없어요.</p>}
+      {playing && edges.length > 0 && <canvas className="c4-flow" ref={flowCanvas} aria-hidden="true" />}
+      {!nodes.length && <p className="c4-diagram-empty">이 레벨에 표시할 요소가 없어요.</p>}
       <div
-        className="archyl-diagram-world"
+        className="c4-diagram-world"
         data-density={scale < .46 ? 'minimal' : scale < .8 ? 'compact' : 'normal'}
-        style={{ '--archyl-type-scale': typeScale, transform: 'translate(' + x + 'px, ' + y + 'px) scale(' + scale + ')' } as CSSProperties}
+        style={{ '--c4-type-scale': typeScale, transform: 'translate(' + x + 'px, ' + y + 'px) scale(' + scale + ')' } as CSSProperties}
       >
         {nodes.map(item => (
           <button
             type="button"
             key={item.id}
-            className="archyl-card"
+            className="c4-card"
             data-kind={item.kind}
             aria-pressed={selected === item.id}
             style={{ left: item.x, top: item.y, width: CARD_WIDTH, height: CARD_HEIGHT, borderTopColor: item.color && /^#[\da-f]{3,8}$/i.test(item.color) ? item.color : undefined }}
@@ -206,10 +206,10 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
             onClick={() => select(item.id)}
             onDoubleClick={() => drill(item.id)}
           >
-            <span className="archyl-card-kind"><span className="archyl-card-icon"><Icon name={iconFor(item)} size={15} /></span>{KIND_LABELS[item.kind] ?? '요소'}</span>
+            <span className="c4-card-kind"><span className="c4-card-icon"><Icon name={iconFor(item)} size={15} /></span>{KIND_LABELS[item.kind] ?? '요소'}</span>
             <strong>{item.name}</strong>
-            {item.description && <span className="archyl-card-description">{item.description}</span>}
-            {item.technology && <span className="archyl-card-tech">{item.technology}</span>}
+            {item.description && <span className="c4-card-description">{item.description}</span>}
+            {item.technology && <span className="c4-card-tech">{item.technology}</span>}
           </button>
         ))}
       </div>
@@ -219,7 +219,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
         return edge.id ? (
           <button
             key={edge.id}
-            className="archyl-edge"
+            className="c4-edge"
             type="button"
             style={style}
             title={title}
@@ -227,9 +227,9 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
             aria-pressed={edge.id === selected}
             onClick={() => select(edge.id)}
           >{caption}</button>
-        ) : <span className="archyl-edge" key={index} style={style} title={title}>{caption}</span>;
+        ) : <span className="c4-edge" key={index} style={style} title={title}>{caption}</span>;
       })}
-      <div className="archyl-zoom" aria-label="다이어그램 보기 도구">
+      <div className="c4-zoom" aria-label="다이어그램 보기 도구">
         <button type="button" aria-label="축소" onClick={() => resize(.8)}>−</button>
         <output>{Math.round(scale * 100)}%</output>
         <button type="button" aria-label="확대" onClick={() => resize(1.25)}>+</button>
@@ -237,7 +237,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
         {edges.length > 0 && (
           <button
             type="button"
-            className="archyl-flow-toggle"
+            className="c4-flow-toggle"
             aria-label="관계 흐름 애니메이션"
             aria-pressed={playing}
             title={playing ? '관계 흐름 일시정지' : '관계 흐름 재생'}
@@ -251,7 +251,7 @@ export function Diagram({ elements, relationships, selected, select, drill }: {
         )}
       </div>
       {nodes.length > 0 && (
-        <div className="archyl-minimap" aria-hidden="true">
+        <div className="c4-minimap" aria-hidden="true">
           {nodes.map(item => (
             <i key={item.id} data-selected={item.id === selected} style={{
               left: 100 * (item.x - box.minX) / box.width + '%',

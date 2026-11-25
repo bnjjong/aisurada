@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import type { WorkspaceController } from '../../workspace/controller.ts';
 
 export type ArchylProject = { id: string; name: string };
-export type ArchylElement = {
+export type C4Element = {
   id: string;
   name: string;
   description: string;
@@ -14,16 +14,16 @@ export type ArchylElement = {
   icon: string | null;
   color: string | null;
 };
-export type ArchylRelationship = {
+export type C4Relationship = {
   id: string | null;
   source: string;
   target: string;
   label: string;
   technology: string;
 };
-export type ArchylModel = { elements: ArchylElement[]; relationships: ArchylRelationship[] };
+export type C4Model = { elements: C4Element[]; relationships: C4Relationship[] };
 export type ArchylMessage = { role: 'user' | 'assistant'; text: string; warning?: string; updated?: boolean };
-export type ArchylReply = { message: string; applied: number; warning: string | null; model: ArchylModel | null };
+export type ArchylReply = { message: string; applied: number; warning: string | null; model: C4Model | null };
 type Connection = { writable: boolean; projects: ArchylProject[] };
 type Account = {
   connection: Connection | null;
@@ -97,7 +97,7 @@ export function useArchylAccount(controller: WorkspaceController) {
 }
 
 export const getArchylModel = (host: WorkspaceController['callHost'], projectId: string) =>
-  host<ArchylModel>('archyl_model', { projectId });
+  host<C4Model>('archyl_model', { projectId });
 export const sendArchylRequest = (
   host: WorkspaceController['callHost'],
   projectId: string,

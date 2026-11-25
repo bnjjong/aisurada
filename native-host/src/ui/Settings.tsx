@@ -18,7 +18,7 @@ import { NoteSettings } from "./NoteSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
 import { AiSettings } from "./AiSettings.tsx";
 import { GithubConnect } from "./GithubConnect.tsx";
-import { ArchylConnect } from "./archyl/ArchylConnect.tsx";
+import { ArchylConnect } from "./architecture/ArchylConnect.tsx";
 
 export interface SettingsLayoutViewProps {
   section: SettingsSection;

@@ -8,7 +8,7 @@ import { Page } from '../OtherPages.tsx';
 import { Diagram } from './Diagram.tsx';
 import { LEVEL_LABELS, projectSlice } from './layout.ts';
 import { errorText, getArchylModel, readProjectLink, sendArchylRequest, useArchylAccount, writeProjectLink } from './client.ts';
-import type { ArchylMessage, ArchylModel, ArchylProject } from './client.ts';
+import type { ArchylMessage, C4Model, ArchylProject } from './client.ts';
 import './architecture.css';
 
 export function ArchitecturePage({ slug, state, controller }: {
@@ -39,8 +39,8 @@ function ProjectArchitecture({ linkKey, name, controller }: {
   }
 
   return (
-    <section className="archyl-page" aria-label="C4 아키텍처">
-      <header className="archyl-page-header">
+    <section className="c4-page" aria-label="C4 아키텍처">
+      <header className="c4-page-header">
         <div><h1>C4 아키텍처</h1><p>{name}</p></div>
         {account.connection && account.connection.projects.length > 0 && (
           <label>Archyl 프로젝트
@@ -51,9 +51,9 @@ function ProjectArchitecture({ linkKey, name, controller }: {
           </label>
         )}
       </header>
-      {error && <p className="archyl-error" role="alert">{error}</p>}
+      {error && <p className="c4-error" role="alert">{error}</p>}
       {!controller.isNative() ? <p>데스크톱 앱에서 Archyl을 연결할 수 있어요.</p> : !linked ? (
-        <div className="archyl-empty">
+        <div className="c4-empty">
           {!account.checked && account.phase === 'checking' ? <p role="status">Archyl 연결을 확인하고 있어요.</p> : account.connection ? (
             <p>{account.connection.projects.length === 0
               ? '이 Archyl 계정으로 볼 수 있는 프로젝트가 없어요.'
@@ -62,7 +62,7 @@ function ProjectArchitecture({ linkKey, name, controller }: {
           ) : (
             <>
               <p>Archyl에 로그인하면 이 프로젝트의 C4 다이어그램을 볼 수 있어요.</p>
-              {account.error && <p className="archyl-error" role="alert">{account.error}</p>}
+              {account.error && <p className="c4-error" role="alert">{account.error}</p>}
               <button className="button-primary" type="button" onClick={() => controller.settings(true, 'connections')}>연결 설정</button>
             </>
           )}
@@ -79,7 +79,7 @@ function LinkedArchitecture({ project, writable, controller }: {
   writable: boolean;
   controller: WorkspaceController;
 }) {
-  const [model, setModel] = useState<ArchylModel | null>(null);
+  const [model, setModel] = useState<C4Model | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [level, setLevel] = useState(1);
@@ -182,32 +182,32 @@ function LinkedArchitecture({ project, writable, controller }: {
   }
 
   return (
-    <div className="archyl-workspace">
-      <div className="archyl-toolbar">
+    <div className="c4-workspace">
+      <div className="c4-toolbar">
         <nav aria-label="C4 레벨">
           {LEVEL_LABELS.map((label, index) => (
             <button key={label} type="button" aria-pressed={level === index + 1} onClick={() => showContext(index + 1)}>{label}</button>
           ))}
         </nav>
-        <div className="archyl-toolbar-actions">
-          <a className="archyl-project-link" href={projectUrl} target="_blank" rel="noreferrer">
+        <div className="c4-toolbar-actions">
+          <a className="c4-project-link" href={projectUrl} target="_blank" rel="noreferrer">
             <Icon name="popout" size={14} /> Archyl에서 열기
           </a>
           <button type="button" onClick={() => void reload()} disabled={loading || sending} aria-label="다이어그램 새로고침"><Icon name="history" size={15} /></button>
           <button
             ref={toggle}
             type="button"
-            aria-controls="archyl-chat-panel"
+            aria-controls="c4-chat-panel"
             aria-expanded={chatOpen}
             onClick={() => { setChatOpen(true); requestAnimationFrame(() => request.current?.focus()); }}
           ><Icon name="tab" size={14} />{chatOpen ? '챗으로 이동' : '챗 열기'}</button>
         </div>
       </div>
-      {error && <p className="archyl-error" role="alert">{error}</p>}
-      <div className="archyl-workbench" data-chat-open={chatOpen}>
-        <div className="archyl-map-column">
+      {error && <p className="c4-error" role="alert">{error}</p>}
+      <div className="c4-workbench" data-chat-open={chatOpen}>
+        <div className="c4-map-column">
           {level > 1 && parents.length > 0 && (
-            <label className="archyl-parent">{LEVEL_LABELS[level - 2]}
+            <label className="c4-parent">{LEVEL_LABELS[level - 2]}
               <select value={parentKey ?? ''} onChange={event => { setParentId(event.target.value); setSelectedId(null); }}>
                 {parents.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
@@ -222,34 +222,34 @@ function LinkedArchitecture({ project, writable, controller }: {
               select={setSelectedId}
               drill={drill}
             />
-          ) : <div className="archyl-empty"><p role={loading ? 'status' : undefined}>{loading ? '다이어그램을 불러오고 있어요.' : '다이어그램을 새로고침해 주세요.'}</p></div>}
-          {targetName && <p className="archyl-details"><strong>{targetName}</strong>{selection?.description && <span>{selection.description}</span>}</p>}
+          ) : <div className="c4-empty"><p role={loading ? 'status' : undefined}>{loading ? '다이어그램을 불러오고 있어요.' : '다이어그램을 새로고침해 주세요.'}</p></div>}
+          {targetName && <p className="c4-details"><strong>{targetName}</strong>{selection?.description && <span>{selection.description}</span>}</p>}
         </div>
-        <aside id="archyl-chat-panel" className="archyl-chat" aria-label="아키텍처 챗" hidden={!chatOpen}>
+        <aside id="c4-chat-panel" className="c4-chat" aria-label="아키텍처 챗" hidden={!chatOpen}>
           <header>
             <div><h2>아키텍처 챗</h2><span>Archyl MCP</span></div>
             <button type="button" aria-label="챗 접기" onClick={() => { setChatOpen(false); toggle.current?.focus(); }}><Icon name="close" size={15} /></button>
           </header>
-          <div className="archyl-chat-log" role="log" aria-label="챗 대화" ref={log}>
+          <div className="c4-chat-log" role="log" aria-label="챗 대화" ref={log}>
             {history.map((message, index) => (
-              <div className="archyl-chat-message" data-role={message.role} key={index}>
-                {message.updated && <span className="archyl-chat-applied">Archyl 반영</span>}
+              <div className="c4-chat-message" data-role={message.role} key={index}>
+                {message.updated && <span className="c4-chat-applied">Archyl 반영</span>}
                 <p>{message.text}</p>
-                {message.warning && <p className="archyl-error">{message.warning}</p>}
+                {message.warning && <p className="c4-error">{message.warning}</p>}
               </div>
             ))}
             {sending && <p role="status">요청을 해석하고 Archyl에 적용하고 있어요.</p>}
           </div>
-          <form className="archyl-compose" onSubmit={event => { event.preventDefault(); void send(); }}>
-            <p className="archyl-chat-target" aria-live="polite">
+          <form className="c4-compose" onSubmit={event => { event.preventDefault(); void send(); }}>
+            <p className="c4-chat-target" aria-live="polite">
               <Icon name="issue" size={14} />
               {targetName ? <><span>선택한 요소</span><strong>{targetName}</strong></> : <span>다이어그램 전체</span>}
             </p>
             {!writable && <p>이 Archyl 연결은 조회 전용이에요. <button type="button" onClick={() => controller.settings(true, 'connections')}>연결 설정</button></p>}
             {writable && !CLAUDE_ENABLED && <p>이 빌드에서는 Claude 챗을 사용할 수 없어요.</p>}
-            <label htmlFor="archyl-request">변경 요청</label>
+            <label htmlFor="c4-request">변경 요청</label>
             <textarea
-              id="archyl-request"
+              id="c4-request"
               ref={request}
               value={draft}
               rows={3}

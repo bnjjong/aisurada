@@ -1,0 +1,72 @@
+.c4-page { padding: 22px clamp(14px, 2.2vw, 28px); min-width: 0; }
+.c4-page h1, .c4-chat h2, .c4-page p { margin: 0; }
+.c4-page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 15px; }
+.c4-page-header h1 { font-size: 24px; line-height: 1.2; }
+.c4-page-header p { margin-top: 4px; color: var(--muted); font-size: 13px; }
+.c4-page-header label, .c4-parent { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; font-size: 12px; color: var(--muted); }
+.c4-page select { min-width: 0; max-width: min(100%, 260px); padding: 5px 8px; }
+.c4-empty { display: grid; place-content: center; justify-items: center; gap: 9px; padding: 20px; min-height: 200px; border: 1px solid var(--line); border-radius: 12px; text-align: center; color: var(--muted); }
+.c4-page .c4-error { color: var(--ink); border-inline-start: 3px solid #b56c37; padding-inline-start: 8px; margin-block: 6px; overflow-wrap: anywhere; }
+.c4-workspace { container-type: inline-size; }
+.c4-toolbar, .c4-toolbar nav, .c4-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.c4-toolbar { justify-content: space-between; margin-bottom: 10px; }
+.c4-toolbar :is(button, .c4-project-link), .c4-chat header button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; min-height: 30px; font-size: 12px; }
+.c4-toolbar button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); color: var(--ink); font-weight: 650; }
+.c4-project-link { color: var(--accent); text-underline-offset: 2px; }
+.c4-workbench { display: grid; grid-template-columns: minmax(0, 1fr) clamp(228px, 31%, 335px); align-items: start; gap: 12px; }
+.c4-workbench[data-chat-open="false"] { grid-template-columns: minmax(0, 1fr); }
+.c4-map-column { min-width: 0; }
+.c4-parent { margin-bottom: 8px; }
+.c4-diagram { --c4-card-surface: var(--surface); position: relative; height: clamp(355px, 63vh, 760px); overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: radial-gradient(color-mix(in srgb, var(--muted) 32%, transparent) .75px, transparent .75px) 0 0 / 17px 17px, var(--surface); cursor: grab; touch-action: none; }
+:root[data-skin="glass"] .c4-diagram { --c4-card-surface: light-dark(#fff, #18243e); }
+.c4-diagram:active { cursor: grabbing; }
+.c4-diagram > canvas { position: absolute; inset: 0; width: 100%; height: 100%; color: color-mix(in srgb, var(--muted) 61%, var(--c4-card-surface)); pointer-events: none; }
+.c4-diagram > .c4-flow { color: var(--accent); }
+.c4-diagram-world { position: absolute; inset: 0; transform-origin: top left; pointer-events: none; }
+.c4-card { position: absolute; display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; pointer-events: auto; text-align: left; border: 1px solid var(--line); border-top: 3px solid color-mix(in srgb, var(--muted) 66%, var(--surface)); border-radius: 12px; color: var(--ink); background: var(--c4-card-surface); box-shadow: 0 4px 10px #101a3520; overflow: hidden; }
+.c4-card:hover:not(:disabled), .c4-card[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 0; background: var(--c4-card-surface); }
+.c4-card[data-kind="system"] { border-top-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--c4-card-surface)); }
+.c4-card[data-kind="person"] { border-top-color: #bd9142; }
+.c4-card-kind { display: flex; flex: none; gap: 6px; align-items: center; font-size: calc(10px * var(--c4-type-scale)); line-height: 1.15; color: var(--muted); }
+.c4-card-icon { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 6px; color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.c4-card[data-kind="person"] .c4-card-icon { background: color-mix(in srgb, #bd9142 26%, var(--surface)); }
+.c4-card strong, .c4-card-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; }
+.c4-card strong { flex: none; text-wrap: balance; }
+.c4-card-tech { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c4-card strong { font-size: calc(14px * var(--c4-type-scale)); line-height: 1.15; }
+.c4-card-description { font-size: calc(11px * var(--c4-type-scale)); line-height: 1.2; color: var(--muted); }
+.c4-card-tech { font-size: 11px; color: var(--muted); }
+.c4-diagram-world[data-density="compact"] .c4-card-tech,
+.c4-diagram-world[data-density="minimal"] :is(.c4-card-description, .c4-card-tech) { display: none; }
+.c4-edge { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); overflow: hidden; padding: 2px 5px; font-size: 11px; line-height: 14px; font-weight: 500; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--c4-card-surface); }
+.c4-edge > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; text-align: center; text-wrap: balance; }
+.c4-edge:hover:not(:disabled), .c4-edge[aria-pressed="true"] { outline: 2px solid var(--accent); background: var(--c4-card-surface); }
+.c4-diagram-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
+.c4-zoom { position: absolute; bottom: 9px; left: 9px; display: flex; align-items: center; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.c4-zoom button { display: grid; place-items: center; width: 28px; height: 27px; padding: 0; border: 0; }
+.c4-zoom output { min-width: 38px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .c4-zoom .c4-flow-toggle { display: none; }
+}
+.c4-minimap { position: absolute; right: 10px; bottom: 10px; width: 76px; height: 39px; border: 4px solid var(--surface); outline: 1px solid var(--line); border-radius: 5px; background: var(--soft); pointer-events: none; }
+.c4-minimap i { position: absolute; min-width: 2px; min-height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--accent) 38%, var(--surface)); }
+.c4-minimap i[data-selected="true"] { background: var(--accent); }
+.c4-page .c4-details { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.c4-details strong { color: var(--ink); }
+.c4-chat { display: grid; grid-template-rows: auto minmax(65px, 1fr) auto; min-height: clamp(355px, 63vh, 760px); max-height: max(440px, 75vh); padding: 12px; gap: 9px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); min-width: 0; }
+.c4-chat[hidden] { display: none; }
+.c4-chat header { display: flex; align-items: start; justify-content: space-between; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid var(--line); }
+.c4-chat h2 { font-size: 15px; }
+.c4-chat header span { color: var(--muted); font-size: 11px; }
+.c4-chat-log { display: flex; flex-direction: column; align-items: stretch; gap: 8px; overflow-y: auto; font-size: 13px; }
+.c4-chat-message { padding: 7px 8px; border-radius: 9px; background: var(--soft); overflow-wrap: anywhere; white-space: pre-wrap; }
+.c4-chat-message[data-role="user"] { align-self: flex-end; margin-inline-start: 10px; background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+.c4-chat-applied { display: inline-block; margin-bottom: 3px; color: var(--muted); font-size: 11px; }
+.c4-compose { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
+.c4-chat-target { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 5px 7px; min-height: 26px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 13%, var(--surface)); overflow-wrap: anywhere; }
+.c4-compose textarea { width: 100%; min-height: 62px; max-height: 154px; font-size: 13px; resize: vertical; }
+.c4-compose > button { justify-self: end; display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; min-height: 32px; }
+@container (max-width: 540px) {
+  .c4-workbench { grid-template-columns: minmax(0, 1fr); }
+  .c4-chat { min-height: 250px; }
+}

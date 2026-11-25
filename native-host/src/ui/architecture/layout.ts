@@ -1,4 +1,4 @@
-import type { ArchylElement, ArchylModel, ArchylRelationship } from './client.ts';
+import type { C4Element, C4Model, C4Relationship } from './client.ts';
 
 export const CARD_WIDTH = 226;
 export const CARD_HEIGHT = 144;
@@ -9,10 +9,10 @@ export const KIND_LABELS: Record<string, string> = {
   person: '사람', system: '시스템', external: '외부 시스템', container: '컨테이너', component: '컴포넌트', code: '코드',
 };
 export type Point = { x: number; y: number };
-export type DiagramNode = ArchylElement & Point;
-export type DiagramEdge = ArchylRelationship & { start: Point; end: Point; a: Point; b: Point };
+export type DiagramNode = C4Element & Point;
+export type DiagramEdge = C4Relationship & { start: Point; end: Point; a: Point; b: Point };
 
-export function projectSlice(model: ArchylModel, level: number, parentId: string | null) {
+export function projectSlice(model: C4Model, level: number, parentId: string | null) {
   const nodes = model.elements.filter(item => item.level === level && (level === 1 || item.parentId === parentId));
   const ids = new Set(nodes.map(item => item.id));
   const related = new Set<string>();
@@ -25,10 +25,10 @@ export function projectSlice(model: ArchylModel, level: number, parentId: string
   return nodes.concat(model.elements.filter(item => !ids.has(item.id) && related.has(item.id)));
 }
 
-export function positionNodes(elements: ArchylElement[]): DiagramNode[] {
+export function positionNodes(elements: C4Element[]): DiagramNode[] {
   const occupied = new Set<string>();
   const fixed: DiagramNode[] = [];
-  const missing: ArchylElement[] = [];
+  const missing: C4Element[] = [];
   for (const item of elements) {
     const point = item.position;
     const key = point && JSON.stringify([point.x, point.y]);
@@ -60,7 +60,7 @@ export function bounds(nodes: DiagramNode[]) {
   };
 }
 
-export function routeEdges(nodes: DiagramNode[], relationships: ArchylRelationship[]): DiagramEdge[] {
+export function routeEdges(nodes: DiagramNode[], relationships: C4Relationship[]): DiagramEdge[] {
   const byId = new Map(nodes.map(item => [item.id, item]));
   const count = new Map<string, number>();
   const edges: DiagramEdge[] = [];

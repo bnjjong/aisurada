@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARD_HEIGHT, CARD_WIDTH, measureEdge, placeLabels, positionNodes, routeEdges } from '../src/ui/archyl/layout.ts';
+import { CARD_HEIGHT, CARD_WIDTH, measureEdge, placeLabels, positionNodes, routeEdges } from '../src/ui/architecture/layout.ts';
 
 const points = [
   ['person', 0, 64], ['app', 478, 0], ['vault', 1140, -145],
