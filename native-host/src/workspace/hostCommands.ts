@@ -9,47 +9,47 @@ export interface HostCommandMap {
   begin_quit: { args?: Record<string, never>; result: void };
   cancel_quit: { args?: Record<string, never>; result: void };
   show_in_main: { args: { path?: string; rail?: string | null; sub?: string | null; id?: string }; result: void };
-  open_note_window: { args: { id: string }; result: void };
+  open_note_window: { args: { docId: string; title?: string; geometry?: unknown }; result: void };
   note_windows: { args?: Record<string, never>; result: string[] };
   close_note_windows: { args?: Record<string, never>; result: void };
   destroy_current_window: { args?: Record<string, never>; result: void };
   saved_note_windows: { args?: Record<string, never>; result: string[] };
-  restore_note_windows: { args: { ids: string[] }; result: void };
-  remember_note_window: { args: { id: string; geometry: unknown }; result: void };
+  restore_note_windows: { args: { docs: unknown[] }; result: string[] };
+  remember_note_window: { args: { geometry: unknown }; result: void };
 
   // 워크스페이스 및 볼트 관리
   allow_workspace: { args: { path: string }; result: void };
   vault_root: { args?: Record<string, never>; result: string | null };
-  is_workspace: { args: { path: string }; result: boolean };
-  create_workspace_dir: { args: { path: string }; result: void };
+  is_workspace: { args: { root: string }; result: boolean };
+  create_workspace_dir: { args: { parent: string; name: string }; result: string };
 
   // 엔진 및 사이드카
   engine_commands: { args?: Record<string, never>; result: string[] };
-  engine_call: { args: { request: unknown }; result: unknown };
+  engine_call: { args: { command: string; args?: unknown }; result: unknown };
   sidecar_call: { args: { request?: string[]; argv?: string[] }; result: unknown };
 
   // 파일 및 마크다운
   read_external_md: { args: { path: string }; result: string };
-  allow_external_images: { args: { mdPath: string; srcs: string[] }; result: void };
-  resolve_md_target: { args: { source: string; target: string }; result: string | null };
+  allow_external_images: { args: { mdPath: string; srcs: string[] }; result: number };
+  resolve_md_target: { args: { path: string; knownRoots?: string[] }; result: unknown };
   open_in_default_app: { args: { path: string }; result: void };
   open_external_path: { args: { path: string }; result: void };
   write_attachment_bytes: { args: { path: string; bytes: number[] }; result: void };
   read_drawio_attachment: { args: { path: string }; result: string };
   write_drawio_attachment: { args: { path: string; xml: string }; result: void };
   copy_dropped_attachment: { args: { source: string; target: string }; result: void };
-  announce_self_write: { args: { root: string }; result: void };
+  announce_self_write: { args: { root: string; relPath: string }; result: void };
 
   // GitHub 연동
   github_status: { args?: Record<string, never>; result: unknown };
   github_connect: { args: { appId: string; pemPath: string }; result: unknown };
   github_disconnect: { args?: Record<string, never>; result: unknown };
   github_repositories: { args?: Record<string, never>; result: unknown };
-  github_clone: { args: { repoFullName: string }; result: unknown };
+  github_clone: { args: { fullName: string }; result: unknown };
 
   // 알림 센터
   notifications_list: { args?: Record<string, never>; result: unknown[] };
-  notifications_push: { args: { expectedVault: string; item: unknown }; result: void };
+  notifications_push: { args: { item: unknown; expectedVault?: string }; result: void };
   notifications_mark_read: { args: { ids: string[] }; result: void };
   notifications_settings_get: { args?: Record<string, never>; result: unknown };
   notifications_settings_set: { args: { settings: unknown }; result: unknown };
@@ -65,7 +65,7 @@ export interface HostCommandMap {
 
   // 매니저 및 웹훅
   manager_webhook_secret: { args: { name: string; action: string }; result: string };
-  manager_test_webhook: { args: { name: string; url?: string; channel?: string }; result: { status: number; elapsed: number } };
+  manager_test_webhook: { args: { name: string; url: string; channel: string }; result: { status: number; elapsed: number } };
   manager_send_status: { args: { taskKey: string }; result: unknown };
 
   // Archyl
@@ -88,17 +88,17 @@ export interface HostCommandMap {
   // 시크릿 마스킹
   secret_table_probe: { args?: Record<string, never>; result: unknown };
   secret_table_status: { args?: Record<string, never>; result: unknown };
-  mask_scrollback: { args: { text: string }; result: string };
+  mask_scrollback: { args: { lines: string[] }; result: unknown };
   scan_text_shapes: { args: { text: string }; result: unknown };
 
   // AI 및 세션
   ask_claude: { args: unknown; result: unknown };
   ask_runtime: { args?: Record<string, never>; result: unknown };
-  cancel_ask: { args?: Record<string, never>; result: unknown };
+  cancel_ask: { args: { sessionId: string; askId?: string }; result: boolean };
   list_claude_agents: { args?: Record<string, never>; result: unknown };
   alive_pids: { args?: Record<string, never>; result: number[] };
-  held_agent_sessions: { args?: Record<string, never>; result: unknown };
-  release_agent_session: { args: { sessionKey: string }; result: unknown };
+  held_agent_sessions: { args?: { vault?: string }; result: string[] };
+  release_agent_session: { args?: { vault?: string; sessionId?: string }; result: unknown };
   write_session_image: { args: unknown; result: unknown };
   start_dictation: { args: unknown; result: unknown };
 }
@@ -121,5 +121,5 @@ export interface TypedHostCall {
       ? [args?: HostCommandMap[K]['args']]
       : [args: HostCommandMap[K]['args']]
   ): Promise<HostCommandMap[K]['result']>;
-  <T = unknown>(command: string, args?: Record<string, unknown>): Promise<T>;
+  <T = unknown>(command: Exclude<string, HostCommandName>, args?: Record<string, unknown>): Promise<T>;
 }

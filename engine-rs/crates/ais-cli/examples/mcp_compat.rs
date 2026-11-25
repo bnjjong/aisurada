@@ -183,6 +183,10 @@ fn main() -> ExitCode {
         .iter()
         .find_map(|a| a.strip_prefix("--bless="))
         .map(PathBuf::from);
+    if bless.is_some() && std::env::var("CI").is_ok() {
+        eprintln!("CI 환경에서는 --bless를 실행할 수 없습니다");
+        return ExitCode::from(2);
+    }
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     // 재생과 다시 적기(bless)는 기준 폴더(jar)가 필요 없다
     let dist: Option<&Path> = positional.first().map(|d| Path::new(d.as_str()));
@@ -393,7 +397,10 @@ fn main() -> ExitCode {
             println!("테이프 {}줄을 적었다", tape.recorded_len());
         }
         if tape.is_bless() && tape.blessed_len() > 0 {
-            println!("테이프 {}줄을 다시 받아 적었다", tape.blessed_len());
+            println!("테이프 {}줄을 다시 받아 적었다:", tape.blessed_len());
+            for item in tape.blessed_list() {
+                println!("  - {item}");
+            }
         }
     }
     if failures.is_empty() {

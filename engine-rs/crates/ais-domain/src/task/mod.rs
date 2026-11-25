@@ -146,8 +146,12 @@ impl RefKind {
     }
 
     pub fn parse(raw: &str) -> Option<RefKind> {
-        let v = raw.trim_matches(|c: char| c <= ' ').to_lowercase();
-        Self::ALL.into_iter().find(|k| k.as_str() == v)
+        match raw {
+            "note" => Some(RefKind::Note),
+            "github" => Some(RefKind::Github),
+            "slack" => Some(RefKind::Slack),
+            _ => None,
+        }
     }
 }
 
@@ -224,5 +228,23 @@ impl Task {
         self.extra.retain(|(key, _)| key != INTAKE_RECEIPT);
         self.extra
             .push((INTAKE_RECEIPT.into(), Value::Str(receipt.into())));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ref_kind_parse_exact_case() {
+        assert_eq!(RefKind::parse("note"), Some(RefKind::Note));
+        assert_eq!(RefKind::parse("github"), Some(RefKind::Github));
+        assert_eq!(RefKind::parse("slack"), Some(RefKind::Slack));
+
+        // 날 글자로 정확히 비교하므로 대문자나 공백은 거절된다
+        assert_eq!(RefKind::parse("GitHub"), None);
+        assert_eq!(RefKind::parse("NOTE"), None);
+        assert_eq!(RefKind::parse("slack "), None);
+        assert_eq!(RefKind::parse(" github"), None);
     }
 }
