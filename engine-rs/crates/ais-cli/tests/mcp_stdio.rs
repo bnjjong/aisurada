@@ -682,6 +682,10 @@ repos: [{"name":"shared","github":"demo/shared"}]
         "http://127.0.0.1:8644/webhooks/other-project"
     );
 
+    std::fs::write(
+        vault.join(".aisurada/agendas/other-duplicate.md"),
+        "---\nid: agfx000b-0000002f\nslug: other\ntitle: 겹치는 아젠다\nproject: other-project\n---\n",
+    ).unwrap();
     let switch = [("AISURADA_VAULT", other_vault.to_str().unwrap())];
     let run = |messages: &[Value]| {
         let (code, replies) =
@@ -750,6 +754,16 @@ repos: [{"name":"shared","github":"demo/shared"}]
     assert!(events["firstCall"].is_number());
     assert_eq!(events["events"].as_array().unwrap().len(), 12);
     assert!(!events.to_string().contains("기록에서 빼야 할"));
+    let summary = cli(&["manager", "dashboard", "--compact", "--summary"]);
+    let summary_history = &summary["items"][0]["history"];
+    assert_eq!(summary_history["events"], json!([]));
+    assert_eq!(summary_history["today"]["calls"], 12);
+    assert_eq!(summary_history["latestCall"], events["events"][0]);
+    assert_eq!(
+        cli(&["manager", "history", "hermes-demo"])["events"],
+        events["events"]
+    );
+
     assert_eq!(
         events["events"].as_array().unwrap().last().unwrap()["target"],
         task["key"]
@@ -773,7 +787,17 @@ repos: [{"name":"shared","github":"demo/shared"}]
         "tools": ["list_tasks"], "repos": ["demo/shared"], "agendas": [],
         "webhook": "http://127.0.0.1:8644/webhooks/demo-project",
     }));
-    std::fs::write(registry, serde_json::to_vec(&rows).unwrap()).unwrap();
+    let broken = json!({"name":"broken","tools":42});
+    rows.push(broken.clone());
+    std::fs::write(&registry, serde_json::to_vec(&rows).unwrap()).unwrap();
+    assert!(cli(&["manager", "dashboard", "--compact"])["registryIssue"].is_string());
+    assert!(
+        !cli(&["manager", "list"])
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["name"] == "broken")
+    );
     let (code, _) = converse(&vault, &["--manager", "legacy"], &[]);
     assert_eq!(
         code, 2,
@@ -782,12 +806,27 @@ repos: [{"name":"shared","github":"demo/shared"}]
     let migrated = cli(&["manager", "update", "legacy", "project=other-project"]);
     assert_eq!(migrated["project"], "other-project");
     assert_eq!(migrated["legacyKey"], true, "기존 키체인 계정을 이어 쓴다");
+    let persisted: Value = serde_json::from_slice(&std::fs::read(&registry).unwrap()).unwrap();
+    assert!(persisted.as_array().unwrap().contains(&broken));
     let (code, _) = converse(
         &vault,
         &["--manager", "legacy"],
         &[call(1, "list_tasks", json!({}))],
     );
     assert_eq!(code, 0);
+
+    std::fs::remove_file(&project_file).unwrap();
+    let rebound = cli(&[
+        "manager",
+        "update",
+        "hermes-demo",
+        "project=other-project",
+        "repos=demo/shared",
+        "agendas=[]",
+    ]);
+    assert_eq!(rebound["project"], "other-project");
+    assert_eq!(rebound["enabled"], false);
+    assert_eq!(rebound["notifyEnabled"], false);
 
     std::fs::remove_dir_all(vault).unwrap();
     std::fs::remove_dir_all(other_vault).unwrap();
@@ -1046,6 +1085,115 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
 }
 
 #[test]
+fn manager_escalates_third_question_and_expired_intake() {
+    use std::cell::Cell;
+
+    let vault = fixture("manager-intake-attention");
+    std::fs::write(
+        vault.join(".aisurada/projects/intake.md"),
+        "---\nid: pjfx100a-000000f1\nslug: intake\ntitle: Intake\nrepos: [{\"name\":\"shared\",\"github\":\"demo/shared\"}]\n---\n",
+    ).unwrap();
+    let start: i64 = 1_700_000_010_000;
+    let now = Cell::new(start);
+    let name = "hermes-intake";
+    let channel = "CDEMO123";
+    let cli = |args: &[&str]| {
+        let time = now.get().to_string();
+        let (status, output, error) = run_cli(&vault, &[("AISURADA_TEST_NOW", &time)], args);
+        assert_eq!(status, 0, "{error}");
+        serde_json::from_str::<Value>(&output).unwrap()
+    };
+    let mcp = |tool: &str, args: Value| {
+        let time = now.get().to_string();
+        let (status, replies) = converse_with(
+            &vault,
+            &["--manager", name],
+            &[("AISURADA_TEST_NOW", &time)],
+            &[call(1, tool, args)],
+        );
+        assert_eq!(status, 0);
+        tool_json(&replies[0])
+    };
+    cli(&[
+        "manager",
+        "add",
+        name,
+        "project=intake",
+        "repos=demo/shared",
+    ]);
+    let settings = json!({"channel":channel,"visibility":"public","label":"가상 채널",
+        "emoji":"ticket","markProcessed":true,"paused":false,"intervalMinutes":15});
+    cli(&["manager", "intake-channel", name, &settings.to_string()]);
+
+    let mut request = json!({
+        "channel":channel, "messageTs":"1700000000.000001",
+        "url":"https://demo.slack.com/archives/CDEMO123/p1700000000000001",
+        "reporter":"가상 제보자", "excerpt":"로그인 오류",
+        "result":"asked", "question":"재현 화면을 알려 주세요", "via":"desktop",
+    });
+    let first = mcp("record_intake", request.clone());
+    request["priorRevision"] = first["item"]["current"]["revision"].clone();
+    request["replyTs"] = json!("1700000001.000001");
+    let second = mcp("record_intake", request.clone());
+    assert_eq!(second["item"]["current"]["result"], "asked");
+    request["priorRevision"] = second["item"]["current"]["revision"].clone();
+    request["replyTs"] = json!("1700000002.000001");
+    let third = mcp("record_intake", request.clone());
+    assert_eq!(third["questionAccepted"], false);
+    assert_eq!(third["item"]["attention"]["reason"], "question_limit");
+    assert_eq!(
+        third["item"]["entry"]["history"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| event["result"] == "asked")
+            .count(),
+        2
+    );
+    let review = |payload: Value| cli(&["manager", "intake-review", name, &payload.to_string()]);
+    let ignored = review(json!({"id":third["item"]["entry"]["id"],
+        "revision":third["item"]["current"]["revision"],"result":"ignored"}));
+    assert_eq!(ignored["current"]["result"], "ignored");
+    assert!(ignored.get("attention").is_none());
+
+    let submitted = mcp(
+        "submit_intake",
+        json!({"source":{"kind":"telegram","key":"bot/chat/report"},
+        "reporter":"가상 제보자","excerpt":"다른 오류"}),
+    );
+    let asked = mcp(
+        "complete_intake",
+        json!({"entryId":submitted["item"]["entry"]["id"],
+        "priorRevision":submitted["item"]["current"]["revision"],
+        "outcome":{"result":"asked","question":"어떤 화면인가요?"}}),
+    );
+    let deadline = start + 3 * 24 * 60 * 60 * 1000;
+    now.set(deadline - 1);
+    let before = cli(&["manager", "intake", name]);
+    assert_eq!(before["waiting"], 1);
+    assert_eq!(before["attention"], json!([]));
+    now.set(deadline);
+    let expired = cli(&["manager", "intake", name]);
+    assert_eq!(expired["waiting"], 0);
+    assert_eq!(expired["attention"][0]["reason"], "no_answer");
+    assert_eq!(expired["attention"][0]["at"], deadline);
+    assert_ne!(before["rowsRevision"], expired["rowsRevision"]);
+    let payload = json!({"id":asked["item"]["entry"]["id"],"revision":asked["item"]["current"]["revision"],
+        "result":"created","task":{"title":"오류 수정","repo":"demo/shared","criteria":["오류가 사라진다"]}});
+    let accepted = review(payload.clone());
+    assert_eq!(accepted["current"]["result"], "created");
+    assert!(accepted.get("attention").is_none());
+    let key = accepted["entry"]["taskKey"].as_str().unwrap();
+    assert_eq!(review(payload)["entry"]["taskKey"], key);
+    assert_eq!(cli(&["get-task", key])["status"], "draft");
+    assert_eq!(
+        cli(&["manager", "intake-sources", key])[0]["id"],
+        asked["item"]["entry"]["id"]
+    );
+    std::fs::remove_dir_all(vault).unwrap();
+}
+
+#[test]
 fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1187,7 +1335,9 @@ fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     asked["replyTs"] = json!(reply);
     asked["priorRevision"] = question["item"]["current"]["revision"].clone();
     asked["taskKey"] = foreign["key"].clone();
-    rejected(own("record_intake", asked.clone()));
+    let denied = own("record_intake", asked.clone());
+    assert!(text(&denied).contains("태스크를 못 찾았다"));
+    rejected(denied);
     asked["taskKey"] = json!(task_key);
     let commented = mcp("record_intake", asked.clone());
     assert_eq!(

@@ -8,8 +8,8 @@ import type { TypedHostCall } from "../workspace/hostCommands.ts";
 
 export type HostCall = TypedHostCall;
 
-export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "manager" | "intake-question" | "test";
-export type EventKind = Exclude<NotifyKind, "test" | "intake-question">;
+export type NotifyKind = "question" | "pr" | "failed" | "done" | "approval" | "decision" | "manager" | "intake-question" | "intake-review" | "test";
+export type EventKind = Exclude<NotifyKind, "test" | "intake-question" | "intake-review">;
 
 export interface NotifyItem {
   id: string;
@@ -98,7 +98,7 @@ export const TOAST_MS = 8000;
 // ---------------------------------------------------------------- 읽기
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "decision", "manager", "intake-question", "test"]);
+const KINDS = new Set<string>(["question", "pr", "failed", "done", "approval", "decision", "manager", "intake-question", "intake-review", "test"]);
 
 /** 호스트 행을 알림으로 읽는다. 모양이 틀리면 null이다. */
 export function toItem(v: unknown): NotifyItem | null {
@@ -106,10 +106,13 @@ export function toItem(v: unknown): NotifyItem | null {
   const { id, kind, title } = v;
   if (typeof id !== "string" || !id || typeof kind !== "string" || !KINDS.has(kind) || typeof title !== "string") return null;
   const target = v.intake;
-  const intake = kind === "intake-question" && isRecord(target) && typeof target.manager === "string"
+  const intake = (kind === "intake-question" || kind === "intake-review")
+    && isRecord(target) && typeof target.manager === "string"
     && /^[a-z][a-z0-9-]{0,31}$/.test(target.manager) && typeof target.entry === "string"
-    && /^[CGD][A-Z0-9]{2,79}:\d{10}\.\d{6}$/.test(target.entry)
-    && typeof target.url === "string" && slackLink(target.url)
+    && typeof target.url === "string" && (
+      (/^[CGD][A-Z0-9]{2,79}:\d{10}\.\d{6}$/.test(target.entry) && slackLink(target.url))
+      || (kind === "intake-review" && /^intake-[0-9a-f]{16}$/.test(target.entry) && target.url === "")
+    )
     ? { manager: target.manager, entry: target.entry, url: target.url } : undefined;
   return {
     id,
@@ -271,7 +274,7 @@ export async function sendTest(call: HostCall): Promise<PushResult | null> {
 // ---------------------------------------------------------------- 표시
 
 export const kindLabel = (k: NotifyKind): string =>
-  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", decision: "정할 것", manager: "매니저", "intake-question": "되물음", test: "시험" })[k];
+  ({ question: "질문", pr: "리뷰", failed: "실패", done: "Done", approval: "승인", decision: "정할 것", manager: "매니저", "intake-question": "되물음", "intake-review": "제보 검토", test: "시험" })[k];
 
 /** 시험 알림의 배너 결과를 사람이 읽을 글로 푼다. */
 export function bannerMessage(banner: string): string {

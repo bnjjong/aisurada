@@ -18,6 +18,8 @@ export function TaskFormModal({
   call,
   existing,
   initialTitle = "",
+  initialBody = "",
+  create,
   repos,
   notes,
   close,
@@ -28,6 +30,8 @@ export function TaskFormModal({
   existing?: TaskDetail;
   /** 보드의 한 줄 입력에서 넘어온 요약 */
   initialTitle?: string;
+  initialBody?: string;
+  create?: (form: TaskForm) => Promise<TaskDetail>;
   repos: RepoChoice[];
   notes: NoteChoice[];
   close: () => void;
@@ -37,6 +41,7 @@ export function TaskFormModal({
     if (existing) return formFromTask(existing);
     const f = emptyTaskForm();
     f.title = initialTitle;
+    f.body = initialBody;
     f.criteria = [{ text: "", done: false }];
     // 저장소가 하나뿐이면 미리 골라 둔다
     if (repos.length === 1) {
@@ -60,7 +65,9 @@ export function TaskFormModal({
     setError("");
     setBusy(true);
     try {
-      const task = existing ? await updateTask(call, existing, cleaned(form)) : await createTask(call, cleaned(form));
+      const draft = cleaned(form);
+      const task = existing ? await updateTask(call, existing, draft)
+        : await (create ? create(draft) : createTask(call, draft));
       saved(task);
     } catch (err) {
       setError(explainError(err));

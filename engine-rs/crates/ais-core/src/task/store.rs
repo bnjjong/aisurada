@@ -159,16 +159,20 @@ pub fn find<'a>(scan: &'a Scan, reference: &str) -> Result<&'a Task, EngineError
     if KEY.is_match(r) {
         return scan
             .by_key(r)
-            .ok_or_else(|| EngineError::not_found(format!("태스크를 못 찾았다: {r}")));
+            .ok_or_else(|| task_not_found(r));
     }
     if format::ID.is_match(r) {
         return scan
             .by_id(r)
-            .ok_or_else(|| EngineError::not_found(format!("태스크를 못 찾았다: {r}")));
+            .ok_or_else(|| task_not_found(r));
     }
     Err(EngineError::invalid_argument(format!(
         "태스크 키(TSK-14)나 id(tk…) 모양이 아니다: {reference}"
     )))
+}
+
+pub(crate) fn task_not_found(reference: &str) -> EngineError {
+    EngineError::not_found(format!("태스크를 못 찾았다: {}", format::java_trim(reference)))
 }
 
 // ---------------------------------------------------------------- 만들기

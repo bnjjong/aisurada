@@ -3,7 +3,7 @@
 use crate::kernel::hue::{DEFAULT_HUE, is_hue};
 use crate::kernel::ids::AGENDA_ID;
 use crate::ports::fs;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::Skipped;
@@ -56,13 +56,6 @@ impl AgendaTable {
         {
             self.id_order.push(info.id.clone());
         }
-    }
-
-    pub(super) fn retain_project(&mut self, project: &str) {
-        self.slug_to_info.retain(|_, agenda| agenda.project.as_deref() == Some(project));
-        self.id_to_info.retain(|_, agenda| {
-            self.slug_to_info.get(&agenda.slug).is_some_and(|current| current.id == agenda.id)
-        });
     }
 
     pub fn has_slug(&self, slug: &str) -> bool {
@@ -125,7 +118,17 @@ fn skip(skipped: &mut Vec<Skipped>, path: &str, reason: &str) {
 
 /// `.aisurada/agendas/`를 훑습니다. 읽기 명령용입니다: 같은 slug에 다른 id가 있으면 표 전체를 비웁니다.
 pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
+    scan_agendas_with(vault_root, None)
+}
+
+pub(crate) fn scan_agendas_for_project(vault_root: &Path, project: &str) -> AgendaScan {
+    scan_agendas_with(vault_root, Some(project))
+}
+
+fn scan_agendas_with(vault_root: &Path, target: Option<&str>) -> AgendaScan {
     let mut scan = AgendaScan::default();
+    let mut seen = HashMap::new();
+    let mut ambiguous = HashSet::new();
     let dir = vault_root.join(".aisurada/agendas");
     let Ok(read_dir) = fs::read_dir(&dir) else {
         return scan;
@@ -193,6 +196,20 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
             continue;
         }
 
+        let project = kv
+            .get("project")
+            .map(|p| trim(p).to_string())
+            .filter(|p| is_valid_slug_segment(p));
+        if target.is_some() {
+            let (first_id, first_project) = seen.entry(slug.clone()).or_insert_with(|| (id.clone(), project.clone()));
+            if *first_id != id || *first_project != project {
+                ambiguous.insert(slug.clone());
+            }
+            if project.as_deref() != target {
+                continue;
+            }
+        }
+
         let title = match kv.get("title") {
             Some(v) if !is_blank(v) => trim(v).to_string(),
             _ => {
@@ -222,10 +239,6 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
             .get("repo")
             .map(|r| trim(r).to_string())
             .filter(|r| !r.is_empty());
-        let project = kv
-            .get("project")
-            .map(|p| trim(p).to_string())
-            .filter(|p| is_valid_slug_segment(p));
         let project_repo = kv
             .get("projectRepo")
             .map(|r| trim(r).to_string())
@@ -254,6 +267,10 @@ pub fn scan_agendas(vault_root: &Path) -> AgendaScan {
             project_repo,
             summary: trim(body).to_string(),
         });
+    }
+    if target.is_some() && ambiguous.iter().any(|slug| scan.table.has_slug(slug)) {
+        scan.table = AgendaTable::default();
+        scan.fatal.get_or_insert_with(|| EngineError::conflict("이 프로젝트에서 쓰는 아젠다 주소가 중복됐다"));
     }
     scan
 }

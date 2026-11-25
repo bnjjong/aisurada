@@ -12,7 +12,7 @@ import { dismissToast, kindLabel, markRead, useNotifications, visibleItems } fro
 import type { NotifyItem, NotifyKind } from "./notificationsStore.ts";
 import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 
-const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", manager: "접", "intake-question": "?", test: "i" };
+const GLYPH: Record<NotifyKind, string> = { question: "?", pr: "PR", failed: "!", done: "✓", approval: "승", decision: "정", manager: "접", "intake-question": "?", "intake-review": "!", test: "i" };
 
 /** 알림 종류를 나타내는 동그라미. 색은 종류가 정한다(`notifications.css`의 `.ntf-ico-*`). */
 function KindMark({ kind }: { kind: NotifyKind }) {
@@ -26,7 +26,7 @@ function KindMark({ kind }: { kind: NotifyKind }) {
 /** 알림 한 줄에 붙는 단추 이름. 질문은 「답하기」, 승인은 「승인하러 가기」, 결정 블록은 「답하러 가기」, 그 밖의 태스크 알림은 「태스크 보기」. */
 export const actionLabel = (item: Pick<NotifyItem, "kind" | "taskKey"> & Pick<Partial<NotifyItem>, "noteRef" | "intake">): string | null =>
   item.kind === "approval" ? "승인하러 가기" : item.kind === "decision" ? (item.noteRef ? "답하러 가기" : null)
-    : item.kind === "intake-question" ? (item.intake ? "원장 항목 보기" : null)
+    : (item.kind === "intake-question" || item.kind === "intake-review") ? (item.intake ? "원장 항목 보기" : null)
     : !item.taskKey ? null : item.kind === "question" ? "답하기" : "태스크 보기";
 
 /** 결정 블록 알림의 노트 참조(`노트id` 또는 `노트id/하위노트id`)를 화면 주소로 바꾼다. */
@@ -42,7 +42,7 @@ export const itemAddress = (item: Pick<NotifyItem, "kind" | "taskKey"> & Pick<Pa
     : item.taskKey ? taskAddress(item.taskKey) : null;
 
 function SlackAction({ item }: { item: NotifyItem }) {
-  if (!item.intake) return null;
+  if (!item.intake?.url) return null;
   const { url } = item.intake;
   return <a className="ntf-slack-link" href={url} target="_blank" rel="noreferrer" onClick={event => {
     if (!isTauri()) return;
@@ -112,7 +112,7 @@ export function NotificationPanel({
                   </p>
                 )}
                 {actionLabel(item) && (
-                  <button type="button" className={item.kind === "question" || item.kind === "decision" || item.kind === "intake-question" ? "button-primary" : ""} onClick={() => onOpen(item)}>
+                  <button type="button" className={item.kind === "question" || item.kind === "decision" || item.kind === "intake-question" || item.kind === "intake-review" ? "button-primary" : ""} onClick={() => onOpen(item)}>
                     {actionLabel(item)}
                   </button>
                 )}
@@ -235,7 +235,7 @@ export function ToastStack({ toasts, onDismiss, onOpen }: { toasts: NotifyItem[]
               </p>
             )}
             {actionLabel(item) && (
-              <button type="button" className={item.kind === "question" || item.kind === "decision" || item.kind === "intake-question" ? "button-primary" : ""} onClick={() => onOpen(item)}>
+              <button type="button" className={item.kind === "question" || item.kind === "decision" || item.kind === "intake-question" || item.kind === "intake-review" ? "button-primary" : ""} onClick={() => onOpen(item)}>
                 {actionLabel(item)}
               </button>
             )}

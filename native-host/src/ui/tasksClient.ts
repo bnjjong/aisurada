@@ -320,16 +320,24 @@ const detailOf = (out: unknown): TaskDetail => {
 };
 
 /** 만들기 인자. 완료 기준이 없으면 엔진이 거절한다(필수). 확인된 기준(done)은 만들 때 보내지 않는다. */
-export function createArgv(form: TaskForm): string[] {
-  const argv = ["create-task", `title=${form.title.trim()}`, `repo=${form.repo.trim()}`, `criteria=${JSON.stringify(form.criteria.map((c) => c.text.trim()).filter(Boolean))}`];
-  argv.push(`type=${form.type}`, `priority=${form.priority}`);
-  if (form.project) argv.push(`project=${form.project}`);
-  if (form.base.trim()) argv.push(`base=${form.base.trim()}`);
-  if (form.body.trim()) argv.push(`body=${form.body}`);
+export function createTaskInput(form: TaskForm) {
+  const base = form.base.trim();
   const labels = parseLabels(form.labelsText);
-  if (labels.length) argv.push(`labels=${JSON.stringify(labels)}`);
-  if (form.refs.length) argv.push(`refs=${JSON.stringify(form.refs.map(refForEngine))}`);
-  return argv;
+  return {
+    title: form.title.trim(), repo: form.repo.trim(),
+    criteria: form.criteria.map(c => c.text.trim()).filter(Boolean),
+    type: form.type, priority: form.priority,
+    ...(form.project ? { project: form.project } : {}),
+    ...(base ? { base } : {}),
+    ...(form.body.trim() ? { body: form.body } : {}),
+    ...(labels.length ? { labels } : {}),
+    ...(form.refs.length ? { refs: form.refs.map(refForEngine) } : {}),
+  };
+}
+
+export function createArgv(form: TaskForm): string[] {
+  return ["create-task", ...Object.entries(createTaskInput(form)).map(([key, value]) =>
+    key + "=" + (typeof value === "string" ? value : JSON.stringify(value)))];
 }
 
 const refForEngine = ({ kind, target, title, reporter, excerpt }: TaskRef) => ({

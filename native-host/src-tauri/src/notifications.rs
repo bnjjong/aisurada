@@ -18,7 +18,7 @@ use std::{
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 /// 알림 종류. 화면의 소식별 켜고 끄기가 이 이름을 쓴다. `test`는 설정의 「시험 알림」이다.
-pub const KINDS: [&str; 9] = [
+pub const KINDS: [&str; 10] = [
     "question",
     "pr",
     "failed",
@@ -27,6 +27,7 @@ pub const KINDS: [&str; 9] = [
     "decision",
     "manager",
     "intake-question",
+    "intake-review",
     "test",
 ];
 /// 목록에 두는 알림의 수. 넘으면 오래된 것부터 버린다.
@@ -182,7 +183,7 @@ pub fn route(settings: &Settings, kind: &str) -> Route {
         "approval" => settings.events.approval,
         "decision" => settings.events.decision,
         "manager" => settings.events.manager,
-        "intake-question" => Channel {
+        "intake-question" | "intake-review" => Channel {
             in_app: settings.events.manager.in_app,
             macos: false,
         },
@@ -313,18 +314,25 @@ pub fn build_item(new: NewItem, at: u64, seq: usize) -> Result<Item, String> {
         _ => None,
     };
     let intake = match (new.kind.as_str(), new.intake) {
-        ("intake-question", Some(target)) => {
+        (kind @ ("intake-question" | "intake-review"), Some(target)) => {
             let source = ais_domain::task::format::slack_thread(&target.url);
+            let slack =
+                source.is_some_and(|(channel, ts)| format!("{channel}:{ts}") == target.entry);
+            let direct = kind == "intake-review"
+                && target.url.is_empty()
+                && target.entry.strip_prefix("intake-").is_some_and(|id| {
+                    id.len() == 16 && id.bytes().all(|byte| byte.is_ascii_hexdigit())
+                });
             if !ais_core::valid_manager_name(&target.manager)
                 || target.url.len() > 512
-                || !source.is_some_and(|(channel, ts)| format!("{channel}:{ts}") == target.entry)
+                || !(slack || direct)
             {
                 return Err("알림이 가리키는 제보 항목을 확인할 수 없다".into());
             }
             Some(target)
         }
-        ("intake-question", None) | (_, Some(_)) => {
-            return Err("되물음 알림의 원장 항목을 지정한다".into())
+        ("intake-question" | "intake-review", None) | (_, Some(_)) => {
+            return Err("접수 알림의 원장 항목을 지정한다".into())
         }
         _ => None,
     };

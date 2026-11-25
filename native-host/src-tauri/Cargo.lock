@@ -79,6 +79,7 @@ dependencies = [
  "ais-domain",
  "ais-infra",
  "libc",
+ "security-framework",
  "serde",
  "serde_json",
 ]

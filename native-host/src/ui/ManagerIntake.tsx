@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { managerAddress, taskAddress } from "../navigation/routes.ts";
-import { channelId, channelLabel, intakeOriginalUrl, intakePostedAt, intakeResultLabel, intakeSourceLabel, resultLabel, slackEmoji, slackLink, slackMessageTime, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
+import { attentionLabel, channelId, channelLabel, intakeOriginalUrl, intakePostedAt, intakeResultLabel, intakeSourceLabel, resultLabel, slackEmoji, slackLink, slackMessageTime, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
 import { Modal } from "./Modal.tsx";
 import { SettingsSwitch } from "./SettingsParts.tsx";
-import type { TaskRef } from "./tasksClient.ts";
+import { createTaskInput, getTask, TITLE_MAX, type TaskRef } from "./tasksClient.ts";
+import { TaskFormModal } from "./TaskFormModal.tsx";
 import { eventTime, managerError, useManagers, type ManagerItem } from "./managersStore.tsx";
 
 const countLabels = ["오늘 접수", "새 태스크", "재제보 댓글", "되물음 대기", "무시"];
-const filters = ["all", "asked", "created", "commented", "ignored", "pending"] as const;
+const filters = ["all", "attention", "asked", "created", "commented", "ignored", "pending"] as const;
 type Filter = typeof filters[number];
 
 const time = (millis: number) => new Date(millis).toLocaleString("ko-KR", {
@@ -26,14 +27,17 @@ function IntakeOriginalLink({ url, controller, children }: { url: string; contro
 
 export function IntakeBadges({ item }: { item: ManagerItem }) {
   const intake = item.intake;
-  if (!intake || !item.manager.enabled || !(intake.waiting || intake.counts[0] || intake.stalledMinutes != null)) return null;
+  if (!intake) return null;
+  const attention = intake.attention?.length ?? 0;
+  if (!attention && (!item.manager.enabled || !(intake.waiting || intake.counts[0] || intake.stalledMinutes != null))) return null;
   const delayed = intake.channels.filter(channel => channel.stalledMinutes != null);
   return <div className="intake-badges">
     <div className="mgr-actions">
-      {intake.waiting > 0 && <span className="mgr-badge mgr-intake-warning">되물음 대기 {intake.waiting}</span>}
-      {intake.counts[0] > 0 && <span className="mgr-badge">오늘 접수 {intake.counts[0]}</span>}
+      {attention > 0 && <span className="mgr-badge is-error">내가 검토할 제보 {attention}</span>}
+      {item.manager.enabled && intake.waiting > 0 && <span className="mgr-badge mgr-intake-warning">되물음 대기 {intake.waiting}</span>}
+      {item.manager.enabled && intake.counts[0] > 0 && <span className="mgr-badge">오늘 접수 {intake.counts[0]}</span>}
     </div>
-    {delayed.length > 0 && <div>
+    {item.manager.enabled && delayed.length > 0 && <div>
       <div className="mgr-actions">{delayed.map(channel => <span key={channel.id} className="mgr-badge is-error">
         {channelLabel(channel)} · 확인 {channel.stalledMinutes}분째 없음
       </span>)}</div>
@@ -171,7 +175,7 @@ function EntryTimeline({ row }: { row: IntakeRow }) {
     timeline.push({
       id: event.revision, at: event.at, content: <>
         <strong>{intakeResultLabel(entry, event)}</strong> · {viaLabel[event.via]}{event.decision && <small>{event.decision}</small>}
-        {event !== current && event.question && <small>{event.question}</small>}
+        {(event.revision !== current.revision || row.attention) && event.question && <small>{event.question}</small>}
       </>,
     });
   }
@@ -180,11 +184,11 @@ function EntryTimeline({ row }: { row: IntakeRow }) {
   )}</ol>;
 }
 
-function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
+function EntryDrawer({ row, channel, controller, close, action, create, busy, error }: {
   row: IntakeRow; channel?: IntakeChannel; controller: WorkspaceController; close(): void;
-  action(result: "pending" | "ignored"): void; busy: boolean; error: string;
+  action(result: "pending" | "ignored"): void; create?: () => void; busy: boolean; error: string;
 }) {
-  const { entry, current } = row;
+  const { entry, current, attention } = row;
   const postedAt = intakePostedAt(entry);
   const originalUrl = intakeOriginalUrl(entry);
   const [copyStatus, setCopyStatus] = useState("");
@@ -198,7 +202,9 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
   };
   return <Modal title="원장 항목" close={close} className="mgr-modal intake-drawer" resizable={false}>
       <div className="intake-drawer-body">
-      <span className={`mgr-badge intake-result is-${current.result}`}>{intakeResultLabel(entry, current)}</span>
+      <span className={`mgr-badge intake-result is-${attention ? "attention" : current.result}`}>
+        {attention ? attentionLabel[attention.reason] : intakeResultLabel(entry, current)}
+      </span>
       <h2>{entry.excerpt.split("\n")[0] || `${intakeSourceLabel(entry)} 제보`}</h2>
       <blockquote className="intake-quote">
         <strong>{entry.reporter} · {channel ? channelLabel(channel) : intakeSourceLabel(entry)}{postedAt != null && ` · ${time(postedAt)}`}</strong>
@@ -213,18 +219,24 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
         </dd></>}
         <dt>매니저</dt><dd>{entry.manager} · {viaLabel[current.via]}</dd>
         {current.decision && <><dt>판단</dt><dd>{current.decision}</dd></>}
-        {current.question && <><dt>답글 초안</dt><dd>{current.question}
+        {!attention && current.question && <><dt>답글 초안</dt><dd>{current.question}
           <div className="mgr-actions intake-draft"><button type="button" onClick={() => void copyQuestion()}>초안 복사</button>
             {copyStatus && <small role="status">{copyStatus}</small>}</div></dd></>}
         {entry.taskKey && <><dt>태스크</dt><dd><button type="button" onClick={() => controller.navigate(taskAddress(entry.taskKey!))}>{entry.taskKey}</button></dd></>}
       </dl>
       <h3>처리 이력</h3>
       <EntryTimeline row={row} />
-      {current.result === "asked" && !entry.source && <p className="mgr-warning">스레드에 답이 오면 다음 확인 때 매니저가 다시 검토해요.</p>}
+      {attention && <p className="mgr-warning">{attention.reason === "no_answer"
+        ? "마지막 되물음에 3일 동안 답이 없어요. 내용을 확인하고 접수하거나 무시해 주세요."
+        : "같은 제보에 이미 두 번 질문했어요. 내용을 확인하고 접수하거나 무시해 주세요."}</p>}
+      {!attention && current.result === "asked" && !entry.source && <p className="mgr-warning">스레드에 답이 오면 다음 확인 때 매니저가 다시 검토해요.</p>}
       {error && <p role="alert" className="mgr-error">{error}</p>}
       <footer className="mgr-actions">
-        <button type="button" className="primary" disabled={busy || current.result === "pending"} onClick={() => action("pending")}>다시 처리</button>
-        <button type="button" disabled={busy || current.result === "ignored"} onClick={() => action("ignored")}>무시로 표시</button>
+        {attention
+          ? <button type="button" className="primary" disabled={busy || !create} onClick={create}>그냥 접수</button>
+          : <button type="button" className="primary" disabled={busy || current.result === "pending"} onClick={() => action("pending")}>다시 처리</button>}
+        <button type="button" disabled={busy || current.result === "ignored"} onClick={() => action("ignored")}>{attention ? "무시" : "무시로 표시"}</button>
+        {attention && !create && <small>권한 탭에서 접수할 저장소를 지정해 주세요.</small>}
         <small className="intake-entry-id">원장 ID <code>{entry.id}</code></small>
       </footer>
       </div>
@@ -239,6 +251,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(entryId);
+  const [creating, setCreating] = useState<IntakeRow>();
   const [rewind, setRewind] = useState<IntakeChannel | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -283,9 +296,12 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
   };
   const channelById = useMemo(() => new Map(channels.map(channel => [channel.id, channel])), [channels]);
   const search = query.trim().toLowerCase();
-  const shown = rows.filter(({ entry, current }) =>
-    (filter === "all" || filter === current.result) &&
-    (!search || [entry.excerpt, entry.reporter, entry.taskKey, entry.channel, intakeSourceLabel(entry)].some(value => value?.toLowerCase().includes(search))));
+  const resultOf = ({ attention, current }: IntakeRow) => attention ? "attention" : current.result;
+  const shown = rows.filter(row => {
+    const { entry } = row;
+    return (filter === "all" || filter === resultOf(row)) &&
+    (!search || [entry.excerpt, entry.reporter, entry.taskKey, entry.channel, intakeSourceLabel(entry)].some(value => value?.toLowerCase().includes(search)));
+  });
   const row = rows.find(item => item.entry.id === selected);
   return <div className="intake-stack">
     {!row && !rewind && error && <p role="alert" className="mgr-error">{error}</p>}
@@ -302,14 +318,14 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
       <div className="mgr-between intake-search">
         <nav className="mgr-chips" aria-label="접수 결과로 거르기">{filters.map(result =>
           <button type="button" key={result} aria-pressed={filter === result} onClick={() => setFilter(result)}>
-            {result === "all" ? "전체" : resultLabel[result]} {result === "all" ? rows.length : rows.filter(row => row.current.result === result).length}
+            {result === "all" ? "전체" : result === "attention" ? "내가 검토할 제보" : resultLabel[result]} {result === "all" ? rows.length : rows.filter(row => resultOf(row) === result).length}
           </button>)}</nav>
         <button type="button" onClick={() => void load().catch(reason => setError(managerError(reason)))}>새로고침</button>
         <input type="search" value={query} aria-label="접수 원장 검색" placeholder="원글·제보자·태스크 키" onChange={event => setQuery(event.target.value)} />
       </div>
       <div className="mgr-table-wrap"><table className="mgr-table intake-table">
         <thead><tr><th scope="col">시각</th><th scope="col">원글</th><th scope="col">결과</th><th scope="col">처리</th></tr></thead>
-        <tbody>{shown.map(({ entry, current, taskRepo, repeatCount }) => {
+        <tbody>{shown.map(({ entry, current, attention, taskRepo, repeatCount }) => {
           const open = () => { setError(""); setSelected(entry.id); };
           const postedAt = intakePostedAt(entry);
           return <tr key={entry.id} data-selected={selected === entry.id}
@@ -319,7 +335,9 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
               aria-haspopup="dialog">{entry.excerpt || `${intakeSourceLabel(entry)} 제보`}</button>
               <small>{entry.reporter}{entry.source && ` · ${intakeSourceLabel(entry)}`}{postedAt != null && ` · ${eventTime(postedAt)}`}{entry.reactionAdded && " · ✅"}</small></td>
             <td>
-              <span className={`mgr-badge intake-result is-${current.result}`}>{intakeResultLabel(entry, current)}{entry.taskKey && ` · ${entry.taskKey}`}</span>
+              <span className={`mgr-badge intake-result is-${attention ? "attention" : current.result}`}>
+                {attention ? attentionLabel[attention.reason] : intakeResultLabel(entry, current)}{entry.taskKey && ` · ${entry.taskKey}`}
+              </span>
               {taskRepo && <small>{taskRepo}</small>}
               {!!repeatCount && <small>재제보 {repeatCount}건</small>}
               {current.decision && <small className="intake-row-decision" title={current.decision}>{current.decision}</small>}
@@ -331,8 +349,30 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
       </table></div>
       {!shown.length && <p className="mgr-intro">{!data ? "원장을 읽는 중이에요." : rows.length ? "검색 조건에 맞는 제보가 없어요." : "원장에 기록한 제보가 없어요."}</p>}
     </section>
-    {row && <EntryDrawer row={row} channel={channelById.get(row.entry.channel)} controller={controller} close={() => { setSelected(undefined); setError(""); }}
-      busy={busy} error={error} action={result => void execute("intake-review", { id: row.entry.id, revision: row.current.revision, result })} />}
+    {row && !creating && <EntryDrawer key={row.entry.id} row={row} channel={channelById.get(row.entry.channel)} controller={controller} close={() => { setSelected(undefined); setError(""); }}
+      busy={busy} error={error} create={item.manager.repos.length ? () => setCreating(row) : undefined}
+      action={result => void execute("intake-review", { id: row.entry.id, revision: row.current.revision, result })} />}
+    {creating && <TaskFormModal
+      call={request => controller.callEngine(request)}
+      initialTitle={creating.entry.excerpt.split("\n")[0].slice(0, TITLE_MAX)}
+      initialBody={creating.entry.excerpt}
+      repos={item.manager.repos.map(repo => ({ repo, project: item.manager.project, label: repo }))}
+      notes={[]} close={() => setCreating(undefined)}
+      create={async form => {
+        const result = await controller.callEngine(["manager", "intake-review", name, JSON.stringify({
+          id: creating.entry.id, revision: creating.current.revision, result: "created", task: createTaskInput(form),
+        })]) as IntakeRow;
+        const key = result.entry.taskKey;
+        if (!key) throw new Error("원장에 연결된 태스크를 확인하지 못했어요.");
+        return getTask(request => controller.callEngine(request), key);
+      }}
+      saved={task => {
+        setCreating(undefined);
+        setSelected(undefined);
+        void refresh();
+        controller.navigate(taskAddress(task.key));
+      }}
+    />}
     {rewind && <RewindDialog channel={rewind} rows={rows} close={() => { setRewind(null); setError(""); }} busy={busy} error={error}
       save={messageTs => void execute("intake-rewind", { channel: rewind.id, messageTs, revision: rewind.revision }, () => setRewind(null))} />}
   </div>;

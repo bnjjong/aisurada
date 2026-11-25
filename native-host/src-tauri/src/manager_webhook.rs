@@ -12,11 +12,7 @@ use tauri::{Runtime, State, WebviewWindow};
 
 pub const EVENT: &str = "aisurada.task.status";
 #[cfg(target_os = "macos")]
-const KEYCHAIN_SERVICE: &str = "aisurada.manager.webhook";
-#[cfg(target_os = "macos")]
-const KEYCHAIN_ITEM_NOT_FOUND: i32 = -25300;
-#[cfg(target_os = "macos")]
-static KEYCHAIN_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+use manager::{KEYCHAIN_ITEM_NOT_FOUND, KEYCHAIN_SERVICE};
 
 #[derive(Debug)]
 pub enum DeliveryError {
@@ -64,10 +60,16 @@ fn active_manager<R: Runtime>(
 }
 
 #[cfg(target_os = "macos")]
-fn ensure_secret(manager: &manager::Manager, regenerate: bool) -> Result<Vec<u8>, String> {
-    let _write = KEYCHAIN_WRITE
-        .lock()
-        .map_err(|_| "키체인 작업을 완료하지 못했어요")?;
+fn ensure_secret(
+    env: &Env,
+    manager: &manager::Manager,
+    regenerate: bool,
+) -> Result<Vec<u8>, String> {
+    manager::with_current_registration(env, manager, || write_secret(manager, regenerate))
+}
+
+#[cfg(target_os = "macos")]
+fn write_secret(manager: &manager::Manager, regenerate: bool) -> Result<Vec<u8>, String> {
     if let Some(secret) = keychain_secret(manager)? {
         if !regenerate {
             return Ok(secret);
@@ -88,7 +90,11 @@ fn ensure_secret(manager: &manager::Manager, regenerate: bool) -> Result<Vec<u8>
 }
 
 #[cfg(not(target_os = "macos"))]
-fn ensure_secret(_manager: &manager::Manager, _regenerate: bool) -> Result<Vec<u8>, String> {
+fn ensure_secret(
+    _env: &Env,
+    _manager: &manager::Manager,
+    _regenerate: bool,
+) -> Result<Vec<u8>, String> {
     Err("서명 비밀은 macOS 키체인에 저장할 수 있어요".into())
 }
 
@@ -99,12 +105,12 @@ pub async fn manager_webhook_secret<R: Runtime>(
     name: String,
     action: String,
 ) -> Result<String, String> {
-    let (_, manager) = active_manager(&window, &state, &name)?;
+    let (env, manager) = active_manager(&window, &state, &name)?;
     tauri::async_runtime::spawn_blocking(move || {
         if !matches!(action.as_str(), "ensure" | "copy" | "rotate") {
             return Err("지원하지 않는 서명 비밀 작업이에요".into());
         }
-        let secret = ensure_secret(&manager, action == "rotate")?;
+        let secret = ensure_secret(&env, &manager, action == "rotate")?;
         let secret = String::from_utf8(secret).map_err(|_| "서명 비밀을 글자로 읽지 못했어요")?;
         if action == "copy" {
             Ok(secret)
@@ -137,8 +143,11 @@ pub async fn manager_test_webhook<R: Runtime>(
     if !slack_channel_id(&channel) {
         return Err("시험 알림을 받을 Slack 채널 ID를 적어 주세요".into());
     }
+    if !manager.allows_slack_channel(&channel) {
+        return Err("매니저의 연결 탭에서 등록한 Slack 채널을 골라 주세요".into());
+    }
     tauri::async_runtime::spawn_blocking(move || {
-        let secret = ensure_secret(&manager, false)?;
+        let secret = ensure_secret(&env, &manager, false)?;
         let id = delivery_id(&format!("test:{}:{:?}", manager.name, SystemTime::now()));
         let payload = json!({
             "event_type": EVENT, "channel": channel, "thread_id": "", "status": "test",

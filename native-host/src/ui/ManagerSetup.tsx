@@ -4,7 +4,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import { Confirm, Modal } from "./Modal.tsx";
 import { SettingsSwitch } from "./SettingsParts.tsx";
 import {
-  belongsTo, eventName, eventTime, kindLabel, managerError, useManagers, webhookEvent, writeTools,
+  belongsTo, eventName, eventTime, kindLabel, latestSuccess, managerError, useManagers, writeTools,
   type ManagerConfig, type ManagerDashboard, type ManagerItem, type ManagerKind, type ManagerProject,
 } from "./managersStore.tsx";
 
@@ -85,9 +85,23 @@ export const configText = (config: McpConfig, kind: ManagerKind, name: string) =
 };
 
 // WebKit는 클릭을 처리하는 동안 복사를 시작해야 한다. 호스트에서 받을 값은 항목에 약속으로 넘긴다.
-function copyFromHost(text: Promise<string>) {
+async function copyFromHost(text: Promise<string>) {
   const content = text.then(value => new Blob([value], { type: "text/plain" }));
-  return navigator.clipboard.write([new ClipboardItem({ "text/plain": content })]);
+  void content.catch(() => {});
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "text/plain": content })]);
+  } catch {
+    await text;
+    throw new Error("클립보드에 복사하지 못했어요. 다시 시도해 주세요.");
+  }
+}
+
+async function checkNotificationSetup(form: ManagerConfig, controller: WorkspaceController) {
+  if (!form.notifyEnabled) return;
+  if (!form.webhook?.trim() || !form.notify.length) {
+    throw new Error("웹훅 주소와 알릴 상태를 골라 주세요.");
+  }
+  await controller.callHost("manager_webhook_secret", { name: form.name, action: "ensure" });
 }
 
 export function copyManagerConfig(controller: WorkspaceController, manager: ManagerConfig) {
@@ -104,7 +118,7 @@ export function ManagerConnection({ form, history, controller, update }: {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const first = history?.firstCall;
-  const last = history?.events.find(event => !webhookEvent(event) && event.result === "ok");
+  const last = latestSuccess(history);
   const profile = form.name;
 
   useEffect(() => {
@@ -132,7 +146,7 @@ export function ManagerConnection({ form, history, controller, update }: {
     {config && <div className="mgr-code">
       <button type="button" onClick={async () => {
         try { await navigator.clipboard.writeText(configText(config, format, form.name)); setMessage("설정을 복사했어요."); }
-        catch (e) { setError(managerError(e)); }
+        catch { setError("클립보드에 복사하지 못했어요. 아래 설정을 선택해 복사해 주세요."); }
       }}>복사</button>
       <pre>{configText(config, format, form.name)}</pre>
     </div>}
@@ -154,7 +168,9 @@ export function ManagerNotifications({ form, controller, update }: {
   form: ManagerConfig; controller: WorkspaceController; update: Update;
 }) {
   const [masked, setMasked] = useState("");
-  const [channel, setChannel] = useState(() => form.slackChannels.find(value => channelId.test(value)) ?? "");
+  const channels = [...new Set(form.slackChannels.filter(value => channelId.test(value)))];
+  const [channel, setChannel] = useState(() => channels[0] ?? "");
+  const testChannel = channels.includes(channel) ? channel : channels[0] ?? "";
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
@@ -206,9 +222,14 @@ export function ManagerNotifications({ form, controller, update }: {
         </div>
       </Choices>
       <div className="mgr-actions mgr-test">
-        <label className="mgr-label">시험 알림을 받을 Slack 채널 ID<input value={channel} placeholder="C0123456789" onChange={event => setChannel(event.target.value.trim())} /></label>
-        <button type="button" disabled={working || !form.webhook || !masked || !channelId.test(channel)} onClick={() => void act(async () => {
-          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, url: form.webhook?.trim(), channel });
+        <label className="mgr-label">시험 알림을 받을 Slack 채널
+          <select value={testChannel} onChange={event => setChannel(event.target.value)} disabled={!channels.length}>
+            {!channels.length && <option value="">연결 탭에서 채널을 등록해 주세요</option>}
+            {channels.map(id => <option value={id} key={id}>{id}</option>)}
+          </select>
+        </label>
+        <button type="button" disabled={working || !form.webhook || !masked || !testChannel} onClick={() => void act(async () => {
+          const answer = await controller.callHost<{status: number; elapsed: number}>("manager_test_webhook", { name: form.name, url: form.webhook?.trim(), channel: testChannel });
           setText(`보냈어요 · HTTP ${answer.status} · ${answer.elapsed}ms`);
           await refresh();
         })}>시험 알림 보내기</button>
@@ -277,7 +298,7 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
     const project = initialProject ?? (source ? projects.find(item => !belongsTo(source, item) && item.repos.length)?.slug : undefined) ?? "";
     const kind = template?.kind ?? "hermes";
     return {
-      kind, project, enabled: migrate?.enabled ?? !source,
+      kind, project, enabled: migrate?.project ? false : migrate?.enabled ?? !source,
       label: template?.label ?? "Hermes",
       name: migrate?.name ?? suggestedName(kind, project, data.names),
       tools: template?.tools ?? data.defaultTools,
@@ -312,7 +333,8 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
     const args = registered || migrate ? ["update", form.name] : source ? ["copy", source.name, form.name] : ["add", form.name];
     const webhook = form.webhook ?? webhookFor(form.name, source);
     const newSettings = { ...form, webhook, notifyEnabled: false };
-    await controller.callEngine(["manager", ...args, `project=${form.project}`, `enabled=${form.enabled}`, ...settings(newSettings)]);
+    await controller.callEngine(["manager", ...args,
+      ...(registered ? [] : [`project=${form.project}`]), `enabled=${form.enabled}`, ...settings(newSettings)]);
     update({ webhook });
     setRegistered(true);
     await refresh();
@@ -320,9 +342,7 @@ export function ManagerSetup({ controller, data, projects, initialProject, sourc
   });
   const save = (skip = false) => work(async () => {
     const next = { ...form, webhook: form.webhook?.trim() || null };
-    if (!skip && next.notifyEnabled && (!next.webhook || !next.notify.length)) {
-      throw new Error("웹훅 주소와 알릴 상태를 골라 주세요.");
-    }
+    if (!skip) await checkNotificationSetup(next, controller);
     await controller.callEngine(["manager", "update", form.name, ...(skip ? ["notifyEnabled=false"] : settings(next))]);
     await refresh();
     opened(form.name);
@@ -414,9 +434,7 @@ export function ManagerEditor({ controller, item, project, data, tab }: {
       tab === "connection" ? [`slackChannels=${JSON.stringify(form.slackChannels.map(value => value.trim()).filter(Boolean))}`] :
         [`webhook=${form.webhook?.trim() || ""}`, `notify=${form.notify.join(",")}`, `notifyEnabled=${form.notifyEnabled}`];
     try {
-      if (tab === "notifications" && form.notifyEnabled && (!form.webhook?.trim() || !form.notify.length)) {
-        throw new Error("웹훅 주소와 알릴 상태를 골라 주세요.");
-      }
+      if (tab === "notifications") await checkNotificationSetup(form, controller);
       await controller.callEngine(["manager", "update", form.name, ...patch]);
       await refresh();
       setMessage("저장했어요.");

@@ -44,6 +44,8 @@ struct Pending {
     first_attempt_at: Option<u64>,
     #[serde(default)]
     next_attempt_at: u64,
+    #[serde(default)]
+    in_flight: bool,
 }
 
 #[derive(Default, Deserialize, PartialEq, Serialize)]
@@ -125,6 +127,7 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
                             registration: configured.registration().into(),
                             first_attempt_at: None,
                             next_attempt_at: 0,
+                            in_flight: false,
                         });
                     }
                     _ => {}
@@ -152,19 +155,30 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
         .iter()
         .position(|item| tasks.insert(&item.task_id) && item.next_attempt_at <= now);
     if let Some(index) = due {
-        if next.pending[index].first_attempt_at.is_none() {
-            next.pending[index].first_attempt_at = Some(now);
-            let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
-            store::write_atomic(&path, &bytes)?;
-        }
-        let mut item = next.pending.remove(index).expect("대기열에서 확인한 항목");
-        let deadline = item
+        let pending = &next.pending[index];
+        let deadline = pending
             .first_attempt_at
             .unwrap_or(now)
             .saturating_add(RETRY_WINDOW_MS);
-        if now >= deadline {
+        if pending.in_flight {
+            let item = next.pending.remove(index).expect("대기열에서 확인한 항목");
+            let env = Env::from_process();
+            if let Ok(manager) = delivery_manager(ctx, &env, &item) {
+                record_result(&env, &manager, &item, Some(
+                    "알림을 보내는 중 앱이 멈췄어요. Slack 스레드에서 전달 여부를 확인해 주세요.",
+                ));
+            }
+        } else if now >= deadline {
+            let item = next.pending.remove(index).expect("대기열에서 확인한 항목");
             record_expired(ctx, &item);
         } else {
+            let pending = &mut next.pending[index];
+            pending.first_attempt_at.get_or_insert(now);
+            pending.in_flight = true;
+            let bytes = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
+            store::write_atomic(&path, &bytes)?;
+
+            let mut item = next.pending.remove(index).expect("대기열에서 확인한 항목");
             let result = deliver_and_record(ctx, &item, false);
             if matches!(
                 result,
@@ -179,6 +193,7 @@ pub(super) fn poll(ctx: &Ctx) -> Result<(), String> {
                     item.id = delivery_id(&format!("{}:{}", item.id, item.attempts));
                 }
                 item.next_attempt_at = now.saturating_add(delay).min(deadline);
+                item.in_flight = false;
                 next.pending.insert(index, item);
             }
         }
@@ -312,7 +327,7 @@ fn attempt_delivery(
         .call(&argv)
         .map_err(|_| DeliveryError::Retry { rejected: false })?;
     let (channel, thread) = slack_source(&task).ok_or(DeliveryError::NoSlackSource)?;
-    if !manager.enabled || manager.scope().is_none() {
+    if !manager.enabled || !manager.allows_slack_channel(&channel) {
         return Err(DeliveryError::Unavailable);
     }
     let url = if manual && manager.notify_enabled {
@@ -379,6 +394,7 @@ pub(super) fn send_current(ctx: &Ctx, key: &str) -> Result<(), String> {
         registration: String::new(),
         first_attempt_at: None,
         next_attempt_at: 0,
+        in_flight: false,
     };
     deliver_and_record(ctx, &item, true)
         .map(|_| ())

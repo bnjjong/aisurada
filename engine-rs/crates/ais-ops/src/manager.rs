@@ -1,6 +1,7 @@
 //! 기기의 매니저 등록과 프로젝트 범위, 호출 기록을 관리한다.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
@@ -10,7 +11,7 @@ use ais_core::{CallContext, ManagerContext, valid_manager_name};
 use ais_domain::task::format;
 use ais_infra::ports::{clock, fs, ids};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{Value, json, value::RawValue};
 
 use crate::{
     Outcome,
@@ -42,6 +43,12 @@ pub const OPTIONAL_TOOLS: [&str; 7] = [
     "list_comments",
     "list_decisions",
 ];
+#[cfg(target_os = "macos")]
+pub const KEYCHAIN_SERVICE: &str = "aisurada.manager.webhook";
+#[cfg(target_os = "macos")]
+pub const KEYCHAIN_ITEM_NOT_FOUND: i32 = -25300;
+
+const VISIBLE_EVENTS: usize = 50;
 const DEFAULT_STATES: [&str; 4] = ["ready-for-develop", "in-review", "done", "failed"];
 pub const NOTIFY_STATES: [&str; 6] = [
     "ready-for-develop",
@@ -137,6 +144,7 @@ impl Manager {
             && self.vault == other.vault
             && self.project == other.project
             && self.project_id == other.project_id
+            && self.legacy_key == other.legacy_key
     }
 
     pub fn registration(&self) -> &str {
@@ -144,11 +152,15 @@ impl Manager {
     }
 
     pub fn keychain_account(&self) -> String {
-        if self.legacy_key {
+        if self.legacy_key || self.legacy() {
             self.name.clone()
         } else {
             format!("{}/{}", self.name, self.registration)
         }
+    }
+
+    pub fn allows_slack_channel(&self, channel: &str) -> bool {
+        self.slack_channels.iter().any(|allowed| allowed == channel)
     }
 
     pub fn webhook_for_status(&self, status: &str) -> Option<&str> {
@@ -344,22 +356,49 @@ fn canonical_vault(env: &Env) -> Result<String, String> {
         .map_err(|_| "vault 경로가 UTF-8이 아니다".into())
 }
 
-pub fn list(env: &Env) -> Result<Vec<Manager>, String> {
+#[derive(Default)]
+struct Registry {
+    managers: Vec<Manager>,
+    unreadable: Vec<Box<RawValue>>,
+    names: BTreeMap<String, usize>,
+}
+
+fn read_registry(env: &Env) -> Result<Registry, String> {
     let bytes = match fs::read(folder(env)?.join("managers.json")) {
         Ok(bytes) => bytes,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Registry::default()),
         Err(error) => return Err(format!("매니저 등록부를 읽지 못했다: {error}")),
     };
-    let managers: Vec<Manager> = serde_json::from_slice(&bytes)
+    let rows: Vec<Box<RawValue>> = serde_json::from_slice(&bytes)
         .map_err(|error| format!("매니저 등록부를 읽지 못했다: {error}"))?;
-    let mut names = HashSet::new();
-    for manager in &managers {
-        manager.validate()?;
-        if !names.insert(&manager.name) {
-            return Err(format!("등록부에 이름이 중복됐다: {}", manager.name));
+    let mut registry = Registry::default();
+    let rows: Vec<_> = rows
+        .into_iter()
+        .map(|row| {
+            let manager = serde_json::from_str::<Manager>(row.get()).ok();
+            let name = manager.as_ref().map(|item| item.name.clone()).or_else(|| {
+                let value: Value = serde_json::from_str(row.get()).ok()?;
+                Some(value.get("name")?.as_str()?.to_owned())
+            });
+            if let Some(name) = name.as_ref().filter(|name| valid_manager_name(name)) {
+                *registry.names.entry(name.clone()).or_default() += 1;
+            }
+            (row, manager)
+        })
+        .collect();
+    for (row, manager) in rows {
+        match manager {
+            Some(item) if item.validate().is_ok() && registry.names[&item.name] == 1 => {
+                registry.managers.push(item);
+            }
+            _ => registry.unreadable.push(row),
         }
     }
-    Ok(managers)
+    Ok(registry)
+}
+
+pub fn list(env: &Env) -> Result<Vec<Manager>, String> {
+    Ok(read_registry(env)?.managers)
 }
 
 pub fn find(env: &Env, name: &str) -> Result<Manager, String> {
@@ -367,6 +406,19 @@ pub fn find(env: &Env, name: &str) -> Result<Manager, String> {
         .into_iter()
         .find(|row| row.name == name)
         .ok_or_else(|| format!("등록되지 않은 매니저다: {name}"))
+}
+
+#[cfg(target_os = "macos")]
+pub fn with_current_registration<T>(
+    env: &Env,
+    manager: &Manager,
+    use_registration: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
+    let _lock = acquire_lock(&folder(env)?).map_err(|error| error.to_string())?;
+    if !find(env, &manager.name)?.same_registration(manager) {
+        return Err("매니저 등록이 바뀌었어요. 설정을 다시 열어 주세요".into());
+    }
+    use_registration()
 }
 
 pub fn find_enabled(env: &Env, name: &str) -> Result<Manager, String> {
@@ -484,7 +536,7 @@ fn registration_id() -> String {
     )
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     at: u64,
@@ -596,9 +648,55 @@ fn record_event(
     write_atomic(&path, &bytes).map_err(|error| error.to_string())
 }
 
-fn dashboard(env: &Env, managers: &[Manager], include_work: bool) -> Result<Value, String> {
+#[derive(Default, Serialize)]
+struct DailyCalls {
+    calls: usize,
+    notes: usize,
+    rejected: usize,
+    sent: usize,
+}
+
+fn compact_history(history: &History) -> Value {
+    let is_delivery =
+        |event: &Event| matches!(event.tool.as_str(), "status_webhook" | "test_webhook");
+    let today = clock().local_clock(clock().now_millis()).date;
+    let mut counts = DailyCalls::default();
+    for event in &history.events {
+        if clock().local_clock(event.at as i64).date != today {
+            continue;
+        }
+        counts.calls += usize::from(!is_delivery(event));
+        counts.rejected += usize::from(event.result == "rejected");
+        if event.result == "ok" {
+            match event.tool.as_str() {
+                "create_doc" => counts.notes += 1,
+                "status_webhook" => counts.sent += 1,
+                _ => {}
+            }
+        }
+    }
+    let mut revision = DefaultHasher::new();
+    history.events[..history.events.len().min(VISIBLE_EVENTS)].hash(&mut revision);
+    json!({
+        "firstCall": history.first_call,
+        "events": [],
+        "revision": format!("{:016x}", revision.finish()),
+        "latestCall": history.events.iter().find(|event| !is_delivery(event)),
+        "latestSuccess": history.events.iter().find(|event| !is_delivery(event) && event.result == "ok"),
+        "latestWebhook": history.events.iter().find(|event| is_delivery(event)),
+        "today": counts,
+    })
+}
+
+fn dashboard(
+    env: &Env,
+    registry: &Registry,
+    include_work: bool,
+    compact: bool,
+) -> Result<Value, String> {
     let vault = canonical_vault(env)?;
-    let registrations: Vec<_> = managers
+    let registrations: Vec<_> = registry
+        .managers
         .iter()
         .filter(|item| item.legacy() || item.vault == vault)
         .map(|item| {
@@ -633,14 +731,19 @@ fn dashboard(env: &Env, managers: &[Manager], include_work: bool) -> Result<Valu
             let intake = issue.is_none()
                 .then(|| item.intake(IntakeOperation::Get, CallContext::app(), json!({"summary": true})));
             let intake_issue = intake.as_ref().and_then(|result| result.as_ref().err()).map(ToString::to_string);
-            json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history.unwrap_or_default(),
+            let history = history.unwrap_or_default();
+            let history = if compact { compact_history(&history) } else { json!(history) };
+            json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history,
                 "work": work.as_ref().and_then(|counts| counts.get(&item.name)), "workIssue": work_issue,
                 "intake": intake.and_then(Result::ok), "intakeIssue": intake_issue})
         })
         .collect();
     Ok(json!({
         "items": items,
-        "names": managers.iter().map(|item| &item.name).collect::<Vec<_>>(),
+        "names": registry.names.keys().collect::<Vec<_>>(),
+        "registryIssue": (!registry.unreadable.is_empty()).then(|| format!(
+            "매니저 등록부에서 확인이 필요한 항목이 {}개 있어요.", registry.unreadable.len()
+        )),
         "defaultTools": DEFAULT_TOOLS,
         "optionalTools": OPTIONAL_TOOLS,
         "defaultNotify": DEFAULT_STATES,
@@ -658,19 +761,26 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     } else {
         None
     };
-    let mut managers = list(env)?;
+    let mut registry = read_registry(env)?;
     match args {
-        [action] if action == "list" => return Ok(json!(managers)),
-        [action] if action == "dashboard" => return dashboard(env, &managers, true),
-        [action, option] if action == "dashboard" && option == "--summary" => {
-            return dashboard(env, &managers, false);
+        [action] if action == "list" => return Ok(json!(registry.managers)),
+        [action, flags @ ..] if action == "dashboard" => {
+            if flags
+                .iter()
+                .any(|flag| !matches!(flag.as_str(), "--summary" | "--compact"))
+            {
+                return Err("dashboard 옵션으로 --summary 또는 --compact를 지정한다".into());
+            }
+            let include_work = !flags.iter().any(|flag| flag == "--summary");
+            let compact = flags.iter().any(|flag| flag == "--compact");
+            return dashboard(env, &registry, include_work, compact);
         }
         _ => {}
     }
     let [action, name, options @ ..] = args else {
         return Err(concat!(
             "ais-cli manager 사용법\n",
-            "  list | dashboard [--summary] | add NAME project=… […] | update NAME […]\n",
+            "  list | dashboard [--summary] [--compact] | history NAME | add NAME project=… […] | update NAME […]\n",
             "  enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME\n",
             "  intake NAME [JSON] | intake-channel NAME JSON | intake-rewind NAME JSON\n",
             "  intake-review NAME JSON | intake-sources TASK"
@@ -686,6 +796,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
             )
             .map_err(|error| error.to_string());
     }
+    let managers = &mut registry.managers;
     let operation = match action.as_str() {
         "intake" => Some(IntakeOperation::Get),
         "intake-channel" => Some(IntakeOperation::Configure),
@@ -723,7 +834,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
             .intake(operation, CallContext::app(), payload)
             .map_err(|error| error.to_string())?;
         if added {
-            save_registry(&folder, &managers)?;
+            save_registry(&folder, &registry)?;
         }
         return Ok(result);
     }
@@ -731,16 +842,26 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     let missing = || format!("등록되지 않은 매니저다: {name}");
     let updated = match (action.as_str(), existing, options) {
         ("config", Some(i), []) => return managers[i].config(&env.exe),
-        ("add", None, options) => {
+        ("history", Some(i), []) => {
+            let item = &managers[i];
+            if !item.legacy() && !item.in_vault(&canonical_vault(env)?) {
+                return Err("현재 작업 폴더에 등록된 매니저의 호출 기록만 볼 수 있다".into());
+            }
+            let mut history =
+                history(env, item).map_err(|_| "매니저 호출 기록을 읽을 수 없어요")?;
+            history.events.truncate(VISIBLE_EVENTS);
+            return Ok(json!(history));
+        }
+        ("add", None, options) if !registry.names.contains_key(name) => {
             let mut item = Manager::new(name);
             set_options(&mut item, options)?;
             bind(&mut item, env)?;
             managers.push(item.clone());
             item
         }
-        ("add", Some(_), _) => return Err(format!("이미 등록된 매니저다: {name}")),
+        ("add", _, _) => return Err(format!("이미 등록된 매니저다: {name}")),
         ("copy", Some(i), [new_name, options @ ..]) => {
-            if managers.iter().any(|item| &item.name == new_name) {
+            if registry.names.contains_key(new_name) {
                 return Err(format!("이미 등록된 매니저다: {new_name}"));
             }
             let item = copy_manager(&managers[i], new_name, options, env)?;
@@ -755,6 +876,15 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
                 item.registration = registration_id();
                 item.legacy_key = true;
                 bind(item, env)?;
+            } else if previous.scope().is_none()
+                && options.iter().any(|arg| arg.starts_with("project="))
+            {
+                if !previous.in_vault(&canonical_vault(env)?) {
+                    return Err("현재 작업 폴더에 등록된 매니저만 관리할 수 있다".into());
+                }
+                bind(item, env)?;
+                item.enabled = false;
+                item.notify_enabled = false;
             } else {
                 if item.project != previous.project {
                     return Err("프로젝트를 바꾸려면 다른 프로젝트로 복사해 주세요".into());
@@ -787,16 +917,72 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
         _ => return Err(format!("매니저 명령의 인자를 확인해 주세요: {action}")),
     };
     updated.validate()?;
-    save_registry(&folder, &managers)?;
-    if action == "remove" && !updated.legacy() {
-        let _ = fs::remove_file(history_path(env, &updated)?);
+    if action == "remove" {
+        remove_registration(&folder, &registry, &updated)?;
+        if !updated.legacy() {
+            let _ = fs::remove_file(history_path(env, &updated)?);
+        }
+    } else {
+        save_registry(&folder, &registry)?;
     }
     Ok(json!(updated))
 }
 
-fn save_registry(folder: &Path, managers: &[Manager]) -> Result<(), String> {
-    let bytes = serde_json::to_vec_pretty(managers).map_err(|error| error.to_string())?;
+fn save_registry(folder: &Path, registry: &Registry) -> Result<(), String> {
+    #[derive(Serialize)]
+    #[serde(untagged)]
+    enum Row<'a> {
+        Valid(&'a Manager),
+        Unreadable(&'a RawValue),
+    }
+    let rows: Vec<_> = registry
+        .managers
+        .iter()
+        .map(Row::Valid)
+        .chain(registry.unreadable.iter().map(|row| Row::Unreadable(row)))
+        .collect();
+    let bytes = serde_json::to_vec_pretty(&rows).map_err(|error| error.to_string())?;
     write_atomic(&folder.join("managers.json"), &bytes).map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn remove_registration(
+    folder: &Path,
+    registry: &Registry,
+    manager: &Manager,
+) -> Result<(), String> {
+    use security_framework::passwords::{
+        delete_generic_password, get_generic_password, set_generic_password,
+    };
+
+    let account = manager.keychain_account();
+    let secret = match get_generic_password(KEYCHAIN_SERVICE, &account) {
+        Ok(secret) => secret,
+        Err(error) if error.code() == KEYCHAIN_ITEM_NOT_FOUND => {
+            return save_registry(folder, registry);
+        }
+        Err(error) => return Err(format!("키체인에서 서명 비밀을 확인하지 못했어요. {error}")),
+    };
+    delete_generic_password(KEYCHAIN_SERVICE, &account)
+        .map_err(|error| format!("키체인의 서명 비밀을 지우지 못했어요. {error}"))?;
+    if let Err(error) = save_registry(folder, registry) {
+        if let Err(restore) = set_generic_password(KEYCHAIN_SERVICE, &account, &secret) {
+            return Err(format!(
+                "{error}. 키체인의 서명 비밀도 복원하지 못했어요. {restore}"
+            ));
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn remove_registration(
+    folder: &Path,
+    registry: &Registry,
+    _manager: &Manager,
+) -> Result<(), String> {
+    save_registry(folder, registry)
 }
 
 pub fn run(args: &[String], env: &Env) -> Outcome {

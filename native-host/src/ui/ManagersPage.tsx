@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { Workspace } from "../workspace/types.ts";
 import { managerAddress, managersAddress, projectAddress } from "../navigation/routes.ts";
@@ -10,14 +10,13 @@ import { SettingsSwitch } from "./SettingsParts.tsx";
 import { copyManagerConfig, ManagerEditor, ManagerSetup } from "./ManagerSetup.tsx";
 import {
   belongsTo, deliveryIssue, enabledManagers, eventName, eventResult, eventTime, kindLabel, managerError, managerProjects,
-  todayEvents, totalCreatedTasks, useManagers, webhookEvent, workCount, type ManagerConfig, type ManagerItem, type ManagerProject,
+  dailyCalls, latestCall, latestWebhook, totalCreatedTasks, useManagers, workCount,
+  type ManagerConfig, type ManagerEvent, type ManagerItem, type ManagerProject,
 } from "./managersStore.tsx";
 
 type Setup = { project?: string; source?: ManagerConfig; migrate?: ManagerConfig };
 const plural = (values: string[]) => !values.length ? "—" :
   values.length === 1 ? values[0] : `${values[0]} 외 ${values.length - 1}개`;
-const metric = (item: ManagerItem, tool: string) =>
-  todayEvents(item.history.events).filter(event => event.result === "ok" && event.tool === tool).length;
 
 function ManagerMark({ manager }: { manager: ManagerConfig }) {
   return <span className="mgr-mark" aria-hidden="true">{manager.kind === "hermes" ? "H" : "M"}</span>;
@@ -34,7 +33,8 @@ function ManagerCard({ item, busy, canCopy, action, open, copy }: {
   open(): void; copy(): void;
 }) {
   const { manager } = item;
-  const last = item.history.events.find(event => !webhookEvent(event));
+  const last = latestCall(item.history);
+  const today = dailyCalls(item.history);
   return <article className="mgr-panel mgr-card">
     <header className="mgr-between">
       <div className="mgr-identity">
@@ -55,7 +55,7 @@ function ManagerCard({ item, busy, canCopy, action, open, copy }: {
       <dl className="mgr-meta">
         <dt>상태 알림</dt><dd>{manager.notifyEnabled && manager.webhook ? manager.webhook : "꺼짐"}</dd>
         <dt>마지막 호출</dt><dd>{last ? `${eventTime(last.at)} · ${eventName(last.tool)} ${eventResult(last.result)}` : "—"}</dd>
-        <dt>오늘</dt><dd>태스크 {workCount(item, "tasks")} · 댓글 {workCount(item, "comments")} · 거절 {todayEvents(item.history.events).filter(event => event.result === "rejected").length}</dd>
+        <dt>오늘</dt><dd>태스크 {workCount(item, "tasks")} · 댓글 {workCount(item, "comments")} · 거절 {today.rejected}</dd>
       </dl>
     </div>
     <IntakeBadges item={item} />
@@ -82,8 +82,8 @@ export function ManagersPage({ project, name, intake, workspace, controller }: {
   const withinFilter = ({ manager }: ManagerItem) => !project || shown.some(item => belongsTo(manager, item));
   const active = enabledManagers(data).filter(withinFilter);
   const shownItems = items.filter(withinFilter);
-  const today = todayEvents(shownItems.flatMap(item => item.history.events));
-  const calls = today.filter(event => !webhookEvent(event));
+  const daily = shownItems.map(item => dailyCalls(item.history));
+  const total = (key: "calls" | "rejected") => daily.reduce((sum, item) => sum + item[key], 0);
   const selected = name ? items.find(item => item.manager.name === name) : undefined;
 
   const action = async (kind: "config" | "enable" | "disable" | "remove", manager: ManagerConfig) => {
@@ -95,7 +95,7 @@ export function ManagersPage({ project, name, intake, workspace, controller }: {
       } else {
         await controller.callEngine(["manager", kind, manager.name]);
         await refresh();
-        if (kind === "remove") controller.navigate(managersAddress(manager.project));
+        if (kind === "remove") controller.navigate(managersAddress(projects.some(p => belongsTo(manager, p)) ? manager.project : undefined));
       }
     } catch (e) { setFailure(managerError(e)); }
     finally { setWorking(""); }
@@ -105,20 +105,21 @@ export function ManagersPage({ project, name, intake, workspace, controller }: {
   return <>
     <Page title={selected?.manager.label ?? "매니저"} className="mgr-page">
       {error && <p role="alert" className="mgr-error">{error}</p>}
+      {data?.registryIssue && <p role="status" className="mgr-warning">{data.registryIssue}</p>}
       {failure && <p role="alert" className="mgr-error">{failure}</p>}
       {feedback && <p role="status" className="mgr-hint">{feedback}</p>}
       {workspace.sample && <p className="mgr-hint">앱에서 작업 폴더를 열면 매니저를 설정할 수 있어요.</p>}
       {!data && !error && !workspace.sample && <p role="status">매니저를 불러오는 중이에요.</p>}
       {!data && error && <button type="button" onClick={() => void refresh()}>다시 읽기</button>}
       {data && name && !selected && <p>매니저를 찾을 수 없어요. <button onClick={() => controller.navigate(managersAddress())}>매니저 목록</button></p>}
-      {data && selected && <ManagerDetail item={selected} projects={projects} controller={controller}
+      {data && selected && <ManagerDetail key={selected.manager.name} item={selected} projects={projects} controller={controller}
         busy={working === selected.manager.name} action={action} setup={setSetup} intake={intake} />}
       {data && !name && <>
         <p className="mgr-intro">매니저는 Slack 등에서 받은 제보를 태스크로 접수해요. 매니저 하나는 프로젝트 하나에 연결돼요.</p>
         <div className="mgr-between mgr-overview">
           <div className="mgr-actions">
             <span className="mgr-badge is-ok">켜짐 {active.length}</span>
-            <small>오늘 호출 {calls.length} · 만든 태스크 {totalCreatedTasks(shownItems)} · 거절 {calls.filter(event => event.result === "rejected").length}</small>
+            <small>오늘 호출 {total("calls")} · 만든 태스크 {totalCreatedTasks(shownItems)} · 거절 {total("rejected")}</small>
           </div>
           <div className="mgr-actions">
             <button type="button" onClick={() => void refresh()}>새로고침</button>
@@ -195,10 +196,11 @@ function ManagerDetail({ item, projects, controller, busy, action, setup, intake
   const { data } = useManagers();
   const { manager, history } = item;
   const project = projects.find(p => belongsTo(manager, p));
-  const last = history.events.find(event => !webhookEvent(event));
-  const webhook = history.events.find(webhookEvent);
+  const last = latestCall(history);
+  const webhook = latestWebhook(history);
+  const intakeCount = (item.intake?.waiting ?? 0) + (item.intake?.attention?.length ?? 0);
   return <>
-    <button type="button" className="mgr-back" onClick={() => controller.navigate(managersAddress(manager.project))}>
+    <button type="button" className="mgr-back" onClick={() => controller.navigate(managersAddress(project?.slug))}>
       ← 매니저{project && ` / ${project.title}`} / {manager.label}
     </button>
     <div className="mgr-between mgr-detail-actions">
@@ -206,7 +208,7 @@ function ManagerDetail({ item, projects, controller, busy, action, setup, intake
         <ManagerMark manager={manager} />
         <span className="mgr-badge">{project?.title || manager.project || "프로젝트 미지정"}</span>
         <ManagerStatePill item={item} />
-        {!manager.project ? <button type="button" onClick={() => setup({ migrate: manager })}>프로젝트 지정</button> :
+        {!project ? <button type="button" disabled={busy || !projects.length} onClick={() => setup({ migrate: manager })}>프로젝트 지정</button> :
           <button type="button" disabled={busy || (!manager.enabled && !!item.issue)} onClick={() => void action(manager.enabled ? "disable" : "enable", manager)}>{manager.enabled ? "끄기" : "켜기"}</button>}
         <button type="button" disabled={busy || !project || !!item.issue} onClick={() => void action("config", manager)}>MCP 설정 복사</button>
         <button type="button" disabled={busy || !manager.project || !projects.some(p => !belongsTo(manager, p))} onClick={() => setup({ source: manager })}>다른 프로젝트로 복사</button>
@@ -216,14 +218,14 @@ function ManagerDetail({ item, projects, controller, busy, action, setup, intake
     {item.issue && <p className="mgr-error" role="status">{item.issue}</p>}
     <nav className="mgr-tabs" aria-label="매니저 상세">
       {tabs.map(([key, label]) => <button type="button" key={key} aria-pressed={selectedTab === key} disabled={key !== "history" && !project} onClick={() => openTab(key)}>{label}
-        {key === "intake" && !!item.intake?.waiting && <span className="mgr-badge mgr-intake-warning">{item.intake.waiting}</span>}
+        {key === "intake" && intakeCount > 0 && <span className="mgr-badge mgr-intake-warning">{intakeCount}</span>}
       </button>)}
     </nav>
     {selectedTab === "intake" && project ? <ManagerIntake item={item} controller={controller} entryId={intake} onConnection={() => openTab("connection")} /> :
     <div className="mgr-detail">
       <div className={selectedTab === "connection" ? "intake-stack" : undefined}>
         {selectedTab === "connection" && project && <IntakeConnection item={item} controller={controller} />}
-        {selectedTab === "history" ? <ManagerHistory item={item} /> : selectedTab !== "intake" && project && data && <ManagerEditor
+        {selectedTab === "history" ? <ManagerHistory key={manager.name} item={item} controller={controller} /> : selectedTab !== "intake" && project && data && <ManagerEditor
           key={selectedTab === "connection" ? item.manager.slackChannels.join(",") : selectedTab}
           item={item} project={project} data={data} controller={controller} tab={selectedTab} />}
       </div>
@@ -256,23 +258,37 @@ function ManagerDetail({ item, projects, controller, busy, action, setup, intake
   </>;
 }
 
-function ManagerHistory({ item }: { item: ManagerItem }) {
-  const today = todayEvents(item.history.events);
+function ManagerHistory({ item, controller }: { item: ManagerItem; controller: WorkspaceController }) {
+  const [events, setEvents] = useState<ManagerEvent[]>([]);
+  const [error, setError] = useState("");
+  const name = item.manager.name;
+  const revision = item.history.revision;
+  const issue = item.historyIssue;
+  useEffect(() => {
+    if (issue) return;
+    let live = true;
+    void controller.callEngine(["manager", "history", name]).then(result => {
+      if (!live) return;
+      setEvents((result as ManagerItem["history"]).events);
+      setError("");
+    }).catch(error => { if (live) setError(managerError(error)); });
+    return () => { live = false; };
+  }, [controller, name, revision, issue]);
+
+  const { calls, notes, rejected, sent } = dailyCalls(item.history);
   const counts = [
-    ["오늘 호출", today.filter(event => !webhookEvent(event)).length],
-    ["만든 태스크", workCount(item, "tasks")], ["댓글", workCount(item, "comments")],
-    ["노트", metric(item, "create_doc")], ["거절", today.filter(event => event.result === "rejected").length],
-    ["보낸 알림", today.filter(event => event.tool === "status_webhook" && event.result === "ok").length],
+    ["오늘 호출", calls], ["만든 태스크", workCount(item, "tasks")], ["댓글", workCount(item, "comments")],
+    ["노트", notes], ["거절", rejected], ["보낸 알림", sent],
   ];
   return <>
     <dl className="mgr-counts">{counts.map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
     {item.workIssue && <p className="mgr-error" role="status">오늘 업무 집계를 읽을 수 없어요.</p>}
     <section className="mgr-panel">
       <h2>최근 호출</h2>
-      {item.historyIssue && <p className="mgr-error" role="status">{item.historyIssue}</p>}
-      {item.history.events.length ? <div className="mgr-table-wrap"><table className="mgr-table">
+      {(issue || error) && <p className="mgr-error" role="status">{issue || error}</p>}
+      {!issue && events.length ? <div className="mgr-table-wrap"><table className="mgr-table">
         <thead><tr><th>시각</th><th>도구</th><th>결과</th><th>대상</th></tr></thead>
-        <tbody>{item.history.events.slice(0, 50).map((event, index) => <tr key={`${event.at}-${index}`}>
+        <tbody>{events.map((event, index) => <tr key={`${event.at}-${index}`}>
           <td title={new Date(event.at).toLocaleString("ko-KR")}>{eventTime(event.at)}</td>
           <td>{eventName(event.tool)}</td>
           <td><span className={`mgr-badge ${event.result === "ok" ? "is-ok" : "is-error"}`}>{eventResult(event.result)}</span>{event.reason && <p>{event.reason}</p>}</td>
@@ -299,7 +315,7 @@ export function ProjectManagers({ project, workspace, controller }: {
     {error && <p role="alert" className="mgr-error">{error}</p>}
     {items.map(item => <div className="mgr-between mgr-project-row" key={item.manager.name}>
       <div className="mgr-actions"><ManagerMark manager={item.manager} /><strong>{item.manager.label}</strong><small>{item.manager.name}</small>
-        <ManagerStatePill item={item} /><small>마지막 호출 {eventTime(item.history.events.find(event => !webhookEvent(event))?.at)} · 오늘 태스크 {workCount(item, "tasks")}</small></div>
+        <ManagerStatePill item={item} /><small>마지막 호출 {eventTime(latestCall(item.history)?.at)} · 오늘 태스크 {workCount(item, "tasks")}</small></div>
       <button type="button" onClick={() => controller.navigate(managerAddress(item.manager.name))}>열기</button>
     </div>)}
     {!items.length && <p className="res-empty">{target?.repos.length ? "이 프로젝트에 매니저가 없어요." : "프로젝트 편집에서 GitHub 저장소를 추가하면 매니저가 태스크를 만들 수 있어요."}</p>}
