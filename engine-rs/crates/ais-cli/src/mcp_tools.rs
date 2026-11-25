@@ -308,7 +308,7 @@ pub const MANAGER_INTAKE_TOOLS: &[McpTool] = &[
     McpTool {
         name: "submit_intake",
         description: "Telegram, 데스크톱 등에서 받은 제보를 원장에 먼저 저장한다. source.key는 어댑터가 제공한 계정·대화·메시지를 식별하는 고정 키다. 임의로 만든 키는 쓰지 않는다. 결과의 entry.id와 current.revision으로 complete_intake를 부른다.",
-        input_schema: r#"{"type":"object","properties":{"source":{"type":"object","properties":{"kind":{"type":"string","description":"어댑터의 종류. 예를 들어 telegram 또는 desktop"},"key":{"type":"string","minLength":1,"maxLength":256},"postedAt":{"type":"integer","description":"확인 가능한 원글 시각. Unix 밀리초"}},"required":["kind","key"],"additionalProperties":false},"reporter":{"type":"string"},"excerpt":{"type":"string","description":"원글 앞 200자"}},"required":["source","reporter","excerpt"],"additionalProperties":false}"#,
+        input_schema: r#"{"type":"object","properties":{"source":{"type":"object","properties":{"kind":{"type":"string","description":"어댑터의 종류. 예를 들어 telegram 또는 desktop"},"key":{"type":"string","minLength":1,"maxLength":256},"postedAt":{"type":"integer","description":"확인 가능한 원글 시각. Unix 밀리초"},"url":{"type":"string","maxLength":2048,"description":"어댑터가 원글에서 받은 HTTPS 주소. 주소가 없으면 생략한다."}},"required":["kind","key"],"additionalProperties":false},"reporter":{"type":"string"},"excerpt":{"type":"string","description":"원글 앞 200자"}},"required":["source","reporter","excerpt"],"additionalProperties":false}"#,
         write: true,
         destructive: false,
     },

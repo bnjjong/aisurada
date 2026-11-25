@@ -50,9 +50,14 @@ export interface ReportReaction {
   at?: number;
 }
 
+export interface DirectIntakeSource {
+  kind: string;
+  postedAt?: number;
+}
+
 export interface IntakeEntry {
   id: string;
-  source?: { kind: string; postedAt?: number };
+  source?: DirectIntakeSource;
   channel: string;
   messageTs: string;
   url: string;
@@ -68,7 +73,9 @@ export interface IntakeEntry {
   history: IntakeProcessing[];
 }
 
-export type IntakeSource = Pick<IntakeEntry, "id" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded" | "reactions">;
+export type IntakeSource =
+  Pick<IntakeEntry, "id" | "source" | "url" | "messageTs" | "reporter" | "excerpt" | "taskOrigin" | "reactionAdded" | "reactions">
+  & Partial<Pick<IntakeEntry, "manager" | "receivedAt">>;
 
 export interface IntakeRow {
   entry: IntakeEntry;
@@ -92,15 +99,25 @@ export const resultLabel: Record<IntakeResult, string> = {
 };
 export const viaLabel: Record<IntakeVia, string> = { desktop: "데스크톱 대화", scheduled: "예약 확인", manual: "사람이 처리", direct: "직접 접수" };
 
-export function intakeSourceLabel(entry: IntakeEntry) {
+export function intakeSourceLabel(entry: Pick<IntakeEntry, "source">) {
   if (!entry.source) return "Slack";
   if (entry.source.kind === "telegram") return "텔레그램";
   if (entry.source.kind === "desktop") return "데스크톱";
   return entry.source.kind;
 }
 
-export function intakePostedAt(entry: IntakeEntry) {
+export function intakePostedAt(entry: Pick<IntakeEntry, "source" | "messageTs">) {
   return entry.source ? entry.source.postedAt : slackTime(entry.messageTs);
+}
+
+export function intakeOriginalUrl(entry: Pick<IntakeEntry, "source" | "url">) {
+  if (!entry.source) return slackLink(entry.url);
+  try {
+    const address = new URL(entry.url);
+    return address.protocol === "https:" && !address.username && !address.password ? address.href : null;
+  } catch {
+    return null;
+  }
 }
 
 export function intakeResultLabel(entry: IntakeEntry, event: IntakeProcessing) {

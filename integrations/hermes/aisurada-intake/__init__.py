@@ -30,6 +30,9 @@ def add_intake_source(*, event, **_):
     }
     if message.date is not None:
         intake_source["postedAt"] = int(message.date.timestamp() * 1000)
+    message_link = getattr(message, "link", None)
+    if message_link:
+        intake_source["url"] = message_link
     payload = {
         "source": intake_source,
         "reporter": source.user_name or "텔레그램 사용자",

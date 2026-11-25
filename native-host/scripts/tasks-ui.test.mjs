@@ -12,6 +12,7 @@ import {
 } from '../src/ui/tasksClient.ts';
 import { PriorityMark, StatusPill, TasksPage, TypeMark } from '../src/ui/TasksPage.tsx';
 import { TaskDetailPage } from '../src/ui/TaskDetailPage.tsx';
+import { TaskReportSources } from '../src/ui/ManagerIntake.tsx';
 import { Rail } from '../src/ui/Rail.tsx';
 
 const raw = (extra = {}) => ({
@@ -29,6 +30,29 @@ const detailRaw = (extra = {}) => raw({
 });
 const detail = (extra = {}) => toDetail(detailRaw(extra));
 
+test('the task source panel reads Slack and Telegram reports and opens only safe original URLs', () => {
+  const intakeSources = [
+    { id: 'CDEMO123:1795575600.000000', taskOrigin: 'created', reporter: '슬랙 제보자', excerpt: '처음 제보',
+      manager: 'hermes-demo', url: 'https://demo.slack.com/archives/CDEMO123/p1795575600000000', messageTs: '1795575600.000000' },
+    { id: 'intake-telegram', taskOrigin: 'commented', manager: 'hermes-demo', reporter: '텔레그램 제보자', excerpt: '재제보 원문',
+      url: 'https://t.me/demo/42', source: { kind: 'telegram', postedAt: 1795575600000 } },
+    { id: 'intake-dm', taskOrigin: 'commented', manager: 'hermes-demo', excerpt: '1:1 제보', source: { kind: 'telegram' },
+      receivedAt: 1795575600000 },
+    { id: 'intake-invalid-url', taskOrigin: 'commented', source: { kind: 'desktop' }, url: 'javascript:alert(1)' },
+  ];
+  const { intakeSources: entries } = detail({ intakeSources });
+  assert.equal(entries.length, 4);
+  const html = renderToStaticMarkup(React.createElement(TaskReportSources, {
+    entries, controller: { isNative: () => false },
+  }));
+  assert.match(html, /처음 · Slack · 슬랙 제보자/);
+  assert.match(html, /재제보 · 텔레그램 · 텔레그램 제보자/);
+  assert.match(html, / · 접수 /);
+  assert.match(html, /재제보 원문/);
+  assert.match(html, /href="https:\/\/t\.me\/demo\/42"/);
+  assert.equal((html.match(/원장 항목 열기/g) ?? []).length, 3);
+  assert.doesNotMatch(html, /javascript:/);
+});
 test('routes: /tasks is a plain page and /task/<key> is the detail', () => {
   assert.deepEqual(parseRoute('/tasks'), { kind: 'tasks' });
   assert.deepEqual(parseRoute('/task/TSK-14'), { kind: 'task', key: 'TSK-14' });

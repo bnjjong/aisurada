@@ -248,15 +248,24 @@ function toEvent(v: unknown): ActivityEvent | null {
 
 function toIntakeSource(v: unknown): IntakeSource | null {
   if (!isRecord(v)) return null;
-  const id = text(v.id), url = text(v.url), messageTs = text(v.messageTs);
+  const id = text(v.id), url = text(v.url) ?? "", messageTs = text(v.messageTs) ?? "";
   const taskOrigin = v.taskOrigin;
-  if (!id || !url || !messageTs || (taskOrigin !== "created" && taskOrigin !== "commented")) return null;
+  if (!id || (taskOrigin !== "created" && taskOrigin !== "commented")) return null;
+  const source = isRecord(v.source) && typeof v.source.kind === "string" && v.source.kind
+    ? { kind: v.source.kind, postedAt: intakeTime(v.source.postedAt) }
+    : undefined;
+  if (!source && (!url || !messageTs)) return null;
   const reactions = listOf(v.reactions, item => {
     if (!isRecord(item) || !text(item.name) || typeof item.count !== "number" || item.count < 1) return null;
     return { name: item.name as string, count: item.count };
   });
-  return { id, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "",
+  return { id, source, url, messageTs, taskOrigin, reporter: text(v.reporter) ?? "", excerpt: text(v.excerpt) ?? "",
+    manager: text(v.manager), receivedAt: intakeTime(v.receivedAt),
     reactionAdded: v.reactionAdded === true, reactions };
+}
+
+function intakeTime(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 8.64e15 ? value : undefined;
 }
 
 const listOf = <T,>(v: unknown, read: (x: unknown) => T | null): T[] => (Array.isArray(v) ? v.map(read).filter((x): x is T => x !== null) : []);
