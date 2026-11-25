@@ -4,8 +4,6 @@ pub mod agents;
 mod approvals;
 #[cfg(feature = "claude")]
 pub mod ask;
-#[cfg(feature = "claude")]
-mod c4_chat;
 mod call_log;
 mod decisions;
 mod desktop;
@@ -102,8 +100,6 @@ fn main() {
             terminal::pty_detach,
             terminal::pty_alive,
             terminal::pty_stats,
-            #[cfg(feature = "claude")]
-            c4_chat::c4_chat,
             github::github_status,
             github::github_connect,
             github::github_disconnect,
