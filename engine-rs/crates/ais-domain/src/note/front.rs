@@ -297,7 +297,7 @@ pub fn kst_minute(millis: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::meta::LinkKind;
+    use crate::note::meta::LinkKind;
     use super::*;
 
     fn pair(key: &str, value: Value) -> (Value, Value) {

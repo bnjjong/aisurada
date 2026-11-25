@@ -338,8 +338,8 @@ fn ref_list(value: Option<&Value>) -> Vec<Ref> {
                 continue;
             }
             let reference = Ref {
-                reporter: slack_ref_text(&kind, str_of(m, "reporter"), 100),
-                excerpt: slack_ref_text(&kind, str_of(m, "excerpt"), 200),
+                reporter: slack_ref_text(kind.as_str(), str_of(m, "reporter"), 100),
+                excerpt: slack_ref_text(kind.as_str(), str_of(m, "excerpt"), 200),
                 kind,
                 target,
                 title: blank_to_null(str_of(m, "title")),
