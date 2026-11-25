@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use super::task_commands::{self, AddTaskCommentRequest, CreateTaskRequest};
 use crate::error::EngineError;
 use crate::kernel::{
-    actor::{CallContext, Caller, ManagerContext},
+    actor::{CallContext, ManagerContext},
     time::{LocalClock, days_from_civil},
 };
 use crate::ports::{clock, fs, ids};
@@ -486,28 +486,47 @@ impl IntakeOperation {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IntakeRole {
+    Operator,
+    Manager,
+    Notifier,
+}
+
 pub(crate) fn authorize(
     vault: &Path,
     operation: IntakeOperation,
     context: &CallContext,
-) -> Result<(), EngineError> {
+) -> Result<IntakeRole, EngineError> {
     check_workspace_marker(vault)?;
-    if matches!(operation, IntakeOperation::Questions) && context.caller != Caller::App {
-        return Err(invalid("되물음 알림은 앱에서 조회한다"));
-    }
-    if matches!(operation, IntakeOperation::Sources) {
-        if context.caller != Caller::App || context.manager.is_some() {
-            return Err(invalid("태스크 출처는 앱에서 조회한다"));
-        }
-        return Ok(());
+    use IntakeOperation::*;
+    let role = if context.is_local_operator() {
+        IntakeRole::Operator
+    } else if context.is_intake_notifier() {
+        IntakeRole::Notifier
+    } else {
+        IntakeRole::Manager
+    };
+    match (role, operation) {
+        (IntakeRole::Operator, Sources) if context.manager.is_none() => return Ok(role),
+        (IntakeRole::Operator, Get | Configure | Rewind | Review)
+        | (IntakeRole::Notifier, Questions)
+        | (IntakeRole::Manager, Get | Submit | Complete | Record | Move) => {}
+        _ => return Err(EngineError::forbidden("이 접수 명령을 현재 요청자에게 허용하지 않는다")),
     }
     let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
     check_manager_project(vault, manager)?;
-    if operation.is_write() {
-        let manual = matches!(operation, IntakeOperation::Configure | IntakeOperation::Rewind | IntakeOperation::Review);
-        if manual != (context.caller == Caller::App) {
-            return Err(invalid("이 접수 명령을 현재 호출자가 쓸 수 없다"));
-        }
+    Ok(role)
+}
+
+fn authorize_work(manager: &ManagerContext, result: ResultKind) -> Result<(), EngineError> {
+    let allowed = match result {
+        ResultKind::Created => manager.intake_work.create_task,
+        ResultKind::Commented => manager.intake_work.comment_task,
+        _ => true,
+    };
+    if !allowed {
+        return Err(EngineError::forbidden("매니저에게 허용하지 않은 태스크 작업이다"));
     }
     Ok(())
 }
@@ -516,6 +535,7 @@ pub(crate) fn execute(
     vault: &Path,
     operation: IntakeOperation,
     context: &CallContext,
+    role: IntakeRole,
     allowed_channels: &[String],
     args: Value,
 ) -> Result<Value, EngineError> {
@@ -528,7 +548,7 @@ pub(crate) fn execute(
     let path = ledger_path(vault)?;
     let manager = context.manager.as_ref().ok_or_else(|| invalid("등록한 매니저가 필요하다"))?;
     if matches!(operation, IntakeOperation::Get) {
-        return Ledger::read(&path)?.get(vault, manager, allowed_channels, parse("get_intake", args)?, context.caller);
+        return Ledger::read(&path)?.get(vault, manager, allowed_channels, parse("get_intake", args)?, role);
     }
     if matches!(operation, IntakeOperation::Questions) {
         return Ledger::read(&path)?.questions(manager, allowed_channels);
@@ -536,20 +556,16 @@ pub(crate) fn execute(
     let mut ledger = Ledger::load(&path)?;
     let (response, changed) = match operation {
         IntakeOperation::Submit => ledger.submit(manager, parse("submit_intake", args)?)?,
-        IntakeOperation::Complete => ledger.complete(
-            vault,
-            &path,
-            context,
-            manager,
-            parse("complete_intake", args)?,
-        )?,
-        IntakeOperation::Record => ledger.record(
-            vault,
-            context,
-            manager,
-            allowed_channels,
-            parse("record_intake", args)?,
-        )?,
+        IntakeOperation::Complete => {
+            let request: Complete = parse("complete_intake", args)?;
+            authorize_work(manager, request.outcome.result)?;
+            ledger.complete(vault, &path, context, manager, request)?
+        }
+        IntakeOperation::Record => {
+            let request: Record = parse("record_intake", args)?;
+            authorize_work(manager, request.result)?;
+            ledger.record(vault, context, manager, allowed_channels, request)?
+        }
         IntakeOperation::Move => {
             ledger.advance(manager, allowed_channels, parse("move_cursor", args)?)?
         }
@@ -831,7 +847,7 @@ impl Ledger {
         manager: &ManagerContext,
         allowed: &[String],
         query: Query,
-        caller: Caller,
+        role: IntakeRole,
     ) -> Result<Value, EngineError> {
         if let Some(entry_id) = &query.entry_id {
             if query.channel.is_some() || query.message_ts.is_some() || query.summary {
@@ -884,7 +900,7 @@ impl Ledger {
             .take_while(|(key, _)| key.starts_with(&prefix))
             .map(|(_, entry)| entry);
         for entry in entries.filter(|entry| {
-            (entry.source.is_some() || caller == Caller::App || allowed.contains(&entry.channel))
+            (entry.source.is_some() || role == IntakeRole::Operator || allowed.contains(&entry.channel))
                 && query.channel.as_ref().is_none_or(|channel| channel == &entry.channel)
         }) {
             let event = entry.current()?;
@@ -912,7 +928,7 @@ impl Ledger {
                 attention_items.push(json!({
                     "id": entry.id, "at": attention.at, "reason": attention.reason,
                     "revision": event.revision, "url": entry.url,
-                    "excerpt": (caller == Caller::App).then(|| short(&entry.excerpt, 100)),
+                    "excerpt": (role == IntakeRole::Operator).then(|| short(&entry.excerpt, 100)),
                 }));
             } else if event.result == ResultKind::Asked {
                 waiting += 1;
@@ -920,7 +936,7 @@ impl Ledger {
                     let mut question = json!({
                         "id": entry.id, "at": event.at, "revision": event.revision, "url": entry.url
                     });
-                    if caller == Caller::App {
+                    if role == IntakeRole::Operator {
                         question["excerpt"] = json!(short(&entry.excerpt, 100));
                         question["question"] = json!(short(&event.question, 140));
                     }
@@ -936,7 +952,7 @@ impl Ledger {
                     pending.push(entry.view()?);
                 }
             }
-            if caller == Caller::Ai
+            if role == IntakeRole::Manager
                 && !query.summary
                 && !entry.reaction_added
                 && entry.mark_requested
@@ -954,7 +970,7 @@ impl Ledger {
                     "result": event.result
                 }));
             }
-            if caller == Caller::App && !query.summary {
+            if role == IntakeRole::Operator && !query.summary {
                 let mut view = entry.view()?;
                 if let Some((key, id)) = entry.task_key.as_deref().zip(entry.task_id.as_deref()) {
                     let repo = repos.entry(key).or_insert_with(|| {

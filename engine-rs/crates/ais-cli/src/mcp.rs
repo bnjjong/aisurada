@@ -393,30 +393,10 @@ impl<'a> McpServer<'a> {
                 Ok(value) => value,
                 Err(_) => return result(id, &tool_result("접수 인자를 읽지 못했다", true)),
             };
-            if matches!(
-                operation,
-                IntakeOperation::Record | IntakeOperation::Complete
-            ) {
-                let outcome = if matches!(operation, IntakeOperation::Complete) {
-                    &args["outcome"]
-                } else {
-                    &args
-                };
-                let required = match outcome["result"].as_str() {
-                    Some("created") => Some("create_task"),
-                    Some("commented") => Some("add_task_comment"),
-                    _ => None,
-                };
-                if let Some(required) = required
-                    && !gate.allowed(manager, required)
-                {
-                    gate.record(tool.name, "rejected", None);
-                    return result(
-                        id,
-                        &tool_result("매니저에게 허용하지 않은 태스크 작업이다", true),
-                    );
-                }
-            }
+            let mut manager = manager.clone();
+            manager
+                .tools
+                .retain(|tool| gate.initial.tools.contains(tool));
             let context = CallContext::ai(
                 session.as_ref().map(|source| source.id.clone()),
                 session.as_ref().map(|source| source.agent.clone()),

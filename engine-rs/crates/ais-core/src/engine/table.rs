@@ -46,7 +46,7 @@ impl Engine {
         args: Value,
     ) -> Result<Value, EngineError> {
         let _installed = self.install_ports();
-        intake_commands::authorize(&self.vault_root, operation, context)?;
+        let role = intake_commands::authorize(&self.vault_root, operation, context)?;
         if matches!(operation, IntakeOperation::Move) {
             // 커서는 파일에 저장하고 제보 기록이나 설정 변경과 함께 커밋한다.
             let _lock = acquire_lock(&self.vault_root)?;
@@ -54,6 +54,7 @@ impl Engine {
                 &self.vault_root,
                 operation,
                 context,
+                role,
                 allowed_channels,
                 args,
             );
@@ -62,7 +63,14 @@ impl Engine {
             .is_write()
             .then(|| self.open_scope(Scope::Standard, context))
             .transpose()?;
-        intake_commands::execute(&self.vault_root, operation, context, allowed_channels, args)
+        intake_commands::execute(
+            &self.vault_root,
+            operation,
+            context,
+            role,
+            allowed_channels,
+            args,
+        )
     }
 }
 

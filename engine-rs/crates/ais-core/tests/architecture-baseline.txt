@@ -20,7 +20,7 @@ edge commands -> note 10
 edge commands -> ports 17
 edge commands -> resource 7
 edge commands -> session 2
-edge commands -> task 8
+edge commands -> task 7
 edge commands -> text 35
 edge commands -> vault 78
 edge commands -> write 91

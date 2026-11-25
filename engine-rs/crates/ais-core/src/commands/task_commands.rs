@@ -14,7 +14,7 @@ use serde_json::{Value as Json, json};
 
 use super::{intake_commands, note_meta_write::BoolArg};
 use crate::error::EngineError;
-use crate::kernel::actor::{CallContext, Caller, ManagerContext};
+use crate::kernel::actor::{CallContext, ManagerContext};
 use crate::task::aggregate::{self, Fields, NewTask, Scan};
 use crate::task::format::{self, java_trim};
 use crate::task::store;
@@ -658,7 +658,7 @@ pub fn get_task(vault: &Path, request: &GetTaskRequest, context: &CallContext) -
     let task = store::find(&scan, reference)?;
     let limit = activity_limit(&request.activity)?;
     let mut value = detail(vault, &scan, refetch(&scan, task), limit)?;
-    if context.caller == Caller::App && context.manager.is_none()
+    if context.is_local_operator() && context.manager.is_none()
         && let Ok(sources) = intake_commands::sources_for_task(vault, &task.id)
         && sources.as_array().is_some_and(|rows| !rows.is_empty())
     {

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use ais_core::engine::{Engine, IntakeOperation, ManagerProject, manager_project};
 use ais_core::write::{acquire_lock, write_atomic};
-use ais_core::{CallContext, ManagerContext, valid_manager_name};
+use ais_core::{CallContext, IntakeWorkPermissions, ManagerContext, valid_manager_name};
 use ais_domain::task::format;
 use ais_infra::ports::{clock, fs, ids};
 use serde::{Deserialize, Serialize};
@@ -276,6 +276,10 @@ impl Manager {
             project_id: self.project_id.clone(),
             repos: self.repos.clone(),
             agendas: self.agendas.clone(),
+            intake_work: IntakeWorkPermissions {
+                create_task: self.tools.iter().any(|name| name == "create_task"),
+                comment_task: self.tools.iter().any(|name| name == "add_task_comment"),
+            },
         }
     }
 
@@ -790,7 +794,11 @@ fn intake_questions(env: &Env, managers: &[Manager]) -> Result<Value, String> {
             continue;
         }
         let Value::Array(questions) = item
-            .intake(IntakeOperation::Questions, CallContext::app(), json!({}))
+            .intake(
+                IntakeOperation::Questions,
+                CallContext::intake_notifier(),
+                json!({}),
+            )
             .map_err(|error| error.to_string())?
         else {
             return Err("되물음 알림 목록을 읽지 못했다".into());
@@ -1051,6 +1059,12 @@ fn remove_registration(
 }
 
 pub fn run(args: &[String], env: &Env) -> Outcome {
+    if crate::env::has_agent_session(env) {
+        return Outcome::err(
+            "AIS-403 매니저 관리 명령은 앱이나 로컬 작업자만 실행할 수 있다.\n".into(),
+            3,
+        );
+    }
     match command(args, env) {
         Ok(value) => Outcome::out(format!("{value:#}\n")),
         Err(error) => Outcome::err(format!("{error}\n"), 2),

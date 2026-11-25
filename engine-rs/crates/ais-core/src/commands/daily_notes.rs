@@ -169,11 +169,9 @@ pub fn plan_day(
             ..CreateDocRequest::default()
         };
         // 계획 노트에는 세션 id를 심지 않는다(29장의 고정값). 호출자는 그대로 넘기고 세션만 뺀다.
-        let plan_context = CallContext {
-            session: None,
-            session_agent: None,
-            ..context.clone()
-        };
+        let mut plan_context = context.clone();
+        plan_context.session = None;
+        plan_context.session_agent = None;
         let saved = create_doc_in(vault, scope, &create, &plan_context)?;
         result.insert("saved".into(), json!(true));
         result.insert("id".into(), json!(saved.id));

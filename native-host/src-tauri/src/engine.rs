@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn engine_error_reaches_the_screen_with_code_and_kind() {
         let error = Engine::new("/nonexistent-vault")
-            .call("no_such_command", Value::Null)
+            .call_as(&CallContext::app(), "no_such_command", Value::Null)
             .unwrap_err();
         let json = serde_json::to_value(IpcError::from(error)).unwrap();
         assert_eq!(json["code"], "AIS-409");

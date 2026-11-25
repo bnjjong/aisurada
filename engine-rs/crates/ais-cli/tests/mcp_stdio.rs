@@ -386,6 +386,10 @@ fn an_ai_change_waits_until_a_human_runs_the_approval() {
         ],
         vec![("CLAUDE_CODE_SESSION_ID", "claude-sess-1")],
         vec![("CODEX_THREAD_ID", "thread-1")],
+        vec![
+            ("CLAUDE_CODE_SESSION_ID", "claude-sess-1"),
+            ("CODEX_THREAD_ID", "thread-1"),
+        ],
     ] {
         let mut env = vec![approvals_env];
         env.extend(markers.iter().copied());
@@ -1005,6 +1009,25 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
     assert_eq!(sources[1]["taskOrigin"], "commented");
     assert_eq!(sources[1]["url"], "");
     assert!(sources[1]["receivedAt"].as_i64().is_some());
+    let agent_env = [
+        ("GEMINI_SESSION_ID", "test-gemini"),
+        ("CODEX_THREAD_ID", "test-codex"),
+    ];
+    let (code, detail, stderr) = run_cli(&vault, &agent_env, &["get-task", task_key]);
+    assert_eq!(code, 0, "{stderr}");
+    let detail: Value = serde_json::from_str(&detail).unwrap();
+    assert_eq!(detail["key"], task_key);
+    assert!(detail.get("intakeSources").is_none());
+    for command in [
+        &["manager", "intake-sources", task_key][..],
+        &["manager", "intake-review", name, "{}"][..],
+        &["manager", "update", name, "tools=create_task"][..],
+    ] {
+        let (code, stdout, stderr) = run_cli(&vault, &agent_env, command);
+        assert_eq!(code, 3);
+        assert!(stdout.is_empty());
+        assert!(stderr.contains("로컬 작업자"), "{stderr}");
+    }
     assert_eq!(
         task["activity"]
             .as_array()
