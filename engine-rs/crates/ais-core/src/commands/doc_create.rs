@@ -12,7 +12,7 @@ use crate::kernel::actor::CallContext;
 use crate::kernel::token::compute_token;
 use crate::note::create::{NewDocInput, ParsedNewDoc};
 use crate::note::front::check_size;
-use crate::text::encode_uri_component;
+use crate::text::{encode_uri_component, is_blank};
 use crate::vault::agenda::{AgendaInfo, scan_agendas};
 use crate::vault::scanner::{NoteRecord, scan_notes};
 use crate::vault::sub_agenda;
@@ -124,7 +124,7 @@ pub fn create_doc_in(
     // 날짜와 시각 배정: 오늘과 그날 겹치지 않는 5분 칸
     let millis = now_millis();
     let now = local_clock(millis);
-    let all_notes = (context.manager.is_some() && request.time.as_deref().is_none_or(crate::text::is_blank)).then(|| {
+    let all_notes = (context.manager.is_some() && request.time.as_deref().is_none_or(is_blank)).then(|| {
         let agendas = scan_agendas(vault);
         scan_notes(vault, &agendas.table)
     });

@@ -4,8 +4,11 @@ use super::meta::{Evaluation, Format, Link, MetaData, agent_for_file};
 use crate::error::EngineError;
 use crate::frontmatter::dump_string;
 use crate::frontmatter::{Value, dump_general_map};
-use crate::kernel::tier::Tier;
-use crate::kernel::time::{civil_from_days, format_utc_millis};
+use crate::kernel::{
+    actor::valid_manager_name,
+    tier::Tier,
+    time::{civil_from_days, format_utc_millis},
+};
 
 pub struct NoteFront<'a> {
     pub id: &'a str,
@@ -207,7 +210,7 @@ pub struct Draft<'a> {
 fn keep_manager_position(mut front: String, raw: &[(Value, Value)]) -> String {
     let Some(index) = raw.iter().position(|(key, value)| {
         matches!((key, value), (Value::Str(key), Value::Str(name))
-            if key == "manager" && crate::kernel::actor::valid_manager_name(name))
+            if key == "manager" && valid_manager_name(name))
     }) else {
         return front;
     };
