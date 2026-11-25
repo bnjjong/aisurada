@@ -647,6 +647,31 @@ fn dashboard(env: &Env, managers: &[Manager], include_work: bool) -> Result<Valu
     }))
 }
 
+fn intake_questions(env: &Env, managers: &[Manager]) -> Result<Value, String> {
+    let vault = canonical_vault(env)?;
+    let mut notices = Vec::new();
+    for item in managers
+        .iter()
+        .filter(|item| item.enabled && !item.legacy() && item.vault == vault)
+    {
+        if item.scope().is_none() {
+            continue;
+        }
+        let Value::Array(questions) = item
+            .intake(IntakeOperation::Questions, CallContext::app(), json!({}))
+            .map_err(|error| error.to_string())?
+        else {
+            return Err("되물음 알림 목록을 읽지 못했다".into());
+        };
+        for mut question in questions {
+            question["manager"] = json!(item.name);
+            question["label"] = json!(item.label);
+            notices.push(question);
+        }
+    }
+    Ok(json!(notices))
+}
+
 fn command(args: &[String], env: &Env) -> Result<Value, String> {
     let folder = folder(env)?;
     let _lock = if matches!(
@@ -662,6 +687,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
     match args {
         [action] if action == "list" => return Ok(json!(managers)),
         [action] if action == "dashboard" => return dashboard(env, &managers, true),
+        [action] if action == "intake-questions" => return intake_questions(env, &managers),
         [action, option] if action == "dashboard" && option == "--summary" => {
             return dashboard(env, &managers, false);
         }
@@ -673,7 +699,7 @@ fn command(args: &[String], env: &Env) -> Result<Value, String> {
             "  list | dashboard [--summary] | add NAME project=… […] | update NAME […]\n",
             "  enable NAME | disable NAME | config NAME | copy NAME NEW_NAME project=… | remove NAME\n",
             "  intake NAME [JSON] | intake-channel NAME JSON | intake-rewind NAME JSON\n",
-            "  intake-review NAME JSON | intake-sources TASK"
+            "  intake-review NAME JSON | intake-sources TASK | intake-questions"
         ).into());
     };
     if action == "intake-sources" && options.is_empty() {

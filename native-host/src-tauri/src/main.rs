@@ -16,6 +16,7 @@ mod environment;
 mod files;
 mod frame;
 mod github;
+mod intake_notifications;
 mod ipc;
 mod layout;
 mod lifecycle;
@@ -164,6 +165,7 @@ fn main() {
             runner::install(app.handle());
             approvals::install(app.handle());
             decisions::install(app.handle());
+            intake_notifications::install(app.handle());
             migration::install(app.handle());
             lifecycle::create_main(app.handle())?;
             menu::install(app.handle())?;

@@ -1042,6 +1042,53 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
         .unwrap();
     assert_eq!(item["work"], json!({"tasks":1,"comments":2}));
     assert_eq!(item["intake"]["counts"], desktop["counts"]);
+
+    let waiting = mcp("submit_intake", report("telegram", "bot:chat:3"));
+    let entry = &waiting["item"]["entry"]["id"];
+    let asked = mcp(
+        "complete_intake",
+        json!({
+            "entryId":entry,
+            "priorRevision":waiting["item"]["current"]["revision"],
+            "outcome":{"result":"asked","question":"어느 화면에서 멈췄나요?"}
+        }),
+    );
+    // 화면과 호스트가 실행되지 않은 동안 오래 남은 질문을 다시 읽는다.
+    let mut saved: Value = serde_json::from_slice(&std::fs::read(&ledger).unwrap()).unwrap();
+    let record = saved["entries"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+        .find(|row| row["id"] == *entry)
+        .unwrap();
+    record["history"]
+        .as_array_mut()
+        .unwrap()
+        .last_mut()
+        .unwrap()["at"] = json!(1_700_000_000_000_i64);
+    std::fs::write(&ledger, serde_json::to_vec(&saved).unwrap()).unwrap();
+    let questions = cli(&["manager", "intake-questions"]);
+    assert_eq!(questions.as_array().unwrap().len(), 1);
+    assert_eq!(questions[0]["manager"], name);
+    assert_eq!(questions[0]["entry"], *entry);
+    assert_eq!(questions[0]["at"], 1_700_000_000_000_i64);
+    assert_eq!(questions[0]["question"], "어느 화면에서 멈췄나요?");
+    assert!(questions[0]["url"].is_null());
+    assert_eq!(cli(&["manager", "intake-questions"]), questions);
+    cli(&["manager", "disable", name]);
+    assert_eq!(cli(&["manager", "intake-questions"]), json!([]));
+    cli(&["manager", "enable", name]);
+    assert_eq!(cli(&["manager", "intake-questions"]), questions);
+    cli(&[
+        "manager",
+        "intake-review",
+        name,
+        &json!({
+            "id": entry, "revision": asked["item"]["current"]["revision"], "result":"ignored"
+        })
+        .to_string(),
+    ]);
+    assert_eq!(cli(&["manager", "intake-questions"]), json!([]));
     std::fs::remove_dir_all(vault).unwrap();
 }
 
@@ -1166,6 +1213,12 @@ fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     asked["result"] = json!("asked");
     asked["question"] = json!("어떤 화면인가요?");
     let question = mcp("record_intake", asked.clone());
+    let queued = cli(&["manager", "intake-questions"]);
+    let notice = &queued[0];
+    let revision = question["item"]["current"]["revision"].as_str().unwrap();
+    assert_eq!(notice["id"], format!("intake-question-{revision}"));
+    assert_eq!(notice["entry"], question["item"]["entry"]["id"]);
+    assert_eq!(notice["url"], asked["url"]);
     let cursor = mcp("move_cursor", move_to(&cursor, &repeat, &[&first, &repeat]));
     assert_eq!(
         mcp("get_intake", json!({}))["pending"]
@@ -1190,6 +1243,7 @@ fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     rejected(own("record_intake", asked.clone()));
     asked["taskKey"] = json!(task_key);
     let commented = mcp("record_intake", asked.clone());
+    assert_eq!(cli(&["manager", "intake-questions"]), json!([]));
     assert_eq!(
         commented["item"]["entry"]["history"]
             .as_array()
