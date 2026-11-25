@@ -133,18 +133,27 @@ fn project_repo_arg(
     Ok(Some(name.to_string()))
 }
 
-pub(crate) fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
+pub(crate) fn require_entity_id(
+    id: &str,
+    usage: &str,
+    validator: impl Fn(&str) -> bool,
+    kind_name: &str,
+) -> Result<(), EngineError> {
     if is_blank(id) {
         return Err(EngineError::invalid_argument(format!(
             "인자가 하나 필요하다: {usage}"
         )));
     }
-    if !is_valid_agenda_id(id) {
+    if !validator(id) {
         return Err(EngineError::invalid_argument(format!(
-            "아젠다 id 모양이 아니다: {id}"
+            "{kind_name} id 모양이 아니다: {id}"
         )));
     }
     Ok(())
+}
+
+pub(crate) fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
+    require_entity_id(id, usage, is_valid_agenda_id, "아젠다")
 }
 
 pub(crate) fn find<'a>(scope: &'a WriteScope, id: &str) -> Result<&'a AgendaInfo, EngineError> {
@@ -257,13 +266,11 @@ pub fn update(
     };
     let changed = info != *current;
     if changed || info.created_at.is_none() || info.edited_at.is_none() {
-        let at = format_utc_millis(now_millis());
-        let created_at = info.created_at.take().unwrap_or_else(|| at.clone());
-        let edited_at = if changed {
-            at
-        } else {
-            info.edited_at.take().unwrap_or(at)
-        };
+        let (created_at, edited_at) = agenda_file::resolve_edit_timestamps(
+            changed,
+            info.created_at.take(),
+            info.edited_at.take(),
+        );
         write_atomic(
             &vault.join(agenda_file::rel_path(&info.slug)),
             &agenda_file::render(&info, &created_at, &edited_at),

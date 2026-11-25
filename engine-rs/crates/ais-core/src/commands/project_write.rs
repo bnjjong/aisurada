@@ -5,11 +5,11 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::agenda_write::{archive, hue_arg};
+use super::agenda_write::{archive, hue_arg, require_entity_id};
 use super::task_commands::project_task_count;
 use crate::error::EngineError;
 use crate::model::ProjectRow;
-use crate::text::{is_blank, trim};
+use crate::text::trim;
 use crate::vault::project::{
     ProjectInfo, ProjectType, archived_project_slugs, is_valid_project_id, scan_projects,
 };
@@ -59,17 +59,7 @@ pub struct DeleteProjectResponse {
 }
 
 fn require_id(id: &str, usage: &str) -> Result<(), EngineError> {
-    if is_blank(id) {
-        return Err(EngineError::invalid_argument(format!(
-            "인자가 하나 필요하다: {usage}"
-        )));
-    }
-    if !is_valid_project_id(id) {
-        return Err(EngineError::invalid_argument(format!(
-            "프로젝트 id 모양이 아니다: {id}"
-        )));
-    }
-    Ok(())
+    require_entity_id(id, usage, is_valid_project_id, "프로젝트")
 }
 
 fn find(projects: &[ProjectInfo], id: &str) -> Result<ProjectInfo, EngineError> {
@@ -168,13 +158,11 @@ pub fn update(vault: &Path, request: &UpdateProjectRequest) -> Result<ProjectRow
     };
     let changed = info != current;
     if changed || info.created_at.is_none() || info.edited_at.is_none() {
-        let at = format_utc_millis(now_millis());
-        let created_at = info.created_at.take().unwrap_or_else(|| at.clone());
-        let edited_at = if changed {
-            at
-        } else {
-            info.edited_at.take().unwrap_or(at)
-        };
+        let (created_at, edited_at) = agenda_file::resolve_edit_timestamps(
+            changed,
+            info.created_at.take(),
+            info.edited_at.take(),
+        );
         write_atomic(
             &vault.join(project_file::rel_path(&info.slug)),
             &project_file::render(&info, &created_at, &edited_at),

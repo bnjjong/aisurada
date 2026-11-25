@@ -6,6 +6,7 @@ use crate::frontmatter::dump_string;
 use crate::kernel::hue::{HUES, position_or_default};
 use crate::vault::agenda::AgendaInfo;
 
+use super::apparatus::{format_utc_millis, now_millis};
 use super::atomic::EngineError;
 use super::confine::has_unusable_path_characters;
 use super::slug;
@@ -27,6 +28,22 @@ pub fn push_yaml_opt(out: &mut String, key: &str, value: Option<&str>) {
     if let Some(v) = value {
         push_yaml_line(out, key, v);
     }
+}
+
+/// 엔티티 수정 시 타임스탬프를 갱신합니다. 변경이 있으면 editedAt을 지금 시각으로 갱신하고, 없으면 기존 값을 유지합니다.
+pub fn resolve_edit_timestamps(
+    changed: bool,
+    created_at: Option<String>,
+    edited_at: Option<String>,
+) -> (String, String) {
+    let now = format_utc_millis(now_millis());
+    let created = created_at.unwrap_or_else(|| now.clone());
+    let edited = if changed {
+        now
+    } else {
+        edited_at.unwrap_or(now)
+    };
+    (created, edited)
 }
 
 /// base 슬러그를 기반으로 미사용 슬러그를 찾고 파일명 검증까지 마쳐 돌려줍니다.
@@ -112,5 +129,13 @@ mod tests {
         assert_eq!(slug, "새-아젠다");
         let err = allocate_entity_slug("테스트", "a", &all).unwrap_err();
         assert!(err.message.contains("100 개까지 차 있어"));
+
+        let (c1, e1) = resolve_edit_timestamps(true, Some("2026-01-01T00:00:00.000Z".into()), None);
+        assert_eq!(c1, "2026-01-01T00:00:00.000Z");
+        assert_ne!(e1, "2026-01-01T00:00:00.000Z");
+
+        let (c2, e2) = resolve_edit_timestamps(false, Some("c".into()), Some("e".into()));
+        assert_eq!(c2, "c");
+        assert_eq!(e2, "e");
     }
 }
