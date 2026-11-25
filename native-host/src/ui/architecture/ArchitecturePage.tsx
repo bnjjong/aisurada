@@ -214,6 +214,11 @@ function ProjectArchitecture({ project, name, controller }: {
                 selectRelationship={pickRelationship}
                 drill={drill}
                 onMove={moveNodes}
+                onConnect={canAdd ? (source, target) => { setNotice(''); setConnect(null); setDialog({ type: 'relation', source, target }); } : undefined}
+                onReconnect={(id, source, target) => {
+                  setNotice('');
+                  void mutate([{ op: 'put_relationship', id, source, target }]).then(failure => setNotice(failure ?? ''));
+                }}
                 resetKey={resetKey}
                 connecting={connect !== null}
                 emptyText={emptyText}

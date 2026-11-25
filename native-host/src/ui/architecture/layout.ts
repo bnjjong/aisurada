@@ -98,6 +98,73 @@ export function wheelFactor(deltaY: number, deltaMode: number, pinch: boolean): 
   return Math.exp(-clamped * (pinch ? .01 : .0015));
 }
 
+/** 카드 가장자리에서 선을 시작하거나 놓을 수 있는 연결 지점. `at`은 그 변을 따라 0~1로 잰 자리다. */
+export type PortSide = 'top' | 'bottom' | 'left' | 'right';
+export type Port = { id: string; side: PortSide; at: number };
+
+const CENTER_PORTS: Port[] = [
+  { id: 'top', side: 'top', at: .5 }, { id: 'bottom', side: 'bottom', at: .5 },
+  { id: 'left', side: 'left', at: .5 }, { id: 'right', side: 'right', at: .5 },
+];
+const BOX_PORTS: Port[] = [
+  { id: 'top-1', side: 'top', at: .25 }, { id: 'top-2', side: 'top', at: .5 }, { id: 'top-3', side: 'top', at: .75 },
+  { id: 'bottom-1', side: 'bottom', at: .25 }, { id: 'bottom-2', side: 'bottom', at: .5 }, { id: 'bottom-3', side: 'bottom', at: .75 },
+  { id: 'left', side: 'left', at: .5 }, { id: 'right', side: 'right', at: .5 },
+];
+
+/** 상자 모양 카드는 위·아래 3개와 양옆 1개, 알약 모양인 사람은 모서리가 둥글어서 네 변의 가운데만 둔다. */
+export const portsFor = (kind: string): Port[] => kind === 'person' ? CENTER_PORTS : BOX_PORTS;
+
+/** 카드 상자 안에서의 연결 지점 비율(0~1). */
+export function portFraction(port: Port): Point {
+  switch (port.side) {
+    case 'top': return { x: port.at, y: 0 };
+    case 'bottom': return { x: port.at, y: 1 };
+    case 'left': return { x: 0, y: port.at };
+    default: return { x: 1, y: port.at };
+  }
+}
+
+/** 카드 왼쪽 위가 `node`일 때 연결 지점의 월드 좌표. */
+export function portPoint(node: Point, port: Port): Point {
+  const fraction = portFraction(port);
+  return { x: node.x + fraction.x * CARD_WIDTH, y: node.y + fraction.y * CARD_HEIGHT };
+}
+
+/** `point`(월드 좌표)에서 가장 가까운 연결 지점. */
+export function nearestPort(node: Point, point: Point, kind: string): Port {
+  const ports = portsFor(kind);
+  let best = ports[0];
+  let distance = Infinity;
+  for (const port of ports) {
+    const at = portPoint(node, port);
+    const length = Math.hypot(at.x - point.x, at.y - point.y);
+    if (length < distance) { best = port; distance = length; }
+  }
+  return best;
+}
+
+/** 칸 안의 화면 좌표를 월드 좌표로 바꾼다. `origin`은 월드 왼쪽 위의 화면 좌표다. */
+export const toWorld = (screen: Point, origin: Point, scale: number): Point => ({
+  x: (screen.x - origin.x) / scale, y: (screen.y - origin.y) / scale,
+});
+
+/** `point`(월드 좌표) 아래에 있는 카드의 id. 겹치면 나중에 그린(위에 있는) 카드가 이긴다. `margin`만큼 바깥도 친다. */
+export function nodeAt(nodes: (Point & { id: string })[], point: Point, margin = 0): string | null {
+  for (let index = nodes.length - 1; index >= 0; index--) {
+    const node = nodes[index];
+    if (point.x >= node.x - margin && point.x <= node.x + CARD_WIDTH + margin
+      && point.y >= node.y - margin && point.y <= node.y + CARD_HEIGHT + margin) return node.id;
+  }
+  return null;
+}
+
+/** 끄는 동안 보이는 점선 곡선의 제어점. 가로로 먼저 뻗었다가 도착점으로 들어온다. */
+export function linkCurve(from: Point, to: Point): { a: Point; b: Point } {
+  const half = (to.x - from.x) / 2;
+  return { a: { x: from.x + half, y: from.y }, b: { x: to.x - half, y: to.y } };
+}
+
 export function routeEdges(nodes: DiagramNode[], relationships: C4Relationship[]): DiagramEdge[] {
   const byId = new Map(nodes.map(item => [item.id, item]));
   const count = new Map<string, number>();
