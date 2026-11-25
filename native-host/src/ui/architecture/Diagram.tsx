@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import { Icon } from '../Icon.tsx';
 import type { C4Element, C4Relationship, Point } from './model.ts';
-import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, measureEdge, placeLabels, positionNodes, routeEdges } from './layout.ts';
+import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, MAX_SCALE, MAX_ZOOM, MIN_ZOOM, measureEdge, placeLabels, positionNodes, routeEdges, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from './layout.ts';
+import type { CameraFrame } from './layout.ts';
 import type { DiagramLabel } from './layout.ts';
 
 const KIND_ICON: Record<string, string> = {
@@ -66,13 +67,31 @@ export function Diagram({
   const idSignature = elements.map(item => item.id).join('|');
   useEffect(() => { setLocked(null); }, [idSignature]);
   const fit = Math.min(1.12, Math.max(.025, (area.width - 46) / box.width), Math.max(.025, (area.height - 78) / box.height));
-  const scale = Math.min(2.5, camera.zoom * fit);
+  const frame: CameraFrame = { fit, width: area.width, height: area.height, box };
+  const scale = viewScale(camera, frame);
   const typeScale = Math.max(1, Math.min(1.6, 1 / scale));
-  const x = (area.width - box.width * scale) / 2 - box.minX * scale + camera.x;
-  const y = (area.height - 32 - box.height * scale) / 2 - box.minY * scale + camera.y;
+  const { x, y } = viewOrigin(camera, frame);
   const resize = (amount: number) => setCamera(current => ({
-    ...current, zoom: Math.max(.45, Math.min(8, current.zoom * amount)),
+    ...current, zoom: Math.max(MIN_ZOOM, Math.min(Math.min(MAX_ZOOM, MAX_SCALE / fit), current.zoom * amount)),
   }));
+  // 스크롤(휠, 트랙패드)로 포인터 아래 지점을 기준 삼아 확대·축소한다. 페이지가 같이 스크롤되지 않도록
+  // 취소할 수 있는(passive가 아닌) 리스너로 받는다. 이벤트가 빨리 이어져도 직전 카메라에서 이어 계산한다.
+  const wheelFrame = useRef(frame);
+  wheelFrame.current = frame;
+  useEffect(() => {
+    const node = viewport.current;
+    if (!node) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.deltaY) return;
+      event.preventDefault();
+      const rect = node.getBoundingClientRect();
+      const anchor = { x: event.clientX - rect.left - node.clientLeft, y: event.clientY - rect.top - node.clientTop };
+      const factor = wheelFactor(event.deltaY, event.deltaMode, event.ctrlKey);
+      setCamera(current => zoomCameraAt(current, factor, anchor, wheelFrame.current));
+    };
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => node.removeEventListener('wheel', onWheel);
+  }, []);
   const reset = () => { setLocked(null); setCamera({ zoom: 1, x: 0, y: 0 }); };
 
   useEffect(() => { setMoved({}); }, [resetKey]);
