@@ -50,7 +50,7 @@ export interface HostCommandMap {
   // 알림 센터
   notifications_list: { args?: Record<string, never>; result: unknown };
   notifications_push: { args: { item: unknown; expectedVault?: string }; result: unknown };
-  notifications_mark_read: { args?: { ids?: string[] }; result: number };
+  notifications_mark_read: { args?: { ids?: string[] | null }; result: number };
   notifications_settings_get: { args?: Record<string, never>; result: unknown };
   notifications_settings_set: { args: { settings: unknown }; result: unknown };
 
@@ -107,20 +107,30 @@ export type OptionalArgsCommandName = {
 
 export type RequiredArgsCommandName = Exclude<HostCommandName, OptionalArgsCommandName>;
 
+export type HostCallArgsTuple = {
+  [K in HostCommandName]: [undefined] extends [HostCommandMap[K]['args']]
+    ? [command: K, args?: HostCommandMap[K]['args']]
+    : [command: K, args: HostCommandMap[K]['args']];
+}[HostCommandName];
+
 /**
  * 정형화된 호스트 IPC 호출 함수 인터페이스.
  * 등록된 명령에 대해서는 타입 추론 및 인자 검사가 엄격히 적용된다.
  */
 export interface TypedHostCall {
-  // 1. 인자가 없거나 생략 가능한 명령
-  <T = never, K extends OptionalArgsCommandName = OptionalArgsCommandName>(
+  // 1. 인자가 없거나 생략 가능한 명령 (반환 타입 자동 추론)
+  <K extends OptionalArgsCommandName>(
     command: K,
     args?: HostCommandMap[K]['args']
-  ): Promise<[T] extends [never] ? HostCommandMap[K]['result'] : T>;
+  ): Promise<HostCommandMap[K]['result']>;
 
-  // 2. 인자가 필수인 명령
-  <T = never, K extends RequiredArgsCommandName = RequiredArgsCommandName>(
+  // 2. 인자가 필수인 명령 (반환 타입 자동 추론)
+  <K extends RequiredArgsCommandName>(
     command: K,
     args: HostCommandMap[K]['args']
-  ): Promise<[T] extends [never] ? HostCommandMap[K]['result'] : T>;
+  ): Promise<HostCommandMap[K]['result']>;
+
+  // 3. 반환 타입 T를 직접 명시하는 호출: call<T>(command, args)
+  // 판별 유니온 튜플(...args: HostCallArgsTuple)을 통해 command에 따른 인자 검사를 강제한다.
+  <T>(...args: HostCallArgsTuple): Promise<T>;
 }
