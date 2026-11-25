@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import { taskAddress } from "../navigation/routes.ts";
-import { channelId, channelLabel, resultLabel, slackEmoji, slackLink, slackMessageTime, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
+import { channelId, channelLabel, intakePostedAt, intakeResultLabel, intakeSourceLabel, resultLabel, slackEmoji, slackLink, slackMessageTime, slackTime, slackTimestamp, viaLabel, type ChannelVisibility, type IntakeChannel, type IntakeData, type IntakeEntry, type IntakeRow, type IntakeSchedule, type IntakeSource } from "./intakeModel.ts";
 import { Modal } from "./Modal.tsx";
 import { SettingsSwitch } from "./SettingsParts.tsx";
 import type { TaskRef } from "./tasksClient.ts";
@@ -155,9 +155,11 @@ function SlackReactions({ entry }: { entry: Pick<IntakeEntry, "reactions" | "rea
 function EntryTimeline({ row }: { row: IntakeRow }) {
   const { entry, current } = row;
   const trigger = entry.reportReaction;
-  const timeline: { id: string; at: number; content: ReactNode }[] = [
-    { id: "posted", at: slackTime(entry.messageTs), content: <>Slack에 원글이 올라왔어요<small>{entry.reporter}</small></> },
-  ];
+  const timeline: { id: string; at: number; content: ReactNode }[] = [];
+  const postedAt = intakePostedAt(entry);
+  if (postedAt != null) timeline.push({
+    id: "posted", at: postedAt, content: <>{intakeSourceLabel(entry)} 원글<small>{entry.reporter}</small></>,
+  });
   if (trigger?.at != null) timeline.push({
     id: "report-reaction", at: trigger.at, content: <>{slackEmoji(trigger.name)} 제보 반응{trigger.by && <small>{trigger.by}</small>}</>,
   });
@@ -170,7 +172,7 @@ function EntryTimeline({ row }: { row: IntakeRow }) {
     });
     timeline.push({
       id: event.revision, at: event.at, content: <>
-        <strong>{resultLabel[event.result]}</strong> · {viaLabel[event.via]}{event.decision && <small>{event.decision}</small>}
+        <strong>{intakeResultLabel(entry, event)}</strong> · {viaLabel[event.via]}{event.decision && <small>{event.decision}</small>}
         {event !== current && event.question && <small>{event.question}</small>}
       </>,
     });
@@ -185,6 +187,7 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
   action(result: "pending" | "ignored"): void; busy: boolean; error: string;
 }) {
   const { entry, current } = row;
+  const postedAt = intakePostedAt(entry);
   const [copyStatus, setCopyStatus] = useState("");
   const copyQuestion = async () => {
     try {
@@ -196,17 +199,17 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
   };
   return <Modal title="원장 항목" close={close} className="mgr-modal intake-drawer" resizable={false}>
       <div className="intake-drawer-body">
-      <span className={`mgr-badge intake-result is-${current.result}`}>{resultLabel[current.result]}</span>
-      <h2>{entry.excerpt.split("\n")[0] || "Slack 제보"}</h2>
+      <span className={`mgr-badge intake-result is-${current.result}`}>{intakeResultLabel(entry, current)}</span>
+      <h2>{entry.excerpt.split("\n")[0] || `${intakeSourceLabel(entry)} 제보`}</h2>
       <blockquote className="intake-quote">
-        <strong>{entry.reporter} · {time(slackTime(entry.messageTs))} · {channel ? channelLabel(channel) : entry.channel}</strong>
+        <strong>{entry.reporter} · {channel ? channelLabel(channel) : intakeSourceLabel(entry)}{postedAt != null && ` · ${time(postedAt)}`}</strong>
         <p>{entry.excerpt || "인용한 글이 없어요."}</p>
         <SlackReactions entry={entry} />
         {entry.reportReaction?.by && entry.reportReaction.at == null &&
           <small>제보 반응 · {entry.reportReaction.by}</small>}
       </blockquote>
       <dl className="mgr-meta">
-        <dt>원글 주소</dt><dd><code>{entry.url}</code><br /><SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink></dd>
+        {entry.url && <><dt>원글 주소</dt><dd><code>{entry.url}</code><br /><SlackIntakeLink url={entry.url} controller={controller}>Slack에서 열기</SlackIntakeLink></dd></>}
         <dt>매니저</dt><dd>{entry.manager} · {viaLabel[current.via]}</dd>
         {current.decision && <><dt>판단</dt><dd>{current.decision}</dd></>}
         {current.question && <><dt>답글 초안</dt><dd>{current.question}
@@ -216,7 +219,7 @@ function EntryDrawer({ row, channel, controller, close, action, busy, error }: {
       </dl>
       <h3>처리 이력</h3>
       <EntryTimeline row={row} />
-      {current.result === "asked" && <p className="mgr-warning">스레드에 답이 오면 다음 확인 때 매니저가 다시 검토해요.</p>}
+      {current.result === "asked" && !entry.source && <p className="mgr-warning">스레드에 답이 오면 다음 확인 때 매니저가 다시 검토해요.</p>}
       {error && <p role="alert" className="mgr-error">{error}</p>}
       <footer className="mgr-actions">
         <button type="button" className="primary" disabled={busy || current.result === "pending"} onClick={() => action("pending")}>다시 처리</button>
@@ -281,7 +284,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
   const search = query.trim().toLowerCase();
   const shown = rows.filter(({ entry, current }) =>
     (filter === "all" || filter === current.result) &&
-    (!search || [entry.excerpt, entry.reporter, entry.taskKey, entry.channel].some(value => value?.toLowerCase().includes(search))));
+    (!search || [entry.excerpt, entry.reporter, entry.taskKey, entry.channel, intakeSourceLabel(entry)].some(value => value?.toLowerCase().includes(search))));
   const row = rows.find(item => item.entry.id === selected);
   return <div className="intake-stack">
     {!row && !rewind && error && <p role="alert" className="mgr-error">{error}</p>}
@@ -289,7 +292,7 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
       onRewind={() => { setError(""); setRewind(channel); }}
       onPause={() => void execute("intake-channel", { channel: channel.id, paused: !channel.paused })} />)}
     {data && !channels.length && <section className="mgr-panel mgr-between">
-      <span>설정한 제보 채널이 없어요.</span><button type="button" onClick={onConnection}>제보 채널 설정</button>
+      <span>설정한 Slack 제보 채널이 없어요.</span><button type="button" onClick={onConnection}>Slack 제보 채널 설정</button>
     </section>}
     <dl className="mgr-counts intake-counts">{countLabels.map((label, index) => <div key={label}>
       <dt>{label}</dt><dd>{counts?.[index] ?? "—"}</dd>
@@ -307,14 +310,15 @@ export function ManagerIntake({ item, controller, entryId, onConnection }: {
         <thead><tr><th scope="col">시각</th><th scope="col">원글</th><th scope="col">결과</th><th scope="col">처리</th></tr></thead>
         <tbody>{shown.map(({ entry, current, taskRepo, repeatCount }) => {
           const open = () => { setError(""); setSelected(entry.id); };
+          const postedAt = intakePostedAt(entry);
           return <tr key={entry.id} data-selected={selected === entry.id}
             onClick={() => { if (window.getSelection()?.type !== "Range") open(); }}>
             <td>{time(current.at)}</td>
             <td><button type="button" className="intake-row-open" onClick={event => { event.stopPropagation(); open(); }}
-              aria-haspopup="dialog">{entry.excerpt || "Slack에서 받은 제보"}</button>
-              <small>{entry.reporter} · {eventTime(slackTime(entry.messageTs))}{entry.reactionAdded && " · ✅"}</small></td>
+              aria-haspopup="dialog">{entry.excerpt || `${intakeSourceLabel(entry)} 제보`}</button>
+              <small>{entry.reporter}{entry.source && ` · ${intakeSourceLabel(entry)}`}{postedAt != null && ` · ${eventTime(postedAt)}`}{entry.reactionAdded && " · ✅"}</small></td>
             <td>
-              <span className={`mgr-badge intake-result is-${current.result}`}>{resultLabel[current.result]}{entry.taskKey && ` · ${entry.taskKey}`}</span>
+              <span className={`mgr-badge intake-result is-${current.result}`}>{intakeResultLabel(entry, current)}{entry.taskKey && ` · ${entry.taskKey}`}</span>
               {taskRepo && <small>{taskRepo}</small>}
               {!!repeatCount && <small>재제보 {repeatCount}건</small>}
               {current.decision && <small className="intake-row-decision" title={current.decision}>{current.decision}</small>}

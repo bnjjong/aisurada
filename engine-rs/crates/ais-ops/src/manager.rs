@@ -26,7 +26,13 @@ pub const DEFAULT_TOOLS: [&str; 7] = [
     "add_task_comment",
     "create_doc",
 ];
-pub const INTAKE_TOOLS: [&str; 3] = ["get_intake", "record_intake", "move_cursor"];
+pub const INTAKE_TOOLS: [&str; 5] = [
+    "get_intake",
+    "submit_intake",
+    "complete_intake",
+    "record_intake",
+    "move_cursor",
+];
 pub const OPTIONAL_TOOLS: [&str; 7] = [
     "list_docs",
     "list_tags",
@@ -605,7 +611,7 @@ fn dashboard(env: &Env, managers: &[Manager]) -> Result<Value, String> {
                 None
             };
             let history_issue = history.is_err().then_some("호출 기록을 읽을 수 없어요");
-            let intake = (issue.is_none() && !item.slack_channels.is_empty())
+            let intake = issue.is_none()
                 .then(|| item.intake(IntakeOperation::Get, CallContext::app(), json!({"summary": true})));
             let intake_issue = intake.as_ref().and_then(|result| result.as_ref().err()).map(ToString::to_string);
             json!({"manager": item, "issue": issue, "historyIssue": history_issue, "history": history.unwrap_or_default(),

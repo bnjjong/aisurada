@@ -15,7 +15,7 @@ use serde_json::{Value as Json, json};
 use super::{intake_commands, note_meta_write::BoolArg};
 use crate::error::EngineError;
 use crate::kernel::actor::{CallContext, Caller, ManagerContext};
-use crate::task::aggregate::{self, Fields, Scan};
+use crate::task::aggregate::{self, Fields, NewTask, Scan};
 use crate::task::format::{self, java_trim};
 use crate::task::store;
 use crate::task::transitions::{self, HUMAN};
@@ -329,6 +329,28 @@ fn refetch<'a>(scan: &'a Scan, task: &'a Task) -> &'a Task {
 // ---------------------------------------------------------------- 쓰기
 
 pub fn create_task(vault: &Path, request: &CreateTaskRequest, context: &CallContext) -> Result<Json, EngineError> {
+    let task = create_intake_task(vault, request, context, None)?;
+    let scan = scan_for_reader(vault, context)?;
+    let mut m = detail(vault, &scan, refetch(&scan, &task), 0)?;
+    m["created"] = json!(true);
+    Ok(m)
+}
+
+pub(super) fn create_intake_task(
+    vault: &Path,
+    request: &CreateTaskRequest,
+    context: &CallContext,
+    receipt: Option<&str>,
+) -> Result<Task, EngineError> {
+    let (task, actor) = prepare_task(vault, request, context)?;
+    store::create(vault, task, &stamp_of(context), &actor, receipt)
+}
+
+pub(super) fn prepare_task(
+    vault: &Path,
+    request: &CreateTaskRequest,
+    context: &CallContext,
+) -> Result<(NewTask, String), EngineError> {
     let mut fields = fields_of(
         &request.title,
         &request.task_type,
@@ -349,11 +371,7 @@ pub fn create_task(vault: &Path, request: &CreateTaskRequest, context: &CallCont
         fields.project = Some(manager.project.clone());
     }
     let actor = actor_of(&request.actor)?;
-    let task = store::create(vault, fields, &stamp_of(&context), &actor)?;
-    let scan = scan_for_reader(vault, context)?;
-    let mut m = detail(vault, &scan, refetch(&scan, &task), 0)?;
-    m["created"] = json!(true);
-    Ok(m)
+    Ok((NewTask::from_fields(fields)?, actor))
 }
 
 pub fn update_task(vault: &Path, request: &UpdateTaskRequest, context: &CallContext) -> Result<Json, EngineError> {

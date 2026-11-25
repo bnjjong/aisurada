@@ -123,8 +123,9 @@ export function ManagerConnection({ form, history, controller, update }: {
     {format === "hermes" ? (
       <ol className="mgr-instructions">
         <li>Hermes에서 <strong>{profile}</strong> 프로필을 만들고 아래 설정을 그 프로필의 <code>config.yaml</code>에 합치세요. 이미 연결한 프로필이 있으면 그 프로필을 사용하세요.</li>
-        <li>기본 Hermes 프로필에 공용 Slack 봇을 설정하세요. <code>gateway.multiplex_profiles</code>를 켜고 <code>gateway.profile_routes</code>에서 Slack 채널 ID를 이 프로필에 연결하세요.</li>
-        <li>Hermes 게이트웨이를 다시 시작한 뒤 프로젝트 채널에서 봇에게 태스크 목록을 물어보세요.</li>
+        <li>Slack을 쓰면 기본 Hermes 프로필에 공용 Slack 봇을 설정하세요. <code>gateway.multiplex_profiles</code>를 켜고 <code>gateway.profile_routes</code>에서 Slack 채널 ID를 이 프로필에 연결하세요.</li>
+        <li>텔레그램을 쓰면 이 프로필에 <code>aisurada-intake</code> Hermes 플러그인을 설치하세요.</li>
+        <li>Hermes 게이트웨이를 다시 시작한 뒤 연결한 채팅에서 봇에게 태스크 목록을 물어보세요.</li>
       </ol>
     ) : <p>아래 설정을 에이전트의 MCP 설정에 합친 뒤 새 세션에서 태스크 목록을 요청하세요.</p>}
     {error && <p role="alert" className="mgr-error">{error}</p>}

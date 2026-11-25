@@ -793,6 +793,192 @@ repos: [{"name":"shared","github":"demo/shared"}]
 }
 
 #[test]
+fn manager_direct_intake_survives_retries_without_slack_channels() {
+    let vault = fixture("direct-intake");
+    std::fs::write(
+        vault.join(".aisurada/projects/intake.md"),
+        "---\nid: pjfx100a-000000f1\nslug: intake\ntitle: intake\nrepos: [{\"name\":\"shared\",\"github\":\"demo/shared\"}]\n---\n",
+    ).unwrap();
+
+    let cli = |args: &[&str]| {
+        let (status, stdout, stderr) = run_cli(&vault, &[], args);
+        assert_eq!(status, 0, "{stderr}");
+        serde_json::from_str::<Value>(&stdout).unwrap()
+    };
+    let name = "hermes-direct";
+    for manager in [name, "other-direct"] {
+        cli(&[
+            "manager",
+            "add",
+            manager,
+            "project=intake",
+            "repos=demo/shared",
+        ]);
+    }
+    let tool = |manager, action, args| {
+        let (status, rows) = converse(&vault, &["--manager", manager], &[call(1, action, args)]);
+        assert_eq!(status, 0);
+        rows.into_iter().next().unwrap()
+    };
+    let mcp = |action, args| tool_json(&tool(name, action, args));
+    let report = |kind, key| {
+        json!({
+            "source": {"kind":kind, "key":key},
+            "reporter":"텔레그램 사용자",
+            "excerpt":"로그인 화면이 멈춰요"
+        })
+    };
+
+    assert_eq!(
+        tool(name, "submit_intake", report("slack", "bot:chat:1"))["result"]["isError"],
+        true
+    );
+    let payload = report("telegram", "bot:chat:1");
+    let received = mcp("submit_intake", payload.clone());
+    assert_eq!(received["recorded"], false);
+    assert_eq!(received["item"]["current"]["result"], "pending");
+    let receipt = &received["item"]["entry"]["id"];
+    let lookup = json!({"entryId":receipt});
+    assert_eq!(mcp("get_intake", lookup.clone())["item"], received["item"]);
+    let queues = mcp("get_intake", json!({}));
+    assert_eq!(queues["pending"], json!([]));
+    assert_eq!(queues["directPending"][0], received["item"]);
+    assert_eq!(
+        tool_json(&tool("other-direct", "get_intake", lookup))["recorded"],
+        false
+    );
+    assert_eq!(
+        mcp("submit_intake", payload.clone())["item"],
+        received["item"]
+    );
+
+    let complete = json!({
+        "entryId":receipt,
+        "priorRevision":received["item"]["current"]["revision"],
+        "outcome":{"result":"created", "task":{"title":"로그인 화면이 멈춤", "repo":"demo/shared", "criteria":["로그인 확인"]}}
+    });
+    assert_eq!(
+        tool("other-direct", "complete_intake", complete.clone())["result"]["isError"],
+        true
+    );
+    cli(&["manager", "update", "other-direct", "tools=list_tasks"]);
+    let other_received = tool_json(&tool(
+        "other-direct",
+        "submit_intake",
+        report("desktop", "client:chat:1"),
+    ));
+    let mut read_only = complete.clone();
+    read_only["entryId"] = other_received["item"]["entry"]["id"].clone();
+    read_only["priorRevision"] = other_received["item"]["current"]["revision"].clone();
+    let rejected = tool("other-direct", "complete_intake", read_only);
+    assert_eq!(rejected["result"]["isError"], true);
+    assert!(text(&rejected).contains("허용하지 않은 태스크 작업"));
+    let mut stale = complete.clone();
+    stale["priorRevision"] = json!("stale");
+    assert_eq!(
+        tool(name, "complete_intake", stale)["result"]["isError"],
+        true
+    );
+    let mut denied = complete.clone();
+    denied["outcome"]["task"]["repo"] = json!("outside/repo");
+    assert_eq!(
+        tool(name, "complete_intake", denied)["result"]["isError"],
+        true
+    );
+
+    let ledger = vault.join(".aisurada/intake/ledger.json");
+    let checkpoint = |receipt: &Value, work| {
+        let mut snapshot: Value = serde_json::from_slice(&std::fs::read(&ledger).unwrap()).unwrap();
+        let entries = snapshot["entries"].as_object_mut().unwrap();
+        let entry = entries
+            .values_mut()
+            .find(|entry| entry["id"] == *receipt)
+            .unwrap();
+        entry["work"] = work;
+        serde_json::to_vec(&snapshot).unwrap()
+    };
+    let pending = checkpoint(receipt, json!({"result":"created", "taskId":null}));
+    let resolved = mcp("complete_intake", complete.clone());
+    let task_key = resolved["item"]["entry"]["taskKey"].as_str().unwrap();
+
+    // 태스크 저장 직후 원장 결과 쓰기가 실패한 상태에서도 같은 태스크를 연결한다.
+    std::fs::write(&ledger, pending).unwrap();
+    let mut changed = complete.clone();
+    changed["outcome"] = json!({"result":"ignored"});
+    assert_eq!(
+        tool(name, "complete_intake", changed)["result"]["isError"],
+        true
+    );
+    assert_eq!(
+        mcp("complete_intake", complete.clone())["item"]["entry"]["taskKey"],
+        task_key
+    );
+    assert_eq!(mcp("complete_intake", complete)["recorded"], true);
+    assert_eq!(
+        mcp("submit_intake", payload)["item"]["entry"]["taskKey"],
+        task_key
+    );
+
+    let repeat = mcp("submit_intake", report("telegram", "bot:chat:2"));
+    let comment = json!({
+        "entryId":repeat["item"]["entry"]["id"],
+        "priorRevision":repeat["item"]["current"]["revision"],
+        "outcome":{"result":"commented", "taskKey":task_key}
+    });
+    let pending = checkpoint(
+        &repeat["item"]["entry"]["id"],
+        json!({"result":"commented", "taskId":resolved["item"]["entry"]["taskId"]}),
+    );
+    assert_eq!(
+        mcp("complete_intake", comment.clone())["item"]["current"]["result"],
+        "commented"
+    );
+    std::fs::write(&ledger, pending).unwrap();
+    assert_eq!(
+        mcp("complete_intake", comment)["item"]["entry"]["taskKey"],
+        task_key
+    );
+    let task = cli(&["get-task", task_key]);
+    assert_eq!(
+        task["activity"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| event["kind"] == "comment")
+            .count(),
+        1
+    );
+
+    let desktop = cli(&["manager", "intake", name]);
+    assert_eq!(desktop["channels"], json!([]));
+    assert_eq!(desktop["counts"], json!([2, 1, 1, 0, 0]));
+    assert_eq!(desktop["rows"].as_array().unwrap().len(), 2);
+    assert_eq!(desktop["rows"][0]["entry"]["source"]["kind"], "telegram");
+    let dashboard = cli(&["manager", "dashboard"]);
+    let item = dashboard["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["manager"]["name"] == name)
+        .unwrap();
+    assert_eq!(item["intake"]["counts"], desktop["counts"]);
+    let tasks = vault.join(".aisurada/tasks");
+    assert_eq!(
+        std::fs::read_dir(tasks)
+            .unwrap()
+            .filter(|entry| entry
+                .as_ref()
+                .unwrap()
+                .path()
+                .extension()
+                .is_some_and(|ext| ext == "md"))
+            .count(),
+        1
+    );
+    std::fs::remove_dir_all(vault).unwrap();
+}
+
+#[test]
 fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     use std::time::{SystemTime, UNIX_EPOCH};
 

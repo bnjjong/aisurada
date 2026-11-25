@@ -1,5 +1,5 @@
 export type IntakeResult = "created" | "commented" | "asked" | "ignored" | "pending";
-export type IntakeVia = "desktop" | "scheduled" | "manual";
+export type IntakeVia = "desktop" | "scheduled" | "manual" | "direct";
 
 export interface IntakeSchedule {
   days: number[];
@@ -52,6 +52,7 @@ export interface ReportReaction {
 
 export interface IntakeEntry {
   id: string;
+  source?: { kind: string; postedAt?: number };
   channel: string;
   messageTs: string;
   url: string;
@@ -89,7 +90,23 @@ export interface IntakeData {
 export const resultLabel: Record<IntakeResult, string> = {
   created: "새 태스크", commented: "재제보 댓글", asked: "되물음 대기", ignored: "무시", pending: "다시 처리 대기",
 };
-export const viaLabel: Record<IntakeVia, string> = { desktop: "데스크톱 대화", scheduled: "예약 확인", manual: "사람이 처리" };
+export const viaLabel: Record<IntakeVia, string> = { desktop: "데스크톱 대화", scheduled: "예약 확인", manual: "사람이 처리", direct: "직접 접수" };
+
+export function intakeSourceLabel(entry: IntakeEntry) {
+  if (!entry.source) return "Slack";
+  if (entry.source.kind === "telegram") return "텔레그램";
+  if (entry.source.kind === "desktop") return "데스크톱";
+  return entry.source.kind;
+}
+
+export function intakePostedAt(entry: IntakeEntry) {
+  return entry.source ? entry.source.postedAt : slackTime(entry.messageTs);
+}
+
+export function intakeResultLabel(entry: IntakeEntry, event: IntakeProcessing) {
+  return event.result === "pending" && entry.source && event.revision === entry.history[0]?.revision
+    ? "접수됨" : resultLabel[event.result];
+}
 const slackEmojis = new Map([
   ["ticket", "🎫"], ["beetle", "🐞"], ["eyes", "👀"], ["white_check_mark", "✅"],
 ]);
