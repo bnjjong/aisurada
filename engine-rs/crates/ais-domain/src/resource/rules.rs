@@ -9,7 +9,7 @@
 //! 값 타입만 쓰고 그 모듈의 파일 읽기·쓰기는 부르지 않는다. 타입을 도메인으로 옮기는 일은 크레이트를 가르는 8단계에서 본다.
 
 use super::format;
-use super::{Entry, Fields, Resource, ResourceKind, tools_equal};
+use super::{Entry, Fields, Resource, ResourceKind, ResourcePermission, tools_equal};
 use crate::error::EngineError;
 use crate::kernel::java::java_trim;
 use crate::text::{is_blank, trim};
@@ -263,11 +263,11 @@ pub fn changed_fields(a: &Resource, b: &Resource) -> Vec<String> {
         out.push("지침".into());
     }
     if a.permission != b.permission {
-        let show = |p: &Option<String>| p.clone().unwrap_or_else(|| "null".to_string());
+        let show = |p: Option<ResourcePermission>| p.map_or("null", |p| p.as_str());
         out.push(format!(
             "권한 {} → {}",
-            show(&a.permission),
-            show(&b.permission)
+            show(a.permission),
+            show(b.permission)
         ));
     }
     if a.skills != b.skills {
@@ -557,7 +557,7 @@ mod tests {
     fn changed_fields_lists_the_slots_in_a_fixed_order_with_the_permission_move() {
         let a = res("ap1", "a", None, &[]);
         let mut b = res("ap1", "b", None, &["sk1"]);
-        b.permission = Some("edit".into());
+        b.permission = Some(ResourcePermission::Edit);
         b.repo = Some("r".into());
         assert_eq!(
             changed_fields(&a, &b),

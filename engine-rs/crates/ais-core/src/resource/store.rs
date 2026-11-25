@@ -19,7 +19,7 @@ use std::time::UNIX_EPOCH;
 
 use regex::Regex;
 
-use super::{Resource, ResourceKind, approvals, format, refs, tools_equal};
+use super::{Resource, ResourceKind, ResourcePermission, approvals, format, refs, tools_equal};
 use crate::error::EngineError;
 use crate::json::{self, JsonValue};
 use crate::kernel::token::compute_token;
@@ -437,7 +437,7 @@ pub fn plan_create(
 
     let (mut permission, mut skills, mut repo) = (None, Vec::new(), None);
     if kind == ResourceKind::Agent {
-        permission = Some(f.permission.clone().unwrap_or_else(|| "read".to_string()));
+        permission = Some(f.permission.unwrap_or(ResourcePermission::DEFAULT));
         skills = f.skills.clone().unwrap_or_default();
         repo = f.repo.clone().filter(|r| !r.is_empty());
         validate_agent_links(vault, &scan, project, &skills, repo.as_deref())?;
@@ -530,12 +530,12 @@ pub fn plan_update(
         _ => cur.tools.clone(),
     };
 
-    let mut permission = cur.permission.clone();
+    let mut permission = cur.permission;
     let mut skills = cur.skills.clone();
     let mut repo = cur.repo.clone();
     if cur.kind == ResourceKind::Agent {
-        if let Some(p) = &f.permission {
-            permission = Some(p.clone());
+        if let Some(p) = f.permission {
+            permission = Some(p);
         }
         if let Some(s) = &f.skills {
             skills = s.clone();

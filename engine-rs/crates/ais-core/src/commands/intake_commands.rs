@@ -18,7 +18,7 @@ use crate::kernel::{
     time::{LocalClock, days_from_civil},
 };
 use crate::ports::{clock, fs, ids};
-use crate::task::{Task, format, store};
+use crate::task::{RefKind, Task, format, store};
 use crate::vault::check_manager_project;
 use crate::write::{marker::check_workspace_marker, write_atomic};
 
@@ -1129,7 +1129,7 @@ fn apply_task(
         // 원장 저장 전에 연결이 끊겨도 원글 주소로 이미 만든 태스크를 찾는다.
         let matches_source = |task: &Task| {
             task.refs.iter().any(|item| {
-                item.kind == "slack"
+                item.kind == RefKind::Slack
                     && source_matches(&item.target, &entry.channel, &entry.message_ts)
             })
         };
@@ -1165,10 +1165,10 @@ fn apply_task(
             .map(format::refs)
             .transpose()?
             .unwrap_or_default();
-        refs.retain(|item| item.kind != "slack");
+        refs.retain(|item| item.kind != RefKind::Slack);
         let mut values: Vec<_> = refs
             .into_iter()
-            .map(|item| json!({"kind": item.kind, "target": item.target, "title": item.title}))
+            .map(|item| json!({"kind": item.kind.as_str(), "target": item.target, "title": item.title}))
             .collect();
         values.insert(
             0,

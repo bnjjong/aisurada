@@ -63,6 +63,44 @@ impl ResourceKind {
     }
 }
 
+/// 에이전트 자원 권한(`read`, `edit`, `publish`)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ResourcePermission {
+    Read,
+    Edit,
+    Publish,
+}
+
+impl ResourcePermission {
+    pub const ALL: [ResourcePermission; 3] = [
+        ResourcePermission::Read,
+        ResourcePermission::Edit,
+        ResourcePermission::Publish,
+    ];
+    pub const DEFAULT: ResourcePermission = ResourcePermission::Read;
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ResourcePermission::Read => "read",
+            ResourcePermission::Edit => "edit",
+            ResourcePermission::Publish => "publish",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<ResourcePermission> {
+        let v = raw.trim_matches(|c: char| c <= ' ').to_lowercase();
+        Self::ALL.into_iter().find(|p| p.as_str() == v)
+    }
+
+    pub fn rank(self) -> usize {
+        match self {
+            ResourcePermission::Read => 0,
+            ResourcePermission::Edit => 1,
+            ResourcePermission::Publish => 2,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Resource {
     pub id: String,
@@ -72,7 +110,7 @@ pub struct Resource {
     pub name: String,
     pub description: String,
     /// 에이전트만(`read`, `edit`, `publish`)
-    pub permission: Option<String>,
+    pub permission: Option<ResourcePermission>,
     pub skills: Vec<String>,
     pub repo: Option<String>,
     /// 도구별 선택 칸. 프로세스와 엔진 설정의 일시만 엔진이 관리한다.
@@ -166,7 +204,7 @@ pub struct Fields {
     pub name: Option<String>,
     pub description: Option<String>,
     pub body: Option<String>,
-    pub permission: Option<String>,
+    pub permission: Option<ResourcePermission>,
     pub skills: Option<Vec<String>>,
     pub repo: Option<String>,
     pub tools: Option<Vec<(String, Value)>>,

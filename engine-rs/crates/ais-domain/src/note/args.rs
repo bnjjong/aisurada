@@ -125,21 +125,16 @@ fn parse_link(entries: &[(String, JsonValue)]) -> Result<Link, EngineError> {
     };
     let to = text_of("to")?;
     let kind = text_of("kind")?;
-    let kind = LinkKind::parse_ignore_ascii_case(&kind)
-        .map(LinkKind::as_str)
-        .ok_or_else(|| {
-            EngineError::invalid_argument(format!(
-                "모르는 관계 종류 이다: {kind}. 쓸 수 있는 것은 [{}] 뿐이다.",
-                LinkKind::NAMES_TEXT
-            ))
-        })?;
+    let kind = LinkKind::parse_ignore_ascii_case(&kind).ok_or_else(|| {
+        EngineError::invalid_argument(format!(
+            "모르는 관계 종류 이다: {kind}. 쓸 수 있는 것은 [{}] 뿐이다.",
+            LinkKind::NAMES_TEXT
+        ))
+    })?;
     if !NOTE_ID.is_match(&to) {
         return Err(EngineError::invalid_argument(format!(
             "노트 id 모양이 아니다: {to}"
         )));
     }
-    Ok(Link {
-        to,
-        kind: kind.to_string(),
-    })
+    Ok(Link { to, kind })
 }

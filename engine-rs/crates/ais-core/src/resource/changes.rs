@@ -190,8 +190,7 @@ pub fn view(r: &Resource) -> JsonValue {
         m.push((
             "permission".into(),
             r.permission
-                .as_deref()
-                .map_or_else(|| literal("null"), string),
+                .map_or_else(|| literal("null"), |p| string(p.as_str())),
         ));
         m.push((
             "skills".into(),

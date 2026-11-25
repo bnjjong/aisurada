@@ -160,7 +160,10 @@ fn row(r: &Resource, with_body: bool, with_token: bool) -> Map<String, Json> {
     m.insert("name".into(), json!(r.name));
     m.insert("description".into(), json!(r.description));
     if r.kind == ResourceKind::Agent {
-        m.insert("permission".into(), json!(r.permission));
+        m.insert(
+            "permission".into(),
+            json!(r.permission.map(|p| p.as_str())),
+        );
         m.insert("skills".into(), json!(r.skills));
         if let Some(repo) = &r.repo {
             m.insert("repo".into(), json!(repo));

@@ -7,7 +7,8 @@ use regex::Regex;
 use serde_json::Value as Json;
 
 use super::{
-    Resource, ResourceKind, is_tool_timestamp, stores_tool_timestamps, tool_settings_equal,
+    Resource, ResourceKind, ResourcePermission, is_tool_timestamp, stores_tool_timestamps,
+    tool_settings_equal,
 };
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
@@ -100,10 +101,8 @@ pub fn parse(
     let (mut permission, mut skills, mut repo) = (None, Vec::new(), None);
     if kind == ResourceKind::Agent {
         permission = Some(match str_of(&map, "permission") {
-            Some(p) if PERMISSIONS.contains(&java_trim(&p).to_lowercase().as_str()) => {
-                java_trim(&p).to_lowercase()
-            }
-            _ => "read".to_string(),
+            Some(p) => ResourcePermission::parse(&p).unwrap_or(ResourcePermission::DEFAULT),
+            None => ResourcePermission::DEFAULT,
         });
         skills = skill_list(get(&map, "skills"));
         repo = str_of(&map, "repo")
@@ -233,7 +232,7 @@ pub fn render(resource: &Resource) -> Result<Vec<u8>, EngineError> {
     if resource.kind == ResourceKind::Agent {
         map.push((
             text("permission"),
-            text(resource.permission.as_deref().unwrap_or("read")),
+            text(resource.permission.unwrap_or(ResourcePermission::DEFAULT).as_str()),
         ));
         if !resource.skills.is_empty() {
             map.push((
@@ -372,15 +371,15 @@ pub fn body(raw: &str) -> Result<String, EngineError> {
     Ok(raw.to_string())
 }
 
-pub fn permission(raw: &str) -> Result<String, EngineError> {
+pub fn permission(raw: &str) -> Result<ResourcePermission, EngineError> {
     let p = java_trim(raw).to_lowercase();
-    if !PERMISSIONS.contains(&p.as_str()) {
+    let Some(perm) = ResourcePermission::parse(&p) else {
         return Err(bad(format!(
             "permission 은 [{}] 가운데 하나여야 한다: {raw}",
             PERMISSIONS.join(", ")
         )));
-    }
-    Ok(p)
+    };
+    Ok(perm)
 }
 
 /// 호출 객체의 JSON 값이나 명령줄의 JSON 글을 읽어 엔진의 JSON 값으로 만든다. 빈 글은 `None`이다.

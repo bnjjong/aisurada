@@ -40,7 +40,7 @@ impl From<&Link> for LinkRow {
     fn from(link: &Link) -> Self {
         LinkRow {
             to: link.to.clone(),
-            kind: link.kind.clone(),
+            kind: link.kind.as_str().to_string(),
         }
     }
 }

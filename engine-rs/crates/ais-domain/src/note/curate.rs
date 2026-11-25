@@ -110,20 +110,20 @@ pub fn check_link_ends(from: &str, to: &str, usage: &str) -> Result<(), EngineEr
     Ok(())
 }
 
-/// 관계 종류를 읽는다. 안 주거나 비면 `direct`, 모르는 값이면 오류. 소문자로 맞춰 돌려준다.
-pub fn parse_link_kind(raw: Option<&str>) -> Result<String, EngineError> {
+/// 관계 종류를 읽는다. 안 주거나 비면 `direct`, 모르는 값이면 오류.
+pub fn parse_link_kind(raw: Option<&str>) -> Result<LinkKind, EngineError> {
     let Some(raw) = raw.filter(|r| !trim(r).is_empty()) else {
-        return Ok(LinkKind::Direct.as_str().to_string());
+        return Ok(LinkKind::Direct);
     };
     let lower = trim(raw).to_lowercase();
-    if LinkKind::parse(&lower).is_none() {
+    let Some(kind) = LinkKind::parse(&lower) else {
         return Err(EngineError::invalid_argument(format!(
             "모르는 관계 종류 이다: {}. 쓸 수 있는 것은 [{}] 뿐이다.",
             trim(raw),
             LinkKind::NAMES_TEXT
         )));
-    }
-    Ok(lower)
+    };
+    Ok(kind)
 }
 
 /// 자기 자신과는 연결할 수 없다.
@@ -145,9 +145,9 @@ pub enum LinkOutcome {
     Changed(Vec<Link>),
 }
 
-/// 같은 대상(`to`)과 종류(`kind`, 대소문자 무시)의 연결을 더하거나 뺀다. 더할 때는 목록 끝에 붙는다.
-pub fn apply_link(links: &[Link], to: &str, kind: &str, remove: bool) -> LinkOutcome {
-    let same = |l: &Link| l.to == to && l.kind.eq_ignore_ascii_case(kind);
+/// 같은 대상(`to`)과 종류(`kind`)의 연결을 더하거나 뺀다. 더할 때는 목록 끝에 붙는다.
+pub fn apply_link(links: &[Link], to: &str, kind: LinkKind, remove: bool) -> LinkOutcome {
+    let same = |l: &Link| l.to == to && l.kind == kind;
     let exists = links.iter().any(same);
     if !remove && exists {
         return LinkOutcome::Unchanged("이미 있는 연결이에요.");
@@ -159,7 +159,7 @@ pub fn apply_link(links: &[Link], to: &str, kind: &str, remove: bool) -> LinkOut
     if !remove {
         next.push(Link {
             to: to.to_string(),
-            kind: kind.to_string(),
+            kind,
         });
     }
     LinkOutcome::Changed(next)
@@ -198,10 +198,10 @@ mod tests {
         }
     }
 
-    fn link(to: &str, kind: &str) -> Link {
+    fn link(to: &str, kind: LinkKind) -> Link {
         Link {
             to: to.into(),
-            kind: kind.into(),
+            kind,
         }
     }
 
@@ -289,9 +289,9 @@ mod tests {
 
     #[test]
     fn link_kind_defaults_to_direct_and_lowercases() {
-        assert_eq!(parse_link_kind(None).unwrap(), "direct");
-        assert_eq!(parse_link_kind(Some("  ")).unwrap(), "direct");
-        assert_eq!(parse_link_kind(Some(" Attach ")).unwrap(), "attach");
+        assert_eq!(parse_link_kind(None).unwrap(), LinkKind::Direct);
+        assert_eq!(parse_link_kind(Some("  ")).unwrap(), LinkKind::Direct);
+        assert_eq!(parse_link_kind(Some(" Attach ")).unwrap(), LinkKind::Attach);
         assert!(
             parse_link_kind(Some("zzz"))
                 .err()
@@ -303,24 +303,23 @@ mod tests {
 
     #[test]
     fn links_are_added_at_the_end_and_removed_by_target_and_kind() {
-        let a = link("nda-1", "direct");
-        let b = link("ndb-2", "attach");
+        let a = link("nda-1", LinkKind::Direct);
+        let b = link("ndb-2", LinkKind::Attach);
         let both = [a.clone(), b.clone()];
         assert_eq!(
-            apply_link(&both, "nda-1", "direct", false),
+            apply_link(&both, "nda-1", LinkKind::Direct, false),
             LinkOutcome::Unchanged("이미 있는 연결이에요.")
         );
         assert_eq!(
-            apply_link(&both, "ndc-3", "direct", true),
+            apply_link(&both, "ndc-3", LinkKind::Direct, true),
             LinkOutcome::Unchanged("제거할 연결이 없어요.")
         );
         assert_eq!(
-            apply_link(&[a.clone()], "ndb-2", "attach", false),
+            apply_link(&[a.clone()], "ndb-2", LinkKind::Attach, false),
             LinkOutcome::Changed(vec![a.clone(), b.clone()])
         );
-        // 종류 비교는 대소문자를 무시한다
         assert_eq!(
-            apply_link(&both, "ndb-2", "ATTACH", true),
+            apply_link(&both, "ndb-2", LinkKind::Attach, true),
             LinkOutcome::Changed(vec![a])
         );
     }

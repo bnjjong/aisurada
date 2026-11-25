@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value as Json;
 
-use super::{Criterion, Link, Ref, Task, TaskStatus};
+use super::{Criterion, Link, Ref, RefKind, Task, TaskPriority, TaskStatus, TaskType};
 use crate::error::EngineError;
 use crate::frontmatter::{self, Value};
 use crate::json::{self, JsonValue};
@@ -206,16 +206,12 @@ pub fn parse(bytes: &[u8], rel_path: &str) -> Result<Task, String> {
     };
     let created_at = required_time("createdAt")?;
     let edited_at = required_time("editedAt")?;
-    let pick = |name: &str, allowed: &[&str], default: &str| -> String {
-        match str_of(&map, name) {
-            Some(v) if allowed.contains(&java_trim(&v).to_lowercase().as_str()) => {
-                java_trim(&v).to_lowercase()
-            }
-            _ => default.to_string(),
-        }
-    };
-    let task_type = pick("type", &TYPES, DEFAULT_TYPE);
-    let priority = pick("priority", &PRIORITIES, DEFAULT_PRIORITY);
+    let task_type = str_of(&map, "type")
+        .and_then(|v| TaskType::parse(&v))
+        .unwrap_or(TaskType::DEFAULT);
+    let priority = str_of(&map, "priority")
+        .and_then(|v| TaskPriority::parse(&v))
+        .unwrap_or(TaskPriority::DEFAULT);
     let extra: Vec<(String, Value)> = map
         .iter()
         .filter_map(|(k, v)| match k {
@@ -332,10 +328,13 @@ fn ref_list(value: Option<&Value>) -> Vec<Ref> {
     if let Some(Value::List(items)) = value {
         for item in items {
             let Value::Map(m) = item else { continue };
-            let (Some(kind), Some(target)) = (str_of(m, "kind"), str_of(m, "target")) else {
+            let (Some(kind_str), Some(target)) = (str_of(m, "kind"), str_of(m, "target")) else {
                 continue;
             };
-            if !valid_ref(&kind, &target) {
+            let Some(kind) = RefKind::parse(&kind_str) else {
+                continue;
+            };
+            if !valid_ref(kind, &target) {
                 continue;
             }
             let reference = Ref {
@@ -356,12 +355,11 @@ fn ref_list(value: Option<&Value>) -> Vec<Ref> {
     out
 }
 
-fn valid_ref(kind: &str, target: &str) -> bool {
+fn valid_ref(kind: RefKind, target: &str) -> bool {
     match kind {
-        "note" => NOTE_ID.is_match(target) || SUB_NOTE_ID.is_match(target),
-        "github" => GITHUB_SHORT.is_match(target) || GITHUB_URL.is_match(target),
-        "slack" => slack_thread(target).is_some(),
-        _ => false,
+        RefKind::Note => NOTE_ID.is_match(target) || SUB_NOTE_ID.is_match(target),
+        RefKind::Github => GITHUB_SHORT.is_match(target) || GITHUB_URL.is_match(target),
+        RefKind::Slack => slack_thread(target).is_some(),
     }
 }
 
@@ -378,8 +376,8 @@ pub fn render(task: &Task) -> Result<Vec<u8>, EngineError> {
     put("key", text(&task.key));
     put("id", text(&task.id));
     put("title", text(&task.title));
-    put("type", text(&task.task_type));
-    put("priority", text(&task.priority));
+    put("type", text(task.task_type.as_str()));
+    put("priority", text(task.priority.as_str()));
     put("status", text(task.status.label()));
     if let Some(repo) = &task.repo {
         put("repo", text(repo));
@@ -440,7 +438,7 @@ pub fn render(task: &Task) -> Result<Vec<u8>, EngineError> {
             .iter()
             .map(|r| {
                 let mut row = vec![
-                    (text("kind"), text(&r.kind)),
+                    (text("kind"), text(r.kind.as_str())),
                     (text("target"), text(&r.target)),
                 ];
                 for (key, value) in [
@@ -508,26 +506,26 @@ pub fn title(raw: &str) -> Result<String, EngineError> {
     Ok(t.to_string())
 }
 
-pub fn task_type(raw: &str) -> Result<String, EngineError> {
+pub fn task_type(raw: &str) -> Result<TaskType, EngineError> {
     let v = java_trim(raw).to_lowercase();
-    if !TYPES.contains(&v.as_str()) {
+    let Some(t) = TaskType::parse(&v) else {
         return Err(bad(format!(
             "type 은 {} 가운데 하나여야 한다: {raw}",
             list_text(&TYPES)
         )));
-    }
-    Ok(v)
+    };
+    Ok(t)
 }
 
-pub fn priority(raw: &str) -> Result<String, EngineError> {
+pub fn priority(raw: &str) -> Result<TaskPriority, EngineError> {
     let v = java_trim(raw).to_lowercase();
-    if !PRIORITIES.contains(&v.as_str()) {
+    let Some(p) = TaskPriority::parse(&v) else {
         return Err(bad(format!(
             "priority 는 {} 가운데 하나여야 한다: {raw}",
             list_text(&PRIORITIES)
         )));
-    }
-    Ok(v)
+    };
+    Ok(p)
 }
 
 /// `owner/name`. 빈 값이면 `None`(지운다)이다.
@@ -719,16 +717,22 @@ pub fn refs(raw: &Json) -> Result<Vec<Ref>, EngineError> {
                 return Err(bad(format!("refs 항목에 모르는 키가 있다: {key}")));
             }
         }
-        let kind = string_of(entries, "kind");
+        let kind_str = string_of(entries, "kind");
         let target = string_of(entries, "target");
-        let (Some(kind), Some(target)) = (kind, target) else {
+        let (Some(kind_str), Some(target)) = (kind_str, target) else {
             return Err(bad(format!(
                 "refs 항목이 틀렸다. note 는 노트 id(nd…), github 는 owner/name#번호나 이슈·PR 주소여야 한다: {}",
                 json::java_record_string(item)
             )));
         };
-        if !valid_ref(java_trim(&kind), java_trim(&target)) {
-            if java_trim(&kind) == "slack" {
+        let Some(kind) = RefKind::parse(&kind_str) else {
+            return Err(bad(format!(
+                "refs 항목이 틀렸다. note 는 노트 id(nd…), github 는 owner/name#번호나 이슈·PR 주소여야 한다: {}",
+                json::java_record_string(item)
+            )));
+        };
+        if !valid_ref(kind, java_trim(&target)) {
+            if kind == RefKind::Slack {
                 return Err(bad(
                     "refs 항목이 틀렸다. slack 은 Slack 메시지 주소여야 한다",
                 ));
@@ -738,12 +742,11 @@ pub fn refs(raw: &Json) -> Result<Vec<Ref>, EngineError> {
                 json::java_record_string(item)
             )));
         }
-        let kind = java_trim(&kind);
         let title = string_of(entries, "title");
         let reference = Ref {
-            reporter: slack_ref_text(kind, string_of(entries, "reporter"), 100),
-            excerpt: slack_ref_text(kind, string_of(entries, "excerpt"), 200),
-            kind: kind.to_string(),
+            reporter: slack_ref_text(kind.as_str(), string_of(entries, "reporter"), 100),
+            excerpt: slack_ref_text(kind.as_str(), string_of(entries, "excerpt"), 200),
+            kind,
             target: java_trim(&target).to_string(),
             title: title
                 .filter(|t| !trim(t).is_empty())

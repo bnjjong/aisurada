@@ -7,8 +7,11 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::frontmatter::Value;
-use crate::kernel::tier::Tier;
-use crate::kernel::time::{civil_from_days, days_from_civil};
+pub use crate::kernel::link_kind::LinkKind;
+use crate::kernel::{
+    tier::Tier,
+    time::{civil_from_days, days_from_civil},
+};
 use crate::text::trim;
 
 pub static TEMPLATE_ID: LazyLock<Regex> =
@@ -48,7 +51,7 @@ impl Format {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     pub to: String,
-    pub kind: String,
+    pub kind: LinkKind,
 }
 
 /// 노트 평가

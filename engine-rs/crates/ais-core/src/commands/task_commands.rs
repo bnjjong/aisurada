@@ -216,8 +216,8 @@ fn row(scan: &Scan, task: &Task, with_body: bool) -> Json {
         "key": task.key,
         "id": task.id,
         "title": task.title,
-        "type": task.task_type,
-        "priority": task.priority,
+        "type": task.task_type.as_str(),
+        "priority": task.priority.as_str(),
         "status": task.status.label(),
         "statusTitle": task.status.title(),
         "labels": task.labels,
@@ -283,7 +283,7 @@ fn detail(
         task.refs
             .iter()
             .map(|r| {
-                let mut v = json!({"kind": r.kind, "target": r.target});
+                let mut v = json!({"kind": r.kind.as_str(), "target": r.target});
                 for (key, value) in [("title", &r.title), ("reporter", &r.reporter), ("excerpt", &r.excerpt)] {
                     if let Some(value) = value {
                         v[key] = json!(value);

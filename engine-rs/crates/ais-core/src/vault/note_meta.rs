@@ -143,17 +143,20 @@ pub fn parse_meta(
         let mut seen = HashSet::new();
         for item in items {
             let Value::Map(entries) = item else { continue };
-            let (Some(to), Some(kind)) = (text(entries, "to"), text(entries, "kind")) else {
+            let (Some(to), Some(kind_str)) = (text(entries, "to"), text(entries, "kind")) else {
                 continue;
             };
-            if !NOTE_ID.is_match(to) || LinkKind::parse(kind).is_none() {
+            let Some(kind) = LinkKind::parse(kind_str) else {
+                continue;
+            };
+            if !NOTE_ID.is_match(to) {
                 continue;
             }
             let self_ref = to == id || (is_sub_note && root_note_id == Some(to));
-            if !self_ref && seen.insert(format!("{to}:{kind}")) {
+            if !self_ref && seen.insert(format!("{to}:{kind_str}")) {
                 links.push(Link {
                     to: to.to_string(),
-                    kind: kind.to_string(),
+                    kind,
                 });
             }
         }
