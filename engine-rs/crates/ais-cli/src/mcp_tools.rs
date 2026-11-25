@@ -295,6 +295,20 @@ pub const TOOLS: &[McpTool] = &[
         write: false,
         destructive: false,
     },
+    McpTool {
+        name: "get_c4_model",
+        description: "프로젝트의 C4 아키텍처 모델을 읽는다: 요소(사람, 시스템, 외부 시스템, 컨테이너, 컴포넌트), 관계, 뷰별 위치. 응답의 precondition은 apply_c4_changes의 f1에 그대로 넣는다. 아직 모델이 없는 프로젝트는 빈 모델이 온다. 요소의 level은 1(시스템 컨텍스트), 2(컨테이너), 3(컴포넌트)이다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"}},"required":["project"],"additionalProperties":false}"#,
+        write: false,
+        destructive: false,
+    },
+    McpTool {
+        name: "apply_c4_changes",
+        description: "프로젝트의 C4 아키텍처 모델에 변경 묶음을 한 번에 적용한다. 하나라도 틀리면 아무것도 바꾸지 않고 몇 번째 변경이 왜 틀렸는지 알린다. f1이 꼭 필요하다(직전에 get_c4_model이나 apply_c4_changes가 준 precondition). 그 사이 다른 곳에서 고쳐졌으면 거절한다. 변경(op): put_element(id, kind, name, description, technology, parent, codeRef: 없는 id면 만들고 있으면 준 칸만 고친다. kind는 person, system, external, container, component. container의 parent는 system, component의 parent는 container), delete_element(id: 자식과 닿은 관계도 함께 지운다), put_relationship(id 선택, source, target, label, technology: id를 안 주면 새 id를 붙인다), delete_relationship(id), set_positions(view, positions: view는 context, container:<시스템 id>, component:<컨테이너 id>, positions는 요소 id별 {x, y}). id는 영문자나 숫자로 시작하고 영문자, 숫자, -, _ 만 쓰는 64자 이하다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"f1":{"type":"string","description":"쓰기 전 토큰. 직전에 get_c4_model이나 apply_c4_changes가 준 precondition 값(f1:…)을 그대로 넣는다. 안 주면 거절된다."},"operations":{"type":"array","minItems":1,"maxItems":200,"description":"순서대로 적용할 변경 목록","items":{"type":"object","properties":{"op":{"type":"string","enum":["put_element","delete_element","put_relationship","delete_relationship","set_positions"]},"id":{"type":"string"},"kind":{"type":"string","enum":["person","system","external","container","component"]},"name":{"type":"string"},"description":{"type":"string"},"technology":{"type":"string"},"parent":{"type":"string"},"codeRef":{"type":"string"},"source":{"type":"string"},"target":{"type":"string"},"label":{"type":"string"},"view":{"type":"string"},"positions":{"type":"object","additionalProperties":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"],"additionalProperties":false}}},"required":["op"],"additionalProperties":false}}},"required":["project","f1","operations"],"additionalProperties":false}"#,
+        write: true,
+        destructive: false,
+    },
 ];
 
 pub const MANAGER_INTAKE_TOOLS: &[McpTool] = &[

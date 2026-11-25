@@ -2,6 +2,7 @@
 
 pub mod agenda_write;
 pub mod ask_chat_commands;
+pub mod c4_commands;
 pub mod comment_write;
 pub mod commit_vault;
 pub mod daily_notes;

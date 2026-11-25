@@ -781,4 +781,22 @@ pub const SPECS: &[Spec] = &[
         allowed: &["days"],
         max: Some(0),
     },
+    Spec {
+        name: "get-c4-model",
+        tool: Some("get_c4_model"),
+        write: false,
+        part4: false,
+        usage: "get-c4-model <프로젝트 slug>",
+        allowed: &[],
+        max: Some(1),
+    },
+    Spec {
+        name: "apply-c4-changes",
+        tool: Some("apply_c4_changes"),
+        write: true,
+        part4: false,
+        usage: "apply-c4-changes <프로젝트 slug> f1=<직전에 읽은 토큰> operations=<변경 JSON 배열. 예: [{\"op\":\"put_element\",\"id\":\"api\",\"kind\":\"container\",\"name\":\"API\",\"parent\":\"app\"}]>",
+        allowed: &["f1", "operations"],
+        max: Some(1),
+    },
 ];

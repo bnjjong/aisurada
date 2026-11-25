@@ -10,9 +10,9 @@ use serde_json::Value;
 
 use super::{Engine, acquire_lock, check_workspace_marker, finish, parse_args};
 use crate::commands::{
-    agenda_write, ask_chat_commands, comment_write, commit_vault, daily_notes, decisions,
-    doc_create, doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts, get_doc,
-    get_sub_note, get_template, history, init_workspace, intake_commands, list_agendas,
+    agenda_write, ask_chat_commands, c4_commands, comment_write, commit_vault, daily_notes,
+    decisions, doc_create, doc_write, export_markdown, facts_brief, facts_write, get_agenda_facts,
+    get_doc, get_sub_note, get_template, history, init_workspace, intake_commands, list_agendas,
     list_attachments, list_comments, list_docs, list_projects, list_sub_notes, list_tags,
     list_templates, list_trash, note_meta_write, project_write, reindex, resource_commands,
     search_docs, session_commands, shard_notes, sub_agenda_write, sub_note_write, task_commands,
@@ -267,6 +267,9 @@ pub(super) static TABLE: &[Def] = &[
     write!("reject_resource_change", WithLedger, resource_commands::ChangeDecisionRequest, |root, request, _scope, ctx| resource_commands::reject_resource_change(root, request, ctx)),
     write!("resolve_resource_edit", WithLedger, resource_commands::ResolveResourceEditRequest, |root, request, _scope, ctx| resource_commands::resolve_resource_edit(root, request, ctx)),
     write!("set_resource_policy", WithLedger, resource_commands::SetResourcePolicyRequest, |root, request, _scope, ctx| resource_commands::set_resource_policy(root, request, ctx)),
+    // ── C4 아키텍처 모델 ──
+    read!("get_c4_model", c4_commands::GetC4ModelRequest, |root, request| c4_commands::get_c4_model(root, request)),
+    write!("apply_c4_changes", Standard, c4_commands::ApplyC4ChangesRequest, |root, request, _scope| c4_commands::apply_c4_changes(root, request)),
     // ── 묻기·대화·세션 ──
     read!("get_ask", ask_chat_commands::NoteRefRequest, |root, request| ask_chat_commands::get_ask(root, request)),
     read!("list_chats", ask_chat_commands::NoteRefRequest, |root, request| ask_chat_commands::list_chats(root, request)),
