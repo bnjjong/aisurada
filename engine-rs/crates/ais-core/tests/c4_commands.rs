@@ -287,11 +287,11 @@ fn a_line_keeps_its_ports_in_the_file_and_in_the_answer() {
         &engine,
         "demo",
         token,
-        json!([{"op":"put_relationship","id":"r1","targetPort":"left"}]),
+        json!([{"op":"put_relationship","id":"r1","sourcePort":"left-1","targetPort":"right-3"}]),
     )
     .unwrap();
-    assert_eq!(moved["relationships"][0]["sourcePort"], "right");
-    assert_eq!(moved["relationships"][0]["targetPort"], "left");
+    assert_eq!(moved["relationships"][0]["sourcePort"], "left-1");
+    assert_eq!(moved["relationships"][0]["targetPort"], "right-3");
     let refused = apply(
         &engine,
         "demo",

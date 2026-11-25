@@ -111,9 +111,14 @@ pub struct Relationship {
     pub extra: Vec<(String, Value)>,
 }
 
-/// 카드 가장자리의 연결 지점 이름. 상자 카드는 여덟 개를 모두 쓰고, 알약 모양인 사람은 `top-2`, `bottom-2`, `left`, `right`만 쓴다.
-pub const PORT_IDS: [&str; 8] = [
-    "top-1", "top-2", "top-3", "bottom-1", "bottom-2", "bottom-3", "left", "right",
+/// 카드 가장자리의 연결 지점 이름. 상자 카드는 네 변마다 3개씩 12개를 쓰고, 알약 모양인 사람은 네 변 가운데 4개만 쓴다.
+/// 예전 이름인 `left`, `right`는 `left-2`, `right-2`와 같게 다룬다.
+pub const PORT_IDS: [&str; 14] = [
+    "top-1", "top-2", "top-3",
+    "bottom-1", "bottom-2", "bottom-3",
+    "left-1", "left-2", "left-3",
+    "right-1", "right-2", "right-3",
+    "left", "right",
 ];
 
 /// 요소와 관계 전체(`model.yaml`)

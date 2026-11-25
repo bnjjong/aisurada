@@ -113,25 +113,34 @@ test('휠 움직임은 위로 굴리면 확대, 아래로 굴리면 축소이고
   assert.ok(wheelFactor(-3, 1, false) > wheelFactor(-3, 0, false), '줄 단위 휠은 줄 높이만큼 곱한다');
 });
 
-test('연결 지점은 상자 카드에 8개(위·아래 3개씩, 양옆 1개), 사람 카드에는 네 변 가운데 4개다', () => {
+test('연결 지점은 상자 카드에 12개(네 변마다 3개씩), 사람 카드에는 네 변 가운데 4개다', () => {
   const box = portsFor('system');
-  assert.deepEqual(box.map(port => port.id), ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left', 'right']);
-  assert.deepEqual(portsFor('person').map(port => port.id), ['top-2', 'bottom-2', 'left', 'right']);
+  assert.deepEqual(box.map(port => port.id), ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left-1', 'left-2', 'left-3', 'right-1', 'right-2', 'right-3']);
+  assert.deepEqual(portsFor('person').map(port => port.id), ['top-2', 'bottom-2', 'left-2', 'right-2']);
   const node = { x: 100, y: 50 };
   const at = id => portPoint(node, box.find(port => port.id === id));
   assert.deepEqual(at('top-2'), { x: 100 + CARD_WIDTH / 2, y: 50 });
   assert.deepEqual(at('top-1'), { x: 100 + CARD_WIDTH / 4, y: 50 });
   assert.deepEqual(at('bottom-3'), { x: 100 + CARD_WIDTH * .75, y: 50 + CARD_HEIGHT });
-  assert.deepEqual(at('left'), { x: 100, y: 50 + CARD_HEIGHT / 2 });
-  assert.deepEqual(at('right'), { x: 100 + CARD_WIDTH, y: 50 + CARD_HEIGHT / 2 });
+  assert.deepEqual(at('left-1'), { x: 100, y: 50 + CARD_HEIGHT * .25 });
+  assert.deepEqual(at('left-2'), { x: 100, y: 50 + CARD_HEIGHT / 2 });
+  assert.deepEqual(at('left-3'), { x: 100, y: 50 + CARD_HEIGHT * .75 });
+  assert.deepEqual(at('right-1'), { x: 100 + CARD_WIDTH, y: 50 + CARD_HEIGHT * .25 });
+  assert.deepEqual(at('right-2'), { x: 100 + CARD_WIDTH, y: 50 + CARD_HEIGHT / 2 });
+  assert.deepEqual(at('right-3'), { x: 100 + CARD_WIDTH, y: 50 + CARD_HEIGHT * .75 });
+  assert.equal(portById('left').id, 'left-2', '예전 left 이름은 left-2로 찾는다');
+  assert.equal(portById('right').id, 'right-2', '예전 right 이름은 right-2로 찾는다');
 });
 
 test('가장 가까운 연결 지점은 포인터가 놓인 쪽의 지점이다', () => {
   const node = { x: 0, y: 0 };
   assert.equal(nearestPort(node, { x: CARD_WIDTH * .3, y: -20 }, 'system').id, 'top-1');
   assert.equal(nearestPort(node, { x: CARD_WIDTH * .7, y: CARD_HEIGHT + 30 }, 'system').id, 'bottom-3');
-  assert.equal(nearestPort(node, { x: -40, y: CARD_HEIGHT / 2 }, 'system').id, 'left');
-  assert.equal(nearestPort(node, { x: CARD_WIDTH + 40, y: 10 }, 'system').id, 'right');
+  assert.equal(nearestPort(node, { x: -40, y: CARD_HEIGHT * .2 }, 'system').id, 'left-1');
+  assert.equal(nearestPort(node, { x: -40, y: CARD_HEIGHT * .5 }, 'system').id, 'left-2');
+  assert.equal(nearestPort(node, { x: -40, y: CARD_HEIGHT * .8 }, 'system').id, 'left-3');
+  assert.equal(nearestPort(node, { x: CARD_WIDTH + 40, y: CARD_HEIGHT * .2 }, 'system').id, 'right-1');
+  assert.equal(nearestPort(node, { x: CARD_WIDTH + 40, y: CARD_HEIGHT * .8 }, 'system').id, 'right-3');
   assert.equal(nearestPort(node, { x: CARD_WIDTH * .3, y: -20 }, 'person').id, 'top-2', '사람은 가운데 지점만 있다');
 });
 
