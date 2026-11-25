@@ -108,6 +108,7 @@ cp -cR native-host/src-tauri/target <경로>/native-host/src-tauri/target   # AP
 | 편집기, 저장, 창, 목록 같은 화면 동작 | 해당 `pnpm --dir native-host test:*:acceptance` |
 | 스킬·에이전트, 승인 대기함, 프로젝트 참조·저장소, 레일 탭 | `pnpm --dir native-host test:resources:acceptance` |
 | 태스크, 알림, 러너 | `pnpm --dir native-host test:tasks:acceptance` |
+| C4 아키텍처 (요소·관계 편집, 끌기, 충돌) | `pnpm --dir native-host test:architecture:acceptance` |
 | 4부 (묻기, 세션) | `pnpm --dir native-host test:part4:acceptance` |
 | 이름, 번들, 권한, 호스트 계약 | 위를 모두 + `pnpm --dir native-host tauri build --debug --bundles app` |
 

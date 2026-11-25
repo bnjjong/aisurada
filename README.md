@@ -176,6 +176,19 @@ Ready For Develop 상태의 태스크에서 **「지금 실행」**을 누르면
 - 앱의 편집기는 결정 블록에 「답 기다림」/「답함」 표시를 붙이고 한 블록에서 하나만 고르게 합니다. 레일의 「내 차례」 배지, 노트 목록의 「답 기다림」 표시, 알림 센터와 macOS 배너(설정의 「AI가 노트에서 답을 기다릴 때」)로도 알립니다.
 - 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「결정 블록」에 있습니다.
 
+## C4 아키텍처 (확장)
+
+외부 설명서에 없는 확장입니다. 프로젝트의 C4 아키텍처 모델(사람, 시스템, 외부 시스템, 컨테이너, 컴포넌트와 그 관계)을 vault가 직접 갖고, 앱의 「C4 아키텍처」 화면과 AI 에이전트가 같은 명령으로 읽고 고칩니다. Archyl 같은 외부 서비스는 쓰지 않습니다.
+
+```bash
+dist/ais-cli get-c4-model 내-프로젝트
+dist/ais-cli apply-c4-changes 내-프로젝트 f1=<get-c4-model 응답의 precondition> 'operations=[{"op":"put_element","id":"app","kind":"system","name":"앱"}]'
+```
+
+- 명령 2개: `get-c4-model`, `apply-c4-changes`. MCP에는 읽기 도구 `get_c4_model`과 쓰기 도구 `apply_c4_changes`(`--write`일 때만)가 열립니다.
+- 변경 묶음은 한 번에 적용하거나 전혀 적용하지 않고, 고칠 때는 직전에 읽은 `f1` 토큰이 필요합니다. 그 사이 다른 곳에서 고쳤으면 거절합니다.
+- 파일은 `.aisurada/c4/<프로젝트 slug>/`의 `model.yaml`(요소·관계)과 `views.yaml`(뷰별 좌표) 두 개뿐입니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「C4 아키텍처」에 있습니다.
+
 ## 22장 사실층
 
 명령 전용 `get-agenda-facts`, `update-agenda-facts`, `facts-brief`를 지원합니다. 사실층은 `.aisurada/facts/<slug>.md`에 두고, AI는 도구 `get_doc`의 `agendaFacts`로 읽습니다.
@@ -434,7 +447,7 @@ Cargo 작업공간 `engine-rs/`에 크레이트 둘이 있습니다. 시험과 �
 | `crates/ais-core/src/write/` | 쓰기 공통 부품. 표식 확인, 원자적 쓰기, 잠금, 폴더 옮기기, 샤드 판정, id와 폴더 이름, 경고, 선결 조건 토큰, 편집 도장, 자동 커밋 |
 | `crates/ais-kernel/` | 바닥 크레이트. 글·JSON 규칙(`text`, `json`), 오류 값(`error`), 프론트매터 YAML 읽기와 쓰기(`frontmatter`, SnakeYAML이 하던 일), YAML 방출기(`snake_dump`), 공용 커널(`kernel`). 다른 영역을 모르고 파일·시계에 손대지 않는다 |
 | `crates/ais-infra/` | 인프라 크레이트. 바깥 세상(시계, 난수, 환경 변수, 잠금, git, sqlite3, vault 저장소)의 약속 `ports`와 기본 구현 `adapters`. `ais-kernel`만 의존한다 |
-| `crates/ais-domain/` | 도메인 크레이트. 노트(`note`), 태스크의 모양·상태 전이·집합체(`task::{format, transitions, aggregate}`), 자원의 모양·승인 규칙·인자와 참조 규칙(`resource::{format, aggregate, rules}`). `ais-kernel`만 의존해서 포트·어댑터·vault 읽기와 쓰기를 쓰면 컴파일이 안 된다 |
+| `crates/ais-domain/` | 도메인 크레이트. 노트(`note`), 태스크의 모양·상태 전이·집합체(`task::{format, transitions, aggregate}`), C4 모델의 모양·검사·변경 적용(`c4::{format, apply}`), 자원의 모양·승인 규칙·인자와 참조 규칙(`resource::{format, aggregate, rules}`). `ais-kernel`만 의존해서 포트·어댑터·vault 읽기와 쓰기를 쓰면 컴파일이 안 된다 |
 | `crates/ais-core/src/{task,resource,session}/` | 태스크, 스킬·에이전트 정의와 승인, 에이전트 세션 읽기 |
 | `crates/ais-core/src/engine.rs`, `engine/table.rs` | 엔진 진입점과, 이름·읽기/쓰기·쓰기 범위·요청 종류·처리 함수를 한 줄에 적은 명령 표 |
 | `crates/ais-cli/src/` | 명령줄 진입점(`main.rs`, `lib.rs`), 인자 읽기(`parse.rs`, `map.rs`, `tool.rs`), 옛 응답 모양으로 바꾸기(`legacy.rs`), 키 차례를 맞춘 JSON 쓰기(`output.rs`) |
