@@ -122,7 +122,7 @@ export class WorkspaceController implements WorkspaceNavigation, WorkspacePrefer
       notice => this.notify(notice)
     );
     this.state = { booting: true, busy: false, route, workspace: null, notice: null, fatal: null,
-      prefs: readPreferences(services.storage, context.kind === 'main') as unknown as Preferences, settingsOpen: false, settingsSection: 'look', form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
+      prefs: readPreferences(services.storage, context.kind === 'main'), settingsOpen: false, settingsSection: 'look', form: null, hiddenAgendas: [], subAgendaFilters: new Map(), previewOpened: null,
       recent: recentWorkspaces(services.storage), home: homePath(readJSON(services.storage, KEYS.home)) || '~/Documents',
       theme: readTheme(services.storage), skin: readSkin(services.storage), typography: readTypography(services.storage), tabs: this.tabs.snapshot(), noteWindows: [], searchOpen: false, preview: null, subNotes: null, vault: this.data.getSnapshot() };
   }
@@ -211,7 +211,7 @@ export class WorkspaceController implements WorkspaceNavigation, WorkspacePrefer
   };
   closeActiveTab = () => { const id = activeTab(this.state.route); if (id !== null) this.closeTab(id); };
   reorderTab = (id: string, index: number) => { this.tabs.reorder(id, index); this.patch({}); };
-  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), typography: this.typographyNow(), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) as unknown as Preferences } : {}) });
+  refreshTheme = () => this.patch({ theme: readTheme(this.services.storage), skin: readSkin(this.services.storage), typography: this.typographyNow(), ...(this.context.kind === 'main' ? { prefs: readPreferences(this.services.storage, true) } : {}) });
   // 글꼴과 배율은 설정에서 저장소에 쓰고, 모든 창이 저장소를 읽어 따른다. 단 노트 창에서 단축키로 바꾼 배율은
   // 설정을 공유 저장소에 쓰지 않는 규칙(15.14) 때문에 그 창에만 남는다. 그 창은 다시 저장소를 읽어도 자기 배율을 지킨다.
   private localScale?: number;
@@ -241,11 +241,11 @@ export class WorkspaceController implements WorkspaceNavigation, WorkspacePrefer
         if (saved !== null) values.set(KEYS.prefs, saved);
         this.windowPrefs = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } };
       }
-      writePreferences(this.windowPrefs, update as any, true);
-      this.patch({ prefs: readPreferences(this.windowPrefs, false) as unknown as Preferences });
+      writePreferences(this.windowPrefs, update, true);
+      this.patch({ prefs: readPreferences(this.windowPrefs, false) });
       return;
     }
-    writePreferences(this.services.storage, update as any, true);
+    writePreferences(this.services.storage, update, true);
     this.refreshTheme();
   };
   settings = (open: boolean, section?: SettingsSection) => {

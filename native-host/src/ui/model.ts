@@ -1,5 +1,7 @@
 import { asRow, asText } from "../workspace/types.ts";
 import type { Note, Agenda, Row, StoragePort } from "../workspace/types.ts";
+import type { FullPreferences, AppPreferences, PreferenceAliases, PreferencesUpdate } from "../workspace/storage.ts";
+import { readPreferences } from "../workspace/storage.ts";
 // C28: an emptied repository clears the agenda's old one only when the form
 // opened with a repository; otherwise an empty field is not sent at all.
 export const agendaRepoField = (opened: string, repo: string) =>
@@ -52,58 +54,42 @@ export function clampRailWidth(value: unknown): number {
   const width = typeof value === "number" && Number.isFinite(value) ? value : RAIL_WIDTH_DEFAULT;
   return Math.min(RAIL_WIDTH_MAX, Math.max(RAIL_WIDTH_MIN, Math.round(width)));
 }
-export interface Preferences {
-  titleDatePrefix?: boolean;
-  showRecordTier?: boolean;
-  mermaidShowSource?: boolean;
-  askTimeoutSeconds?: number;
-  titleDate: boolean;
-  showRecords: boolean;
-  diagrams: boolean;
-  weekLayout: "agendas" | "dates" | "swimlane" | "stack";
-  agendaSort: "structure" | "time";
-  agendaDesc: boolean;
-  docSortMode?: "structure" | "time";
-  docSortDir?: "desc" | "asc";
-  collapsedProjects: string[];
-  expandedSessionProjects?: string[];
-  previewSize: { width: number; height: number } | null;
-  [key: string]: unknown;
-}
+export type Preferences = FullPreferences;
+export type { AppPreferences, PreferenceAliases, PreferencesUpdate };
+
 export const defaultPrefs: Preferences = {
+  theme: "light",
+  weekLayout: "swimlane",
+  railWidth: 264,
+  detailListWidth: 340,
+  docWidth: 820,
+  noteRailWidth: 392,
+  previewWidth: 720,
+  previewHeight: null,
+  askCardWidth: 360,
+  askCardHeight: null,
+  composeWidth: 280,
+  composeInputHeight: null,
+  docSortMode: "structure",
+  docSortDir: "desc",
   titleDatePrefix: true,
   showRecordTier: false,
   mermaidShowSource: false,
-  titleDate: true,
-  showRecords: false,
-  diagrams: false,
-  weekLayout: "agendas",
-  agendaSort: "structure",
-  agendaDesc: true,
-  docSortMode: "structure",
-  docSortDir: "desc",
+  askTimeoutSeconds: 3600,
+  sessionPreviewOpen: true,
   collapsedProjects: [],
   expandedSessionProjects: [],
-  previewSize: null,
+  get titleDate() { return this.titleDatePrefix; },
+  get showRecords() { return this.showRecordTier; },
+  get diagrams() { return this.mermaidShowSource; },
+  get agendaSort() { return this.docSortMode; },
+  get agendaDesc() { return this.docSortDir === "desc"; },
+  get previewSize() { return this.previewWidth ? { width: this.previewWidth, height: this.previewHeight ?? 480 } : null; },
 };
+
 export function preferences(storage: StoragePort): Preferences {
   try {
-    const state =
-      asRow(
-        asRow(JSON.parse(storage.getItem("aisurada.prefs.v1") || "null"))?.state,
-      ) || {};
-    return {
-      ...defaultPrefs,
-      ...state,
-      titleDate: state.titleDate !== false,
-      showRecords: state.showRecords === true,
-      diagrams: state.diagrams === true,
-      collapsedProjects: Array.isArray(state.collapsedProjects)
-        ? state.collapsedProjects.filter(
-            (x): x is string => typeof x === "string",
-          )
-        : [],
-    };
+    return readPreferences(storage, false);
   } catch {
     return { ...defaultPrefs };
   }

@@ -1,5 +1,5 @@
 import { asRow, asText } from './types.ts';
-import type { RecentWorkspace, StoragePort, WorkspaceState } from './types.ts';
+import type { RecentWorkspace, StoragePort, WorkspaceState, Skin } from './types.ts';
 
 export const KEYS = {
   last: 'aisurada.lastWorkspace.v1',
@@ -16,7 +16,7 @@ export const KEYS = {
 
 export interface AppPreferences {
   theme: 'light' | 'dark';
-  weekLayout: 'swimlane' | 'stack';
+  weekLayout: 'swimlane' | 'stack' | 'agendas' | 'dates';
   railWidth: number;
   detailListWidth: number;
   docWidth: number;
@@ -39,6 +39,35 @@ export interface AppPreferences {
   expandedSessionProjects: string[];
   [key: string]: unknown;
 }
+
+/** UI 바인딩 하위 호환을 위한 동적 별칭(getter) 필드 */
+export interface PreferenceAliases {
+  readonly titleDate: boolean;
+  readonly showRecords: boolean;
+  readonly diagrams: boolean;
+  readonly agendaSort: 'structure' | 'time';
+  readonly agendaDesc: boolean;
+  readonly previewSize: { width: number; height: number } | null;
+}
+
+/** 런타임에 정규 필드와 별칭 getter를 모두 갖춘 전체 환경설정 타입 */
+export type FullPreferences = AppPreferences & PreferenceAliases;
+
+/** 설정 변경 시 정규 필드 및 UI 별칭 필드를 모두 허용하는 업데이트 타입 */
+export type PreferencesUpdate = Partial<Omit<AppPreferences, 'weekLayout'>> & {
+  weekLayout?: 'swimlane' | 'stack' | 'agendas' | 'dates' | string;
+  titleDate?: boolean;
+  showRecords?: boolean;
+  diagrams?: boolean;
+  agendaSort?: 'structure' | 'time';
+  agendaDesc?: boolean;
+  previewSize?: { width: number; height: number } | null;
+  skin?: Skin;
+  uiScale?: number;
+  uiFont?: string;
+  terminalFont?: string;
+  [key: string]: unknown;
+};
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
   theme: 'light',
@@ -94,7 +123,7 @@ export function sanitizePreferences(obj: Record<string, unknown>): AppPreference
   return result as unknown as AppPreferences;
 }
 
-export function normalizePreferences(raw: unknown): { state: AppPreferences; version: number } {
+export function normalizePreferences(raw: unknown): { state: FullPreferences; version: number } {
   const row = asRow(raw);
   const stateRow = asRow(row?.state) || {};
   const rawVersion = typeof row?.version === 'number' ? row.version : 0;
@@ -152,7 +181,7 @@ export function normalizePreferences(raw: unknown): { state: AppPreferences; ver
     previewSize: { get() { return this.previewWidth ? { width: this.previewWidth, height: this.previewHeight ?? 480 } : null; }, enumerable: false, configurable: true },
   });
 
-  return { state: merged, version: 1 };
+  return { state: merged as unknown as FullPreferences, version: 1 };
 }
 
 export function readNoteWindowGeometry(storage: StoragePort): { width: number; height: number; x?: number; y?: number } | null {
@@ -179,7 +208,7 @@ export function writeNoteWindowGeometry(
 export const writeNoteGeometry = writeNoteWindowGeometry;
 export const readNoteGeometry = readNoteWindowGeometry;
 
-export function readPreferences(storage: StoragePort, isMain = true): AppPreferences {
+export function readPreferences(storage: StoragePort, isMain = true): FullPreferences {
   const json = readJSON(storage, KEYS.prefs);
   const normalized = normalizePreferences(json);
   const row = asRow(json), version = row?.version;
@@ -196,7 +225,7 @@ export function readPreferences(storage: StoragePort, isMain = true): AppPrefere
 
 export function writePreferences(
   storage: StoragePort,
-  prefs: Partial<Omit<AppPreferences, 'weekLayout'> & { weekLayout?: 'swimlane' | 'stack' | 'agendas' | 'dates' | string; titleDate?: boolean; showRecords?: boolean; diagrams?: boolean; agendaSort?: 'structure' | 'time'; agendaDesc?: boolean; previewSize?: { width: number; height: number } | null }>,
+  prefs: PreferencesUpdate,
   isMain = true
 ) {
   if (!isMain) return; // 노트 창은 설정을 쓰지 않는다 (15.7, 16.3)
