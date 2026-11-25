@@ -76,6 +76,9 @@ pub fn parse_views(text: &str, model: &Model) -> Result<Views, EngineError> {
             _ => views.extra.push((key, value)),
         }
     }
+    // 모델과 뷰는 따로 쓰므로(그 사이 전원이 끊기거나 손으로 모델만 고쳤을 수 있다) 없어진 요소의 좌표와 범위를 잃은 뷰는
+    // 오류로 막지 않고 무시한다. 좌표 값 자체가 틀린 것만 거절한다.
+    views.prune(model);
     views.validate(model)?;
     Ok(views)
 }

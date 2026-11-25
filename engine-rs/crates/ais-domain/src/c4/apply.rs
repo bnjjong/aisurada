@@ -577,4 +577,15 @@ mod tests {
         );
         assert!(format::parse_model("").unwrap().elements.is_empty());
     }
+
+    #[test]
+    fn views_of_vanished_elements_are_ignored_but_bad_coordinates_are_not() {
+        let (model, _) = base();
+        let stale = "version: 1\nviews:\n  context:\n    me: {x: 1, y: 2}\n    ghost: {x: 3, y: 4}\n  container:gone:\n    me: {x: 5, y: 6}\n";
+        let views = format::parse_views(stale, &model).unwrap();
+        assert_eq!(views.views.len(), 1);
+        assert_eq!(views.views["context"].len(), 1);
+        let far = "version: 1\nviews:\n  context:\n    me: {x: 99999999, y: 2}\n";
+        assert!(format::parse_views(far, &model).is_err());
+    }
 }
