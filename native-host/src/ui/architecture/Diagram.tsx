@@ -102,6 +102,8 @@ export function Diagram({
   const frame: CameraFrame = { fit, width: area.width, height: area.height, box };
   const scale = viewScale(camera, frame);
   const typeScale = Math.max(1, Math.min(1.6, 1 / scale));
+  // 관계 라벨과 화살촉은 카드와 같은 비율로 커지고 줄어든다. 카드 글자가 `typeScale`로 키워 보이는 것까지 같이 따른다.
+  const labelUnit = Math.max(.6, Math.min(3, scale * typeScale));
   const { x, y } = viewOrigin(camera, frame);
   // 카드와 글자는 `scale()` 변환 대신 `zoom`으로 키운다. 변환은 작게 그린 층을 늘려 쓰는 길이 있어 글자가 번질 수 있고,
   // `zoom`은 처음부터 최종 크기로 배치한다. 이동도 소수점 위치에 그리면 번지므로 화면 픽셀에 맞춰 반올림한다.
@@ -245,7 +247,7 @@ export function Diagram({
     const stroke = style.color;
     const accent = style.getPropertyValue('--accent').trim() || stroke;
     context.strokeStyle = context.fillStyle = stroke;
-    context.font = '600 13px ' + style.fontFamily;
+    context.font = '600 ' + 13 * labelUnit + 'px ' + style.fontFamily;
     for (const edge of edges) {
       const active = edge.id === selectedRelationship;
       context.strokeStyle = context.fillStyle = active ? accent : stroke;
@@ -256,7 +258,7 @@ export function Diagram({
       context.bezierCurveTo(edge.a.x, edge.a.y, edge.b.x, edge.b.y, edge.end.x, edge.end.y);
       context.stroke();
       const angle = Math.atan2(edge.end.y - edge.b.y, edge.end.x - edge.b.x);
-      const length = (active ? 16 : 13) / scale;
+      const length = (active ? 16 : 13) * labelUnit / scale;
       const spread = 0.44;
       context.beginPath();
       context.moveTo(edge.end.x, edge.end.y);
@@ -265,7 +267,7 @@ export function Diagram({
       context.closePath();
       context.fill();
     }
-    const nextLabels = placeLabels(edges, nodes, { ...area, x, y, scale }, selectedRelationship, title => context.measureText(title).width);
+    const nextLabels = placeLabels(edges, nodes, { ...area, x, y, scale }, selectedRelationship, title => context.measureText(title).width, labelUnit);
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.strokeStyle = stroke;
     context.globalAlpha = .8;
@@ -384,6 +386,7 @@ export function Diagram({
       ref={viewport}
       data-connecting={connecting}
       data-linking={linking}
+      style={{ '--c4-label-k': labelUnit } as CSSProperties}
       aria-label="C4 다이어그램"
       onPointerDown={startPan}
       onPointerMove={event => {
