@@ -228,22 +228,23 @@ export function Diagram({
     const stroke = style.color;
     const accent = style.getPropertyValue('--accent').trim() || stroke;
     context.strokeStyle = context.fillStyle = stroke;
-    context.font = '500 11px ' + style.fontFamily;
+    context.font = '600 13px ' + style.fontFamily;
     for (const edge of edges) {
       const active = edge.id === selectedRelationship;
       context.strokeStyle = context.fillStyle = active ? accent : stroke;
-      context.globalAlpha = active ? 1 : .85;
-      context.lineWidth = (active ? 2.2 : 1.3) / scale;
+      context.globalAlpha = active ? 1 : .9;
+      context.lineWidth = (active ? 2.4 : 1.6) / scale;
       context.beginPath();
       context.moveTo(edge.start.x, edge.start.y);
       context.bezierCurveTo(edge.a.x, edge.a.y, edge.b.x, edge.b.y, edge.end.x, edge.end.y);
       context.stroke();
       const angle = Math.atan2(edge.end.y - edge.b.y, edge.end.x - edge.b.x);
-      const length = 7 / scale;
+      const length = (active ? 16 : 13) / scale;
+      const spread = 0.44;
       context.beginPath();
       context.moveTo(edge.end.x, edge.end.y);
-      context.lineTo(edge.end.x - length * Math.cos(angle - .44), edge.end.y - length * Math.sin(angle - .44));
-      context.lineTo(edge.end.x - length * Math.cos(angle + .44), edge.end.y - length * Math.sin(angle + .44));
+      context.lineTo(edge.end.x - length * Math.cos(angle - spread), edge.end.y - length * Math.sin(angle - spread));
+      context.lineTo(edge.end.x - length * Math.cos(angle + spread), edge.end.y - length * Math.sin(angle + spread));
       context.closePath();
       context.fill();
     }

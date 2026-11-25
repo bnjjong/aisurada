@@ -300,7 +300,7 @@ export function placeLabels(
       top: origin.y, bottom: origin.y + CARD_HEIGHT * view.scale,
     };
   });
-  const maxWidth = Math.max(96, Math.min(152, Math.floor(view.width / 5)));
+  const maxWidth = Math.max(104, Math.min(168, Math.floor(view.width / 4.8)));
   const placements: DiagramLabel[] = [];
   const candidates = edges.map((edge, index) => ({ edge, index }));
   if (selected) candidates.sort((a, b) => Number(b.edge.id === selected) - Number(a.edge.id === selected));
@@ -308,8 +308,8 @@ export function placeLabels(
   for (const { edge, index } of candidates) {
     const title = [edge.label || '관계', edge.technology].filter(Boolean).join(' · ');
     if (view.scale < .3 && edge.id !== selected) continue;
-    const textWidth = Math.ceil(measure(title)) + 12;
-    const widths = [...new Set([Math.min(maxWidth, textWidth), Math.min(118, textWidth), Math.min(85, textWidth), 24])];
+    const textWidth = Math.ceil(measure(title)) + 16;
+    const widths = [...new Set([Math.min(maxWidth, textWidth), Math.min(132, textWidth), Math.min(92, textWidth), 26])];
     const anchors = [.5, .36, .64, .23, .77, .12, .88].map(t => {
       const anchor = project(pointOnCurve(edge, t));
       const next = project(pointOnCurve(edge, t + .01));
@@ -320,9 +320,9 @@ export function placeLabels(
     });
     let placed = false;
     for (const width of widths) {
-      const compact = width === 24 && width < textWidth;
-      const height = !compact && textWidth > width ? 34 : 20;
-      for (const offset of [0, -16, 16, -30, 30, -46, 46]) {
+      const compact = width === 26 && width < textWidth;
+      const height = !compact && textWidth > width ? 38 : 22;
+      for (const offset of [0, -18, 18, -34, 34, -50, 50]) {
         for (const { anchor, normal } of anchors) {
           const center = { x: anchor.x + normal.x * offset, y: anchor.y + normal.y * offset };
           const rect = {
