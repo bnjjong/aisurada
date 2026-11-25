@@ -106,11 +106,8 @@ pub enum TaskPriority {
 }
 
 impl TaskPriority {
-    pub const ALL: [TaskPriority; 3] = [
-        TaskPriority::High,
-        TaskPriority::Medium,
-        TaskPriority::Low,
-    ];
+    pub const ALL: [TaskPriority; 3] =
+        [TaskPriority::High, TaskPriority::Medium, TaskPriority::Low];
     pub const DEFAULT: TaskPriority = TaskPriority::Medium;
 
     pub const fn as_str(self) -> &'static str {

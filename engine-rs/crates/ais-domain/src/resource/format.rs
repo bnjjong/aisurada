@@ -232,7 +232,12 @@ pub fn render(resource: &Resource) -> Result<Vec<u8>, EngineError> {
     if resource.kind == ResourceKind::Agent {
         map.push((
             text("permission"),
-            text(resource.permission.unwrap_or(ResourcePermission::DEFAULT).as_str()),
+            text(
+                resource
+                    .permission
+                    .unwrap_or(ResourcePermission::DEFAULT)
+                    .as_str(),
+            ),
         ));
         if !resource.skills.is_empty() {
             map.push((
