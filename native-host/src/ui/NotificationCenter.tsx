@@ -8,7 +8,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { isTauri } from "@tauri-apps/api/core";
 import { docAddress, managerAddress, subAddress, taskAddress } from "../navigation/routes.ts";
 import { formatRelativeTime } from "./dates.ts";
-import { dismissToast, kindLabel, markRead, useNotifications, visibleItems } from "./notificationsStore.ts";
+import { dismissToast, kindLabel, markRead, refreshNotifications, useNotifications, visibleItems } from "./notificationsStore.ts";
 import type { NotifyItem, NotifyKind } from "./notificationsStore.ts";
 import { usePopoverDismiss } from "./usePopoverDismiss.ts";
 
@@ -42,8 +42,8 @@ export const itemAddress = (item: Pick<NotifyItem, "kind" | "taskKey"> & Pick<Pa
     : item.taskKey ? taskAddress(item.taskKey) : null;
 
 function SlackAction({ item }: { item: NotifyItem }) {
-  if (!item.intake) return null;
-  const { url } = item.intake;
+  const url = item.intake?.url;
+  if (!url) return null;
   return <a className="ntf-slack-link" href={url} target="_blank" rel="noreferrer" onClick={event => {
     if (!isTauri()) return;
     event.preventDefault();
@@ -157,7 +157,10 @@ export function NotificationBell({ controller }: { controller: WorkspaceControll
         aria-label={n.unread > 0 ? `알림 ${n.unread}개` : "알림"}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) void refreshNotifications(call);
+          setOpen(!open);
+        }}
       >
         <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3zM6.5 14h3" />

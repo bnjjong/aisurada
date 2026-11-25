@@ -1,6 +1,6 @@
 //! 매니저 제보 원장과 Slack 채널 커서를 vault에 저장한다.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::ErrorKind;
@@ -39,6 +39,7 @@ pub enum IntakeOperation {
     Rewind,
     Review,
     Sources,
+    Questions,
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -49,6 +50,8 @@ struct Ledger {
     task_sources: BTreeMap<String, Vec<String>>,
     #[serde(skip)]
     repeat_counts: BTreeMap<String, usize>,
+    #[serde(skip)]
+    pending_questions: BTreeSet<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -421,7 +424,7 @@ struct SourceQuery {
 
 impl IntakeOperation {
     pub(crate) fn is_write(self) -> bool {
-        !matches!(self, Self::Get | Self::Sources)
+        !matches!(self, Self::Get | Self::Sources | Self::Questions)
     }
 }
 
@@ -431,6 +434,9 @@ pub(crate) fn authorize(
     context: &CallContext,
 ) -> Result<(), EngineError> {
     check_workspace_marker(vault)?;
+    if matches!(operation, IntakeOperation::Questions) && context.caller != Caller::App {
+        return Err(invalid("되물음 알림은 앱에서 조회한다"));
+    }
     if matches!(operation, IntakeOperation::Sources) {
         if context.caller != Caller::App || context.manager.is_some() {
             return Err(invalid("태스크 출처는 앱에서 조회한다"));
@@ -466,6 +472,9 @@ pub(crate) fn execute(
     if matches!(operation, IntakeOperation::Get) {
         return Ledger::read(&path)?.get(vault, manager, allowed_channels, parse("get_intake", args)?, context.caller);
     }
+    if matches!(operation, IntakeOperation::Questions) {
+        return Ledger::read(&path)?.questions(manager, allowed_channels);
+    }
     let mut ledger = Ledger::load(&path)?;
     let (response, changed) = match operation {
         IntakeOperation::Submit => ledger.submit(manager, parse("submit_intake", args)?)?,
@@ -493,7 +502,7 @@ pub(crate) fn execute(
             ledger.rewind(manager, allowed_channels, parse("rewind_cursor", args)?)?
         }
         IntakeOperation::Review => ledger.review(manager, parse("review_intake", args)?)?,
-        IntakeOperation::Get | IntakeOperation::Sources => unreachable!(),
+        IntakeOperation::Get | IntakeOperation::Sources | IntakeOperation::Questions => unreachable!(),
     };
     if changed {
         ledger.save(&path)?;
@@ -654,6 +663,9 @@ impl Ledger {
         }
         let mut ledger = Self::load(path)?;
         for (key, entry) in &ledger.entries {
+            if entry.history.last().is_some_and(|event| event.result == ResultKind::Asked) {
+                ledger.pending_questions.insert(key.clone());
+            }
             if let Some(task) = &entry.task_id {
                 ledger.task_sources.entry(task.clone()).or_default().push(key.clone());
             }
@@ -721,6 +733,28 @@ impl Ledger {
         self.channels
             .get(&manager_key(manager, id))
             .ok_or_else(|| invalid("연결 탭에서 제보 채널을 먼저 설정해 주세요"))
+    }
+
+    fn questions(&self, manager: &ManagerContext, allowed: &[String]) -> Result<Value, EngineError> {
+        let prefix = manager_key(manager, "");
+        let mut notices = Vec::new();
+        for key in self.pending_questions.range(prefix.clone()..).take_while(|key| key.starts_with(&prefix)) {
+            let entry = &self.entries[key];
+            if entry.source.is_none() && !allowed.contains(&entry.channel) {
+                continue;
+            }
+            // 질문 본문과 이 버전은 원장 결과와 같은 저장에 들어간다.
+            let event = entry.current()?;
+            notices.push(json!({
+                "id": format!("intake-question-{}", event.revision),
+                "entry": entry.id,
+                "at": event.at,
+                "excerpt": short(&entry.excerpt, 100),
+                "question": short(&event.question, 140),
+                "url": entry.source.is_none().then_some(entry.url.as_str()),
+            }));
+        }
+        Ok(json!(notices))
     }
 
     fn get(
