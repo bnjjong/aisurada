@@ -327,14 +327,14 @@ pub fn delete(
 
 /// 파일을 휴지통 폴더로 옮긴다. 옮길 파일이 없으면 경고만 하고 넘어가고, 옮길 자리에 이미 있으면 실패한다.
 pub(crate) fn archive(source: &Path, target: &Path, kind: &str) -> Result<(), EngineError> {
-    if !source.exists() {
+    if !fs::exists(source) {
         eprintln!(
             "Warning: 옮길 {kind} 파일이 없어 옮기지 않았다: {}",
             source.display()
         );
         return Ok(());
     }
-    if target.exists() {
+    if fs::exists(target) {
         return Err(EngineError::internal(format!(
             "옮길 자리에 이미 무엇이 있어 옮기지 않았다: {}",
             target.display()

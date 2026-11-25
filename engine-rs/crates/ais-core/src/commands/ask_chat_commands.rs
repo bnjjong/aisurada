@@ -479,7 +479,7 @@ pub fn get_ask(vault: &Path, request: &NoteRefRequest) -> Result<Json, EngineErr
     let index = NoteIndex::fresh(vault);
     let target = locate(&index, &ids, "문답을")?;
     let file = target.dir.join("ask.json");
-    if !file.exists() {
+    if !fs::exists(&file) {
         return Ok(Json::Null);
     }
     Ok(Json::Object(ask_response(&read_ask(
@@ -557,7 +557,7 @@ pub fn append_ask_turn(
     // 인자가 다 맞은 뒤에야 노트를 찾는다. 없으면 AIS-404, 단일 파일 노트면 AIS-500
     let target = locate(&scope.index, &ids, "문답을")?;
     let file = target.dir.join("ask.json");
-    let mut thread = if file.exists() {
+    let mut thread = if fs::exists(&file) {
         read_ask(&file, &target.note_id)?
     } else {
         AskThread {
@@ -746,8 +746,8 @@ pub fn list_chats(vault: &Path, request: &NoteRefRequest) -> Result<Json, Engine
 
     let mut chats: Vec<Chat> = Vec::new();
     let mut unreadable: Vec<String> = Vec::new();
-    if chats_dir.exists() {
-        if !chats_dir.is_dir() {
+    if fs::exists(&chats_dir) {
+        if !fs::metadata(&chats_dir).map(|m| m.is_dir()).unwrap_or(false) {
             return Err(EngineError::internal(format!(
                 "chats 경로가 디렉토리가 아니다: {}",
                 chats_dir.display()
@@ -842,7 +842,7 @@ pub fn append_chat_turn(
     let file = target.dir.join("chats").join(format!("{chat_id}.json"));
     let rel_path = rel(vault, &file);
 
-    let mut chat = if file.exists() {
+    let mut chat = if fs::exists(&file) {
         let size = fs::metadata(&file)
             .map_err(|e| {
                 EngineError::internal(format!("레일 대화 파일을 못 읽어 붙일 수 없다: {e}"))

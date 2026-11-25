@@ -430,6 +430,7 @@ fn write_scope_is_opened_only_by_the_dispatcher() {
 
 /// 파일 읽기·쓰기는 어댑터(`adapters/`)만 `std::fs`로 직접 한다. 나머지 코드는 저장소 포트(`ports::fs`, `ports::VaultStore`)를 거친다.
 /// `use std::fs;`, `std::fs::`, `use std::{.., fs, ..};` 꼴을 모두 잡는다. 시험 모듈과 `tests.rs`는 디스크를 그대로 만져도 된다.
+/// 또한 `Path::exists()`는 포트를 거치지 않는 `std::fs::metadata().is_ok()`이므로 `ports::fs::exists()`를 쓰게 한다.
 #[test]
 fn file_access_goes_through_the_store_port() {
     let mut bad = Vec::new();
@@ -444,12 +445,18 @@ fn file_access_goes_through_the_store_port() {
                     .any(|w| w == "fs")
         });
         if text.contains("std::fs") || grouped {
-            bad.push(rel);
+            bad.push(format!("{rel}: std::fs 사용"));
+        }
+        if text.contains(".exists()") {
+            bad.push(format!(
+                "{rel}: .exists() 대신 crate::ports::fs::exists() 사용"
+            ));
         }
     }
     assert!(
         bad.is_empty(),
-        "std::fs를 직접 쓴다. `use crate::ports::fs;`로 저장소 포트를 거친다: {bad:?}"
+        "std::fs나 .exists()를 직접 쓴다. 저장소 포트(`ports::fs`)를 거친다:\n  {}",
+        bad.join("\n  ")
     );
 }
 

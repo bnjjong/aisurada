@@ -3,11 +3,12 @@
 use std::path::Path;
 
 use super::confine::absolute_normalized;
+use super::doc_place::fs;
 use crate::error::EngineError;
 
 /// `vault_root`에 표식이 있는지 본다(끊긴 링크는 없는 것으로 본다). 없으면 `AIS-400`이다.
 pub fn check_workspace_marker(vault_root: &Path) -> Result<(), EngineError> {
-    if vault_root.join(".aisurada/workspace.json").exists() {
+    if fs::exists(&vault_root.join(".aisurada/workspace.json")) {
         return Ok(());
     }
     Err(EngineError::invalid_argument(format!(

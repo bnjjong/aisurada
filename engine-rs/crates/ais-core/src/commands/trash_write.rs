@@ -170,7 +170,7 @@ pub fn delete_doc(
     };
     let (existing, _) = entries_in_file_order(vault);
     let source = vault.join(&path);
-    if !source.exists() {
+    if !fs::exists(&source) {
         return Err(EngineError::invalid_argument(format!(
             "옮길 노트 파일이 없다: {path}"
         )));
@@ -256,7 +256,7 @@ pub fn restore_doc(
             .collect()
     };
     let source = archive_path(vault, &entry.file)?;
-    if !source.exists() {
+    if !fs::exists(&source) {
         save(vault, &others())?;
         return Err(EngineError::invalid_argument(
             "보관 파일이 사라져 복구할 수 없어요(휴지통 목록 정리됨).",
@@ -280,7 +280,7 @@ pub fn restore_doc(
     check_segment(vault, &name)?;
     let mut target = normalize(&vault.join(&parent).join(&name));
     check_confinement(vault, &target)?;
-    if target.exists() {
+    if fs::exists(&target) {
         let tail = format!(
             "-restored-{}",
             &entry.trash_id[entry.trash_id.len().saturating_sub(6)..]

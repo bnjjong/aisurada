@@ -743,7 +743,7 @@ fn trash_item(kind: ResourceKind) -> &'static str {
 /// 자원을 휴지통으로 보낸다(스킬은 폴더째). 되살릴 수 있다.
 pub fn delete(vault: &Path, r: &Resource) -> Result<(), EngineError> {
     let trash = root(vault).join(".trash").join(&r.id);
-    if trash.exists() {
+    if fs::exists(&trash) {
         return Err(EngineError::conflict(format!(
             "휴지통에 같은 id 가 이미 있다: {}",
             r.id
@@ -831,7 +831,7 @@ pub fn restore(vault: &Path, id: &str) -> Result<Resource, EngineError> {
     } else {
         target.clone()
     };
-    if destination.exists() {
+    if fs::exists(&destination) {
         return Err(EngineError::conflict(format!(
             "제자리에 같은 이름이 이미 있어 되살리지 못했다. 그 이름을 바꾸거나 지운 뒤 다시 한다: {}",
             e.rel_path
@@ -964,7 +964,7 @@ fn snapshot(vault: &Path, id: &str, bytes: &[u8]) -> Result<(), EngineError> {
     let base = to_base36(now_millis());
     let mut name = base.clone();
     let mut n = 1;
-    while dir.join(format!("{name}.md")).exists() {
+    while fs::exists(&dir.join(format!("{name}.md"))) {
         name = format!("{base}-{n}");
         n += 1;
     }

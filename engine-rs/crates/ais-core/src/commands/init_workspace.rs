@@ -138,7 +138,7 @@ pub fn execute(
         )?;
     }
     let marker = vault.join(".aisurada/workspace.json");
-    let created = !marker.exists();
+    let created = !fs::exists(&marker);
     if created {
         let name = request.name.clone().unwrap_or_else(|| {
             vault
@@ -162,7 +162,7 @@ fn plant(
     seeded: &mut Vec<String>,
     skipped: &mut Vec<String>,
 ) -> Result<(), EngineError> {
-    if vault.join(&rel_path).exists() {
+    if fs::exists(&vault.join(&rel_path)) {
         skipped.push(rel_path);
         return Ok(());
     }

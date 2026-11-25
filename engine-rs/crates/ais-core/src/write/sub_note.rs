@@ -290,7 +290,7 @@ pub fn strip_child_cards(body: &str, sub_id: &str) -> String {
 /// 파일이나 폴더(안의 것까지)를 지운다. 없으면 아무것도 안 한다. 심볼릭 링크는 따라가지 않고 링크만 지운다.
 pub fn remove_tree(target: &Path) -> Result<(), EngineError> {
     // Java `Files.exists`처럼 링크를 따라가 보고, 가리키는 곳이 없으면 아무것도 안 한다
-    if !target.exists() {
+    if !fs::exists(target) {
         return Ok(());
     }
     let Ok(metadata) = fs::symlink_metadata(target) else {
