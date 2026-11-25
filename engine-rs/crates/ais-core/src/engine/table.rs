@@ -284,6 +284,10 @@ pub(super) static TABLE: &[Def] = &[
     // ── C4 아키텍처 모델 ──
     read!("get_c4_model", c4_commands::GetC4ModelRequest, |root, request| c4_commands::get_c4_model(root, request)),
     write!("apply_c4_changes", Standard, c4_commands::ApplyC4ChangesRequest, |root, request, _scope| c4_commands::apply_c4_changes(root, request)),
+    read!("list_c4_diagrams", c4_commands::ListC4DiagramsRequest, |root, request| c4_commands::list_c4_diagrams(root, request)),
+    write!("create_c4_diagram", Standard, c4_commands::CreateC4DiagramRequest, |root, request, _scope| c4_commands::create_c4_diagram(root, request)),
+    write!("rename_c4_diagram", Standard, c4_commands::C4DiagramRequest, |root, request, _scope| c4_commands::rename_c4_diagram(root, request)),
+    write!("delete_c4_diagram", Standard, c4_commands::C4DiagramRequest, |root, request, _scope| c4_commands::delete_c4_diagram(root, request)),
     // ── 묻기·대화·세션 ──
     read!("get_ask", ask_chat_commands::NoteRefRequest, |root, request| ask_chat_commands::get_ask(root, request)),
     read!("list_chats", ask_chat_commands::NoteRefRequest, |root, request| ask_chat_commands::list_chats(root, request)),

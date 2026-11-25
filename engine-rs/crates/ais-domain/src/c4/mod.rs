@@ -1,17 +1,21 @@
 //! C4 아키텍처 모델의 규칙. 모양(`Model`, `Views`), 검사(`validate`), 변경 적용(`apply`), 파일 글(`format`)이다.
 //! 파일도 시계도 모르는 순수 코드다. vault에서 읽고 쓰는 곳(`c4::store`)은 `ais-core`에 있다.
 //!
-//! 한 프로젝트의 모델은 두 파일이다.
+//! 한 아키텍처(다이어그램)의 모델은 두 파일이다.
 //!
 //! ```text
 //! .aisurada/c4/<프로젝트 slug>/model.yaml   요소와 관계
 //! .aisurada/c4/<프로젝트 slug>/views.yaml   뷰별 요소 위치(끌 때마다 바뀌는 좌표를 모델 이력과 떼어 둔다)
 //! ```
 //!
+//! 프로젝트는 아키텍처를 여러 개 가질 수 있다. 위 파일이 `main`이고, 새로 만든 것은
+//! `.aisurada/c4/<프로젝트 slug>/diagrams/<id>/` 아래에 같은 두 파일과 이름 파일(`diagram.yaml`)을 둔다(`diagram`).
+//!
 //! 요소의 단계(레벨)는 종류에서 정한다: 사람·시스템·외부 시스템은 1, 컨테이너는 2, 컴포넌트는 3이다.
 //! 코드(4단계)는 직접 그리지 않는다(요소의 `codeRef` 파일 경로만 둔다).
 
 pub mod apply;
+pub mod diagram;
 pub mod format;
 
 use std::collections::{BTreeMap, HashSet};
@@ -114,11 +118,8 @@ pub struct Relationship {
 /// 카드 가장자리의 연결 지점 이름. 상자 카드는 네 변마다 3개씩 12개를 쓰고, 알약 모양인 사람은 네 변 가운데 4개만 쓴다.
 /// 예전 이름인 `left`, `right`는 `left-2`, `right-2`와 같게 다룬다.
 pub const PORT_IDS: [&str; 14] = [
-    "top-1", "top-2", "top-3",
-    "bottom-1", "bottom-2", "bottom-3",
-    "left-1", "left-2", "left-3",
-    "right-1", "right-2", "right-3",
-    "left", "right",
+    "top-1", "top-2", "top-3", "bottom-1", "bottom-2", "bottom-3", "left-1", "left-2", "left-3",
+    "right-1", "right-2", "right-3", "left", "right",
 ];
 
 /// 요소와 관계 전체(`model.yaml`)
@@ -161,7 +162,9 @@ impl Model {
     }
 
     pub fn relationship(&self, id: &str) -> Option<&Relationship> {
-        self.relationships.iter().find(|relationship| relationship.id == id)
+        self.relationships
+            .iter()
+            .find(|relationship| relationship.id == id)
     }
 
     /// 모델이 규칙에 맞는지 검사한다. 파일을 읽을 때와 변경을 적용한 뒤에 부른다.
@@ -305,7 +308,8 @@ impl Views {
     pub fn prune(&mut self, model: &Model) {
         self.views.retain(|view, _| Self::scope_exists(view, model));
         for positions in self.views.values_mut() {
-            positions.retain(|id, _| model.element(id).is_some() || model.relationship(id).is_some());
+            positions
+                .retain(|id, _| model.element(id).is_some() || model.relationship(id).is_some());
         }
         self.views.retain(|_, positions| !positions.is_empty());
     }

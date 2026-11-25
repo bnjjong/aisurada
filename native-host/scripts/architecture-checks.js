@@ -353,5 +353,67 @@ try {
     // 선의 끝이 그 지점으로 옮겨 그려진다
     await until(() => { const a = middle(handle()), b = middle(portOf(late, wanted)); return Math.abs(a.x - b.x) <= 4 && Math.abs(a.y - b.y) <= 4; }, '선의 끝이 새 연결 지점에 붙음');
   });
+
+  const modelOf = diagram => invoke('engine_call', { command: 'get_c4_model', args: { project: A.projectSlug, diagram } });
+  const chips = () => all('.c4-diagram-tabs button');
+  const chip = name => chips().find(e => e.textContent.trim() === name);
+  const bar = label => document.querySelector(`.c4-diagram-actions button[aria-label="${label}"]`);
+  const barButton = text => byText('.c4-diagram-actions button', text);
+
+  await test('a-second-architecture-is-made-switched-and-kept-apart', async () => {
+    await until(() => chip('기본')?.getAttribute('aria-pressed') === 'true', '처음에는 기본 아키텍처가 골라져 있다');
+    const mainBefore = await model();
+    barButton('새 아키텍처').click();
+    await until(form, '이름 창');
+    fillField(form().querySelector('input[required]'), '배포 구조');
+    submit().click();
+    await until(() => !form(), '창이 닫힘');
+    await until(() => chip('배포 구조')?.getAttribute('aria-pressed') === 'true', '새 아키텍처로 바뀜');
+    await until(() => document.querySelector('.c4-diagram-empty') && cards().length === 0, '새 아키텍처는 비어 있다');
+    const list = await invoke('engine_call', { command: 'list_c4_diagrams', args: { project: A.projectSlug } });
+    assert(list.diagrams.map(d => d.id).join() === 'main,arch-2', `엔진의 목록: ${JSON.stringify(list)}`);
+    await addElement('배포 서버', 'system');
+    const second = await modelOf('arch-2');
+    assert(second.elements.map(e => e.name).join() === '배포 서버', `둘째에 들어갔다: ${JSON.stringify(second.elements)}`);
+    const mainNow = await model();
+    assert(mainNow.precondition === mainBefore.precondition && !mainNow.elements.some(e => e.name === '배포 서버'), '기본 아키텍처는 그대로다');
+    chip('기본').click();
+    await until(() => chip('기본').getAttribute('aria-pressed') === 'true' && cardOf('GitHub') && !cardOf('배포 서버'), '기본으로 돌아오면 원래 카드만 보인다');
+    chip('배포 구조').click();
+    await until(() => cardOf('배포 서버') && !cardOf('GitHub'), '둘째로 가면 둘째 카드만 보인다');
+  });
+
+  await test('a-diagram-can-be-renamed-and-the-name-must-be-free', async () => {
+    bar('아키텍처 이름 바꾸기').click();
+    await until(form, '이름 창');
+    assert(form().querySelector('input[required]').value === '배포 구조', '지금 이름이 채워져 있다');
+    fillField(form().querySelector('input[required]'), '기본');
+    submit().click();
+    await until(() => form()?.querySelector('.c4-error'), '겹치는 이름은 거절된다');
+    assert(chip('배포 구조'), '거절되면 이름이 그대로다');
+    fillField(form().querySelector('input[required]'), '운영 구조');
+    submit().click();
+    await until(() => !form(), '창이 닫힘');
+    await until(() => chip('운영 구조')?.getAttribute('aria-pressed') === 'true' && !chip('배포 구조'), '칩 이름이 바뀜');
+    const read = await modelOf('arch-2');
+    assert(read.diagram.name === '운영 구조' && read.elements.length === 1, '엔진에도 이름이 바뀌고 요소는 그대로다');
+  });
+
+  await test('deleting-a-diagram-asks-first-and-returns-to-main', async () => {
+    bar('아키텍처 지우기').click();
+    await until(() => document.querySelector('.ui-modal'), '확인 창');
+    const text = document.querySelector('.ui-modal').textContent;
+    assert(text.includes('운영 구조') && text.includes('요소 1개'), `무엇이 사라지는지 알린다: ${text}`);
+    byText('.ui-modal button', '취소').click();
+    await until(() => !document.querySelector('.ui-modal'), '취소하면 닫힘');
+    assert(chip('운영 구조'), '취소하면 그대로 남는다');
+    bar('아키텍처 지우기').click();
+    await until(() => document.querySelector('.ui-modal'), '확인 창');
+    byText('.ui-modal button', '삭제').click();
+    await until(() => !chip('운영 구조') && chip('기본')?.getAttribute('aria-pressed') === 'true', '지우면 기본으로 돌아온다');
+    const list = await invoke('engine_call', { command: 'list_c4_diagrams', args: { project: A.projectSlug } });
+    assert(list.diagrams.map(d => d.id).join() === 'main', `엔진에서도 사라졌다: ${JSON.stringify(list)}`);
+    await until(() => cardOf('GitHub'), '기본 아키텍처의 카드가 보인다');
+  });
 } catch { /* 첫 실패 뒤의 점검은 앞 상태에 기대므로 멈춘다 */ }
 await post('/result', results);

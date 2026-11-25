@@ -302,3 +302,290 @@ fn a_line_keeps_its_ports_in_the_file_and_in_the_answer() {
     assert!(refused.message.contains("middle"), "{}", refused.message);
     assert_eq!(get(&engine, "demo")["precondition"], moved["precondition"]);
 }
+
+fn call(engine: &Engine, name: &str, args: Value) -> Result<Value, ais_core::error::EngineError> {
+    engine.call(name, args)
+}
+
+fn ids(list: &Value) -> Vec<String> {
+    list["diagrams"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["id"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn a_project_always_lists_main_and_new_diagrams_get_numbered_ids() {
+    let vault = vault("diagrams-list");
+    let engine = Engine::new(&vault);
+    let list = call(&engine, "list_c4_diagrams", json!({"project": "demo"})).unwrap();
+    assert_eq!(ids(&list), ["main"]);
+    assert_eq!(list["diagrams"][0]["name"], "기본");
+
+    let second = call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "  결제 흐름 "}),
+    )
+    .unwrap();
+    assert_eq!(second["diagram"]["id"], "arch-2");
+    assert_eq!(second["diagram"]["name"], "결제 흐름");
+    let third = call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "배포"}),
+    )
+    .unwrap();
+    assert_eq!(third["diagram"]["id"], "arch-3");
+
+    let list = call(&engine, "list_c4_diagrams", json!({"project": "demo"})).unwrap();
+    assert_eq!(ids(&list), ["main", "arch-2", "arch-3"]);
+    assert_eq!(list["diagrams"][1]["elements"], 0);
+    assert!(
+        vault
+            .join(".aisurada/c4/demo/diagrams/arch-2/diagram.yaml")
+            .is_file()
+    );
+    assert!(
+        !vault.join(".aisurada/c4/demo/model.yaml").exists(),
+        "main의 파일은 만들지 않는다"
+    );
+}
+
+#[test]
+fn each_diagram_keeps_its_own_model_and_token() {
+    let vault = vault("diagrams-own");
+    let engine = Engine::new(&vault);
+    let main = get(&engine, "demo");
+    apply(
+        &engine,
+        "demo",
+        main["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"app","kind":"system","name":"메인 앱"}]),
+    )
+    .unwrap();
+    call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "다른 것"}),
+    )
+    .unwrap();
+
+    let other = call(
+        &engine,
+        "get_c4_model",
+        json!({"project": "demo", "diagram": "arch-2"}),
+    )
+    .unwrap();
+    assert_eq!(other["elements"], json!([]), "다른 아키텍처는 비어 있다");
+    assert_eq!(other["diagram"]["id"], "arch-2");
+    assert_eq!(other["diagram"]["name"], "다른 것");
+
+    let written = engine
+        .call(
+            "apply_c4_changes",
+            json!({
+                "project": "demo", "diagram": "arch-2",
+                "f1": other["precondition"],
+                "operations": [{"op":"put_element","id":"app","kind":"system","name":"둘째 앱"}],
+            }),
+        )
+        .unwrap();
+    assert_eq!(written["diagram"]["id"], "arch-2");
+    assert_eq!(written["elements"][0]["name"], "둘째 앱");
+    assert_eq!(get(&engine, "demo")["elements"][0]["name"], "메인 앱");
+    let file = vault.join(".aisurada/c4/demo/diagrams/arch-2/model.yaml");
+    assert!(std::fs::read_to_string(file).unwrap().contains("둘째 앱"));
+
+    // 다른 아키텍처의 토큰은 이쪽에서 통하지 않는다
+    let stale = engine.call(
+        "apply_c4_changes",
+        json!({
+            "project": "demo", "diagram": "arch-2",
+            "f1": main["precondition"],
+            "operations": [{"op":"delete_element","id":"app"}],
+        }),
+    );
+    assert_eq!(stale.unwrap_err().kind, ErrorKind::PreconditionFailed);
+}
+
+#[test]
+fn renaming_changes_only_the_name_and_not_the_token() {
+    let vault = vault("diagrams-rename");
+    let engine = Engine::new(&vault);
+    call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "첫째"}),
+    )
+    .unwrap();
+    call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "둘째"}),
+    )
+    .unwrap();
+    let before = call(
+        &engine,
+        "get_c4_model",
+        json!({"project": "demo", "diagram": "arch-2"}),
+    )
+    .unwrap();
+
+    let renamed = call(
+        &engine,
+        "rename_c4_diagram",
+        json!({"project": "demo", "diagram": "arch-2", "name": "셋째"}),
+    )
+    .unwrap();
+    assert_eq!(renamed["diagram"]["id"], "arch-2");
+    assert_eq!(renamed["diagram"]["name"], "셋째");
+    let after = call(
+        &engine,
+        "get_c4_model",
+        json!({"project": "demo", "diagram": "arch-2"}),
+    )
+    .unwrap();
+    assert_eq!(after["precondition"], before["precondition"]);
+    assert_eq!(after["diagram"]["name"], "셋째");
+
+    // main의 이름도 바꿀 수 있고, 같은 이름은 거절한다
+    call(
+        &engine,
+        "rename_c4_diagram",
+        json!({"project": "demo", "diagram": "main", "name": "개요"}),
+    )
+    .unwrap();
+    let list = call(&engine, "list_c4_diagrams", json!({"project": "demo"})).unwrap();
+    assert_eq!(list["diagrams"][0]["name"], "개요");
+    let taken = call(
+        &engine,
+        "rename_c4_diagram",
+        json!({"project": "demo", "diagram": "arch-3", "name": "개요"}),
+    );
+    assert_eq!(taken.unwrap_err().kind, ErrorKind::Conflict);
+    let same = call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "셋째"}),
+    );
+    assert_eq!(same.unwrap_err().kind, ErrorKind::Conflict);
+    // 자기 이름 그대로는 된다
+    call(
+        &engine,
+        "rename_c4_diagram",
+        json!({"project": "demo", "diagram": "arch-3", "name": "둘째"}),
+    )
+    .unwrap();
+}
+
+#[test]
+fn deleting_removes_the_folder_and_main_goes_back_to_empty() {
+    let vault = vault("diagrams-delete");
+    let engine = Engine::new(&vault);
+    let main = get(&engine, "demo");
+    apply(
+        &engine,
+        "demo",
+        main["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"app","kind":"system","name":"앱"}]),
+    )
+    .unwrap();
+    call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "둘째"}),
+    )
+    .unwrap();
+
+    let gone = call(
+        &engine,
+        "delete_c4_diagram",
+        json!({"project": "demo", "diagram": "arch-2"}),
+    )
+    .unwrap();
+    assert_eq!(gone["deleted"], "arch-2");
+    assert!(!vault.join(".aisurada/c4/demo/diagrams/arch-2").exists());
+    let list = call(&engine, "list_c4_diagrams", json!({"project": "demo"})).unwrap();
+    assert_eq!(ids(&list), ["main"]);
+    // 지운 뒤 번호는 가장 큰 번호 다음부터 이어진다(비어 있으면 다시 arch-2)
+    let again = call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "새것"}),
+    )
+    .unwrap();
+    assert_eq!(again["diagram"]["id"], "arch-2");
+
+    call(
+        &engine,
+        "delete_c4_diagram",
+        json!({"project": "demo", "diagram": "main"}),
+    )
+    .unwrap();
+    assert_eq!(get(&engine, "demo")["elements"], json!([]));
+    assert!(!vault.join(".aisurada/c4/demo/model.yaml").exists());
+    let list = call(&engine, "list_c4_diagrams", json!({"project": "demo"})).unwrap();
+    assert_eq!(
+        ids(&list),
+        ["main", "arch-2"],
+        "main을 지워도 다른 아키텍처는 남는다"
+    );
+    assert_eq!(list["diagrams"][0]["name"], "기본");
+}
+
+#[test]
+fn unknown_unsafe_and_missing_diagram_arguments_are_refused() {
+    let vault = vault("diagrams-refuse");
+    let engine = Engine::new(&vault);
+    for bad in ["arch-9", "../x", "a/b", "A"] {
+        let got = call(
+            &engine,
+            "get_c4_model",
+            json!({"project": "demo", "diagram": bad}),
+        );
+        assert!(got.is_err(), "{bad}");
+    }
+    assert_eq!(
+        call(
+            &engine,
+            "get_c4_model",
+            json!({"project": "demo", "diagram": "arch-9"})
+        )
+        .unwrap_err()
+        .kind,
+        ErrorKind::NotFound
+    );
+    // 지우기와 이름 바꾸기는 diagram을 꼭 적어야 한다(없다고 main으로 보지 않는다)
+    assert!(call(&engine, "delete_c4_diagram", json!({"project": "demo"})).is_err());
+    assert!(
+        call(
+            &engine,
+            "rename_c4_diagram",
+            json!({"project": "demo", "name": "x"})
+        )
+        .is_err()
+    );
+    assert!(
+        call(
+            &engine,
+            "create_c4_diagram",
+            json!({"project": "demo", "name": "  "})
+        )
+        .is_err()
+    );
+    assert!(
+        call(
+            &engine,
+            "create_c4_diagram",
+            json!({"project": "nope", "name": "x"})
+        )
+        .is_err()
+    );
+    assert!(
+        !vault.join(".aisurada/c4").exists(),
+        "거절된 호출은 아무것도 만들지 않는다"
+    );
+}

@@ -8,10 +8,13 @@
 .c4-empty { flex: 1; min-height: 200px; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; text-align: center; color: var(--muted); }
 .c4-page .c4-error { flex: none; color: var(--ink); border-inline-start: 3px solid #b56c37; padding-inline-start: 8px; margin-block: 6px; overflow-wrap: anywhere; }
 .c4-workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
-.c4-toolbar, .c4-toolbar nav, .c4-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.c4-toolbar, .c4-toolbar nav, .c4-toolbar-actions, .c4-diagram-bar, .c4-diagram-tabs, .c4-diagram-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .c4-toolbar { flex: none; justify-content: space-between; margin-bottom: 10px; }
-.c4-toolbar button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; min-height: 30px; font-size: 12px; }
-.c4-toolbar button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); color: var(--ink); font-weight: 650; }
+.c4-diagram-bar { flex: none; justify-content: space-between; margin-bottom: 8px; }
+.c4-diagram-tabs { min-width: 0; }
+.c4-diagram-tabs button { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c4-toolbar button, .c4-diagram-bar button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; min-height: 30px; font-size: 12px; }
+.c4-toolbar button[aria-pressed="true"], .c4-diagram-bar button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); color: var(--ink); font-weight: 650; }
 .c4-workbench { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .c4-map-column { flex: 1; min-height: 0; display: flex; flex-direction: column; min-width: 0; position: relative; }
 .c4-parent { flex: none; margin-bottom: 8px; }

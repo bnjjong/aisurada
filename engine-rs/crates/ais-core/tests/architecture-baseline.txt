@@ -4,8 +4,8 @@ edge adapters -> error 1
 edge adapters -> kernel 3
 edge adapters -> ports 8
 edge adapters -> text 2
-edge c4 -> error 4
-edge c4 -> frontmatter 2
+edge c4 -> error 5
+edge c4 -> frontmatter 3
 edge c4 -> kernel 1
 edge c4 -> ports 1
 edge c4 -> vault 1

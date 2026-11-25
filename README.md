@@ -183,11 +183,15 @@ Ready For Develop 상태의 태스크에서 **「지금 실행」**을 누르면
 ```bash
 dist/ais-cli get-c4-model 내-프로젝트
 dist/ais-cli apply-c4-changes 내-프로젝트 f1=<get-c4-model 응답의 precondition> 'operations=[{"op":"put_element","id":"app","kind":"system","name":"앱"}]'
+dist/ais-cli list-c4-diagrams 내-프로젝트
+dist/ais-cli create-c4-diagram 내-프로젝트 name=결제-흐름
+dist/ais-cli get-c4-model 내-프로젝트 diagram=arch-2
 ```
 
-- 명령 2개: `get-c4-model`, `apply-c4-changes`. MCP에는 읽기 도구 `get_c4_model`과 쓰기 도구 `apply_c4_changes`(`--write`일 때만)가 열립니다.
+- 명령 6개: `get-c4-model`, `apply-c4-changes`, `list-c4-diagrams`, `create-c4-diagram`, `rename-c4-diagram`, `delete-c4-diagram`. MCP에는 읽기 도구 `get_c4_model`, `list_c4_diagrams`와 쓰기 도구 `apply_c4_changes`, `create_c4_diagram`, `rename_c4_diagram`, `delete_c4_diagram`(`--write`일 때만)이 열립니다.
+- 프로젝트마다 아키텍처를 여러 개 둘 수 있습니다. 읽기·쓰기 명령은 `diagram=<아키텍처 id>`로 고르고, 안 주면 기존 아키텍처 `main`입니다. 새 아키텍처의 id는 `arch-2`, `arch-3`처럼 자동으로 붙습니다.
 - 변경 묶음은 한 번에 적용하거나 전혀 적용하지 않고, 고칠 때는 직전에 읽은 `f1` 토큰이 필요합니다. 그 사이 다른 곳에서 고쳤으면 거절합니다.
-- 파일은 `.aisurada/c4/<프로젝트 slug>/`의 `model.yaml`(요소·관계)과 `views.yaml`(뷰별 좌표) 두 개뿐입니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「C4 아키텍처」에 있습니다.
+- 아키텍처마다 파일은 `model.yaml`(요소·관계)과 `views.yaml`(뷰별 좌표) 두 개입니다. `main`은 `.aisurada/c4/<프로젝트 slug>/`에, 나머지는 `.aisurada/c4/<프로젝트 slug>/diagrams/<id>/`에 두고, 이름은 `diagram.yaml`에 적습니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「C4 아키텍처」에 있습니다.
 
 ## 22장 사실층
 

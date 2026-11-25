@@ -1,5 +1,9 @@
-//! C4 아키텍처 모델 명령 2개: `get_c4_model`, `apply_c4_changes`.
-//! 외부 설명서에 없는 확장이다. 화면, 챗, AI 에이전트(MCP)가 같은 두 명령으로 모델을 읽고 고친다.
+//! C4 아키텍처 모델 명령 6개: `get_c4_model`, `apply_c4_changes`, `list_c4_diagrams`, `create_c4_diagram`,
+//! `rename_c4_diagram`, `delete_c4_diagram`.
+//! 외부 설명서에 없는 확장이다. 화면과 AI 에이전트(MCP)가 같은 명령으로 모델을 읽고 고친다.
+//!
+//! 프로젝트는 아키텍처(다이어그램)를 여러 개 가질 수 있다. 읽기와 쓰기 명령은 선택 인자 `diagram`으로 어느 것인지 고르고,
+//! 안 주면 기존 파일이 가리키는 `main`이다. 만들기, 이름 바꾸기, 지우기는 위 목록 명령들로 한다.
 //!
 //! 고치려면 먼저 `get_c4_model`로 읽고, 응답의 `precondition`을 `apply_c4_changes`의 `f1`에 그대로 싣는다. 그 사이 파일이
 //! 바뀌었으면 아무것도 쓰지 않고 거절한다. 변경 목록(`operations`)은 한 번에 적용하거나 전혀 적용하지 않는다(`c4::apply`).
@@ -16,20 +20,50 @@ use crate::kernel::token::PREFIX;
 
 const GET_USAGE: &str = "get-c4-model <프로젝트 slug>";
 const APPLY_USAGE: &str = "apply-c4-changes <프로젝트 slug> f1=<직전에 읽은 토큰> operations=<변경 JSON 배열>";
+const LIST_USAGE: &str = "list-c4-diagrams <프로젝트 slug>";
+const CREATE_USAGE: &str = "create-c4-diagram <프로젝트 slug> name=<이름>";
+const RENAME_USAGE: &str = "rename-c4-diagram <프로젝트 slug> diagram=<아키텍처 id> name=<새 이름>";
+const DELETE_USAGE: &str = "delete-c4-diagram <프로젝트 slug> diagram=<아키텍처 id>";
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct GetC4ModelRequest {
     pub project: Option<String>,
+    /// 아키텍처 id. 안 주면 `main`
+    pub diagram: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ApplyC4ChangesRequest {
     pub project: Option<String>,
+    /// 아키텍처 id. 안 주면 `main`
+    pub diagram: Option<String>,
     pub f1: Option<String>,
     /// 호출 객체에서는 배열, 명령줄에서는 JSON 글
     pub operations: Option<Json>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ListC4DiagramsRequest {
+    pub project: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CreateC4DiagramRequest {
+    pub project: Option<String>,
+    pub name: Option<String>,
+}
+
+/// 이름 바꾸기와 지우기가 같이 쓴다. 지울 때는 `name`을 안 받는다.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct C4DiagramRequest {
+    pub project: Option<String>,
+    pub diagram: Option<String>,
+    pub name: Option<String>,
 }
 
 fn project_of<'a>(raw: &'a Option<String>, usage: &str) -> Result<&'a str, EngineError> {
@@ -40,8 +74,9 @@ fn project_of<'a>(raw: &'a Option<String>, usage: &str) -> Result<&'a str, Engin
 
 pub fn get_c4_model(vault: &Path, request: &GetC4ModelRequest) -> Result<Json, EngineError> {
     let project = project_of(&request.project, GET_USAGE)?;
-    let stored = store::load(vault, project)?;
-    Ok(store::to_json(project, &stored.model, &stored.views, &stored.token))
+    let diagram = store::diagram_of(request.diagram.as_deref())?;
+    let stored = store::load(vault, project, diagram)?;
+    Ok(store::to_json(project, &stored.info, &stored.model, &stored.views, &stored.token))
 }
 
 pub fn apply_c4_changes(vault: &Path, request: &ApplyC4ChangesRequest) -> Result<Json, EngineError> {
@@ -51,19 +86,67 @@ pub fn apply_c4_changes(vault: &Path, request: &ApplyC4ChangesRequest) -> Result
         .as_ref()
         .ok_or_else(|| EngineError::invalid_argument(format!("operations 가 필요하다: {APPLY_USAGE}")))?;
     let operations = parse_operations(operations)?;
-    let stored = store::load(vault, project)?;
+    let diagram = store::diagram_of(request.diagram.as_deref())?;
+    let stored = store::load(vault, project, diagram)?;
     check_token(request.f1.as_deref(), &stored.token, project)?;
 
     let outcome = apply(&stored.model, &stored.views, &operations)?;
-    let token = store::save(vault, project, &stored, &outcome.model, &outcome.views)?;
+    let token = store::save(vault, project, diagram, &stored, &outcome.model, &outcome.views)?;
     let changed = token != stored.token;
-    let mut out = store::to_json(project, &outcome.model, &outcome.views, &token);
+    let mut out = store::to_json(project, &stored.info, &outcome.model, &outcome.views, &token);
     out["changed"] = json!(changed);
     out["applied"] = json!(operations.len());
     out["createdRelationships"] = json!(outcome.created_relationships);
     out["removedElements"] = json!(outcome.removed_elements);
     out["removedRelationships"] = json!(outcome.removed_relationships);
     Ok(out)
+}
+
+pub fn list_c4_diagrams(vault: &Path, request: &ListC4DiagramsRequest) -> Result<Json, EngineError> {
+    let project = project_of(&request.project, LIST_USAGE)?;
+    let diagrams = store::list(vault, project)?;
+    Ok(json!({
+        "project": project,
+        "diagrams": diagrams.iter().map(store::DiagramInfo::to_json).collect::<Vec<_>>(),
+    }))
+}
+
+pub fn create_c4_diagram(vault: &Path, request: &CreateC4DiagramRequest) -> Result<Json, EngineError> {
+    let project = project_of(&request.project, CREATE_USAGE)?;
+    let name = request
+        .name
+        .as_deref()
+        .ok_or_else(|| EngineError::invalid_argument(format!("name 이 필요하다: {CREATE_USAGE}")))?;
+    let created = store::create(vault, project, name)?;
+    Ok(json!({ "project": project, "diagram": created.to_json() }))
+}
+
+pub fn rename_c4_diagram(vault: &Path, request: &C4DiagramRequest) -> Result<Json, EngineError> {
+    let project = project_of(&request.project, RENAME_USAGE)?;
+    let diagram = diagram_required(request, RENAME_USAGE)?;
+    let name = request
+        .name
+        .as_deref()
+        .ok_or_else(|| EngineError::invalid_argument(format!("name 이 필요하다: {RENAME_USAGE}")))?;
+    let renamed = store::rename(vault, project, diagram, name)?;
+    Ok(json!({ "project": project, "diagram": renamed.to_json() }))
+}
+
+pub fn delete_c4_diagram(vault: &Path, request: &C4DiagramRequest) -> Result<Json, EngineError> {
+    let project = project_of(&request.project, DELETE_USAGE)?;
+    let diagram = diagram_required(request, DELETE_USAGE)?;
+    store::delete(vault, project, diagram)?;
+    Ok(json!({ "project": project, "deleted": diagram }))
+}
+
+/// 지우기와 이름 바꾸기는 어느 것인지 꼭 적어야 한다(안 적었다고 `main`으로 보지 않는다).
+fn diagram_required<'a>(request: &'a C4DiagramRequest, usage: &str) -> Result<&'a str, EngineError> {
+    match request.diagram.as_deref().map(str::trim).filter(|id| !id.is_empty()) {
+        Some(id) => store::diagram_of(Some(id)),
+        None => Err(EngineError::invalid_argument(format!(
+            "diagram 이 필요하다: {usage}"
+        ))),
+    }
 }
 
 fn check_token(provided: Option<&str>, current: &str, project: &str) -> Result<(), EngineError> {
