@@ -6,7 +6,7 @@ import {
   extractErrorMessage,
 } from "../src/ui/engineClient.ts";
 import { isMissingCommand } from "../src/ui/runnerStore.ts";
-import { humanizeAskError } from "../src/plugs/claude/askText.ts";
+import { EMPTY_ANSWER_ERROR, humanizeAskError, isBlankAnswer } from "../src/plugs/claude/askText.ts";
 
 test("extractErrorKind recognizes structured kind and AIS-### codes", () => {
   assert.equal(extractErrorKind({ kind: "conflict" }), "conflict");
@@ -66,4 +66,17 @@ test("explainEngineError maintains Korean messages when structured error kinds a
 
   const timeout = explainEngineError({ kind: "timeout", message: "slow backend" });
   assert.match(timeout, /응답 시간이 너무 오래 걸려/);
+});
+
+test("TSK-4: a blank ok answer is told apart from a real one, and its error reads as a notice", () => {
+  assert.equal(isBlankAnswer(true, ""), true);
+  assert.equal(isBlankAnswer(true, "  \n"), true);
+  assert.equal(isBlankAnswer(true, undefined), true);
+  assert.equal(isBlankAnswer(true, "답"), false);
+  assert.equal(isBlankAnswer(false, ""), false, "a failure keeps its own error");
+  const info = humanizeAskError(EMPTY_ANSWER_ERROR);
+  assert.equal(info.kind, "empty_answer");
+  assert.match(info.message, /답을 주지 않았어요/);
+  // 호스트 글 뒤에 표준오류가 붙어 login 따위가 들어 있어도 같은 안내가 먼저다
+  assert.equal(humanizeAskError("claude 가 종료 코드 0 으로 끝났지만 답이 비어 있다. 도구 실행이 실패했을 수 있다. login expired").kind, "empty_answer");
 });

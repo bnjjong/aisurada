@@ -239,6 +239,16 @@ test('3.9: a picture that cannot be written means ask_claude is not called and t
   assert.match(pictureName(file, 1762136140512, '5e6f7a8b-0000-4000-8000-000000000000'), /^ask-[0-9a-z]+-5e6f7a8b\.png$/);
 });
 
+test('TSK-4: an ok answer with no text is recorded as a failed turn, not as a blank bubble', async () => {
+  setAskThread('ndq-00000004', null);
+  const host = fakeHost({ answers: [{ ok: true, answer: '  \n', error: null, elapsed_ms: 30100 }] });
+  await startAsk(host, baseRequest({ target: { id: 'ndq-00000004' }, rootId: 'ndq-00000004' }));
+  const saved = askNow().threads['ndq-00000004'].turns[0];
+  assert.equal(saved.answer, '');
+  assert.match(saved.error, /답이 비어 있다/);
+  assert.equal(saved.elapsedMs, 30100);
+});
+
 test('3.9 with pictures: the picture lines go in the text and the turn keeps them (the bridge writes headers and body)', async () => {
   setAskThread('ndq-00000004', null);
   const host = fakeHost();
