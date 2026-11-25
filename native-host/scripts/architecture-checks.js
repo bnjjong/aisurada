@@ -1,6 +1,6 @@
 /* 실제 WKWebView와 앱 안의 Rust 엔진, 격리된 vault로 C4 아키텍처 화면을 점검한다(TSK-24).
    요소와 관계를 화면에서 만들고, 끌어서 옮기고, 고치고, 지우고, 다른 곳이 먼저 고쳤을 때 거절되는 것까지 본다.
-   엔진이 쓴 값은 화면이 아니라 엔진 호출로 다시 읽어 확인한다. 챗은 Claude CLI가 있어야 해서 이 점검에 없다. */
+   엔진이 쓴 값은 화면이 아니라 엔진 호출로 다시 읽어 확인한다. */
 const cfg = window.__AIS_FIXTURE__;
 const A = cfg.architecture;
 const invoke = (...args) => window.__TAURI_INTERNALS__.invoke(...args);

@@ -1,12 +1,8 @@
-// C4 모델을 엔진(`get_c4_model`, `apply_c4_changes`)과 호스트(`c4_chat`)로 읽고 쓰는 얇은 층.
+// C4 모델을 엔진(`get_c4_model`, `apply_c4_changes`)으로 읽고 쓰는 얇은 층.
 // 규칙과 검사는 엔진이 한다. 여기서는 응답 모양을 확인하고 오류를 사람이 읽는 글로 바꾼다.
 import { isRecord, explainEngineError } from '../engineClient.ts';
 import type { EngineCall } from '../engineClient.ts';
-import type { WorkspaceController } from '../../workspace/controller.ts';
 import type { C4Model, C4Operation } from './model.ts';
-
-export type C4Message = { role: 'user' | 'assistant'; text: string; warning?: string; updated?: boolean };
-export type C4Reply = { message: string; applied: number; warning: string | null; model: C4Model | null };
 
 export function errorText(value: unknown): string {
   return explainEngineError(value, (_, kind) => kind === 'precondition_failed'
@@ -36,11 +32,3 @@ export async function applyC4Changes(call: EngineCall, model: C4Model, operation
     args: { project: model.project, f1: model.precondition, operations },
   }));
 }
-
-export const sendC4Request = (
-  host: WorkspaceController['callHost'],
-  project: string,
-  selectedId: string | null,
-  request: string,
-  history: C4Message[],
-) => host<C4Reply>('c4_chat', { project, selectedId, request, history: history.slice(-8) });
