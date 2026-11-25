@@ -4,7 +4,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { AskContext } from './askContext.ts';
 import { AskImageStrip, AskOptionsRow, useAskImages } from './askPickers.tsx';
-import { humanizeAskError, isGeminiModel, modelLabel } from './askText.ts';
+import { EMPTY_ANSWER_ERROR, humanizeAskError, isGeminiModel, modelLabel } from './askText.ts';
 import type { AskTurn } from './askText.ts';
 import { cancelQueuedAsk } from './askRun.ts';
 import { ModelProse } from './modelProse.tsx';
@@ -34,9 +34,11 @@ function pictureSource(baseDir: string, relative: string): string {
 export function AskTurnView({ turn, fold }: { turn: AskTurn; fold: boolean }) {
   const { baseDir } = useContext(AskContext);
   const pictures = turn.images ?? [];
-  const errorInfo = turn.error ? humanizeAskError(turn.error) : null;
+  // TSK-4: 옛 기록에는 ok 로 저장된 빈 답이 있다. 말풍선 없이 소요 시간만 남기지 않고 안내를 보인다.
+  const failure = turn.error || (turn.answer.trim() ? '' : EMPTY_ANSWER_ERROR);
+  const errorInfo = failure ? humanizeAskError(failure) : null;
   return (
-    <div className={`ask-turn${turn.error ? ' is-error' : ''}`} data-turn-id={turn.id}>
+    <div className={`ask-turn${failure ? ' is-error' : ''}`} data-turn-id={turn.id}>
       {turn.quote && <div className="ask-quote" title={turn.quote}>{turn.quote}</div>}
       <div className="ask-question">{turn.question}</div>
       {pictures.length > 0 &&
@@ -72,6 +74,9 @@ export function AskTurnView({ turn, fold }: { turn: AskTurn; fold: boolean }) {
   );
 }
 
+/** TSK-4: 이 초가 넘으면 「도구를 쓰는 중일 수 있다」는 안내를 덧붙인다. */
+const TOOL_HINT_SECONDS = 10;
+
 /** 4.9: the text of the "요청 중" line from the record and the clock. */
 export function pendingText(record: Pick<PendingAsk, 'at' | 'queued' | 'timeoutSeconds'>, now: number): string {
   const seconds = Math.max(0, Math.floor((now - record.at) / 1000));
@@ -79,7 +84,9 @@ export function pendingText(record: Pick<PendingAsk, 'at' | 'queued' | 'timeoutS
   if (record.queued) return `앞 물음을 기다리는 중이에요… ${elapsed}`;
   const limit = record.timeoutSeconds ?? 3600;
   const limitText = limit >= 60 ? `${Math.floor(limit / 60)}분` : `${limit}초`;
-  return seconds >= limit / 2 ? `답을 기다리는 중이에요… ${elapsed} · 최대 ${limitText}까지 기다려요` : `답을 기다리는 중이에요… ${elapsed}`;
+  if (seconds >= limit / 2) return `답을 기다리는 중이에요… ${elapsed} · 최대 ${limitText}까지 기다려요`;
+  // TSK-4: 호스트는 답이 끝나야 글을 주므로 도구를 쓰는지는 알 수 없다. 오래 걸리면 멈춘 게 아니라고 알린다.
+  return seconds >= TOOL_HINT_SECONDS ? `답을 기다리는 중이에요… ${elapsed} · 도구를 쓰거나 오래 생각하는 중일 수 있어요` : `답을 기다리는 중이에요… ${elapsed}`;
 }
 
 /** 4.9: the line of a question in flight. The second count is made from the clock every second, not counted. */

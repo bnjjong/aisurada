@@ -2,7 +2,7 @@
 // `read-session` answer is read (7.7), the session header (9.3), whether the composer is open (10.1), the rail chat's
 // question and turn (8.6 to 8.10) and the note a transcript is pinned into (9.8).
 // Adheres to Chapters 7 to 10 of aisurada Part 4 Claude integration specifications.
-import { cutText, noteHeading, TEXT_LIMIT } from './askText.ts';
+import { cutText, EMPTY_ANSWER_ERROR, isBlankAnswer, noteHeading, TEXT_LIMIT } from './askText.ts';
 import type { EngineTurn } from './transcriptLines.ts';
 import type { ClaudeSession } from './sessionTypes.ts';
 
@@ -298,13 +298,14 @@ export interface RailChat {
 
 /** 8.10: the turn made from an answer. The text is cut to 20,000 with the rule of 3.10. */
 export function railTurnFrom(input: { id: string; askedAt: string; question: string; model: string; effort: string; images: string[]; answer: { ok: boolean; answer?: string; error?: string | null; elapsed_ms?: number } }): RailTurn {
-  const failed = !input.answer.ok;
+  const blank = isBlankAnswer(input.answer.ok, input.answer.answer);
+  const failed = !input.answer.ok || blank;
   return {
     id: input.id,
     askedAt: input.askedAt,
     question: cutText(input.question, TEXT_LIMIT),
     answer: failed ? '' : cutText(input.answer.answer ?? '', TEXT_LIMIT),
-    ...(failed ? { error: input.answer.error || '답변을 받지 못했어요' } : {}),
+    ...(failed ? { error: input.answer.error || (blank ? EMPTY_ANSWER_ERROR : '답변을 받지 못했어요') } : {}),
     model: input.model,
     effort: input.effort,
     elapsedMs: Math.max(0, Math.trunc(input.answer.elapsed_ms ?? 0) || 0),

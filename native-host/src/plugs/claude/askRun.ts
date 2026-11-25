@@ -2,6 +2,7 @@
 // It has no React in it and reaches the host only through `AskHost`, so the node tests drive it with a fake.
 // Adheres to Chapters 2 and 3 of aisurada Part 4 Claude integration specifications.
 import {
+  EMPTY_ANSWER_ERROR,
   IMAGE_MIME_EXTENSIONS,
   QUOTE_LIMIT,
   TEXT_LIMIT,
@@ -10,6 +11,7 @@ import {
   cutText,
   groupTurns,
   isAnswered,
+  isBlankAnswer,
   mergeUnsaved,
   newUnderlineId,
   normalizeEffort,
@@ -364,7 +366,8 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
     }
 
     // 3.10: the turn is made now, after the answer, so askedAt is the time the answer arrived.
-    const failed = !result.ok;
+    const blank = isBlankAnswer(result.ok, result.answer);
+    const failed = !result.ok || blank;
     noteAskOutcome(failed ? 'error' : 'ok');
     const turn: AskTurn = {
       id: request.turnId,
@@ -373,7 +376,7 @@ async function depart(host: AskHost, request: AskRequest, picturesPromise: Promi
       ...(request.quote.trim() ? { quote: cutText(request.quote, QUOTE_LIMIT) } : {}),
       question: cutText(request.question, TEXT_LIMIT),
       answer: failed ? '' : cutText(result.answer ?? '', TEXT_LIMIT),
-      ...(failed ? { error: result.error || '까닭을 못 받았다' } : {}),
+      ...(failed ? { error: result.error || (blank ? EMPTY_ANSWER_ERROR : '까닭을 못 받았다') } : {}),
       model: request.model,
       effort: request.effort,
       elapsedMs: Math.max(0, Math.trunc(result.elapsed_ms) || 0),

@@ -434,6 +434,26 @@ fn failure(error: String, elapsed_ms: u64, missing_cwd: Option<String>) -> AskCl
     }
 }
 
+/// 종료 코드 0 으로 끝났지만 표준출력이 비었을 때의 실패. 도구 실패 따위로 글 없이 끝난 물음을
+/// 성공으로 돌려주면 화면에는 소요 시간만 남아 무응답처럼 보인다(TSK-4). 화면은 `답이 비어 있다`
+/// 글자로 이 경우를 알아본다(`askText.ts`의 `EMPTY_ANSWER_MARK`).
+fn empty_answer(
+    bin_name: &str,
+    stderr: &str,
+    elapsed_ms: u64,
+    missing_cwd: Option<String>,
+) -> AskClaudeResponse {
+    let cause = format_cause(stderr, "");
+    let mut message = format!(
+        "{} 가 종료 코드 0 으로 끝났지만 답이 비어 있다. 도구 실행이 실패했을 수 있다.",
+        bin_name
+    );
+    if !cause.is_empty() {
+        message.push_str(&format!(" {}", cause));
+    }
+    failure(message, elapsed_ms, missing_cwd)
+}
+
 /// 받은 `route` 를 검사한다. 값이 없거나 http 하나만 받고(http 도 기본 길 claude -p 로 간다),
 /// 다른 값은 커맨드째 거절한다(1장 1.6).
 fn check_route(route: Option<&str>) -> Result<(), String> {
@@ -532,6 +552,13 @@ fn execute_gemini_ask(
                 };
             }
             if res.exit_code == Some(0) {
+                if res.stdout.trim().is_empty() {
+                    let bin_name = gemini_bin
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("antigravity");
+                    return empty_answer(bin_name, &res.stderr, elapsed, missing_cwd);
+                }
                 return AskClaudeResponse {
                     ok: true,
                     answer: res.stdout.trim().to_string(),
@@ -713,6 +740,9 @@ pub fn execute_ask(args: AskClaudeArgs) -> AskClaudeResponse {
     }
 
     if res.exit_code == Some(0) {
+        if res.stdout.trim().is_empty() {
+            return empty_answer("claude", &res.stderr, elapsed, missing_cwd);
+        }
         return AskClaudeResponse {
             ok: true,
             answer: res.stdout.trim().to_string(),
@@ -1290,6 +1320,55 @@ exit 1
         assert!(!resp.ok);
         assert!(resp.error.unwrap().contains("1초 안에 답이 안 왔다"));
         assert!(started.elapsed() < Duration::from_secs(4));
+    }
+
+    #[test]
+    fn exit_zero_with_blank_stdout_is_a_failure_not_a_silent_success() {
+        let _lock = env_lock();
+        let dir = tempdir().unwrap();
+        // 도구가 실패해 글 없이 끝난 물음(TSK-4). ok 로 돌려주면 화면에 소요 시간만 남는다
+        let fake = create_executable_script(
+            dir.path(),
+            "fake_blank.sh",
+            "#!/bin/sh\necho '  ' \necho 'tool failed: permission denied' >&2\nexit 0\n",
+        );
+        env::set_var("AISURADA_CLAUDE_BIN", fake.to_str().unwrap());
+        let resp = execute_ask(ask_args("sess-blank", false, false));
+        env::remove_var("AISURADA_CLAUDE_BIN");
+        assert!(!resp.ok);
+        assert!(resp.answer.is_empty());
+        let err = resp.error.unwrap();
+        assert!(err.contains("답이 비어 있다"), "{err}");
+        assert!(err.contains("tool failed: permission denied"), "{err}");
+    }
+
+    #[test]
+    fn exit_zero_with_blank_stdout_and_blank_stderr_still_says_why() {
+        let _lock = env_lock();
+        let dir = tempdir().unwrap();
+        let fake = create_executable_script(dir.path(), "fake_silent.sh", "#!/bin/sh\nexit 0\n");
+        env::set_var("AISURADA_CLAUDE_BIN", fake.to_str().unwrap());
+        let resp = execute_ask(ask_args("sess-silent", false, false));
+        env::remove_var("AISURADA_CLAUDE_BIN");
+        assert!(!resp.ok);
+        assert!(resp.error.unwrap().contains("답이 비어 있다"));
+    }
+
+    #[test]
+    fn gemini_exit_zero_with_blank_stdout_is_a_failure() {
+        let _lock = env_lock();
+        let temp = tempdir().unwrap();
+        let fake = create_executable_script(temp.path(), "antigravity", "#!/bin/sh\nexit 0\n");
+        env::set_var("AISURADA_ANTIGRAVITY_BIN", &fake);
+        let mut args = ask_args("sess-gemini-blank", false, false);
+        args.vault = temp.path().to_str().unwrap().to_string();
+        args.model = "gemini-3-8-high".to_string();
+        let resp = execute_ask(args);
+        env::remove_var("AISURADA_ANTIGRAVITY_BIN");
+        assert!(!resp.ok);
+        let err = resp.error.unwrap();
+        assert!(err.starts_with("antigravity"), "{err}");
+        assert!(err.contains("답이 비어 있다"), "{err}");
     }
 
     #[test]
