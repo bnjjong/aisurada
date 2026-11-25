@@ -6,7 +6,7 @@ use std::path::Path;
 
 use super::apparatus::{next_random_u64, to_base36_u64};
 use super::confine::absolute_normalized;
-use crate::error::EngineError;
+pub(crate) use crate::error::EngineError;
 
 /// `bytes`를 `target`에 원자적으로 쓴다. 실패하면 임시 파일을 지우고 `AIS-500`이다.
 pub fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), EngineError> {

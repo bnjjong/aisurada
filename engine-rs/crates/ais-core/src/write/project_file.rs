@@ -1,11 +1,12 @@
 //! 프로젝트 파일(`.aisurada/projects/<slug>.md`) 만들기와, 사용자가 준 저장소 목록(JSON)의 엄격한 검사.
 
 use crate::error::EngineError;
-use crate::frontmatter::dump_string;
 use crate::json::{JsonValue, append_string, parse};
 use crate::text::{trim, utf16_len};
 use crate::vault::agenda::is_valid_slug_segment;
 use crate::vault::project::{ARCHIVED_PROJECTS_DIR, GITHUB, ProjectInfo, ProjectRepo};
+
+use super::agenda_file::push_yaml_line;
 
 const MAX_ENTRIES: usize = 20;
 const MAX_PATH_UNITS: usize = 1024;
@@ -22,15 +23,13 @@ pub fn archived_rel_path(slug: &str, id: &str) -> String {
 /// 프로젝트 속성, 저장소 목록, 요약 본문을 파일에 쓴다.
 pub fn render(info: &ProjectInfo, created_at: &str, edited_at: &str) -> Vec<u8> {
     let mut out = String::from("---\n");
-    let mut line =
-        |key: &str, value: &str| out.push_str(&format!("{key}: {}\n", dump_string(value, 1)));
-    line("id", &info.id);
-    line("slug", &info.slug);
-    line("title", &info.title);
-    line("type", info.project_type.as_str());
-    line("hue", &info.hue);
-    line("createdAt", created_at);
-    line("editedAt", edited_at);
+    push_yaml_line(&mut out, "id", &info.id);
+    push_yaml_line(&mut out, "slug", &info.slug);
+    push_yaml_line(&mut out, "title", &info.title);
+    push_yaml_line(&mut out, "type", info.project_type.as_str());
+    push_yaml_line(&mut out, "hue", &info.hue);
+    push_yaml_line(&mut out, "createdAt", created_at);
+    push_yaml_line(&mut out, "editedAt", edited_at);
     let repos = repos_json(&info.repos);
     if !repos.is_empty() {
         out.push_str(&format!("repos: {repos}\n"));

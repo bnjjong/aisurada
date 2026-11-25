@@ -13,12 +13,11 @@ use crate::text::{is_blank, trim};
 use crate::vault::project::{
     ProjectInfo, ProjectType, archived_project_slugs, is_valid_project_id, scan_projects,
 };
-use crate::write::agenda_file::{self, MAX_SLUG_SUFFIX};
+use crate::write::agenda_file;
 use crate::write::apparatus::{format_utc_millis, next_id, now_millis};
 use crate::write::atomic::write_atomic;
-use crate::write::confine::has_unusable_path_characters;
 use crate::write::pipeline::WriteScope;
-use crate::write::{project_file, slug};
+use crate::write::project_file;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -110,20 +109,10 @@ pub fn create(vault: &Path, request: &CreateProjectRequest) -> Result<ProjectRow
     })?;
     let taken: HashSet<String> = projects.iter().map(|p| p.slug.clone())
         .chain(archived).collect();
-    let Some(slug) = agenda_file::pick_free_slug(&slug::build(title, 50), &taken) else {
-        return Err(EngineError::invalid_argument(format!(
-            "같은 이름의 프로젝트가 {MAX_SLUG_SUFFIX} 개까지 차 있어 새로 만들 수 없다: {title}"
-        )));
-    };
+    let slug = agenda_file::allocate_entity_slug("프로젝트가", title, &taken)?;
     let hue = hue.unwrap_or_else(|| {
         agenda_file::least_used_hue(projects.iter().map(|p| p.hue.as_str())).to_string()
     });
-    let file_name = format!("{slug}.md");
-    if has_unusable_path_characters(&file_name) {
-        return Err(EngineError::invalid_argument(format!(
-            "경로로 쓸 수 없는 값이다: {file_name}"
-        )));
-    }
     let at = format_utc_millis(now_millis());
     let info = ProjectInfo {
         id,
