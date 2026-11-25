@@ -379,8 +379,8 @@ fn set_positions(
     }
     let placed = views.views.entry(view.to_string()).or_default();
     for (id, point) in positions {
-        if model.element(id).is_none() {
-            return Err(EngineError::not_found(format!("요소를 못 찾았다: {id}")));
+        if model.element(id).is_none() && model.relationship(id).is_none() {
+            return Err(EngineError::not_found(format!("요소나 관계를 못 찾았다: {id}")));
         }
         let (x, y) = (point.x.round(), point.y.round());
         if x.abs() > MAX_COORDINATE as f64 || y.abs() > MAX_COORDINATE as f64 {

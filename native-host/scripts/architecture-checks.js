@@ -105,6 +105,27 @@ try {
     assert(cardOf('GitHub').getAttribute('aria-pressed') === 'false', '끌기는 선택하지 않는다');
   });
 
+  await test('dragging-an-edge-label-saves-its-position-in-the-view', async () => {
+    const label = document.querySelector('.c4-edge');
+    assert(label, '관계 라벨이 화면에 있다');
+    const before = label.getBoundingClientRect();
+    pointer(label, 'pointerdown', before.x + 10, before.y + 10);
+    pointer(label, 'pointermove', before.x + 60, before.y + 50);
+    pointer(label, 'pointermove', before.x + 100, before.y + 70);
+    pointer(label, 'pointerup', before.x + 100, before.y + 70);
+    const m = await model();
+    const relId = m.relationships[0]?.id;
+    assert(relId, '관계가 있다');
+    await until(async () => {
+      const current = await model();
+      return Boolean(current.views.context && current.views.context[relId]);
+    }, '관계 라벨의 위치가 뷰에 저장됨');
+    const read = await model();
+    const pos = read.views.context[relId];
+    assert(pos && Number.isInteger(pos.x) && Number.isInteger(pos.y), '라벨 정수 좌표');
+    assert(!all('.c4-error').length, '라벨을 끌어도 오류가 없다');
+  });
+
   await test('positions-survive-leaving-and-coming-back', async () => {
     const saved = (await model()).views.context;
     const id = (await model()).elements.find(e => e.name === 'GitHub').id;

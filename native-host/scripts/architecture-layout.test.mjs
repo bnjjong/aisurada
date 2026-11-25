@@ -207,3 +207,15 @@ test('한 줄로 들어가면 줄바꿈 없이 한 줄이고, 칸이 좁을 때�
   assert.ok(!narrow || narrow.compact || narrow.height === 38 || narrow.width < wide.width, '좁은 칸에서는 줄이거나 아이콘이다');
 });
 
+test('직접 지정된 라벨 좌표(positions)가 있으면 그 위치에 라벨을 놓고 곡선과 가장 가까운 지점을 앵커로 잡는다', () => {
+  const measure = text => text.length * 10;
+  const view = { width: 1600, height: 900, scale: 1, x: 0, y: 0 };
+  const customPositions = { '0': { x: 500, y: 350 } };
+  const labels = placeLabels(edges, nodes, view, null, measure, 1, customPositions);
+  const label = labels.find(l => l.edge.id === '0');
+  assert.ok(label, '라벨이 배치되어야 한다');
+  assert.equal(label.center.x, 500);
+  assert.equal(label.center.y, 350);
+  assert.notEqual(label.center.x, label.anchor.x);
+});
+
