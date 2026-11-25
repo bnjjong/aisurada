@@ -185,8 +185,13 @@ fn require_project(vault: &Path, slug: &str) -> Result<(), EngineError> {
 }
 
 /// 새 태스크를 Draft로 만든다. 요약(title), 저장소(repo), 완료 기준(criteria 1개 이상)이 필수다(규칙은 `NewTask`가 검사한다).
-pub fn create(vault: &Path, f: Fields, stamp: &Stamp, actor: &str) -> Result<Task, EngineError> {
-    let new = NewTask::from_fields(f)?;
+pub fn create(
+    vault: &Path,
+    new: NewTask,
+    stamp: &Stamp,
+    actor: &str,
+    receipt: Option<&str>,
+) -> Result<Task, EngineError> {
     if let Some(project) = &new.project {
         require_project(vault, project)?;
     }
@@ -201,7 +206,10 @@ pub fn create(vault: &Path, f: Fields, stamp: &Stamp, actor: &str) -> Result<Tas
         }
     };
     let path = file_path(vault, &key);
-    let (task, event) = new.into_task(key.clone(), id, rel(vault, &path), stamp, actor);
+    let (mut task, event) = new.into_task(key.clone(), id, rel(vault, &path), stamp, actor);
+    if let Some(receipt) = receipt {
+        task.set_intake_receipt(receipt);
+    }
     let bytes = format::render(&task)?;
     write_atomic(&path, &bytes)?;
     append_activity(vault, &key, &event)?;

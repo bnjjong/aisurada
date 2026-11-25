@@ -270,7 +270,7 @@ impl<'a> McpServer<'a> {
             quote(&self.manager.as_ref().map_or_else(
                 || instructions(self.client_name.as_deref()),
                 |gate| format!(
-                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. Slack 제보는 get_intake로 등록 채널, 커서와 처리 대기를 읽고, 채널의 커서 뒤 글만 읽는다. 지정 이모지가 달린 글의 시각마다 get_intake로 기존 기록을 확인한다. 유사 태스크와 노트를 찾은 뒤 record_intake로 새 태스크, 재제보 댓글, 되물음 초안이나 무시를 기록한다. 확인을 시작할 때 받은 checkedAt과 실제 검색을 마친 searchedAt을 넘긴다. Slack에서 제공한 반응 목록과 제보 반응의 사람·시각이 있으면 reactions와 reportReaction에 기록한다. asked는 새 스레드 답변이 있을 때만, pending은 다음 확인에 다시 처리한다. 제보를 모두 기록한 뒤 move_cursor를 부른다. 처리 표시가 켜져 있으면 성공한 항목의 Slack 원글에 ✅를 달고 reactionAdded를 기록한다. 되물음은 스레드 답글 초안으로 사용자에게 확인받는다. Slack 연결 없이 들어온 직접 제보는 기존 도구로 처리한다.",
+                    "매니저 {}의 프로젝트 {} 제보 접수 도구다. 텔레그램이나 데스크톱에서 직접 제보를 받으면 어댑터가 준 고정 메시지 키로 submit_intake를 먼저 부른다. 저장된 접수 번호와 버전을 보관한다. 처리 대기인 경우 유사 태스크와 노트를 찾은 뒤 complete_intake에 새 태스크, 재제보 댓글, 되물음이나 무시 결과를 보낸다. 완료된 접수라면 저장된 결과를 안내한다. 메시지 키가 없으면 접수 완료를 안내하지 않는다. Slack을 확인할 때는 get_intake로 설정과 커서를 읽고, 커서 뒤의 글에서 지정 이모지가 달린 글만 record_intake로 기록한다. checkedAt, 실제 검색 시각 searchedAt, Slack 반응을 아는 경우 넘긴다. Slack 처리 대기 중 asked는 새 스레드 답변이 있을 때 처리한다. 등록 채널의 제보를 모두 기록한 뒤 move_cursor를 부른다. 완료 표시가 켜져 있으면 성공 항목에 ✅를 달고 reactionAdded를 기록한다. 되물음은 스레드 답글 초안으로 사용자에게 확인받는다.",
                     gate.initial.name, gate.initial.project
                 )
             ))
@@ -314,6 +314,8 @@ impl<'a> McpServer<'a> {
         let params = params.expect("name을 읽었으므로 params가 있다");
         let intake = match (self.manager.is_some(), name.as_str()) {
             (true, "get_intake") => Some(IntakeOperation::Get),
+            (true, "submit_intake") => Some(IntakeOperation::Submit),
+            (true, "complete_intake") => Some(IntakeOperation::Complete),
             (true, "record_intake") => Some(IntakeOperation::Record),
             (true, "move_cursor") => Some(IntakeOperation::Move),
             _ => None,
@@ -391,8 +393,16 @@ impl<'a> McpServer<'a> {
                 Ok(value) => value,
                 Err(_) => return result(id, &tool_result("접수 인자를 읽지 못했다", true)),
             };
-            if matches!(operation, IntakeOperation::Record) {
-                let required = match args["result"].as_str() {
+            if matches!(
+                operation,
+                IntakeOperation::Record | IntakeOperation::Complete
+            ) {
+                let outcome = if matches!(operation, IntakeOperation::Complete) {
+                    &args["outcome"]
+                } else {
+                    &args
+                };
+                let required = match outcome["result"].as_str() {
                     Some("created") => Some("create_task"),
                     Some("commented") => Some("add_task_comment"),
                     _ => None,

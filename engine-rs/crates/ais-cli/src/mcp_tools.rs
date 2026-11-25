@@ -300,9 +300,23 @@ pub const TOOLS: &[McpTool] = &[
 pub const MANAGER_INTAKE_TOOLS: &[McpTool] = &[
     McpTool {
         name: "get_intake",
-        description: "등록한 제보 채널의 설정, 커서와 처리 대기를 읽는다. 확인을 시작할 때 응답의 checkedAt을 기록한다. channel과 messageTs를 함께 주면 그 글을 이미 기록했는지 확인한다.",
-        input_schema: r#"{"type":"object","properties":{"channel":{"type":"string"},"messageTs":{"type":"string"}},"additionalProperties":false}"#,
+        description: "직접 제보는 entryId로, Slack은 channel과 messageTs로 확인한다. 인자 없이 부르면 직접 제보 처리 대기는 directPending, Slack 확인 목록은 channels·pending·unmarked로 받는다. Slack 확인을 시작할 때 checkedAt을 기록한다.",
+        input_schema: r#"{"type":"object","properties":{"entryId":{"type":"string"},"channel":{"type":"string"},"messageTs":{"type":"string"}},"additionalProperties":false}"#,
         write: false,
+        destructive: false,
+    },
+    McpTool {
+        name: "submit_intake",
+        description: "Telegram, 데스크톱 등에서 받은 제보를 원장에 먼저 저장한다. source.key는 어댑터가 제공한 계정·대화·메시지를 식별하는 고정 키다. 임의로 만든 키는 쓰지 않는다. 결과의 entry.id와 current.revision으로 complete_intake를 부른다.",
+        input_schema: r#"{"type":"object","properties":{"source":{"type":"object","properties":{"kind":{"type":"string","description":"어댑터의 종류. 예를 들어 telegram 또는 desktop"},"key":{"type":"string","minLength":1,"maxLength":256},"postedAt":{"type":"integer","description":"확인 가능한 원글 시각. Unix 밀리초"}},"required":["kind","key"],"additionalProperties":false},"reporter":{"type":"string"},"excerpt":{"type":"string","description":"원글 앞 200자"}},"required":["source","reporter","excerpt"],"additionalProperties":false}"#,
+        write: true,
+        destructive: false,
+    },
+    McpTool {
+        name: "complete_intake",
+        description: "직접 제보의 처리 결과를 저장하고 필요하면 태스크나 댓글을 만든다. created에는 task, commented에는 taskKey, asked에는 question을 준다. 같은 접수 번호와 버전을 다시 보내면 저장된 결과를 돌려준다.",
+        input_schema: r#"{"type":"object","properties":{"entryId":{"type":"string"},"priorRevision":{"type":"string"},"outcome":{"type":"object","properties":{"result":{"enum":["created","commented","asked","ignored"]},"decision":{"type":"string"},"question":{"type":"string"},"task":{"type":"object","properties":{"title":{"type":"string"},"repo":{"type":"string"},"criteria":{"type":"array","items":{"type":"string"}},"body":{"type":"string"},"type":{"enum":["feature","bug","chore"]},"priority":{"enum":["high","medium","low"]}},"required":["title","repo","criteria"],"additionalProperties":false},"taskKey":{"type":"string"}},"required":["result"],"additionalProperties":false}},"required":["entryId","priorRevision","outcome"],"additionalProperties":false}"#,
+        write: true,
         destructive: false,
     },
     McpTool {

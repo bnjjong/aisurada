@@ -1,0 +1,5 @@
+name: aisurada-intake
+version: 0.1.0
+description: "현재 텔레그램 메시지의 식별자를 aisurada 매니저에 전달한다."
+provides_hooks:
+  - pre_gateway_dispatch

@@ -1,4 +1,4 @@
-//! 매니저의 Slack 제보 원장과 채널 커서를 vault에 저장한다.
+//! 매니저 제보 원장과 Slack 채널 커서를 vault에 저장한다.
 
 use std::collections::{BTreeMap, HashSet};
 use std::collections::hash_map::DefaultHasher;
@@ -31,6 +31,8 @@ const LEDGER_PATH: &str = ".aisurada/intake/ledger.json";
 #[derive(Clone, Copy)]
 pub enum IntakeOperation {
     Get,
+    Submit,
+    Complete,
     Record,
     Move,
     Configure,
@@ -186,6 +188,7 @@ enum ProcessVia {
     Desktop,
     Scheduled,
     Manual,
+    Direct,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -202,6 +205,8 @@ enum ResultKind {
 #[serde(rename_all = "camelCase")]
 struct Entry {
     id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<DirectSource>,
     channel: String,
     message_ts: String,
     url: String,
@@ -222,6 +227,24 @@ struct Entry {
     mark_requested: bool,
     reply_ts: Option<String>,
     history: Vec<Processing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    work: Option<DirectWork>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DirectWork {
+    result: ResultKind,
+    task_id: Option<String>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct DirectSource {
+    kind: String,
+    key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    posted_at: Option<i64>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -273,7 +296,36 @@ impl Entry {
 struct Query {
     channel: Option<String>,
     message_ts: Option<String>,
+    entry_id: Option<String>,
     summary: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Submit {
+    source: DirectSource,
+    reporter: String,
+    excerpt: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Complete {
+    entry_id: String,
+    prior_revision: String,
+    outcome: Outcome,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Outcome {
+    result: ResultKind,
+    #[serde(default)]
+    decision: String,
+    #[serde(default)]
+    question: String,
+    task: Option<CreateTaskRequest>,
+    task_key: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -399,10 +451,30 @@ pub(crate) fn execute(
     }
     let mut ledger = Ledger::load(&path)?;
     let (response, changed) = match operation {
-        IntakeOperation::Record => ledger.record(vault, context, manager, allowed_channels, parse("record_intake", args)?)?,
-        IntakeOperation::Move => ledger.advance(manager, allowed_channels, parse("move_cursor", args)?)?,
-        IntakeOperation::Configure => ledger.configure(manager, allowed_channels, parse("configure_intake", args)?)?,
-        IntakeOperation::Rewind => ledger.rewind(manager, allowed_channels, parse("rewind_cursor", args)?)?,
+        IntakeOperation::Submit => ledger.submit(manager, parse("submit_intake", args)?)?,
+        IntakeOperation::Complete => ledger.complete(
+            vault,
+            &path,
+            context,
+            manager,
+            parse("complete_intake", args)?,
+        )?,
+        IntakeOperation::Record => ledger.record(
+            vault,
+            context,
+            manager,
+            allowed_channels,
+            parse("record_intake", args)?,
+        )?,
+        IntakeOperation::Move => {
+            ledger.advance(manager, allowed_channels, parse("move_cursor", args)?)?
+        }
+        IntakeOperation::Configure => {
+            ledger.configure(manager, allowed_channels, parse("configure_intake", args)?)?
+        }
+        IntakeOperation::Rewind => {
+            ledger.rewind(manager, allowed_channels, parse("rewind_cursor", args)?)?
+        }
         IntakeOperation::Review => ledger.review(manager, parse("review_intake", args)?)?,
         IntakeOperation::Get | IntakeOperation::Sources => unreachable!(),
     };
@@ -492,7 +564,7 @@ fn check_revision(actual: &str, expected: &str) -> Result<(), EngineError> {
 }
 
 fn agent_via(via: ProcessVia) -> Result<(), EngineError> {
-    if via == ProcessVia::Manual {
+    if !matches!(via, ProcessVia::Desktop | ProcessVia::Scheduled) {
         return Err(invalid("처리 경로는 desktop 또는 scheduled여야 한다"));
     }
     Ok(())
@@ -532,7 +604,11 @@ pub(super) fn sources_for_task(vault: &Path, task_id: &str) -> Result<Value, Eng
     let Some(keys) = ledger.task_sources.get(task_id) else {
         return Ok(json!([]));
     };
-    let mut rows: Vec<_> = keys.iter().filter_map(|key| ledger.entries.get(key)).collect();
+    let mut rows: Vec<_> = keys
+        .iter()
+        .filter_map(|key| ledger.entries.get(key))
+        .filter(|entry| entry.source.is_none())
+        .collect();
     rows.sort_by_key(|entry| (entry.task_origin != Some(ResultKind::Created), &entry.message_ts));
     // 같은 프로젝트의 매니저가 같은 Slack 출처를 연결하면 화면에는 한 번만 싣는다.
     let mut shown = HashSet::new();
@@ -628,6 +704,19 @@ impl Ledger {
         query: Query,
         caller: Caller,
     ) -> Result<Value, EngineError> {
+        if let Some(entry_id) = &query.entry_id {
+            if query.channel.is_some() || query.message_ts.is_some() || query.summary {
+                return Err(invalid("접수 번호만 지정해 주세요"));
+            }
+            let existing = self
+                .entries
+                .get(&manager_key(manager, entry_id))
+                .filter(|entry| entry.source.is_some());
+            return Ok(json!({
+                "recorded": existing.is_some(),
+                "item": existing.map(Entry::view).transpose()?
+            }));
+        }
         if let Some(id) = &query.channel {
             check_channel(allowed, id)?;
         }
@@ -653,6 +742,7 @@ impl Ledger {
             .collect();
         let mut views = Vec::new();
         let mut pending = Vec::new();
+        let mut direct_pending = Vec::new();
         let mut unmarked = Vec::new();
         let mut asked = Vec::new();
         let mut counts = [0_u64; 5];
@@ -664,7 +754,7 @@ impl Ledger {
             .take_while(|(key, _)| key.starts_with(&prefix))
             .map(|(_, entry)| entry);
         for entry in entries.filter(|entry| {
-            (caller == Caller::App || allowed.contains(&entry.channel))
+            (entry.source.is_some() || caller == Caller::App || allowed.contains(&entry.channel))
                 && query.channel.as_ref().is_none_or(|channel| channel == &entry.channel)
         }) {
             let event = entry.current()?;
@@ -700,11 +790,12 @@ impl Ledger {
                         pending.push(entry.view()?);
                     }
                 }
-            } else if event.result == ResultKind::Pending
-                && allowed.contains(&entry.channel)
-                && !query.summary
-            {
-                pending.push(entry.view()?);
+            } else if event.result == ResultKind::Pending && !query.summary {
+                if entry.source.is_some() {
+                    direct_pending.push(entry.view()?);
+                } else if allowed.contains(&entry.channel) {
+                    pending.push(entry.view()?);
+                }
             }
             if caller == Caller::Ai
                 && !query.summary
@@ -751,7 +842,8 @@ impl Ledger {
         Ok(json!({
             "checkedAt": now, "channels": channels, "rows": views.into_iter().map(|(_, view)| view).collect::<Vec<_>>(),
             "rowsRevision": format!("{:016x}", rows_revision.finish()),
-            "pending": pending, "unmarked": unmarked, "asked": asked, "waiting": waiting, "counts": counts,
+            "pending": pending, "directPending": direct_pending, "unmarked": unmarked,
+            "asked": asked, "waiting": waiting, "counts": counts,
             "stalledMinutes": stalled_minutes
         }))
     }
@@ -915,6 +1007,9 @@ impl Ledger {
             .get_mut(&manager_key(manager, &request.id))
             .ok_or_else(|| EngineError::not_found("접수 항목을 찾을 수 없다"))?;
         check_revision(&entry.current()?.revision, &request.revision)?;
+        if entry.work.is_some() {
+            return Err(invalid("매니저가 시작한 태스크 작업을 먼저 마쳐 주세요"));
+        }
         entry.history.push(Processing {
             revision: revision(),
             result: request.result,
@@ -935,6 +1030,145 @@ impl Ledger {
 }
 
 impl Ledger {
+    fn submit(
+        &mut self,
+        manager: &ManagerContext,
+        request: Submit,
+    ) -> Result<(Value, bool), EngineError> {
+        let now = clock().now_millis();
+        let source = request.source;
+        if source.kind == "slack"
+            || source.kind.len() > 32
+            || !source.kind.starts_with(|c: char| c.is_ascii_lowercase())
+            || !source
+                .kind
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+            || source.key.is_empty()
+            || source.key.len() > 256
+            || source
+                .key
+                .chars()
+                .any(|c| c.is_whitespace() || c.is_control())
+            || source
+                .posted_at
+                .is_some_and(|at| at <= 0 || at > now + 1000)
+        {
+            return Err(invalid(
+                "직접 제보의 출처 종류, 메시지 키, 원글 시각을 확인해 주세요",
+            ));
+        }
+        let reporter = short(&request.reporter, 100);
+        let excerpt = short(&request.excerpt, 200);
+        if reporter.is_empty() || excerpt.is_empty() {
+            return Err(invalid("제보자와 제보 내용을 입력해 주세요"));
+        }
+        let prefix = manager_key(manager, "intake-");
+        let existing = self
+            .entries
+            .range(prefix.clone()..)
+            .take_while(|(key, _)| key.starts_with(&prefix))
+            .find_map(|(_, entry)| {
+                entry
+                    .source
+                    .as_ref()
+                    .filter(|stored| stored.kind == source.kind && stored.key == source.key)
+                    .map(|_| entry)
+            });
+        if let Some(existing) = existing {
+            return Ok((json!({"recorded": true, "item": existing.view()?}), false));
+        }
+        let id = loop {
+            let candidate = format!("intake-{}", revision());
+            if !self.entries.contains_key(&manager_key(manager, &candidate)) {
+                break candidate;
+            }
+        };
+        let entry = Entry {
+            id: id.clone(),
+            source: Some(source),
+            channel: String::new(),
+            message_ts: String::new(),
+            url: String::new(),
+            reporter,
+            excerpt,
+            manager: manager.name.clone(),
+            project_id: manager.project_id.clone(),
+            received_at: now,
+            task_key: None,
+            task_id: None,
+            task_origin: None,
+            reaction_added: false,
+            reactions: Vec::new(),
+            report_reaction: None,
+            mark_requested: false,
+            reply_ts: None,
+            history: vec![Processing {
+                revision: revision(),
+                result: ResultKind::Pending,
+                at: now,
+                checked_at: None,
+                searched_at: None,
+                via: ProcessVia::Direct,
+                decision: String::new(),
+                question: String::new(),
+            }],
+            work: None,
+        };
+        let response = json!({"recorded": false, "item": entry.view()?});
+        self.entries.insert(manager_key(manager, &id), entry);
+        Ok((response, true))
+    }
+
+    fn complete(
+        &mut self,
+        vault: &Path,
+        path: &Path,
+        context: &CallContext,
+        manager: &ManagerContext,
+        request: Complete,
+    ) -> Result<(Value, bool), EngineError> {
+        let key = manager_key(manager, &request.entry_id);
+        let mut entry = self
+            .entries
+            .get(&key)
+            .filter(|entry| entry.source.is_some())
+            .cloned()
+            .ok_or_else(|| invalid("이 매니저의 직접 제보 접수 번호가 필요하다"))?;
+        let current = entry.current()?;
+        if current.result != ResultKind::Pending {
+            return Ok((json!({"recorded": true, "item": entry.view()?}), false));
+        }
+        check_revision(&current.revision, &request.prior_revision)?;
+        let outcome = request.outcome;
+        if let Some(work) = &entry.work {
+            if work.result != outcome.result {
+                return Err(invalid("이미 시작한 태스크 작업의 결과를 다시 보내 주세요"));
+            }
+        } else if let Some(work) = prepare_direct_work(vault, context, manager, &outcome)? {
+            // 결과를 쓰기 전에 중단돼도 원래 정한 태스크 작업을 이어 간다.
+            entry.work = Some(work);
+            self.entries.insert(key.clone(), entry.clone());
+            self.save(path)?;
+        }
+        let mut event = Processing {
+            revision: revision(),
+            result: outcome.result,
+            at: clock().now_millis(),
+            checked_at: None,
+            searched_at: None,
+            via: ProcessVia::Direct,
+            decision: String::new(),
+            question: String::new(),
+        };
+        resolve(vault, context, manager, &mut entry, &outcome, &mut event)?;
+        entry.work = None;
+        entry.history.push(event);
+        let response = json!({"recorded": false, "item": entry.view()?});
+        self.entries.insert(key, entry);
+        Ok((response, true))
+    }
+
     fn record(
         &mut self,
         vault: &Path,
@@ -1010,6 +1244,7 @@ impl Ledger {
             }
             Entry {
                 id: id.clone(),
+                source: None,
                 channel: request.channel.clone(),
                 message_ts: request.message_ts.clone(),
                 url: request.url.split('?').next().unwrap_or_default().into(),
@@ -1027,6 +1262,7 @@ impl Ledger {
                 mark_requested: false,
                 reply_ts: None,
                 history: Vec::new(),
+                work: None,
             }
         };
 
@@ -1058,25 +1294,8 @@ impl Ledger {
                 entry.report_reaction = Some(reaction);
             }
         }
-        let question = short(&request.question, 500);
         if request.reaction_added.is_some() {
             return Err(invalid("Slack 표시 여부는 접수한 항목에 따로 기록한다"));
-        }
-        match request.result {
-            ResultKind::Pending => return Err(invalid("다시 처리 대기는 앱에서 지정한다")),
-            ResultKind::Asked if question.is_empty() => {
-                return Err(invalid("되물음에는 질문을 적는다"));
-            }
-            ResultKind::Created | ResultKind::Commented => {
-                let (key, task_id) = apply_task(vault, context, manager, &entry, &request)?;
-                entry.task_key = Some(key);
-                entry.task_id = Some(task_id);
-                entry.task_origin = Some(request.result);
-            }
-            _ if request.task_key.is_some() || request.task.is_some() => {
-                return Err(invalid("태스크는 새 태스크 또는 재제보 댓글에만 지정한다"));
-            }
-            _ => {}
         }
         if let Some(reply_ts) = request.reply_ts {
             if entry.reply_ts.as_ref().is_none_or(|last| &reply_ts > last) {
@@ -1088,20 +1307,97 @@ impl Ledger {
                 request.result,
                 ResultKind::Created | ResultKind::Commented | ResultKind::Ignored
             );
-        entry.history.push(Processing {
+        let mut event = Processing {
             revision: revision(),
             result: request.result,
             at: now,
             checked_at: request.checked_at,
             searched_at: request.searched_at,
             via: request.via,
-            decision: short(&request.decision, 500),
-            question,
-        });
+            decision: String::new(),
+            question: String::new(),
+        };
+        let outcome = Outcome {
+            result: request.result,
+            decision: request.decision,
+            question: request.question,
+            task: request.task,
+            task_key: request.task_key,
+        };
+        resolve(vault, context, manager, &mut entry, &outcome, &mut event)?;
+        entry.history.push(event);
         let response = json!({"recorded": false, "item": entry.view()?});
         self.entries.insert(key, entry);
         Ok((response, true))
     }
+}
+
+fn prepare_direct_work(
+    vault: &Path,
+    context: &CallContext,
+    manager: &ManagerContext,
+    outcome: &Outcome,
+) -> Result<Option<DirectWork>, EngineError> {
+    let task_id = match outcome.result {
+        ResultKind::Created => {
+            if outcome.task_key.is_some() {
+                return Err(invalid("새 태스크에는 태스크 내용을 지정한다"));
+            }
+            let draft = outcome
+                .task
+                .as_ref()
+                .ok_or_else(|| invalid("새 태스크 내용을 지정한다"))?;
+            task_commands::prepare_task(vault, draft, context)?;
+            None
+        }
+        ResultKind::Commented => {
+            if outcome.task.is_some() {
+                return Err(invalid("재제보에는 기존 태스크 키를 지정한다"));
+            }
+            let reference = outcome
+                .task_key
+                .as_deref()
+                .ok_or_else(|| invalid("재제보를 남길 태스크 키를 지정한다"))?;
+            let scan = store::scan(vault);
+            let task = store::find(&scan, reference)?;
+            check_task(vault, manager, task)?;
+            Some(task.id.clone())
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(DirectWork {
+        result: outcome.result,
+        task_id,
+    }))
+}
+
+fn resolve(
+    vault: &Path,
+    context: &CallContext,
+    manager: &ManagerContext,
+    entry: &mut Entry,
+    outcome: &Outcome,
+    event: &mut Processing,
+) -> Result<(), EngineError> {
+    event.decision = short(&outcome.decision, 500);
+    event.question = short(&outcome.question, 500);
+    match outcome.result {
+        ResultKind::Pending => return Err(invalid("다시 처리 대기는 앱에서 지정한다")),
+        ResultKind::Asked if event.question.is_empty() => {
+            return Err(invalid("되물음에는 질문을 적는다"));
+        }
+        ResultKind::Created | ResultKind::Commented => {
+            let (key, task_id) = apply_task(vault, context, manager, entry, outcome)?;
+            entry.task_key = Some(key);
+            entry.task_id = Some(task_id);
+            entry.task_origin = Some(outcome.result);
+        }
+        _ if outcome.task_key.is_some() || outcome.task.is_some() => {
+            return Err(invalid("태스크는 새 태스크 또는 재제보 댓글에만 지정한다"));
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn apply_task(
@@ -1109,7 +1405,7 @@ fn apply_task(
     context: &CallContext,
     manager: &ManagerContext,
     entry: &Entry,
-    request: &Record,
+    request: &Outcome,
 ) -> Result<(String, String), EngineError> {
     let scan = store::scan(vault);
     if let Some(id) = &entry.task_id {
@@ -1126,8 +1422,12 @@ fn apply_task(
         return Ok((task.key.clone(), task.id.clone()));
     }
     if request.result == ResultKind::Created {
-        // 원장 저장 전에 연결이 끊겨도 원글 주소로 이미 만든 태스크를 찾는다.
+        // 원장 저장 전에 작업이 끊겨도 이미 만든 태스크를 찾는다.
+        let receipt = entry.source.as_ref().map(|_| entry.id.as_str());
         let matches_source = |task: &Task| {
+            if let Some(receipt) = receipt {
+                return task.intake_receipt() == Some(receipt);
+            }
             task.refs.iter().any(|item| {
                 item.kind == RefKind::Slack
                     && source_matches(&item.target, &entry.channel, &entry.message_ts)
@@ -1142,7 +1442,11 @@ fn apply_task(
             let task = store::find(&scan, reference)?;
             check_task(vault, manager, task)?;
             if !matches_source(task) {
-                return Err(invalid("태스크의 Slack 출처가 접수하려는 원글과 다르다"));
+                return Err(invalid(if receipt.is_some() {
+                    "태스크에 같은 접수 번호가 연결되어 있지 않다"
+                } else {
+                    "태스크의 Slack 출처가 접수하려는 원글과 다르다"
+                }));
             }
             return Ok((task.key.clone(), task.id.clone()));
         }
@@ -1158,6 +1462,10 @@ fn apply_task(
             .task
             .clone()
             .ok_or_else(|| invalid("새 태스크 내용을 지정한다"))?;
+        if let Some(receipt) = receipt {
+            let task = task_commands::create_intake_task(vault, &draft, context, Some(receipt))?;
+            return Ok((task.key, task.id));
+        }
         let mut refs = draft
             .refs
             .take()
@@ -1176,11 +1484,8 @@ fn apply_task(
                    "reporter": entry.reporter, "excerpt": entry.excerpt}),
         );
         draft.refs = Some(json!(values));
-        let task = task_commands::create_task(vault, &draft, context)?;
-        return Ok((
-            task["key"].as_str().unwrap().into(),
-            task["id"].as_str().unwrap().into(),
-        ));
+        let task = task_commands::create_intake_task(vault, &draft, context, None)?;
+        return Ok((task.key, task.id));
     }
     if request.task.is_some() {
         return Err(invalid("재제보에는 기존 태스크 키를 지정한다"));
@@ -1191,7 +1496,19 @@ fn apply_task(
         .ok_or_else(|| invalid("재제보를 남길 태스크 키를 지정한다"))?;
     let task = store::find(&scan, reference)?;
     check_task(vault, manager, task)?;
-    let comment = format!("Slack 재제보를 접수했어요. [원글 열기]({})", entry.url);
+    if entry
+        .work
+        .as_ref()
+        .and_then(|work| work.task_id.as_ref())
+        .is_some_and(|id| id != &task.id)
+    {
+        return Err(invalid("이미 시작한 재제보 댓글의 태스크 키를 보내 주세요"));
+    }
+    let comment = if entry.source.is_some() {
+        format!("재제보를 접수했어요. 접수 번호는 {}예요.", entry.id)
+    } else {
+        format!("Slack 재제보를 접수했어요. [원글 열기]({})", entry.url)
+    };
     let already_commented = store::activity(vault, &task.key, 0)?
         .iter()
         .any(|event| event["kind"] == "comment" && event["body"] == comment);
