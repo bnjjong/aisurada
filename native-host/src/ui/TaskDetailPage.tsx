@@ -8,7 +8,7 @@ import type { WorkspaceController } from "../workspace/controller.ts";
 import type { WorkspaceState } from "../workspace/types.ts";
 import { asText } from "../workspace/types.ts";
 import { docAddress, projectAddress } from "../navigation/routes.ts";
-import { TaskSlackSources } from "./ManagerIntake.tsx";
+import { TaskReportSources } from "./ManagerIntake.tsx";
 import { Confirm, Modal } from "./Modal.tsx";
 import { Icon } from "./Icon.tsx";
 import { ReadMarkdown } from "./ReadMarkdown.tsx";
@@ -604,7 +604,7 @@ export function TaskDetailPage({
               </ul>
               <p className="task-hint">세 가지가 차야 상태 메뉴에서 Ready For Develop을 고를 수 있어요.</p>
             </section>
-            <TaskSlackSources entries={task.intakeSources ?? []} firstRef={slackSource} controller={controller} busy={busy}
+            <TaskReportSources entries={task.intakeSources ?? []} firstRef={slackSource} controller={controller} busy={busy}
               onSaveFirst={source => saveField({ refs: task.refs.map(ref => ref === slackSource ? { ...ref, ...source } : ref) })}>
               {task.manager && slackSource && runner.supported && <button type="button" disabled={sendingStatus} onClick={async () => {
                 setSendingStatus(true);
@@ -619,7 +619,7 @@ export function TaskDetailPage({
                 }
               }}>Slack 스레드에 상태 알리기</button>}
               {statusMessage && <p role="status">{statusMessage}</p>}
-            </TaskSlackSources>
+            </TaskReportSources>
           </aside>
         </div>
       </div>

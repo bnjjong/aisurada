@@ -833,7 +833,17 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
         tool(name, "submit_intake", report("slack", "bot:chat:1"))["result"]["isError"],
         true
     );
-    let payload = report("telegram", "bot:chat:1");
+    let mut payload = report("telegram", "bot:chat:1");
+    payload["source"]["postedAt"] = json!(1_700_000_000_000_i64);
+    payload["source"]["url"] = json!("https://t.me/demo/1");
+    for url in ["javascript:alert(1)", "https://person@t.me/demo/1"] {
+        let mut unsafe_link = payload.clone();
+        unsafe_link["source"]["url"] = json!(url);
+        assert_eq!(
+            tool(name, "submit_intake", unsafe_link)["result"]["isError"],
+            true
+        );
+    }
     let received = mcp("submit_intake", payload.clone());
     assert_eq!(received["recorded"], false);
     assert_eq!(received["item"]["current"]["result"], "pending");
@@ -939,6 +949,18 @@ fn manager_direct_intake_survives_retries_without_slack_channels() {
         task_key
     );
     let task = cli(&["get-task", task_key]);
+    let sources = task["intakeSources"].as_array().unwrap();
+    assert_eq!(sources.len(), 2);
+    assert_eq!(sources[0]["id"], *receipt);
+    assert_eq!(sources[0]["manager"], name);
+    assert_eq!(sources[0]["taskOrigin"], "created");
+    assert_eq!(sources[0]["source"]["postedAt"], 1_700_000_000_000_i64);
+    assert_eq!(sources[0]["url"], "https://t.me/demo/1");
+    assert_eq!(sources[0]["reporter"], "텔레그램 사용자");
+    assert_eq!(sources[0]["excerpt"], "로그인 화면이 멈춰요");
+    assert_eq!(sources[1]["taskOrigin"], "commented");
+    assert_eq!(sources[1]["url"], "");
+    assert!(sources[1]["receivedAt"].as_i64().is_some());
     assert_eq!(
         task["activity"]
             .as_array()
@@ -1290,6 +1312,24 @@ fn manager_intake_keeps_one_record_and_resumes_questions_after_rewind() {
     paused["paused"] = json!(true);
     let paused = desktop("intake-channel", paused);
     rejected(own("move_cursor", move_to(&paused, &repeat, &[])));
+    let telegram = mcp(
+        "submit_intake",
+        json!({"source":{"kind":"telegram","key":"bot:chat:13"},"reporter":"텔레그램 제보자","excerpt":"같은 문제를 발견했어요"}),
+    );
+    mcp(
+        "complete_intake",
+        json!({
+            "entryId": telegram["item"]["entry"]["id"],
+            "priorRevision": telegram["item"]["current"]["revision"],
+            "outcome":{"result":"commented","taskKey":task_key}
+        }),
+    );
+    let sources = cli(&["manager", "intake-sources", task_key]);
+    assert_eq!(sources.as_array().unwrap().len(), 3);
+    assert_eq!(sources[0]["taskOrigin"], "created");
+    assert_eq!(sources[0]["url"], original["url"]);
+    assert_eq!(sources[2]["source"]["kind"], "telegram");
+    assert_eq!(sources[2]["taskOrigin"], "commented");
     let raw = std::fs::read_to_string(vault.join(".aisurada/intake/ledger.json")).unwrap();
     assert!(!raw.contains(&"가".repeat(201)));
     std::fs::remove_dir_all(vault).unwrap();

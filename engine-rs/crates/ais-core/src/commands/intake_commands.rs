@@ -280,6 +280,14 @@ struct Processing {
 }
 
 impl Entry {
+    fn source_time(&self) -> i64 {
+        let posted_at = match &self.source {
+            Some(source) => source.posted_at,
+            None => timestamp(&self.message_ts).ok().map(|at| (at / 1000) as i64),
+        };
+        posted_at.unwrap_or(self.received_at)
+    }
+
     fn current(&self) -> Result<&Processing, EngineError> {
         self.history
             .last()
@@ -303,9 +311,18 @@ struct Query {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct Submit {
-    source: DirectSource,
+    source: SubmittedSource,
     reporter: String,
     excerpt: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct SubmittedSource {
+    kind: String,
+    key: String,
+    posted_at: Option<i64>,
+    url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -585,6 +602,17 @@ fn source_matches(url: &str, channel: &str, message_ts: &str) -> bool {
         && format::slack_thread(url).is_some_and(|(_, ts)| ts == message_ts)
 }
 
+fn direct_source_url(url: &str) -> bool {
+    let Some(address) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let authority = address.split(['/', '?', '#']).next().unwrap_or_default();
+    url.len() <= 2048
+        && !authority.is_empty()
+        && !authority.contains('@')
+        && !url.chars().any(|c| c.is_whitespace() || c.is_control() || c == '\\')
+}
+
 struct CachedLedger {
     path: PathBuf,
     stamp: (SystemTime, u64),
@@ -607,9 +635,8 @@ pub(super) fn sources_for_task(vault: &Path, task_id: &str) -> Result<Value, Eng
     let mut rows: Vec<_> = keys
         .iter()
         .filter_map(|key| ledger.entries.get(key))
-        .filter(|entry| entry.source.is_none())
         .collect();
-    rows.sort_by_key(|entry| (entry.task_origin != Some(ResultKind::Created), &entry.message_ts));
+    rows.sort_by_key(|entry| (entry.task_origin != Some(ResultKind::Created), entry.source_time()));
     // 같은 프로젝트의 매니저가 같은 Slack 출처를 연결하면 화면에는 한 번만 싣는다.
     let mut shown = HashSet::new();
     rows.retain(|entry| shown.insert(&entry.id));
@@ -1036,7 +1063,8 @@ impl Ledger {
         request: Submit,
     ) -> Result<(Value, bool), EngineError> {
         let now = clock().now_millis();
-        let source = request.source;
+        let SubmittedSource { kind, key, posted_at, url } = request.source;
+        let source = DirectSource { kind, key, posted_at };
         if source.kind == "slack"
             || source.kind.len() > 32
             || !source.kind.starts_with(|c: char| c.is_ascii_lowercase())
@@ -1057,6 +1085,9 @@ impl Ledger {
             return Err(invalid(
                 "직접 제보의 출처 종류, 메시지 키, 원글 시각을 확인해 주세요",
             ));
+        }
+        if url.as_deref().is_some_and(|url| !direct_source_url(url)) {
+            return Err(invalid("원글 주소는 사용자 정보나 공백이 없는 HTTPS 주소여야 한다"));
         }
         let reporter = short(&request.reporter, 100);
         let excerpt = short(&request.excerpt, 200);
@@ -1089,7 +1120,7 @@ impl Ledger {
             source: Some(source),
             channel: String::new(),
             message_ts: String::new(),
-            url: String::new(),
+            url: url.unwrap_or_default(),
             reporter,
             excerpt,
             manager: manager.name.clone(),
