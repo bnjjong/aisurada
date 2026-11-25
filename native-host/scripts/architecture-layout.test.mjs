@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARD_HEIGHT, CARD_WIDTH, MAX_SCALE, MIN_ZOOM, measureEdge, placeLabels, positionNodes, routeEdges, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from '../src/ui/architecture/layout.ts';
+import { CARD_HEIGHT, CARD_WIDTH, MAX_SCALE, MIN_ZOOM, linkCurve, measureEdge, nearestPort, nodeAt, placeLabels, portPoint, portsFor, positionNodes, routeEdges, toWorld, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from '../src/ui/architecture/layout.ts';
 
 const points = [
   ['person', 0, 64], ['app', 478, 0], ['vault', 1140, -145],
@@ -111,4 +111,43 @@ test('휠 움직임은 위로 굴리면 확대, 아래로 굴리면 축소이고
   assert.ok(wheelFactor(-10, 0, true) > wheelFactor(-10, 0, false), '모아 쥐기는 더 민감하다');
   assert.ok(wheelFactor(-5000, 0, false) <= Math.exp(.0015 * 240) + 1e-9, '아주 큰 값도 막는다');
   assert.ok(wheelFactor(-3, 1, false) > wheelFactor(-3, 0, false), '줄 단위 휠은 줄 높이만큼 곱한다');
+});
+
+test('연결 지점은 상자 카드에 8개(위·아래 3개씩, 양옆 1개), 사람 카드에는 네 변 가운데 4개다', () => {
+  const box = portsFor('system');
+  assert.deepEqual(box.map(port => port.id), ['top-1', 'top-2', 'top-3', 'bottom-1', 'bottom-2', 'bottom-3', 'left', 'right']);
+  assert.deepEqual(portsFor('person').map(port => port.id), ['top', 'bottom', 'left', 'right']);
+  const node = { x: 100, y: 50 };
+  const at = id => portPoint(node, box.find(port => port.id === id));
+  assert.deepEqual(at('top-2'), { x: 100 + CARD_WIDTH / 2, y: 50 });
+  assert.deepEqual(at('top-1'), { x: 100 + CARD_WIDTH / 4, y: 50 });
+  assert.deepEqual(at('bottom-3'), { x: 100 + CARD_WIDTH * .75, y: 50 + CARD_HEIGHT });
+  assert.deepEqual(at('left'), { x: 100, y: 50 + CARD_HEIGHT / 2 });
+  assert.deepEqual(at('right'), { x: 100 + CARD_WIDTH, y: 50 + CARD_HEIGHT / 2 });
+});
+
+test('가장 가까운 연결 지점은 포인터가 놓인 쪽의 지점이다', () => {
+  const node = { x: 0, y: 0 };
+  assert.equal(nearestPort(node, { x: CARD_WIDTH * .3, y: -20 }, 'system').id, 'top-1');
+  assert.equal(nearestPort(node, { x: CARD_WIDTH * .7, y: CARD_HEIGHT + 30 }, 'system').id, 'bottom-3');
+  assert.equal(nearestPort(node, { x: -40, y: CARD_HEIGHT / 2 }, 'system').id, 'left');
+  assert.equal(nearestPort(node, { x: CARD_WIDTH + 40, y: 10 }, 'system').id, 'right');
+  assert.equal(nearestPort(node, { x: CARD_WIDTH * .3, y: -20 }, 'person').id, 'top', '사람은 가운데 지점만 있다');
+});
+
+test('포인터 아래의 카드를 월드 좌표로 찾고, 겹치면 위에 그린 카드가 이기며, 여백만큼 바깥도 친다', () => {
+  const items = [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 100, y: 50 }];
+  assert.equal(nodeAt(items, { x: 10, y: 10 }), 'a');
+  assert.equal(nodeAt(items, { x: 150, y: 80 }), 'b', '겹치면 나중 카드');
+  assert.equal(nodeAt(items, { x: CARD_WIDTH + 200, y: 0 }), null);
+  assert.equal(nodeAt(items, { x: -8, y: 10 }), null);
+  assert.equal(nodeAt(items, { x: -8, y: 10 }, 12), 'a', '여백 안은 카드로 친다');
+  const world = toWorld({ x: 330, y: 210 }, { x: 30, y: 10 }, 2);
+  assert.deepEqual(world, { x: 150, y: 100 });
+});
+
+test('미리보기 곡선은 가로로 뻗었다가 도착점으로 들어온다', () => {
+  const { a, b } = linkCurve({ x: 0, y: 0 }, { x: 200, y: 80 });
+  assert.deepEqual(a, { x: 100, y: 0 });
+  assert.deepEqual(b, { x: 100, y: 80 });
 });

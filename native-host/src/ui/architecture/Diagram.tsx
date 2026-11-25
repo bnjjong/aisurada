@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import { Icon } from '../Icon.tsx';
 import type { C4Element, C4Relationship, Point } from './model.ts';
-import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, MAX_SCALE, MAX_ZOOM, MIN_ZOOM, measureEdge, placeLabels, positionNodes, routeEdges, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from './layout.ts';
-import type { CameraFrame } from './layout.ts';
+import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, MAX_SCALE, MAX_ZOOM, MIN_ZOOM, linkCurve, measureEdge, nearestPort, nodeAt, placeLabels, portFraction, portPoint, portsFor, positionNodes, routeEdges, toWorld, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from './layout.ts';
+import type { CameraFrame, Port } from './layout.ts';
 import type { DiagramLabel } from './layout.ts';
 
 const KIND_ICON: Record<string, string> = {
@@ -21,10 +21,31 @@ function iconFor(item: C4Element) {
 }
 
 const DRAG_THRESHOLD = 4;
+/** 카드 가장자리에서 이만큼(화면 픽셀) 바깥에 놓아도 그 카드로 친다. 연결 지점이 카드 가장자리에 걸쳐 있어서다. */
+const DROP_MARGIN = 12;
+
+/**
+ * 선을 끄는 중의 상태. `create`는 카드의 연결 지점에서 새 관계를 시작하고, `reconnect`는 고른 관계의 한쪽 끝을 옮긴다.
+ * `from`은 움직이지 않는 쪽의 월드 좌표이고, `pointer`는 칸 안의 화면 좌표다.
+ */
+type Link = {
+  kind: 'create' | 'reconnect';
+  fixedId: string;
+  from: Point;
+  edge?: string;
+  end?: 'source' | 'target';
+  pointer: Point;
+  over: string | null;
+};
+
+function portStyle(port: Port): CSSProperties {
+  const fraction = portFraction(port);
+  return { left: fraction.x * 100 + '%', top: fraction.y * 100 + '%' };
+}
 
 export function Diagram({
   elements, relationships, positions, selectedElement, selectedRelationship, selectElement, selectRelationship, drill,
-  onMove, resetKey, connecting = false, emptyText,
+  onMove, onConnect, onReconnect, resetKey, connecting = false, emptyText,
 }: {
   elements: C4Element[];
   relationships: C4Relationship[];
@@ -37,6 +58,10 @@ export function Diagram({
   drill(id: string): void;
   /** 끌기를 마치면 보이는 모든 요소의 좌표를 알린다. 없으면 끌 수 없다 */
   onMove?(positions: Record<string, Point>): void;
+  /** 카드의 연결 지점에서 다른 카드로 끌어다 놓으면 알린다. 없으면 연결 지점을 보이지 않는다 */
+  onConnect?(source: string, target: string): void;
+  /** 고른 관계의 한쪽 끝을 다른 카드로 끌어다 놓으면 새 출발·도착 요소를 알린다. 없으면 끝을 옮길 수 없다 */
+  onReconnect?(relationshipId: string, source: string, target: string): void;
   /** 바뀌면 끄는 중에 임시로 둔 자리를 버리고 저장된 자리로 돌아간다 */
   resetKey: number;
   connecting?: boolean;
@@ -100,6 +125,73 @@ export function Diagram({
   const reset = () => { setLocked(null); setCamera({ zoom: 1, x: 0, y: 0 }); };
 
   useEffect(() => { setMoved({}); }, [resetKey]);
+
+  // 선 끌기(연결 지점에서 새 관계, 또는 고른 관계의 끝 옮기기). 포인터가 카드 위인지는 DOM이 아니라 월드 좌표로 판정한다.
+  const [link, setLink] = useState<Link | null>(null);
+  const latest = useRef({ nodes, relationships, pixelX, pixelY, scale, link, onConnect, onReconnect });
+  latest.current = { nodes, relationships, pixelX, pixelY, scale, link, onConnect, onReconnect };
+  const localPoint = (event: { clientX: number; clientY: number }): Point => {
+    const node = viewport.current!;
+    const rect = node.getBoundingClientRect();
+    return { x: event.clientX - rect.left - node.clientLeft, y: event.clientY - rect.top - node.clientTop };
+  };
+  const hitCard = (point: Point, fixedId: string): string | null => {
+    const current = latest.current;
+    const id = nodeAt(current.nodes, toWorld(point, { x: current.pixelX, y: current.pixelY }, current.scale), DROP_MARGIN / current.scale);
+    return id === fixedId ? null : id;
+  };
+  const linking = link !== null;
+  useEffect(() => {
+    if (!linking) return;
+    const move = (event: globalThis.PointerEvent) => {
+      const point = localPoint(event);
+      setLink(current => current && { ...current, pointer: point, over: hitCard(point, current.fixedId) });
+    };
+    const finish = (event: globalThis.PointerEvent) => {
+      const current = latest.current;
+      const active = current.link;
+      setLink(null);
+      // 끝난 뒤에 이어 오는 click이 바탕을 눌러 선택을 풀지 않게 한 번 삼킨다
+      panned.current = true;
+      setTimeout(() => { panned.current = false; }, 0);
+      if (!active) return;
+      const over = hitCard(localPoint(event), active.fixedId);
+      if (!over) return;
+      if (active.kind === 'create') { current.onConnect?.(active.fixedId, over); return; }
+      const edge = current.relationships.find(item => item.id === active.edge);
+      if (!edge) return;
+      const source = active.end === 'source' ? over : edge.source;
+      const target = active.end === 'target' ? over : edge.target;
+      if (source !== edge.source || target !== edge.target) current.onReconnect?.(edge.id, source, target);
+    };
+    const cancel = () => setLink(null);
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setLink(null); } };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('keydown', key, true);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('keydown', key, true);
+    };
+  }, [linking]);
+
+  function startCreate(event: PointerEvent<HTMLElement>, node: DiagramNodeLike, port: Port) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    setLink({ kind: 'create', fixedId: node.id, from: portPoint(node, port), pointer: localPoint(event), over: null });
+  }
+
+  function startReconnect(event: PointerEvent<HTMLElement>, edge: (typeof edges)[number], end: 'source' | 'target') {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const fixed = end === 'target' ? edge.start : edge.end;
+    setLink({ kind: 'reconnect', edge: edge.id, end, fixedId: end === 'target' ? edge.source : edge.target, from: fixed, pointer: localPoint(event), over: null });
+  }
 
   useLayoutEffect(() => {
     const node = viewport.current;
@@ -255,11 +347,25 @@ export function Diagram({
     onMove({ ...Object.fromEntries(nodes.map(item => [item.id, { x: Math.round(item.x), y: Math.round(item.y) }])), [current.id]: current.last });
   }
 
+  const toScreen = (point: Point): Point => ({ x: pixelX + point.x * scale, y: pixelY + point.y * scale });
+  const overNode = link?.over ? nodes.find(item => item.id === link.over) : undefined;
+  const overPortValue = link && overNode ? nearestPort(overNode, toWorld(link.pointer, { x: pixelX, y: pixelY }, scale), overNode.kind) : undefined;
+  const overPort = overNode && overPortValue ? { node: overNode.id, port: overPortValue.id } : undefined;
+  const selectedEdge = onReconnect && selectedRelationship ? edges.find(item => item.id === selectedRelationship) : undefined;
+  let preview: { path: string; end: Point } | null = null;
+  if (link) {
+    const from = toScreen(link.from);
+    const end = overNode && overPortValue ? toScreen(portPoint(overNode, overPortValue)) : link.pointer;
+    const { a, b } = linkCurve(from, end);
+    preview = { path: 'M ' + from.x + ' ' + from.y + ' C ' + a.x + ' ' + a.y + ' ' + b.x + ' ' + b.y + ' ' + end.x + ' ' + end.y, end };
+  }
+
   return (
     <div
       className="c4-diagram"
       ref={viewport}
       data-connecting={connecting}
+      data-linking={linking}
       aria-label="C4 다이어그램"
       onPointerDown={startPan}
       onPointerMove={event => {
@@ -287,11 +393,12 @@ export function Diagram({
         style={{ '--c4-type-scale': typeScale, zoom: scale } as CSSProperties}
       >
         {nodes.map(item => (
+          <Fragment key={item.id}>
           <button
             type="button"
-            key={item.id}
             className="c4-card"
             data-kind={item.kind}
+            data-link-target={link?.over === item.id}
             aria-pressed={selectedElement === item.id}
             data-movable={Boolean(onMove)}
             data-dragging={Boolean(moved[item.id])}
@@ -312,6 +419,27 @@ export function Diagram({
             {item.description && <span className="c4-card-description">{item.description}</span>}
             {item.technology && <span className="c4-card-tech">{item.technology}</span>}
           </button>
+          {onConnect && (
+            <span
+              className="c4-ports"
+              data-for={item.id}
+              data-show={link?.over === item.id ? 'target' : selectedElement === item.id ? 'selected' : undefined}
+              style={{ left: item.x, top: item.y, width: CARD_WIDTH, height: CARD_HEIGHT }}
+              aria-hidden="true"
+            >
+              {portsFor(item.kind).map(port => (
+                <i
+                  key={port.id}
+                  className="c4-port"
+                  data-port={port.id}
+                  data-near={overPort?.node === item.id && overPort.port === port.id}
+                  style={portStyle(port)}
+                  onPointerDown={event => startCreate(event, item, port)}
+                />
+              ))}
+            </span>
+          )}
+          </Fragment>
         ))}
       </div>
       </div>
@@ -331,6 +459,27 @@ export function Diagram({
           >{caption}</button>
         );
       })}
+      {selectedEdge && (['source', 'target'] as const).map(end => {
+        const at = toScreen(end === 'source' ? selectedEdge.start : selectedEdge.end);
+        return (
+          <button
+            key={end}
+            type="button"
+            className="c4-edge-end"
+            data-end={end}
+            aria-label={end === 'source' ? '관계의 시작 끝을 끌어서 옮기기' : '관계의 도착 끝을 끌어서 옮기기'}
+            title={end === 'source' ? '끌어서 시작 요소 바꾸기' : '끌어서 도착 요소 바꾸기'}
+            style={{ left: at.x, top: at.y }}
+            onPointerDown={event => startReconnect(event, selectedEdge, end)}
+          />
+        );
+      })}
+      {preview && (
+        <svg className="c4-link" aria-hidden="true">
+          <path d={preview.path} />
+          <circle cx={preview.end.x} cy={preview.end.y} r={link?.over ? 6 : 4.5} />
+        </svg>
+      )}
       <div className="c4-zoom" aria-label="다이어그램 보기 도구">
         <button type="button" aria-label="축소" onClick={() => resize(.8)}>−</button>
         <output>{Math.round(scale * 100)}%</output>

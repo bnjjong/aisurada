@@ -208,5 +208,97 @@ try {
     byText('.c4-form button', '취소').click();
     await until(() => !form(), '창이 닫힘');
   });
+  // 선 끌기: 카드 가장자리의 연결 지점에서 다른 카드로 끌어 관계를 만들고, 고른 관계의 끝을 다른 카드로 옮긴다
+  const middle = element => { const r = element.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  const idOf = async name => (await model()).elements.find(e => e.name === name).id;
+  const portOf = (id, side) => document.querySelector(`.c4-ports[data-for="${id}"] .c4-port[data-port="${side}"]`);
+  const down = (target, at) => target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 11, button: 0, clientX: at.x, clientY: at.y }));
+  const moveTo = at => window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 11, clientX: at.x, clientY: at.y }));
+  const upAt = at => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 11, button: 0, clientX: at.x, clientY: at.y }));
+  const preview = () => document.querySelector('.c4-link path');
+  // 누르고 나서 화면이 끌기 상태로 바뀌고 리스너가 붙을 때까지 기다린다(사람은 누른 뒤에야 움직인다)
+  const begin = async (target, at) => { down(target, at); await until(preview, '끌기가 시작됨'); await wait(60); };
+
+  await test('dragging-from-a-card-port-makes-a-relationship-through-the-form', async () => {
+    const source = await idOf('GitHub');
+    const port = portOf(source, 'right');
+    assert(port, '카드에 연결 지점이 있다');
+    const target = cardOf('다른 곳에서 만든 것');
+    // 빈 곳에 놓으면 아무 일도 없다
+    const empty = { x: middle(port).x + 40, y: middle(port).y + 150 };
+    await begin(port, middle(port));
+    moveTo(empty);
+    assert(!document.querySelector('.c4-card[data-link-target="true"]'), '빈 곳 위에서는 대상 카드가 없다');
+    upAt(empty);
+    await until(() => !preview(), '놓으면 점선이 사라짐');
+    assert(!form(), '빈 곳에 놓으면 창이 열리지 않는다');
+    // Esc로 취소
+    await begin(port, middle(port));
+    moveTo(middle(target));
+    await until(() => document.querySelector('.c4-card[data-link-target="true"]'), '대상 카드가 강조됨');
+    assert(document.querySelector('.c4-port[data-near="true"]'), '가장 가까운 연결 지점이 강조됨');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await until(() => !preview(), 'Esc로 끌기가 취소됨');
+    upAt(middle(target));
+    assert(!form(), 'Esc 뒤에는 놓아도 창이 열리지 않는다');
+    // 카드 위에 놓으면 출발과 도착이 채워진 관계 창이 열리고, 취소하면 관계가 늘지 않는다
+    const before = (await model()).relationships.length;
+    await begin(port, middle(port));
+    moveTo(middle(target));
+    upAt(middle(target));
+    await until(form, '관계 추가 창');
+    const picked = all('.c4-form select').map(select => select.selectedOptions[0].textContent);
+    assert(picked[0].startsWith('GitHub') && picked[1].startsWith('다른 곳에서 만든 것'), `출발과 도착이 채워져 있다: ${picked}`);
+    byText('.c4-form button', '취소').click();
+    await until(() => !form(), '창이 닫힘');
+    assert((await model()).relationships.length === before, '취소하면 관계가 늘지 않는다');
+  });
+
+  await test('dragging-a-line-end-moves-the-relationship-to-another-card', async () => {
+    // 끌어서 관계를 하나 만든다: GitHub -> 다른 곳에서 만든 것
+    const github = await idOf('GitHub');
+    const elsewhere = await idOf('다른 곳에서 만든 것');
+    const late = await idOf('늦은 요소');
+    const port = portOf(github, 'right');
+    await begin(port, middle(port));
+    moveTo(middle(cardOf('다른 곳에서 만든 것')));
+    upAt(middle(cardOf('다른 곳에서 만든 것')));
+    await until(form, '관계 추가 창');
+    fillField(form().querySelector('input[maxlength="200"]'), '끌어서 만든 관계');
+    submit().click();
+    await until(() => !form(), '창이 닫힘');
+    await until(async () => (await model()).relationships.some(r => r.label === '끌어서 만든 관계'), '엔진에 관계가 생김');
+    const line = (await model()).relationships.find(r => r.label === '끌어서 만든 관계');
+    assert(line.source === github && line.target === elsewhere, `끌어서 만든 방향: ${JSON.stringify(line)}`);
+    const count = (await model()).relationships.length;
+    // 관계를 고르면 양 끝에 손잡이가 보이고, 도착 끝을 다른 카드로 옮긴다
+    // 라벨이 아이콘만 보일 수 있으니 접근성 이름으로 찾고, 라벨이 없으면 카드 상세의 관계 목록으로 고른다
+    const labelButton = () => all('.c4-edge').find(e => (e.getAttribute('aria-label') || '').includes('끌어서 만든 관계'));
+    if (labelButton()) labelButton().click();
+    else {
+      cardOf('GitHub').click();
+      await until(() => byText('.c4-relations button', '끌어서 만든 관계'), '상세의 관계 목록');
+      byText('.c4-relations button', '끌어서 만든 관계').click();
+    }
+    await until(() => document.querySelector('.c4-edge-end[data-end="target"]'), '끝 손잡이가 보임');
+    const handle = document.querySelector('.c4-edge-end[data-end="target"]');
+    await begin(handle, middle(handle));
+    moveTo(middle(cardOf('늦은 요소')));
+    await until(() => document.querySelector('.c4-card[data-link-target="true"]'), '옮길 카드가 강조됨');
+    upAt(middle(cardOf('늦은 요소')));
+    await until(async () => (await model()).relationships.find(r => r.id === line.id)?.target === late, '엔진에 도착 끝이 바뀜');
+    const moved = (await model()).relationships.find(r => r.id === line.id);
+    assert(moved.source === github && moved.label === '끌어서 만든 관계', `출발과 이름은 그대로다: ${JSON.stringify(moved)}`);
+    assert((await model()).relationships.length === count, '관계 수는 그대로다');
+    // 시작 끝을 다른 카드로 옮긴다
+    await until(() => document.querySelector('.c4-edge-end[data-end="source"]'), '관계가 선택된 채로 남음');
+    const start = document.querySelector('.c4-edge-end[data-end="source"]');
+    await begin(start, middle(start));
+    moveTo(middle(cardOf('개발자')));
+    upAt(middle(cardOf('개발자')));
+    await until(async () => (await model()).relationships.find(r => r.id === line.id)?.source === 'person-1', '엔진에 시작 끝이 바뀜');
+    const again = (await model()).relationships.find(r => r.id === line.id);
+    assert(again.target === late && again.label === '끌어서 만든 관계', `도착과 이름은 그대로다: ${JSON.stringify(again)}`);
+  });
 } catch { /* 첫 실패 뒤의 점검은 앞 상태에 기대므로 멈춘다 */ }
 await post('/result', results);
