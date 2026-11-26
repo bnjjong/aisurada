@@ -154,14 +154,6 @@
   color: var(--accent);
 }
 
-.set-nav-foot {
-  margin-top: auto;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
-  padding: 0 4px;
-}
-
 /* 3. 우측 패널 공통 */
 .set-panes {
   overflow-y: auto;
@@ -892,9 +884,6 @@
   }
   .set-results {
     max-height: 200px;
-  }
-  .set-nav-foot {
-    display: none;
   }
   .set-pane {
     padding: 16px 18px 22px;

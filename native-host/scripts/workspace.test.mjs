@@ -20,10 +20,11 @@ function harness(t, options = {}) {
       if (command === 'allow_workspace') { current = args.path; return; }
       if (command === 'vault_root') return current;
       if (command === 'create_workspace_dir') return `${args.parent}/${args.name}`;
+      if (command === 'set_vault_git') return { enabled: args.enabled, phase: args.enabled ? 'ready' : 'off' };
       if (['note_windows', 'saved_note_windows'].includes(command)) return [];
       if (command === 'sidecar_call') {
         const cmd = args.argv[0];
-        const value = cmd === 'list-docs' ? [fixtureNote] : cmd === 'list-agendas' ? [{ id: 'ag-demo', slug: 'demo', title: 'Demo' }] : cmd === 'reindex' ? { skipped: [], conflicts: [] } : [];
+        const value = cmd === 'list-docs' ? [fixtureNote] : cmd === 'list-agendas' ? [{ id: 'ag-demo', slug: 'demo', title: 'Demo' }] : cmd === 'reindex' ? { skipped: [], conflicts: [] } : cmd === 'init-workspace' ? { created: true } : [];
         return { status: 0, stdout: JSON.stringify(value), stderr: '' };
       }
     },
@@ -115,6 +116,7 @@ test('creation initializes twice but fails visibly if its first initialization f
   assert.equal(await h.controller.create('  새 공간  '), true);
   assert.equal(h.calls.filter(c => c.command === 'allow_workspace').length, 2);
   assert.equal(argv(h).filter(a => a[0] === 'init-workspace').length, 2);
+  assert.deepEqual(h.calls.find(c => c.command === 'set_vault_git').args, { expectedVault: '/parent/새 공간', enabled: true });
   assert.equal(h.controller.getSnapshot().recent[0].created, true);
   assert.deepEqual(lastWorkspace(h.services.storage), { path: '/parent/새 공간', name: '새 공간' });
   const broken = harness(t, { invoke: async (cmd, args) => {
@@ -125,6 +127,28 @@ test('creation initializes twice but fails visibly if its first initialization f
   assert.equal(lastWorkspace(broken.services.storage), null);
   assert.equal(broken.controller.getSnapshot().recent.length, 0);
   assert.match(broken.controller.getSnapshot().notice, /생성 실패/);
+});
+
+test('워크스페이스 생성 시 Git 끄기를 전달하고 기존 폴더를 열 때 설정을 쓰지 않는다', async t => {
+  const h = harness(t);
+  await h.controller.boot();
+  h.controller.setHome('/parent');
+  assert.equal(await h.controller.create('local', false), true);
+  assert.equal(await h.controller.open('/existing'), true);
+  assert.deepEqual(h.calls.filter(c => c.command === 'set_vault_git').map(c => c.args), [
+    { expectedVault: '/parent/local', enabled: false },
+  ]);
+});
+
+test('첫 Git 커밋에 실패해도 만든 워크스페이스를 열고 오류를 알려 준다', async t => {
+  const h = harness(t, { invoke: async command => {
+    if (command === 'set_vault_git') throw new Error('Git을 실행할 수 없어요.');
+  } });
+  await h.controller.boot();
+  h.controller.setHome('/parent');
+  assert.equal(await h.controller.create('local'), true);
+  assert.equal(h.controller.getSnapshot().workspace.path, '/parent/local');
+  assert.match(h.controller.getSnapshot().notice, /Git 설정 실패/);
 });
 
 test('sample stops watching, preserves last real workspace and makes no invoke calls', async t => {

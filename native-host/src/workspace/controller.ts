@@ -67,7 +67,7 @@ export interface WorkspaceHostBridge {
 export interface WorkspaceLifecycle {
   boot(seedSample?: boolean, developmentLink?: string): Promise<void>;
   open(rawPath: string, menu?: boolean): Promise<boolean>;
-  create(rawName: string): Promise<boolean>;
+  create(rawName: string, gitEnabled?: boolean): Promise<boolean>;
   sample(): Promise<boolean>;
   openRecent(item: RecentWorkspace): Promise<boolean>;
   forgetRecent(path: string): void;
@@ -940,14 +940,15 @@ export class WorkspaceController implements WorkspaceNavigation, WorkspacePrefer
     return true;
   }, '폴더를 열 수 없어요', menu ? () => this.navigate('/launcher') : undefined);
 
-  create = (rawName: string): Promise<boolean> => this.action(async () => {
+  create = (rawName: string, gitEnabled = true): Promise<boolean> => this.action(async () => {
     const name = rawName.trim(), parent = this.state.home;
     if (!name || !await this.leaveVault()) return false;
     const path = await this.services.host.invoke<string>('create_workspace_dir', { parent, name });
     const before = await this.services.host.invoke<string | null>('vault_root').catch(() => null);
     await this.authorize(path);
     // Creation reports initialization failure instead of claiming success.
-    try { await engineCall(this.services.host, write.init(name)); }
+    let created: boolean;
+    try { created = asRow(await engineCall(this.services.host, write.init(name)))?.created === true; }
     catch (error) {
       // C202: the host goes back to the vault it had when creation started, so the
       // vault still on screen and the host's vault never part. The first error is
@@ -957,10 +958,22 @@ export class WorkspaceController implements WorkspaceNavigation, WorkspacePrefer
       if (shown && !shown.sample) this.installWatch(shown.path);
       throw error;
     }
+    let gitNotice = '';
+    if (created) {
+      try {
+        const result = await this.callHost('set_vault_git', { expectedVault: path, enabled: gitEnabled });
+        if (result.phase !== 'ready' && result.phase !== 'off') {
+          gitNotice = '워크스페이스를 만들었어요. 설정의 워크스페이스 메뉴에서 Git 상태를 확인해 주세요.';
+        }
+      } catch (error) {
+        gitNotice = `워크스페이스를 만들었어요. Git 설정 실패 (${String(error)}). 설정에서 다시 시도할 수 있어요.`;
+      }
+    }
     await this.openWorkspace(path, name);
     writeJSON(this.services.storage, KEYS.home, homePath(parent));
     this.patch({ recent: addRecent(this.services.storage, { path, name, created: true }) });
     this.navigate('/calendar');
+    if (gitNotice) this.notify(gitNotice);
     return true;
   }, '워크스페이스 생성 실패');
 

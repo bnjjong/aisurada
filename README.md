@@ -322,7 +322,9 @@ dist/ais-cli reindex-paths notes/demo/hello/note.md
 
 노트 내부 경로는 루트 노트로 접고 중복은 한 번만 엽니다. 200개를 넘겨 `mode: full`이 되어도 템플릿·회고·휴지통은 검사하지 않습니다. 색인이 없는 구현이므로 `indexed`는 이번에 읽은 노트 수, `unchanged`와 `removed`는 0입니다(8.6).
 
-자동 커밋은 `.git` 폴더가 있는 `main` 브랜치에서 동작합니다. `AISURADA_VAULT_AUTOCOMMIT_ENABLED=false`(`off`·`no`·`0`도 같다)로 끄고, `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS`로 유휴 시간을 정합니다(기본 300초). 대기 기록은 `vault/.git/aisurada-pending.json`에 남고 프로세스 사이에 공유합니다. git 잠금·병합 중 상태는 건너뛰고, 실패는 재시도하되 노트 쓰기의 성공 여부를 바꾸지 않습니다. 훅·서명은 끄고 `*.tmp`를 제외한 vault 변경을 담습니다. `history <노트 id> [번호] [commit=<40자 커밋>] [query=<글자>]`는 수동·자동 커밋과 옛 스냅숏을 합쳐 보여 줍니다. `commit-vault`는 즉시 시도한 결과를 `outcome`과 선택적인 `blocked`로 돌려주며, git 실패도 종료 코드 0입니다. 쓰기와 같은 vault 잠금을 잡고 커밋하므로 다른 쪽이 쓰는 중이면 그 쓰기가 끝나기를 기다립니다. 두 명령은 명령 표면에만 있고 워크스페이스 표식이나 색인을 요구하지 않습니다. 본문을 덮기 직전에 옛 바이트를 남기던 스냅숏 쓰기(`AISURADA_VAULT_SNAPSHOT_ENABLED`)는 Rust 이전 때 지웠습니다. 이미 남은 스냅숏은 `history`가 계속 읽습니다. 자세한 계약과 유지한 경계는 [31장 완료 문서](docs/rebuild-p1-chapter31-complete.md)에 있습니다.
+데스크톱 앱에서 만드는 새 워크스페이스는 **Git으로 변경 이력 저장**이 기본으로 켜져 있습니다. 이미 만든 워크스페이스에 Git 이력을 추가하려면 **설정 → 워크스페이스**에서 켭니다. 처음 켜면 현재 파일을 첫 커밋으로 남깁니다.
+
+자동 커밋은 워크스페이스의 Git 설정이 켜져 있고 `.git` 폴더가 있는 `main` 브랜치에서 동작합니다. `AISURADA_VAULT_AUTOCOMMIT_ENABLED=false`(`off`·`no`·`0`도 같다)로 끄고, `AISURADA_VAULT_AUTOCOMMIT_IDLE_SECONDS`로 유휴 시간을 정합니다(기본 300초). 대기 기록은 `vault/.git/aisurada-pending.json`에 남고 프로세스 사이에 공유합니다. git 잠금·병합 중 상태는 건너뛰고, 실패는 재시도하되 노트 쓰기의 성공 여부를 바꾸지 않습니다. 훅·서명은 끄고 `*.tmp`와 Git 설정 파일을 제외한 vault 변경을 담습니다. `history <노트 id> [번호] [commit=<40자 커밋>] [query=<글자>]`는 수동·자동 커밋과 옛 스냅숏을 합쳐 보여 줍니다. `commit-vault`는 즉시 시도한 결과를 `outcome`과 선택적인 `blocked`로 돌려주며, git 실패도 종료 코드 0입니다. 쓰기와 같은 vault 잠금을 잡고 커밋하므로 다른 쪽이 쓰는 중이면 그 쓰기가 끝나기를 기다립니다. 두 명령은 명령 표면에만 있고 워크스페이스 표식이나 색인을 요구하지 않습니다. 본문을 덮기 직전에 옛 바이트를 남기던 스냅숏 쓰기(`AISURADA_VAULT_SNAPSHOT_ENABLED`)는 Rust 이전 때 지웠습니다. 이미 남은 스냅숏은 `history`가 계속 읽습니다. 자세한 계약과 유지한 경계는 [31장 완료 문서](docs/rebuild-p1-chapter31-complete.md)에 있습니다.
 
 자동 커밋 시험은 `bash test.sh`가 실제 임시 git 저장소로 돌립니다. [누락 기능 완료 노트](docs/rebuild-p1-chapters01-20-gaps-complete.md)에 구현과 시험 근거를 기록했습니다.
 

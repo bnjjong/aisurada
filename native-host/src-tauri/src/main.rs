@@ -67,6 +67,8 @@ fn main() {
             lifecycle::exit_app,
             workspace::allow_workspace,
             workspace::vault_root,
+            workspace::vault_git_status,
+            workspace::set_vault_git,
             workspace::is_workspace,
             workspace::create_workspace_dir,
             sidecar::sidecar_call,

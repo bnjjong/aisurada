@@ -19,6 +19,7 @@ import { NotificationSettingsView } from '../src/ui/NotificationSettings.tsx';
 import { SettingsGroup, SettingsPane, SettingsRow } from '../src/ui/SettingsParts.tsx';
 import { ConnectView } from '../src/plugs/claude/connect.tsx';
 import { GithubConnect } from '../src/ui/GithubConnect.tsx';
+import { WorkspaceGitSettings } from '../src/ui/WorkspaceGitSettings.tsx';
 
 function harness(t, { context = { kind: 'main' }, values = {} } = {}) {
   const map = new Map(Object.entries(values)), writes = [], warnings = [];
@@ -68,18 +69,18 @@ test('노트 창(보조 창)에서는 설정이 열리지 않는다', t => {
   assert.equal(h.controller.getSnapshot().settingsOpen, false);
 });
 
-test('묶음 목록: 6개 묶음의 id, 이름, 아이콘, 설명이 정해진 순서대로 정의된다', () => {
+test('설정 묶음의 이름과 아이콘이 정해진 순서대로 정의된다', () => {
   assert.deepEqual(
     SETTINGS_SECTIONS.map(s => s.id),
-    ['look', 'fonts', 'notes', 'notifications', 'ai', 'connections']
+    ['look', 'fonts', 'notes', 'workspace', 'notifications', 'ai', 'connections']
   );
   assert.deepEqual(
     SETTINGS_SECTIONS.map(s => s.name),
-    ['모양', '글꼴', '노트', '알림', 'AI', '연결']
+    ['모양', '글꼴', '노트', '워크스페이스', '알림', 'AI', '연결']
   );
   assert.deepEqual(
     SETTINGS_SECTIONS.map(s => s.icon),
-    ['palette', 'type', 'note', 'bell', 'bot', 'chain']
+    ['palette', 'type', 'note', 'folder', 'bell', 'bot', 'chain']
   );
 });
 
@@ -88,12 +89,13 @@ test('그리기: SettingsLayoutView는 4부 유무에 따라 탭 수가 달라�
     look: React.createElement('div', { id: 'p-look' }, 'Look'),
     fonts: React.createElement('div', { id: 'p-fonts' }, 'Fonts'),
     notes: React.createElement('div', { id: 'p-notes' }, 'Notes'),
+    workspace: React.createElement('div', { id: 'p-workspace' }, 'Workspace'),
     notifications: React.createElement('div', { id: 'p-ntf' }, 'Notifications'),
     ai: React.createElement('div', { id: 'p-ai' }, 'AI'),
     connections: React.createElement('div', { id: 'p-conn' }, 'Connections'),
   };
 
-  // 4부를 켠 판 (6탭)
+  // 4부를 켠 판은 설정 묶음 7개를 보인다.
   const htmlFull = renderToStaticMarkup(React.createElement(SettingsLayoutView, {
     section: 'look',
     onSelectSection() {},
@@ -101,7 +103,7 @@ test('그리기: SettingsLayoutView는 4부 유무에 따라 탭 수가 달라�
     panes,
   }));
   const fullTabs = [...htmlFull.matchAll(/role="tab"/g)];
-  assert.equal(fullTabs.length, 6);
+  assert.equal(fullTabs.length, 7);
   assert.match(htmlFull, /id="set-tab-look"[^>]*aria-selected="true"/);
   assert.match(htmlFull, /id="set-tab-fonts"[^>]*aria-selected="false"/);
   // 숨지 않은 패널(hidden 없는 것)은 고른 묶음 하나뿐이어야 한다
@@ -109,7 +111,7 @@ test('그리기: SettingsLayoutView는 4부 유무에 따라 탭 수가 달라�
   assert.equal(visiblePanesFull.length, 1);
   assert.match(htmlFull, /id="set-pane-look"[^>]*class="set-pane"/);
 
-  // 4부를 끈 판 (5탭, ai 제외)
+  // 4부를 끈 판은 AI 묶음을 뺀다.
   const htmlNoClaude = renderToStaticMarkup(React.createElement(SettingsLayoutView, {
     section: 'look',
     onSelectSection() {},
@@ -117,7 +119,7 @@ test('그리기: SettingsLayoutView는 4부 유무에 따라 탭 수가 달라�
     panes,
   }));
   const noClaudeTabs = [...htmlNoClaude.matchAll(/role="tab"/g)];
-  assert.equal(noClaudeTabs.length, 5);
+  assert.equal(noClaudeTabs.length, 6);
   assert.ok(!htmlNoClaude.includes('id="set-tab-ai"'));
   assert.ok(!htmlNoClaude.includes('id="set-pane-ai"'));
 });
@@ -210,7 +212,7 @@ test('설정 검색: 검색어로 라벨과 키워드를 찾고, AI 제외 옵�
   assert.equal(darkResults.length, 0);
 });
 
-test('색인 유효성: SETTINGS_INDEX의 모든 항목은 유효한 6개 묶음 중 하나에 속한다', () => {
+test('설정 색인의 모든 항목은 정의된 설정 묶음에 속한다', () => {
   const validSections = new Set(SETTINGS_SECTIONS.map(s => s.id));
   for (const item of SETTINGS_INDEX) {
     assert.ok(validSections.has(item.section), `잘못된 섹션: ${item.section}`);
@@ -250,6 +252,7 @@ test('색인 전수 검증: SETTINGS_INDEX의 모든 key가 실제 설정 화면
     look: React.createElement(LookSettings, { controller: h.controller, state: dummyState }),
     fonts: React.createElement(TypographySettings, { controller: h.controller, typography: dummyState.typography }),
     notes: React.createElement(NoteSettings, { controller: h.controller, state: dummyState }),
+    workspace: React.createElement(WorkspaceGitSettings, { call: h.controller.callHost }),
     notifications: React.createElement(NotificationSettingsView, {
       settings: toSettings({}),
       native: true,

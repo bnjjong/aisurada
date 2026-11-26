@@ -1,4 +1,4 @@
-// 설정 화면. 6개 묶음(모양, 글꼴, 노트, 알림, AI, 연결)으로 나누어 패널을 보인다.
+// 설정을 묶음별 패널로 보여 주고 항목을 검색한다.
 import { useState, type ReactNode } from "react";
 import type { WorkspaceController } from "../workspace/controller.ts";
 import type { SettingsSection, WorkspaceState } from "../workspace/types.ts";
@@ -16,6 +16,7 @@ import { LookSettings } from "./LookSettings.tsx";
 import { TypographySettings } from "./TypographySettings.tsx";
 import { NoteSettings } from "./NoteSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
+import { WorkspaceGitSettings } from "./WorkspaceGitSettings.tsx";
 import { AiSettings } from "./AiSettings.tsx";
 import { GithubConnect } from "./GithubConnect.tsx";
 
@@ -237,10 +238,6 @@ export function SettingsLayoutView({
               )}
             </div>
           )}
-
-          <p className="set-nav-foot">
-            이 기기에만 적용돼요. 노트 파일은 바뀌지 않아요.
-          </p>
         </nav>
         <div className="set-panes">
           {visibleSections.map((s) => (
@@ -279,6 +276,11 @@ export function Settings({
     look: <LookSettings controller={controller} state={state} />,
     fonts: <TypographySettings controller={controller} typography={state.typography} />,
     notes: <NoteSettings controller={controller} state={state} />,
+    workspace: section === "workspace" && <WorkspaceGitSettings
+      key={state.workspace?.path}
+      call={controller.callHost}
+      path={controller.isNative() && !state.workspace?.sample ? state.workspace?.path : undefined}
+    />,
     notifications: <NotificationSettings controller={controller} />,
     ai: <AiSettings controller={controller} state={state} />,
     connections: (

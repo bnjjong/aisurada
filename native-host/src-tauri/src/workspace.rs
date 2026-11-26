@@ -136,6 +136,49 @@ pub fn vault_root(state: State<'_, HostState>) -> Option<String> {
     state.current_vault()
 }
 
+fn git_settings_vault(
+    window: &str,
+    host: &HostState,
+    expected_vault: &str,
+) -> Result<String, String> {
+    if window != "main" {
+        return Err("Git 설정은 기본 창에서 열어 주세요.".into());
+    }
+    host.current_vault()
+        .filter(|path| path == expected_vault)
+        .ok_or_else(|| "열린 워크스페이스가 바뀌었어요. 설정을 다시 열어 주세요.".into())
+}
+
+#[tauri::command]
+pub async fn vault_git_status<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, HostState>,
+    expected_vault: String,
+) -> Result<ais_core::write::vault_git::Status, String> {
+    let vault = git_settings_vault(window.label(), &state, &expected_vault)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        ais_core::write::vault_git::status(Path::new(&vault)).map_err(|error| error.message)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn set_vault_git<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, HostState>,
+    expected_vault: String,
+    enabled: bool,
+) -> Result<ais_core::write::vault_git::Status, String> {
+    let vault = git_settings_vault(window.label(), &state, &expected_vault)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        ais_core::write::vault_git::set_enabled(Path::new(&vault), enabled)
+            .map_err(|error| error.message)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 pub fn is_workspace(root: String) -> bool {
     Path::new(&root).join(".aisurada/workspace.json").is_file()

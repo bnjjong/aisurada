@@ -60,6 +60,8 @@ impl VersionControl for GitCli {
                         "core.fsmonitor=false",
                     ])
                     .env_remove("GIT_INDEX_FILE")
+                    .env_remove("GIT_COMMON_DIR")
+                    .env_remove("GIT_OBJECT_DIRECTORY")
                     .env("GIT_DIR", vault.join(".git"))
                     .env("GIT_WORK_TREE", vault);
                 // 앱이 남기는 커밋의 작성자는 늘 aisurada-auto다(판 목록이 이것으로 자동·수동을 가른다)

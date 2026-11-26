@@ -24,6 +24,7 @@ import { NotificationToasts } from './ui/NotificationCenter.tsx';
 import { ManagersProvider } from './ui/managersStore.tsx';
 import { parseRoute } from './navigation/routes.ts';
 import { MoveUndoToast } from './ui/MoveUndo.tsx';
+import { SettingsSwitch } from './ui/SettingsParts.tsx';
 
 // Window identity is decided once, before any internal navigation.
 const context = windowContext(window.location.pathname);
@@ -210,6 +211,7 @@ function Launcher({ controller, state }: { controller: WorkspaceController; stat
   const [mode, setMode] = useState<'create' | 'open' | null>(() => new URLSearchParams(state.route.split('?')[1]).get('mode') === 'create' ? 'create' : null);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
+  const [gitEnabled, setGitEnabled] = useState(true);
   useEffect(() => {
     if (new URLSearchParams(state.route.split('?')[1]).get('mode') === 'create') setMode('create');
   }, [state.route]);
@@ -219,7 +221,7 @@ function Launcher({ controller, state }: { controller: WorkspaceController; stat
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (mode === 'create') void controller.create(name); else void controller.open(path);
+    if (mode === 'create') void controller.create(name, gitEnabled); else void controller.open(path);
   };
   return <main className="launcher">
     <section className="launcher-intro"><Brand /><p className="eyebrow">YOUR WORK, IN CONTEXT</p>
@@ -243,6 +245,10 @@ function Launcher({ controller, state }: { controller: WorkspaceController; stat
             placeholder="/Users/me/Documents/aisurada" autoFocus={mode === 'open'} disabled={state.busy} required />
           <button type="button" className="button-subtle" onClick={() => void choose()} disabled={state.busy}>찾아보기</button>
         </span></label>
+        {mode === 'create' && <label className="workspace-git-option">
+          <span>Git으로 변경 이력 저장</span>
+          <SettingsSwitch checked={gitEnabled} onChange={setGitEnabled} disabled={state.busy} />
+        </label>}
         <button className="button-primary" type="submit" disabled={state.busy || !(mode === 'create' ? name.trim() && state.home : path.trim())}>
           {state.busy ? '워크스페이스를 여는 중…' : mode === 'create' ? '만들기' : '열기'}</button>
       </form>}
