@@ -52,7 +52,7 @@ function portStyle(port: Port): CSSProperties {
 
 export function Diagram({
   elements, relationships, positions, selectedElement, selectedRelationship, selectElement, selectRelationship, drill,
-  onMove, onConnect, onReconnect, resetKey, connecting = false, emptyText,
+  onMove, onConnect, onReconnect, resetKey, connecting = false, emptyText, changes,
 }: {
   elements: C4Element[];
   relationships: C4Relationship[];
@@ -73,6 +73,8 @@ export function Diagram({
   resetKey: number;
   connecting?: boolean;
   emptyText?: string;
+  /** 타임 트래블에서 앞 시점과 달라진 요소(카드에 표시한다) */
+  changes?: Record<string, 'added' | 'changed'>;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -458,6 +460,7 @@ export function Diagram({
             className="c4-card"
             data-kind={item.kind}
             data-link-target={link?.over === item.id}
+            data-change={changes?.[item.id]}
             aria-pressed={selectedElement === item.id}
             data-movable={Boolean(onMove)}
             data-dragging={Boolean(moved[item.id])}

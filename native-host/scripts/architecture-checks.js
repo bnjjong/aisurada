@@ -415,5 +415,75 @@ try {
     assert(list.diagrams.map(d => d.id).join() === 'main', `엔진에서도 사라졌다: ${JSON.stringify(list)}`);
     await until(() => cardOf('GitHub'), '기본 아키텍처의 카드가 보인다');
   });
+
+  const historyOf = () => invoke('engine_call', { command: 'list_c4_history', args: { project: A.projectSlug } });
+  const travelBar = () => document.querySelector('.c4-travel');
+  const dots = () => all('.c4-travel-dot');
+  const travelState = () => document.querySelector('.c4-travel-state')?.textContent ?? '';
+  const settled = () => !travelState().includes('불러오는 중');
+  const levelOneNames = async seq => (await invoke('engine_call', { command: 'get_c4_model', args: { project: A.projectSlug, at: seq } })).elements.filter(e => e.level === 1).map(e => e.name).sort().join('|');
+  const shownNames = () => cards().map(c => c.querySelector('strong')?.textContent).sort().join('|');
+
+  await test('time-travel-shows-past-states-read-only-and-comes-back-to-now', async () => {
+    const live = await model();
+    const before = await historyOf();
+    assert(before.snapshots.length >= 4 && before.latestIsCurrent === true, `앞 점검들이 이력을 쌓았다: ${before.snapshots.length}점, 현재와 같음 ${before.latestIsCurrent}`);
+    assert(before.snapshots.every((p, i) => i === 0 || p.at >= before.snapshots[i - 1].at), '점은 시간 순서다');
+
+    byText('.c4-toolbar button', '타임 트래블').click();
+    await until(travelBar, '타임 트래블 막대');
+    assert(dots().length === before.snapshots.length, `점 ${dots().length}개, 이력 ${before.snapshots.length}개`);
+    assert(dots().at(-1).getAttribute('aria-current') === 'step' && byText('.c4-travel-now', 'Now'), '처음에는 Now가 골라져 있다');
+    assert(travelState().startsWith('현재 상태'), `상태 글: ${travelState()}`);
+    assert(byText('.c4-toolbar button', '요소 추가').disabled && byText('.c4-toolbar button', '관계 추가').disabled, '과거를 보는 동안 편집 단추는 닫혀 있다');
+    assert(!document.querySelector('.c4-card[data-movable="true"]'), '카드를 끌 수 없다');
+
+    // 첫 점: 그때의 카드만 보인다
+    dots()[0].click();
+    await until(() => dots()[0].getAttribute('aria-current') === 'step' && settled(), '첫 점 선택');
+    const firstSeq = before.snapshots[0].seq;
+    const levelOneNamesCache = await levelOneNames(firstSeq);
+    await until(() => shownNames() === levelOneNamesCache, `첫 점의 카드가 그때 모양이다: 화면 ${shownNames()} / 엔진 ${levelOneNamesCache}`);
+    assert(!document.querySelector('.c4-card[data-change]'), '첫 점에는 견줄 앞 점이 없어 표시가 없다');
+    assert(!travelState().startsWith('현재 상태'), `과거 점의 설명: ${travelState()}`);
+
+    // 다음 점: 새로 생긴 요소가 강조된다
+    document.querySelector('button[aria-label="다음 시점"]').click();
+    await until(() => dots()[1].getAttribute('aria-current') === 'step' && settled(), '둘째 점');
+    const second = await levelOneNames(before.snapshots[1].seq);
+    await until(() => shownNames() === second, '둘째 점의 카드');
+    const added = [...new Set(second.split('|'))].filter(n => !levelOneNamesCache.split('|').includes(n));
+    if (added.length) await until(() => all('.c4-card[data-change="added"]').some(c => added.includes(c.querySelector('strong')?.textContent)), `새로 생긴 요소(${added})가 강조됨`);
+
+    // 과거에서는 상세의 편집·삭제 단추가 숨는다
+    cards()[0].click();
+    await until(() => document.querySelector('.c4-details-actions'), '상세가 열림');
+    assert(getComputedStyle(document.querySelector('.c4-details-actions')).display === 'none', '상세의 편집 단추가 숨어 있다');
+    cards()[0].click();
+
+    // 타임랩스: 끝에서 두 점 앞에서 시작하면 Now에 닿으면 멈춘다
+    dots().at(-3).click();
+    await until(() => dots().at(-3).getAttribute('aria-current') === 'step' && settled(), '끝에서 셋째 점');
+    byText('.c4-travel-lapse', '타임랩스').click();
+    await until(() => dots().at(-1).getAttribute('aria-current') === 'step', '타임랩스가 Now에 닿음', 60000);
+    await until(() => byText('.c4-travel-lapse', '타임랩스').getAttribute('aria-pressed') === 'false', '닿으면 멈춘다');
+    await until(() => shownNames() === live.elements.filter(e => e.level === 1).map(e => e.name).sort().join('|'), 'Now에서는 지금 카드가 보인다');
+
+    // 지켜본 것만으로는 아무것도 바뀌지 않았다
+    assert((await model()).precondition === live.precondition, '읽기만으로 모델이 바뀌지 않았다');
+    assert((await historyOf()).snapshots.length === before.snapshots.length, '읽기만으로 점이 늘지 않았다');
+
+    document.querySelector('button[aria-label="타임 트래블 닫기"]').click();
+    await until(() => !travelBar(), '막대가 닫힘');
+    assert(!byText('.c4-toolbar button', '요소 추가').disabled, '닫으면 편집 단추가 열린다');
+  });
+
+  await test('a-change-after-time-travel-adds-exactly-one-point', async () => {
+    const before = (await historyOf()).snapshots.length;
+    await addElement('타임 트래블 뒤', 'system');
+    const after = await historyOf();
+    assert(after.snapshots.length === before + 1 && after.latestIsCurrent === true, `점 ${before} → ${after.snapshots.length}`);
+    assert(after.snapshots.at(-1).summary.includes('타임 트래블 뒤') && after.snapshots.at(-1).by === 'app', `마지막 점: ${JSON.stringify(after.snapshots.at(-1))}`);
+  });
 } catch { /* 첫 실패 뒤의 점검은 앞 상태에 기대므로 멈춘다 */ }
 await post('/result', results);

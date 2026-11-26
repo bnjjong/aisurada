@@ -107,3 +107,56 @@ test('아키텍처 관리 명령은 프로젝트 slug를 자리 인자로 보낸
   assert.deepEqual(toArgv({ command: 'rename_c4_diagram', args: { project: 'demo', diagram: 'arch-2', name: '운영' } }), ['rename-c4-diagram', 'demo', 'diagram=arch-2', 'name=운영']);
   assert.deepEqual(toArgv({ command: 'list_c4_diagrams', args: { project: 'demo' } }), ['list-c4-diagrams', 'demo']);
 });
+
+test('타임라인의 마지막 점은 늘 Now이고, 이력에 없는 변경이 있으면 Now가 따로 붙는다', async () => {
+  const { travelPoints, describePoint } = await import('../src/ui/architecture/model.ts');
+  const snap = (seq, extra = {}) => ({ seq, at: Date.UTC(2026, 10, 26, 0, 12), by: 'app', kind: 'change', summary: '요소 추가: API', elements: 1, relationships: 0, ...extra });
+  const same = travelPoints({ snapshots: [snap(1), snap(2)], latestIsCurrent: true });
+  assert.equal(same.length, 2, '마지막 점이 지금과 같으면 그 점이 Now다');
+  const behind = travelPoints({ snapshots: [snap(1), snap(2)], latestIsCurrent: false });
+  assert.equal(behind.length, 3);
+  assert.equal(behind[2].snapshot, null, '이력에 없는 지금 상태는 빈 점이다');
+  assert.equal(travelPoints({ snapshots: [], latestIsCurrent: true }).length, 1, '이력이 없어도 Now 하나는 있다');
+
+  const fixed = () => '11월 26일 09:12';
+  assert.equal(describePoint(behind[0], false, fixed), '11월 26일 09:12 · 앱 · 요소 추가: API');
+  assert.equal(describePoint({ snapshot: snap(3, { by: 'ai', summary: '' }) }, false, fixed), '11월 26일 09:12 · AI · 변경');
+  assert.equal(describePoint({ snapshot: snap(4, { by: '', kind: 'baseline', summary: '시작 상태' }) }, false, fixed), '11월 26일 09:12 · 시작 상태');
+  assert.equal(describePoint(behind[2], true), '현재 상태');
+  assert.equal(describePoint(same[1], true), '현재 상태 · 요소 추가: API');
+});
+
+test('앞 시점과 견줘 새로 생긴 요소와 내용이 바뀐 요소를 가린다', async () => {
+  const { diffElements } = await import('../src/ui/architecture/model.ts');
+  const before = { ...model, elements: model.elements.slice(0, 3) };
+  const after = {
+    ...model,
+    elements: [
+      ...model.elements.slice(0, 2),
+      { ...model.elements[2], technology: 'Rust' },
+      element('new', 'system', 1),
+    ],
+  };
+  assert.deepEqual(diffElements(before, after), { gh: 'changed', new: 'added' });
+  assert.deepEqual(diffElements(undefined, after), {}, '앞 시점이 없으면 표시하지 않는다');
+  assert.deepEqual(diffElements(after, after), {});
+});
+
+test('이력 호출은 아키텍처와 점 번호를 싣고, 과거 응답에는 확인 값이 없어도 받는다', async () => {
+  const { getC4Model, listC4History, readModel } = await import('../src/ui/architecture/client.ts');
+  const sent = [];
+  const call = async request => {
+    sent.push(request);
+    if (request.command === 'list_c4_history') return { snapshots: [{ seq: 1 }], latestIsCurrent: true };
+    const { precondition, ...past } = { ...model, diagram: { id: 'main', name: '기본' } };
+    return request.args.at ? past : { ...past, precondition };
+  };
+  const history = await listC4History(call, 'demo', 'arch-2');
+  assert.deepEqual(sent.at(-1), { command: 'list_c4_history', args: { project: 'demo', diagram: 'arch-2' } });
+  assert.equal(history.latestIsCurrent, true);
+  const older = await getC4Model(call, 'demo', 'main', 3);
+  assert.deepEqual(sent.at(-1).args, { project: 'demo', diagram: 'main', at: 3 });
+  assert.equal(older.precondition, undefined);
+  const { precondition, ...noToken } = { ...model, diagram: { id: 'main', name: '기본' } };
+  assert.throws(() => readModel(noToken), /모양/, '지금 모델은 확인 값이 없으면 받지 않는다(쓰기에 쓰니까)');
+});
