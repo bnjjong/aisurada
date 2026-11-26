@@ -1,11 +1,14 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import { Icon } from '../Icon.tsx';
+import { C4Icon, tileStyle } from './C4Icon.tsx';
+import { isKnownIcon } from './icons.ts';
 import type { C4Element, C4Relationship, Point, ResolveNote } from './model.ts';
 import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, MAX_SCALE, MAX_ZOOM, MIN_ZOOM, linkCurve, measureEdge, nearestPort, nodeAt, placeLabels, portFraction, portPoint, portsFor, positionNodes, routeEdges, toWorld, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from './layout.ts';
 import type { CameraFrame, Port } from './layout.ts';
 import type { DiagramLabel } from './layout.ts';
 
+/** 종류별 기본 아이콘(`icons.ts`의 이름) */
 const KIND_ICON: Record<string, string> = {
   person: 'person', system: 'grid', external: 'globe', container: 'tab', component: 'tree', code: 'note',
 };
@@ -13,9 +16,14 @@ const FLOW_PERIOD_MS = 1450;
 
 type DiagramNodeLike = Point & { id: string };
 
-export function iconFor(item: C4Element) {
+/**
+ * 카드에 쓸 아이콘 이름. 요소에 고른 아이콘이 있고 아는 이름이면 그것이다. 없으면 이름·기술에 단서가 있을 때 그에 맞게,
+ * 그것도 없으면 종류의 기본 아이콘이다. 모르는 이름(새 앱이 쓴 것)은 고르지 않은 것과 같게 다룬다.
+ */
+export function iconFor(item: Pick<C4Element, 'kind' | 'name' | 'technology'> & { icon?: string | null }) {
+  if (isKnownIcon(item.icon)) return item.icon;
   const hint = (item.name + ' ' + item.technology).toLowerCase();
-  if (/\bgithub\b/.test(hint)) return 'gitBranch';
+  if (/\bgithub\b/.test(hint)) return 'git-branch';
   if (/database|db\b|sqlite|postgres|mysql|데이터베이스/.test(hint)) return 'database';
   return KIND_ICON[item.kind] ?? 'tree';
 }
@@ -500,7 +508,7 @@ export function Diagram({
             onDoubleClick={() => drill(item.id)}
           >
             <span className="c4-card-head">
-              <span className="c4-card-icon"><Icon name={iconFor(item)} size={18} /></span>
+              <span className="c4-card-icon" data-icon={iconFor(item)} style={tileStyle(iconFor(item))}><C4Icon name={iconFor(item)} size={18} /></span>
               <span className="c4-card-kind">{KIND_LABELS[item.kind] ?? '요소'}</span>
             </span>
             <strong>{item.name}</strong>

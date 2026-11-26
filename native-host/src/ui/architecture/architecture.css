@@ -474,3 +474,19 @@
 .c4-pick-box { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 5px; color: var(--accent-ink, #fff); background: var(--surface); }
 .c4-pick-row[data-checked="1"] .c4-pick-box { background: var(--accent); border-color: var(--accent); }
 .c4-pick footer { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* 요소 아이콘 고르기: 편집 창의 「아이콘」 칸과 서비스 로고 타일 */
+.c4-icon-field { display: grid; gap: 8px; }
+.c4-icon-label { font-size: 12px; }
+.c4-icon-now { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.c4-icon-preview { --kind: #94a3b8; --kind-end: #64748b; --tile-ink: #fff; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--tile-ink); background: linear-gradient(135deg, var(--kind), var(--kind-end)); box-shadow: inset 0 1px 0 #ffffff26; }
+.c4-icon-auto { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 11px; font-size: 12px; border-radius: 999px; }
+.c4-icon-auto[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); font-weight: 650; }
+.c4-icon-search { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 120px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); }
+:root:root .c4-icon-search input { flex: 1; min-width: 0; width: auto; border: 0; outline: 0; box-shadow: none; background: transparent; border-radius: 0; padding: 5px 0; color: var(--ink); font-size: 12px; }
+.c4-icon-scroll { display: grid; gap: 10px; max-height: 232px; overflow-y: auto; padding: 2px; }
+.c4-icon-group { display: grid; gap: 5px; }
+.c4-icon-group h4 { margin: 0; font-size: 11px; font-weight: 650; letter-spacing: .04em; color: var(--muted); }
+.c4-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 6px; }
+:root:root .c4-icon-opt { display: grid; place-items: center; height: 36px; min-height: 0; padding: 0; border-radius: 9px; }
+:root:root .c4-icon-opt[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent); }

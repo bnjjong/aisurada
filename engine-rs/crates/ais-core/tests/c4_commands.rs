@@ -916,3 +916,37 @@ fn notes_attach_to_an_element_survive_in_the_file_and_in_the_history() {
     assert_eq!(error.kind, ErrorKind::InvalidArgument);
     assert_eq!(get(&engine, "demo")["elements"][0]["notes"], json!([note]));
 }
+
+#[test]
+fn an_element_icon_is_stored_through_the_engine_and_a_bad_name_is_refused() {
+    let vault = vault("element-icon");
+    let engine = Engine::new(&vault);
+    put(&engine, "main", "gh", "GitHub");
+
+    let read = get(&engine, "demo");
+    assert_eq!(read["elements"][0]["icon"], Value::Null);
+    let applied = apply(
+        &engine,
+        "demo",
+        read["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"gh","icon":"github"}]),
+    )
+    .unwrap();
+    assert_eq!(applied["elements"][0]["icon"], "github");
+    let file = std::fs::read_to_string(vault.join(".aisurada/c4/demo/model.yaml")).unwrap();
+    assert!(file.contains("icon: github"), "{file}");
+    let list = history(&engine, "main");
+    assert_eq!(list["snapshots"].as_array().unwrap().len(), 2);
+    assert_eq!(list["snapshots"][1]["summary"], "요소 수정: GitHub");
+
+    let error = apply(
+        &engine,
+        "demo",
+        applied["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"gh","icon":"githab"}]),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::InvalidArgument);
+    assert!(error.message.contains("icon을 모른다"), "{}", error.message);
+    assert_eq!(get(&engine, "demo")["elements"][0]["icon"], "github");
+}

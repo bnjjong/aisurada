@@ -5,7 +5,7 @@
 //!
 //! | `op` | 칸 | 뜻 |
 //! |---|---|---|
-//! | `put_element` | `id`, `kind`, `name`, `description`, `technology`, `parent`, `codeRef`, `notes` | 없는 id면 만들고(`kind`, `name` 필요), 있으면 준 칸만 고친다. 빈 글은 칸을 비운다. `notes`(노트 id 목록)는 준 목록으로 통째로 바꾼다(빈 목록이면 모두 뗀다) |
+//! | `put_element` | `id`, `kind`, `name`, `description`, `technology`, `parent`, `codeRef`, `notes`, `icon` | 없는 id면 만들고(`kind`, `name` 필요), 있으면 준 칸만 고친다. 빈 글은 칸을 비운다. `notes`(노트 id 목록)는 준 목록으로 통째로 바꾼다(빈 목록이면 모두 뗀다). `icon`은 `icons`의 이름이고 모르는 이름은 거절한다(빈 글이면 기본 아이콘으로 돌아간다) |
 //! | `delete_element` | `id` | 요소와 그 자식, 그 요소들에 닿은 관계를 모두 지운다 |
 //! | `put_relationship` | `id`(선택), `source`, `target`, `label`, `technology` | id가 없으면 새 id(`r1`, `r2`…)를 붙인다. 있는 id면 준 칸만 고친다 |
 //! | `delete_relationship` | `id` | 관계를 지운다 |
@@ -36,6 +36,7 @@ pub enum Operation {
         parent: Option<String>,
         code_ref: Option<String>,
         notes: Option<Vec<String>>,
+        icon: Option<String>,
     },
     DeleteElement {
         id: String,
@@ -156,6 +157,7 @@ fn apply_one(
             parent,
             code_ref,
             notes,
+            icon,
         } => put_element(
             model,
             id,
@@ -166,6 +168,7 @@ fn apply_one(
             parent.as_deref(),
             code_ref.as_deref(),
             notes.as_deref(),
+            icon.as_deref(),
         ),
         Operation::DeleteElement { id } => delete_element(model, id, outcome),
         Operation::PutRelationship {
@@ -213,10 +216,20 @@ fn put_element(
     parent: Option<&str>,
     code_ref: Option<&str>,
     notes: Option<&[String]>,
+    icon: Option<&str>,
 ) -> Result<(), EngineError> {
     if !is_valid_id(id) {
         return Err(invalid(format!(
             "요소 id 모양이 아니다: {id:?}. 영문자나 숫자로 시작하고 영문자, 숫자, -, _ 만 쓰는 64자 이하여야 한다"
+        )));
+    }
+    let icon = icon.map(str::trim);
+    if let Some(name) = icon.filter(|name| !name.is_empty())
+        && !super::icons::is_known(name)
+    {
+        return Err(invalid(format!(
+            "요소 {id}의 icon을 모른다: {name:?}. {}",
+            super::icons::catalog_line()
         )));
     }
     let kind = kind
@@ -251,6 +264,9 @@ fn put_element(
             if let Some(notes) = notes {
                 element.notes = trimmed(notes);
             }
+            if let Some(icon) = icon {
+                element.icon = non_blank(Some(icon)).map(str::to_string);
+            }
         }
         None => {
             let kind = kind.ok_or_else(|| invalid(format!("새 요소 {id}에는 kind가 필요하다")))?;
@@ -265,6 +281,7 @@ fn put_element(
                 parent: non_blank(parent).map(|p| p.trim().to_string()),
                 code_ref: non_blank(code_ref).map(|c| c.trim().to_string()),
                 notes: notes.map(trimmed).unwrap_or_default(),
+                icon: non_blank(icon).map(str::to_string),
                 extra: Vec::new(),
             });
         }
@@ -840,6 +857,123 @@ mod tests {
         // 노트를 안 붙인 요소는 notes 칸이 파일에 없다(옛 파일과 같은 모양)
         assert!(!format::render_model(&model).unwrap().contains("notes"));
         // 붙이기도 요소 수정으로 이력에 남는다
+        assert_eq!(
+            crate::c4::history::summarize(&model, &out.model),
+            "요소 수정: GitHub"
+        );
+    }
+    #[test]
+    fn an_element_icon_is_set_replaced_cleared_and_kept_by_other_edits() {
+        let (model, views) = base();
+        let out = run(
+            &model,
+            &views,
+            json!([{"op":"put_element","id":"gh","icon":"github"}]),
+        )
+        .unwrap();
+        assert_eq!(
+            out.model.element("gh").unwrap().icon.as_deref(),
+            Some("github")
+        );
+        // icon을 안 준 고치기는 아이콘을 건드리지 않는다
+        let out = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_element","id":"gh","name":"GitHub 저장소"}]),
+        )
+        .unwrap();
+        assert_eq!(
+            out.model.element("gh").unwrap().icon.as_deref(),
+            Some("github")
+        );
+        let out = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_element","id":"gh","icon":" git-branch "}]),
+        )
+        .unwrap();
+        assert_eq!(
+            out.model.element("gh").unwrap().icon.as_deref(),
+            Some("git-branch")
+        );
+        // 빈 글이면 기본 아이콘으로 돌아간다
+        let out = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_element","id":"gh","icon":""}]),
+        )
+        .unwrap();
+        assert_eq!(out.model.element("gh").unwrap().icon, None);
+    }
+
+    #[test]
+    fn an_unknown_icon_is_refused_with_the_catalog_and_changes_nothing() {
+        let (model, views) = base();
+        for bad in ["githab", "GitHub", "slack"] {
+            let error = run(
+                &model,
+                &views,
+                json!([{"op":"put_element","id":"gh","name":"바뀌면 안 됨","icon":bad}]),
+            )
+            .unwrap_err();
+            assert!(error.message.contains("operations[0]"), "{}", error.message);
+            assert!(error.message.contains("icon을 모른다"), "{}", error.message);
+            assert!(
+                error.message.contains("서비스 로고: anthropic"),
+                "{}",
+                error.message
+            );
+        }
+        let new = run(
+            &Model::default(),
+            &Views::default(),
+            json!([{"op":"put_element","id":"x","kind":"system","name":"X","icon":"nope"}]),
+        );
+        assert!(new.is_err());
+    }
+
+    #[test]
+    fn an_icon_survives_the_files_and_json_and_an_unknown_one_in_a_file_is_tolerated() {
+        let (model, views) = base();
+        let out = run(
+            &model,
+            &views,
+            json!([{"op":"put_element","id":"gh","icon":"github"}]),
+        )
+        .unwrap();
+        let text = format::render_model(&out.model).unwrap();
+        assert!(text.contains("icon: github"), "{text}");
+        assert_eq!(
+            format::parse_model(&text)
+                .unwrap()
+                .element("gh")
+                .unwrap()
+                .icon
+                .as_deref(),
+            Some("github")
+        );
+        assert_eq!(
+            format::model_json(&out.model)["elements"][2]["icon"],
+            json!("github")
+        );
+        assert_eq!(
+            format::model_json(&model)["elements"][2]["icon"],
+            Json::Null
+        );
+        assert!(!format::render_model(&model).unwrap().contains("icon"));
+        // 새 앱이 쓴 이름을 옛 앱이 몰라도 모델은 열리고, 다시 써도 그 이름을 지우지 않는다
+        let hand = "version: 1\nelements:\n  - id: a\n    kind: system\n    name: A\n    icon: future-icon\nrelationships: []\n";
+        let parsed = format::parse_model(hand).unwrap();
+        assert_eq!(
+            parsed.element("a").unwrap().icon.as_deref(),
+            Some("future-icon")
+        );
+        assert!(
+            format::render_model(&parsed)
+                .unwrap()
+                .contains("icon: future-icon")
+        );
+        // 아이콘 바꾸기도 요소 수정으로 이력에 남는다
         assert_eq!(
             crate::c4::history::summarize(&model, &out.model),
             "요소 수정: GitHub"

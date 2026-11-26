@@ -13,6 +13,8 @@ export type C4Element = {
   codeRef: string | null;
   /** 이 요소에 붙인 노트 id(붙인 순서). 노트가 없어져도 id는 남는다. */
   notes: string[];
+  /** 고른 아이콘 이름(`icons.ts`). 없으면 종류에 맞는 기본 아이콘이다. */
+  icon: string | null;
 };
 /** `sourcePort`, `targetPort`는 선이 카드의 어느 연결 지점에 붙는지다. 비어 있으면 자동 배치가 정한다. */
 export type C4Relationship = { id: string; source: string; target: string; label: string; technology: string; sourcePort?: string; targetPort?: string };
@@ -46,7 +48,7 @@ export type C4Model = {
 };
 
 export type C4Operation =
-  | { op: 'put_element'; id: string; kind?: string; name?: string; description?: string; technology?: string; parent?: string; codeRef?: string; notes?: string[] }
+  | { op: 'put_element'; id: string; kind?: string; name?: string; description?: string; technology?: string; parent?: string; codeRef?: string; notes?: string[]; icon?: string }
   | { op: 'delete_element'; id: string }
   | { op: 'put_relationship'; id?: string; source?: string; target?: string; label?: string; technology?: string; sourcePort?: string; targetPort?: string }
   | { op: 'delete_relationship'; id: string }
@@ -91,13 +93,14 @@ export function newElementId(name: string, kind: string, taken: Iterable<string>
   }
 }
 
-export type ElementForm = { kind: string; name: string; description: string; technology: string; codeRef: string };
+/** `icon`이 빈 글이면 자동(기본 아이콘)이다. */
+export type ElementForm = { kind: string; name: string; description: string; technology: string; codeRef: string; icon: string };
 /** `sourcePort`, `targetPort`는 폼 칸이 아니다. 끌어서 만들 때 놓은 연결 지점을 새 관계에 실어 보내려고 들고 있다. */
 export type RelationForm = { source: string; target: string; label: string; technology: string; sourcePort?: string; targetPort?: string };
 
-export const emptyElementForm = (kind: string): ElementForm => ({ kind, name: '', description: '', technology: '', codeRef: '' });
+export const emptyElementForm = (kind: string): ElementForm => ({ kind, name: '', description: '', technology: '', codeRef: '', icon: '' });
 export const elementFormOf = (element: C4Element): ElementForm => ({
-  kind: element.kind, name: element.name, description: element.description, technology: element.technology, codeRef: element.codeRef ?? '',
+  kind: element.kind, name: element.name, description: element.description, technology: element.technology, codeRef: element.codeRef ?? '', icon: element.icon ?? '',
 });
 export const relationFormOf = (relation: C4Relationship): RelationForm => ({
   source: relation.source, target: relation.target, label: relation.label, technology: relation.technology,
@@ -121,6 +124,7 @@ export function createElementOps(model: C4Model, form: ElementForm, parentId: st
     op: 'put_element', id, kind: form.kind, name: form.name.trim(), description: form.description, technology: form.technology.trim(),
   };
   if (form.codeRef.trim()) op.codeRef = form.codeRef.trim();
+  if (form.icon) op.icon = form.icon;
   if (parentId) op.parent = parentId;
   return [op];
 }
@@ -133,6 +137,8 @@ export function editElementOps(before: C4Element, form: ElementForm): C4Operatio
   if (form.description.trim() !== before.description) op.description = form.description;
   if (form.technology.trim() !== before.technology) op.technology = form.technology.trim();
   if (form.codeRef.trim() !== (before.codeRef ?? '')) op.codeRef = form.codeRef.trim();
+  // 자동으로 되돌릴 때는 빈 글을 보낸다(엔진이 칸을 비운다)
+  if (form.icon !== (before.icon ?? '')) op.icon = form.icon;
   return Object.keys(op).length > 2 ? [op] : [];
 }
 

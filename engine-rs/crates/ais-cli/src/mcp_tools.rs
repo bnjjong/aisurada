@@ -304,8 +304,8 @@ pub const TOOLS: &[McpTool] = &[
     },
     McpTool {
         name: "apply_c4_changes",
-        description: "프로젝트의 C4 아키텍처 모델에 변경 묶음을 한 번에 적용한다. 하나라도 틀리면 아무것도 바꾸지 않고 몇 번째 변경이 왜 틀렸는지 알린다. f1이 꼭 필요하다(직전에 get_c4_model이나 apply_c4_changes가 준 precondition). 그 사이 다른 곳에서 고쳐졌으면 거절한다. 변경(op): put_element(id, kind, name, description, technology, parent, codeRef, notes: 없는 id면 만들고 있으면 준 칸만 고친다. notes는 요소에 붙일 노트 id의 목록이고(list_docs나 search_docs가 준 id, 최대 50개) 준 목록으로 통째로 바꾸며 빈 목록이면 모두 뗀다. kind는 person, system, external, container, component. container의 parent는 system, component의 parent는 container), delete_element(id: 자식과 닿은 관계도 함께 지운다), put_relationship(id 선택, source, target, label, technology, sourcePort, targetPort: id를 안 주면 새 id를 붙인다. 있는 id면 준 칸만 고친다. sourcePort와 targetPort는 선이 출발·도착 카드의 어느 연결 지점에 붙는지이고 top-1, top-2, top-3, bottom-1, bottom-2, bottom-3, left-1, left-2, left-3, right-1, right-2, right-3 중 하나다. 빈 글이면 자동 배치로 돌아간다), delete_relationship(id), set_positions(view, positions: view는 context, container:<시스템 id>, component:<컨테이너 id>, positions는 요소나 관계 id별 {x, y}). id는 영문자나 숫자로 시작하고 영문자, 숫자, -, _ 만 쓰는 64자 이하다.",
-        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main(기존 아키텍처). list_c4_diagrams로 목록을 본다."},"f1":{"type":"string","description":"쓰기 전 토큰. 직전에 get_c4_model이나 apply_c4_changes가 준 precondition 값(f1:…)을 그대로 넣는다. 안 주면 거절된다."},"operations":{"type":"array","minItems":1,"maxItems":200,"description":"순서대로 적용할 변경 목록","items":{"type":"object","properties":{"op":{"type":"string","enum":["put_element","delete_element","put_relationship","delete_relationship","set_positions"]},"id":{"type":"string"},"kind":{"type":"string","enum":["person","system","external","container","component"]},"name":{"type":"string"},"description":{"type":"string"},"technology":{"type":"string"},"parent":{"type":"string"},"codeRef":{"type":"string"},"notes":{"type":"array","maxItems":50,"items":{"type":"string"},"description":"요소에 붙일 노트 id 목록. 준 목록으로 통째로 바꾼다."},"source":{"type":"string"},"target":{"type":"string"},"label":{"type":"string"},"sourcePort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"targetPort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"view":{"type":"string"},"positions":{"type":"object","additionalProperties":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"],"additionalProperties":false}}},"required":["op"],"additionalProperties":false}}},"required":["project","f1","operations"],"additionalProperties":false}"#,
+        description: "프로젝트의 C4 아키텍처 모델에 변경 묶음을 한 번에 적용한다. 하나라도 틀리면 아무것도 바꾸지 않고 몇 번째 변경이 왜 틀렸는지 알린다. f1이 꼭 필요하다(직전에 get_c4_model이나 apply_c4_changes가 준 precondition). 그 사이 다른 곳에서 고쳐졌으면 거절한다. 변경(op): put_element(id, kind, name, description, technology, parent, codeRef, notes, icon: 없는 id면 만들고 있으면 준 칸만 고친다. notes는 요소에 붙일 노트 id의 목록이고(list_docs나 search_docs가 준 id, 최대 50개) 준 목록으로 통째로 바꾸며 빈 목록이면 모두 뗀다. icon은 카드에 쓸 아이콘 이름이다(선 아이콘과 서비스 로고 이름은 입력 스키마에 있다). kind는 person, system, external, container, component. container의 parent는 system, component의 parent는 container), delete_element(id: 자식과 닿은 관계도 함께 지운다), put_relationship(id 선택, source, target, label, technology, sourcePort, targetPort: id를 안 주면 새 id를 붙인다. 있는 id면 준 칸만 고친다. sourcePort와 targetPort는 선이 출발·도착 카드의 어느 연결 지점에 붙는지이고 top-1, top-2, top-3, bottom-1, bottom-2, bottom-3, left-1, left-2, left-3, right-1, right-2, right-3 중 하나다. 빈 글이면 자동 배치로 돌아간다), delete_relationship(id), set_positions(view, positions: view는 context, container:<시스템 id>, component:<컨테이너 id>, positions는 요소나 관계 id별 {x, y}). id는 영문자나 숫자로 시작하고 영문자, 숫자, -, _ 만 쓰는 64자 이하다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main(기존 아키텍처). list_c4_diagrams로 목록을 본다."},"f1":{"type":"string","description":"쓰기 전 토큰. 직전에 get_c4_model이나 apply_c4_changes가 준 precondition 값(f1:…)을 그대로 넣는다. 안 주면 거절된다."},"operations":{"type":"array","minItems":1,"maxItems":200,"description":"순서대로 적용할 변경 목록","items":{"type":"object","properties":{"op":{"type":"string","enum":["put_element","delete_element","put_relationship","delete_relationship","set_positions"]},"id":{"type":"string"},"kind":{"type":"string","enum":["person","system","external","container","component"]},"name":{"type":"string"},"description":{"type":"string"},"technology":{"type":"string"},"parent":{"type":"string"},"codeRef":{"type":"string"},"notes":{"type":"array","maxItems":50,"items":{"type":"string"},"description":"요소에 붙일 노트 id 목록. 준 목록으로 통째로 바꾼다."},"icon":{"type":"string","description":"요소 카드의 아이콘 이름. 안 주면 바꾸지 않고, 빈 글이면 종류에 맞는 기본 아이콘으로 돌아가며, 아래에 없는 이름은 거절한다. 선 아이콘: bell, book, bot, box, bug, calendar, chart, chat, cloud, code, cpu, database, folder, git-branch, globe, grid, image, key, link, lock, mail, note, person, plug, queue, server, settings, shield, sparkle, tab, terminal, tree, window, zap. 서비스 로고: anthropic, apple, asana, bitbucket, claude, cloudflare, confluence, datadog, discord, docker, dropbox, figma, firebase, git, github, githubactions, githubcopilot, gitlab, gmail, go, google, googlecalendar, googlecloud, googledrive, googlegemini, grafana, huggingface, javascript, jenkins, jira, kakaotalk, kotlin, kubernetes, line, linear, linux, mistralai, mongodb, mysql, naver, nextdotjs, nginx, nodedotjs, notion, npm, obsidian, ollama, openjdk, perplexity, pnpm, postgresql, prometheus, python, react, redis, rust, sentry, spring, sqlite, stripe, supabase, swift, tailwindcss, tauri, telegram, terraform, trello, typescript, vercel, vite, vuedotjs, whatsapp, x, youtube, zapier, zoom."},"source":{"type":"string"},"target":{"type":"string"},"label":{"type":"string"},"sourcePort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"targetPort":{"type":"string","enum":["","top-1","top-2","top-3","bottom-1","bottom-2","bottom-3","left-1","left-2","left-3","right-1","right-2","right-3","left","right"]},"view":{"type":"string"},"positions":{"type":"object","additionalProperties":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"],"additionalProperties":false}}},"required":["op"],"additionalProperties":false}}},"required":["project","f1","operations"],"additionalProperties":false}"#,
         write: true,
         destructive: false,
     },
@@ -383,3 +383,34 @@ pub const MANAGER_INTAKE_TOOLS: &[McpTool] = &[
         destructive: false,
     },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::TOOLS;
+
+    /// 요소 아이콘 이름의 원본은 `ais-domain`의 `c4/icons.rs`다. 도구 스키마가 그 이름을 빠짐없이 알려 주는지 맞춘다.
+    #[test]
+    fn apply_c4_changes_lists_every_icon_name() {
+        let source = include_str!("../../ais-domain/src/c4/icons.rs");
+        let names: Vec<&str> = source
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix('"')?.strip_suffix("\","))
+            .filter(|name| {
+                name.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            })
+            .collect();
+        assert!(names.len() >= 100, "이름 목록을 못 읽었다: {}", names.len());
+        let schema = TOOLS
+            .iter()
+            .find(|tool| tool.name == "apply_c4_changes")
+            .map(|tool| tool.input_schema)
+            .unwrap();
+        for name in names {
+            assert!(
+                schema.contains(&format!("{name},")) || schema.contains(&format!("{name}.")),
+                "apply_c4_changes 스키마에 아이콘 {name}이 없다"
+            );
+        }
+    }
+}

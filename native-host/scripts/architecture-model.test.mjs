@@ -6,7 +6,7 @@ import {
 } from '../src/ui/architecture/model.ts';
 
 const element = (id, kind, level, parentId = null, extra = {}) => ({
-  id, kind, level, name: id.toUpperCase(), description: '', technology: '', parentId, codeRef: null, notes: [], ...extra,
+  id, kind, level, name: id.toUpperCase(), description: '', technology: '', parentId, codeRef: null, notes: [], icon: null, ...extra,
 });
 const model = {
   project: 'demo', precondition: 'f1:x', views: {},
@@ -170,4 +170,19 @@ test('노트 붙이기는 목록을 통째로 바꾸는 변경 하나이고, 달
   assert.deepEqual(setNotesOps(item, []), [{ op: 'put_element', id: 'app', notes: [] }]);
   // 겹친 id는 한 번만 보낸다
   assert.deepEqual(setNotesOps(element('x', 'person', 1), ['ndc-1', 'ndc-1']), [{ op: 'put_element', id: 'x', notes: ['ndc-1'] }]);
+});
+
+test('아이콘은 폼에서 고른 값만 변경에 실리고, 자동으로 되돌릴 때는 빈 글을 보낸다', () => {
+  const [made] = createElementOps(model, { ...emptyElementForm('external'), name: 'GitHub', icon: 'github' }, null);
+  assert.equal(made.icon, 'github');
+  const [plain] = createElementOps(model, { ...emptyElementForm('system'), name: '이름' }, null);
+  assert.ok(!('icon' in plain), '고르지 않으면 icon을 보내지 않는다');
+
+  const before = element('gh', 'external', 1, null, { icon: 'github' });
+  assert.deepEqual(editElementOps(before, elementFormOf(before)), [], '그대로면 변경이 없다');
+  const [swap] = editElementOps(before, { ...elementFormOf(before), icon: 'gitlab' });
+  assert.deepEqual(swap, { op: 'put_element', id: 'gh', icon: 'gitlab' });
+  const [auto] = editElementOps(before, { ...elementFormOf(before), icon: '' });
+  assert.deepEqual(auto, { op: 'put_element', id: 'gh', icon: '' }, '자동으로 되돌리면 빈 글');
+  assert.equal(elementFormOf(element('x', 'person', 1)).icon, '', '아이콘이 없는 요소는 자동');
 });

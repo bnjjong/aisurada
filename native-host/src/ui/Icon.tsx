@@ -234,6 +234,87 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M9.5 6.5a2.5 2.5 0 0 0-3.5 0L3.5 9a2.5 2.5 0 0 0 3.5 3.5l.7-.7" />
     </>
   ),
+  // 아래는 C4 요소 아이콘 고르기에서 쓰는 선 아이콘이다(`ui/architecture/icons.ts`가 이름과 묶음을 정한다).
+  chat: <path d="M3 3.5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H8.5L5.5 14v-2.5H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z" />,
+  bug: (
+    <>
+      <ellipse cx="8" cy="9.5" rx="3" ry="3.8" />
+      <path d="M8 5.7V3M5.5 3.2L7 4.8M10.5 3.2L9 4.8M2.5 8h2.8M10.7 8h2.8M2.5 11.5h2.8M10.7 11.5h2.8M8 6v7.3" />
+    </>
+  ),
+  server: (
+    <>
+      <rect x="2.5" y="2.5" width="11" height="4.5" rx="1.2" />
+      <rect x="2.5" y="9" width="11" height="4.5" rx="1.2" />
+      <path d="M5 4.75h.01M5 11.25h.01" strokeWidth="2" />
+    </>
+  ),
+  cloud: <path d="M4.5 12.5a3 3 0 0 1-.4-5.97A4 4 0 0 1 11.9 6 2.8 2.8 0 0 1 11.5 12.5z" />,
+  terminal: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M5 6.5l2 1.5-2 1.5M8.5 10h2.5" />
+    </>
+  ),
+  cpu: (
+    <>
+      <rect x="4.5" y="4.5" width="7" height="7" rx="1.2" />
+      <path d="M6.5 2.5v2M9.5 2.5v2M6.5 11.5v2M9.5 11.5v2M2.5 6.5h2M2.5 9.5h2M11.5 6.5h2M11.5 9.5h2" />
+    </>
+  ),
+  window: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M2 6h12" />
+      <path d="M4.2 4.5h.01M6 4.5h.01" strokeWidth="1.8" />
+    </>
+  ),
+  plug: <path d="M6 2.5v3M10 2.5v3M4.5 5.5h7v2.5a3.5 3.5 0 0 1-7 0zM8 11.5v2" />,
+  shield: (
+    <>
+      <path d="M8 2.2l4.8 1.8v3.7c0 3-2.2 5.1-4.8 6.1-2.6-1-4.8-3.1-4.8-6.1V4z" />
+      <path d="M5.8 8l1.6 1.6L10.4 6.6" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1.4" />
+      <path d="M5.5 7V5.5a2.5 2.5 0 0 1 5 0V7" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="5.5" cy="10.5" r="2.5" />
+      <path d="M7.3 8.7L13 3M10.5 5.5l1.5 1.5" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="2" y="3.5" width="12" height="9" rx="1.5" />
+      <path d="M2.5 4.5L8 9l5.5-4.5" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="2.5" y="3.5" width="11" height="10" rx="1.5" />
+      <path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" />
+    </>
+  ),
+  box: (
+    <>
+      <path d="M8 2l5.5 3v6L8 14l-5.5-3V5z" />
+      <path d="M2.5 5L8 8l5.5-3M8 8v6" />
+    </>
+  ),
+  queue: <path d="M3 4h10M3 8h10M3 12h6" />,
+  sparkle: (
+    <>
+      <path d="M7.5 2.5l1.3 3.2 3.2 1.3-3.2 1.3-1.3 3.2-1.3-3.2L3 7l3.2-1.3z" />
+      <path d="M12.5 11v3M11 12.5h3" />
+    </>
+  ),
+  code: <path d="M5.5 5L2.5 8l3 3M10.5 5l3 3-3 3M9 3.5L7 12.5" />,
+  chart: <path d="M3 13V3M3 13h10M5.5 10V7.5M8.5 10V5M11.5 10V8.5" />,
 };
 
 export type IconName = keyof typeof PATHS;

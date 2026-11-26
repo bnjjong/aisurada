@@ -1,6 +1,8 @@
 // 요소와 관계를 만들고 고치는 창. 값을 모아 변경 목록으로 바꿔 부모에게 넘기고, 저장과 검사는 엔진이 한다.
 import { useState } from 'react';
 import { Modal } from '../Modal.tsx';
+import { IconPicker } from './IconPicker.tsx';
+import { iconFor } from './Diagram.tsx';
 import { KIND_LABELS, createElementOps, createRelationOps, editElementOps, editRelationOps, elementFormOf, emptyElementForm, kindsForLevel, relationFormOf } from './model.ts';
 import type { C4Element, C4Model, C4Operation, C4Relationship, ElementForm, RelationForm } from './model.ts';
 
@@ -58,6 +60,7 @@ export function ElementFormModal({ model, level, parentId, existing, submit, clo
           <input maxLength={300} value={form.codeRef} placeholder="예: engine-rs/crates/ais-core" onChange={event => set('codeRef', event.target.value)} />
           <small className="c4-hint">이 요소의 코드가 있는 파일이나 폴더 경로예요(선택).</small>
         </label>
+        <IconPicker value={form.icon} auto={iconFor({ kind: form.kind, name: form.name, technology: form.technology })} onChange={icon => set('icon', icon)} />
         {error && <p role="alert" className="c4-error">{error}</p>}
         <footer>
           <button type="button" onClick={close}>취소</button>

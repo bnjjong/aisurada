@@ -251,6 +251,7 @@ mod tests {
             parent: None,
             code_ref: None,
             notes: Vec::new(),
+            icon: None,
             extra: Vec::new(),
         }
     }
