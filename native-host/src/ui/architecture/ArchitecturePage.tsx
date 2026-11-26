@@ -56,6 +56,7 @@ function ProjectArchitecture({ project, name, controller }: {
   const [diagramId, setDiagramId] = useState(MAIN_DIAGRAM);
   const [model, setModel] = useState<C4Model | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloading, setReloading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [level, setLevel] = useState(1);
@@ -257,7 +258,19 @@ function ProjectArchitecture({ project, name, controller }: {
               disabled={!model || model.elements.length < 2}
               onClick={() => { setNotice(''); setConnect(current => current ? null : { source: element?.id ?? null }); }}
             ><Icon name="link" size={14} /> 관계 추가</button>
-            <button type="button" onClick={() => void load(false)} disabled={loading} aria-label="다시 불러오기"><Icon name="history" size={15} /></button>
+            <button
+              type="button"
+              className={reloading ? 'c4-refresh-spin' : undefined}
+              onClick={() => {
+                setReloading(true);
+                void load(false).finally(() => {
+                  setTimeout(() => setReloading(false), 500);
+                });
+              }}
+              disabled={loading || reloading}
+              title="다시 불러오기"
+              aria-label="다시 불러오기"
+            ><Icon name="refresh" size={14} /></button>
           </div>
         </div>
         {connect && (

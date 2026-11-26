@@ -398,3 +398,6 @@
 .c4-diagram[data-linking="true"], .c4-diagram[data-linking="true"] .c4-card, .c4-diagram[data-linking="true"] .c4-edge { cursor: crosshair; }
 .c4-diagram[data-linking="true"] .c4-edge-end { cursor: crosshair; }
 
+.c4-refresh-spin svg { animation: c4-spin 0.5s ease-out; }
+@keyframes c4-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
