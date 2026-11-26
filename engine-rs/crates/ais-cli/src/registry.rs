@@ -81,6 +81,7 @@ pub const CLI_TOOL_NAMES: &[&str] = &[
     "create_c4_diagram",
     "rename_c4_diagram",
     "delete_c4_diagram",
+    "list_c4_history",
 ];
 
 /// `--list`가 도구 이름 옆에 적는 한 줄 설명
@@ -136,6 +137,7 @@ pub fn tool_description(name: &str) -> &'static str {
         "list_c4_diagrams" => "프로젝트가 가진 C4 아키텍처(다이어그램) 목록을 낸다",
         "create_c4_diagram" => "프로젝트에 새 C4 아키텍처를 빈 모델로 만든다",
         "rename_c4_diagram" => "C4 아키텍처의 이름을 바꾼다",
+        "list_c4_history" => "C4 아키텍처의 변경 이력(시점 목록)을 낸다",
         "delete_c4_diagram" => "C4 아키텍처를 지운다(되살리는 길은 vault의 git 이력뿐이다)",
         _ => "",
     }
@@ -254,7 +256,7 @@ pub const ENGINE_COMMANDS_DECISIONS: &[&str] = &["list-decisions", "pending-deci
 
 pub const ENGINE_COMMANDS_SUB_AGENDAS: &[&str] = &["create-sub-agenda", "update-sub-agenda"];
 
-/// C4 아키텍처 모델 명령 6개
+/// C4 아키텍처 모델 명령 7개
 pub const ENGINE_COMMANDS_C4: &[&str] = &[
     "get-c4-model",
     "apply-c4-changes",
@@ -262,6 +264,7 @@ pub const ENGINE_COMMANDS_C4: &[&str] = &[
     "create-c4-diagram",
     "rename-c4-diagram",
     "delete-c4-diagram",
+    "list-c4-history",
 ];
 
 /// 사이드카 고유 명령 전부를 쉼표로 이은 글

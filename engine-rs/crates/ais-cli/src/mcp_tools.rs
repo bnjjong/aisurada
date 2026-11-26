@@ -298,7 +298,7 @@ pub const TOOLS: &[McpTool] = &[
     McpTool {
         name: "get_c4_model",
         description: "프로젝트의 C4 아키텍처 모델을 읽는다: 요소(사람, 시스템, 외부 시스템, 컨테이너, 컴포넌트), 관계, 뷰별 위치. 응답의 precondition은 apply_c4_changes의 f1에 그대로 넣는다. 프로젝트는 아키텍처를 여러 개 가질 수 있고 diagram으로 고른다(안 주면 main). 응답의 diagram에 id와 이름이 있다. 아직 모델이 없는 프로젝트는 빈 모델이 온다. 요소의 level은 1(시스템 컨텍스트), 2(컨테이너), 3(컴포넌트)이다.",
-        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main(기존 아키텍처). list_c4_diagrams로 목록을 본다."}},"required":["project"],"additionalProperties":false}"#,
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main(기존 아키텍처). list_c4_diagrams로 목록을 본다."},"at":{"type":"integer","minimum":1,"description":"이력의 점 번호(list_c4_history). 주면 그 시점의 모델을 읽기 전용으로 낸다. 응답에 precondition이 없어서 쓰기에 쓸 수 없다."}},"required":["project"],"additionalProperties":false}"#,
         write: false,
         destructive: false,
     },
@@ -313,6 +313,13 @@ pub const TOOLS: &[McpTool] = &[
         name: "list_c4_diagrams",
         description: "프로젝트가 가진 C4 아키텍처(다이어그램) 목록을 낸다. 항목마다 id, name, elements와 relationships 개수가 있다. 첫 항목은 늘 main(기존 아키텍처)이다. id를 get_c4_model과 apply_c4_changes의 diagram에 넣는다.",
         input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"}},"required":["project"],"additionalProperties":false}"#,
+        write: false,
+        destructive: false,
+    },
+    McpTool {
+        name: "list_c4_history",
+        description: "C4 아키텍처의 변경 이력을 낸다(타임 트래블). 요소나 관계가 바뀔 때마다 점이 하나 생기고, 위치만 바뀐 것은 마지막 점에 합쳐진다. 점마다 seq(번호), at(시각, 유닉스 밀리초), by(app 또는 ai), kind(change, baseline=이력을 쌓기 전부터 있던 모양, external=손으로 고친 것을 알아챈 모양), summary(바뀐 것 한 줄), elements와 relationships 개수가 있다. 오래된 것부터 나오고 아키텍처마다 200점까지 남는다. latestIsCurrent가 false면 마지막 점 뒤에 이력에 없는 변경이 있다. 점의 모양은 get_c4_model의 at으로 읽는다.",
+        input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"아키텍처 id. 안 주면 main."}},"required":["project"],"additionalProperties":false}"#,
         write: false,
         destructive: false,
     },
@@ -332,7 +339,7 @@ pub const TOOLS: &[McpTool] = &[
     },
     McpTool {
         name: "delete_c4_diagram",
-        description: "C4 아키텍처를 파일째 지운다. 사람이 지우라고 했을 때만 쓴다. main을 지우면 요소와 관계가 모두 사라지고 빈 main이 된다. 되살리는 길은 vault의 git 이력뿐이다.",
+        description: "C4 아키텍처를 파일째 지운다(이력도 함께). 사람이 지우라고 했을 때만 쓴다. main을 지우면 요소와 관계가 모두 사라지고 빈 main이 된다. 되살리는 길은 vault의 git 이력뿐이다.",
         input_schema: r#"{"type":"object","properties":{"project":{"type":"string","description":"프로젝트 slug"},"diagram":{"type":"string","description":"지울 아키텍처 id"}},"required":["project","diagram"],"additionalProperties":false}"#,
         write: true,
         destructive: true,
