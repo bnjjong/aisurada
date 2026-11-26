@@ -37,6 +37,7 @@ internal_mods!(
     warnings,
 );
 pub mod autocommit;
+pub mod vault_git;
 
 pub mod marker {
     pub use super::pipeline::check_workspace_marker;

@@ -19,6 +19,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
 
 use super::confine::absolute_normalized;
+use super::vault_git::{EXCLUDE_PREFERENCE, SETUP_REASON, allows_autocommit};
 use crate::text::{parse_flag, trim};
 use crate::vault::git::Git;
 use crate::vault::history::{header_id, read_batch};
@@ -197,7 +198,11 @@ impl AutoCommit {
 
     /// 대기 기록을 파일에 올릴 수 있는가: 자동 커밋이 켜져 있고 vault가 git 저장소여야 한다.
     fn persistent(&self) -> bool {
-        self.config.enabled && self.vault.join(".git").is_dir()
+        self.vault.join(".git").is_dir() && self.enabled()
+    }
+
+    fn enabled(&self) -> bool {
+        self.config.enabled && allows_autocommit(&self.vault)
     }
 
     fn pending_path(&self) -> PathBuf {
@@ -248,6 +253,9 @@ impl AutoCommit {
 
     /// 쓰기 앞에서 부른다. 앞서 기록된 쓴 쪽이 이번 쓴 쪽과 다르면 먼저 커밋해서 둘이 한 커밋에 섞이지 않게 한다.
     pub fn before_write(&self, tool: bool, session: Option<&str>) {
+        if !self.enabled() {
+            return;
+        }
         let mut state = self.state.lock().unwrap();
         self.load(&mut state);
         let pair = pair_of(tool, session);
@@ -262,7 +270,7 @@ impl AutoCommit {
 
     /// 쓰기가 끝난 뒤에 부른다. 쓴 쪽과 시각을 기록한다.
     pub fn after_write(&self, tool: bool, session: Option<&str>) {
-        if !self.config.enabled {
+        if !self.enabled() {
             return;
         }
         let mut state = self.state.lock().unwrap();
@@ -283,6 +291,9 @@ impl AutoCommit {
 
     /// 주기적으로 부른다. 마지막 쓰기 뒤 유휴 시간이 지났거나, 처음 쓴 지 15분이 넘었으면 정비 커밋을 시도한다.
     pub fn tick(&self) {
+        if !self.enabled() {
+            return;
+        }
         let mut state = self.state.lock().unwrap();
         self.load(&mut state);
         let now = self.now();
@@ -361,7 +372,7 @@ impl AutoCommit {
     }
 
     fn attempt(&self, state: &Pending, reason: &str) -> CommitResult {
-        if !self.config.enabled {
+        if !self.enabled() {
             return CommitResult::new("disabled", Some("off"));
         }
         let git_dir = self.vault.join(".git");
@@ -407,7 +418,17 @@ impl AutoCommit {
         }
         if self
             .git
-            .run(&["add", "-A", "--", ".", ":(exclude)*.tmp"], &[])
+            .run(
+                &[
+                    "add",
+                    "-A",
+                    "--",
+                    ".",
+                    ":(exclude)*.tmp",
+                    EXCLUDE_PREFERENCE,
+                ],
+                &[],
+            )
             .code
             != 0
         {
@@ -433,7 +454,7 @@ impl AutoCommit {
             }
             i += 2;
         }
-        if changes.is_empty() {
+        if changes.is_empty() && reason != SETUP_REASON {
             return CommitResult::new("nothing", None);
         }
         let ids = self.note_ids(&changes);
@@ -459,10 +480,11 @@ impl AutoCommit {
             let listed: Vec<&str> = ids.iter().take(MAX_NOTE_IDS).map(String::as_str).collect();
             message.push_str(&format!("Aisurada-Notes: {}\n", listed.join(" ")));
         }
-        let commit = self.git.run(
-            &["commit", "-q", "--no-verify", "-F", "-"],
-            message.as_bytes(),
-        );
+        let mut args = vec!["commit", "-q", "--no-verify", "-F", "-"];
+        if reason == SETUP_REASON {
+            args.push("--allow-empty");
+        }
+        let commit = self.git.run(&args, message.as_bytes());
         if commit.code == 0 {
             CommitResult::new("committed", None)
         } else {
@@ -931,6 +953,63 @@ mod tests {
             "저장소가 아니어도 이 프로세스 안에서는 기록한다"
         );
         assert!(!plain.join(".git").exists());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn vault_git_preference_applies_to_an_already_running_writer() {
+        let dir = scratch();
+        let vault = dir.join("vault");
+        fs::create_dir(vault.join(".aisurada")).unwrap();
+        fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+        let mut ports = crate::adapters::default_ports();
+        ports.lock = Arc::new(FlockLock::in_dir(dir.join("locks")));
+        let _ports = crate::ports::install(Arc::new(ports));
+        let resident = auto(&dir, &vault, Arc::new(|| 10_000_000));
+        let setting = |enabled| super::super::vault_git::set_enabled(&vault, enabled);
+
+        assert!(!vault.join(".git").exists());
+        setting(false).unwrap();
+        assert!(!vault.join(".git").exists());
+        note(&vault, "notes/a/note.md", "ndaa-00000001", "첫 기록");
+        setting(true).unwrap();
+        assert_eq!(count(&vault), 1);
+        assert!(git(&vault, &["show", "HEAD:notes/a/note.md"]).contains("첫 기록"));
+        assert!(git(&vault, &["status", "--porcelain"]).is_empty());
+
+        note(&vault, "notes/a/note.md", "ndaa-00000001", "새 기록");
+        resident.after_write(false, None);
+        setting(false).unwrap();
+        resident.before_write(true, Some("tool-session"));
+        assert_eq!(resident.commit("restore").blocked, Some("off"));
+        assert_eq!(count(&vault), 1);
+
+        setting(true).unwrap();
+        assert_eq!(count(&vault), 1);
+        resident.before_write(true, Some("tool-session"));
+        assert_eq!(count(&vault), 2);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn vault_git_setup_retries_the_first_commit_after_git_unlocks() {
+        let dir = scratch();
+        let vault = dir.join("vault");
+        fs::create_dir(vault.join(".aisurada")).unwrap();
+        fs::write(vault.join(".aisurada/workspace.json"), "{}\n").unwrap();
+        let mut ports = crate::adapters::default_ports();
+        ports.lock = Arc::new(FlockLock::in_dir(dir.join("locks")));
+        let _ports = crate::ports::install(Arc::new(ports));
+        git(&vault, &["init", "-q", "-b", "main"]);
+        let lock = vault.join(".git/index.lock");
+        fs::write(&lock, "").unwrap();
+
+        let setup = || super::super::vault_git::set_enabled(&vault, true);
+        assert!(setup().is_err());
+        assert!(lock.exists());
+        fs::remove_file(lock).unwrap();
+        setup().unwrap();
+        assert_eq!(count(&vault), 1);
         fs::remove_dir_all(&dir).unwrap();
     }
 

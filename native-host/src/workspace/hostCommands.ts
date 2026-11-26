@@ -3,6 +3,11 @@
  * 명령 이름(command), 전달 인자(args), 반환 결과(result)의 단일 진실 공급원(SSOT)이다.
  */
 
+export interface VaultGitStatus {
+  enabled: boolean;
+  phase: 'off' | 'ready' | 'needs-setup' | 'git-unavailable' | 'unsupported' | 'other-branch' | 'paused';
+}
+
 export interface HostCommandMap {
   // 앱 수명주기 및 윈도우 관리
   exit_app: { args?: Record<string, never>; result: void };
@@ -20,6 +25,8 @@ export interface HostCommandMap {
   // 워크스페이스 및 볼트 관리
   allow_workspace: { args: { path: string }; result: void };
   vault_root: { args?: Record<string, never>; result: string | null };
+  vault_git_status: { args: { expectedVault: string }; result: VaultGitStatus };
+  set_vault_git: { args: { expectedVault: string; enabled: boolean }; result: VaultGitStatus };
   is_workspace: { args: { root: string }; result: boolean };
   create_workspace_dir: { args: { parent: string; name: string }; result: string };
 
