@@ -3,6 +3,7 @@ import { Icon } from '../Icon.tsx';
 import { KIND_LABELS, relationTitle } from './model.ts';
 import type { C4Element, C4Model, C4Relationship, ResolveNote } from './model.ts';
 import { iconFor } from './Diagram.tsx';
+import { C4Icon, tileStyle } from './C4Icon.tsx';
 
 export function Details({
   model,
@@ -102,8 +103,8 @@ export function Details({
     <div className="c4-details-panel">
       <div className="c4-details-head">
         <div className="c4-details-title-group">
-          <span className="c4-details-icon" data-kind={item.kind}>
-            <Icon name={iconFor(item)} size={18} />
+          <span className="c4-details-icon" data-kind={item.kind} data-icon={iconFor(item)} style={tileStyle(iconFor(item))}>
+            <C4Icon name={iconFor(item)} size={18} />
           </span>
           <div className="c4-details-title-text">
             <strong>{item.name}</strong>

@@ -28,6 +28,7 @@ pnpm --dir native-host exec node --import tsx --test scripts/rail-tabs.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/typography.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/settings.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/sub-tabs-ui.test.mjs
+pnpm --dir native-host exec node --import tsx --test scripts/architecture-model.test.mjs scripts/architecture-layout.test.mjs scripts/architecture-icons.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/notifications-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/runner-ui.test.mjs
 pnpm --dir native-host exec node --import tsx --test scripts/approvals-ui.test.mjs

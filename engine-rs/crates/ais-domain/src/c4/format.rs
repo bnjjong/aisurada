@@ -145,6 +145,7 @@ pub fn model_json(model: &Model) -> Json {
                 "parentId": e.parent,
                 "codeRef": e.code_ref,
                 "notes": e.notes,
+                "icon": e.icon,
             })
         })
         .collect();
@@ -296,6 +297,7 @@ fn element_of(value: Value, index: usize) -> Result<Element, EngineError> {
         parent: take_str(&what, &mut fields, "parent")?,
         code_ref: take_str(&what, &mut fields, "codeRef")?,
         notes: take_str_list(&what, &mut fields, "notes")?,
+        icon: take_str(&what, &mut fields, "icon")?,
         extra: fields,
         id,
     })
@@ -366,6 +368,9 @@ fn element_value(element: &Element) -> Value {
     }
     if let Some(code_ref) = &element.code_ref {
         pairs.push((text("codeRef"), text(code_ref)));
+    }
+    if let Some(icon) = &element.icon {
+        pairs.push((text("icon"), text(icon)));
     }
     if !element.notes.is_empty() {
         pairs.push((

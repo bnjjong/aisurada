@@ -545,5 +545,53 @@ try {
     await until(async () => (await elementOf('GitHub')).notes.length === 0, '엔진에서 떨어졌다');
     await until(() => !badgeOf('GitHub'), '배지가 사라진다');
   });
+  // 요소 아이콘: 편집 창에서 고르면(검색도 된다) 엔진에 저장되고 카드와 상세 머리에 그려진다. 모르는 이름은 엔진이 거절하고, 「자동」으로 되돌릴 수 있다.
+  const iconOf = async name => (await model()).elements.find(e => e.name === name)?.icon ?? null;
+  const tileOf = name => cardOf(name)?.querySelector('.c4-card-icon');
+  const openEdit = async name => {
+    cardOf(name).click();
+    await until(() => document.querySelector('.c4-details-head strong')?.textContent === name, `${name} 상세`);
+    byText('.c4-details-actions button', '편집').click();
+    await until(form, '편집 창');
+  };
+
+  await test('an-element-icon-is-chosen-in-the-edit-form-and-drawn-on-card-and-details', async () => {
+    await openEdit('GitHub');
+    assert(tileOf('GitHub').dataset.icon === 'git-branch', '고르기 전에는 이름의 단서(GitHub)로 자동');
+    assert(form().querySelector('.c4-icon-auto').getAttribute('aria-pressed') === 'true', '처음에는 자동이 눌려 있다');
+    fillField(form().querySelector('.c4-icon-search input'), 'tele');
+    await until(() => all('.c4-icon-opt', form()).length === 1 && all('.c4-icon-opt', form())[0].dataset.icon === 'telegram', '검색이 telegram 하나로 좁힌다');
+    fillField(form().querySelector('.c4-icon-search input'), '');
+    await until(() => form().querySelector('.c4-icon-opt[data-icon="github"]'), '로고 목록');
+    assert(all('.c4-icon-opt', form()).length >= 100, '선 아이콘과 서비스 로고가 모두 보인다');
+    form().querySelector('.c4-icon-opt[data-icon="github"]').click();
+    await until(() => form().querySelector('.c4-icon-preview').dataset.icon === 'github' && form().querySelector('.c4-icon-auto').getAttribute('aria-pressed') === 'false', '미리보기가 바뀜');
+    submit().click();
+    await until(() => !form(), '창이 닫힘');
+    await until(async () => (await iconOf('GitHub')) === 'github', '엔진에 icon이 저장됨');
+    await until(() => tileOf('GitHub')?.dataset.icon === 'github' && tileOf('GitHub').querySelector('svg[viewBox="0 0 24 24"]'), '카드에 GitHub 로고');
+    assert(tileOf('GitHub').style.getPropertyValue('--kind').toLowerCase() === '#181717', `로고 타일은 브랜드 색: ${tileOf('GitHub').getAttribute('style')}`);
+    assert(document.querySelector('.c4-details-icon')?.dataset.icon === 'github', '상세 머리도 같은 아이콘');
+  });
+
+  await test('an-unknown-icon-is-refused-and-auto-brings-back-the-default', async () => {
+    const read = await model();
+    const github = read.elements.find(e => e.name === 'GitHub');
+    let refusal = '';
+    try {
+      await invoke('engine_call', { command: 'apply_c4_changes', args: { project: A.projectSlug, f1: read.precondition, operations: [{ op: 'put_element', id: github.id, icon: 'githab' }] } });
+    } catch (failure) { refusal = JSON.stringify(failure); }
+    assert(refusal.includes('icon을 모른다'), `엔진이 모르는 이름을 거절한다: ${refusal}`);
+    assert((await iconOf('GitHub')) === 'github', '거절하면 아무것도 바뀌지 않는다');
+
+    await openEdit('GitHub');
+    assert(form().querySelector('.c4-icon-opt[data-icon="github"]').getAttribute('aria-pressed') === 'true', '고른 아이콘이 눌려 있다');
+    form().querySelector('.c4-icon-auto').click();
+    await until(() => form().querySelector('.c4-icon-auto').getAttribute('aria-pressed') === 'true', '자동으로 돌아감');
+    submit().click();
+    await until(() => !form(), '창이 닫힘');
+    await until(async () => (await iconOf('GitHub')) === null, '엔진에서 icon이 비워짐');
+    await until(() => tileOf('GitHub')?.dataset.icon === 'git-branch' && !tileOf('GitHub').querySelector('svg[viewBox="0 0 24 24"]'), '카드가 기본 아이콘으로 돌아옴');
+  });
 } catch { /* 첫 실패 뒤의 점검은 앞 상태에 기대므로 멈춘다 */ }
 await post('/result', results);

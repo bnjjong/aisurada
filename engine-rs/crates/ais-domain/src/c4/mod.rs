@@ -18,6 +18,7 @@ pub mod apply;
 pub mod diagram;
 pub mod format;
 pub mod history;
+pub mod icons;
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -102,6 +103,9 @@ pub struct Element {
     pub code_ref: Option<String>,
     /// 이 요소에 붙인 노트의 id(붙인 순서). 노트가 없어져도 id는 남는다(화면이 「찾을 수 없는 노트」로 보여 준다).
     pub notes: Vec<String>,
+    /// 카드에 쓸 아이콘 이름(`icons`의 이름). 없으면 화면이 종류에 맞는 기본 아이콘을 쓴다.
+    /// 읽을 때는 모르는 이름도 받아 두고(새 앱이 쓴 이름을 옛 앱이 몰라도 모델을 열 수 있게), 쓸 때만 거절한다.
+    pub icon: Option<String>,
     pub extra: Vec<(String, Value)>,
 }
 
