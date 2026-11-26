@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import { Icon } from '../Icon.tsx';
-import type { C4Element, C4Relationship, Point } from './model.ts';
+import type { C4Element, C4Relationship, Point, ResolveNote } from './model.ts';
 import { bounds, CARD_HEIGHT, CARD_WIDTH, KIND_LABELS, MAX_SCALE, MAX_ZOOM, MIN_ZOOM, linkCurve, measureEdge, nearestPort, nodeAt, placeLabels, portFraction, portPoint, portsFor, positionNodes, routeEdges, toWorld, viewOrigin, viewScale, wheelFactor, zoomCameraAt } from './layout.ts';
 import type { CameraFrame, Port } from './layout.ts';
 import type { DiagramLabel } from './layout.ts';
@@ -52,7 +52,7 @@ function portStyle(port: Port): CSSProperties {
 
 export function Diagram({
   elements, relationships, positions, selectedElement, selectedRelationship, selectElement, selectRelationship, drill,
-  onMove, onConnect, onReconnect, resetKey, connecting = false, emptyText, changes,
+  onMove, onConnect, onReconnect, resetKey, connecting = false, emptyText, changes, resolveNote, openNote, linkNotes,
 }: {
   elements: C4Element[];
   relationships: C4Relationship[];
@@ -75,6 +75,12 @@ export function Diagram({
   emptyText?: string;
   /** 타임 트래블에서 앞 시점과 달라진 요소(카드에 표시한다) */
   changes?: Record<string, 'added' | 'changed'>;
+  /** 노트 id의 이름표를 찾는다. 없으면 노트 배지를 눌러도 목록만 보인다 */
+  resolveNote?: ResolveNote;
+  /** 노트 하나를 팝업으로 연다 */
+  openNote?(id: string): void;
+  /** 노트 목록 아래의 「노트 연결」을 누르면 그 요소의 노트 고르기를 연다. 없으면 단추를 보이지 않는다 */
+  linkNotes?(elementId: string): void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -89,6 +95,8 @@ export function Diagram({
   const grab = useRef<{ id: string; pointer: number; x: number; y: number; origin: Point; last: Point; active: boolean } | null>(null);
   const grabLabel = useRef<{ id: string; pointer: number; x: number; y: number; origin: Point; last: Point; active: boolean } | null>(null);
   const suppressClick = useRef(false);
+  // 노트가 여럿인 요소의 배지를 누르면 뜨는 목록(요소 id)
+  const [notePop, setNotePop] = useState<string | null>(null);
   const [moved, setMoved] = useState<Record<string, Point>>({});
   const placed = useMemo(() => positionNodes(elements, positions), [elements, positions]);
   const nodes = useMemo(() => placed.map(item => moved[item.id] ? { ...item, ...moved[item.id] } : item), [placed, moved]);
@@ -334,6 +342,24 @@ export function Diagram({
     };
   }, [area, flowPaths, playing, scale, x, y]);
 
+  useEffect(() => {
+    if (!notePop) return;
+    const away = (event: globalThis.PointerEvent) => {
+      if (!(event.target as HTMLElement).closest('.c4-note-pop, .c4-note-badge')) setNotePop(null);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setNotePop(null); };
+    document.addEventListener('pointerdown', away, true);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', away, true); document.removeEventListener('keydown', escape); };
+  }, [notePop]);
+
+  /** 노트가 하나이고 이름을 찾았으면 바로 열고, 아니면 목록을 편다. */
+  function pressBadge(item: DiagramNodeLike & C4Element) {
+    const only = item.notes.length === 1 ? item.notes[0] : null;
+    if (only && openNote && resolveNote?.(only)) { setNotePop(null); openNote(only); return; }
+    setNotePop(current => current === item.id ? null : item.id);
+  }
+
   function startPan(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
     drag.current = { id: event.pointerId, x: event.clientX - camera.x, y: event.clientY - camera.y, moved: false };
@@ -481,6 +507,21 @@ export function Diagram({
             {item.description && <span className="c4-card-description">{item.description}</span>}
             {item.technology && <span className="c4-card-tech">{item.technology}</span>}
           </button>
+          {item.notes.length > 0 && (
+            <button
+              type="button"
+              className="c4-note-badge"
+              data-open={notePop === item.id || undefined}
+              data-selected={selectedElement === item.id || undefined}
+              style={{ left: item.x + CARD_WIDTH - 18, top: item.y - 9 }}
+              aria-label={`${item.name}의 노트 ${item.notes.length}개`}
+              aria-haspopup="menu"
+              title={`노트 ${item.notes.length}개`}
+              onClick={() => pressBadge(item)}
+            >
+              <Icon name="note" size={12} /><b>{item.notes.length > 9 ? '9+' : item.notes.length}</b>
+            </button>
+          )}
           {onConnect && (
             <span
               className="c4-ports"
@@ -548,6 +589,38 @@ export function Diagram({
           <circle cx={preview.end.x} cy={preview.end.y} r={link?.over ? 6 : 4.5} />
         </svg>
       )}
+      {notePop && (() => {
+        const item = nodes.find(other => other.id === notePop);
+        if (!item) return null;
+        const corner = toScreen({ x: item.x + CARD_WIDTH, y: item.y + CARD_HEIGHT });
+        const left = Math.max(8, Math.min(area.width - 258, corner.x - 250));
+        const top = Math.max(8, Math.min(area.height - 40, corner.y + 8));
+        return (
+          <div className="c4-note-pop" role="menu" onPointerDown={event => event.stopPropagation()} aria-label={`${item.name}의 노트`} style={{ left, top }}>
+            <div className="c4-note-pop-head"><Icon name="note" size={13} /> 노트 {item.notes.length}개</div>
+            <ul>
+              {item.notes.map(id => {
+                const ref = resolveNote?.(id);
+                return (
+                  <li key={id}>
+                    <button type="button" role="menuitem" className="c4-note-open" disabled={!ref || !openNote} data-missing={!ref || undefined} onClick={() => { setNotePop(null); openNote?.(id); }}>
+                      <span className="c4-note-text">
+                        <span className="c4-note-title">{ref ? ref.title : '찾을 수 없는 노트'}</span>
+                        <span className="c4-note-meta">{ref ? ref.meta : '삭제됐거나 vault에서 사라졌어요'}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {linkNotes && (
+              <div className="c4-note-pop-foot">
+                <button type="button" onClick={() => { setNotePop(null); linkNotes(item.id); }}><Icon name="plus" size={12} /> 노트 연결</button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <div className="c4-zoom" aria-label="다이어그램 보기 도구">
         <button type="button" aria-label="축소" onClick={() => resize(.8)}>−</button>
         <output>{Math.round(scale * 100)}%</output>

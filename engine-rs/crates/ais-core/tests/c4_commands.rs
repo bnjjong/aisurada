@@ -876,3 +876,43 @@ fn bad_point_numbers_and_unknown_diagrams_are_refused() {
     assert!(call(&engine, "list_c4_history", json!({"project": "nope"})).is_err());
     assert!(call(&engine, "list_c4_history", json!({})).is_err());
 }
+
+#[test]
+fn notes_attach_to_an_element_survive_in_the_file_and_in_the_history() {
+    let vault = vault("element-notes");
+    let engine = Engine::new(&vault);
+    put(&engine, "main", "api", "API");
+
+    let read = get(&engine, "demo");
+    assert_eq!(read["elements"][0]["notes"], json!([]));
+    let note = "ndmw5k2f0a-0123abcd";
+    let applied = apply(
+        &engine,
+        "demo",
+        read["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"api","notes":[note]}]),
+    )
+    .unwrap();
+    assert_eq!(applied["changed"], true);
+    assert_eq!(applied["elements"][0]["notes"], json!([note]));
+    let file = std::fs::read_to_string(vault.join(".aisurada/c4/demo/model.yaml")).unwrap();
+    assert!(file.contains(note), "{file}");
+
+    // 붙이기도 이력의 점이 되고, 과거 시점을 읽으면 그때의 노트 목록이 나온다
+    let list = history(&engine, "main");
+    assert_eq!(seqs_of(&list), [1, 2]);
+    assert_eq!(list["snapshots"][1]["summary"], "요소 수정: API");
+    let past = call(&engine, "get_c4_model", json!({"project": "demo", "at": 1})).unwrap();
+    assert_eq!(past["elements"][0]["notes"], json!([]));
+
+    // 노트 id가 아닌 값은 거절하고 아무것도 쓰지 않는다
+    let error = apply(
+        &engine,
+        "demo",
+        applied["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"api","notes":["not-a-note"]}]),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::InvalidArgument);
+    assert_eq!(get(&engine, "demo")["elements"][0]["notes"], json!([note]));
+}

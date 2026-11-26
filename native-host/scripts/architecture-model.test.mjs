@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   createElementOps, createRelationOps, deletionImpact, editElementOps, editRelationOps, elementFormOf, emptyElementForm,
-  kindsForLevel, newElementId, relationFormOf, viewIdFor,
+  kindsForLevel, newElementId, relationFormOf, setNotesOps, viewIdFor,
 } from '../src/ui/architecture/model.ts';
 
 const element = (id, kind, level, parentId = null, extra = {}) => ({
-  id, kind, level, name: id.toUpperCase(), description: '', technology: '', parentId, codeRef: null, ...extra,
+  id, kind, level, name: id.toUpperCase(), description: '', technology: '', parentId, codeRef: null, notes: [], ...extra,
 });
 const model = {
   project: 'demo', precondition: 'f1:x', views: {},
@@ -159,4 +159,15 @@ test('이력 호출은 아키텍처와 점 번호를 싣고, 과거 응답에는
   assert.equal(older.precondition, undefined);
   const { precondition, ...noToken } = { ...model, diagram: { id: 'main', name: '기본' } };
   assert.throws(() => readModel(noToken), /모양/, '지금 모델은 확인 값이 없으면 받지 않는다(쓰기에 쓰니까)');
+});
+
+test('노트 붙이기는 목록을 통째로 바꾸는 변경 하나이고, 달라진 것이 없으면 변경이 없다', () => {
+  const item = element('app', 'system', 1, null, { notes: ['ndaaaaaaaaaa-0123abcd'] });
+  assert.deepEqual(setNotesOps(item, ['ndaaaaaaaaaa-0123abcd']), []);
+  assert.deepEqual(setNotesOps(item, ['ndaaaaaaaaaa-0123abcd', 'ndbbbbbbbbbb-0123abcd']), [
+    { op: 'put_element', id: 'app', notes: ['ndaaaaaaaaaa-0123abcd', 'ndbbbbbbbbbb-0123abcd'] },
+  ]);
+  assert.deepEqual(setNotesOps(item, []), [{ op: 'put_element', id: 'app', notes: [] }]);
+  // 겹친 id는 한 번만 보낸다
+  assert.deepEqual(setNotesOps(element('x', 'person', 1), ['ndc-1', 'ndc-1']), [{ op: 'put_element', id: 'x', notes: ['ndc-1'] }]);
 });
