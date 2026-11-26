@@ -334,7 +334,7 @@ export function Rail({
               })
             }
           >
-            ◐
+            <Icon name="theme" size={18} />
           </button>
           <button
             type="button"
@@ -343,16 +343,16 @@ export function Rail({
             aria-label="설정"
             onClick={() => controller.settings(true)}
           >
-            <Icon name="settings" size={20} />
+            <Icon name="settings" size={18} />
           </button>
           <button
-            className={`iconbtn icon-btn ${route.kind === "guide" ? "active" : ""}`}
+            className={`rail-activity-btn ${route.kind === "guide" ? "active" : ""}`}
             title="연동 가이드"
             aria-label="연동 가이드"
             aria-current={route.kind === "guide" ? "page" : undefined}
             onClick={() => controller.navigate("/guide")}
           >
-            ?
+            <Icon name="help" size={18} />
           </button>
         </div>
       </div>
