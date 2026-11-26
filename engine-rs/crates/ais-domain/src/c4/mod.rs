@@ -41,6 +41,8 @@ const MAX_TECHNOLOGY: usize = 120;
 const MAX_LABEL: usize = 200;
 const MAX_DESCRIPTION: usize = 2000;
 const MAX_CODE_REF: usize = 300;
+/// 요소 하나에 붙일 수 있는 노트 개수 상한
+pub const MAX_NOTES_PER_ELEMENT: usize = 50;
 
 /// 요소 종류
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -98,6 +100,8 @@ pub struct Element {
     pub parent: Option<String>,
     /// 코드 위치를 가리키는 파일 경로(선택)
     pub code_ref: Option<String>,
+    /// 이 요소에 붙인 노트의 id(붙인 순서). 노트가 없어져도 id는 남는다(화면이 「찾을 수 없는 노트」로 보여 준다).
+    pub notes: Vec<String>,
     pub extra: Vec<(String, Value)>,
 }
 
@@ -256,6 +260,7 @@ impl Model {
                 true,
             )?;
         }
+        self.validate_notes(element)?;
         let parent_kind = element
             .parent
             .as_deref()
@@ -283,6 +288,32 @@ impl Model {
                 want.as_str()
             ))),
         }
+    }
+}
+
+impl Model {
+    /// 붙인 노트 id의 모양, 겹침, 개수를 본다. 노트가 vault에 있는지는 보지 않는다(없어져도 연결은 남는다).
+    fn validate_notes(&self, element: &Element) -> Result<(), EngineError> {
+        let id = &element.id;
+        if element.notes.len() > MAX_NOTES_PER_ELEMENT {
+            return Err(invalid(format!(
+                "요소 {id}에는 노트를 {MAX_NOTES_PER_ELEMENT}개까지 붙일 수 있다"
+            )));
+        }
+        let mut seen = HashSet::new();
+        for note in &element.notes {
+            if !ais_kernel::text::NOTE_ID.is_match(note) {
+                return Err(invalid(format!(
+                    "요소 {id}의 notes에 노트 id 모양이 아닌 값이 있다: {note:?}. list_docs나 search_docs가 준 id를 그대로 쓴다"
+                )));
+            }
+            if !seen.insert(note.as_str()) {
+                return Err(invalid(format!(
+                    "요소 {id}의 notes에 같은 노트가 겹친다: {note}"
+                )));
+            }
+        }
+        Ok(())
     }
 }
 

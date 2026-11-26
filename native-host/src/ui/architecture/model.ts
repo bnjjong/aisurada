@@ -11,6 +11,8 @@ export type C4Element = {
   technology: string;
   parentId: string | null;
   codeRef: string | null;
+  /** 이 요소에 붙인 노트 id(붙인 순서). 노트가 없어져도 id는 남는다. */
+  notes: string[];
 };
 /** `sourcePort`, `targetPort`는 선이 카드의 어느 연결 지점에 붙는지다. 비어 있으면 자동 배치가 정한다. */
 export type C4Relationship = { id: string; source: string; target: string; label: string; technology: string; sourcePort?: string; targetPort?: string };
@@ -44,7 +46,7 @@ export type C4Model = {
 };
 
 export type C4Operation =
-  | { op: 'put_element'; id: string; kind?: string; name?: string; description?: string; technology?: string; parent?: string; codeRef?: string }
+  | { op: 'put_element'; id: string; kind?: string; name?: string; description?: string; technology?: string; parent?: string; codeRef?: string; notes?: string[] }
   | { op: 'delete_element'; id: string }
   | { op: 'put_relationship'; id?: string; source?: string; target?: string; label?: string; technology?: string; sourcePort?: string; targetPort?: string }
   | { op: 'delete_relationship'; id: string }
@@ -100,6 +102,17 @@ export const elementFormOf = (element: C4Element): ElementForm => ({
 export const relationFormOf = (relation: C4Relationship): RelationForm => ({
   source: relation.source, target: relation.target, label: relation.label, technology: relation.technology,
 });
+
+/** 요소에 붙은 노트 목록을 통째로 바꾸는 변경. 목록이 그대로면 빈 목록(바꿀 것 없음)이다. */
+export function setNotesOps(element: C4Element, notes: string[]): C4Operation[] {
+  const next = [...new Set(notes)];
+  const same = next.length === element.notes.length && next.every((id, index) => id === element.notes[index]);
+  return same ? [] : [{ op: 'put_element', id: element.id, notes: next }];
+}
+
+/** 노트 id에서 화면에 보일 이름표를 찾는다. 없는 노트(지워졌거나 vault에서 사라짐)는 `null`이다. */
+export type NoteRef = { id: string; title: string; meta: string };
+export type ResolveNote = (id: string) => NoteRef | null;
 
 /** 새 요소를 만드는 변경. 부모는 지금 보고 있는 부모다. */
 export function createElementOps(model: C4Model, form: ElementForm, parentId: string | null): C4Operation[] {

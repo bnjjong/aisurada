@@ -144,6 +144,7 @@ pub fn model_json(model: &Model) -> Json {
                 "technology": e.technology,
                 "parentId": e.parent,
                 "codeRef": e.code_ref,
+                "notes": e.notes,
             })
         })
         .collect();
@@ -243,6 +244,28 @@ fn take_str(
     }
 }
 
+/// 맵에서 글 목록 칸을 꺼낸다. 없거나 `null`이면 빈 목록, 글 목록이 아니면 오류다.
+fn take_str_list(
+    what: &str,
+    fields: &mut Vec<(String, Value)>,
+    key: &str,
+) -> Result<Vec<String>, EngineError> {
+    let Some(at) = fields.iter().position(|(name, _)| name == key) else {
+        return Ok(Vec::new());
+    };
+    match fields.remove(at).1 {
+        Value::Null => Ok(Vec::new()),
+        Value::List(items) => items
+            .into_iter()
+            .map(|item| match item {
+                Value::Str(value) => Ok(value),
+                _ => Err(invalid(format!("{what}의 {key}는 글 목록이어야 한다"))),
+            })
+            .collect(),
+        _ => Err(invalid(format!("{what}의 {key}는 글 목록이어야 한다"))),
+    }
+}
+
 fn fields_of(what: &str, value: Value) -> Result<Vec<(String, Value)>, EngineError> {
     map_of(what, value)?
         .into_iter()
@@ -272,6 +295,7 @@ fn element_of(value: Value, index: usize) -> Result<Element, EngineError> {
         technology: take_str(&what, &mut fields, "technology")?.unwrap_or_default(),
         parent: take_str(&what, &mut fields, "parent")?,
         code_ref: take_str(&what, &mut fields, "codeRef")?,
+        notes: take_str_list(&what, &mut fields, "notes")?,
         extra: fields,
         id,
     })
@@ -342,6 +366,12 @@ fn element_value(element: &Element) -> Value {
     }
     if let Some(code_ref) = &element.code_ref {
         pairs.push((text("codeRef"), text(code_ref)));
+    }
+    if !element.notes.is_empty() {
+        pairs.push((
+            text("notes"),
+            Value::List(element.notes.iter().map(|note| text(note)).collect()),
+        ));
     }
     pairs.extend(element.extra.iter().map(|(k, v)| (text(k), v.clone())));
     Value::Map(pairs)

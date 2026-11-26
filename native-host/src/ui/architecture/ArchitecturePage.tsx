@@ -9,12 +9,14 @@ import { isRecord } from '../engineClient.ts';
 import { Details } from './Details.tsx';
 import { Diagram } from './Diagram.tsx';
 import { DiagramNameModal } from './DiagramForms.tsx';
+import { NotePickerModal } from './NotePicker.tsx';
 import { ElementFormModal, RelationFormModal } from './EditForms.tsx';
 import { TimeTravel } from './TimeTravel.tsx';
 import { LEVEL_LABELS, projectSlice } from './layout.ts';
 import { applyC4Changes, createC4Diagram, deleteC4Diagram, errorText, getC4Model, isPreconditionError, listC4Diagrams, listC4History, renameC4Diagram } from './client.ts';
-import { KIND_LABELS, MAIN_DIAGRAM, deletionImpact, diffElements, parentKindFor, relationTitle, travelPoints, viewIdFor } from './model.ts';
-import type { C4Diagram, C4Element, C4History, C4Model, C4Operation, C4Relationship, ElementChanges, Point } from './model.ts';
+import { KIND_LABELS, MAIN_DIAGRAM, deletionImpact, diffElements, parentKindFor, relationTitle, setNotesOps, travelPoints, viewIdFor } from './model.ts';
+import type { C4Diagram, C4Element, C4History, C4Model, C4Operation, C4Relationship, ElementChanges, NoteRef, Point, ResolveNote } from './model.ts';
+import { displayTitle } from '../model.ts';
 import './architecture.css';
 
 const NO_POSITIONS: Record<string, Point> = {};
@@ -22,6 +24,7 @@ const NO_POSITIONS: Record<string, Point> = {};
 type Dialog =
   | { type: 'element'; existing?: C4Element }
   | { type: 'relation'; existing?: C4Relationship; source?: string; target?: string; sourcePort?: string; targetPort?: string }
+  | { type: 'notes'; elementId: string }
   | { type: 'delete'; target: { kind: 'element' | 'relationship'; id: string } }
   | { type: 'diagram-create' }
   | { type: 'diagram-rename' }
@@ -45,13 +48,14 @@ export function ArchitecturePage({ slug, state, controller }: {
   const project = workspace.projects.find(item => item.slug === slug || item.id === slug);
   if (!project) return <Page title="이 프로젝트를 찾을 수 없어요" />;
   const projectSlug = asText(project.slug) || slug;
-  return <ProjectArchitecture key={projectSlug} project={projectSlug} name={asText(project.name) || slug} controller={controller} />;
+  return <ProjectArchitecture key={projectSlug} project={projectSlug} name={asText(project.name) || slug} controller={controller} state={state} />;
 }
 
-function ProjectArchitecture({ project, name, controller }: {
+function ProjectArchitecture({ project, name, controller, state }: {
   project: string;
   name: string;
   controller: WorkspaceController;
+  state: WorkspaceState;
 }) {
   const [diagrams, setDiagrams] = useState<C4Diagram[]>([]);
   const [diagramId, setDiagramId] = useState(MAIN_DIAGRAM);
@@ -80,6 +84,21 @@ function ProjectArchitecture({ project, name, controller }: {
   const generation = useRef(0);
   const call = controller.callEngine;
   dialogOpen.current = dialog !== null;
+
+  // 요소에 붙은 노트 id를 노트 이름표로 바꾼다. vault 목록에 없으면 `null`(지워졌거나 사라진 노트)이다.
+  const noteRefs = useMemo(() => {
+    const workspace = state.workspace;
+    const datePrefix = state.prefs.titleDatePrefix ?? true;
+    const agendas = new Map((workspace?.agendas ?? []).map(item => [asText(item.id), asText(item.title)]));
+    const list: NoteRef[] = (workspace?.notes ?? []).map(note => {
+      const date = asText(note.date) || asText(note.created).slice(0, 10);
+      const agenda = agendas.get(asText(note.agendaId));
+      return { id: note.id, title: displayTitle(note, datePrefix), meta: [date, agenda].filter(Boolean).join(' · ') };
+    });
+    return { list, byId: new Map(list.map(item => [item.id, item])) };
+  }, [state.workspace, state.prefs.titleDatePrefix]);
+  const resolveNote: ResolveNote = useCallback(id => noteRefs.byId.get(id) ?? null, [noteRefs]);
+  const openNote = useCallback((id: string) => controller.showPreview(id), [controller]);
 
   const accept = useCallback((next: C4Model) => { modelRef.current = next; setModel(next); }, []);
 
@@ -278,6 +297,11 @@ function ProjectArchitecture({ project, name, controller }: {
     void mutate([{ op: 'set_positions', view: viewId, positions: moved }]).then(failure => setNotice(failure ?? ''));
   } : undefined;
 
+  const unlinkNote = (item: C4Element, id: string) => {
+    void mutate(setNotesOps(item, item.notes.filter(other => other !== id))).then(failure => setNotice(failure ?? ''));
+  };
+  const noteTarget = dialog?.type === 'notes' && model ? model.elements.find(item => item.id === dialog.elementId) : undefined;
+
   const confirmDelete = (target: { kind: 'element' | 'relationship'; id: string }) => {
     const operation: C4Operation = target.kind === 'element'
       ? { op: 'delete_element', id: target.id } : { op: 'delete_relationship', id: target.id };
@@ -386,6 +410,9 @@ function ProjectArchitecture({ project, name, controller }: {
                     setNotice('');
                     void mutate([{ op: 'put_relationship', id, ...change }]).then(failure => setNotice(failure ?? ''));
                   }}
+                  resolveNote={resolveNote}
+                  openNote={openNote}
+                  linkNotes={canAdd && !traveling ? id => { setNotice(''); setDialog({ type: 'notes', elementId: id }); } : undefined}
                   resetKey={resetKey}
                   connecting={connect !== null}
                   emptyText={emptyText}
@@ -402,6 +429,10 @@ function ProjectArchitecture({ project, name, controller }: {
                     connect={() => setDialog({ type: 'relation', source: element?.id })}
                     open={element && (element.kind === 'system' || element.kind === 'container') ? () => drill(element.id) : undefined}
                     pickRelation={pickRelationship}
+                    resolveNote={resolveNote}
+                    openNote={openNote}
+                    unlinkNote={element && !traveling ? id => unlinkNote(element, id) : undefined}
+                    linkNotes={element && !traveling ? () => { setNotice(''); setDialog({ type: 'notes', elementId: element.id }); } : undefined}
                     onClose={() => { setSelectedElement(null); setSelectedRelationship(null); }}
                   />
                 </aside>
@@ -415,6 +446,9 @@ function ProjectArchitecture({ project, name, controller }: {
       )}
       {model && dialog?.type === 'relation' && (
         <RelationFormModal model={model} existing={dialog.existing} source={dialog.source} target={dialog.target} sourcePort={dialog.sourcePort} targetPort={dialog.targetPort} submit={mutate} close={() => setDialog(null)} />
+      )}
+      {noteTarget && (
+        <NotePickerModal element={noteTarget} candidates={noteRefs.list} submit={mutate} close={() => setDialog(null)} />
       )}
       {dialog?.type === 'diagram-create' && (
         <DiagramNameModal title="새 아키텍처" submit={createDiagram} close={() => setDialog(null)} />

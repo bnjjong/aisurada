@@ -250,6 +250,7 @@ mod tests {
             technology: String::new(),
             parent: None,
             code_ref: None,
+            notes: Vec::new(),
             extra: Vec::new(),
         }
     }

@@ -485,5 +485,65 @@ try {
     assert(after.snapshots.length === before + 1 && after.latestIsCurrent === true, `점 ${before} → ${after.snapshots.length}`);
     assert(after.snapshots.at(-1).summary.includes('타임 트래블 뒤') && after.snapshots.at(-1).by === 'app', `마지막 점: ${JSON.stringify(after.snapshots.at(-1))}`);
   });
+  // 노트 붙이기: 요소에 노트를 붙이면 배지가 생기고, 누르면 노트 팝업이 열리며, 떼면 사라진다. 없어진 노트는 따로 보이고 정리할 수 있다.
+  const elementOf = async name => (await model()).elements.find(e => e.name === name);
+  const badgeOf = name => all('.c4-note-badge').find(b => b.getAttribute('aria-label')?.startsWith(name));
+  const detailsNotes = () => all('.c4-details .c4-note-row');
+  const putNotes = async (id, notes) => {
+    const read = await model();
+    await invoke('engine_call', { command: 'apply_c4_changes', args: { project: A.projectSlug, f1: read.precondition, operations: [{ op: 'put_element', id, notes }] } });
+  };
+
+  await test('notes-are-attached-from-the-details-and-shown-as-a-badge', async () => {
+    assert(!badgeOf('GitHub'), '처음에는 배지가 없다');
+    cardOf('GitHub').click();
+    await until(() => document.querySelector('.c4-details'), '상세가 열림');
+    assert(document.querySelector('.c4-details .c4-note-empty'), '노트가 없으면 안내가 보인다');
+    byText('.c4-details .c4-note-add', '노트 연결').click();
+    await until(() => document.querySelector('.c4-pick'), '노트 고르기 창');
+    const row = await (async () => { await until(() => byText('.c4-pick-row', '실제 엔진 기록'), '목록에 점검용 노트'); return byText('.c4-pick-row', '실제 엔진 기록'); })();
+    assert(document.querySelector('.c4-pick footer .button-primary').disabled, '고르기 전에는 저장이 닫혀 있다');
+    row.click();
+    await until(() => !document.querySelector('.c4-pick footer .button-primary').disabled, '고르면 저장이 열린다');
+    document.querySelector('.c4-pick footer .button-primary').click();
+    await until(() => !document.querySelector('.c4-pick'), '창이 닫힘');
+    const item = await elementOf('GitHub');
+    assert(item.notes.join() === cfg.id, `엔진에 붙었다: ${item.notes}`);
+    await until(() => badgeOf('GitHub'), '카드에 배지가 생김');
+    assert(badgeOf('GitHub').textContent.trim() === '1', '배지는 개수를 보여 준다');
+    await until(() => detailsNotes().length === 1 && detailsNotes()[0].textContent.includes('실제 엔진 기록'), '상세에 노트 줄이 보인다');
+  });
+
+  await test('a-single-note-badge-opens-the-note-popup', async () => {
+    badgeOf('GitHub').click();
+    await until(() => document.querySelector(".note-preview[role='dialog']"), '노트 팝업이 열림');
+    assert(document.querySelector(".note-preview[role='dialog']").textContent.includes('실제 엔진 기록'), '붙인 노트가 열린다');
+    document.querySelector(".note-preview[role='dialog'] .modal-ctrl-close").click();
+    await until(() => !document.querySelector(".note-preview[role='dialog']"), '팝업이 닫힘');
+  });
+
+  await test('missing-notes-are-shown-apart-and-can-be-cleaned-up', async () => {
+    await putNotes('github', [cfg.id, 'ndgone0000-0123abcd']);
+    document.querySelector('.c4-toolbar button[aria-label="다시 불러오기"]').click();
+    await until(() => detailsNotes().length === 2, '두 줄이 보인다');
+    const gone = detailsNotes().find(r => r.hasAttribute('data-missing'));
+    assert(gone && gone.textContent.includes('찾을 수 없는 노트'), '없는 노트는 따로 보인다');
+    gone.querySelector('.c4-note-unlink').click();
+    await until(() => detailsNotes().length === 1, '연결 정리로 한 줄이 남는다');
+    assert((await elementOf('GitHub')).notes.join() === cfg.id, '엔진에는 있는 노트만 남았다');
+  });
+
+  await test('notes-can-be-detached-and-time-travel-keeps-them-read-only', async () => {
+    byText('.c4-toolbar button', '타임 트래블').click();
+    await until(() => document.querySelector('.c4-travel'), '타임 트래블 막대');
+    assert(!document.querySelector('.c4-details .c4-note-unlink') && !document.querySelector('.c4-details .c4-note-link-btn'), '과거를 보는 동안에는 노트를 붙이거나 뗄 수 없다');
+    document.querySelector('button[aria-label="타임 트래블 닫기"]').click();
+    await until(() => !document.querySelector('.c4-travel'), '막대가 닫힘');
+    cardOf('GitHub').click();
+    await until(() => document.querySelector('.c4-details .c4-note-unlink'), '상세의 연결 해제 단추');
+    document.querySelector('.c4-details .c4-note-unlink').click();
+    await until(async () => (await elementOf('GitHub')).notes.length === 0, '엔진에서 떨어졌다');
+    await until(() => !badgeOf('GitHub'), '배지가 사라진다');
+  });
 } catch { /* 첫 실패 뒤의 점검은 앞 상태에 기대므로 멈춘다 */ }
 await post('/result', results);

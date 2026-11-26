@@ -5,7 +5,7 @@
 //!
 //! | `op` | 칸 | 뜻 |
 //! |---|---|---|
-//! | `put_element` | `id`, `kind`, `name`, `description`, `technology`, `parent`, `codeRef` | 없는 id면 만들고(`kind`, `name` 필요), 있으면 준 칸만 고친다. 빈 글은 칸을 비운다 |
+//! | `put_element` | `id`, `kind`, `name`, `description`, `technology`, `parent`, `codeRef`, `notes` | 없는 id면 만들고(`kind`, `name` 필요), 있으면 준 칸만 고친다. 빈 글은 칸을 비운다. `notes`(노트 id 목록)는 준 목록으로 통째로 바꾼다(빈 목록이면 모두 뗀다) |
 //! | `delete_element` | `id` | 요소와 그 자식, 그 요소들에 닿은 관계를 모두 지운다 |
 //! | `put_relationship` | `id`(선택), `source`, `target`, `label`, `technology` | id가 없으면 새 id(`r1`, `r2`…)를 붙인다. 있는 id면 준 칸만 고친다 |
 //! | `delete_relationship` | `id` | 관계를 지운다 |
@@ -35,6 +35,7 @@ pub enum Operation {
         technology: Option<String>,
         parent: Option<String>,
         code_ref: Option<String>,
+        notes: Option<Vec<String>>,
     },
     DeleteElement {
         id: String,
@@ -154,6 +155,7 @@ fn apply_one(
             technology,
             parent,
             code_ref,
+            notes,
         } => put_element(
             model,
             id,
@@ -163,6 +165,7 @@ fn apply_one(
             technology.as_deref(),
             parent.as_deref(),
             code_ref.as_deref(),
+            notes.as_deref(),
         ),
         Operation::DeleteElement { id } => delete_element(model, id, outcome),
         Operation::PutRelationship {
@@ -209,6 +212,7 @@ fn put_element(
     technology: Option<&str>,
     parent: Option<&str>,
     code_ref: Option<&str>,
+    notes: Option<&[String]>,
 ) -> Result<(), EngineError> {
     if !is_valid_id(id) {
         return Err(invalid(format!(
@@ -244,6 +248,9 @@ fn put_element(
             if let Some(code_ref) = code_ref {
                 element.code_ref = non_blank(Some(code_ref)).map(|c| c.trim().to_string());
             }
+            if let Some(notes) = notes {
+                element.notes = trimmed(notes);
+            }
         }
         None => {
             let kind = kind.ok_or_else(|| invalid(format!("새 요소 {id}에는 kind가 필요하다")))?;
@@ -257,11 +264,16 @@ fn put_element(
                 technology: technology.unwrap_or_default().trim().to_string(),
                 parent: non_blank(parent).map(|p| p.trim().to_string()),
                 code_ref: non_blank(code_ref).map(|c| c.trim().to_string()),
+                notes: notes.map(trimmed).unwrap_or_default(),
                 extra: Vec::new(),
             });
         }
     }
     Ok(())
+}
+
+fn trimmed(notes: &[String]) -> Vec<String> {
+    notes.iter().map(|note| note.trim().to_string()).collect()
 }
 
 fn non_blank(value: Option<&str>) -> Option<&str> {
@@ -728,6 +740,109 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("sourcePort")
+        );
+    }
+    const NOTE_A: &str = "ndmw5k2f0a-0123abcd";
+    const NOTE_B: &str = "ndmwg229um-e59223de";
+
+    #[test]
+    fn notes_are_replaced_as_a_whole_and_untouched_by_other_edits() {
+        let (model, views) = base();
+        let out = run(
+            &model,
+            &views,
+            json!([{"op":"put_element","id":"gh","notes":[NOTE_A, NOTE_B]}]),
+        )
+        .unwrap();
+        assert_eq!(out.model.element("gh").unwrap().notes, [NOTE_A, NOTE_B]);
+        // notes를 안 준 고치기는 붙은 노트를 건드리지 않는다
+        let out = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_element","id":"gh","name":"GitHub 저장소"}]),
+        )
+        .unwrap();
+        assert_eq!(out.model.element("gh").unwrap().notes, [NOTE_A, NOTE_B]);
+        // 준 목록으로 통째로 바꾸고, 빈 목록이면 모두 뗀다
+        let out = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_element","id":"gh","notes":[NOTE_B]}]),
+        )
+        .unwrap();
+        assert_eq!(out.model.element("gh").unwrap().notes, [NOTE_B]);
+        let out = run(
+            &out.model,
+            &out.views,
+            json!([{"op":"put_element","id":"gh","notes":[]}]),
+        )
+        .unwrap();
+        assert!(out.model.element("gh").unwrap().notes.is_empty());
+    }
+
+    #[test]
+    fn a_new_element_may_carry_notes() {
+        let out = run(
+            &Model::default(),
+            &Views::default(),
+            json!([{"op":"put_element","id":"x","kind":"system","name":"X","notes":[NOTE_A]}]),
+        )
+        .unwrap();
+        assert_eq!(out.model.element("x").unwrap().notes, [NOTE_A]);
+    }
+
+    #[test]
+    fn bad_note_ids_duplicates_and_too_many_are_refused() {
+        let (model, views) = base();
+        for notes in [
+            json!(["nope"]),
+            json!([NOTE_A, NOTE_A]),
+            json!(["sn1abc-0123abcd"]),
+        ] {
+            let error = run(
+                &model,
+                &views,
+                json!([{"op":"put_element","id":"gh","notes":notes}]),
+            )
+            .unwrap_err();
+            assert!(error.message.contains("notes"), "{}", error.message);
+        }
+        let many: Vec<String> = (0..=super::super::MAX_NOTES_PER_ELEMENT)
+            .map(|n| format!("nd{n}-0123abcd"))
+            .collect();
+        assert!(
+            run(
+                &model,
+                &views,
+                json!([{"op":"put_element","id":"gh","notes":many}]),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn notes_survive_the_files_and_show_in_json_and_the_summary() {
+        let (model, views) = base();
+        let out = run(
+            &model,
+            &views,
+            json!([{"op":"put_element","id":"gh","notes":[NOTE_A]}]),
+        )
+        .unwrap();
+        let text = format::render_model(&out.model).unwrap();
+        assert!(text.contains(NOTE_A), "{text}");
+        let again = format::parse_model(&text).unwrap();
+        assert_eq!(again.element("gh").unwrap().notes, [NOTE_A]);
+        assert_eq!(
+            format::model_json(&again)["elements"][2]["notes"],
+            json!([NOTE_A])
+        );
+        // 노트를 안 붙인 요소는 notes 칸이 파일에 없다(옛 파일과 같은 모양)
+        assert!(!format::render_model(&model).unwrap().contains("notes"));
+        // 붙이기도 요소 수정으로 이력에 남는다
+        assert_eq!(
+            crate::c4::history::summarize(&model, &out.model),
+            "요소 수정: GitHub"
         );
     }
 }
