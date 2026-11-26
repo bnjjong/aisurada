@@ -283,7 +283,8 @@ pub(super) static TABLE: &[Def] = &[
     write!("set_resource_policy", WithLedger, resource_commands::SetResourcePolicyRequest, |root, request, _scope, ctx| resource_commands::set_resource_policy(root, request, ctx)),
     // ── C4 아키텍처 모델 ──
     read!("get_c4_model", c4_commands::GetC4ModelRequest, |root, request| c4_commands::get_c4_model(root, request)),
-    write!("apply_c4_changes", Standard, c4_commands::ApplyC4ChangesRequest, |root, request, _scope| c4_commands::apply_c4_changes(root, request)),
+    write!("apply_c4_changes", Standard, c4_commands::ApplyC4ChangesRequest, |root, request, _scope, ctx| c4_commands::apply_c4_changes(root, request, ctx)),
+    read!("list_c4_history", c4_commands::ListC4HistoryRequest, |root, request| c4_commands::list_c4_history(root, request)),
     read!("list_c4_diagrams", c4_commands::ListC4DiagramsRequest, |root, request| c4_commands::list_c4_diagrams(root, request)),
     write!("create_c4_diagram", Standard, c4_commands::CreateC4DiagramRequest, |root, request, _scope| c4_commands::create_c4_diagram(root, request)),
     write!("rename_c4_diagram", Standard, c4_commands::C4DiagramRequest, |root, request, _scope| c4_commands::rename_c4_diagram(root, request)),

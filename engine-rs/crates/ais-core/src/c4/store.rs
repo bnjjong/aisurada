@@ -67,7 +67,7 @@ fn project_dir(vault: &Path, project: &str) -> PathBuf {
 }
 
 /// 아키텍처의 폴더. `main`은 프로젝트 폴더 자체이고, 나머지는 그 아래 `diagrams/<id>/`다.
-fn dir(vault: &Path, project: &str, diagram: &str) -> PathBuf {
+pub(super) fn dir(vault: &Path, project: &str, diagram: &str) -> PathBuf {
     if diagram == MAIN {
         project_dir(vault, project)
     } else {
@@ -96,7 +96,7 @@ pub fn require_project(vault: &Path, slug: &str) -> Result<(), EngineError> {
     )))
 }
 
-fn read_bytes(file: &Path) -> Result<Vec<u8>, EngineError> {
+pub(super) fn read_bytes(file: &Path) -> Result<Vec<u8>, EngineError> {
     match fs::metadata(file) {
         Err(_) => Ok(Vec::new()),
         Ok(meta) if !meta.is_file() => Err(EngineError::internal(format!(
@@ -121,7 +121,7 @@ fn token_of(model: &[u8], views: &[u8]) -> String {
     compute_token(&joined)
 }
 
-fn utf8(bytes: &[u8], file: &str) -> Result<String, EngineError> {
+pub(super) fn utf8(bytes: &[u8], file: &str) -> Result<String, EngineError> {
     String::from_utf8(bytes.to_vec())
         .map_err(|_| EngineError::invalid_argument(format!("{file}이 UTF-8 글이 아니다")))
 }
@@ -304,7 +304,7 @@ pub fn rename(
     })
 }
 
-/// 아키텍처를 지운다. `main`은 모델·위치·이름 파일만 지워서 다시 빈 `main`이 된다. 되살리는 길은 vault의 git 이력뿐이다.
+/// 아키텍처를 지운다(이력도 함께). `main`은 모델·위치·이름 파일과 이력만 지워서 다시 빈 `main`이 된다. 되살리는 길은 vault의 git 이력뿐이다.
 pub fn delete(vault: &Path, project: &str, id: &str) -> Result<(), EngineError> {
     require_project(vault, project)?;
     let folder = dir(vault, project, id);
@@ -318,7 +318,10 @@ pub fn delete(vault: &Path, project: &str, id: &str) -> Result<(), EngineError> 
                 Err(e) => return Err(failed(e)),
             }
         }
-        return Ok(());
+        return match fs::remove_dir_all(folder.join(super::history_store::DIR)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(failed(e)),
+            _ => Ok(()),
+        };
     }
     fs::remove_dir_all(&folder).map_err(failed)
 }

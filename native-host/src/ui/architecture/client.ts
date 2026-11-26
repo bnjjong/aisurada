@@ -3,7 +3,7 @@
 import { isRecord, explainEngineError } from '../engineClient.ts';
 import type { EngineCall } from '../engineClient.ts';
 import { MAIN_DIAGRAM } from './model.ts';
-import type { C4Diagram, C4Model, C4Operation } from './model.ts';
+import type { C4Diagram, C4History, C4Model, C4Operation } from './model.ts';
 
 export function errorText(value: unknown): string {
   return explainEngineError(value, (_, kind) => kind === 'precondition_failed'
@@ -14,17 +14,19 @@ export const isPreconditionError = (value: unknown) =>
   isRecord(value) && (value.kind === 'precondition_failed' || /AIS-412/.test(String(value.message ?? value.stderr ?? '')));
 
 /** 엔진 응답을 모델로 읽는다. 모양이 틀리면 오류를 던진다. */
-export function readModel(value: unknown): C4Model {
+export function readModel(value: unknown, past = false): C4Model {
   if (!isRecord(value) || !Array.isArray(value.elements) || !Array.isArray(value.relationships)
-    || !isRecord(value.views) || typeof value.precondition !== 'string' || typeof value.project !== 'string'
+    || !isRecord(value.views) || (!past && typeof value.precondition !== 'string') || typeof value.project !== 'string'
     || !isRecord(value.diagram) || typeof value.diagram.id !== 'string') {
     throw new Error('C4 모델 응답의 모양을 확인하지 못했어요.');
   }
   return value as unknown as C4Model;
 }
 
-export async function getC4Model(call: EngineCall, project: string, diagram: string = MAIN_DIAGRAM): Promise<C4Model> {
-  return readModel(await call({ command: 'get_c4_model', args: { project, diagram } }));
+/** `at`을 주면 이력의 그 시점을 읽는다(읽기 전용, `precondition` 없음). */
+export async function getC4Model(call: EngineCall, project: string, diagram: string = MAIN_DIAGRAM, at?: number): Promise<C4Model> {
+  const args = at === undefined ? { project, diagram } : { project, diagram, at };
+  return readModel(await call({ command: 'get_c4_model', args }), at !== undefined);
 }
 
 /** 변경 묶음을 한 번에 적용한다. 읽은 모델의 확인 값을 실어 보내서, 그 사이 바뀌었으면 엔진이 아무것도 쓰지 않고 거절한다. */
@@ -58,4 +60,13 @@ export const renameC4Diagram = (call: EngineCall, project: string, diagram: stri
   diagramAnswer(call, 'rename_c4_diagram', { project, diagram, name });
 export async function deleteC4Diagram(call: EngineCall, project: string, diagram: string): Promise<void> {
   await call({ command: 'delete_c4_diagram', args: { project, diagram } });
+}
+
+/** 아키텍처의 변경 이력(오래된 것부터). */
+export async function listC4History(call: EngineCall, project: string, diagram: string = MAIN_DIAGRAM): Promise<C4History> {
+  const answer = await call({ command: 'list_c4_history', args: { project, diagram } });
+  if (!isRecord(answer) || !Array.isArray(answer.snapshots) || typeof answer.latestIsCurrent !== 'boolean') {
+    throw new Error('이력 응답의 모양을 확인하지 못했어요.');
+  }
+  return { snapshots: answer.snapshots as C4History['snapshots'], latestIsCurrent: answer.latestIsCurrent };
 }

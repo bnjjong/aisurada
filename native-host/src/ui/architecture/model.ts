@@ -19,6 +19,18 @@ export type C4Views = Record<string, Record<string, Point>>;
 /** 프로젝트가 가진 아키텍처 하나의 이름표. `main`은 기존 아키텍처이고 파일이 없어도 늘 있다. 개수는 파일이 깨졌으면 없다. */
 export type C4Diagram = { id: string; name: string; elements?: number; relationships?: number };
 export const MAIN_DIAGRAM = 'main';
+/** 이력(타임 트래블)의 점 하나. `at`은 유닉스 밀리초, `by`는 `app`이나 `ai`(시작 상태와 외부 변경은 빈 글). */
+export type C4Snapshot = {
+  seq: number;
+  at: number;
+  by: string;
+  kind: 'change' | 'baseline' | 'external';
+  summary: string;
+  elements: number;
+  relationships: number;
+};
+/** 이력의 점 목록. `latestIsCurrent`가 거짓이면 마지막 점 뒤에 이력에 없는 변경이 있다. */
+export type C4History = { snapshots: C4Snapshot[]; latestIsCurrent: boolean };
 /** 엔진이 주는 모델 한 벌. `precondition`은 다음 쓰기에 그대로 싣는 확인 값이다. */
 export type C4Model = {
   project: string;
@@ -27,6 +39,8 @@ export type C4Model = {
   relationships: C4Relationship[];
   views: C4Views;
   precondition: string;
+  /** 과거 시점을 읽은 응답에만 있다. 이 모델로는 쓸 수 없다(`precondition`도 없다). */
+  snapshot?: C4Snapshot;
 };
 
 export type C4Operation =
@@ -143,4 +157,46 @@ export function deletionImpact(model: C4Model, id: string): { elements: number; 
 export function relationTitle(model: C4Model, relation: C4Relationship): string {
   const name = (id: string) => model.elements.find(item => item.id === id)?.name ?? id;
   return `${name(relation.source)} → ${name(relation.target)}`;
+}
+
+/** 카드 위에 보여 줄 변화: 앞 시점에 없던 요소는 `added`, 있었지만 내용이 달라진 요소는 `changed`. */
+export type ElementChanges = Record<string, 'added' | 'changed'>;
+
+/** 두 시점의 모델을 견줘 요소의 변화를 구한다. 위치는 보지 않는다. */
+export function diffElements(previous: C4Model | undefined, current: C4Model): ElementChanges {
+  const changes: ElementChanges = {};
+  if (!previous) return changes;
+  const before = new Map(previous.elements.map(item => [item.id, JSON.stringify(item)]));
+  for (const item of current.elements) {
+    const old = before.get(item.id);
+    if (old === undefined) changes[item.id] = 'added';
+    else if (old !== JSON.stringify(item)) changes[item.id] = 'changed';
+  }
+  return changes;
+}
+
+/** 타임라인에 그리는 점. `snapshot`이 없는 점은 이력에 아직 없는 지금 상태(`Now`)다. */
+export type TravelPoint = { snapshot: C4Snapshot | null };
+
+/** 이력에서 타임라인의 점을 만든다. 마지막 점은 늘 `Now`다(마지막 점이 지금과 같으면 그 점이 `Now`다). */
+export function travelPoints(history: C4History): TravelPoint[] {
+  const points: TravelPoint[] = history.snapshots.map(snapshot => ({ snapshot }));
+  if (!history.latestIsCurrent || points.length === 0) points.push({ snapshot: null });
+  return points;
+}
+
+/** 점 하나를 말로 풀어 쓴다. `Now`는 「현재 상태」, 나머지는 시각과 쓴 쪽과 바뀐 것이다. */
+export function describePoint(point: TravelPoint, isNow: boolean, format: (at: number) => string = formatAt): string {
+  const snapshot = point.snapshot;
+  if (isNow) return snapshot?.summary ? `현재 상태 · ${snapshot.summary}` : '현재 상태';
+  if (!snapshot) return '현재 상태';
+  const by = snapshot.by === 'ai' ? 'AI' : snapshot.by === 'app' ? '앱' : '';
+  return [format(snapshot.at), by, snapshot.summary || '변경'].filter(Boolean).join(' · ');
+}
+
+/** 시각을 `11월 26일 09:12` 모양으로 쓴다. */
+export function formatAt(at: number): string {
+  const date = new Date(at);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

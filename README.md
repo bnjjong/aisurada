@@ -186,11 +186,14 @@ dist/ais-cli apply-c4-changes 내-프로젝트 f1=<get-c4-model 응답의 precon
 dist/ais-cli list-c4-diagrams 내-프로젝트
 dist/ais-cli create-c4-diagram 내-프로젝트 name=결제-흐름
 dist/ais-cli get-c4-model 내-프로젝트 diagram=arch-2
+dist/ais-cli list-c4-history 내-프로젝트
+dist/ais-cli get-c4-model 내-프로젝트 at=3
 ```
 
-- 명령 6개: `get-c4-model`, `apply-c4-changes`, `list-c4-diagrams`, `create-c4-diagram`, `rename-c4-diagram`, `delete-c4-diagram`. MCP에는 읽기 도구 `get_c4_model`, `list_c4_diagrams`와 쓰기 도구 `apply_c4_changes`, `create_c4_diagram`, `rename_c4_diagram`, `delete_c4_diagram`(`--write`일 때만)이 열립니다.
+- 명령 7개: `get-c4-model`, `apply-c4-changes`, `list-c4-diagrams`, `create-c4-diagram`, `rename-c4-diagram`, `delete-c4-diagram`, `list-c4-history`. MCP에는 읽기 도구 `get_c4_model`, `list_c4_diagrams`, `list_c4_history`와 쓰기 도구 `apply_c4_changes`, `create_c4_diagram`, `rename_c4_diagram`, `delete_c4_diagram`(`--write`일 때만)이 열립니다.
 - 프로젝트마다 아키텍처를 여러 개 둘 수 있습니다. 읽기·쓰기 명령은 `diagram=<아키텍처 id>`로 고르고, 안 주면 기존 아키텍처 `main`입니다. 새 아키텍처의 id는 `arch-2`, `arch-3`처럼 자동으로 붙습니다.
 - 변경 묶음은 한 번에 적용하거나 전혀 적용하지 않고, 고칠 때는 직전에 읽은 `f1` 토큰이 필요합니다. 그 사이 다른 곳에서 고쳤으면 거절합니다.
+- 변경 이력(타임 트래블): 요소나 관계가 바뀔 때마다 아키텍처 폴더의 `history/`에 점(스냅숏)이 하나씩 쌓입니다(위치만 바뀐 것은 마지막 점에 합침, 아키텍처당 200점). `list-c4-history`로 점 목록을, `get-c4-model at=<번호>`로 그 시점을 읽기 전용으로 봅니다. 앱의 「타임 트래블」 단추로도 훑습니다.
 - 아키텍처마다 파일은 `model.yaml`(요소·관계)과 `views.yaml`(뷰별 좌표) 두 개입니다. `main`은 `.aisurada/c4/<프로젝트 slug>/`에, 나머지는 `.aisurada/c4/<프로젝트 slug>/diagrams/<id>/`에 두고, 이름은 `diagram.yaml`에 적습니다. 자세한 것은 [개발자 가이드](docs/developer-guide.md)의 「C4 아키텍처」에 있습니다.
 
 ## 22장 사실층

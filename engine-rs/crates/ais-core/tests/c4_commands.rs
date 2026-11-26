@@ -589,3 +589,290 @@ fn unknown_unsafe_and_missing_diagram_arguments_are_refused() {
         "거절된 호출은 아무것도 만들지 않는다"
     );
 }
+
+fn history(engine: &Engine, diagram: &str) -> Value {
+    call(
+        engine,
+        "list_c4_history",
+        json!({"project": "demo", "diagram": diagram}),
+    )
+    .unwrap()
+}
+
+fn put(engine: &Engine, diagram: &str, id: &str, name: &str) -> Value {
+    let read = call(
+        engine,
+        "get_c4_model",
+        json!({"project": "demo", "diagram": diagram}),
+    )
+    .unwrap();
+    engine
+        .call(
+            "apply_c4_changes",
+            json!({
+                "project": "demo", "diagram": diagram, "f1": read["precondition"],
+                "operations": [{"op":"put_element","id":id,"kind":"system","name":name}],
+            }),
+        )
+        .unwrap()
+}
+
+fn seqs_of(list: &Value) -> Vec<u64> {
+    list["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["seq"].as_u64().unwrap())
+        .collect()
+}
+
+#[test]
+fn every_model_change_adds_a_point_and_position_only_changes_merge_into_the_last_one() {
+    let vault = vault("history-points");
+    let engine = Engine::new(&vault);
+    assert_eq!(history(&engine, "main")["snapshots"], json!([]));
+    assert_eq!(
+        history(&engine, "main")["latestIsCurrent"],
+        true,
+        "빈 모델은 점이 없어도 현재와 같다"
+    );
+
+    put(&engine, "main", "a", "에이");
+    put(&engine, "main", "b", "비");
+    let list = history(&engine, "main");
+    assert_eq!(seqs_of(&list), [1, 2]);
+    assert_eq!(list["snapshots"][0]["summary"], "요소 추가: 에이");
+    assert_eq!(list["snapshots"][1]["summary"], "요소 추가: 비");
+    assert_eq!(list["snapshots"][1]["by"], "app");
+    assert_eq!(list["snapshots"][1]["elements"], 2);
+    assert_eq!(list["latestIsCurrent"], true);
+    assert!(
+        vault
+            .join(".aisurada/c4/demo/history/000002.json")
+            .is_file()
+    );
+
+    // 위치만 바꾸면 새 점이 없고 마지막 점의 위치만 갱신된다
+    let read = get(&engine, "demo");
+    apply(
+        &engine,
+        "demo",
+        read["precondition"].as_str().unwrap(),
+        json!([{"op":"set_positions","view":"context","positions":{"a":{"x":5,"y":6}}}]),
+    )
+    .unwrap();
+    let list = history(&engine, "main");
+    assert_eq!(
+        seqs_of(&list),
+        [1, 2],
+        "위치만 바뀐 쓰기는 점을 만들지 않는다"
+    );
+    assert_eq!(list["latestIsCurrent"], true);
+    let last = call(&engine, "get_c4_model", json!({"project": "demo", "at": 2})).unwrap();
+    assert_eq!(
+        last["views"]["context"]["a"],
+        json!({"x": 5, "y": 6}),
+        "마지막 점에 합쳐졌다"
+    );
+    let first = call(
+        &engine,
+        "get_c4_model",
+        json!({"project": "demo", "at": "1"}),
+    )
+    .unwrap();
+    assert_eq!(
+        first["elements"].as_array().unwrap().len(),
+        1,
+        "첫 점은 그때의 모양이다(명령줄 글 번호도 된다)"
+    );
+    assert_eq!(first["readOnly"], true);
+    assert!(
+        first.get("precondition").is_none(),
+        "과거에는 쓸 수 없으니 확인 값이 없다"
+    );
+    assert_eq!(first["snapshot"]["seq"], 1);
+
+    // 바뀐 것이 없는 쓰기는 점을 만들지 않는다
+    let read = get(&engine, "demo");
+    apply(
+        &engine,
+        "demo",
+        read["precondition"].as_str().unwrap(),
+        json!([{"op":"put_element","id":"a","name":"에이"}]),
+    )
+    .unwrap();
+    assert_eq!(seqs_of(&history(&engine, "main")), [1, 2]);
+}
+
+#[test]
+fn a_hand_edit_and_a_pre_existing_model_get_their_own_points() {
+    let vault = vault("history-external");
+    // 이력이 생기기 전부터 있던 모델
+    write(
+        &vault,
+        ".aisurada/c4/demo/model.yaml",
+        "version: 1\nelements:\n- id: old\n  kind: system\n  name: 옛것\nrelationships: []\n",
+    );
+    let engine = Engine::new(&vault);
+    assert_eq!(
+        history(&engine, "main")["latestIsCurrent"],
+        false,
+        "점이 없는데 모델이 있으면 현재와 다르다"
+    );
+    put(&engine, "main", "b", "비");
+    let list = history(&engine, "main");
+    assert_eq!(seqs_of(&list), [1, 2]);
+    assert_eq!(list["snapshots"][0]["kind"], "baseline");
+    assert_eq!(list["snapshots"][0]["summary"], "시작 상태");
+    assert_eq!(
+        list["snapshots"][0]["elements"], 1,
+        "시작 상태는 쓰기 전의 모양이다"
+    );
+    assert_eq!(list["snapshots"][1]["kind"], "change");
+
+    // 엔진을 거치지 않은 손 편집은 다음 쓰기 때 먼저 「외부 변경」 점이 된다
+    write(
+        &vault,
+        ".aisurada/c4/demo/model.yaml",
+        "version: 1\nelements:\n- id: old\n  kind: system\n  name: 옛것\n- id: b\n  kind: system\n  name: 비\n- id: hand\n  kind: system\n  name: 손으로\nrelationships: []\n",
+    );
+    assert_eq!(history(&engine, "main")["latestIsCurrent"], false);
+    put(&engine, "main", "c", "씨");
+    let list = history(&engine, "main");
+    assert_eq!(seqs_of(&list), [1, 2, 3, 4]);
+    assert_eq!(list["snapshots"][2]["kind"], "external");
+    assert_eq!(
+        list["snapshots"][2]["summary"],
+        "외부 변경 · 요소 추가: 손으로"
+    );
+    assert_eq!(list["snapshots"][3]["summary"], "요소 추가: 씨");
+    assert_eq!(list["latestIsCurrent"], true);
+}
+
+#[test]
+fn the_caller_is_recorded_and_the_oldest_points_go_past_the_cap() {
+    use ais_core::kernel::actor::CallContext;
+    let vault = vault("history-cap");
+    let engine = Engine::new(&vault);
+    let read = get(&engine, "demo");
+    engine
+        .call_as(
+            &CallContext::ai(Some("s1".into()), None),
+            "apply_c4_changes",
+            json!({"project": "demo", "f1": read["precondition"],
+                   "operations": [{"op":"put_element","id":"a","kind":"system","name":"AI가 만듦"}]}),
+        )
+        .unwrap();
+    assert_eq!(history(&engine, "main")["snapshots"][0]["by"], "ai");
+
+    for n in 0..204 {
+        put(&engine, "main", "a", &format!("이름 {n}"));
+    }
+    let list = history(&engine, "main");
+    let seqs = seqs_of(&list);
+    assert_eq!(seqs.len(), 200, "상한을 넘으면 오래된 것부터 지운다");
+    assert_eq!(
+        (seqs[0], *seqs.last().unwrap()),
+        (6, 205),
+        "번호는 다시 쓰지 않는다"
+    );
+    assert!(!vault.join(".aisurada/c4/demo/history/000005.json").exists());
+    let gone = call(&engine, "get_c4_model", json!({"project": "demo", "at": 5}));
+    assert_eq!(gone.unwrap_err().kind, ErrorKind::NotFound);
+}
+
+#[test]
+fn each_diagram_keeps_its_own_history_and_deleting_takes_it_along() {
+    let vault = vault("history-diagrams");
+    let engine = Engine::new(&vault);
+    call(
+        &engine,
+        "create_c4_diagram",
+        json!({"project": "demo", "name": "둘째"}),
+    )
+    .unwrap();
+    put(&engine, "main", "a", "메인");
+    put(&engine, "arch-2", "x", "둘째 것");
+    put(&engine, "arch-2", "y", "둘째 것 2");
+    assert_eq!(seqs_of(&history(&engine, "main")), [1]);
+    assert_eq!(seqs_of(&history(&engine, "arch-2")), [1, 2]);
+    let second = call(
+        &engine,
+        "get_c4_model",
+        json!({"project": "demo", "diagram": "arch-2", "at": 1}),
+    )
+    .unwrap();
+    assert_eq!(second["elements"][0]["name"], "둘째 것");
+    assert_eq!(second["diagram"]["id"], "arch-2");
+
+    // 이름을 바꿔도 이력은 그대로
+    call(
+        &engine,
+        "rename_c4_diagram",
+        json!({"project": "demo", "diagram": "arch-2", "name": "바뀜"}),
+    )
+    .unwrap();
+    assert_eq!(seqs_of(&history(&engine, "arch-2")), [1, 2]);
+
+    call(
+        &engine,
+        "delete_c4_diagram",
+        json!({"project": "demo", "diagram": "arch-2"}),
+    )
+    .unwrap();
+    assert!(!vault.join(".aisurada/c4/demo/diagrams/arch-2").exists());
+    call(
+        &engine,
+        "delete_c4_diagram",
+        json!({"project": "demo", "diagram": "main"}),
+    )
+    .unwrap();
+    assert!(
+        !vault.join(".aisurada/c4/demo/history").exists(),
+        "main을 지우면 이력도 지워진다"
+    );
+    assert_eq!(history(&engine, "main")["snapshots"], json!([]));
+}
+
+#[test]
+fn bad_point_numbers_and_unknown_diagrams_are_refused() {
+    let vault = vault("history-refuse");
+    let engine = Engine::new(&vault);
+    put(&engine, "main", "a", "에이");
+    for bad in [
+        json!(0),
+        json!(-1),
+        json!("x"),
+        json!(1.5),
+        json!(null),
+        json!([1]),
+    ] {
+        let got = call(
+            &engine,
+            "get_c4_model",
+            json!({"project": "demo", "at": bad}),
+        );
+        // null 은 "안 줌"과 같아 현재 모델을 낸다
+        if bad.is_null() {
+            assert!(got.is_ok());
+        } else {
+            assert_eq!(got.unwrap_err().kind, ErrorKind::InvalidArgument, "{bad}");
+        }
+    }
+    assert_eq!(
+        call(&engine, "get_c4_model", json!({"project": "demo", "at": 9}))
+            .unwrap_err()
+            .kind,
+        ErrorKind::NotFound
+    );
+    assert!(
+        call(
+            &engine,
+            "list_c4_history",
+            json!({"project": "demo", "diagram": "arch-9"})
+        )
+        .is_err()
+    );
+    assert!(call(&engine, "list_c4_history", json!({"project": "nope"})).is_err());
+    assert!(call(&engine, "list_c4_history", json!({})).is_err());
+}

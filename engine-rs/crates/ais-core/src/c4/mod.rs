@@ -3,4 +3,5 @@
 
 pub use ais_domain::c4::*;
 
+pub mod history_store;
 pub mod store;

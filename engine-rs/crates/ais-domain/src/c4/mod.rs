@@ -17,6 +17,7 @@
 pub mod apply;
 pub mod diagram;
 pub mod format;
+pub mod history;
 
 use std::collections::{BTreeMap, HashSet};
 

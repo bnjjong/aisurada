@@ -668,7 +668,8 @@ fn resource_or_task_tool(
             &TASK_BOOLS,
         ),
         "get_task" => (&["id", "activity"], &TASK_BOOLS),
-        "get_c4_model" => (&["project", "diagram"], &TASK_BOOLS),
+        "get_c4_model" => (&["project", "diagram", "at"], &TASK_BOOLS),
+        "list_c4_history" => (&["project", "diagram"], &TASK_BOOLS),
         "apply_c4_changes" => (&["project", "diagram", "f1", "operations"], &TASK_BOOLS),
         "list_c4_diagrams" => (&["project"], &TASK_BOOLS),
         "create_c4_diagram" => (&["project", "name"], &TASK_BOOLS),
@@ -760,7 +761,9 @@ fn resource_or_task_tool(
         | "get_task"
         | "add_task_comment" => &["id"],
         "usable_resources" | "get_c4_model" | "apply_c4_changes" | "list_c4_diagrams"
-        | "create_c4_diagram" | "rename_c4_diagram" | "delete_c4_diagram" => &["project"],
+        | "create_c4_diagram" | "rename_c4_diagram" | "delete_c4_diagram" | "list_c4_history" => {
+            &["project"]
+        }
         "set_resource_ref" => &["project", "id"],
         _ => &[],
     };

@@ -85,6 +85,7 @@ fn cases() -> Vec<String> {
                     | "create_c4_diagram"
                     | "rename_c4_diagram"
                     | "delete_c4_diagram"
+                    | "list_c4_history"
             )
         })
         .enumerate()
