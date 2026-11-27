@@ -436,6 +436,22 @@
 .c4-note-badge svg { width: calc(12px * var(--c4-type-scale, 1)); height: calc(12px * var(--c4-type-scale, 1)); }
 .c4-note-badge:hover:not(:disabled), .c4-note-badge[data-selected], .c4-note-badge[data-open] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .c4-note-badge[data-open] { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+:root[data-skin="glass"] .c4-note-badge {
+  --c4-note-badge-ink: var(--muted);
+  --c4-note-badge-surface: var(--c4-card-surface, var(--surface));
+  background: color-mix(in srgb, var(--c4-note-badge-ink) 9%, var(--c4-note-badge-surface));
+  border-color: color-mix(in srgb, var(--c4-note-badge-ink) 24%, var(--c4-note-badge-surface));
+  color: var(--c4-note-badge-ink);
+  box-shadow: 0 1px 2px #00000026;
+}
+:root[data-skin="glass"] .c4-note-badge:is(:hover:not(:disabled), [data-selected], [data-open]) {
+  background: color-mix(in srgb, var(--c4-note-badge-ink) 18%, var(--c4-note-badge-surface));
+  border-color: color-mix(in srgb, var(--c4-note-badge-ink) 42%, var(--c4-note-badge-surface));
+}
+:root[data-skin="glass"] .c4-note-badge[data-open] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c4-note-badge-ink) 17%, transparent);
+}
+:root[data-skin="glass"] .c4-note-badge:focus-visible { outline-color: var(--c4-note-badge-ink); }
 .c4-note-pop { position: absolute; z-index: 6; width: 250px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 14px 34px -6px #00000038, 0 3px 10px -2px #0000001c; overflow: hidden; cursor: default; }
 :root[data-skin="glass"] .c4-note-pop { background: light-dark(rgba(255, 255, 255, .94), rgba(24, 36, 62, .94)); backdrop-filter: blur(20px); }
 .c4-note-pop-head { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 650; color: var(--muted); }
