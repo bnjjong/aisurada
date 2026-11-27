@@ -559,6 +559,11 @@ try {
     await openEdit('GitHub');
     assert(tileOf('GitHub').dataset.icon === 'git-branch', '고르기 전에는 이름의 단서(GitHub)로 자동');
     assert(form().querySelector('.c4-icon-auto').getAttribute('aria-pressed') === 'true', '처음에는 자동이 눌려 있다');
+    const rowOf = selector => form().querySelector(selector).getBoundingClientRect();
+    assert(Math.abs(rowOf('.c4-icon-search').top - rowOf('.c4-icon-preview').top) < rowOf('.c4-icon-preview').height, '검색칸은 미리보기와 같은 줄에 있다');
+    assert(rowOf('.c4-icon-search').height < 48, `검색칸이 한 줄 높이다: ${rowOf('.c4-icon-search').height}`);
+    const search = form().querySelector('.c4-icon-search');
+    assert(Math.abs(search.querySelector('svg').getBoundingClientRect().top - search.querySelector('input').getBoundingClientRect().top) < 24, '돋보기와 입력칸이 한 줄에 놓인다');
     fillField(form().querySelector('.c4-icon-search input'), 'tele');
     await until(() => all('.c4-icon-opt', form()).length === 1 && all('.c4-icon-opt', form())[0].dataset.icon === 'telegram', '검색이 telegram 하나로 좁힌다');
     fillField(form().querySelector('.c4-icon-search input'), '');

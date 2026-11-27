@@ -55,3 +55,10 @@ test('밝은 브랜드 색은 어두운 글자색을, 어두운 색은 흰 글�
   assert.equal(logoInk('181717'), 'var(--ink)', '검정에 가까운 로고는 기본 글자색');
   assert.equal(logoInk('26A5E4'), '#26A5E4');
 });
+
+test('편집 창 안의 label 클래스는 .c4-form label(grid)보다 우선순위를 올려 배치를 지킨다', () => {
+  const css = readFileSync(new URL('../src/ui/architecture/architecture.css', import.meta.url), 'utf8');
+  for (const name of ['c4-icon-search', 'c4-pick-search', 'c4-pick-row']) {
+    assert.match(css, new RegExp(`^:root:root \\.${name} \\{[^}]*display: flex`, 'm'), `.${name}은 :root:root로 올려야 .c4-form label의 display: grid를 이긴다`);
+  }
+});
